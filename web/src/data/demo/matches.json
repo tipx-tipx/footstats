@@ -1,0 +1,67 @@
+[
+ {
+  "id": 12812997,
+  "liga": "MŚ",
+  "sezon": "2026",
+  "kolejka": "Ćwierćfinał",
+  "kickoff_ts": 1783033200,
+  "gospodarz": "Portugal",
+  "gosc": "Croatia",
+  "sedzia": null,
+  "sedzia_mnoznik_fauli": 1.0,
+  "okazje": []
+ },
+ {
+  "id": 12813019,
+  "liga": "MŚ",
+  "sezon": "2026",
+  "kolejka": "Ćwierćfinał",
+  "kickoff_ts": 1783047600,
+  "gospodarz": "Switzerland",
+  "gosc": "Algeria",
+  "sedzia": null,
+  "sedzia_mnoznik_fauli": 1.0,
+  "okazje": []
+ },
+ {
+  "id": 12813011,
+  "liga": "MŚ",
+  "sezon": "2026",
+  "kolejka": "Ćwierćfinał",
+  "kickoff_ts": 1783128600,
+  "gospodarz": "Colombia",
+  "gosc": "Ghana",
+  "sedzia": null,
+  "sedzia_mnoznik_fauli": 1.0,
+  "okazje": [
+   1,
+   2
+  ]
+ },
+ {
+  "id": 12812999,
+  "liga": "MŚ",
+  "sezon": "2026",
+  "kolejka": "Ćwierćfinał",
+  "kickoff_ts": 1783116000,
+  "gospodarz": "Argentina",
+  "gosc": "Cape Verde",
+  "sedzia": null,
+  "sedzia_mnoznik_fauli": 1.0,
+  "okazje": []
+ },
+ {
+  "id": 12813018,
+  "liga": "MŚ",
+  "sezon": "2026",
+  "kolejka": "Ćwierćfinał",
+  "kickoff_ts": 1783101600,
+  "gospodarz": "Australia",
+  "gosc": "Egypt",
+  "sedzia": null,
+  "sedzia_mnoznik_fauli": 1.0,
+  "okazje": [
+   3
+  ]
+ }
+]

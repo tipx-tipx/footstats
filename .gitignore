@@ -1,0 +1,32 @@
+# Node / Next.js
+node_modules/
+web/.next/
+web/out/
+web/.vercel/
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+
+# dane pipeline (duże, odtwarzalne przez backfill/statshub)
+pipeline/data/http_cache/
+pipeline/data/store/
+pipeline/logs/
+
+# obieg kursów (lokalny, może zawierać wpisane linie)
+pipeline/odds/
+
+# profile przeglądarki z testów
+.browser-profile*/
+
+# środowisko / sekrety — NIGDY do repo
+.env
+.env.*
+!.env.example
+.vercel
+
+# systemowe
+.DS_Store
+Thumbs.db

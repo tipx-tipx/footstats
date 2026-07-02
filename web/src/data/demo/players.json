@@ -1,0 +1,722 @@
+[
+ {
+  "id": 750,
+  "nazwa": "Cristiano Ronaldo",
+  "pozycja": "F",
+  "druzyna": "Portugal",
+  "minuty_lacznie": 3320,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     3,
+     7,
+     3,
+     4,
+     3,
+     5,
+     5,
+     3,
+     3,
+     4
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     65,
+     45,
+     87,
+     90,
+     83,
+     89,
+     90
+    ],
+    "srednia90": 5.48
+   }
+  }
+ },
+ {
+  "id": 1518931,
+  "nazwa": "Johan Manzambi",
+  "pozycja": "M",
+  "druzyna": "Switzerland",
+  "minuty_lacznie": 3195,
+  "forma": {
+   "fouls_won": {
+    "ostatnie": [
+     1,
+     1,
+     1,
+     4,
+     2,
+     3,
+     1,
+     3,
+     3,
+     6
+    ],
+    "minuty": [
+     85,
+     71,
+     45,
+     90,
+     72,
+     58,
+     90,
+     90,
+     90,
+     120
+    ],
+    "srednia90": 3.21
+   }
+  }
+ },
+ {
+  "id": 281253,
+  "nazwa": "Jhon Cordoba",
+  "pozycja": "F",
+  "druzyna": "Colombia",
+  "minuty_lacznie": 3502,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     2,
+     1,
+     4,
+     1,
+     1,
+     4,
+     8,
+     1,
+     2,
+     2
+    ],
+    "minuty": [
+     60,
+     75,
+     90,
+     90,
+     120,
+     90,
+     90,
+     90,
+     90,
+     90
+    ],
+    "srednia90": 3.11
+   }
+  }
+ },
+ {
+  "id": 944656,
+  "nazwa": "Julian Alvarez",
+  "pozycja": "F",
+  "druzyna": "Argentina",
+  "minuty_lacznie": 3106,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     1,
+     1,
+     6,
+     6,
+     1,
+     2,
+     1,
+     1,
+     5,
+     7
+    ],
+    "minuty": [
+     82,
+     66,
+     77,
+     120,
+     90,
+     90,
+     70,
+     45,
+     90,
+     84
+    ],
+    "srednia90": 3.01
+   }
+  }
+ },
+ {
+  "id": 107414,
+  "nazwa": "James Rodriguez",
+  "pozycja": "M",
+  "druzyna": "Colombia",
+  "minuty_lacznie": 3112,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     3,
+     1,
+     2,
+     1,
+     1,
+     6,
+     1,
+     2,
+     2,
+     3
+    ],
+    "minuty": [
+     76,
+     58,
+     72,
+     64,
+     64,
+     63,
+     66,
+     63,
+     63,
+     90
+    ],
+    "srednia90": 2.31
+   }
+  }
+ },
+ {
+  "id": 1160386,
+  "nazwa": "Andres Gomez",
+  "pozycja": "M",
+  "druzyna": "Colombia",
+  "minuty_lacznie": 3315,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     1,
+     3,
+     1,
+     4,
+     2,
+     4,
+     1,
+     5,
+     3,
+     4
+    ],
+    "minuty": [
+     45,
+     90,
+     88,
+     90,
+     89,
+     90,
+     78,
+     90,
+     90,
+     90
+    ],
+    "srednia90": 3.1
+   }
+  }
+ },
+ {
+  "id": 1445228,
+  "nazwa": "Fares Ghedjemis",
+  "pozycja": "F",
+  "druzyna": "Algeria",
+  "minuty_lacznie": 3257,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     4,
+     3,
+     1,
+     4,
+     2,
+     5,
+     5,
+     4,
+     4,
+     3
+    ],
+    "minuty": [
+     67,
+     89,
+     70,
+     90,
+     80,
+     74,
+     90,
+     67,
+     90,
+     90
+    ],
+    "srednia90": 3.04
+   }
+  }
+ },
+ {
+  "id": 12994,
+  "nazwa": "Lionel Messi",
+  "pozycja": "F",
+  "druzyna": "Argentina",
+  "minuty_lacznie": 3490,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     7,
+     6,
+     3,
+     9,
+     6,
+     5,
+     5,
+     6,
+     10,
+     3
+    ],
+    "minuty": [
+     90,
+     80,
+     73,
+     90,
+     90,
+     90,
+     90,
+     90,
+     90,
+     90
+    ],
+    "srednia90": 5.57
+   }
+  }
+ },
+ {
+  "id": 1103589,
+  "nazwa": "Abdul Fatawu Issahaku",
+  "pozycja": "M",
+  "druzyna": "Ghana",
+  "minuty_lacznie": 3382,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     1,
+     2,
+     1,
+     2,
+     6,
+     3,
+     6,
+     1,
+     1,
+     1
+    ],
+    "minuty": [
+     45,
+     80,
+     90,
+     90,
+     90,
+     90,
+     90,
+     70,
+     90,
+     90
+    ],
+    "srednia90": 2.58
+   }
+  }
+ },
+ {
+  "id": 352296,
+  "nazwa": "Breel Embolo",
+  "pozycja": "F",
+  "druzyna": "Switzerland",
+  "minuty_lacznie": 3237,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     2,
+     1,
+     4,
+     3,
+     1,
+     1,
+     4,
+     2,
+     4,
+     1
+    ],
+    "minuty": [
+     85,
+     89,
+     90,
+     71,
+     90,
+     81,
+     68,
+     73,
+     90,
+     66
+    ],
+    "srednia90": 2.09
+   }
+  }
+ },
+ {
+  "id": 1646783,
+  "nazwa": "Lucas Herrington",
+  "pozycja": "D",
+  "druzyna": "Australia",
+  "minuty_lacznie": 3558,
+  "forma": {
+   "tackles": {
+    "ostatnie": [
+     2,
+     1,
+     1,
+     1,
+     1,
+     1,
+     2,
+     1,
+     1,
+     2
+    ],
+    "minuty": [
+     90,
+     45,
+     89,
+     90,
+     90,
+     90,
+     90,
+     90,
+     90,
+     120
+    ],
+    "srednia90": 1.21
+   }
+  }
+ },
+ {
+  "id": 1101624,
+  "nazwa": "Mahmoud Saber",
+  "pozycja": "M",
+  "druzyna": "Egypt",
+  "minuty_lacznie": 3068,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     3,
+     7,
+     3,
+     5,
+     2,
+     10,
+     3,
+     5,
+     5,
+     1
+    ],
+    "minuty": [
+     45,
+     90,
+     86,
+     90,
+     90,
+     90,
+     90,
+     89,
+     90,
+     55
+    ],
+    "srednia90": 2.96
+   }
+  }
+ },
+ {
+  "id": 895324,
+  "nazwa": "Alexis Mac Allister",
+  "pozycja": "M",
+  "druzyna": "Argentina",
+  "minuty_lacznie": 3443,
+  "forma": {
+   "tackles": {
+    "ostatnie": [
+     4,
+     1,
+     3,
+     2,
+     1,
+     2,
+     2,
+     1,
+     2,
+     1
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     90,
+     90,
+     90,
+     90,
+     74,
+     90,
+     53
+    ],
+    "srednia90": 2.14
+   }
+  }
+ },
+ {
+  "id": 181581,
+  "nazwa": "Jackson Irvine",
+  "pozycja": "M",
+  "druzyna": "Australia",
+  "minuty_lacznie": 3477,
+  "forma": {
+   "tackles": {
+    "ostatnie": [
+     2,
+     3,
+     3,
+     6,
+     1,
+     2,
+     1,
+     5,
+     3,
+     1
+    ],
+    "minuty": [
+     84,
+     89,
+     89,
+     90,
+     84,
+     90,
+     90,
+     90,
+     90,
+     90
+    ],
+    "srednia90": 1.92
+   }
+  }
+ },
+ {
+  "id": 845802,
+  "nazwa": "Jovane Cabral",
+  "pozycja": "F",
+  "druzyna": "Cape Verde",
+  "minuty_lacznie": 2865,
+  "forma": {
+   "tackles": {
+    "ostatnie": [
+     2,
+     3,
+     1,
+     2,
+     2,
+     1,
+     1,
+     1,
+     3,
+     1
+    ],
+    "minuty": [
+     61,
+     80,
+     70,
+     90,
+     90,
+     76,
+     73,
+     83,
+     69,
+     80
+    ],
+    "srednia90": 2.01
+   }
+  }
+ },
+ {
+  "id": 788284,
+  "nazwa": "Ajdin Hrustic",
+  "pozycja": "M",
+  "druzyna": "Australia",
+  "minuty_lacznie": 3361,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     2,
+     1,
+     2,
+     2,
+     1,
+     2,
+     3,
+     1,
+     3,
+     2
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     90,
+     62,
+     90,
+     90,
+     90,
+     84,
+     90
+    ],
+    "srednia90": 1.47
+   }
+  }
+ },
+ {
+  "id": 929620,
+  "nazwa": "Fabian Rieder",
+  "pozycja": "M",
+  "druzyna": "Switzerland",
+  "minuty_lacznie": 3086,
+  "forma": {
+   "tackles": {
+    "ostatnie": [
+     3,
+     2,
+     2,
+     3,
+     2,
+     3,
+     2,
+     2,
+     2,
+     2
+    ],
+    "minuty": [
+     71,
+     90,
+     90,
+     90,
+     90,
+     90,
+     90,
+     90,
+     73,
+     62
+    ],
+    "srednia90": 1.52
+   }
+  }
+ },
+ {
+  "id": 159665,
+  "nazwa": "Mohamed Salah",
+  "pozycja": "M",
+  "druzyna": "Egypt",
+  "minuty_lacznie": 3412,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     1,
+     5,
+     1,
+     4,
+     1,
+     1,
+     5,
+     4,
+     7,
+     0
+    ],
+    "minuty": [
+     57,
+     85,
+     76,
+     74,
+     59,
+     90,
+     89,
+     77,
+     74,
+     60
+    ],
+    "srednia90": 2.85
+   }
+  }
+ },
+ {
+  "id": 288205,
+  "nazwa": "Bruno Fernandes",
+  "pozycja": "M",
+  "druzyna": "Portugal",
+  "minuty_lacznie": 3428,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     2,
+     2,
+     2,
+     1,
+     2,
+     1,
+     5,
+     2,
+     2,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     45,
+     90,
+     90,
+     90,
+     90,
+     89,
+     90
+    ],
+    "srednia90": 2.63
+   }
+  }
+ },
+ {
+  "id": 383560,
+  "nazwa": "Manuel Akanji",
+  "pozycja": "D",
+  "druzyna": "Switzerland",
+  "minuty_lacznie": 3476,
+  "forma": {
+   "tackles": {
+    "ostatnie": [
+     2,
+     3,
+     1,
+     1,
+     1,
+     2,
+     1,
+     2,
+     1,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     79,
+     60,
+     90,
+     90,
+     90,
+     90,
+     90
+    ],
+    "srednia90": 1.37
+   }
+  }
+ }
+]

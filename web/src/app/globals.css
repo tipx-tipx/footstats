@@ -1,0 +1,98 @@
+@import "tailwindcss";
+
+/* ============================================================
+   FootStats — system designu
+   Marka (z logo): atramentowy grafit + butelkowa zieleń na bieli.
+   Kolory DANYCH (wykresy) zwalidowane pod CVD i kontrast:
+   zieleń #1F9D66 · bursztyn #C77E1F · czerwień #C2452D
+   ============================================================ */
+
+@theme {
+  /* --- marka --- */
+  --color-ink: #13202a;          /* atrament — nagłówki, tekst główny */
+  --color-ink-soft: #33434d;     /* tekst drugorzędny */
+  --color-muted: #5f6f6a;        /* tekst pomocniczy */
+  --color-faint: #8b9a94;        /* podpisy, metadane */
+  --color-brand: #16583f;        /* butelkowa zieleń — akcent marki, UI */
+  --color-brand-deep: #0e3d2b;
+  --color-brand-wash: #e7f0ea;   /* delikatne tło zielone */
+
+  /* --- powierzchnie --- */
+  --color-paper: #f2f5f3;        /* tło strony — chłodny papier z nutą zieleni */
+  --color-card: #ffffff;
+  --color-hairline: #e1e8e3;
+  --color-hairline-strong: #cbd6cf;
+
+  /* --- kolory danych (wykresy, badge) — zwalidowane --- */
+  --color-data-green: #1f9d66;
+  --color-data-amber: #c77e1f;
+  --color-data-red: #c2452d;
+  --color-data-green-wash: #e3f3ea;
+  --color-data-amber-wash: #f7ecdc;
+  --color-data-red-wash: #f7e3de;
+
+  /* --- typografia --- */
+  --font-display: var(--font-sora), system-ui, sans-serif;
+  --font-body: var(--font-plex-sans), system-ui, sans-serif;
+  --font-data: var(--font-plex-mono), ui-monospace, monospace;
+
+  --radius-card: 0.875rem;
+
+  --shadow-card: 0 1px 2px rgb(19 32 42 / 0.04), 0 4px 16px rgb(19 32 42 / 0.05);
+  --shadow-card-hover: 0 2px 4px rgb(19 32 42 / 0.06), 0 10px 32px rgb(19 32 42 / 0.10);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* liczby zawsze tabelaryczne w danych */
+.font-data {
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+h1, h2, h3, .font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+/* delikatna siatka "boiska" w tle hero */
+.pitch-grid {
+  background-image:
+    linear-gradient(to right, rgb(22 88 63 / 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(22 88 63 / 0.05) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+/* pasek przewijania w duchu designu */
+::-webkit-scrollbar { height: 8px; width: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--color-hairline-strong);
+  border-radius: 6px;
+}
+
+/* fokus klawiatury — zawsze widoczny */
+:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

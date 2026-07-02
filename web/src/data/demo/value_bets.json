@@ -1,0 +1,221 @@
+[
+ {
+  "id": 2,
+  "mecz_id": 12813011,
+  "mecz": "Colombia – Ghana",
+  "kickoff_ts": 1783128600,
+  "podmiot_typ": "zawodnik",
+  "podmiot_id": 1160386,
+  "podmiot": "Andres Gomez",
+  "druzyna": "Colombia",
+  "przeciwnik": "Ghana",
+  "rynek_kod": "shots",
+  "rynek": "Strzały",
+  "linia": 1.5,
+  "strona": "powyzej",
+  "kurs": 1.58,
+  "bukmacher": "Superbet",
+  "p_model": 0.7566,
+  "p_rynku": 0.5886,
+  "fair_kurs": 1.322,
+  "edge_pp": 16.8,
+  "ev_pct": 19.55,
+  "pewnosc": "srednia",
+  "pewnosc_score": 54.7,
+  "ryzyko": "niskie",
+  "rank_score": 6.798,
+  "ci": [
+   0.6571,
+   0.8644
+  ],
+  "oczekiwane_minuty": 84.2,
+  "lambda": 2.854,
+  "rozklad": [
+   0.0551826175423501,
+   0.1558988238727531,
+   0.22405845335895677,
+   0.21835790862994436,
+   0.16229113969549927,
+   0.09809535322292313,
+   0.05021611983639999,
+   0.022387297637632964,
+   0.01351228620354028
+  ],
+  "czynniki": {
+   "rywal": 0.961,
+   "sedzia": 1.0,
+   "dom_wyjazd": 1.0,
+   "scenariusz_meczu": 1.0,
+   "matchup": 1.0,
+   "lacznie": 0.961,
+   "opisy": {}
+  },
+  "uzasadnienie": {
+   "czynniki": [
+    {
+     "nazwa": "Poziom bazowy",
+     "opis": "Średnio 3.18 na 90 minut (efektywna próba: 13 meczów)",
+     "mnoznik": null
+    },
+    {
+     "nazwa": "Minuty",
+     "opis": "Przewidywane minuty: 84 (szansa na pierwszy skład: 88%)",
+     "mnoznik": 0.94
+    },
+    {
+     "nazwa": "Rywal",
+     "opis": "Ghana dopuszcza mniej takich akcji niż średnia ligi",
+     "mnoznik": 0.96
+    }
+   ],
+   "oczekiwana_liczba": 2.85,
+   "rynek_rzadki": false
+  }
+ },
+ {
+  "id": 3,
+  "mecz_id": 12813018,
+  "mecz": "Australia – Egypt",
+  "kickoff_ts": 1783101600,
+  "podmiot_typ": "zawodnik",
+  "podmiot_id": 159665,
+  "podmiot": "Mohamed Salah",
+  "druzyna": "Egypt",
+  "przeciwnik": "Australia",
+  "rynek_kod": "shots",
+  "rynek": "Strzały",
+  "linia": 1.5,
+  "strona": "powyzej",
+  "kurs": 1.37,
+  "bukmacher": "Superbet",
+  "p_model": 0.7804,
+  "p_rynku": 0.6788,
+  "fair_kurs": 1.281,
+  "edge_pp": 10.16,
+  "ev_pct": 6.92,
+  "pewnosc": "wysoka",
+  "pewnosc_score": 66.1,
+  "ryzyko": "niskie",
+  "rank_score": 5.464,
+  "ci": [
+   0.6734,
+   0.8701
+  ],
+  "oczekiwane_minuty": 88.2,
+  "lambda": 2.917,
+  "rozklad": [
+   0.06276281071928264,
+   0.16989243712649965,
+   0.23368639903323574,
+   0.21772469621932422,
+   0.15454011654680963,
+   0.08911647810200757,
+   0.043479566667317095,
+   0.018456898144226373,
+   0.010340597441297117
+  ],
+  "czynniki": {
+   "rywal": 1.03,
+   "sedzia": 1.0,
+   "dom_wyjazd": 1.0,
+   "scenariusz_meczu": 1.0,
+   "matchup": 1.0,
+   "lacznie": 1.03,
+   "opisy": {}
+  },
+  "uzasadnienie": {
+   "czynniki": [
+    {
+     "nazwa": "Poziom bazowy",
+     "opis": "Średnio 2.89 na 90 minut (efektywna próba: 16 meczów)",
+     "mnoznik": null
+    },
+    {
+     "nazwa": "Minuty",
+     "opis": "Skład ogłoszony — pewny występ",
+     "mnoznik": 0.98
+    },
+    {
+     "nazwa": "Rywal",
+     "opis": "Australia dopuszcza więcej takich akcji niż średnia ligi",
+     "mnoznik": 1.03
+    }
+   ],
+   "oczekiwana_liczba": 2.92,
+   "rynek_rzadki": false
+  }
+ },
+ {
+  "id": 1,
+  "mecz_id": 12813011,
+  "mecz": "Colombia – Ghana",
+  "kickoff_ts": 1783128600,
+  "podmiot_typ": "zawodnik",
+  "podmiot_id": 281253,
+  "podmiot": "Jhon Cordoba",
+  "druzyna": "Colombia",
+  "przeciwnik": "Ghana",
+  "rynek_kod": "shots",
+  "rynek": "Strzały",
+  "linia": 2.5,
+  "strona": "powyzej",
+  "kurs": 1.92,
+  "bukmacher": "Superbet",
+  "p_model": 0.539,
+  "p_rynku": 0.4844,
+  "fair_kurs": 1.855,
+  "edge_pp": 5.46,
+  "ev_pct": 3.48,
+  "pewnosc": "srednia",
+  "pewnosc_score": 50.6,
+  "ryzyko": "niskie",
+  "rank_score": 1.963,
+  "ci": [
+   0.3936,
+   0.6782
+  ],
+  "oczekiwane_minuty": 89.0,
+  "lambda": 2.857,
+  "rozklad": [
+   0.05487707959992196,
+   0.15545901712870097,
+   0.22390486106592652,
+   0.21855130810129073,
+   0.16260085389641105,
+   0.09833064012815126,
+   0.05033524541516173,
+   0.022428615369375095,
+   0.013512379295060661
+  ],
+  "czynniki": {
+   "rywal": 0.961,
+   "sedzia": 1.0,
+   "dom_wyjazd": 1.0,
+   "scenariusz_meczu": 1.0,
+   "matchup": 1.0,
+   "lacznie": 0.961,
+   "opisy": {}
+  },
+  "uzasadnienie": {
+   "czynniki": [
+    {
+     "nazwa": "Poziom bazowy",
+     "opis": "Średnio 3.01 na 90 minut (efektywna próba: 15 meczów)",
+     "mnoznik": null
+    },
+    {
+     "nazwa": "Minuty",
+     "opis": "Przewidywane minuty: 89 (szansa na pierwszy skład: 100%)",
+     "mnoznik": 0.99
+    },
+    {
+     "nazwa": "Rywal",
+     "opis": "Ghana dopuszcza mniej takich akcji niż średnia ligi",
+     "mnoznik": 0.96
+    }
+   ],
+   "oczekiwana_liczba": 2.86,
+   "rynek_rzadki": false
+  }
+ }
+]
