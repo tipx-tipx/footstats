@@ -1,0 +1,41 @@
+name: FootStats — cykl zbierania danych
+
+# Darmowy cron w chmurze (GitHub Actions). Uruchamia pipeline i wypycha wyniki
+# do Supabase. Aplikacja na Vercel czyta z Supabase — nic nie musi być włączone
+# na komputerze użytkownika.
+#
+# Uwaga: publiczne repo = nielimitowane minuty Actions. Prywatne = 2000 min/mc,
+# więc przy prywatnym trzymaj interwał >= 60 min.
+
+on:
+  schedule:
+    - cron: "0 * * * *"      # co godzinę (UTC). Zmień na "*/30 * * * *" dla co 30 min.
+  workflow_dispatch: {}       # pozwala uruchomić ręcznie z zakładki Actions
+
+concurrency:
+  group: footstats-cycle
+  cancel-in-progress: false
+
+jobs:
+  cycle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalacja zależności
+        working-directory: pipeline
+        run: pip install -r requirements.txt websockets
+
+      - name: Przelicz okazje i wypchnij do Supabase
+        working-directory: pipeline
+        env:
+          PYTHONIOENCODING: utf-8
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: python -m footstats.jobs.cycle
