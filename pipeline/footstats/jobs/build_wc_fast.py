@@ -676,6 +676,12 @@ def main():
                 and (tr.odds_type == "over") == (a.side == "powyzej")
             ):
                 kurs_ref = round(statistics.median(tr.ref_odds), 2)
+            # OKAZJA Z KURSEM tylko, gdy Superbet płaci >= 0.10 więcej niż
+            # konsensus innych bukmacherów (decyzja usera — sygnał miękkiej
+            # linii ważniejszy niż sama przewaga modelu). Bez referencji nie
+            # ma dowodu odstawania — typ zostaje w puli pewniaków.
+            if kurs_ref is None or kurs_wziety - kurs_ref < 0.10:
+                continue
             value_bets.append({
                 "id": vb_id, "mecz_id": mid, "mecz": match_label, "kickoff_ts": ts,
                 "podmiot_typ": "zawodnik", "podmiot_id": tr.player_id,
