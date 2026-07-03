@@ -1,11 +1,11 @@
 {
- "wygenerowano_ts": 1783037769,
+ "wygenerowano_ts": 1783073221,
  "tryb": "ms2026",
  "liga": "Mistrzostwa Świata",
  "sezon": "2026",
  "zrodlo": "statshub (statystyki i historia) + Superbet (kursy)",
- "meczow_w_bazie": 4,
- "meczow_demo": 4,
+ "meczow_w_bazie": 3,
+ "meczow_demo": 3,
  "meczow_kalibracja": 20,
- "okazji": 13
+ "okazji": 8
 }

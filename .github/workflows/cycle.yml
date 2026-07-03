@@ -4,12 +4,13 @@ name: FootStats — cykl zbierania danych
 # do Supabase. Aplikacja na Vercel czyta z Supabase — nic nie musi być włączone
 # na komputerze użytkownika.
 #
-# Uwaga: publiczne repo = nielimitowane minuty Actions. Prywatne = 2000 min/mc,
-# więc przy prywatnym trzymaj interwał >= 60 min.
+# Uwaga: publiczne repo = nielimitowane minuty Actions. Prywatne = 2000 min/mc;
+# cykl trwa <1 min, więc co 30 min ≈ 1450 min/mc — mieści się w limicie.
+# Częściej (co 30 min zamiast godziny), żeby łapać ogłoszone składy przed meczem.
 
 on:
   schedule:
-    - cron: "0 * * * *"      # co godzinę (UTC). Zmień na "*/30 * * * *" dla co 30 min.
+    - cron: "*/30 * * * *"   # co 30 min (UTC)
   workflow_dispatch: {}       # pozwala uruchomić ręcznie z zakładki Actions
 
 concurrency:

@@ -40,6 +40,7 @@ class MatchContext:
     referee_cards_multiplier: float | None = None
     referee_sample_matches: int = 0
     official_started: bool | None = None          # None = skład nieogłoszony
+    predicted_started: bool | None = None         # przewidywany skład (miękki sygnał)
     injured_or_suspended: bool = False
     opponent_name: str = ""
     referee_name: str = ""
@@ -86,8 +87,12 @@ def _build_reasoning(
             "nazwa": "Minuty",
             "opis": (
                 "Skład ogłoszony — pewny występ" if mm.official_lineup and mm.p_start > 0.5
+                else "Skład ogłoszony — zawodnik poza XI (możliwe wejście z ławki)"
+                if mm.official_lineup
                 else f"Przewidywane minuty: {mm.expected_minutes:.0f} "
-                f"(szansa na pierwszy skład: {mm.p_start * 100:.0f}%)"
+                f"(szansa na pierwszy skład: {mm.p_start * 100:.0f}%"
+                + (", wg przewidywanego składu" if ctx.predicted_started is not None else "")
+                + ")"
             ),
             "mnoznik": round(mm.expected_minutes / 90.0, 2),
         }
@@ -176,6 +181,7 @@ def score_player_market(
         days_ago=history.days_ago,
         injured_or_suspended=ctx.injured_or_suspended,
         official_started=ctx.official_started,
+        predicted_started=ctx.predicted_started,
     )
 
     # 3) czynniki kontekstowe

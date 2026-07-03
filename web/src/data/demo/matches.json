@@ -1,19 +1,19 @@
 [
  {
-  "id": 12813019,
+  "id": 12812999,
   "liga": "MŚ",
   "sezon": "2026",
   "kolejka": "Ćwierćfinał",
-  "kickoff_ts": 1783047600,
-  "gospodarz": "Switzerland",
-  "gosc": "Algeria",
+  "kickoff_ts": 1783116000,
+  "gospodarz": "Argentina",
+  "gosc": "Cape Verde",
   "sedzia": null,
   "sedzia_mnoznik_fauli": 1.0,
   "okazje": [
+   2,
    3,
-   8,
-   9,
-   13
+   5,
+   7
   ]
  },
  {
@@ -27,26 +27,8 @@
   "sedzia": null,
   "sedzia_mnoznik_fauli": 1.0,
   "okazje": [
-   1,
    4,
-   5,
-   7,
-   11
-  ]
- },
- {
-  "id": 12812999,
-  "liga": "MŚ",
-  "sezon": "2026",
-  "kolejka": "Ćwierćfinał",
-  "kickoff_ts": 1783116000,
-  "gospodarz": "Argentina",
-  "gosc": "Cape Verde",
-  "sedzia": null,
-  "sedzia_mnoznik_fauli": 1.0,
-  "okazje": [
-   6,
-   10
+   6
   ]
  },
  {
@@ -60,8 +42,8 @@
   "sedzia": null,
   "sedzia_mnoznik_fauli": 1.0,
   "okazje": [
-   2,
-   12
+   1,
+   8
   ]
  }
 ]

@@ -64,6 +64,7 @@ def estimate_minutes(
     days_ago: list[float],
     injured_or_suspended: bool = False,
     official_started: bool | None = None,
+    predicted_started: bool | None = None,
     tau_days: float = 60.0,
 ) -> MinutesModel:
     """Zbuduj scenariusze minutowe z historii występów.
@@ -72,6 +73,9 @@ def estimate_minutes(
     (uwzględniając mecze, w których zawodnik NIE zagrał: started=False, minutes=0).
     official_started — jeżeli skład jest ogłoszony: True (w XI) / False (poza XI);
                        None = skład nieznany, używamy historii.
+    predicted_started — przewidywany skład (media/statshub), sygnał MIĘKKI:
+                       przesuwa P(start), ale nie daje pewności składu.
+                       Używany tylko, gdy official_started is None.
     """
     if injured_or_suspended:
         return MinutesModel(
@@ -85,10 +89,20 @@ def estimate_minutes(
 
     if len(minutes) == 0:
         # Brak historii: ostrożny default rezerwowego.
-        p_start = 0.3 if official_started is None else (1.0 if official_started else 0.0)
+        if official_started is not None:
+            p_start = 1.0 if official_started else 0.0
+        elif predicted_started is not None:
+            p_start = 0.88 if predicted_started else 0.12
+        else:
+            p_start = 0.3
         start_min, sub_min, p_sub = 80.0, 25.0, 0.4
     else:
         p_start = float(np.average(started, weights=w))
+        if official_started is None and predicted_started is not None:
+            # Miękkie przesunięcie: przewidywane składy trafiają ~85-90%,
+            # ale bywają błędne — mieszamy z historią zamiast nadpisywać.
+            target = 0.88 if predicted_started else 0.12
+            p_start = 0.35 * p_start + 0.65 * target
         start_mask = started & (minutes > 0)
         start_min = float(np.average(minutes[start_mask], weights=w[start_mask])) if start_mask.any() else 80.0
         sub_mask = (~started) & (minutes > 0)

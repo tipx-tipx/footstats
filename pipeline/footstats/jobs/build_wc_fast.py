@@ -82,8 +82,21 @@ def group_prior_from_context(trend: statshub.StatshubTrend) -> counts.GroupPrior
     return counts.GroupPrior(mean_per90=max(base, 0.15), pseudo_matches=5.0)
 
 
-def score_from_trend(trend: statshub.StatshubTrend, opp_avg_ref: float | None):
-    """Zbuduj PlayerHistory z recentGames i policz predykcję (bez kursów)."""
+def score_from_trend(
+    trend: statshub.StatshubTrend,
+    opp_avg_ref: float | None,
+    lineup_confirmed: bool = False,
+    predicted_available: bool = False,
+):
+    """Zbuduj PlayerHistory z recentGames i policz predykcję (bez kursów).
+
+    Składy dwustopniowo:
+      * lineupConfirmed (event) = skład OGŁOSZONY -> inPredictedLineup to twardy
+        fakt: w XI (True) albo poza XI (False, scenariusz ławki),
+      * skład nieogłoszony, ale statshub ma przewidywany (ktokolwiek w meczu
+        ma inPredictedLineup=True) -> sygnał miękki (predicted_started),
+      * brak przewidywanego składu dla meczu -> ignorujemy pole (sama historia).
+    """
     now = int(time.time())
     hist = PlayerHistory(
         counts=trend.counts,
@@ -94,6 +107,12 @@ def score_from_trend(trend: statshub.StatshubTrend, opp_avg_ref: float | None):
     if sum(1 for m in trend.minutes if m > 0) < 3:
         return None, hist
     prior = group_prior_from_context(trend)
+    if lineup_confirmed:
+        official, predicted = trend.in_predicted_lineup, None
+    elif predicted_available:
+        official, predicted = None, trend.in_predicted_lineup
+    else:
+        official, predicted = None, None
     # kontekst: średnia rywala względem ligi (jeśli statshub podał)
     ctx = MatchContext(
         is_home=trend.is_home,
@@ -102,7 +121,8 @@ def score_from_trend(trend: statshub.StatshubTrend, opp_avg_ref: float | None):
         opponent_allowed_per90=trend.opponent_average,
         league_avg_per90=trend.league_average,
         opponent_sample_matches=6 if trend.opponent_average else 0,
-        official_started=None if not trend.in_predicted_lineup else True,
+        official_started=official,
+        predicted_started=predicted,
         opponent_name=trend.opponent_name,
     )
     return (prior, ctx), hist
@@ -154,6 +174,19 @@ def main():
     sb_cache: dict[int, dict] = {}
     sts_cache: dict[int, dict] = {}
 
+    # składy: potwierdzone (event.lineupConfirmed) i przewidywane (czy statshub
+    # w ogóle wystawił przewidywany skład dla danego meczu)
+    lineup_confirmed = {e["id"]: bool(e.get("lineupConfirmed")) for e in events}
+    predicted_available: dict[int, bool] = {}
+    for t in trends:
+        if t.event_id:
+            predicted_available[t.event_id] = (
+                predicted_available.get(t.event_id, False) or t.in_predicted_lineup
+            )
+    n_conf = sum(lineup_confirmed.values())
+    if n_conf:
+        print(f"Składy ogłoszone: {n_conf} z {len(events)} meczów")
+
     value_bets, matches_out, players_out = [], {}, {}
     vb_id = 0
     seen_player_market = set()  # (player_id, market) — statshub bywa zdublowany
@@ -183,7 +216,11 @@ def main():
                 "sedzia": None, "sedzia_mnoznik_fauli": 1.0, "okazje": [],
             }
 
-        built, hist = score_from_trend(tr, tr.opponent_average)
+        built, hist = score_from_trend(
+            tr, tr.opponent_average,
+            lineup_confirmed=lineup_confirmed.get(mid, False),
+            predicted_available=predicted_available.get(mid, False),
+        )
         if built is None:
             continue
         prior, ctx = built

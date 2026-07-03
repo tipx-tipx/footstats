@@ -39,6 +39,31 @@ def test_official_lineup_locks_start():
     assert official_in.certainty == 1.0
 
 
+def test_predicted_lineup_soft_signal():
+    """Przewidywany skład przesuwa P(start), ale nie daje pewności 1.0."""
+    rotation = dict(
+        recent_started=[True, False, False, True, False, False],
+        recent_minutes=[75.0, 20.0, 0.0, 68.0, 25.0, 0.0],
+        days_ago=[4.0, 11.0, 18.0, 25.0, 32.0, 39.0],
+    )
+    base = mm.estimate_minutes(**rotation)
+    pred_in = mm.estimate_minutes(**rotation, predicted_started=True)
+    pred_out = mm.estimate_minutes(**rotation, predicted_started=False)
+    assert pred_in.p_start > base.p_start > pred_out.p_start
+    assert pred_in.p_start < 1.0          # miękki, nie twardy
+    assert pred_out.p_start > 0.0
+    assert not pred_in.official_lineup    # certainty dalej z rozproszenia
+    assert pred_in.certainty < 1.0
+
+
+def test_official_overrides_predicted():
+    """Gdy skład ogłoszony, sygnał przewidywany jest ignorowany."""
+    base = _regular_starter()
+    m = mm.estimate_minutes(**base, official_started=False, predicted_started=True)
+    assert m.p_start == 0.0
+    assert m.official_lineup
+
+
 def test_injury_zeroes_everything():
     m = mm.estimate_minutes(**_regular_starter(), injured_or_suspended=True)
     assert m.expected_minutes == 0.0

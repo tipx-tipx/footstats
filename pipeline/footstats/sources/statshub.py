@@ -74,6 +74,7 @@ class StatshubTrend:
     opponent_average: float | None
     opponent_rank: int | None
     total_ranks: int | None
+    event_id: int = 0
     # historia: listy równoległe (od najnowszych)
     counts: list[float] = field(default_factory=list)
     minutes: list[float] = field(default_factory=list)
@@ -112,6 +113,7 @@ def fetch_event_trends(event_ids: list[int]) -> list[StatshubTrend]:
                 market_code=mk,
                 line=float(rec.get("line", 0.5)),
                 in_predicted_lineup=bool(rec.get("inPredictedLineup")),
+                event_id=int(rec.get("eventId") or 0),
                 league_average=rec.get("leagueAverage"),
                 opponent_average=rec.get("opponentAverage"),
                 opponent_rank=rec.get("opponentRank"),

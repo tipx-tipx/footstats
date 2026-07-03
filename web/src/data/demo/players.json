@@ -1,37 +1,37 @@
 [
  {
-  "id": 1518931,
-  "nazwa": "Johan Manzambi",
+  "id": 1171451,
+  "nazwa": "Nicolas Paz",
   "pozycja": "M",
-  "druzyna": "Switzerland",
-  "minuty_lacznie": 3195,
+  "druzyna": "Argentina",
+  "minuty_lacznie": 3222,
   "forma": {
-   "fouls_won": {
+   "shots": {
     "ostatnie": [
      1,
-     1,
-     1,
      4,
-     2,
-     3,
      1,
-     3,
-     3,
-     6
+     2,
+     2,
+     2,
+     5,
+     6,
+     2,
+     1
     ],
     "minuty": [
-     85,
-     71,
-     45,
-     90,
-     72,
+     61,
      58,
      90,
      90,
+     45,
      90,
-     120
+     90,
+     90,
+     90,
+     16
     ],
-    "srednia90": 3.21
+    "srednia90": 3.66
    }
   }
  },
@@ -144,38 +144,38 @@
   }
  },
  {
-  "id": 1445228,
-  "nazwa": "Fares Ghedjemis",
-  "pozycja": "F",
-  "druzyna": "Algeria",
-  "minuty_lacznie": 3257,
+  "id": 1160386,
+  "nazwa": "Andres Gomez",
+  "pozycja": "M",
+  "druzyna": "Colombia",
+  "minuty_lacznie": 3315,
   "forma": {
    "shots": {
     "ostatnie": [
-     4,
+     1,
      3,
      1,
      4,
      2,
-     5,
-     5,
      4,
-     4,
-     3
+     1,
+     5,
+     3,
+     4
     ],
     "minuty": [
-     67,
+     45,
+     90,
+     88,
+     90,
      89,
-     70,
      90,
-     80,
-     74,
+     78,
      90,
-     67,
      90,
      90
     ],
-    "srednia90": 3.04
+    "srednia90": 3.1
    }
   }
  },
@@ -252,42 +252,6 @@
   }
  },
  {
-  "id": 352296,
-  "nazwa": "Breel Embolo",
-  "pozycja": "F",
-  "druzyna": "Switzerland",
-  "minuty_lacznie": 3237,
-  "forma": {
-   "shots": {
-    "ostatnie": [
-     2,
-     1,
-     4,
-     3,
-     1,
-     1,
-     4,
-     2,
-     4,
-     1
-    ],
-    "minuty": [
-     85,
-     89,
-     90,
-     71,
-     90,
-     81,
-     68,
-     73,
-     90,
-     66
-    ],
-    "srednia90": 2.09
-   }
-  }
- },
- {
   "id": 826545,
   "nazwa": "Mohamed Hany",
   "pozycja": "D",
@@ -360,74 +324,38 @@
   }
  },
  {
-  "id": 352290,
-  "nazwa": "Cedric Itten",
-  "pozycja": "F",
-  "druzyna": "Switzerland",
-  "minuty_lacznie": 3254,
+  "id": 944054,
+  "nazwa": "Cameron Devlin",
+  "pozycja": "M",
+  "druzyna": "Australia",
+  "minuty_lacznie": 3539,
   "forma": {
-   "fouls_committed": {
+   "fouls_won": {
     "ostatnie": [
+     1,
+     2,
+     6,
+     4,
+     4,
+     3,
+     4,
      2,
      5,
-     2,
-     2,
-     3,
-     2,
-     2,
-     1,
-     1,
-     1
+     4
     ],
     "minuty": [
      90,
-     90,
-     90,
-     90,
-     90,
-     59,
+     67,
      90,
      89,
+     76,
+     89,
+     90,
+     90,
      90,
      90
     ],
-    "srednia90": 2.05
-   }
-  }
- },
- {
-  "id": 1101624,
-  "nazwa": "Mahmoud Saber",
-  "pozycja": "M",
-  "druzyna": "Egypt",
-  "minuty_lacznie": 3068,
-  "forma": {
-   "shots": {
-    "ostatnie": [
-     3,
-     7,
-     3,
-     5,
-     2,
-     10,
-     3,
-     5,
-     5,
-     1
-    ],
-    "minuty": [
-     45,
-     90,
-     86,
-     90,
-     90,
-     90,
-     90,
-     89,
-     90,
-     55
-    ],
-    "srednia90": 2.96
+    "srednia90": 2.8
    }
   }
  },
@@ -540,110 +468,38 @@
   }
  },
  {
-  "id": 1986794,
-  "nazwa": "Caleb Yirenkyi",
+  "id": 822600,
+  "nazwa": "Exequiel Palacios",
   "pozycja": "M",
-  "druzyna": "Ghana",
-  "minuty_lacznie": 3491,
+  "druzyna": "Argentina",
+  "minuty_lacznie": 3252,
   "forma": {
-   "fouls_committed": {
+   "fouls_won": {
     "ostatnie": [
-     3,
      1,
-     2,
-     2,
      1,
      1,
      2,
      1,
-     3,
+     2,
+     1,
+     2,
+     2,
      1
     ],
     "minuty": [
      90,
+     45,
+     81,
      90,
      90,
      90,
      90,
      90,
-     90,
-     90,
-     90,
+     81,
      90
     ],
-    "srednia90": 1.55
-   }
-  }
- },
- {
-  "id": 788284,
-  "nazwa": "Ajdin Hrustic",
-  "pozycja": "M",
-  "druzyna": "Australia",
-  "minuty_lacznie": 3361,
-  "forma": {
-   "shots": {
-    "ostatnie": [
-     2,
-     1,
-     2,
-     2,
-     1,
-     2,
-     3,
-     1,
-     3,
-     2
-    ],
-    "minuty": [
-     90,
-     90,
-     90,
-     90,
-     62,
-     90,
-     90,
-     90,
-     84,
-     90
-    ],
-    "srednia90": 1.47
-   }
-  }
- },
- {
-  "id": 929620,
-  "nazwa": "Fabian Rieder",
-  "pozycja": "M",
-  "druzyna": "Switzerland",
-  "minuty_lacznie": 3086,
-  "forma": {
-   "tackles": {
-    "ostatnie": [
-     3,
-     2,
-     2,
-     3,
-     2,
-     3,
-     2,
-     2,
-     2,
-     2
-    ],
-    "minuty": [
-     71,
-     90,
-     90,
-     90,
-     90,
-     90,
-     90,
-     90,
-     73,
-     62
-    ],
-    "srednia90": 1.52
+    "srednia90": 1.61
    }
   }
  },
@@ -684,132 +540,24 @@
   }
  },
  {
-  "id": 1049534,
-  "nazwa": "Jaouen Hadjam",
-  "pozycja": "D",
-  "druzyna": "Algeria",
-  "minuty_lacznie": 3164,
-  "forma": {
-   "tackles": {
-    "ostatnie": [
-     1,
-     2,
-     2,
-     1,
-     1,
-     2,
-     2,
-     2,
-     1,
-     0
-    ],
-    "minuty": [
-     71,
-     70,
-     71,
-     13,
-     90,
-     69,
-     90,
-     90,
-     80,
-     68
-    ],
-    "srednia90": 1.96
-   }
-  }
- },
- {
-  "id": 383560,
-  "nazwa": "Manuel Akanji",
-  "pozycja": "D",
-  "druzyna": "Switzerland",
-  "minuty_lacznie": 3476,
-  "forma": {
-   "tackles": {
-    "ostatnie": [
-     2,
-     3,
-     1,
-     1,
-     1,
-     2,
-     1,
-     2,
-     1,
-     0
-    ],
-    "minuty": [
-     90,
-     90,
-     90,
-     79,
-     60,
-     90,
-     90,
-     90,
-     90,
-     90
-    ],
-    "srednia90": 1.37
-   }
-  }
- },
- {
-  "id": 1094482,
-  "nazwa": "Adil Boulbina",
-  "pozycja": "M",
-  "druzyna": "Algeria",
-  "minuty_lacznie": 2081,
-  "forma": {
-   "shots": {
-    "ostatnie": [
-     2,
-     5,
-     3,
-     3,
-     4,
-     3,
-     2,
-     3,
-     1,
-     4
-    ],
-    "minuty": [
-     90,
-     120,
-     90,
-     90,
-     90,
-     45,
-     90,
-     90,
-     90,
-     90
-    ],
-    "srednia90": 3.72
-   }
-  }
- },
- {
   "id": 1015292,
   "nazwa": "Richard Rios",
   "pozycja": "M",
   "druzyna": "Colombia",
   "minuty_lacznie": 3376,
   "forma": {
-   "fouls_won": {
+   "fouls_committed": {
     "ostatnie": [
      2,
-     1,
      2,
      3,
+     1,
      2,
-     4,
      2,
      1,
-     0,
-     3
+     2,
+     1,
+     0
     ],
     "minuty": [
      68,
@@ -823,7 +571,115 @@
      71,
      90
     ],
-    "srednia90": 2.48
+    "srednia90": 1.71
+   }
+  }
+ },
+ {
+  "id": 1138352,
+  "nazwa": "Augustine Boakye",
+  "pozycja": "F",
+  "druzyna": "Ghana",
+  "minuty_lacznie": 3185,
+  "forma": {
+   "tackles": {
+    "ostatnie": [
+     1,
+     2,
+     1,
+     1,
+     1,
+     1,
+     1,
+     3,
+     5,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     90,
+     90,
+     90,
+     54,
+     90,
+     90,
+     90
+    ],
+    "srednia90": 1.67
+   }
+  }
+ },
+ {
+  "id": 1094395,
+  "nazwa": "Helio Varela",
+  "pozycja": "M",
+  "druzyna": "Cape Verde",
+  "minuty_lacznie": 3274,
+  "forma": {
+   "fouls_won": {
+    "ostatnie": [
+     3,
+     3,
+     2,
+     3,
+     3,
+     1,
+     4,
+     2,
+     0,
+     2
+    ],
+    "minuty": [
+     90,
+     90,
+     73,
+     90,
+     90,
+     90,
+     90,
+     77,
+     86,
+     90
+    ],
+    "srednia90": 2.5
+   }
+  }
+ },
+ {
+  "id": 844096,
+  "nazwa": "Jhon Arias",
+  "pozycja": "M",
+  "druzyna": "Colombia",
+  "minuty_lacznie": 3091,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     3,
+     2,
+     2,
+     3,
+     4,
+     2,
+     3,
+     3,
+     0,
+     3
+    ],
+    "minuty": [
+     76,
+     77,
+     89,
+     64,
+     80,
+     75,
+     90,
+     90,
+     82,
+     73
+    ],
+    "srednia90": 2.04
    }
   }
  }
