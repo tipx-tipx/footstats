@@ -101,7 +101,14 @@ export function ValueBoard({
   const [pewnosc, setPewnosc] = useState<Pewnosc | "kazda">("kazda");
   const [minEv, setMinEv] = useState(3);
   const [meczId, setMeczId] = useState<number | undefined>(initialMatchId);
-  const [rodzaj, setRodzaj] = useState<"okazje" | "sugestie" | "wszystko">("okazje");
+  // gdy rynek chwilowo nie daje okazji z kursem, otwórz od razu sugestie
+  const [rodzaj, setRodzaj] = useState<"okazje" | "sugestie" | "wszystko">(() =>
+    bets.some((b) => !b.sugestia)
+      ? "okazje"
+      : bets.some((b) => b.sugestia)
+        ? "sugestie"
+        : "okazje",
+  );
   const [sortuj, setSortuj] = useState<SortKey>("ranking");
   const [limit, setLimit] = useState(25);
   const reduced = useReducedMotion();
@@ -295,23 +302,43 @@ export function ValueBoard({
           }`}
       </p>
 
-      {filtered.length === 0 && (
-        <div className="rounded-(--radius-card) border border-hairline bg-card px-6 py-10 text-center shadow-(--shadow-card)">
-          <p className="text-sm font-medium text-ink">
-            Brak pozycji spełniających obecne filtry
-          </p>
-          <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-muted">
-            Zmniejsz minimalną wartość, ustaw pewność na „Każda” albo wybierz
-            inny rynek — lub zacznij od czysta.
-          </p>
-          <button
-            onClick={wyczyscFiltry}
-            className="mt-4 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-deep"
-          >
-            Wyczyść filtry
-          </button>
-        </div>
-      )}
+      {filtered.length === 0 &&
+        (rodzaj === "okazje" && !bets.some((b) => !b.sugestia) ? (
+          <div className="rounded-(--radius-card) border border-hairline bg-card px-6 py-10 text-center shadow-(--shadow-card)">
+            <p className="text-sm font-medium text-ink">
+              Rynek w tej chwili nie daje okazji z kursem
+            </p>
+            <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-muted">
+              Bukmacher wycenia dostępne zdarzenia blisko szans modelu — nie ma
+              czego przepłacać. To się zmienia z każdą aktualizacją kursów:
+              zajrzyj do sugestii STS albo wróć za pół godziny.
+            </p>
+            {liczbaSugestii > 0 && (
+              <button
+                onClick={() => setRodzaj("sugestie")}
+                className="mt-4 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-deep"
+              >
+                Zobacz sugestie STS ({liczbaSugestii})
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="rounded-(--radius-card) border border-hairline bg-card px-6 py-10 text-center shadow-(--shadow-card)">
+            <p className="text-sm font-medium text-ink">
+              Brak pozycji spełniających obecne filtry
+            </p>
+            <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-muted">
+              Zmniejsz minimalną wartość, ustaw pewność na „Każda” albo wybierz
+              inny rynek — lub zacznij od czysta.
+            </p>
+            <button
+              onClick={wyczyscFiltry}
+              className="mt-4 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-deep"
+            >
+              Wyczyść filtry
+            </button>
+          </div>
+        ))}
 
       {/* lista */}
       <div className="space-y-2.5">
