@@ -102,11 +102,11 @@ export function ValueBoard({
   const [minEv, setMinEv] = useState(1);
   const [meczId, setMeczId] = useState<number | undefined>(initialMatchId);
   // gdy rynek chwilowo nie daje okazji z kursem, otwórz od razu sugestie
-  // domyślnie pełna plansza typów (user wybiera z niej legi na kupony),
-  // sortowana po pewności — przewaga nad kursem to informacja, nie kryterium
+  // Pewniaki pierwsze i domyślne (user wybiera z nich legi na kupony);
+  // sort po pewności — przewaga nad kursem to informacja, nie kryterium
   const [rodzaj, setRodzaj] = useState<
     "okazje" | "pewniaki" | "sugestie" | "wszystko"
-  >("wszystko");
+  >(() => (bets.some((b) => b.pewniak) ? "pewniaki" : "wszystko"));
   const [sortuj, setSortuj] = useState<SortKey>("pewnosc");
   const [limit, setLimit] = useState(25);
   const reduced = useReducedMotion();
@@ -219,8 +219,8 @@ export function ValueBoard({
             aria-label="Rodzaj pozycji"
           >
             {([
-              ["okazje", "Okazje z kursem"],
               ["pewniaki", `Pewniaki (${liczbaPewniakow})`],
+              ["okazje", "Okazje z kursem"],
               ["sugestie", `Sugestie STS (${liczbaSugestii})`],
               ["wszystko", "Wszystko"],
             ] as const).map(([kod, label]) => (
