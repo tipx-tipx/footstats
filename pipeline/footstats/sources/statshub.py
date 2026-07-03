@@ -36,7 +36,6 @@ STATTYPE_MAP = {
     "fouls": "fouls_committed",
     "totalTackle": "tackles",
     "wasFouled": "fouls_won",
-    "totalPass": "passes",
 }
 
 

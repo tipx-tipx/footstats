@@ -39,9 +39,7 @@ PLAYER_MARKET_MAP = {
     "Zawodnik - liczba spalonych": "offsides",
     "Zawodnik - liczba niecelnych strzałów": "shots_off_target",
     "Zawodnik - liczba zablokowanych strzałów": "shots_blocked",
-    "Zawodnik - Liczba podań": "passes",
     "Zawodnik - liczba przechwytów": "interceptions",
-    "Zawodnik - liczba asyst": "assists",
 }
 
 # rynki drużynowe (nazwa zawiera nazwę drużyny, np. "Francja liczba fauli")

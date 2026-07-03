@@ -346,8 +346,7 @@ def main():
             side_key = "over" if a.side == "powyzej" else "under"
             kurs_wziety, book = slot[side_key]
             vb_id += 1
-            # rozkład do wykresu — bez sensu przy podaniach (λ rzędu 30-80)
-            dist = None if mk == "passes" else counts.predict_match(
+            dist = counts.predict_match(
                 counts.fit_posterior(
                     np.array(hist.counts), np.array(hist.minutes),
                     np.array(hist.days_ago), prior),
