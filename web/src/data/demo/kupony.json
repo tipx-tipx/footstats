@@ -1,1 +1,110 @@
-[]
+[
+ {
+  "cel": 10,
+  "styl": "pewniaki",
+  "kurs_laczny": 9.92,
+  "p_model": 0.0806,
+  "fair_kurs": 12.4,
+  "ev_pct": -20.1,
+  "legi": [
+   {
+    "value_bet_id": 0,
+    "podmiot": "Mahmoud Saber",
+    "rynek": "Strzały",
+    "linia": 0.5,
+    "strona": "powyzej",
+    "kurs": 1.34,
+    "bukmacher": "Superbet",
+    "p_model": 0.9232,
+    "pewnosc": "srednia",
+    "mecz": "Australia – Egypt",
+    "mecz_id": 12813018,
+    "kickoff_ts": 1783101600
+   },
+   {
+    "value_bet_id": 0,
+    "podmiot": "Gustavo Puerta",
+    "rynek": "Faule popełnione",
+    "linia": 1.5,
+    "strona": "powyzej",
+    "kurs": 1.78,
+    "bukmacher": "Superbet",
+    "p_model": 0.5648,
+    "pewnosc": "srednia",
+    "mecz": "Colombia – Ghana",
+    "mecz_id": 12813011,
+    "kickoff_ts": 1783128600
+   },
+   {
+    "value_bet_id": 0,
+    "podmiot": "Antonee Robinson",
+    "rynek": "Odbiory",
+    "linia": 1.5,
+    "strona": "powyzej",
+    "kurs": 1.41,
+    "bukmacher": "Superbet",
+    "p_model": 0.698,
+    "pewnosc": "srednia",
+    "mecz": "USA – Belgium",
+    "mecz_id": 12813002,
+    "kickoff_ts": 1783382400
+   },
+   {
+    "value_bet_id": 0,
+    "podmiot": "Mohamed Salah",
+    "rynek": "Strzały",
+    "linia": 1.5,
+    "strona": "powyzej",
+    "kurs": 1.29,
+    "bukmacher": "Superbet",
+    "p_model": 0.7572,
+    "pewnosc": "srednia",
+    "mecz": "Australia – Egypt",
+    "mecz_id": 12813018,
+    "kickoff_ts": 1783101600
+   },
+   {
+    "value_bet_id": 0,
+    "podmiot": "Lionel Messi",
+    "rynek": "Strzały",
+    "linia": 4.5,
+    "strona": "powyzej",
+    "kurs": 1.44,
+    "bukmacher": "Superbet",
+    "p_model": 0.6452,
+    "pewnosc": "srednia",
+    "mecz": "Argentina – Cape Verde",
+    "mecz_id": 12812999,
+    "kickoff_ts": 1783116000
+   },
+   {
+    "value_bet_id": 0,
+    "podmiot": "Youri Tielemans",
+    "rynek": "Strzały",
+    "linia": 0.5,
+    "strona": "powyzej",
+    "kurs": 1.27,
+    "bukmacher": "Superbet",
+    "p_model": 0.7372,
+    "pewnosc": "srednia",
+    "mecz": "USA – Belgium",
+    "mecz_id": 12813002,
+    "kickoff_ts": 1783382400
+   },
+   {
+    "value_bet_id": 0,
+    "podmiot": "James Rodriguez",
+    "rynek": "Strzały zza pola karnego",
+    "linia": 0.5,
+    "strona": "powyzej",
+    "kurs": 1.25,
+    "bukmacher": "Superbet",
+    "p_model": 0.7173,
+    "pewnosc": "srednia",
+    "mecz": "Colombia – Ghana",
+    "mecz_id": 12813011,
+    "kickoff_ts": 1783128600
+   }
+  ]
+ }
+]

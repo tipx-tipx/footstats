@@ -49,6 +49,38 @@ def test_no_coupon_when_not_enough_legs():
     assert kupony.build_kupony(bets) == []
 
 
+def _leg(mecz_id, podmiot_id, kurs, p):
+    return {
+        "id": 0, "mecz_id": mecz_id, "podmiot_id": podmiot_id,
+        "podmiot": f"P{podmiot_id}", "rynek": "Strzały", "linia": 0.5,
+        "strona": "powyzej", "kurs": kurs, "bukmacher": "Superbet",
+        "p_model": p, "mecz": f"M{mecz_id}", "kickoff_ts": 0,
+    }
+
+
+def test_pewniaki_reach_target_with_max_4_per_match():
+    pool = []
+    pid = 0
+    for mecz in range(1, 4):
+        for _ in range(6):
+            pid += 1
+            pool.append(_leg(mecz, pid, 1.45, 0.72))
+    out = kupony.build_kupony([], pool)
+    pewniaki = [k for k in out if k["styl"] == "pewniaki"]
+    assert pewniaki, "przy 18 legach 1.45 kupon x10 musi się złożyć"
+    for k in pewniaki:
+        licznik = {}
+        for l in k["legi"]:
+            licznik[l["mecz_id"]] = licznik.get(l["mecz_id"], 0) + 1
+        assert max(licznik.values()) <= 4
+        assert k["cel"] * 0.85 <= k["kurs_laczny"] <= k["cel"] * 1.6
+        # kara korelacyjna: p kuponu <= iloczyn szans legów
+        iloczyn = 1.0
+        for l in k["legi"]:
+            iloczyn *= l["p_model"]
+        assert k["p_model"] <= round(iloczyn, 4) + 1e-9
+
+
 def test_low_confidence_and_negative_ev_excluded():
     bets = [
         _bet(1, 1, 11, 2.0, 0.6, pewnosc="niska"),

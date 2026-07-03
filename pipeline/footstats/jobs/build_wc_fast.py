@@ -400,6 +400,7 @@ def main():
     seen_player_market = set()  # (player_id, market) — statshub bywa zdublowany
     shot_lam = {}  # player_id -> {'shots': λ, 'sot': λ, 'info': {...}} — pod sugestie STS
     real_split = {}  # (player_id, mk) -> pełny scoring niecelnych/zablokowanych z 365
+    legi_pool = []   # wszystkie kwotowane linie z wysoką szansą — pula pod kupony pewniaków
 
     for tr in trends:
         if (tr.player_id, tr.market_code) in seen_player_market:
@@ -542,6 +543,28 @@ def main():
             sm = score_player_market(mk, l, hist, prior, ctx,
                                      over_odd, under_odd,
                                      market_calibrated=True)
+            # pula pewniaków pod kupony: wysoka szansa + rozsądny kurs,
+            # bez wymogu value (ale bez grania mocno przeciw modelowi)
+            for side_key, side_pl in (("over", "powyzej"), ("under", "ponizej")):
+                sv = slot.get(side_key)
+                if not sv:
+                    continue
+                odd = sv[0]
+                p_side = sm.p_over if side_key == "over" else 1.0 - sm.p_over
+                if (
+                    1.10 <= odd <= 2.60
+                    and p_side >= 0.55
+                    and p_side * odd - 1.0 >= -0.12
+                    and (sm.ci_high - sm.ci_low) <= 0.35
+                ):
+                    legi_pool.append({
+                        "id": 0, "mecz_id": mid, "mecz": match_label,
+                        "kickoff_ts": ts, "podmiot_id": tr.player_id,
+                        "podmiot": tr.player_name,
+                        "rynek": MARKET_NAMES_PL[mk], "linia": l,
+                        "strona": side_pl, "kurs": odd,
+                        "bukmacher": sv[1], "p_model": round(p_side, 4),
+                    })
             for a in sm.assessments:
                 if a.side not in best_by_side or a.rank_score > best_by_side[a.side].rank_score:
                     best_by_side[a.side] = a
@@ -682,7 +705,7 @@ def main():
     dump("value_bets.json", value_bets)
     dump("matches.json", list(matches_out.values()))
     dump("players.json", list(players_out.values()))
-    kupony_list = kupony.build_kupony(value_bets)
+    kupony_list = kupony.build_kupony(value_bets, legi_pool)
     dump("kupony.json", kupony_list)
     if kupony_list:
         print("Kupony:", ", ".join(

@@ -138,9 +138,11 @@ export interface KuponLeg {
   kickoff_ts: number;
 }
 
-/** Kupon (AKO) budowany przez model pod docelowy kurs (x5/x10/x15/x20). */
+/** Kupon (AKO) budowany przez model pod docelowy kurs (x5/x10/x15/x20/x25). */
 export interface Kupon {
   cel: number;
+  /** pewniaki = maks. szansa przy zadanym kursie; value = tylko typy z przewagą */
+  styl?: "pewniaki" | "value";
   kurs_laczny: number;
   p_model: number;
   fair_kurs: number;

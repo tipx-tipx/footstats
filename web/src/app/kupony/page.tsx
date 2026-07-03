@@ -15,12 +15,12 @@ export default async function KuponyPage() {
         title="Kupony budowane przez model"
         lead={
           <>
-            Model składa kupony z pojedynczych typów z wartością — celując w
-            łączne kursy ~5, ~10, ~15 i ~20. Zasady twarde: tylko typy z
-            dodatnią wartością i pewnością co najmniej średnią, maksymalnie
-            jeden typ z meczu (wyniki w meczu są od siebie zależne — sklejanie
-            ich zawyża szansę). Szansa kuponu = iloczyn szans, wartość = szansa
-            × kurs − 1.
+            Model składa kupony z w pełni przeanalizowanych typów (historia,
+            minuty, składy z dwóch źródeł, matchup). <strong>Pewniaki</strong>:
+            legi o najwyższej szansie łączone tak, by kurs doszedł do ~10–25
+            przy maksymalnej szansie trafienia — do 4 wydarzeń z meczu, z karą
+            korelacyjną. <strong>Value</strong>: wyłącznie typy z matematyczną
+            przewagą, max 1 na mecz. Szansa kuponu = iloczyn szans legów.
           </>
         }
       />
@@ -42,11 +42,22 @@ export default async function KuponyPage() {
       ) : (
         <div className="mt-8 grid gap-4 lg:grid-cols-2">
           {kupony.map((k, i) => (
-            <Reveal key={k.cel} delay={Math.min(i * 0.06, 0.25)}>
+            <Reveal key={`${k.styl}-${k.cel}`} delay={Math.min(i * 0.06, 0.25)}>
               <article className="flex h-full flex-col rounded-2xl border border-hairline bg-card shadow-(--shadow-card) transition-shadow hover:shadow-(--shadow-card-hover)">
                 <header className="flex items-center justify-between gap-3 border-b border-hairline px-5 py-4">
-                  <span className="font-data rounded-lg bg-brand px-3 py-1 text-lg font-bold text-white">
-                    ×{k.cel}
+                  <span className="flex items-center gap-2">
+                    <span className="font-data rounded-lg bg-brand px-3 py-1 text-lg font-bold text-white">
+                      ×{k.cel}
+                    </span>
+                    <span
+                      className={`rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                        k.styl === "value"
+                          ? "bg-data-green-wash text-brand-deep"
+                          : "bg-paper text-muted"
+                      }`}
+                    >
+                      {k.styl === "value" ? "value" : "pewniaki"}
+                    </span>
                   </span>
                   <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-right">
                     <div>

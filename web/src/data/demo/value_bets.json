@@ -32,15 +32,15 @@
   ],
   "oczekiwane_minuty": 84.3,
   "rozklad": [
-   0.40768377156181623,
-   0.3447063160944223,
-   0.1652161903069978,
-   0.05901843315593515,
-   0.017480161412561302,
-   0.004537125567089904,
-   0.0010668748860876553,
-   0.0002322628292005282,
-   5.886418588907372e-05
+   0.4076839825546746,
+   0.34470617953522903,
+   0.1652160968053106,
+   0.059018424376223795,
+   0.017480174406007375,
+   0.004537134766458645,
+   0.0010668787707242523,
+   0.00023226411480780222,
+   5.886467056392952e-05
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -69,7 +69,7 @@
   }
  },
  {
-  "id": 6,
+  "id": 8,
   "mecz_id": 12813018,
   "mecz": "Australia – Egypt",
   "kickoff_ts": 1783101600,
@@ -123,7 +123,76 @@
   }
  },
  {
-  "id": 7,
+  "id": 4,
+  "mecz_id": 12812990,
+  "mecz": "Portugal – Spain",
+  "kickoff_ts": 1783364400,
+  "podmiot_typ": "zawodnik",
+  "podmiot_id": 789071,
+  "podmiot": "Dani Olmo",
+  "druzyna": "Spain",
+  "przeciwnik": "Portugal",
+  "rynek_kod": "shots_blocked",
+  "rynek": "Strzały zablokowane",
+  "linia": 0.5,
+  "strona": "powyzej",
+  "sugestia": true,
+  "kurs": null,
+  "bukmacher": "STS (sprawdź ręcznie)",
+  "p_model": 0.5772,
+  "p_rynku": null,
+  "fair_kurs": 1.73,
+  "edge_pp": null,
+  "ev_pct": null,
+  "rank_score": 0.5772,
+  "lambda": 0.925,
+  "pewnosc": "srednia",
+  "pewnosc_score": 45.0,
+  "ryzyko": "wysokie",
+  "ci": [
+   0.3629,
+   0.7821
+  ],
+  "oczekiwane_minuty": 71.3,
+  "rozklad": [
+   0.4170255606300448,
+   0.34547505454444305,
+   0.16101532803792973,
+   0.05559594998748158,
+   0.015838769883249258,
+   0.0039383891705158285,
+   0.0008841598661691708,
+   0.0001832357084629154,
+   4.3552171703709064e-05
+  ],
+  "czynniki": {
+   "rywal": 1.0,
+   "sedzia": 1.0,
+   "dom_wyjazd": 1.0,
+   "scenariusz_meczu": 1.0,
+   "matchup": 1.0,
+   "lacznie": 1.0,
+   "opisy": {}
+  },
+  "uzasadnienie": {
+   "czynniki": [
+    {
+     "nazwa": "Poziom bazowy",
+     "opis": "Średnio 1.17 na 90 minut (efektywna próba: 2 meczów)",
+     "mnoznik": null
+    },
+    {
+     "nazwa": "Minuty",
+     "opis": "Przewidywane minuty: 71 (szansa na pierwszy skład: 90%, wg przewidywanego składu)",
+     "mnoznik": 0.79
+    }
+   ],
+   "oczekiwana_liczba": 0.92,
+   "rynek_rzadki": false
+  }
+ },
+ {
+  "id": 5,
   "mecz_id": 12812990,
   "mecz": "Portugal – Spain",
   "kickoff_ts": 1783364400,
@@ -139,41 +208,56 @@
   "sugestia": true,
   "kurs": null,
   "bukmacher": "STS (sprawdź ręcznie)",
-  "p_model": 0.5794,
+  "p_model": 0.5652,
   "p_rynku": null,
-  "fair_kurs": 1.73,
+  "fair_kurs": 1.77,
   "edge_pp": null,
   "ev_pct": null,
-  "rank_score": 0.5793800564780717,
-  "lambda": 0.866,
-  "pewnosc": "niska",
-  "pewnosc_score": 30.0,
+  "rank_score": 0.5652,
+  "lambda": 0.894,
+  "pewnosc": "srednia",
+  "pewnosc_score": 45.0,
   "ryzyko": "wysokie",
   "ci": [
-   null,
-   null
+   0.3492,
+   0.7734
   ],
-  "oczekiwane_minuty": null,
+  "oczekiwane_minuty": 71.3,
   "rozklad": [
-   0.42061994352192833,
-   0.36426763896054415,
-   0.1577325502956943,
-   0.045533475503119626,
-   0.009858288860668616,
-   0.001707506105106771,
-   0.000280596752938226
+   0.42920218101203983,
+   0.34386205313767554,
+   0.15557656321904179,
+   0.05230431477716741,
+   0.014544547919139426,
+   0.0035372749306565063,
+   0.0007780390362546434,
+   0.00015821293126305451,
+   3.681303676184022e-05
   ],
-  "czynniki": {},
+  "czynniki": {
+   "rywal": 1.0,
+   "sedzia": 1.0,
+   "dom_wyjazd": 1.0,
+   "scenariusz_meczu": 1.0,
+   "matchup": 1.0,
+   "lacznie": 1.0,
+   "opisy": {}
+  },
   "uzasadnienie": {
    "czynniki": [
     {
-     "nazwa": "Szacunek z modelu",
-     "opis": "Oczekiwane 0.87 na mecz (z: strzały − celne, podział 55% wg danych ligowych)",
+     "nazwa": "Poziom bazowy",
+     "opis": "Średnio 1.13 na 90 minut (efektywna próba: 2 meczów)",
      "mnoznik": null
+    },
+    {
+     "nazwa": "Minuty",
+     "opis": "Przewidywane minuty: 71 (szansa na pierwszy skład: 90%, wg przewidywanego składu)",
+     "mnoznik": 0.79
     }
    ],
-   "oczekiwana_liczba": 0.87,
-   "rynek_rzadki": true
+   "oczekiwana_liczba": 0.89,
+   "rynek_rzadki": false
   }
  },
  {
@@ -209,15 +293,15 @@
   ],
   "oczekiwane_minuty": 84.3,
   "rozklad": [
-   0.16054896549482242,
-   0.276735042784749,
-   0.25414616782421323,
-   0.16517929754169772,
-   0.08518634165559139,
-   0.03707222805318683,
-   0.014143155870521635,
-   0.0048532917993728865,
-   0.002135508975844913
+   0.1605492056346519,
+   0.27673513718356896,
+   0.2541460635162958,
+   0.16517916446812006,
+   0.08518626638796822,
+   0.037072202947963664,
+   0.01414315283516372,
+   0.00485329412923509,
+   0.002135512897032621
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -246,7 +330,7 @@
   }
  },
  {
-  "id": 4,
+  "id": 6,
   "mecz_id": 12813011,
   "mecz": "Colombia – Ghana",
   "kickoff_ts": 1783128600,
@@ -332,15 +416,15 @@
   ],
   "oczekiwane_minuty": 77.2,
   "rozklad": [
-   0.4765014478621951,
-   0.3362068427514933,
-   0.13454153072781802,
-   0.0401438692296576,
-   0.009934624481059091,
-   0.0021551740844852193,
-   0.0004236548999962488,
-   7.7119140479763e-05,
-   1.5736822815637375e-05
+   0.4765020627135392,
+   0.33620657552319316,
+   0.13454128308021535,
+   0.04014378624096038,
+   0.009934608272523788,
+   0.002155172685471339,
+   0.0004236552355330114,
+   7.711934281547855e-05,
+   1.5736905748298113e-05
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -369,7 +453,7 @@
   }
  },
  {
-  "id": 5,
+  "id": 7,
   "mecz_id": 12812999,
   "mecz": "Argentina – Cape Verde",
   "kickoff_ts": 1783116000,
