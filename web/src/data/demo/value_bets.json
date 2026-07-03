@@ -1,5 +1,113 @@
 [
  {
+  "id": 5,
+  "mecz_id": 12813018,
+  "mecz": "Australia – Egypt",
+  "kickoff_ts": 1783101600,
+  "podmiot_typ": "zawodnik",
+  "podmiot_id": 1101624,
+  "podmiot": "Mahmoud Saber",
+  "druzyna": "Egypt",
+  "przeciwnik": "Australia",
+  "rynek_kod": "shots_blocked",
+  "rynek": "Strzały zablokowane",
+  "linia": 0.5,
+  "strona": "powyzej",
+  "sugestia": true,
+  "kurs": null,
+  "bukmacher": "STS (sprawdź ręcznie)",
+  "p_model": 0.5802,
+  "p_rynku": null,
+  "fair_kurs": 1.72,
+  "edge_pp": null,
+  "ev_pct": null,
+  "pewnosc": "niska",
+  "pewnosc_score": 30.0,
+  "ryzyko": "wysokie",
+  "rank_score": 0.5802031939960145,
+  "ci": [
+   null,
+   null
+  ],
+  "oczekiwane_minuty": null,
+  "lambda": 0.868,
+  "rozklad": [
+   0.41979680600398533,
+   0.36437711236503006,
+   0.15813683920003116,
+   0.04575344071396089,
+   0.009928319111579537,
+   0.001723525380267688,
+   0.00028395722514530154
+  ],
+  "czynniki": {},
+  "uzasadnienie": {
+   "czynniki": [
+    {
+     "nazwa": "Szacunek z modelu",
+     "opis": "Oczekiwane 0.87 na mecz (z: strzały − celne, podział 44% wg danych ligowych)",
+     "mnoznik": null
+    }
+   ],
+   "oczekiwana_liczba": 0.87,
+   "rynek_rzadki": true
+  }
+ },
+ {
+  "id": 6,
+  "mecz_id": 12813018,
+  "mecz": "Australia – Egypt",
+  "kickoff_ts": 1783101600,
+  "podmiot_typ": "zawodnik",
+  "podmiot_id": 159665,
+  "podmiot": "Mohamed Salah",
+  "druzyna": "Egypt",
+  "przeciwnik": "Australia",
+  "rynek_kod": "shots_blocked",
+  "rynek": "Strzały zablokowane",
+  "linia": 0.5,
+  "strona": "powyzej",
+  "sugestia": true,
+  "kurs": null,
+  "bukmacher": "STS (sprawdź ręcznie)",
+  "p_model": 0.5603,
+  "p_rynku": null,
+  "fair_kurs": 1.78,
+  "edge_pp": null,
+  "ev_pct": null,
+  "pewnosc": "niska",
+  "pewnosc_score": 30.0,
+  "ryzyko": "wysokie",
+  "rank_score": 0.5603094786007081,
+  "ci": [
+   null,
+   null
+  ],
+  "oczekiwane_minuty": null,
+  "lambda": 0.822,
+  "rozklad": [
+   0.4396905213992918,
+   0.3612867367359391,
+   0.14843179439700557,
+   0.04065468476546543,
+   0.008351327625394058,
+   0.0013724307249513418,
+   0.00021250435195268374
+  ],
+  "czynniki": {},
+  "uzasadnienie": {
+   "czynniki": [
+    {
+     "nazwa": "Szacunek z modelu",
+     "opis": "Oczekiwane 0.82 na mecz (z: strzały − celne, podział 44% wg danych ligowych)",
+     "mnoznik": null
+    }
+   ],
+   "oczekiwana_liczba": 0.82,
+   "rynek_rzadki": true
+  }
+ },
+ {
   "id": 1,
   "mecz_id": 12812999,
   "mecz": "Argentina – Cape Verde",
@@ -16,99 +124,45 @@
   "sugestia": true,
   "kurs": null,
   "bukmacher": "STS (sprawdź ręcznie)",
-  "p_model": 0.595,
+  "p_model": 0.5488,
   "p_rynku": null,
-  "fair_kurs": 1.68,
+  "fair_kurs": 1.82,
   "edge_pp": null,
   "ev_pct": null,
   "pewnosc": "niska",
   "pewnosc_score": 30.0,
   "ryzyko": "wysokie",
-  "rank_score": 0.594981478166867,
+  "rank_score": 0.5488413556388297,
   "ci": [
    null,
    null
   ],
   "oczekiwane_minuty": null,
-  "lambda": 0.904,
+  "lambda": 0.796,
   "rozklad": [
-   0.40501852183313297,
-   0.36606484484915647,
-   0.1654288179561899,
-   0.04983942816954404,
-   0.01126149889249479,
-   0.0020356791715063793,
-   0.000351209127975483
+   0.4511586443611702,
+   0.359093515036327,
+   0.14290777108319883,
+   0.03791515799424734,
+   0.007544512073236795,
+   0.0012009901144413408,
+   0.0001794093373784625
   ],
   "czynniki": {},
   "uzasadnienie": {
    "czynniki": [
     {
      "nazwa": "Szacunek z modelu",
-     "opis": "Oczekiwane 0.90 na mecz (z: strzały − celne, podział 55% wg danych ligowych)",
+     "opis": "Oczekiwane 0.80 na mecz (z: strzały − celne, podział 55% wg danych ligowych)",
      "mnoznik": null
     }
    ],
-   "oczekiwana_liczba": 0.9,
+   "oczekiwana_liczba": 0.8,
    "rynek_rzadki": true
   }
  },
  {
-  "id": 6,
-  "mecz_id": 12812999,
-  "mecz": "Argentina – Cape Verde",
-  "kickoff_ts": 1783116000,
-  "podmiot_typ": "zawodnik",
-  "podmiot_id": 12994,
-  "podmiot": "Lionel Messi",
-  "druzyna": "Argentina",
-  "przeciwnik": "Cape Verde",
-  "rynek_kod": "shots_off_target",
-  "rynek": "Strzały niecelne",
-  "linia": 1.5,
-  "strona": "powyzej",
-  "sugestia": true,
-  "kurs": null,
-  "bukmacher": "STS (sprawdź ręcznie)",
-  "p_model": 0.5926,
-  "p_rynku": null,
-  "fair_kurs": 1.69,
-  "edge_pp": null,
-  "ev_pct": null,
-  "pewnosc": "niska",
-  "pewnosc_score": 30.0,
-  "ryzyko": "wysokie",
-  "rank_score": 0.5925833573373718,
-  "ci": [
-   null,
-   null
-  ],
-  "oczekiwane_minuty": null,
-  "lambda": 1.995,
-  "rozklad": [
-   0.13604159968242627,
-   0.27137504298020165,
-   0.27066872972833617,
-   0.1799761698747318,
-   0.08975387114893772,
-   0.03580810678136839,
-   0.016376479803997958
-  ],
-  "czynniki": {},
-  "uzasadnienie": {
-   "czynniki": [
-    {
-     "nazwa": "Szacunek z modelu",
-     "opis": "Oczekiwane 1.99 na mecz (z: strzały − celne, podział 55% wg danych ligowych)",
-     "mnoznik": null
-    }
-   ],
-   "oczekiwana_liczba": 1.99,
-   "rynek_rzadki": true
-  }
- },
- {
-  "id": 3,
+  "id": 2,
   "mecz_id": 12813011,
   "mecz": "Colombia – Ghana",
   "kickoff_ts": 1783128600,
@@ -124,45 +178,45 @@
   "sugestia": true,
   "kurs": null,
   "bukmacher": "STS (sprawdź ręcznie)",
-  "p_model": 0.5598,
+  "p_model": 0.5212,
   "p_rynku": null,
-  "fair_kurs": 1.79,
+  "fair_kurs": 1.92,
   "edge_pp": null,
   "ev_pct": null,
   "pewnosc": "niska",
   "pewnosc_score": 30.0,
   "ryzyko": "wysokie",
-  "rank_score": 0.5597984373357472,
+  "rank_score": 0.5212078592946607,
   "ci": [
    null,
    null
   ],
   "oczekiwane_minuty": null,
-  "lambda": 0.821,
+  "lambda": 0.736,
   "rozklad": [
-   0.44020156266425287,
-   0.36119531311327324,
-   0.14818445148785228,
-   0.0405295618290028,
-   0.008313854956902915,
-   0.0013643411105413333,
-   0.00021091483817454502
+   0.4787921407053393,
+   0.3526250108541352,
+   0.12985217144197408,
+   0.03187821984484002,
+   0.005869487332351206,
+   0.000864562242491911,
+   0.00011840757886827147
   ],
   "czynniki": {},
   "uzasadnienie": {
    "czynniki": [
     {
      "nazwa": "Szacunek z modelu",
-     "opis": "Oczekiwane 0.82 na mecz (z: strzały − celne, podział 55% wg danych ligowych)",
+     "opis": "Oczekiwane 0.74 na mecz (z: strzały − celne, podział 55% wg danych ligowych)",
      "mnoznik": null
     }
    ],
-   "oczekiwana_liczba": 0.82,
+   "oczekiwana_liczba": 0.74,
    "rynek_rzadki": true
   }
  },
  {
-  "id": 4,
+  "id": 3,
   "mecz_id": 12812999,
   "mecz": "Argentina – Cape Verde",
   "kickoff_ts": 1783116000,
@@ -178,105 +232,51 @@
   "sugestia": true,
   "kurs": null,
   "bukmacher": "STS (sprawdź ręcznie)",
-  "p_model": 0.5596,
+  "p_model": 0.5173,
   "p_rynku": null,
-  "fair_kurs": 1.79,
+  "fair_kurs": 1.93,
   "edge_pp": null,
   "ev_pct": null,
   "pewnosc": "niska",
   "pewnosc_score": 30.0,
   "ryzyko": "wysokie",
-  "rank_score": 0.5596368713279938,
+  "rank_score": 0.5173268681126203,
   "ci": [
    null,
    null
   ],
   "oczekiwane_minuty": null,
-  "lambda": 0.82,
+  "lambda": 0.728,
   "rozklad": [
-   0.4403631286720063,
-   0.3611662860138665,
-   0.14810627600273715,
-   0.040490063886263486,
-   0.008302038160169193,
-   0.0013617926176952922,
-   0.00021041464726209358
+   0.4826731318873795,
+   0.3515866389676247,
+   0.12805059628779286,
+   0.03109135064177681,
+   0.005661856208135061,
+   0.0008248368773924851,
+   0.00011158912989865209
   ],
   "czynniki": {},
   "uzasadnienie": {
    "czynniki": [
     {
      "nazwa": "Szacunek z modelu",
-     "opis": "Oczekiwane 0.82 na mecz (z: strzały − celne, podział 55% wg danych ligowych)",
+     "opis": "Oczekiwane 0.73 na mecz (z: strzały − celne, podział 55% wg danych ligowych)",
      "mnoznik": null
     }
    ],
-   "oczekiwana_liczba": 0.82,
+   "oczekiwana_liczba": 0.73,
    "rynek_rzadki": true
   }
  },
  {
-  "id": 7,
-  "mecz_id": 12813018,
-  "mecz": "Australia – Egypt",
-  "kickoff_ts": 1783101600,
-  "podmiot_typ": "zawodnik",
-  "podmiot_id": 159665,
-  "podmiot": "Mohamed Salah",
-  "druzyna": "Egypt",
-  "przeciwnik": "Australia",
-  "rynek_kod": "shots_blocked",
-  "rynek": "Strzały zablokowane",
-  "linia": 0.5,
-  "strona": "powyzej",
-  "sugestia": true,
-  "kurs": null,
-  "bukmacher": "STS (sprawdź ręcznie)",
-  "p_model": 0.5525,
-  "p_rynku": null,
-  "fair_kurs": 1.81,
-  "edge_pp": null,
-  "ev_pct": null,
-  "pewnosc": "niska",
-  "pewnosc_score": 30.0,
-  "ryzyko": "wysokie",
-  "rank_score": 0.5525103007643601,
-  "ci": [
-   null,
-   null
-  ],
-  "oczekiwane_minuty": null,
-  "lambda": 0.804,
-  "rozklad": [
-   0.44748969923563975,
-   0.35982725473724864,
-   0.144668864415095,
-   0.038776162831126434,
-   0.007794995194638839,
-   0.0012535938710401269,
-   0.00018942971521122514
-  ],
-  "czynniki": {},
-  "uzasadnienie": {
-   "czynniki": [
-    {
-     "nazwa": "Szacunek z modelu",
-     "opis": "Oczekiwane 0.80 na mecz (z: strzały − celne, podział 44% wg danych ligowych)",
-     "mnoznik": null
-    }
-   ],
-   "oczekiwana_liczba": 0.8,
-   "rynek_rzadki": true
-  }
- },
- {
-  "id": 5,
+  "id": 4,
   "mecz_id": 12813011,
   "mecz": "Colombia – Ghana",
   "kickoff_ts": 1783128600,
   "podmiot_typ": "zawodnik",
-  "podmiot_id": 1160386,
-  "podmiot": "Andres Gomez",
+  "podmiot_id": 107414,
+  "podmiot": "James Rodriguez",
   "druzyna": "Colombia",
   "przeciwnik": "Ghana",
   "rynek_kod": "shots_off_target",
@@ -286,94 +286,40 @@
   "sugestia": true,
   "kurs": null,
   "bukmacher": "STS (sprawdź ręcznie)",
-  "p_model": 0.5361,
+  "p_model": 0.5048,
   "p_rynku": null,
-  "fair_kurs": 1.87,
+  "fair_kurs": 1.98,
   "edge_pp": null,
   "ev_pct": null,
   "pewnosc": "niska",
   "pewnosc_score": 30.0,
   "ryzyko": "wysokie",
-  "rank_score": 0.5360819134740135,
+  "rank_score": 0.5047677328994488,
   "ci": [
    null,
    null
   ],
   "oczekiwane_minuty": null,
-  "lambda": 0.768,
+  "lambda": 0.703,
   "rozklad": [
-   0.46391808652598665,
-   0.35631102449908875,
-   0.13683185660026925,
-   0.03503111175972896,
-   0.006726387525608963,
-   0.0010332367286539788,
-   0.00014829636066342506
+   0.4952322671005511,
+   0.3480137786879429,
+   0.1222795829376661,
+   0.028643111890151157,
+   0.0050320820473967205,
+   0.000707237393167165,
+   9.193994312477653e-05
   ],
   "czynniki": {},
   "uzasadnienie": {
    "czynniki": [
     {
      "nazwa": "Szacunek z modelu",
-     "opis": "Oczekiwane 0.77 na mecz (z: strzały − celne, podział 55% wg danych ligowych)",
+     "opis": "Oczekiwane 0.70 na mecz (z: strzały − celne, podział 55% wg danych ligowych)",
      "mnoznik": null
     }
    ],
-   "oczekiwana_liczba": 0.77,
-   "rynek_rzadki": true
-  }
- },
- {
-  "id": 2,
-  "mecz_id": 12812999,
-  "mecz": "Argentina – Cape Verde",
-  "kickoff_ts": 1783116000,
-  "podmiot_typ": "zawodnik",
-  "podmiot_id": 1171451,
-  "podmiot": "Nicolas Paz",
-  "druzyna": "Argentina",
-  "przeciwnik": "Cape Verde",
-  "rynek_kod": "shots_blocked",
-  "rynek": "Strzały zablokowane",
-  "linia": 0.5,
-  "strona": "powyzej",
-  "sugestia": true,
-  "kurs": null,
-  "bukmacher": "STS (sprawdź ręcznie)",
-  "p_model": 0.5141,
-  "p_rynku": null,
-  "fair_kurs": 1.95,
-  "edge_pp": null,
-  "ev_pct": null,
-  "pewnosc": "niska",
-  "pewnosc_score": 30.0,
-  "ryzyko": "wysokie",
-  "rank_score": 0.5141024695463255,
-  "ci": [
-   null,
-   null
-  ],
-  "oczekiwane_minuty": null,
-  "lambda": 0.722,
-  "rozklad": [
-   0.48589753045367456,
-   0.3507001965543686,
-   0.12656025206429686,
-   0.030448604553500593,
-   0.0054941273274988255,
-   0.0007930855428919562,
-   0.0001062035037685871
-  ],
-  "czynniki": {},
-  "uzasadnienie": {
-   "czynniki": [
-    {
-     "nazwa": "Szacunek z modelu",
-     "opis": "Oczekiwane 0.72 na mecz (z: strzały − celne, podział 44% wg danych ligowych)",
-     "mnoznik": null
-    }
-   ],
-   "oczekiwana_liczba": 0.72,
+   "oczekiwana_liczba": 0.7,
    "rynek_rzadki": true
   }
  }

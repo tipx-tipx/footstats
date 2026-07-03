@@ -23,7 +23,7 @@ from curl_cffi import requests
 
 from ..engine import MatchContext, PlayerHistory, RARE_MARKETS, score_player_market
 from ..model import counts
-from ..sources import statshub, superbet
+from ..sources import rotowire, statshub, superbet
 from .build_demo import MARKET_NAMES_PL, WEB_DATA_DIR, line_for_lambda
 
 # KURSY GŁÓWNE: wyłącznie Superbet. STS blokuje IP serwerowni (chmura = źródło
@@ -84,15 +84,18 @@ def score_from_trend(
     opp_avg_ref: float | None,
     lineup_confirmed: bool = False,
     predicted_available: bool = False,
+    roto_pred: bool | None = None,
+    roto_confirmed: bool = False,
 ):
     """Zbuduj PlayerHistory z recentGames i policz predykcję (bez kursów).
 
-    Składy dwustopniowo:
-      * lineupConfirmed (event) = skład OGŁOSZONY -> inPredictedLineup to twardy
-        fakt: w XI (True) albo poza XI (False, scenariusz ławki),
-      * skład nieogłoszony, ale statshub ma przewidywany (ktokolwiek w meczu
-        ma inPredictedLineup=True) -> sygnał miękki (predicted_started),
-      * brak przewidywanego składu dla meczu -> ignorujemy pole (sama historia).
+    Składy — hierarchia sygnałów:
+      1. lineupConfirmed (statshub) LUB skład potwierdzony na Rotowire
+         -> official_started: twardy fakt (w XI / scenariusz ławki),
+      2. przewidywane XI z DWÓCH źródeł (statshub + Rotowire):
+         zgoda -> mocny sygnał miękki; spór -> wracamy do historii minut,
+      3. tylko jedno źródło -> jego prognoza jako sygnał miękki,
+      4. brak prognoz -> sama historia.
     """
     now = int(time.time())
     hist = PlayerHistory(
@@ -104,12 +107,18 @@ def score_from_trend(
     if sum(1 for m in trend.minutes if m > 0) < 3:
         return None, hist
     prior = group_prior_from_context(trend)
+    sh_pred = trend.in_predicted_lineup if predicted_available else None
     if lineup_confirmed:
         official, predicted = trend.in_predicted_lineup, None
-    elif predicted_available:
-        official, predicted = None, trend.in_predicted_lineup
+    elif roto_confirmed and roto_pred is not None:
+        official, predicted = roto_pred, None
+    elif sh_pred is not None and roto_pred is not None:
+        # dwa źródła: zgoda = sygnał, spór = nie wiemy -> historia
+        official = None
+        predicted = sh_pred if sh_pred == roto_pred else None
     else:
-        official, predicted = None, None
+        official = None
+        predicted = sh_pred if sh_pred is not None else roto_pred
     # kontekst: średnia rywala względem ligi (jeśli statshub podał)
     ctx = MatchContext(
         is_home=trend.is_home,
@@ -162,6 +171,14 @@ def main():
     ev_by_id = {e["id"]: e for e in events}
     sb_cache: dict[int, dict] = {}
 
+    # przewidywane XI z Rotowire (drugie źródło, działa z chmury)
+    try:
+        roto = rotowire.fetch_predicted_lineups()
+        print(f"Rotowire: przewidywane składy {len(roto)} drużyn")
+    except Exception as e:
+        roto = {}
+        print(f"Rotowire niedostępny: {e}")
+
     # składy: potwierdzone (event.lineupConfirmed) i przewidywane (czy statshub
     # w ogóle wystawił przewidywany skład dla danego meczu)
     lineup_confirmed = {e["id"]: bool(e.get("lineupConfirmed")) for e in events}
@@ -202,13 +219,19 @@ def main():
                 "kolejka": "Ćwierćfinał", "kickoff_ts": ts,
                 "gospodarz": home_name, "gosc": away_name,
                 "sedzia": None, "sedzia_mnoznik_fauli": 1.0, "okazje": [],
-                "sklady_ogloszone": lineup_confirmed.get(mid, False),
+                "sklady_ogloszone": lineup_confirmed.get(mid, False)
+                or (
+                    rotowire.is_confirmed(roto, home_name)
+                    and rotowire.is_confirmed(roto, away_name)
+                ),
             }
 
         built, hist = score_from_trend(
             tr, tr.opponent_average,
             lineup_confirmed=lineup_confirmed.get(mid, False),
             predicted_available=predicted_available.get(mid, False),
+            roto_pred=rotowire.predicted_status(roto, tr.team_name, tr.player_name),
+            roto_confirmed=rotowire.is_confirmed(roto, tr.team_name),
         )
         if built is None:
             continue

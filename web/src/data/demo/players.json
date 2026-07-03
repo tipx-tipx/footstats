@@ -360,6 +360,42 @@
   }
  },
  {
+  "id": 1101624,
+  "nazwa": "Mahmoud Saber",
+  "pozycja": "M",
+  "druzyna": "Egypt",
+  "minuty_lacznie": 3068,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     3,
+     7,
+     3,
+     5,
+     2,
+     10,
+     3,
+     5,
+     5,
+     1
+    ],
+    "minuty": [
+     45,
+     90,
+     86,
+     90,
+     90,
+     90,
+     90,
+     89,
+     90,
+     55
+    ],
+    "srednia90": 2.96
+   }
+  }
+ },
+ {
   "id": 895324,
   "nazwa": "Alexis Mac Allister",
   "pozycja": "M",
@@ -644,42 +680,6 @@
      90
     ],
     "srednia90": 2.5
-   }
-  }
- },
- {
-  "id": 1174889,
-  "nazwa": "Gustavo Puerta",
-  "pozycja": "M",
-  "druzyna": "Colombia",
-  "minuty_lacznie": 3360,
-  "forma": {
-   "fouls_committed": {
-    "ostatnie": [
-     2,
-     1,
-     2,
-     1,
-     1,
-     1,
-     4,
-     1,
-     0,
-     1
-    ],
-    "minuty": [
-     90,
-     90,
-     80,
-     45,
-     68,
-     84,
-     89,
-     90,
-     90,
-     85
-    ],
-    "srednia90": 2.22
    }
   }
  }

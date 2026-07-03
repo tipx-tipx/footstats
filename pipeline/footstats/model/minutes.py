@@ -92,17 +92,19 @@ def estimate_minutes(
         if official_started is not None:
             p_start = 1.0 if official_started else 0.0
         elif predicted_started is not None:
-            p_start = 0.90 if predicted_started else 0.10
+            p_start = 0.93 if predicted_started else 0.07
         else:
             p_start = 0.3
         start_min, sub_min, p_sub = 80.0, 25.0, 0.4
     else:
         p_start = float(np.average(started, weights=w))
         if official_started is None and predicted_started is not None:
-            # Miękkie przesunięcie: przewidywane składy trafiają ~85-90%,
-            # ale bywają błędne — mieszamy z historią zamiast nadpisywać.
-            target = 0.90 if predicted_started else 0.10
-            p_start = 0.25 * p_start + 0.75 * target
+            # Przewidywany skład to GŁÓWNY sygnał przed ogłoszeniem XI —
+            # typy muszą istnieć przed meczem, nie godzinę przed. Prognozy
+            # trafiają ~85-90%, więc ufamy im mocno, ale zostawiamy
+            # domieszkę historii na wypadek błędnej prognozy.
+            target = 0.93 if predicted_started else 0.07
+            p_start = 0.15 * p_start + 0.85 * target
         start_mask = started & (minutes > 0)
         start_min = float(np.average(minutes[start_mask], weights=w[start_mask])) if start_mask.any() else 80.0
         sub_mask = (~started) & (minutes > 0)
