@@ -61,68 +61,80 @@ export function BetTracker() {
 
   if (zaklady.length === 0) {
     return (
-      <div className="mt-8 rounded-(--radius-card) border border-dashed border-hairline-strong bg-card p-10 text-center">
-        <p className="font-semibold">Nie masz jeszcze żadnych zakładów</p>
-        <p className="mt-1 text-sm text-muted">
-          Wejdź w <Link href="/" className="text-brand underline">Okazje</Link>,
-          rozwiń interesujący zakład i kliknij „Dodaj do moich zakładów”.
+      <div className="mt-8 rounded-2xl border border-dashed border-hairline-strong bg-card px-8 py-14 text-center">
+        <span
+          aria-hidden
+          className="font-data mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-brand-wash text-xl text-brand"
+        >
+          +
+        </span>
+        <p className="mt-4 font-semibold">Nie masz jeszcze żadnych zakładów</p>
+        <p className="mx-auto mt-1 max-w-sm text-sm leading-relaxed text-muted">
+          Rozwiń interesującą okazję i kliknij „Dodaj do moich zakładów” —
+          wróci tutaj jako wpis do rozliczenia.
         </p>
+        <Link
+          href="/"
+          className="mt-5 inline-block rounded-lg bg-brand px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-deep"
+        >
+          Przeglądaj okazje
+        </Link>
       </div>
     );
   }
 
   return (
     <>
-      {/* podsumowanie */}
-      <dl className="mt-6 flex flex-wrap gap-x-10 gap-y-3 rounded-(--radius-card) border border-hairline bg-card px-5 py-4 shadow-(--shadow-card)">
-        <div>
-          <dt className="text-xs text-faint">zakładów</dt>
-          <dd className="font-data text-xl font-semibold">{podsumowanie.n}</dd>
-        </div>
-        <div>
-          <dt className="text-xs text-faint">trafionych</dt>
-          <dd className="font-data text-xl font-semibold">
-            {podsumowanie.wygrane}/{podsumowanie.rozliczone}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-xs text-faint">zysk (dla podanych stawek)</dt>
-          <dd
-            className={`font-data text-xl font-semibold ${
+      {/* podsumowanie — kafelki jak w hero */}
+      <dl className="mt-7 grid max-w-3xl grid-cols-2 gap-2.5 sm:grid-cols-4">
+        {[
+          { label: "zakładów", value: String(podsumowanie.n), tone: "" },
+          {
+            label: "trafionych",
+            value: `${podsumowanie.wygrane}/${podsumowanie.rozliczone}`,
+            tone: "",
+          },
+          {
+            label: "zysk (dla podanych stawek)",
+            value: `${podsumowanie.zysk >= 0 ? "+" : ""}${podsumowanie.zysk
+              .toFixed(2)
+              .replace(".", ",")} zł`,
+            tone:
               podsumowanie.zysk > 0
                 ? "text-data-green"
                 : podsumowanie.zysk < 0
                   ? "text-data-red"
-                  : ""
-            }`}
-          >
-            {podsumowanie.zysk >= 0 ? "+" : ""}
-            {podsumowanie.zysk.toFixed(2).replace(".", ",")} zł
-          </dd>
-        </div>
-        <div>
-          <dt className="text-xs text-faint">
-            średni CLV{" "}
-            <span title="Czy Twój kurs był lepszy niż kurs tuż przed meczem. Dodatni = wyprzedzasz rynek.">
-              ⓘ
-            </span>
-          </dt>
-          <dd
-            className={`font-data text-xl font-semibold ${
+                  : "",
+          },
+          {
+            label: "średni CLV",
+            value:
+              podsumowanie.sredniCLV === null
+                ? "—"
+                : `${podsumowanie.sredniCLV > 0 ? "+" : ""}${podsumowanie.sredniCLV
+                    .toFixed(1)
+                    .replace(".", ",")}%`,
+            tone:
               (podsumowanie.sredniCLV ?? 0) > 0
                 ? "text-data-green"
                 : (podsumowanie.sredniCLV ?? 0) < 0
                   ? "text-data-red"
-                  : ""
-            }`}
+                  : "",
+            hint: "Czy Twój kurs był lepszy niż kurs tuż przed meczem. Dodatni = wyprzedzasz rynek.",
+          },
+        ].map((s) => (
+          <div
+            key={s.label}
+            className="rounded-xl border border-hairline bg-card px-3.5 py-3 shadow-(--shadow-card)"
+            title={"hint" in s ? s.hint : undefined}
           >
-            {podsumowanie.sredniCLV === null
-              ? "—"
-              : `${podsumowanie.sredniCLV > 0 ? "+" : ""}${podsumowanie.sredniCLV
-                  .toFixed(1)
-                  .replace(".", ",")}%`}
-          </dd>
-        </div>
+            <dd className={`font-data text-xl font-semibold ${s.tone}`}>{s.value}</dd>
+            <dt className="mt-0.5 text-[11px] leading-tight text-faint">
+              {s.label}
+              {"hint" in s && " ⓘ"}
+            </dt>
+          </div>
+        ))}
       </dl>
 
       {/* lista */}

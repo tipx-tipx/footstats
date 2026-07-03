@@ -25,6 +25,7 @@ const GRUPY: { href: string; label: string }[][] = [
 
 export function Nav() {
   const pathname = usePathname();
+  if (pathname === "/login") return null;
   return (
     <header className="sticky top-0 z-40 border-b border-hairline bg-card/90 backdrop-blur-md">
       <div className="mx-auto flex h-14 max-w-6xl items-center gap-5 px-4 sm:px-6">
@@ -75,6 +76,19 @@ export function Nav() {
             </div>
           ))}
         </nav>
+        <button
+          onClick={async () => {
+            await fetch("/api/login", { method: "DELETE" });
+            window.location.href = "/login";
+          }}
+          title="Wyloguj"
+          aria-label="Wyloguj"
+          className="shrink-0 rounded-lg p-2 text-faint transition-colors hover:bg-paper hover:text-ink"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
       </div>
     </header>
   );

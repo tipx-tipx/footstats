@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { IBM_Plex_Mono, IBM_Plex_Sans, Sora } from "next/font/google";
 import "./globals.css";
 import { Nav } from "@/components/Nav";
+import { SiteFooter } from "@/components/SiteFooter";
 import { getMeta } from "@/lib/data";
 
 const sora = Sora({
@@ -50,18 +51,13 @@ export default async function RootLayout({
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-24 sm:px-6">
           {children}
         </main>
-        <footer className="border-t border-hairline bg-card">
-          <div className="mx-auto flex max-w-6xl flex-col gap-1 px-4 py-6 text-xs text-faint sm:px-6">
-            <p>
-              FootStats · narzędzie analityczne — nie gwarantuje wygranych.
-              Graj odpowiedzialnie, obstawiaj wyłącznie u legalnych bukmacherów.
-            </p>
-            <p>
-              Dane: {meta.zrodlo} · {meta.liga} {meta.sezon} · {meta.meczow_w_bazie}{" "}
-              meczów w bazie · aktualizacja: {aktualizacja}
-            </p>
-          </div>
-        </footer>
+        <SiteFooter
+          zrodlo={meta.zrodlo}
+          liga={meta.liga}
+          sezon={meta.sezon}
+          meczow={meta.meczow_w_bazie}
+          aktualizacja={aktualizacja}
+        />
       </body>
     </html>
   );
