@@ -148,6 +148,43 @@ export interface Kupon {
   legi: KuponLeg[];
 }
 
+/** Rozliczony (lub czekający) typ z automatycznego logu. */
+export interface TypRozliczony {
+  mecz: string;
+  kickoff_ts: number;
+  podmiot: string;
+  rynek_kod: string;
+  rynek: string;
+  linia: number;
+  strona: Strona;
+  kurs: number | null;
+  p_model: number;
+  sugestia: boolean;
+  wynik: "wygrany" | "przegrany" | "zwrot" | null;
+  faktyczna: number | null;
+}
+
+/** Skuteczność realnych typów (log rozliczany automatycznie po meczach). */
+export interface TypyWyniki {
+  podsumowanie: {
+    opublikowane: number;
+    rozliczone: number;
+    trafione: number;
+    roi_flat: number;
+    okazje_rozliczone: number;
+  } | null;
+  po_rynku: {
+    rynek_kod: string;
+    rynek: string;
+    n: number;
+    trafione: number;
+    sr_p_model: number;
+    czestosc: number;
+    bias: number;
+  }[];
+  ostatnie: TypRozliczony[];
+}
+
 /** Zakład zapisany w trackerze (localStorage). */
 export interface MojZaklad {
   id: string;

@@ -14,8 +14,17 @@ import playersLocal from "@/data/demo/players.json";
 import calibrationLocal from "@/data/demo/calibration.json";
 import metaLocal from "@/data/demo/meta.json";
 import kuponyLocal from "@/data/demo/kupony.json";
+import typyWynikiLocal from "@/data/demo/typy_wyniki.json";
 
-import type { Kalibracja, Kupon, Mecz, Meta, ValueBet, Zawodnik } from "./types";
+import type {
+  Kalibracja,
+  Kupon,
+  Mecz,
+  Meta,
+  TypyWyniki,
+  ValueBet,
+  Zawodnik,
+} from "./types";
 
 type Bundle = {
   value_bets: ValueBet[];
@@ -24,6 +33,7 @@ type Bundle = {
   calibration: Kalibracja;
   meta: Meta;
   kupony: Kupon[];
+  typy_wyniki: TypyWyniki;
 };
 
 const LOCAL: Bundle = {
@@ -33,6 +43,7 @@ const LOCAL: Bundle = {
   calibration: calibrationLocal as unknown as Kalibracja,
   meta: metaLocal as unknown as Meta,
   kupony: kuponyLocal as unknown as Kupon[],
+  typy_wyniki: typyWynikiLocal as unknown as TypyWyniki,
 };
 
 const SUPABASE_URL = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -62,6 +73,7 @@ async function loadBundle(): Promise<Bundle> {
       calibration: (map.calibration ?? LOCAL.calibration) as Kalibracja,
       meta: (map.meta ?? LOCAL.meta) as Meta,
       kupony: (map.kupony ?? LOCAL.kupony) as Kupon[],
+      typy_wyniki: (map.typy_wyniki ?? LOCAL.typy_wyniki) as TypyWyniki,
     };
   } catch {
     return LOCAL;
@@ -98,4 +110,8 @@ export async function getBetsForMatch(matchId: number): Promise<ValueBet[]> {
 
 export async function getKupony(): Promise<Kupon[]> {
   return (await loadBundle()).kupony;
+}
+
+export async function getTypyWyniki(): Promise<TypyWyniki> {
+  return (await loadBundle()).typy_wyniki;
 }

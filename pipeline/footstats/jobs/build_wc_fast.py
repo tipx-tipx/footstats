@@ -26,9 +26,11 @@ from curl_cffi import requests
 
 from dataclasses import replace as dc_replace
 
+from .. import supa
 from ..engine import MatchContext, PlayerHistory, RARE_MARKETS, score_player_market
 from ..model import counts, kupony, matchup_lite
 from ..sources import rotowire, scores365, statshub, superbet
+from . import rozliczanie
 from .build_demo import MARKET_NAMES_PL, WEB_DATA_DIR, line_for_lambda
 
 # KURSY GŁÓWNE: wyłącznie Superbet. STS blokuje IP serwerowni (chmura = źródło
@@ -74,53 +76,17 @@ def upcoming_wc_events() -> list[dict]:
     return list(out.values())
 
 
-def _supabase_headers() -> tuple[str, dict] | None:
-    url = os.environ.get("SUPABASE_URL", "").rstrip("/")
-    key = os.environ.get("SUPABASE_SERVICE_KEY", "")
-    if not url or not key:
-        return None
-    return url, {
-        "apikey": key,
-        "Authorization": f"Bearer {key}",
-        "Content-Type": "application/json",
-    }
-
-
 def load_trend_lib() -> dict:
     """Trwała biblioteka trendów (Supabase app_data.trend_lib).
 
     statshub KASUJE propsy po meczu — bez tej biblioteki tracimy historię
     zawodników, zanim pojawią się kursy na ich następny mecz.
     """
-    sb = _supabase_headers()
-    if sb is None:
-        return {}
-    url, headers = sb
-    try:
-        r = requests.get(
-            f"{url}/rest/v1/app_data?select=payload&key=eq.trend_lib",
-            headers=headers, impersonate="chrome124", timeout=30,
-        )
-        rows = r.json() if r.status_code == 200 else []
-        return rows[0]["payload"] if rows else {}
-    except Exception:
-        return {}
+    return supa.get_key("trend_lib") or {}
 
 
 def save_trend_lib(lib: dict) -> None:
-    sb = _supabase_headers()
-    if sb is None:
-        return
-    url, headers = sb
-    try:
-        requests.post(
-            f"{url}/rest/v1/app_data?on_conflict=key",
-            headers={**headers, "Prefer": "resolution=merge-duplicates"},
-            data=json.dumps([{"key": "trend_lib", "payload": lib}]),
-            impersonate="chrome124", timeout=60,
-        )
-    except Exception:
-        pass
+    supa.put_key("trend_lib", lib)
 
 
 def past_wc_event_ids(days_back: int = 25) -> list[int]:
@@ -723,6 +689,15 @@ def main():
             f"x{k['cel']} (kurs {k['kurs_laczny']}, EV {k['ev_pct']:+.0f}%)"
             for k in kupony_list
         ))
+    try:
+        wyniki = rozliczanie.rozlicz(value_bets)
+        dump("typy_wyniki.json", wyniki)
+        p = wyniki["podsumowanie"]
+        print(f"Typy: {p['opublikowane']} w logu, {p['rozliczone']} rozliczonych, "
+              f"{p['trafione']} trafionych, ROI flat {p['roi_flat']:+.2f} j.")
+    except Exception as ex:
+        print(f"Rozliczanie pominięte ({ex})")
+        dump("typy_wyniki.json", {"podsumowanie": None, "po_rynku": [], "ostatnie": []})
     dump("meta.json", {
         "wygenerowano_ts": int(time.time()), "tryb": "ms2026",
         "liga": "Mistrzostwa Świata", "sezon": "2026",

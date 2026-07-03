@@ -1,12 +1,18 @@
 import { CalibrationChart } from "@/components/CalibrationChart";
 import { PageHeader } from "@/components/PageHeader";
 import { Reveal } from "@/components/Reveal";
-import { getKalibracja, getMeta } from "@/lib/data";
+import { getKalibracja, getMeta, getTypyWyniki } from "@/lib/data";
+import { fmtLinia, fmtProc } from "@/lib/format";
 
 export const metadata = { title: "Skuteczność modelu — FootStats" };
 
 export default async function ModelPage() {
-  const [kal, meta] = await Promise.all([getKalibracja(), getMeta()]);
+  const [kal, meta, typy] = await Promise.all([
+    getKalibracja(),
+    getMeta(),
+    getTypyWyniki(),
+  ]);
+  const pods = typy.podsumowanie;
 
   return (
     <div>
@@ -52,6 +58,138 @@ export default async function ModelPage() {
           </div>
         </Reveal>
       )}
+
+      {/* rozliczenia realnych typów — automatyczne po każdym meczu */}
+      <Reveal className="mt-10">
+        <h2 className="text-lg font-semibold">Realne typy — test na żywo</h2>
+        <p className="mt-1 max-w-3xl text-sm text-muted">
+          Każdy publikowany typ trafia do logu z zamrożoną szansą i kursem,
+          a po meczu system sam sprawdza wynik (statystyki per strzał i per
+          zawodnik). Od 25 rozliczonych typów na rynek model zacznie dokręcać
+          kalibrację na tej podstawie.
+        </p>
+        {pods && pods.rozliczone > 0 ? (
+          <>
+            <dl className="mt-4 grid max-w-3xl grid-cols-2 gap-2.5 sm:grid-cols-4">
+              {[
+                { label: "typów w logu", value: String(pods.opublikowane) },
+                { label: "rozliczonych", value: String(pods.rozliczone) },
+                {
+                  label: "trafionych",
+                  value: `${pods.trafione}/${pods.rozliczone} (${Math.round(
+                    (pods.trafione / Math.max(pods.rozliczone, 1)) * 100,
+                  )}%)`,
+                },
+                {
+                  label: "ROI (stawka 1 j. na okazję)",
+                  value: `${pods.roi_flat >= 0 ? "+" : ""}${pods.roi_flat
+                    .toFixed(2)
+                    .replace(".", ",")} j.`,
+                  tone:
+                    pods.roi_flat > 0
+                      ? "text-data-green"
+                      : pods.roi_flat < 0
+                        ? "text-data-red"
+                        : "",
+                },
+              ].map((s) => (
+                <div
+                  key={s.label}
+                  className="rounded-xl border border-hairline bg-card px-3.5 py-3 shadow-(--shadow-card)"
+                >
+                  <dd
+                    className={`font-data text-xl font-semibold ${"tone" in s ? s.tone : ""}`}
+                  >
+                    {s.value}
+                  </dd>
+                  <dt className="mt-0.5 text-[11px] leading-tight text-faint">
+                    {s.label}
+                  </dt>
+                </div>
+              ))}
+            </dl>
+            {typy.po_rynku.length > 0 && (
+              <div className="mt-4 max-w-3xl overflow-x-auto rounded-xl border border-hairline bg-card shadow-(--shadow-card)">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-hairline text-left text-[11px] uppercase tracking-wide text-faint">
+                      <th className="px-4 py-2.5 font-medium">rynek</th>
+                      <th className="px-4 py-2.5 font-medium">trafione</th>
+                      <th className="px-4 py-2.5 font-medium" title="Średnia szansa, jaką dawał model">
+                        model mówił
+                      </th>
+                      <th className="px-4 py-2.5 font-medium">było</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-hairline">
+                    {typy.po_rynku.map((r) => (
+                      <tr key={r.rynek_kod}>
+                        <td className="px-4 py-2.5 font-medium">{r.rynek}</td>
+                        <td className="font-data px-4 py-2.5">
+                          {r.trafione}/{r.n}
+                        </td>
+                        <td className="font-data px-4 py-2.5 text-muted">
+                          {fmtProc(r.sr_p_model)}
+                        </td>
+                        <td className="font-data px-4 py-2.5">
+                          {fmtProc(r.czestosc)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {typy.ostatnie.length > 0 && (
+              <ul className="mt-4 max-w-3xl space-y-1.5">
+                {typy.ostatnie.slice(0, 12).map((t, i) => (
+                  <li
+                    key={`${t.mecz}-${t.podmiot}-${t.rynek_kod}-${i}`}
+                    className="flex items-center gap-3 rounded-lg border border-hairline bg-card px-3.5 py-2 text-sm"
+                  >
+                    <span
+                      aria-hidden
+                      className={`h-2 w-2 shrink-0 rounded-full ${
+                        t.wynik === "wygrany"
+                          ? "bg-data-green"
+                          : t.wynik === "przegrany"
+                            ? "bg-data-red"
+                            : "bg-data-amber"
+                      }`}
+                    />
+                    <span className="min-w-0 flex-1 truncate">
+                      <span className="font-medium">{t.podmiot}</span>{" "}
+                      <span className="text-muted">
+                        {t.rynek.toLowerCase()} pow. {fmtLinia(t.linia)} · {t.mecz}
+                      </span>
+                    </span>
+                    <span className="font-data shrink-0 text-xs text-muted">
+                      było: {t.faktyczna != null ? t.faktyczna : "—"}
+                    </span>
+                    <span
+                      className={`shrink-0 text-xs font-semibold ${
+                        t.wynik === "wygrany"
+                          ? "text-data-green"
+                          : t.wynik === "przegrany"
+                            ? "text-data-red"
+                            : "text-[#8a5613]"
+                      }`}
+                    >
+                      {t.wynik === "wygrany" ? "✓ trafiony" : t.wynik === "przegrany" ? "✗ nietrafiony" : "zwrot"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+        ) : (
+          <p className="mt-4 max-w-3xl rounded-xl border border-hairline bg-card px-4 py-3.5 text-sm text-muted shadow-(--shadow-card)">
+            Log już zbiera publikowane typy — pierwsze rozliczenia pojawią się
+            automatycznie po zakończeniu najbliższych meczów
+            {pods ? ` (w logu: ${pods.opublikowane})` : ""}.
+          </p>
+        )}
+      </Reveal>
 
       <Reveal className="mt-10">
         <h2 className="text-lg font-semibold">Kalibracja po rynkach</h2>
