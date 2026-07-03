@@ -46,7 +46,8 @@ export function FormBars({
           {values.map((v, i) => {
             const over = v > line;
             const short = mins != null && mins[i] > 0 && mins[i] < 30;
-            const h = Math.max((v / max) * 100, 5);
+            // zero = cienka kreska przy podstawie (nie udaje słupka)
+            const h = v > 0 ? Math.max((v / max) * 100, 8) : 2;
             return (
               <div key={i} className="relative flex-1" style={{ minWidth: 8 }}>
                 <div

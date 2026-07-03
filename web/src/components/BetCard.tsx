@@ -4,7 +4,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useEffect, useState } from "react";
 
 import { ConfidenceBadge, EdgeBadge, PewnoscDots, RiskBadge } from "./badges";
-import { DistributionStrip } from "./DistributionStrip";
+import { ChanceBar, OutcomeColumns } from "./DistributionStrip";
 import { FormBars } from "./Sparkline";
 import { addZakladFromBet, isTracked, onZakladyChange } from "@/lib/tracker";
 import {
@@ -71,23 +71,8 @@ export function BetCard({
         </span>
 
         <span className="hidden min-w-0 items-center gap-3 sm:flex">
-          <span className="w-full max-w-44">
-            {bet.rozklad ? (
-              <>
-                <DistributionStrip dist={bet.rozklad} line={bet.linia} height={14} />
-                <span className="mt-1 block text-[10px] text-faint">
-                  szansa wg modelu:{" "}
-                  <span className="font-data font-medium text-ink-soft">
-                    {fmtProc(bet.p_model)}
-                  </span>
-                </span>
-              </>
-            ) : (
-              <span className="text-xs text-faint">
-                szansa wg modelu:{" "}
-                <span className="font-data text-ink-soft">{fmtProc(bet.p_model)}</span>
-              </span>
-            )}
+          <span className="w-full max-w-48">
+            <ChanceBar p={bet.p_model} line={bet.linia} side={bet.strona} />
           </span>
         </span>
 
@@ -275,12 +260,10 @@ export function BetCard({
                     <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-faint">
                       Możliwe wyniki i ich szanse
                     </h4>
-                    <DistributionStrip
+                    <OutcomeColumns
                       dist={bet.rozklad}
                       line={bet.linia}
                       side={bet.strona}
-                      height={30}
-                      showLabels
                     />
                   </div>
                 )}
