@@ -40,22 +40,23 @@ export function FormBars({
       >
         {/* słupki */}
         <div
-          className="absolute inset-x-0 bottom-0 flex items-end gap-[3px]"
+          className="absolute inset-x-0 bottom-0 flex gap-1"
           style={{ height: plotH }}
         >
           {values.map((v, i) => {
             const over = v > line;
             const short = mins != null && mins[i] > 0 && mins[i] < 30;
             // zero = cienka kreska przy podstawie (nie udaje słupka)
-            const h = v > 0 ? Math.max((v / max) * 100, 8) : 2;
+            const h = v > 0 ? Math.max((v / max) * 100, 8) : 3;
             return (
-              <div key={i} className="relative flex-1" style={{ minWidth: 8 }}>
+              // h-full jest kluczowe: wysokość słupka to % wysokości kolumny
+              <div key={i} className="relative h-full flex-1" style={{ minWidth: 10 }}>
                 <div
-                  className="absolute inset-x-0 bottom-0 rounded-t-[4px]"
+                  className="absolute inset-x-0 bottom-0 rounded-t-[5px]"
                   style={{
                     height: `${h}%`,
                     background: over
-                      ? "var(--color-data-green)"
+                      ? "linear-gradient(to top, var(--color-brand), var(--color-data-green))"
                       : "var(--color-hairline-strong)",
                     opacity: short ? 0.45 : 1,
                   }}
