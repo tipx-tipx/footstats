@@ -22,9 +22,11 @@ from collections import defaultdict
 import numpy as np
 from curl_cffi import requests
 
+from dataclasses import replace as dc_replace
+
 from ..engine import MatchContext, PlayerHistory, RARE_MARKETS, score_player_market
 from ..model import counts, matchup_lite
-from ..sources import rotowire, statshub, superbet
+from ..sources import rotowire, scores365, statshub, superbet
 from .build_demo import MARKET_NAMES_PL, WEB_DATA_DIR, line_for_lambda
 
 # KURSY GŁÓWNE: wyłącznie Superbet. STS blokuje IP serwerowni (chmura = źródło
@@ -157,6 +159,65 @@ def main():
         print("statshub nie ma jeszcze propsów na te mecze (ładują się ~24-48 h "
               "przed). Uruchom ponownie bliżej meczu.")
         return
+
+    # --- rynki z map strzałów (365Scores): głową / zza pola karnego ---
+    # Syntetyczne trendy: liczby z chartEvents 365Scores (per typ strzału),
+    # minuty/starty/pozycje ze statshubowego trendu "shots" tego zawodnika
+    # (mecze parowane po timestampie). Dalej płyną przez ten sam scoring,
+    # co rynki rdzeniowe (składy, matchup, kursy Superbetu, bezpieczniki).
+    SHOT_SPLIT = {
+        "headed_shots": "headed",
+        "headed_sot": "headed_sot",
+        "shots_outside_box": "outside",
+        "sot_outside_box": "sot_outside",
+    }
+    try:
+        shots_trends = [t for t in trends if t.market_code == "shots"]
+        team_names = sorted({t.team_name for t in shots_trends if t.team_name})
+        cids = scores365.competitor_ids(team_names)
+        hist365: dict[str, list] = {}
+        for name in team_names:
+            cid = cids.get(rotowire._norm(name))
+            if cid:
+                hist365[name] = scores365.team_shot_history(cid, n_games=6)
+        n_syn = 0
+        for t in shots_trends:
+            games365 = hist365.get(t.team_name) or []
+            if not games365:
+                continue
+            all_keys = {k for _, pp in games365 for k in pp}
+            pkey = scores365.resolve_player_key(all_keys, t.player_name)
+            if pkey is None:
+                continue  # zawodnik bez strzałów w historii 365 — nic do modelowania
+            for mk2, f365 in SHOT_SPLIT.items():
+                counts2, minutes2, ts2, started2, pos2 = [], [], [], [], []
+                for i, ts in enumerate(t.timestamps):
+                    rec = next(
+                        (pp for g_ts, pp in games365 if abs(g_ts - ts) < 36 * 3600),
+                        None,
+                    )
+                    if rec is None:
+                        continue
+                    counts2.append(float(rec.get(pkey, {}).get(f365, 0)))
+                    minutes2.append(t.minutes[i])
+                    ts2.append(ts)
+                    started2.append(t.started[i])
+                    pos2.append(t.game_positions[i] if i < len(t.game_positions) else "")
+                if sum(1 for m in minutes2 if m > 0) < 3:
+                    continue
+                trends.append(dc_replace(
+                    t, market_code=mk2, line=0.5,
+                    counts=counts2, minutes=minutes2, timestamps=ts2,
+                    started=started2, game_positions=pos2,
+                    opponent_average=None, opponent_rank=None,
+                    league_average=None, ref_odds=[],
+                ))
+                n_syn += 1
+        if n_syn:
+            print(f"365Scores: dołożono {n_syn} trendów map strzałów "
+                  f"(drużyn z historią: {len(hist365)})")
+    except Exception as e:
+        print(f"365Scores pominięte ({e}) — rynki map strzałów bez zmian.")
 
     # nazwy drużyn są w trendach (event ma tylko ID) -> mapa id->nazwa
     team_name = {}

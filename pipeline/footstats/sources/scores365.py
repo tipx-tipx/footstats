@@ -1,0 +1,153 @@
+"""Źródło danych: 365Scores — mapy strzałów (alternatywa dla Sofascore).
+
+Sofascore blokuje IP serwerowni, więc rynki wymagające danych per strzał
+(głową, zza pola karnego, zablokowane, niecelne) nie działały w chmurze.
+365Scores (webws.365scores.com) daje to samo i DZIAŁA z GitHub Actions
+(potwierdzone). Każdy strzał w chartEvents ma:
+
+  * bodyPart:  "Header" / "Left foot" / "Right Foot",
+  * outcome.id: 0=Goal, 1=Missed (niecelny), 2=Saved (celny, obroniony),
+                4=Blocked (zablokowany),
+  * side: pozycja wzdłuż boiska w % (bramka=100; rzut karny ~88.5;
+          linia pola karnego ~84 — strzał zza pola: side < 84),
+  * xG / xGOT (bonus, nieużywane).
+
+Przepływ: competitor_ids (z bieżących meczów) -> games/results per drużyna
+-> game/?gameId= (members + chartEvents) -> agregacja per zawodnik per mecz.
+Wyniki cache'owane w pamięci procesu (jeden cykl = jedno pobranie).
+"""
+
+from __future__ import annotations
+
+import time as _time
+
+from curl_cffi import requests
+
+from .rotowire import _norm
+
+BASE = "https://webws.365scores.com/web"
+Q = "appTypeId=5&langId=1&timezoneName=Europe/Warsaw&userCountryId=1"
+
+# linia pola karnego: 16.5 m z ~105 m boiska => ~84% (karny side~88.5 potwierdza skalę)
+BOX_SIDE_THRESHOLD = 84.0
+
+_game_cache: dict[int, dict] = {}
+
+
+def _get(url: str, timeout: int = 25, retries: int = 2) -> dict:
+    last = None
+    for attempt in range(retries):
+        try:
+            r = requests.get(url, impersonate="chrome124", timeout=timeout)
+            r.raise_for_status()
+            return r.json()
+        except Exception as e:
+            last = e
+            _time.sleep(2 * (attempt + 1))
+    raise last
+
+
+def competitor_ids(team_names: list[str]) -> dict[str, int]:
+    """Mapa: znormalizowana nazwa drużyny -> competitorId (z bieżących meczów)."""
+    wanted = {_norm(n) for n in team_names}
+    out: dict[str, int] = {}
+    data = _get(f"{BASE}/games/current/?{Q}&sports=1")
+    for g in data.get("games", []):
+        for side in ("homeCompetitor", "awayCompetitor"):
+            c = g.get(side) or {}
+            key = _norm(str(c.get("name", "")))
+            if key in wanted and key not in out and c.get("id"):
+                out[key] = int(c["id"])
+    return out
+
+
+def recent_finished_games(competitor_id: int, n: int = 6) -> list[tuple[int, int]]:
+    """Ostatnie n zakończonych meczów drużyny: [(gameId, timestamp_unix), ...] od najnowszych."""
+    data = _get(f"{BASE}/games/results/?{Q}&competitors={competitor_id}")
+    rows = []
+    for g in data.get("games", []):
+        if g.get("statusGroup") != 4:
+            continue
+        st = str(g.get("startTime", ""))  # np. "2026-06-25T20:00:00+02:00"
+        try:
+            from datetime import datetime
+
+            ts = int(datetime.fromisoformat(st).timestamp())
+        except Exception:
+            continue
+        rows.append((int(g["id"]), ts))
+    rows.sort(key=lambda x: x[1], reverse=True)
+    return rows[:n]
+
+
+def classify_event(e: dict) -> dict[str, int] | None:
+    """Zamień jedno zdarzenie chartEvents na liczniki rynków (None = pomiń)."""
+    if e.get("type") not in (0, None):  # 0 = strzał
+        return None
+    out_id = (e.get("outcome") or {}).get("id")
+    body = str(e.get("bodyPart") or "")
+    side = e.get("side")
+    headed = body == "Header"
+    on_target = out_id in (0, 2)
+    outside = side is not None and float(side) < BOX_SIDE_THRESHOLD
+    return {
+        "shots": 1,
+        "sot": 1 if on_target else 0,
+        "headed": 1 if headed else 0,
+        "headed_sot": 1 if headed and on_target else 0,
+        "outside": 1 if outside else 0,
+        "sot_outside": 1 if outside and on_target else 0,
+        "blocked": 1 if out_id == 4 else 0,
+        "off_target": 1 if out_id == 1 else 0,
+    }
+
+
+def resolve_player_key(all_keys: set[str], player_name: str) -> str | None:
+    """Znajdź klucz zawodnika w historii 365 (dokładnie albo nazwisko+inicjał)."""
+    p = _norm(player_name)
+    if p in all_keys:
+        return p
+    pt = p.split()
+    if not pt:
+        return None
+    for k in all_keys:
+        kt = k.split()
+        if kt and pt[-1] == kt[-1] and pt[0][:1] == kt[0][:1]:
+            return k
+    return None
+
+
+def game_player_shots(game_id: int) -> dict[str, dict[str, int]]:
+    """Agregat strzałów per zawodnik (znormalizowane nazwisko) dla meczu."""
+    if game_id in _game_cache:
+        return _game_cache[game_id]
+    data = _get(f"{BASE}/game/?{Q}&gameId={game_id}")
+    game = data.get("game", {})
+    names = {int(m["id"]): str(m.get("name", "")) for m in game.get("members", []) if m.get("id")}
+    per_player: dict[str, dict[str, int]] = {}
+    for e in (game.get("chartEvents") or {}).get("events", []):
+        counts = classify_event(e)
+        if counts is None:
+            continue
+        name = names.get(int(e.get("playerId") or 0))
+        if not name:
+            continue
+        slot = per_player.setdefault(_norm(name), dict.fromkeys(counts, 0))
+        for k, v in counts.items():
+            slot[k] += v
+    _game_cache[game_id] = per_player
+    return per_player
+
+
+def team_shot_history(
+    competitor_id: int, n_games: int = 6
+) -> list[tuple[int, dict[str, dict[str, int]]]]:
+    """Historia drużyny: [(timestamp, {zawodnik: liczniki}), ...] od najnowszych."""
+    out = []
+    for gid, ts in recent_finished_games(competitor_id, n_games):
+        try:
+            out.append((ts, game_player_shots(gid)))
+        except Exception:
+            continue
+        _time.sleep(0.3)  # grzecznie dla API
+    return out
