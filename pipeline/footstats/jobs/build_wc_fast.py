@@ -133,6 +133,7 @@ def score_from_trend(
     roto_confirmed: bool = False,
     matchup_factor: float | None = None,
     matchup_opis: str = "",
+    wc_names: set | None = None,
 ):
     """Zbuduj PlayerHistory z recentGames i policz predykcję (bez kursów).
 
@@ -145,11 +146,22 @@ def score_from_trend(
       4. brak prognoz -> sama historia.
     """
     now = int(time.time())
+    # ważenie próby siłą rywala: mecz z uczestnikiem MŚ liczy się pełniej
+    # niż mecz ze słabszym zespołem (pierwsze przybliżenie siły — Elo później)
+    opp_w = None
+    if wc_names and trend.game_opponents:
+        opp_w = [
+            1.0 if rotowire._norm(o) in wc_names else 0.75
+            for o in trend.game_opponents[: len(trend.counts)]
+        ]
+        if len(opp_w) < len(trend.counts):
+            opp_w += [0.85] * (len(trend.counts) - len(opp_w))
     hist = PlayerHistory(
         counts=trend.counts,
         minutes=trend.minutes,
         days_ago=[max((now - ts) / 86400.0, 0.0) for ts in trend.timestamps],
         started=trend.started,
+        opp_weights=opp_w,
     )
     if sum(1 for m in trend.minutes if m > 0) < 3:
         return None, hist
@@ -213,6 +225,9 @@ def main():
         e for e in events
         if e["id"] not in covered and e.get("homeTeamId") and e.get("awayTeamId")
     ]
+    # timestampy meczów reprezentacji per drużyna (z historii 365Scores) —
+    # do oznaczania "kadra vs klub" w formie zawodnika
+    nt_ts: dict[str, set] = {}
     try:
         # 1) trwała biblioteka z Supabase (przeżywa kasowanie propsów przez statshub)
         stored = load_trend_lib()
@@ -304,6 +319,9 @@ def main():
                     continue
                 if team_nm not in hist_cache:
                     hist_cache[team_nm] = scores365.team_match_history(cid, 6)
+                    nt_ts.setdefault(team_nm, set()).update(
+                        g_ts for g_ts, _ in hist_cache[team_nm]
+                    )
                 games = hist_cache[team_nm]
                 if len(games) < 3:
                     continue
@@ -368,6 +386,9 @@ def main():
             cid = cids.get(rotowire._norm(name))
             if cid:
                 hist365[name] = scores365.team_shot_history(cid, n_games=6)
+                nt_ts.setdefault(name, set()).update(
+                    g_ts for g_ts, _ in hist365[name]
+                )
         n_syn = 0
         for t in shots_trends:
             games365 = hist365.get(t.team_name) or []
@@ -419,6 +440,16 @@ def main():
             team_name[t.team_id] = t.team_name
         if t.opponent_id:
             team_name[t.opponent_id] = t.opponent_name
+
+    # uczestnicy MŚ (znormalizowani) — do ważenia próby siłą rywala
+    wc_names = {
+        rotowire._norm(n) for n in team_name.values() if n
+    } | {
+        rotowire._norm(x)
+        for t in trends
+        for x in (t.team_name, t.opponent_name)
+        if x
+    }
 
     # kursy Superbetu
     try:
@@ -522,6 +553,7 @@ def main():
             roto_confirmed=rotowire.is_confirmed(roto, tr.team_name),
             matchup_factor=mf if mf != 1.0 else None,
             matchup_opis=mo,
+            wc_names=wc_names,
         )
         if built is None:
             continue
@@ -605,9 +637,15 @@ def main():
                 "pozycja": tr.position or "?", "druzyna": tr.team_name,
                 "minuty_lacznie": int(sum(tr.minutes)), "forma": {},
             }
+        nt_zbior = nt_ts.get(tr.team_name, set())
         players_out[tr.player_id]["forma"][mk] = {
             "ostatnie": [int(c) for c in tr.counts[:10]],
             "minuty": [int(m) for m in tr.minutes[:10]],
+            "rywale": [str(o) for o in tr.game_opponents[:10]],
+            "kadra": [
+                any(abs(ts_g - g) < 36 * 3600 for g in nt_zbior)
+                for ts_g in tr.timestamps[:10]
+            ],
             "srednia90": round(
                 float(np.sum(tr.counts) / max(np.sum(tr.minutes), 1) * 90.0), 2
             ),

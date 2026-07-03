@@ -105,21 +105,31 @@ def fit_posterior(
     days_ago: np.ndarray,
     prior: GroupPrior,
     tau_days: float = DEFAULT_TAU_DAYS,
+    extra_weights: np.ndarray | None = None,
 ) -> GammaPosterior:
     """Policz posterior intensywności per-90 z historii meczów zawodnika.
 
     counts   — liczba zdarzeń w kolejnych meczach
     minutes  — rozegrane minuty w tych meczach
     days_ago — ile dni temu był każdy mecz (świeże ważą najwięcej)
+    extra_weights — waga jakości próby per mecz (siła rywala: mecz z drużyną
+                    poziomu MŚ liczy się pełniej niż mecz ze słabeuszem);
+                    mnożona przez wagę świeżości
     """
     counts = np.asarray(counts, dtype=float)
     minutes = np.asarray(minutes, dtype=float)
     days_ago = np.asarray(days_ago, dtype=float)
+    ew = (
+        np.asarray(extra_weights, dtype=float)
+        if extra_weights is not None and len(extra_weights) == len(counts)
+        else np.ones_like(counts)
+    )
 
     mask = (minutes > 0) & np.isfinite(counts)
     counts, minutes, days_ago = counts[mask], minutes[mask], days_ago[mask]
+    ew = ew[mask]
 
-    w = np.exp(-np.maximum(days_ago, 0.0) / tau_days)
+    w = np.exp(-np.maximum(days_ago, 0.0) / tau_days) * ew
     exposure = minutes / 90.0
 
     alpha = prior.alpha0 + float(np.sum(w * counts))

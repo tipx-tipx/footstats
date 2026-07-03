@@ -349,6 +349,8 @@ export function BetCard({
                       <FormBars
                         counts={forma.ostatnie}
                         minutes={forma.minuty}
+                        opponents={forma.rywale}
+                        kadra={forma.kadra}
                         line={bet.linia}
                         height={64}
                       />

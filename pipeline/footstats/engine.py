@@ -24,6 +24,8 @@ class PlayerHistory:
     minutes: list[float]
     days_ago: list[float]
     started: list[bool]
+    # waga jakości próby per mecz (siła rywala); None = wszystkie równe
+    opp_weights: list[float] | None = None
 
 
 @dataclass
@@ -180,6 +182,9 @@ def score_player_market(
         np.array(history.minutes),
         np.array(history.days_ago),
         prior=group_prior,
+        extra_weights=(
+            np.array(history.opp_weights) if history.opp_weights else None
+        ),
     )
 
     # 2) model minut

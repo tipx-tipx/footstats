@@ -81,6 +81,10 @@ export interface Mecz {
 export interface FormaRynku {
   ostatnie: number[];
   minuty: number[];
+  /** rywal w każdym meczu (równolegle z ostatnie) */
+  rywale?: string[];
+  /** true = mecz reprezentacji (false/brak = klub) */
+  kadra?: boolean[];
   srednia90: number;
 }
 

@@ -31,7 +31,10 @@ MARKETY_365 = {
 # rynki rozliczane z banku trendów statshub
 MARKETY_LIB = {"fouls_committed", "tackles", "fouls_won", "interceptions"}
 
-MECZ_KONIEC_PO_S = int(2.5 * 3600)
+
+# próbuj rozliczać już ~105 min po kickoffie (źródła i tak wymagają statusu
+# "zakończony") — status kuponu odświeża się tuż po końcowym gwizdku
+MECZ_KONIEC_PO_S = 105 * 60
 OKNO_PAROWANIA_S = 36 * 3600
 
 

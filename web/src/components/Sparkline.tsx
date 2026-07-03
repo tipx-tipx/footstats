@@ -13,16 +13,22 @@ import { fmtLinia } from "@/lib/format";
 export function FormBars({
   counts,
   minutes,
+  opponents,
+  kadra,
   line,
   height = 56,
 }: {
   counts: number[];
   minutes?: number[];
+  opponents?: string[];
+  kadra?: boolean[];
   line: number;
   height?: number;
 }) {
   const values = [...counts].reverse(); // najstarszy z lewej
   const mins = minutes ? [...minutes].reverse() : undefined;
+  const opps = opponents ? [...opponents].reverse() : undefined;
+  const nt = kadra ? [...kadra].reverse() : undefined;
   const max = Math.max(...values, Math.ceil(line + 0.5), 2);
   const labelH = 14; // miejsce na liczby nad słupkami
   const plotH = height - labelH;
@@ -60,12 +66,19 @@ export function FormBars({
                       : "var(--color-hairline-strong)",
                     opacity: short ? 0.45 : 1,
                   }}
-                  title={`${v} — ${
+                  title={`${v}${opps?.[i] ? ` vs ${opps[i]}` : ""} — ${
                     mins ? `${mins[i]} min gry, ` : ""
                   }${values.length - i} ${values.length - i === 1 ? "mecz" : "mecze/-ów"} temu${
-                    short ? " (krótki występ)" : ""
-                  }`}
+                    nt?.[i] ? " · reprezentacja" : ""
+                  }${short ? " (krótki występ)" : ""}`}
                 />
+                {nt?.[i] && (
+                  <span
+                    aria-hidden
+                    title="Mecz reprezentacji"
+                    className="absolute -bottom-[7px] left-1/2 h-[3px] w-[3px] -translate-x-1/2 rounded-full bg-brand"
+                  />
+                )}
                 <span
                   aria-hidden
                   className="font-data absolute inset-x-0 text-center text-[9px]"
@@ -96,11 +109,18 @@ export function FormBars({
           }}
         />
       </div>
-      <div className="mt-1 flex items-center justify-between text-[10px] text-faint">
+      <div className="mt-1.5 flex items-center justify-between text-[10px] text-faint">
         <span>najstarszy →</span>
         <span>
-          – – linia <span className="font-data">{fmtLinia(line)}</span> · blade
-          słupki = krótki występ
+          – – linia <span className="font-data">{fmtLinia(line)}</span>
+          {nt?.some(Boolean) && (
+            <>
+              {" "}
+              · <span aria-hidden className="mx-0.5 inline-block h-[3px] w-[3px] rounded-full bg-brand align-middle" />{" "}
+              kadra
+            </>
+          )}{" "}
+          · blade = krótki występ
         </span>
       </div>
     </div>

@@ -83,6 +83,8 @@ class StatshubTrend:
     started: list[bool] = field(default_factory=list)
     # pozycje per mecz (RW, LB, RCB...) — pod matchup-lite stron boiska
     game_positions: list[str] = field(default_factory=list)
+    # rywal per mecz — do formy w UI i ważenia próby siłą rywala
+    game_opponents: list[str] = field(default_factory=list)
     # kursy referencyjne bukmacherów UK dla linii `line` (Bet365, WH, ...)
     ref_odds: list[float] = field(default_factory=list)
 
@@ -127,6 +129,7 @@ def fetch_event_trends(event_ids: list[int]) -> list[StatshubTrend]:
                 timestamps=[int(g.get("eventTimestamp") or 0) for g in rg],
                 started=[float(g.get("minutesPlayed") or 0) >= 60 for g in rg],
                 game_positions=[str(g.get("position") or "") for g in rg],
+                game_opponents=[str(g.get("opponentName") or "") for g in rg],
                 ref_odds=[
                     float(b["oddsValue"])
                     for b in rec.get("bookmakers", [])

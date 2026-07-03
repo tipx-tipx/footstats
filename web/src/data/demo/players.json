@@ -31,6 +31,30 @@
      90,
      16
     ],
+    "rywale": [
+     "Jordan",
+     "Iceland",
+     "Hellas Verona",
+     "Napoli",
+     "Genoa",
+     "Inter",
+     "Sassuolo",
+     "Inter",
+     "Udinese",
+     "Zambia"
+    ],
+    "kadra": [
+     true,
+     true,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     true
+    ],
     "srednia90": 3.66
    },
    "shots_outside_box": {
@@ -43,6 +67,23 @@
      61,
      58,
      16
+    ],
+    "rywale": [
+     "Jordan",
+     "Iceland",
+     "Hellas Verona",
+     "Napoli",
+     "Genoa",
+     "Inter",
+     "Sassuolo",
+     "Inter",
+     "Udinese",
+     "Zambia"
+    ],
+    "kadra": [
+     true,
+     true,
+     true
     ],
     "srednia90": 2.0
    },
@@ -57,6 +98,23 @@
      58,
      16
     ],
+    "rywale": [
+     "Jordan",
+     "Iceland",
+     "Hellas Verona",
+     "Napoli",
+     "Genoa",
+     "Inter",
+     "Sassuolo",
+     "Inter",
+     "Udinese",
+     "Zambia"
+    ],
+    "kadra": [
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.33
    },
    "shots_off_target": {
@@ -69,6 +127,23 @@
      61,
      58,
      16
+    ],
+    "rywale": [
+     "Jordan",
+     "Iceland",
+     "Hellas Verona",
+     "Napoli",
+     "Genoa",
+     "Inter",
+     "Sassuolo",
+     "Inter",
+     "Udinese",
+     "Zambia"
+    ],
+    "kadra": [
+     true,
+     true,
+     true
     ],
     "srednia90": 2.0
    }
@@ -106,6 +181,30 @@
      90,
      90
     ],
+    "rywale": [
+     "Portugal",
+     "FC Spartak Moscow",
+     "Orenburg",
+     "Dynamo Moscow",
+     "Dynamo Moscow",
+     "Akron Togliatti",
+     "Dinamo Makhachkala",
+     "FC Spartak Moscow",
+     "Baltika Kaliningrad",
+     "Zenit St. Petersburg"
+    ],
+    "kadra": [
+     true,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
     "srednia90": 3.11
    }
   }
@@ -141,6 +240,30 @@
      45,
      90,
      84
+    ],
+    "rywale": [
+     "Jordan",
+     "Arsenal",
+     "Arsenal",
+     "Real Sociedad",
+     "Barcelona",
+     "Barcelona",
+     "Zambia",
+     "Mauritania",
+     "Real Madrid",
+     "Tottenham Hotspur"
+    ],
+    "kadra": [
+     true,
+     false,
+     false,
+     false,
+     false,
+     false,
+     true,
+     false,
+     false,
+     false
     ],
     "srednia90": 3.01
    }
@@ -178,6 +301,30 @@
      63,
      90
     ],
+    "rywale": [
+     "Portugal",
+     "DR Congo",
+     "Uzbekistan",
+     "Jordan",
+     "Colorado Rapids",
+     "Los Angeles FC",
+     "Sacramento Republic FC",
+     "France",
+     "Croatia",
+     "Australia"
+    ],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     false,
+     false,
+     false,
+     true,
+     false,
+     false
+    ],
     "srednia90": 2.31
    },
    "shots_outside_box": {
@@ -194,6 +341,25 @@
      72,
      64,
      63
+    ],
+    "rywale": [
+     "Portugal",
+     "DR Congo",
+     "Uzbekistan",
+     "Jordan",
+     "Colorado Rapids",
+     "Los Angeles FC",
+     "Sacramento Republic FC",
+     "France",
+     "Croatia",
+     "Australia"
+    ],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.89
    },
@@ -212,6 +378,25 @@
      64,
      63
     ],
+    "rywale": [
+     "Portugal",
+     "DR Congo",
+     "Uzbekistan",
+     "Jordan",
+     "Colorado Rapids",
+     "Los Angeles FC",
+     "Sacramento Republic FC",
+     "France",
+     "Croatia",
+     "Australia"
+    ],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.08
    },
    "shots_blocked": {
@@ -228,6 +413,25 @@
      72,
      64,
      63
+    ],
+    "rywale": [
+     "Portugal",
+     "DR Congo",
+     "Uzbekistan",
+     "Jordan",
+     "Colorado Rapids",
+     "Los Angeles FC",
+     "Sacramento Republic FC",
+     "France",
+     "Croatia",
+     "Australia"
+    ],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.08
    }
@@ -265,6 +469,30 @@
      90,
      90
     ],
+    "rywale": [
+     "Costa Rica",
+     "Barracas Central",
+     "Red Bull Bragantino",
+     "Internacional",
+     "Athletico",
+     "Corinthians",
+     "Paysandu SC",
+     "São Paulo",
+     "Remo",
+     "Botafogo"
+    ],
+    "kadra": [
+     true,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
     "srednia90": 3.1
    }
   }
@@ -301,6 +529,30 @@
      90,
      90
     ],
+    "rywale": [
+     "Austria",
+     "Algeria",
+     "Philadelphia Union",
+     "Portland Timbers",
+     "FC Cincinnati",
+     "Toronto FC",
+     "Orlando City SC",
+     "New England Revolution",
+     "Real Salt Lake",
+     "Colorado Rapids"
+    ],
+    "kadra": [
+     true,
+     true,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
     "srednia90": 5.57
    },
    "shots_outside_box": {
@@ -313,6 +565,23 @@
      90,
      80,
      90
+    ],
+    "rywale": [
+     "Austria",
+     "Algeria",
+     "Philadelphia Union",
+     "Portland Timbers",
+     "FC Cincinnati",
+     "Toronto FC",
+     "Orlando City SC",
+     "New England Revolution",
+     "Real Salt Lake",
+     "Colorado Rapids"
+    ],
+    "kadra": [
+     true,
+     true,
+     true
     ],
     "srednia90": 2.42
    },
@@ -327,6 +596,23 @@
      80,
      90
     ],
+    "rywale": [
+     "Austria",
+     "Algeria",
+     "Philadelphia Union",
+     "Portland Timbers",
+     "FC Cincinnati",
+     "Toronto FC",
+     "Orlando City SC",
+     "New England Revolution",
+     "Real Salt Lake",
+     "Colorado Rapids"
+    ],
+    "kadra": [
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.04
    },
    "shots_blocked": {
@@ -340,6 +626,23 @@
      80,
      90
     ],
+    "rywale": [
+     "Austria",
+     "Algeria",
+     "Philadelphia Union",
+     "Portland Timbers",
+     "FC Cincinnati",
+     "Toronto FC",
+     "Orlando City SC",
+     "New England Revolution",
+     "Real Salt Lake",
+     "Colorado Rapids"
+    ],
+    "kadra": [
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.04
    },
    "shots_off_target": {
@@ -352,6 +655,23 @@
      90,
      80,
      90
+    ],
+    "rywale": [
+     "Austria",
+     "Algeria",
+     "Philadelphia Union",
+     "Portland Timbers",
+     "FC Cincinnati",
+     "Toronto FC",
+     "Orlando City SC",
+     "New England Revolution",
+     "Real Salt Lake",
+     "Colorado Rapids"
+    ],
+    "kadra": [
+     true,
+     true,
+     true
     ],
     "srednia90": 2.08
    }
@@ -389,6 +709,30 @@
      90,
      90
     ],
+    "rywale": [
+     "Wales",
+     "Millwall",
+     "Hull City",
+     "Portsmouth",
+     "Swansea City",
+     "Sheffield Wednesday",
+     "Preston North End",
+     "Austria",
+     "Watford",
+     "Queens Park Rangers"
+    ],
+    "kadra": [
+     true,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
     "srednia90": 2.58
    }
   }
@@ -424,6 +768,30 @@
      90,
      90,
      90
+    ],
+    "rywale": [
+     "Iran",
+     "New Zealand",
+     "Belgium",
+     "Brazil",
+     "Russia",
+     "Al-Masry",
+     "Pyramids FC",
+     "Smouha",
+     "Ceramica Cleopatra",
+     "Spain"
+    ],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     false,
+     false,
+     false,
+     false,
+     true
     ],
     "srednia90": 1.81
    }
@@ -461,6 +829,30 @@
      90,
      120
     ],
+    "rywale": [
+     "Paraguay",
+     "Switzerland",
+     "Mexico",
+     "FC Dallas",
+     "San Jose Earthquakes",
+     "Real Salt Lake",
+     "Minnesota United",
+     "St.Louis City",
+     "Houston Dynamo",
+     "Colorado Springs Switchbacks FC"
+    ],
+    "kadra": [
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
     "srednia90": 1.21
    }
   }
@@ -496,6 +888,30 @@
      90,
      90,
      90
+    ],
+    "rywale": [
+     "Celtic",
+     "Falkirk FC",
+     "Motherwell",
+     "Livingston",
+     "Dundee FC",
+     "St. Mirren",
+     "Dundee FC",
+     "Livingston",
+     "Hibernian",
+     "Rangers"
+    ],
+    "kadra": [
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false
     ],
     "srednia90": 2.8
    }
@@ -533,6 +949,30 @@
      90,
      55
     ],
+    "rywale": [
+     "Iran",
+     "El Gouna FC",
+     "Pharco FC",
+     "National Bank of Egypt",
+     "Modern Sport FC",
+     "Petrojet",
+     "Al-Mokawloon",
+     "Tala'ea El-Gaish",
+     "Modern Sport FC",
+     "Al Ahly FC"
+    ],
+    "kadra": [
+     true,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
     "srednia90": 2.96
    }
   }
@@ -568,6 +1008,30 @@
      74,
      90,
      53
+    ],
+    "rywale": [
+     "Austria",
+     "Algeria",
+     "Brentford",
+     "Aston Villa",
+     "Chelsea",
+     "Manchester United",
+     "Crystal Palace",
+     "Paris Saint-Germain",
+     "Paris Saint-Germain",
+     "Zambia"
+    ],
+    "kadra": [
+     true,
+     true,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     true
     ],
     "srednia90": 2.14
    }
@@ -605,6 +1069,30 @@
      90,
      90
     ],
+    "rywale": [
+     "Paraguay",
+     "Mexico",
+     "VfL Wolfsburg",
+     "RB Leipzig",
+     "1. FSV Mainz 05",
+     "1. FC Heidenheim",
+     "1. FC Köln",
+     "1. FC Union Berlin",
+     "SC Freiburg",
+     "Borussia M'gladbach"
+    ],
+    "kadra": [
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
     "srednia90": 1.92
    }
   }
@@ -640,6 +1128,30 @@
      83,
      69,
      80
+    ],
+    "rywale": [
+     "Spain",
+     "Famalicão",
+     "Moreirense",
+     "Rio Ave",
+     "Gil Vicente",
+     "AVS - Futebol SAD",
+     "Tondela",
+     "Vitória SC",
+     "Santa Clara",
+     "Sporting Braga"
+    ],
+    "kadra": [
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false
     ],
     "srednia90": 2.01
    }
@@ -677,6 +1189,30 @@
      81,
      90
     ],
+    "rywale": [
+     "Jordan",
+     "Iceland",
+     "Honduras",
+     "Hamburger SV",
+     "VfB Stuttgart",
+     "RB Leipzig",
+     "1. FC Köln",
+     "FC Bayern München",
+     "FC Augsburg",
+     "Borussia Dortmund"
+    ],
+    "kadra": [
+     true,
+     true,
+     true,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
     "srednia90": 1.61
    }
   }
@@ -713,6 +1249,30 @@
      74,
      60
     ],
+    "rywale": [
+     "Iran",
+     "New Zealand",
+     "Belgium",
+     "Brentford",
+     "Crystal Palace",
+     "Everton",
+     "Fulham",
+     "Manchester City",
+     "Galatasaray",
+     "Galatasaray"
+    ],
+    "kadra": [
+     true,
+     true,
+     true,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
     "srednia90": 2.85
    },
    "headed_shots": {
@@ -725,6 +1285,23 @@
      57,
      85,
      76
+    ],
+    "rywale": [
+     "Iran",
+     "New Zealand",
+     "Belgium",
+     "Brentford",
+     "Crystal Palace",
+     "Everton",
+     "Fulham",
+     "Manchester City",
+     "Galatasaray",
+     "Galatasaray"
+    ],
+    "kadra": [
+     true,
+     true,
+     true
     ],
     "srednia90": 0.41
    },
@@ -739,6 +1316,23 @@
      85,
      76
     ],
+    "rywale": [
+     "Iran",
+     "New Zealand",
+     "Belgium",
+     "Brentford",
+     "Crystal Palace",
+     "Everton",
+     "Fulham",
+     "Manchester City",
+     "Galatasaray",
+     "Galatasaray"
+    ],
+    "kadra": [
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.41
    },
    "shots_outside_box": {
@@ -752,6 +1346,23 @@
      85,
      76
     ],
+    "rywale": [
+     "Iran",
+     "New Zealand",
+     "Belgium",
+     "Brentford",
+     "Crystal Palace",
+     "Everton",
+     "Fulham",
+     "Manchester City",
+     "Galatasaray",
+     "Galatasaray"
+    ],
+    "kadra": [
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.24
    },
    "shots_blocked": {
@@ -764,6 +1375,23 @@
      57,
      85,
      76
+    ],
+    "rywale": [
+     "Iran",
+     "New Zealand",
+     "Belgium",
+     "Brentford",
+     "Crystal Palace",
+     "Everton",
+     "Fulham",
+     "Manchester City",
+     "Galatasaray",
+     "Galatasaray"
+    ],
+    "kadra": [
+     true,
+     true,
+     true
     ],
     "srednia90": 1.24
    }
@@ -801,6 +1429,30 @@
      71,
      90
     ],
+    "rywale": [
+     "Costa Rica",
+     "Estoril Praia",
+     "Famalicão",
+     "Moreirense",
+     "Sporting",
+     "CD Nacional",
+     "Casa Pia",
+     "France",
+     "Croatia",
+     "Vitória SC"
+    ],
+    "kadra": [
+     true,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     true,
+     false,
+     false
+    ],
     "srednia90": 1.71
    }
   }
@@ -836,6 +1488,30 @@
      90,
      90,
      90
+    ],
+    "rywale": [
+     "Nice",
+     "Nice",
+     "Amiens SC",
+     "Rodez AF",
+     "Troyes",
+     "Bastia",
+     "USL Dunkerque",
+     "Nancy",
+     "Annecy FC",
+     "Grenoble Foot 38"
+    ],
+    "kadra": [
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false
     ],
     "srednia90": 1.67
    }
@@ -873,6 +1549,30 @@
      86,
      90
     ],
+    "rywale": [
+     "Beitar Jerusalem",
+     "Hapoel Tel Aviv",
+     "Hapoel Petach Tikva",
+     "Beitar Jerusalem",
+     "Hapoel Be'er Sheva",
+     "Maccabi Haifa",
+     "Hapoel Tel Aviv",
+     "Hapoel Be'er Sheva",
+     "Hapoel Haifa",
+     "Ashdod SC"
+    ],
+    "kadra": [
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
     "srednia90": 2.5
    }
   }
@@ -909,6 +1609,30 @@
      83,
      89
     ],
+    "rywale": [
+     "Croatia",
+     "Colombia",
+     "Uzbekistan",
+     "DR Congo",
+     "Nigeria",
+     "Chile",
+     "Damac FC",
+     "Gamba Osaka",
+     "Al-Hilal",
+     "Al-Shabab"
+    ],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true,
+     false,
+     false,
+     false,
+     false
+    ],
     "srednia90": 5.3
    },
    "headed_shots": {
@@ -927,6 +1651,26 @@
      90,
      65,
      45
+    ],
+    "rywale": [
+     "Croatia",
+     "Colombia",
+     "Uzbekistan",
+     "DR Congo",
+     "Nigeria",
+     "Chile",
+     "Damac FC",
+     "Gamba Osaka",
+     "Al-Hilal",
+     "Al-Shabab"
+    ],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.39
    },
@@ -947,6 +1691,26 @@
      65,
      45
     ],
+    "rywale": [
+     "Croatia",
+     "Colombia",
+     "Uzbekistan",
+     "DR Congo",
+     "Nigeria",
+     "Chile",
+     "Damac FC",
+     "Gamba Osaka",
+     "Al-Hilal",
+     "Al-Shabab"
+    ],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.98
    },
    "shots_blocked": {
@@ -966,6 +1730,26 @@
      65,
      45
     ],
+    "rywale": [
+     "Croatia",
+     "Colombia",
+     "Uzbekistan",
+     "DR Congo",
+     "Nigeria",
+     "Chile",
+     "Damac FC",
+     "Gamba Osaka",
+     "Al-Hilal",
+     "Al-Shabab"
+    ],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.17
    },
    "shots_off_target": {
@@ -984,6 +1768,26 @@
      90,
      65,
      45
+    ],
+    "rywale": [
+     "Croatia",
+     "Colombia",
+     "Uzbekistan",
+     "DR Congo",
+     "Nigeria",
+     "Chile",
+     "Damac FC",
+     "Gamba Osaka",
+     "Al-Hilal",
+     "Al-Shabab"
+    ],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.76
    }
@@ -1021,6 +1825,30 @@
      90,
      89
     ],
+    "rywale": [
+     "Croatia",
+     "Colombia",
+     "Uzbekistan",
+     "DR Congo",
+     "Nigeria",
+     "Chile",
+     "Brighton & Hove Albion",
+     "Nottingham Forest",
+     "Sunderland",
+     "Liverpool"
+    ],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true,
+     false,
+     false,
+     false,
+     false
+    ],
     "srednia90": 2.62
    },
    "shots_outside_box": {
@@ -1039,6 +1867,26 @@
      90,
      45,
      90
+    ],
+    "rywale": [
+     "Croatia",
+     "Colombia",
+     "Uzbekistan",
+     "DR Congo",
+     "Nigeria",
+     "Chile",
+     "Brighton & Hove Albion",
+     "Nottingham Forest",
+     "Sunderland",
+     "Liverpool"
+    ],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.15
    },
@@ -1059,6 +1907,26 @@
      45,
      90
     ],
+    "rywale": [
+     "Croatia",
+     "Colombia",
+     "Uzbekistan",
+     "DR Congo",
+     "Nigeria",
+     "Chile",
+     "Brighton & Hove Albion",
+     "Nottingham Forest",
+     "Sunderland",
+     "Liverpool"
+    ],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.38
    },
    "shots_blocked": {
@@ -1078,7 +1946,66 @@
      45,
      90
     ],
+    "rywale": [
+     "Croatia",
+     "Colombia",
+     "Uzbekistan",
+     "DR Congo",
+     "Nigeria",
+     "Chile",
+     "Brighton & Hove Albion",
+     "Nottingham Forest",
+     "Sunderland",
+     "Liverpool"
+    ],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.77
+   },
+   "shots_off_target": {
+    "ostatnie": [
+     0,
+     1,
+     0,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     63,
+     90,
+     90,
+     90,
+     45,
+     90
+    ],
+    "rywale": [
+     "Croatia",
+     "Colombia",
+     "Uzbekistan",
+     "DR Congo",
+     "Nigeria",
+     "Chile",
+     "Brighton & Hove Albion",
+     "Nottingham Forest",
+     "Sunderland",
+     "Liverpool"
+    ],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
+    "srednia90": 0.38
    }
   }
  },
@@ -1114,6 +2041,30 @@
      73,
      89
     ],
+    "rywale": [
+     "Austria",
+     "Saudi Arabia",
+     "Iraq",
+     "Valencia",
+     "Deportivo Alavés",
+     "Real Madrid",
+     "Osasuna",
+     "Getafe",
+     "Celta Vigo",
+     "Atlético Madrid"
+    ],
+    "kadra": [
+     true,
+     true,
+     true,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
     "srednia90": 2.87
    },
    "shots_outside_box": {
@@ -1126,6 +2077,23 @@
      71,
      61,
      45
+    ],
+    "rywale": [
+     "Austria",
+     "Saudi Arabia",
+     "Iraq",
+     "Valencia",
+     "Deportivo Alavés",
+     "Real Madrid",
+     "Osasuna",
+     "Getafe",
+     "Celta Vigo",
+     "Atlético Madrid"
+    ],
+    "kadra": [
+     true,
+     true,
+     true
     ],
     "srednia90": 2.03
    },
@@ -1140,6 +2108,23 @@
      61,
      45
     ],
+    "rywale": [
+     "Austria",
+     "Saudi Arabia",
+     "Iraq",
+     "Valencia",
+     "Deportivo Alavés",
+     "Real Madrid",
+     "Osasuna",
+     "Getafe",
+     "Celta Vigo",
+     "Atlético Madrid"
+    ],
+    "kadra": [
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.53
    },
    "shots_off_target": {
@@ -1152,6 +2137,23 @@
      71,
      61,
      45
+    ],
+    "rywale": [
+     "Austria",
+     "Saudi Arabia",
+     "Iraq",
+     "Valencia",
+     "Deportivo Alavés",
+     "Real Madrid",
+     "Osasuna",
+     "Getafe",
+     "Celta Vigo",
+     "Atlético Madrid"
+    ],
+    "kadra": [
+     true,
+     true,
+     true
     ],
     "srednia90": 1.53
    }
@@ -1189,6 +2191,30 @@
      63,
      99
     ],
+    "rywale": [
+     "Uruguay",
+     "Cape Verde",
+     "Peru",
+     "Villarreal",
+     "Osasuna",
+     "Celta Vigo",
+     "Arsenal",
+     "Arsenal",
+     "Athletic Club",
+     "Real Sociedad"
+    ],
+    "kadra": [
+     true,
+     true,
+     true,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
     "srednia90": 2.83
    }
   }
@@ -1224,6 +2250,30 @@
      45,
      71,
      77
+    ],
+    "rywale": [
+     "Bosnia & Herzegovina",
+     "Paraguay",
+     "Germany",
+     "Senegal",
+     "Juventus",
+     "Hellas Verona",
+     "Udinese",
+     "Portugal",
+     "Belgium",
+     "Torino"
+    ],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false
     ],
     "srednia90": 0.78
    }
@@ -1261,6 +2311,30 @@
      90,
      90
     ],
+    "rywale": [
+     "Senegal",
+     "New Zealand",
+     "Iran",
+     "Egypt",
+     "Tunisia",
+     "Croatia",
+     "SC Freiburg",
+     "Liverpool",
+     "Burnley",
+     "Nottingham Forest"
+    ],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true,
+     false,
+     false,
+     false,
+     false
+    ],
     "srednia90": 1.46
    },
    "headed_shots": {
@@ -1279,6 +2353,26 @@
      90,
      74,
      90
+    ],
+    "rywale": [
+     "Senegal",
+     "New Zealand",
+     "Iran",
+     "Egypt",
+     "Tunisia",
+     "Croatia",
+     "SC Freiburg",
+     "Liverpool",
+     "Burnley",
+     "Nottingham Forest"
+    ],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.33
    },
@@ -1299,6 +2393,26 @@
      74,
      90
     ],
+    "rywale": [
+     "Senegal",
+     "New Zealand",
+     "Iran",
+     "Egypt",
+     "Tunisia",
+     "Croatia",
+     "SC Freiburg",
+     "Liverpool",
+     "Burnley",
+     "Nottingham Forest"
+    ],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.15
    },
    "shots_blocked": {
@@ -1318,6 +2432,26 @@
      74,
      90
     ],
+    "rywale": [
+     "Senegal",
+     "New Zealand",
+     "Iran",
+     "Egypt",
+     "Tunisia",
+     "Croatia",
+     "SC Freiburg",
+     "Liverpool",
+     "Burnley",
+     "Nottingham Forest"
+    ],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.49
    },
    "shots_off_target": {
@@ -1336,6 +2470,26 @@
      90,
      74,
      90
+    ],
+    "rywale": [
+     "Senegal",
+     "New Zealand",
+     "Iran",
+     "Egypt",
+     "Tunisia",
+     "Croatia",
+     "SC Freiburg",
+     "Liverpool",
+     "Burnley",
+     "Nottingham Forest"
+    ],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.98
    }
@@ -1373,6 +2527,30 @@
      74,
      77
     ],
+    "rywale": [
+     "Türkiye",
+     "Senegal",
+     "San Diego FC",
+     "Houston Dynamo",
+     "FC Dallas",
+     "San Jose Earthquakes",
+     "LA Galaxy",
+     "Colorado Rapids",
+     "Sporting Kansas City",
+     "New York City FC"
+    ],
+    "kadra": [
+     true,
+     true,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
     "srednia90": 2.33
    },
    "fouls_won": {
@@ -1399,6 +2577,30 @@
      89,
      74,
      77
+    ],
+    "rywale": [
+     "Türkiye",
+     "Senegal",
+     "San Diego FC",
+     "Houston Dynamo",
+     "FC Dallas",
+     "San Jose Earthquakes",
+     "LA Galaxy",
+     "Colorado Rapids",
+     "Sporting Kansas City",
+     "New York City FC"
+    ],
+    "kadra": [
+     true,
+     true,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false
     ],
     "srednia90": 1.49
    }
@@ -1436,6 +2638,30 @@
      90,
      69
     ],
+    "rywale": [
+     "Bosnia & Herzegovina",
+     "Australia",
+     "Paraguay",
+     "Germany",
+     "Senegal",
+     "Newcastle United",
+     "Wolverhampton",
+     "Bournemouth",
+     "Arsenal",
+     "Liverpool"
+    ],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
     "srednia90": 2.67
    }
   }
@@ -1471,6 +2697,30 @@
      90,
      79,
      90
+    ],
+    "rywale": [
+     "Bosnia & Herzegovina",
+     "Australia",
+     "Paraguay",
+     "Germany",
+     "Senegal",
+     "Sevilla",
+     "Levante UD",
+     "Celta Vigo",
+     "Portugal",
+     "Uruguay"
+    ],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     false,
+     false,
+     false,
+     false,
+     false
     ],
     "srednia90": 1.89
    }
@@ -1508,6 +2758,30 @@
      90,
      90
     ],
+    "rywale": [
+     "Senegal",
+     "New Zealand",
+     "Egypt",
+     "Tunisia",
+     "Croatia",
+     "Bournemouth",
+     "Chelsea",
+     "Brentford",
+     "Everton",
+     "Burnley"
+    ],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
     "srednia90": 3.01
    }
   }
@@ -1544,12 +2818,36 @@
      90,
      62
     ],
+    "rywale": [
+     "Bosnia & Herzegovina",
+     "Australia",
+     "Paraguay",
+     "Germany",
+     "Senegal",
+     "Nottingham Forest",
+     "Manchester City",
+     "Crystal Palace",
+     "Brentford",
+     "Sunderland"
+    ],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
     "srednia90": 1.78
    }
   }
  },
  {
-  "id": 929793602,
+  "id": 937933110,
   "nazwa": "Ali Ahmed",
   "pozycja": "M",
   "druzyna": "Canada",
@@ -1566,12 +2864,18 @@
      70,
      30
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.72
    }
   }
  },
  {
-  "id": 919267467,
+  "id": 954888381,
   "nazwa": "Alistair Johnston",
   "pozycja": "M",
   "druzyna": "Canada",
@@ -1594,6 +2898,15 @@
      45,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.0
    },
    "fouls_committed": {
@@ -1612,6 +2925,15 @@
      90,
      45,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.8
    },
@@ -1632,6 +2954,15 @@
      45,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.0
    },
    "interceptions": {
@@ -1651,12 +2982,21 @@
      45,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.4
    }
   }
  },
  {
-  "id": 918098942,
+  "id": 940837649,
   "nazwa": "Cyle Larin",
   "pozycja": "M",
   "druzyna": "Canada",
@@ -1677,6 +3017,14 @@
      72,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 4.19
    },
    "sot": {
@@ -1693,6 +3041,14 @@
      15,
      72,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.61
    },
@@ -1711,6 +3067,14 @@
      72,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.97
    },
    "shots_blocked": {
@@ -1728,12 +3092,20 @@
      72,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.94
    }
   }
  },
  {
-  "id": 981964860,
+  "id": 938844903,
   "nazwa": "Derek Cornelius",
   "pozycja": "M",
   "druzyna": "Canada",
@@ -1756,6 +3128,15 @@
      90,
      69
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.52
    },
    "fouls_committed": {
@@ -1774,6 +3155,15 @@
      90,
      90,
      69
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.33
    },
@@ -1794,6 +3184,15 @@
      90,
      69
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.95
    },
    "interceptions": {
@@ -1812,6 +3211,15 @@
      90,
      90,
      69
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.57
    },
@@ -1832,6 +3240,15 @@
      90,
      69
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.76
    },
    "shots_blocked": {
@@ -1850,6 +3267,15 @@
      90,
      90,
      69
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.57
    },
@@ -1870,12 +3296,21 @@
      90,
      69
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.76
    }
   }
  },
  {
-  "id": 984068760,
+  "id": 950297521,
   "nazwa": "Ismael Kone",
   "pozycja": "M",
   "druzyna": "Canada",
@@ -1894,6 +3329,13 @@
      90,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.6
    },
    "fouls_won": {
@@ -1908,6 +3350,13 @@
      90,
      90,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 2.24
    },
@@ -1924,12 +3373,19 @@
      90,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.6
    }
   }
  },
  {
-  "id": 934230697,
+  "id": 911200953,
   "nazwa": "Jonathan David",
   "pozycja": "M",
   "druzyna": "Canada",
@@ -1952,6 +3408,15 @@
      90,
      69
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 3.31
    },
    "sot": {
@@ -1971,6 +3436,15 @@
      90,
      69
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.29
    },
    "fouls_won": {
@@ -1989,6 +3463,15 @@
      60,
      90,
      69
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.1
    },
@@ -2009,6 +3492,15 @@
      90,
      69
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.55
    },
    "shots_outside_box": {
@@ -2027,6 +3519,15 @@
      60,
      90,
      69
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.74
    },
@@ -2047,6 +3548,15 @@
      90,
      69
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.29
    },
    "shots_off_target": {
@@ -2066,12 +3576,21 @@
      90,
      69
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.74
    }
   }
  },
  {
-  "id": 960965168,
+  "id": 923396915,
   "nazwa": "Liam Millar",
   "pozycja": "M",
   "druzyna": "Canada",
@@ -2092,6 +3611,14 @@
      86,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 2.15
    },
    "fouls_committed": {
@@ -2108,6 +3635,14 @@
      60,
      86,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.54
    },
@@ -2126,6 +3661,14 @@
      86,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.61
    },
    "interceptions": {
@@ -2142,6 +3685,14 @@
      60,
      86,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.61
    },
@@ -2160,6 +3711,14 @@
      86,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.61
    },
    "shots_blocked": {
@@ -2176,6 +3735,14 @@
      60,
      86,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.92
    },
@@ -2194,12 +3761,20 @@
      86,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.23
    }
   }
  },
  {
-  "id": 922689917,
+  "id": 940961748,
   "nazwa": "Luc De Fougerolles",
   "pozycja": "M",
   "druzyna": "Canada",
@@ -2222,6 +3797,15 @@
      90,
      60
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.04
    },
    "fouls_won": {
@@ -2241,12 +3825,21 @@
      90,
      60
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.88
    }
   }
  },
  {
-  "id": 905563006,
+  "id": 923674348,
   "nazwa": "Nathan-Dylan Saliba",
   "pozycja": "M",
   "druzyna": "Canada",
@@ -2267,6 +3860,14 @@
      4,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.56
    },
    "fouls_committed": {
@@ -2283,6 +3884,14 @@
      34,
      4,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 2.34
    },
@@ -2301,6 +3910,14 @@
      4,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.78
    },
    "interceptions": {
@@ -2317,6 +3934,14 @@
      34,
      4,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.56
    },
@@ -2335,6 +3960,14 @@
      4,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.78
    },
    "shots_outside_box": {
@@ -2351,6 +3984,14 @@
      34,
      4,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.17
    },
@@ -2369,6 +4010,14 @@
      4,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.39
    },
    "shots_blocked": {
@@ -2385,6 +4034,14 @@
      34,
      4,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.78
    },
@@ -2403,12 +4060,20 @@
      4,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.78
    }
   }
  },
  {
-  "id": 979464061,
+  "id": 951162793,
   "nazwa": "Niko Sigur",
   "pozycja": "M",
   "druzyna": "Canada",
@@ -2427,6 +4092,13 @@
      45,
      59
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.88
    },
    "interceptions": {
@@ -2442,12 +4114,19 @@
      45,
      59
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 3.12
    }
   }
  },
  {
-  "id": 918078761,
+  "id": 972823112,
   "nazwa": "Promise David",
   "pozycja": "M",
   "druzyna": "Canada",
@@ -2468,12 +4147,20 @@
      18,
      21
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 5.05
    }
   }
  },
  {
-  "id": 973635262,
+  "id": 968588787,
   "nazwa": "Richie Laryea",
   "pozycja": "M",
   "druzyna": "Canada",
@@ -2496,6 +4183,15 @@
      61,
      31
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.42
    },
    "fouls_won": {
@@ -2515,12 +4211,21 @@
      61,
      31
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 2.43
    }
   }
  },
  {
-  "id": 933400211,
+  "id": 935158081,
   "nazwa": "Stephen Eustaquio",
   "pozycja": "M",
   "druzyna": "Canada",
@@ -2543,6 +4248,15 @@
      86,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.83
    },
    "fouls_won": {
@@ -2561,6 +4275,15 @@
      90,
      86,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.45
    },
@@ -2581,6 +4304,15 @@
      86,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.41
    },
    "shots_outside_box": {
@@ -2600,12 +4332,21 @@
      86,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.83
    }
   }
  },
  {
-  "id": 929618749,
+  "id": 988887149,
   "nazwa": "Tajon Buchanan",
   "pozycja": "M",
   "druzyna": "Canada",
@@ -2628,6 +4369,15 @@
      86,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.5
    },
    "sot": {
@@ -2646,6 +4396,15 @@
      60,
      86,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.64
    },
@@ -2666,6 +4425,15 @@
      86,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.07
    },
    "fouls_won": {
@@ -2684,6 +4452,15 @@
      60,
      86,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 2.36
    },
@@ -2704,6 +4481,15 @@
      86,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.86
    },
    "sot_outside_box": {
@@ -2722,6 +4508,15 @@
      60,
      86,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.43
    },
@@ -2742,12 +4537,21 @@
      86,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.64
    }
   }
  },
  {
-  "id": 932088390,
+  "id": 925814750,
   "nazwa": "Tani Oluwaseyi",
   "pozycja": "M",
   "druzyna": "Canada",
@@ -2770,6 +4574,15 @@
      4,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 4.02
    },
    "sot": {
@@ -2788,6 +4601,15 @@
      75,
      4,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.1
    },
@@ -2808,6 +4630,15 @@
      4,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.83
    },
    "fouls_won": {
@@ -2826,6 +4657,15 @@
      75,
      4,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.46
    },
@@ -2846,6 +4686,15 @@
      4,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.73
    },
    "shots_blocked": {
@@ -2864,6 +4713,15 @@
      75,
      4,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.1
    },
@@ -2884,12 +4742,21 @@
      4,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.83
    }
   }
  },
  {
-  "id": 931498071,
+  "id": 931753534,
   "nazwa": "Achraf Hakimi",
   "pozycja": "M",
   "druzyna": "Morocco",
@@ -2910,6 +4777,14 @@
      90,
      64
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 2.78
    },
    "sot": {
@@ -2927,6 +4802,14 @@
      90,
      64
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.99
    },
    "fouls_committed": {
@@ -2943,6 +4826,14 @@
      90,
      90,
      64
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.79
    },
@@ -2961,6 +4852,14 @@
      90,
      64
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 2.38
    },
    "interceptions": {
@@ -2977,6 +4876,14 @@
      90,
      90,
      64
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.99
    },
@@ -2995,6 +4902,14 @@
      90,
      64
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.39
    },
    "sot_outside_box": {
@@ -3011,6 +4926,14 @@
      90,
      90,
      64
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.4
    },
@@ -3029,6 +4952,14 @@
      90,
      64
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.59
    },
    "shots_off_target": {
@@ -3046,12 +4977,20 @@
      90,
      64
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.99
    }
   }
  },
  {
-  "id": 937543812,
+  "id": 988603059,
   "nazwa": "Anass Salah-Eddine",
   "pozycja": "M",
   "druzyna": "Morocco",
@@ -3070,6 +5009,13 @@
      11,
      64
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.3
    },
    "fouls_won": {
@@ -3085,12 +5031,19 @@
      11,
      64
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.73
    }
   }
  },
  {
-  "id": 950510210,
+  "id": 961671416,
   "nazwa": "Ayoub El Kaabi",
   "pozycja": "M",
   "druzyna": "Morocco",
@@ -3107,6 +5060,12 @@
      26,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true
+    ],
     "srednia90": 3.21
    },
    "sot": {
@@ -3120,12 +5079,18 @@
      26,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.93
    }
   }
  },
  {
-  "id": 911121229,
+  "id": 975076829,
   "nazwa": "Ayyoub Bouaddi",
   "pozycja": "M",
   "druzyna": "Morocco",
@@ -3146,6 +5111,14 @@
      45,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.78
    },
    "fouls_committed": {
@@ -3162,6 +5135,14 @@
      90,
      45,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.52
    },
@@ -3180,6 +5161,14 @@
      45,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.03
    },
    "interceptions": {
@@ -3196,6 +5185,14 @@
      90,
      45,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.78
    },
@@ -3214,6 +5211,14 @@
      45,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.78
    },
    "shots_off_target": {
@@ -3231,12 +5236,20 @@
      45,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.52
    }
   }
  },
  {
-  "id": 900063144,
+  "id": 986842679,
   "nazwa": "Azzedine Ounahi",
   "pozycja": "M",
   "druzyna": "Morocco",
@@ -3259,6 +5272,15 @@
      63,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.49
    },
    "fouls_committed": {
@@ -3277,6 +5299,15 @@
      64,
      63,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.74
    },
@@ -3297,6 +5328,15 @@
      63,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.23
    },
    "interceptions": {
@@ -3315,6 +5355,15 @@
      64,
      63,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.49
    },
@@ -3335,12 +5384,21 @@
      63,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.49
    }
   }
  },
  {
-  "id": 957863601,
+  "id": 919129779,
   "nazwa": "Bilel El Khanouss",
   "pozycja": "M",
   "druzyna": "Morocco",
@@ -3363,6 +5421,15 @@
      27,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.76
    },
    "fouls_won": {
@@ -3381,6 +5448,15 @@
      79,
      27,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.1
    },
@@ -3401,6 +5477,15 @@
      27,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.1
    },
    "sot_outside_box": {
@@ -3420,12 +5505,21 @@
      27,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.66
    }
   }
  },
  {
-  "id": 980622132,
+  "id": 954519200,
   "nazwa": "Brahim Diaz",
   "pozycja": "M",
   "druzyna": "Morocco",
@@ -3448,6 +5542,15 @@
      63,
      10
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 2.21
    },
    "sot": {
@@ -3466,6 +5569,15 @@
      64,
      63,
      10
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.98
    },
@@ -3486,6 +5598,15 @@
      63,
      10
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.96
    },
    "shots_outside_box": {
@@ -3504,6 +5625,15 @@
      64,
      63,
      10
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.74
    },
@@ -3524,6 +5654,15 @@
      63,
      10
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.49
    },
    "shots_blocked": {
@@ -3543,12 +5682,21 @@
      63,
      10
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.74
    }
   }
  },
  {
-  "id": 907290169,
+  "id": 936501871,
   "nazwa": "Chadi Riad",
   "pozycja": "M",
   "druzyna": "Morocco",
@@ -3571,6 +5719,15 @@
      64,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.79
    },
    "interceptions": {
@@ -3589,6 +5746,15 @@
      90,
      64,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.19
    },
@@ -3609,12 +5775,21 @@
      64,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.4
    }
   }
  },
  {
-  "id": 926240481,
+  "id": 966457777,
   "nazwa": "Gessime Yassine",
   "pozycja": "M",
   "druzyna": "Morocco",
@@ -3631,6 +5806,12 @@
      21,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.59
    },
    "fouls_won": {
@@ -3644,12 +5825,18 @@
      21,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true
+    ],
     "srednia90": 2.39
    }
   }
  },
  {
-  "id": 977467347,
+  "id": 926851725,
   "nazwa": "Ismael Saibari",
   "pozycja": "M",
   "druzyna": "Morocco",
@@ -3672,6 +5859,15 @@
      64,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 3.45
    },
    "sot": {
@@ -3690,6 +5886,15 @@
      88,
      64,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.73
    },
@@ -3710,6 +5915,15 @@
      64,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.73
    },
    "fouls_won": {
@@ -3728,6 +5942,15 @@
      88,
      64,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.77
    },
@@ -3748,6 +5971,15 @@
      64,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.38
    },
    "shots_outside_box": {
@@ -3766,6 +5998,15 @@
      88,
      64,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.96
    },
@@ -3786,6 +6027,15 @@
      64,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.38
    },
    "shots_blocked": {
@@ -3804,6 +6054,15 @@
      88,
      64,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.96
    },
@@ -3824,12 +6083,21 @@
      64,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.96
    }
   }
  },
  {
-  "id": 944520759,
+  "id": 923518968,
   "nazwa": "Issa Diop",
   "pozycja": "M",
   "druzyna": "Morocco",
@@ -3850,6 +6118,14 @@
      63,
      65
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.84
    },
    "interceptions": {
@@ -3866,6 +6142,14 @@
      90,
      63,
      65
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.05
    },
@@ -3884,6 +6168,14 @@
      63,
      65
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.21
    },
    "headed_sot": {
@@ -3901,12 +6193,20 @@
      63,
      65
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.21
    }
   }
  },
  {
-  "id": 961583172,
+  "id": 905874286,
   "nazwa": "Neil El Aynaoui",
   "pozycja": "M",
   "druzyna": "Morocco",
@@ -3927,6 +6227,14 @@
      90,
      63
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.42
    },
    "sot": {
@@ -3943,6 +6251,14 @@
      90,
      90,
      63
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.4
    },
@@ -3961,6 +6277,14 @@
      90,
      63
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 2.43
    },
    "fouls_won": {
@@ -3977,6 +6301,14 @@
      90,
      90,
      63
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.62
    },
@@ -3995,6 +6327,14 @@
      90,
      63
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.62
    },
    "headed_shots": {
@@ -4011,6 +6351,14 @@
      90,
      90,
      63
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.81
    },
@@ -4029,6 +6377,14 @@
      90,
      63
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.4
    },
    "shots_off_target": {
@@ -4046,12 +6402,20 @@
      90,
      63
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.81
    }
   }
  },
  {
-  "id": 903474087,
+  "id": 928968881,
   "nazwa": "Noussair Mazraoui",
   "pozycja": "M",
   "druzyna": "Morocco",
@@ -4074,6 +6438,15 @@
      27,
      65
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.93
    },
    "fouls_won": {
@@ -4093,12 +6466,21 @@
      27,
      65
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.16
    }
   }
  },
  {
-  "id": 906759291,
+  "id": 962882941,
   "nazwa": "Redouane Halhal",
   "pozycja": "M",
   "druzyna": "Morocco",
@@ -4115,12 +6497,18 @@
      26,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.68
    }
   }
  },
  {
-  "id": 957104310,
+  "id": 978268389,
   "nazwa": "Sofyan Amrabat",
   "pozycja": "M",
   "druzyna": "Morocco",
@@ -4137,6 +6525,12 @@
      45,
      80
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.67
    },
    "fouls_won": {
@@ -4149,6 +6543,12 @@
      90,
      45,
      80
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true
     ],
     "srednia90": 0.84
    },
@@ -4163,12 +6563,18 @@
      45,
      80
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.67
    }
   }
  },
  {
-  "id": 940481467,
+  "id": 981576365,
   "nazwa": "Soufiane Rahimi",
   "pozycja": "M",
   "druzyna": "Morocco",
@@ -4191,6 +6597,15 @@
      45,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 2.25
    },
    "sot": {
@@ -4210,6 +6625,15 @@
      45,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 2.25
    },
    "fouls_committed": {
@@ -4228,6 +6652,15 @@
      2,
      45,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 3.94
    },
@@ -4248,12 +6681,21 @@
      45,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 3.38
    }
   }
  },
  {
-  "id": 929920112,
+  "id": 947115467,
   "nazwa": "Andres Cubas",
   "pozycja": "M",
   "druzyna": "Paraguay",
@@ -4274,6 +6716,14 @@
      90,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 2.48
    },
    "fouls_won": {
@@ -4290,6 +6740,14 @@
      90,
      90,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.62
    },
@@ -4308,12 +6766,20 @@
      90,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.66
    }
   }
  },
  {
-  "id": 934101368,
+  "id": 930834077,
   "nazwa": "Damian Bobadilla",
   "pozycja": "M",
   "druzyna": "Paraguay",
@@ -4334,12 +6800,20 @@
      45,
      90
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.94
    }
   }
  },
  {
-  "id": 919569980,
+  "id": 968534201,
   "nazwa": "Diego Gomez",
   "pozycja": "M",
   "druzyna": "Paraguay",
@@ -4360,6 +6834,14 @@
      45,
      90
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.46
    },
    "fouls_committed": {
@@ -4376,6 +6858,14 @@
      79,
      45,
      90
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.46
    },
@@ -4394,6 +6884,14 @@
      45,
      90
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.7
    },
    "shots_outside_box": {
@@ -4410,6 +6908,14 @@
      79,
      45,
      90
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.73
    },
@@ -4428,6 +6934,14 @@
      45,
      90
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.49
    },
    "shots_off_target": {
@@ -4445,12 +6959,20 @@
      45,
      90
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.97
    }
   }
  },
  {
-  "id": 924132520,
+  "id": 965508178,
   "nazwa": "Gabriel Avalos",
   "pozycja": "M",
   "druzyna": "Paraguay",
@@ -4471,12 +6993,20 @@
      45,
      68
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.54
    }
   }
  },
  {
-  "id": 971663942,
+  "id": 973773488,
   "nazwa": "Gustavo Gomez",
   "pozycja": "M",
   "druzyna": "Paraguay",
@@ -4499,6 +7029,15 @@
      45,
      90
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.69
    },
    "sot": {
@@ -4517,6 +7056,15 @@
      90,
      45,
      90
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.69
    },
@@ -4537,6 +7085,15 @@
      45,
      90
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.86
    },
    "headed_shots": {
@@ -4555,6 +7112,15 @@
      90,
      45,
      90
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.86
    },
@@ -4575,12 +7141,21 @@
      45,
      90
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.51
    }
   }
  },
  {
-  "id": 929209265,
+  "id": 940024549,
   "nazwa": "Jose Canale",
   "pozycja": "M",
   "druzyna": "Paraguay",
@@ -4599,12 +7174,19 @@
      1,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.04
    }
   }
  },
  {
-  "id": 976835622,
+  "id": 928474761,
   "nazwa": "Juan Caceres",
   "pozycja": "M",
   "druzyna": "Paraguay",
@@ -4627,6 +7209,15 @@
      45,
      90
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.56
    },
    "fouls_committed": {
@@ -4645,6 +7236,15 @@
      78,
      45,
      90
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.87
    },
@@ -4665,6 +7265,15 @@
      45,
      90
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.56
    },
    "interceptions": {
@@ -4684,12 +7293,21 @@
      45,
      90
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.56
    }
   }
  },
  {
-  "id": 950774126,
+  "id": 911926967,
   "nazwa": "Julio Enciso",
   "pozycja": "M",
   "druzyna": "Paraguay",
@@ -4712,6 +7330,15 @@
      24,
      90
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 2.25
    },
    "sot": {
@@ -4730,6 +7357,15 @@
      90,
      24,
      90
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.61
    },
@@ -4750,6 +7386,15 @@
      24,
      90
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 2.45
    },
    "shots_outside_box": {
@@ -4768,6 +7413,15 @@
      90,
      24,
      90
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.23
    },
@@ -4788,6 +7442,15 @@
      24,
      90
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.41
    },
    "shots_blocked": {
@@ -4806,6 +7469,15 @@
      90,
      24,
      90
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.61
    },
@@ -4826,12 +7498,21 @@
      24,
      90
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.02
    }
   }
  },
  {
-  "id": 950069534,
+  "id": 973862433,
   "nazwa": "Junior Alonso",
   "pozycja": "M",
   "druzyna": "Paraguay",
@@ -4854,6 +7535,15 @@
      45,
      90
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.62
    },
    "fouls_won": {
@@ -4873,12 +7563,21 @@
      45,
      90
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.62
    }
   }
  },
  {
-  "id": 920468723,
+  "id": 900622863,
   "nazwa": "Matias Galarza",
   "pozycja": "M",
   "druzyna": "Paraguay",
@@ -4897,6 +7596,13 @@
      90,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.52
    },
    "sot": {
@@ -4911,6 +7617,13 @@
      90,
      90,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.52
    },
@@ -4927,6 +7640,13 @@
      90,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.83
    },
    "fouls_won": {
@@ -4941,6 +7661,13 @@
      90,
      90,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.57
    },
@@ -4957,6 +7684,13 @@
      90,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.04
    },
    "shots_outside_box": {
@@ -4971,6 +7705,13 @@
      90,
      90,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.52
    },
@@ -4987,12 +7728,19 @@
      90,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.26
    }
   }
  },
  {
-  "id": 979664461,
+  "id": 910823778,
   "nazwa": "Mauricio",
   "pozycja": "M",
   "druzyna": "Paraguay",
@@ -5013,6 +7761,14 @@
      66,
      35
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.03
    },
    "sot": {
@@ -5029,6 +7785,14 @@
      45,
      66,
      35
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.38
    },
@@ -5047,12 +7811,20 @@
      66,
      35
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.03
    }
   }
  },
  {
-  "id": 923250104,
+  "id": 946159263,
   "nazwa": "Miguel Almiron",
   "pozycja": "M",
   "druzyna": "Paraguay",
@@ -5073,6 +7845,14 @@
      45,
      68
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.11
    },
    "fouls_committed": {
@@ -5089,6 +7869,14 @@
      78,
      45,
      68
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.55
    },
@@ -5107,6 +7895,14 @@
      45,
      68
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.94
    },
    "interceptions": {
@@ -5123,6 +7919,14 @@
      78,
      45,
      68
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.38
    },
@@ -5141,6 +7945,14 @@
      45,
      68
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.83
    },
    "shots_blocked": {
@@ -5158,12 +7970,20 @@
      45,
      68
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.11
    }
   }
  },
  {
-  "id": 919713138,
+  "id": 935535372,
   "nazwa": "Orlando Gill",
   "pozycja": "M",
   "druzyna": "Paraguay",
@@ -5186,12 +8006,21 @@
      45,
      90
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.51
    }
   }
  },
  {
-  "id": 930797302,
+  "id": 952751612,
   "nazwa": "Adrien Rabiot",
   "pozycja": "M",
   "druzyna": "France",
@@ -5212,6 +8041,14 @@
      90,
      66
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.06
    },
    "fouls_committed": {
@@ -5228,6 +8065,14 @@
      90,
      90,
      66
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 2.11
    },
@@ -5246,6 +8091,14 @@
      90,
      66
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.85
    },
    "interceptions": {
@@ -5262,6 +8115,14 @@
      90,
      90,
      66
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.63
    },
@@ -5280,6 +8141,14 @@
      90,
      66
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.63
    },
    "shots_off_target": {
@@ -5297,12 +8166,20 @@
      90,
      66
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.85
    }
   }
  },
  {
-  "id": 946440403,
+  "id": 981237427,
   "nazwa": "Aurelien Tchouameni",
   "pozycja": "M",
   "druzyna": "France",
@@ -5323,6 +8200,14 @@
      81,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.14
    },
    "fouls_committed": {
@@ -5339,6 +8224,14 @@
      90,
      81,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.14
    },
@@ -5357,6 +8250,14 @@
      81,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.91
    },
    "interceptions": {
@@ -5373,6 +8274,14 @@
      90,
      81,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 2.27
    },
@@ -5391,6 +8300,14 @@
      81,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.91
    },
    "shots_off_target": {
@@ -5408,12 +8325,20 @@
      81,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.45
    }
   }
  },
  {
-  "id": 903871203,
+  "id": 914182069,
   "nazwa": "Bradley Barcola",
   "pozycja": "M",
   "druzyna": "France",
@@ -5436,6 +8361,15 @@
      29,
      2
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 2.25
    },
    "sot": {
@@ -5454,6 +8388,15 @@
      11,
      29,
      2
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.12
    },
@@ -5474,6 +8417,15 @@
      29,
      2
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.38
    },
    "shots_off_target": {
@@ -5493,12 +8445,21 @@
      29,
      2
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.12
    }
   }
  },
  {
-  "id": 912912960,
+  "id": 917494142,
   "nazwa": "Dayot Upamecano",
   "pozycja": "M",
   "druzyna": "France",
@@ -5521,6 +8482,15 @@
      90,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.75
    },
    "fouls_committed": {
@@ -5539,6 +8509,15 @@
      90,
      90,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.75
    },
@@ -5559,6 +8538,15 @@
      90,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 2.25
    },
    "headed_shots": {
@@ -5577,6 +8565,15 @@
      90,
      90,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.38
    },
@@ -5597,12 +8594,21 @@
      90,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.56
    }
   }
  },
  {
-  "id": 958821861,
+  "id": 930888739,
   "nazwa": "Desire Doue",
   "pozycja": "M",
   "druzyna": "France",
@@ -5623,6 +8629,14 @@
      86,
      61
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 2.61
    },
    "sot": {
@@ -5639,6 +8653,14 @@
      23,
      86,
      61
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.96
    },
@@ -5657,6 +8679,14 @@
      86,
      61
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.63
    },
    "sot_outside_box": {
@@ -5674,12 +8704,20 @@
      86,
      61
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.98
    }
   }
  },
  {
-  "id": 943529073,
+  "id": 954846747,
   "nazwa": "Jules Kounde",
   "pozycja": "M",
   "druzyna": "France",
@@ -5702,6 +8740,15 @@
      45,
      65
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.81
    },
    "fouls_won": {
@@ -5721,12 +8768,21 @@
      45,
      65
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.61
    }
   }
  },
  {
-  "id": 924916058,
+  "id": 962576141,
   "nazwa": "Kylian Mbappe",
   "pozycja": "M",
   "druzyna": "France",
@@ -5749,6 +8805,15 @@
      90,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 5.2
    },
    "sot": {
@@ -5767,6 +8832,15 @@
      90,
      90,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 2.6
    },
@@ -5787,6 +8861,15 @@
      90,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.74
    },
    "fouls_won": {
@@ -5805,6 +8888,15 @@
      90,
      90,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.74
    },
@@ -5825,6 +8917,15 @@
      90,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.3
    },
    "sot_outside_box": {
@@ -5843,6 +8944,15 @@
      90,
      90,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.74
    },
@@ -5863,6 +8973,15 @@
      90,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.56
    },
    "shots_off_target": {
@@ -5882,12 +9001,21 @@
      90,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.86
    }
   }
  },
  {
-  "id": 920071474,
+  "id": 902449192,
   "nazwa": "Lucas Digne",
   "pozycja": "M",
   "druzyna": "France",
@@ -5906,6 +9034,13 @@
      29,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.75
    },
    "fouls_committed": {
@@ -5920,6 +9055,13 @@
      90,
      29,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.12
    },
@@ -5936,6 +9078,13 @@
      29,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.75
    },
    "sot_outside_box": {
@@ -5951,12 +9100,19 @@
      29,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.37
    }
   }
  },
  {
-  "id": 961184142,
+  "id": 972178456,
   "nazwa": "Maxence Lacroix",
   "pozycja": "M",
   "druzyna": "France",
@@ -5973,12 +9129,18 @@
      45,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.0
    }
   }
  },
  {
-  "id": 954738430,
+  "id": 924260706,
   "nazwa": "Michael Olise",
   "pozycja": "M",
   "druzyna": "France",
@@ -6001,6 +9163,15 @@
      81,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 4.18
    },
    "sot": {
@@ -6019,6 +9190,15 @@
      90,
      81,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 2.09
    },
@@ -6039,6 +9219,15 @@
      81,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.46
    },
    "interceptions": {
@@ -6058,6 +9247,15 @@
      81,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.63
    },
    "shots_outside_box": {
@@ -6076,6 +9274,15 @@
      90,
      81,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.88
    },
@@ -6096,6 +9303,15 @@
      81,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.04
    },
    "shots_blocked": {
@@ -6114,6 +9330,15 @@
      90,
      81,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.04
    },
@@ -6134,12 +9359,21 @@
      81,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.63
    }
   }
  },
  {
-  "id": 941776638,
+  "id": 986731638,
   "nazwa": "Ousmane Dembele",
   "pozycja": "M",
   "druzyna": "France",
@@ -6160,6 +9394,14 @@
      79,
      61
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 2.87
    },
    "sot": {
@@ -6176,6 +9418,14 @@
      67,
      79,
      61
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.3
    },
@@ -6194,6 +9444,14 @@
      79,
      61
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.52
    },
    "shots_outside_box": {
@@ -6210,6 +9468,14 @@
      67,
      79,
      61
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.04
    },
@@ -6228,6 +9494,14 @@
      79,
      61
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.04
    },
    "shots_off_target": {
@@ -6245,12 +9519,20 @@
      79,
      61
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.52
    }
   }
  },
  {
-  "id": 977473346,
+  "id": 905923182,
   "nazwa": "Theo Hernandez",
   "pozycja": "M",
   "druzyna": "France",
@@ -6271,12 +9553,20 @@
      61,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 2.41
    }
   }
  },
  {
-  "id": 931283640,
+  "id": 981035821,
   "nazwa": "William Saliba",
   "pozycja": "M",
   "druzyna": "France",
@@ -6295,6 +9585,13 @@
      90,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.57
    },
    "interceptions": {
@@ -6309,6 +9606,13 @@
      90,
      90,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.14
    },
@@ -6325,12 +9629,19 @@
      90,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.29
    }
   }
  },
  {
-  "id": 956219997,
+  "id": 982069578,
   "nazwa": "Bruno Guimaraes",
   "pozycja": "M",
   "druzyna": "Brazil",
@@ -6353,6 +9664,15 @@
      45,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.68
    },
    "fouls_committed": {
@@ -6371,6 +9691,15 @@
      79,
      45,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.05
    },
@@ -6391,6 +9720,15 @@
      45,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.89
    },
    "shots_outside_box": {
@@ -6409,6 +9747,15 @@
      79,
      45,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.63
    },
@@ -6429,6 +9776,15 @@
      45,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.63
    },
    "shots_off_target": {
@@ -6448,12 +9804,21 @@
      45,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.63
    }
   }
  },
  {
-  "id": 960487317,
+  "id": 960740934,
   "nazwa": "Casemiro",
   "pozycja": "M",
   "druzyna": "Brazil",
@@ -6476,6 +9841,15 @@
      45,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.19
    },
    "fouls_committed": {
@@ -6494,6 +9868,15 @@
      45,
      45,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.42
    },
@@ -6514,6 +9897,15 @@
      45,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.95
    },
    "interceptions": {
@@ -6532,6 +9924,15 @@
      45,
      45,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.42
    },
@@ -6552,6 +9953,15 @@
      45,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.71
    },
    "headed_sot": {
@@ -6571,12 +9981,21 @@
      45,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.47
    }
   }
  },
  {
-  "id": 932150858,
+  "id": 944859206,
   "nazwa": "Danilo",
   "pozycja": "M",
   "druzyna": "Brazil",
@@ -6599,6 +10018,15 @@
      45,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.78
    },
    "sot": {
@@ -6617,6 +10045,15 @@
      11,
      45,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.89
    },
@@ -6637,6 +10074,15 @@
      45,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.34
    },
    "interceptions": {
@@ -6655,6 +10101,15 @@
      11,
      45,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.89
    },
@@ -6675,6 +10130,15 @@
      45,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.45
    },
    "shots_off_target": {
@@ -6694,12 +10158,21 @@
      45,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.89
    }
   }
  },
  {
-  "id": 907820771,
+  "id": 919660557,
   "nazwa": "Douglas Santos",
   "pozycja": "M",
   "druzyna": "Brazil",
@@ -6722,12 +10195,21 @@
      70,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.97
    }
   }
  },
  {
-  "id": 927007100,
+  "id": 935251849,
   "nazwa": "Endrick",
   "pozycja": "M",
   "druzyna": "Brazil",
@@ -6748,12 +10230,20 @@
      45,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 3.16
    }
   }
  },
  {
-  "id": 922223904,
+  "id": 988968847,
   "nazwa": "Fabinho",
   "pozycja": "M",
   "druzyna": "Brazil",
@@ -6774,12 +10264,20 @@
      45,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 2.22
    }
   }
  },
  {
-  "id": 916068541,
+  "id": 980990303,
   "nazwa": "Igor Thiago",
   "pozycja": "M",
   "druzyna": "Brazil",
@@ -6796,6 +10294,12 @@
      45,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true
+    ],
     "srednia90": 3.58
    },
    "sot": {
@@ -6808,6 +10312,12 @@
      61,
      45,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true
     ],
     "srednia90": 2.38
    },
@@ -6822,6 +10332,12 @@
      45,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.79
    },
    "headed_shots": {
@@ -6834,6 +10350,12 @@
      61,
      45,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true
     ],
     "srednia90": 0.6
    },
@@ -6848,12 +10370,18 @@
      45,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.6
    }
   }
  },
  {
-  "id": 949981375,
+  "id": 966376310,
   "nazwa": "Lucas Paqueta",
   "pozycja": "M",
   "druzyna": "Brazil",
@@ -6876,6 +10404,15 @@
      45,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 2.23
    },
    "fouls_committed": {
@@ -6895,6 +10432,15 @@
      45,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.39
    },
    "fouls_won": {
@@ -6913,6 +10459,15 @@
      60,
      45,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.95
    },
@@ -6933,12 +10488,21 @@
      45,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.39
    }
   }
  },
  {
-  "id": 926426986,
+  "id": 943838530,
   "nazwa": "Luiz Henrique",
   "pozycja": "M",
   "druzyna": "Brazil",
@@ -6955,12 +10519,18 @@
      45,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.51
    }
   }
  },
  {
-  "id": 946058358,
+  "id": 913993192,
   "nazwa": "Marquinhos",
   "pozycja": "M",
   "druzyna": "Brazil",
@@ -6981,12 +10551,20 @@
      90,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.44
    }
   }
  },
  {
-  "id": 916567215,
+  "id": 911486278,
   "nazwa": "Matheus Cunha",
   "pozycja": "M",
   "druzyna": "Brazil",
@@ -7009,6 +10587,15 @@
      45,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 3.07
    },
    "sot": {
@@ -7027,6 +10614,15 @@
      30,
      45,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.39
    },
@@ -7047,6 +10643,15 @@
      45,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.39
    },
    "interceptions": {
@@ -7065,6 +10670,15 @@
      30,
      45,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.84
    },
@@ -7085,6 +10699,15 @@
      45,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.67
    },
    "sot_outside_box": {
@@ -7103,6 +10726,15 @@
      30,
      45,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.56
    },
@@ -7123,6 +10755,15 @@
      45,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.84
    },
    "shots_off_target": {
@@ -7142,12 +10783,21 @@
      45,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.11
    }
   }
  },
  {
-  "id": 987890929,
+  "id": 942701112,
   "nazwa": "Raphinha",
   "pozycja": "M",
   "druzyna": "Brazil",
@@ -7166,12 +10816,19 @@
      70,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 2.95
    }
   }
  },
  {
-  "id": 921649046,
+  "id": 967977885,
   "nazwa": "Rayan",
   "pozycja": "M",
   "druzyna": "Brazil",
@@ -7190,6 +10847,13 @@
      51,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 2.02
    },
    "sot": {
@@ -7205,6 +10869,13 @@
      51,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.01
    },
    "fouls_committed": {
@@ -7219,6 +10890,13 @@
      81,
      51,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.35
    },
@@ -7235,6 +10913,13 @@
      51,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.35
    },
    "interceptions": {
@@ -7249,6 +10934,13 @@
      81,
      51,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.67
    },
@@ -7265,6 +10957,13 @@
      51,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.34
    },
    "shots_outside_box": {
@@ -7279,6 +10978,13 @@
      81,
      51,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.01
    },
@@ -7295,6 +11001,13 @@
      51,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.34
    },
    "shots_blocked": {
@@ -7310,12 +11023,19 @@
      51,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.67
    }
   }
  },
  {
-  "id": 931440529,
+  "id": 979816586,
   "nazwa": "Roger Ibanez",
   "pozycja": "M",
   "druzyna": "Brazil",
@@ -7332,6 +11052,12 @@
      45,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true
+    ],
     "srednia90": 2.0
    },
    "interceptions": {
@@ -7345,12 +11071,18 @@
      45,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.33
    }
   }
  },
  {
-  "id": 985854402,
+  "id": 947593502,
   "nazwa": "Vinicius Junior",
   "pozycja": "M",
   "druzyna": "Brazil",
@@ -7373,6 +11105,15 @@
      45,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 4.09
    },
    "sot": {
@@ -7391,6 +11132,15 @@
      90,
      45,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 2.66
    },
@@ -7411,6 +11161,15 @@
      45,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.43
    },
    "fouls_won": {
@@ -7429,6 +11188,15 @@
      90,
      45,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 2.05
    },
@@ -7449,6 +11217,15 @@
      45,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.82
    },
    "sot_outside_box": {
@@ -7467,6 +11244,15 @@
      90,
      45,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.61
    },
@@ -7487,12 +11273,21 @@
      45,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.02
    }
   }
  },
  {
-  "id": 908504126,
+  "id": 959755281,
   "nazwa": "Alexander Sorloth",
   "pozycja": "M",
   "druzyna": "Norway",
@@ -7513,6 +11308,14 @@
      71,
      61
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.76
    },
    "fouls_committed": {
@@ -7529,6 +11332,14 @@
      72,
      71,
      61
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 2.27
    },
@@ -7547,6 +11358,14 @@
      71,
      61
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.76
    },
    "headed_shots": {
@@ -7563,6 +11382,14 @@
      72,
      71,
      61
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.01
    },
@@ -7581,6 +11408,14 @@
      71,
      61
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.01
    },
    "shots_off_target": {
@@ -7598,12 +11433,20 @@
      71,
      61
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.5
    }
   }
  },
  {
-  "id": 931976576,
+  "id": 952671238,
   "nazwa": "Antonio Nusa",
   "pozycja": "M",
   "druzyna": "Norway",
@@ -7626,6 +11469,15 @@
      45,
      62
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 2.75
    },
    "sot": {
@@ -7645,6 +11497,15 @@
      45,
      62
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.1
    },
    "fouls_won": {
@@ -7663,6 +11524,15 @@
      72,
      45,
      62
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.38
    },
@@ -7683,6 +11553,15 @@
      45,
      62
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.83
    },
    "shots_outside_box": {
@@ -7701,6 +11580,15 @@
      72,
      45,
      62
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.83
    },
@@ -7721,12 +11609,21 @@
      45,
      62
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.1
    }
   }
  },
  {
-  "id": 984636827,
+  "id": 980864798,
   "nazwa": "David Moller Wolfe",
   "pozycja": "M",
   "druzyna": "Norway",
@@ -7747,6 +11644,14 @@
      71,
      62
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 2.1
    },
    "fouls_won": {
@@ -7763,6 +11668,14 @@
      72,
      71,
      62
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.47
    },
@@ -7781,12 +11694,20 @@
      71,
      62
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.7
    }
   }
  },
  {
-  "id": 979427993,
+  "id": 915524943,
   "nazwa": "Erling Haaland",
   "pozycja": "M",
   "druzyna": "Norway",
@@ -7805,6 +11726,13 @@
      90,
      71
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 3.96
    },
    "sot": {
@@ -7819,6 +11747,13 @@
      90,
      90,
      71
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 2.38
    },
@@ -7835,6 +11770,13 @@
      90,
      71
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.06
    },
    "fouls_won": {
@@ -7849,6 +11791,13 @@
      90,
      90,
      71
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.79
    },
@@ -7865,6 +11814,13 @@
      90,
      71
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.32
    },
    "headed_sot": {
@@ -7879,6 +11835,13 @@
      90,
      90,
      71
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.53
    },
@@ -7895,12 +11858,19 @@
      90,
      71
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.06
    }
   }
  },
  {
-  "id": 907770864,
+  "id": 905824621,
   "nazwa": "Fredrik Bjørkan",
   "pozycja": "M",
   "druzyna": "Norway",
@@ -7917,12 +11887,18 @@
      19,
      28
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true
+    ],
     "srednia90": 2.93
    }
   }
  },
  {
-  "id": 963347641,
+  "id": 978142030,
   "nazwa": "Julian Ryerson",
   "pozycja": "M",
   "druzyna": "Norway",
@@ -7941,12 +11917,19 @@
      90,
      62
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 2.13
    }
   }
  },
  {
-  "id": 917280926,
+  "id": 986622747,
   "nazwa": "Jørgen Strand Larsen",
   "pozycja": "M",
   "druzyna": "Norway",
@@ -7963,6 +11946,12 @@
      19,
      62
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true
+    ],
     "srednia90": 4.21
    },
    "sot": {
@@ -7975,6 +11964,12 @@
      90,
      19,
      62
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true
     ],
     "srednia90": 2.11
    },
@@ -7989,6 +11984,12 @@
      19,
      62
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.58
    },
    "headed_sot": {
@@ -8001,6 +12002,12 @@
      90,
      19,
      62
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true
     ],
     "srednia90": 1.05
    },
@@ -8015,12 +12022,18 @@
      19,
      62
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.58
    }
   }
  },
  {
-  "id": 956123364,
+  "id": 911788834,
   "nazwa": "Kristian Thorstvedt",
   "pozycja": "M",
   "druzyna": "Norway",
@@ -8039,12 +12052,19 @@
      11,
      28
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 3.53
    }
   }
  },
  {
-  "id": 979226748,
+  "id": 919142182,
   "nazwa": "Kristoffer Ajer",
   "pozycja": "M",
   "druzyna": "Norway",
@@ -8065,6 +12085,14 @@
      71,
      62
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.45
    },
    "fouls_committed": {
@@ -8082,6 +12110,14 @@
      71,
      62
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.45
    },
    "interceptions": {
@@ -8098,6 +12134,14 @@
      90,
      71,
      62
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.89
    },
@@ -8116,12 +12160,20 @@
      71,
      62
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.45
    }
   }
  },
  {
-  "id": 929601854,
+  "id": 909559711,
   "nazwa": "Marcus Pedersen",
   "pozycja": "M",
   "druzyna": "Norway",
@@ -8140,6 +12192,13 @@
      78,
      28
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.77
    },
    "sot": {
@@ -8154,6 +12213,13 @@
      45,
      78,
      28
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.77
    },
@@ -8170,12 +12236,19 @@
      78,
      28
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.16
    }
   }
  },
  {
-  "id": 902611784,
+  "id": 988719141,
   "nazwa": "Martin Odegaard",
   "pozycja": "M",
   "druzyna": "Norway",
@@ -8194,6 +12267,13 @@
      80,
      79
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.59
    },
    "sot": {
@@ -8208,6 +12288,13 @@
      90,
      80,
      79
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.53
    },
@@ -8224,6 +12311,13 @@
      80,
      79
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.8
    },
    "fouls_won": {
@@ -8238,6 +12332,13 @@
      90,
      80,
      79
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.8
    },
@@ -8254,6 +12355,13 @@
      80,
      79
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.53
    },
    "shots_outside_box": {
@@ -8268,6 +12376,13 @@
      90,
      80,
      79
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.8
    },
@@ -8284,6 +12399,13 @@
      80,
      79
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.53
    },
    "shots_off_target": {
@@ -8299,12 +12421,19 @@
      80,
      79
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.53
    }
   }
  },
  {
-  "id": 902093725,
+  "id": 988998388,
   "nazwa": "Patrick Berg",
   "pozycja": "M",
   "druzyna": "Norway",
@@ -8327,6 +12456,15 @@
      19,
      29
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.64
    },
    "fouls_committed": {
@@ -8345,6 +12483,15 @@
      10,
      19,
      29
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.95
    },
@@ -8365,12 +12512,21 @@
      19,
      29
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.64
    }
   }
  },
  {
-  "id": 968996025,
+  "id": 931705055,
   "nazwa": "Sander Berge",
   "pozycja": "M",
   "druzyna": "Norway",
@@ -8391,6 +12547,14 @@
      71,
      62
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.45
    },
    "fouls_won": {
@@ -8407,6 +12571,14 @@
      90,
      71,
      62
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.45
    },
@@ -8425,12 +12597,20 @@
      71,
      62
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.34
    }
   }
  },
  {
-  "id": 966106496,
+  "id": 921174827,
   "nazwa": "Thelo Aasgaard",
   "pozycja": "M",
   "druzyna": "Norway",
@@ -8447,6 +12627,12 @@
      19,
      28
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true
+    ],
     "srednia90": 2.63
    },
    "interceptions": {
@@ -8460,12 +12646,18 @@
      19,
      28
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.97
    }
   }
  },
  {
-  "id": 914986390,
+  "id": 948495901,
   "nazwa": "Torbjorn Heggem",
   "pozycja": "M",
   "druzyna": "Norway",
@@ -8486,6 +12678,14 @@
      90,
      62
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.43
    },
    "fouls_committed": {
@@ -8503,12 +12703,20 @@
      90,
      62
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.65
    }
   }
  },
  {
-  "id": 984272658,
+  "id": 979710238,
   "nazwa": "Alexis Vega",
   "pozycja": "M",
   "druzyna": "Mexico",
@@ -8525,12 +12733,18 @@
      33,
      59
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true
+    ],
     "srednia90": 2.6
    }
   }
  },
  {
-  "id": 957582557,
+  "id": 949520949,
   "nazwa": "Alvaro Fidalgo",
   "pozycja": "M",
   "druzyna": "Mexico",
@@ -8549,12 +12763,19 @@
      58,
      59
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.79
    }
   }
  },
  {
-  "id": 956371948,
+  "id": 900894448,
   "nazwa": "Brian Gutierrez",
   "pozycja": "M",
   "druzyna": "Mexico",
@@ -8573,6 +12794,13 @@
      65,
      57
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 3.2
    },
    "fouls_committed": {
@@ -8587,6 +12815,13 @@
      70,
      65,
      57
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.6
    },
@@ -8603,6 +12838,13 @@
      65,
      57
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.2
    },
    "shots_outside_box": {
@@ -8617,6 +12859,13 @@
      70,
      65,
      57
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.2
    },
@@ -8633,6 +12882,13 @@
      65,
      57
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.2
    },
    "shots_off_target": {
@@ -8648,12 +12904,19 @@
      65,
      57
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.6
    }
   }
  },
  {
-  "id": 930794399,
+  "id": 961625524,
   "nazwa": "Cesar Montes",
   "pozycja": "M",
   "druzyna": "Mexico",
@@ -8674,6 +12937,14 @@
      58,
      31
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.5
    },
    "fouls_committed": {
@@ -8690,6 +12961,14 @@
      90,
      58,
      31
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.25
    },
@@ -8708,6 +12987,14 @@
      58,
      31
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.75
    },
    "headed_shots": {
@@ -8724,6 +13011,14 @@
      90,
      58,
      31
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.5
    },
@@ -8742,12 +13037,20 @@
      58,
      31
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.25
    }
   }
  },
  {
-  "id": 916392832,
+  "id": 923589416,
   "nazwa": "Edson Alvarez",
   "pozycja": "M",
   "druzyna": "Mexico",
@@ -8768,6 +13071,14 @@
      45,
      59
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.51
    },
    "fouls_won": {
@@ -8784,6 +13095,14 @@
      15,
      45,
      59
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.2
    },
@@ -8802,12 +13121,20 @@
      45,
      59
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.51
    }
   }
  },
  {
-  "id": 925522077,
+  "id": 932442632,
   "nazwa": "Erik Lira",
   "pozycja": "M",
   "druzyna": "Mexico",
@@ -8828,6 +13155,14 @@
      45,
      31
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.82
    },
    "fouls_won": {
@@ -8844,6 +13179,14 @@
      75,
      45,
      31
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.36
    },
@@ -8862,12 +13205,20 @@
      45,
      31
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.82
    }
   }
  },
  {
-  "id": 948774928,
+  "id": 909375991,
   "nazwa": "Gilberto Mora",
   "pozycja": "M",
   "druzyna": "Mexico",
@@ -8888,6 +13239,14 @@
      32,
      31
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 2.08
    },
    "fouls_won": {
@@ -8904,6 +13263,14 @@
      25,
      32,
      31
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 2.08
    },
@@ -8922,6 +13289,14 @@
      32,
      31
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.83
    },
    "shots_outside_box": {
@@ -8938,6 +13313,14 @@
      25,
      32,
      31
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.25
    },
@@ -8956,6 +13339,14 @@
      32,
      31
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.25
    },
    "shots_off_target": {
@@ -8973,12 +13364,20 @@
      32,
      31
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.83
    }
   }
  },
  {
-  "id": 937936295,
+  "id": 975083664,
   "nazwa": "Guillermo Martinez",
   "pozycja": "M",
   "druzyna": "Mexico",
@@ -8995,12 +13394,18 @@
      33,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.93
    }
   }
  },
  {
-  "id": 912272982,
+  "id": 981371263,
   "nazwa": "Jesus Gallardo",
   "pozycja": "M",
   "druzyna": "Mexico",
@@ -9023,6 +13428,15 @@
      71,
      31
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.7
    },
    "fouls_committed": {
@@ -9041,6 +13455,15 @@
      90,
      71,
      31
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.64
    },
@@ -9061,6 +13484,15 @@
      71,
      31
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.17
    },
    "shots_off_target": {
@@ -9080,12 +13512,21 @@
      71,
      31
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.47
    }
   }
  },
  {
-  "id": 976991720,
+  "id": 953459124,
   "nazwa": "Johan Vasquez",
   "pozycja": "M",
   "druzyna": "Mexico",
@@ -9106,6 +13547,14 @@
      72,
      73
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.87
    },
    "sot": {
@@ -9122,6 +13571,14 @@
      90,
      72,
      73
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.43
    },
@@ -9140,6 +13597,14 @@
      72,
      73
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.65
    },
    "fouls_won": {
@@ -9156,6 +13621,14 @@
      90,
      72,
      73
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.43
    },
@@ -9174,6 +13647,14 @@
      72,
      73
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.65
    },
    "headed_sot": {
@@ -9191,12 +13672,20 @@
      72,
      73
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.43
    }
   }
  },
  {
-  "id": 926022174,
+  "id": 938943674,
   "nazwa": "Jorge Sanchez",
   "pozycja": "M",
   "druzyna": "Mexico",
@@ -9217,6 +13706,14 @@
      90,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.89
    },
    "interceptions": {
@@ -9234,12 +13731,20 @@
      90,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.89
    }
   }
  },
  {
-  "id": 905026775,
+  "id": 927531509,
   "nazwa": "Julian Quinones",
   "pozycja": "M",
   "druzyna": "Mexico",
@@ -9262,6 +13767,15 @@
      57,
      31
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 3.23
    },
    "sot": {
@@ -9280,6 +13794,15 @@
      78,
      57,
      31
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.29
    },
@@ -9300,6 +13823,15 @@
      57,
      31
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.51
    },
    "fouls_won": {
@@ -9319,6 +13851,15 @@
      57,
      31
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.51
    },
    "headed_shots": {
@@ -9337,6 +13878,15 @@
      78,
      57,
      31
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.65
    },
@@ -9357,6 +13907,15 @@
      57,
      31
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.43
    },
    "shots_outside_box": {
@@ -9375,6 +13934,15 @@
      78,
      57,
      31
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.08
    },
@@ -9395,12 +13963,21 @@
      57,
      31
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.08
    }
   }
  },
  {
-  "id": 975529522,
+  "id": 914591177,
   "nazwa": "Luis Chavez",
   "pozycja": "M",
   "druzyna": "Mexico",
@@ -9417,6 +13994,12 @@
      32,
      59
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true
+    ],
     "srednia90": 3.88
    },
    "shots_outside_box": {
@@ -9430,12 +14013,18 @@
      32,
      59
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true
+    ],
     "srednia90": 3.88
    }
   }
  },
  {
-  "id": 963308777,
+  "id": 932723666,
   "nazwa": "Luis Romo",
   "pozycja": "M",
   "druzyna": "Mexico",
@@ -9456,6 +14045,14 @@
      19,
      73
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.91
    },
    "fouls_won": {
@@ -9472,6 +14069,14 @@
      70,
      19,
      73
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.61
    },
@@ -9490,12 +14095,20 @@
      19,
      73
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.91
    }
   }
  },
  {
-  "id": 980811379,
+  "id": 985998164,
   "nazwa": "Mateo Chavez",
   "pozycja": "M",
   "druzyna": "Mexico",
@@ -9512,12 +14125,18 @@
      18,
      59
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.75
    }
   }
  },
  {
-  "id": 987534692,
+  "id": 982517888,
   "nazwa": "Raul Jimenez",
   "pozycja": "M",
   "druzyna": "Mexico",
@@ -9536,6 +14155,13 @@
      75,
      58
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 4.11
    },
    "sot": {
@@ -9550,6 +14176,13 @@
      79,
      75,
      58
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 2.21
    },
@@ -9566,6 +14199,13 @@
      75,
      58
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 2.21
    },
    "fouls_won": {
@@ -9580,6 +14220,13 @@
      79,
      75,
      58
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.95
    },
@@ -9596,6 +14243,13 @@
      75,
      58
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.58
    },
    "headed_sot": {
@@ -9610,6 +14264,13 @@
      79,
      75,
      58
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.32
    },
@@ -9626,6 +14287,13 @@
      75,
      58
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.63
    },
    "shots_blocked": {
@@ -9640,6 +14308,13 @@
      79,
      75,
      58
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.63
    },
@@ -9656,12 +14331,19 @@
      75,
      58
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.26
    }
   }
  },
  {
-  "id": 902874067,
+  "id": 955435918,
   "nazwa": "Roberto Alvarado",
   "pozycja": "M",
   "druzyna": "Mexico",
@@ -9682,6 +14364,14 @@
      90,
      72
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.1
    },
    "fouls_committed": {
@@ -9699,6 +14389,14 @@
      90,
      72
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.66
    },
    "fouls_won": {
@@ -9715,6 +14413,14 @@
      79,
      90,
      72
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.88
    },
@@ -9733,6 +14439,14 @@
      90,
      72
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.66
    },
    "shots_blocked": {
@@ -9749,6 +14463,14 @@
      79,
      90,
      72
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.44
    },
@@ -9767,12 +14489,20 @@
      90,
      72
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.66
    }
   }
  },
  {
-  "id": 904865092,
+  "id": 960343374,
   "nazwa": "Santiago Gimenez",
   "pozycja": "M",
   "druzyna": "Mexico",
@@ -9791,12 +14521,19 @@
      11,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 3.56
    }
   }
  },
  {
-  "id": 977370696,
+  "id": 945676259,
   "nazwa": "Anthony Gordon",
   "pozycja": "M",
   "druzyna": "England",
@@ -9817,6 +14554,14 @@
      70,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 2.25
    },
    "sot": {
@@ -9833,6 +14578,14 @@
      71,
      70,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.29
    },
@@ -9851,6 +14604,14 @@
      70,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.93
    },
    "headed_shots": {
@@ -9867,6 +14628,14 @@
      71,
      70,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.64
    },
@@ -9885,12 +14654,20 @@
      70,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.64
    }
   }
  },
  {
-  "id": 968392324,
+  "id": 984366865,
   "nazwa": "Bukayo Saka",
   "pozycja": "M",
   "druzyna": "England",
@@ -9911,6 +14688,14 @@
      19,
      28
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 3.82
    },
    "fouls_won": {
@@ -9927,6 +14712,14 @@
      26,
      19,
      28
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 3.27
    },
@@ -9945,12 +14738,20 @@
      19,
      28
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 2.18
    }
   }
  },
  {
-  "id": 961602138,
+  "id": 957628056,
   "nazwa": "Declan Rice",
   "pozycja": "M",
   "druzyna": "England",
@@ -9969,6 +14770,13 @@
      71,
      62
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.73
    },
    "sot": {
@@ -9983,6 +14791,13 @@
      90,
      71,
      62
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.58
    },
@@ -9999,6 +14814,13 @@
      71,
      62
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.58
    },
    "headed_shots": {
@@ -10013,6 +14835,13 @@
      90,
      71,
      62
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.29
    },
@@ -10029,6 +14858,13 @@
      71,
      62
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.58
    },
    "sot_outside_box": {
@@ -10043,6 +14879,13 @@
      90,
      71,
      62
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.29
    },
@@ -10059,12 +14902,19 @@
      71,
      62
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.86
    }
   }
  },
  {
-  "id": 954823432,
+  "id": 925418061,
   "nazwa": "Djed Spence",
   "pozycja": "M",
   "druzyna": "England",
@@ -10087,6 +14937,15 @@
      28,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.1
    },
    "fouls_won": {
@@ -10106,12 +14965,21 @@
      28,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.1
    }
   }
  },
  {
-  "id": 901484049,
+  "id": 985556599,
   "nazwa": "Eberechi Eze",
   "pozycja": "M",
   "druzyna": "England",
@@ -10130,6 +14998,13 @@
      17,
      28
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 6.28
    },
    "shots_outside_box": {
@@ -10144,6 +15019,13 @@
      20,
      17,
      28
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 4.19
    },
@@ -10160,12 +15042,19 @@
      17,
      28
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 6.28
    }
   }
  },
  {
-  "id": 932093668,
+  "id": 902187807,
   "nazwa": "Elliot Anderson",
   "pozycja": "M",
   "druzyna": "England",
@@ -10188,6 +15077,15 @@
      70,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.6
    },
    "fouls_committed": {
@@ -10206,6 +15104,15 @@
      90,
      70,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.4
    },
@@ -10226,6 +15133,15 @@
      70,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 3.19
    },
    "interceptions": {
@@ -10244,6 +15160,15 @@
      90,
      70,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.8
    },
@@ -10264,6 +15189,15 @@
      70,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.4
    },
    "shots_outside_box": {
@@ -10282,6 +15216,15 @@
      90,
      70,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.0
    },
@@ -10302,6 +15245,15 @@
      70,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.8
    },
    "shots_off_target": {
@@ -10321,12 +15273,21 @@
      70,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.6
    }
   }
  },
  {
-  "id": 951156514,
+  "id": 944637721,
   "nazwa": "Ezri Konsa",
   "pozycja": "M",
   "druzyna": "England",
@@ -10349,6 +15310,15 @@
      70,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.57
    },
    "fouls_committed": {
@@ -10367,6 +15337,15 @@
      90,
      70,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.33
    },
@@ -10387,6 +15366,15 @@
      70,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 2.08
    },
    "headed_shots": {
@@ -10406,12 +15394,21 @@
      70,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.38
    }
   }
  },
  {
-  "id": 986628141,
+  "id": 961370577,
   "nazwa": "Harry Kane",
   "pozycja": "M",
   "druzyna": "England",
@@ -10434,6 +15431,15 @@
      62,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 4.7
    },
    "sot": {
@@ -10452,6 +15458,15 @@
      90,
      62,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 2.54
    },
@@ -10472,6 +15487,15 @@
      62,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.17
    },
    "fouls_won": {
@@ -10490,6 +15514,15 @@
      90,
      62,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.17
    },
@@ -10510,6 +15543,15 @@
      62,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.37
    },
    "headed_sot": {
@@ -10528,6 +15570,15 @@
      90,
      62,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.17
    },
@@ -10548,6 +15599,15 @@
      62,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.98
    },
    "sot_outside_box": {
@@ -10566,6 +15626,15 @@
      90,
      62,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.39
    },
@@ -10586,6 +15655,15 @@
      62,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.98
    },
    "shots_off_target": {
@@ -10605,12 +15683,21 @@
      62,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.17
    }
   }
  },
  {
-  "id": 926370371,
+  "id": 968664432,
   "nazwa": "Jordan Pickford",
   "pozycja": "M",
   "druzyna": "England",
@@ -10633,12 +15720,21 @@
      62,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.58
    }
   }
  },
  {
-  "id": 986191041,
+  "id": 952025790,
   "nazwa": "Jude Bellingham",
   "pozycja": "M",
   "druzyna": "England",
@@ -10661,6 +15757,15 @@
      70,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 2.54
    },
    "sot": {
@@ -10679,6 +15784,15 @@
      79,
      70,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.27
    },
@@ -10699,6 +15813,15 @@
      70,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.48
    },
    "fouls_won": {
@@ -10717,6 +15840,15 @@
      79,
      70,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.48
    },
@@ -10737,6 +15869,15 @@
      70,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.42
    },
    "headed_sot": {
@@ -10755,6 +15896,15 @@
      79,
      70,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.42
    },
@@ -10775,6 +15925,15 @@
      70,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.63
    },
    "shots_blocked": {
@@ -10793,6 +15952,15 @@
      79,
      70,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.63
    },
@@ -10813,12 +15981,21 @@
      70,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.63
    }
   }
  },
  {
-  "id": 950462207,
+  "id": 923609507,
   "nazwa": "Marc Guehi",
   "pozycja": "M",
   "druzyna": "England",
@@ -10841,6 +16018,15 @@
      28,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.78
    },
    "fouls_won": {
@@ -10859,6 +16045,15 @@
      4,
      28,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 3.37
    },
@@ -10879,12 +16074,21 @@
      28,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.78
    }
   }
  },
  {
-  "id": 974103319,
+  "id": 913973271,
   "nazwa": "Marcus Rashford",
   "pozycja": "M",
   "druzyna": "England",
@@ -10907,6 +16111,15 @@
      20,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 4.46
    },
    "sot": {
@@ -10925,6 +16138,15 @@
      19,
      20,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.74
    },
@@ -10945,6 +16167,15 @@
      20,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.86
    },
    "fouls_won": {
@@ -10963,6 +16194,15 @@
      19,
      20,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.49
    },
@@ -10983,6 +16223,15 @@
      20,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.74
    },
    "shots_outside_box": {
@@ -11001,6 +16250,15 @@
      19,
      20,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.12
    },
@@ -11021,12 +16279,21 @@
      20,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 2.98
    }
   }
  },
  {
-  "id": 906466167,
+  "id": 952052580,
   "nazwa": "Morgan Rogers",
   "pozycja": "M",
   "druzyna": "England",
@@ -11047,12 +16314,20 @@
      28,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 2.25
    }
   }
  },
  {
-  "id": 901957329,
+  "id": 935097052,
   "nazwa": "Nico O'Reilly",
   "pozycja": "M",
   "druzyna": "England",
@@ -11075,6 +16350,15 @@
      70,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.76
    },
    "fouls_committed": {
@@ -11093,6 +16377,15 @@
      90,
      70,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.54
    },
@@ -11113,6 +16406,15 @@
      70,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.1
    },
    "interceptions": {
@@ -11131,6 +16433,15 @@
      90,
      70,
      45
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.44
    },
@@ -11151,6 +16462,15 @@
      70,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.32
    },
    "shots_off_target": {
@@ -11170,12 +16490,21 @@
      70,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.32
    }
   }
  },
  {
-  "id": 980280315,
+  "id": 972939197,
   "nazwa": "Noni Madueke",
   "pozycja": "M",
   "druzyna": "England",
@@ -11196,6 +16525,14 @@
      71,
      62
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 2.67
    },
    "sot": {
@@ -11212,6 +16549,14 @@
      82,
      71,
      62
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.59
    },
@@ -11230,6 +16575,14 @@
      71,
      62
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.49
    },
    "interceptions": {
@@ -11246,6 +16599,14 @@
      82,
      71,
      62
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 0.59
    },
@@ -11264,6 +16625,14 @@
      71,
      62
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 1.19
    },
    "shots_blocked": {
@@ -11280,6 +16649,14 @@
      82,
      71,
      62
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.19
    },
@@ -11298,12 +16675,20 @@
      71,
      62
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.59
    }
   }
  },
  {
-  "id": 923224536,
+  "id": 957695058,
   "nazwa": "Ollie Watkins",
   "pozycja": "M",
   "druzyna": "England",
@@ -11320,12 +16705,18 @@
      20,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true
+    ],
     "srednia90": 6.25
    }
   }
  },
  {
-  "id": 954582165,
+  "id": 913540859,
   "nazwa": "Reece James",
   "pozycja": "M",
   "druzyna": "England",
@@ -11344,12 +16735,19 @@
      62,
      45
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.94
    }
   }
  },
  {
-  "id": 946340468,
+  "id": 932672600,
   "nazwa": "Moise Bombito",
   "pozycja": "M",
   "druzyna": "Canada",
@@ -11366,12 +16764,18 @@
      45,
      30
     ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true
+    ],
     "srednia90": 0.68
    }
   }
  },
  {
-  "id": 924042583,
+  "id": 958775957,
   "nazwa": "Leo Oestigaard",
   "pozycja": "M",
   "druzyna": "Norway",
@@ -11391,6 +16795,14 @@
      18,
      19,
      28
+    ],
+    "rywale": [],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     true
     ],
     "srednia90": 1.67
    }
