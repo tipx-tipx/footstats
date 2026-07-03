@@ -21,6 +21,8 @@ import time
 from collections import defaultdict
 from dataclasses import asdict
 
+from scipy import stats as _stats
+
 import numpy as np
 from curl_cffi import requests
 
@@ -669,6 +671,11 @@ def main():
                         ),
                         "czynniki": sm.factors, "uzasadnienie": sm.reasoning,
                         "lambda": sm.lam,
+                        # rozkład przybliżony Poissonem z λ — pod drabinkę
+                        # "szanse na inne linie" w rozwinięciu karty
+                        "rozklad": [
+                            float(_stats.poisson.pmf(k, sm.lam)) for k in range(7)
+                        ] + [float(_stats.poisson.sf(6, sm.lam))],
                     })
             for a in sm.assessments:
                 if a.side not in best_by_side or a.rank_score > best_by_side[a.side].rank_score:
@@ -855,7 +862,8 @@ def main():
             "ryzyko": b.get("ryzyko", "srednie"),
             "rank_score": b["p_model"],
             "ci": ci, "oczekiwane_minuty": b.get("oczekiwane_minuty"),
-            "lambda": round(b.get("lambda", 0.0), 3), "rozklad": None,
+            "lambda": round(b.get("lambda", 0.0), 3),
+            "rozklad": b.get("rozklad"),
             "czynniki": b.get("czynniki", {}),
             "uzasadnienie": b.get("uzasadnienie", {"czynniki": []}),
         })

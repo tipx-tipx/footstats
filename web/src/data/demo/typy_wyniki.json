@@ -1,6 +1,6 @@
 {
  "podsumowanie": {
-  "opublikowane": 519,
+  "opublikowane": 561,
   "rozliczone": 0,
   "trafione": 0,
   "roi_flat": 0,
@@ -34,7 +34,7 @@
     },
     {
      "value_bet_id": 57,
-     "podmiot_id": 939923939,
+     "podmiot_id": 961583172,
      "podmiot": "Neil El Aynaoui",
      "rynek_kod": "fouls_committed",
      "rynek": "Faule popełnione",
@@ -50,7 +50,7 @@
     },
     {
      "value_bet_id": 61,
-     "podmiot_id": 912261448,
+     "podmiot_id": 912912960,
      "podmiot": "Dayot Upamecano",
      "rynek_kod": "interceptions",
      "rynek": "Przechwyty",
@@ -66,7 +66,7 @@
     },
     {
      "value_bet_id": 59,
-     "podmiot_id": 974482797,
+     "podmiot_id": 979427993,
      "podmiot": "Erling Haaland",
      "rynek_kod": "sot",
      "rynek": "Strzały celne",
@@ -82,7 +82,7 @@
     },
     {
      "value_bet_id": 56,
-     "podmiot_id": 963876665,
+     "podmiot_id": 986628141,
      "podmiot": "Harry Kane",
      "rynek_kod": "shots",
      "rynek": "Strzały",
@@ -113,7 +113,7 @@
      "kickoff_ts": 1783364400
     },
     {
-     "value_bet_id": 75,
+     "value_bet_id": 74,
      "podmiot_id": 331737,
      "podmiot": "Youri Tielemans",
      "rynek_kod": "shots_outside_box",
@@ -142,10 +142,10 @@
    "cel": 5,
    "cel_label": "5–10",
    "styl": "pewniaki",
-   "kurs_laczny": 5.42,
-   "p_model": 0.3001,
-   "fair_kurs": 3.33,
-   "ev_pct": 62.5,
+   "kurs_laczny": 6.37,
+   "p_model": 0.2434,
+   "fair_kurs": 4.11,
+   "ev_pct": 55.0,
    "legi": [
     {
      "value_bet_id": 0,
@@ -165,7 +165,7 @@
     },
     {
      "value_bet_id": 0,
-     "podmiot_id": 939923939,
+     "podmiot_id": 961583172,
      "podmiot": "Neil El Aynaoui",
      "rynek_kod": "fouls_committed",
      "rynek": "Faule popełnione",
@@ -181,7 +181,23 @@
     },
     {
      "value_bet_id": 0,
-     "podmiot_id": 941509551,
+     "podmiot_id": 931498071,
+     "podmiot": "Achraf Hakimi",
+     "rynek_kod": "fouls_won",
+     "rynek": "Faule wywalczone",
+     "linia": 0.5,
+     "strona": "powyzej",
+     "kurs": 1.21,
+     "bukmacher": "Superbet",
+     "p_model": 0.8537,
+     "pewnosc": "srednia",
+     "mecz": "Canada – Morocco",
+     "mecz_id": 12813009,
+     "kickoff_ts": 1783184400
+    },
+    {
+     "value_bet_id": 0,
+     "podmiot_id": 934230697,
      "podmiot": "Jonathan David",
      "rynek_kod": "shots",
      "rynek": "Strzały",
@@ -197,7 +213,7 @@
     },
     {
      "value_bet_id": 0,
-     "podmiot_id": 909240028,
+     "podmiot_id": 977467347,
      "podmiot": "Ismael Saibari",
      "rynek_kod": "sot",
      "rynek": "Strzały celne",
@@ -213,13 +229,13 @@
     },
     {
      "value_bet_id": 0,
-     "podmiot_id": 983503725,
+     "podmiot_id": 954738430,
      "podmiot": "Michael Olise",
      "rynek_kod": "sot",
      "rynek": "Strzały celne",
      "linia": 0.5,
      "strona": "powyzej",
-     "kurs": 1.42,
+     "kurs": 1.38,
      "bukmacher": "Superbet",
      "p_model": 0.757,
      "pewnosc": "srednia",
@@ -239,10 +255,10 @@
    "cel": 10,
    "cel_label": "10–15",
    "styl": "pewniaki",
-   "kurs_laczny": 14.51,
+   "kurs_laczny": 14.1,
    "p_model": 0.0943,
    "fair_kurs": 10.6,
-   "ev_pct": 36.8,
+   "ev_pct": 33.0,
    "legi": [
     {
      "value_bet_id": 0,
@@ -278,7 +294,7 @@
     },
     {
      "value_bet_id": 0,
-     "podmiot_id": 939923939,
+     "podmiot_id": 961583172,
      "podmiot": "Neil El Aynaoui",
      "rynek_kod": "fouls_committed",
      "rynek": "Faule popełnione",
@@ -294,7 +310,7 @@
     },
     {
      "value_bet_id": 0,
-     "podmiot_id": 919443720,
+     "podmiot_id": 931498071,
      "podmiot": "Achraf Hakimi",
      "rynek_kod": "fouls_won",
      "rynek": "Faule wywalczone",
@@ -310,7 +326,7 @@
     },
     {
      "value_bet_id": 0,
-     "podmiot_id": 941509551,
+     "podmiot_id": 934230697,
      "podmiot": "Jonathan David",
      "rynek_kod": "shots",
      "rynek": "Strzały",
@@ -326,7 +342,7 @@
     },
     {
      "value_bet_id": 0,
-     "podmiot_id": 909240028,
+     "podmiot_id": 977467347,
      "podmiot": "Ismael Saibari",
      "rynek_kod": "sot",
      "rynek": "Strzały celne",
@@ -342,7 +358,7 @@
     },
     {
      "value_bet_id": 0,
-     "podmiot_id": 912261448,
+     "podmiot_id": 912912960,
      "podmiot": "Dayot Upamecano",
      "rynek_kod": "interceptions",
      "rynek": "Przechwyty",
@@ -358,13 +374,13 @@
     },
     {
      "value_bet_id": 0,
-     "podmiot_id": 983503725,
+     "podmiot_id": 954738430,
      "podmiot": "Michael Olise",
      "rynek_kod": "sot",
      "rynek": "Strzały celne",
      "linia": 0.5,
      "strona": "powyzej",
-     "kurs": 1.42,
+     "kurs": 1.38,
      "bukmacher": "Superbet",
      "p_model": 0.757,
      "pewnosc": "srednia",
@@ -384,10 +400,10 @@
    "cel": 15,
    "cel_label": "15–20",
    "styl": "pewniaki",
-   "kurs_laczny": 17.7,
+   "kurs_laczny": 17.2,
    "p_model": 0.0716,
    "fair_kurs": 13.97,
-   "ev_pct": 26.7,
+   "ev_pct": 23.1,
    "legi": [
     {
      "value_bet_id": 0,
@@ -423,7 +439,7 @@
     },
     {
      "value_bet_id": 0,
-     "podmiot_id": 939923939,
+     "podmiot_id": 961583172,
      "podmiot": "Neil El Aynaoui",
      "rynek_kod": "fouls_committed",
      "rynek": "Faule popełnione",
@@ -439,7 +455,7 @@
     },
     {
      "value_bet_id": 0,
-     "podmiot_id": 919443720,
+     "podmiot_id": 931498071,
      "podmiot": "Achraf Hakimi",
      "rynek_kod": "fouls_won",
      "rynek": "Faule wywalczone",
@@ -455,7 +471,7 @@
     },
     {
      "value_bet_id": 0,
-     "podmiot_id": 941509551,
+     "podmiot_id": 934230697,
      "podmiot": "Jonathan David",
      "rynek_kod": "shots",
      "rynek": "Strzały",
@@ -471,7 +487,7 @@
     },
     {
      "value_bet_id": 0,
-     "podmiot_id": 909240028,
+     "podmiot_id": 977467347,
      "podmiot": "Ismael Saibari",
      "rynek_kod": "sot",
      "rynek": "Strzały celne",
@@ -487,7 +503,7 @@
     },
     {
      "value_bet_id": 0,
-     "podmiot_id": 912261448,
+     "podmiot_id": 912912960,
      "podmiot": "Dayot Upamecano",
      "rynek_kod": "interceptions",
      "rynek": "Przechwyty",
@@ -503,7 +519,7 @@
     },
     {
      "value_bet_id": 0,
-     "podmiot_id": 910485326,
+     "podmiot_id": 950774126,
      "podmiot": "Julio Enciso",
      "rynek_kod": "fouls_won",
      "rynek": "Faule wywalczone",
@@ -519,13 +535,13 @@
     },
     {
      "value_bet_id": 0,
-     "podmiot_id": 983503725,
+     "podmiot_id": 954738430,
      "podmiot": "Michael Olise",
      "rynek_kod": "sot",
      "rynek": "Strzały celne",
      "linia": 0.5,
      "strona": "powyzej",
-     "kurs": 1.42,
+     "kurs": 1.38,
      "bukmacher": "Superbet",
      "p_model": 0.757,
      "pewnosc": "srednia",
@@ -545,10 +561,10 @@
    "cel": 20,
    "cel_label": "20–25",
    "styl": "pewniaki",
-   "kurs_laczny": 21.04,
+   "kurs_laczny": 20.44,
    "p_model": 0.059,
    "fair_kurs": 16.96,
-   "ev_pct": 24.1,
+   "ev_pct": 20.6,
    "legi": [
     {
      "value_bet_id": 0,
@@ -584,7 +600,7 @@
     },
     {
      "value_bet_id": 0,
-     "podmiot_id": 939923939,
+     "podmiot_id": 961583172,
      "podmiot": "Neil El Aynaoui",
      "rynek_kod": "fouls_committed",
      "rynek": "Faule popełnione",
@@ -600,7 +616,7 @@
     },
     {
      "value_bet_id": 0,
-     "podmiot_id": 919443720,
+     "podmiot_id": 931498071,
      "podmiot": "Achraf Hakimi",
      "rynek_kod": "fouls_won",
      "rynek": "Faule wywalczone",
@@ -616,7 +632,7 @@
     },
     {
      "value_bet_id": 0,
-     "podmiot_id": 941509551,
+     "podmiot_id": 934230697,
      "podmiot": "Jonathan David",
      "rynek_kod": "shots",
      "rynek": "Strzały",
@@ -632,7 +648,7 @@
     },
     {
      "value_bet_id": 0,
-     "podmiot_id": 909240028,
+     "podmiot_id": 977467347,
      "podmiot": "Ismael Saibari",
      "rynek_kod": "sot",
      "rynek": "Strzały celne",
@@ -648,7 +664,7 @@
     },
     {
      "value_bet_id": 0,
-     "podmiot_id": 912261448,
+     "podmiot_id": 912912960,
      "podmiot": "Dayot Upamecano",
      "rynek_kod": "interceptions",
      "rynek": "Przechwyty",
@@ -664,13 +680,13 @@
     },
     {
      "value_bet_id": 0,
-     "podmiot_id": 983503725,
+     "podmiot_id": 954738430,
      "podmiot": "Michael Olise",
      "rynek_kod": "sot",
      "rynek": "Strzały celne",
      "linia": 0.5,
      "strona": "powyzej",
-     "kurs": 1.42,
+     "kurs": 1.38,
      "bukmacher": "Superbet",
      "p_model": 0.757,
      "pewnosc": "srednia",
@@ -680,7 +696,7 @@
     },
     {
      "value_bet_id": 0,
-     "podmiot_id": 924985843,
+     "podmiot_id": 924916058,
      "podmiot": "Kylian Mbappe",
      "rynek_kod": "shots",
      "rynek": "Strzały",
@@ -729,7 +745,7 @@
     },
     {
      "value_bet_id": 0,
-     "podmiot_id": 941509551,
+     "podmiot_id": 934230697,
      "podmiot": "Jonathan David",
      "rynek_kod": "shots",
      "rynek": "Strzały",
@@ -745,7 +761,7 @@
     },
     {
      "value_bet_id": 0,
-     "podmiot_id": 943808126,
+     "podmiot_id": 985854402,
      "podmiot": "Vinicius Junior",
      "rynek_kod": "sot",
      "rynek": "Strzały celne",
@@ -761,7 +777,7 @@
     },
     {
      "value_bet_id": 0,
-     "podmiot_id": 963876665,
+     "podmiot_id": 986628141,
      "podmiot": "Harry Kane",
      "rynek_kod": "sot",
      "rynek": "Strzały celne",
@@ -777,7 +793,7 @@
     },
     {
      "value_bet_id": 0,
-     "podmiot_id": 936262214,
+     "podmiot_id": 987534692,
      "podmiot": "Raul Jimenez",
      "rynek_kod": "shots",
      "rynek": "Strzały",
@@ -858,7 +874,7 @@
     },
     {
      "value_bet_id": 0,
-     "podmiot_id": 939923939,
+     "podmiot_id": 961583172,
      "podmiot": "Neil El Aynaoui",
      "rynek_kod": "fouls_committed",
      "rynek": "Faule popełnione",
@@ -874,7 +890,7 @@
     },
     {
      "value_bet_id": 0,
-     "podmiot_id": 941509551,
+     "podmiot_id": 934230697,
      "podmiot": "Jonathan David",
      "rynek_kod": "shots",
      "rynek": "Strzały",
@@ -890,7 +906,7 @@
     },
     {
      "value_bet_id": 0,
-     "podmiot_id": 943808126,
+     "podmiot_id": 985854402,
      "podmiot": "Vinicius Junior",
      "rynek_kod": "sot",
      "rynek": "Strzały celne",
@@ -906,7 +922,7 @@
     },
     {
      "value_bet_id": 0,
-     "podmiot_id": 963876665,
+     "podmiot_id": 986628141,
      "podmiot": "Harry Kane",
      "rynek_kod": "sot",
      "rynek": "Strzały celne",
@@ -922,7 +938,7 @@
     },
     {
      "value_bet_id": 0,
-     "podmiot_id": 936262214,
+     "podmiot_id": 987534692,
      "podmiot": "Raul Jimenez",
      "rynek_kod": "shots",
      "rynek": "Strzały",
@@ -1003,7 +1019,7 @@
     },
     {
      "value_bet_id": 0,
-     "podmiot_id": 941509551,
+     "podmiot_id": 934230697,
      "podmiot": "Jonathan David",
      "rynek_kod": "shots",
      "rynek": "Strzały",
@@ -1019,7 +1035,7 @@
     },
     {
      "value_bet_id": 0,
-     "podmiot_id": 943808126,
+     "podmiot_id": 985854402,
      "podmiot": "Vinicius Junior",
      "rynek_kod": "sot",
      "rynek": "Strzały celne",
@@ -1035,7 +1051,7 @@
     },
     {
      "value_bet_id": 0,
-     "podmiot_id": 963876665,
+     "podmiot_id": 986628141,
      "podmiot": "Harry Kane",
      "rynek_kod": "sot",
      "rynek": "Strzały celne",
@@ -1051,7 +1067,7 @@
     },
     {
      "value_bet_id": 0,
-     "podmiot_id": 936262214,
+     "podmiot_id": 987534692,
      "podmiot": "Raul Jimenez",
      "rynek_kod": "shots",
      "rynek": "Strzały",
@@ -1067,7 +1083,7 @@
     },
     {
      "value_bet_id": 0,
-     "podmiot_id": 987195631,
+     "podmiot_id": 901957329,
      "podmiot": "Nico O'Reilly",
      "rynek_kod": "shots",
      "rynek": "Strzały",
@@ -1148,7 +1164,7 @@
     },
     {
      "value_bet_id": 0,
-     "podmiot_id": 941509551,
+     "podmiot_id": 934230697,
      "podmiot": "Jonathan David",
      "rynek_kod": "shots",
      "rynek": "Strzały",
@@ -1164,7 +1180,7 @@
     },
     {
      "value_bet_id": 0,
-     "podmiot_id": 909240028,
+     "podmiot_id": 977467347,
      "podmiot": "Ismael Saibari",
      "rynek_kod": "sot",
      "rynek": "Strzały celne",
@@ -1180,7 +1196,7 @@
     },
     {
      "value_bet_id": 0,
-     "podmiot_id": 943808126,
+     "podmiot_id": 985854402,
      "podmiot": "Vinicius Junior",
      "rynek_kod": "sot",
      "rynek": "Strzały celne",
@@ -1196,7 +1212,7 @@
     },
     {
      "value_bet_id": 0,
-     "podmiot_id": 963876665,
+     "podmiot_id": 986628141,
      "podmiot": "Harry Kane",
      "rynek_kod": "sot",
      "rynek": "Strzały celne",
@@ -1212,7 +1228,7 @@
     },
     {
      "value_bet_id": 0,
-     "podmiot_id": 936262214,
+     "podmiot_id": 987534692,
      "podmiot": "Raul Jimenez",
      "rynek_kod": "shots",
      "rynek": "Strzały",
@@ -1228,7 +1244,7 @@
     },
     {
      "value_bet_id": 0,
-     "podmiot_id": 987195631,
+     "podmiot_id": 901957329,
      "podmiot": "Nico O'Reilly",
      "rynek_kod": "shots",
      "rynek": "Strzały",

@@ -30,8 +30,7 @@
   "sedzia_mnoznik_fauli": 1.0,
   "okazje": [
    15,
-   50,
-   70
+   50
   ],
   "sklady_ogloszone": false
  },
@@ -86,8 +85,8 @@
   "okazje": [
    25,
    67,
-   71,
-   75
+   70,
+   74
   ],
   "sklady_ogloszone": false
  },
@@ -113,7 +112,7 @@
    64,
    66,
    68,
-   72
+   71
   ],
   "sklady_ogloszone": false
  },
@@ -138,7 +137,7 @@
    61,
    62,
    65,
-   73
+   72
   ],
   "sklady_ogloszone": false
  },
@@ -182,7 +181,7 @@
    49,
    56,
    60,
-   74
+   73
   ],
   "sklady_ogloszone": false
  }

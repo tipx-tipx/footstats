@@ -274,6 +274,51 @@ export function BetCard({
                     />
                   </div>
                 )}
+                {bet.rozklad && (
+                  <div>
+                    <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-faint">
+                      Szanse na inne linie wg modelu
+                    </h4>
+                    <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+                      {[0.5, 1.5, 2.5, 3.5].map((l) => {
+                        const total =
+                          bet.rozklad!.reduce((a, b) => a + b, 0) || 1;
+                        const p =
+                          bet.rozklad!
+                            .slice(Math.floor(l) + 1)
+                            .reduce((a, b) => a + b, 0) / total;
+                        const aktualna = Math.abs(l - bet.linia) < 0.01;
+                        if (p < 0.02 && !aktualna) return null;
+                        return (
+                          <div
+                            key={l}
+                            className={`rounded-lg border px-2.5 py-2 text-center ${
+                              aktualna
+                                ? "border-brand/40 bg-brand-wash"
+                                : "border-hairline bg-card"
+                            }`}
+                            title={
+                              aktualna
+                                ? "Linia tego typu"
+                                : `Szansa modelu na powyżej ${fmtLinia(l)}`
+                            }
+                          >
+                            <p className="text-[10px] uppercase tracking-wide text-faint">
+                              pow. {fmtLinia(l)}
+                            </p>
+                            <p
+                              className={`font-data text-sm font-semibold ${
+                                aktualna ? "text-brand-deep" : "text-ink"
+                              }`}
+                            >
+                              {fmtProc(p)}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
                 {forma && (() => {
                   const zagrane = forma.ostatnie.filter(
                     (_, i) => (forma.minuty[i] ?? 0) > 0,
@@ -312,7 +357,12 @@ export function BetCard({
                         <span className="font-data text-ink-soft">
                           {forma.srednia90.toFixed(2).replace(".", ",")}
                         </span>{" "}
-                        na 90 minut · przewidywane minuty:{" "}
+                        na 90 minut{" "}
+                        <span title="Liczba ostatnich meczów z minutami, z których policzona jest średnia (klub + reprezentacja)">
+                          (próba: {zagrane.length}{" "}
+                          {zagrane.length === 1 ? "mecz" : zagrane.length < 5 ? "mecze" : "meczów"})
+                        </span>{" "}
+                        · przewidywane minuty:{" "}
                         <span className="font-data text-ink-soft">
                           {bet.oczekiwane_minuty != null
                             ? Math.round(bet.oczekiwane_minuty)
