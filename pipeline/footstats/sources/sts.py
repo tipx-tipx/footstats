@@ -24,9 +24,11 @@ Bierzemy wersje 90-minutowe (bez "(z dogrywką)"), by pasowały do naszych staty
 
 from __future__ import annotations
 
-import asyncio
 import json
 import re
+import time
+
+from curl_cffi import requests as curl_requests
 
 from .superbet import norm_name
 
@@ -56,36 +58,59 @@ _LINE_RE = re.compile(r"(\d+)\s+lub\s+więcej")
 MAX_SANE_ODDS = 50.0  # wyżej = zablokowane/placeholder
 
 
-async def _fetch_frames(match_id: str, seconds: float = 12.0) -> list[dict]:
-    import websockets
+def _ws_collect(channels: list[dict], seconds: float = 12.0) -> list[dict]:
+    """Połącz z STS przez curl_cffi (impersonacja TLS Chrome — omija część blokad),
+    wyślij handshake + subskrypcję i zbierz sparsowane ładunki ramek.
 
-    payloads = []
-    async with websockets.connect(WS_URL, additional_headers=WS_HEADERS, max_size=None) as ws:
+    Impersonacja TLS jest kluczowa: goły klient WS bywa odrzucany (403) z IP,
+    które przy fingerprintcie przeglądarki przechodzą.
+    """
+    payloads: list[dict] = []
+    ws = curl_requests.WebSocket()
+    try:
+        ws.connect(WS_URL, headers=WS_HEADERS, impersonate="chrome124")
+    except Exception:
+        return payloads
+    try:
         for msg in (
             {"t": 1, "b": {"place.rsp": 0, "session": 0, "slips.rsp": 0, "cashout": 0}},
             {"t": 4, "s": 1},
-            {"t": 1, "u": [
-                {"s": "i_pl", "n": 0},
-                {"s": "rcm_global", "n": 0},
-                {"s": f"f_{match_id}_pl", "n": 0},
-                {"s": f"rcm_{match_id}", "n": 0},
-            ]},
+            {"t": 1, "u": channels},
         ):
-            await ws.send(json.dumps(msg))
+            ws.send(json.dumps(msg).encode())
+        start = time.time()
+        while time.time() - start < seconds:
+            try:
+                data = ws.recv()
+            except Exception:
+                break
+            raw = data[0] if isinstance(data, tuple) else data
+            text = raw.decode("utf-8", "ignore") if isinstance(raw, (bytes, bytearray)) else str(raw)
+            for line in text.split("\n"):
+                line = line.strip()
+                if line.startswith("{"):
+                    try:
+                        payloads.append(json.loads(line))
+                    except Exception:
+                        pass
+    finally:
         try:
-            async with asyncio.timeout(seconds):
-                async for raw in ws:
-                    text = raw if isinstance(raw, str) else raw.decode("utf-8", "ignore")
-                    for line in text.split("\n"):
-                        line = line.strip()
-                        if line.startswith("{"):
-                            try:
-                                payloads.append(json.loads(line))
-                            except Exception:
-                                pass
-        except (asyncio.TimeoutError, TimeoutError):
+            ws.close()
+        except Exception:
             pass
     return payloads
+
+
+def _fetch_frames(match_id: str, seconds: float = 12.0) -> list[dict]:
+    return _ws_collect(
+        [
+            {"s": "i_pl", "n": 0},
+            {"s": "rcm_global", "n": 0},
+            {"s": f"f_{match_id}_pl", "n": 0},
+            {"s": f"rcm_{match_id}", "n": 0},
+        ],
+        seconds,
+    )
 
 
 def _market_name_catalog(payloads: list[dict]) -> dict:
@@ -175,7 +200,7 @@ def fetch_stat_odds(match_id: str, seconds: float = 12.0) -> dict:
 
     Zwraca {players: {norm_name: {market_code: {line: {'over': kurs}}}}}.
     """
-    payloads = asyncio.run(_fetch_frames(match_id, seconds))
+    payloads = _fetch_frames(match_id, seconds)
     return parse_player_odds(payloads)
 
 
@@ -216,38 +241,12 @@ def find_match_id(payloads: list[dict], home_en_or_pl: str, away_en_or_pl: str) 
     return found.get("hit", {}).get("_fid")
 
 
-async def _catalog_only(seconds: float = 8.0) -> list[dict]:
-    import websockets
-
-    payloads = []
-    async with websockets.connect(WS_URL, additional_headers=WS_HEADERS, max_size=None) as ws:
-        for msg in (
-            {"t": 1, "b": {"place.rsp": 0, "session": 0, "slips.rsp": 0, "cashout": 0}},
-            {"t": 4, "s": 1},
-            {"t": 1, "u": [{"s": "i_pl", "n": 0}]},
-        ):
-            await ws.send(json.dumps(msg))
-        try:
-            async with asyncio.timeout(seconds):
-                async for raw in ws:
-                    text = raw if isinstance(raw, str) else raw.decode("utf-8", "ignore")
-                    for line in text.split("\n"):
-                        if line.strip().startswith("{"):
-                            try:
-                                payloads.append(json.loads(line.strip()))
-                            except Exception:
-                                pass
-        except (asyncio.TimeoutError, TimeoutError):
-            pass
-    return payloads
-
-
 def match_ids_by_teams() -> dict:
     """Zwróć {(norm_home, norm_away): 'fID'} dla wszystkich meczów w katalogu i_pl.
 
     Pozwala znaleźć STS id meczu bez przeglądarki, po nazwach drużyn.
     """
-    payloads = asyncio.run(_catalog_only())
+    payloads = _ws_collect([{"s": "i_pl", "n": 0}], seconds=8.0)
     out = {}
 
     def walk(o, depth=0):
