@@ -170,7 +170,11 @@ def main():
         "headed_sot": "headed_sot",
         "shots_outside_box": "outside",
         "sot_outside_box": "sot_outside",
+        # rynki STS (bez kursu w chmurze) — prawdziwa historia zamiast szacunku
+        "shots_blocked": "blocked",
+        "shots_off_target": "off_target",
     }
+    real_split_reserved: set = set()
     try:
         shots_trends = [t for t in trends if t.market_code == "shots"]
         team_names = sorted({t.team_name for t in shots_trends if t.team_name})
@@ -213,6 +217,11 @@ def main():
                     league_average=None, ref_odds=[],
                 ))
                 n_syn += 1
+                if mk2 in ("shots_blocked", "shots_off_target"):
+                    # rezerwacja: jest prawdziwa historia -> fallbackowy
+                    # szacunek (strzały − celne) ma się NIE odzywać, nawet
+                    # gdy scoring odrzuci rynek jako zbyt rzadki
+                    real_split_reserved.add((t.player_id, mk2))
         if n_syn:
             print(f"365Scores: dołożono {n_syn} trendów map strzałów "
                   f"(drużyn z historią: {len(hist365)})")
@@ -276,6 +285,7 @@ def main():
     vb_id = 0
     seen_player_market = set()  # (player_id, market) — statshub bywa zdublowany
     shot_lam = {}  # player_id -> {'shots': λ, 'sot': λ, 'info': {...}} — pod sugestie STS
+    real_split = {}  # (player_id, mk) -> pełny scoring niecelnych/zablokowanych z 365
 
     for tr in trends:
         if (tr.player_id, tr.market_code) in seen_player_market:
@@ -340,6 +350,26 @@ def main():
                 "opp": tr.opponent_name, "mid": mid, "ts": ts,
                 "match": match_label, "minutes": int(sum(tr.minutes)),
                 "position": tr.position or "?",
+            }
+
+        # niecelne/zablokowane z PRAWDZIWEJ historii 365Scores: pełny scoring
+        # (Superbet nie kwotuje tych rynków — wynik trafi do sugestii STS)
+        if mk in ("shots_blocked", "shots_off_target"):
+            sm_r = score_player_market(mk, line, hist, prior, ctx, None, None,
+                                       market_calibrated=True)
+            dist_r = counts.predict_match(
+                counts.fit_posterior(
+                    np.array(hist.counts), np.array(hist.minutes),
+                    np.array(hist.days_ago), prior),
+                sm_r.expected_minutes, 1.0,
+            ).distribution(8)
+            real_split[(tr.player_id, mk)] = {
+                "sm": sm_r, "line": line, "dist": dist_r,
+                "info": {
+                    "name": tr.player_name, "team": tr.team_name,
+                    "opp": tr.opponent_name, "mid": mid, "ts": ts,
+                    "match": match_label,
+                },
             }
 
         # kursy Superbetu dla tego zawodnika/rynku
@@ -442,11 +472,45 @@ def main():
             matches_out[mid]["okazje"].append(vb_id)
 
     # --- SUGESTIE bez kursów: niecelne / zablokowane (rynki STS, blokowany w chmurze) ---
-    # statshub nie ma tych rynków, ale daje "strzały" i "celne". Ich różnica to
-    # "nietrafione w światło bramki" = niecelne + zablokowane. Podział wg realnych
-    # danych ligowych. Pokazujemy jako SUGESTIE (bez kursu) — kurs sprawdzasz w STS.
+    # Preferujemy PRAWDZIWĄ historię per strzał z 365Scores (real_split — pełny
+    # scoring modelu: prior, minuty, składy, matchup). Gdy 365 nie ma zawodnika,
+    # fallback: szacunek "strzały − celne" z podziałem wg danych ligowych.
     OFF_SHARE, BLK_SHARE = 0.556, 0.444
     from scipy import stats as _st
+
+    def _push_sugestia(pid, mk, info, lam, p_over, line, extra):
+        nonlocal vb_id
+        vb_id += 1
+        value_bets.append({
+            "id": vb_id, "mecz_id": info["mid"], "mecz": info["match"],
+            "kickoff_ts": info["ts"], "podmiot_typ": "zawodnik",
+            "podmiot_id": pid, "podmiot": info["name"], "druzyna": info["team"],
+            "przeciwnik": info["opp"],
+            "rynek_kod": mk, "rynek": MARKET_NAMES_PL[mk],
+            "linia": line, "strona": "powyzej",
+            "sugestia": True,                      # <-- brak kursu, sprawdź w STS
+            "kurs": None, "bukmacher": "STS (sprawdź ręcznie)",
+            "p_model": round(p_over, 4), "p_rynku": None,
+            "fair_kurs": round(1.0 / max(p_over, 1e-6), 2),
+            "edge_pp": None, "ev_pct": None,
+            "rank_score": p_over,                  # sortowanie sugestii po szansie
+            "lambda": round(lam, 3),
+            **extra,
+        })
+        matches_out.setdefault(info["mid"], {}).setdefault("okazje", []).append(vb_id)
+
+    for (pid, mk), real in real_split.items():
+        sm_r, line, dist_r = real["sm"], real["line"], real["dist"]
+        if sm_r.lam < 0.5 or sm_r.p_over < 0.5:
+            continue
+        _push_sugestia(pid, mk, real["info"], sm_r.lam, sm_r.p_over, line, {
+            "pewnosc": "srednia", "pewnosc_score": 45.0, "ryzyko": "wysokie",
+            "ci": [sm_r.ci_low, sm_r.ci_high],
+            "oczekiwane_minuty": sm_r.expected_minutes,
+            "rozklad": dist_r, "czynniki": sm_r.factors,
+            "uzasadnienie": sm_r.reasoning,
+        })
+
     for pid, slot in shot_lam.items():
         lam_shots = slot.get("shots")
         info = slot.get("info")
@@ -455,6 +519,8 @@ def main():
         lam_sot = slot.get("sot", lam_shots * 0.34)  # brak celnych → typowy udział 34%
         lam_not_on = max(lam_shots - lam_sot, 0.1)
         for mk, share in (("shots_off_target", OFF_SHARE), ("shots_blocked", BLK_SHARE)):
+            if (pid, mk) in real_split_reserved or (pid, mk) in real_split:
+                continue  # jest prawdziwa historia 365 — szacunek zbędny
             lam = lam_not_on * share
             if lam < 0.5:
                 continue  # za rzadkie na sensowną sugestię
@@ -463,23 +529,9 @@ def main():
             p_over = float(_st.poisson.sf(thr, lam))
             if p_over < 0.5:
                 continue  # sugerujemy tylko, gdy model widzi realną szansę na "powyżej"
-            vb_id += 1
-            value_bets.append({
-                "id": vb_id, "mecz_id": info["mid"], "mecz": info["match"],
-                "kickoff_ts": info["ts"], "podmiot_typ": "zawodnik",
-                "podmiot_id": pid, "podmiot": info["name"], "druzyna": info["team"],
-                "przeciwnik": info["opp"],
-                "rynek_kod": mk, "rynek": MARKET_NAMES_PL[mk],
-                "linia": line, "strona": "powyzej",
-                "sugestia": True,                      # <-- brak kursu, sprawdź w STS
-                "kurs": None, "bukmacher": "STS (sprawdź ręcznie)",
-                "p_model": round(p_over, 4), "p_rynku": None,
-                "fair_kurs": round(1.0 / max(p_over, 1e-6), 2),
-                "edge_pp": None, "ev_pct": None,
+            _push_sugestia(pid, mk, info, lam, p_over, line, {
                 "pewnosc": "niska", "pewnosc_score": 30.0, "ryzyko": "wysokie",
-                "rank_score": p_over,                  # sortowanie sugestii po szansie
                 "ci": [None, None], "oczekiwane_minuty": None,
-                "lambda": round(lam, 3),
                 "rozklad": [float(_st.poisson.pmf(k, lam)) for k in range(6)]
                 + [float(_st.poisson.sf(5, lam))],
                 "czynniki": {}, "uzasadnienie": {
@@ -492,7 +544,6 @@ def main():
                     "oczekiwana_liczba": round(lam, 2), "rynek_rzadki": True,
                 },
             })
-            matches_out.setdefault(info["mid"], {}).setdefault("okazje", []).append(vb_id)
 
     value_bets.sort(key=lambda b: -b["rank_score"])
 

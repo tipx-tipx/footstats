@@ -45,6 +45,32 @@
      16
     ],
     "srednia90": 2.0
+   },
+   "shots_blocked": {
+    "ostatnie": [
+     0,
+     2,
+     0
+    ],
+    "minuty": [
+     61,
+     58,
+     16
+    ],
+    "srednia90": 1.33
+   },
+   "shots_off_target": {
+    "ostatnie": [
+     1,
+     1,
+     1
+    ],
+    "minuty": [
+     61,
+     58,
+     16
+    ],
+    "srednia90": 2.0
    }
   }
  },
@@ -187,6 +213,23 @@
      63
     ],
     "srednia90": 1.08
+   },
+   "shots_blocked": {
+    "ostatnie": [
+     2,
+     0,
+     1,
+     0,
+     1
+    ],
+    "minuty": [
+     76,
+     58,
+     72,
+     64,
+     63
+    ],
+    "srednia90": 1.08
    }
   }
  },
@@ -285,6 +328,32 @@
      90
     ],
     "srednia90": 1.04
+   },
+   "shots_blocked": {
+    "ostatnie": [
+     2,
+     0,
+     1
+    ],
+    "minuty": [
+     90,
+     80,
+     90
+    ],
+    "srednia90": 1.04
+   },
+   "shots_off_target": {
+    "ostatnie": [
+     3,
+     2,
+     1
+    ],
+    "minuty": [
+     90,
+     80,
+     90
+    ],
+    "srednia90": 2.08
    }
   }
  },
@@ -676,6 +745,19 @@
     "ostatnie": [
      0,
      3,
+     0
+    ],
+    "minuty": [
+     57,
+     85,
+     76
+    ],
+    "srednia90": 1.24
+   },
+   "shots_blocked": {
+    "ostatnie": [
+     1,
+     2,
      0
     ],
     "minuty": [

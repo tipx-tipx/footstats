@@ -1,6 +1,75 @@
 [
  {
-  "id": 5,
+  "id": 2,
+  "mecz_id": 12812999,
+  "mecz": "Argentina – Cape Verde",
+  "kickoff_ts": 1783116000,
+  "podmiot_typ": "zawodnik",
+  "podmiot_id": 12994,
+  "podmiot": "Lionel Messi",
+  "druzyna": "Argentina",
+  "przeciwnik": "Cape Verde",
+  "rynek_kod": "shots_blocked",
+  "rynek": "Strzały zablokowane",
+  "linia": 0.5,
+  "strona": "powyzej",
+  "sugestia": true,
+  "kurs": null,
+  "bukmacher": "STS (sprawdź ręcznie)",
+  "p_model": 0.5804,
+  "p_rynku": null,
+  "fair_kurs": 1.72,
+  "edge_pp": null,
+  "ev_pct": null,
+  "rank_score": 0.5804,
+  "lambda": 0.954,
+  "pewnosc": "srednia",
+  "pewnosc_score": 45.0,
+  "ryzyko": "wysokie",
+  "ci": [
+   0.3633,
+   0.797
+  ],
+  "oczekiwane_minuty": 84.3,
+  "rozklad": [
+   0.40768169648027164,
+   0.3447076591329215,
+   0.16521710988428887,
+   0.05901851950118783,
+   0.017480033622400085,
+   0.00453703509244868,
+   0.0010668366815034054,
+   0.00023225018564599958,
+   5.8859419332035756e-05
+  ],
+  "czynniki": {
+   "rywal": 1.0,
+   "sedzia": 1.0,
+   "dom_wyjazd": 1.0,
+   "scenariusz_meczu": 1.0,
+   "matchup": 1.0,
+   "lacznie": 1.0,
+   "opisy": {}
+  },
+  "uzasadnienie": {
+   "czynniki": [
+    {
+     "nazwa": "Poziom bazowy",
+     "opis": "Średnio 1.02 na 90 minut (efektywna próba: 2 meczów)",
+     "mnoznik": null
+    },
+    {
+     "nazwa": "Minuty",
+     "opis": "Przewidywane minuty: 84 (szansa na pierwszy skład: 94%, wg przewidywanego składu)",
+     "mnoznik": 0.94
+    }
+   ],
+   "oczekiwana_liczba": 0.95,
+   "rynek_rzadki": false
+  }
+ },
+ {
+  "id": 6,
   "mecz_id": 12813018,
   "mecz": "Australia – Egypt",
   "kickoff_ts": 1783101600,
@@ -21,16 +90,16 @@
   "fair_kurs": 1.72,
   "edge_pp": null,
   "ev_pct": null,
+  "rank_score": 0.5802031939960145,
+  "lambda": 0.868,
   "pewnosc": "niska",
   "pewnosc_score": 30.0,
   "ryzyko": "wysokie",
-  "rank_score": 0.5802031939960145,
   "ci": [
    null,
    null
   ],
   "oczekiwane_minuty": null,
-  "lambda": 0.868,
   "rozklad": [
    0.41979680600398533,
    0.36437711236503006,
@@ -54,115 +123,76 @@
   }
  },
  {
-  "id": 6,
-  "mecz_id": 12813018,
-  "mecz": "Australia – Egypt",
-  "kickoff_ts": 1783101600,
-  "podmiot_typ": "zawodnik",
-  "podmiot_id": 159665,
-  "podmiot": "Mohamed Salah",
-  "druzyna": "Egypt",
-  "przeciwnik": "Australia",
-  "rynek_kod": "shots_blocked",
-  "rynek": "Strzały zablokowane",
-  "linia": 0.5,
-  "strona": "powyzej",
-  "sugestia": true,
-  "kurs": null,
-  "bukmacher": "STS (sprawdź ręcznie)",
-  "p_model": 0.5603,
-  "p_rynku": null,
-  "fair_kurs": 1.78,
-  "edge_pp": null,
-  "ev_pct": null,
-  "pewnosc": "niska",
-  "pewnosc_score": 30.0,
-  "ryzyko": "wysokie",
-  "rank_score": 0.5603094786007081,
-  "ci": [
-   null,
-   null
-  ],
-  "oczekiwane_minuty": null,
-  "lambda": 0.822,
-  "rozklad": [
-   0.4396905213992918,
-   0.3612867367359391,
-   0.14843179439700557,
-   0.04065468476546543,
-   0.008351327625394058,
-   0.0013724307249513418,
-   0.00021250435195268374
-  ],
-  "czynniki": {},
-  "uzasadnienie": {
-   "czynniki": [
-    {
-     "nazwa": "Szacunek z modelu",
-     "opis": "Oczekiwane 0.82 na mecz (z: strzały − celne, podział 44% wg danych ligowych)",
-     "mnoznik": null
-    }
-   ],
-   "oczekiwana_liczba": 0.82,
-   "rynek_rzadki": true
-  }
- },
- {
-  "id": 1,
+  "id": 3,
   "mecz_id": 12812999,
   "mecz": "Argentina – Cape Verde",
   "kickoff_ts": 1783116000,
   "podmiot_typ": "zawodnik",
-  "podmiot_id": 1171451,
-  "podmiot": "Nicolas Paz",
+  "podmiot_id": 12994,
+  "podmiot": "Lionel Messi",
   "druzyna": "Argentina",
   "przeciwnik": "Cape Verde",
   "rynek_kod": "shots_off_target",
   "rynek": "Strzały niecelne",
-  "linia": 0.5,
+  "linia": 1.5,
   "strona": "powyzej",
   "sugestia": true,
   "kurs": null,
   "bukmacher": "STS (sprawdź ręcznie)",
-  "p_model": 0.5488,
+  "p_model": 0.558,
   "p_rynku": null,
-  "fair_kurs": 1.82,
+  "fair_kurs": 1.79,
   "edge_pp": null,
   "ev_pct": null,
-  "pewnosc": "niska",
-  "pewnosc_score": 30.0,
+  "rank_score": 0.558,
+  "lambda": 1.944,
+  "pewnosc": "srednia",
+  "pewnosc_score": 45.0,
   "ryzyko": "wysokie",
-  "rank_score": 0.5488413556388297,
   "ci": [
-   null,
-   null
+   0.3329,
+   0.7744
   ],
-  "oczekiwane_minuty": null,
-  "lambda": 0.796,
+  "oczekiwane_minuty": 84.3,
   "rozklad": [
-   0.4511586443611702,
-   0.359093515036327,
-   0.14290777108319883,
-   0.03791515799424734,
-   0.007544512073236795,
-   0.0012009901144413408,
-   0.0001794093373784625
+   0.16054660377043645,
+   0.27673411437670675,
+   0.2541471936703035,
+   0.16518060630209666,
+   0.08518708190315816,
+   0.03707247495897357,
+   0.014143185721899538,
+   0.004853268884973135,
+   0.002135470411452234
   ],
-  "czynniki": {},
+  "czynniki": {
+   "rywal": 1.0,
+   "sedzia": 1.0,
+   "dom_wyjazd": 1.0,
+   "scenariusz_meczu": 1.0,
+   "matchup": 1.0,
+   "lacznie": 1.0,
+   "opisy": {}
+  },
   "uzasadnienie": {
    "czynniki": [
     {
-     "nazwa": "Szacunek z modelu",
-     "opis": "Oczekiwane 0.80 na mecz (z: strzały − celne, podział 55% wg danych ligowych)",
+     "nazwa": "Poziom bazowy",
+     "opis": "Średnio 2.07 na 90 minut (efektywna próba: 2 meczów)",
      "mnoznik": null
+    },
+    {
+     "nazwa": "Minuty",
+     "opis": "Przewidywane minuty: 84 (szansa na pierwszy skład: 94%, wg przewidywanego składu)",
+     "mnoznik": 0.94
     }
    ],
-   "oczekiwana_liczba": 0.8,
-   "rynek_rzadki": true
+   "oczekiwana_liczba": 1.94,
+   "rynek_rzadki": false
   }
  },
  {
-  "id": 2,
+  "id": 4,
   "mecz_id": 12813011,
   "mecz": "Colombia – Ghana",
   "kickoff_ts": 1783128600,
@@ -183,16 +213,16 @@
   "fair_kurs": 1.92,
   "edge_pp": null,
   "ev_pct": null,
+  "rank_score": 0.5212078592946607,
+  "lambda": 0.736,
   "pewnosc": "niska",
   "pewnosc_score": 30.0,
   "ryzyko": "wysokie",
-  "rank_score": 0.5212078592946607,
   "ci": [
    null,
    null
   ],
   "oczekiwane_minuty": null,
-  "lambda": 0.736,
   "rozklad": [
    0.4787921407053393,
    0.3526250108541352,
@@ -216,7 +246,76 @@
   }
  },
  {
-  "id": 3,
+  "id": 1,
+  "mecz_id": 12813011,
+  "mecz": "Colombia – Ghana",
+  "kickoff_ts": 1783128600,
+  "podmiot_typ": "zawodnik",
+  "podmiot_id": 107414,
+  "podmiot": "James Rodriguez",
+  "druzyna": "Colombia",
+  "przeciwnik": "Ghana",
+  "rynek_kod": "shots_blocked",
+  "rynek": "Strzały zablokowane",
+  "linia": 0.5,
+  "strona": "powyzej",
+  "sugestia": true,
+  "kurs": null,
+  "bukmacher": "STS (sprawdź ręcznie)",
+  "p_model": 0.5209,
+  "p_rynku": null,
+  "fair_kurs": 1.92,
+  "edge_pp": null,
+  "ev_pct": null,
+  "rank_score": 0.5209,
+  "lambda": 0.78,
+  "pewnosc": "srednia",
+  "pewnosc_score": 45.0,
+  "ryzyko": "wysokie",
+  "ci": [
+   0.3082,
+   0.7289
+  ],
+  "oczekiwane_minuty": 77.2,
+  "rozklad": [
+   0.4764953805137651,
+   0.33620947973397,
+   0.13454397452931405,
+   0.04014468816925282,
+   0.00993478442727433,
+   0.002155187889464666,
+   0.0004236515887220768,
+   7.711714379341256e-05,
+   1.573600444360057e-05
+  ],
+  "czynniki": {
+   "rywal": 1.0,
+   "sedzia": 1.0,
+   "dom_wyjazd": 1.0,
+   "scenariusz_meczu": 1.0,
+   "matchup": 1.0,
+   "lacznie": 1.0,
+   "opisy": {}
+  },
+  "uzasadnienie": {
+   "czynniki": [
+    {
+     "nazwa": "Poziom bazowy",
+     "opis": "Średnio 0.91 na 90 minut (efektywna próba: 3 meczów)",
+     "mnoznik": null
+    },
+    {
+     "nazwa": "Minuty",
+     "opis": "Przewidywane minuty: 77 (szansa na pierwszy skład: 90%, wg przewidywanego składu)",
+     "mnoznik": 0.86
+    }
+   ],
+   "oczekiwana_liczba": 0.78,
+   "rynek_rzadki": false
+  }
+ },
+ {
+  "id": 5,
   "mecz_id": 12812999,
   "mecz": "Argentina – Cape Verde",
   "kickoff_ts": 1783116000,
@@ -237,16 +336,16 @@
   "fair_kurs": 1.93,
   "edge_pp": null,
   "ev_pct": null,
+  "rank_score": 0.5173268681126203,
+  "lambda": 0.728,
   "pewnosc": "niska",
   "pewnosc_score": 30.0,
   "ryzyko": "wysokie",
-  "rank_score": 0.5173268681126203,
   "ci": [
    null,
    null
   ],
   "oczekiwane_minuty": null,
-  "lambda": 0.728,
   "rozklad": [
    0.4826731318873795,
    0.3515866389676247,
@@ -266,60 +365,6 @@
     }
    ],
    "oczekiwana_liczba": 0.73,
-   "rynek_rzadki": true
-  }
- },
- {
-  "id": 4,
-  "mecz_id": 12813011,
-  "mecz": "Colombia – Ghana",
-  "kickoff_ts": 1783128600,
-  "podmiot_typ": "zawodnik",
-  "podmiot_id": 107414,
-  "podmiot": "James Rodriguez",
-  "druzyna": "Colombia",
-  "przeciwnik": "Ghana",
-  "rynek_kod": "shots_off_target",
-  "rynek": "Strzały niecelne",
-  "linia": 0.5,
-  "strona": "powyzej",
-  "sugestia": true,
-  "kurs": null,
-  "bukmacher": "STS (sprawdź ręcznie)",
-  "p_model": 0.5046,
-  "p_rynku": null,
-  "fair_kurs": 1.98,
-  "edge_pp": null,
-  "ev_pct": null,
-  "pewnosc": "niska",
-  "pewnosc_score": 30.0,
-  "ryzyko": "wysokie",
-  "rank_score": 0.5045859691187347,
-  "ci": [
-   null,
-   null
-  ],
-  "oczekiwane_minuty": null,
-  "lambda": 0.702,
-  "rozklad": [
-   0.4954140308812652,
-   0.3479597121259699,
-   0.12219674223539079,
-   0.028608759946585974,
-   0.00502342245817461,
-   0.0007056516462903722,
-   9.16807063231969e-05
-  ],
-  "czynniki": {},
-  "uzasadnienie": {
-   "czynniki": [
-    {
-     "nazwa": "Szacunek z modelu",
-     "opis": "Oczekiwane 0.70 na mecz (z: strzały − celne, podział 55% wg danych ligowych)",
-     "mnoznik": null
-    }
-   ],
-   "oczekiwana_liczba": 0.7,
    "rynek_rzadki": true
   }
  }

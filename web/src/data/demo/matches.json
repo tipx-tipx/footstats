@@ -10,8 +10,9 @@
   "sedzia": null,
   "sedzia_mnoznik_fauli": 1.0,
   "okazje": [
-   1,
-   3
+   2,
+   3,
+   5
   ],
   "sklady_ogloszone": false
  },
@@ -26,7 +27,7 @@
   "sedzia": null,
   "sedzia_mnoznik_fauli": 1.0,
   "okazje": [
-   2,
+   1,
    4
   ],
   "sklady_ogloszone": false
@@ -42,7 +43,6 @@
   "sedzia": null,
   "sedzia_mnoznik_fauli": 1.0,
   "okazje": [
-   5,
    6
   ],
   "sklady_ogloszone": false
