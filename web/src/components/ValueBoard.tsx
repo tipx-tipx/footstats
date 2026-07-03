@@ -220,8 +220,8 @@ export function ValueBoard({
           >
             {([
               ["pewniaki", `Pewniaki (${liczbaPewniakow})`],
-              ["okazje", "Okazje z kursem"],
               ["sugestie", `Sugestie STS (${liczbaSugestii})`],
+              ["okazje", "Okazje z kursem"],
               ["wszystko", "Wszystko"],
             ] as const).map(([kod, label]) => (
               <button

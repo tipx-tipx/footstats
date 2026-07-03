@@ -632,10 +632,21 @@ def main():
                 odd = sv[0]
                 p_side = sm.p_over if side_key == "over" else 1.0 - sm.p_over
                 implied = betting.implied_prob_one_sided(odd)
-                if (
-                    betting.MIN_ODDS <= odd <= 2.80   # user: interesują nas kursy 1.19+
+                # dwa profile lega: PEWNIAK (niski kurs, wysoka szansa) oraz
+                # PEREŁKA (kurs 2.0-3.6 przy wciąż solidnej szansie i
+                # nieujemnej wartości — okazjonalne rodzynki na kupony)
+                pewny = (
+                    betting.MIN_ODDS <= odd <= 2.80   # user: kursy od 1.19
                     and p_side >= 0.52
                     and p_side * odd - 1.0 >= -0.12
+                )
+                perelka = (
+                    1.90 <= odd <= 3.60
+                    and p_side >= 0.42
+                    and p_side * odd - 1.0 >= 0.0
+                )
+                if (
+                    (pewny or perelka)
                     and (sm.ci_high - sm.ci_low) <= 0.35
                     and abs(p_side - implied) <= betting.MAX_MODEL_MARKET_DIVERGENCE
                     and (implied <= 0 or p_side / implied <= betting.MAX_RELATIVE_DIVERGENCE)
@@ -650,6 +661,12 @@ def main():
                         "bukmacher": sv[1], "p_model": round(p_side, 4),
                         "ci": [sm.ci_low, sm.ci_high],
                         "oczekiwane_minuty": sm.expected_minutes,
+                        "ryzyko": betting.risk_level(
+                            sm.lam, mk in RARE_MARKETS,
+                            1.0 if (sm.expected_minutes or 0) >= 80
+                            else 0.75 if (sm.expected_minutes or 0) >= 60
+                            else 0.45,
+                        ),
                         "czynniki": sm.factors, "uzasadnienie": sm.reasoning,
                         "lambda": sm.lam,
                     })
@@ -795,14 +812,28 @@ def main():
         for b in value_bets
     }
     per_mecz_rynek: set[tuple[int, str]] = set()
+    # perełki: do 2 wpisów z wyższym kursem (>=2.0) per mecz, po wartości
+    perelki_kandydaci = sorted(
+        (b for b in legi_pool if b["kurs"] >= 1.90),
+        key=lambda x: -(x["p_model"] * x["kurs"]),
+    )
+    perelki_per_mecz: dict[int, int] = {}
+    do_emisji: list[dict] = []
     for b in sorted(legi_pool, key=lambda x: -x["p_model"]):
         if (b["mecz_id"], b["rynek_kod"]) in per_mecz_rynek:
             continue
+        per_mecz_rynek.add((b["mecz_id"], b["rynek_kod"]))
+        do_emisji.append(b)
+    for b in perelki_kandydaci:
+        if perelki_per_mecz.get(b["mecz_id"], 0) >= 2:
+            continue
+        perelki_per_mecz[b["mecz_id"]] = perelki_per_mecz.get(b["mecz_id"], 0) + 1
+        do_emisji.append(b)
+    for b in do_emisji:
         klucz = (b["podmiot_id"], b["rynek_kod"], b["linia"], b["strona"])
         if klucz in juz_opublikowane:
             continue
         juz_opublikowane.add(klucz)
-        per_mecz_rynek.add((b["mecz_id"], b["rynek_kod"]))
         ci = b.get("ci") or [None, None]
         ci_w = (ci[1] - ci[0]) if ci[0] is not None else 1.0
         vb_id += 1
@@ -820,7 +851,8 @@ def main():
             "edge_pp": None,
             "ev_pct": round((b["p_model"] * b["kurs"] - 1.0) * 100.0, 1),
             "pewnosc": "wysoka" if ci_w <= 0.18 else "srednia",
-            "pewnosc_score": 55.0, "ryzyko": "srednie",
+            "pewnosc_score": 55.0,
+            "ryzyko": b.get("ryzyko", "srednie"),
             "rank_score": b["p_model"],
             "ci": ci, "oczekiwane_minuty": b.get("oczekiwane_minuty"),
             "lambda": round(b.get("lambda", 0.0), 3), "rozklad": None,

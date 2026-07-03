@@ -274,26 +274,54 @@ export function BetCard({
                     />
                   </div>
                 )}
-                {forma && (
-                  <div>
-                    <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-faint">
-                      Ostatnie mecze ({bet.rynek.toLowerCase()}) — linia{" "}
-                      {fmtLinia(bet.linia)}
-                    </h4>
-                    <FormBars
-                      counts={forma.ostatnie}
-                      minutes={forma.minuty}
-                      line={bet.linia}
-                    />
-                    <p className="mt-1.5 text-xs text-faint">
-                      Średnio {forma.srednia90.toFixed(2).replace(".", ",")} na 90
-                      minut · przewidywane minuty:{" "}
-                      {bet.oczekiwane_minuty != null
-                        ? Math.round(bet.oczekiwane_minuty)
-                        : "—"}
-                    </p>
-                  </div>
-                )}
+                {forma && (() => {
+                  const zagrane = forma.ostatnie.filter(
+                    (_, i) => (forma.minuty[i] ?? 0) > 0,
+                  );
+                  const trafione = forma.ostatnie.filter(
+                    (v, i) => (forma.minuty[i] ?? 0) > 0 && v > bet.linia,
+                  ).length;
+                  const dobraSeria = zagrane.length > 0 && trafione / zagrane.length >= 0.6;
+                  return (
+                    <div className="rounded-xl border border-hairline bg-card p-4">
+                      <div className="mb-3 flex items-center justify-between gap-2">
+                        <h4 className="text-xs font-semibold uppercase tracking-wide text-faint">
+                          Ostatnie mecze — {bet.rynek.toLowerCase()}
+                        </h4>
+                        {zagrane.length > 0 && (
+                          <span
+                            className={`font-data shrink-0 rounded-md px-2 py-0.5 text-xs font-semibold ${
+                              dobraSeria
+                                ? "bg-data-green-wash text-brand-deep"
+                                : "bg-paper text-muted"
+                            }`}
+                            title={`Linia ${fmtLinia(bet.linia)} przebita w ${trafione} z ${zagrane.length} ostatnich meczów, w których grał`}
+                          >
+                            linia przebita: {trafione}/{zagrane.length}
+                          </span>
+                        )}
+                      </div>
+                      <FormBars
+                        counts={forma.ostatnie}
+                        minutes={forma.minuty}
+                        line={bet.linia}
+                        height={64}
+                      />
+                      <p className="mt-2 text-xs text-faint">
+                        Średnio{" "}
+                        <span className="font-data text-ink-soft">
+                          {forma.srednia90.toFixed(2).replace(".", ",")}
+                        </span>{" "}
+                        na 90 minut · przewidywane minuty:{" "}
+                        <span className="font-data text-ink-soft">
+                          {bet.oczekiwane_minuty != null
+                            ? Math.round(bet.oczekiwane_minuty)
+                            : "—"}
+                        </span>
+                      </p>
+                    </div>
+                  );
+                })()}
                 {bet.sugestia ? (
                   <p className="rounded-lg border border-hairline bg-card px-3 py-2.5 text-center text-xs leading-relaxed text-muted">
                     Otwórz STS → wyszukaj zawodnika → sprawdź kurs tego rynku.
