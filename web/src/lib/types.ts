@@ -59,6 +59,8 @@ export interface ValueBet {
   czynniki: Czynniki | Record<string, never>;
   uzasadnienie: Uzasadnienie;
   sugestia?: boolean;           // true = brak kursu, tylko podpowiedź modelu
+  /** true = top typ meczu z pełnego skanu (wysoka szansa, bez wymogu value) */
+  pewniak?: boolean;
 }
 
 export interface Mecz {

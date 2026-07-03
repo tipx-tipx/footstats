@@ -102,12 +102,16 @@ export function ValueBoard({
   const [minEv, setMinEv] = useState(1);
   const [meczId, setMeczId] = useState<number | undefined>(initialMatchId);
   // gdy rynek chwilowo nie daje okazji z kursem, otwórz od razu sugestie
-  const [rodzaj, setRodzaj] = useState<"okazje" | "sugestie" | "wszystko">(() =>
-    bets.some((b) => !b.sugestia)
+  const [rodzaj, setRodzaj] = useState<
+    "okazje" | "pewniaki" | "sugestie" | "wszystko"
+  >(() =>
+    bets.some((b) => !b.sugestia && !b.pewniak)
       ? "okazje"
-      : bets.some((b) => b.sugestia)
-        ? "sugestie"
-        : "okazje",
+      : bets.some((b) => b.pewniak)
+        ? "pewniaki"
+        : bets.some((b) => b.sugestia)
+          ? "sugestie"
+          : "okazje",
   );
   const [sortuj, setSortuj] = useState<SortKey>("ranking");
   const [limit, setLimit] = useState(25);
@@ -115,6 +119,10 @@ export function ValueBoard({
 
   const liczbaSugestii = useMemo(
     () => bets.filter((b) => b.sugestia).length,
+    [bets],
+  );
+  const liczbaPewniakow = useMemo(
+    () => bets.filter((b) => b.pewniak).length,
     [bets],
   );
 
@@ -133,7 +141,8 @@ export function ValueBoard({
   const liczbaPerRynek = useMemo(() => {
     const m = new Map<string, number>();
     for (const b of bets) {
-      if (rodzaj === "okazje" && b.sugestia) continue;
+      if (rodzaj === "okazje" && (b.sugestia || b.pewniak)) continue;
+      if (rodzaj === "pewniaki" && !b.pewniak) continue;
       if (rodzaj === "sugestie" && !b.sugestia) continue;
       let kod = b.rynek_kod;
       if (b.rynek_kod.startsWith("team_")) kod = "druzyny";
@@ -167,12 +176,14 @@ export function ValueBoard({
         b.rynek_kod !== rynek
       )
         return false;
-      if (rodzaj === "okazje" && b.sugestia) return false;
+      if (rodzaj === "okazje" && (b.sugestia || b.pewniak)) return false;
+      if (rodzaj === "pewniaki" && !b.pewniak) return false;
       if (rodzaj === "sugestie" && !b.sugestia) return false;
       if (pewnosc === "wysoka" && b.pewnosc !== "wysoka") return false;
       if (pewnosc === "srednia" && b.pewnosc === "niska") return false;
-      // sugestie nie mają EV — omijają filtr wartości
-      if (!b.sugestia && (b.ev_pct == null || b.ev_pct < minEv)) return false;
+      // sugestie i pewniaki nie podlegają filtrowi wartości
+      if (!b.sugestia && !b.pewniak && (b.ev_pct == null || b.ev_pct < minEv))
+        return false;
       if (meczId !== undefined && b.mecz_id !== meczId) return false;
       return true;
     });
@@ -181,9 +192,16 @@ export function ValueBoard({
       case "ev":
         wynik.sort((a, b) => (b.ev_pct ?? -1) - (a.ev_pct ?? -1));
         break;
-      case "pewnosc":
-        wynik.sort((a, b) => b.pewnosc_score - a.pewnosc_score);
+      case "pewnosc": {
+        const poziom = { wysoka: 2, srednia: 1, niska: 0 } as const;
+        wynik.sort(
+          (a, b) =>
+            poziom[b.pewnosc] - poziom[a.pewnosc] ||
+            b.pewnosc_score - a.pewnosc_score ||
+            b.p_model - a.p_model,
+        );
         break;
+      }
       case "kickoff":
         wynik.sort((a, b) => a.kickoff_ts - b.kickoff_ts);
         break;
@@ -200,7 +218,7 @@ export function ValueBoard({
     <section aria-label="Lista okazji">
       {/* pasek narzędzi: rodzaj + filtry + sortowanie */}
       <div className="mb-4 rounded-(--radius-card) border border-hairline bg-card p-3.5 shadow-(--shadow-card) sm:p-4">
-        {liczbaSugestii > 0 && (
+        {(liczbaSugestii > 0 || liczbaPewniakow > 0) && (
           <div
             className="mb-3.5 inline-flex rounded-lg bg-paper p-0.5 text-sm"
             role="tablist"
@@ -208,6 +226,7 @@ export function ValueBoard({
           >
             {([
               ["okazje", "Okazje z kursem"],
+              ["pewniaki", `Pewniaki (${liczbaPewniakow})`],
               ["sugestie", `Sugestie STS (${liczbaSugestii})`],
               ["wszystko", "Wszystko"],
             ] as const).map(([kod, label]) => (
@@ -303,7 +322,7 @@ export function ValueBoard({
       </p>
 
       {filtered.length === 0 &&
-        (rodzaj === "okazje" && !bets.some((b) => !b.sugestia) ? (
+        (rodzaj === "okazje" && !bets.some((b) => !b.sugestia && !b.pewniak) ? (
           <div className="rounded-(--radius-card) border border-hairline bg-card px-6 py-10 text-center shadow-(--shadow-card)">
             <p className="text-sm font-medium text-ink">
               Rynek w tej chwili nie daje okazji z kursem

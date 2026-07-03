@@ -632,10 +632,15 @@ def main():
                     legi_pool.append({
                         "id": 0, "mecz_id": mid, "mecz": match_label,
                         "kickoff_ts": ts, "podmiot_id": tr.player_id,
-                        "podmiot": tr.player_name,
-                        "rynek": MARKET_NAMES_PL[mk], "linia": l,
+                        "podmiot": tr.player_name, "druzyna": tr.team_name,
+                        "przeciwnik": tr.opponent_name,
+                        "rynek_kod": mk, "rynek": MARKET_NAMES_PL[mk], "linia": l,
                         "strona": side_pl, "kurs": odd,
                         "bukmacher": sv[1], "p_model": round(p_side, 4),
+                        "ci": [sm.ci_low, sm.ci_high],
+                        "oczekiwane_minuty": sm.expected_minutes,
+                        "czynniki": sm.factors, "uzasadnienie": sm.reasoning,
+                        "lambda": sm.lam,
                     })
             for a in sm.assessments:
                 if a.side not in best_by_side or a.rank_score > best_by_side[a.side].rank_score:
@@ -709,16 +714,25 @@ def main():
         matches_out.setdefault(info["mid"], {}).setdefault("okazje", []).append(vb_id)
 
     for (pid, mk), real in real_split.items():
-        sm_r, line, dist_r = real["sm"], real["line"], real["dist"]
-        if sm_r.lam < 0.5 or sm_r.p_over < 0.5:
+        sm_r, dist_r = real["sm"], real["dist"]
+        if sm_r.lam < 0.5:
             continue
-        _push_sugestia(pid, mk, real["info"], sm_r.lam, sm_r.p_over, line, {
-            "pewnosc": "srednia", "pewnosc_score": 45.0, "ryzyko": "wysokie",
-            "ci": [sm_r.ci_low, sm_r.ci_high],
-            "oczekiwane_minuty": sm_r.expected_minutes,
-            "rozklad": dist_r, "czynniki": sm_r.factors,
-            "uzasadnienie": sm_r.reasoning,
-        })
+        # STS wystawia kilka linii ("1 lub więcej", "2 lub więcej"...) —
+        # emitujemy KAŻDĄ, przy której model daje >= 50% szans (z rozkładu)
+        for linia_s in (0.5, 1.5, 2.5, 3.5):
+            thr = int(linia_s) + 1  # "powyżej 1.5" = X >= 2
+            p_over_l = float(sum(dist_r[thr:])) if thr < len(dist_r) else 0.0
+            # linia bazowa musi być prawdopodobna; wyższe warianty pokazujemy
+            # już od ~38% (fair ~2.6 — typowy zakres kursów STS)
+            if p_over_l < (0.5 if linia_s == 0.5 else 0.38):
+                break
+            _push_sugestia(pid, mk, real["info"], sm_r.lam, p_over_l, linia_s, {
+                "pewnosc": "srednia", "pewnosc_score": 45.0, "ryzyko": "wysokie",
+                "ci": [sm_r.ci_low, sm_r.ci_high],
+                "oczekiwane_minuty": sm_r.expected_minutes,
+                "rozklad": dist_r, "czynniki": sm_r.factors,
+                "uzasadnienie": sm_r.reasoning,
+            })
 
     for pid, slot in shot_lam.items():
         lam_shots = slot.get("shots")
@@ -733,12 +747,12 @@ def main():
             lam = lam_not_on * share
             if lam < 0.5:
                 continue  # za rzadkie na sensowną sugestię
-            line = line_for_lambda(lam)
-            thr = int(line)  # "powyżej line" = X > floor(line)
-            p_over = float(_st.poisson.sf(thr, lam))
-            if p_over < 0.5:
-                continue  # sugerujemy tylko, gdy model widzi realną szansę na "powyżej"
-            _push_sugestia(pid, mk, info, lam, p_over, line, {
+            for line in (0.5, 1.5, 2.5):
+                thr = int(line)  # "powyżej line" = X > floor(line)
+                p_over = float(_st.poisson.sf(thr, lam))
+                if p_over < (0.5 if line == 0.5 else 0.38):
+                    break
+                _push_sugestia(pid, mk, info, lam, p_over, line, {
                 "pewnosc": "niska", "pewnosc_score": 30.0, "ryzyko": "wysokie",
                 "ci": [None, None], "oczekiwane_minuty": None,
                 "rozklad": [float(_st.poisson.pmf(k, lam)) for k in range(6)]
@@ -753,6 +767,48 @@ def main():
                     "oczekiwana_liczba": round(lam, 2), "rynek_rzadki": True,
                 },
             })
+
+    # --- PEWNIAKI: top typy każdego meczu z pełnego skanu (bez wymogu value) ---
+    # Żeby każdy mecz miał co pokazać, nawet gdy rynek dograł kursy i value
+    # zniknęło. Kandydaci przeszli pełny scoring + bezpieczniki rozbieżności.
+    juz_opublikowane = {
+        (b["podmiot_id"], b["rynek_kod"], b["linia"], b["strona"])
+        for b in value_bets
+    }
+    per_mecz: dict[int, int] = {}
+    for b in sorted(legi_pool, key=lambda x: -x["p_model"]):
+        if per_mecz.get(b["mecz_id"], 0) >= 3:
+            continue
+        klucz = (b["podmiot_id"], b["rynek_kod"], b["linia"], b["strona"])
+        if klucz in juz_opublikowane:
+            continue
+        juz_opublikowane.add(klucz)
+        per_mecz[b["mecz_id"]] = per_mecz.get(b["mecz_id"], 0) + 1
+        ci = b.get("ci") or [None, None]
+        ci_w = (ci[1] - ci[0]) if ci[0] is not None else 1.0
+        vb_id += 1
+        value_bets.append({
+            "id": vb_id, "mecz_id": b["mecz_id"], "mecz": b["mecz"],
+            "kickoff_ts": b["kickoff_ts"], "podmiot_typ": "zawodnik",
+            "podmiot_id": b["podmiot_id"], "podmiot": b["podmiot"],
+            "druzyna": b.get("druzyna", ""), "przeciwnik": b.get("przeciwnik", ""),
+            "rynek_kod": b["rynek_kod"], "rynek": b["rynek"],
+            "linia": b["linia"], "strona": b["strona"],
+            "pewniak": True,
+            "kurs": b["kurs"], "bukmacher": b["bukmacher"],
+            "p_model": b["p_model"], "p_rynku": None,
+            "fair_kurs": round(1.0 / max(b["p_model"], 1e-6), 2),
+            "edge_pp": None,
+            "ev_pct": round((b["p_model"] * b["kurs"] - 1.0) * 100.0, 1),
+            "pewnosc": "wysoka" if ci_w <= 0.18 else "srednia",
+            "pewnosc_score": 55.0, "ryzyko": "srednie",
+            "rank_score": b["p_model"],
+            "ci": ci, "oczekiwane_minuty": b.get("oczekiwane_minuty"),
+            "lambda": round(b.get("lambda", 0.0), 3), "rozklad": None,
+            "czynniki": b.get("czynniki", {}),
+            "uzasadnienie": b.get("uzasadnienie", {"czynniki": []}),
+        })
+        matches_out.setdefault(b["mecz_id"], {}).setdefault("okazje", []).append(vb_id)
 
     value_bets.sort(key=lambda b: -b["rank_score"])
 

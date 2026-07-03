@@ -169,23 +169,18 @@ def build_kupony(
     pool = [b for b in (pool or []) if b["kickoff_ts"] > now - 3600]
     out: list[dict] = []
 
-    dzis = [b for b in pool if b["kickoff_ts"] <= now + OKNO_DZIS_S]
-    if len({b["mecz_id"] for b in dzis}) < 2:
-        dzis = [b for b in pool if b["kickoff_ts"] <= now + OKNO_JUTRO_S]
-    dzienne = [
-        k for cmin, cmax in PRZEDZIALY_DZIENNE
-        if (k := _zloz_pewniaki(dzis, cmin, cmax)) is not None
-    ]
-    if not dzienne:
-        # z samego "dziś" nie da się złożyć kuponu — dobierz mecze z jutra
-        dzis = [b for b in pool if b["kickoff_ts"] <= now + OKNO_JUTRO_S]
-        dzienne = [
-            k for cmin, cmax in PRZEDZIALY_DZIENNE
-            if (k := _zloz_pewniaki(dzis, cmin, cmax)) is not None
-        ]
-    for k in dzienne:
-        k["horyzont"] = "dzienny"
-        out.append(k)
+    # dzienny: każdy przedział NAJPIERW z samego "dziś"; dopiero gdy się nie
+    # składa — dobiera mecze z jutra (decyzja usera)
+    dzis20 = [b for b in pool if b["kickoff_ts"] <= now + OKNO_DZIS_S]
+    dzis44 = [b for b in pool if b["kickoff_ts"] <= now + OKNO_JUTRO_S]
+    tylko_dzis_ok = len({b["mecz_id"] for b in dzis20}) >= 2
+    for cmin, cmax in PRZEDZIALY_DZIENNE:
+        k = _zloz_pewniaki(dzis20, cmin, cmax) if tylko_dzis_ok else None
+        if k is None:
+            k = _zloz_pewniaki(dzis44, cmin, cmax)
+        if k is not None:
+            k["horyzont"] = "dzienny"
+            out.append(k)
 
     dlugo = [b for b in pool if b["kickoff_ts"] <= now + OKNO_DLUGO_S]
     for cmin, cmax in PRZEDZIALY_DLUGOTERMINOWE:
