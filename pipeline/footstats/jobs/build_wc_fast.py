@@ -15,6 +15,7 @@ a strażnik/kolejne uruchomienie dokończy, gdy propsy się pojawią.
 from __future__ import annotations
 
 import json
+import statistics
 import time
 from collections import defaultdict
 
@@ -22,7 +23,7 @@ import numpy as np
 from curl_cffi import requests
 
 from ..engine import MatchContext, PlayerHistory, RARE_MARKETS, score_player_market
-from ..model import counts
+from ..model import counts, matchup_lite
 from ..sources import rotowire, statshub, superbet
 from .build_demo import MARKET_NAMES_PL, WEB_DATA_DIR, line_for_lambda
 
@@ -86,6 +87,8 @@ def score_from_trend(
     predicted_available: bool = False,
     roto_pred: bool | None = None,
     roto_confirmed: bool = False,
+    matchup_factor: float | None = None,
+    matchup_opis: str = "",
 ):
     """Zbuduj PlayerHistory z recentGames i policz predykcję (bez kursów).
 
@@ -130,6 +133,8 @@ def score_from_trend(
         official_started=official,
         predicted_started=predicted,
         opponent_name=trend.opponent_name,
+        matchup_factor=matchup_factor,
+        matchup_opis=matchup_opis,
     )
     return (prior, ctx), hist
 
@@ -192,6 +197,20 @@ def main():
     if n_conf:
         print(f"Składy ogłoszone: {n_conf} z {len(events)} meczów")
 
+    # matchup-lite: profil per90 zawodników każdej drużyny (pod strony boiska)
+    opp_players_by_team: dict[tuple[int, int], list[matchup_lite.OppPlayer]] = {}
+    for t in trends:
+        tot_min = sum(t.minutes)
+        if not t.event_id or not t.team_id or tot_min < 90:
+            continue
+        opp_players_by_team.setdefault((t.event_id, t.team_id), []).append(
+            matchup_lite.OppPlayer(
+                market_code=t.market_code,
+                positions=tuple(t.game_positions[:6]),
+                per90=float(sum(t.counts) / tot_min * 90.0),
+            )
+        )
+
     value_bets, matches_out, players_out = [], {}, {}
     vb_id = 0
     seen_player_market = set()  # (player_id, market) — statshub bywa zdublowany
@@ -226,12 +245,19 @@ def main():
                 ),
             }
 
+        mf, mo = matchup_lite.matchup_lite_factor(
+            tr.market_code,
+            tr.game_positions[:6],
+            opp_players_by_team.get((mid, tr.opponent_id), []),
+        )
         built, hist = score_from_trend(
             tr, tr.opponent_average,
             lineup_confirmed=lineup_confirmed.get(mid, False),
             predicted_available=predicted_available.get(mid, False),
             roto_pred=rotowire.predicted_status(roto, tr.team_name, tr.player_name),
             roto_confirmed=rotowire.is_confirmed(roto, tr.team_name),
+            matchup_factor=mf if mf != 1.0 else None,
+            matchup_opis=mo,
         )
         if built is None:
             continue
@@ -320,12 +346,21 @@ def main():
             side_key = "over" if a.side == "powyzej" else "under"
             kurs_wziety, book = slot[side_key]
             vb_id += 1
-            dist = counts.predict_match(
+            # rozkład do wykresu — bez sensu przy podaniach (λ rzędu 30-80)
+            dist = None if mk == "passes" else counts.predict_match(
                 counts.fit_posterior(
                     np.array(hist.counts), np.array(hist.minutes),
                     np.array(hist.days_ago), prior),
                 sm.expected_minutes, 1.0,
             ).distribution(8)
+            # konsensus bukmacherów UK (statshub) dla tej samej linii i strony
+            kurs_ref = None
+            if (
+                tr.ref_odds
+                and abs(l - tr.line) < 1e-6
+                and (tr.odds_type == "over") == (a.side == "powyzej")
+            ):
+                kurs_ref = round(statistics.median(tr.ref_odds), 2)
             value_bets.append({
                 "id": vb_id, "mecz_id": mid, "mecz": match_label, "kickoff_ts": ts,
                 "podmiot_typ": "zawodnik", "podmiot_id": tr.player_id,
@@ -335,6 +370,7 @@ def main():
                 "linia": l, "strona": a.side,
                 "kurs": kurs_wziety,
                 "bukmacher": book,
+                "kurs_ref": kurs_ref,
                 "p_model": a.model_prob, "p_rynku": a.implied_prob,
                 "fair_kurs": a.fair_odds, "edge_pp": a.edge_pp, "ev_pct": a.ev_pct,
                 "pewnosc": a.confidence, "pewnosc_score": a.confidence_score,

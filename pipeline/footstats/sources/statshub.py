@@ -36,6 +36,7 @@ STATTYPE_MAP = {
     "fouls": "fouls_committed",
     "totalTackle": "tackles",
     "wasFouled": "fouls_won",
+    "totalPass": "passes",
 }
 
 
@@ -75,12 +76,15 @@ class StatshubTrend:
     opponent_rank: int | None
     total_ranks: int | None
     event_id: int = 0
+    odds_type: str = "over"  # strona, której dotyczą line i ref_odds
     # historia: listy równoległe (od najnowszych)
     counts: list[float] = field(default_factory=list)
     minutes: list[float] = field(default_factory=list)
     timestamps: list[int] = field(default_factory=list)
     started: list[bool] = field(default_factory=list)
-    # kursy referencyjne (UK) — do sanity-checku, nie do rozliczeń
+    # pozycje per mecz (RW, LB, RCB...) — pod matchup-lite stron boiska
+    game_positions: list[str] = field(default_factory=list)
+    # kursy referencyjne bukmacherów UK dla linii `line` (Bet365, WH, ...)
     ref_odds: list[float] = field(default_factory=list)
 
 
@@ -114,6 +118,7 @@ def fetch_event_trends(event_ids: list[int]) -> list[StatshubTrend]:
                 line=float(rec.get("line", 0.5)),
                 in_predicted_lineup=bool(rec.get("inPredictedLineup")),
                 event_id=int(rec.get("eventId") or 0),
+                odds_type=str(rec.get("oddsType") or "over"),
                 league_average=rec.get("leagueAverage"),
                 opponent_average=rec.get("opponentAverage"),
                 opponent_rank=rec.get("opponentRank"),
@@ -122,6 +127,7 @@ def fetch_event_trends(event_ids: list[int]) -> list[StatshubTrend]:
                 minutes=[float(g.get("minutesPlayed") or 0) for g in rg],
                 timestamps=[int(g.get("eventTimestamp") or 0) for g in rg],
                 started=[float(g.get("minutesPlayed") or 0) >= 60 for g in rg],
+                game_positions=[str(g.get("position") or "") for g in rg],
                 ref_odds=[
                     float(b["oddsValue"])
                     for b in rec.get("bookmakers", [])

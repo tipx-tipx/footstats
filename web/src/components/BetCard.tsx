@@ -112,6 +112,17 @@ export function BetCard({
             ) : (
               <EdgeBadge ev={bet.ev_pct} />
             )}
+            {!bet.sugestia &&
+              bet.kurs != null &&
+              bet.kurs_ref != null &&
+              bet.kurs >= bet.kurs_ref * 1.12 && (
+                <span
+                  className="hidden rounded-md bg-brand-wash px-1.5 py-0.5 text-[10px] font-semibold text-brand-deep sm:inline-flex"
+                  title={`Bukmacherzy w UK płacą za to średnio ${fmtKurs(bet.kurs_ref)} — kurs Superbetu wyraźnie odstaje w górę`}
+                >
+                  ↑ odstaje od rynku
+                </span>
+              )}
             <span
               className="hidden items-center gap-1 text-[10px] text-faint sm:flex"
               title="Pewność modelu: ile danych i jak stabilnych stoi za tą predykcją"
@@ -192,6 +203,22 @@ export function BetCard({
                       </>
                     )}
                     .
+                    {bet.kurs_ref != null && (
+                      <span className="mt-1.5 block text-xs text-muted">
+                        Bukmacherzy w UK płacą za to średnio{" "}
+                        <span className="font-data font-medium text-ink-soft">
+                          {fmtKurs(bet.kurs_ref)}
+                        </span>
+                        {bet.kurs != null && bet.kurs >= bet.kurs_ref * 1.12 && (
+                          <>
+                            {" "}
+                            — <strong>Superbet wyraźnie odstaje w górę</strong>, a
+                            kurs odstający od reszty rynku to często najlepszy
+                            sygnał wartości.
+                          </>
+                        )}
+                      </span>
+                    )}
                   </div>
                 )}
                 {!bet.sugestia && bet.ci[0] != null && (

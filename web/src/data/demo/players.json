@@ -180,6 +180,42 @@
   }
  },
  {
+  "id": 287833,
+  "nazwa": "Steven Moreira",
+  "pozycja": "D",
+  "druzyna": "Cape Verde",
+  "minuty_lacznie": 3457,
+  "forma": {
+   "passes": {
+    "ostatnie": [
+     24,
+     27,
+     79,
+     64,
+     36,
+     63,
+     40,
+     66,
+     46,
+     45
+    ],
+    "minuty": [
+     90,
+     90,
+     69,
+     76,
+     90,
+     90,
+     68,
+     90,
+     90,
+     88
+    ],
+    "srednia90": 52.28
+   }
+  }
+ },
+ {
   "id": 12994,
   "nazwa": "Lionel Messi",
   "pozycja": "F",

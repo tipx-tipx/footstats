@@ -47,6 +47,9 @@ class MatchContext:
     # matchup "kto na kogo gra" — profile stylu (patrz model/matchup.py)
     player_style: "matchup.PlayerStyle | None" = None
     opponent_style: "matchup.OpponentStyle | None" = None
+    # matchup-lite (tryb MŚ): gotowy mnożnik strony boiska z model/matchup_lite.py
+    matchup_factor: float | None = None
+    matchup_opis: str = ""
 
 
 @dataclass
@@ -216,6 +219,11 @@ def score_player_market(
         cf.matchup = mf
         if matchup_opis:
             cf.notes["matchup"] = matchup_opis
+    elif ctx.matchup_factor is not None:
+        # matchup-lite (tryb MŚ): mnożnik strony boiska policzony ze statshub
+        cf.matchup = ctx.matchup_factor
+        if ctx.matchup_opis:
+            cf.notes["matchup"] = ctx.matchup_opis
 
     # 4) P(over) jako mieszanka po scenariuszach minutowych
     if market_code == "yellow_card":

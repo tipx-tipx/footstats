@@ -41,6 +41,8 @@ export interface ValueBet {
   strona: Strona;
   kurs: number | null;          // null dla sugestii (rynek STS — sprawdź ręcznie)
   bukmacher: string;
+  /** mediana kursów bukmacherów UK (Bet365, WH...) dla tej linii — konsensus rynku */
+  kurs_ref?: number | null;
   p_model: number;
   p_rynku: number | null;
   fair_kurs: number;
