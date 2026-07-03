@@ -33,12 +33,7 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="pitch-grid relative flex min-h-dvh items-center justify-center overflow-hidden px-4">
-      {/* skanująca linia — sygnatura "skanu rynków" */}
-      {!reduced && (
-        <div aria-hidden className="scan-line pointer-events-none absolute inset-y-0 w-40" />
-      )}
-
+    <main className="pitch-grid relative flex min-h-dvh w-full items-center justify-center overflow-hidden px-4">
       <motion.div
         initial={reduced ? false : { opacity: 0, y: 16, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -118,10 +113,6 @@ export default function LoginPage() {
             </button>
           </form>
         </motion.div>
-
-        <p className="mt-4 text-center text-[11px] leading-relaxed text-faint">
-          FootStats · prywatny silnik value betów — dostęp tylko dla właściciela.
-        </p>
       </motion.div>
     </main>
   );

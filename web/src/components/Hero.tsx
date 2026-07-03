@@ -82,10 +82,6 @@ export function Hero({
 
   return (
     <section className="pitch-grid relative -mx-4 mb-8 overflow-hidden border-b border-hairline bg-card px-4 pb-10 pt-12 sm:-mx-6 sm:px-6">
-      {/* sygnatura: linia skanująca rynek */}
-      {!reduced && (
-        <div aria-hidden className="scan-line pointer-events-none absolute inset-y-0 w-48" />
-      )}
       {/* miękka zielona poświata za nagłówkiem */}
       <div
         aria-hidden

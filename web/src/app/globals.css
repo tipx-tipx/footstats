@@ -66,27 +66,6 @@ h1, h2, h3, .font-display {
   letter-spacing: -0.02em;
 }
 
-/* linia skanująca — sygnatura "skanu rynków" (hero, logowanie) */
-.scan-line {
-  left: -14rem;
-  background: linear-gradient(
-    to right,
-    transparent,
-    rgb(31 157 102 / 0.07) 30%,
-    rgb(31 157 102 / 0.16) 50%,
-    rgb(31 157 102 / 0.07) 70%,
-    transparent
-  );
-  animation: scan-sweep 8s linear infinite;
-}
-@keyframes scan-sweep {
-  from { transform: translateX(0); }
-  to   { transform: translateX(calc(100vw + 28rem)); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .scan-line { display: none; }
-}
-
 /* kropka "dane na żywo" — spokojny puls */
 .live-dot {
   animation: live-pulse 2.4s ease-in-out infinite;

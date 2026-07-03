@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Mono, IBM_Plex_Sans, Sora } from "next/font/google";
 import "./globals.css";
+import { MainShell } from "@/components/MainShell";
 import { Nav } from "@/components/Nav";
 import { SiteFooter } from "@/components/SiteFooter";
 import { getMeta } from "@/lib/data";
@@ -48,9 +49,7 @@ export default async function RootLayout({
     >
       <body className="flex min-h-full flex-col">
         <Nav />
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-24 sm:px-6">
-          {children}
-        </main>
+        <MainShell>{children}</MainShell>
         <SiteFooter
           zrodlo={meta.zrodlo}
           liga={meta.liga}
