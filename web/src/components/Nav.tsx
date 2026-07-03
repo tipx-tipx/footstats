@@ -14,6 +14,7 @@ import { usePathname } from "next/navigation";
 const GRUPY: { href: string; label: string }[][] = [
   [
     { href: "/", label: "Okazje" },
+    { href: "/kupony", label: "Kupony" },
     { href: "/mecze", label: "Mecze" },
   ],
   [{ href: "/zaklady", label: "Moje zakłady" }],

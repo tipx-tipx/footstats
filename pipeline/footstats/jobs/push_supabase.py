@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 
 WEB_DATA_DIR = Path(__file__).resolve().parent.parent.parent.parent / "web" / "src" / "data" / "demo"
-KEYS = ["value_bets", "matches", "players", "calibration", "meta"]
+KEYS = ["value_bets", "matches", "players", "calibration", "meta", "kupony"]
 
 
 def push() -> bool:

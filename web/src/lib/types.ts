@@ -122,6 +122,32 @@ export interface Meta {
   okazji: number;
 }
 
+/** Jeden typ (leg) na kuponie. */
+export interface KuponLeg {
+  value_bet_id: number;
+  podmiot: string;
+  rynek: string;
+  linia: number;
+  strona: Strona;
+  kurs: number;
+  bukmacher: string;
+  p_model: number;
+  pewnosc: Pewnosc;
+  mecz: string;
+  mecz_id: number;
+  kickoff_ts: number;
+}
+
+/** Kupon (AKO) budowany przez model pod docelowy kurs (x5/x10/x15/x20). */
+export interface Kupon {
+  cel: number;
+  kurs_laczny: number;
+  p_model: number;
+  fair_kurs: number;
+  ev_pct: number;
+  legi: KuponLeg[];
+}
+
 /** Zakład zapisany w trackerze (localStorage). */
 export interface MojZaklad {
   id: string;

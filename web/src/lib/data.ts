@@ -13,8 +13,9 @@ import matchesLocal from "@/data/demo/matches.json";
 import playersLocal from "@/data/demo/players.json";
 import calibrationLocal from "@/data/demo/calibration.json";
 import metaLocal from "@/data/demo/meta.json";
+import kuponyLocal from "@/data/demo/kupony.json";
 
-import type { Kalibracja, Mecz, Meta, ValueBet, Zawodnik } from "./types";
+import type { Kalibracja, Kupon, Mecz, Meta, ValueBet, Zawodnik } from "./types";
 
 type Bundle = {
   value_bets: ValueBet[];
@@ -22,6 +23,7 @@ type Bundle = {
   players: Zawodnik[];
   calibration: Kalibracja;
   meta: Meta;
+  kupony: Kupon[];
 };
 
 const LOCAL: Bundle = {
@@ -30,6 +32,7 @@ const LOCAL: Bundle = {
   players: playersLocal as unknown as Zawodnik[],
   calibration: calibrationLocal as unknown as Kalibracja,
   meta: metaLocal as unknown as Meta,
+  kupony: kuponyLocal as unknown as Kupon[],
 };
 
 const SUPABASE_URL = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -58,6 +61,7 @@ async function loadBundle(): Promise<Bundle> {
       players: (map.players ?? LOCAL.players) as Zawodnik[],
       calibration: (map.calibration ?? LOCAL.calibration) as Kalibracja,
       meta: (map.meta ?? LOCAL.meta) as Meta,
+      kupony: (map.kupony ?? LOCAL.kupony) as Kupon[],
     };
   } catch {
     return LOCAL;
@@ -90,4 +94,8 @@ export async function getMeta(): Promise<Meta> {
 
 export async function getBetsForMatch(matchId: number): Promise<ValueBet[]> {
   return (await getValueBets()).filter((b) => b.mecz_id === matchId);
+}
+
+export async function getKupony(): Promise<Kupon[]> {
+  return (await loadBundle()).kupony;
 }

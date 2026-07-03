@@ -27,7 +27,7 @@ from curl_cffi import requests
 from dataclasses import replace as dc_replace
 
 from ..engine import MatchContext, PlayerHistory, RARE_MARKETS, score_player_market
-from ..model import counts, matchup_lite
+from ..model import counts, kupony, matchup_lite
 from ..sources import rotowire, scores365, statshub, superbet
 from .build_demo import MARKET_NAMES_PL, WEB_DATA_DIR, line_for_lambda
 
@@ -716,6 +716,13 @@ def main():
     dump("value_bets.json", value_bets)
     dump("matches.json", list(matches_out.values()))
     dump("players.json", list(players_out.values()))
+    kupony_list = kupony.build_kupony(value_bets)
+    dump("kupony.json", kupony_list)
+    if kupony_list:
+        print("Kupony:", ", ".join(
+            f"x{k['cel']} (kurs {k['kurs_laczny']}, EV {k['ev_pct']:+.0f}%)"
+            for k in kupony_list
+        ))
     dump("meta.json", {
         "wygenerowano_ts": int(time.time()), "tryb": "ms2026",
         "liga": "Mistrzostwa Świata", "sezon": "2026",

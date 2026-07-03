@@ -990,117 +990,6 @@
   }
  },
  {
-  "id": 789071,
-  "nazwa": "Dani Olmo",
-  "pozycja": "M",
-  "druzyna": "Spain",
-  "minuty_lacznie": 2982,
-  "forma": {
-   "shots": {
-    "ostatnie": [
-     3,
-     2,
-     2,
-     1,
-     2,
-     1,
-     2,
-     2,
-     2,
-     3
-    ],
-    "minuty": [
-     71,
-     61,
-     45,
-     62,
-     90,
-     64,
-     62,
-     90,
-     73,
-     89
-    ],
-    "srednia90": 2.87
-   },
-   "shots_outside_box": {
-    "ostatnie": [
-     2,
-     1,
-     1
-    ],
-    "minuty": [
-     71,
-     61,
-     45
-    ],
-    "srednia90": 2.03
-   },
-   "shots_blocked": {
-    "ostatnie": [
-     3,
-     0,
-     0
-    ],
-    "minuty": [
-     71,
-     61,
-     45
-    ],
-    "srednia90": 1.53
-   },
-   "shots_off_target": {
-    "ostatnie": [
-     0,
-     2,
-     1
-    ],
-    "minuty": [
-     71,
-     61,
-     45
-    ],
-    "srednia90": 1.53
-   }
-  }
- },
- {
-  "id": 353138,
-  "nazwa": "Marcos Llorente",
-  "pozycja": "D",
-  "druzyna": "Spain",
-  "minuty_lacznie": 3371,
-  "forma": {
-   "tackles": {
-    "ostatnie": [
-     4,
-     2,
-     1,
-     1,
-     7,
-     4,
-     4,
-     2,
-     1,
-     6
-    ],
-    "minuty": [
-     90,
-     90,
-     69,
-     90,
-     79,
-     90,
-     90,
-     90,
-     63,
-     99
-    ],
-    "srednia90": 2.83
-   }
-  }
- },
- {
   "id": 288205,
   "nazwa": "Bruno Fernandes",
   "pozycja": "M",
@@ -1194,6 +1083,150 @@
   }
  },
  {
+  "id": 789071,
+  "nazwa": "Dani Olmo",
+  "pozycja": "M",
+  "druzyna": "Spain",
+  "minuty_lacznie": 2982,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     3,
+     2,
+     2,
+     1,
+     2,
+     1,
+     2,
+     2,
+     2,
+     3
+    ],
+    "minuty": [
+     71,
+     61,
+     45,
+     62,
+     90,
+     64,
+     62,
+     90,
+     73,
+     89
+    ],
+    "srednia90": 2.87
+   }
+  }
+ },
+ {
+  "id": 353138,
+  "nazwa": "Marcos Llorente",
+  "pozycja": "D",
+  "druzyna": "Spain",
+  "minuty_lacznie": 3371,
+  "forma": {
+   "tackles": {
+    "ostatnie": [
+     4,
+     2,
+     1,
+     1,
+     7,
+     4,
+     4,
+     2,
+     1,
+     6
+    ],
+    "minuty": [
+     90,
+     90,
+     69,
+     90,
+     79,
+     90,
+     90,
+     90,
+     63,
+     99
+    ],
+    "srednia90": 2.83
+   }
+  }
+ },
+ {
+  "id": 817957,
+  "nazwa": "Christian Pulisic",
+  "pozycja": "F",
+  "druzyna": "USA",
+  "minuty_lacznie": 2986,
+  "forma": {
+   "sot": {
+    "ostatnie": [
+     0,
+     0,
+     0,
+     1,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "minuty": [
+     88,
+     45,
+     62,
+     45,
+     62,
+     80,
+     72,
+     45,
+     71,
+     77
+    ],
+    "srednia90": 0.78
+   }
+  }
+ },
+ {
+  "id": 331737,
+  "nazwa": "Youri Tielemans",
+  "pozycja": "M",
+  "druzyna": "Belgium",
+  "minuty_lacznie": 3389,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     4,
+     1,
+     2,
+     2,
+     2,
+     2,
+     1,
+     1,
+     3,
+     2
+    ],
+    "minuty": [
+     120,
+     85,
+     90,
+     90,
+     74,
+     90,
+     88,
+     89,
+     90,
+     90
+    ],
+    "srednia90": 1.46
+   }
+  }
+ },
+ {
   "id": 1014845,
   "nazwa": "Sebastian Berhalter",
   "pozycja": "M",
@@ -1257,42 +1290,6 @@
   }
  },
  {
-  "id": 934386,
-  "nazwa": "Jeremy Doku",
-  "pozycja": "M",
-  "druzyna": "Belgium",
-  "minuty_lacznie": 3141,
-  "forma": {
-   "fouls_won": {
-    "ostatnie": [
-     4,
-     1,
-     5,
-     4,
-     2,
-     2,
-     3,
-     3,
-     7,
-     2
-    ],
-    "minuty": [
-     56,
-     56,
-     86,
-     74,
-     73,
-     76,
-     90,
-     89,
-     90,
-     90
-    ],
-    "srednia90": 3.01
-   }
-  }
- },
- {
   "id": 803174,
   "nazwa": "Antonee Robinson",
   "pozycja": "D",
@@ -1325,78 +1322,6 @@
      69
     ],
     "srednia90": 2.67
-   }
-  }
- },
- {
-  "id": 817957,
-  "nazwa": "Christian Pulisic",
-  "pozycja": "F",
-  "druzyna": "USA",
-  "minuty_lacznie": 2986,
-  "forma": {
-   "sot": {
-    "ostatnie": [
-     0,
-     0,
-     0,
-     1,
-     0,
-     0,
-     0,
-     0,
-     0,
-     0
-    ],
-    "minuty": [
-     88,
-     45,
-     62,
-     45,
-     62,
-     80,
-     72,
-     45,
-     71,
-     77
-    ],
-    "srednia90": 0.78
-   }
-  }
- },
- {
-  "id": 800419,
-  "nazwa": "Tyler Adams",
-  "pozycja": "M",
-  "druzyna": "USA",
-  "minuty_lacznie": 3189,
-  "forma": {
-   "fouls_committed": {
-    "ostatnie": [
-     1,
-     1,
-     2,
-     2,
-     2,
-     2,
-     2,
-     1,
-     2,
-     2
-    ],
-    "minuty": [
-     90,
-     90,
-     90,
-     72,
-     45,
-     90,
-     90,
-     69,
-     90,
-     62
-    ],
-    "srednia90": 1.78
    }
   }
  },
@@ -1437,38 +1362,74 @@
   }
  },
  {
-  "id": 331737,
-  "nazwa": "Youri Tielemans",
+  "id": 934386,
+  "nazwa": "Jeremy Doku",
   "pozycja": "M",
   "druzyna": "Belgium",
-  "minuty_lacznie": 3389,
+  "minuty_lacznie": 3141,
   "forma": {
-   "shots": {
+   "fouls_won": {
     "ostatnie": [
      4,
      1,
+     5,
+     4,
      2,
      2,
-     2,
-     2,
-     1,
-     1,
      3,
+     3,
+     7,
      2
     ],
     "minuty": [
-     120,
-     85,
-     90,
-     90,
+     56,
+     56,
+     86,
      74,
+     73,
+     76,
      90,
-     88,
      89,
      90,
      90
     ],
-    "srednia90": 1.46
+    "srednia90": 3.01
+   }
+  }
+ },
+ {
+  "id": 800419,
+  "nazwa": "Tyler Adams",
+  "pozycja": "M",
+  "druzyna": "USA",
+  "minuty_lacznie": 3189,
+  "forma": {
+   "fouls_committed": {
+    "ostatnie": [
+     1,
+     1,
+     2,
+     2,
+     2,
+     2,
+     2,
+     1,
+     2,
+     2
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     72,
+     45,
+     90,
+     90,
+     69,
+     90,
+     62
+    ],
+    "srednia90": 1.78
    }
   }
  }
