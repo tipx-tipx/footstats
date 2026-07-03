@@ -633,8 +633,8 @@ def main():
                 p_side = sm.p_over if side_key == "over" else 1.0 - sm.p_over
                 implied = betting.implied_prob_one_sided(odd)
                 if (
-                    1.10 <= odd <= 2.60
-                    and p_side >= 0.55
+                    betting.MIN_ODDS <= odd <= 2.80   # user: interesują nas kursy 1.19+
+                    and p_side >= 0.52
                     and p_side * odd - 1.0 >= -0.12
                     and (sm.ci_high - sm.ci_low) <= 0.35
                     and abs(p_side - implied) <= betting.MAX_MODEL_MARKET_DIVERGENCE
@@ -779,22 +779,24 @@ def main():
                 },
             })
 
-    # --- PEWNIAKI: top typy każdego meczu z pełnego skanu (bez wymogu value) ---
-    # Żeby każdy mecz miał co pokazać, nawet gdy rynek dograł kursy i value
-    # zniknęło. Kandydaci przeszli pełny scoring + bezpieczniki rozbieżności.
+    # --- PEWNIAKI: najlepszy typ KAŻDEGO rynku dla każdego meczu ---
+    # Nie top-N po samej szansie (wygrywałyby zawsze zwykłe strzały 0.5) —
+    # użytkownik chce widzieć pełne spektrum statystyk: strzały, celne,
+    # zza pola, celne zza pola, faule, wywalczone, odbiory, przechwyty...
+    # Kandydaci przeszli pełny scoring + bezpieczniki rozbieżności.
     juz_opublikowane = {
         (b["podmiot_id"], b["rynek_kod"], b["linia"], b["strona"])
         for b in value_bets
     }
-    per_mecz: dict[int, int] = {}
+    per_mecz_rynek: set[tuple[int, str]] = set()
     for b in sorted(legi_pool, key=lambda x: -x["p_model"]):
-        if per_mecz.get(b["mecz_id"], 0) >= 3:
+        if (b["mecz_id"], b["rynek_kod"]) in per_mecz_rynek:
             continue
         klucz = (b["podmiot_id"], b["rynek_kod"], b["linia"], b["strona"])
         if klucz in juz_opublikowane:
             continue
         juz_opublikowane.add(klucz)
-        per_mecz[b["mecz_id"]] = per_mecz.get(b["mecz_id"], 0) + 1
+        per_mecz_rynek.add((b["mecz_id"], b["rynek_kod"]))
         ci = b.get("ci") or [None, None]
         ci_w = (ci[1] - ci[0]) if ci[0] is not None else 1.0
         vb_id += 1

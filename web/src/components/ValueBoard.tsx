@@ -102,18 +102,12 @@ export function ValueBoard({
   const [minEv, setMinEv] = useState(1);
   const [meczId, setMeczId] = useState<number | undefined>(initialMatchId);
   // gdy rynek chwilowo nie daje okazji z kursem, otwórz od razu sugestie
+  // domyślnie pełna plansza typów (user wybiera z niej legi na kupony),
+  // sortowana po pewności — przewaga nad kursem to informacja, nie kryterium
   const [rodzaj, setRodzaj] = useState<
     "okazje" | "pewniaki" | "sugestie" | "wszystko"
-  >(() =>
-    bets.some((b) => !b.sugestia && !b.pewniak)
-      ? "okazje"
-      : bets.some((b) => b.pewniak)
-        ? "pewniaki"
-        : bets.some((b) => b.sugestia)
-          ? "sugestie"
-          : "okazje",
-  );
-  const [sortuj, setSortuj] = useState<SortKey>("ranking");
+  >("wszystko");
+  const [sortuj, setSortuj] = useState<SortKey>("pewnosc");
   const [limit, setLimit] = useState(25);
   const reduced = useReducedMotion();
 

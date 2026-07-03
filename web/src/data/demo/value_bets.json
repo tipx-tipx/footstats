@@ -32,15 +32,15 @@
   "oczekiwane_minuty": 85.8,
   "lambda": 4.743,
   "rozklad": [
-   0.009514098520278895,
-   0.043450724009722046,
-   0.1000355376913655,
-   0.15479229881288825,
-   0.1810948968029174,
-   0.1708541888365815,
-   0.13539693297657157,
-   0.09269645885812726,
-   0.11216486349154753
+   0.009514139089550672,
+   0.04345083879793327,
+   0.10003567072550766,
+   0.1547923488567258,
+   0.1810948274764993,
+   0.17085405330441747,
+   0.13539680939871263,
+   0.09269638973269953,
+   0.11216492261795363
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -93,7 +93,7 @@
   "pewnosc": "srednia",
   "pewnosc_score": 64.5,
   "ryzyko": "niskie",
-  "rank_score": 11.054,
+  "rank_score": 11.053,
   "ci": [
    0.8983,
    0.9751
@@ -101,15 +101,15 @@
   "oczekiwane_minuty": 76.3,
   "lambda": 2.962,
   "rozklad": [
-   0.06002436289845971,
-   0.16408971535148273,
-   0.22886864920877795,
-   0.21707364284963973,
-   0.157445037771992,
-   0.09311502961581002,
-   0.04675772937311963,
-   0.020498171882179842,
-   0.012127661048538352
+   0.060025240839623066,
+   0.16409112159941472,
+   0.22886938626751874,
+   0.21707332809522017,
+   0.15744417694832963,
+   0.09311420493137842,
+   0.046757185076771,
+   0.020497888147496486,
+   0.012127468094247806
   ],
   "czynniki": {
    "rywal": 1.022,
@@ -175,15 +175,15 @@
   "oczekiwane_minuty": 86.0,
   "lambda": 2.327,
   "rozklad": [
-   0.10204424557526291,
-   0.2285295869346329,
-   0.26015962313907803,
-   0.20067952705113817,
-   0.11797001634291004,
-   0.05635922894572252,
-   0.022787996528777065,
-   0.008019120361235593,
-   0.0034506551212427627
+   0.10204437400182076,
+   0.2285295878727327,
+   0.2601594588531589,
+   0.20067939296286771,
+   0.11797000160078934,
+   0.05635928417935409,
+   0.022788056450619848,
+   0.008019158909702433,
+   0.003450685168954193
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -217,7 +217,7 @@
   "mecz": "Mexico – England",
   "kickoff_ts": 1783296000,
   "podmiot_typ": "zawodnik",
-  "podmiot_id": 930155892,
+  "podmiot_id": 917959202,
   "podmiot": "Harry Kane",
   "druzyna": "England",
   "przeciwnik": "Mexico",
@@ -244,15 +244,15 @@
   "oczekiwane_minuty": 81.8,
   "lambda": 2.128,
   "rozklad": [
-   0.1307747027316668,
-   0.2545576813985549,
-   0.25857234323881884,
-   0.18242695987795027,
-   0.10040572568843747,
-   0.04591675708412571,
-   0.018149109709155734,
-   0.0063692303582283056,
-   0.0028274899130620312
+   0.13077545153059736,
+   0.25455817414783855,
+   0.25857213535654977,
+   0.1824264896673356,
+   0.1004053783245098,
+   0.04591659561906254,
+   0.01814905875919129,
+   0.006369221536260276,
+   0.002827495058654872
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -286,7 +286,7 @@
   "mecz": "Brazil – Norway",
   "kickoff_ts": 1783281600,
   "podmiot_typ": "zawodnik",
-  "podmiot_id": 924376476,
+  "podmiot_id": 931030847,
   "podmiot": "Vinicius Junior",
   "druzyna": "Brazil",
   "przeciwnik": "Norway",
@@ -313,15 +313,15 @@
   "oczekiwane_minuty": 80.1,
   "lambda": 2.139,
   "rozklad": [
-   0.1293886632814549,
-   0.25308918916037454,
-   0.2583664365128271,
-   0.18321340814716663,
-   0.101364250812402,
-   0.04660111119046874,
-   0.01851897007462142,
-   0.006534614886083698,
-   0.002923355934601024
+   0.1293895759988078,
+   0.2530898607599886,
+   0.25836625627488424,
+   0.1832128431024046,
+   0.1013637865126083,
+   0.04660086638394804,
+   0.018518874489976984,
+   0.0065345864071086075,
+   0.002923350070272779
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -382,15 +382,15 @@
   "oczekiwane_minuty": 79.4,
   "lambda": 2.36,
   "rozklad": [
-   0.09924176731273074,
-   0.2243577399074009,
-   0.2583754045971703,
-   0.20202982590519264,
-   0.12062679339506559,
-   0.05864446896897348,
-   0.02417470272384576,
-   0.00868864565812744,
-   0.0038606515314931755
+   0.09924225133705243,
+   0.2243581918657352,
+   0.2583753617043414,
+   0.20202948469491772,
+   0.120626482459188,
+   0.05864430156987545,
+   0.02417464131113964,
+   0.008688631275505659,
+   0.0038606537822445386
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -424,7 +424,7 @@
   "mecz": "Canada – Morocco",
   "kickoff_ts": 1783184400,
   "podmiot_typ": "zawodnik",
-  "podmiot_id": 951008589,
+  "podmiot_id": 943796767,
   "podmiot": "Neil El Aynaoui",
   "druzyna": "Morocco",
   "przeciwnik": "Canada",
@@ -451,15 +451,15 @@
   "oczekiwane_minuty": 84.9,
   "lambda": 2.278,
   "rozklad": [
-   0.11370366013753987,
-   0.23598258723270732,
-   0.2554338847089374,
-   0.19194065407214964,
-   0.11246405759221918,
-   0.054728645513327394,
-   0.023009724901047295,
-   0.008586024851625006,
-   0.004150760990446867
+   0.11370395725749015,
+   0.23598268329803376,
+   0.25543366766638004,
+   0.191940417490097,
+   0.11246396669376277,
+   0.05472866543243497,
+   0.023009776235979596,
+   0.008586065595086373,
+   0.004150800330735338
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -493,7 +493,7 @@
   "mecz": "Canada – Morocco",
   "kickoff_ts": 1783184400,
   "podmiot_typ": "zawodnik",
-  "podmiot_id": 948290709,
+  "podmiot_id": 911574269,
   "podmiot": "Jonathan David",
   "druzyna": "Canada",
   "przeciwnik": "Morocco",
@@ -512,7 +512,7 @@
   "pewnosc": "niska",
   "pewnosc_score": 29.4,
   "ryzyko": "niskie",
-  "rank_score": 2.655,
+  "rank_score": 2.654,
   "ci": [
    0.6245,
    0.8974
@@ -520,15 +520,15 @@
   "oczekiwane_minuty": 83.6,
   "lambda": 2.941,
   "rozklad": [
-   0.06015657314826793,
-   0.1617564824072861,
-   0.22438657702299641,
-   0.21390216498883274,
-   0.1575002430008844,
-   0.09546804381976741,
-   0.049582561230311656,
-   0.022677845679679384,
-   0.014569508701973932
+   0.06015695832983332,
+   0.16175698840893582,
+   0.2243867164441436,
+   0.21390191613647758,
+   0.15749988579900762,
+   0.09546778312813797,
+   0.049582432971791914,
+   0.022677803303413617,
+   0.014569515478258577
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -562,7 +562,7 @@
   "mecz": "Mexico – England",
   "kickoff_ts": 1783296000,
   "podmiot_typ": "zawodnik",
-  "podmiot_id": 930155892,
+  "podmiot_id": 917959202,
   "podmiot": "Harry Kane",
   "druzyna": "England",
   "przeciwnik": "Mexico",
@@ -589,15 +589,15 @@
   "oczekiwane_minuty": 81.8,
   "lambda": 3.934,
   "rozklad": [
-   0.023266806016349187,
-   0.08372603712518258,
-   0.15420346999704831,
-   0.1937068530634528,
-   0.1866141390483144,
-   0.14699757353109338,
-   0.09857533430309678,
-   0.057857463003391944,
-   0.0550523239120706
+   0.023267054996054744,
+   0.08372661316944137,
+   0.15420403118008105,
+   0.19370703752651083,
+   0.18661391413967074,
+   0.14699715369421848,
+   0.09857493785775229,
+   0.057857189783364835,
+   0.05505206765290571
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -631,7 +631,7 @@
   "mecz": "Canada – Morocco",
   "kickoff_ts": 1783184400,
   "podmiot_typ": "zawodnik",
-  "podmiot_id": 927402501,
+  "podmiot_id": 947444809,
   "podmiot": "Achraf Hakimi",
   "druzyna": "Morocco",
   "przeciwnik": "Canada",
@@ -658,15 +658,15 @@
   "oczekiwane_minuty": 84.9,
   "lambda": 2.248,
   "rozklad": [
-   0.11687300136440193,
-   0.23959570570852376,
-   0.2562110886750737,
-   0.19022294401506318,
-   0.11013822448937191,
-   0.05296823196608112,
-   0.022010672148527102,
-   0.008118517053078712,
-   0.0038616145798785473
+   0.11687322214984568,
+   0.23959570614990963,
+   0.2562108490457445,
+   0.19022275419272908,
+   0.11013819663088378,
+   0.052968297648758315,
+   0.02201074759803081,
+   0.008118567897846924,
+   0.0038616586862513236
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -700,7 +700,7 @@
   "mecz": "Brazil – Norway",
   "kickoff_ts": 1783281600,
   "podmiot_typ": "zawodnik",
-  "podmiot_id": 907924846,
+  "podmiot_id": 984239530,
   "podmiot": "Erling Haaland",
   "druzyna": "Norway",
   "przeciwnik": "Brazil",
@@ -727,15 +727,15 @@
   "oczekiwane_minuty": 84.4,
   "lambda": 2.167,
   "rozklad": [
-   0.12798167622705203,
-   0.2498437707981842,
-   0.25625547236902907,
-   0.18368968411185704,
-   0.10330750147819322,
-   0.04852871902057116,
-   0.01979884983953585,
-   0.007204050528568792,
-   0.0033902756270086654
+   0.12798213045624182,
+   0.249843986936178,
+   0.25625525886040085,
+   0.1836893834917774,
+   0.1033073337148156,
+   0.04852867708451046,
+   0.019798861367156684,
+   0.007204069704214419,
+   0.0033902983847047263
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -769,7 +769,7 @@
   "mecz": "Canada – Morocco",
   "kickoff_ts": 1783184400,
   "podmiot_typ": "zawodnik",
-  "podmiot_id": 935666937,
+  "podmiot_id": 913379165,
   "podmiot": "Ismael Saibari",
   "druzyna": "Morocco",
   "przeciwnik": "Canada",
@@ -796,15 +796,15 @@
   "oczekiwane_minuty": 83.1,
   "lambda": 1.459,
   "rozklad": [
-   0.24806337497634717,
-   0.33071393613759925,
-   0.23468206234094266,
-   0.11775617582026511,
-   0.04684837380889063,
-   0.015716978678094982,
-   0.004619462006518756,
-   0.0012205636215468117,
-   0.0003790726097946395
+   0.24806415125118475,
+   0.3307139018097544,
+   0.234681628523899,
+   0.11775590791858505,
+   0.04684830232059042,
+   0.015716983049748345,
+   0.004619476023239549,
+   0.0012205717429819016,
+   0.00037907736001652204
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -838,7 +838,7 @@
   "mecz": "Paraguay – France",
   "kickoff_ts": 1783198800,
   "podmiot_typ": "zawodnik",
-  "podmiot_id": 988240439,
+  "podmiot_id": 943978131,
   "podmiot": "Michael Olise",
   "druzyna": "France",
   "przeciwnik": "Paraguay",
@@ -865,15 +865,15 @@
   "oczekiwane_minuty": 77.1,
   "lambda": 1.586,
   "rozklad": [
-   0.2192373318563774,
-   0.3186537141324828,
-   0.24485024333850275,
-   0.13222682657144544,
-   0.05630909477895175,
-   0.0201217611735742,
-   0.006271412083521163,
-   0.001750040705748438,
-   0.0005795753593961228
+   0.2192384817298279,
+   0.31865399188567234,
+   0.24484971588645035,
+   0.13222630147235567,
+   0.05630883025798103,
+   0.02012167192809219,
+   0.006271391562538281,
+   0.0017500384567362005,
+   0.0005795768203460394
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -902,242 +902,6 @@
   }
  },
  {
-  "id": 54,
-  "mecz_id": 12813009,
-  "mecz": "Canada – Morocco",
-  "kickoff_ts": 1783184400,
-  "podmiot_typ": "zawodnik",
-  "podmiot_id": 948290709,
-  "podmiot": "Jonathan David",
-  "druzyna": "Canada",
-  "przeciwnik": "Morocco",
-  "rynek_kod": "shots",
-  "rynek": "Strzały",
-  "linia": 0.5,
-  "strona": "powyzej",
-  "pewniak": true,
-  "kurs": 1.1,
-  "bukmacher": "Superbet",
-  "p_model": 0.9053,
-  "p_rynku": null,
-  "fair_kurs": 1.1,
-  "edge_pp": null,
-  "ev_pct": -0.4,
-  "pewnosc": "wysoka",
-  "pewnosc_score": 55.0,
-  "ryzyko": "srednie",
-  "rank_score": 0.9053,
-  "ci": [
-   0.8795,
-   0.9789
-  ],
-  "oczekiwane_minuty": 83.6,
-  "lambda": 2.941,
-  "rozklad": null,
-  "czynniki": {
-   "rywal": 1.0,
-   "sedzia": 1.0,
-   "dom_wyjazd": 1.0,
-   "scenariusz_meczu": 1.0,
-   "matchup": 1.0,
-   "lacznie": 1.0,
-   "opisy": {}
-  },
-  "uzasadnienie": {
-   "czynniki": [
-    {
-     "nazwa": "Poziom bazowy",
-     "opis": "Średnio 3.17 na 90 minut (efektywna próba: 5 meczów)",
-     "mnoznik": null
-    },
-    {
-     "nazwa": "Minuty",
-     "opis": "Przewidywane minuty: 84 (szansa na pierwszy skład: 94%, wg przewidywanego składu)",
-     "mnoznik": 0.93
-    }
-   ],
-   "oczekiwana_liczba": 2.94,
-   "rynek_rzadki": false
-  }
- },
- {
-  "id": 55,
-  "mecz_id": 12812990,
-  "mecz": "Portugal – Spain",
-  "kickoff_ts": 1783364400,
-  "podmiot_typ": "zawodnik",
-  "podmiot_id": 789071,
-  "podmiot": "Dani Olmo",
-  "druzyna": "Spain",
-  "przeciwnik": "Portugal",
-  "rynek_kod": "shots",
-  "rynek": "Strzały",
-  "linia": 0.5,
-  "strona": "powyzej",
-  "pewniak": true,
-  "kurs": 1.1,
-  "bukmacher": "Superbet",
-  "p_model": 0.8931,
-  "p_rynku": null,
-  "fair_kurs": 1.12,
-  "edge_pp": null,
-  "ev_pct": -1.8,
-  "pewnosc": "wysoka",
-  "pewnosc_score": 55.0,
-  "ryzyko": "srednie",
-  "rank_score": 0.8931,
-  "ci": [
-   0.8414,
-   0.946
-  ],
-  "oczekiwane_minuty": 79.4,
-  "lambda": 2.36,
-  "rozklad": null,
-  "czynniki": {
-   "rywal": 1.0,
-   "sedzia": 1.0,
-   "dom_wyjazd": 1.0,
-   "scenariusz_meczu": 1.0,
-   "matchup": 1.0,
-   "lacznie": 1.0,
-   "opisy": {}
-  },
-  "uzasadnienie": {
-   "czynniki": [
-    {
-     "nazwa": "Poziom bazowy",
-     "opis": "Średnio 2.68 na 90 minut (efektywna próba: 15 meczów)",
-     "mnoznik": null
-    },
-    {
-     "nazwa": "Minuty",
-     "opis": "Przewidywane minuty: 79 (szansa na pierwszy skład: 92%, wg przewidywanego składu)",
-     "mnoznik": 0.88
-    }
-   ],
-   "oczekiwana_liczba": 2.36,
-   "rynek_rzadki": false
-  }
- },
- {
-  "id": 56,
-  "mecz_id": 12812990,
-  "mecz": "Portugal – Spain",
-  "kickoff_ts": 1783364400,
-  "podmiot_typ": "zawodnik",
-  "podmiot_id": 288205,
-  "podmiot": "Bruno Fernandes",
-  "druzyna": "Portugal",
-  "przeciwnik": "Spain",
-  "rynek_kod": "shots",
-  "rynek": "Strzały",
-  "linia": 0.5,
-  "strona": "powyzej",
-  "pewniak": true,
-  "kurs": 1.17,
-  "bukmacher": "Superbet",
-  "p_model": 0.8912,
-  "p_rynku": null,
-  "fair_kurs": 1.12,
-  "edge_pp": null,
-  "ev_pct": 4.3,
-  "pewnosc": "wysoka",
-  "pewnosc_score": 55.0,
-  "ryzyko": "srednie",
-  "rank_score": 0.8912,
-  "ci": [
-   0.8418,
-   0.9418
-  ],
-  "oczekiwane_minuty": 86.0,
-  "lambda": 2.327,
-  "rozklad": null,
-  "czynniki": {
-   "rywal": 1.0,
-   "sedzia": 1.0,
-   "dom_wyjazd": 1.0,
-   "scenariusz_meczu": 1.0,
-   "matchup": 1.0,
-   "lacznie": 1.0,
-   "opisy": {}
-  },
-  "uzasadnienie": {
-   "czynniki": [
-    {
-     "nazwa": "Poziom bazowy",
-     "opis": "Średnio 2.43 na 90 minut (efektywna próba: 20 meczów)",
-     "mnoznik": null
-    },
-    {
-     "nazwa": "Minuty",
-     "opis": "Przewidywane minuty: 86 (szansa na pierwszy skład: 93%, wg przewidywanego składu)",
-     "mnoznik": 0.96
-    }
-   ],
-   "oczekiwana_liczba": 2.33,
-   "rynek_rzadki": false
-  }
- },
- {
-  "id": 57,
-  "mecz_id": 12813010,
-  "mecz": "Paraguay – France",
-  "kickoff_ts": 1783198800,
-  "podmiot_typ": "zawodnik",
-  "podmiot_id": 970375646,
-  "podmiot": "Andres Cubas",
-  "druzyna": "Paraguay",
-  "przeciwnik": "France",
-  "rynek_kod": "fouls_committed",
-  "rynek": "Faule popełnione",
-  "linia": 0.5,
-  "strona": "powyzej",
-  "pewniak": true,
-  "kurs": 1.12,
-  "bukmacher": "Superbet",
-  "p_model": 0.857,
-  "p_rynku": null,
-  "fair_kurs": 1.17,
-  "edge_pp": null,
-  "ev_pct": -4.0,
-  "pewnosc": "wysoka",
-  "pewnosc_score": 55.0,
-  "ryzyko": "srednie",
-  "rank_score": 0.857,
-  "ci": [
-   0.7865,
-   0.9559
-  ],
-  "oczekiwane_minuty": 84.9,
-  "lambda": 2.283,
-  "rozklad": null,
-  "czynniki": {
-   "rywal": 1.0,
-   "sedzia": 1.0,
-   "dom_wyjazd": 1.0,
-   "scenariusz_meczu": 1.0,
-   "matchup": 1.0,
-   "lacznie": 1.0,
-   "opisy": {}
-  },
-  "uzasadnienie": {
-   "czynniki": [
-    {
-     "nazwa": "Poziom bazowy",
-     "opis": "Średnio 2.42 na 90 minut (efektywna próba: 5 meczów)",
-     "mnoznik": null
-    },
-    {
-     "nazwa": "Minuty",
-     "opis": "Przewidywane minuty: 85 (szansa na pierwszy skład: 94%, wg przewidywanego składu)",
-     "mnoznik": 0.94
-    }
-   ],
-   "oczekiwana_liczba": 2.28,
-   "rynek_rzadki": false
-  }
- },
- {
   "id": 17,
   "mecz_id": 12812999,
   "mecz": "Argentina – Cape Verde",
@@ -1159,7 +923,7 @@
   "fair_kurs": 1.19,
   "edge_pp": null,
   "ev_pct": null,
-  "rank_score": 0.8394432810093376,
+  "rank_score": 0.8394426799711412,
   "lambda": 1.944,
   "pewnosc": "srednia",
   "pewnosc_score": 45.0,
@@ -1170,15 +934,15 @@
   ],
   "oczekiwane_minuty": 84.3,
   "rozklad": [
-   0.16055671899066234,
-   0.2767380905310195,
-   0.25414279998861716,
-   0.16517500103322047,
-   0.08518391151906025,
-   0.037071417481945354,
-   0.014143057859769066,
-   0.0048533670179956925,
-   0.0021356355777101266
+   0.1605573200288589,
+   0.27673832677450455,
+   0.25414253891939764,
+   0.16517466798309466,
+   0.0851837231441399,
+   0.03707135464880718,
+   0.014143050261545002,
+   0.004853372848248569,
+   0.002135645391403651
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -1207,130 +971,12 @@
   }
  },
  {
-  "id": 58,
-  "mecz_id": 12813006,
-  "mecz": "Brazil – Norway",
-  "kickoff_ts": 1783281600,
-  "podmiot_typ": "zawodnik",
-  "podmiot_id": 907924846,
-  "podmiot": "Erling Haaland",
-  "druzyna": "Norway",
-  "przeciwnik": "Brazil",
-  "rynek_kod": "shots",
-  "rynek": "Strzały",
-  "linia": 1.5,
-  "strona": "powyzej",
-  "pewniak": true,
-  "kurs": 1.16,
-  "bukmacher": "Superbet",
-  "p_model": 0.8345,
-  "p_rynku": null,
-  "fair_kurs": 1.2,
-  "edge_pp": null,
-  "ev_pct": -3.2,
-  "pewnosc": "srednia",
-  "pewnosc_score": 55.0,
-  "ryzyko": "srednie",
-  "rank_score": 0.8345,
-  "ci": [
-   0.7361,
-   0.9487
-  ],
-  "oczekiwane_minuty": 84.4,
-  "lambda": 3.612,
-  "rozklad": null,
-  "czynniki": {
-   "rywal": 1.0,
-   "sedzia": 1.0,
-   "dom_wyjazd": 1.0,
-   "scenariusz_meczu": 1.0,
-   "matchup": 1.0,
-   "lacznie": 1.0,
-   "opisy": {}
-  },
-  "uzasadnienie": {
-   "czynniki": [
-    {
-     "nazwa": "Poziom bazowy",
-     "opis": "Średnio 3.85 na 90 minut (efektywna próba: 4 meczów)",
-     "mnoznik": null
-    },
-    {
-     "nazwa": "Minuty",
-     "opis": "Przewidywane minuty: 84 (szansa na pierwszy skład: 94%, wg przewidywanego składu)",
-     "mnoznik": 0.94
-    }
-   ],
-   "oczekiwana_liczba": 3.61,
-   "rynek_rzadki": false
-  }
- },
- {
-  "id": 59,
-  "mecz_id": 12813009,
-  "mecz": "Canada – Morocco",
-  "kickoff_ts": 1783184400,
-  "podmiot_typ": "zawodnik",
-  "podmiot_id": 949072477,
-  "podmiot": "Tani Oluwaseyi",
-  "druzyna": "Canada",
-  "przeciwnik": "Morocco",
-  "rynek_kod": "shots",
-  "rynek": "Strzały",
-  "linia": 0.5,
-  "strona": "powyzej",
-  "pewniak": true,
-  "kurs": 1.18,
-  "bukmacher": "Superbet",
-  "p_model": 0.8209,
-  "p_rynku": null,
-  "fair_kurs": 1.22,
-  "edge_pp": null,
-  "ev_pct": -3.1,
-  "pewnosc": "srednia",
-  "pewnosc_score": 55.0,
-  "ryzyko": "srednie",
-  "rank_score": 0.8209,
-  "ci": [
-   0.7296,
-   0.9418
-  ],
-  "oczekiwane_minuty": 71.8,
-  "lambda": 2.022,
-  "rozklad": null,
-  "czynniki": {
-   "rywal": 1.0,
-   "sedzia": 1.0,
-   "dom_wyjazd": 1.0,
-   "scenariusz_meczu": 1.0,
-   "matchup": 1.0,
-   "lacznie": 1.0,
-   "opisy": {}
-  },
-  "uzasadnienie": {
-   "czynniki": [
-    {
-     "nazwa": "Poziom bazowy",
-     "opis": "Średnio 2.53 na 90 minut (efektywna próba: 3 meczów)",
-     "mnoznik": null
-    },
-    {
-     "nazwa": "Minuty",
-     "opis": "Przewidywane minuty: 72 (szansa na pierwszy skład: 84%, wg przewidywanego składu)",
-     "mnoznik": 0.8
-    }
-   ],
-   "oczekiwana_liczba": 2.02,
-   "rynek_rzadki": false
-  }
- },
- {
-  "id": 60,
+  "id": 54,
   "mecz_id": 12813010,
   "mecz": "Paraguay – France",
   "kickoff_ts": 1783198800,
   "podmiot_typ": "zawodnik",
-  "podmiot_id": 969763784,
+  "podmiot_id": 986062832,
   "podmiot": "Dayot Upamecano",
   "druzyna": "France",
   "przeciwnik": "Paraguay",
@@ -1384,96 +1030,37 @@
   }
  },
  {
-  "id": 61,
+  "id": 55,
   "mecz_id": 12813010,
   "mecz": "Paraguay – France",
   "kickoff_ts": 1783198800,
   "podmiot_typ": "zawodnik",
-  "podmiot_id": 942273484,
-  "podmiot": "Adrien Rabiot",
-  "druzyna": "France",
-  "przeciwnik": "Paraguay",
-  "rynek_kod": "fouls_committed",
-  "rynek": "Faule popełnione",
+  "podmiot_id": 930221685,
+  "podmiot": "Julio Enciso",
+  "druzyna": "Paraguay",
+  "przeciwnik": "France",
+  "rynek_kod": "fouls_won",
+  "rynek": "Faule wywalczone",
   "linia": 0.5,
   "strona": "powyzej",
   "pewniak": true,
-  "kurs": 1.14,
+  "kurs": 1.22,
   "bukmacher": "Superbet",
-  "p_model": 0.8169,
-  "p_rynku": null,
-  "fair_kurs": 1.22,
-  "edge_pp": null,
-  "ev_pct": -6.9,
-  "pewnosc": "srednia",
-  "pewnosc_score": 55.0,
-  "ryzyko": "srednie",
-  "rank_score": 0.8169,
-  "ci": [
-   0.7171,
-   0.9345
-  ],
-  "oczekiwane_minuty": 84.4,
-  "lambda": 1.944,
-  "rozklad": null,
-  "czynniki": {
-   "rywal": 1.0,
-   "sedzia": 1.0,
-   "dom_wyjazd": 1.0,
-   "scenariusz_meczu": 1.0,
-   "matchup": 1.0,
-   "lacznie": 1.0,
-   "opisy": {}
-  },
-  "uzasadnienie": {
-   "czynniki": [
-    {
-     "nazwa": "Poziom bazowy",
-     "opis": "Średnio 2.07 na 90 minut (efektywna próba: 4 meczów)",
-     "mnoznik": null
-    },
-    {
-     "nazwa": "Minuty",
-     "opis": "Przewidywane minuty: 84 (szansa na pierwszy skład: 94%, wg przewidywanego składu)",
-     "mnoznik": 0.94
-    }
-   ],
-   "oczekiwana_liczba": 1.94,
-   "rynek_rzadki": false
-  }
- },
- {
-  "id": 62,
-  "mecz_id": 12813006,
-  "mecz": "Brazil – Norway",
-  "kickoff_ts": 1783281600,
-  "podmiot_typ": "zawodnik",
-  "podmiot_id": 924376476,
-  "podmiot": "Vinicius Junior",
-  "druzyna": "Brazil",
-  "przeciwnik": "Norway",
-  "rynek_kod": "shots",
-  "rynek": "Strzały",
-  "linia": 1.5,
-  "strona": "powyzej",
-  "pewniak": true,
-  "kurs": 1.18,
-  "bukmacher": "Superbet",
-  "p_model": 0.8016,
+  "p_model": 0.7989,
   "p_rynku": null,
   "fair_kurs": 1.25,
   "edge_pp": null,
-  "ev_pct": -5.4,
+  "ev_pct": -2.5,
   "pewnosc": "srednia",
   "pewnosc_score": 55.0,
   "ryzyko": "srednie",
-  "rank_score": 0.8016,
+  "rank_score": 0.7989,
   "ci": [
-   0.6943,
-   0.9256
+   0.6967,
+   0.9224
   ],
-  "oczekiwane_minuty": 80.1,
-  "lambda": 3.29,
+  "oczekiwane_minuty": 76.9,
+  "lambda": 1.829,
   "rozklad": null,
   "czynniki": {
    "rywal": 1.0,
@@ -1488,75 +1075,16 @@
    "czynniki": [
     {
      "nazwa": "Poziom bazowy",
-     "opis": "Średnio 3.70 na 90 minut (efektywna próba: 4 meczów)",
+     "opis": "Średnio 2.14 na 90 minut (efektywna próba: 4 meczów)",
      "mnoznik": null
     },
     {
      "nazwa": "Minuty",
-     "opis": "Przewidywane minuty: 80 (szansa na pierwszy skład: 94%, wg przewidywanego składu)",
-     "mnoznik": 0.89
+     "opis": "Przewidywane minuty: 77 (szansa na pierwszy skład: 94%, wg przewidywanego składu)",
+     "mnoznik": 0.85
     }
    ],
-   "oczekiwana_liczba": 3.29,
-   "rynek_rzadki": false
-  }
- },
- {
-  "id": 63,
-  "mecz_id": 12813007,
-  "mecz": "Mexico – England",
-  "kickoff_ts": 1783296000,
-  "podmiot_typ": "zawodnik",
-  "podmiot_id": 930137987,
-  "podmiot": "Noni Madueke",
-  "druzyna": "England",
-  "przeciwnik": "Mexico",
-  "rynek_kod": "shots",
-  "rynek": "Strzały",
-  "linia": 0.5,
-  "strona": "powyzej",
-  "pewniak": true,
-  "kurs": 1.17,
-  "bukmacher": "Superbet",
-  "p_model": 0.7882,
-  "p_rynku": null,
-  "fair_kurs": 1.27,
-  "edge_pp": null,
-  "ev_pct": -7.8,
-  "pewnosc": "srednia",
-  "pewnosc_score": 55.0,
-  "ryzyko": "srednie",
-  "rank_score": 0.7882,
-  "ci": [
-   0.6631,
-   0.9139
-  ],
-  "oczekiwane_minuty": 72.5,
-  "lambda": 1.72,
-  "rozklad": null,
-  "czynniki": {
-   "rywal": 1.0,
-   "sedzia": 1.0,
-   "dom_wyjazd": 1.0,
-   "scenariusz_meczu": 1.0,
-   "matchup": 1.0,
-   "lacznie": 1.0,
-   "opisy": {}
-  },
-  "uzasadnienie": {
-   "czynniki": [
-    {
-     "nazwa": "Poziom bazowy",
-     "opis": "Średnio 2.13 na 90 minut (efektywna próba: 3 meczów)",
-     "mnoznik": null
-    },
-    {
-     "nazwa": "Minuty",
-     "opis": "Przewidywane minuty: 73 (szansa na pierwszy skład: 91%, wg przewidywanego składu)",
-     "mnoznik": 0.81
-    }
-   ],
-   "oczekiwana_liczba": 1.72,
+   "oczekiwana_liczba": 1.83,
    "rynek_rzadki": false
   }
  },
@@ -1566,7 +1094,7 @@
   "mecz": "Paraguay – France",
   "kickoff_ts": 1783198800,
   "podmiot_typ": "zawodnik",
-  "podmiot_id": 936927995,
+  "podmiot_id": 940617899,
   "podmiot": "Kylian Mbappe",
   "druzyna": "France",
   "przeciwnik": "Paraguay",
@@ -1577,12 +1105,12 @@
   "sugestia": true,
   "kurs": null,
   "bukmacher": "STS (sprawdź ręcznie)",
-  "p_model": 0.7872,
+  "p_model": 0.7871,
   "p_rynku": null,
   "fair_kurs": 1.27,
   "edge_pp": null,
   "ev_pct": null,
-  "rank_score": 0.7871502244537986,
+  "rank_score": 0.7871495395745656,
   "lambda": 1.619,
   "pewnosc": "srednia",
   "pewnosc_score": 45.0,
@@ -1593,15 +1121,15 @@
   ],
   "oczekiwane_minuty": 83.5,
   "rozklad": [
-   0.21284977554620144,
-   0.3151134623355285,
-   0.24664532246286527,
-   0.13568997587903878,
-   0.058869585387432026,
-   0.021433268653362102,
-   0.006806458358094329,
-   0.001935347197098009,
-   0.0006568041803795
+   0.21285046042543435,
+   0.31511350741250843,
+   0.24664493175005028,
+   0.13568969057862038,
+   0.05886949527079179,
+   0.02143326928579346,
+   0.006806475306900251,
+   0.0019353583720530946,
+   0.0006568115978479172
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -1630,7 +1158,7 @@
   }
  },
  {
-  "id": 64,
+  "id": 56,
   "mecz_id": 12812999,
   "mecz": "Argentina – Cape Verde",
   "kickoff_ts": 1783116000,
@@ -1694,12 +1222,12 @@
   }
  },
  {
-  "id": 65,
+  "id": 57,
   "mecz_id": 12813007,
   "mecz": "Mexico – England",
   "kickoff_ts": 1783296000,
   "podmiot_typ": "zawodnik",
-  "podmiot_id": 907446136,
+  "podmiot_id": 932129961,
   "podmiot": "Raul Jimenez",
   "druzyna": "Mexico",
   "przeciwnik": "England",
@@ -1774,7 +1302,7 @@
   "fair_kurs": 1.31,
   "edge_pp": null,
   "ev_pct": null,
-  "rank_score": 0.7620370476819227,
+  "rank_score": 0.7620362188754787,
   "lambda": 1.504,
   "pewnosc": "srednia",
   "pewnosc_score": 45.0,
@@ -1785,15 +1313,15 @@
   ],
   "oczekiwane_minuty": 85.1,
   "rozklad": [
-   0.2379629523180773,
-   0.3263592869577418,
-   0.23816288979966074,
-   0.12285680072841346,
-   0.0502360984902692,
-   0.017317799276817782,
-   0.0052290616807992634,
-   0.001419112004240808,
-   0.00045599874397961315
+   0.2379637811245213,
+   0.3263593019540518,
+   0.2381624371353371,
+   0.12285649033479674,
+   0.05023599933948659,
+   0.017317792994955745,
+   0.005229073203323964,
+   0.0014191200032726394,
+   0.00045600391025413245
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -1822,7 +1350,7 @@
   }
  },
  {
-  "id": 66,
+  "id": 58,
   "mecz_id": 12813018,
   "mecz": "Australia – Egypt",
   "kickoff_ts": 1783101600,
@@ -1886,12 +1414,12 @@
   }
  },
  {
-  "id": 67,
+  "id": 59,
   "mecz_id": 12813009,
   "mecz": "Canada – Morocco",
   "kickoff_ts": 1783184400,
   "podmiot_typ": "zawodnik",
-  "podmiot_id": 935666937,
+  "podmiot_id": 913379165,
   "podmiot": "Ismael Saibari",
   "druzyna": "Morocco",
   "przeciwnik": "Canada",
@@ -1945,12 +1473,130 @@
   }
  },
  {
+  "id": 60,
+  "mecz_id": 12813009,
+  "mecz": "Canada – Morocco",
+  "kickoff_ts": 1783184400,
+  "podmiot_typ": "zawodnik",
+  "podmiot_id": 943796767,
+  "podmiot": "Neil El Aynaoui",
+  "druzyna": "Morocco",
+  "przeciwnik": "Canada",
+  "rynek_kod": "fouls_won",
+  "rynek": "Faule wywalczone",
+  "linia": 0.5,
+  "strona": "powyzej",
+  "pewniak": true,
+  "kurs": 1.19,
+  "bukmacher": "Superbet",
+  "p_model": 0.7428,
+  "p_rynku": null,
+  "fair_kurs": 1.35,
+  "edge_pp": null,
+  "ev_pct": -11.6,
+  "pewnosc": "srednia",
+  "pewnosc_score": 55.0,
+  "ryzyko": "srednie",
+  "rank_score": 0.7428,
+  "ci": [
+   0.6037,
+   0.889
+  ],
+  "oczekiwane_minuty": 84.9,
+  "lambda": 1.511,
+  "rozklad": null,
+  "czynniki": {
+   "rywal": 1.0,
+   "sedzia": 1.0,
+   "dom_wyjazd": 1.0,
+   "scenariusz_meczu": 1.0,
+   "matchup": 1.0,
+   "lacznie": 1.0,
+   "opisy": {}
+  },
+  "uzasadnienie": {
+   "czynniki": [
+    {
+     "nazwa": "Poziom bazowy",
+     "opis": "Średnio 1.60 na 90 minut (efektywna próba: 5 meczów)",
+     "mnoznik": null
+    },
+    {
+     "nazwa": "Minuty",
+     "opis": "Przewidywane minuty: 85 (szansa na pierwszy skład: 94%, wg przewidywanego składu)",
+     "mnoznik": 0.94
+    }
+   ],
+   "oczekiwana_liczba": 1.51,
+   "rynek_rzadki": false
+  }
+ },
+ {
+  "id": 61,
+  "mecz_id": 12813009,
+  "mecz": "Canada – Morocco",
+  "kickoff_ts": 1783184400,
+  "podmiot_typ": "zawodnik",
+  "podmiot_id": 943796767,
+  "podmiot": "Neil El Aynaoui",
+  "druzyna": "Morocco",
+  "przeciwnik": "Canada",
+  "rynek_kod": "interceptions",
+  "rynek": "Przechwyty",
+  "linia": 0.5,
+  "strona": "powyzej",
+  "pewniak": true,
+  "kurs": 1.21,
+  "bukmacher": "Superbet",
+  "p_model": 0.7417,
+  "p_rynku": null,
+  "fair_kurs": 1.35,
+  "edge_pp": null,
+  "ev_pct": -10.3,
+  "pewnosc": "srednia",
+  "pewnosc_score": 55.0,
+  "ryzyko": "srednie",
+  "rank_score": 0.7417,
+  "ci": [
+   0.6021,
+   0.8883
+  ],
+  "oczekiwane_minuty": 84.9,
+  "lambda": 1.506,
+  "rozklad": null,
+  "czynniki": {
+   "rywal": 1.0,
+   "sedzia": 1.0,
+   "dom_wyjazd": 1.0,
+   "scenariusz_meczu": 1.0,
+   "matchup": 1.0,
+   "lacznie": 1.0,
+   "opisy": {}
+  },
+  "uzasadnienie": {
+   "czynniki": [
+    {
+     "nazwa": "Poziom bazowy",
+     "opis": "Średnio 1.60 na 90 minut (efektywna próba: 5 meczów)",
+     "mnoznik": null
+    },
+    {
+     "nazwa": "Minuty",
+     "opis": "Przewidywane minuty: 85 (szansa na pierwszy skład: 94%, wg przewidywanego składu)",
+     "mnoznik": 0.94
+    }
+   ],
+   "oczekiwana_liczba": 1.51,
+   "rynek_rzadki": false
+  }
+ },
+ {
   "id": 46,
   "mecz_id": 12813007,
   "mecz": "Mexico – England",
   "kickoff_ts": 1783296000,
   "podmiot_typ": "zawodnik",
-  "podmiot_id": 921692202,
+  "podmiot_id": 905122713,
   "podmiot": "Marcus Rashford",
   "druzyna": "England",
   "przeciwnik": "Mexico",
@@ -1966,7 +1612,7 @@
   "fair_kurs": 1.35,
   "edge_pp": null,
   "ev_pct": null,
-  "rank_score": 0.7397493798967125,
+  "rank_score": 0.7397458453661522,
   "lambda": 1.411,
   "pewnosc": "srednia",
   "pewnosc_score": 45.0,
@@ -1977,15 +1623,15 @@
   ],
   "oczekiwane_minuty": 67.1,
   "rozklad": [
-   0.2602506201032875,
-   0.3343012497582284,
-   0.22976592556582237,
-   0.11217725858184396,
-   0.04360163057110675,
-   0.014343267925650372,
-   0.004147300618616245,
-   0.0010812279745172908,
-   0.0003315189009270858
+   0.26025415463384777,
+   0.3343021797628752,
+   0.2297644654765688,
+   0.11217568438504584,
+   0.04360074012335799,
+   0.014342899825979041,
+   0.004147176713707986,
+   0.001081192119627143,
+   0.000331506958990202
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -2014,7 +1660,7 @@
   }
  },
  {
-  "id": 68,
+  "id": 62,
   "mecz_id": 12813002,
   "mecz": "USA – Belgium",
   "kickoff_ts": 1783382400,
@@ -2073,71 +1719,12 @@
   }
  },
  {
-  "id": 69,
-  "mecz_id": 12813007,
-  "mecz": "Mexico – England",
-  "kickoff_ts": 1783296000,
-  "podmiot_typ": "zawodnik",
-  "podmiot_id": 959378331,
-  "podmiot": "Nico O'Reilly",
-  "druzyna": "England",
-  "przeciwnik": "Mexico",
-  "rynek_kod": "shots",
-  "rynek": "Strzały",
-  "linia": 0.5,
-  "strona": "powyzej",
-  "pewniak": true,
-  "kurs": 1.59,
-  "bukmacher": "Superbet",
-  "p_model": 0.7261,
-  "p_rynku": null,
-  "fair_kurs": 1.38,
-  "edge_pp": null,
-  "ev_pct": 15.4,
-  "pewnosc": "srednia",
-  "pewnosc_score": 55.0,
-  "ryzyko": "srednie",
-  "rank_score": 0.7261,
-  "ci": [
-   0.5691,
-   0.8752
-  ],
-  "oczekiwane_minuty": 83.2,
-  "lambda": 1.41,
-  "rozklad": null,
-  "czynniki": {
-   "rywal": 1.0,
-   "sedzia": 1.0,
-   "dom_wyjazd": 1.0,
-   "scenariusz_meczu": 1.0,
-   "matchup": 1.0,
-   "lacznie": 1.0,
-   "opisy": {}
-  },
-  "uzasadnienie": {
-   "czynniki": [
-    {
-     "nazwa": "Poziom bazowy",
-     "opis": "Średnio 1.53 na 90 minut (efektywna próba: 4 meczów)",
-     "mnoznik": null
-    },
-    {
-     "nazwa": "Minuty",
-     "opis": "Przewidywane minuty: 83 (szansa na pierwszy skład: 89%, wg przewidywanego składu)",
-     "mnoznik": 0.92
-    }
-   ],
-   "oczekiwana_liczba": 1.41,
-   "rynek_rzadki": false
-  }
- },
- {
-  "id": 70,
+  "id": 63,
   "mecz_id": 12813006,
   "mecz": "Brazil – Norway",
   "kickoff_ts": 1783281600,
   "podmiot_typ": "zawodnik",
-  "podmiot_id": 969375748,
+  "podmiot_id": 916260775,
   "podmiot": "Martin Odegaard",
   "druzyna": "Norway",
   "przeciwnik": "Brazil",
@@ -2191,7 +1778,7 @@
   }
  },
  {
-  "id": 71,
+  "id": 64,
   "mecz_id": 12813011,
   "mecz": "Colombia – Ghana",
   "kickoff_ts": 1783128600,
@@ -2250,7 +1837,7 @@
   }
  },
  {
-  "id": 72,
+  "id": 65,
   "mecz_id": 12813002,
   "mecz": "USA – Belgium",
   "kickoff_ts": 1783382400,
@@ -2305,6 +1892,65 @@
     }
    ],
    "oczekiwana_liczba": 2.5,
+   "rynek_rzadki": false
+  }
+ },
+ {
+  "id": 66,
+  "mecz_id": 12813009,
+  "mecz": "Canada – Morocco",
+  "kickoff_ts": 1783184400,
+  "podmiot_typ": "zawodnik",
+  "podmiot_id": 947444809,
+  "podmiot": "Achraf Hakimi",
+  "druzyna": "Morocco",
+  "przeciwnik": "Canada",
+  "rynek_kod": "shots_outside_box",
+  "rynek": "Strzały zza pola karnego",
+  "linia": 0.5,
+  "strona": "powyzej",
+  "pewniak": true,
+  "kurs": 1.29,
+  "bukmacher": "Superbet",
+  "p_model": 0.6958,
+  "p_rynku": null,
+  "fair_kurs": 1.44,
+  "edge_pp": null,
+  "ev_pct": -10.2,
+  "pewnosc": "srednia",
+  "pewnosc_score": 55.0,
+  "ryzyko": "srednie",
+  "rank_score": 0.6958,
+  "ci": [
+   0.5377,
+   0.8576
+  ],
+  "oczekiwane_minuty": 84.9,
+  "lambda": 1.31,
+  "rozklad": null,
+  "czynniki": {
+   "rywal": 1.0,
+   "sedzia": 1.0,
+   "dom_wyjazd": 1.0,
+   "scenariusz_meczu": 1.0,
+   "matchup": 1.0,
+   "lacznie": 1.0,
+   "opisy": {}
+  },
+  "uzasadnienie": {
+   "czynniki": [
+    {
+     "nazwa": "Poziom bazowy",
+     "opis": "Średnio 1.39 na 90 minut (efektywna próba: 5 meczów)",
+     "mnoznik": null
+    },
+    {
+     "nazwa": "Minuty",
+     "opis": "Przewidywane minuty: 85 (szansa na pierwszy skład: 94%, wg przewidywanego składu)",
+     "mnoznik": 0.94
+    }
+   ],
+   "oczekiwana_liczba": 1.31,
    "rynek_rzadki": false
   }
  },
@@ -2368,7 +2014,7 @@
   "mecz": "Canada – Morocco",
   "kickoff_ts": 1783184400,
   "podmiot_typ": "zawodnik",
-  "podmiot_id": 948290709,
+  "podmiot_id": 911574269,
   "podmiot": "Jonathan David",
   "druzyna": "Canada",
   "przeciwnik": "Morocco",
@@ -2384,7 +2030,7 @@
   "fair_kurs": 1.51,
   "edge_pp": null,
   "ev_pct": null,
-  "rank_score": 0.6623647484997873,
+  "rank_score": 0.6623639693804011,
   "lambda": 1.136,
   "pewnosc": "srednia",
   "pewnosc_score": 45.0,
@@ -2395,15 +2041,15 @@
   ],
   "oczekiwane_minuty": 83.6,
   "rozklad": [
-   0.3376352515002126,
-   0.3507043997812214,
-   0.19712366692595223,
-   0.07948086177621781,
-   0.025733115951389864,
-   0.007104966582579361,
-   0.0017359339447669897,
-   0.0003847354320264168,
-   9.706810563325785e-05
+   0.3376360306195989,
+   0.35070411413511005,
+   0.1971232622641509,
+   0.07948072875737433,
+   0.02573311877569894,
+   0.007104988774226099,
+   0.0017359464850186285,
+   0.0003847401610429885,
+   9.707002777914475e-05
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -2432,67 +2078,239 @@
   }
  },
  {
-  "id": 73,
-  "mecz_id": 12812999,
-  "mecz": "Argentina – Cape Verde",
-  "kickoff_ts": 1783116000,
+  "id": 67,
+  "mecz_id": 12813010,
+  "mecz": "Paraguay – France",
+  "kickoff_ts": 1783198800,
   "podmiot_typ": "zawodnik",
-  "podmiot_id": 12994,
-  "podmiot": "Lionel Messi",
-  "druzyna": "Argentina",
-  "przeciwnik": "Cape Verde",
+  "podmiot_id": 940617899,
+  "podmiot": "Kylian Mbappe",
+  "druzyna": "France",
+  "przeciwnik": "Paraguay",
   "rynek_kod": "shots",
   "rynek": "Strzały",
-  "linia": 4.5,
+  "linia": 3.5,
   "strona": "powyzej",
   "pewniak": true,
-  "kurs": 1.44,
+  "kurs": 1.45,
   "bukmacher": "Superbet",
-  "p_model": 0.6452,
+  "p_model": 0.6582,
   "p_rynku": null,
-  "fair_kurs": 1.55,
+  "fair_kurs": 1.52,
   "edge_pp": null,
-  "ev_pct": -7.1,
+  "ev_pct": -4.6,
   "pewnosc": "srednia",
   "pewnosc_score": 55.0,
   "ryzyko": "srednie",
-  "rank_score": 0.6452,
+  "rank_score": 0.6582,
   "ci": [
-   0.5084,
-   0.7624
+   0.4728,
+   0.8216
   ],
-  "oczekiwane_minuty": 84.7,
-  "lambda": 5.531,
+  "oczekiwane_minuty": 83.5,
+  "lambda": 4.588,
   "rozklad": null,
   "czynniki": {
-   "rywal": 1.053,
+   "rywal": 1.0,
    "sedzia": 1.0,
    "dom_wyjazd": 1.0,
    "scenariusz_meczu": 1.0,
    "matchup": 1.0,
-   "lacznie": 1.053,
+   "lacznie": 1.0,
    "opisy": {}
   },
   "uzasadnienie": {
    "czynniki": [
     {
      "nazwa": "Poziom bazowy",
-     "opis": "Średnio 5.58 na 90 minut (efektywna próba: 17 meczów)",
+     "opis": "Średnio 4.94 na 90 minut (efektywna próba: 5 meczów)",
      "mnoznik": null
     },
     {
      "nazwa": "Minuty",
-     "opis": "Przewidywane minuty: 85 (szansa na pierwszy skład: 94%, wg przewidywanego składu)",
-     "mnoznik": 0.94
-    },
-    {
-     "nazwa": "Rywal",
-     "opis": "Cape Verde dopuszcza więcej takich akcji niż średnia ligi",
-     "mnoznik": 1.05
+     "opis": "Przewidywane minuty: 84 (szansa na pierwszy skład: 94%, wg przewidywanego składu)",
+     "mnoznik": 0.93
     }
    ],
-   "oczekiwana_liczba": 5.53,
+   "oczekiwana_liczba": 4.59,
    "rynek_rzadki": false
+  }
+ },
+ {
+  "id": 68,
+  "mecz_id": 12813009,
+  "mecz": "Canada – Morocco",
+  "kickoff_ts": 1783184400,
+  "podmiot_typ": "zawodnik",
+  "podmiot_id": 911574269,
+  "podmiot": "Jonathan David",
+  "druzyna": "Canada",
+  "przeciwnik": "Morocco",
+  "rynek_kod": "sot",
+  "rynek": "Strzały celne",
+  "linia": 0.5,
+  "strona": "powyzej",
+  "pewniak": true,
+  "kurs": 1.78,
+  "bukmacher": "Superbet",
+  "p_model": 0.6516,
+  "p_rynku": null,
+  "fair_kurs": 1.53,
+  "edge_pp": null,
+  "ev_pct": 16.0,
+  "pewnosc": "srednia",
+  "pewnosc_score": 55.0,
+  "ryzyko": "srednie",
+  "rank_score": 0.6516,
+  "ci": [
+   0.4824,
+   0.8245
+  ],
+  "oczekiwane_minuty": 83.6,
+  "lambda": 1.15,
+  "rozklad": null,
+  "czynniki": {
+   "rywal": 1.0,
+   "sedzia": 1.0,
+   "dom_wyjazd": 1.0,
+   "scenariusz_meczu": 1.0,
+   "matchup": 1.0,
+   "lacznie": 1.0,
+   "opisy": {}
+  },
+  "uzasadnienie": {
+   "czynniki": [
+    {
+     "nazwa": "Poziom bazowy",
+     "opis": "Średnio 1.24 na 90 minut (efektywna próba: 5 meczów)",
+     "mnoznik": null
+    },
+    {
+     "nazwa": "Minuty",
+     "opis": "Przewidywane minuty: 84 (szansa na pierwszy skład: 94%, wg przewidywanego składu)",
+     "mnoznik": 0.93
+    }
+   ],
+   "oczekiwana_liczba": 1.15,
+   "rynek_rzadki": false
+  }
+ },
+ {
+  "id": 69,
+  "mecz_id": 12813010,
+  "mecz": "Paraguay – France",
+  "kickoff_ts": 1783198800,
+  "podmiot_typ": "zawodnik",
+  "podmiot_id": 940617899,
+  "podmiot": "Kylian Mbappe",
+  "druzyna": "France",
+  "przeciwnik": "Paraguay",
+  "rynek_kod": "sot",
+  "rynek": "Strzały celne",
+  "linia": 1.5,
+  "strona": "powyzej",
+  "pewniak": true,
+  "kurs": 1.45,
+  "bukmacher": "Superbet",
+  "p_model": 0.6478,
+  "p_rynku": null,
+  "fair_kurs": 1.54,
+  "edge_pp": null,
+  "ev_pct": -6.1,
+  "pewnosc": "srednia",
+  "pewnosc_score": 55.0,
+  "ryzyko": "srednie",
+  "rank_score": 0.6478,
+  "ci": [
+   0.4709,
+   0.8187
+  ],
+  "oczekiwane_minuty": 83.5,
+  "lambda": 2.31,
+  "rozklad": null,
+  "czynniki": {
+   "rywal": 1.0,
+   "sedzia": 1.0,
+   "dom_wyjazd": 1.0,
+   "scenariusz_meczu": 1.0,
+   "matchup": 1.0,
+   "lacznie": 1.0,
+   "opisy": {}
+  },
+  "uzasadnienie": {
+   "czynniki": [
+    {
+     "nazwa": "Poziom bazowy",
+     "opis": "Średnio 2.49 na 90 minut (efektywna próba: 5 meczów)",
+     "mnoznik": null
+    },
+    {
+     "nazwa": "Minuty",
+     "opis": "Przewidywane minuty: 84 (szansa na pierwszy skład: 94%, wg przewidywanego składu)",
+     "mnoznik": 0.93
+    }
+   ],
+   "oczekiwana_liczba": 2.31,
+   "rynek_rzadki": false
+  }
+ },
+ {
+  "id": 70,
+  "mecz_id": 12813007,
+  "mecz": "Mexico – England",
+  "kickoff_ts": 1783296000,
+  "podmiot_typ": "zawodnik",
+  "podmiot_id": 917959202,
+  "podmiot": "Harry Kane",
+  "druzyna": "England",
+  "przeciwnik": "Mexico",
+  "rynek_kod": "headed_shots",
+  "rynek": "Strzały głową",
+  "linia": 0.5,
+  "strona": "powyzej",
+  "pewniak": true,
+  "kurs": 1.43,
+  "bukmacher": "Superbet",
+  "p_model": 0.6471,
+  "p_rynku": null,
+  "fair_kurs": 1.55,
+  "edge_pp": null,
+  "ev_pct": -7.5,
+  "pewnosc": "srednia",
+  "pewnosc_score": 55.0,
+  "ryzyko": "srednie",
+  "rank_score": 0.6471,
+  "ci": [
+   0.4776,
+   0.8211
+  ],
+  "oczekiwane_minuty": 81.8,
+  "lambda": 1.136,
+  "rozklad": null,
+  "czynniki": {
+   "rywal": 1.0,
+   "sedzia": 1.0,
+   "dom_wyjazd": 1.0,
+   "scenariusz_meczu": 1.0,
+   "matchup": 1.0,
+   "lacznie": 1.0,
+   "opisy": {}
+  },
+  "uzasadnienie": {
+   "czynniki": [
+    {
+     "nazwa": "Poziom bazowy",
+     "opis": "Średnio 1.25 na 90 minut (efektywna próba: 5 meczów)",
+     "mnoznik": null
+    },
+    {
+     "nazwa": "Minuty",
+     "opis": "Przewidywane minuty: 82 (szansa na pierwszy skład: 94%, wg przewidywanego składu)",
+     "mnoznik": 0.91
+    }
+   ],
+   "oczekiwana_liczba": 1.14,
+   "rynek_rzadki": true
   }
  },
  {
@@ -2501,7 +2319,7 @@
   "mecz": "Mexico – England",
   "kickoff_ts": 1783296000,
   "podmiot_typ": "zawodnik",
-  "podmiot_id": 959378331,
+  "podmiot_id": 956467164,
   "podmiot": "Nico O'Reilly",
   "druzyna": "England",
   "przeciwnik": "Mexico",
@@ -2517,7 +2335,7 @@
   "fair_kurs": 1.57,
   "edge_pp": null,
   "ev_pct": null,
-  "rank_score": 0.6349770593514695,
+  "rank_score": 0.6349754972005034,
   "lambda": 1.057,
   "pewnosc": "srednia",
   "pewnosc_score": 45.0,
@@ -2528,15 +2346,15 @@
   ],
   "oczekiwane_minuty": 83.2,
   "rozklad": [
-   0.36502294064853047,
-   0.35089573701320254,
-   0.18459425802281776,
-   0.0703282934804737,
-   0.021692752721303145,
-   0.005746988807894428,
-   0.0013557790886587543,
-   0.0002917445173308501,
-   7.150569978831012e-05
+   0.36502450279949666,
+   0.3508954051585521,
+   0.18459351946089675,
+   0.07032792558335264,
+   0.02169264632063634,
+   0.005746970212254844,
+   0.0013557785518170527,
+   0.000291745530616755,
+   7.150638237685136e-05
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -2565,7 +2383,7 @@
   }
  },
  {
-  "id": 74,
+  "id": 71,
   "mecz_id": 12813002,
   "mecz": "USA – Belgium",
   "kickoff_ts": 1783382400,
@@ -2645,7 +2463,7 @@
   "fair_kurs": 1.6,
   "edge_pp": null,
   "ev_pct": null,
-  "rank_score": 0.6265799594110455,
+  "rank_score": 0.6265788275241694,
   "lambda": 1.032,
   "pewnosc": "srednia",
   "pewnosc_score": 45.0,
@@ -2656,15 +2474,15 @@
   ],
   "oczekiwane_minuty": 85.1,
   "rozklad": [
-   0.3734200405889545,
-   0.3513965532583673,
-   0.18080489465300106,
-   0.06732614926289177,
-   0.020284521776137442,
-   0.005246356930663869,
-   0.0012077416667729312,
-   0.0002535010320993422,
-   6.024083111177969e-05
+   0.3734211724758307,
+   0.3513961818571187,
+   0.1808043566660596,
+   0.06732594280118656,
+   0.02028448937795796,
+   0.0052463633323833764,
+   0.0012077479636936762,
+   0.00025350362860802493,
+   6.024189716147266e-05
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -2714,7 +2532,7 @@
   "fair_kurs": 1.63,
   "edge_pp": null,
   "ev_pct": null,
-  "rank_score": 0.6128988418463861,
+  "rank_score": 0.6128976352175521,
   "lambda": 1.008,
   "pewnosc": "srednia",
   "pewnosc_score": 45.0,
@@ -2725,15 +2543,15 @@
   ],
   "oczekiwane_minuty": 84.1,
   "rozklad": [
-   0.3871011581536139,
-   0.3460189557946167,
-   0.17437461424395256,
-   0.06521080935103565,
-   0.020148953732704554,
-   0.0054399982047399036,
-   0.001327326858162632,
-   0.0002992140373682201,
-   7.896962380582462e-05
+   0.3871023647824478,
+   0.34601861113717125,
+   0.17437406377350814,
+   0.06521056402493339,
+   0.02014889129640376,
+   0.0054399906911246,
+   0.0013273284860118321,
+   0.00029921541238349283,
+   7.897039601567624e-05
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -2767,7 +2585,7 @@
   "mecz": "Mexico – England",
   "kickoff_ts": 1783296000,
   "podmiot_typ": "zawodnik",
-  "podmiot_id": 930155892,
+  "podmiot_id": 917959202,
   "podmiot": "Harry Kane",
   "druzyna": "England",
   "przeciwnik": "Mexico",
@@ -2783,7 +2601,7 @@
   "fair_kurs": 1.64,
   "edge_pp": null,
   "ev_pct": null,
-  "rank_score": 0.6088215684133375,
+  "rank_score": 0.6088205376856182,
   "lambda": 0.982,
   "pewnosc": "srednia",
   "pewnosc_score": 45.0,
@@ -2794,15 +2612,15 @@
   ],
   "oczekiwane_minuty": 81.8,
   "rozklad": [
-   0.3911784315866626,
-   0.3513204250765028,
-   0.17269401586728025,
-   0.0614859864201374,
-   0.017725277059626825,
-   0.004389248144302288,
-   0.0009679306056028213,
-   0.00019471234218229453,
-   4.39728977027487e-05
+   0.3911794623143819,
+   0.3513200218111891,
+   0.1726935391410945,
+   0.06148582972270533,
+   0.017725263219264802,
+   0.004389258366454887,
+   0.0009679370019423842,
+   0.00019471466238217569,
+   4.397376058495883e-05
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -2836,7 +2654,7 @@
   "mecz": "Brazil – Norway",
   "kickoff_ts": 1783281600,
   "podmiot_typ": "zawodnik",
-  "podmiot_id": 907924846,
+  "podmiot_id": 984239530,
   "podmiot": "Erling Haaland",
   "druzyna": "Norway",
   "przeciwnik": "Brazil",
@@ -2852,7 +2670,7 @@
   "fair_kurs": 1.67,
   "edge_pp": null,
   "ev_pct": null,
-  "rank_score": 0.6000214674991854,
+  "rank_score": 0.6000208062114795,
   "lambda": 0.966,
   "pewnosc": "srednia",
   "pewnosc_score": 45.0,
@@ -2863,15 +2681,15 @@
   ],
   "oczekiwane_minuty": 84.4,
   "rozklad": [
-   0.39997853250081467,
-   0.3480333639917746,
-   0.16866947642522867,
-   0.06006959033154705,
-   0.017533643957227337,
-   0.004441963512330865,
-   0.0010111678058474332,
-   0.00021162019337543801,
-   5.064128185394701e-05
+   0.39997919378852054,
+   0.34803297814454487,
+   0.1686691768100652,
+   0.060069545973097035,
+   0.01753367403403823,
+   0.004441987336815208,
+   0.0010111779504472262,
+   0.00021162349134397614,
+   5.0642471127737565e-05
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -2905,7 +2723,7 @@
   "mecz": "Mexico – England",
   "kickoff_ts": 1783296000,
   "podmiot_typ": "zawodnik",
-  "podmiot_id": 907446136,
+  "podmiot_id": 932129961,
   "podmiot": "Raul Jimenez",
   "druzyna": "Mexico",
   "przeciwnik": "England",
@@ -2921,7 +2739,7 @@
   "fair_kurs": 1.68,
   "edge_pp": null,
   "ev_pct": null,
-  "rank_score": 0.5950682084303797,
+  "rank_score": 0.5950667104722361,
   "lambda": 0.952,
   "pewnosc": "srednia",
   "pewnosc_score": 45.0,
@@ -2932,15 +2750,15 @@
   ],
   "oczekiwane_minuty": 76.5,
   "rozklad": [
-   0.40493179156962034,
-   0.3479836590286251,
-   0.16642985946986832,
-   0.05845643998542955,
-   0.016819200907675774,
-   0.004198282853516274,
-   0.0009412810727243652,
-   0.00019395929658553437,
-   4.5525815954738924e-05
+   0.4049332895277639,
+   0.34798323187933045,
+   0.16642918533386836,
+   0.058456138469197984,
+   0.016819119512670053,
+   0.004198268927987971,
+   0.000941280353081919,
+   0.0001939598162196314,
+   4.552617987974017e-05
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -2990,7 +2808,7 @@
   "fair_kurs": 1.69,
   "edge_pp": null,
   "ev_pct": null,
-  "rank_score": 0.5928942694055745,
+  "rank_score": 0.5928939342585618,
   "lambda": 0.938,
   "pewnosc": "srednia",
   "pewnosc_score": 45.0,
@@ -3001,15 +2819,15 @@
   ],
   "oczekiwane_minuty": 84.9,
   "rozklad": [
-   0.4071057305944254,
-   0.3507266380368537,
-   0.16538109316319308,
-   0.05648543654179701,
-   0.015621130072400532,
-   0.003710862963016412,
-   0.0007850545891195149,
-   0.00015150424108803105,
-   3.25497981062961e-05
+   0.4071060657414382,
+   0.35072624988626616,
+   0.16538094985517138,
+   0.05648550422607242,
+   0.015621205344534319,
+   0.0037108992585566593,
+   0.0007850670814257074,
+   0.00015150773670282618,
+   3.255086983233735e-05
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -3059,7 +2877,7 @@
   "fair_kurs": 1.69,
   "edge_pp": null,
   "ev_pct": null,
-  "rank_score": 0.5923094161314121,
+  "rank_score": 0.592308888061993,
   "lambda": 0.954,
   "pewnosc": "srednia",
   "pewnosc_score": 45.0,
@@ -3070,15 +2888,15 @@
   ],
   "oczekiwane_minuty": 84.3,
   "rozklad": [
-   0.4076905838685879,
-   0.34470190702359205,
-   0.16521317145440295,
-   0.059018149668906554,
-   0.017480580914969273,
-   0.004537422583427852,
-   0.0010670003109324447,
-   0.00023230433928991153,
-   5.887983589103474e-05
+   0.407691111938007,
+   0.3447015652460256,
+   0.16521293744446464,
+   0.059018127692357626,
+   0.01748061343216734,
+   0.004537445606992648,
+   0.0010670100336546981,
+   0.00023230755718225648,
+   5.888104914819614e-05
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -3112,7 +2930,7 @@
   "mecz": "Canada – Morocco",
   "kickoff_ts": 1783184400,
   "podmiot_typ": "zawodnik",
-  "podmiot_id": 927402501,
+  "podmiot_id": 947444809,
   "podmiot": "Achraf Hakimi",
   "druzyna": "Morocco",
   "przeciwnik": "Canada",
@@ -3128,7 +2946,7 @@
   "fair_kurs": 1.7,
   "edge_pp": null,
   "ev_pct": null,
-  "rank_score": 0.5875720956496793,
+  "rank_score": 0.587571863419137,
   "lambda": 0.928,
   "pewnosc": "srednia",
   "pewnosc_score": 45.0,
@@ -3139,15 +2957,15 @@
   ],
   "oczekiwane_minuty": 84.9,
   "rozklad": [
-   0.4124279043503207,
-   0.3488443934530965,
-   0.16299311291651752,
-   0.05558706226208727,
-   0.015449887352810983,
-   0.0037092237213855847,
-   0.0007968946754520337,
-   0.0001568392958281851,
-   3.4681972501227065e-05
+   0.4124281365808629,
+   0.3488440167311099,
+   0.16299301975948244,
+   0.05558715761682549,
+   0.015449972285943832,
+   0.003709262866448551,
+   0.000796907990375913,
+   0.0001568430319210172,
+   3.468313702992276e-05
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -3197,7 +3015,7 @@
   "fair_kurs": 1.72,
   "edge_pp": null,
   "ev_pct": null,
-  "rank_score": 0.5829486829356259,
+  "rank_score": 0.5829466225658652,
   "lambda": 0.924,
   "pewnosc": "srednia",
   "pewnosc_score": 45.0,
@@ -3208,15 +3026,15 @@
   ],
   "oczekiwane_minuty": 71.3,
   "rozklad": [
-   0.41705131706437415,
-   0.34546917018045625,
-   0.16100388939597426,
-   0.055590099713733916,
-   0.0158368184629016,
-   0.003937886329571055,
-   0.0008840531277797009,
-   0.00018321665611520835,
-   4.354906909387335e-05
+   0.41705337743413484,
+   0.34546869941029795,
+   0.16100297438565722,
+   0.05558963174854037,
+   0.01583666237057295,
+   0.003937846107937131,
+   0.0008840445898520789,
+   0.00018321513210483862,
+   4.3548820902628016e-05
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -3304,7 +3122,7 @@
   "mecz": "Canada – Morocco",
   "kickoff_ts": 1783184400,
   "podmiot_typ": "zawodnik",
-  "podmiot_id": 949072477,
+  "podmiot_id": 959429381,
   "podmiot": "Tani Oluwaseyi",
   "druzyna": "Canada",
   "przeciwnik": "Morocco",
@@ -3320,7 +3138,7 @@
   "fair_kurs": 1.73,
   "edge_pp": null,
   "ev_pct": null,
-  "rank_score": 0.5793398335472341,
+  "rank_score": 0.5793364220514718,
   "lambda": 0.912,
   "pewnosc": "srednia",
   "pewnosc_score": 45.0,
@@ -3331,15 +3149,15 @@
   ],
   "oczekiwane_minuty": 71.8,
   "rozklad": [
-   0.420660166452766,
-   0.3464565802253329,
-   0.15932593577684245,
-   0.05395248248858989,
-   0.014999225782851223,
-   0.003624340056033177,
-   0.0007878826744143709,
-   0.00015762859551018843,
-   3.575794765986462e-05
+   0.42066357794852816,
+   0.34645588513353537,
+   0.1593244119355761,
+   0.05395167058889059,
+   0.014998943538187759,
+   0.00362426342338096,
+   0.0007878651512104866,
+   0.00015762508400501241,
+   3.575719668558186e-05
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -3354,7 +3172,7 @@
    "czynniki": [
     {
      "nazwa": "Poziom bazowy",
-     "opis": "Średnio 1.14 na 90 minut (efektywna próba: 3 meczów)",
+     "opis": "Średnio 1.14 na 90 minut (efektywna próba: 2 meczów)",
      "mnoznik": null
     },
     {
@@ -3389,7 +3207,7 @@
   "fair_kurs": 1.75,
   "edge_pp": null,
   "ev_pct": null,
-  "rank_score": 0.5707767873687646,
+  "rank_score": 0.5707751049693405,
   "lambda": 0.894,
   "pewnosc": "srednia",
   "pewnosc_score": 45.0,
@@ -3400,15 +3218,15 @@
   ],
   "oczekiwane_minuty": 71.3,
   "rozklad": [
-   0.42922321263123536,
-   0.3438561700579281,
-   0.15556736221378756,
-   0.05230002319975029,
-   0.01454324759572312,
-   0.0035369783185571404,
-   0.000777986573556735,
-   0.00015820633135289327,
-   3.6813078108766106e-05
+   0.4292248950306595,
+   0.3438556994151011,
+   0.1555666262033306,
+   0.05229967991395476,
+   0.014543143582801357,
+   0.0035369545924112335,
+   0.0007779823769543625,
+   0.00015820580338394395,
+   3.681308140313089e-05
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -3458,7 +3276,7 @@
   "fair_kurs": 1.78,
   "edge_pp": null,
   "ev_pct": null,
-  "rank_score": 0.5627051904783181,
+  "rank_score": 0.5627043531966366,
   "lambda": 1.944,
   "pewnosc": "srednia",
   "pewnosc_score": 45.0,
@@ -3469,15 +3287,15 @@
   ],
   "oczekiwane_minuty": 84.3,
   "rozklad": [
-   0.16055671899066234,
-   0.2767380905310195,
-   0.25414279998861716,
-   0.16517500103322047,
-   0.08518391151906025,
-   0.037071417481945354,
-   0.014143057859769066,
-   0.0048533670179956925,
-   0.0021356355777101266
+   0.1605573200288589,
+   0.27673832677450455,
+   0.25414253891939764,
+   0.16517466798309466,
+   0.0851837231441399,
+   0.03707135464880718,
+   0.014143050261545002,
+   0.004853372848248569,
+   0.002135645391403651
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -3511,7 +3329,7 @@
   "mecz": "Mexico – England",
   "kickoff_ts": 1783296000,
   "podmiot_typ": "zawodnik",
-  "podmiot_id": 917221368,
+  "podmiot_id": 971907427,
   "podmiot": "Julian Quinones",
   "druzyna": "Mexico",
   "przeciwnik": "England",
@@ -3527,7 +3345,7 @@
   "fair_kurs": 1.8,
   "edge_pp": null,
   "ev_pct": null,
-  "rank_score": 0.5560540632370049,
+  "rank_score": 0.5560526914641383,
   "lambda": 0.852,
   "pewnosc": "srednia",
   "pewnosc_score": 45.0,
@@ -3538,15 +3356,15 @@
   ],
   "oczekiwane_minuty": 81.9,
   "rozklad": [
-   0.44394593676299504,
-   0.34413168914865355,
-   0.14877106366985823,
-   0.04731258770748736,
-   0.012342903672010738,
-   0.002796830232898837,
-   0.0005698179102623033,
-   0.00010678986183279355,
-   2.238103400109548e-05
+   0.44394730853586173,
+   0.3441311108002865,
+   0.1487704846691851,
+   0.04731239732961407,
+   0.012342873642769056,
+   0.0027968319356454934,
+   0.0005698206961233411,
+   0.00010679095524099263,
+   2.2381435273666206e-05
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -3580,7 +3398,7 @@
   "mecz": "Mexico – England",
   "kickoff_ts": 1783296000,
   "podmiot_typ": "zawodnik",
-  "podmiot_id": 930155892,
+  "podmiot_id": 917959202,
   "podmiot": "Harry Kane",
   "druzyna": "England",
   "przeciwnik": "Mexico",
@@ -3596,7 +3414,7 @@
   "fair_kurs": 1.83,
   "edge_pp": null,
   "ev_pct": null,
-  "rank_score": 0.5451814918376192,
+  "rank_score": 0.5451804274554266,
   "lambda": 0.824,
   "pewnosc": "srednia",
   "pewnosc_score": 45.0,
@@ -3607,15 +3425,15 @@
   ],
   "oczekiwane_minuty": 81.8,
   "rozklad": [
-   0.4548185081623808,
-   0.3428761855224394,
-   0.14381613966994744,
-   0.04428995567026813,
-   0.01117095858772688,
-   0.002443980822860665,
-   0.0004802037296077836,
-   8.670501081557931e-05,
-   1.736282395325972e-05
+   0.4548195725445734,
+   0.3428756349976986,
+   0.1438157094160759,
+   0.04428985428705513,
+   0.01117096026629647,
+   0.002443990736670289,
+   0.0004802081560652726,
+   8.670635177733791e-05,
+   1.7363243787649196e-05
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -3649,7 +3467,7 @@
   "mecz": "Canada – Morocco",
   "kickoff_ts": 1783184400,
   "podmiot_typ": "zawodnik",
-  "podmiot_id": 935666937,
+  "podmiot_id": 913379165,
   "podmiot": "Ismael Saibari",
   "druzyna": "Morocco",
   "przeciwnik": "Canada",
@@ -3665,7 +3483,7 @@
   "fair_kurs": 1.84,
   "edge_pp": null,
   "ev_pct": null,
-  "rank_score": 0.5433185054496509,
+  "rank_score": 0.5433176030768018,
   "lambda": 0.82,
   "pewnosc": "srednia",
   "pewnosc_score": 45.0,
@@ -3676,15 +3494,15 @@
   ],
   "oczekiwane_minuty": 83.1,
   "rozklad": [
-   0.4566814945503492,
-   0.3422996735492751,
-   0.14301260362257864,
-   0.04393636409193536,
-   0.01106891579024524,
-   0.0024214013752747996,
-   0.00047614686496756485,
-   8.610830575883474e-05,
-   1.7291849615297394e-05
+   0.45668239692319823,
+   0.3422991481685533,
+   0.1430122480837637,
+   0.043936304526588046,
+   0.011068932400810473,
+   0.0024214154470896102,
+   0.00047615227612534213,
+   8.610985492275422e-05,
+   1.7292318948536334e-05
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -3718,7 +3536,7 @@
   "mecz": "Canada – Morocco",
   "kickoff_ts": 1783184400,
   "podmiot_typ": "zawodnik",
-  "podmiot_id": 935666937,
+  "podmiot_id": 913379165,
   "podmiot": "Ismael Saibari",
   "druzyna": "Morocco",
   "przeciwnik": "Canada",
@@ -3734,7 +3552,7 @@
   "fair_kurs": 1.84,
   "edge_pp": null,
   "ev_pct": null,
-  "rank_score": 0.5421428071104929,
+  "rank_score": 0.5421419322168114,
   "lambda": 0.818,
   "pewnosc": "srednia",
   "pewnosc_score": 45.0,
@@ -3745,15 +3563,15 @@
   ],
   "oczekiwane_minuty": 83.1,
   "rozklad": [
-   0.45785719288950716,
-   0.34205510864914473,
-   0.1424898963851643,
-   0.043658991579186714,
-   0.010972199618535239,
-   0.002394848287326521,
-   0.00046994401642342986,
-   8.48214843928247e-05,
-   1.6997090319104124e-05
+   0.45785806778318866,
+   0.342054587041635,
+   0.1424895542235138,
+   0.04365893929463267,
+   0.010972218601879212,
+   0.002394862919604592,
+   0.0004699495286180018,
+   8.482304680188376e-05,
+   1.699756012618625e-05
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -3787,7 +3605,7 @@
   "mecz": "Brazil – Norway",
   "kickoff_ts": 1783281600,
   "podmiot_typ": "zawodnik",
-  "podmiot_id": 924376476,
+  "podmiot_id": 931030847,
   "podmiot": "Vinicius Junior",
   "druzyna": "Brazil",
   "przeciwnik": "Norway",
@@ -3803,7 +3621,7 @@
   "fair_kurs": 1.84,
   "edge_pp": null,
   "ev_pct": null,
-  "rank_score": 0.5420544809446078,
+  "rank_score": 0.542053304138813,
   "lambda": 0.817,
   "pewnosc": "srednia",
   "pewnosc_score": 45.0,
@@ -3814,15 +3632,15 @@
   ],
   "oczekiwane_minuty": 80.1,
   "rozklad": [
-   0.4579455190553921,
-   0.3421098839124651,
-   0.14244052744161764,
-   0.043604953204931025,
-   0.01094535142411085,
-   0.0023854538130053922,
-   0.00046730055862005795,
-   8.41834983208727e-05,
-   1.682709153694173e-05
+   0.45794669586118697,
+   0.34210931208248896,
+   0.14244004933743942,
+   0.04360482403628026,
+   0.010945342191935327,
+   0.0023854603221014296,
+   0.0004673040831584473,
+   8.418462881152013e-05,
+   1.682745659770113e-05
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -3856,7 +3674,7 @@
   "mecz": "Paraguay – France",
   "kickoff_ts": 1783198800,
   "podmiot_typ": "zawodnik",
-  "podmiot_id": 988240439,
+  "podmiot_id": 943978131,
   "podmiot": "Michael Olise",
   "druzyna": "France",
   "przeciwnik": "Paraguay",
@@ -3872,7 +3690,7 @@
   "fair_kurs": 1.85,
   "edge_pp": null,
   "ev_pct": null,
-  "rank_score": 0.5413688877583708,
+  "rank_score": 0.5413674363280233,
   "lambda": 0.815,
   "pewnosc": "srednia",
   "pewnosc_score": 45.0,
@@ -3883,15 +3701,15 @@
   ],
   "oczekiwane_minuty": 77.1,
   "rozklad": [
-   0.4586311122416292,
-   0.34239839364814617,
-   0.14207492993150542,
-   0.04324740237107688,
-   0.010774122285279707,
-   0.0023268339453458393,
-   0.0004510723166820775,
-   8.032018802197096e-05,
-   1.5813072312687027e-05
+   0.4586325636719767,
+   0.34239777309991065,
+   0.14207432843226264,
+   0.04324720491998149,
+   0.010774088265363996,
+   0.002326833298494933,
+   0.0004510740588465315,
+   8.032091851233042e-05,
+   1.5813334650727207e-05
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -3925,7 +3743,7 @@
   "mecz": "Paraguay – France",
   "kickoff_ts": 1783198800,
   "podmiot_typ": "zawodnik",
-  "podmiot_id": 934652282,
+  "podmiot_id": 930221685,
   "podmiot": "Julio Enciso",
   "druzyna": "Paraguay",
   "przeciwnik": "France",
@@ -3941,7 +3759,7 @@
   "fair_kurs": 1.89,
   "edge_pp": null,
   "ev_pct": null,
-  "rank_score": 0.530320020335505,
+  "rank_score": 0.5303187804387438,
   "lambda": 0.79,
   "pewnosc": "srednia",
   "pewnosc_score": 45.0,
@@ -3952,15 +3770,15 @@
   ],
   "oczekiwane_minuty": 76.9,
   "rozklad": [
-   0.46967997966449504,
-   0.33964948547563084,
-   0.13722655987437435,
-   0.040845271527487736,
-   0.00998506108838745,
-   0.0021223043115164387,
-   0.0004059391586381322,
-   7.147627235238171e-05,
-   1.3922627117635145e-05
+   0.4696812195612562,
+   0.3396488866667898,
+   0.13722606419479613,
+   0.040845132936904276,
+   0.009985046460718157,
+   0.002122308342088253,
+   0.00040594179188602897,
+   7.147713932169843e-05,
+   1.39229062394719e-05
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -4010,7 +3828,7 @@
   "fair_kurs": 1.91,
   "edge_pp": null,
   "ev_pct": null,
-  "rank_score": 0.5234786320973644,
+  "rank_score": 0.5234770878613605,
   "lambda": 0.78,
   "pewnosc": "srednia",
   "pewnosc_score": 45.0,
@@ -4021,15 +3839,15 @@
   ],
   "oczekiwane_minuty": 77.2,
   "rozklad": [
-   0.4765213679026356,
-   0.33619818482021724,
-   0.13453350756545848,
-   0.04014118062373633,
-   0.00993409935950101,
-   0.0021551287544945117,
-   0.00042366576886746675,
-   7.712569541058874e-05,
-   1.5739509678813768e-05
+   0.4765229121386395,
+   0.3361975136224785,
+   0.1345328856097808,
+   0.04014097220469455,
+   0.009934058651587259,
+   0.0021551252400437153,
+   0.0004236666112777433,
+   7.712620352825895e-05,
+   1.5739717969642797e-05
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -4063,7 +3881,7 @@
   "mecz": "Mexico – England",
   "kickoff_ts": 1783296000,
   "podmiot_typ": "zawodnik",
-  "podmiot_id": 930137987,
+  "podmiot_id": 982768966,
   "podmiot": "Noni Madueke",
   "druzyna": "England",
   "przeciwnik": "Mexico",
@@ -4079,7 +3897,7 @@
   "fair_kurs": 1.91,
   "edge_pp": null,
   "ev_pct": null,
-  "rank_score": 0.5223153466436535,
+  "rank_score": 0.5223133155270872,
   "lambda": 0.775,
   "pewnosc": "srednia",
   "pewnosc_score": 45.0,
@@ -4090,15 +3908,15 @@
   ],
   "oczekiwane_minuty": 72.5,
   "rozklad": [
-   0.47768465335634647,
-   0.33679966813591083,
-   0.13387537313671036,
-   0.03948892451558818,
-   0.009623664399365812,
-   0.0020493397910914214,
-   0.00039438112037660963,
-   7.011962726112344e-05,
-   1.3875917349248645e-05
+   0.47768668447291285,
+   0.33679888719653084,
+   0.1338745364974404,
+   0.03948860557940857,
+   0.009623585596969917,
+   0.0020493257028493285,
+   0.0003943794020468896,
+   7.01195704772846e-05,
+   1.387598136393109e-05
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -4186,7 +4004,7 @@
   "mecz": "Paraguay – France",
   "kickoff_ts": 1783198800,
   "podmiot_typ": "zawodnik",
-  "podmiot_id": 942273484,
+  "podmiot_id": 960825100,
   "podmiot": "Adrien Rabiot",
   "druzyna": "France",
   "przeciwnik": "Paraguay",
@@ -4202,7 +4020,7 @@
   "fair_kurs": 1.93,
   "edge_pp": null,
   "ev_pct": null,
-  "rank_score": 0.5192556956279841,
+  "rank_score": 0.5192551199296848,
   "lambda": 0.769,
   "pewnosc": "srednia",
   "pewnosc_score": 45.0,
@@ -4213,15 +4031,15 @@
   ],
   "oczekiwane_minuty": 84.4,
   "rozklad": [
-   0.4807443043720159,
-   0.3357760353062829,
-   0.13259006032023307,
-   0.03893973710627577,
-   0.00946584291425165,
-   0.0020136891644832455,
-   0.0003876228735713124,
-   6.901160013889644e-05,
-   1.3696342747282486e-05
+   0.48074488007031524,
+   0.33577555517338353,
+   0.13258987034692032,
+   0.03893976222036395,
+   0.009465884682872575,
+   0.002013708455546489,
+   0.00038762904679567114,
+   6.901320656218957e-05,
+   1.3696797240059233e-05
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -4309,7 +4127,7 @@
   "mecz": "Canada – Morocco",
   "kickoff_ts": 1783184400,
   "podmiot_typ": "zawodnik",
-  "podmiot_id": 951008589,
+  "podmiot_id": 943796767,
   "podmiot": "Neil El Aynaoui",
   "druzyna": "Morocco",
   "przeciwnik": "Canada",
@@ -4325,7 +4143,7 @@
   "fair_kurs": 1.97,
   "edge_pp": null,
   "ev_pct": null,
-  "rank_score": 0.5086899767356131,
+  "rank_score": 0.5086897264684185,
   "lambda": 0.745,
   "pewnosc": "srednia",
   "pewnosc_score": 45.0,
@@ -4336,15 +4154,15 @@
   ],
   "oczekiwane_minuty": 84.9,
   "rozklad": [
-   0.4913100232643869,
-   0.3333064755167142,
-   0.1279629503994378,
-   0.03656650358468743,
-   0.008654482935821033,
-   0.001793464273304865,
-   0.0003364489821125042,
-   5.8398870187600734e-05,
-   1.1252173347631178e-05
+   0.4913102735315815,
+   0.33330607126416884,
+   0.12796291048583228,
+   0.03656660102990053,
+   0.008654546332686487,
+   0.0017934882676818623,
+   0.00033645591428339773,
+   5.8400553726754576e-05,
+   1.1252620138346714e-05
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -4378,7 +4196,7 @@
   "mecz": "Brazil – Norway",
   "kickoff_ts": 1783281600,
   "podmiot_typ": "zawodnik",
-  "podmiot_id": 978989165,
+  "podmiot_id": 913859312,
   "podmiot": "Alexander Sorloth",
   "druzyna": "Norway",
   "przeciwnik": "Brazil",
@@ -4394,7 +4212,7 @@
   "fair_kurs": 1.97,
   "edge_pp": null,
   "ev_pct": null,
-  "rank_score": 0.5079194980128067,
+  "rank_score": 0.5079183672691042,
   "lambda": 0.743,
   "pewnosc": "srednia",
   "pewnosc_score": 45.0,
@@ -4405,15 +4223,15 @@
   ],
   "oczekiwane_minuty": 76.6,
   "rozklad": [
-   0.49208050198719333,
-   0.33300679527844607,
-   0.12764944517455323,
-   0.03644659844339337,
-   0.008623979242375856,
-   0.0017875675600851387,
-   0.00033555891815643924,
-   5.83021339790626e-05,
-   1.1251261817557534e-05
+   0.49208163273089583,
+   0.3330061871725867,
+   0.12764901941360168,
+   0.036446497160833397,
+   0.008623974505970489,
+   0.0017875730361737831,
+   0.00033556154833795236,
+   5.830292708111983e-05,
+   1.1251504519083078e-05
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -4447,7 +4265,7 @@
   "mecz": "Paraguay – France",
   "kickoff_ts": 1783198800,
   "podmiot_typ": "zawodnik",
-  "podmiot_id": 975480780,
+  "podmiot_id": 969203275,
   "podmiot": "Diego Gomez",
   "druzyna": "Paraguay",
   "przeciwnik": "France",
@@ -4463,7 +4281,7 @@
   "fair_kurs": 1.97,
   "edge_pp": null,
   "ev_pct": null,
-  "rank_score": 0.5071748316760821,
+  "rank_score": 0.5071737751154535,
   "lambda": 0.743,
   "pewnosc": "srednia",
   "pewnosc_score": 45.0,
@@ -4474,15 +4292,15 @@
   ],
   "oczekiwane_minuty": 77.3,
   "rozklad": [
-   0.49282516832391793,
-   0.33236639185286154,
-   0.12741786957887555,
-   0.03648620871944677,
-   0.008678002306565421,
-   0.0018114365635682672,
-   0.00034296999391031515,
-   6.0183223026337507e-05,
-   1.176943782787987e-05
+   0.49282622488454647,
+   0.3323658044458004,
+   0.12741747631024603,
+   0.036486122226229746,
+   0.008678002179266085,
+   0.001811443249817293,
+   0.0003429729185645898,
+   6.018408511030468e-05,
+   1.1769700419050899e-05
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -4516,7 +4334,7 @@
   "mecz": "Paraguay – France",
   "kickoff_ts": 1783198800,
   "podmiot_typ": "zawodnik",
-  "podmiot_id": 924573863,
+  "podmiot_id": 911117890,
   "podmiot": "Ousmane Dembele",
   "druzyna": "France",
   "przeciwnik": "Paraguay",
@@ -4532,7 +4350,7 @@
   "fair_kurs": 1.98,
   "edge_pp": null,
   "ev_pct": null,
-  "rank_score": 0.504091671492605,
+  "rank_score": 0.5040903157626545,
   "lambda": 0.735,
   "pewnosc": "srednia",
   "pewnosc_score": 45.0,
@@ -4543,15 +4361,15 @@
   ],
   "oczekiwane_minuty": 73.6,
   "rozklad": [
-   0.49590832850739497,
-   0.3324585939123934,
-   0.1258974554789986,
-   0.0354334677699349,
-   0.00824988635891645,
-   0.001680137185196626,
-   0.00030949468315081446,
-   5.271210941813416e-05,
-   9.923994596094943e-06
+   0.49590968423734555,
+   0.332457924001888,
+   0.12589693486418152,
+   0.035433320071677835,
+   0.008249865700225253,
+   0.0016801381386311177,
+   0.0003094961764550459,
+   5.271264156702528e-05,
+   9.924168028696556e-06
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -4585,7 +4403,7 @@
   "mecz": "Paraguay – France",
   "kickoff_ts": 1783198800,
   "podmiot_typ": "zawodnik",
-  "podmiot_id": 936927995,
+  "podmiot_id": 940617899,
   "podmiot": "Kylian Mbappe",
   "druzyna": "France",
   "przeciwnik": "Paraguay",
@@ -4601,7 +4419,7 @@
   "fair_kurs": 2.12,
   "edge_pp": null,
   "ev_pct": null,
-  "rank_score": 0.47203676211827,
+  "rank_score": 0.4720360321620572,
   "lambda": 1.619,
   "pewnosc": "srednia",
   "pewnosc_score": 45.0,
@@ -4612,15 +4430,15 @@
   ],
   "oczekiwane_minuty": 83.5,
   "rozklad": [
-   0.21284977554620144,
-   0.3151134623355285,
-   0.24664532246286527,
-   0.13568997587903878,
-   0.058869585387432026,
-   0.021433268653362102,
-   0.006806458358094329,
-   0.001935347197098009,
-   0.0006568041803795
+   0.21285046042543435,
+   0.31511350741250843,
+   0.24664493175005028,
+   0.13568969057862038,
+   0.05886949527079179,
+   0.02143326928579346,
+   0.006806475306900251,
+   0.0019353583720530946,
+   0.0006568115978479172
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -4670,7 +4488,7 @@
   "fair_kurs": 2.3,
   "edge_pp": null,
   "ev_pct": null,
-  "rank_score": 0.43567776072418085,
+  "rank_score": 0.4356769169214269,
   "lambda": 1.504,
   "pewnosc": "srednia",
   "pewnosc_score": 45.0,
@@ -4681,15 +4499,15 @@
   ],
   "oczekiwane_minuty": 85.1,
   "rozklad": [
-   0.2379629523180773,
-   0.3263592869577418,
-   0.23816288979966074,
-   0.12285680072841346,
-   0.0502360984902692,
-   0.017317799276817782,
-   0.0052290616807992634,
-   0.001419112004240808,
-   0.00045599874397961315
+   0.2379637811245213,
+   0.3263593019540518,
+   0.2381624371353371,
+   0.12285649033479674,
+   0.05023599933948659,
+   0.017317792994955745,
+   0.005229073203323964,
+   0.0014191200032726394,
+   0.00045600391025413245
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -4723,7 +4541,7 @@
   "mecz": "Mexico – England",
   "kickoff_ts": 1783296000,
   "podmiot_typ": "zawodnik",
-  "podmiot_id": 921692202,
+  "podmiot_id": 905122713,
   "podmiot": "Marcus Rashford",
   "druzyna": "England",
   "przeciwnik": "Mexico",
@@ -4739,7 +4557,7 @@
   "fair_kurs": 2.47,
   "edge_pp": null,
   "ev_pct": null,
-  "rank_score": 0.4054481301384841,
+  "rank_score": 0.405443665603277,
   "lambda": 1.411,
   "pewnosc": "srednia",
   "pewnosc_score": 45.0,
@@ -4750,15 +4568,15 @@
   ],
   "oczekiwane_minuty": 67.1,
   "rozklad": [
-   0.2602506201032875,
-   0.3343012497582284,
-   0.22976592556582237,
-   0.11217725858184396,
-   0.04360163057110675,
-   0.014343267925650372,
-   0.004147300618616245,
-   0.0010812279745172908,
-   0.0003315189009270858
+   0.26025415463384777,
+   0.3343021797628752,
+   0.2297644654765688,
+   0.11217568438504584,
+   0.04360074012335799,
+   0.014342899825979041,
+   0.004147176713707986,
+   0.001081192119627143,
+   0.000331506958990202
   ],
   "czynniki": {
    "rywal": 1.0,
@@ -4792,7 +4610,7 @@
   "mecz": "Brazil – Norway",
   "kickoff_ts": 1783281600,
   "podmiot_typ": "zawodnik",
-  "podmiot_id": 907924846,
+  "podmiot_id": 984239530,
   "podmiot": "Erling Haaland",
   "druzyna": "Norway",
   "przeciwnik": "Brazil",
@@ -4819,15 +4637,15 @@
   "oczekiwane_minuty": 84.4,
   "lambda": 3.612,
   "rozklad": [
-   0.03249090958416415,
-   0.10572445449657825,
-   0.17725297139142382,
-   0.20397408239473572,
-   0.18109816373014556,
-   0.13222112195953514,
-   0.08263112978716812,
-   0.045433202431080004,
-   0.03917396422516928
+   0.032491102104392953,
+   0.10572479688615481,
+   0.17725317608820818,
+   0.20397400889647954,
+   0.18109792129125632,
+   0.13222088270795038,
+   0.08263098109479272,
+   0.04543314184787753,
+   0.039173989082887606
   ],
   "czynniki": {
    "rywal": 1.0,
