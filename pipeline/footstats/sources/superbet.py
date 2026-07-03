@@ -115,8 +115,13 @@ def match_superbet_event(
     events: list[dict], home_en: str, away_en: str, kickoff_ts: int
 ) -> dict | None:
     """Znajdź mecz Superbetu odpowiadający meczowi Sofascore (nazwy + czas)."""
-    en_pl = {v: k for k, v in TEAM_PL_EN.items()}
-    home_pl, away_pl = en_pl.get(home_en), en_pl.get(away_en)
+    # jedna nazwa EN może mieć KILKA polskich wariantów (np. Cape Verde =
+    # "Republika Zielonego Przylądka" i "Zielony Przylądek") — zbierz wszystkie
+    en_pl_multi: dict[str, set[str]] = {}
+    for pl, en in TEAM_PL_EN.items():
+        en_pl_multi.setdefault(en, set()).add(pl.strip())
+    home_pl = en_pl_multi.get(home_en, set())
+    away_pl = en_pl_multi.get(away_en, set())
     for ev in events:
         name = ev.get("matchName") or ""
         parts = [p.strip() for p in name.split("·")]
@@ -124,7 +129,7 @@ def match_superbet_event(
             continue
         # Dokładne dopasowanie nazw (PL) — w turnieju mecz jest jednoznaczny,
         # więc NIE bramkujemy czasem (matchTimestamp Superbetu bywa przesunięty).
-        if home_pl and away_pl and parts == [home_pl, away_pl]:
+        if parts[0] in home_pl and parts[1] in away_pl:
             return ev
         # awaryjnie: znormalizowane nazwy + luźne okno czasowe (±30 h)
         if norm_name(parts[0]) == norm_name(home_en) and norm_name(parts[1]) == norm_name(away_en):

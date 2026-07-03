@@ -15,9 +15,11 @@ a strażnik/kolejne uruchomienie dokończy, gdy propsy się pojawią.
 from __future__ import annotations
 
 import json
+import os
 import statistics
 import time
 from collections import defaultdict
+from dataclasses import asdict
 
 import numpy as np
 from curl_cffi import requests
@@ -70,6 +72,78 @@ def upcoming_wc_events() -> list[dict]:
             if utid == WC_UTID and ev.get("status") == "notstarted":
                 out[ev["id"]] = ev
     return list(out.values())
+
+
+def _supabase_headers() -> tuple[str, dict] | None:
+    url = os.environ.get("SUPABASE_URL", "").rstrip("/")
+    key = os.environ.get("SUPABASE_SERVICE_KEY", "")
+    if not url or not key:
+        return None
+    return url, {
+        "apikey": key,
+        "Authorization": f"Bearer {key}",
+        "Content-Type": "application/json",
+    }
+
+
+def load_trend_lib() -> dict:
+    """Trwała biblioteka trendów (Supabase app_data.trend_lib).
+
+    statshub KASUJE propsy po meczu — bez tej biblioteki tracimy historię
+    zawodników, zanim pojawią się kursy na ich następny mecz.
+    """
+    sb = _supabase_headers()
+    if sb is None:
+        return {}
+    url, headers = sb
+    try:
+        r = requests.get(
+            f"{url}/rest/v1/app_data?select=payload&key=eq.trend_lib",
+            headers=headers, impersonate="chrome124", timeout=30,
+        )
+        rows = r.json() if r.status_code == 200 else []
+        return rows[0]["payload"] if rows else {}
+    except Exception:
+        return {}
+
+
+def save_trend_lib(lib: dict) -> None:
+    sb = _supabase_headers()
+    if sb is None:
+        return
+    url, headers = sb
+    try:
+        requests.post(
+            f"{url}/rest/v1/app_data?on_conflict=key",
+            headers={**headers, "Prefer": "resolution=merge-duplicates"},
+            data=json.dumps([{"key": "trend_lib", "payload": lib}]),
+            impersonate="chrome124", timeout=60,
+        )
+    except Exception:
+        pass
+
+
+def past_wc_event_ids(days_back: int = 25) -> list[int]:
+    """ID rozegranych meczów MŚ z ostatnich dni (do biblioteki historii)."""
+    now = int(time.time())
+    out: dict[int, bool] = {}
+    for d in range(1, days_back + 1):
+        start = now - d * 86400
+        start -= start % 86400
+        try:
+            data = _sh(
+                f"{SH_BASE}/event/by-date?startOfDay={start}&endOfDay={start + 86399}"
+            ).get("data", [])
+        except Exception:
+            continue
+        for e in data:
+            ev = e.get("events", e)
+            utid = ev.get("uniqueTournamentId") or (ev.get("tournament") or {}).get(
+                "uniqueTournamentId"
+            )
+            if utid == WC_UTID and ev.get("status") != "notstarted":
+                out[ev["id"]] = True
+    return list(out)
 
 
 def group_prior_from_context(trend: statshub.StatshubTrend) -> counts.GroupPrior:
@@ -159,6 +233,80 @@ def main():
         print("statshub nie ma jeszcze propsów na te mecze (ładują się ~24-48 h "
               "przed). Uruchom ponownie bliżej meczu.")
         return
+
+    # --- BIBLIOTEKA HISTORII: mecze bez propsów statshub (np. ćwierćfinały) ---
+    # statshub wystawia propsy ~24-48 h przed meczem, a Superbet kwotuje dużo
+    # wcześniej (i wtedy kursy są najmiększe). Historia zawodnika nie zależy
+    # od nadchodzącego meczu — bierzemy jego najświeższy trend z ROZEGRANYCH
+    # meczów MŚ i przepinamy na nowy event (rywal/kontekst neutralne, składy
+    # z Rotowire, kursy z Superbetu).
+    covered = {t.event_id for t in trends}
+    uncovered = [
+        e for e in events
+        if e["id"] not in covered and e.get("homeTeamId") and e.get("awayTeamId")
+    ]
+    try:
+        # 1) trwała biblioteka z Supabase (przeżywa kasowanie propsów przez statshub)
+        stored = load_trend_lib()
+        lib: dict[tuple[int, str], statshub.StatshubTrend] = {}
+        for rec in stored.values():
+            try:
+                t = statshub.StatshubTrend(**rec)
+                lib[(t.player_id, t.market_code)] = t
+            except TypeError:
+                continue  # stary format po zmianie pól — rekord wypada
+
+        def _merge(t: statshub.StatshubTrend) -> None:
+            key = (t.player_id, t.market_code)
+            prev = lib.get(key)
+            ts_new = t.timestamps[0] if t.timestamps else 0
+            ts_old = prev.timestamps[0] if prev and prev.timestamps else -1
+            if prev is None or ts_new >= ts_old:
+                lib[key] = t
+
+        # 2) dołóż co jeszcze zostało z rozegranych eventów + dzisiejsze trendy
+        if uncovered:
+            past_ids = past_wc_event_ids()
+            for i in range(0, len(past_ids), 8):
+                for t in statshub.fetch_event_trends(past_ids[i:i + 8]):
+                    _merge(t)
+        for t in trends:
+            _merge(t)
+        save_trend_lib({
+            f"{t.player_id}:{t.market_code}": asdict(t) for t in lib.values()
+        })
+
+        # 3) mecze bez propsów statshub: przepnij najświeższe trendy z biblioteki
+        team_by_id: dict[int, str] = {}
+        for t in lib.values():
+            if t.team_id:
+                team_by_id[t.team_id] = t.team_name
+            if t.opponent_id:
+                team_by_id[t.opponent_id] = t.opponent_name
+        n_lib = 0
+        for e in uncovered:
+            hid, aid = e["homeTeamId"], e["awayTeamId"]
+            if not team_by_id.get(hid) or not team_by_id.get(aid):
+                continue  # nieznana drużyna = brak historii i pusta karta meczu
+            for (pid, mk), t in lib.items():
+                if t.team_id not in (hid, aid):
+                    continue
+                opp_id = aid if t.team_id == hid else hid
+                trends.append(dc_replace(
+                    t,
+                    event_id=e["id"],
+                    opponent_id=opp_id,
+                    opponent_name=team_by_id.get(opp_id, ""),
+                    is_home=(t.team_id == hid),
+                    opponent_average=None, opponent_rank=None,
+                    in_predicted_lineup=False, ref_odds=[],
+                ))
+                n_lib += 1
+        if n_lib:
+            print(f"Biblioteka historii ({len(lib)} trendów w banku): "
+                  f"+{n_lib} przepiętych na mecze bez propsów statshub")
+    except Exception as ex:
+        print(f"Biblioteka historii pominięta ({ex})")
 
     # --- rynki z map strzałów (365Scores): głową / zza pola karnego ---
     # Syntetyczne trendy: liczby z chartEvents 365Scores (per typ strzału),
