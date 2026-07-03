@@ -33,6 +33,13 @@ export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   const meta = await getMeta();
+  const aktualizacja = new Intl.DateTimeFormat("pl-PL", {
+    day: "numeric",
+    month: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Europe/Warsaw",
+  }).format(new Date(meta.wygenerowano_ts * 1000));
   return (
     <html
       lang="pl"
@@ -51,7 +58,7 @@ export default async function RootLayout({
             </p>
             <p>
               Dane: {meta.zrodlo} · {meta.liga} {meta.sezon} · {meta.meczow_w_bazie}{" "}
-              meczów w bazie
+              meczów w bazie · aktualizacja: {aktualizacja}
             </p>
           </div>
         </footer>
