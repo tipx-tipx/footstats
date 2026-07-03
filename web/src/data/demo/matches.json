@@ -10,9 +10,9 @@
   "sedzia": null,
   "sedzia_mnoznik_fauli": 1.0,
   "okazje": [
-   2,
-   3,
-   7
+   12,
+   13,
+   33
   ],
   "sklady_ogloszone": false
  },
@@ -27,8 +27,8 @@
   "sedzia": null,
   "sedzia_mnoznik_fauli": 1.0,
   "okazje": [
-   1,
-   6
+   11,
+   32
   ],
   "sklady_ogloszone": false
  },
@@ -43,7 +43,7 @@
   "sedzia": null,
   "sedzia_mnoznik_fauli": 1.0,
   "okazje": [
-   8
+   34
   ],
   "sklady_ogloszone": false
  },
@@ -58,8 +58,8 @@
   "sedzia": null,
   "sedzia_mnoznik_fauli": 1.0,
   "okazje": [
-   4,
-   5
+   14,
+   15
   ],
   "sklady_ogloszone": false
  },
@@ -73,7 +73,90 @@
   "gosc": "Belgium",
   "sedzia": null,
   "sedzia_mnoznik_fauli": 1.0,
-  "okazje": [],
+  "okazje": [
+   16
+  ],
+  "sklady_ogloszone": false
+ },
+ {
+  "id": 12813009,
+  "liga": "MŚ",
+  "sezon": "2026",
+  "kolejka": "Ćwierćfinał",
+  "kickoff_ts": 1783184400,
+  "gospodarz": "Canada",
+  "gosc": "Morocco",
+  "sedzia": null,
+  "sedzia_mnoznik_fauli": 1.0,
+  "okazje": [
+   1,
+   2,
+   3,
+   4,
+   17,
+   18,
+   19,
+   20,
+   21
+  ],
+  "sklady_ogloszone": false
+ },
+ {
+  "id": 12813010,
+  "liga": "MŚ",
+  "sezon": "2026",
+  "kolejka": "Ćwierćfinał",
+  "kickoff_ts": 1783198800,
+  "gospodarz": "Paraguay",
+  "gosc": "France",
+  "sedzia": null,
+  "sedzia_mnoznik_fauli": 1.0,
+  "okazje": [
+   5,
+   22,
+   23,
+   24
+  ],
+  "sklady_ogloszone": false
+ },
+ {
+  "id": 12813006,
+  "liga": "MŚ",
+  "sezon": "2026",
+  "kolejka": "Ćwierćfinał",
+  "kickoff_ts": 1783281600,
+  "gospodarz": "Brazil",
+  "gosc": "Norway",
+  "sedzia": null,
+  "sedzia_mnoznik_fauli": 1.0,
+  "okazje": [
+   6,
+   7,
+   8,
+   25,
+   26
+  ],
+  "sklady_ogloszone": false
+ },
+ {
+  "id": 12813007,
+  "liga": "MŚ",
+  "sezon": "2026",
+  "kolejka": "Ćwierćfinał",
+  "kickoff_ts": 1783296000,
+  "gospodarz": "Mexico",
+  "gosc": "England",
+  "sedzia": null,
+  "sedzia_mnoznik_fauli": 1.0,
+  "okazje": [
+   9,
+   10,
+   27,
+   28,
+   29,
+   30,
+   31
+  ],
   "sklady_ogloszone": false
  }
 ]

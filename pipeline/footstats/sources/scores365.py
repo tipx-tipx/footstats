@@ -48,16 +48,39 @@ def _get(url: str, timeout: int = 25, retries: int = 2) -> dict:
 
 
 def competitor_ids(team_names: list[str]) -> dict[str, int]:
-    """Mapa: znormalizowana nazwa drużyny -> competitorId (z bieżących meczów)."""
+    """Mapa: znormalizowana nazwa drużyny -> competitorId.
+
+    Szuka w bieżących meczach ORAZ w oknie najbliższych dni (drużyny grające
+    za 2-3 dni nie występują w "current").
+    """
     wanted = {_norm(n) for n in team_names}
     out: dict[str, int] = {}
-    data = _get(f"{BASE}/games/current/?{Q}&sports=1")
-    for g in data.get("games", []):
-        for side in ("homeCompetitor", "awayCompetitor"):
-            c = g.get(side) or {}
-            key = _norm(str(c.get("name", "")))
-            if key in wanted and key not in out and c.get("id"):
-                out[key] = int(c["id"])
+
+    def _scan(games: list[dict]) -> None:
+        for g in games:
+            for side in ("homeCompetitor", "awayCompetitor"):
+                c = g.get(side) or {}
+                key = _norm(str(c.get("name", "")))
+                if key in wanted and key not in out and c.get("id"):
+                    out[key] = int(c["id"])
+
+    wc_comp_id = None
+    try:
+        data = _get(f"{BASE}/games/current/?{Q}&sports=1")
+        _scan(data.get("games", []))
+        for g in data.get("games", []):
+            if "World Cup" in str(g.get("competitionDisplayName", "")):
+                wc_comp_id = g.get("competitionId")
+                break
+    except Exception:
+        pass
+    # drużyny grające za 2-3 dni: pełny terminarz MŚ (fixtures per rozgrywki)
+    if len(out) < len(wanted) and wc_comp_id:
+        try:
+            data = _get(f"{BASE}/games/fixtures/?{Q}&competitions={wc_comp_id}")
+            _scan(data.get("games", []))
+        except Exception:
+            pass
     return out
 
 
@@ -150,4 +173,80 @@ def team_shot_history(
         except Exception:
             continue
         _time.sleep(0.3)  # grzecznie dla API
+    return out
+
+
+# ---- pełne statystyki meczowe per zawodnik (lineups.members[].stats) ----
+# nazwa statystyki 365 -> nasz kod rynku (odbiory NIE występują w 365)
+STAT_NAME_MAP = {
+    "Minutes": "minutes",
+    "Total Shots": "shots",
+    "Fouls Made": "fouls_committed",
+    "Was Fouled": "fouls_won",
+    "Interceptions": "interceptions",
+    "Offsides": "offsides",
+}
+
+_full_cache: dict[int, dict] = {}
+
+
+def _stat_val(v) -> float:
+    """"90'" -> 90; "20/26 (77%)" -> 20; "2" -> 2."""
+    s = str(v).strip().rstrip("'")
+    s = s.split("/")[0].split("(")[0].strip()
+    try:
+        return float(s)
+    except ValueError:
+        return 0.0
+
+
+def game_player_match_stats(game_id: int) -> dict[str, dict[str, float]]:
+    """Pełne staty meczu per zawodnik: minuty, strzały, faule, przechwyty...
+
+    Zwraca {znormalizowane nazwisko: {"minutes": 90, "shots": 2, ...,
+    "started": 1.0/0.0, "sot": ... (z chartEvents)}}.
+    """
+    if game_id in _full_cache:
+        return _full_cache[game_id]
+    data = _get(f"{BASE}/game/?{Q}&gameId={game_id}")
+    game = data.get("game", {})
+    names = {int(m["id"]): str(m.get("name", "")) for m in game.get("members", []) if m.get("id")}
+    out: dict[str, dict[str, float]] = {}
+    for side in ("homeCompetitor", "awayCompetitor"):
+        lu = (game.get(side) or {}).get("lineups") or {}
+        for m in lu.get("members") or []:
+            name = names.get(int(m.get("id") or 0))
+            if not name:
+                continue
+            rec: dict[str, float] = {
+                "started": 1.0 if m.get("statusText") == "Starting" else 0.0,
+            }
+            for s in m.get("stats") or []:
+                kod = STAT_NAME_MAP.get(str(s.get("name")))
+                if kod:
+                    rec[kod] = _stat_val(s.get("value"))
+            if rec.get("minutes"):
+                out[_norm(name)] = rec
+    # celne strzały z mapy strzałów (nie ma ich w lineups)
+    try:
+        for pkey, cnts in game_player_shots(game_id).items():
+            if pkey in out:
+                out[pkey]["sot"] = float(cnts.get("sot", 0))
+    except Exception:
+        pass
+    _full_cache[game_id] = out
+    return out
+
+
+def team_match_history(
+    competitor_id: int, n_games: int = 6
+) -> list[tuple[int, dict[str, dict[str, float]]]]:
+    """Historia pełnych statystyk drużyny: [(timestamp, {zawodnik: staty}), ...]."""
+    out = []
+    for gid, ts in recent_finished_games(competitor_id, n_games):
+        try:
+            out.append((ts, game_player_match_stats(gid)))
+        except Exception:
+            continue
+        _time.sleep(0.3)
     return out

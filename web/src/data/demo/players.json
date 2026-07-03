@@ -1262,6 +1262,82 @@
      90
     ],
     "srednia90": 1.46
+   },
+   "headed_shots": {
+    "ostatnie": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     120,
+     85,
+     90,
+     90,
+     74,
+     90
+    ],
+    "srednia90": 0.33
+   },
+   "shots_outside_box": {
+    "ostatnie": [
+     1,
+     1,
+     1,
+     1,
+     2,
+     1
+    ],
+    "minuty": [
+     120,
+     85,
+     90,
+     90,
+     74,
+     90
+    ],
+    "srednia90": 1.15
+   },
+   "shots_blocked": {
+    "ostatnie": [
+     1,
+     0,
+     0,
+     0,
+     1,
+     1
+    ],
+    "minuty": [
+     120,
+     85,
+     90,
+     90,
+     74,
+     90
+    ],
+    "srednia90": 0.49
+   },
+   "shots_off_target": {
+    "ostatnie": [
+     1,
+     1,
+     1,
+     2,
+     1,
+     0
+    ],
+    "minuty": [
+     120,
+     85,
+     90,
+     90,
+     74,
+     90
+    ],
+    "srednia90": 0.98
    }
   }
  },
@@ -1469,6 +1545,9854 @@
      62
     ],
     "srednia90": 1.78
+   }
+  }
+ },
+ {
+  "id": 947308465,
+  "nazwa": "Ali Ahmed",
+  "pozycja": "M",
+  "druzyna": "Canada",
+  "minuty_lacznie": 157,
+  "forma": {
+   "fouls_won": {
+    "ostatnie": [
+     2,
+     1,
+     0
+    ],
+    "minuty": [
+     57,
+     70,
+     30
+    ],
+    "srednia90": 1.72
+   }
+  }
+ },
+ {
+  "id": 981024266,
+  "nazwa": "Alistair Johnston",
+  "pozycja": "M",
+  "druzyna": "Canada",
+  "minuty_lacznie": 450,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     0,
+     2,
+     1,
+     1,
+     1,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     90,
+     45,
+     45
+    ],
+    "srednia90": 1.0
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     0,
+     2,
+     0,
+     2,
+     0,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     90,
+     45,
+     45
+    ],
+    "srednia90": 0.8
+   },
+   "fouls_won": {
+    "ostatnie": [
+     0,
+     1,
+     1,
+     2,
+     0,
+     1
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     90,
+     45,
+     45
+    ],
+    "srednia90": 1.0
+   },
+   "interceptions": {
+    "ostatnie": [
+     1,
+     3,
+     2,
+     0,
+     0,
+     1
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     90,
+     45,
+     45
+    ],
+    "srednia90": 1.4
+   }
+  }
+ },
+ {
+  "id": 980966041,
+  "nazwa": "Cyle Larin",
+  "pozycja": "M",
+  "druzyna": "Canada",
+  "minuty_lacznie": 279,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     1,
+     6,
+     2,
+     3,
+     1
+    ],
+    "minuty": [
+     57,
+     90,
+     15,
+     72,
+     45
+    ],
+    "srednia90": 4.19
+   },
+   "sot": {
+    "ostatnie": [
+     1,
+     2,
+     1,
+     1,
+     0
+    ],
+    "minuty": [
+     57,
+     90,
+     15,
+     72,
+     45
+    ],
+    "srednia90": 1.61
+   },
+   "headed_shots": {
+    "ostatnie": [
+     0,
+     3,
+     0,
+     0,
+     0
+    ],
+    "minuty": [
+     57,
+     90,
+     15,
+     72,
+     45
+    ],
+    "srednia90": 0.97
+   },
+   "shots_blocked": {
+    "ostatnie": [
+     0,
+     3,
+     1,
+     2,
+     0
+    ],
+    "minuty": [
+     57,
+     90,
+     15,
+     72,
+     45
+    ],
+    "srednia90": 1.94
+   }
+  }
+ },
+ {
+  "id": 906743168,
+  "nazwa": "Derek Cornelius",
+  "pozycja": "M",
+  "druzyna": "Canada",
+  "minuty_lacznie": 474,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     1,
+     2,
+     1,
+     1,
+     3,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     45,
+     90,
+     90,
+     69
+    ],
+    "srednia90": 1.52
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     0,
+     2,
+     2,
+     0,
+     2,
+     1
+    ],
+    "minuty": [
+     90,
+     90,
+     45,
+     90,
+     90,
+     69
+    ],
+    "srednia90": 1.33
+   },
+   "fouls_won": {
+    "ostatnie": [
+     1,
+     1,
+     0,
+     1,
+     0,
+     2
+    ],
+    "minuty": [
+     90,
+     90,
+     45,
+     90,
+     90,
+     69
+    ],
+    "srednia90": 0.95
+   },
+   "interceptions": {
+    "ostatnie": [
+     0,
+     1,
+     0,
+     1,
+     1,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     45,
+     90,
+     90,
+     69
+    ],
+    "srednia90": 0.57
+   },
+   "headed_shots": {
+    "ostatnie": [
+     1,
+     1,
+     1,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     45,
+     90,
+     90,
+     69
+    ],
+    "srednia90": 0.76
+   },
+   "shots_blocked": {
+    "ostatnie": [
+     0,
+     1,
+     0,
+     0,
+     2,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     45,
+     90,
+     90,
+     69
+    ],
+    "srednia90": 0.57
+   },
+   "shots_off_target": {
+    "ostatnie": [
+     0,
+     1,
+     1,
+     1,
+     1,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     45,
+     90,
+     90,
+     69
+    ],
+    "srednia90": 0.76
+   }
+  }
+ },
+ {
+  "id": 965294575,
+  "nazwa": "Ismael Kone",
+  "pozycja": "M",
+  "druzyna": "Canada",
+  "minuty_lacznie": 281,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     1,
+     1,
+     3,
+     0
+    ],
+    "minuty": [
+     56,
+     90,
+     90,
+     45
+    ],
+    "srednia90": 1.6
+   },
+   "fouls_won": {
+    "ostatnie": [
+     1,
+     2,
+     1,
+     3
+    ],
+    "minuty": [
+     56,
+     90,
+     90,
+     45
+    ],
+    "srednia90": 2.24
+   },
+   "interceptions": {
+    "ostatnie": [
+     1,
+     2,
+     0,
+     2
+    ],
+    "minuty": [
+     56,
+     90,
+     90,
+     45
+    ],
+    "srednia90": 1.6
+   }
+  }
+ },
+ {
+  "id": 908771786,
+  "nazwa": "Jonathan David",
+  "pozycja": "M",
+  "druzyna": "Canada",
+  "minuty_lacznie": 489,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     2,
+     2,
+     8,
+     3,
+     3,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     60,
+     90,
+     69
+    ],
+    "srednia90": 3.31
+   },
+   "sot": {
+    "ostatnie": [
+     1,
+     0,
+     5,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     60,
+     90,
+     69
+    ],
+    "srednia90": 1.29
+   },
+   "fouls_won": {
+    "ostatnie": [
+     0,
+     3,
+     0,
+     1,
+     1,
+     1
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     60,
+     90,
+     69
+    ],
+    "srednia90": 1.1
+   },
+   "interceptions": {
+    "ostatnie": [
+     1,
+     1,
+     0,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     60,
+     90,
+     69
+    ],
+    "srednia90": 0.55
+   },
+   "shots_outside_box": {
+    "ostatnie": [
+     0,
+     1,
+     2,
+     0,
+     1,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     60,
+     90,
+     69
+    ],
+    "srednia90": 0.74
+   },
+   "shots_blocked": {
+    "ostatnie": [
+     0,
+     1,
+     3,
+     1,
+     2,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     60,
+     90,
+     69
+    ],
+    "srednia90": 1.29
+   },
+   "shots_off_target": {
+    "ostatnie": [
+     1,
+     1,
+     0,
+     1,
+     1,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     60,
+     90,
+     69
+    ],
+    "srednia90": 0.74
+   }
+  }
+ },
+ {
+  "id": 959195124,
+  "nazwa": "Liam Millar",
+  "pozycja": "M",
+  "druzyna": "Canada",
+  "minuty_lacznie": 293,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     0,
+     1,
+     0,
+     5,
+     1
+    ],
+    "minuty": [
+     69,
+     33,
+     60,
+     86,
+     45
+    ],
+    "srednia90": 2.15
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     1,
+     1,
+     1,
+     1,
+     1
+    ],
+    "minuty": [
+     69,
+     33,
+     60,
+     86,
+     45
+    ],
+    "srednia90": 1.54
+   },
+   "fouls_won": {
+    "ostatnie": [
+     0,
+     1,
+     0,
+     0,
+     1
+    ],
+    "minuty": [
+     69,
+     33,
+     60,
+     86,
+     45
+    ],
+    "srednia90": 0.61
+   },
+   "interceptions": {
+    "ostatnie": [
+     0,
+     0,
+     0,
+     1,
+     1
+    ],
+    "minuty": [
+     69,
+     33,
+     60,
+     86,
+     45
+    ],
+    "srednia90": 0.61
+   },
+   "shots_outside_box": {
+    "ostatnie": [
+     0,
+     0,
+     0,
+     2,
+     0
+    ],
+    "minuty": [
+     69,
+     33,
+     60,
+     86,
+     45
+    ],
+    "srednia90": 0.61
+   },
+   "shots_blocked": {
+    "ostatnie": [
+     0,
+     1,
+     0,
+     1,
+     1
+    ],
+    "minuty": [
+     69,
+     33,
+     60,
+     86,
+     45
+    ],
+    "srednia90": 0.92
+   },
+   "shots_off_target": {
+    "ostatnie": [
+     0,
+     0,
+     0,
+     4,
+     0
+    ],
+    "minuty": [
+     69,
+     33,
+     60,
+     86,
+     45
+    ],
+    "srednia90": 1.23
+   }
+  }
+ },
+ {
+  "id": 943890638,
+  "nazwa": "Luc De Fougerolles",
+  "pozycja": "M",
+  "druzyna": "Canada",
+  "minuty_lacznie": 432,
+  "forma": {
+   "fouls_committed": {
+    "ostatnie": [
+     0,
+     3,
+     0,
+     2,
+     0,
+     0
+    ],
+    "minuty": [
+     32,
+     90,
+     70,
+     90,
+     90,
+     60
+    ],
+    "srednia90": 1.04
+   },
+   "fouls_won": {
+    "ostatnie": [
+     0,
+     2,
+     0,
+     4,
+     2,
+     1
+    ],
+    "minuty": [
+     32,
+     90,
+     70,
+     90,
+     90,
+     60
+    ],
+    "srednia90": 1.88
+   }
+  }
+ },
+ {
+  "id": 940266921,
+  "nazwa": "Nathan-Dylan Saliba",
+  "pozycja": "M",
+  "druzyna": "Canada",
+  "minuty_lacznie": 231,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     0,
+     0,
+     3,
+     0,
+     1
+    ],
+    "minuty": [
+     58,
+     90,
+     34,
+     4,
+     45
+    ],
+    "srednia90": 1.56
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     3,
+     2,
+     0,
+     0,
+     1
+    ],
+    "minuty": [
+     58,
+     90,
+     34,
+     4,
+     45
+    ],
+    "srednia90": 2.34
+   },
+   "fouls_won": {
+    "ostatnie": [
+     2,
+     0,
+     0,
+     0,
+     0
+    ],
+    "minuty": [
+     58,
+     90,
+     34,
+     4,
+     45
+    ],
+    "srednia90": 0.78
+   },
+   "interceptions": {
+    "ostatnie": [
+     3,
+     1,
+     0,
+     0,
+     0
+    ],
+    "minuty": [
+     58,
+     90,
+     34,
+     4,
+     45
+    ],
+    "srednia90": 1.56
+   },
+   "headed_shots": {
+    "ostatnie": [
+     0,
+     0,
+     2,
+     0,
+     0
+    ],
+    "minuty": [
+     58,
+     90,
+     34,
+     4,
+     45
+    ],
+    "srednia90": 0.78
+   },
+   "shots_outside_box": {
+    "ostatnie": [
+     0,
+     0,
+     2,
+     0,
+     1
+    ],
+    "minuty": [
+     58,
+     90,
+     34,
+     4,
+     45
+    ],
+    "srednia90": 1.17
+   },
+   "sot_outside_box": {
+    "ostatnie": [
+     0,
+     0,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     58,
+     90,
+     34,
+     4,
+     45
+    ],
+    "srednia90": 0.39
+   },
+   "shots_blocked": {
+    "ostatnie": [
+     0,
+     0,
+     1,
+     0,
+     1
+    ],
+    "minuty": [
+     58,
+     90,
+     34,
+     4,
+     45
+    ],
+    "srednia90": 0.78
+   },
+   "shots_off_target": {
+    "ostatnie": [
+     0,
+     0,
+     2,
+     0,
+     0
+    ],
+    "minuty": [
+     58,
+     90,
+     34,
+     4,
+     45
+    ],
+    "srednia90": 0.78
+   }
+  }
+ },
+ {
+  "id": 926386877,
+  "nazwa": "Niko Sigur",
+  "pozycja": "M",
+  "druzyna": "Canada",
+  "minuty_lacznie": 144,
+  "forma": {
+   "fouls_committed": {
+    "ostatnie": [
+     3,
+     0,
+     0,
+     0
+    ],
+    "minuty": [
+     32,
+     8,
+     45,
+     59
+    ],
+    "srednia90": 1.88
+   },
+   "interceptions": {
+    "ostatnie": [
+     0,
+     0,
+     1,
+     4
+    ],
+    "minuty": [
+     32,
+     8,
+     45,
+     59
+    ],
+    "srednia90": 3.12
+   }
+  }
+ },
+ {
+  "id": 984888161,
+  "nazwa": "Promise David",
+  "pozycja": "M",
+  "druzyna": "Canada",
+  "minuty_lacznie": 107,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     1,
+     3,
+     1,
+     1,
+     0
+    ],
+    "minuty": [
+     21,
+     17,
+     30,
+     18,
+     21
+    ],
+    "srednia90": 5.05
+   }
+  }
+ },
+ {
+  "id": 964971554,
+  "nazwa": "Richie Laryea",
+  "pozycja": "M",
+  "druzyna": "Canada",
+  "minuty_lacznie": 444,
+  "forma": {
+   "fouls_committed": {
+    "ostatnie": [
+     4,
+     2,
+     0,
+     0,
+     0,
+     1
+    ],
+    "minuty": [
+     90,
+     82,
+     90,
+     90,
+     61,
+     31
+    ],
+    "srednia90": 1.42
+   },
+   "fouls_won": {
+    "ostatnie": [
+     3,
+     5,
+     3,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     90,
+     82,
+     90,
+     90,
+     61,
+     31
+    ],
+    "srednia90": 2.43
+   }
+  }
+ },
+ {
+  "id": 948520495,
+  "nazwa": "Stephen Eustaquio",
+  "pozycja": "M",
+  "druzyna": "Canada",
+  "minuty_lacznie": 434,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     2,
+     0,
+     1,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     90,
+     33,
+     90,
+     90,
+     86,
+     45
+    ],
+    "srednia90": 0.83
+   },
+   "fouls_won": {
+    "ostatnie": [
+     1,
+     0,
+     1,
+     3,
+     2,
+     0
+    ],
+    "minuty": [
+     90,
+     33,
+     90,
+     90,
+     86,
+     45
+    ],
+    "srednia90": 1.45
+   },
+   "interceptions": {
+    "ostatnie": [
+     1,
+     1,
+     0,
+     0,
+     0,
+     0
+    ],
+    "minuty": [
+     90,
+     33,
+     90,
+     90,
+     86,
+     45
+    ],
+    "srednia90": 0.41
+   },
+   "shots_outside_box": {
+    "ostatnie": [
+     2,
+     0,
+     1,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     90,
+     33,
+     90,
+     90,
+     86,
+     45
+    ],
+    "srednia90": 0.83
+   }
+  }
+ },
+ {
+  "id": 932405623,
+  "nazwa": "Tajon Buchanan",
+  "pozycja": "M",
+  "druzyna": "Canada",
+  "minuty_lacznie": 420,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     1,
+     0,
+     4,
+     0,
+     1,
+     1
+    ],
+    "minuty": [
+     74,
+     73,
+     82,
+     60,
+     86,
+     45
+    ],
+    "srednia90": 1.5
+   },
+   "sot": {
+    "ostatnie": [
+     1,
+     0,
+     0,
+     0,
+     1,
+     1
+    ],
+    "minuty": [
+     74,
+     73,
+     82,
+     60,
+     86,
+     45
+    ],
+    "srednia90": 0.64
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     1,
+     0,
+     1,
+     0,
+     3,
+     0
+    ],
+    "minuty": [
+     74,
+     73,
+     82,
+     60,
+     86,
+     45
+    ],
+    "srednia90": 1.07
+   },
+   "fouls_won": {
+    "ostatnie": [
+     0,
+     3,
+     3,
+     2,
+     1,
+     2
+    ],
+    "minuty": [
+     74,
+     73,
+     82,
+     60,
+     86,
+     45
+    ],
+    "srednia90": 2.36
+   },
+   "shots_outside_box": {
+    "ostatnie": [
+     0,
+     0,
+     2,
+     0,
+     1,
+     1
+    ],
+    "minuty": [
+     74,
+     73,
+     82,
+     60,
+     86,
+     45
+    ],
+    "srednia90": 0.86
+   },
+   "sot_outside_box": {
+    "ostatnie": [
+     0,
+     0,
+     0,
+     0,
+     1,
+     1
+    ],
+    "minuty": [
+     74,
+     73,
+     82,
+     60,
+     86,
+     45
+    ],
+    "srednia90": 0.43
+   },
+   "shots_blocked": {
+    "ostatnie": [
+     0,
+     0,
+     3,
+     0,
+     0,
+     0
+    ],
+    "minuty": [
+     74,
+     73,
+     82,
+     60,
+     86,
+     45
+    ],
+    "srednia90": 0.64
+   }
+  }
+ },
+ {
+  "id": 931331247,
+  "nazwa": "Tani Oluwaseyi",
+  "pozycja": "M",
+  "druzyna": "Canada",
+  "minuty_lacznie": 246,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     3,
+     0,
+     1,
+     2,
+     1,
+     4
+    ],
+    "minuty": [
+     69,
+     33,
+     20,
+     75,
+     4,
+     45
+    ],
+    "srednia90": 4.02
+   },
+   "sot": {
+    "ostatnie": [
+     2,
+     0,
+     0,
+     0,
+     0,
+     1
+    ],
+    "minuty": [
+     69,
+     33,
+     20,
+     75,
+     4,
+     45
+    ],
+    "srednia90": 1.1
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     1,
+     0,
+     2,
+     0,
+     0,
+     2
+    ],
+    "minuty": [
+     69,
+     33,
+     20,
+     75,
+     4,
+     45
+    ],
+    "srednia90": 1.83
+   },
+   "fouls_won": {
+    "ostatnie": [
+     2,
+     0,
+     0,
+     2,
+     0,
+     0
+    ],
+    "minuty": [
+     69,
+     33,
+     20,
+     75,
+     4,
+     45
+    ],
+    "srednia90": 1.46
+   },
+   "headed_shots": {
+    "ostatnie": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     69,
+     33,
+     20,
+     75,
+     4,
+     45
+    ],
+    "srednia90": 0.73
+   },
+   "shots_blocked": {
+    "ostatnie": [
+     0,
+     0,
+     1,
+     1,
+     0,
+     1
+    ],
+    "minuty": [
+     69,
+     33,
+     20,
+     75,
+     4,
+     45
+    ],
+    "srednia90": 1.1
+   },
+   "shots_off_target": {
+    "ostatnie": [
+     1,
+     0,
+     0,
+     1,
+     1,
+     2
+    ],
+    "minuty": [
+     69,
+     33,
+     20,
+     75,
+     4,
+     45
+    ],
+    "srednia90": 1.83
+   }
+  }
+ },
+ {
+  "id": 955704151,
+  "nazwa": "Achraf Hakimi",
+  "pozycja": "M",
+  "druzyna": "Morocco",
+  "minuty_lacznie": 454,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     3,
+     5,
+     2,
+     3,
+     1
+    ],
+    "minuty": [
+     120,
+     90,
+     90,
+     90,
+     64
+    ],
+    "srednia90": 2.78
+   },
+   "sot": {
+    "ostatnie": [
+     1,
+     3,
+     0,
+     0,
+     1
+    ],
+    "minuty": [
+     120,
+     90,
+     90,
+     90,
+     64
+    ],
+    "srednia90": 0.99
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     0,
+     1,
+     0,
+     3,
+     0
+    ],
+    "minuty": [
+     120,
+     90,
+     90,
+     90,
+     64
+    ],
+    "srednia90": 0.79
+   },
+   "fouls_won": {
+    "ostatnie": [
+     2,
+     2,
+     3,
+     5,
+     0
+    ],
+    "minuty": [
+     120,
+     90,
+     90,
+     90,
+     64
+    ],
+    "srednia90": 2.38
+   },
+   "interceptions": {
+    "ostatnie": [
+     3,
+     1,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     120,
+     90,
+     90,
+     90,
+     64
+    ],
+    "srednia90": 0.99
+   },
+   "shots_outside_box": {
+    "ostatnie": [
+     1,
+     2,
+     1,
+     2,
+     1
+    ],
+    "minuty": [
+     120,
+     90,
+     90,
+     90,
+     64
+    ],
+    "srednia90": 1.39
+   },
+   "sot_outside_box": {
+    "ostatnie": [
+     1,
+     0,
+     0,
+     0,
+     1
+    ],
+    "minuty": [
+     120,
+     90,
+     90,
+     90,
+     64
+    ],
+    "srednia90": 0.4
+   },
+   "shots_blocked": {
+    "ostatnie": [
+     1,
+     2,
+     0,
+     0,
+     0
+    ],
+    "minuty": [
+     120,
+     90,
+     90,
+     90,
+     64
+    ],
+    "srednia90": 0.59
+   },
+   "shots_off_target": {
+    "ostatnie": [
+     0,
+     0,
+     2,
+     3,
+     0
+    ],
+    "minuty": [
+     120,
+     90,
+     90,
+     90,
+     64
+    ],
+    "srednia90": 0.99
+   }
+  }
+ },
+ {
+  "id": 945331017,
+  "nazwa": "Anass Salah-Eddine",
+  "pozycja": "M",
+  "druzyna": "Morocco",
+  "minuty_lacznie": 208,
+  "forma": {
+   "fouls_committed": {
+    "ostatnie": [
+     2,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     51,
+     82,
+     11,
+     64
+    ],
+    "srednia90": 1.3
+   },
+   "fouls_won": {
+    "ostatnie": [
+     1,
+     1,
+     0,
+     2
+    ],
+    "minuty": [
+     51,
+     82,
+     11,
+     64
+    ],
+    "srednia90": 1.73
+   }
+  }
+ },
+ {
+  "id": 986798269,
+  "nazwa": "Ayoub El Kaabi",
+  "pozycja": "M",
+  "druzyna": "Morocco",
+  "minuty_lacznie": 140,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     3,
+     0,
+     2
+    ],
+    "minuty": [
+     69,
+     26,
+     45
+    ],
+    "srednia90": 3.21
+   },
+   "sot": {
+    "ostatnie": [
+     2,
+     0,
+     1
+    ],
+    "minuty": [
+     69,
+     26,
+     45
+    ],
+    "srednia90": 1.93
+   }
+  }
+ },
+ {
+  "id": 948881467,
+  "nazwa": "Ayyoub Bouaddi",
+  "pozycja": "M",
+  "druzyna": "Morocco",
+  "minuty_lacznie": 348,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     2,
+     1,
+     0,
+     0,
+     0
+    ],
+    "minuty": [
+     78,
+     90,
+     90,
+     45,
+     45
+    ],
+    "srednia90": 0.78
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     0,
+     1,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     78,
+     90,
+     90,
+     45,
+     45
+    ],
+    "srednia90": 0.52
+   },
+   "fouls_won": {
+    "ostatnie": [
+     2,
+     0,
+     2,
+     0,
+     0
+    ],
+    "minuty": [
+     78,
+     90,
+     90,
+     45,
+     45
+    ],
+    "srednia90": 1.03
+   },
+   "interceptions": {
+    "ostatnie": [
+     0,
+     1,
+     0,
+     2,
+     0
+    ],
+    "minuty": [
+     78,
+     90,
+     90,
+     45,
+     45
+    ],
+    "srednia90": 0.78
+   },
+   "shots_outside_box": {
+    "ostatnie": [
+     2,
+     1,
+     0,
+     0,
+     0
+    ],
+    "minuty": [
+     78,
+     90,
+     90,
+     45,
+     45
+    ],
+    "srednia90": 0.78
+   },
+   "shots_off_target": {
+    "ostatnie": [
+     2,
+     0,
+     0,
+     0,
+     0
+    ],
+    "minuty": [
+     78,
+     90,
+     90,
+     45,
+     45
+    ],
+    "srednia90": 0.52
+   }
+  }
+ },
+ {
+  "id": 922379911,
+  "nazwa": "Azzedine Ounahi",
+  "pozycja": "M",
+  "druzyna": "Morocco",
+  "minuty_lacznie": 367,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     1,
+     1,
+     0,
+     0,
+     0,
+     0
+    ],
+    "minuty": [
+     85,
+     21,
+     89,
+     64,
+     63,
+     45
+    ],
+    "srednia90": 0.49
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     1,
+     0,
+     0,
+     0,
+     0,
+     2
+    ],
+    "minuty": [
+     85,
+     21,
+     89,
+     64,
+     63,
+     45
+    ],
+    "srednia90": 0.74
+   },
+   "fouls_won": {
+    "ostatnie": [
+     1,
+     0,
+     1,
+     0,
+     1,
+     2
+    ],
+    "minuty": [
+     85,
+     21,
+     89,
+     64,
+     63,
+     45
+    ],
+    "srednia90": 1.23
+   },
+   "interceptions": {
+    "ostatnie": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     85,
+     21,
+     89,
+     64,
+     63,
+     45
+    ],
+    "srednia90": 0.49
+   },
+   "shots_outside_box": {
+    "ostatnie": [
+     1,
+     1,
+     0,
+     0,
+     0,
+     0
+    ],
+    "minuty": [
+     85,
+     21,
+     89,
+     64,
+     63,
+     45
+    ],
+    "srednia90": 0.49
+   }
+  }
+ },
+ {
+  "id": 900890907,
+  "nazwa": "Bilel El Khanouss",
+  "pozycja": "M",
+  "druzyna": "Morocco",
+  "minuty_lacznie": 410,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     1,
+     2,
+     2,
+     1,
+     0,
+     2
+    ],
+    "minuty": [
+     86,
+     90,
+     83,
+     79,
+     27,
+     45
+    ],
+    "srednia90": 1.76
+   },
+   "fouls_won": {
+    "ostatnie": [
+     1,
+     1,
+     1,
+     1,
+     0,
+     1
+    ],
+    "minuty": [
+     86,
+     90,
+     83,
+     79,
+     27,
+     45
+    ],
+    "srednia90": 1.1
+   },
+   "shots_outside_box": {
+    "ostatnie": [
+     1,
+     2,
+     0,
+     1,
+     0,
+     1
+    ],
+    "minuty": [
+     86,
+     90,
+     83,
+     79,
+     27,
+     45
+    ],
+    "srednia90": 1.1
+   },
+   "sot_outside_box": {
+    "ostatnie": [
+     1,
+     2,
+     0,
+     0,
+     0,
+     0
+    ],
+    "minuty": [
+     86,
+     90,
+     83,
+     79,
+     27,
+     45
+    ],
+    "srednia90": 0.66
+   }
+  }
+ },
+ {
+  "id": 940066824,
+  "nazwa": "Brahim Diaz",
+  "pozycja": "M",
+  "druzyna": "Morocco",
+  "minuty_lacznie": 367,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     0,
+     1,
+     1,
+     3,
+     3,
+     1
+    ],
+    "minuty": [
+     78,
+     69,
+     83,
+     64,
+     63,
+     10
+    ],
+    "srednia90": 2.21
+   },
+   "sot": {
+    "ostatnie": [
+     0,
+     0,
+     0,
+     1,
+     2,
+     1
+    ],
+    "minuty": [
+     78,
+     69,
+     83,
+     64,
+     63,
+     10
+    ],
+    "srednia90": 0.98
+   },
+   "fouls_won": {
+    "ostatnie": [
+     0,
+     2,
+     2,
+     3,
+     1,
+     0
+    ],
+    "minuty": [
+     78,
+     69,
+     83,
+     64,
+     63,
+     10
+    ],
+    "srednia90": 1.96
+   },
+   "shots_outside_box": {
+    "ostatnie": [
+     0,
+     0,
+     0,
+     2,
+     1,
+     0
+    ],
+    "minuty": [
+     78,
+     69,
+     83,
+     64,
+     63,
+     10
+    ],
+    "srednia90": 0.74
+   },
+   "sot_outside_box": {
+    "ostatnie": [
+     0,
+     0,
+     0,
+     1,
+     1,
+     0
+    ],
+    "minuty": [
+     78,
+     69,
+     83,
+     64,
+     63,
+     10
+    ],
+    "srednia90": 0.49
+   },
+   "shots_blocked": {
+    "ostatnie": [
+     0,
+     0,
+     1,
+     2,
+     0,
+     0
+    ],
+    "minuty": [
+     78,
+     69,
+     83,
+     64,
+     63,
+     10
+    ],
+    "srednia90": 0.74
+   }
+  }
+ },
+ {
+  "id": 978186090,
+  "nazwa": "Chadi Riad",
+  "pozycja": "M",
+  "druzyna": "Morocco",
+  "minuty_lacznie": 453,
+  "forma": {
+   "fouls_won": {
+    "ostatnie": [
+     1,
+     0,
+     0,
+     0,
+     3,
+     0
+    ],
+    "minuty": [
+     74,
+     90,
+     90,
+     90,
+     64,
+     45
+    ],
+    "srednia90": 0.79
+   },
+   "interceptions": {
+    "ostatnie": [
+     1,
+     1,
+     0,
+     2,
+     0,
+     2
+    ],
+    "minuty": [
+     74,
+     90,
+     90,
+     90,
+     64,
+     45
+    ],
+    "srednia90": 1.19
+   },
+   "headed_shots": {
+    "ostatnie": [
+     0,
+     1,
+     0,
+     0,
+     0,
+     1
+    ],
+    "minuty": [
+     74,
+     90,
+     90,
+     90,
+     64,
+     45
+    ],
+    "srednia90": 0.4
+   }
+  }
+ },
+ {
+  "id": 973782784,
+  "nazwa": "Gessime Yassine",
+  "pozycja": "M",
+  "druzyna": "Morocco",
+  "minuty_lacznie": 113,
+  "forma": {
+   "fouls_committed": {
+    "ostatnie": [
+     0,
+     1,
+     1
+    ],
+    "minuty": [
+     47,
+     21,
+     45
+    ],
+    "srednia90": 1.59
+   },
+   "fouls_won": {
+    "ostatnie": [
+     1,
+     1,
+     1
+    ],
+    "minuty": [
+     47,
+     21,
+     45
+    ],
+    "srednia90": 2.39
+   }
+  }
+ },
+ {
+  "id": 952789808,
+  "nazwa": "Ismael Saibari",
+  "pozycja": "M",
+  "druzyna": "Morocco",
+  "minuty_lacznie": 469,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     0,
+     5,
+     2,
+     3,
+     1,
+     7
+    ],
+    "minuty": [
+     120,
+     69,
+     83,
+     88,
+     64,
+     45
+    ],
+    "srednia90": 3.45
+   },
+   "sot": {
+    "ostatnie": [
+     1,
+     1,
+     1,
+     1,
+     1,
+     4
+    ],
+    "minuty": [
+     120,
+     69,
+     83,
+     88,
+     64,
+     45
+    ],
+    "srednia90": 1.73
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     5,
+     1,
+     0,
+     2,
+     0,
+     1
+    ],
+    "minuty": [
+     120,
+     69,
+     83,
+     88,
+     64,
+     45
+    ],
+    "srednia90": 1.73
+   },
+   "fouls_won": {
+    "ostatnie": [
+     1,
+     1,
+     0,
+     1,
+     1,
+     0
+    ],
+    "minuty": [
+     120,
+     69,
+     83,
+     88,
+     64,
+     45
+    ],
+    "srednia90": 0.77
+   },
+   "headed_shots": {
+    "ostatnie": [
+     0,
+     1,
+     0,
+     0,
+     0,
+     1
+    ],
+    "minuty": [
+     120,
+     69,
+     83,
+     88,
+     64,
+     45
+    ],
+    "srednia90": 0.38
+   },
+   "shots_outside_box": {
+    "ostatnie": [
+     0,
+     1,
+     0,
+     2,
+     1,
+     1
+    ],
+    "minuty": [
+     120,
+     69,
+     83,
+     88,
+     64,
+     45
+    ],
+    "srednia90": 0.96
+   },
+   "sot_outside_box": {
+    "ostatnie": [
+     0,
+     0,
+     0,
+     1,
+     1,
+     0
+    ],
+    "minuty": [
+     120,
+     69,
+     83,
+     88,
+     64,
+     45
+    ],
+    "srednia90": 0.38
+   },
+   "shots_blocked": {
+    "ostatnie": [
+     0,
+     1,
+     1,
+     2,
+     0,
+     1
+    ],
+    "minuty": [
+     120,
+     69,
+     83,
+     88,
+     64,
+     45
+    ],
+    "srednia90": 0.96
+   },
+   "shots_off_target": {
+    "ostatnie": [
+     0,
+     3,
+     0,
+     0,
+     0,
+     2
+    ],
+    "minuty": [
+     120,
+     69,
+     83,
+     88,
+     64,
+     45
+    ],
+    "srednia90": 0.96
+   }
+  }
+ },
+ {
+  "id": 913807335,
+  "nazwa": "Issa Diop",
+  "pozycja": "M",
+  "druzyna": "Morocco",
+  "minuty_lacznie": 428,
+  "forma": {
+   "fouls_committed": {
+    "ostatnie": [
+     2,
+     1,
+     0,
+     0,
+     1
+    ],
+    "minuty": [
+     120,
+     90,
+     90,
+     63,
+     65
+    ],
+    "srednia90": 0.84
+   },
+   "interceptions": {
+    "ostatnie": [
+     3,
+     0,
+     1,
+     1,
+     0
+    ],
+    "minuty": [
+     120,
+     90,
+     90,
+     63,
+     65
+    ],
+    "srednia90": 1.05
+   },
+   "headed_shots": {
+    "ostatnie": [
+     1,
+     0,
+     0,
+     0,
+     0
+    ],
+    "minuty": [
+     120,
+     90,
+     90,
+     63,
+     65
+    ],
+    "srednia90": 0.21
+   },
+   "headed_sot": {
+    "ostatnie": [
+     1,
+     0,
+     0,
+     0,
+     0
+    ],
+    "minuty": [
+     120,
+     90,
+     90,
+     63,
+     65
+    ],
+    "srednia90": 0.21
+   }
+  }
+ },
+ {
+  "id": 925642313,
+  "nazwa": "Neil El Aynaoui",
+  "pozycja": "M",
+  "druzyna": "Morocco",
+  "minuty_lacznie": 445,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     1,
+     1,
+     1,
+     3,
+     1
+    ],
+    "minuty": [
+     120,
+     82,
+     90,
+     90,
+     63
+    ],
+    "srednia90": 1.42
+   },
+   "sot": {
+    "ostatnie": [
+     1,
+     1,
+     0,
+     0,
+     0
+    ],
+    "minuty": [
+     120,
+     82,
+     90,
+     90,
+     63
+    ],
+    "srednia90": 0.4
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     5,
+     0,
+     2,
+     4,
+     1
+    ],
+    "minuty": [
+     120,
+     82,
+     90,
+     90,
+     63
+    ],
+    "srednia90": 2.43
+   },
+   "fouls_won": {
+    "ostatnie": [
+     1,
+     3,
+     0,
+     3,
+     1
+    ],
+    "minuty": [
+     120,
+     82,
+     90,
+     90,
+     63
+    ],
+    "srednia90": 1.62
+   },
+   "interceptions": {
+    "ostatnie": [
+     1,
+     1,
+     3,
+     1,
+     2
+    ],
+    "minuty": [
+     120,
+     82,
+     90,
+     90,
+     63
+    ],
+    "srednia90": 1.62
+   },
+   "headed_shots": {
+    "ostatnie": [
+     1,
+     1,
+     0,
+     1,
+     1
+    ],
+    "minuty": [
+     120,
+     82,
+     90,
+     90,
+     63
+    ],
+    "srednia90": 0.81
+   },
+   "headed_sot": {
+    "ostatnie": [
+     1,
+     1,
+     0,
+     0,
+     0
+    ],
+    "minuty": [
+     120,
+     82,
+     90,
+     90,
+     63
+    ],
+    "srednia90": 0.4
+   },
+   "shots_off_target": {
+    "ostatnie": [
+     0,
+     0,
+     1,
+     2,
+     1
+    ],
+    "minuty": [
+     120,
+     82,
+     90,
+     90,
+     63
+    ],
+    "srednia90": 0.81
+   }
+  }
+ },
+ {
+  "id": 931708755,
+  "nazwa": "Noussair Mazraoui",
+  "pozycja": "M",
+  "druzyna": "Morocco",
+  "minuty_lacznie": 389,
+  "forma": {
+   "fouls_committed": {
+    "ostatnie": [
+     0,
+     0,
+     1,
+     2,
+     0,
+     1
+    ],
+    "minuty": [
+     120,
+     8,
+     90,
+     79,
+     27,
+     65
+    ],
+    "srednia90": 0.93
+   },
+   "fouls_won": {
+    "ostatnie": [
+     0,
+     0,
+     2,
+     0,
+     1,
+     2
+    ],
+    "minuty": [
+     120,
+     8,
+     90,
+     79,
+     27,
+     65
+    ],
+    "srednia90": 1.16
+   }
+  }
+ },
+ {
+  "id": 910895758,
+  "nazwa": "Redouane Halhal",
+  "pozycja": "M",
+  "druzyna": "Morocco",
+  "minuty_lacznie": 161,
+  "forma": {
+   "fouls_won": {
+    "ostatnie": [
+     3,
+     0,
+     0
+    ],
+    "minuty": [
+     90,
+     26,
+     45
+    ],
+    "srednia90": 1.68
+   }
+  }
+ },
+ {
+  "id": 961866142,
+  "nazwa": "Sofyan Amrabat",
+  "pozycja": "M",
+  "druzyna": "Morocco",
+  "minuty_lacznie": 215,
+  "forma": {
+   "fouls_committed": {
+    "ostatnie": [
+     1,
+     1,
+     2
+    ],
+    "minuty": [
+     90,
+     45,
+     80
+    ],
+    "srednia90": 1.67
+   },
+   "fouls_won": {
+    "ostatnie": [
+     1,
+     0,
+     1
+    ],
+    "minuty": [
+     90,
+     45,
+     80
+    ],
+    "srednia90": 0.84
+   },
+   "interceptions": {
+    "ostatnie": [
+     2,
+     2,
+     0
+    ],
+    "minuty": [
+     90,
+     45,
+     80
+    ],
+    "srednia90": 1.67
+   }
+  }
+ },
+ {
+  "id": 904767593,
+  "nazwa": "Soufiane Rahimi",
+  "pozycja": "M",
+  "druzyna": "Morocco",
+  "minuty_lacznie": 160,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     1,
+     2,
+     0,
+     0,
+     0,
+     1
+    ],
+    "minuty": [
+     40,
+     21,
+     7,
+     2,
+     45,
+     45
+    ],
+    "srednia90": 2.25
+   },
+   "sot": {
+    "ostatnie": [
+     2,
+     1,
+     0,
+     0,
+     0,
+     1
+    ],
+    "minuty": [
+     40,
+     21,
+     7,
+     2,
+     45,
+     45
+    ],
+    "srednia90": 2.25
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     0,
+     2,
+     1,
+     0,
+     2,
+     2
+    ],
+    "minuty": [
+     40,
+     21,
+     7,
+     2,
+     45,
+     45
+    ],
+    "srednia90": 3.94
+   },
+   "fouls_won": {
+    "ostatnie": [
+     2,
+     2,
+     0,
+     0,
+     1,
+     1
+    ],
+    "minuty": [
+     40,
+     21,
+     7,
+     2,
+     45,
+     45
+    ],
+    "srednia90": 3.38
+   }
+  }
+ },
+ {
+  "id": 938956246,
+  "nazwa": "Andres Cubas",
+  "pozycja": "M",
+  "druzyna": "Paraguay",
+  "minuty_lacznie": 435,
+  "forma": {
+   "fouls_committed": {
+    "ostatnie": [
+     1,
+     1,
+     5,
+     5,
+     0
+    ],
+    "minuty": [
+     120,
+     90,
+     90,
+     90,
+     45
+    ],
+    "srednia90": 2.48
+   },
+   "fouls_won": {
+    "ostatnie": [
+     1,
+     1,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     120,
+     90,
+     90,
+     90,
+     45
+    ],
+    "srednia90": 0.62
+   },
+   "interceptions": {
+    "ostatnie": [
+     3,
+     2,
+     3,
+     0,
+     0
+    ],
+    "minuty": [
+     120,
+     90,
+     90,
+     90,
+     45
+    ],
+    "srednia90": 1.66
+   }
+  }
+ },
+ {
+  "id": 989761639,
+  "nazwa": "Damian Bobadilla",
+  "pozycja": "M",
+  "druzyna": "Paraguay",
+  "minuty_lacznie": 279,
+  "forma": {
+   "interceptions": {
+    "ostatnie": [
+     3,
+     0,
+     0,
+     2,
+     1
+    ],
+    "minuty": [
+     98,
+     1,
+     45,
+     45,
+     90
+    ],
+    "srednia90": 1.94
+   }
+  }
+ },
+ {
+  "id": 950560653,
+  "nazwa": "Diego Gomez",
+  "pozycja": "M",
+  "druzyna": "Paraguay",
+  "minuty_lacznie": 370,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     0,
+     1,
+     4,
+     0,
+     1
+    ],
+    "minuty": [
+     90,
+     66,
+     79,
+     45,
+     90
+    ],
+    "srednia90": 1.46
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     2,
+     1,
+     1,
+     0,
+     2
+    ],
+    "minuty": [
+     90,
+     66,
+     79,
+     45,
+     90
+    ],
+    "srednia90": 1.46
+   },
+   "interceptions": {
+    "ostatnie": [
+     4,
+     1,
+     2,
+     0,
+     0
+    ],
+    "minuty": [
+     90,
+     66,
+     79,
+     45,
+     90
+    ],
+    "srednia90": 1.7
+   },
+   "shots_outside_box": {
+    "ostatnie": [
+     0,
+     1,
+     2,
+     0,
+     0
+    ],
+    "minuty": [
+     90,
+     66,
+     79,
+     45,
+     90
+    ],
+    "srednia90": 0.73
+   },
+   "shots_blocked": {
+    "ostatnie": [
+     0,
+     0,
+     2,
+     0,
+     0
+    ],
+    "minuty": [
+     90,
+     66,
+     79,
+     45,
+     90
+    ],
+    "srednia90": 0.49
+   },
+   "shots_off_target": {
+    "ostatnie": [
+     0,
+     1,
+     2,
+     0,
+     1
+    ],
+    "minuty": [
+     90,
+     66,
+     79,
+     45,
+     90
+    ],
+    "srednia90": 0.97
+   }
+  }
+ },
+ {
+  "id": 904798634,
+  "nazwa": "Gabriel Avalos",
+  "pozycja": "M",
+  "druzyna": "Paraguay",
+  "minuty_lacznie": 234,
+  "forma": {
+   "fouls_won": {
+    "ostatnie": [
+     1,
+     1,
+     0,
+     0,
+     2
+    ],
+    "minuty": [
+     54,
+     66,
+     1,
+     45,
+     68
+    ],
+    "srednia90": 1.54
+   }
+  }
+ },
+ {
+  "id": 941080216,
+  "nazwa": "Gustavo Gomez",
+  "pozycja": "M",
+  "druzyna": "Paraguay",
+  "minuty_lacznie": 525,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     1,
+     0,
+     1,
+     0,
+     0,
+     2
+    ],
+    "minuty": [
+     120,
+     90,
+     90,
+     90,
+     45,
+     90
+    ],
+    "srednia90": 0.69
+   },
+   "sot": {
+    "ostatnie": [
+     1,
+     0,
+     0,
+     0,
+     0,
+     3
+    ],
+    "minuty": [
+     120,
+     90,
+     90,
+     90,
+     45,
+     90
+    ],
+    "srednia90": 0.69
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     1,
+     0,
+     0,
+     2,
+     0,
+     2
+    ],
+    "minuty": [
+     120,
+     90,
+     90,
+     90,
+     45,
+     90
+    ],
+    "srednia90": 0.86
+   },
+   "headed_shots": {
+    "ostatnie": [
+     1,
+     0,
+     1,
+     0,
+     0,
+     3
+    ],
+    "minuty": [
+     120,
+     90,
+     90,
+     90,
+     45,
+     90
+    ],
+    "srednia90": 0.86
+   },
+   "headed_sot": {
+    "ostatnie": [
+     0,
+     0,
+     0,
+     0,
+     0,
+     3
+    ],
+    "minuty": [
+     120,
+     90,
+     90,
+     90,
+     45,
+     90
+    ],
+    "srednia90": 0.51
+   }
+  }
+ },
+ {
+  "id": 947847313,
+  "nazwa": "Jose Canale",
+  "pozycja": "M",
+  "druzyna": "Paraguay",
+  "minuty_lacznie": 173,
+  "forma": {
+   "fouls_won": {
+    "ostatnie": [
+     2,
+     0,
+     0,
+     0
+    ],
+    "minuty": [
+     120,
+     7,
+     1,
+     45
+    ],
+    "srednia90": 1.04
+   }
+  }
+ },
+ {
+  "id": 926329168,
+  "nazwa": "Juan Caceres",
+  "pozycja": "M",
+  "druzyna": "Paraguay",
+  "minuty_lacznie": 481,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     0,
+     1,
+     1,
+     0,
+     0,
+     1
+    ],
+    "minuty": [
+     98,
+     90,
+     80,
+     78,
+     45,
+     90
+    ],
+    "srednia90": 0.56
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     1,
+     2,
+     2,
+     3,
+     0,
+     2
+    ],
+    "minuty": [
+     98,
+     90,
+     80,
+     78,
+     45,
+     90
+    ],
+    "srednia90": 1.87
+   },
+   "fouls_won": {
+    "ostatnie": [
+     0,
+     0,
+     1,
+     2,
+     0,
+     0
+    ],
+    "minuty": [
+     98,
+     90,
+     80,
+     78,
+     45,
+     90
+    ],
+    "srednia90": 0.56
+   },
+   "interceptions": {
+    "ostatnie": [
+     1,
+     0,
+     1,
+     0,
+     0,
+     1
+    ],
+    "minuty": [
+     98,
+     90,
+     80,
+     78,
+     45,
+     90
+    ],
+    "srednia90": 0.56
+   }
+  }
+ },
+ {
+  "id": 921493271,
+  "nazwa": "Julio Enciso",
+  "pozycja": "M",
+  "druzyna": "Paraguay",
+  "minuty_lacznie": 440,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     3,
+     2,
+     1,
+     2,
+     0,
+     3
+    ],
+    "minuty": [
+     56,
+     90,
+     90,
+     90,
+     24,
+     90
+    ],
+    "srednia90": 2.25
+   },
+   "sot": {
+    "ostatnie": [
+     1,
+     0,
+     0,
+     0,
+     0,
+     2
+    ],
+    "minuty": [
+     56,
+     90,
+     90,
+     90,
+     24,
+     90
+    ],
+    "srednia90": 0.61
+   },
+   "fouls_won": {
+    "ostatnie": [
+     0,
+     2,
+     2,
+     4,
+     0,
+     4
+    ],
+    "minuty": [
+     56,
+     90,
+     90,
+     90,
+     24,
+     90
+    ],
+    "srednia90": 2.45
+   },
+   "shots_outside_box": {
+    "ostatnie": [
+     0,
+     2,
+     0,
+     1,
+     0,
+     3
+    ],
+    "minuty": [
+     56,
+     90,
+     90,
+     90,
+     24,
+     90
+    ],
+    "srednia90": 1.23
+   },
+   "sot_outside_box": {
+    "ostatnie": [
+     0,
+     0,
+     0,
+     0,
+     0,
+     2
+    ],
+    "minuty": [
+     56,
+     90,
+     90,
+     90,
+     24,
+     90
+    ],
+    "srednia90": 0.41
+   },
+   "shots_blocked": {
+    "ostatnie": [
+     1,
+     1,
+     0,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     56,
+     90,
+     90,
+     90,
+     24,
+     90
+    ],
+    "srednia90": 0.61
+   },
+   "shots_off_target": {
+    "ostatnie": [
+     1,
+     1,
+     1,
+     1,
+     0,
+     1
+    ],
+    "minuty": [
+     56,
+     90,
+     90,
+     90,
+     24,
+     90
+    ],
+    "srednia90": 1.02
+   }
+  }
+ },
+ {
+  "id": 964728734,
+  "nazwa": "Junior Alonso",
+  "pozycja": "M",
+  "druzyna": "Paraguay",
+  "minuty_lacznie": 436,
+  "forma": {
+   "fouls_committed": {
+    "ostatnie": [
+     2,
+     0,
+     0,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     120,
+     1,
+     90,
+     90,
+     45,
+     90
+    ],
+    "srednia90": 0.62
+   },
+   "fouls_won": {
+    "ostatnie": [
+     0,
+     0,
+     2,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     120,
+     1,
+     90,
+     90,
+     45,
+     90
+    ],
+    "srednia90": 0.62
+   }
+  }
+ },
+ {
+  "id": 921886961,
+  "nazwa": "Matias Galarza",
+  "pozycja": "M",
+  "druzyna": "Paraguay",
+  "minuty_lacznie": 345,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     0,
+     0,
+     2,
+     0
+    ],
+    "minuty": [
+     120,
+     90,
+     90,
+     45
+    ],
+    "srednia90": 0.52
+   },
+   "sot": {
+    "ostatnie": [
+     1,
+     0,
+     1,
+     0
+    ],
+    "minuty": [
+     120,
+     90,
+     90,
+     45
+    ],
+    "srednia90": 0.52
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     4,
+     1,
+     2,
+     0
+    ],
+    "minuty": [
+     120,
+     90,
+     90,
+     45
+    ],
+    "srednia90": 1.83
+   },
+   "fouls_won": {
+    "ostatnie": [
+     3,
+     0,
+     3,
+     0
+    ],
+    "minuty": [
+     120,
+     90,
+     90,
+     45
+    ],
+    "srednia90": 1.57
+   },
+   "interceptions": {
+    "ostatnie": [
+     2,
+     1,
+     1,
+     0
+    ],
+    "minuty": [
+     120,
+     90,
+     90,
+     45
+    ],
+    "srednia90": 1.04
+   },
+   "shots_outside_box": {
+    "ostatnie": [
+     0,
+     0,
+     2,
+     0
+    ],
+    "minuty": [
+     120,
+     90,
+     90,
+     45
+    ],
+    "srednia90": 0.52
+   },
+   "sot_outside_box": {
+    "ostatnie": [
+     0,
+     0,
+     1,
+     0
+    ],
+    "minuty": [
+     120,
+     90,
+     90,
+     45
+    ],
+    "srednia90": 0.26
+   }
+  }
+ },
+ {
+  "id": 928433776,
+  "nazwa": "Mauricio",
+  "pozycja": "M",
+  "druzyna": "Paraguay",
+  "minuty_lacznie": 261,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     0,
+     2,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     70,
+     45,
+     45,
+     66,
+     35
+    ],
+    "srednia90": 1.03
+   },
+   "sot": {
+    "ostatnie": [
+     1,
+     2,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     70,
+     45,
+     45,
+     66,
+     35
+    ],
+    "srednia90": 1.38
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     1,
+     2,
+     0,
+     0,
+     0
+    ],
+    "minuty": [
+     70,
+     45,
+     45,
+     66,
+     35
+    ],
+    "srednia90": 1.03
+   }
+  }
+ },
+ {
+  "id": 952204586,
+  "nazwa": "Miguel Almiron",
+  "pozycja": "M",
+  "druzyna": "Paraguay",
+  "minuty_lacznie": 325,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     1,
+     0,
+     2,
+     0,
+     1
+    ],
+    "minuty": [
+     89,
+     45,
+     78,
+     45,
+     68
+    ],
+    "srednia90": 1.11
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     0,
+     1,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     89,
+     45,
+     78,
+     45,
+     68
+    ],
+    "srednia90": 0.55
+   },
+   "fouls_won": {
+    "ostatnie": [
+     3,
+     1,
+     1,
+     0,
+     2
+    ],
+    "minuty": [
+     89,
+     45,
+     78,
+     45,
+     68
+    ],
+    "srednia90": 1.94
+   },
+   "interceptions": {
+    "ostatnie": [
+     1,
+     0,
+     1,
+     0,
+     3
+    ],
+    "minuty": [
+     89,
+     45,
+     78,
+     45,
+     68
+    ],
+    "srednia90": 1.38
+   },
+   "shots_outside_box": {
+    "ostatnie": [
+     1,
+     0,
+     2,
+     0,
+     0
+    ],
+    "minuty": [
+     89,
+     45,
+     78,
+     45,
+     68
+    ],
+    "srednia90": 0.83
+   },
+   "shots_blocked": {
+    "ostatnie": [
+     1,
+     0,
+     2,
+     0,
+     1
+    ],
+    "minuty": [
+     89,
+     45,
+     78,
+     45,
+     68
+    ],
+    "srednia90": 1.11
+   }
+  }
+ },
+ {
+  "id": 948914417,
+  "nazwa": "Orlando Gill",
+  "pozycja": "M",
+  "druzyna": "Paraguay",
+  "minuty_lacznie": 525,
+  "forma": {
+   "fouls_won": {
+    "ostatnie": [
+     3,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "minuty": [
+     120,
+     90,
+     90,
+     90,
+     45,
+     90
+    ],
+    "srednia90": 0.51
+   }
+  }
+ },
+ {
+  "id": 955880197,
+  "nazwa": "Adrien Rabiot",
+  "pozycja": "M",
+  "druzyna": "France",
+  "minuty_lacznie": 426,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     2,
+     1,
+     0,
+     1,
+     1
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     90,
+     66
+    ],
+    "srednia90": 1.06
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     4,
+     2,
+     1,
+     3,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     90,
+     66
+    ],
+    "srednia90": 2.11
+   },
+   "fouls_won": {
+    "ostatnie": [
+     1,
+     0,
+     0,
+     0,
+     3
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     90,
+     66
+    ],
+    "srednia90": 0.85
+   },
+   "interceptions": {
+    "ostatnie": [
+     2,
+     0,
+     0,
+     1,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     90,
+     66
+    ],
+    "srednia90": 0.63
+   },
+   "shots_outside_box": {
+    "ostatnie": [
+     1,
+     0,
+     0,
+     1,
+     1
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     90,
+     66
+    ],
+    "srednia90": 0.63
+   },
+   "shots_off_target": {
+    "ostatnie": [
+     1,
+     1,
+     0,
+     1,
+     1
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     90,
+     66
+    ],
+    "srednia90": 0.85
+   }
+  }
+ },
+ {
+  "id": 913790115,
+  "nazwa": "Aurelien Tchouameni",
+  "pozycja": "M",
+  "druzyna": "France",
+  "minuty_lacznie": 396,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     1,
+     1,
+     0,
+     2,
+     1
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     81,
+     45
+    ],
+    "srednia90": 1.14
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     1,
+     3,
+     0,
+     1,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     81,
+     45
+    ],
+    "srednia90": 1.14
+   },
+   "fouls_won": {
+    "ostatnie": [
+     2,
+     0,
+     0,
+     2,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     81,
+     45
+    ],
+    "srednia90": 0.91
+   },
+   "interceptions": {
+    "ostatnie": [
+     1,
+     2,
+     2,
+     4,
+     1
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     81,
+     45
+    ],
+    "srednia90": 2.27
+   },
+   "shots_outside_box": {
+    "ostatnie": [
+     1,
+     1,
+     0,
+     2,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     81,
+     45
+    ],
+    "srednia90": 0.91
+   },
+   "shots_off_target": {
+    "ostatnie": [
+     1,
+     1,
+     0,
+     0,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     81,
+     45
+    ],
+    "srednia90": 0.45
+   }
+  }
+ },
+ {
+  "id": 916983845,
+  "nazwa": "Bradley Barcola",
+  "pozycja": "M",
+  "druzyna": "France",
+  "minuty_lacznie": 240,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     3,
+     0,
+     1,
+     1,
+     1,
+     0
+    ],
+    "minuty": [
+     90,
+     26,
+     82,
+     11,
+     29,
+     2
+    ],
+    "srednia90": 2.25
+   },
+   "sot": {
+    "ostatnie": [
+     2,
+     0,
+     0,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     90,
+     26,
+     82,
+     11,
+     29,
+     2
+    ],
+    "srednia90": 1.12
+   },
+   "headed_shots": {
+    "ostatnie": [
+     0,
+     0,
+     1,
+     0,
+     0,
+     0
+    ],
+    "minuty": [
+     90,
+     26,
+     82,
+     11,
+     29,
+     2
+    ],
+    "srednia90": 0.38
+   },
+   "shots_off_target": {
+    "ostatnie": [
+     1,
+     0,
+     1,
+     0,
+     1,
+     0
+    ],
+    "minuty": [
+     90,
+     26,
+     82,
+     11,
+     29,
+     2
+    ],
+    "srednia90": 1.12
+   }
+  }
+ },
+ {
+  "id": 952987026,
+  "nazwa": "Dayot Upamecano",
+  "pozycja": "M",
+  "druzyna": "France",
+  "minuty_lacznie": 480,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     2,
+     0,
+     0,
+     0,
+     2,
+     0
+    ],
+    "minuty": [
+     90,
+     75,
+     90,
+     90,
+     90,
+     45
+    ],
+    "srednia90": 0.75
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     1,
+     1,
+     1,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     90,
+     75,
+     90,
+     90,
+     90,
+     45
+    ],
+    "srednia90": 0.75
+   },
+   "interceptions": {
+    "ostatnie": [
+     1,
+     2,
+     2,
+     3,
+     1,
+     3
+    ],
+    "minuty": [
+     90,
+     75,
+     90,
+     90,
+     90,
+     45
+    ],
+    "srednia90": 2.25
+   },
+   "headed_shots": {
+    "ostatnie": [
+     1,
+     0,
+     0,
+     0,
+     1,
+     0
+    ],
+    "minuty": [
+     90,
+     75,
+     90,
+     90,
+     90,
+     45
+    ],
+    "srednia90": 0.38
+   },
+   "shots_blocked": {
+    "ostatnie": [
+     1,
+     0,
+     0,
+     0,
+     2,
+     0
+    ],
+    "minuty": [
+     90,
+     75,
+     90,
+     90,
+     90,
+     45
+    ],
+    "srednia90": 0.56
+   }
+  }
+ },
+ {
+  "id": 972406657,
+  "nazwa": "Desire Doue",
+  "pozycja": "M",
+  "druzyna": "France",
+  "minuty_lacznie": 276,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     1,
+     4,
+     0,
+     2,
+     1
+    ],
+    "minuty": [
+     16,
+     90,
+     23,
+     86,
+     61
+    ],
+    "srednia90": 2.61
+   },
+   "sot": {
+    "ostatnie": [
+     1,
+     3,
+     0,
+     1,
+     1
+    ],
+    "minuty": [
+     16,
+     90,
+     23,
+     86,
+     61
+    ],
+    "srednia90": 1.96
+   },
+   "shots_outside_box": {
+    "ostatnie": [
+     0,
+     3,
+     0,
+     1,
+     1
+    ],
+    "minuty": [
+     16,
+     90,
+     23,
+     86,
+     61
+    ],
+    "srednia90": 1.63
+   },
+   "sot_outside_box": {
+    "ostatnie": [
+     0,
+     2,
+     0,
+     0,
+     1
+    ],
+    "minuty": [
+     16,
+     90,
+     23,
+     86,
+     61
+    ],
+    "srednia90": 0.98
+   }
+  }
+ },
+ {
+  "id": 949868537,
+  "nazwa": "Jules Kounde",
+  "pozycja": "M",
+  "druzyna": "France",
+  "minuty_lacznie": 442,
+  "forma": {
+   "fouls_committed": {
+    "ostatnie": [
+     0,
+     1,
+     0,
+     1,
+     1,
+     1
+    ],
+    "minuty": [
+     74,
+     86,
+     82,
+     90,
+     45,
+     65
+    ],
+    "srednia90": 0.81
+   },
+   "fouls_won": {
+    "ostatnie": [
+     1,
+     1,
+     1,
+     0,
+     0,
+     0
+    ],
+    "minuty": [
+     74,
+     86,
+     82,
+     90,
+     45,
+     65
+    ],
+    "srednia90": 0.61
+   }
+  }
+ },
+ {
+  "id": 908538328,
+  "nazwa": "Kylian Mbappe",
+  "pozycja": "M",
+  "druzyna": "France",
+  "minuty_lacznie": 485,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     5,
+     4,
+     8,
+     4,
+     6,
+     1
+    ],
+    "minuty": [
+     84,
+     86,
+     90,
+     90,
+     90,
+     45
+    ],
+    "srednia90": 5.2
+   },
+   "sot": {
+    "ostatnie": [
+     4,
+     2,
+     3,
+     4,
+     0,
+     1
+    ],
+    "minuty": [
+     84,
+     86,
+     90,
+     90,
+     90,
+     45
+    ],
+    "srednia90": 2.6
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     1,
+     0,
+     1,
+     2,
+     0,
+     0
+    ],
+    "minuty": [
+     84,
+     86,
+     90,
+     90,
+     90,
+     45
+    ],
+    "srednia90": 0.74
+   },
+   "fouls_won": {
+    "ostatnie": [
+     1,
+     0,
+     1,
+     1,
+     0,
+     1
+    ],
+    "minuty": [
+     84,
+     86,
+     90,
+     90,
+     90,
+     45
+    ],
+    "srednia90": 0.74
+   },
+   "shots_outside_box": {
+    "ostatnie": [
+     2,
+     1,
+     3,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     84,
+     86,
+     90,
+     90,
+     90,
+     45
+    ],
+    "srednia90": 1.3
+   },
+   "sot_outside_box": {
+    "ostatnie": [
+     2,
+     0,
+     1,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     84,
+     86,
+     90,
+     90,
+     90,
+     45
+    ],
+    "srednia90": 0.74
+   },
+   "shots_blocked": {
+    "ostatnie": [
+     0,
+     1,
+     1,
+     0,
+     1,
+     0
+    ],
+    "minuty": [
+     84,
+     86,
+     90,
+     90,
+     90,
+     45
+    ],
+    "srednia90": 0.56
+   },
+   "shots_off_target": {
+    "ostatnie": [
+     0,
+     1,
+     4,
+     0,
+     5,
+     0
+    ],
+    "minuty": [
+     84,
+     86,
+     90,
+     90,
+     90,
+     45
+    ],
+    "srednia90": 1.86
+   }
+  }
+ },
+ {
+  "id": 929620321,
+  "nazwa": "Lucas Digne",
+  "pozycja": "M",
+  "druzyna": "France",
+  "minuty_lacznie": 241,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     1,
+     0,
+     1,
+     0
+    ],
+    "minuty": [
+     77,
+     90,
+     29,
+     45
+    ],
+    "srednia90": 0.75
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     1,
+     1,
+     0,
+     1
+    ],
+    "minuty": [
+     77,
+     90,
+     29,
+     45
+    ],
+    "srednia90": 1.12
+   },
+   "shots_outside_box": {
+    "ostatnie": [
+     1,
+     0,
+     1,
+     0
+    ],
+    "minuty": [
+     77,
+     90,
+     29,
+     45
+    ],
+    "srednia90": 0.75
+   },
+   "sot_outside_box": {
+    "ostatnie": [
+     1,
+     0,
+     0,
+     0
+    ],
+    "minuty": [
+     77,
+     90,
+     29,
+     45
+    ],
+    "srednia90": 0.37
+   }
+  }
+ },
+ {
+  "id": 919298249,
+  "nazwa": "Maxence Lacroix",
+  "pozycja": "M",
+  "druzyna": "France",
+  "minuty_lacznie": 180,
+  "forma": {
+   "fouls_committed": {
+    "ostatnie": [
+     2,
+     0,
+     0
+    ],
+    "minuty": [
+     90,
+     45,
+     45
+    ],
+    "srednia90": 1.0
+   }
+  }
+ },
+ {
+  "id": 958876931,
+  "nazwa": "Michael Olise",
+  "pozycja": "M",
+  "druzyna": "France",
+  "minuty_lacznie": 431,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     6,
+     3,
+     3,
+     2,
+     5,
+     1
+    ],
+    "minuty": [
+     84,
+     64,
+     67,
+     90,
+     81,
+     45
+    ],
+    "srednia90": 4.18
+   },
+   "sot": {
+    "ostatnie": [
+     3,
+     0,
+     0,
+     2,
+     4,
+     1
+    ],
+    "minuty": [
+     84,
+     64,
+     67,
+     90,
+     81,
+     45
+    ],
+    "srednia90": 2.09
+   },
+   "fouls_won": {
+    "ostatnie": [
+     1,
+     2,
+     1,
+     2,
+     0,
+     1
+    ],
+    "minuty": [
+     84,
+     64,
+     67,
+     90,
+     81,
+     45
+    ],
+    "srednia90": 1.46
+   },
+   "interceptions": {
+    "ostatnie": [
+     0,
+     0,
+     0,
+     0,
+     1,
+     2
+    ],
+    "minuty": [
+     84,
+     64,
+     67,
+     90,
+     81,
+     45
+    ],
+    "srednia90": 0.63
+   },
+   "shots_outside_box": {
+    "ostatnie": [
+     3,
+     0,
+     2,
+     1,
+     3,
+     0
+    ],
+    "minuty": [
+     84,
+     64,
+     67,
+     90,
+     81,
+     45
+    ],
+    "srednia90": 1.88
+   },
+   "sot_outside_box": {
+    "ostatnie": [
+     2,
+     0,
+     0,
+     1,
+     2,
+     0
+    ],
+    "minuty": [
+     84,
+     64,
+     67,
+     90,
+     81,
+     45
+    ],
+    "srednia90": 1.04
+   },
+   "shots_blocked": {
+    "ostatnie": [
+     1,
+     2,
+     2,
+     0,
+     0,
+     0
+    ],
+    "minuty": [
+     84,
+     64,
+     67,
+     90,
+     81,
+     45
+    ],
+    "srednia90": 1.04
+   },
+   "shots_off_target": {
+    "ostatnie": [
+     1,
+     1,
+     0,
+     0,
+     1,
+     0
+    ],
+    "minuty": [
+     84,
+     64,
+     67,
+     90,
+     81,
+     45
+    ],
+    "srednia90": 0.63
+   }
+  }
+ },
+ {
+  "id": 940318727,
+  "nazwa": "Ousmane Dembele",
+  "pozycja": "M",
+  "druzyna": "France",
+  "minuty_lacznie": 345,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     2,
+     3,
+     4,
+     1,
+     1
+    ],
+    "minuty": [
+     74,
+     64,
+     67,
+     79,
+     61
+    ],
+    "srednia90": 2.87
+   },
+   "sot": {
+    "ostatnie": [
+     0,
+     3,
+     2,
+     0,
+     0
+    ],
+    "minuty": [
+     74,
+     64,
+     67,
+     79,
+     61
+    ],
+    "srednia90": 1.3
+   },
+   "fouls_won": {
+    "ostatnie": [
+     1,
+     0,
+     0,
+     1,
+     0
+    ],
+    "minuty": [
+     74,
+     64,
+     67,
+     79,
+     61
+    ],
+    "srednia90": 0.52
+   },
+   "shots_outside_box": {
+    "ostatnie": [
+     1,
+     1,
+     1,
+     1,
+     0
+    ],
+    "minuty": [
+     74,
+     64,
+     67,
+     79,
+     61
+    ],
+    "srednia90": 1.04
+   },
+   "shots_blocked": {
+    "ostatnie": [
+     1,
+     0,
+     1,
+     1,
+     1
+    ],
+    "minuty": [
+     74,
+     64,
+     67,
+     79,
+     61
+    ],
+    "srednia90": 1.04
+   },
+   "shots_off_target": {
+    "ostatnie": [
+     1,
+     0,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     74,
+     64,
+     67,
+     79,
+     61
+    ],
+    "srednia90": 0.52
+   }
+  }
+ },
+ {
+  "id": 957382267,
+  "nazwa": "Theo Hernandez",
+  "pozycja": "M",
+  "druzyna": "France",
+  "minuty_lacznie": 299,
+  "forma": {
+   "fouls_won": {
+    "ostatnie": [
+     0,
+     3,
+     0,
+     4,
+     1
+    ],
+    "minuty": [
+     13,
+     90,
+     90,
+     61,
+     45
+    ],
+    "srednia90": 2.41
+   }
+  }
+ },
+ {
+  "id": 900388339,
+  "nazwa": "William Saliba",
+  "pozycja": "M",
+  "druzyna": "France",
+  "minuty_lacznie": 315,
+  "forma": {
+   "fouls_committed": {
+    "ostatnie": [
+     2,
+     0,
+     0,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     45
+    ],
+    "srednia90": 0.57
+   },
+   "interceptions": {
+    "ostatnie": [
+     1,
+     2,
+     1,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     45
+    ],
+    "srednia90": 1.14
+   },
+   "headed_shots": {
+    "ostatnie": [
+     0,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     45
+    ],
+    "srednia90": 0.29
+   }
+  }
+ },
+ {
+  "id": 934730244,
+  "nazwa": "Bruno Guimaraes",
+  "pozycja": "M",
+  "druzyna": "Brazil",
+  "minuty_lacznie": 429,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     4,
+     1,
+     0,
+     1,
+     1,
+     1
+    ],
+    "minuty": [
+     90,
+     90,
+     80,
+     79,
+     45,
+     45
+    ],
+    "srednia90": 1.68
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     0,
+     1,
+     1,
+     1,
+     1,
+     1
+    ],
+    "minuty": [
+     90,
+     90,
+     80,
+     79,
+     45,
+     45
+    ],
+    "srednia90": 1.05
+   },
+   "fouls_won": {
+    "ostatnie": [
+     1,
+     2,
+     2,
+     2,
+     2,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     80,
+     79,
+     45,
+     45
+    ],
+    "srednia90": 1.89
+   },
+   "shots_outside_box": {
+    "ostatnie": [
+     0,
+     1,
+     0,
+     1,
+     0,
+     1
+    ],
+    "minuty": [
+     90,
+     90,
+     80,
+     79,
+     45,
+     45
+    ],
+    "srednia90": 0.63
+   },
+   "shots_blocked": {
+    "ostatnie": [
+     2,
+     1,
+     0,
+     0,
+     0,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     80,
+     79,
+     45,
+     45
+    ],
+    "srednia90": 0.63
+   },
+   "shots_off_target": {
+    "ostatnie": [
+     1,
+     0,
+     0,
+     1,
+     0,
+     1
+    ],
+    "minuty": [
+     90,
+     90,
+     80,
+     79,
+     45,
+     45
+    ],
+    "srednia90": 0.63
+   }
+  }
+ },
+ {
+  "id": 984857628,
+  "nazwa": "Casemiro",
+  "pozycja": "M",
+  "druzyna": "Brazil",
+  "minuty_lacznie": 379,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     2,
+     1,
+     0,
+     0,
+     1,
+     1
+    ],
+    "minuty": [
+     90,
+     64,
+     90,
+     45,
+     45,
+     45
+    ],
+    "srednia90": 1.19
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     1,
+     1,
+     2,
+     1,
+     1,
+     0
+    ],
+    "minuty": [
+     90,
+     64,
+     90,
+     45,
+     45,
+     45
+    ],
+    "srednia90": 1.42
+   },
+   "fouls_won": {
+    "ostatnie": [
+     0,
+     1,
+     2,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     90,
+     64,
+     90,
+     45,
+     45,
+     45
+    ],
+    "srednia90": 0.95
+   },
+   "interceptions": {
+    "ostatnie": [
+     1,
+     2,
+     1,
+     1,
+     0,
+     1
+    ],
+    "minuty": [
+     90,
+     64,
+     90,
+     45,
+     45,
+     45
+    ],
+    "srednia90": 1.42
+   },
+   "headed_shots": {
+    "ostatnie": [
+     2,
+     0,
+     0,
+     0,
+     0,
+     1
+    ],
+    "minuty": [
+     90,
+     64,
+     90,
+     45,
+     45,
+     45
+    ],
+    "srednia90": 0.71
+   },
+   "headed_sot": {
+    "ostatnie": [
+     1,
+     0,
+     0,
+     0,
+     0,
+     1
+    ],
+    "minuty": [
+     90,
+     64,
+     90,
+     45,
+     45,
+     45
+    ],
+    "srednia90": 0.47
+   }
+  }
+ },
+ {
+  "id": 946756661,
+  "nazwa": "Danilo",
+  "pozycja": "M",
+  "druzyna": "Brazil",
+  "minuty_lacznie": 202,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     0,
+     0,
+     0,
+     2,
+     0,
+     2
+    ],
+    "minuty": [
+     1,
+     90,
+     10,
+     11,
+     45,
+     45
+    ],
+    "srednia90": 1.78
+   },
+   "sot": {
+    "ostatnie": [
+     0,
+     0,
+     0,
+     1,
+     0,
+     1
+    ],
+    "minuty": [
+     1,
+     90,
+     10,
+     11,
+     45,
+     45
+    ],
+    "srednia90": 0.89
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     0,
+     3,
+     0,
+     0,
+     0,
+     0
+    ],
+    "minuty": [
+     1,
+     90,
+     10,
+     11,
+     45,
+     45
+    ],
+    "srednia90": 1.34
+   },
+   "interceptions": {
+    "ostatnie": [
+     0,
+     2,
+     0,
+     0,
+     0,
+     0
+    ],
+    "minuty": [
+     1,
+     90,
+     10,
+     11,
+     45,
+     45
+    ],
+    "srednia90": 0.89
+   },
+   "headed_shots": {
+    "ostatnie": [
+     0,
+     0,
+     0,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     1,
+     90,
+     10,
+     11,
+     45,
+     45
+    ],
+    "srednia90": 0.45
+   },
+   "shots_off_target": {
+    "ostatnie": [
+     0,
+     0,
+     0,
+     1,
+     0,
+     1
+    ],
+    "minuty": [
+     1,
+     90,
+     10,
+     11,
+     45,
+     45
+    ],
+    "srednia90": 0.89
+   }
+  }
+ },
+ {
+  "id": 931502475,
+  "nazwa": "Douglas Santos",
+  "pozycja": "M",
+  "druzyna": "Brazil",
+  "minuty_lacznie": 466,
+  "forma": {
+   "interceptions": {
+    "ostatnie": [
+     1,
+     2,
+     0,
+     1,
+     1,
+     0
+    ],
+    "minuty": [
+     90,
+     81,
+     90,
+     90,
+     70,
+     45
+    ],
+    "srednia90": 0.97
+   }
+  }
+ },
+ {
+  "id": 932526700,
+  "nazwa": "Endrick",
+  "pozycja": "M",
+  "druzyna": "Brazil",
+  "minuty_lacznie": 171,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     1,
+     0,
+     0,
+     2,
+     3
+    ],
+    "minuty": [
+     45,
+     9,
+     27,
+     45,
+     45
+    ],
+    "srednia90": 3.16
+   }
+  }
+ },
+ {
+  "id": 957587996,
+  "nazwa": "Fabinho",
+  "pozycja": "M",
+  "druzyna": "Brazil",
+  "minuty_lacznie": 162,
+  "forma": {
+   "fouls_committed": {
+    "ostatnie": [
+     0,
+     1,
+     3,
+     0,
+     0
+    ],
+    "minuty": [
+     1,
+     26,
+     45,
+     45,
+     45
+    ],
+    "srednia90": 2.22
+   }
+  }
+ },
+ {
+  "id": 965855204,
+  "nazwa": "Igor Thiago",
+  "pozycja": "M",
+  "druzyna": "Brazil",
+  "minuty_lacznie": 151,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     2,
+     2,
+     2
+    ],
+    "minuty": [
+     61,
+     45,
+     45
+    ],
+    "srednia90": 3.58
+   },
+   "sot": {
+    "ostatnie": [
+     1,
+     1,
+     2
+    ],
+    "minuty": [
+     61,
+     45,
+     45
+    ],
+    "srednia90": 2.38
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     2,
+     0,
+     1
+    ],
+    "minuty": [
+     61,
+     45,
+     45
+    ],
+    "srednia90": 1.79
+   },
+   "headed_shots": {
+    "ostatnie": [
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     61,
+     45,
+     45
+    ],
+    "srednia90": 0.6
+   },
+   "sot_outside_box": {
+    "ostatnie": [
+     0,
+     0,
+     1
+    ],
+    "minuty": [
+     61,
+     45,
+     45
+    ],
+    "srednia90": 0.6
+   }
+  }
+ },
+ {
+  "id": 969587600,
+  "nazwa": "Lucas Paqueta",
+  "pozycja": "M",
+  "druzyna": "Brazil",
+  "minuty_lacznie": 323,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     2,
+     1,
+     0,
+     2,
+     1,
+     2
+    ],
+    "minuty": [
+     45,
+     65,
+     63,
+     60,
+     45,
+     45
+    ],
+    "srednia90": 2.23
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     0,
+     0,
+     1,
+     2,
+     0,
+     2
+    ],
+    "minuty": [
+     45,
+     65,
+     63,
+     60,
+     45,
+     45
+    ],
+    "srednia90": 1.39
+   },
+   "fouls_won": {
+    "ostatnie": [
+     1,
+     2,
+     0,
+     3,
+     0,
+     1
+    ],
+    "minuty": [
+     45,
+     65,
+     63,
+     60,
+     45,
+     45
+    ],
+    "srednia90": 1.95
+   },
+   "interceptions": {
+    "ostatnie": [
+     0,
+     1,
+     3,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     45,
+     65,
+     63,
+     60,
+     45,
+     45
+    ],
+    "srednia90": 1.39
+   }
+  }
+ },
+ {
+  "id": 954331736,
+  "nazwa": "Luiz Henrique",
+  "pozycja": "M",
+  "druzyna": "Brazil",
+  "minuty_lacznie": 119,
+  "forma": {
+   "fouls_won": {
+    "ostatnie": [
+     1,
+     0,
+     1
+    ],
+    "minuty": [
+     29,
+     45,
+     45
+    ],
+    "srednia90": 1.51
+   }
+  }
+ },
+ {
+  "id": 925620727,
+  "nazwa": "Marquinhos",
+  "pozycja": "M",
+  "druzyna": "Brazil",
+  "minuty_lacznie": 405,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     0,
+     0,
+     0,
+     2,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     90,
+     45
+    ],
+    "srednia90": 0.44
+   }
+  }
+ },
+ {
+  "id": 935721709,
+  "nazwa": "Matheus Cunha",
+  "pozycja": "M",
+  "druzyna": "Brazil",
+  "minuty_lacznie": 323,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     3,
+     5,
+     2,
+     0,
+     1,
+     0
+    ],
+    "minuty": [
+     65,
+     75,
+     63,
+     30,
+     45,
+     45
+    ],
+    "srednia90": 3.07
+   },
+   "sot": {
+    "ostatnie": [
+     1,
+     1,
+     2,
+     0,
+     0,
+     1
+    ],
+    "minuty": [
+     65,
+     75,
+     63,
+     30,
+     45,
+     45
+    ],
+    "srednia90": 1.39
+   },
+   "fouls_won": {
+    "ostatnie": [
+     0,
+     0,
+     1,
+     1,
+     2,
+     1
+    ],
+    "minuty": [
+     65,
+     75,
+     63,
+     30,
+     45,
+     45
+    ],
+    "srednia90": 1.39
+   },
+   "interceptions": {
+    "ostatnie": [
+     0,
+     1,
+     1,
+     0,
+     0,
+     1
+    ],
+    "minuty": [
+     65,
+     75,
+     63,
+     30,
+     45,
+     45
+    ],
+    "srednia90": 0.84
+   },
+   "shots_outside_box": {
+    "ostatnie": [
+     3,
+     2,
+     0,
+     0,
+     0,
+     1
+    ],
+    "minuty": [
+     65,
+     75,
+     63,
+     30,
+     45,
+     45
+    ],
+    "srednia90": 1.67
+   },
+   "sot_outside_box": {
+    "ostatnie": [
+     1,
+     0,
+     0,
+     0,
+     0,
+     1
+    ],
+    "minuty": [
+     65,
+     75,
+     63,
+     30,
+     45,
+     45
+    ],
+    "srednia90": 0.56
+   },
+   "shots_blocked": {
+    "ostatnie": [
+     0,
+     2,
+     0,
+     0,
+     1,
+     0
+    ],
+    "minuty": [
+     65,
+     75,
+     63,
+     30,
+     45,
+     45
+    ],
+    "srednia90": 0.84
+   },
+   "shots_off_target": {
+    "ostatnie": [
+     2,
+     2,
+     0,
+     0,
+     0,
+     0
+    ],
+    "minuty": [
+     65,
+     75,
+     63,
+     30,
+     45,
+     45
+    ],
+    "srednia90": 1.11
+   }
+  }
+ },
+ {
+  "id": 939631021,
+  "nazwa": "Raphinha",
+  "pozycja": "M",
+  "druzyna": "Brazil",
+  "minuty_lacznie": 244,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     1,
+     2,
+     2,
+     3
+    ],
+    "minuty": [
+     39,
+     90,
+     70,
+     45
+    ],
+    "srednia90": 2.95
+   }
+  }
+ },
+ {
+  "id": 982032575,
+  "nazwa": "Rayan",
+  "pozycja": "M",
+  "druzyna": "Brazil",
+  "minuty_lacznie": 267,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     1,
+     2,
+     0,
+     3
+    ],
+    "minuty": [
+     90,
+     81,
+     51,
+     45
+    ],
+    "srednia90": 2.02
+   },
+   "sot": {
+    "ostatnie": [
+     0,
+     1,
+     0,
+     2
+    ],
+    "minuty": [
+     90,
+     81,
+     51,
+     45
+    ],
+    "srednia90": 1.01
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     0,
+     1,
+     2,
+     1
+    ],
+    "minuty": [
+     90,
+     81,
+     51,
+     45
+    ],
+    "srednia90": 1.35
+   },
+   "fouls_won": {
+    "ostatnie": [
+     1,
+     1,
+     2,
+     0
+    ],
+    "minuty": [
+     90,
+     81,
+     51,
+     45
+    ],
+    "srednia90": 1.35
+   },
+   "interceptions": {
+    "ostatnie": [
+     0,
+     1,
+     1,
+     0
+    ],
+    "minuty": [
+     90,
+     81,
+     51,
+     45
+    ],
+    "srednia90": 0.67
+   },
+   "headed_shots": {
+    "ostatnie": [
+     1,
+     0,
+     0,
+     0
+    ],
+    "minuty": [
+     90,
+     81,
+     51,
+     45
+    ],
+    "srednia90": 0.34
+   },
+   "shots_outside_box": {
+    "ostatnie": [
+     0,
+     1,
+     0,
+     2
+    ],
+    "minuty": [
+     90,
+     81,
+     51,
+     45
+    ],
+    "srednia90": 1.01
+   },
+   "sot_outside_box": {
+    "ostatnie": [
+     0,
+     0,
+     0,
+     1
+    ],
+    "minuty": [
+     90,
+     81,
+     51,
+     45
+    ],
+    "srednia90": 0.34
+   },
+   "shots_blocked": {
+    "ostatnie": [
+     1,
+     0,
+     0,
+     1
+    ],
+    "minuty": [
+     90,
+     81,
+     51,
+     45
+    ],
+    "srednia90": 0.67
+   }
+  }
+ },
+ {
+  "id": 918297442,
+  "nazwa": "Roger Ibanez",
+  "pozycja": "M",
+  "druzyna": "Brazil",
+  "minuty_lacznie": 135,
+  "forma": {
+   "fouls_committed": {
+    "ostatnie": [
+     2,
+     0,
+     1
+    ],
+    "minuty": [
+     45,
+     45,
+     45
+    ],
+    "srednia90": 2.0
+   },
+   "interceptions": {
+    "ostatnie": [
+     1,
+     1,
+     0
+    ],
+    "minuty": [
+     45,
+     45,
+     45
+    ],
+    "srednia90": 1.33
+   }
+  }
+ },
+ {
+  "id": 943288395,
+  "nazwa": "Vinicius Junior",
+  "pozycja": "M",
+  "druzyna": "Brazil",
+  "minuty_lacznie": 440,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     3,
+     8,
+     3,
+     1,
+     2,
+     3
+    ],
+    "minuty": [
+     90,
+     90,
+     80,
+     90,
+     45,
+     45
+    ],
+    "srednia90": 4.09
+   },
+   "sot": {
+    "ostatnie": [
+     2,
+     5,
+     2,
+     1,
+     1,
+     2
+    ],
+    "minuty": [
+     90,
+     90,
+     80,
+     90,
+     45,
+     45
+    ],
+    "srednia90": 2.66
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     0,
+     1,
+     0,
+     3,
+     2,
+     1
+    ],
+    "minuty": [
+     90,
+     90,
+     80,
+     90,
+     45,
+     45
+    ],
+    "srednia90": 1.43
+   },
+   "fouls_won": {
+    "ostatnie": [
+     3,
+     3,
+     1,
+     2,
+     1,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     80,
+     90,
+     45,
+     45
+    ],
+    "srednia90": 2.05
+   },
+   "shots_outside_box": {
+    "ostatnie": [
+     2,
+     1,
+     0,
+     0,
+     0,
+     1
+    ],
+    "minuty": [
+     90,
+     90,
+     80,
+     90,
+     45,
+     45
+    ],
+    "srednia90": 0.82
+   },
+   "sot_outside_box": {
+    "ostatnie": [
+     1,
+     1,
+     0,
+     0,
+     0,
+     1
+    ],
+    "minuty": [
+     90,
+     90,
+     80,
+     90,
+     45,
+     45
+    ],
+    "srednia90": 0.61
+   },
+   "shots_blocked": {
+    "ostatnie": [
+     1,
+     1,
+     1,
+     0,
+     1,
+     1
+    ],
+    "minuty": [
+     90,
+     90,
+     80,
+     90,
+     45,
+     45
+    ],
+    "srednia90": 1.02
+   }
+  }
+ },
+ {
+  "id": 931198270,
+  "nazwa": "Alexander Sorloth",
+  "pozycja": "M",
+  "druzyna": "Norway",
+  "minuty_lacznie": 357,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     1,
+     0,
+     2,
+     2,
+     2
+    ],
+    "minuty": [
+     70,
+     83,
+     72,
+     71,
+     61
+    ],
+    "srednia90": 1.76
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     1,
+     1,
+     3,
+     4,
+     0
+    ],
+    "minuty": [
+     70,
+     83,
+     72,
+     71,
+     61
+    ],
+    "srednia90": 2.27
+   },
+   "fouls_won": {
+    "ostatnie": [
+     0,
+     1,
+     1,
+     0,
+     1
+    ],
+    "minuty": [
+     70,
+     83,
+     72,
+     71,
+     61
+    ],
+    "srednia90": 0.76
+   },
+   "headed_shots": {
+    "ostatnie": [
+     1,
+     0,
+     1,
+     1,
+     1
+    ],
+    "minuty": [
+     70,
+     83,
+     72,
+     71,
+     61
+    ],
+    "srednia90": 1.01
+   },
+   "shots_blocked": {
+    "ostatnie": [
+     0,
+     0,
+     2,
+     1,
+     1
+    ],
+    "minuty": [
+     70,
+     83,
+     72,
+     71,
+     61
+    ],
+    "srednia90": 1.01
+   },
+   "shots_off_target": {
+    "ostatnie": [
+     1,
+     0,
+     0,
+     1,
+     0
+    ],
+    "minuty": [
+     70,
+     83,
+     72,
+     71,
+     61
+    ],
+    "srednia90": 0.5
+   }
+  }
+ },
+ {
+  "id": 933655746,
+  "nazwa": "Antonio Nusa",
+  "pozycja": "M",
+  "druzyna": "Norway",
+  "minuty_lacznie": 327,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     1,
+     0,
+     2,
+     0,
+     1,
+     6
+    ],
+    "minuty": [
+     70,
+     8,
+     70,
+     72,
+     45,
+     62
+    ],
+    "srednia90": 2.75
+   },
+   "sot": {
+    "ostatnie": [
+     1,
+     0,
+     0,
+     0,
+     1,
+     2
+    ],
+    "minuty": [
+     70,
+     8,
+     70,
+     72,
+     45,
+     62
+    ],
+    "srednia90": 1.1
+   },
+   "fouls_won": {
+    "ostatnie": [
+     1,
+     0,
+     0,
+     2,
+     0,
+     2
+    ],
+    "minuty": [
+     70,
+     8,
+     70,
+     72,
+     45,
+     62
+    ],
+    "srednia90": 1.38
+   },
+   "interceptions": {
+    "ostatnie": [
+     0,
+     0,
+     1,
+     0,
+     1,
+     1
+    ],
+    "minuty": [
+     70,
+     8,
+     70,
+     72,
+     45,
+     62
+    ],
+    "srednia90": 0.83
+   },
+   "shots_outside_box": {
+    "ostatnie": [
+     0,
+     0,
+     1,
+     0,
+     0,
+     2
+    ],
+    "minuty": [
+     70,
+     8,
+     70,
+     72,
+     45,
+     62
+    ],
+    "srednia90": 0.83
+   },
+   "shots_blocked": {
+    "ostatnie": [
+     0,
+     0,
+     1,
+     0,
+     0,
+     3
+    ],
+    "minuty": [
+     70,
+     8,
+     70,
+     72,
+     45,
+     62
+    ],
+    "srednia90": 1.1
+   }
+  }
+ },
+ {
+  "id": 923942928,
+  "nazwa": "David Moller Wolfe",
+  "pozycja": "M",
+  "druzyna": "Norway",
+  "minuty_lacznie": 385,
+  "forma": {
+   "fouls_committed": {
+    "ostatnie": [
+     2,
+     2,
+     3,
+     2,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     72,
+     71,
+     62
+    ],
+    "srednia90": 2.1
+   },
+   "fouls_won": {
+    "ostatnie": [
+     0,
+     0,
+     1,
+     1,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     72,
+     71,
+     62
+    ],
+    "srednia90": 0.47
+   },
+   "interceptions": {
+    "ostatnie": [
+     2,
+     1,
+     0,
+     0,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     72,
+     71,
+     62
+    ],
+    "srednia90": 0.7
+   }
+  }
+ },
+ {
+  "id": 972197014,
+  "nazwa": "Erling Haaland",
+  "pozycja": "M",
+  "druzyna": "Norway",
+  "minuty_lacznie": 341,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     4,
+     5,
+     5,
+     1
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     71
+    ],
+    "srednia90": 3.96
+   },
+   "sot": {
+    "ostatnie": [
+     2,
+     3,
+     4,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     71
+    ],
+    "srednia90": 2.38
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     0,
+     2,
+     2,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     71
+    ],
+    "srednia90": 1.06
+   },
+   "fouls_won": {
+    "ostatnie": [
+     0,
+     0,
+     3,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     71
+    ],
+    "srednia90": 0.79
+   },
+   "headed_shots": {
+    "ostatnie": [
+     2,
+     1,
+     1,
+     1
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     71
+    ],
+    "srednia90": 1.32
+   },
+   "headed_sot": {
+    "ostatnie": [
+     1,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     71
+    ],
+    "srednia90": 0.53
+   },
+   "shots_blocked": {
+    "ostatnie": [
+     2,
+     1,
+     0,
+     1
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     71
+    ],
+    "srednia90": 1.06
+   }
+  }
+ },
+ {
+  "id": 951328483,
+  "nazwa": "Fredrik Bjørkan",
+  "pozycja": "M",
+  "druzyna": "Norway",
+  "minuty_lacznie": 92,
+  "forma": {
+   "interceptions": {
+    "ostatnie": [
+     2,
+     1,
+     0
+    ],
+    "minuty": [
+     45,
+     19,
+     28
+    ],
+    "srednia90": 2.93
+   }
+  }
+ },
+ {
+  "id": 910842925,
+  "nazwa": "Julian Ryerson",
+  "pozycja": "M",
+  "druzyna": "Norway",
+  "minuty_lacznie": 254,
+  "forma": {
+   "fouls_committed": {
+    "ostatnie": [
+     0,
+     2,
+     2,
+     2
+    ],
+    "minuty": [
+     12,
+     90,
+     90,
+     62
+    ],
+    "srednia90": 2.13
+   }
+  }
+ },
+ {
+  "id": 983901468,
+  "nazwa": "Jørgen Strand Larsen",
+  "pozycja": "M",
+  "druzyna": "Norway",
+  "minuty_lacznie": 171,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     2,
+     1,
+     5
+    ],
+    "minuty": [
+     90,
+     19,
+     62
+    ],
+    "srednia90": 4.21
+   },
+   "sot": {
+    "ostatnie": [
+     1,
+     0,
+     3
+    ],
+    "minuty": [
+     90,
+     19,
+     62
+    ],
+    "srednia90": 2.11
+   },
+   "headed_shots": {
+    "ostatnie": [
+     0,
+     0,
+     3
+    ],
+    "minuty": [
+     90,
+     19,
+     62
+    ],
+    "srednia90": 1.58
+   },
+   "headed_sot": {
+    "ostatnie": [
+     0,
+     0,
+     2
+    ],
+    "minuty": [
+     90,
+     19,
+     62
+    ],
+    "srednia90": 1.05
+   },
+   "shots_off_target": {
+    "ostatnie": [
+     1,
+     0,
+     2
+    ],
+    "minuty": [
+     90,
+     19,
+     62
+    ],
+    "srednia90": 1.58
+   }
+  }
+ },
+ {
+  "id": 961440066,
+  "nazwa": "Kristian Thorstvedt",
+  "pozycja": "M",
+  "druzyna": "Norway",
+  "minuty_lacznie": 102,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     1,
+     2,
+     1,
+     0
+    ],
+    "minuty": [
+     45,
+     18,
+     11,
+     28
+    ],
+    "srednia90": 3.53
+   }
+  }
+ },
+ {
+  "id": 927366481,
+  "nazwa": "Kristoffer Ajer",
+  "pozycja": "M",
+  "druzyna": "Norway",
+  "minuty_lacznie": 403,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     0,
+     1,
+     0,
+     1,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     71,
+     62
+    ],
+    "srednia90": 0.45
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     0,
+     0,
+     0,
+     1,
+     1
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     71,
+     62
+    ],
+    "srednia90": 0.45
+   },
+   "interceptions": {
+    "ostatnie": [
+     0,
+     1,
+     1,
+     1,
+     1
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     71,
+     62
+    ],
+    "srednia90": 0.89
+   },
+   "headed_shots": {
+    "ostatnie": [
+     0,
+     1,
+     0,
+     1,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     71,
+     62
+    ],
+    "srednia90": 0.45
+   }
+  }
+ },
+ {
+  "id": 970300648,
+  "nazwa": "Marcus Pedersen",
+  "pozycja": "M",
+  "druzyna": "Norway",
+  "minuty_lacznie": 233,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     0,
+     0,
+     1,
+     1
+    ],
+    "minuty": [
+     82,
+     45,
+     78,
+     28
+    ],
+    "srednia90": 0.77
+   },
+   "sot": {
+    "ostatnie": [
+     0,
+     0,
+     1,
+     1
+    ],
+    "minuty": [
+     82,
+     45,
+     78,
+     28
+    ],
+    "srednia90": 0.77
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     1,
+     0,
+     1,
+     1
+    ],
+    "minuty": [
+     82,
+     45,
+     78,
+     28
+    ],
+    "srednia90": 1.16
+   }
+  }
+ },
+ {
+  "id": 920132151,
+  "nazwa": "Martin Odegaard",
+  "pozycja": "M",
+  "druzyna": "Norway",
+  "minuty_lacznie": 339,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     1,
+     3,
+     1,
+     1
+    ],
+    "minuty": [
+     90,
+     90,
+     80,
+     79
+    ],
+    "srednia90": 1.59
+   },
+   "sot": {
+    "ostatnie": [
+     0,
+     1,
+     0,
+     1
+    ],
+    "minuty": [
+     90,
+     90,
+     80,
+     79
+    ],
+    "srednia90": 0.53
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     2,
+     0,
+     1,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     80,
+     79
+    ],
+    "srednia90": 0.8
+   },
+   "fouls_won": {
+    "ostatnie": [
+     1,
+     1,
+     1,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     80,
+     79
+    ],
+    "srednia90": 0.8
+   },
+   "interceptions": {
+    "ostatnie": [
+     1,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     80,
+     79
+    ],
+    "srednia90": 0.53
+   },
+   "shots_outside_box": {
+    "ostatnie": [
+     1,
+     1,
+     1,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     80,
+     79
+    ],
+    "srednia90": 0.8
+   },
+   "shots_blocked": {
+    "ostatnie": [
+     1,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     80,
+     79
+    ],
+    "srednia90": 0.53
+   },
+   "shots_off_target": {
+    "ostatnie": [
+     0,
+     1,
+     1,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     80,
+     79
+    ],
+    "srednia90": 0.53
+   }
+  }
+ },
+ {
+  "id": 928244337,
+  "nazwa": "Patrick Berg",
+  "pozycja": "M",
+  "druzyna": "Norway",
+  "minuty_lacznie": 283,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     0,
+     1,
+     0,
+     0,
+     0,
+     1
+    ],
+    "minuty": [
+     90,
+     90,
+     45,
+     10,
+     19,
+     29
+    ],
+    "srednia90": 0.64
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     0,
+     1,
+     2,
+     0,
+     0,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     45,
+     10,
+     19,
+     29
+    ],
+    "srednia90": 0.95
+   },
+   "interceptions": {
+    "ostatnie": [
+     0,
+     1,
+     0,
+     0,
+     0,
+     1
+    ],
+    "minuty": [
+     90,
+     90,
+     45,
+     10,
+     19,
+     29
+    ],
+    "srednia90": 0.64
+   }
+  }
+ },
+ {
+  "id": 958226434,
+  "nazwa": "Sander Berge",
+  "pozycja": "M",
+  "druzyna": "Norway",
+  "minuty_lacznie": 403,
+  "forma": {
+   "fouls_committed": {
+    "ostatnie": [
+     0,
+     1,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     71,
+     62
+    ],
+    "srednia90": 0.45
+   },
+   "fouls_won": {
+    "ostatnie": [
+     0,
+     0,
+     1,
+     1,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     71,
+     62
+    ],
+    "srednia90": 0.45
+   },
+   "interceptions": {
+    "ostatnie": [
+     1,
+     4,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     71,
+     62
+    ],
+    "srednia90": 1.34
+   }
+  }
+ },
+ {
+  "id": 921574292,
+  "nazwa": "Thelo Aasgaard",
+  "pozycja": "M",
+  "druzyna": "Norway",
+  "minuty_lacznie": 137,
+  "forma": {
+   "fouls_won": {
+    "ostatnie": [
+     3,
+     0,
+     1
+    ],
+    "minuty": [
+     90,
+     19,
+     28
+    ],
+    "srednia90": 2.63
+   },
+   "interceptions": {
+    "ostatnie": [
+     3,
+     0,
+     0
+    ],
+    "minuty": [
+     90,
+     19,
+     28
+    ],
+    "srednia90": 1.97
+   }
+  }
+ },
+ {
+  "id": 984599813,
+  "nazwa": "Torbjorn Heggem",
+  "pozycja": "M",
+  "druzyna": "Norway",
+  "minuty_lacznie": 415,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     1,
+     0,
+     0,
+     0,
+     1
+    ],
+    "minuty": [
+     90,
+     83,
+     90,
+     90,
+     62
+    ],
+    "srednia90": 0.43
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     0,
+     0,
+     1,
+     1,
+     1
+    ],
+    "minuty": [
+     90,
+     83,
+     90,
+     90,
+     62
+    ],
+    "srednia90": 0.65
+   }
+  }
+ },
+ {
+  "id": 912779493,
+  "nazwa": "Alexis Vega",
+  "pozycja": "M",
+  "druzyna": "Mexico",
+  "minuty_lacznie": 104,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     0,
+     1,
+     2
+    ],
+    "minuty": [
+     12,
+     33,
+     59
+    ],
+    "srednia90": 2.6
+   }
+  }
+ },
+ {
+  "id": 939461040,
+  "nazwa": "Alvaro Fidalgo",
+  "pozycja": "M",
+  "druzyna": "Mexico",
+  "minuty_lacznie": 201,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     1,
+     0,
+     0,
+     3
+    ],
+    "minuty": [
+     19,
+     65,
+     58,
+     59
+    ],
+    "srednia90": 1.79
+   }
+  }
+ },
+ {
+  "id": 974317880,
+  "nazwa": "Brian Gutierrez",
+  "pozycja": "M",
+  "druzyna": "Mexico",
+  "minuty_lacznie": 225,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     0,
+     1,
+     4,
+     3
+    ],
+    "minuty": [
+     33,
+     70,
+     65,
+     57
+    ],
+    "srednia90": 3.2
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     1,
+     1,
+     2,
+     0
+    ],
+    "minuty": [
+     33,
+     70,
+     65,
+     57
+    ],
+    "srednia90": 1.6
+   },
+   "fouls_won": {
+    "ostatnie": [
+     0,
+     1,
+     1,
+     1
+    ],
+    "minuty": [
+     33,
+     70,
+     65,
+     57
+    ],
+    "srednia90": 1.2
+   },
+   "shots_outside_box": {
+    "ostatnie": [
+     0,
+     1,
+     2,
+     0
+    ],
+    "minuty": [
+     33,
+     70,
+     65,
+     57
+    ],
+    "srednia90": 1.2
+   },
+   "shots_blocked": {
+    "ostatnie": [
+     0,
+     0,
+     2,
+     1
+    ],
+    "minuty": [
+     33,
+     70,
+     65,
+     57
+    ],
+    "srednia90": 1.2
+   },
+   "shots_off_target": {
+    "ostatnie": [
+     0,
+     1,
+     2,
+     1
+    ],
+    "minuty": [
+     33,
+     70,
+     65,
+     57
+    ],
+    "srednia90": 1.6
+   }
+  }
+ },
+ {
+  "id": 970280065,
+  "nazwa": "Cesar Montes",
+  "pozycja": "M",
+  "druzyna": "Mexico",
+  "minuty_lacznie": 359,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     1,
+     0,
+     0,
+     1,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     58,
+     31
+    ],
+    "srednia90": 0.5
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     0,
+     1,
+     2,
+     0,
+     2
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     58,
+     31
+    ],
+    "srednia90": 1.25
+   },
+   "fouls_won": {
+    "ostatnie": [
+     1,
+     1,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     58,
+     31
+    ],
+    "srednia90": 0.75
+   },
+   "headed_shots": {
+    "ostatnie": [
+     1,
+     0,
+     0,
+     1,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     58,
+     31
+    ],
+    "srednia90": 0.5
+   },
+   "headed_sot": {
+    "ostatnie": [
+     1,
+     0,
+     0,
+     0,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     58,
+     31
+    ],
+    "srednia90": 0.25
+   }
+  }
+ },
+ {
+  "id": 946886626,
+  "nazwa": "Edson Alvarez",
+  "pozycja": "M",
+  "druzyna": "Mexico",
+  "minuty_lacznie": 299,
+  "forma": {
+   "fouls_committed": {
+    "ostatnie": [
+     4,
+     0,
+     0,
+     1,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     15,
+     45,
+     59
+    ],
+    "srednia90": 1.51
+   },
+   "fouls_won": {
+    "ostatnie": [
+     1,
+     0,
+     1,
+     1,
+     1
+    ],
+    "minuty": [
+     90,
+     90,
+     15,
+     45,
+     59
+    ],
+    "srednia90": 1.2
+   },
+   "interceptions": {
+    "ostatnie": [
+     1,
+     2,
+     0,
+     1,
+     1
+    ],
+    "minuty": [
+     90,
+     90,
+     15,
+     45,
+     59
+    ],
+    "srednia90": 1.51
+   }
+  }
+ },
+ {
+  "id": 954517251,
+  "nazwa": "Erik Lira",
+  "pozycja": "M",
+  "druzyna": "Mexico",
+  "minuty_lacznie": 331,
+  "forma": {
+   "fouls_committed": {
+    "ostatnie": [
+     0,
+     2,
+     0,
+     1,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     75,
+     45,
+     31
+    ],
+    "srednia90": 0.82
+   },
+   "fouls_won": {
+    "ostatnie": [
+     1,
+     0,
+     2,
+     0,
+     2
+    ],
+    "minuty": [
+     90,
+     90,
+     75,
+     45,
+     31
+    ],
+    "srednia90": 1.36
+   },
+   "interceptions": {
+    "ostatnie": [
+     0,
+     1,
+     1,
+     0,
+     1
+    ],
+    "minuty": [
+     90,
+     90,
+     75,
+     45,
+     31
+    ],
+    "srednia90": 0.82
+   }
+  }
+ },
+ {
+  "id": 931067396,
+  "nazwa": "Gilberto Mora",
+  "pozycja": "M",
+  "druzyna": "Mexico",
+  "minuty_lacznie": 216,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     3,
+     1,
+     0,
+     0,
+     1
+    ],
+    "minuty": [
+     57,
+     71,
+     25,
+     32,
+     31
+    ],
+    "srednia90": 2.08
+   },
+   "fouls_won": {
+    "ostatnie": [
+     2,
+     1,
+     0,
+     1,
+     1
+    ],
+    "minuty": [
+     57,
+     71,
+     25,
+     32,
+     31
+    ],
+    "srednia90": 2.08
+   },
+   "interceptions": {
+    "ostatnie": [
+     1,
+     0,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     57,
+     71,
+     25,
+     32,
+     31
+    ],
+    "srednia90": 0.83
+   },
+   "shots_outside_box": {
+    "ostatnie": [
+     1,
+     1,
+     0,
+     0,
+     1
+    ],
+    "minuty": [
+     57,
+     71,
+     25,
+     32,
+     31
+    ],
+    "srednia90": 1.25
+   },
+   "shots_blocked": {
+    "ostatnie": [
+     1,
+     1,
+     0,
+     0,
+     1
+    ],
+    "minuty": [
+     57,
+     71,
+     25,
+     32,
+     31
+    ],
+    "srednia90": 1.25
+   },
+   "shots_off_target": {
+    "ostatnie": [
+     2,
+     0,
+     0,
+     0,
+     0
+    ],
+    "minuty": [
+     57,
+     71,
+     25,
+     32,
+     31
+    ],
+    "srednia90": 0.83
+   }
+  }
+ },
+ {
+  "id": 959509096,
+  "nazwa": "Guillermo Martinez",
+  "pozycja": "M",
+  "druzyna": "Mexico",
+  "minuty_lacznie": 140,
+  "forma": {
+   "fouls_committed": {
+    "ostatnie": [
+     3,
+     0,
+     0
+    ],
+    "minuty": [
+     62,
+     33,
+     45
+    ],
+    "srednia90": 1.93
+   }
+  }
+ },
+ {
+  "id": 926098671,
+  "nazwa": "Jesus Gallardo",
+  "pozycja": "M",
+  "druzyna": "Mexico",
+  "minuty_lacznie": 385,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     0,
+     0,
+     1,
+     2,
+     0,
+     0
+    ],
+    "minuty": [
+     90,
+     13,
+     90,
+     90,
+     71,
+     31
+    ],
+    "srednia90": 0.7
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     3,
+     0,
+     1,
+     1,
+     1,
+     1
+    ],
+    "minuty": [
+     90,
+     13,
+     90,
+     90,
+     71,
+     31
+    ],
+    "srednia90": 1.64
+   },
+   "interceptions": {
+    "ostatnie": [
+     1,
+     1,
+     0,
+     3,
+     0,
+     0
+    ],
+    "minuty": [
+     90,
+     13,
+     90,
+     90,
+     71,
+     31
+    ],
+    "srednia90": 1.17
+   },
+   "shots_off_target": {
+    "ostatnie": [
+     0,
+     0,
+     1,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     90,
+     13,
+     90,
+     90,
+     71,
+     31
+    ],
+    "srednia90": 0.47
+   }
+  }
+ },
+ {
+  "id": 958516347,
+  "nazwa": "Johan Vasquez",
+  "pozycja": "M",
+  "druzyna": "Mexico",
+  "minuty_lacznie": 415,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     1,
+     0,
+     0,
+     1,
+     2
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     72,
+     73
+    ],
+    "srednia90": 0.87
+   },
+   "sot": {
+    "ostatnie": [
+     0,
+     0,
+     0,
+     1,
+     1
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     72,
+     73
+    ],
+    "srednia90": 0.43
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     0,
+     0,
+     0,
+     1,
+     2
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     72,
+     73
+    ],
+    "srednia90": 0.65
+   },
+   "fouls_won": {
+    "ostatnie": [
+     2,
+     0,
+     0,
+     0,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     72,
+     73
+    ],
+    "srednia90": 0.43
+   },
+   "headed_shots": {
+    "ostatnie": [
+     1,
+     0,
+     0,
+     1,
+     1
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     72,
+     73
+    ],
+    "srednia90": 0.65
+   },
+   "headed_sot": {
+    "ostatnie": [
+     0,
+     0,
+     0,
+     1,
+     1
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     72,
+     73
+    ],
+    "srednia90": 0.43
+   }
+  }
+ },
+ {
+  "id": 901297605,
+  "nazwa": "Jorge Sanchez",
+  "pozycja": "M",
+  "druzyna": "Mexico",
+  "minuty_lacznie": 405,
+  "forma": {
+   "fouls_committed": {
+    "ostatnie": [
+     1,
+     1,
+     1,
+     1,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     90,
+     45
+    ],
+    "srednia90": 0.89
+   },
+   "interceptions": {
+    "ostatnie": [
+     1,
+     2,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     90,
+     45
+    ],
+    "srednia90": 0.89
+   }
+  }
+ },
+ {
+  "id": 945758880,
+  "nazwa": "Julian Quinones",
+  "pozycja": "M",
+  "druzyna": "Mexico",
+  "minuty_lacznie": 418,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     1,
+     4,
+     1,
+     5,
+     4,
+     0
+    ],
+    "minuty": [
+     79,
+     90,
+     83,
+     78,
+     57,
+     31
+    ],
+    "srednia90": 3.23
+   },
+   "sot": {
+    "ostatnie": [
+     1,
+     1,
+     1,
+     2,
+     1,
+     0
+    ],
+    "minuty": [
+     79,
+     90,
+     83,
+     78,
+     57,
+     31
+    ],
+    "srednia90": 1.29
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     2,
+     1,
+     1,
+     1,
+     2,
+     0
+    ],
+    "minuty": [
+     79,
+     90,
+     83,
+     78,
+     57,
+     31
+    ],
+    "srednia90": 1.51
+   },
+   "fouls_won": {
+    "ostatnie": [
+     1,
+     1,
+     3,
+     2,
+     0,
+     0
+    ],
+    "minuty": [
+     79,
+     90,
+     83,
+     78,
+     57,
+     31
+    ],
+    "srednia90": 1.51
+   },
+   "headed_shots": {
+    "ostatnie": [
+     0,
+     1,
+     1,
+     0,
+     1,
+     0
+    ],
+    "minuty": [
+     79,
+     90,
+     83,
+     78,
+     57,
+     31
+    ],
+    "srednia90": 0.65
+   },
+   "headed_sot": {
+    "ostatnie": [
+     0,
+     0,
+     1,
+     0,
+     1,
+     0
+    ],
+    "minuty": [
+     79,
+     90,
+     83,
+     78,
+     57,
+     31
+    ],
+    "srednia90": 0.43
+   },
+   "shots_outside_box": {
+    "ostatnie": [
+     0,
+     1,
+     0,
+     3,
+     1,
+     0
+    ],
+    "minuty": [
+     79,
+     90,
+     83,
+     78,
+     57,
+     31
+    ],
+    "srednia90": 1.08
+   },
+   "shots_off_target": {
+    "ostatnie": [
+     0,
+     2,
+     0,
+     1,
+     2,
+     0
+    ],
+    "minuty": [
+     79,
+     90,
+     83,
+     78,
+     57,
+     31
+    ],
+    "srednia90": 1.08
+   }
+  }
+ },
+ {
+  "id": 960810837,
+  "nazwa": "Luis Chavez",
+  "pozycja": "M",
+  "druzyna": "Mexico",
+  "minuty_lacznie": 116,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     0,
+     2,
+     3
+    ],
+    "minuty": [
+     25,
+     32,
+     59
+    ],
+    "srednia90": 3.88
+   },
+   "shots_outside_box": {
+    "ostatnie": [
+     0,
+     2,
+     3
+    ],
+    "minuty": [
+     25,
+     32,
+     59
+    ],
+    "srednia90": 3.88
+   }
+  }
+ },
+ {
+  "id": 922458043,
+  "nazwa": "Luis Romo",
+  "pozycja": "M",
+  "druzyna": "Mexico",
+  "minuty_lacznie": 296,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     1,
+     0,
+     1,
+     0,
+     1
+    ],
+    "minuty": [
+     72,
+     62,
+     70,
+     19,
+     73
+    ],
+    "srednia90": 0.91
+   },
+   "fouls_won": {
+    "ostatnie": [
+     0,
+     1,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     72,
+     62,
+     70,
+     19,
+     73
+    ],
+    "srednia90": 0.61
+   },
+   "interceptions": {
+    "ostatnie": [
+     2,
+     0,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     72,
+     62,
+     70,
+     19,
+     73
+    ],
+    "srednia90": 0.91
+   }
+  }
+ },
+ {
+  "id": 956439757,
+  "nazwa": "Mateo Chavez",
+  "pozycja": "M",
+  "druzyna": "Mexico",
+  "minuty_lacznie": 154,
+  "forma": {
+   "fouls_won": {
+    "ostatnie": [
+     1,
+     0,
+     2
+    ],
+    "minuty": [
+     77,
+     18,
+     59
+    ],
+    "srednia90": 1.75
+   }
+  }
+ },
+ {
+  "id": 980707140,
+  "nazwa": "Raul Jimenez",
+  "pozycja": "M",
+  "druzyna": "Mexico",
+  "minuty_lacznie": 285,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     4,
+     2,
+     4,
+     3
+    ],
+    "minuty": [
+     73,
+     79,
+     75,
+     58
+    ],
+    "srednia90": 4.11
+   },
+   "sot": {
+    "ostatnie": [
+     1,
+     1,
+     2,
+     3
+    ],
+    "minuty": [
+     73,
+     79,
+     75,
+     58
+    ],
+    "srednia90": 2.21
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     1,
+     2,
+     1,
+     3
+    ],
+    "minuty": [
+     73,
+     79,
+     75,
+     58
+    ],
+    "srednia90": 2.21
+   },
+   "fouls_won": {
+    "ostatnie": [
+     1,
+     1,
+     0,
+     1
+    ],
+    "minuty": [
+     73,
+     79,
+     75,
+     58
+    ],
+    "srednia90": 0.95
+   },
+   "headed_shots": {
+    "ostatnie": [
+     2,
+     1,
+     2,
+     0
+    ],
+    "minuty": [
+     73,
+     79,
+     75,
+     58
+    ],
+    "srednia90": 1.58
+   },
+   "headed_sot": {
+    "ostatnie": [
+     0,
+     0,
+     1,
+     0
+    ],
+    "minuty": [
+     73,
+     79,
+     75,
+     58
+    ],
+    "srednia90": 0.32
+   },
+   "shots_outside_box": {
+    "ostatnie": [
+     1,
+     0,
+     1,
+     0
+    ],
+    "minuty": [
+     73,
+     79,
+     75,
+     58
+    ],
+    "srednia90": 0.63
+   },
+   "shots_blocked": {
+    "ostatnie": [
+     0,
+     1,
+     1,
+     0
+    ],
+    "minuty": [
+     73,
+     79,
+     75,
+     58
+    ],
+    "srednia90": 0.63
+   },
+   "shots_off_target": {
+    "ostatnie": [
+     3,
+     0,
+     1,
+     0
+    ],
+    "minuty": [
+     73,
+     79,
+     75,
+     58
+    ],
+    "srednia90": 1.26
+   }
+  }
+ },
+ {
+  "id": 948398544,
+  "nazwa": "Roberto Alvarado",
+  "pozycja": "M",
+  "druzyna": "Mexico",
+  "minuty_lacznie": 410,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     3,
+     1,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     79,
+     90,
+     79,
+     90,
+     72
+    ],
+    "srednia90": 1.1
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     1,
+     0,
+     0,
+     2,
+     0
+    ],
+    "minuty": [
+     79,
+     90,
+     79,
+     90,
+     72
+    ],
+    "srednia90": 0.66
+   },
+   "fouls_won": {
+    "ostatnie": [
+     2,
+     0,
+     0,
+     2,
+     0
+    ],
+    "minuty": [
+     79,
+     90,
+     79,
+     90,
+     72
+    ],
+    "srednia90": 0.88
+   },
+   "shots_outside_box": {
+    "ostatnie": [
+     2,
+     0,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     79,
+     90,
+     79,
+     90,
+     72
+    ],
+    "srednia90": 0.66
+   },
+   "shots_blocked": {
+    "ostatnie": [
+     2,
+     0,
+     0,
+     0,
+     0
+    ],
+    "minuty": [
+     79,
+     90,
+     79,
+     90,
+     72
+    ],
+    "srednia90": 0.44
+   },
+   "shots_off_target": {
+    "ostatnie": [
+     1,
+     1,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     79,
+     90,
+     79,
+     90,
+     72
+    ],
+    "srednia90": 0.66
+   }
+  }
+ },
+ {
+  "id": 986382571,
+  "nazwa": "Santiago Gimenez",
+  "pozycja": "M",
+  "druzyna": "Mexico",
+  "minuty_lacznie": 101,
+  "forma": {
+   "fouls_won": {
+    "ostatnie": [
+     2,
+     1,
+     0,
+     1
+    ],
+    "minuty": [
+     17,
+     28,
+     11,
+     45
+    ],
+    "srednia90": 3.56
+   }
+  }
+ },
+ {
+  "id": 912982510,
+  "nazwa": "Anthony Gordon",
+  "pozycja": "M",
+  "druzyna": "England",
+  "minuty_lacznie": 280,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     1,
+     1,
+     2,
+     1,
+     2
+    ],
+    "minuty": [
+     30,
+     64,
+     71,
+     70,
+     45
+    ],
+    "srednia90": 2.25
+   },
+   "sot": {
+    "ostatnie": [
+     0,
+     1,
+     1,
+     1,
+     1
+    ],
+    "minuty": [
+     30,
+     64,
+     71,
+     70,
+     45
+    ],
+    "srednia90": 1.29
+   },
+   "fouls_won": {
+    "ostatnie": [
+     0,
+     3,
+     0,
+     3,
+     0
+    ],
+    "minuty": [
+     30,
+     64,
+     71,
+     70,
+     45
+    ],
+    "srednia90": 1.93
+   },
+   "headed_shots": {
+    "ostatnie": [
+     1,
+     0,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     30,
+     64,
+     71,
+     70,
+     45
+    ],
+    "srednia90": 0.64
+   },
+   "sot_outside_box": {
+    "ostatnie": [
+     0,
+     1,
+     0,
+     0,
+     1
+    ],
+    "minuty": [
+     30,
+     64,
+     71,
+     70,
+     45
+    ],
+    "srednia90": 0.64
+   }
+  }
+ },
+ {
+  "id": 944164838,
+  "nazwa": "Bukayo Saka",
+  "pozycja": "M",
+  "druzyna": "England",
+  "minuty_lacznie": 165,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     0,
+     3,
+     2,
+     0,
+     2
+    ],
+    "minuty": [
+     30,
+     62,
+     26,
+     19,
+     28
+    ],
+    "srednia90": 3.82
+   },
+   "fouls_won": {
+    "ostatnie": [
+     0,
+     1,
+     3,
+     1,
+     1
+    ],
+    "minuty": [
+     30,
+     62,
+     26,
+     19,
+     28
+    ],
+    "srednia90": 3.27
+   },
+   "shots_off_target": {
+    "ostatnie": [
+     0,
+     2,
+     1,
+     0,
+     1
+    ],
+    "minuty": [
+     30,
+     62,
+     26,
+     19,
+     28
+    ],
+    "srednia90": 2.18
+   }
+  }
+ },
+ {
+  "id": 949521745,
+  "nazwa": "Declan Rice",
+  "pozycja": "M",
+  "druzyna": "England",
+  "minuty_lacznie": 313,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     0,
+     3,
+     1,
+     2
+    ],
+    "minuty": [
+     90,
+     90,
+     71,
+     62
+    ],
+    "srednia90": 1.73
+   },
+   "sot": {
+    "ostatnie": [
+     0,
+     0,
+     1,
+     1
+    ],
+    "minuty": [
+     90,
+     90,
+     71,
+     62
+    ],
+    "srednia90": 0.58
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     0,
+     1,
+     1,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     71,
+     62
+    ],
+    "srednia90": 0.58
+   },
+   "headed_shots": {
+    "ostatnie": [
+     0,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     71,
+     62
+    ],
+    "srednia90": 0.29
+   },
+   "shots_outside_box": {
+    "ostatnie": [
+     0,
+     1,
+     1,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     71,
+     62
+    ],
+    "srednia90": 0.58
+   },
+   "sot_outside_box": {
+    "ostatnie": [
+     0,
+     0,
+     1,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     71,
+     62
+    ],
+    "srednia90": 0.29
+   },
+   "shots_off_target": {
+    "ostatnie": [
+     0,
+     2,
+     0,
+     1
+    ],
+    "minuty": [
+     90,
+     90,
+     71,
+     62
+    ],
+    "srednia90": 0.86
+   }
+  }
+ },
+ {
+  "id": 932703065,
+  "nazwa": "Djed Spence",
+  "pozycja": "M",
+  "druzyna": "England",
+  "minuty_lacznie": 246,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     0,
+     0,
+     0,
+     1,
+     0,
+     2
+    ],
+    "minuty": [
+     69,
+     28,
+     65,
+     11,
+     28,
+     45
+    ],
+    "srednia90": 1.1
+   },
+   "fouls_won": {
+    "ostatnie": [
+     2,
+     0,
+     0,
+     0,
+     0,
+     1
+    ],
+    "minuty": [
+     69,
+     28,
+     65,
+     11,
+     28,
+     45
+    ],
+    "srednia90": 1.1
+   }
+  }
+ },
+ {
+  "id": 950659282,
+  "nazwa": "Eberechi Eze",
+  "pozycja": "M",
+  "druzyna": "England",
+  "minuty_lacznie": 86,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     0,
+     1,
+     0,
+     5
+    ],
+    "minuty": [
+     21,
+     20,
+     17,
+     28
+    ],
+    "srednia90": 6.28
+   },
+   "shots_outside_box": {
+    "ostatnie": [
+     0,
+     1,
+     0,
+     3
+    ],
+    "minuty": [
+     21,
+     20,
+     17,
+     28
+    ],
+    "srednia90": 4.19
+   },
+   "shots_blocked": {
+    "ostatnie": [
+     0,
+     1,
+     0,
+     5
+    ],
+    "minuty": [
+     21,
+     20,
+     17,
+     28
+    ],
+    "srednia90": 6.28
+   }
+  }
+ },
+ {
+  "id": 941226862,
+  "nazwa": "Elliot Anderson",
+  "pozycja": "M",
+  "druzyna": "England",
+  "minuty_lacznie": 451,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     1,
+     1,
+     4,
+     1,
+     0,
+     1
+    ],
+    "minuty": [
+     90,
+     83,
+     73,
+     90,
+     70,
+     45
+    ],
+    "srednia90": 1.6
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     0,
+     1,
+     2,
+     3,
+     1,
+     0
+    ],
+    "minuty": [
+     90,
+     83,
+     73,
+     90,
+     70,
+     45
+    ],
+    "srednia90": 1.4
+   },
+   "fouls_won": {
+    "ostatnie": [
+     1,
+     3,
+     3,
+     2,
+     5,
+     2
+    ],
+    "minuty": [
+     90,
+     83,
+     73,
+     90,
+     70,
+     45
+    ],
+    "srednia90": 3.19
+   },
+   "interceptions": {
+    "ostatnie": [
+     1,
+     2,
+     0,
+     4,
+     2,
+     0
+    ],
+    "minuty": [
+     90,
+     83,
+     73,
+     90,
+     70,
+     45
+    ],
+    "srednia90": 1.8
+   },
+   "headed_shots": {
+    "ostatnie": [
+     0,
+     0,
+     2,
+     0,
+     0,
+     0
+    ],
+    "minuty": [
+     90,
+     83,
+     73,
+     90,
+     70,
+     45
+    ],
+    "srednia90": 0.4
+   },
+   "shots_outside_box": {
+    "ostatnie": [
+     1,
+     1,
+     1,
+     1,
+     0,
+     1
+    ],
+    "minuty": [
+     90,
+     83,
+     73,
+     90,
+     70,
+     45
+    ],
+    "srednia90": 1.0
+   },
+   "shots_blocked": {
+    "ostatnie": [
+     0,
+     0,
+     2,
+     1,
+     0,
+     1
+    ],
+    "minuty": [
+     90,
+     83,
+     73,
+     90,
+     70,
+     45
+    ],
+    "srednia90": 0.8
+   },
+   "shots_off_target": {
+    "ostatnie": [
+     1,
+     0,
+     2,
+     0,
+     0,
+     0
+    ],
+    "minuty": [
+     90,
+     83,
+     73,
+     90,
+     70,
+     45
+    ],
+    "srednia90": 0.6
+   }
+  }
+ },
+ {
+  "id": 974311895,
+  "nazwa": "Ezri Konsa",
+  "pozycja": "M",
+  "druzyna": "England",
+  "minuty_lacznie": 475,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     0,
+     0,
+     0,
+     2,
+     1,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     90,
+     70,
+     45
+    ],
+    "srednia90": 0.57
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     1,
+     3,
+     2,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     90,
+     70,
+     45
+    ],
+    "srednia90": 1.33
+   },
+   "fouls_won": {
+    "ostatnie": [
+     1,
+     3,
+     2,
+     2,
+     2,
+     1
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     90,
+     70,
+     45
+    ],
+    "srednia90": 2.08
+   },
+   "headed_shots": {
+    "ostatnie": [
+     0,
+     0,
+     0,
+     1,
+     1,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     90,
+     70,
+     45
+    ],
+    "srednia90": 0.38
+   }
+  }
+ },
+ {
+  "id": 939677256,
+  "nazwa": "Harry Kane",
+  "pozycja": "M",
+  "druzyna": "England",
+  "minuty_lacznie": 460,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     5,
+     3,
+     3,
+     7,
+     3,
+     3
+    ],
+    "minuty": [
+     90,
+     83,
+     90,
+     90,
+     62,
+     45
+    ],
+    "srednia90": 4.7
+   },
+   "sot": {
+    "ostatnie": [
+     3,
+     2,
+     1,
+     3,
+     1,
+     3
+    ],
+    "minuty": [
+     90,
+     83,
+     90,
+     90,
+     62,
+     45
+    ],
+    "srednia90": 2.54
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     0,
+     2,
+     1,
+     2,
+     1,
+     0
+    ],
+    "minuty": [
+     90,
+     83,
+     90,
+     90,
+     62,
+     45
+    ],
+    "srednia90": 1.17
+   },
+   "fouls_won": {
+    "ostatnie": [
+     2,
+     1,
+     2,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     90,
+     83,
+     90,
+     90,
+     62,
+     45
+    ],
+    "srednia90": 1.17
+   },
+   "headed_shots": {
+    "ostatnie": [
+     1,
+     1,
+     0,
+     2,
+     1,
+     2
+    ],
+    "minuty": [
+     90,
+     83,
+     90,
+     90,
+     62,
+     45
+    ],
+    "srednia90": 1.37
+   },
+   "headed_sot": {
+    "ostatnie": [
+     1,
+     1,
+     0,
+     1,
+     1,
+     2
+    ],
+    "minuty": [
+     90,
+     83,
+     90,
+     90,
+     62,
+     45
+    ],
+    "srednia90": 1.17
+   },
+   "shots_outside_box": {
+    "ostatnie": [
+     1,
+     0,
+     1,
+     1,
+     1,
+     1
+    ],
+    "minuty": [
+     90,
+     83,
+     90,
+     90,
+     62,
+     45
+    ],
+    "srednia90": 0.98
+   },
+   "sot_outside_box": {
+    "ostatnie": [
+     0,
+     0,
+     1,
+     0,
+     0,
+     1
+    ],
+    "minuty": [
+     90,
+     83,
+     90,
+     90,
+     62,
+     45
+    ],
+    "srednia90": 0.39
+   },
+   "shots_blocked": {
+    "ostatnie": [
+     1,
+     1,
+     1,
+     1,
+     1,
+     0
+    ],
+    "minuty": [
+     90,
+     83,
+     90,
+     90,
+     62,
+     45
+    ],
+    "srednia90": 0.98
+   },
+   "shots_off_target": {
+    "ostatnie": [
+     1,
+     0,
+     1,
+     3,
+     1,
+     0
+    ],
+    "minuty": [
+     90,
+     83,
+     90,
+     90,
+     62,
+     45
+    ],
+    "srednia90": 1.17
+   }
+  }
+ },
+ {
+  "id": 910041677,
+  "nazwa": "Jordan Pickford",
+  "pozycja": "M",
+  "druzyna": "England",
+  "minuty_lacznie": 467,
+  "forma": {
+   "fouls_won": {
+    "ostatnie": [
+     0,
+     0,
+     2,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     90,
+     62,
+     45
+    ],
+    "srednia90": 0.58
+   }
+  }
+ },
+ {
+  "id": 939286940,
+  "nazwa": "Jude Bellingham",
+  "pozycja": "M",
+  "druzyna": "England",
+  "minuty_lacznie": 426,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     3,
+     2,
+     1,
+     3,
+     1,
+     2
+    ],
+    "minuty": [
+     90,
+     70,
+     72,
+     79,
+     70,
+     45
+    ],
+    "srednia90": 2.54
+   },
+   "sot": {
+    "ostatnie": [
+     3,
+     1,
+     0,
+     2,
+     0,
+     0
+    ],
+    "minuty": [
+     90,
+     70,
+     72,
+     79,
+     70,
+     45
+    ],
+    "srednia90": 1.27
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     2,
+     0,
+     2,
+     0,
+     1,
+     2
+    ],
+    "minuty": [
+     90,
+     70,
+     72,
+     79,
+     70,
+     45
+    ],
+    "srednia90": 1.48
+   },
+   "fouls_won": {
+    "ostatnie": [
+     1,
+     4,
+     0,
+     1,
+     0,
+     1
+    ],
+    "minuty": [
+     90,
+     70,
+     72,
+     79,
+     70,
+     45
+    ],
+    "srednia90": 1.48
+   },
+   "headed_shots": {
+    "ostatnie": [
+     2,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "minuty": [
+     90,
+     70,
+     72,
+     79,
+     70,
+     45
+    ],
+    "srednia90": 0.42
+   },
+   "headed_sot": {
+    "ostatnie": [
+     2,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "minuty": [
+     90,
+     70,
+     72,
+     79,
+     70,
+     45
+    ],
+    "srednia90": 0.42
+   },
+   "shots_outside_box": {
+    "ostatnie": [
+     0,
+     1,
+     0,
+     0,
+     1,
+     1
+    ],
+    "minuty": [
+     90,
+     70,
+     72,
+     79,
+     70,
+     45
+    ],
+    "srednia90": 0.63
+   },
+   "shots_blocked": {
+    "ostatnie": [
+     0,
+     0,
+     1,
+     0,
+     1,
+     1
+    ],
+    "minuty": [
+     90,
+     70,
+     72,
+     79,
+     70,
+     45
+    ],
+    "srednia90": 0.63
+   },
+   "shots_off_target": {
+    "ostatnie": [
+     0,
+     1,
+     0,
+     1,
+     0,
+     1
+    ],
+    "minuty": [
+     90,
+     70,
+     72,
+     79,
+     70,
+     45
+    ],
+    "srednia90": 0.63
+   }
+  }
+ },
+ {
+  "id": 970103608,
+  "nazwa": "Marc Guehi",
+  "pozycja": "M",
+  "druzyna": "England",
+  "minuty_lacznie": 347,
+  "forma": {
+   "fouls_committed": {
+    "ostatnie": [
+     0,
+     0,
+     2,
+     0,
+     0,
+     1
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     4,
+     28,
+     45
+    ],
+    "srednia90": 0.78
+   },
+   "fouls_won": {
+    "ostatnie": [
+     1,
+     2,
+     7,
+     0,
+     1,
+     2
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     4,
+     28,
+     45
+    ],
+    "srednia90": 3.37
+   },
+   "interceptions": {
+    "ostatnie": [
+     0,
+     2,
+     0,
+     0,
+     1,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     4,
+     28,
+     45
+    ],
+    "srednia90": 0.78
+   }
+  }
+ },
+ {
+  "id": 956964556,
+  "nazwa": "Marcus Rashford",
+  "pozycja": "M",
+  "druzyna": "England",
+  "minuty_lacznie": 242,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     3,
+     5,
+     0,
+     1,
+     1,
+     2
+    ],
+    "minuty": [
+     60,
+     90,
+     8,
+     19,
+     20,
+     45
+    ],
+    "srednia90": 4.46
+   },
+   "sot": {
+    "ostatnie": [
+     0,
+     1,
+     0,
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     60,
+     90,
+     8,
+     19,
+     20,
+     45
+    ],
+    "srednia90": 0.74
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     2,
+     1,
+     2,
+     0,
+     0,
+     0
+    ],
+    "minuty": [
+     60,
+     90,
+     8,
+     19,
+     20,
+     45
+    ],
+    "srednia90": 1.86
+   },
+   "fouls_won": {
+    "ostatnie": [
+     1,
+     0,
+     0,
+     0,
+     2,
+     1
+    ],
+    "minuty": [
+     60,
+     90,
+     8,
+     19,
+     20,
+     45
+    ],
+    "srednia90": 1.49
+   },
+   "headed_shots": {
+    "ostatnie": [
+     1,
+     1,
+     0,
+     0,
+     0,
+     0
+    ],
+    "minuty": [
+     60,
+     90,
+     8,
+     19,
+     20,
+     45
+    ],
+    "srednia90": 0.74
+   },
+   "shots_outside_box": {
+    "ostatnie": [
+     0,
+     2,
+     0,
+     0,
+     0,
+     1
+    ],
+    "minuty": [
+     60,
+     90,
+     8,
+     19,
+     20,
+     45
+    ],
+    "srednia90": 1.12
+   },
+   "shots_off_target": {
+    "ostatnie": [
+     2,
+     4,
+     0,
+     0,
+     1,
+     1
+    ],
+    "minuty": [
+     60,
+     90,
+     8,
+     19,
+     20,
+     45
+    ],
+    "srednia90": 2.98
+   }
+  }
+ },
+ {
+  "id": 958294249,
+  "nazwa": "Morgan Rogers",
+  "pozycja": "M",
+  "druzyna": "England",
+  "minuty_lacznie": 200,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     0,
+     0,
+     0,
+     3,
+     2
+    ],
+    "minuty": [
+     90,
+     18,
+     19,
+     28,
+     45
+    ],
+    "srednia90": 2.25
+   }
+  }
+ },
+ {
+  "id": 920157799,
+  "nazwa": "Nico O'Reilly",
+  "pozycja": "M",
+  "druzyna": "England",
+  "minuty_lacznie": 410,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     1,
+     1,
+     2,
+     2,
+     2,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     25,
+     90,
+     70,
+     45
+    ],
+    "srednia90": 1.76
+   },
+   "fouls_committed": {
+    "ostatnie": [
+     3,
+     2,
+     0,
+     1,
+     0,
+     1
+    ],
+    "minuty": [
+     90,
+     90,
+     25,
+     90,
+     70,
+     45
+    ],
+    "srednia90": 1.54
+   },
+   "fouls_won": {
+    "ostatnie": [
+     1,
+     0,
+     0,
+     1,
+     3,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     25,
+     90,
+     70,
+     45
+    ],
+    "srednia90": 1.1
+   },
+   "interceptions": {
+    "ostatnie": [
+     1,
+     0,
+     0,
+     0,
+     1,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     25,
+     90,
+     70,
+     45
+    ],
+    "srednia90": 0.44
+   },
+   "headed_shots": {
+    "ostatnie": [
+     0,
+     1,
+     2,
+     2,
+     1,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     25,
+     90,
+     70,
+     45
+    ],
+    "srednia90": 1.32
+   },
+   "shots_off_target": {
+    "ostatnie": [
+     1,
+     1,
+     1,
+     1,
+     2,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     25,
+     90,
+     70,
+     45
+    ],
+    "srednia90": 1.32
+   }
+  }
+ },
+ {
+  "id": 976626296,
+  "nazwa": "Noni Madueke",
+  "pozycja": "M",
+  "druzyna": "England",
+  "minuty_lacznie": 303,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     2,
+     1,
+     2,
+     1,
+     3
+    ],
+    "minuty": [
+     60,
+     28,
+     82,
+     71,
+     62
+    ],
+    "srednia90": 2.67
+   },
+   "sot": {
+    "ostatnie": [
+     0,
+     1,
+     0,
+     0,
+     1
+    ],
+    "minuty": [
+     60,
+     28,
+     82,
+     71,
+     62
+    ],
+    "srednia90": 0.59
+   },
+   "fouls_won": {
+    "ostatnie": [
+     1,
+     0,
+     1,
+     1,
+     2
+    ],
+    "minuty": [
+     60,
+     28,
+     82,
+     71,
+     62
+    ],
+    "srednia90": 1.49
+   },
+   "interceptions": {
+    "ostatnie": [
+     1,
+     0,
+     0,
+     1,
+     0
+    ],
+    "minuty": [
+     60,
+     28,
+     82,
+     71,
+     62
+    ],
+    "srednia90": 0.59
+   },
+   "shots_outside_box": {
+    "ostatnie": [
+     1,
+     0,
+     1,
+     0,
+     2
+    ],
+    "minuty": [
+     60,
+     28,
+     82,
+     71,
+     62
+    ],
+    "srednia90": 1.19
+   },
+   "shots_blocked": {
+    "ostatnie": [
+     2,
+     0,
+     1,
+     1,
+     0
+    ],
+    "minuty": [
+     60,
+     28,
+     82,
+     71,
+     62
+    ],
+    "srednia90": 1.19
+   },
+   "shots_off_target": {
+    "ostatnie": [
+     0,
+     0,
+     1,
+     0,
+     1
+    ],
+    "minuty": [
+     60,
+     28,
+     82,
+     71,
+     62
+    ],
+    "srednia90": 0.59
+   }
+  }
+ },
+ {
+  "id": 966722601,
+  "nazwa": "Ollie Watkins",
+  "pozycja": "M",
+  "druzyna": "England",
+  "minuty_lacznie": 72,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     0,
+     3,
+     2
+    ],
+    "minuty": [
+     7,
+     20,
+     45
+    ],
+    "srednia90": 6.25
+   }
+  }
+ },
+ {
+  "id": 915133817,
+  "nazwa": "Reece James",
+  "pozycja": "M",
+  "druzyna": "England",
+  "minuty_lacznie": 287,
+  "forma": {
+   "fouls_committed": {
+    "ostatnie": [
+     0,
+     1,
+     1,
+     1
+    ],
+    "minuty": [
+     90,
+     90,
+     62,
+     45
+    ],
+    "srednia90": 0.94
+   }
+  }
+ },
+ {
+  "id": 941159352,
+  "nazwa": "Moise Bombito",
+  "pozycja": "M",
+  "druzyna": "Canada",
+  "minuty_lacznie": 133,
+  "forma": {
+   "headed_shots": {
+    "ostatnie": [
+     1,
+     0,
+     0
+    ],
+    "minuty": [
+     58,
+     45,
+     30
+    ],
+    "srednia90": 0.68
+   }
+  }
+ },
+ {
+  "id": 976617969,
+  "nazwa": "Leo Oestigaard",
+  "pozycja": "M",
+  "druzyna": "Norway",
+  "minuty_lacznie": 162,
+  "forma": {
+   "headed_shots": {
+    "ostatnie": [
+     1,
+     0,
+     2,
+     0,
+     0
+    ],
+    "minuty": [
+     90,
+     7,
+     18,
+     19,
+     28
+    ],
+    "srednia90": 1.67
    }
   }
  }

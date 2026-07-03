@@ -5,6 +5,28 @@ import { fmtDataCzas, fmtKurs, fmtLinia, fmtProc, STRONA_LABEL } from "@/lib/for
 
 export const metadata = { title: "Kupony — FootStats" };
 
+const HORYZONTY: {
+  kod: "dzienny" | "dlugoterminowy" | "value";
+  tytul: string;
+  opis: string;
+}[] = [
+  {
+    kod: "dzienny",
+    tytul: "Na dziś",
+    opis: "Mecze z dzisiaj (a gdy gra mało drużyn — także z jutra). Krótkie oczekiwanie, więcej wydarzeń z jednego meczu.",
+  },
+  {
+    kod: "dlugoterminowy",
+    tytul: "Długoterminowe (1–4 dni)",
+    opis: "Legi rozłożone na kilka dni — model wybiera z pełnej puli nadchodzących meczów, więc jakość legów jest najwyższa.",
+  },
+  {
+    kod: "value",
+    tytul: "Value",
+    opis: "Wyłącznie typy z matematyczną przewagą nad bukmacherem, maksymalnie jeden z meczu — kupon nastawiony na zysk w długiej serii.",
+  },
+];
+
 export default async function KuponyPage() {
   const [kupony, meta] = await Promise.all([getKupony(), getMeta()]);
 
@@ -15,12 +37,11 @@ export default async function KuponyPage() {
         title="Kupony budowane przez model"
         lead={
           <>
-            Model składa kupony z w pełni przeanalizowanych typów (historia,
-            minuty, składy z dwóch źródeł, matchup). <strong>Pewniaki</strong>:
-            legi o najwyższej szansie łączone tak, by kurs doszedł do ~10–25
-            przy maksymalnej szansie trafienia — do 4 wydarzeń z meczu, z karą
-            korelacyjną. <strong>Value</strong>: wyłącznie typy z matematyczną
-            przewagą, max 1 na mecz. Szansa kuponu = iloczyn szans legów.
+            Każdy leg przechodzi pełną analizę modelu (historia, minuty, składy
+            z dwóch źródeł, matchup), a do kuponu wchodzą legi o najlepszym
+            stosunku pewności do kursu — do 4 wydarzeń z jednego meczu, z karą
+            korelacyjną za łączenie w ramach meczu. Szansa kuponu = iloczyn
+            szans legów.
           </>
         }
       />
@@ -40,14 +61,23 @@ export default async function KuponyPage() {
           </div>
         </Reveal>
       ) : (
-        <div className="mt-8 grid gap-4 lg:grid-cols-2">
-          {kupony.map((k, i) => (
-            <Reveal key={`${k.styl}-${k.cel}`} delay={Math.min(i * 0.06, 0.25)}>
+        HORYZONTY.map((h) => {
+          const grupa = kupony.filter((k) => (k.horyzont ?? "value") === h.kod);
+          if (grupa.length === 0) return null;
+          return (
+            <section key={h.kod} className="mt-9">
+              <Reveal>
+                <h2 className="text-lg font-semibold">{h.tytul}</h2>
+                <p className="mt-1 max-w-3xl text-sm text-muted">{h.opis}</p>
+              </Reveal>
+              <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                {grupa.map((k, i) => (
+            <Reveal key={`${k.horyzont}-${k.cel}`} delay={Math.min(i * 0.06, 0.25)}>
               <article className="flex h-full flex-col rounded-2xl border border-hairline bg-card shadow-(--shadow-card) transition-shadow hover:shadow-(--shadow-card-hover)">
                 <header className="flex items-center justify-between gap-3 border-b border-hairline px-5 py-4">
                   <span className="flex items-center gap-2">
                     <span className="font-data rounded-lg bg-brand px-3 py-1 text-lg font-bold text-white">
-                      ×{k.cel}
+                      ×{k.cel_label ?? k.cel}
                     </span>
                     <span
                       className={`rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
@@ -122,8 +152,11 @@ export default async function KuponyPage() {
                 </footer>
               </article>
             </Reveal>
-          ))}
-        </div>
+                ))}
+              </div>
+            </section>
+          );
+        })
       )}
     </div>
   );

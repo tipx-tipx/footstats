@@ -19,9 +19,15 @@ EV = szansa x kurs - 1. Za mało legów = brak kuponu (nie sklejamy na siłę).
 from __future__ import annotations
 
 import math
+import time
 
 CELE = (5.0, 10.0)
-CELE_PEWNIAKI = (10.0, 15.0, 20.0, 25.0)
+# przedziały kursowe (user: "nie muszą być dokładnie, np. od 5 do 10, od 10 do 15")
+PRZEDZIALY_DZIENNE = ((5.0, 10.0), (10.0, 15.0), (15.0, 20.0), (20.0, 25.0))
+PRZEDZIALY_DLUGOTERMINOWE = ((10.0, 15.0), (15.0, 20.0), (20.0, 25.0), (25.0, 35.0))
+OKNO_DZIS_S = 20 * 3600       # "dziś" = mecze w ciągu ~20 h
+OKNO_JUTRO_S = 44 * 3600      # rozszerzenie na jutro, gdy dziś < 2 mecze
+OKNO_DLUGO_S = 4 * 86400      # długoterminowy: mecze z najbliższych 4 dni
 MIN_LEG_EV = 0.0          # leg value musi mieć nieujemną wartość
 MAX_LEGI = 8
 MAX_LEGI_PEWNIAKI = 12
@@ -102,8 +108,8 @@ def _leg_dict(b: dict) -> dict:
     }
 
 
-def _zloz_pewniaki(pool: list[dict], cel: float) -> dict | None:
-    """Maksymalizuj szansę kuponu przy kursie łącznym ~cel.
+def _zloz_pewniaki(pool: list[dict], cmin: float, cmax: float) -> dict | None:
+    """Maksymalizuj szansę kuponu przy kursie łącznym w przedziale [cmin, cmax].
 
     Jakość lega = ln(p) / ln(kurs): ile "kosztu pewności" płacimy za każdą
     jednostkę logarytmu kursu. Im bliżej zera, tym leg bezpieczniejszy
@@ -119,10 +125,12 @@ def _zloz_pewniaki(pool: list[dict], cel: float) -> dict | None:
     uzyci: set[int] = set()
     kara = 1.0
     for b in cands:
-        if len(legi) >= MAX_LEGI_PEWNIAKI or kurs >= cel * 0.9:
+        if len(legi) >= MAX_LEGI_PEWNIAKI or kurs >= cmin:
             break
         if b["podmiot_id"] in uzyci or na_mecz.get(b["mecz_id"], 0) >= MAX_NA_MECZ:
             continue
+        if kurs * b["kurs"] > cmax:
+            continue  # ten leg przestrzeliłby przedział — szukaj mniejszego
         if na_mecz.get(b["mecz_id"], 0) >= 1:
             kara *= KARA_KORELACJI  # każdy dodatkowy leg z tego samego meczu
         legi.append(b)
@@ -131,10 +139,11 @@ def _zloz_pewniaki(pool: list[dict], cel: float) -> dict | None:
         kurs *= b["kurs"]
         p *= b["p_model"]
     p *= kara
-    if len(legi) < 3 or not (cel * 0.85 <= kurs <= cel * 1.6):
+    if len(legi) < 3 or not (cmin <= kurs <= cmax):
         return None
     return {
-        "cel": int(cel),
+        "cel": int(cmin),
+        "cel_label": f"{int(cmin)}–{int(cmax)}",
         "styl": "pewniaki",
         "kurs_laczny": round(kurs, 2),
         "p_model": round(p, 4),
@@ -144,18 +153,41 @@ def _zloz_pewniaki(pool: list[dict], cel: float) -> dict | None:
     }
 
 
-def build_kupony(bets: list[dict], pool: list[dict] | None = None) -> list[dict]:
-    """Kupony pewniaków (z puli wszystkich kwotowanych linii) + kupony value."""
+def build_kupony(
+    bets: list[dict], pool: list[dict] | None = None, now_ts: int | None = None
+) -> list[dict]:
+    """Kupony pewniaków w dwóch horyzontach + kupony value.
+
+    DZIENNY: mecze z dziś (gdy dziś < 2 mecze — również jutro); przedziały
+    kursowe 5-10 / 10-15 / 15-20 / 20-25.
+    DŁUGOTERMINOWY: mecze z najbliższych 4 dni; przedziały od 10-15 do 25-35.
+    """
+    now = now_ts if now_ts is not None else int(time.time())
+    pool = [b for b in (pool or []) if b["kickoff_ts"] > now - 3600]
     out: list[dict] = []
-    for cel in CELE_PEWNIAKI:
-        k = _zloz_pewniaki(pool or [], cel)
+
+    dzis = [b for b in pool if b["kickoff_ts"] <= now + OKNO_DZIS_S]
+    if len({b["mecz_id"] for b in dzis}) < 2:
+        dzis = [b for b in pool if b["kickoff_ts"] <= now + OKNO_JUTRO_S]
+    for cmin, cmax in PRZEDZIALY_DZIENNE:
+        k = _zloz_pewniaki(dzis, cmin, cmax)
         if k is not None:
+            k["horyzont"] = "dzienny"
             out.append(k)
+
+    dlugo = [b for b in pool if b["kickoff_ts"] <= now + OKNO_DLUGO_S]
+    for cmin, cmax in PRZEDZIALY_DLUGOTERMINOWE:
+        k = _zloz_pewniaki(dlugo, cmin, cmax)
+        if k is not None:
+            k["horyzont"] = "dlugoterminowy"
+            out.append(k)
+
     cands = _kandydaci(bets)
     for cel in CELE:
         k = _zloz(cands, cel)
         if k is not None:
             k["styl"] = "value"
+            k["horyzont"] = "value"
+            k["cel_label"] = f"~{int(cel)}"
             out.append(k)
-    out.sort(key=lambda k: (k["styl"] != "pewniaki", k["cel"]))
     return out

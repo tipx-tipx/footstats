@@ -116,8 +116,8 @@ class ValueAssessment:
 
 
 # Minimalne progi publikacji okazji
-MIN_EV_PCT = 3.0
-MIN_EV_PCT_RARE = 8.0
+MIN_EV_PCT = 1.0   # decyzja użytkownika 2026-07-03: pokazuj każdą dodatnią wartość od +1%
+MIN_EV_PCT_RARE = 5.0
 MIN_CONFIDENCE_SCORE = 25.0
 MAX_MODEL_MARKET_DIVERGENCE = 0.22  # różnica p_model vs p_rynku > 22 pp = podejrzana
 MAX_RELATIVE_DIVERGENCE = 1.9       # p_model / p_rynku > 1.9x = podejrzane (longshoty!)

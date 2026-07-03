@@ -28,7 +28,7 @@ from dataclasses import replace as dc_replace
 
 from .. import supa
 from ..engine import MatchContext, PlayerHistory, RARE_MARKETS, score_player_market
-from ..model import counts, kupony, matchup_lite
+from ..model import betting, counts, kupony, matchup_lite
 from ..sources import rotowire, scores365, statshub, superbet
 from . import rozliczanie
 from .build_demo import MARKET_NAMES_PL, WEB_DATA_DIR, line_for_lambda
@@ -271,6 +271,74 @@ def main():
         if n_lib:
             print(f"Biblioteka historii ({len(lib)} trendów w banku): "
                   f"+{n_lib} przepiętych na mecze bez propsów statshub")
+
+        # 4) drużyny wciąż BEZ historii (statshub skasował przed powstaniem
+        #    banku): pełne statystyki meczowe z 365Scores (minuty, strzały,
+        #    faule, faule na zawodniku, przechwyty; odbiór — brak w 365)
+        MARKETY_365_FULL = ("shots", "sot", "fouls_committed", "fouls_won",
+                            "interceptions")
+        pokryte_teamy = {t.team_id for t in trends}
+        braki: list[tuple[dict, int, int, bool, str, str]] = []
+        for e in uncovered:
+            hid, aid = e["homeTeamId"], e["awayTeamId"]
+            slug_parts = str(e.get("slug", "")).replace("-vs-", "|").split("|")
+            if len(slug_parts) != 2:
+                continue
+            home_nm = slug_parts[0].replace("-", " ").title()
+            away_nm = slug_parts[1].rsplit("-", 1)[0].replace("-", " ").title()
+            if hid not in pokryte_teamy:
+                braki.append((e, hid, aid, True, home_nm, away_nm))
+            if aid not in pokryte_teamy:
+                braki.append((e, aid, hid, False, away_nm, home_nm))
+        if braki:
+            cids365 = scores365.competitor_ids(
+                sorted({b[4] for b in braki})
+            )
+            n_365 = 0
+            hist_cache: dict[str, list] = {}
+            for e, tid, opp_tid, is_home, team_nm, opp_nm in braki:
+                cid = cids365.get(rotowire._norm(team_nm))
+                if not cid:
+                    continue
+                if team_nm not in hist_cache:
+                    hist_cache[team_nm] = scores365.team_match_history(cid, 6)
+                games = hist_cache[team_nm]
+                if len(games) < 3:
+                    continue
+                gracze = sorted({p for _, st in games for p in st})
+                for pkey in gracze:
+                    wpisy = [(ts, st.get(pkey)) for ts, st in games]
+                    zagrane = [w for w in wpisy if w[1] and w[1].get("minutes", 0) > 0]
+                    if len(zagrane) < 3:
+                        continue
+                    for mk in MARKETY_365_FULL:
+                        c_l, m_l, tss, st_l = [], [], [], []
+                        for ts_g, rec in wpisy:
+                            if rec is None:
+                                continue
+                            c_l.append(float(rec.get(mk, 0)))
+                            m_l.append(float(rec.get("minutes", 0)))
+                            tss.append(int(ts_g))
+                            st_l.append(bool(rec.get("started")))
+                        trends.append(statshub.StatshubTrend(
+                            player_id=900_000_000 + abs(hash(pkey)) % 90_000_000,
+                            player_name=pkey.title(),
+                            position="M",
+                            team_id=tid, team_name=team_nm,
+                            opponent_id=opp_tid, opponent_name=opp_nm,
+                            is_home=is_home, market_code=mk, line=0.5,
+                            in_predicted_lineup=False,
+                            league_average=None, opponent_average=None,
+                            opponent_rank=None, total_ranks=None,
+                            event_id=e["id"],
+                            counts=c_l, minutes=m_l,
+                            timestamps=tss, started=st_l,
+                            game_positions=[""] * len(c_l),
+                        ))
+                        n_365 += 1
+            if n_365:
+                print(f"365Scores pełne staty: +{n_365} trendów dla drużyn "
+                      f"bez historii statshub ({len(hist_cache)} drużyn)")
     except Exception as ex:
         print(f"Biblioteka historii pominięta ({ex})")
 
@@ -544,18 +612,22 @@ def main():
                                      over_odd, under_odd,
                                      market_calibrated=True)
             # pula pewniaków pod kupony: wysoka szansa + rozsądny kurs,
-            # bez wymogu value (ale bez grania mocno przeciw modelowi)
+            # bez wymogu value, ale z TYMI SAMYMI bezpiecznikami rozbieżności
+            # co okazje — model skrajnie niezgodny z rynkiem zwykle się myli
             for side_key, side_pl in (("over", "powyzej"), ("under", "ponizej")):
                 sv = slot.get(side_key)
                 if not sv:
                     continue
                 odd = sv[0]
                 p_side = sm.p_over if side_key == "over" else 1.0 - sm.p_over
+                implied = betting.implied_prob_one_sided(odd)
                 if (
                     1.10 <= odd <= 2.60
                     and p_side >= 0.55
                     and p_side * odd - 1.0 >= -0.12
                     and (sm.ci_high - sm.ci_low) <= 0.35
+                    and abs(p_side - implied) <= betting.MAX_MODEL_MARKET_DIVERGENCE
+                    and (implied <= 0 or p_side / implied <= betting.MAX_RELATIVE_DIVERGENCE)
                 ):
                     legi_pool.append({
                         "id": 0, "mecz_id": mid, "mecz": match_label,

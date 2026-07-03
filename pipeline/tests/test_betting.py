@@ -65,8 +65,8 @@ def test_assess_rejects_extreme_divergence():
 
 def test_rare_market_needs_bigger_edge():
     conf_rare = betting.ConfidenceInputs(25.0, 0.9, 0.08, 0.05, True, True)
-    # EV ~5% — wystarcza normalnie, za mało dla rzadkiego rynku
-    res = betting.assess(0.50, over_odds=2.10, under_odds=1.80, conf_inputs=conf_rare, lam=0.4)
+    # EV ~3% — wystarcza normalnie (próg 1%), za mało dla rzadkiego (próg 5%)
+    res = betting.assess(0.50, over_odds=2.06, under_odds=1.84, conf_inputs=conf_rare, lam=0.4)
     assert all(r.side != "powyzej" for r in res)
 
 

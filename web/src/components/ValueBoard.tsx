@@ -99,7 +99,7 @@ export function ValueBoard({
 }) {
   const [rynek, setRynek] = useState("wszystkie");
   const [pewnosc, setPewnosc] = useState<Pewnosc | "kazda">("kazda");
-  const [minEv, setMinEv] = useState(3);
+  const [minEv, setMinEv] = useState(1);
   const [meczId, setMeczId] = useState<number | undefined>(initialMatchId);
   // gdy rynek chwilowo nie daje okazji z kursem, otwórz od razu sugestie
   const [rodzaj, setRodzaj] = useState<"okazje" | "sugestie" | "wszystko">(() =>
@@ -147,7 +147,7 @@ export function ValueBoard({
   const wyczyscFiltry = () => {
     setRynek("wszystkie");
     setPewnosc("kazda");
-    setMinEv(3);
+    setMinEv(1);
     setMeczId(undefined);
     setSortuj("ranking");
   };
@@ -283,7 +283,7 @@ export function ValueBoard({
             </span>
             <input
               type="range"
-              min={3}
+              min={1}
               max={20}
               step={1}
               value={minEv}

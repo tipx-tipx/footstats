@@ -141,6 +141,10 @@ export interface KuponLeg {
 /** Kupon (AKO) budowany przez model pod docelowy kurs (x5/x10/x15/x20/x25). */
 export interface Kupon {
   cel: number;
+  /** np. "10–15" — przedział kursowy kuponu */
+  cel_label?: string;
+  /** dzienny = mecze z dziś/jutra; dlugoterminowy = najbliższe 4 dni */
+  horyzont?: "dzienny" | "dlugoterminowy" | "value";
   /** pewniaki = maks. szansa przy zadanym kursie; value = tylko typy z przewagą */
   styl?: "pewniaki" | "value";
   kurs_laczny: number;
