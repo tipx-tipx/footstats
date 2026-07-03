@@ -166,8 +166,13 @@ def score_player_market(
     under_odds: float | None = None,
     market_calibrated: bool = False,
     card_conversion: float | None = None,
+    market_bias: float = 1.0,
 ) -> ScoredMarket:
-    """Pełny scoring jednego rynku zawodnika dla jednego meczu."""
+    """Pełny scoring jednego rynku zawodnika dla jednego meczu.
+
+    market_bias — kalibracja z ROZLICZONYCH typów (jobs/rozliczanie.py):
+    zmierzone odchylenie rzeczywistej częstości od szans modelu na tym rynku.
+    """
 
     # 1) posterior bazowej intensywności per-90
     posterior = counts.fit_posterior(
@@ -245,6 +250,13 @@ def score_player_market(
         lam = pred_center.lam
 
     p_over = minutes_mod.p_over_mixture(mm, p_over_given_minutes)
+    if market_bias != 1.0:
+        # samokalibracja: skaluj szansę zmierzonym odchyleniem (cap w rozliczanie.py)
+        p_over *= market_bias
+        cf.notes["kalibracja"] = (
+            f"Korekta z rozliczonych typów: ×{market_bias:.2f} "
+            f"({'model niedoszacowywał' if market_bias > 1 else 'model przeszacowywał'})"
+        )
     p_over = float(np.clip(p_over, 1e-4, 1.0 - 1e-4))
 
     # 5) przedział wiarygodności (na centrum minutowym)

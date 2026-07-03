@@ -425,6 +425,14 @@ def main():
         sb_events = []
         print(f"Superbet niedostępny: {e}")
 
+    # samokalibracja: zmierzone odchylenia szans per rynek (od n>=25 rozliczonych)
+    try:
+        bias_map = rozliczanie.market_bias()
+        if bias_map:
+            print(f"Kalibracja z rozliczeń: {bias_map}")
+    except Exception:
+        bias_map = {}
+
     ev_by_id = {e["id"]: e for e in events}
     sb_cache: dict[int, dict] = {}
 
@@ -519,7 +527,8 @@ def main():
         mk = tr.market_code
 
         probe = score_player_market(mk, 0.5, hist, prior, ctx, None, None,
-                                    market_calibrated=True)
+                                    market_calibrated=True,
+                                    market_bias=bias_map.get(mk, 1.0))
         if probe.lam < (0.35 if mk not in RARE_MARKETS else 0.2):
             continue
         line = line_for_lambda(probe.lam)
@@ -539,7 +548,8 @@ def main():
         # (Superbet nie kwotuje tych rynków — wynik trafi do sugestii STS)
         if mk in ("shots_blocked", "shots_off_target"):
             sm_r = score_player_market(mk, line, hist, prior, ctx, None, None,
-                                       market_calibrated=True)
+                                       market_calibrated=True,
+                                       market_bias=bias_map.get(mk, 1.0))
             dist_r = counts.predict_match(
                 counts.fit_posterior(
                     np.array(hist.counts), np.array(hist.minutes),
@@ -610,7 +620,8 @@ def main():
             under_odd = slot.get("under", (None,))[0]
             sm = score_player_market(mk, l, hist, prior, ctx,
                                      over_odd, under_odd,
-                                     market_calibrated=True)
+                                     market_calibrated=True,
+                                     market_bias=bias_map.get(mk, 1.0))
             # pula pewniaków pod kupony: wysoka szansa + rozsądny kurs,
             # bez wymogu value, ale z TYMI SAMYMI bezpiecznikami rozbieżności
             # co okazje — model skrajnie niezgodny z rynkiem zwykle się myli

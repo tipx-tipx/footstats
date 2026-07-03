@@ -113,6 +113,39 @@ def _wartosc_z_banku(rec: dict, lib: dict) -> float | None:
     return None
 
 
+MIN_N_KALIBRACJI = 25          # od tylu rozliczonych typów na rynek korygujemy
+BIAS_CAP = (0.85, 1.15)        # ostrożnie: maks. +-15% korekty szansy
+
+
+def compute_bias(log: dict, min_n: int = MIN_N_KALIBRACJI) -> dict[str, float]:
+    """Współczynniki korekty szansy per rynek z rozliczonych typów.
+
+    bias = (trafienia + 2) / (suma zamrożonych p_model + 2) — czyli o ile
+    rzeczywista częstość odbiega od tego, co model twierdził. >1 = model
+    niedoszacowuje, <1 = przeszacowuje. Zwracamy tylko rynki z próbą >= min_n,
+    z twardym capem — korekta ma dokręcać, nie rządzić.
+    """
+    grupy: dict[str, list[dict]] = {}
+    for r in log.values():
+        if r.get("wynik") in ("wygrany", "przegrany"):
+            grupy.setdefault(r["rynek_kod"], []).append(r)
+    out: dict[str, float] = {}
+    for mk, grp in grupy.items():
+        if len(grp) < min_n:
+            continue
+        traf = sum(1 for r in grp if r["wynik"] == "wygrany")
+        suma_p = sum(r["p_model"] for r in grp)
+        bias = (traf + 2.0) / (suma_p + 2.0)
+        out[mk] = round(max(BIAS_CAP[0], min(BIAS_CAP[1], bias)), 3)
+    return out
+
+
+def market_bias() -> dict[str, float]:
+    """Korekty kalibracyjne z logu w Supabase (puste, gdy brak danych/env)."""
+    log = supa.get_key("typy_log") or {}
+    return compute_bias(log)
+
+
 def rozlicz(value_bets: list[dict]) -> dict:
     """Dopisz nowe typy do logu, rozlicz zakończone, zwróć podsumowanie."""
     log = supa.get_key("typy_log") or {}
