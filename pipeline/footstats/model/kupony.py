@@ -65,6 +65,7 @@ def _zloz(cands: list[dict], cel: float) -> dict | None:
         p *= b["p_model"]
     if len(legi) < 2 or not (cel * 0.85 <= kurs <= cel * 1.6):
         return None
+    legi.sort(key=lambda b: (b["kickoff_ts"], b["mecz_id"]))
     return {
         "cel": int(cel),
         "kurs_laczny": round(kurs, 2),
@@ -141,6 +142,8 @@ def _zloz_pewniaki(pool: list[dict], cmin: float, cmax: float) -> dict | None:
     p *= kara
     if len(legi) < 3 or not (cmin <= kurs <= cmax):
         return None
+    # legi z tego samego meczu obok siebie, mecze chronologicznie
+    legi.sort(key=lambda b: (b["kickoff_ts"], b["mecz_id"], -b["p_model"]))
     return {
         "cel": int(cmin),
         "cel_label": f"{int(cmin)}–{int(cmax)}",
@@ -169,11 +172,20 @@ def build_kupony(
     dzis = [b for b in pool if b["kickoff_ts"] <= now + OKNO_DZIS_S]
     if len({b["mecz_id"] for b in dzis}) < 2:
         dzis = [b for b in pool if b["kickoff_ts"] <= now + OKNO_JUTRO_S]
-    for cmin, cmax in PRZEDZIALY_DZIENNE:
-        k = _zloz_pewniaki(dzis, cmin, cmax)
-        if k is not None:
-            k["horyzont"] = "dzienny"
-            out.append(k)
+    dzienne = [
+        k for cmin, cmax in PRZEDZIALY_DZIENNE
+        if (k := _zloz_pewniaki(dzis, cmin, cmax)) is not None
+    ]
+    if not dzienne:
+        # z samego "dziś" nie da się złożyć kuponu — dobierz mecze z jutra
+        dzis = [b for b in pool if b["kickoff_ts"] <= now + OKNO_JUTRO_S]
+        dzienne = [
+            k for cmin, cmax in PRZEDZIALY_DZIENNE
+            if (k := _zloz_pewniaki(dzis, cmin, cmax)) is not None
+        ]
+    for k in dzienne:
+        k["horyzont"] = "dzienny"
+        out.append(k)
 
     dlugo = [b for b in pool if b["kickoff_ts"] <= now + OKNO_DLUGO_S]
     for cmin, cmax in PRZEDZIALY_DLUGOTERMINOWE:

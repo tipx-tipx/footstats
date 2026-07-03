@@ -10,9 +10,9 @@
   "sedzia": null,
   "sedzia_mnoznik_fauli": 1.0,
   "okazje": [
-   12,
-   13,
-   33
+   16,
+   17,
+   37
   ],
   "sklady_ogloszone": false
  },
@@ -27,8 +27,8 @@
   "sedzia": null,
   "sedzia_mnoznik_fauli": 1.0,
   "okazje": [
-   11,
-   32
+   15,
+   36
   ],
   "sklady_ogloszone": false
  },
@@ -43,7 +43,8 @@
   "sedzia": null,
   "sedzia_mnoznik_fauli": 1.0,
   "okazje": [
-   34
+   1,
+   38
   ],
   "sklady_ogloszone": false
  },
@@ -58,8 +59,11 @@
   "sedzia": null,
   "sedzia_mnoznik_fauli": 1.0,
   "okazje": [
-   14,
-   15
+   2,
+   3,
+   4,
+   18,
+   19
   ],
   "sklady_ogloszone": false
  },
@@ -74,7 +78,7 @@
   "sedzia": null,
   "sedzia_mnoznik_fauli": 1.0,
   "okazje": [
-   16
+   20
   ],
   "sklady_ogloszone": false
  },
@@ -89,15 +93,15 @@
   "sedzia": null,
   "sedzia_mnoznik_fauli": 1.0,
   "okazje": [
-   1,
-   2,
-   3,
-   4,
-   17,
-   18,
-   19,
-   20,
-   21
+   5,
+   6,
+   7,
+   8,
+   21,
+   22,
+   23,
+   24,
+   25
   ],
   "sklady_ogloszone": false
  },
@@ -112,10 +116,10 @@
   "sedzia": null,
   "sedzia_mnoznik_fauli": 1.0,
   "okazje": [
-   5,
-   22,
-   23,
-   24
+   9,
+   26,
+   27,
+   28
   ],
   "sklady_ogloszone": false
  },
@@ -130,11 +134,11 @@
   "sedzia": null,
   "sedzia_mnoznik_fauli": 1.0,
   "okazje": [
-   6,
-   7,
-   8,
-   25,
-   26
+   10,
+   11,
+   12,
+   29,
+   30
   ],
   "sklady_ogloszone": false
  },
@@ -149,13 +153,13 @@
   "sedzia": null,
   "sedzia_mnoznik_fauli": 1.0,
   "okazje": [
-   9,
-   10,
-   27,
-   28,
-   29,
-   30,
-   31
+   13,
+   14,
+   31,
+   32,
+   33,
+   34,
+   35
   ],
   "sklady_ogloszone": false
  }

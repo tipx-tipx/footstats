@@ -111,6 +111,8 @@ def classify_event(e: dict) -> dict[str, int] | None:
     body = str(e.get("bodyPart") or "")
     side = e.get("side")
     headed = body == "Header"
+    left = "left" in body.lower()
+    right = "right" in body.lower()
     on_target = out_id in (0, 2)
     outside = side is not None and float(side) < BOX_SIDE_THRESHOLD
     return {
@@ -122,6 +124,10 @@ def classify_event(e: dict) -> dict[str, int] | None:
         "sot_outside": 1 if outside and on_target else 0,
         "blocked": 1 if out_id == 4 else 0,
         "off_target": 1 if out_id == 1 else 0,
+        "left_foot": 1 if left else 0,
+        "left_foot_sot": 1 if left and on_target else 0,
+        "right_foot": 1 if right else 0,
+        "right_foot_sot": 1 if right and on_target else 0,
     }
 
 

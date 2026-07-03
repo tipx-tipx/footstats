@@ -121,30 +121,42 @@ export default async function KuponyPage() {
                     </div>
                   </div>
                 </header>
-                <ul className="flex-1 divide-y divide-hairline">
-                  {k.legi.map((l) => (
-                    <li key={l.value_bet_id} className="flex items-center gap-3 px-5 py-3">
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold">
-                          {l.podmiot}
-                          <span className="ml-1.5 font-normal text-muted">
-                            {l.rynek.toLowerCase()} {STRONA_LABEL[l.strona]}{" "}
-                            {fmtLinia(l.linia)}
+                {/* legi zgrupowane po meczu — jak w bet builderze */}
+                <div className="flex-1">
+                  {k.legi.map((l, li) => {
+                    const nowyMecz =
+                      li === 0 || k.legi[li - 1].mecz_id !== l.mecz_id;
+                    return (
+                      <div key={`${l.mecz_id}-${l.value_bet_id}-${li}`}>
+                        {nowyMecz && (
+                          <p className="flex items-baseline justify-between gap-2 border-y border-hairline bg-paper px-5 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-ink-soft first:border-t-0">
+                            {l.mecz}
+                            <span className="font-normal normal-case tracking-normal text-faint">
+                              {fmtDataCzas(l.kickoff_ts)}
+                            </span>
+                          </p>
+                        )}
+                        <div className="flex items-center gap-3 px-5 py-2.5">
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-semibold">
+                              {l.podmiot}
+                              <span className="ml-1.5 font-normal text-muted">
+                                {l.rynek.toLowerCase()} {STRONA_LABEL[l.strona]}{" "}
+                                {fmtLinia(l.linia)}
+                              </span>
+                            </p>
+                          </div>
+                          <span className="font-data text-xs text-muted">
+                            {fmtProc(l.p_model)}
                           </span>
-                        </p>
-                        <p className="truncate text-xs text-faint">
-                          {l.mecz} · {fmtDataCzas(l.kickoff_ts)}
-                        </p>
+                          <span className="font-data rounded-md bg-paper px-2 py-0.5 text-sm font-semibold">
+                            {fmtKurs(l.kurs)}
+                          </span>
+                        </div>
                       </div>
-                      <span className="font-data text-xs text-muted">
-                        {fmtProc(l.p_model)}
-                      </span>
-                      <span className="font-data rounded-md bg-paper px-2 py-0.5 text-sm font-semibold">
-                        {fmtKurs(l.kurs)}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+                    );
+                  })}
+                </div>
                 <footer className="border-t border-hairline px-5 py-3 text-xs text-faint">
                   uczciwy kurs kuponu: {fmtKurs(k.fair_kurs)} · {k.legi.length}{" "}
                   {k.legi.length === 1 ? "typ" : k.legi.length < 5 ? "typy" : "typów"}{" "}
