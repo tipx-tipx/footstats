@@ -10,7 +10,9 @@
   "legi": [
    {
     "value_bet_id": 0,
+    "podmiot_id": 1101624,
     "podmiot": "Mahmoud Saber",
+    "rynek_kod": "shots",
     "rynek": "Strzały",
     "linia": 0.5,
     "strona": "powyzej",
@@ -24,7 +26,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 951008589,
     "podmiot": "Neil El Aynaoui",
+    "rynek_kod": "fouls_committed",
     "rynek": "Faule popełnione",
     "linia": 0.5,
     "strona": "powyzej",
@@ -38,7 +42,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 948290709,
     "podmiot": "Jonathan David",
+    "rynek_kod": "shots",
     "rynek": "Strzały",
     "linia": 1.5,
     "strona": "powyzej",
@@ -52,7 +58,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 935666937,
     "podmiot": "Ismael Saibari",
+    "rynek_kod": "sot",
     "rynek": "Strzały celne",
     "linia": 0.5,
     "strona": "powyzej",
@@ -66,7 +74,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 988240439,
     "podmiot": "Michael Olise",
+    "rynek_kod": "sot",
     "rynek": "Strzały celne",
     "linia": 0.5,
     "strona": "powyzej",
@@ -92,7 +102,9 @@
   "legi": [
    {
     "value_bet_id": 0,
+    "podmiot_id": 1101624,
     "podmiot": "Mahmoud Saber",
+    "rynek_kod": "shots",
     "rynek": "Strzały",
     "linia": 0.5,
     "strona": "powyzej",
@@ -106,7 +118,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 951008589,
     "podmiot": "Neil El Aynaoui",
+    "rynek_kod": "fouls_committed",
     "rynek": "Faule popełnione",
     "linia": 0.5,
     "strona": "powyzej",
@@ -120,7 +134,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 927402501,
     "podmiot": "Achraf Hakimi",
+    "rynek_kod": "fouls_won",
     "rynek": "Faule wywalczone",
     "linia": 0.5,
     "strona": "powyzej",
@@ -134,7 +150,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 948290709,
     "podmiot": "Jonathan David",
+    "rynek_kod": "shots",
     "rynek": "Strzały",
     "linia": 1.5,
     "strona": "powyzej",
@@ -148,7 +166,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 935666937,
     "podmiot": "Ismael Saibari",
+    "rynek_kod": "sot",
     "rynek": "Strzały celne",
     "linia": 0.5,
     "strona": "powyzej",
@@ -162,7 +182,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 969763784,
     "podmiot": "Dayot Upamecano",
+    "rynek_kod": "interceptions",
     "rynek": "Przechwyty",
     "linia": 0.5,
     "strona": "powyzej",
@@ -176,7 +198,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 988240439,
     "podmiot": "Michael Olise",
+    "rynek_kod": "sot",
     "rynek": "Strzały celne",
     "linia": 0.5,
     "strona": "powyzej",
@@ -190,7 +214,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 936927995,
     "podmiot": "Kylian Mbappe",
+    "rynek_kod": "shots",
     "rynek": "Strzały",
     "linia": 3.5,
     "strona": "powyzej",
@@ -216,7 +242,9 @@
   "legi": [
    {
     "value_bet_id": 0,
+    "podmiot_id": 1101624,
     "podmiot": "Mahmoud Saber",
+    "rynek_kod": "shots",
     "rynek": "Strzały",
     "linia": 0.5,
     "strona": "powyzej",
@@ -230,7 +258,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 159665,
     "podmiot": "Mohamed Salah",
+    "rynek_kod": "shots",
     "rynek": "Strzały",
     "linia": 1.5,
     "strona": "powyzej",
@@ -244,7 +274,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 951008589,
     "podmiot": "Neil El Aynaoui",
+    "rynek_kod": "fouls_committed",
     "rynek": "Faule popełnione",
     "linia": 0.5,
     "strona": "powyzej",
@@ -258,7 +290,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 927402501,
     "podmiot": "Achraf Hakimi",
+    "rynek_kod": "fouls_won",
     "rynek": "Faule wywalczone",
     "linia": 0.5,
     "strona": "powyzej",
@@ -272,7 +306,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 948290709,
     "podmiot": "Jonathan David",
+    "rynek_kod": "shots",
     "rynek": "Strzały",
     "linia": 1.5,
     "strona": "powyzej",
@@ -286,7 +322,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 935666937,
     "podmiot": "Ismael Saibari",
+    "rynek_kod": "sot",
     "rynek": "Strzały celne",
     "linia": 0.5,
     "strona": "powyzej",
@@ -300,7 +338,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 969763784,
     "podmiot": "Dayot Upamecano",
+    "rynek_kod": "interceptions",
     "rynek": "Przechwyty",
     "linia": 0.5,
     "strona": "powyzej",
@@ -314,7 +354,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 934652282,
     "podmiot": "Julio Enciso",
+    "rynek_kod": "fouls_won",
     "rynek": "Faule wywalczone",
     "linia": 0.5,
     "strona": "powyzej",
@@ -328,7 +370,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 988240439,
     "podmiot": "Michael Olise",
+    "rynek_kod": "sot",
     "rynek": "Strzały celne",
     "linia": 0.5,
     "strona": "powyzej",
@@ -342,7 +386,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 936927995,
     "podmiot": "Kylian Mbappe",
+    "rynek_kod": "shots",
     "rynek": "Strzały",
     "linia": 3.5,
     "strona": "powyzej",
@@ -368,7 +414,9 @@
   "legi": [
    {
     "value_bet_id": 0,
+    "podmiot_id": 1101624,
     "podmiot": "Mahmoud Saber",
+    "rynek_kod": "shots",
     "rynek": "Strzały",
     "linia": 0.5,
     "strona": "powyzej",
@@ -382,7 +430,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 12994,
     "podmiot": "Lionel Messi",
+    "rynek_kod": "shots",
     "rynek": "Strzały",
     "linia": 4.5,
     "strona": "powyzej",
@@ -396,7 +446,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 951008589,
     "podmiot": "Neil El Aynaoui",
+    "rynek_kod": "fouls_committed",
     "rynek": "Faule popełnione",
     "linia": 0.5,
     "strona": "powyzej",
@@ -410,7 +462,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 927402501,
     "podmiot": "Achraf Hakimi",
+    "rynek_kod": "fouls_won",
     "rynek": "Faule wywalczone",
     "linia": 0.5,
     "strona": "powyzej",
@@ -424,7 +478,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 948290709,
     "podmiot": "Jonathan David",
+    "rynek_kod": "shots",
     "rynek": "Strzały",
     "linia": 1.5,
     "strona": "powyzej",
@@ -438,7 +494,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 935666937,
     "podmiot": "Ismael Saibari",
+    "rynek_kod": "sot",
     "rynek": "Strzały celne",
     "linia": 0.5,
     "strona": "powyzej",
@@ -452,7 +510,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 969763784,
     "podmiot": "Dayot Upamecano",
+    "rynek_kod": "interceptions",
     "rynek": "Przechwyty",
     "linia": 0.5,
     "strona": "powyzej",
@@ -466,7 +526,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 934652282,
     "podmiot": "Julio Enciso",
+    "rynek_kod": "fouls_won",
     "rynek": "Faule wywalczone",
     "linia": 0.5,
     "strona": "powyzej",
@@ -480,7 +542,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 988240439,
     "podmiot": "Michael Olise",
+    "rynek_kod": "sot",
     "rynek": "Strzały celne",
     "linia": 0.5,
     "strona": "powyzej",
@@ -494,7 +558,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 936927995,
     "podmiot": "Kylian Mbappe",
+    "rynek_kod": "shots",
     "rynek": "Strzały",
     "linia": 3.5,
     "strona": "powyzej",
@@ -520,7 +586,9 @@
   "legi": [
    {
     "value_bet_id": 0,
+    "podmiot_id": 1101624,
     "podmiot": "Mahmoud Saber",
+    "rynek_kod": "shots",
     "rynek": "Strzały",
     "linia": 0.5,
     "strona": "powyzej",
@@ -534,7 +602,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 948290709,
     "podmiot": "Jonathan David",
+    "rynek_kod": "shots",
     "rynek": "Strzały",
     "linia": 1.5,
     "strona": "powyzej",
@@ -548,7 +618,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 924376476,
     "podmiot": "Vinicius Junior",
+    "rynek_kod": "sot",
     "rynek": "Strzały celne",
     "linia": 0.5,
     "strona": "powyzej",
@@ -562,7 +634,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 930155892,
     "podmiot": "Harry Kane",
+    "rynek_kod": "sot",
     "rynek": "Strzały celne",
     "linia": 0.5,
     "strona": "powyzej",
@@ -576,7 +650,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 907446136,
     "podmiot": "Raul Jimenez",
+    "rynek_kod": "shots",
     "rynek": "Strzały",
     "linia": 1.5,
     "strona": "powyzej",
@@ -590,7 +666,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 750,
     "podmiot": "Cristiano Ronaldo",
+    "rynek_kod": "shots",
     "rynek": "Strzały",
     "linia": 1.5,
     "strona": "powyzej",
@@ -604,7 +682,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 288205,
     "podmiot": "Bruno Fernandes",
+    "rynek_kod": "shots",
     "rynek": "Strzały",
     "linia": 1.5,
     "strona": "powyzej",
@@ -630,7 +710,9 @@
   "legi": [
    {
     "value_bet_id": 0,
+    "podmiot_id": 1101624,
     "podmiot": "Mahmoud Saber",
+    "rynek_kod": "shots",
     "rynek": "Strzały",
     "linia": 0.5,
     "strona": "powyzej",
@@ -644,7 +726,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 951008589,
     "podmiot": "Neil El Aynaoui",
+    "rynek_kod": "fouls_committed",
     "rynek": "Faule popełnione",
     "linia": 0.5,
     "strona": "powyzej",
@@ -658,7 +742,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 948290709,
     "podmiot": "Jonathan David",
+    "rynek_kod": "shots",
     "rynek": "Strzały",
     "linia": 1.5,
     "strona": "powyzej",
@@ -672,7 +758,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 924376476,
     "podmiot": "Vinicius Junior",
+    "rynek_kod": "sot",
     "rynek": "Strzały celne",
     "linia": 0.5,
     "strona": "powyzej",
@@ -686,7 +774,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 930155892,
     "podmiot": "Harry Kane",
+    "rynek_kod": "sot",
     "rynek": "Strzały celne",
     "linia": 0.5,
     "strona": "powyzej",
@@ -700,7 +790,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 907446136,
     "podmiot": "Raul Jimenez",
+    "rynek_kod": "shots",
     "rynek": "Strzały",
     "linia": 1.5,
     "strona": "powyzej",
@@ -714,7 +806,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 750,
     "podmiot": "Cristiano Ronaldo",
+    "rynek_kod": "shots",
     "rynek": "Strzały",
     "linia": 1.5,
     "strona": "powyzej",
@@ -728,7 +822,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 288205,
     "podmiot": "Bruno Fernandes",
+    "rynek_kod": "shots",
     "rynek": "Strzały",
     "linia": 1.5,
     "strona": "powyzej",
@@ -754,7 +850,9 @@
   "legi": [
    {
     "value_bet_id": 0,
+    "podmiot_id": 1101624,
     "podmiot": "Mahmoud Saber",
+    "rynek_kod": "shots",
     "rynek": "Strzały",
     "linia": 0.5,
     "strona": "powyzej",
@@ -768,7 +866,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 948290709,
     "podmiot": "Jonathan David",
+    "rynek_kod": "shots",
     "rynek": "Strzały",
     "linia": 1.5,
     "strona": "powyzej",
@@ -782,7 +882,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 924376476,
     "podmiot": "Vinicius Junior",
+    "rynek_kod": "sot",
     "rynek": "Strzały celne",
     "linia": 0.5,
     "strona": "powyzej",
@@ -796,7 +898,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 930155892,
     "podmiot": "Harry Kane",
+    "rynek_kod": "sot",
     "rynek": "Strzały celne",
     "linia": 0.5,
     "strona": "powyzej",
@@ -810,7 +914,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 907446136,
     "podmiot": "Raul Jimenez",
+    "rynek_kod": "shots",
     "rynek": "Strzały",
     "linia": 1.5,
     "strona": "powyzej",
@@ -824,7 +930,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 959378331,
     "podmiot": "Nico O'Reilly",
+    "rynek_kod": "shots",
     "rynek": "Strzały",
     "linia": 0.5,
     "strona": "powyzej",
@@ -838,7 +946,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 750,
     "podmiot": "Cristiano Ronaldo",
+    "rynek_kod": "shots",
     "rynek": "Strzały",
     "linia": 1.5,
     "strona": "powyzej",
@@ -852,7 +962,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 288205,
     "podmiot": "Bruno Fernandes",
+    "rynek_kod": "shots",
     "rynek": "Strzały",
     "linia": 1.5,
     "strona": "powyzej",
@@ -878,7 +990,9 @@
   "legi": [
    {
     "value_bet_id": 0,
+    "podmiot_id": 1101624,
     "podmiot": "Mahmoud Saber",
+    "rynek_kod": "shots",
     "rynek": "Strzały",
     "linia": 0.5,
     "strona": "powyzej",
@@ -892,7 +1006,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 948290709,
     "podmiot": "Jonathan David",
+    "rynek_kod": "shots",
     "rynek": "Strzały",
     "linia": 1.5,
     "strona": "powyzej",
@@ -906,7 +1022,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 935666937,
     "podmiot": "Ismael Saibari",
+    "rynek_kod": "sot",
     "rynek": "Strzały celne",
     "linia": 0.5,
     "strona": "powyzej",
@@ -920,7 +1038,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 924376476,
     "podmiot": "Vinicius Junior",
+    "rynek_kod": "sot",
     "rynek": "Strzały celne",
     "linia": 0.5,
     "strona": "powyzej",
@@ -934,7 +1054,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 930155892,
     "podmiot": "Harry Kane",
+    "rynek_kod": "sot",
     "rynek": "Strzały celne",
     "linia": 0.5,
     "strona": "powyzej",
@@ -948,7 +1070,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 907446136,
     "podmiot": "Raul Jimenez",
+    "rynek_kod": "shots",
     "rynek": "Strzały",
     "linia": 1.5,
     "strona": "powyzej",
@@ -962,7 +1086,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 959378331,
     "podmiot": "Nico O'Reilly",
+    "rynek_kod": "shots",
     "rynek": "Strzały",
     "linia": 0.5,
     "strona": "powyzej",
@@ -976,7 +1102,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 750,
     "podmiot": "Cristiano Ronaldo",
+    "rynek_kod": "shots",
     "rynek": "Strzały",
     "linia": 1.5,
     "strona": "powyzej",
@@ -990,7 +1118,9 @@
    },
    {
     "value_bet_id": 0,
+    "podmiot_id": 288205,
     "podmiot": "Bruno Fernandes",
+    "rynek_kod": "shots",
     "rynek": "Strzały",
     "linia": 1.5,
     "strona": "powyzej",
@@ -1014,7 +1144,9 @@
   "legi": [
    {
     "value_bet_id": 1,
+    "podmiot_id": 1101624,
     "podmiot": "Mahmoud Saber",
+    "rynek_kod": "shots",
     "rynek": "Strzały",
     "linia": 0.5,
     "strona": "powyzej",
@@ -1028,7 +1160,9 @@
    },
    {
     "value_bet_id": 8,
+    "podmiot_id": 951008589,
     "podmiot": "Neil El Aynaoui",
+    "rynek_kod": "fouls_committed",
     "rynek": "Faule popełnione",
     "linia": 0.5,
     "strona": "powyzej",
@@ -1042,7 +1176,9 @@
    },
    {
     "value_bet_id": 60,
+    "podmiot_id": 969763784,
     "podmiot": "Dayot Upamecano",
+    "rynek_kod": "interceptions",
     "rynek": "Przechwyty",
     "linia": 0.5,
     "strona": "powyzej",
@@ -1056,7 +1192,9 @@
    },
    {
     "value_bet_id": 10,
+    "podmiot_id": 924376476,
     "podmiot": "Vinicius Junior",
+    "rynek_kod": "sot",
     "rynek": "Strzały celne",
     "linia": 0.5,
     "strona": "powyzej",
@@ -1070,7 +1208,9 @@
    },
    {
     "value_bet_id": 14,
+    "podmiot_id": 930155892,
     "podmiot": "Harry Kane",
+    "rynek_kod": "sot",
     "rynek": "Strzały celne",
     "linia": 0.5,
     "strona": "powyzej",
@@ -1084,7 +1224,9 @@
    },
    {
     "value_bet_id": 2,
+    "podmiot_id": 750,
     "podmiot": "Cristiano Ronaldo",
+    "rynek_kod": "shots",
     "rynek": "Strzały",
     "linia": 1.5,
     "strona": "powyzej",

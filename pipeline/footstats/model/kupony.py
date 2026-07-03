@@ -72,30 +72,16 @@ def _zloz(cands: list[dict], cel: float) -> dict | None:
         "p_model": round(p, 4),
         "fair_kurs": round(1.0 / max(p, 1e-9), 2),
         "ev_pct": round((p * kurs - 1.0) * 100.0, 1),
-        "legi": [
-            {
-                "value_bet_id": b["id"],
-                "podmiot": b["podmiot"],
-                "rynek": b["rynek"],
-                "linia": b["linia"],
-                "strona": b["strona"],
-                "kurs": b["kurs"],
-                "bukmacher": b["bukmacher"],
-                "p_model": b["p_model"],
-                "pewnosc": b["pewnosc"],
-                "mecz": b["mecz"],
-                "mecz_id": b["mecz_id"],
-                "kickoff_ts": b["kickoff_ts"],
-            }
-            for b in legi
-        ],
+        "legi": [_leg_dict(b) for b in legi],
     }
 
 
 def _leg_dict(b: dict) -> dict:
     return {
         "value_bet_id": b.get("id", 0),
+        "podmiot_id": b.get("podmiot_id", 0),
         "podmiot": b["podmiot"],
+        "rynek_kod": b.get("rynek_kod", ""),
         "rynek": b["rynek"],
         "linia": b["linia"],
         "strona": b["strona"],

@@ -191,6 +191,72 @@ export default async function ModelPage() {
         )}
       </Reveal>
 
+      {/* historia kuponów — zamrażane przy starcie 1. meczu, rozliczane z legów */}
+      {(typy.kupony?.length ?? 0) > 0 && (
+        <Reveal className="mt-10">
+          <h2 className="text-lg font-semibold">Kupony — historia</h2>
+          <p className="mt-1 max-w-3xl text-sm text-muted">
+            Kupon dnia zamraża się w chwili startu pierwszego meczu i czeka na
+            wyniki legów: jedno pudło = kupon przegrany, zwrot lega (zawodnik
+            nie zagrał) wyłącza go z kursu — jak u bukmachera.
+          </p>
+          <div className="mt-4 grid max-w-4xl gap-3 sm:grid-cols-2">
+            {typy.kupony!.slice(0, 12).map((k) => {
+              const rozliczone = k.legi_rozliczone ?? 0;
+              const trafione = k.legi_trafione ?? 0;
+              return (
+                <div
+                  key={`${k.horyzont}-${k.cel_label}-${k.dzien}`}
+                  className={`rounded-xl border bg-card px-4 py-3.5 shadow-(--shadow-card) ${
+                    k.wynik === "wygrany"
+                      ? "border-data-green/40"
+                      : k.wynik === "przegrany"
+                        ? "border-data-red/30"
+                        : "border-hairline"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="flex items-center gap-2">
+                      <span className="font-data rounded-md bg-brand px-2 py-0.5 text-sm font-bold text-white">
+                        ×{k.cel_label ?? k.cel}
+                      </span>
+                      <span className="text-xs text-muted">
+                        {k.horyzont === "dzienny"
+                          ? "dzienny"
+                          : k.horyzont === "value"
+                            ? "value"
+                            : "długoterminowy"}{" "}
+                        · {k.dzien}
+                      </span>
+                    </span>
+                    <span
+                      className={`text-xs font-semibold ${
+                        k.wynik === "wygrany"
+                          ? "text-data-green"
+                          : k.wynik === "przegrany"
+                            ? "text-data-red"
+                            : "text-[#8a5613]"
+                      }`}
+                    >
+                      {k.wynik === "wygrany"
+                        ? `✓ wygrany${k.kurs_rozliczony ? ` @${k.kurs_rozliczony.toFixed(2).replace(".", ",")}` : ""}`
+                        : k.wynik === "przegrany"
+                          ? "✗ przegrany"
+                          : "w grze"}
+                    </span>
+                  </div>
+                  <p className="font-data mt-2 text-xs text-muted">
+                    kurs {k.kurs_laczny.toFixed(2).replace(".", ",")} · szansa{" "}
+                    {fmtProc(k.p_model)} · legi: {trafione}/{rozliczone}{" "}
+                    rozliczonych z {k.legi.length}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </Reveal>
+      )}
+
       <Reveal className="mt-10">
         <h2 className="text-lg font-semibold">Kalibracja po rynkach</h2>
         <p className="mt-1 max-w-3xl text-sm text-muted">

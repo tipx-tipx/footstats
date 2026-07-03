@@ -146,10 +146,73 @@ def market_bias() -> dict[str, float]:
     return compute_bias(log)
 
 
-def rozlicz(value_bets: list[dict]) -> dict:
+def _kupon_do_logu(log_kuponow: dict, kupony_list: list[dict], now: int) -> None:
+    """Kupon dnia (horyzont+przedział) aktualizuje się do startu pierwszego
+    meczu — potem jest zamrożony i czeka na rozliczenie legów."""
+    dzien = time.strftime("%Y-%m-%d", time.localtime(now))
+    for k in kupony_list:
+        if k.get("styl") == "value" and not k.get("legi"):
+            continue
+        klucz = f"{k.get('horyzont', '?')}:{k.get('cel_label', k.get('cel'))}:{dzien}"
+        rec = log_kuponow.get(klucz)
+        pierwszy = min(l["kickoff_ts"] for l in k["legi"])
+        if rec is None:
+            log_kuponow[klucz] = {
+                **k, "dzien": dzien, "opublikowano_ts": now, "wynik": None,
+            }
+        elif rec.get("wynik") is None and now < min(
+            l["kickoff_ts"] for l in rec["legi"]
+        ) and now < pierwszy:
+            log_kuponow[klucz] = {
+                **k, "dzien": dzien,
+                "opublikowano_ts": rec["opublikowano_ts"], "wynik": None,
+            }
+
+
+def _rozlicz_kupony(log_kuponow: dict, typy_log: dict, now: int) -> list[dict]:
+    """Wynik kuponu z wyników legów: przegrany od pierwszego pudła; wygrany,
+    gdy wszystkie legi trafione (zwrot wyłącza lega z kursu, jak u buka)."""
+    for rec in log_kuponow.values():
+        if rec.get("wynik"):
+            continue
+        statusy = []
+        for l in rec["legi"]:
+            tk = (f"{l['mecz_id']}:{l.get('podmiot_id', 0)}:"
+                  f"{l.get('rynek_kod', '')}:{l['linia']}:{l['strona']}")
+            statusy.append((l, (typy_log.get(tk) or {}).get("wynik")))
+        if any(s == "przegrany" for _, s in statusy):
+            rec.update(wynik="przegrany", rozliczono_ts=now)
+        elif all(s in ("wygrany", "zwrot") for _, s in statusy):
+            kurs = 1.0
+            for l, s in statusy:
+                if s == "wygrany":
+                    kurs *= l["kurs"]
+            rec.update(wynik="wygrany", kurs_rozliczony=round(kurs, 2),
+                       rozliczono_ts=now)
+        rec["legi_trafione"] = sum(1 for _, s in statusy if s == "wygrany")
+        rec["legi_rozliczone"] = sum(1 for _, s in statusy if s)
+    return sorted(
+        log_kuponow.values(),
+        key=lambda r: (-(r.get("opublikowano_ts") or 0)),
+    )[:40]
+
+
+def rozlicz(value_bets: list[dict], kupony_list: list[dict] | None = None) -> dict:
     """Dopisz nowe typy do logu, rozlicz zakończone, zwróć podsumowanie."""
     log = supa.get_key("typy_log") or {}
     _dopisz_nowe(log, value_bets)
+    # legi kuponów też muszą być w logu (pewniaki spoza publikowanych typów)
+    for k in kupony_list or []:
+        _dopisz_nowe(log, [{
+            "mecz_id": l["mecz_id"], "mecz": l["mecz"],
+            "kickoff_ts": l["kickoff_ts"],
+            "podmiot_id": l.get("podmiot_id", 0),
+            "podmiot": l["podmiot"], "rynek_kod": l.get("rynek_kod", ""),
+            "rynek": l["rynek"], "linia": l["linia"], "strona": l["strona"],
+            "kurs": l["kurs"], "bukmacher": l.get("bukmacher"),
+            "p_model": l["p_model"], "pewnosc": l.get("pewnosc"),
+            "sugestia": False,
+        } for l in k["legi"]])
     lib = supa.get_key("trend_lib") or {}
     now = int(time.time())
     cache_365: dict = {}
@@ -181,6 +244,12 @@ def rozlicz(value_bets: list[dict]) -> dict:
         )
 
     supa.put_key("typy_log", log)
+
+    # ---- historia kuponów ----
+    log_kuponow = supa.get_key("kupony_log") or {}
+    _kupon_do_logu(log_kuponow, kupony_list or [], now)
+    kupony_hist = _rozlicz_kupony(log_kuponow, log, now)
+    supa.put_key("kupony_log", log_kuponow)
 
     # ---- podsumowanie do UI ----
     settled = [r for r in log.values() if r.get("wynik") in ("wygrany", "przegrany")]
@@ -216,4 +285,5 @@ def rozlicz(value_bets: list[dict]) -> dict:
         },
         "po_rynku": po_rynku,
         "ostatnie": ostatnie,
+        "kupony": kupony_hist,
     }

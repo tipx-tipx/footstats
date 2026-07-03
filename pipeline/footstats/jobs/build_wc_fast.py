@@ -856,14 +856,15 @@ def main():
             for k in kupony_list
         ))
     try:
-        wyniki = rozliczanie.rozlicz(value_bets)
+        wyniki = rozliczanie.rozlicz(value_bets, kupony_list)
         dump("typy_wyniki.json", wyniki)
         p = wyniki["podsumowanie"]
         print(f"Typy: {p['opublikowane']} w logu, {p['rozliczone']} rozliczonych, "
               f"{p['trafione']} trafionych, ROI flat {p['roi_flat']:+.2f} j.")
     except Exception as ex:
         print(f"Rozliczanie pominięte ({ex})")
-        dump("typy_wyniki.json", {"podsumowanie": None, "po_rynku": [], "ostatnie": []})
+        dump("typy_wyniki.json", {"podsumowanie": None, "po_rynku": [],
+                                  "ostatnie": [], "kupony": []})
     dump("meta.json", {
         "wygenerowano_ts": int(time.time()), "tryb": "ms2026",
         "liga": "Mistrzostwa Świata", "sezon": "2026",

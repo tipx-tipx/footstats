@@ -172,6 +172,16 @@ export interface TypRozliczony {
   faktyczna: number | null;
 }
 
+/** Kupon w historii: zamrożony przy starcie pierwszego meczu, rozliczany z legów. */
+export interface KuponHistoria extends Kupon {
+  dzien: string;
+  opublikowano_ts: number;
+  wynik: "wygrany" | "przegrany" | null;
+  kurs_rozliczony?: number;
+  legi_trafione?: number;
+  legi_rozliczone?: number;
+}
+
 /** Skuteczność realnych typów (log rozliczany automatycznie po meczach). */
 export interface TypyWyniki {
   podsumowanie: {
@@ -191,6 +201,7 @@ export interface TypyWyniki {
     bias: number;
   }[];
   ostatnie: TypRozliczony[];
+  kupony?: KuponHistoria[];
 }
 
 /** Zakład zapisany w trackerze (localStorage). */
