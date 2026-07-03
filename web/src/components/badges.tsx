@@ -37,7 +37,7 @@ export function ConfidenceBadge({ level }: { level: Pewnosc }) {
   );
 }
 
-function PewnoscDots({ level }: { level: Pewnosc }) {
+export function PewnoscDots({ level }: { level: Pewnosc }) {
   const filled = level === "wysoka" ? 3 : level === "srednia" ? 2 : 1;
   return (
     <span aria-hidden className="flex items-center gap-0.5">

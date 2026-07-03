@@ -63,6 +63,28 @@ export function ValueBoard({
     return [...seen.entries()];
   }, [bets]);
 
+  // liczba pozycji per rynek (przy aktywnym rodzaju) — do etykiet filtra
+  const liczbaPerRynek = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const b of bets) {
+      if (rodzaj === "okazje" && b.sugestia) continue;
+      if (rodzaj === "sugestie" && !b.sugestia) continue;
+      let kod = b.rynek_kod;
+      if (b.rynek_kod.startsWith("team_")) kod = "druzyny";
+      else if (!GLOWNE_KODY.has(b.rynek_kod)) kod = "inne";
+      m.set(kod, (m.get(kod) ?? 0) + 1);
+      m.set("wszystkie", (m.get("wszystkie") ?? 0) + 1);
+    }
+    return m;
+  }, [bets, rodzaj]);
+
+  const wyczyscFiltry = () => {
+    setRynek("wszystkie");
+    setPewnosc("kazda");
+    setMinEv(3);
+    setMeczId(undefined);
+  };
+
   const filtered = useMemo(() => {
     return bets.filter((b) => {
       if (rynek === "druzyny" && !b.rynek_kod.startsWith("team_")) return false;
@@ -124,11 +146,14 @@ export function ValueBoard({
           className="rounded-lg border border-hairline bg-card px-3 py-1.5 text-sm"
           aria-label="Filtruj po rynku"
         >
-          {RYNKI_FILTRY.map((r) => (
-            <option key={r.kod} value={r.kod}>
-              {r.label}
-            </option>
-          ))}
+          {RYNKI_FILTRY.map((r) => {
+            const n = liczbaPerRynek.get(r.kod) ?? 0;
+            return (
+              <option key={r.kod} value={r.kod}>
+                {r.label} ({n})
+              </option>
+            );
+          })}
         </select>
         <select
           value={pewnosc}
@@ -172,11 +197,84 @@ export function ValueBoard({
         </label>
       </div>
 
+      {/* legenda: jak czytać karty (zwijana, bez JS) */}
+      <details className="group mb-4 rounded-lg border border-hairline bg-card text-sm">
+        <summary className="flex cursor-pointer select-none items-center gap-2 px-4 py-2.5 text-muted transition-colors hover:text-ink [&::-webkit-details-marker]:hidden">
+          <span
+            aria-hidden
+            className="flex h-4 w-4 items-center justify-center rounded-full bg-brand-wash text-[10px] font-bold text-brand"
+          >
+            ?
+          </span>
+          Jak czytać te karty
+          <svg
+            aria-hidden
+            width="12"
+            height="12"
+            viewBox="0 0 14 14"
+            className="ml-auto text-faint transition-transform group-open:rotate-180"
+          >
+            <path
+              d="M3 5.5 L7 9.5 L11 5.5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </summary>
+        <ul className="space-y-2 border-t border-hairline px-4 py-3 text-xs leading-relaxed text-ink-soft">
+          <li>
+            <strong className="text-data-green">Zielona wartość (np. +12%)</strong>{" "}
+            — o ile procent kurs bukmachera płaci lepiej, niż powinien według
+            modelu. Im wyżej, tym lepsza okazja.
+          </li>
+          <li>
+            <strong>Kropki pewności (●●●)</strong> — ile danych i jak stabilnych
+            stoi za predykcją. Trzy kropki = duża próba i pewne minuty; jedna =
+            traktuj ostrożnie.
+          </li>
+          <li>
+            <strong>Kolorowy pasek</strong> — możliwe wyniki i ich szanse:
+            zielona część to scenariusze „powyżej linii”, kreskowana pionowa
+            linia to linia bukmachera.
+          </li>
+          <li>
+            <strong className="text-[#8a5613]">„Sprawdź w STS”</strong> — model
+            widzi potencjalną wartość, ale kurs musisz sprawdzić ręcznie w STS
+            (podajemy próg, od którego się opłaca).
+          </li>
+          <li>
+            Kliknij kartę, żeby zobaczyć pełne uzasadnienie: dlaczego ten
+            zakład, forma zawodnika i przewidywane minuty.
+          </li>
+        </ul>
+      </details>
+
       <p className="mb-3 text-xs text-faint" aria-live="polite">
         {filtered.length === 0
-          ? "Brak okazji spełniających filtry — poluzuj kryteria."
+          ? ""
           : `${filtered.length} okazji · posortowane od najlepszej (wartość × pewność)`}
       </p>
+
+      {filtered.length === 0 && (
+        <div className="rounded-(--radius-card) border border-hairline bg-card px-6 py-10 text-center shadow-(--shadow-card)">
+          <p className="text-sm font-medium text-ink">
+            Brak okazji spełniających obecne filtry
+          </p>
+          <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-muted">
+            Zmniejsz minimalną wartość, wybierz „Każda pewność” albo inny rynek
+            — lub wyczyść wszystko jednym kliknięciem.
+          </p>
+          <button
+            onClick={wyczyscFiltry}
+            className="mt-4 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-deep"
+          >
+            Wyczyść filtry
+          </button>
+        </div>
+      )}
 
       {/* lista */}
       <div className="space-y-2.5">

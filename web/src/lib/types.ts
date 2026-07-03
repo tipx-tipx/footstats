@@ -70,6 +70,8 @@ export interface Mecz {
   sedzia: string | null;
   sedzia_mnoznik_fauli: number;
   okazje: number[];
+  /** true = oficjalne XI ogłoszone (model przeliczony na pewnych składach) */
+  sklady_ogloszone?: boolean;
 }
 
 export interface FormaRynku {

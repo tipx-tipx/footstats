@@ -14,7 +14,8 @@
    3,
    5,
    7
-  ]
+  ],
+  "sklady_ogloszone": false
  },
  {
   "id": 12813011,
@@ -29,7 +30,8 @@
   "okazje": [
    4,
    6
-  ]
+  ],
+  "sklady_ogloszone": false
  },
  {
   "id": 12813018,
@@ -44,6 +46,7 @@
   "okazje": [
    1,
    8
-  ]
+  ],
+  "sklady_ogloszone": false
  }
 ]

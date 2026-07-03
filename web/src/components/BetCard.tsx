@@ -3,17 +3,18 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useEffect, useState } from "react";
 
-import { ConfidenceBadge, DataPill, EdgeBadge, RiskBadge } from "./badges";
+import { ConfidenceBadge, EdgeBadge, PewnoscDots, RiskBadge } from "./badges";
 import { DistributionStrip } from "./DistributionStrip";
 import { FormBars } from "./Sparkline";
 import { addZakladFromBet, isTracked, onZakladyChange } from "@/lib/tracker";
 import {
   fmtDataCzas,
+  fmtEV,
   fmtKurs,
   fmtLinia,
   fmtMnoznik,
-  fmtPP,
   fmtProc,
+  PEWNOSC_LABEL,
   STRONA_LABEL,
 } from "@/lib/format";
 import type { ValueBet, Zawodnik } from "@/lib/types";
@@ -72,10 +73,19 @@ export function BetCard({
         <span className="hidden min-w-0 items-center gap-3 sm:flex">
           <span className="w-full max-w-44">
             {bet.rozklad ? (
-              <DistributionStrip dist={bet.rozklad} line={bet.linia} height={16} />
+              <>
+                <DistributionStrip dist={bet.rozklad} line={bet.linia} height={14} />
+                <span className="mt-1 block text-[10px] text-faint">
+                  szansa wg modelu:{" "}
+                  <span className="font-data font-medium text-ink-soft">
+                    {fmtProc(bet.p_model)}
+                  </span>
+                </span>
+              </>
             ) : (
               <span className="text-xs text-faint">
-                szansa: {fmtProc(bet.p_model)}
+                szansa wg modelu:{" "}
+                <span className="font-data text-ink-soft">{fmtProc(bet.p_model)}</span>
               </span>
             )}
           </span>
@@ -90,33 +100,47 @@ export function BetCard({
           </span>
         </span>
 
-        <span className="flex items-center justify-end gap-2">
-          {bet.sugestia || bet.ev_pct == null ? (
+        <span className="flex items-center justify-end gap-2.5">
+          <span className="flex flex-col items-end gap-1">
+            {bet.sugestia || bet.ev_pct == null ? (
+              <span
+                className="inline-flex items-center rounded-md bg-data-amber-wash px-2 py-0.5 text-xs font-semibold text-[#8a5613]"
+                title="Rynek dostępny w STS — sprawdź kurs ręcznie"
+              >
+                sprawdź w STS
+              </span>
+            ) : (
+              <EdgeBadge ev={bet.ev_pct} />
+            )}
             <span
-              className="inline-flex items-center rounded-md bg-data-amber-wash px-2 py-0.5 text-xs font-semibold text-[#8a5613]"
-              title="Rynek dostępny w STS — sprawdź kurs ręcznie"
+              className="hidden items-center gap-1 text-[10px] text-faint sm:flex"
+              title="Pewność modelu: ile danych i jak stabilnych stoi za tą predykcją"
             >
-              sprawdź w STS
+              <PewnoscDots level={bet.pewnosc} />
+              {PEWNOSC_LABEL[bet.pewnosc]} pewność
             </span>
-          ) : (
-            <EdgeBadge ev={bet.ev_pct} />
-          )}
-          <svg
-            aria-hidden
-            width="14"
-            height="14"
-            viewBox="0 0 14 14"
-            className={`text-faint transition-transform ${open ? "rotate-180" : ""}`}
-          >
-            <path
-              d="M3 5.5 L7 9.5 L11 5.5"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.6"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+          </span>
+          <span className="flex flex-col items-center gap-0.5">
+            <svg
+              aria-hidden
+              width="14"
+              height="14"
+              viewBox="0 0 14 14"
+              className={`text-faint transition-transform ${open ? "rotate-180" : ""}`}
+            >
+              <path
+                d="M3 5.5 L7 9.5 L11 5.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <span className="hidden text-[9px] uppercase tracking-wide text-faint sm:block">
+              {open ? "zwiń" : "detale"}
+            </span>
+          </span>
         </span>
       </button>
 
@@ -131,52 +155,53 @@ export function BetCard({
             transition={{ duration: 0.28, ease: [0.25, 0.9, 0.3, 1] }}
           >
             <div className="grid gap-6 border-t border-hairline bg-paper/50 px-4 py-5 sm:grid-cols-2 sm:px-6">
-              {/* lewa: liczby i uzasadnienie */}
+              {/* lewa: podsumowanie po ludzku i uzasadnienie */}
               <div className="space-y-4">
-                <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-                  <DataPill
-                    label="szansa wg modelu"
-                    value={fmtProc(bet.p_model)}
-                    emphasis
-                  />
-                  {bet.sugestia ? (
-                    <DataPill
-                      label="uczciwy kurs (szacunek)"
-                      value={fmtKurs(bet.fair_kurs)}
-                    />
-                  ) : (
-                    <>
-                      {bet.p_rynku != null && (
-                        <DataPill label="kurs mówi" value={fmtProc(bet.p_rynku)} />
-                      )}
-                      <DataPill label="uczciwy kurs" value={fmtKurs(bet.fair_kurs)} />
-                      {bet.edge_pp != null && (
-                        <DataPill
-                          label="przewaga"
-                          value={fmtPP(bet.edge_pp)}
-                          emphasis
-                        />
-                      )}
-                    </>
-                  )}
-                </div>
                 {bet.sugestia ? (
-                  <p className="rounded-lg border border-data-amber/40 bg-data-amber-wash px-3 py-2 text-xs leading-relaxed text-[#6d4410]">
-                    <strong>Sugestia bez kursu.</strong> Ten rynek (niecelne /
-                    zablokowane) jest w STS, ale STS nie działa z chmury. Model
-                    szacuje szansę z „strzały − celne" — <strong>sprawdź kurs w
-                    STS ręcznie</strong> i oceń, czy jest wartość.
-                  </p>
+                  <div className="rounded-lg border border-data-amber/40 bg-data-amber-wash px-3.5 py-3 text-sm leading-relaxed text-[#6d4410]">
+                    Model daje temu zdarzeniu{" "}
+                    <strong className="font-data">{fmtProc(bet.p_model)}</strong>{" "}
+                    szans, czyli uczciwy kurs to{" "}
+                    <strong className="font-data">{fmtKurs(bet.fair_kurs)}</strong>.
+                    <span className="mt-1.5 block">
+                      Kursu nie pobieramy automatycznie (rynek tylko w STS) —{" "}
+                      <strong>
+                        wartość jest, gdy STS płaci więcej niż ~
+                        <span className="font-data">
+                          {fmtKurs(bet.fair_kurs * 1.05)}
+                        </span>
+                      </strong>
+                      . Im wyższy kurs, tym lepsza okazja.
+                    </span>
+                  </div>
                 ) : (
-                  bet.ci[0] != null && (
-                    <p className="text-xs text-muted">
-                      Widełki szansy:{" "}
-                      <span className="font-data">
-                        {fmtProc(bet.ci[0])}–{fmtProc(bet.ci[1] as number)}
-                      </span>{" "}
-                      — im węższe, tym stabilniejsza predykcja.
-                    </p>
-                  )
+                  <div className="rounded-lg border border-brand/20 bg-brand-wash px-3.5 py-3 text-sm leading-relaxed text-brand-deep">
+                    Model daje temu zdarzeniu{" "}
+                    <strong className="font-data">{fmtProc(bet.p_model)}</strong>{" "}
+                    szans, czyli uczciwy kurs to{" "}
+                    <strong className="font-data">{fmtKurs(bet.fair_kurs)}</strong>.{" "}
+                    {bet.bukmacher} płaci{" "}
+                    <strong className="font-data">
+                      {bet.kurs != null ? fmtKurs(bet.kurs) : "—"}
+                    </strong>
+                    {bet.ev_pct != null && (
+                      <>
+                        {" "}
+                        — o <strong className="font-data">{fmtEV(bet.ev_pct)}</strong>{" "}
+                        lepiej, niż powinien
+                      </>
+                    )}
+                    .
+                  </div>
+                )}
+                {!bet.sugestia && bet.ci[0] != null && (
+                  <p className="text-xs text-muted">
+                    Widełki szansy:{" "}
+                    <span className="font-data">
+                      {fmtProc(bet.ci[0])}–{fmtProc(bet.ci[1] as number)}
+                    </span>{" "}
+                    — im węższe, tym stabilniejsza predykcja.
+                  </p>
                 )}
                 <div className="flex flex-wrap items-center gap-3">
                   <ConfidenceBadge level={bet.pewnosc} />
@@ -253,9 +278,13 @@ export function BetCard({
                   </div>
                 )}
                 {bet.sugestia ? (
-                  <p className="rounded-lg border border-hairline bg-card px-3 py-2.5 text-center text-xs text-muted">
-                    Otwórz STS, znajdź ten rynek dla zawodnika i sprawdź kurs.
-                    Jeśli jest wartość — dodasz w „Moich zakładach".
+                  <p className="rounded-lg border border-hairline bg-card px-3 py-2.5 text-center text-xs leading-relaxed text-muted">
+                    Otwórz STS → wyszukaj zawodnika → sprawdź kurs tego rynku.
+                    Kurs powyżej{" "}
+                    <span className="font-data font-semibold text-ink">
+                      ~{fmtKurs(bet.fair_kurs * 1.05)}
+                    </span>
+                    ? Jest wartość — dodaj zakład w „Moich zakładach”.
                   </p>
                 ) : (
                   <button

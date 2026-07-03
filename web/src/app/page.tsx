@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { ValueBoard } from "@/components/ValueBoard";
 import { getMeta, getValueBets, getZawodnicy } from "@/lib/data";
 import { fmtEV } from "@/lib/format";
@@ -17,6 +19,11 @@ export default async function OkazjePage({
   const okazje = bets.filter((b) => !b.sugestia);
   const naj = okazje.find((b) => b.ev_pct != null);
   const wysokaPewnosc = okazje.filter((b) => b.pewnosc === "wysoka").length;
+  const aktualizacja = new Intl.DateTimeFormat("pl-PL", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Europe/Warsaw",
+  }).format(new Date(meta.wygenerowano_ts * 1000));
 
   return (
     <>
@@ -65,6 +72,21 @@ export default async function OkazjePage({
               </dd>
             </div>
           </dl>
+
+          <p className="mt-5 text-xs text-faint">
+            Dane odświeżane automatycznie co ok. 30 minut · ostatnia
+            aktualizacja:{" "}
+            <span className="font-data font-medium text-ink-soft">
+              {aktualizacja}
+            </span>{" "}
+            ·{" "}
+            <Link
+              href="/jak-to-dziala"
+              className="font-medium text-brand underline-offset-2 hover:underline"
+            >
+              Jak to działa? →
+            </Link>
+          </p>
 
           {meta.tryb === "demo" && (
             <p className="mt-6 inline-flex items-center gap-2 rounded-lg border border-data-amber/40 bg-data-amber-wash px-3 py-2 text-xs text-[#8a5613]">

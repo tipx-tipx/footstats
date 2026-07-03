@@ -214,6 +214,7 @@ def main():
                 "kolejka": "Ćwierćfinał", "kickoff_ts": ts,
                 "gospodarz": home_name, "gosc": away_name,
                 "sedzia": None, "sedzia_mnoznik_fauli": 1.0, "okazje": [],
+                "sklady_ogloszone": lineup_confirmed.get(mid, False),
             }
 
         built, hist = score_from_trend(
