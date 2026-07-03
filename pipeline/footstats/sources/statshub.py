@@ -39,10 +39,20 @@ STATTYPE_MAP = {
 }
 
 
-def _get(url: str, timeout: int = 30) -> dict:
-    r = requests.get(url, impersonate="chrome124", timeout=timeout, headers=HEADERS)
-    r.raise_for_status()
-    return r.json()
+def _get(url: str, timeout: int = 25, retries: int = 3) -> dict:
+    """GET z retry — statshub bywa chwilowo wolny/niedostępny (zwłaszcza z chmury)."""
+    import time as _t
+
+    last = None
+    for attempt in range(retries):
+        try:
+            r = requests.get(url, impersonate="chrome124", timeout=timeout, headers=HEADERS)
+            r.raise_for_status()
+            return r.json()
+        except Exception as e:  # timeout, 5xx, itp.
+            last = e
+            _t.sleep(3 * (attempt + 1))
+    raise last
 
 
 @dataclass

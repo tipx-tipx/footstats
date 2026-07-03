@@ -115,7 +115,11 @@ def main():
         print("Brak nadchodzących meczów MŚ w statshub.")
         return
 
-    trends = statshub.fetch_event_trends([e["id"] for e in events])
+    try:
+        trends = statshub.fetch_event_trends([e["id"] for e in events])
+    except Exception as e:
+        print(f"statshub chwilowo niedostępny ({e}) — pomijam ten cykl, dane bez zmian.")
+        return
     print(f"Trendów propsów: {len(trends)} "
           f"({len(set(t.player_id for t in trends))} zawodników)")
     if not trends:
