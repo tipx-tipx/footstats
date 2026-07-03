@@ -83,15 +83,24 @@ export function BetCard({
 
         <span className="flex flex-col items-end gap-0.5">
           <span className="font-data text-base font-semibold">
-            {fmtKurs(bet.kurs)}
+            {bet.kurs != null ? fmtKurs(bet.kurs) : fmtProc(bet.p_model)}
           </span>
           <span className="text-[10px] uppercase tracking-wide text-faint">
-            {bet.bukmacher}
+            {bet.kurs != null ? bet.bukmacher : "szansa modelu"}
           </span>
         </span>
 
         <span className="flex items-center justify-end gap-2">
-          <EdgeBadge ev={bet.ev_pct} />
+          {bet.sugestia || bet.ev_pct == null ? (
+            <span
+              className="inline-flex items-center rounded-md bg-data-amber-wash px-2 py-0.5 text-xs font-semibold text-[#8a5613]"
+              title="Rynek dostępny w STS — sprawdź kurs ręcznie"
+            >
+              sprawdź w STS
+            </span>
+          ) : (
+            <EdgeBadge ev={bet.ev_pct} />
+          )}
           <svg
             aria-hidden
             width="14"
@@ -130,17 +139,45 @@ export function BetCard({
                     value={fmtProc(bet.p_model)}
                     emphasis
                   />
-                  <DataPill label="kurs mówi" value={fmtProc(bet.p_rynku)} />
-                  <DataPill label="uczciwy kurs" value={fmtKurs(bet.fair_kurs)} />
-                  <DataPill label="przewaga" value={fmtPP(bet.edge_pp)} emphasis />
+                  {bet.sugestia ? (
+                    <DataPill
+                      label="uczciwy kurs (szacunek)"
+                      value={fmtKurs(bet.fair_kurs)}
+                    />
+                  ) : (
+                    <>
+                      {bet.p_rynku != null && (
+                        <DataPill label="kurs mówi" value={fmtProc(bet.p_rynku)} />
+                      )}
+                      <DataPill label="uczciwy kurs" value={fmtKurs(bet.fair_kurs)} />
+                      {bet.edge_pp != null && (
+                        <DataPill
+                          label="przewaga"
+                          value={fmtPP(bet.edge_pp)}
+                          emphasis
+                        />
+                      )}
+                    </>
+                  )}
                 </div>
-                <p className="text-xs text-muted">
-                  Widełki szansy:{" "}
-                  <span className="font-data">
-                    {fmtProc(bet.ci[0])}–{fmtProc(bet.ci[1])}
-                  </span>{" "}
-                  — im węższe, tym stabilniejsza predykcja.
-                </p>
+                {bet.sugestia ? (
+                  <p className="rounded-lg border border-data-amber/40 bg-data-amber-wash px-3 py-2 text-xs leading-relaxed text-[#6d4410]">
+                    <strong>Sugestia bez kursu.</strong> Ten rynek (niecelne /
+                    zablokowane) jest w STS, ale STS nie działa z chmury. Model
+                    szacuje szansę z „strzały − celne" — <strong>sprawdź kurs w
+                    STS ręcznie</strong> i oceń, czy jest wartość.
+                  </p>
+                ) : (
+                  bet.ci[0] != null && (
+                    <p className="text-xs text-muted">
+                      Widełki szansy:{" "}
+                      <span className="font-data">
+                        {fmtProc(bet.ci[0])}–{fmtProc(bet.ci[1] as number)}
+                      </span>{" "}
+                      — im węższe, tym stabilniejsza predykcja.
+                    </p>
+                  )
+                )}
                 <div className="flex flex-wrap items-center gap-3">
                   <ConfidenceBadge level={bet.pewnosc} />
                   <RiskBadge level={bet.ryzyko} />
@@ -209,21 +246,30 @@ export function BetCard({
                     <p className="mt-1.5 text-xs text-faint">
                       Średnio {forma.srednia90.toFixed(2).replace(".", ",")} na 90
                       minut · przewidywane minuty:{" "}
-                      {Math.round(bet.oczekiwane_minuty)}
+                      {bet.oczekiwane_minuty != null
+                        ? Math.round(bet.oczekiwane_minuty)
+                        : "—"}
                     </p>
                   </div>
                 )}
-                <button
-                  onClick={() => addZakladFromBet(bet, null)}
-                  disabled={tracked}
-                  className={`w-full rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${
-                    tracked
-                      ? "cursor-default bg-brand-wash text-brand"
-                      : "bg-brand text-white hover:bg-brand-deep"
-                  }`}
-                >
-                  {tracked ? "✓ W moich zakładach" : "Dodaj do moich zakładów"}
-                </button>
+                {bet.sugestia ? (
+                  <p className="rounded-lg border border-hairline bg-card px-3 py-2.5 text-center text-xs text-muted">
+                    Otwórz STS, znajdź ten rynek dla zawodnika i sprawdź kurs.
+                    Jeśli jest wartość — dodasz w „Moich zakładach".
+                  </p>
+                ) : (
+                  <button
+                    onClick={() => addZakladFromBet(bet, null)}
+                    disabled={tracked}
+                    className={`w-full rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${
+                      tracked
+                        ? "cursor-default bg-brand-wash text-brand"
+                        : "bg-brand text-white hover:bg-brand-deep"
+                    }`}
+                  >
+                    {tracked ? "✓ W moich zakładach" : "Dodaj do moich zakładów"}
+                  </button>
+                )}
               </div>
             </div>
           </motion.div>

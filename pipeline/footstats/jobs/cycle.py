@@ -13,6 +13,15 @@ from __future__ import annotations
 import sys
 import time
 import traceback
+from pathlib import Path
+
+# lokalnie: wczytaj sekrety z pipeline/.env (gitignorowany). W GitHub Actions
+# zmienne przychodzą ze środowiska — dotenv ich nie nadpisze.
+try:
+    from dotenv import load_dotenv
+    load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
+except Exception:
+    pass
 
 MODE = "ms2026"  # przełączyć na "liga" po starcie sezonu 2026/27
 

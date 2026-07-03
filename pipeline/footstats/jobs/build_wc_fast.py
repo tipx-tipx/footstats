@@ -157,6 +157,7 @@ def main():
     value_bets, matches_out, players_out = [], {}, {}
     vb_id = 0
     seen_player_market = set()  # (player_id, market) — statshub bywa zdublowany
+    shot_lam = {}  # player_id -> {'shots': λ, 'sot': λ, 'info': {...}} — pod sugestie STS
 
     for tr in trends:
         if (tr.player_id, tr.market_code) in seen_player_market:
@@ -193,6 +194,17 @@ def main():
         if probe.lam < (0.35 if mk not in RARE_MARKETS else 0.2):
             continue
         line = line_for_lambda(probe.lam)
+
+        # zapamiętaj λ strzałów/celnych — do sugestii niecelne/zablokowane (STS)
+        if mk in ("shots", "sot"):
+            slot = shot_lam.setdefault(tr.player_id, {})
+            slot[mk] = probe.lam
+            slot["info"] = {
+                "name": tr.player_name, "team": tr.team_name,
+                "opp": tr.opponent_name, "mid": mid, "ts": ts,
+                "match": match_label, "minutes": int(sum(tr.minutes)),
+                "position": tr.position or "?",
+            }
 
         # kursy Superbetu dla tego zawodnika/rynku
         sb_odds = sb_cache.get(mid)
@@ -300,6 +312,59 @@ def main():
                 "rozklad": dist, "czynniki": sm.factors, "uzasadnienie": sm.reasoning,
             })
             matches_out[mid]["okazje"].append(vb_id)
+
+    # --- SUGESTIE bez kursów: niecelne / zablokowane (rynki STS, blokowany w chmurze) ---
+    # statshub nie ma tych rynków, ale daje "strzały" i "celne". Ich różnica to
+    # "nietrafione w światło bramki" = niecelne + zablokowane. Podział wg realnych
+    # danych ligowych. Pokazujemy jako SUGESTIE (bez kursu) — kurs sprawdzasz w STS.
+    OFF_SHARE, BLK_SHARE = 0.556, 0.444
+    from scipy import stats as _st
+    for pid, slot in shot_lam.items():
+        lam_shots = slot.get("shots")
+        info = slot.get("info")
+        if not lam_shots or not info:
+            continue
+        lam_sot = slot.get("sot", lam_shots * 0.34)  # brak celnych → typowy udział 34%
+        lam_not_on = max(lam_shots - lam_sot, 0.1)
+        for mk, share in (("shots_off_target", OFF_SHARE), ("shots_blocked", BLK_SHARE)):
+            lam = lam_not_on * share
+            if lam < 0.5:
+                continue  # za rzadkie na sensowną sugestię
+            line = line_for_lambda(lam)
+            thr = int(line)  # "powyżej line" = X > floor(line)
+            p_over = float(_st.poisson.sf(thr, lam))
+            if p_over < 0.5:
+                continue  # sugerujemy tylko, gdy model widzi realną szansę na "powyżej"
+            vb_id += 1
+            value_bets.append({
+                "id": vb_id, "mecz_id": info["mid"], "mecz": info["match"],
+                "kickoff_ts": info["ts"], "podmiot_typ": "zawodnik",
+                "podmiot_id": pid, "podmiot": info["name"], "druzyna": info["team"],
+                "przeciwnik": info["opp"],
+                "rynek_kod": mk, "rynek": MARKET_NAMES_PL[mk],
+                "linia": line, "strona": "powyzej",
+                "sugestia": True,                      # <-- brak kursu, sprawdź w STS
+                "kurs": None, "bukmacher": "STS (sprawdź ręcznie)",
+                "p_model": round(p_over, 4), "p_rynku": None,
+                "fair_kurs": round(1.0 / max(p_over, 1e-6), 2),
+                "edge_pp": None, "ev_pct": None,
+                "pewnosc": "niska", "pewnosc_score": 30.0, "ryzyko": "wysokie",
+                "rank_score": p_over,                  # sortowanie sugestii po szansie
+                "ci": [None, None], "oczekiwane_minuty": None,
+                "lambda": round(lam, 3),
+                "rozklad": [float(_st.poisson.pmf(k, lam)) for k in range(6)]
+                + [float(_st.poisson.sf(5, lam))],
+                "czynniki": {}, "uzasadnienie": {
+                    "czynniki": [{
+                        "nazwa": "Szacunek z modelu",
+                        "opis": f"Oczekiwane {lam:.2f} na mecz (z: strzały − celne, "
+                        f"podział {int(share*100)}% wg danych ligowych)",
+                        "mnoznik": None,
+                    }],
+                    "oczekiwana_liczba": round(lam, 2), "rynek_rzadki": True,
+                },
+            })
+            matches_out.setdefault(info["mid"], {}).setdefault("okazje", []).append(vb_id)
 
     value_bets.sort(key=lambda b: -b["rank_score"])
 

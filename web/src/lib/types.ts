@@ -39,23 +39,24 @@ export interface ValueBet {
   rynek: string;
   linia: number;
   strona: Strona;
-  kurs: number;
+  kurs: number | null;          // null dla sugestii (rynek STS — sprawdź ręcznie)
   bukmacher: string;
   p_model: number;
-  p_rynku: number;
+  p_rynku: number | null;
   fair_kurs: number;
-  edge_pp: number;
-  ev_pct: number;
+  edge_pp: number | null;
+  ev_pct: number | null;
   pewnosc: Pewnosc;
   pewnosc_score: number;
   ryzyko: Ryzyko;
   rank_score: number;
-  ci: [number, number];
-  oczekiwane_minuty: number;
+  ci: [number, number] | [null, null];
+  oczekiwane_minuty: number | null;
   lambda: number;
   rozklad: number[] | null;
-  czynniki: Czynniki;
+  czynniki: Czynniki | Record<string, never>;
   uzasadnienie: Uzasadnienie;
+  sugestia?: boolean;           // true = brak kursu, tylko podpowiedź modelu
 }
 
 export interface Mecz {

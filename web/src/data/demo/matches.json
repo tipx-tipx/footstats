@@ -1,17 +1,5 @@
 [
  {
-  "id": 12812997,
-  "liga": "MŚ",
-  "sezon": "2026",
-  "kolejka": "Ćwierćfinał",
-  "kickoff_ts": 1783033200,
-  "gospodarz": "Portugal",
-  "gosc": "Croatia",
-  "sedzia": null,
-  "sedzia_mnoznik_fauli": 1.0,
-  "okazje": []
- },
- {
   "id": 12813019,
   "liga": "MŚ",
   "sezon": "2026",
@@ -21,7 +9,12 @@
   "gosc": "Algeria",
   "sedzia": null,
   "sedzia_mnoznik_fauli": 1.0,
-  "okazje": []
+  "okazje": [
+   3,
+   8,
+   9,
+   13
+  ]
  },
  {
   "id": 12813011,
@@ -35,7 +28,10 @@
   "sedzia_mnoznik_fauli": 1.0,
   "okazje": [
    1,
-   2
+   4,
+   5,
+   7,
+   11
   ]
  },
  {
@@ -48,7 +44,10 @@
   "gosc": "Cape Verde",
   "sedzia": null,
   "sedzia_mnoznik_fauli": 1.0,
-  "okazje": []
+  "okazje": [
+   6,
+   10
+  ]
  },
  {
   "id": 12813018,
@@ -61,7 +60,8 @@
   "sedzia": null,
   "sedzia_mnoznik_fauli": 1.0,
   "okazje": [
-   3
+   2,
+   12
   ]
  }
 ]

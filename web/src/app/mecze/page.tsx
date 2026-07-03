@@ -10,8 +10,9 @@ export default async function MeczePage() {
   const okazjeByMecz = new Map<number, number>();
   let bestByMecz = new Map<number, number>();
   for (const b of bets) {
+    if (b.sugestia) continue; // sugestie STS nie liczą się jako okazje z kursem
     okazjeByMecz.set(b.mecz_id, (okazjeByMecz.get(b.mecz_id) ?? 0) + 1);
-    if ((bestByMecz.get(b.mecz_id) ?? 0) < b.ev_pct)
+    if (b.ev_pct != null && (bestByMecz.get(b.mecz_id) ?? 0) < b.ev_pct)
       bestByMecz.set(b.mecz_id, b.ev_pct);
   }
 

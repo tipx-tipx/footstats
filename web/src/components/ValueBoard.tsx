@@ -43,8 +43,14 @@ export function ValueBoard({
   const [pewnosc, setPewnosc] = useState<Pewnosc | "kazda">("kazda");
   const [minEv, setMinEv] = useState(3);
   const [meczId, setMeczId] = useState<number | undefined>(initialMatchId);
+  const [rodzaj, setRodzaj] = useState<"okazje" | "sugestie" | "wszystko">("okazje");
   const [limit, setLimit] = useState(25);
   const reduced = useReducedMotion();
+
+  const liczbaSugestii = useMemo(
+    () => bets.filter((b) => b.sugestia).length,
+    [bets],
+  );
 
   const zawodnikById = useMemo(
     () => new Map(zawodnicy.map((z) => [z.id, z])),
@@ -72,18 +78,44 @@ export function ValueBoard({
         b.rynek_kod !== rynek
       )
         return false;
+      if (rodzaj === "okazje" && b.sugestia) return false;
+      if (rodzaj === "sugestie" && !b.sugestia) return false;
       if (pewnosc === "wysoka" && b.pewnosc !== "wysoka") return false;
       if (pewnosc === "srednia" && b.pewnosc === "niska") return false;
-      if (b.ev_pct < minEv) return false;
+      // sugestie nie mają EV — omijają filtr wartości
+      if (!b.sugestia && (b.ev_pct == null || b.ev_pct < minEv)) return false;
       if (meczId !== undefined && b.mecz_id !== meczId) return false;
       return true;
     });
-  }, [bets, rynek, pewnosc, minEv, meczId]);
+  }, [bets, rynek, pewnosc, minEv, meczId, rodzaj]);
 
   const shown = filtered.slice(0, limit);
 
   return (
     <section aria-label="Lista okazji">
+      {/* przełącznik: okazje z kursem / sugestie STS */}
+      {liczbaSugestii > 0 && (
+        <div className="mb-3 inline-flex rounded-lg border border-hairline bg-card p-0.5 text-sm">
+          {([
+            ["okazje", "Okazje z kursem"],
+            ["sugestie", `Sugestie STS (${liczbaSugestii})`],
+            ["wszystko", "Wszystko"],
+          ] as const).map(([kod, label]) => (
+            <button
+              key={kod}
+              onClick={() => setRodzaj(kod)}
+              className={`rounded-md px-3 py-1 transition-colors ${
+                rodzaj === kod
+                  ? "bg-brand text-white"
+                  : "text-muted hover:text-ink"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* filtry */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <select

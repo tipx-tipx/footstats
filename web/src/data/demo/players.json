@@ -1,41 +1,5 @@
 [
  {
-  "id": 750,
-  "nazwa": "Cristiano Ronaldo",
-  "pozycja": "F",
-  "druzyna": "Portugal",
-  "minuty_lacznie": 3320,
-  "forma": {
-   "shots": {
-    "ostatnie": [
-     3,
-     7,
-     3,
-     4,
-     3,
-     5,
-     5,
-     3,
-     3,
-     4
-    ],
-    "minuty": [
-     90,
-     90,
-     90,
-     65,
-     45,
-     87,
-     90,
-     83,
-     89,
-     90
-    ],
-    "srednia90": 5.48
-   }
-  }
- },
- {
   "id": 1518931,
   "nazwa": "Johan Manzambi",
   "pozycja": "M",
@@ -176,42 +140,6 @@
      90
     ],
     "srednia90": 2.31
-   }
-  }
- },
- {
-  "id": 1160386,
-  "nazwa": "Andres Gomez",
-  "pozycja": "M",
-  "druzyna": "Colombia",
-  "minuty_lacznie": 3315,
-  "forma": {
-   "shots": {
-    "ostatnie": [
-     1,
-     3,
-     1,
-     4,
-     2,
-     4,
-     1,
-     5,
-     3,
-     4
-    ],
-    "minuty": [
-     45,
-     90,
-     88,
-     90,
-     89,
-     90,
-     78,
-     90,
-     90,
-     90
-    ],
-    "srednia90": 3.1
    }
   }
  },
@@ -360,6 +288,42 @@
   }
  },
  {
+  "id": 826545,
+  "nazwa": "Mohamed Hany",
+  "pozycja": "D",
+  "druzyna": "Egypt",
+  "minuty_lacznie": 3536,
+  "forma": {
+   "tackles": {
+    "ostatnie": [
+     6,
+     1,
+     6,
+     1,
+     1,
+     3,
+     2,
+     2,
+     1,
+     1
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     75,
+     85,
+     90,
+     90,
+     90,
+     90,
+     90
+    ],
+    "srednia90": 1.81
+   }
+  }
+ },
+ {
   "id": 1646783,
   "nazwa": "Lucas Herrington",
   "pozycja": "D",
@@ -392,6 +356,42 @@
      120
     ],
     "srednia90": 1.21
+   }
+  }
+ },
+ {
+  "id": 352290,
+  "nazwa": "Cedric Itten",
+  "pozycja": "F",
+  "druzyna": "Switzerland",
+  "minuty_lacznie": 3254,
+  "forma": {
+   "fouls_committed": {
+    "ostatnie": [
+     2,
+     5,
+     2,
+     2,
+     3,
+     2,
+     2,
+     1,
+     1,
+     1
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     90,
+     90,
+     59,
+     90,
+     89,
+     90,
+     90
+    ],
+    "srednia90": 2.05
    }
   }
  },
@@ -540,6 +540,42 @@
   }
  },
  {
+  "id": 1986794,
+  "nazwa": "Caleb Yirenkyi",
+  "pozycja": "M",
+  "druzyna": "Ghana",
+  "minuty_lacznie": 3491,
+  "forma": {
+   "fouls_committed": {
+    "ostatnie": [
+     3,
+     1,
+     2,
+     2,
+     1,
+     1,
+     2,
+     1,
+     3,
+     1
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     90,
+     90,
+     90,
+     90,
+     90,
+     90,
+     90
+    ],
+    "srednia90": 1.55
+   }
+  }
+ },
+ {
   "id": 788284,
   "nazwa": "Ajdin Hrustic",
   "pozycja": "M",
@@ -648,38 +684,38 @@
   }
  },
  {
-  "id": 288205,
-  "nazwa": "Bruno Fernandes",
-  "pozycja": "M",
-  "druzyna": "Portugal",
-  "minuty_lacznie": 3428,
+  "id": 1049534,
+  "nazwa": "Jaouen Hadjam",
+  "pozycja": "D",
+  "druzyna": "Algeria",
+  "minuty_lacznie": 3164,
   "forma": {
-   "shots": {
+   "tackles": {
     "ostatnie": [
+     1,
+     2,
+     2,
+     1,
+     1,
      2,
      2,
      2,
      1,
-     2,
-     1,
-     5,
-     2,
-     2,
      0
     ],
     "minuty": [
+     71,
+     70,
+     71,
+     13,
+     90,
+     69,
      90,
      90,
-     90,
-     45,
-     90,
-     90,
-     90,
-     90,
-     89,
-     90
+     80,
+     68
     ],
-    "srednia90": 2.63
+    "srednia90": 1.96
    }
   }
  },
@@ -716,6 +752,78 @@
      90
     ],
     "srednia90": 1.37
+   }
+  }
+ },
+ {
+  "id": 1094482,
+  "nazwa": "Adil Boulbina",
+  "pozycja": "M",
+  "druzyna": "Algeria",
+  "minuty_lacznie": 2081,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     2,
+     5,
+     3,
+     3,
+     4,
+     3,
+     2,
+     3,
+     1,
+     4
+    ],
+    "minuty": [
+     90,
+     120,
+     90,
+     90,
+     90,
+     45,
+     90,
+     90,
+     90,
+     90
+    ],
+    "srednia90": 3.72
+   }
+  }
+ },
+ {
+  "id": 1015292,
+  "nazwa": "Richard Rios",
+  "pozycja": "M",
+  "druzyna": "Colombia",
+  "minuty_lacznie": 3376,
+  "forma": {
+   "fouls_won": {
+    "ostatnie": [
+     2,
+     1,
+     2,
+     3,
+     2,
+     4,
+     2,
+     1,
+     0,
+     3
+    ],
+    "minuty": [
+     68,
+     90,
+     90,
+     89,
+     90,
+     79,
+     90,
+     45,
+     71,
+     90
+    ],
+    "srednia90": 2.48
    }
   }
  }

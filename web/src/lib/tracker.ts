@@ -31,7 +31,7 @@ export function addZakladFromBet(bet: ValueBet, stawka: number | null): MojZakla
     rynek: bet.rynek,
     linia: bet.linia,
     strona: bet.strona,
-    kurs: bet.kurs,
+    kurs: bet.kurs ?? 0, // sugestie (kurs null) nie są dodawane — przycisk ukryty
     bukmacher: bet.bukmacher,
     stawka,
     dodano_ts: Math.floor(Date.now() / 1000),

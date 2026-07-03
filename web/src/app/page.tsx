@@ -14,8 +14,9 @@ export default async function OkazjePage({
     getMeta(),
   ]);
 
-  const naj = bets[0];
-  const wysokaPewnosc = bets.filter((b) => b.pewnosc === "wysoka").length;
+  const okazje = bets.filter((b) => !b.sugestia);
+  const naj = okazje.find((b) => b.ev_pct != null);
+  const wysokaPewnosc = okazje.filter((b) => b.pewnosc === "wysoka").length;
 
   return (
     <>
@@ -40,7 +41,7 @@ export default async function OkazjePage({
             <div>
               <dt className="text-xs text-faint">znalezione okazje</dt>
               <dd className="font-data text-2xl font-semibold text-ink">
-                {bets.length}
+                {okazje.length}
               </dd>
             </div>
             <div>
@@ -49,7 +50,7 @@ export default async function OkazjePage({
                 {wysokaPewnosc}
               </dd>
             </div>
-            {naj && (
+            {naj?.ev_pct != null && (
               <div>
                 <dt className="text-xs text-faint">najlepsza wartość</dt>
                 <dd className="font-data text-2xl font-semibold text-data-green">
