@@ -1,79 +1,6 @@
 [
  {
   "id": 1,
-  "mecz_id": 12813018,
-  "mecz": "Australia – Egypt",
-  "kickoff_ts": 1783101600,
-  "podmiot_typ": "zawodnik",
-  "podmiot_id": 159665,
-  "podmiot": "Mohamed Salah",
-  "druzyna": "Egypt",
-  "przeciwnik": "Australia",
-  "rynek_kod": "shots",
-  "rynek": "Strzały",
-  "linia": 3.5,
-  "strona": "powyzej",
-  "kurs": 3.9,
-  "bukmacher": "STS",
-  "p_model": 0.2993,
-  "p_rynku": 0.2385,
-  "fair_kurs": 3.341,
-  "edge_pp": 6.08,
-  "ev_pct": 16.73,
-  "pewnosc": "srednia",
-  "pewnosc_score": 54.1,
-  "ryzyko": "niskie",
-  "rank_score": 2.419,
-  "ci": [
-   0.1768,
-   0.4301
-  ],
-  "oczekiwane_minuty": 83.6,
-  "lambda": 2.744,
-  "rozklad": [
-   0.0723068632326039,
-   0.18592366808542055,
-   0.24293596979314888,
-   0.21501939745871165,
-   0.1449893564914194,
-   0.0794311426610815,
-   0.03681870325831399,
-   0.014849255761555807,
-   0.007725643257744386
-  ],
-  "czynniki": {
-   "rywal": 1.022,
-   "sedzia": 1.0,
-   "dom_wyjazd": 1.0,
-   "scenariusz_meczu": 1.0,
-   "matchup": 1.0,
-   "lacznie": 1.022,
-   "opisy": {}
-  },
-  "uzasadnienie": {
-   "czynniki": [
-    {
-     "nazwa": "Poziom bazowy",
-     "opis": "Średnio 2.89 na 90 minut (efektywna próba: 16 meczów)",
-     "mnoznik": null
-    },
-    {
-     "nazwa": "Minuty",
-     "opis": "Przewidywane minuty: 84 (szansa na pierwszy skład: 85%, wg przewidywanego składu)",
-     "mnoznik": 0.93
-    },
-    {
-     "nazwa": "Rywal",
-     "opis": "Australia dopuszcza więcej takich akcji niż średnia ligi",
-     "mnoznik": 1.02
-    }
-   ],
-   "oczekiwana_liczba": 2.74,
-   "rynek_rzadki": false
-  }
- },
- {
-  "id": 2,
   "mecz_id": 12812999,
   "mecz": "Argentina – Cape Verde",
   "kickoff_ts": 1783116000,
@@ -127,7 +54,7 @@
   }
  },
  {
-  "id": 7,
+  "id": 6,
   "mecz_id": 12812999,
   "mecz": "Argentina – Cape Verde",
   "kickoff_ts": 1783116000,
@@ -181,7 +108,7 @@
   }
  },
  {
-  "id": 4,
+  "id": 3,
   "mecz_id": 12813011,
   "mecz": "Colombia – Ghana",
   "kickoff_ts": 1783128600,
@@ -235,7 +162,7 @@
   }
  },
  {
-  "id": 5,
+  "id": 4,
   "mecz_id": 12812999,
   "mecz": "Argentina – Cape Verde",
   "kickoff_ts": 1783116000,
@@ -289,7 +216,7 @@
   }
  },
  {
-  "id": 8,
+  "id": 7,
   "mecz_id": 12813018,
   "mecz": "Australia – Egypt",
   "kickoff_ts": 1783101600,
@@ -343,7 +270,7 @@
   }
  },
  {
-  "id": 6,
+  "id": 5,
   "mecz_id": 12813011,
   "mecz": "Colombia – Ghana",
   "kickoff_ts": 1783128600,
@@ -397,7 +324,7 @@
   }
  },
  {
-  "id": 3,
+  "id": 2,
   "mecz_id": 12812999,
   "mecz": "Argentina – Cape Verde",
   "kickoff_ts": 1783116000,

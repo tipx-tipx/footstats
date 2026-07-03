@@ -23,17 +23,14 @@ from curl_cffi import requests
 
 from ..engine import MatchContext, PlayerHistory, RARE_MARKETS, score_player_market
 from ..model import counts
-from ..sources import statshub, sts, superbet
+from ..sources import statshub, superbet
 from .build_demo import MARKET_NAMES_PL, WEB_DATA_DIR, line_for_lambda
 
-
-def _sts_match_id(catalog: dict, home_en: str, away_en: str) -> str | None:
-    """Znajdź STS id meczu po nazwach (statshub EN -> STS PL)."""
-    en_pl = {v: k for k, v in superbet.TEAM_PL_EN.items()}
-    h = superbet.norm_name(en_pl.get(home_en, home_en))
-    a = superbet.norm_name(en_pl.get(away_en, away_en))
-    # dopasowanie w obu kolejnościach (STS może mieć odwróconą stronę)
-    return catalog.get((h, a)) or catalog.get((a, h))
+# KURSY GŁÓWNE: wyłącznie Superbet. STS blokuje IP serwerowni (chmura = źródło
+# prawdy, cron GitHub Actions), więc kursy STS w line-shoppingu powodowały
+# rozjazd danych między przebiegiem lokalnym a chmurowym (typy "znikały").
+# STS zostaje tylko jako adresat SUGESTII bez kursu (niecelne/zablokowane).
+# Wróci do kursów głównych, gdy pipeline pójdzie z domowego IP (telefon/Pi).
 
 SH_BASE = "https://www.statshub.com/api"
 SH_HEADERS = {"Accept": "application/json", "Referer": "https://www.statshub.com/"}
@@ -162,17 +159,8 @@ def main():
         sb_events = []
         print(f"Superbet niedostępny: {e}")
 
-    # katalog STS (id meczów po nazwach drużyn — bez przeglądarki)
-    try:
-        sts_catalog = sts.match_ids_by_teams()
-        print(f"STS: {len(sts_catalog)} meczów w katalogu")
-    except Exception as e:
-        sts_catalog = {}
-        print(f"STS niedostępny: {e}")
-
     ev_by_id = {e["id"]: e for e in events}
     sb_cache: dict[int, dict] = {}
-    sts_cache: dict[int, dict] = {}
 
     # składy: potwierdzone (event.lineupConfirmed) i przewidywane (czy statshub
     # w ogóle wystawił przewidywany skład dla danego meczu)
@@ -266,31 +254,14 @@ def main():
                 superbet.norm_name(tr.player_name), {}
             ).get(mk, {})
 
-        # kursy STS dla tego meczu (WebSocket, po id z katalogu)
-        sts_odds = sts_cache.get(mid)
-        if sts_odds is None:
-            sts_id = _sts_match_id(sts_catalog, home_name, away_name)
-            if sts_id:
-                try:
-                    sts_odds = sts.fetch_stat_odds(sts_id, seconds=14)
-                except Exception:
-                    sts_odds = {"players": {}}
-            else:
-                sts_odds = {"players": {}}
-            sts_cache[mid] = sts_odds
-        sts_lines = sts_odds.get("players", {}).get(
-            superbet.norm_name(tr.player_name), {}
-        ).get(mk, {})
-
-        # SCAL kursy z obu bukmacherów: linia -> strona -> (kurs, bukmacher)
+        # kursy: linia -> strona -> (kurs, bukmacher) — tylko Superbet (patrz nota u góry)
         merged: dict = {}
-        for src_name, src in (("Superbet", sb_lines), ("STS", sts_lines)):
-            for l, v in src.items():
-                slot = merged.setdefault(l, {})
-                for side in ("over", "under"):
-                    odd = v.get(side)
-                    if odd and (side not in slot or odd > slot[side][0]):
-                        slot[side] = (odd, src_name)
+        for l, v in sb_lines.items():
+            slot = merged.setdefault(l, {})
+            for side in ("over", "under"):
+                odd = v.get(side)
+                if odd and (side not in slot or odd > slot[side][0]):
+                    slot[side] = (odd, "Superbet")
 
         # zapisz formę zawodnika (dla UI)
         if tr.player_id not in players_out:

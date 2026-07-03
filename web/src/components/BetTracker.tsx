@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import {
@@ -63,8 +64,8 @@ export function BetTracker() {
       <div className="mt-8 rounded-(--radius-card) border border-dashed border-hairline-strong bg-card p-10 text-center">
         <p className="font-semibold">Nie masz jeszcze żadnych zakładów</p>
         <p className="mt-1 text-sm text-muted">
-          Wejdź w <a href="/" className="text-brand underline">Okazje</a>,
-          rozwiń interesujący zakład i kliknij „Dodaj do moich zakładów".
+          Wejdź w <Link href="/" className="text-brand underline">Okazje</Link>,
+          rozwiń interesujący zakład i kliknij „Dodaj do moich zakładów”.
         </p>
       </div>
     );

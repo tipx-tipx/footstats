@@ -66,6 +66,15 @@ h1, h2, h3, .font-display {
   letter-spacing: -0.02em;
 }
 
+/* kropka "dane na żywo" — spokojny puls */
+.live-dot {
+  animation: live-pulse 2.4s ease-in-out infinite;
+}
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgb(31 157 102 / 0.45); }
+  50%      { opacity: 0.7; box-shadow: 0 0 0 4px rgb(31 157 102 / 0); }
+}
+
 /* delikatna siatka "boiska" w tle hero */
 .pitch-grid {
   background-image:

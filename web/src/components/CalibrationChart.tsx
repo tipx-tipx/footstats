@@ -62,6 +62,16 @@ export function CalibrationChart({
           stroke="var(--color-hairline-strong)" strokeWidth="1.5"
           strokeDasharray="5 4"
         />
+        <text
+          x={x(0.63)}
+          y={y(0.63) - 7}
+          textAnchor="middle"
+          fontSize="9"
+          className="fill-(--color-faint)"
+          transform={`rotate(-45 ${x(0.63)} ${y(0.63) - 7})`}
+        >
+          ideał
+        </text>
         {/* punkty kubełków */}
         {bins.map((b, i) => (
           <circle
@@ -96,8 +106,8 @@ export function CalibrationChart({
         <div
           className="pointer-events-none absolute rounded-lg border border-hairline bg-card px-2.5 py-1.5 text-xs shadow-(--shadow-card-hover)"
           style={{
-            left: x(bins[hover].p_pred) + 10,
-            top: y(bins[hover].p_real) - 34,
+            left: Math.min(x(bins[hover].p_pred) + 10, size - 190),
+            top: Math.max(y(bins[hover].p_real) - 34, 2),
           }}
         >
           <span className="font-data">

@@ -40,8 +40,8 @@ export default function JakToDzialaPage() {
     <div className="pt-10">
       <h1 className="text-2xl font-bold">Jak to działa</h1>
       <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted">
-        Bez żargonu: co się dzieje między „mecz w sobotę" a „ten kurs jest
-        zawyżony". Osiem kroków — dokładnie w tej kolejności wykonuje je
+        Bez żargonu: co się dzieje między „mecz w sobotę” a „ten kurs jest
+        zawyżony”. Osiem kroków — dokładnie w tej kolejności wykonuje je
         system dla każdego zawodnika i każdego rynku.
       </p>
 
@@ -74,7 +74,7 @@ export default function JakToDzialaPage() {
           ani planów trenera. Dlatego nigdy nie pokazujemy zakładów, w których
           model drastycznie nie zgadza się z rynkiem — najczęściej to rynek
           wie coś, czego nie wie model. Wartość dodatnia w długiej serii, a
-          nie pojedynczy „pewniak", jest celem tego narzędzia.
+          nie pojedynczy „pewniak”, jest celem tego narzędzia.
         </p>
       </div>
     </div>

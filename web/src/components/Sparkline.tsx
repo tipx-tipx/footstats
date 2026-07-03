@@ -1,14 +1,20 @@
 "use client";
 
+import { fmtLinia } from "@/lib/format";
+
 /**
  * Forma zawodnika: liczba zdarzeń w ostatnich meczach (najnowszy z prawej),
- * jako słupki z zaznaczoną linią zakładu. Słupek nad linią = zielony.
+ * jako słupki z kreskowaną linią zakładu.
+ *   zielony słupek  = wynik nad linią (zakład "powyżej" by wszedł)
+ *   szary słupek    = wynik pod linią
+ *   półprzezroczysty = zawodnik grał krótko (<30 min) — wynik mało mówi
+ * Nad każdym słupkiem mała liczba — konkretny wynik z tamtego meczu.
  */
 export function FormBars({
   counts,
   minutes,
   line,
-  height = 44,
+  height = 56,
 }: {
   counts: number[];
   minutes?: number[];
@@ -18,43 +24,83 @@ export function FormBars({
   const values = [...counts].reverse(); // najstarszy z lewej
   const mins = minutes ? [...minutes].reverse() : undefined;
   const max = Math.max(...values, Math.ceil(line + 0.5), 2);
-  const lineY = 1 - line / max;
+  const labelH = 14; // miejsce na liczby nad słupkami
+  const plotH = height - labelH;
+  const lineY = labelH + (1 - line / max) * plotH;
 
   return (
-    <div
-      className="relative flex w-full items-end gap-[3px]"
-      style={{ height }}
-      role="img"
-      aria-label={`Ostatnie ${values.length} meczów: ${values.join(", ")}`}
-    >
-      {values.map((v, i) => {
-        const over = v > line;
-        const h = Math.max((v / max) * 100, 4);
-        return (
-          <div
-            key={i}
-            className="relative flex-1 rounded-t-[3px]"
-            style={{
-              height: `${h}%`,
-              background: over ? "var(--color-data-green)" : "#cdd8d1",
-              minWidth: 6,
-            }}
-            title={`${v} (${mins ? `${mins[i]} min` : "mecz"} ${
-              values.length - i
-            } temu)`}
-          />
-        );
-      })}
-      {/* linia zakładu */}
+    <div className="w-full">
       <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0"
-        style={{
-          top: `${lineY * 100}%`,
-          borderTop: "1.5px dashed var(--color-ink)",
-          opacity: 0.5,
-        }}
-      />
+        className="relative w-full"
+        style={{ height }}
+        role="img"
+        aria-label={`Ostatnie ${values.length} meczów (od najstarszego): ${values.join(
+          ", ",
+        )}. Linia zakładu: ${fmtLinia(line)}.`}
+      >
+        {/* słupki */}
+        <div
+          className="absolute inset-x-0 bottom-0 flex items-end gap-[3px]"
+          style={{ height: plotH }}
+        >
+          {values.map((v, i) => {
+            const over = v > line;
+            const short = mins != null && mins[i] > 0 && mins[i] < 30;
+            const h = Math.max((v / max) * 100, 5);
+            return (
+              <div key={i} className="relative flex-1" style={{ minWidth: 8 }}>
+                <div
+                  className="absolute inset-x-0 bottom-0 rounded-t-[4px]"
+                  style={{
+                    height: `${h}%`,
+                    background: over
+                      ? "var(--color-data-green)"
+                      : "var(--color-hairline-strong)",
+                    opacity: short ? 0.45 : 1,
+                  }}
+                  title={`${v} — ${
+                    mins ? `${mins[i]} min gry, ` : ""
+                  }${values.length - i} ${values.length - i === 1 ? "mecz" : "mecze/-ów"} temu${
+                    short ? " (krótki występ)" : ""
+                  }`}
+                />
+                <span
+                  aria-hidden
+                  className="font-data absolute inset-x-0 text-center text-[9px]"
+                  style={{
+                    bottom: `calc(${h}% + 2px)`,
+                    color: over ? "var(--color-brand-deep)" : "var(--color-faint)",
+                  }}
+                >
+                  {v}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+        {/* podstawa */}
+        <div
+          aria-hidden
+          className="absolute inset-x-0 bottom-0 h-px bg-hairline"
+        />
+        {/* kreskowana linia zakładu */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0"
+          style={{
+            top: lineY,
+            borderTop: "1.5px dashed var(--color-ink)",
+            opacity: 0.45,
+          }}
+        />
+      </div>
+      <div className="mt-1 flex items-center justify-between text-[10px] text-faint">
+        <span>najstarszy →</span>
+        <span>
+          – – linia <span className="font-data">{fmtLinia(line)}</span> · blade
+          słupki = krótki występ
+        </span>
+      </div>
     </div>
   );
 }

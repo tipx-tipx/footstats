@@ -30,56 +30,29 @@ export default async function OkazjePage({
       {/* hero */}
       <section className="pitch-grid -mx-4 mb-8 border-b border-hairline bg-card px-4 pb-8 pt-10 sm:-mx-6 sm:px-6">
         <div className="mx-auto max-w-6xl">
-          <p className="mb-1 text-xs font-medium uppercase tracking-widest text-brand">
-            Skan rynków · {meta.liga} {meta.sezon}
-          </p>
-          <h1 className="max-w-2xl text-3xl font-bold leading-tight sm:text-4xl">
-            Gdzie kurs jest <span className="text-brand">zawyżony</span>{" "}
-            względem matematyki
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="text-xs font-medium uppercase tracking-widest text-brand">
+              Skan rynków · {meta.liga} {meta.sezon}
+            </p>
+            <span
+              className="inline-flex items-center gap-1.5 rounded-full border border-hairline bg-paper px-2.5 py-1 text-[11px] text-muted"
+              title="Cykl w chmurze pobiera statystyki i kursy, przelicza model i odświeża tę stronę"
+            >
+              <span aria-hidden className="live-dot h-1.5 w-1.5 rounded-full bg-data-green" />
+              aktualizacja co ~30 min · ostatnia{" "}
+              <span className="font-data font-medium text-ink-soft">{aktualizacja}</span>
+            </span>
+          </div>
+
+          <h1 className="mt-3 max-w-2xl text-3xl font-bold leading-tight sm:text-4xl">
+            Gdzie kurs płaci{" "}
+            <span className="text-brand">więcej, niż powinien</span>
           </h1>
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted">
-            Model szacuje szansę każdego zdarzenia (strzały, faule, odbiory…)
-            na podstawie historii, minut, rywala i sędziego — a potem porównuje
-            ją z kursem bukmachera. Poniżej tylko te zakłady, gdzie kurs płaci
-            lepiej, niż powinien.
-          </p>
-
-          <dl className="mt-6 flex flex-wrap gap-x-10 gap-y-4">
-            <div>
-              <dt className="text-xs text-faint">znalezione okazje</dt>
-              <dd className="font-data text-2xl font-semibold text-ink">
-                {okazje.length}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs text-faint">z wysoką pewnością</dt>
-              <dd className="font-data text-2xl font-semibold text-ink">
-                {wysokaPewnosc}
-              </dd>
-            </div>
-            {naj?.ev_pct != null && (
-              <div>
-                <dt className="text-xs text-faint">najlepsza wartość</dt>
-                <dd className="font-data text-2xl font-semibold text-data-green">
-                  {fmtEV(naj.ev_pct)}
-                </dd>
-              </div>
-            )}
-            <div>
-              <dt className="text-xs text-faint">meczów w analizie</dt>
-              <dd className="font-data text-2xl font-semibold text-ink">
-                {meta.meczow_demo}
-              </dd>
-            </div>
-          </dl>
-
-          <p className="mt-5 text-xs text-faint">
-            Dane odświeżane automatycznie co ok. 30 minut · ostatnia
-            aktualizacja:{" "}
-            <span className="font-data font-medium text-ink-soft">
-              {aktualizacja}
-            </span>{" "}
-            ·{" "}
+            Model liczy prawdziwe szanse na strzały, faule czy odbiory — z
+            historii zawodnika, przewidywanych minut, rywala i sędziego. Potem
+            porównuje je z kursami bukmachera i zostawia tylko zakłady, w
+            których bukmacher się przelicza.{" "}
             <Link
               href="/jak-to-dziala"
               className="font-medium text-brand underline-offset-2 hover:underline"
@@ -87,6 +60,33 @@ export default async function OkazjePage({
               Jak to działa? →
             </Link>
           </p>
+
+          <dl className="mt-6 grid max-w-3xl grid-cols-2 gap-2.5 sm:grid-cols-4">
+            {[
+              { label: "okazje z kursem", value: String(okazje.length) },
+              { label: "z wysoką pewnością", value: String(wysokaPewnosc) },
+              ...(naj?.ev_pct != null
+                ? [{ label: "najlepsza wartość", value: fmtEV(naj.ev_pct), green: true }]
+                : []),
+              { label: "meczów w analizie", value: String(meta.meczow_demo) },
+            ].map((s) => (
+              <div
+                key={s.label}
+                className="rounded-xl border border-hairline bg-card px-4 py-3 shadow-(--shadow-card)"
+              >
+                <dd
+                  className={`font-data text-2xl font-semibold ${
+                    "green" in s && s.green ? "text-data-green" : "text-ink"
+                  }`}
+                >
+                  {s.value}
+                </dd>
+                <dt className="mt-0.5 text-[11px] leading-tight text-faint">
+                  {s.label}
+                </dt>
+              </div>
+            ))}
+          </dl>
 
           {meta.tryb === "demo" && (
             <p className="mt-6 inline-flex items-center gap-2 rounded-lg border border-data-amber/40 bg-data-amber-wash px-3 py-2 text-xs text-[#8a5613]">

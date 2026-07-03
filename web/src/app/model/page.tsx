@@ -50,7 +50,7 @@ export default async function ModelPage() {
 
       <h2 className="mt-10 text-lg font-semibold">Kalibracja po rynkach</h2>
       <p className="mt-1 max-w-3xl text-sm text-muted">
-        Punkt na przekątnej = model idealnie skalibrowany (gdy mówi „60%",
+        Punkt na przekątnej = model idealnie skalibrowany (gdy mówi „60%”,
         zdarzenie zachodzi w 60% przypadków). Wielkość punktu = liczba
         predykcji w kubełku.
       </p>

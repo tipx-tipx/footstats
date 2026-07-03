@@ -648,38 +648,38 @@
   }
  },
  {
-  "id": 844096,
-  "nazwa": "Jhon Arias",
+  "id": 1174889,
+  "nazwa": "Gustavo Puerta",
   "pozycja": "M",
   "druzyna": "Colombia",
-  "minuty_lacznie": 3091,
+  "minuty_lacznie": 3360,
   "forma": {
-   "shots": {
+   "fouls_committed": {
     "ostatnie": [
-     3,
      2,
+     1,
      2,
-     3,
+     1,
+     1,
+     1,
      4,
-     2,
-     3,
-     3,
+     1,
      0,
-     3
+     1
     ],
     "minuty": [
-     76,
-     77,
-     89,
-     64,
+     90,
+     90,
      80,
-     75,
+     45,
+     68,
+     84,
+     89,
      90,
      90,
-     82,
-     73
+     85
     ],
-    "srednia90": 2.04
+    "srednia90": 2.22
    }
   }
  }

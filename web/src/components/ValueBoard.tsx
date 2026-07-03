@@ -25,10 +25,68 @@ const RYNKI_FILTRY: { kod: string; label: string }[] = [
 const GLOWNE_KODY = new Set(RYNKI_FILTRY.map((r) => r.kod));
 
 const PEWNOSC_FILTRY: { kod: Pewnosc | "kazda"; label: string }[] = [
-  { kod: "kazda", label: "Każda pewność" },
-  { kod: "wysoka", label: "Tylko wysoka" },
+  { kod: "kazda", label: "Każda" },
   { kod: "srednia", label: "Średnia i wyższa" },
+  { kod: "wysoka", label: "Tylko wysoka" },
 ];
+
+type SortKey = "ranking" | "ev" | "pewnosc" | "kickoff" | "kurs";
+
+const SORTOWANIA: { kod: SortKey; label: string }[] = [
+  { kod: "ranking", label: "Najtrafniejsze (wartość × pewność)" },
+  { kod: "ev", label: "Największa wartość" },
+  { kod: "pewnosc", label: "Najwyższa pewność" },
+  { kod: "kickoff", label: "Najbliższy mecz" },
+  { kod: "kurs", label: "Najwyższy kurs" },
+];
+
+/** Ostylowany select z etykietą — wspólny wygląd wszystkich filtrów. */
+function FilterSelect({
+  label,
+  value,
+  onChange,
+  children,
+  className = "",
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <label className={`flex min-w-0 flex-col gap-1 ${className}`}>
+      <span className="text-[10px] font-semibold uppercase tracking-wide text-faint">
+        {label}
+      </span>
+      <span className="relative">
+        <select
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-full cursor-pointer appearance-none rounded-lg border border-hairline bg-paper py-1.5 pl-3 pr-8 text-sm text-ink transition-colors hover:border-hairline-strong focus:border-brand"
+        >
+          {children}
+        </select>
+        <svg
+          aria-hidden
+          width="12"
+          height="12"
+          viewBox="0 0 14 14"
+          className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-faint"
+        >
+          <path
+            d="M3 5.5 L7 9.5 L11 5.5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </span>
+    </label>
+  );
+}
 
 export function ValueBoard({
   bets,
@@ -44,6 +102,7 @@ export function ValueBoard({
   const [minEv, setMinEv] = useState(3);
   const [meczId, setMeczId] = useState<number | undefined>(initialMatchId);
   const [rodzaj, setRodzaj] = useState<"okazje" | "sugestie" | "wszystko">("okazje");
+  const [sortuj, setSortuj] = useState<SortKey>("ranking");
   const [limit, setLimit] = useState(25);
   const reduced = useReducedMotion();
 
@@ -83,10 +142,11 @@ export function ValueBoard({
     setPewnosc("kazda");
     setMinEv(3);
     setMeczId(undefined);
+    setSortuj("ranking");
   };
 
   const filtered = useMemo(() => {
-    return bets.filter((b) => {
+    const wynik = bets.filter((b) => {
       if (rynek === "druzyny" && !b.rynek_kod.startsWith("team_")) return false;
       if (
         rynek === "inne" &&
@@ -109,163 +169,140 @@ export function ValueBoard({
       if (meczId !== undefined && b.mecz_id !== meczId) return false;
       return true;
     });
-  }, [bets, rynek, pewnosc, minEv, meczId, rodzaj]);
+    // kolejność wejściowa = ranking (wartość × pewność) z pipeline
+    switch (sortuj) {
+      case "ev":
+        wynik.sort((a, b) => (b.ev_pct ?? -1) - (a.ev_pct ?? -1));
+        break;
+      case "pewnosc":
+        wynik.sort((a, b) => b.pewnosc_score - a.pewnosc_score);
+        break;
+      case "kickoff":
+        wynik.sort((a, b) => a.kickoff_ts - b.kickoff_ts);
+        break;
+      case "kurs":
+        wynik.sort((a, b) => (b.kurs ?? 0) - (a.kurs ?? 0));
+        break;
+    }
+    return wynik;
+  }, [bets, rynek, pewnosc, minEv, meczId, rodzaj, sortuj]);
 
   const shown = filtered.slice(0, limit);
 
   return (
     <section aria-label="Lista okazji">
-      {/* przełącznik: okazje z kursem / sugestie STS */}
-      {liczbaSugestii > 0 && (
-        <div className="mb-3 inline-flex rounded-lg border border-hairline bg-card p-0.5 text-sm">
-          {([
-            ["okazje", "Okazje z kursem"],
-            ["sugestie", `Sugestie STS (${liczbaSugestii})`],
-            ["wszystko", "Wszystko"],
-          ] as const).map(([kod, label]) => (
-            <button
-              key={kod}
-              onClick={() => setRodzaj(kod)}
-              className={`rounded-md px-3 py-1 transition-colors ${
-                rodzaj === kod
-                  ? "bg-brand text-white"
-                  : "text-muted hover:text-ink"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      )}
+      {/* pasek narzędzi: rodzaj + filtry + sortowanie */}
+      <div className="mb-4 rounded-(--radius-card) border border-hairline bg-card p-3.5 shadow-(--shadow-card) sm:p-4">
+        {liczbaSugestii > 0 && (
+          <div
+            className="mb-3.5 inline-flex rounded-lg bg-paper p-0.5 text-sm"
+            role="tablist"
+            aria-label="Rodzaj pozycji"
+          >
+            {([
+              ["okazje", "Okazje z kursem"],
+              ["sugestie", `Sugestie STS (${liczbaSugestii})`],
+              ["wszystko", "Wszystko"],
+            ] as const).map(([kod, label]) => (
+              <button
+                key={kod}
+                role="tab"
+                aria-selected={rodzaj === kod}
+                onClick={() => setRodzaj(kod)}
+                className={`rounded-md px-3 py-1.5 font-medium transition-colors ${
+                  rodzaj === kod
+                    ? "bg-card text-brand-deep shadow-(--shadow-card)"
+                    : "text-muted hover:text-ink"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
 
-      {/* filtry */}
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <select
-          value={rynek}
-          onChange={(e) => setRynek(e.target.value)}
-          className="rounded-lg border border-hairline bg-card px-3 py-1.5 text-sm"
-          aria-label="Filtruj po rynku"
-        >
-          {RYNKI_FILTRY.map((r) => {
-            const n = liczbaPerRynek.get(r.kod) ?? 0;
-            return (
-              <option key={r.kod} value={r.kod}>
-                {r.label} ({n})
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-[1.2fr_1fr_1.2fr_1.4fr_auto]">
+          <FilterSelect label="Rynek" value={rynek} onChange={setRynek}>
+            {RYNKI_FILTRY.map((r) => {
+              const n = liczbaPerRynek.get(r.kod) ?? 0;
+              return (
+                <option key={r.kod} value={r.kod}>
+                  {r.label} ({n})
+                </option>
+              );
+            })}
+          </FilterSelect>
+
+          <FilterSelect
+            label="Pewność"
+            value={pewnosc}
+            onChange={(v) => setPewnosc(v as Pewnosc | "kazda")}
+          >
+            {PEWNOSC_FILTRY.map((p) => (
+              <option key={p.kod} value={p.kod}>
+                {p.label}
               </option>
-            );
-          })}
-        </select>
-        <select
-          value={pewnosc}
-          onChange={(e) => setPewnosc(e.target.value as Pewnosc | "kazda")}
-          className="rounded-lg border border-hairline bg-card px-3 py-1.5 text-sm"
-          aria-label="Filtruj po pewności"
-        >
-          {PEWNOSC_FILTRY.map((p) => (
-            <option key={p.kod} value={p.kod}>
-              {p.label}
-            </option>
-          ))}
-        </select>
-        <select
-          value={meczId ?? ""}
-          onChange={(e) =>
-            setMeczId(e.target.value ? Number(e.target.value) : undefined)
-          }
-          className="max-w-56 rounded-lg border border-hairline bg-card px-3 py-1.5 text-sm"
-          aria-label="Filtruj po meczu"
-        >
-          <option value="">Wszystkie mecze</option>
-          {mecze.map(([id, nazwa]) => (
-            <option key={id} value={id}>
-              {nazwa}
-            </option>
-          ))}
-        </select>
-        <label className="ml-auto flex items-center gap-2 text-sm text-muted">
-          min. wartość:
-          <input
-            type="range"
-            min={3}
-            max={20}
-            step={1}
-            value={minEv}
-            onChange={(e) => setMinEv(Number(e.target.value))}
-            className="accent-(--color-brand)"
-          />
-          <span className="font-data w-12 text-ink">+{minEv}%</span>
-        </label>
+            ))}
+          </FilterSelect>
+
+          <FilterSelect
+            label="Mecz"
+            value={meczId != null ? String(meczId) : ""}
+            onChange={(v) => setMeczId(v ? Number(v) : undefined)}
+          >
+            <option value="">Wszystkie mecze</option>
+            {mecze.map(([id, nazwa]) => (
+              <option key={id} value={id}>
+                {nazwa}
+              </option>
+            ))}
+          </FilterSelect>
+
+          <FilterSelect
+            label="Sortuj"
+            value={sortuj}
+            onChange={(v) => setSortuj(v as SortKey)}
+          >
+            {SORTOWANIA.map((s) => (
+              <option key={s.kod} value={s.kod}>
+                {s.label}
+              </option>
+            ))}
+          </FilterSelect>
+
+          <label className="col-span-2 flex flex-col gap-1 sm:col-span-4 lg:col-span-1 lg:w-44">
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-faint">
+              Min. wartość: <span className="font-data text-ink">+{minEv}%</span>
+            </span>
+            <input
+              type="range"
+              min={3}
+              max={20}
+              step={1}
+              value={minEv}
+              onChange={(e) => setMinEv(Number(e.target.value))}
+              className="h-8 accent-(--color-brand)"
+              aria-label="Minimalna wartość okazji w procentach"
+            />
+          </label>
+        </div>
       </div>
 
-      {/* legenda: jak czytać karty (zwijana, bez JS) */}
-      <details className="group mb-4 rounded-lg border border-hairline bg-card text-sm">
-        <summary className="flex cursor-pointer select-none items-center gap-2 px-4 py-2.5 text-muted transition-colors hover:text-ink [&::-webkit-details-marker]:hidden">
-          <span
-            aria-hidden
-            className="flex h-4 w-4 items-center justify-center rounded-full bg-brand-wash text-[10px] font-bold text-brand"
-          >
-            ?
-          </span>
-          Jak czytać te karty
-          <svg
-            aria-hidden
-            width="12"
-            height="12"
-            viewBox="0 0 14 14"
-            className="ml-auto text-faint transition-transform group-open:rotate-180"
-          >
-            <path
-              d="M3 5.5 L7 9.5 L11 5.5"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.6"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </summary>
-        <ul className="space-y-2 border-t border-hairline px-4 py-3 text-xs leading-relaxed text-ink-soft">
-          <li>
-            <strong className="text-data-green">Zielona wartość (np. +12%)</strong>{" "}
-            — o ile procent kurs bukmachera płaci lepiej, niż powinien według
-            modelu. Im wyżej, tym lepsza okazja.
-          </li>
-          <li>
-            <strong>Kropki pewności (●●●)</strong> — ile danych i jak stabilnych
-            stoi za predykcją. Trzy kropki = duża próba i pewne minuty; jedna =
-            traktuj ostrożnie.
-          </li>
-          <li>
-            <strong>Kolorowy pasek</strong> — możliwe wyniki i ich szanse:
-            zielona część to scenariusze „powyżej linii”, kreskowana pionowa
-            linia to linia bukmachera.
-          </li>
-          <li>
-            <strong className="text-[#8a5613]">„Sprawdź w STS”</strong> — model
-            widzi potencjalną wartość, ale kurs musisz sprawdzić ręcznie w STS
-            (podajemy próg, od którego się opłaca).
-          </li>
-          <li>
-            Kliknij kartę, żeby zobaczyć pełne uzasadnienie: dlaczego ten
-            zakład, forma zawodnika i przewidywane minuty.
-          </li>
-        </ul>
-      </details>
-
       <p className="mb-3 text-xs text-faint" aria-live="polite">
-        {filtered.length === 0
-          ? ""
-          : `${filtered.length} okazji · posortowane od najlepszej (wartość × pewność)`}
+        {filtered.length > 0 &&
+          `${filtered.length} ${filtered.length === 1 ? "pozycja" : "pozycji"}${
+            sortuj === "ranking" ? " · od najtrafniejszej" : ""
+          }`}
       </p>
 
       {filtered.length === 0 && (
         <div className="rounded-(--radius-card) border border-hairline bg-card px-6 py-10 text-center shadow-(--shadow-card)">
           <p className="text-sm font-medium text-ink">
-            Brak okazji spełniających obecne filtry
+            Brak pozycji spełniających obecne filtry
           </p>
           <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-muted">
-            Zmniejsz minimalną wartość, wybierz „Każda pewność” albo inny rynek
-            — lub wyczyść wszystko jednym kliknięciem.
+            Zmniejsz minimalną wartość, ustaw pewność na „Każda” albo wybierz
+            inny rynek — lub zacznij od czysta.
           </p>
           <button
             onClick={wyczyscFiltry}
