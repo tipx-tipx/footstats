@@ -31,7 +31,50 @@ Q = "appTypeId=5&langId=1&timezoneName=Europe/Warsaw&userCountryId=1"
 # linia pola karnego: 16.5 m z ~105 m boiska => ~84% (karny side~88.5 potwierdza skalę)
 BOX_SIDE_THRESHOLD = 84.0
 
+# competitionId Mistrzostw Świata 2026 (endpoint /search)
+WC_COMPETITION_ID = 5930
+
+# rynki liczone są w REGULARNYM czasie gry (90 min + doliczony): zdarzenia
+# z bazową minutą > 90 ("104'", "120 + 5'") to dogrywka/karne — pomijamy
+REGULARNY_CZAS_MIN = 90.0
+
 _game_cache: dict[int, dict] = {}
+# gameId -> mecz miał dogrywkę (gameTime > 90) — staty lineups obejmują wtedy
+# całe 120 min i NIE nadają się do rozliczania rynków regularnego czasu
+_et_cache: dict[int, bool] = {}
+
+
+def _minuta(t) -> float | None:
+    """Bazowa minuta zdarzenia: "90 + 2'" -> 90; "104'" -> 104; brak -> None."""
+    s = str(t or "").replace("'", "").strip()
+    if not s:
+        return None
+    try:
+        return float(s.split("+")[0].strip())
+    except ValueError:
+        return None
+
+
+def _zapamietaj_et(game_id: int, game: dict) -> None:
+    try:
+        gt = float(game.get("gameTime") or 0)
+    except (TypeError, ValueError):
+        gt = 0.0
+    _et_cache[game_id] = (
+        gt > REGULARNY_CZAS_MIN + 0.5
+        or "ET" in str(game.get("shortStatusText") or "")
+    )
+
+
+def after_extra_time(game_id: int) -> bool:
+    """Czy mecz miał dogrywkę (wg wcześniej pobranych danych meczu)."""
+    if game_id not in _et_cache:
+        try:
+            game = _get(f"{BASE}/game/?{Q}&gameId={game_id}").get("game", {})
+            _zapamietaj_et(game_id, game)
+        except Exception:
+            return False
+    return _et_cache.get(game_id, False)
 
 
 def _get(url: str, timeout: int = 25, retries: int = 2) -> dict:
@@ -81,6 +124,32 @@ def competitor_ids(team_names: list[str]) -> dict[str, int]:
             _scan(data.get("games", []))
         except Exception:
             pass
+    return out
+
+
+def finished_games_by_competition(comp_id: int = WC_COMPETITION_ID) -> list[dict]:
+    """Ostatnie zakończone mecze rozgrywek: [{id, ts, home, away}, ...].
+
+    /games/results per rozgrywki — pewniejsze do rozliczeń niż /games/current,
+    który IGNORUJE parametry startDate/endDate i zwraca tylko ~100 bieżących
+    meczów (wczorajszy mecz MŚ zwykle w ogóle się w nim nie pojawia).
+    """
+    from datetime import datetime
+
+    data = _get(f"{BASE}/games/results/?{Q}&competitions={comp_id}")
+    out = []
+    for g in data.get("games", []):
+        if g.get("statusGroup") != 4:
+            continue
+        try:
+            ts = int(datetime.fromisoformat(str(g.get("startTime", ""))).timestamp())
+        except Exception:
+            continue
+        out.append({
+            "id": int(g["id"]), "ts": ts,
+            "home": _norm(str((g.get("homeCompetitor") or {}).get("name", ""))),
+            "away": _norm(str((g.get("awayCompetitor") or {}).get("name", ""))),
+        })
     return out
 
 
@@ -147,14 +216,22 @@ def resolve_player_key(all_keys: set[str], player_name: str) -> str | None:
 
 
 def game_player_shots(game_id: int) -> dict[str, dict[str, int]]:
-    """Agregat strzałów per zawodnik (znormalizowane nazwisko) dla meczu."""
+    """Agregat strzałów per zawodnik (znormalizowane nazwisko) dla meczu.
+
+    Liczony WYŁĄCZNIE w regularnym czasie (90 min + doliczony) — tak rozlicza
+    bukmacher; strzały z dogrywki i serii karnych nie wchodzą do agregatu.
+    """
     if game_id in _game_cache:
         return _game_cache[game_id]
     data = _get(f"{BASE}/game/?{Q}&gameId={game_id}")
     game = data.get("game", {})
+    _zapamietaj_et(game_id, game)
     names = {int(m["id"]): str(m.get("name", "")) for m in game.get("members", []) if m.get("id")}
     per_player: dict[str, dict[str, int]] = {}
     for e in (game.get("chartEvents") or {}).get("events", []):
+        m_ev = _minuta(e.get("time"))
+        if m_ev is not None and m_ev > REGULARNY_CZAS_MIN:
+            continue  # dogrywka / seria karnych
         counts = classify_event(e)
         if counts is None:
             continue
@@ -216,6 +293,7 @@ def game_player_match_stats(game_id: int) -> dict[str, dict[str, float]]:
         return _full_cache[game_id]
     data = _get(f"{BASE}/game/?{Q}&gameId={game_id}")
     game = data.get("game", {})
+    _zapamietaj_et(game_id, game)
     names = {int(m["id"]): str(m.get("name", "")) for m in game.get("members", []) if m.get("id")}
     out: dict[str, dict[str, float]] = {}
     for side in ("homeCompetitor", "awayCompetitor"):

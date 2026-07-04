@@ -176,11 +176,15 @@ export interface TypRozliczony {
   faktyczna: number | null;
 }
 
-/** Kupon w historii: zamrożony przy starcie pierwszego meczu, rozliczany z legów. */
+/** Kupon w historii: zamrożony przy publikacji, rozliczany z legów. */
 export interface KuponHistoria extends Kupon {
   dzien: string;
   opublikowano_ts: number;
-  wynik: "wygrany" | "przegrany" | null;
+  /** "anulowany" = unieważniony przez zmianę ogłoszonych składów */
+  wynik: "wygrany" | "przegrany" | "anulowany" | null;
+  powod?: string;
+  slot?: string;
+  klucz?: string;
   kurs_rozliczony?: number;
   legi_trafione?: number;
   legi_rozliczone?: number;

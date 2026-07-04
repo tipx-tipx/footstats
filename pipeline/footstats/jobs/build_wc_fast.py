@@ -43,6 +43,38 @@ from .build_demo import MARKET_NAMES_PL, WEB_DATA_DIR, line_for_lambda
 
 SH_BASE = "https://www.statshub.com/api"
 SH_HEADERS = {"Accept": "application/json", "Referer": "https://www.statshub.com/"}
+
+
+def _dump(name: str, obj) -> None:
+    WEB_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    (WEB_DATA_DIR / name).write_text(
+        json.dumps(obj, ensure_ascii=False, indent=1), encoding="utf-8"
+    )
+
+
+def _rozlicz_i_zapisz(
+    value_bets: list[dict],
+    kupony_list: list[dict],
+    niedostepni: set[int] | None = None,
+) -> None:
+    """Rozliczanie + zapis wyników. Wywoływane w KAŻDYM cyklu — także gdy
+    statshub nie ma propsów (rozliczenia nie mogą czekać na nowe typy).
+
+    kupony.json = AKTYWNE kupony z logu (zamrożone przy publikacji), a nie
+    świeżo wygenerowana lista — dzięki temu strona /kupony pokazuje dokładnie
+    to, co potem trafi do historii, i nic nie zmienia się między cyklami.
+    Przy błędzie NIE nadpisujemy plików — zostają wyniki z poprzedniego cyklu.
+    """
+    try:
+        wyniki = rozliczanie.rozlicz(value_bets, kupony_list, niedostepni)
+    except Exception as ex:
+        print(f"Rozliczanie pominięte ({ex}) — poprzednie wyniki bez zmian")
+        return
+    _dump("typy_wyniki.json", wyniki)
+    _dump("kupony.json", [k for k in wyniki["kupony"] if k.get("wynik") is None])
+    p = wyniki["podsumowanie"]
+    print(f"Typy: {p['opublikowane']} w logu, {p['rozliczone']} rozliczonych, "
+          f"{p['trafione']} trafionych, ROI flat {p['roi_flat']:+.2f} j.")
 # uniqueTournamentId 16 = Mistrzostwa Świata (jak w Sofascore)
 WC_UTID = 16
 # nazwy reprezentacji EN -> PL (do dopasowania z Superbetem)
@@ -200,18 +232,21 @@ def main():
     print(f"Nadchodzące mecze MŚ (statshub): {len(events)}")
     if not events:
         print("Brak nadchodzących meczów MŚ w statshub.")
+        _rozlicz_i_zapisz([], [])  # rozliczenia lecą niezależnie od nowych typów
         return
 
     try:
         trends = statshub.fetch_event_trends([e["id"] for e in events])
     except Exception as e:
         print(f"statshub chwilowo niedostępny ({e}) — pomijam ten cykl, dane bez zmian.")
+        _rozlicz_i_zapisz([], [])
         return
     print(f"Trendów propsów: {len(trends)} "
           f"({len(set(t.player_id for t in trends))} zawodników)")
     if not trends:
         print("statshub nie ma jeszcze propsów na te mecze (ładują się ~24-48 h "
               "przed). Uruchom ponownie bliżej meczu.")
+        _rozlicz_i_zapisz([], [])
         return
 
     # --- BIBLIOTEKA HISTORII: mecze bez propsów statshub (np. ćwierćfinały) ---
@@ -489,6 +524,20 @@ def main():
     n_conf = sum(lineup_confirmed.values())
     if n_conf:
         print(f"Składy ogłoszone: {n_conf} z {len(events)} meczów")
+
+    # zawodnicy POZA ogłoszonym składem (twardy sygnał z statshub lub Rotowire)
+    # — unieważniają zamrożone kupony z ich legami (patrz rozliczanie)
+    niedostepni: set[int] = set()
+    for t in trends:
+        if not t.player_id or not t.event_id:
+            continue
+        rp = rotowire.predicted_status(roto, t.team_name, t.player_name)
+        if (lineup_confirmed.get(t.event_id) and not t.in_predicted_lineup) or (
+            rotowire.is_confirmed(roto, t.team_name) and rp is False
+        ):
+            niedostepni.add(t.player_id)
+    if niedostepni:
+        print(f"Poza ogłoszonymi składami: {len(niedostepni)} zawodników")
 
     # matchup-lite: profil per90 zawodników każdej drużyny (pod strony boiska)
     opp_players_by_team: dict[tuple[int, int], list[matchup_lite.OppPlayer]] = {}
@@ -918,40 +967,26 @@ def main():
             f"{len(players_out)} zawodników ma propsy). Nie podmieniam danych "
             "aplikacji — czekam na pełne propsy/kursy ćwierćfinałów."
         )
+        _rozlicz_i_zapisz([], [], niedostepni)
         return
 
-    WEB_DATA_DIR.mkdir(parents=True, exist_ok=True)
-
-    def dump(name, obj):
-        (WEB_DATA_DIR / name).write_text(
-            json.dumps(obj, ensure_ascii=False, indent=1), encoding="utf-8"
-        )
-
-    dump("value_bets.json", value_bets)
-    dump("matches.json", list(matches_out.values()))
-    dump("players.json", list(players_out.values()))
+    _dump("value_bets.json", value_bets)
+    _dump("matches.json", list(matches_out.values()))
+    _dump("players.json", list(players_out.values()))
     n_dzis = len({b["mecz_id"] for b in legi_pool
                   if b["kickoff_ts"] <= time.time() + kupony.OKNO_DZIS_S})
     print(f"Pula kuponów: {len(legi_pool)} legów, meczów w oknie dziennym: {n_dzis}")
     kupony_list = kupony.build_kupony(value_bets, legi_pool)
-    dump("kupony.json", kupony_list)
     if kupony_list:
-        print("Kupony:", ", ".join(
+        print("Kandydaci na kupony:", ", ".join(
             f"{k.get('horyzont', '?')[:5]} x{k.get('cel_label', k['cel'])} "
             f"(kurs {k['kurs_laczny']}, szansa {k['p_model']*100:.0f}%)"
             for k in kupony_list
         ))
-    try:
-        wyniki = rozliczanie.rozlicz(value_bets, kupony_list)
-        dump("typy_wyniki.json", wyniki)
-        p = wyniki["podsumowanie"]
-        print(f"Typy: {p['opublikowane']} w logu, {p['rozliczone']} rozliczonych, "
-              f"{p['trafione']} trafionych, ROI flat {p['roi_flat']:+.2f} j.")
-    except Exception as ex:
-        print(f"Rozliczanie pominięte ({ex})")
-        dump("typy_wyniki.json", {"podsumowanie": None, "po_rynku": [],
-                                  "ostatnie": [], "kupony": []})
-    dump("meta.json", {
+    # publikacja kuponów idzie przez log (zamrożenie/anulowanie/rozliczenie)
+    # wewnątrz _rozlicz_i_zapisz — kupony.json to aktywne kupony z logu
+    _rozlicz_i_zapisz(value_bets, kupony_list, niedostepni)
+    _dump("meta.json", {
         "wygenerowano_ts": int(time.time()), "tryb": "ms2026",
         "liga": "Mistrzostwa Świata", "sezon": "2026",
         "zrodlo": "statshub (statystyki i historia) + Superbet (kursy)",

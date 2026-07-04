@@ -50,8 +50,22 @@ const SUPABASE_URL = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABAS
 const SUPABASE_ANON =
   process.env.SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
+/**
+ * Odetnij mecze, które już się zaczęły: typ nie do obstawienia nie może
+ * wisieć na tablicy (pewniaki/STS/okazje), nawet gdy pipeline chwilowo
+ * nie podmienił snapshotu. Kupony zostają — ich status pokazuje historia.
+ */
+function tylkoNadchodzace(bundle: Bundle): Bundle {
+  const now = Math.floor(Date.now() / 1000);
+  return {
+    ...bundle,
+    value_bets: bundle.value_bets.filter((b) => b.kickoff_ts > now),
+    matches: bundle.matches.filter((m) => m.kickoff_ts > now),
+  };
+}
+
 async function loadBundle(): Promise<Bundle> {
-  if (!SUPABASE_URL || !SUPABASE_ANON) return LOCAL;
+  if (!SUPABASE_URL || !SUPABASE_ANON) return tylkoNadchodzace(LOCAL);
   try {
     const res = await fetch(
       `${SUPABASE_URL}/rest/v1/app_data?select=key,payload`,
@@ -63,10 +77,10 @@ async function loadBundle(): Promise<Bundle> {
         next: { revalidate: 900 }, // odśwież co 15 min
       },
     );
-    if (!res.ok) return LOCAL;
+    if (!res.ok) return tylkoNadchodzace(LOCAL);
     const rows: { key: keyof Bundle; payload: unknown }[] = await res.json();
     const map = Object.fromEntries(rows.map((r) => [r.key, r.payload]));
-    return {
+    return tylkoNadchodzace({
       value_bets: (map.value_bets ?? LOCAL.value_bets) as ValueBet[],
       matches: (map.matches ?? LOCAL.matches) as Mecz[],
       players: (map.players ?? LOCAL.players) as Zawodnik[],
@@ -74,9 +88,9 @@ async function loadBundle(): Promise<Bundle> {
       meta: (map.meta ?? LOCAL.meta) as Meta,
       kupony: (map.kupony ?? LOCAL.kupony) as Kupon[],
       typy_wyniki: (map.typy_wyniki ?? LOCAL.typy_wyniki) as TypyWyniki,
-    };
+    });
   } catch {
-    return LOCAL;
+    return tylkoNadchodzace(LOCAL);
   }
 }
 

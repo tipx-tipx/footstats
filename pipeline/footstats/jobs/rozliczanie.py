@@ -3,11 +3,15 @@
 Przepływ (wywoływane na końcu każdego cyklu):
   1. każdy publikowany typ (okazja i sugestia) trafia do logu `typy_log`
      w Supabase — z ZAMROŻONYM p_model i kursem z chwili pierwszej publikacji,
-  2. po zakończonym meczu (kickoff + 2,5 h) cykl szuka faktycznej wartości:
-       * rynki strzałowe — z 365Scores (chartEvents, per strzał),
-       * faule/odbiory/przechwyty — z banku trendów (świeży trend zawodnika
-         w statshub zawiera rozegrany mecz; parowanie po timestampie),
-       * zawodnik nie zagrał (0 minut wg statshub) -> "zwrot" (void),
+  2. po zakończonym meczu (kickoff + ~105 min) cykl szuka faktycznej wartości
+     — wszystko liczone w REGULARNYM czasie gry (bez dogrywki, jak u buka):
+       * rynki strzałowe — z 365Scores (chartEvents per strzał, minuta <= 90),
+       * faule/wywalczone/przechwyty — z pełnych statystyk meczu 365Scores
+         (od razu po meczu; przy dogrywce NIE używamy — obejmują 120 min),
+         fallback: bank trendów statshub (parowanie po timestampie),
+       * odbiory — tylko bank trendów (365 ich nie podaje),
+       * zawodnik nie zagrał (brak w statystykach meczu / 0 minut) -> "zwrot",
+       * brak danych źródłowych po 48 h -> "zwrot" (nic nie wisi "w grze"),
   3. podsumowanie `typy_wyniki` (trafienia, ROI flat, per rynek) idzie na
      stronę Skuteczności. Odchylenie trafień od średniego p_model per rynek
      (bias) to surowiec do dokręcenia kalibracji — STOSUJEMY je w modelu
@@ -28,7 +32,10 @@ MARKETY_365 = {
     "shots_outside_box": "outside", "sot_outside_box": "sot_outside",
     "shots_blocked": "blocked", "shots_off_target": "off_target",
 }
-# rynki rozliczane z banku trendów statshub
+# rynki z pełnych statystyk meczowych 365Scores (lineups.members[].stats) —
+# dostępne od razu po meczu, bez czekania na odświeżenie banku trendów
+MARKETY_365_STATY = {"fouls_committed", "fouls_won", "interceptions"}
+# rynki rozliczane z banku trendów statshub (odbiory nie występują w 365)
 MARKETY_LIB = {"fouls_committed", "tackles", "fouls_won", "interceptions"}
 
 
@@ -36,6 +43,9 @@ MARKETY_LIB = {"fouls_committed", "tackles", "fouls_won", "interceptions"}
 # "zakończony") — status kuponu odświeża się tuż po końcowym gwizdku
 MECZ_KONIEC_PO_S = 105 * 60
 OKNO_PAROWANIA_S = 36 * 3600
+# po tym czasie bez danych źródłowych typ zamyka się jako "zwrot" (brak
+# rozstrzygnięcia) — kupony nie mogą wisieć "w grze" w nieskończoność
+TERMIN_BRAK_DANYCH_S = 48 * 3600
 
 
 def _klucz(b: dict) -> str:
@@ -61,8 +71,14 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
         }
 
 
-def _gra_365(rec: dict, cache: dict) -> dict | None:
-    """Znajdź agregat strzałów 365Scores dla meczu z rekordu (cache per mecz)."""
+def _gid_365(rec: dict, cache: dict) -> int | None:
+    """Znajdź id zakończonego meczu w 365Scores (cache per mecz).
+
+    Szuka w wynikach rozgrywek MŚ (endpoint /games/results — /games/current
+    ignoruje filtr dat i nie zawiera wczorajszych meczów). Dopasowanie po
+    znormalizowanych nazwach drużyn; awaryjnie po kickoffie + jednej nazwie
+    (rozjazdy typu "USA" vs "United States").
+    """
     mid = rec["mecz_id"]
     if mid in cache:
         return cache[mid]
@@ -71,26 +87,24 @@ def _gra_365(rec: dict, cache: dict) -> dict | None:
         cache[mid] = None
         return None
     home, away = rotowire._norm(teams[0]), rotowire._norm(teams[1])
-    dzien = time.strftime("%d/%m/%Y", time.localtime(rec["kickoff_ts"]))
-    nastepny = time.strftime("%d/%m/%Y", time.localtime(rec["kickoff_ts"] + 86400))
-    wynik = None
-    try:
-        data = scores365._get(
-            f"{scores365.BASE}/games/current/?{scores365.Q}&sports=1"
-            f"&startDate={dzien}&endDate={nastepny}"
-        )
-        for g in data.get("games", []):
-            gn = {
-                rotowire._norm(str((g.get("homeCompetitor") or {}).get("name", ""))),
-                rotowire._norm(str((g.get("awayCompetitor") or {}).get("name", ""))),
-            }
-            if gn == {home, away} and g.get("statusGroup") == 4:
-                wynik = scores365.game_player_shots(int(g["id"]))
-                break
-    except Exception:
-        wynik = None
-    cache[mid] = wynik
-    return wynik
+    if "_wyniki" not in cache:
+        try:
+            cache["_wyniki"] = scores365.finished_games_by_competition()
+        except Exception:
+            cache["_wyniki"] = []
+    gid = None
+    for g in cache["_wyniki"]:
+        if {g["home"], g["away"]} == {home, away}:
+            gid = g["id"]
+            break
+        if (
+            abs(g["ts"] - rec["kickoff_ts"]) < 3 * 3600
+            and {g["home"], g["away"]} & {home, away}
+        ):
+            gid = g["id"]
+            break
+    cache[mid] = gid
+    return gid
 
 
 def _minuty_z_banku(rec: dict, lib: dict) -> float | None:
@@ -149,27 +163,66 @@ def market_bias() -> dict[str, float]:
     return compute_bias(log)
 
 
-def _kupon_do_logu(log_kuponow: dict, kupony_list: list[dict], now: int) -> None:
-    """Kupon dnia (horyzont+przedział) aktualizuje się do startu pierwszego
-    meczu — potem jest zamrożony i czeka na rozliczenie legów."""
+def _kupon_do_logu(
+    log_kuponow: dict,
+    kupony_list: list[dict],
+    now: int,
+    niedostepni: set[int] | None = None,
+) -> None:
+    """Cykl życia kuponu — przemyślany raz, potem ZAMROŻONY.
+
+    Zasady (decyzja usera):
+      * kupon po pierwszej publikacji się NIE zmienia (koniec z typami
+        znikającymi między cyklami),
+      * jedyny powód unieważnienia: potwierdzone składy wywróciły lega
+        (zawodnik poza XI, a jego mecz jeszcze się nie zaczął) -> stary kupon
+        dostaje wynik "anulowany" z powodem, a slot się zwalnia,
+      * nowy kupon w danym slocie (horyzont+przedział) powstaje TYLKO, gdy
+        poprzedni jest rozliczony (wygrany/przegrany) albo anulowany,
+      * nie publikujemy kuponu, którego pierwszy mecz już trwa.
+    """
+    niedostepni = niedostepni or set()
     dzien = time.strftime("%Y-%m-%d", time.localtime(now))
-    for k in kupony_list:
-        if k.get("styl") == "value" and not k.get("legi"):
+
+    # migracja starych rekordów (klucz = "horyzont:przedział:data")
+    for key, rec in log_kuponow.items():
+        rec.setdefault("slot", ":".join(key.split(":")[:2]))
+        rec.setdefault("klucz", key)
+
+    # 1) unieważnij aktywne kupony, którym ogłoszone składy wywróciły lega
+    for rec in log_kuponow.values():
+        if rec.get("wynik"):
             continue
-        klucz = f"{k.get('horyzont', '?')}:{k.get('cel_label', k.get('cel'))}:{dzien}"
-        rec = log_kuponow.get(klucz)
-        pierwszy = min(l["kickoff_ts"] for l in k["legi"])
-        if rec is None:
-            log_kuponow[klucz] = {
-                **k, "dzien": dzien, "opublikowano_ts": now, "wynik": None,
-            }
-        elif rec.get("wynik") is None and now < min(
-            l["kickoff_ts"] for l in rec["legi"]
-        ) and now < pierwszy:
-            log_kuponow[klucz] = {
-                **k, "dzien": dzien,
-                "opublikowano_ts": rec["opublikowano_ts"], "wynik": None,
-            }
+        poza = [
+            l for l in rec["legi"]
+            if l.get("podmiot_id") in niedostepni and l["kickoff_ts"] > now
+        ]
+        if poza:
+            rec.update(
+                wynik="anulowany", rozliczono_ts=now,
+                powod="zmiana składu: " + ", ".join(l["podmiot"] for l in poza),
+            )
+
+    # 2) nowe kupony wyłącznie do wolnych slotów
+    zajete = {r["slot"] for r in log_kuponow.values() if not r.get("wynik")}
+    for k in kupony_list:
+        if not k.get("legi"):
+            continue
+        slot = f"{k.get('horyzont', '?')}:{k.get('cel_label', k.get('cel'))}"
+        if slot in zajete:
+            continue  # poprzedni kupon wciąż w grze — nie podmieniamy go
+        if min(l["kickoff_ts"] for l in k["legi"]) <= now:
+            continue  # pierwszy mecz już trwa — za późno na publikację
+        if any(l.get("podmiot_id") in niedostepni for l in k["legi"]):
+            continue  # leg z zawodnikiem poza składem — czekaj na kolejny cykl
+        klucz, n = f"{slot}:{dzien}", 2
+        while klucz in log_kuponow:
+            klucz, n = f"{slot}:{dzien}#{n}", n + 1
+        log_kuponow[klucz] = {
+            **k, "slot": slot, "klucz": klucz, "dzien": dzien,
+            "opublikowano_ts": now, "wynik": None,
+        }
+        zajete.add(slot)
 
 
 def _rozlicz_kupony(log_kuponow: dict, typy_log: dict, now: int) -> list[dict]:
@@ -200,7 +253,11 @@ def _rozlicz_kupony(log_kuponow: dict, typy_log: dict, now: int) -> list[dict]:
     )[:40]
 
 
-def rozlicz(value_bets: list[dict], kupony_list: list[dict] | None = None) -> dict:
+def rozlicz(
+    value_bets: list[dict],
+    kupony_list: list[dict] | None = None,
+    niedostepni: set[int] | None = None,
+) -> dict:
     """Dopisz nowe typy do logu, rozlicz zakończone, zwróć podsumowanie."""
     log = supa.get_key("typy_log") or {}
     _dopisz_nowe(log, value_bets)
@@ -224,19 +281,62 @@ def rozlicz(value_bets: list[dict], kupony_list: list[dict] | None = None) -> di
         if rec.get("wynik") or now - rec["kickoff_ts"] < MECZ_KONIEC_PO_S:
             continue
         mk = rec["rynek_kod"]
+
+        # pełne statystyki meczu z 365 (minuty + faule/przechwyty) — dostępne
+        # tuż po końcowym gwizdku, niezależnie od odświeżeń banku trendów
+        gid = _gid_365(rec, cache_365)
+        staty = None
+        if gid is not None:
+            try:
+                staty = scores365.game_player_match_stats(gid)
+            except Exception:
+                staty = None
+        pkey = scores365.resolve_player_key(set(staty), rec["podmiot"]) if staty else None
+
+        # minuty: najpierw 365 (nieobecny w statystykach meczu = nie zagrał),
+        # fallback bank trendów
+        minuty = None
+        if staty:
+            minuty = float(staty[pkey].get("minutes", 0)) if pkey else 0.0
+        if minuty is None:
+            minuty = _minuty_z_banku(rec, lib)
+        if minuty is not None and minuty <= 0:
+            rec.update(wynik="zwrot", faktyczna=0.0, rozliczono_ts=now,
+                       powod="nie zagrał")
+            continue
+
         wartosc = None
         if mk in MARKETY_365:
-            gra = _gra_365(rec, cache_365)
+            gra = None
+            if gid is not None:
+                try:
+                    gra = scores365.game_player_shots(gid)
+                except Exception:
+                    gra = None
             if gra is not None:
-                pkey = scores365.resolve_player_key(set(gra), rec["podmiot"])
-                wartosc = float(gra.get(pkey, {}).get(MARKETY_365[mk], 0)) if pkey else 0.0
+                skey = scores365.resolve_player_key(set(gra), rec["podmiot"])
+                if skey:
+                    wartosc = float(gra[skey].get(MARKETY_365[mk], 0))
+                elif minuty:
+                    # zagrał (minuty > 0), a nie ma go w mapie = 0 zdarzeń
+                    wartosc = 0.0
         elif mk in MARKETY_LIB:
-            wartosc = _wartosc_z_banku(rec, lib)
+            # staty lineups obejmują CAŁY mecz — przy dogrywce nie nadają się
+            # do rozliczenia rynku regularnego czasu (bank trendów zostaje)
+            if (
+                mk in MARKETY_365_STATY and staty and pkey
+                and not scores365.after_extra_time(gid)
+            ):
+                w = staty[pkey].get(mk)
+                wartosc = float(w) if w is not None else None
+            if wartosc is None:
+                wartosc = _wartosc_z_banku(rec, lib)
         if wartosc is None:
-            continue  # źródło jeszcze nie ma meczu — spróbujemy w kolejnym cyklu
-        minuty = _minuty_z_banku(rec, lib)
-        if minuty is not None and minuty <= 0:
-            rec.update(wynik="zwrot", faktyczna=0.0, rozliczono_ts=now)
+            # źródło nie ma jeszcze meczu — spróbujemy w kolejnym cyklu;
+            # po terminie zamykamy jako zwrot, żeby nic nie wisiało "w grze"
+            if now - rec["kickoff_ts"] > TERMIN_BRAK_DANYCH_S:
+                rec.update(wynik="zwrot", faktyczna=None, rozliczono_ts=now,
+                           powod="brak danych źródła")
             continue
         trafiony = (
             wartosc > rec["linia"] if rec["strona"] == "powyzej" else wartosc < rec["linia"]
@@ -250,7 +350,7 @@ def rozlicz(value_bets: list[dict], kupony_list: list[dict] | None = None) -> di
 
     # ---- historia kuponów ----
     log_kuponow = supa.get_key("kupony_log") or {}
-    _kupon_do_logu(log_kuponow, kupony_list or [], now)
+    _kupon_do_logu(log_kuponow, kupony_list or [], now, niedostepni)
     kupony_hist = _rozlicz_kupony(log_kuponow, log, now)
     supa.put_key("kupony_log", log_kuponow)
 

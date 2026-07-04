@@ -22,9 +22,10 @@ import math
 import time
 
 CELE = (5.0, 10.0)
-# przedziały kursowe (user: "nie muszą być dokładnie, np. od 5 do 10, od 10 do 15")
-PRZEDZIALY_DZIENNE = ((5.0, 10.0), (10.0, 15.0), (15.0, 20.0), (20.0, 25.0))
-PRZEDZIALY_DLUGOTERMINOWE = ((10.0, 15.0), (15.0, 20.0), (20.0, 25.0), (25.0, 35.0))
+# przedziały kursowe — KOMPAKTOWO (user: kilka dopracowanych kuponów,
+# nie taśma 8-10 wariantów): dwa dzienne + jeden długoterminowy
+PRZEDZIALY_DZIENNE = ((5.0, 10.0), (12.0, 25.0))
+PRZEDZIALY_DLUGOTERMINOWE = ((10.0, 20.0),)
 OKNO_DZIS_S = 20 * 3600       # "dziś" = mecze w ciągu ~20 h
 OKNO_JUTRO_S = 44 * 3600      # rozszerzenie na jutro, gdy dziś < 2 mecze
 OKNO_DLUGO_S = 4 * 86400      # długoterminowy: mecze z najbliższych 4 dni

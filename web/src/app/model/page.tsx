@@ -196,9 +196,11 @@ export default async function ModelPage() {
         <Reveal className="mt-10">
           <h2 className="text-lg font-semibold">Kupony — historia</h2>
           <p className="mt-1 max-w-3xl text-sm text-muted">
-            Kupon dnia zamraża się w chwili startu pierwszego meczu i czeka na
-            wyniki legów: jedno pudło = kupon przegrany, zwrot lega (zawodnik
-            nie zagrał) wyłącza go z kursu — jak u bukmachera.
+            Kupon zamraża się w chwili publikacji — zmienia się tylko wtedy,
+            gdy ogłoszone składy wywrócą któryś leg (wtedy jest anulowany
+            i powstaje nowy). Jedno pudło = kupon przegrany, zwrot lega
+            (zawodnik nie zagrał) wyłącza go z kursu — jak u bukmachera.
+            Statystyki liczone w regularnym czasie gry, bez dogrywek.
           </p>
           <div className="mt-4 grid max-w-4xl gap-3 sm:grid-cols-2">
             {typy.kupony!.slice(0, 12).map((k) => {
@@ -206,7 +208,7 @@ export default async function ModelPage() {
               const trafione = k.legi_trafione ?? 0;
               return (
                 <div
-                  key={`${k.horyzont}-${k.cel_label}-${k.dzien}`}
+                  key={k.klucz ?? `${k.horyzont}-${k.cel_label}-${k.dzien}`}
                   className={`rounded-xl border bg-card px-4 py-3.5 shadow-(--shadow-card) ${
                     k.wynik === "wygrany"
                       ? "border-data-green/40"
@@ -235,14 +237,19 @@ export default async function ModelPage() {
                           ? "text-data-green"
                           : k.wynik === "przegrany"
                             ? "text-data-red"
-                            : "text-[#8a5613]"
+                            : k.wynik === "anulowany"
+                              ? "text-faint"
+                              : "text-[#8a5613]"
                       }`}
+                      title={k.powod}
                     >
                       {k.wynik === "wygrany"
                         ? `✓ wygrany${k.kurs_rozliczony ? ` @${k.kurs_rozliczony.toFixed(2).replace(".", ",")}` : ""}`
                         : k.wynik === "przegrany"
                           ? "✗ przegrany"
-                          : "w grze"}
+                          : k.wynik === "anulowany"
+                            ? "anulowany (składy)"
+                            : "w grze"}
                     </span>
                   </div>
                   <p className="font-data mt-2 text-xs text-muted">

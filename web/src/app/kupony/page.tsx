@@ -39,9 +39,10 @@ export default async function KuponyPage() {
           <>
             Każdy leg przechodzi pełną analizę modelu (historia, minuty, składy
             z dwóch źródeł, matchup), a do kuponu wchodzą legi o najlepszym
-            stosunku pewności do kursu — do 4 wydarzeń z jednego meczu, z karą
-            korelacyjną za łączenie w ramach meczu. Szansa kuponu = iloczyn
-            szans legów.
+            stosunku pewności do kursu. Kupon po publikacji jest zamrożony —
+            nowy w danym przedziale powstaje dopiero, gdy poprzedni się
+            rozliczy albo gdy ogłoszone składy wywrócą któryś leg. Szansa
+            kuponu = iloczyn szans legów (z karą korelacyjną w ramach meczu).
           </>
         }
       />
