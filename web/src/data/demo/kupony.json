@@ -1,5 +1,267 @@
 [
  {
+  "cel": 10,
+  "cel_label": "10–20",
+  "styl": "pewniaki",
+  "kurs_laczny": 12.98,
+  "p_model": 0.1882,
+  "fair_kurs": 5.31,
+  "ev_pct": 144.3,
+  "legi": [
+   {
+    "value_bet_id": 0,
+    "podmiot_id": 964524195,
+    "podmiot": "Jonathan David",
+    "rynek_kod": "shots",
+    "rynek": "Strzały",
+    "linia": 1.5,
+    "strona": "powyzej",
+    "kurs": 1.57,
+    "bukmacher": "Superbet",
+    "p_model": 0.7589,
+    "pewnosc": "srednia",
+    "mecz": "Canada – Morocco",
+    "mecz_id": 12813009,
+    "kickoff_ts": 1783184400
+   },
+   {
+    "value_bet_id": 0,
+    "podmiot_id": 988733749,
+    "podmiot": "Vinicius Junior",
+    "rynek_kod": "sot",
+    "rynek": "Strzały celne",
+    "linia": 0.5,
+    "strona": "powyzej",
+    "kurs": 1.31,
+    "bukmacher": "Superbet",
+    "p_model": 0.841,
+    "pewnosc": "srednia",
+    "mecz": "Brazil – Norway",
+    "mecz_id": 12813006,
+    "kickoff_ts": 1783281600
+   },
+   {
+    "value_bet_id": 0,
+    "podmiot_id": 911633308,
+    "podmiot": "Harry Kane",
+    "rynek_kod": "sot",
+    "rynek": "Strzały celne",
+    "linia": 0.5,
+    "strona": "powyzej",
+    "kurs": 1.37,
+    "bukmacher": "Superbet",
+    "p_model": 0.8404,
+    "pewnosc": "srednia",
+    "mecz": "Mexico – England",
+    "mecz_id": 12813007,
+    "kickoff_ts": 1783296000
+   },
+   {
+    "value_bet_id": 0,
+    "podmiot_id": 918047804,
+    "podmiot": "Ezri Konsa",
+    "rynek_kod": "fouls_won",
+    "rynek": "Faule wywalczone",
+    "linia": 0.5,
+    "strona": "powyzej",
+    "kurs": 1.41,
+    "bukmacher": "Superbet",
+    "p_model": 0.8239,
+    "pewnosc": "srednia",
+    "mecz": "Mexico – England",
+    "mecz_id": 12813007,
+    "kickoff_ts": 1783296000
+   },
+   {
+    "value_bet_id": 0,
+    "podmiot_id": 979639501,
+    "podmiot": "Elliot Anderson",
+    "rynek_kod": "fouls_won",
+    "rynek": "Faule wywalczone",
+    "linia": 1.5,
+    "strona": "powyzej",
+    "kurs": 1.67,
+    "bukmacher": "Superbet",
+    "p_model": 0.7319,
+    "pewnosc": "srednia",
+    "mecz": "Mexico – England",
+    "mecz_id": 12813007,
+    "kickoff_ts": 1783296000
+   },
+   {
+    "value_bet_id": 0,
+    "podmiot_id": 983104798,
+    "podmiot": "Nico O'Reilly",
+    "rynek_kod": "shots",
+    "rynek": "Strzały",
+    "linia": 0.5,
+    "strona": "powyzej",
+    "kurs": 1.63,
+    "bukmacher": "Superbet",
+    "p_model": 0.726,
+    "pewnosc": "srednia",
+    "mecz": "Mexico – England",
+    "mecz_id": 12813007,
+    "kickoff_ts": 1783296000
+   },
+   {
+    "value_bet_id": 0,
+    "podmiot_id": 750,
+    "podmiot": "Cristiano Ronaldo",
+    "rynek_kod": "shots",
+    "rynek": "Strzały",
+    "linia": 1.5,
+    "strona": "powyzej",
+    "kurs": 1.2,
+    "bukmacher": "Superbet",
+    "p_model": 0.9349,
+    "pewnosc": "srednia",
+    "mecz": "Portugal – Spain",
+    "mecz_id": 12812990,
+    "kickoff_ts": 1783364400
+   }
+  ],
+  "horyzont": "dlugoterminowy",
+  "slot": "dlugoterminowy:10–20",
+  "klucz": "dlugoterminowy:10–20:2026-07-04",
+  "dzien": "2026-07-04",
+  "opublikowano_ts": 1783158517,
+  "wynik": null,
+  "legi_trafione": 0,
+  "legi_rozliczone": 0
+ },
+ {
+  "cel": 12,
+  "legi": [
+   {
+    "kurs": 1.57,
+    "mecz": "Canada – Morocco",
+    "linia": 1.5,
+    "rynek": "Strzały",
+    "strona": "powyzej",
+    "mecz_id": 12813009,
+    "p_model": 0.7589,
+    "pewnosc": "srednia",
+    "podmiot": "Jonathan David",
+    "bukmacher": "Superbet",
+    "rynek_kod": "shots",
+    "kickoff_ts": 1783184400,
+    "podmiot_id": 964524195,
+    "value_bet_id": 0
+   },
+   {
+    "kurs": 1.52,
+    "mecz": "Canada – Morocco",
+    "linia": 0.5,
+    "rynek": "Strzały celne",
+    "strona": "powyzej",
+    "mecz_id": 12813009,
+    "p_model": 0.7317,
+    "pewnosc": "srednia",
+    "podmiot": "Ismael Saibari",
+    "bukmacher": "Superbet",
+    "rynek_kod": "sot",
+    "kickoff_ts": 1783184400,
+    "podmiot_id": 902150090,
+    "value_bet_id": 0
+   },
+   {
+    "kurs": 1.31,
+    "mecz": "Brazil – Norway",
+    "linia": 0.5,
+    "rynek": "Strzały celne",
+    "strona": "powyzej",
+    "mecz_id": 12813006,
+    "p_model": 0.841,
+    "pewnosc": "srednia",
+    "podmiot": "Vinicius Junior",
+    "bukmacher": "Superbet",
+    "rynek_kod": "sot",
+    "kickoff_ts": 1783281600,
+    "podmiot_id": 988733749,
+    "value_bet_id": 0
+   },
+   {
+    "kurs": 1.37,
+    "mecz": "Mexico – England",
+    "linia": 0.5,
+    "rynek": "Strzały celne",
+    "strona": "powyzej",
+    "mecz_id": 12813007,
+    "p_model": 0.8404,
+    "pewnosc": "srednia",
+    "podmiot": "Harry Kane",
+    "bukmacher": "Superbet",
+    "rynek_kod": "sot",
+    "kickoff_ts": 1783296000,
+    "podmiot_id": 911633308,
+    "value_bet_id": 0
+   },
+   {
+    "kurs": 1.41,
+    "mecz": "Mexico – England",
+    "linia": 0.5,
+    "rynek": "Faule wywalczone",
+    "strona": "powyzej",
+    "mecz_id": 12813007,
+    "p_model": 0.8239,
+    "pewnosc": "srednia",
+    "podmiot": "Ezri Konsa",
+    "bukmacher": "Superbet",
+    "rynek_kod": "fouls_won",
+    "kickoff_ts": 1783296000,
+    "podmiot_id": 918047804,
+    "value_bet_id": 0
+   },
+   {
+    "kurs": 1.67,
+    "mecz": "Mexico – England",
+    "linia": 1.5,
+    "rynek": "Faule wywalczone",
+    "strona": "powyzej",
+    "mecz_id": 12813007,
+    "p_model": 0.7319,
+    "pewnosc": "srednia",
+    "podmiot": "Elliot Anderson",
+    "bukmacher": "Superbet",
+    "rynek_kod": "fouls_won",
+    "kickoff_ts": 1783296000,
+    "podmiot_id": 979639501,
+    "value_bet_id": 0
+   },
+   {
+    "kurs": 1.63,
+    "mecz": "Mexico – England",
+    "linia": 0.5,
+    "rynek": "Strzały",
+    "strona": "powyzej",
+    "mecz_id": 12813007,
+    "p_model": 0.726,
+    "pewnosc": "srednia",
+    "podmiot": "Nico O'Reilly",
+    "bukmacher": "Superbet",
+    "rynek_kod": "shots",
+    "kickoff_ts": 1783296000,
+    "podmiot_id": 983104798,
+    "value_bet_id": 0
+   }
+  ],
+  "slot": "dzienny:12–25",
+  "styl": "pewniaki",
+  "dzien": "2026-07-04",
+  "klucz": "dzienny:12–25:2026-07-04",
+  "wynik": null,
+  "ev_pct": 130.0,
+  "p_model": 0.1399,
+  "horyzont": "dzienny",
+  "cel_label": "12–25",
+  "fair_kurs": 7.15,
+  "kurs_laczny": 16.44,
+  "legi_trafione": 0,
+  "legi_rozliczone": 0,
+  "opublikowano_ts": 1783158383
+ },
+ {
   "cel": 5,
   "legi": [
    {
@@ -83,8 +345,10 @@
     "value_bet_id": 0
    }
   ],
+  "slot": "dzienny:5–10",
   "styl": "pewniaki",
   "dzien": "2026-07-04",
+  "klucz": "dzienny:5–10:2026-07-04",
   "wynik": null,
   "ev_pct": 29.2,
   "p_model": 0.2129,
@@ -94,9 +358,7 @@
   "kurs_laczny": 6.07,
   "legi_trafione": 0,
   "legi_rozliczone": 0,
-  "opublikowano_ts": 1783128697,
-  "slot": "dzienny:5–10",
-  "klucz": "dzienny:5–10:2026-07-04"
+  "opublikowano_ts": 1783128697
  },
  {
   "cel": 10,
@@ -214,8 +476,10 @@
     "value_bet_id": 0
    }
   ],
+  "slot": "dzienny:10–15",
   "styl": "pewniaki",
   "dzien": "2026-07-04",
+  "klucz": "dzienny:10–15:2026-07-04",
   "wynik": null,
   "ev_pct": 12.0,
   "p_model": 0.1035,
@@ -225,9 +489,7 @@
   "kurs_laczny": 10.82,
   "legi_trafione": 0,
   "legi_rozliczone": 0,
-  "opublikowano_ts": 1783128697,
-  "slot": "dzienny:10–15",
-  "klucz": "dzienny:10–15:2026-07-04"
+  "opublikowano_ts": 1783128697
  },
  {
   "cel": 15,
@@ -377,8 +639,10 @@
     "value_bet_id": 0
    }
   ],
+  "slot": "dzienny:15–20",
   "styl": "pewniaki",
   "dzien": "2026-07-04",
+  "klucz": "dzienny:15–20:2026-07-04",
   "wynik": null,
   "ev_pct": 26.5,
   "p_model": 0.0822,
@@ -388,9 +652,7 @@
   "kurs_laczny": 15.39,
   "legi_trafione": 0,
   "legi_rozliczone": 0,
-  "opublikowano_ts": 1783128697,
-  "slot": "dzienny:15–20",
-  "klucz": "dzienny:15–20:2026-07-04"
+  "opublikowano_ts": 1783128697
  },
  {
   "cel": 20,
@@ -556,8 +818,10 @@
     "value_bet_id": 0
    }
   ],
+  "slot": "dzienny:20–25",
   "styl": "pewniaki",
   "dzien": "2026-07-04",
+  "klucz": "dzienny:20–25:2026-07-04",
   "wynik": null,
   "ev_pct": 17.7,
   "p_model": 0.0566,
@@ -567,9 +831,7 @@
   "kurs_laczny": 20.78,
   "legi_trafione": 0,
   "legi_rozliczone": 0,
-  "opublikowano_ts": 1783128697,
-  "slot": "dzienny:20–25",
-  "klucz": "dzienny:20–25:2026-07-04"
+  "opublikowano_ts": 1783128697
  },
  {
   "cel": 10,
@@ -687,8 +949,10 @@
     "value_bet_id": 0
    }
   ],
+  "slot": "dlugoterminowy:10–15",
   "styl": "pewniaki",
   "dzien": "2026-07-04",
+  "klucz": "dlugoterminowy:10–15:2026-07-04",
   "wynik": null,
   "ev_pct": 143.2,
   "p_model": 0.1968,
@@ -698,9 +962,7 @@
   "kurs_laczny": 12.36,
   "legi_trafione": 0,
   "legi_rozliczone": 0,
-  "opublikowano_ts": 1783128697,
-  "slot": "dlugoterminowy:10–15",
-  "klucz": "dlugoterminowy:10–15:2026-07-04"
+  "opublikowano_ts": 1783128697
  },
  {
   "cel": 15,
@@ -834,8 +1096,10 @@
     "value_bet_id": 0
    }
   ],
+  "slot": "dlugoterminowy:15–20",
   "styl": "pewniaki",
   "dzien": "2026-07-04",
+  "klucz": "dlugoterminowy:15–20:2026-07-04",
   "wynik": null,
   "ev_pct": 156.9,
   "p_model": 0.1368,
@@ -845,9 +1109,7 @@
   "kurs_laczny": 18.78,
   "legi_trafione": 0,
   "legi_rozliczone": 0,
-  "opublikowano_ts": 1783128697,
-  "slot": "dlugoterminowy:15–20",
-  "klucz": "dlugoterminowy:15–20:2026-07-04"
+  "opublikowano_ts": 1783128697
  },
  {
   "cel": 20,
@@ -981,8 +1243,10 @@
     "value_bet_id": 0
    }
   ],
+  "slot": "dlugoterminowy:20–25",
   "styl": "pewniaki",
   "dzien": "2026-07-04",
+  "klucz": "dlugoterminowy:20–25:2026-07-04",
   "wynik": null,
   "ev_pct": 182.4,
   "p_model": 0.1235,
@@ -992,9 +1256,7 @@
   "kurs_laczny": 22.86,
   "legi_trafione": 0,
   "legi_rozliczone": 0,
-  "opublikowano_ts": 1783128697,
-  "slot": "dlugoterminowy:20–25",
-  "klucz": "dlugoterminowy:20–25:2026-07-04"
+  "opublikowano_ts": 1783128697
  },
  {
   "cel": 25,
@@ -1144,8 +1406,10 @@
     "value_bet_id": 0
    }
   ],
+  "slot": "dlugoterminowy:25–35",
   "styl": "pewniaki",
   "dzien": "2026-07-04",
+  "klucz": "dlugoterminowy:25–35:2026-07-04",
   "wynik": null,
   "ev_pct": 198.3,
   "p_model": 0.0859,
@@ -1155,9 +1419,7 @@
   "kurs_laczny": 34.74,
   "legi_trafione": 0,
   "legi_rozliczone": 0,
-  "opublikowano_ts": 1783128697,
-  "slot": "dlugoterminowy:25–35",
-  "klucz": "dlugoterminowy:25–35:2026-07-04"
+  "opublikowano_ts": 1783128697
  },
  {
   "cel": 5,
@@ -1275,8 +1537,10 @@
     "value_bet_id": 74
    }
   ],
+  "slot": "value:~5",
   "styl": "value",
   "dzien": "2026-07-03",
+  "klucz": "value:~5:2026-07-03",
   "wynik": null,
   "ev_pct": 65.6,
   "p_model": 0.2782,
@@ -1286,9 +1550,7 @@
   "kurs_laczny": 5.95,
   "legi_trafione": 1,
   "legi_rozliczone": 1,
-  "opublikowano_ts": 1783091684,
-  "slot": "value:~5",
-  "klucz": "value:~5:2026-07-03"
+  "opublikowano_ts": 1783091684
  },
  {
   "cel": 5,
@@ -1374,8 +1636,10 @@
     "value_bet_id": 0
    }
   ],
+  "slot": "dzienny:5–10",
   "styl": "pewniaki",
   "dzien": "2026-07-03",
+  "klucz": "dzienny:5–10:2026-07-03",
   "wynik": null,
   "ev_pct": 20.0,
   "p_model": 0.2365,
@@ -1385,9 +1649,7 @@
   "kurs_laczny": 5.07,
   "legi_trafione": 1,
   "legi_rozliczone": 1,
-  "opublikowano_ts": 1783091684,
-  "slot": "dzienny:5–10",
-  "klucz": "dzienny:5–10:2026-07-03"
+  "opublikowano_ts": 1783091684
  },
  {
   "cel": 20,
@@ -1553,8 +1815,10 @@
     "value_bet_id": 0
    }
   ],
+  "slot": "dzienny:20–25",
   "styl": "pewniaki",
   "dzien": "2026-07-03",
+  "klucz": "dzienny:20–25:2026-07-03",
   "wynik": null,
   "ev_pct": -15.9,
   "p_model": 0.0337,
@@ -1564,9 +1828,7 @@
   "kurs_laczny": 24.98,
   "legi_trafione": 2,
   "legi_rozliczone": 2,
-  "opublikowano_ts": 1783091684,
-  "slot": "dzienny:20–25",
-  "klucz": "dzienny:20–25:2026-07-03"
+  "opublikowano_ts": 1783091684
  },
  {
   "cel": 10,
@@ -1684,8 +1946,10 @@
     "value_bet_id": 0
    }
   ],
+  "slot": "dlugoterminowy:10–15",
   "styl": "pewniaki",
   "dzien": "2026-07-03",
+  "klucz": "dlugoterminowy:10–15:2026-07-03",
   "wynik": null,
   "ev_pct": 141.7,
   "p_model": 0.1791,
@@ -1695,9 +1959,7 @@
   "kurs_laczny": 13.49,
   "legi_trafione": 0,
   "legi_rozliczone": 0,
-  "opublikowano_ts": 1783091684,
-  "slot": "dlugoterminowy:10–15",
-  "klucz": "dlugoterminowy:10–15:2026-07-03"
+  "opublikowano_ts": 1783091684
  },
  {
   "cel": 15,
@@ -1831,8 +2093,10 @@
     "value_bet_id": 0
    }
   ],
+  "slot": "dlugoterminowy:15–20",
   "styl": "pewniaki",
   "dzien": "2026-07-03",
+  "klucz": "dlugoterminowy:15–20:2026-07-03",
   "wynik": null,
   "ev_pct": 139.9,
   "p_model": 0.1457,
@@ -1842,9 +2106,7 @@
   "kurs_laczny": 16.46,
   "legi_trafione": 0,
   "legi_rozliczone": 0,
-  "opublikowano_ts": 1783091684,
-  "slot": "dlugoterminowy:15–20",
-  "klucz": "dlugoterminowy:15–20:2026-07-03"
+  "opublikowano_ts": 1783091684
  },
  {
   "cel": 20,
@@ -1978,8 +2240,10 @@
     "value_bet_id": 0
    }
   ],
+  "slot": "dlugoterminowy:20–25",
   "styl": "pewniaki",
   "dzien": "2026-07-03",
+  "klucz": "dlugoterminowy:20–25:2026-07-03",
   "wynik": null,
   "ev_pct": 165.0,
   "p_model": 0.1235,
@@ -1989,9 +2253,7 @@
   "kurs_laczny": 21.46,
   "legi_trafione": 0,
   "legi_rozliczone": 0,
-  "opublikowano_ts": 1783091684,
-  "slot": "dlugoterminowy:20–25",
-  "klucz": "dlugoterminowy:20–25:2026-07-03"
+  "opublikowano_ts": 1783091684
  },
  {
   "cel": 25,
@@ -2141,8 +2403,10 @@
     "value_bet_id": 0
    }
   ],
+  "slot": "dlugoterminowy:25–35",
   "styl": "pewniaki",
   "dzien": "2026-07-03",
+  "klucz": "dlugoterminowy:25–35:2026-07-03",
   "wynik": null,
   "ev_pct": 180.0,
   "p_model": 0.0859,
@@ -2152,8 +2416,6 @@
   "kurs_laczny": 32.61,
   "legi_trafione": 0,
   "legi_rozliczone": 0,
-  "opublikowano_ts": 1783091684,
-  "slot": "dlugoterminowy:25–35",
-  "klucz": "dlugoterminowy:25–35:2026-07-03"
+  "opublikowano_ts": 1783091684
  }
 ]

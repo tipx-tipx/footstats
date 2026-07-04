@@ -1,57 +1,5 @@
 [
  {
-  "id": 12812999,
-  "liga": "MŚ",
-  "sezon": "2026",
-  "kolejka": "Ćwierćfinał",
-  "kickoff_ts": 1783116000,
-  "gospodarz": "Argentina",
-  "gosc": "Cape Verde",
-  "sedzia": null,
-  "sedzia_mnoznik_fauli": 1.0,
-  "okazje": [
-   15,
-   16,
-   17,
-   50,
-   61
-  ],
-  "sklady_ogloszone": false
- },
- {
-  "id": 12813011,
-  "liga": "MŚ",
-  "sezon": "2026",
-  "kolejka": "Ćwierćfinał",
-  "kickoff_ts": 1783128600,
-  "gospodarz": "Colombia",
-  "gosc": "Ghana",
-  "sedzia": null,
-  "sedzia_mnoznik_fauli": 1.0,
-  "okazje": [
-   14,
-   49
-  ],
-  "sklady_ogloszone": false
- },
- {
-  "id": 12813018,
-  "liga": "MŚ",
-  "sezon": "2026",
-  "kolejka": "Ćwierćfinał",
-  "kickoff_ts": 1783101600,
-  "gospodarz": "Australia",
-  "gosc": "Egypt",
-  "sedzia": null,
-  "sedzia_mnoznik_fauli": 1.0,
-  "okazje": [
-   18,
-   51,
-   52
-  ],
-  "sklady_ogloszone": false
- },
- {
   "id": 12812990,
   "liga": "MŚ",
   "sezon": "2026",
@@ -62,12 +10,61 @@
   "sedzia": null,
   "sedzia_mnoznik_fauli": 1.0,
   "okazje": [
+   16,
+   17,
+   18,
    19,
    20,
+   44,
+   45,
+   46,
+   71,
+   75,
+   82,
+   83
+  ],
+  "sklady_ogloszone": false
+ },
+ {
+  "id": 12812991,
+  "liga": "MŚ",
+  "sezon": "2026",
+  "kolejka": "Ćwierćfinał",
+  "kickoff_ts": 1783454400,
+  "gospodarz": "Switzerland",
+  "gosc": "Colombia",
+  "sedzia": null,
+  "sedzia_mnoznik_fauli": 1.0,
+  "okazje": [
    21,
    22,
+   55,
+   56,
+   57,
+   72
+  ],
+  "sklady_ogloszone": false
+ },
+ {
+  "id": 12812993,
+  "liga": "MŚ",
+  "sezon": "2026",
+  "kolejka": "Ćwierćfinał",
+  "kickoff_ts": 1783440000,
+  "gospodarz": "Argentina",
+  "gosc": "Egypt",
+  "sedzia": null,
+  "sedzia_mnoznik_fauli": 1.0,
+  "okazje": [
    23,
-   53
+   24,
+   25,
+   26,
+   58,
+   59,
+   60,
+   73,
+   74
   ],
   "sklady_ogloszone": false
  },
@@ -77,14 +74,22 @@
   "sezon": "2026",
   "kolejka": "Ćwierćfinał",
   "kickoff_ts": 1783382400,
-  "gospodarz": "USA",
+  "gospodarz": "Usa",
   "gosc": "Belgium",
   "sedzia": null,
   "sedzia_mnoznik_fauli": 1.0,
   "okazje": [
-   24,
+   27,
+   61,
+   62,
+   63,
+   64,
    65,
-   69
+   66,
+   67,
+   68,
+   69,
+   70
   ],
   "sklady_ogloszone": false
  },
@@ -99,18 +104,17 @@
   "sedzia": null,
   "sedzia_mnoznik_fauli": 1.0,
   "okazje": [
-   25,
-   26,
-   27,
    28,
    29,
    30,
-   55,
-   56,
-   62,
-   64,
-   66,
-   68
+   31,
+   32,
+   33,
+   84,
+   86,
+   87,
+   88,
+   90
   ],
   "sklady_ogloszone": false
  },
@@ -125,17 +129,16 @@
   "sedzia": null,
   "sedzia_mnoznik_fauli": 1.0,
   "okazje": [
-   31,
-   32,
-   33,
    34,
    35,
    36,
    37,
-   59,
-   60,
-   63,
-   70
+   38,
+   39,
+   40,
+   80,
+   85,
+   92
   ],
   "sklady_ogloszone": false
  },
@@ -150,11 +153,12 @@
   "sedzia": null,
   "sedzia_mnoznik_fauli": 1.0,
   "okazje": [
-   38,
-   39,
-   40,
-   57,
-   67
+   41,
+   42,
+   43,
+   77,
+   81,
+   89
   ],
   "sklady_ogloszone": false
  },
@@ -169,17 +173,19 @@
   "sedzia": null,
   "sedzia_mnoznik_fauli": 1.0,
   "okazje": [
-   41,
-   42,
-   43,
-   44,
-   45,
-   46,
    47,
    48,
+   49,
+   50,
+   51,
+   52,
+   53,
    54,
-   58,
-   71
+   76,
+   78,
+   79,
+   91,
+   93
   ],
   "sklady_ogloszone": false
  }

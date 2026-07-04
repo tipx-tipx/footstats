@@ -117,13 +117,18 @@ def competitor_ids(team_names: list[str]) -> dict[str, int]:
                 break
     except Exception:
         pass
-    # drużyny grające za 2-3 dni: pełny terminarz MŚ (fixtures per rozgrywki)
-    if len(out) < len(wanted) and wc_comp_id:
-        try:
-            data = _get(f"{BASE}/games/fixtures/?{Q}&competitions={wc_comp_id}")
-            _scan(data.get("games", []))
-        except Exception:
-            pass
+    # terminarz i wyniki MŚ po znanym id rozgrywek — /games/current często
+    # w ogóle nie zawiera meczów MŚ (ucina do ~100 bieżących wszystkich lig)
+    if len(out) < len(wanted):
+        for comp in {wc_comp_id, WC_COMPETITION_ID} - {None}:
+            for endpoint in ("fixtures", "results"):
+                try:
+                    data = _get(f"{BASE}/games/{endpoint}/?{Q}&competitions={comp}")
+                    _scan(data.get("games", []))
+                except Exception:
+                    pass
+            if len(out) >= len(wanted):
+                break
     return out
 
 

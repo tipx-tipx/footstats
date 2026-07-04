@@ -18,6 +18,7 @@ import json
 import os
 import statistics
 import time
+import zlib
 from collections import defaultdict
 from dataclasses import asdict
 
@@ -244,10 +245,12 @@ def main():
     print(f"Trendów propsów: {len(trends)} "
           f"({len(set(t.player_id for t in trends))} zawodników)")
     if not trends:
-        print("statshub nie ma jeszcze propsów na te mecze (ładują się ~24-48 h "
-              "przed). Uruchom ponownie bliżej meczu.")
-        _rozlicz_i_zapisz([], [])
-        return
+        # statshub schował feed propsów (2026-07-04: /api/props/* zwraca
+        # pustkę anonimowo — prawdopodobnie za kontem). NIE przerywamy:
+        # historia jest w banku trendów (Supabase) i w 365Scores, składy
+        # daje Rotowire, kursy Superbet — jedziemy bez statshuba.
+        print("statshub: 0 propsów w feedzie — buduję trendy z banku "
+              "historii i pełnych statystyk 365Scores.")
 
     # --- BIBLIOTEKA HISTORII: mecze bez propsów statshub (np. ćwierćfinały) ---
     # statshub wystawia propsy ~24-48 h przed meczem, a Superbet kwotuje dużo
@@ -324,13 +327,17 @@ def main():
             print(f"Biblioteka historii ({len(lib)} trendów w banku): "
                   f"+{n_lib} przepiętych na mecze bez propsów statshub")
 
-        # 4) drużyny wciąż BEZ historii (statshub skasował przed powstaniem
-        #    banku): pełne statystyki meczowe z 365Scores (minuty, strzały,
-        #    faule, faule na zawodniku, przechwyty; odbiór — brak w 365)
+        # 4) uzupełnij braki PER ZAWODNIK×RYNEK z pełnych statystyk meczowych
+        #    365Scores (minuty, strzały, faule, faule na zawodniku, przechwyty;
+        #    odbiory — brak w 365). Bank rzadko ma całą kadrę — wcześniejsza
+        #    wersja pomijała drużynę, gdy miała w banku choć jeden trend.
         MARKETY_365_FULL = ("shots", "sot", "fouls_committed", "fouls_won",
                             "interceptions")
-        pokryte_teamy = {t.team_id for t in trends}
-        braki: list[tuple[dict, int, int, bool, str, str]] = []
+        pokryci = {
+            (t.team_id, rotowire._norm(t.player_name), t.market_code)
+            for t in trends
+        }
+        zespoly: list[tuple[dict, int, int, bool, str, str]] = []
         for e in uncovered:
             hid, aid = e["homeTeamId"], e["awayTeamId"]
             slug_parts = str(e.get("slug", "")).replace("-vs-", "|").split("|")
@@ -338,17 +345,15 @@ def main():
                 continue
             home_nm = slug_parts[0].replace("-", " ").title()
             away_nm = slug_parts[1].rsplit("-", 1)[0].replace("-", " ").title()
-            if hid not in pokryte_teamy:
-                braki.append((e, hid, aid, True, home_nm, away_nm))
-            if aid not in pokryte_teamy:
-                braki.append((e, aid, hid, False, away_nm, home_nm))
-        if braki:
+            zespoly.append((e, hid, aid, True, home_nm, away_nm))
+            zespoly.append((e, aid, hid, False, away_nm, home_nm))
+        if zespoly:
             cids365 = scores365.competitor_ids(
-                sorted({b[4] for b in braki})
+                sorted({z[4] for z in zespoly})
             )
             n_365 = 0
             hist_cache: dict[str, list] = {}
-            for e, tid, opp_tid, is_home, team_nm, opp_nm in braki:
+            for e, tid, opp_tid, is_home, team_nm, opp_nm in zespoly:
                 cid = cids365.get(rotowire._norm(team_nm))
                 if not cid:
                     continue
@@ -367,6 +372,8 @@ def main():
                     if len(zagrane) < 3:
                         continue
                     for mk in MARKETY_365_FULL:
+                        if (tid, pkey, mk) in pokryci:
+                            continue  # jest już trend z banku/statshub
                         c_l, m_l, tss, st_l = [], [], [], []
                         for ts_g, rec in wpisy:
                             if rec is None:
@@ -376,7 +383,10 @@ def main():
                             tss.append(int(ts_g))
                             st_l.append(bool(rec.get("started")))
                         trends.append(statshub.StatshubTrend(
-                            player_id=900_000_000 + abs(hash(pkey)) % 90_000_000,
+                            # hash() jest randomizowany per proces — id musi
+                            # być STABILNE między cyklami (log typów, kupony)
+                            player_id=900_000_000
+                            + zlib.crc32(pkey.encode("utf-8")) % 90_000_000,
                             player_name=pkey.title(),
                             position="M",
                             team_id=tid, team_name=team_nm,
@@ -392,8 +402,8 @@ def main():
                         ))
                         n_365 += 1
             if n_365:
-                print(f"365Scores pełne staty: +{n_365} trendów dla drużyn "
-                      f"bez historii statshub ({len(hist_cache)} drużyn)")
+                print(f"365Scores pełne staty: +{n_365} trendów uzupełnionych "
+                      f"({len(hist_cache)} drużyn)")
     except Exception as ex:
         print(f"Biblioteka historii pominięta ({ex})")
 
@@ -526,15 +536,19 @@ def main():
         print(f"Składy ogłoszone: {n_conf} z {len(events)} meczów")
 
     # zawodnicy POZA ogłoszonym składem (twardy sygnał z statshub lub Rotowire)
-    # — unieważniają zamrożone kupony z ich legami (patrz rozliczanie)
+    # — unieważniają zamrożone kupony z ich legami (patrz rozliczanie).
+    # in_predicted_lineup jest wiarygodne TYLKO dla trendów z żywego feedu
+    # statshub (covered) — trendy z banku/365 mają tam zawsze False.
     niedostepni: set[int] = set()
     for t in trends:
         if not t.player_id or not t.event_id:
             continue
         rp = rotowire.predicted_status(roto, t.team_name, t.player_name)
-        if (lineup_confirmed.get(t.event_id) and not t.in_predicted_lineup) or (
-            rotowire.is_confirmed(roto, t.team_name) and rp is False
-        ):
+        if (
+            lineup_confirmed.get(t.event_id)
+            and t.event_id in covered
+            and not t.in_predicted_lineup
+        ) or (rotowire.is_confirmed(roto, t.team_name) and rp is False):
             niedostepni.add(t.player_id)
     if niedostepni:
         print(f"Poza ogłoszonymi składami: {len(niedostepni)} zawodników")
@@ -596,7 +610,9 @@ def main():
         )
         built, hist = score_from_trend(
             tr, tr.opponent_average,
-            lineup_confirmed=lineup_confirmed.get(mid, False),
+            # potwierdzony skład wolno czytać z in_predicted_lineup tylko dla
+            # trendów z żywego feedu statshub — bank/365 mają tam False
+            lineup_confirmed=lineup_confirmed.get(mid, False) and mid in covered,
             predicted_available=predicted_available.get(mid, False),
             roto_pred=rotowire.predicted_status(roto, tr.team_name, tr.player_name),
             roto_confirmed=rotowire.is_confirmed(roto, tr.team_name),
