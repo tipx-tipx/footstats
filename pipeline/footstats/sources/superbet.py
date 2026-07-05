@@ -158,6 +158,8 @@ def fetch_stat_odds(event_id: int, home_pl: str, away_pl: str) -> dict:
 
     players: dict = defaultdict(lambda: defaultdict(dict))
     teams: dict = {"home": defaultdict(dict), "away": defaultdict(dict)}
+    # kursy meczowe pod tempo/scenariusz meczu (model/tempo.py)
+    match: dict = {"h": None, "x": None, "a": None, "totals": defaultdict(dict)}
 
     for o in odds:
         if o.get("status") == "block":
@@ -168,6 +170,22 @@ def fetch_stat_odds(event_id: int, home_pl: str, away_pl: str) -> dict:
         mname = (o.get("marketName") or "").strip()
         oname = (o.get("name") or "").strip()
         spec = o.get("specifiers") or {}
+
+        # --- 1X2 (rynek "Mecz") i total goli ("Liczba goli") ---
+        if mname == "Mecz" and oname in ("1", "X", "2"):
+            match[{"1": "h", "X": "x", "2": "a"}[oname]] = float(price)
+            continue
+        if mname == "Liczba goli" and spec.get("total"):
+            try:
+                line = float(spec["total"])
+            except ValueError:
+                line = None
+            if line is not None:
+                if "powyżej" in oname:
+                    match["totals"][line]["over"] = float(price)
+                elif "poniżej" in oname:
+                    match["totals"][line]["under"] = float(price)
+            continue
 
         side = None
         if "powyżej" in oname or "powyżej" in mname:
@@ -212,4 +230,5 @@ def fetch_stat_odds(event_id: int, home_pl: str, away_pl: str) -> dict:
             break
 
     return {"players": {k: dict(v) for k, v in players.items()},
-            "teams": {k: dict(v) for k, v in teams.items()}}
+            "teams": {k: dict(v) for k, v in teams.items()},
+            "match": {**match, "totals": {k: dict(v) for k, v in match["totals"].items()}}}

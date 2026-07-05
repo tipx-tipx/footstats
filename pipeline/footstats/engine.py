@@ -16,6 +16,17 @@ RARE_MARKETS = {"sot_outside_box", "headed_shots", "headed_sot", "fh_sot", "offs
 DISCIPLINARY_MARKETS = {"fouls_committed", "yellow_card", "team_fouls", "team_cards"}
 
 
+def _select_bias(market_bias, p: float) -> float:
+    """Kalibracja z rozliczeń: skalar (stary format) albo dict z przedziałami
+    szansy {"global": g, "bins": [[lo, hi, bias], ...]} (rozliczanie.py)."""
+    if isinstance(market_bias, dict):
+        for lo, hi, b in market_bias.get("bins", []):
+            if lo <= p < hi:
+                return float(b)
+        return float(market_bias.get("global", 1.0))
+    return float(market_bias)
+
+
 @dataclass
 class PlayerHistory:
     """Historia zawodnika dla jednej statystyki (posortowana od najnowszych)."""
@@ -26,6 +37,10 @@ class PlayerHistory:
     started: list[bool]
     # waga jakości próby per mecz (siła rywala); None = wszystkie równe
     opp_weights: list[float] | None = None
+    # mecze wchodzące do posteriora intensywności (True); False = mecz
+    # sprzed turnieju, ujęty już w priorze klubowym (bez podwójnego liczenia).
+    # Model minut zawsze korzysta z PEŁNEJ historii. None = wszystkie True.
+    likelihood_mask: list[bool] | None = None
 
 
 @dataclass
@@ -76,17 +91,22 @@ def _build_reasoning(
     ctx_factors: context.ContextFactors,
     ctx: MatchContext,
     lam: float,
+    prior: counts.GroupPrior | None = None,
 ) -> dict:
     """Uzasadnienie po polsku — najważniejsze czynniki dla UI."""
     czynniki = []
-    czynniki.append(
-        {
-            "nazwa": "Poziom bazowy",
-            "opis": f"Średnio {posterior.mean_per90:.2f} na 90 minut "
-            f"(efektywna próba: {posterior.effective_matches:.0f} meczów)",
-            "mnoznik": None,
-        }
-    )
+    if prior is not None and prior.source == "klub":
+        opis_bazy = (
+            f"Średnio {posterior.mean_per90:.2f} na 90 minut "
+            f"(baza: {prior.pseudo_matches:.0f} meczów sprzed turnieju "
+            f"+ {posterior.effective_matches:.0f} na turnieju)"
+        )
+    else:
+        opis_bazy = (
+            f"Średnio {posterior.mean_per90:.2f} na 90 minut "
+            f"(efektywna próba: {posterior.effective_matches:.0f} meczów)"
+        )
+    czynniki.append({"nazwa": "Poziom bazowy", "opis": opis_bazy, "mnoznik": None})
     czynniki.append(
         {
             "nazwa": "Minuty",
@@ -168,7 +188,7 @@ def score_player_market(
     under_odds: float | None = None,
     market_calibrated: bool = False,
     card_conversion: float | None = None,
-    market_bias: float = 1.0,
+    market_bias: float | dict = 1.0,
 ) -> ScoredMarket:
     """Pełny scoring jednego rynku zawodnika dla jednego meczu.
 
@@ -176,15 +196,25 @@ def score_player_market(
     zmierzone odchylenie rzeczywistej częstości od szans modelu na tym rynku.
     """
 
-    # 1) posterior bazowej intensywności per-90
+    # 1) posterior bazowej intensywności per-90 — tylko mecze z maski
+    # likelihood (mecze sprzed turnieju siedzą w priorze klubowym)
+    lm = (
+        np.array(history.likelihood_mask, dtype=bool)
+        if history.likelihood_mask
+        and len(history.likelihood_mask) == len(history.counts)
+        else np.ones(len(history.counts), dtype=bool)
+    )
+    ow = (
+        np.array(history.opp_weights)[lm]
+        if history.opp_weights and len(history.opp_weights) == len(history.counts)
+        else None
+    )
     posterior = counts.fit_posterior(
-        np.array(history.counts),
-        np.array(history.minutes),
-        np.array(history.days_ago),
+        np.array(history.counts)[lm],
+        np.array(history.minutes)[lm],
+        np.array(history.days_ago)[lm],
         prior=group_prior,
-        extra_weights=(
-            np.array(history.opp_weights) if history.opp_weights else None
-        ),
+        extra_weights=ow,
     )
 
     # 2) model minut
@@ -255,12 +285,13 @@ def score_player_market(
         lam = pred_center.lam
 
     p_over = minutes_mod.p_over_mixture(mm, p_over_given_minutes)
-    if market_bias != 1.0:
+    bias = _select_bias(market_bias, p_over)
+    if bias != 1.0:
         # samokalibracja: skaluj szansę zmierzonym odchyleniem (cap w rozliczanie.py)
-        p_over *= market_bias
+        p_over *= bias
         cf.notes["kalibracja"] = (
-            f"Korekta z rozliczonych typów: ×{market_bias:.2f} "
-            f"({'model niedoszacowywał' if market_bias > 1 else 'model przeszacowywał'})"
+            f"Korekta z rozliczonych typów: ×{bias:.2f} "
+            f"({'model niedoszacowywał' if bias > 1 else 'model przeszacowywał'})"
         )
     p_over = float(np.clip(p_over, 1e-4, 1.0 - 1e-4))
 
@@ -295,5 +326,6 @@ def score_player_market(
         expected_minutes=round(mm.expected_minutes, 1),
         factors=cf.as_dict(),
         assessments=assessments,
-        reasoning=_build_reasoning(market_code, posterior, mm, cf, ctx, lam),
+        reasoning=_build_reasoning(market_code, posterior, mm, cf, ctx, lam,
+                                   prior=group_prior),
     )

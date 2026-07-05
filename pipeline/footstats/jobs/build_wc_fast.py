@@ -31,8 +31,8 @@ from dataclasses import replace as dc_replace
 
 from .. import supa
 from ..engine import MatchContext, PlayerHistory, RARE_MARKETS, score_player_market
-from ..model import betting, counts, kupony, matchup_lite
-from ..sources import rotowire, scores365, statshub, superbet
+from ..model import betting, counts, kupony, matchup_lite, tempo
+from ..sources import eloratings, rotowire, scores365, statshub, superbet
 from . import rozliczanie
 from .build_demo import MARKET_NAMES_PL, WEB_DATA_DIR, line_for_lambda
 
@@ -157,6 +157,60 @@ def group_prior_from_context(trend: statshub.StatshubTrend) -> counts.GroupPrior
     return counts.GroupPrior(mean_per90=max(base, 0.15), pseudo_matches=5.0)
 
 
+# start MŚ 2026 (2026-06-08 UTC, kilka dni zapasu przed 1. meczem) — granica
+# między "sezonem klubowym" (prior) a "turniejem" (aktualizacja posteriora)
+WC_START_TS = 1_780_876_800
+# wygaszanie historii przedturniejowej w priorze (sezon klubowy jest długi)
+PRIOR_TAU_DNI = 240.0
+# minimalna/maksymalna siła priora klubowego (w ekwiwalencie pełnych meczów)
+PRIOR_MIN_MECZE, PRIOR_MAX_MECZE = 4.0, 12.0
+
+
+def klub_prior(
+    trend: statshub.StatshubTrend,
+    now: int,
+    opp_w: list[float] | None,
+) -> tuple[counts.GroupPrior, list[bool]] | None:
+    """SILNY prior Gamma z historii SPRZED turnieju (sezon klubowy + kadra).
+
+    Leczy chroniczną "za małą próbę": zamiast słabej średniej z 6-10 meczów
+    turnieju, punktem wyjścia jest tempo per-90 z pełnej dostępnej historii
+    przedturniejowej (ważonej świeżością i siłą rywala), a mecze turnieju
+    tylko AKTUALIZUJĄ posterior (maska likelihood — bez podwójnego liczenia).
+
+    Zwraca (prior, maska_likelihood) albo None, gdy próba sprzed turnieju
+    jest za mała (wtedy zostaje dotychczasowy słaby prior + pełna historia).
+    """
+    w_sum, exp_sum, cnt_sum = 0.0, 0.0, 0.0
+    mask = []
+    for i, ts_g in enumerate(trend.timestamps):
+        pre = ts_g < WC_START_TS
+        mask.append(not pre)
+        if not pre or i >= len(trend.counts):
+            continue
+        mins = trend.minutes[i] if i < len(trend.minutes) else 0.0
+        if mins <= 0:
+            continue
+        dni = max((now - ts_g) / 86400.0, 0.0)
+        w = float(np.exp(-dni / PRIOR_TAU_DNI))
+        if opp_w and i < len(opp_w):
+            w *= opp_w[i]
+        exp_sum += w * mins / 90.0
+        cnt_sum += w * trend.counts[i]
+        w_sum += w
+    if exp_sum < PRIOR_MIN_MECZE:
+        return None
+    rate = cnt_sum / exp_sum
+    return (
+        counts.GroupPrior(
+            mean_per90=max(rate, 0.05),
+            pseudo_matches=float(min(exp_sum, PRIOR_MAX_MECZE)),
+            source="klub",
+        ),
+        mask,
+    )
+
+
 def score_from_trend(
     trend: statshub.StatshubTrend,
     opp_avg_ref: float | None,
@@ -167,6 +221,8 @@ def score_from_trend(
     matchup_factor: float | None = None,
     matchup_opis: str = "",
     wc_names: set | None = None,
+    elo_map: dict[str, int] | None = None,
+    tempo_meczu: dict | None = None,
 ):
     """Zbuduj PlayerHistory z recentGames i policz predykcję (bez kursów).
 
@@ -177,18 +233,26 @@ def score_from_trend(
          zgoda -> mocny sygnał miękki; spór -> wracamy do historii minut,
       3. tylko jedno źródło -> jego prognoza jako sygnał miękki,
       4. brak prognoz -> sama historia.
+
+    elo_map — ratingi eloratings.net: ciągła waga próby siłą rywala
+    (Botswana ≠ Francja) i syntetyczny spread, gdy brak kursów 1X2.
+    tempo_meczu — {'spread','total',...} z model/tempo.py (kursy Superbetu).
     """
     now = int(time.time())
-    # ważenie próby siłą rywala: mecz z uczestnikiem MŚ liczy się pełniej
-    # niż mecz ze słabszym zespołem (pierwsze przybliżenie siły — Elo później)
+    elo_map = elo_map or {}
+    # ważenie próby siłą rywala: ciągła waga z Elo (mecz z Francją liczy się
+    # pełniej niż z Botswaną); rywal bez ratingu (klub) dostaje wagę bazową
     opp_w = None
-    if wc_names and trend.game_opponents:
+    if trend.game_opponents:
         opp_w = [
-            1.0 if rotowire._norm(o) in wc_names else 0.75
+            eloratings.sample_weight(
+                elo_map.get(eloratings._norm(o)),
+                is_wc_participant=bool(wc_names and rotowire._norm(o) in wc_names),
+            )
             for o in trend.game_opponents[: len(trend.counts)]
         ]
         if len(opp_w) < len(trend.counts):
-            opp_w += [0.85] * (len(trend.counts) - len(opp_w))
+            opp_w += [0.8] * (len(trend.counts) - len(opp_w))
     hist = PlayerHistory(
         counts=trend.counts,
         minutes=trend.minutes,
@@ -198,7 +262,14 @@ def score_from_trend(
     )
     if sum(1 for m in trend.minutes if m > 0) < 3:
         return None, hist
-    prior = group_prior_from_context(trend)
+    # PRIOR: pełna historia sprzed turnieju jako silny prior Gamma
+    # ("sezon klubowy"), mecze turnieju aktualizują posterior; przy małej
+    # próbie przedturniejowej — dotychczasowy słaby prior + cała historia
+    kp = klub_prior(trend, now, opp_w)
+    if kp is not None:
+        prior, hist.likelihood_mask = kp
+    else:
+        prior = group_prior_from_context(trend)
     sh_pred = trend.in_predicted_lineup if predicted_available else None
     if lineup_confirmed:
         official, predicted = trend.in_predicted_lineup, None
@@ -211,11 +282,27 @@ def score_from_trend(
     else:
         official = None
         predicted = sh_pred if sh_pred is not None else roto_pred
+    # tempo/scenariusz meczu: kursy 1X2+gole Superbetu; fallback różnica Elo
+    spread_home, total = None, None
+    if tempo_meczu:
+        spread_home = tempo_meczu.get("spread")
+        total = tempo_meczu.get("total")
+    else:
+        spread_home = eloratings.synthetic_spread(
+            elo_map.get(eloratings._norm(trend.team_name if trend.is_home else trend.opponent_name)),
+            elo_map.get(eloratings._norm(trend.opponent_name if trend.is_home else trend.team_name)),
+        )
+    # spread z perspektywy DRUŻYNY ZAWODNIKA (dodatni = jego zespół faworytem)
+    spread_teamu = None
+    if spread_home is not None:
+        spread_teamu = spread_home if trend.is_home else -spread_home
     # kontekst: średnia rywala względem ligi (jeśli statshub podał)
     ctx = MatchContext(
         is_home=trend.is_home,
-        is_favourite=False,
+        is_favourite=bool(spread_teamu is not None and spread_teamu > 0.15),
         neutral_venue=True,
+        implied_spread=spread_teamu,
+        implied_total=total,
         opponent_allowed_per90=trend.opponent_average,
         league_avg_per90=trend.league_average,
         opponent_sample_matches=6 if trend.opponent_average else 0,
@@ -503,16 +590,24 @@ def main():
         sb_events = []
         print(f"Superbet niedostępny: {e}")
 
+    # Elo reprezentacji (eloratings.net, cache w Supabase) — ciągła waga
+    # próby siłą rywala + syntetyczny spread, gdy brak kursów 1X2
+    elo_map = eloratings.get_ratings()
+    print(f"Elo: {len(elo_map)} reprezentacji" if elo_map
+          else "Elo niedostępne — wagi próby z listy uczestników MŚ")
+
     # samokalibracja: zmierzone odchylenia szans per rynek (od n>=25 rozliczonych)
     try:
         bias_map = rozliczanie.market_bias()
         if bias_map:
-            print(f"Kalibracja z rozliczeń: {bias_map}")
+            print("Kalibracja z rozliczeń: " + ", ".join(
+                f"{mk} ×{v['global']}" for mk, v in bias_map.items()))
     except Exception:
         bias_map = {}
 
     ev_by_id = {e["id"]: e for e in events}
     sb_cache: dict[int, dict] = {}
+    tempo_cache: dict[int, dict | None] = {}  # mid -> tempo z kursów 1X2/goli
 
     # przewidywane XI z Rotowire (drugie źródło, działa z chmury)
     try:
@@ -603,6 +698,28 @@ def main():
                 ),
             }
 
+        # kursy Superbetu dla meczu — POBIERANE PRZED scoringiem, bo tempo
+        # meczu (1X2 + total goli) wchodzi do kontekstu predykcji
+        sb_odds = sb_cache.get(mid)
+        if sb_odds is None and sb_events:
+            sb_ev = superbet.match_superbet_event(
+                sb_events, home_name, away_name, ts
+            )
+            if sb_ev:
+                parts = [p.strip() for p in (sb_ev.get("matchName") or "·").split("·")]
+                try:
+                    sb_odds = superbet.fetch_stat_odds(sb_ev["eventId"], parts[0], parts[1])
+                except Exception:
+                    sb_odds = {"players": {}, "teams": {}}
+            else:
+                sb_odds = {"players": {}, "teams": {}}
+            sb_cache[mid] = sb_odds
+            tempo_m = tempo.tempo_from_match_odds(sb_odds.get("match"))
+            tempo_cache[mid] = tempo_m
+            if tempo_m:
+                print(f"  tempo {match_label}: spread {tempo_m['spread']:+.2f}, "
+                      f"gole {tempo_m['total']:.2f}")
+
         mf, mo = matchup_lite.matchup_lite_factor(
             tr.market_code,
             tr.game_positions[:6],
@@ -619,6 +736,8 @@ def main():
             matchup_factor=mf if mf != 1.0 else None,
             matchup_opis=mo,
             wc_names=wc_names,
+            elo_map=elo_map,
+            tempo_meczu=tempo_cache.get(mid),
         )
         if built is None:
             continue
@@ -664,22 +783,7 @@ def main():
                 },
             }
 
-        # kursy Superbetu dla tego zawodnika/rynku
-        sb_odds = sb_cache.get(mid)
-        if sb_odds is None and sb_events:
-            sb_ev = superbet.match_superbet_event(
-                sb_events, home_name, away_name, ts
-            )
-            if sb_ev:
-                parts = [p.strip() for p in (sb_ev.get("matchName") or "·").split("·")]
-                try:
-                    sb_odds = superbet.fetch_stat_odds(sb_ev["eventId"], parts[0], parts[1])
-                except Exception:
-                    sb_odds = {"players": {}, "teams": {}}
-            else:
-                sb_odds = {"players": {}, "teams": {}}
-            sb_cache[mid] = sb_odds
-
+        # kursy Superbetu dla tego zawodnika/rynku (mecz pobrany wyżej)
         sb_lines = {}
         if sb_odds:
             sb_lines = sb_odds.get("players", {}).get(

@@ -55,6 +55,7 @@ class GroupPrior:
 
     mean_per90: float
     pseudo_matches: float  # ile "wirtualnych meczów" waży prior (siła ściągania)
+    source: str = ""       # np. "klub" = prior z historii sprzed turnieju
 
     @property
     def alpha0(self) -> float:

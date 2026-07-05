@@ -160,35 +160,97 @@ def _wartosc_z_banku(rec: dict, lib: dict) -> float | None:
 
 MIN_N_KALIBRACJI = 25          # od tylu rozliczonych typów na rynek korygujemy
 BIAS_CAP = (0.85, 1.15)        # ostrożnie: maks. +-15% korekty szansy
+# kalibracja PRZEDZIAŁOWA: bias liczony osobno per przedział szansy (model
+# może przeszacowywać longshoty, a pewniaki mieć dobrze)
+BIAS_PRZEDZIALY = [(0.0, 0.55), (0.55, 0.70), (0.70, 1.01)]
+MIN_N_PRZEDZIAL = 15
+# pokrewne rynki dzielą błąd modelu (shots i sot mylą się razem) — shrinkage
+# rodzinny: rynek z małą próbą jest ściągany do biasu swojej rodziny
+RODZINY_RYNKOW = {
+    "shots": "strzelanie", "sot": "strzelanie",
+    "shots_outside_box": "strzelanie", "sot_outside_box": "strzelanie",
+    "headed_shots": "strzelanie", "headed_sot": "strzelanie",
+    "shots_blocked": "strzelanie", "shots_off_target": "strzelanie",
+    "fouls_committed": "faule", "fouls_won": "faule", "yellow_card": "faule",
+    "tackles": "defensywa", "interceptions": "defensywa",
+}
+
+
+def _bias_surowy(grp: list[dict]) -> float:
+    """(trafienia + 2) / (suma zamrożonych p_model + 2): >1 = model
+    niedoszacowuje, <1 = przeszacowuje (pseudozliczenia +2 stabilizują)."""
+    traf = sum(1 for r in grp if r["wynik"] == "wygrany")
+    return (traf + 2.0) / (sum(r["p_model"] for r in grp) + 2.0)
+
+
+def _cap_bias(b: float) -> float:
+    return round(max(BIAS_CAP[0], min(BIAS_CAP[1], b)), 3)
 
 
 def compute_bias(log: dict, min_n: int = MIN_N_KALIBRACJI) -> dict[str, float]:
-    """Współczynniki korekty szansy per rynek z rozliczonych typów.
-
-    bias = (trafienia + 2) / (suma zamrożonych p_model + 2) — czyli o ile
-    rzeczywista częstość odbiega od tego, co model twierdził. >1 = model
-    niedoszacowuje, <1 = przeszacowuje. Zwracamy tylko rynki z próbą >= min_n,
-    z twardym capem — korekta ma dokręcać, nie rządzić.
-    """
+    """Płaski bias per rynek (stary format) — zachowany dla raportu i testów."""
     grupy: dict[str, list[dict]] = {}
     for r in log.values():
         if r.get("wynik") in ("wygrany", "przegrany"):
             grupy.setdefault(r["rynek_kod"], []).append(r)
-    out: dict[str, float] = {}
+    return {
+        mk: _cap_bias(_bias_surowy(grp))
+        for mk, grp in grupy.items()
+        if len(grp) >= min_n
+    }
+
+
+def compute_bias_full(log: dict, min_n: int = MIN_N_KALIBRACJI) -> dict[str, dict]:
+    """Kalibracja przedziałowa z shrinkage: rodzina -> rynek -> przedział.
+
+    Trzy poziomy (każdy ściągany do nadrzędnego proporcjonalnie do próby):
+      1. rodzina rynków (strzelanie/faule/defensywa) — od min_n rozliczeń,
+      2. rynek — bias ściągany do rodziny wagą n/(n+min_n),
+      3. przedział szansy — ściągany do biasu rynku wagą n/(n+MIN_N_PRZEDZIAL).
+
+    Zwraca {rynek: {"global": bias, "bins": [[lo, hi, bias], ...]}} —
+    format rozumiany przez engine._select_bias.
+    """
+    settled = [
+        r for r in log.values() if r.get("wynik") in ("wygrany", "przegrany")
+    ]
+    rodziny: dict[str, list[dict]] = {}
+    for r in settled:
+        fam = RODZINY_RYNKOW.get(r["rynek_kod"])
+        if fam:
+            rodziny.setdefault(fam, []).append(r)
+    fam_bias = {
+        f: _bias_surowy(g) for f, g in rodziny.items() if len(g) >= min_n
+    }
+    grupy: dict[str, list[dict]] = {}
+    for r in settled:
+        grupy.setdefault(r["rynek_kod"], []).append(r)
+    out: dict[str, dict] = {}
     for mk, grp in grupy.items():
-        if len(grp) < min_n:
-            continue
-        traf = sum(1 for r in grp if r["wynik"] == "wygrany")
-        suma_p = sum(r["p_model"] for r in grp)
-        bias = (traf + 2.0) / (suma_p + 2.0)
-        out[mk] = round(max(BIAS_CAP[0], min(BIAS_CAP[1], bias)), 3)
+        fb = fam_bias.get(RODZINY_RYNKOW.get(mk, ""))
+        n, raw = len(grp), _bias_surowy(grp)
+        if fb is not None:
+            g = fb + (n / (n + min_n)) * (raw - fb)
+        elif n >= min_n:
+            g = raw
+        else:
+            continue  # za mało danych i brak rozliczonej rodziny
+        bins = []
+        for lo, hi in BIAS_PRZEDZIALY:
+            bgrp = [r for r in grp if lo <= r["p_model"] < hi]
+            bb = g
+            if len(bgrp) >= MIN_N_PRZEDZIAL:
+                k = len(bgrp) / (len(bgrp) + MIN_N_PRZEDZIAL)
+                bb = g + k * (_bias_surowy(bgrp) - g)
+            bins.append([lo, hi, _cap_bias(bb)])
+        out[mk] = {"global": _cap_bias(g), "bins": bins}
     return out
 
 
-def market_bias() -> dict[str, float]:
+def market_bias() -> dict[str, dict]:
     """Korekty kalibracyjne z logu w Supabase (puste, gdy brak danych/env)."""
     log = _migruj_log(supa.get_key("typy_log") or {})
-    return compute_bias(log)
+    return compute_bias_full(log)
 
 
 def _kupon_do_logu(
