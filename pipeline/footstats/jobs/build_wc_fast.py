@@ -934,6 +934,21 @@ def main():
             continue
         per_mecz_rynek.add((b["mecz_id"], b["rynek_kod"]))
         do_emisji.append(b)
+    # WYŻSZE LINIE: ranking po samej szansie prawie zawsze wygrywa linia 0,5
+    # — a w puli bywają perełki typu "strzały 1,5+" albo "odbiory 2,5+"
+    # (kurs wyraźnie wyższy przy wciąż solidnej szansie). Per (mecz, rynek)
+    # dokładamy najlepszego kandydata z linią >= 1,5 po jakości p×kurs.
+    wyzsze: dict[tuple[int, str], dict] = {}
+    for b in legi_pool:
+        if b["linia"] < 1.5 or b["p_model"] < 0.52:
+            continue
+        kw = (b["mecz_id"], b["rynek_kod"])
+        w = wyzsze.get(kw)
+        if w is None or b["p_model"] * b["kurs"] > w["p_model"] * w["kurs"]:
+            wyzsze[kw] = b
+    for b in wyzsze.values():
+        b["wyzsza_linia"] = True
+        do_emisji.append(b)
     for b in perelki_kandydaci:
         if perelki_per_mecz.get(b["mecz_id"], 0) >= 2:
             continue
@@ -955,6 +970,7 @@ def main():
             "rynek_kod": b["rynek_kod"], "rynek": b["rynek"],
             "linia": b["linia"], "strona": b["strona"],
             "pewniak": True,
+            "wyzsza_linia": bool(b.get("wyzsza_linia")),
             "kurs": b["kurs"], "bukmacher": b["bukmacher"],
             "p_model": b["p_model"], "p_rynku": None,
             "fair_kurs": round(1.0 / max(b["p_model"], 1e-6), 2),

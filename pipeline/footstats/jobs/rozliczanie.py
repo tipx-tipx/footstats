@@ -49,7 +49,35 @@ TERMIN_BRAK_DANYCH_S = 48 * 3600
 
 
 def _klucz(b: dict) -> str:
-    return f"{b['mecz_id']}:{b['podmiot_id']}:{b['rynek_kod']}:{b['linia']}:{b['strona']}"
+    # klucz po ZNORMALIZOWANYM NAZWISKU, nie player_id: syntetyczne id
+    # (bank/365) może się różnić między źródłami, a w erze randomizowanego
+    # hash() zmieniało się co cykl i dublowało typy w logu (do 25 kopii)
+    podmiot = rotowire._norm(str(b["podmiot"]))
+    return f"{b['mecz_id']}:{podmiot}:{b['rynek_kod']}:{b['linia']}:{b['strona']}"
+
+
+_RANGA_WYNIKU = {"wygrany": 2, "przegrany": 2, "zwrot": 1, None: 0}
+
+
+def _migruj_log(log: dict) -> dict:
+    """Przeklucz stary log (klucze z player_id) na klucze po nazwisku,
+    scalając duplikaty: kurs/p_model z PIERWSZEJ publikacji (zamrożone),
+    wynik z któregokolwiek rozliczonego duplikatu."""
+    nowy: dict = {}
+    for r in log.values():
+        k = _klucz(r)
+        a = nowy.get(k)
+        if a is None:
+            nowy[k] = r
+            continue
+        if r.get("opublikowano_ts", 0) < a.get("opublikowano_ts", 0):
+            a, r = r, a
+            nowy[k] = a
+        if _RANGA_WYNIKU.get(r.get("wynik"), 0) > _RANGA_WYNIKU.get(a.get("wynik"), 0):
+            for f in ("wynik", "faktyczna", "rozliczono_ts", "powod"):
+                if f in r:
+                    a[f] = r[f]
+    return nowy
 
 
 def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
@@ -159,7 +187,7 @@ def compute_bias(log: dict, min_n: int = MIN_N_KALIBRACJI) -> dict[str, float]:
 
 def market_bias() -> dict[str, float]:
     """Korekty kalibracyjne z logu w Supabase (puste, gdy brak danych/env)."""
-    log = supa.get_key("typy_log") or {}
+    log = _migruj_log(supa.get_key("typy_log") or {})
     return compute_bias(log)
 
 
@@ -229,13 +257,19 @@ def _rozlicz_kupony(log_kuponow: dict, typy_log: dict, now: int) -> list[dict]:
     """Wynik kuponu z wyników legów: przegrany od pierwszego pudła; wygrany,
     gdy wszystkie legi trafione (zwrot wyłącza lega z kursu, jak u buka)."""
     for rec in log_kuponow.values():
-        if rec.get("wynik"):
-            continue
         statusy = []
         for l in rec["legi"]:
-            tk = (f"{l['mecz_id']}:{l.get('podmiot_id', 0)}:"
+            tk = (f"{l['mecz_id']}:{rotowire._norm(str(l['podmiot']))}:"
                   f"{l.get('rynek_kod', '')}:{l['linia']}:{l['strona']}")
-            statusy.append((l, (typy_log.get(tk) or {}).get("wynik")))
+            s = (typy_log.get(tk) or {}).get("wynik")
+            # status lega zapisany w kuponie — podgląd kuponu w historii
+            # pokazuje, które legi siadły (także dla już rozliczonych)
+            l["wynik"] = s
+            statusy.append((l, s))
+        rec["legi_trafione"] = sum(1 for _, s in statusy if s == "wygrany")
+        rec["legi_rozliczone"] = sum(1 for _, s in statusy if s)
+        if rec.get("wynik"):
+            continue
         if any(s == "przegrany" for _, s in statusy):
             rec.update(wynik="przegrany", rozliczono_ts=now)
         elif all(s in ("wygrany", "zwrot") for _, s in statusy):
@@ -245,8 +279,6 @@ def _rozlicz_kupony(log_kuponow: dict, typy_log: dict, now: int) -> list[dict]:
                     kurs *= l["kurs"]
             rec.update(wynik="wygrany", kurs_rozliczony=round(kurs, 2),
                        rozliczono_ts=now)
-        rec["legi_trafione"] = sum(1 for _, s in statusy if s == "wygrany")
-        rec["legi_rozliczone"] = sum(1 for _, s in statusy if s)
     return sorted(
         log_kuponow.values(),
         key=lambda r: (-(r.get("opublikowano_ts") or 0)),
@@ -259,7 +291,7 @@ def rozlicz(
     niedostepni: set[int] | None = None,
 ) -> dict:
     """Dopisz nowe typy do logu, rozlicz zakończone, zwróć podsumowanie."""
-    log = supa.get_key("typy_log") or {}
+    log = _migruj_log(supa.get_key("typy_log") or {})
     _dopisz_nowe(log, value_bets)
     # legi kuponów też muszą być w logu (pewniaki spoza publikowanych typów)
     for k in kupony_list or []:

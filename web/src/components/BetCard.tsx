@@ -87,7 +87,14 @@ export function BetCard({
 
         <span className="flex items-center justify-end gap-2.5">
           <span className="flex flex-col items-end gap-1">
-            {bet.pewniak ? (
+            {bet.pewniak && bet.wyzsza_linia ? (
+              <span
+                className="font-data inline-flex items-center rounded-md bg-data-amber-wash px-2 py-0.5 text-xs font-semibold text-[#8a5613]"
+                title="Perełka: wyższa linia (1,5+) przy wciąż solidnej szansie — wyraźnie lepszy kurs niż na linii 0,5"
+              >
+                ✦ wyższa linia · {fmtProc(bet.p_model)}
+              </span>
+            ) : bet.pewniak ? (
               <span
                 className="font-data inline-flex items-center rounded-md bg-brand-wash px-2 py-0.5 text-xs font-semibold text-brand-deep"
                 title="Top typ meczu wg szansy modelu — bez wymogu matematycznej przewagi nad kursem"

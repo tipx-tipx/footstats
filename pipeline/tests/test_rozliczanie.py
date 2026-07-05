@@ -108,9 +108,9 @@ def test_rozliczenie_kuponu_z_legow():
     log = {}
     rozliczanie._kupon_do_logu(log, [_kupon()], now=1_000)
     typy_log = {
-        "1:11:shots:1.5:powyzej": {"wynik": "wygrany"},
-        "2:22:shots:1.5:powyzej": {"wynik": "zwrot"},
-        "3:33:shots:1.5:powyzej": {"wynik": "wygrany"},
+        "1:p11:shots:1.5:powyzej": {"wynik": "wygrany"},
+        "2:p22:shots:1.5:powyzej": {"wynik": "zwrot"},
+        "3:p33:shots:1.5:powyzej": {"wynik": "wygrany"},
     }
     hist = rozliczanie._rozlicz_kupony(log, typy_log, now=50_000)
     assert hist[0]["wynik"] == "wygrany"
@@ -120,7 +120,7 @@ def test_rozliczenie_kuponu_z_legow():
 def test_przegrany_od_pierwszego_pudla():
     log = {}
     rozliczanie._kupon_do_logu(log, [_kupon()], now=1_000)
-    typy_log = {"1:11:shots:1.5:powyzej": {"wynik": "przegrany"}}
+    typy_log = {"1:p11:shots:1.5:powyzej": {"wynik": "przegrany"}}
     hist = rozliczanie._rozlicz_kupony(log, typy_log, now=50_000)
     assert hist[0]["wynik"] == "przegrany"
 
@@ -131,3 +131,25 @@ def test_minuta_regularny_czas():
     assert scores365._minuta("45 + 1'") == 45
     assert scores365._minuta("104'") == 104  # dogrywka — odpada z agregatów
     assert scores365._minuta(None) is None
+
+
+def test_migracja_scala_duplikaty_po_nazwisku():
+    # era randomizowanego hash(): ten sam typ z innym player_id co cykl
+    log = {
+        "1:111:sot:0.5:powyzej": {
+            "mecz_id": 1, "podmiot": "Michael Olise", "rynek_kod": "sot",
+            "linia": 0.5, "strona": "powyzej", "kurs": 1.42,
+            "opublikowano_ts": 100, "wynik": None,
+        },
+        "1:222:sot:0.5:powyzej": {
+            "mecz_id": 1, "podmiot": "Michael Olise", "rynek_kod": "sot",
+            "linia": 0.5, "strona": "powyzej", "kurs": 1.38,
+            "opublikowano_ts": 200, "wynik": "przegrany", "faktyczna": 0.0,
+        },
+    }
+    nowy = rozliczanie._migruj_log(log)
+    assert len(nowy) == 1
+    r = nowy["1:michael olise:sot:0.5:powyzej"]
+    assert r["kurs"] == 1.42          # zamrozony z pierwszej publikacji
+    assert r["wynik"] == "przegrany"  # wynik z rozliczonego duplikatu
+    assert r["faktyczna"] == 0.0

@@ -61,6 +61,8 @@ export interface ValueBet {
   sugestia?: boolean;           // true = brak kursu, tylko podpowiedź modelu
   /** true = top typ meczu z pełnego skanu (wysoka szansa, bez wymogu value) */
   pewniak?: boolean;
+  /** true = perełka na wyższej linii (>= 1,5) przy wciąż solidnej szansie */
+  wyzsza_linia?: boolean;
 }
 
 export interface Mecz {
@@ -142,6 +144,8 @@ export interface KuponLeg {
   mecz: string;
   mecz_id: number;
   kickoff_ts: number;
+  /** wynik lega z logu rozliczeń (null/brak = jeszcze w grze) */
+  wynik?: "wygrany" | "przegrany" | "zwrot" | null;
 }
 
 /** Kupon (AKO) budowany przez model pod docelowy kurs (x5/x10/x15/x20/x25). */
