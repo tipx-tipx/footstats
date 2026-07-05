@@ -148,6 +148,13 @@ export interface KuponLeg {
   wynik?: "wygrany" | "przegrany" | "zwrot" | null;
 }
 
+/** Propozycja wymiany najsłabszego lega (rentgen kuponu — doradcza). */
+export interface KuponAlternatywa extends KuponLeg {
+  zamiast_idx: number;
+  kurs_po: number;
+  p_po: number;
+}
+
 /** Kupon (AKO) budowany przez model pod docelowy kurs (x5/x10/x15/x20/x25). */
 export interface Kupon {
   cel: number;
@@ -162,6 +169,9 @@ export interface Kupon {
   fair_kurs: number;
   ev_pct: number;
   legi: KuponLeg[];
+  /** indeks lega o najniższej szansie (najsłabsze ogniwo) */
+  najslabszy_idx?: number;
+  alternatywa?: KuponAlternatywa;
 }
 
 /** Rozliczony (lub czekający) typ z automatycznego logu. */
@@ -178,6 +188,10 @@ export interface TypRozliczony {
   sugestia: boolean;
   wynik: "wygrany" | "przegrany" | "zwrot" | null;
   faktyczna: number | null;
+  /** ostatni kurs przed startem meczu (linia zamknięcia rynku) */
+  kurs_zamkniecia?: number | null;
+  /** CLV: o ile % kurs wzięty był lepszy od zamknięcia (dodatnie = bijemy rynek) */
+  clv_pct?: number | null;
 }
 
 /** Kupon w historii: zamrożony przy publikacji, rozliczany z legów. */
@@ -202,6 +216,9 @@ export interface TypyWyniki {
     trafione: number;
     roi_flat: number;
     okazje_rozliczone: number;
+    /** średnie CLV rozliczonych typów (dodatnie = bierzemy kursy lepsze niż zamknięcie) */
+    clv_sr_pct?: number | null;
+    clv_n?: number;
   } | null;
   po_rynku: {
     rynek_kod: string;

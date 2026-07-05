@@ -173,3 +173,68 @@ def test_select_bias_wybiera_przedzial():
     assert _select_bias(mb, 0.60) == 0.97
     assert _select_bias(mb, 0.30) == 1.05
     assert _select_bias(0.93, 0.80) == 0.93         # stary format: skalar
+
+
+# ---- CLV: snapshot kursu zamkniecia ----
+
+def test_clv_snapshot_przed_meczem():
+    log = {"1:kane:sot:0.5:powyzej": {
+        "mecz_id": 1, "podmiot": "Kane", "rynek_kod": "sot", "linia": 0.5,
+        "strona": "powyzej", "kurs": 1.85, "kickoff_ts": 10_000, "wynik": None,
+    }}
+    bets = [{"mecz_id": 1, "podmiot": "Kane", "rynek_kod": "sot",
+             "linia": 0.5, "strona": "powyzej", "kurs": 1.62}]
+    rozliczanie._snapshot_zamkniecia(log, bets, [], now=5_000)
+    assert log["1:kane:sot:0.5:powyzej"]["kurs_zamkniecia"] == 1.62
+    # po kickoffie snapshot juz sie nie zmienia
+    bets[0]["kurs"] = 1.40
+    rozliczanie._snapshot_zamkniecia(log, bets, [], now=11_000)
+    assert log["1:kane:sot:0.5:powyzej"]["kurs_zamkniecia"] == 1.62
+
+
+def test_clv_snapshot_nie_dotyka_rozliczonych():
+    log = {"1:kane:sot:0.5:powyzej": {
+        "mecz_id": 1, "podmiot": "Kane", "rynek_kod": "sot", "linia": 0.5,
+        "strona": "powyzej", "kurs": 1.85, "kickoff_ts": 10_000,
+        "wynik": "wygrany",
+    }}
+    bets = [{"mecz_id": 1, "podmiot": "Kane", "rynek_kod": "sot",
+             "linia": 0.5, "strona": "powyzej", "kurs": 1.62}]
+    rozliczanie._snapshot_zamkniecia(log, bets, [], now=5_000)
+    assert "kurs_zamkniecia" not in log["1:kane:sot:0.5:powyzej"]
+
+
+# ---- rentgen kuponu: najslabsze ogniwo + alternatywa ----
+
+def _leg_pool(pid, mecz_id, p, kurs, kickoff=50_000):
+    return {"id": 0, "podmiot_id": pid, "podmiot": f"P{pid}",
+            "rynek_kod": "shots", "rynek": "Strzaly", "linia": 0.5,
+            "strona": "powyzej", "kurs": kurs, "bukmacher": "Superbet",
+            "p_model": p, "pewnosc": "wysoka", "mecz": f"M{mecz_id}",
+            "mecz_id": mecz_id, "kickoff_ts": kickoff}
+
+
+def test_rentgen_wskazuje_najslabszy_i_alternatywe():
+    from footstats.model import kupony as kmod
+    legi = [_leg_pool(1, 1, 0.80, 1.5), _leg_pool(2, 2, 0.55, 2.0),
+            _leg_pool(3, 3, 0.75, 1.6)]
+    kupon = {"kurs_laczny": round(1.5 * 2.0 * 1.6, 2), "p_model": 0.33,
+             "legi": [kmod._leg_dict(b) for b in legi]}
+    # pula: lepszy kandydat z nowego meczu o podobnym kursie
+    pool = legi + [_leg_pool(9, 9, 0.72, 1.9)]
+    kmod._rentgen(kupon, pool, 4.0, 6.0)
+    assert kupon["najslabszy_idx"] == 1
+    alt = kupon["alternatywa"]
+    assert alt["podmiot_id"] == 9 and alt["zamiast_idx"] == 1
+    assert alt["p_po"] > kupon["p_model"]
+    assert 4.0 * 0.8 <= alt["kurs_po"] <= 6.0
+
+
+def test_rentgen_bez_lepszego_kandydata():
+    from footstats.model import kupony as kmod
+    legi = [_leg_pool(1, 1, 0.80, 1.5), _leg_pool(2, 2, 0.55, 2.0)]
+    kupon = {"kurs_laczny": 3.0, "p_model": 0.44,
+             "legi": [kmod._leg_dict(b) for b in legi]}
+    kmod._rentgen(kupon, legi, 2.5, 4.0)
+    assert kupon["najslabszy_idx"] == 1
+    assert "alternatywa" not in kupon

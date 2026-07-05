@@ -72,7 +72,15 @@ export default async function KuponyPage() {
                 <p className="mt-1 max-w-3xl text-sm text-muted">{h.opis}</p>
               </Reveal>
               <div className="mt-4 grid gap-4 lg:grid-cols-2">
-                {grupa.map((k, i) => (
+                {grupa.map((k, i) => {
+                  // najsłabsze ogniwo: z pipeline'u, awaryjnie liczone z legów
+                  const weakIdx =
+                    k.najslabszy_idx ??
+                    k.legi.reduce(
+                      (mi, l, ix, arr) => (l.p_model < arr[mi].p_model ? ix : mi),
+                      0,
+                    );
+                  return (
             <Reveal key={`${k.horyzont}-${k.cel}`} delay={Math.min(i * 0.06, 0.25)}>
               <article className="flex h-full flex-col rounded-2xl border border-hairline bg-card shadow-(--shadow-card) transition-shadow hover:shadow-(--shadow-card-hover)">
                 <header className="flex flex-col gap-3 border-b border-hairline px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
@@ -137,27 +145,87 @@ export default async function KuponyPage() {
                             </span>
                           </p>
                         )}
-                        <div className="flex items-center gap-3 px-5 py-2.5">
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-semibold">
-                              {l.podmiot}
-                              <span className="ml-1.5 font-normal text-muted">
-                                {l.rynek.toLowerCase()} {STRONA_LABEL[l.strona]}{" "}
-                                {fmtLinia(l.linia)}
+                        <div className="px-4 py-2.5 sm:px-5">
+                          <div className="flex items-center gap-3">
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-semibold">
+                                {l.podmiot}
+                                <span className="ml-1.5 font-normal text-muted">
+                                  {l.rynek.toLowerCase()} {STRONA_LABEL[l.strona]}{" "}
+                                  {fmtLinia(l.linia)}
+                                </span>
+                              </p>
+                            </div>
+                            {li === weakIdx && k.legi.length > 1 && (
+                              <span
+                                className="shrink-0 rounded-md bg-data-amber-wash px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[#8a5613]"
+                                title="Leg o najniższej szansie — to on najmocniej ciągnie szansę kuponu w dół"
+                              >
+                                ⚠ najsłabsze
                               </span>
-                            </p>
+                            )}
+                            <span className="font-data shrink-0 text-xs text-muted">
+                              {fmtProc(l.p_model)}
+                            </span>
+                            <span className="font-data shrink-0 rounded-md bg-paper px-2 py-0.5 text-sm font-semibold">
+                              {fmtKurs(l.kurs)}
+                            </span>
                           </div>
-                          <span className="font-data text-xs text-muted">
-                            {fmtProc(l.p_model)}
-                          </span>
-                          <span className="font-data rounded-md bg-paper px-2 py-0.5 text-sm font-semibold">
-                            {fmtKurs(l.kurs)}
-                          </span>
+                          {/* pasek szansy lega — rentgen kuponu na jeden rzut oka */}
+                          <div
+                            className="mt-1.5 h-[3px] overflow-hidden rounded-full bg-paper"
+                            aria-hidden
+                          >
+                            <div
+                              className={`h-full rounded-full ${
+                                l.p_model >= 0.65
+                                  ? "bg-data-green/80"
+                                  : l.p_model >= 0.5
+                                    ? "bg-data-amber/80"
+                                    : "bg-data-red/70"
+                              }`}
+                              style={{ width: `${Math.round(l.p_model * 100)}%` }}
+                            />
+                          </div>
                         </div>
                       </div>
                     );
                   })}
                 </div>
+
+                {/* rentgen: propozycja wymiany najsłabszego ogniwa (doradcza) */}
+                {k.alternatywa && (
+                  <div className="border-t border-dashed border-brand/30 bg-brand-wash/40 px-4 py-3.5 sm:px-5">
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-brand">
+                      ✦ mocniejsza wersja tego kuponu
+                    </p>
+                    <p className="mt-1.5 text-sm leading-relaxed">
+                      <span className="text-muted line-through decoration-data-red/50">
+                        {k.legi[k.alternatywa.zamiast_idx]?.podmiot}{" "}
+                        {k.legi[k.alternatywa.zamiast_idx]?.rynek.toLowerCase()}{" "}
+                        {fmtLinia(k.legi[k.alternatywa.zamiast_idx]?.linia ?? 0)}
+                      </span>{" "}
+                      →{" "}
+                      <strong>{k.alternatywa.podmiot}</strong>{" "}
+                      <span className="text-muted">
+                        {k.alternatywa.rynek.toLowerCase()}{" "}
+                        {STRONA_LABEL[k.alternatywa.strona]}{" "}
+                        {fmtLinia(k.alternatywa.linia)}
+                      </span>{" "}
+                      <span className="font-data font-semibold">
+                        @{fmtKurs(k.alternatywa.kurs)}
+                      </span>
+                    </p>
+                    <p className="font-data mt-1 text-xs text-muted">
+                      szansa {fmtProc(k.p_model)} →{" "}
+                      <strong className="text-brand-deep">
+                        {fmtProc(k.alternatywa.p_po)}
+                      </strong>{" "}
+                      · kurs {fmtKurs(k.kurs_laczny)} →{" "}
+                      {fmtKurs(k.alternatywa.kurs_po)}
+                    </p>
+                  </div>
+                )}
                 <footer className="border-t border-hairline px-5 py-3 text-xs text-faint">
                   uczciwy kurs kuponu: {fmtKurs(k.fair_kurs)} · {k.legi.length}{" "}
                   {k.legi.length === 1 ? "typ" : k.legi.length < 5 ? "typy" : "typów"}{" "}
@@ -165,7 +233,8 @@ export default async function KuponyPage() {
                 </footer>
               </article>
             </Reveal>
-                ))}
+                  );
+                })}
               </div>
             </section>
           );

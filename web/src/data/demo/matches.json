@@ -7,16 +7,17 @@
   "kickoff_ts": 1783364400,
   "gospodarz": "Portugal",
   "gosc": "Spain",
-  "sedzia": null,
-  "sedzia_mnoznik_fauli": 1.0,
+  "sedzia": "Anthony Taylor",
+  "sedzia_mnoznik_fauli": 0.944,
   "okazje": [
+   5,
+   6,
+   7,
    8,
    9,
-   10,
-   11,
-   12,
-   32,
-   37
+   34,
+   39,
+   43
   ],
   "sklady_ogloszone": false
  },
@@ -28,13 +29,13 @@
   "kickoff_ts": 1783281600,
   "gospodarz": "Brazil",
   "gosc": "Norway",
-  "sedzia": null,
-  "sedzia_mnoznik_fauli": 1.0,
+  "sedzia": "Ismail Elfath",
+  "sedzia_mnoznik_fauli": 1.258,
   "okazje": [
-   27,
-   28,
-   29,
-   30
+   24,
+   25,
+   26,
+   27
   ],
   "sklady_ogloszone": false
  },
@@ -46,14 +47,13 @@
   "kickoff_ts": 1783296000,
   "gospodarz": "Mexico",
   "gosc": "England",
-  "sedzia": null,
-  "sedzia_mnoznik_fauli": 1.0,
+  "sedzia": "Alireza Faghani",
+  "sedzia_mnoznik_fauli": 0.809,
   "okazje": [
-   13,
-   14,
-   33,
+   10,
+   11,
    36,
-   40,
+   38,
    41
   ],
   "sklady_ogloszone": false
@@ -69,15 +69,15 @@
   "sedzia": null,
   "sedzia_mnoznik_fauli": 1.0,
   "okazje": [
+   12,
+   13,
+   14,
    15,
-   16,
-   17,
-   18,
-   26,
-   31,
-   34,
-   38,
-   39
+   23,
+   33,
+   37,
+   40,
+   42
   ],
   "sklady_ogloszone": false
  },
@@ -102,8 +102,8 @@
   "kickoff_ts": 1783382400,
   "gospodarz": "USA",
   "gosc": "Belgium",
-  "sedzia": null,
-  "sedzia_mnoznik_fauli": 1.0,
+  "sedzia": "Adham Makhadmeh",
+  "sedzia_mnoznik_fauli": 0.876,
   "okazje": [
    35
   ],
@@ -120,13 +120,18 @@
   "sedzia": null,
   "sedzia_mnoznik_fauli": 1.0,
   "okazje": [
+   16,
+   17,
+   18,
    19,
    20,
    21,
    22,
-   23,
-   24,
-   25
+   28,
+   29,
+   30,
+   31,
+   32
   ],
   "sklady_ogloszone": false
  }

@@ -98,10 +98,29 @@ export default async function ModelPage() {
                         ? "text-data-red"
                         : "",
                 },
+                ...(pods.clv_sr_pct != null && (pods.clv_n ?? 0) > 0
+                  ? [
+                      {
+                        label: `śr. CLV (${pods.clv_n} typów) ⓘ`,
+                        value: `${pods.clv_sr_pct >= 0 ? "+" : ""}${pods.clv_sr_pct
+                          .toFixed(1)
+                          .replace(".", ",")}%`,
+                        tone:
+                          pods.clv_sr_pct > 0
+                            ? "text-data-green"
+                            : pods.clv_sr_pct < 0
+                              ? "text-data-red"
+                              : "",
+                        title:
+                          "Closing Line Value: o ile % kurs wzięty przy publikacji był lepszy od kursu tuż przed meczem. Systematycznie dodatnie CLV = bijemy rynek (najszybszy miernik jakości typów).",
+                      },
+                    ]
+                  : []),
               ].map((s) => (
                 <div
                   key={s.label}
                   className="rounded-xl border border-hairline bg-card px-3.5 py-3 shadow-(--shadow-card)"
+                  title={"title" in s ? (s.title as string) : undefined}
                 >
                   <dd
                     className={`font-data text-xl font-semibold ${"tone" in s ? s.tone : ""}`}
@@ -172,6 +191,21 @@ export default async function ModelPage() {
                     <span className="font-data shrink-0 text-xs text-muted">
                       było: {t.faktyczna != null ? t.faktyczna : "—"}
                     </span>
+                    {t.clv_pct != null && (
+                      <span
+                        className={`font-data hidden shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-semibold sm:inline-flex ${
+                          t.clv_pct > 0
+                            ? "bg-data-green-wash text-brand-deep"
+                            : t.clv_pct < 0
+                              ? "bg-data-red-wash text-data-red"
+                              : "bg-paper text-muted"
+                        }`}
+                        title={`Wzięty @${t.kurs?.toFixed(2).replace(".", ",")}, zamknięcie @${t.kurs_zamkniecia?.toFixed(2).replace(".", ",")} — dodatnie CLV = kurs lepszy niż wycena rynku na koniec`}
+                      >
+                        CLV {t.clv_pct > 0 ? "+" : ""}
+                        {t.clv_pct.toFixed(0)}%
+                      </span>
+                    )}
                     <span
                       className={`shrink-0 text-xs font-semibold ${
                         t.wynik === "wygrany"

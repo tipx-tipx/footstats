@@ -253,6 +253,29 @@ def market_bias() -> dict[str, dict]:
     return compute_bias_full(log)
 
 
+def _snapshot_zamkniecia(
+    log: dict, value_bets: list[dict], kupony_list: list[dict], now: int
+) -> None:
+    """CLV: kurs zamknięcia = ostatni kurs widziany PRZED startem meczu.
+
+    Cykl chodzi co ~30 min, więc nadpisujemy snapshot do kickoffu — po meczu
+    zostaje ostatnia wycena rynku. Porównanie "kurs wzięty przy publikacji vs
+    zamknięcie" to najszybszy miernik, czy typy biją rynek (dodatnie CLV
+    wygrywa długoterminowo, nawet gdy krótka seria jest na minusie).
+    """
+    kursy_teraz: dict[str, float] = {}
+    for b in value_bets:
+        if b.get("kurs"):
+            kursy_teraz[_klucz(b)] = float(b["kurs"])
+    for k in kupony_list:
+        for l in k["legi"]:
+            if l.get("kurs"):
+                kursy_teraz.setdefault(_klucz(l), float(l["kurs"]))
+    for kk, rec in log.items():
+        if not rec.get("wynik") and rec["kickoff_ts"] > now and kk in kursy_teraz:
+            rec["kurs_zamkniecia"] = kursy_teraz[kk]
+
+
 def _kupon_do_logu(
     log_kuponow: dict,
     kupony_list: list[dict],
@@ -371,6 +394,8 @@ def rozlicz(
     now = int(time.time())
     cache_365: dict = {}
 
+    _snapshot_zamkniecia(log, value_bets, kupony_list or [], now)
+
     for rec in log.values():
         if rec.get("wynik") or now - rec["kickoff_ts"] < MECZ_KONIEC_PO_S:
             continue
@@ -439,6 +464,10 @@ def rozlicz(
             wynik="wygrany" if trafiony else "przegrany",
             faktyczna=wartosc, rozliczono_ts=now,
         )
+        if rec.get("kurs") and rec.get("kurs_zamkniecia"):
+            rec["clv_pct"] = round(
+                (rec["kurs"] / rec["kurs_zamkniecia"] - 1.0) * 100.0, 1
+            )
 
     supa.put_key("typy_log", log)
 
@@ -472,6 +501,7 @@ def rozlicz(
         settled + [r for r in log.values() if r.get("wynik") == "zwrot"],
         key=lambda r: -(r.get("rozliczono_ts") or 0),
     )[:60]
+    z_clv = [r for r in settled if r.get("clv_pct") is not None]
     return {
         "podsumowanie": {
             "opublikowane": len(log),
@@ -479,6 +509,12 @@ def rozlicz(
             "trafione": sum(1 for r in settled if r["wynik"] == "wygrany"),
             "roi_flat": round(roi, 2),
             "okazje_rozliczone": len(okazje),
+            # CLV: dodatnie = braliśmy kursy lepsze niż zamknięcie rynku
+            "clv_sr_pct": (
+                round(sum(r["clv_pct"] for r in z_clv) / len(z_clv), 1)
+                if z_clv else None
+            ),
+            "clv_n": len(z_clv),
         },
         "po_rynku": po_rynku,
         "ostatnie": ostatnie,

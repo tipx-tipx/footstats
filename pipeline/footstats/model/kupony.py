@@ -143,6 +143,55 @@ def _zloz_pewniaki(pool: list[dict], cmin: float, cmax: float) -> dict | None:
     }
 
 
+def _rentgen(
+    kupon: dict,
+    pool: list[dict],
+    cmin: float,
+    cmax: float,
+    max_na_mecz: int = MAX_NA_MECZ,
+) -> None:
+    """Rentgen kuponu (wzorzec HOF Parlay Optimizer): najsłabsze ogniwo
+    + propozycja zamiany z puli, która podnosi szansę kuponu.
+
+    Czysto doradcze — kupon pozostaje zamrożony; UI pokazuje "co by było,
+    gdyby wymienić najsłabszego lega". Kurs po zamianie musi zostać
+    w charakterze przedziału (>= 80% dolnej granicy, <= górna).
+    """
+    legi = kupon["legi"]
+    idx = min(range(len(legi)), key=lambda i: legi[i]["p_model"])
+    kupon["najslabszy_idx"] = idx
+    slaby = legi[idx]
+    kurs_bez = kupon["kurs_laczny"] / slaby["kurs"]
+    p_bez = kupon["p_model"] / max(slaby["p_model"], 1e-9)
+    uzyci = {l["podmiot_id"] for i, l in enumerate(legi) if i != idx}
+    na_mecz: dict[int, int] = {}
+    for i, l in enumerate(legi):
+        if i != idx:
+            na_mecz[l["mecz_id"]] = na_mecz.get(l["mecz_id"], 0) + 1
+    best = None
+    for b in pool:
+        if b["podmiot_id"] in uzyci or b["p_model"] <= slaby["p_model"]:
+            continue
+        if na_mecz.get(b["mecz_id"], 0) >= max_na_mecz:
+            continue
+        kurs_po = kurs_bez * b["kurs"]
+        if not (cmin * 0.8 <= kurs_po <= cmax):
+            continue
+        if best is None or b["p_model"] > best["p_model"]:
+            best = b
+    if best is None:
+        return
+    p_po = p_bez * best["p_model"]
+    if p_po <= kupon["p_model"] + 1e-9:
+        return
+    kupon["alternatywa"] = {
+        **_leg_dict(best),
+        "zamiast_idx": idx,
+        "kurs_po": round(kurs_bez * best["kurs"], 2),
+        "p_po": round(p_po, 4),
+    }
+
+
 def build_kupony(
     bets: list[dict], pool: list[dict] | None = None, now_ts: int | None = None
 ) -> list[dict]:
@@ -163,10 +212,13 @@ def build_kupony(
     tylko_dzis_ok = len({b["mecz_id"] for b in dzis20}) >= 2
     for cmin, cmax in PRZEDZIALY_DZIENNE:
         k = _zloz_pewniaki(dzis20, cmin, cmax) if tylko_dzis_ok else None
+        pula_k = dzis20
         if k is None:
             k = _zloz_pewniaki(dzis44, cmin, cmax)
+            pula_k = dzis44
         if k is not None:
             k["horyzont"] = "dzienny"
+            _rentgen(k, pula_k, cmin, cmax)
             out.append(k)
 
     dlugo = [b for b in pool if b["kickoff_ts"] <= now + OKNO_DLUGO_S]
@@ -174,6 +226,7 @@ def build_kupony(
         k = _zloz_pewniaki(dlugo, cmin, cmax)
         if k is not None:
             k["horyzont"] = "dlugoterminowy"
+            _rentgen(k, dlugo, cmin, cmax)
             out.append(k)
 
     cands = _kandydaci(bets)
@@ -183,5 +236,7 @@ def build_kupony(
             k["styl"] = "value"
             k["horyzont"] = "value"
             k["cel_label"] = f"~{int(cel)}"
+            # value: max 1 leg z meczu — alternatywa musi to respektować
+            _rentgen(k, cands, cel * 0.85, cel * 1.6, max_na_mecz=1)
             out.append(k)
     return out

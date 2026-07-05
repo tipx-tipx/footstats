@@ -17,7 +17,58 @@ import {
   PEWNOSC_LABEL,
   STRONA_LABEL,
 } from "@/lib/format";
-import type { ValueBet, Zawodnik } from "@/lib/types";
+import type { FormaRynku, ValueBet, Zawodnik } from "@/lib/types";
+
+/** Hit-rate linii w oknach czasowych (mecze z minutami, od najnowszych). */
+function oknaFormy(forma: FormaRynku, linia: number) {
+  const zagrane = forma.ostatnie
+    .map((v, i) => ({ v, min: forma.minuty[i] ?? 0 }))
+    .filter((x) => x.min > 0);
+  const okno = (n: number) => {
+    const w = zagrane.slice(0, n);
+    return { traf: w.filter((x) => x.v > linia).length, n: w.length };
+  };
+  return {
+    zagrane: zagrane.length,
+    l5: okno(5),
+    l10: okno(10),
+    all: okno(zagrane.length),
+  };
+}
+
+/**
+ * Sygnalizacja świetlna (wzorzec Outlier): triage wzrokiem bez czytania.
+ * zielony = historia (L10) i model zgodnie wysoko; czerwony = historia
+ * przeczy linii; bursztyn = środek; null = za mała próba (bez paska).
+ */
+function swiatloTypu(
+  forma: FormaRynku | undefined,
+  linia: number,
+  pModel: number,
+): "green" | "amber" | "red" | null {
+  if (!forma) return null;
+  const o = oknaFormy(forma, linia);
+  if (o.zagrane < 5) return null;
+  const hr = o.l10.traf / Math.max(o.l10.n, 1);
+  if (hr >= 0.65 && pModel >= 0.55) return "green";
+  if (hr < 0.45) return "red";
+  return "amber";
+}
+
+const SWIATLO_STYL = {
+  green: {
+    pasek: "bg-data-green",
+    opis: "Zielone światło: linia przebijana w ≥65% ostatnich 10 meczów, a model daje wysoką szansę",
+  },
+  amber: {
+    pasek: "bg-data-amber",
+    opis: "Żółte światło: historia i model nie mówią jednym głosem — przeczytaj szczegóły",
+  },
+  red: {
+    pasek: "bg-data-red",
+    opis: "Czerwone światło: linia przebita w mniej niż 45% ostatnich 10 meczów — historia przeczy typowi",
+  },
+} as const;
 
 /** memo: przy zmianie filtrów listy nie przerenderowują się wszystkie karty */
 export const BetCard = memo(function BetCard({
@@ -39,12 +90,21 @@ export const BetCard = memo(function BetCard({
   }, [bet.id]);
 
   const forma = zawodnik?.forma[bet.rynek_kod];
+  const swiatlo = swiatloTypu(forma, bet.linia, bet.p_model);
 
   return (
     <motion.article
       layout={!reduced}
-      className="overflow-hidden rounded-(--radius-card) border border-hairline bg-card shadow-(--shadow-card) transition-shadow hover:shadow-(--shadow-card-hover)"
+      className="relative overflow-hidden rounded-(--radius-card) border border-hairline bg-card shadow-(--shadow-card) transition-shadow hover:shadow-(--shadow-card-hover)"
     >
+      {/* sygnalizacja świetlna — triage wzrokiem przy przewijaniu listy */}
+      {swiatlo && (
+        <span
+          aria-hidden
+          title={SWIATLO_STYL[swiatlo].opis}
+          className={`absolute inset-y-0 left-0 z-10 w-1 ${SWIATLO_STYL[swiatlo].pasek}`}
+        />
+      )}
       {/* wiersz główny */}
       <button
         onClick={() => setOpen((o) => !o)}
@@ -328,29 +388,46 @@ export const BetCard = memo(function BetCard({
                   </div>
                 )}
                 {forma && (() => {
-                  const zagrane = forma.ostatnie.filter(
-                    (_, i) => (forma.minuty[i] ?? 0) > 0,
-                  );
-                  const trafione = forma.ostatnie.filter(
-                    (v, i) => (forma.minuty[i] ?? 0) > 0 && v > bet.linia,
-                  ).length;
-                  const dobraSeria = zagrane.length > 0 && trafione / zagrane.length >= 0.6;
+                  const okna = oknaFormy(forma, bet.linia);
+                  const zagrane = okna.zagrane;
+                  // okna jak w Props.cash/StatsHub: forma TERAZ vs średnia —
+                  // L5 wykrywa trend, którego jedna suma nie pokaże
+                  const chipy = [
+                    ...(zagrane >= 3 ? [{ label: "L5", ...okna.l5 }] : []),
+                    ...(zagrane >= 7 ? [{ label: "L10", ...okna.l10 }] : []),
+                    { label: "razem", ...okna.all },
+                  ];
                   return (
                     <div className="rounded-xl border border-hairline bg-card p-4">
-                      <div className="mb-3 flex items-center justify-between gap-2">
+                      <div className="mb-3 flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
                         <h4 className="text-xs font-semibold uppercase tracking-wide text-faint">
                           Ostatnie mecze — {bet.rynek.toLowerCase()}
                         </h4>
-                        {zagrane.length > 0 && (
+                        {zagrane > 0 && (
                           <span
-                            className={`font-data shrink-0 rounded-md px-2 py-0.5 text-xs font-semibold ${
-                              dobraSeria
-                                ? "bg-data-green-wash text-brand-deep"
-                                : "bg-paper text-muted"
-                            }`}
-                            title={`Linia ${fmtLinia(bet.linia)} przebita w ${trafione} z ${zagrane.length} ostatnich meczów, w których grał`}
+                            className="flex items-center gap-1"
+                            title={`Jak często linia ${fmtLinia(bet.linia)} była przebijana: w ostatnich 5 / 10 / wszystkich meczach z minutami`}
                           >
-                            linia przebita: {trafione}/{zagrane.length}
+                            {chipy.map((c) => {
+                              const r = c.n > 0 ? c.traf / c.n : 0;
+                              return (
+                                <span
+                                  key={c.label}
+                                  className={`font-data inline-flex items-baseline gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-semibold ${
+                                    c.n >= 3 && r >= 0.6
+                                      ? "bg-data-green-wash text-brand-deep"
+                                      : c.n >= 3 && r < 0.45
+                                        ? "bg-data-red-wash text-data-red"
+                                        : "bg-paper text-muted"
+                                  }`}
+                                >
+                                  <span className="text-[9px] font-medium uppercase opacity-70">
+                                    {c.label}
+                                  </span>
+                                  {c.traf}/{c.n}
+                                </span>
+                              );
+                            })}
                           </span>
                         )}
                       </div>
@@ -369,8 +446,8 @@ export const BetCard = memo(function BetCard({
                         </span>{" "}
                         na 90 minut{" "}
                         <span title="Liczba ostatnich meczów z minutami, z których policzona jest średnia (klub + reprezentacja)">
-                          (próba: {zagrane.length}{" "}
-                          {zagrane.length === 1 ? "mecz" : zagrane.length < 5 ? "mecze" : "meczów"})
+                          (próba: {zagrane}{" "}
+                          {zagrane === 1 ? "mecz" : zagrane < 5 ? "mecze" : "meczów"})
                         </span>{" "}
                         · przewidywane minuty:{" "}
                         <span className="font-data text-ink-soft">

@@ -31,7 +31,7 @@ from dataclasses import replace as dc_replace
 
 from .. import supa
 from ..engine import MatchContext, PlayerHistory, RARE_MARKETS, score_player_market
-from ..model import betting, counts, kupony, matchup_lite, tempo
+from ..model import betting, context, counts, kupony, matchup_lite, tempo
 from ..sources import eloratings, rotowire, scores365, statshub, superbet
 from . import rozliczanie
 from .build_demo import MARKET_NAMES_PL, WEB_DATA_DIR, line_for_lambda
@@ -157,6 +157,80 @@ def group_prior_from_context(trend: statshub.StatshubTrend) -> counts.GroupPrior
     return counts.GroupPrior(mean_per90=max(base, 0.15), pseudo_matches=5.0)
 
 
+def profil_sedziow(
+    events: list[dict], team_name: dict[int, str]
+) -> dict[int, dict]:
+    """Profil sędziego per nadchodzący mecz: {mid: {sedzia, mnoznik, n}}.
+
+    Źródło: 365Scores — officials (obsada znana 1-2 dni przed meczem) +
+    suma fauli wszystkich zawodników z rozegranych meczów MŚ tego sędziego.
+    Mnożnik = średnia fauli sędziego / średnia turnieju; mecze z dogrywką
+    pomijane (staty obejmują 120 min i zawyżałyby profil). Wyniki per mecz
+    cache'owane w Supabase (sedziowie_cache) — kolejne cykle nie odpytują
+    365 o rozegrane mecze ponownie.
+    """
+    cache = supa.get_key("sedziowie_cache") or {}
+    zmieniony = False
+    for g in scores365.finished_games_by_competition():
+        gid = str(g["id"])
+        if gid in cache:
+            continue
+        rec = {"sedzia": scores365.game_referee(g["id"]), "faule": None}
+        try:
+            if not scores365.after_extra_time(g["id"]):
+                staty = scores365.game_player_match_stats(g["id"])
+                faule = sum(
+                    float(s.get("fouls_committed") or 0) for s in staty.values()
+                )
+                rec["faule"] = round(faule, 1) if faule > 0 else None
+        except Exception:
+            pass
+        cache[gid] = rec
+        zmieniony = True
+    if zmieniony:
+        supa.put_key("sedziowie_cache", cache)
+
+    per_sedzia: dict[str, list[float]] = {}
+    for rec in cache.values():
+        if rec.get("sedzia") and rec.get("faule"):
+            per_sedzia.setdefault(rec["sedzia"], []).append(float(rec["faule"]))
+    wszystkie = [f for fl in per_sedzia.values() for f in fl]
+    if not wszystkie:
+        return {}
+    turniej_sr = sum(wszystkie) / len(wszystkie)
+
+    # obsady nadchodzących meczów: parowanie fixtures 365 z eventami statshub
+    # po znormalizowanych nazwach drużyn (awaryjnie kickoff +-3h + jedna nazwa)
+    sched = scores365.scheduled_games_by_competition()
+    out: dict[int, dict] = {}
+    for e in events:
+        hn = rotowire._norm(team_name.get(e.get("homeTeamId"), ""))
+        an = rotowire._norm(team_name.get(e.get("awayTeamId"), ""))
+        ts = e.get("timeStartTimestamp") or 0
+        g365 = next(
+            (g for g in sched if {g["home"], g["away"]} == {hn, an}),
+            None,
+        ) or next(
+            (g for g in sched
+             if abs(g["ts"] - ts) < 3 * 3600 and {g["home"], g["away"]} & {hn, an}),
+            None,
+        )
+        if g365 is None:
+            continue
+        ref = scores365.game_referee(g365["id"])
+        if not ref:
+            continue
+        proby = per_sedzia.get(ref, [])
+        out[e["id"]] = {
+            "sedzia": ref,
+            "mnoznik": (
+                round(sum(proby) / len(proby) / turniej_sr, 3) if proby else None
+            ),
+            "n": len(proby),
+        }
+    return out
+
+
 # start MŚ 2026 (2026-06-08 UTC, kilka dni zapasu przed 1. meczem) — granica
 # między "sezonem klubowym" (prior) a "turniejem" (aktualizacja posteriora)
 WC_START_TS = 1_780_876_800
@@ -223,6 +297,7 @@ def score_from_trend(
     wc_names: set | None = None,
     elo_map: dict[str, int] | None = None,
     tempo_meczu: dict | None = None,
+    sedzia: dict | None = None,
 ):
     """Zbuduj PlayerHistory z recentGames i policz predykcję (bez kursów).
 
@@ -306,6 +381,11 @@ def score_from_trend(
         opponent_allowed_per90=trend.opponent_average,
         league_avg_per90=trend.league_average,
         opponent_sample_matches=6 if trend.opponent_average else 0,
+        # profil sędziego (365Scores): mnożnik fauli vs średnia turnieju —
+        # shrinkowany i capowany w context.referee_factor
+        referee_fouls_multiplier=(sedzia or {}).get("mnoznik"),
+        referee_sample_matches=(sedzia or {}).get("n", 0),
+        referee_name=(sedzia or {}).get("sedzia") or "",
         official_started=official,
         predicted_started=predicted,
         opponent_name=trend.opponent_name,
@@ -596,6 +676,21 @@ def main():
     print(f"Elo: {len(elo_map)} reprezentacji" if elo_map
           else "Elo niedostępne — wagi próby z listy uczestników MŚ")
 
+    # profil sędziów: obsada + średnia fauli/mecz vs średnia turnieju
+    try:
+        sedzia_by_mid = profil_sedziow(events, team_name)
+        _ev_by = {e["id"]: e for e in events}
+        for mid_s, s in sedzia_by_mid.items():
+            _e = _ev_by.get(mid_s, {})
+            lbl = (f"{team_name.get(_e.get('homeTeamId'), '?')} – "
+                   f"{team_name.get(_e.get('awayTeamId'), '?')}")
+            print(f"  sędzia {lbl}: {s['sedzia']}"
+                  + (f" (faule ×{s['mnoznik']}, {s['n']} m.)"
+                     if s.get("mnoznik") else " (bez historii MŚ)"))
+    except Exception as e:
+        sedzia_by_mid = {}
+        print(f"Profil sędziów pominięty ({e})")
+
     # samokalibracja: zmierzone odchylenia szans per rynek (od n>=25 rozliczonych)
     try:
         bias_map = rozliczanie.market_bias()
@@ -686,11 +781,18 @@ def main():
         match_label = f"{home_name} – {away_name}"
 
         if mid not in matches_out:
+            sed = sedzia_by_mid.get(mid) or {}
+            # na karcie meczu pokazujemy mnożnik PO shrinkage (1-2 mecze
+            # próby to za słaby dowód na "×1,26") — spójnie ze scoringiem
             matches_out[mid] = {
                 "id": mid, "liga": "MŚ", "sezon": "2026",
                 "kolejka": "Ćwierćfinał", "kickoff_ts": ts,
                 "gospodarz": home_name, "gosc": away_name,
-                "sedzia": None, "sedzia_mnoznik_fauli": 1.0, "okazje": [],
+                "sedzia": sed.get("sedzia"),
+                "sedzia_mnoznik_fauli": round(context.shrink_factor(
+                    float(sed.get("mnoznik") or 1.0), sed.get("n", 0), 8.0
+                ), 2),
+                "okazje": [],
                 "sklady_ogloszone": lineup_confirmed.get(mid, False)
                 or (
                     rotowire.is_confirmed(roto, home_name)
@@ -738,6 +840,7 @@ def main():
             wc_names=wc_names,
             elo_map=elo_map,
             tempo_meczu=tempo_cache.get(mid),
+            sedzia=sedzia_by_mid.get(mid),
         )
         if built is None:
             continue

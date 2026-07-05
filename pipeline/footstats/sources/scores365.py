@@ -158,6 +158,51 @@ def finished_games_by_competition(comp_id: int = WC_COMPETITION_ID) -> list[dict
     return out
 
 
+def scheduled_games_by_competition(comp_id: int = WC_COMPETITION_ID) -> list[dict]:
+    """Nadchodzące mecze rozgrywek: [{id, ts, home, away}, ...] (statusGroup 2)."""
+    from datetime import datetime
+
+    data = _get(f"{BASE}/games/fixtures/?{Q}&competitions={comp_id}")
+    out = []
+    for g in data.get("games", []):
+        if g.get("statusGroup") != 2:
+            continue
+        try:
+            ts = int(datetime.fromisoformat(str(g.get("startTime", ""))).timestamp())
+        except Exception:
+            continue
+        out.append({
+            "id": int(g["id"]), "ts": ts,
+            "home": _norm(str((g.get("homeCompetitor") or {}).get("name", ""))),
+            "away": _norm(str((g.get("awayCompetitor") or {}).get("name", ""))),
+        })
+    return out
+
+
+_ref_cache: dict[int, str | None] = {}
+
+
+def game_referee(game_id: int) -> str | None:
+    """Sędzia główny meczu (officials[0]) — znany zwykle 1-2 dni przed meczem.
+
+    365 dopisuje kraj w nawiasie ("Ismail Elfath (USA )") — ucinamy go.
+    """
+    if game_id in _ref_cache:
+        return _ref_cache[game_id]
+    import re as _re
+
+    name = ""
+    try:
+        data = _get(f"{BASE}/game/?{Q}&gameId={game_id}")
+        offs = (data.get("game") or {}).get("officials") or []
+        if offs:
+            name = _re.sub(r"\s*\(.*?\)\s*$", "", str(offs[0].get("name") or "")).strip()
+    except Exception:
+        pass
+    _ref_cache[game_id] = name or None
+    return _ref_cache[game_id]
+
+
 def recent_finished_games(competitor_id: int, n: int = 6) -> list[tuple[int, int]]:
     """Ostatnie n zakończonych meczów drużyny: [(gameId, timestamp_unix), ...] od najnowszych."""
     data = _get(f"{BASE}/games/results/?{Q}&competitors={competitor_id}")

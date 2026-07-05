@@ -2208,54 +2208,54 @@
   }
  },
  {
-  "id": 859025,
-  "nazwa": "Aurelien Tchouameni",
-  "pozycja": "M",
+  "id": 791702,
+  "nazwa": "Marcus Thuram",
+  "pozycja": "F",
   "druzyna": "France",
-  "minuty_lacznie": 3283,
+  "minuty_lacznie": 3063,
   "forma": {
-   "tackles": {
+   "shots": {
     "ostatnie": [
-     3,
-     7,
-     3,
-     4,
+     5,
+     2,
      2,
      3,
-     1,
-     1,
+     4,
      3,
-     0
+     2,
+     3,
+     2,
+     2
     ],
     "minuty": [
-     90,
-     90,
-     90,
+     89,
      82,
      45,
-     70,
-     64,
+     67,
      90,
-     84,
-     63
+     90,
+     76,
+     90,
+     66,
+     78
     ],
     "rywale": [
-     "Sweden",
-     "Norway",
-     "Senegal",
-     "Northern Ireland",
      "Côte d'Ivoire",
-     "Sevilla",
-     "Real Oviedo",
-     "Barcelona",
-     "Espanyol",
-     "Deportivo Alavés"
+     "Lazio",
+     "Lazio",
+     "Parma",
+     "Torino",
+     "Como",
+     "Cagliari",
+     "Como",
+     "Roma",
+     "Colombia"
     ],
     "kadra": [
-     true,
-     true,
-     true,
-     true,
+     false,
+     false,
+     false,
+     false,
      false,
      false,
      false,
@@ -2263,7 +2263,7 @@
      false,
      false
     ],
-    "srednia90": 2.55
+    "srednia90": 3.58
    }
   }
  },
@@ -2441,6 +2441,546 @@
      true
     ],
     "srednia90": 0.62
+   }
+  }
+ },
+ {
+  "id": 919793,
+  "nazwa": "Ayoub El Kaabi",
+  "pozycja": "F",
+  "druzyna": "Morocco",
+  "minuty_lacznie": 3188,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     3,
+     2,
+     4,
+     4,
+     4,
+     1,
+     4,
+     4,
+     5,
+     2
+    ],
+    "minuty": [
+     70,
+     72,
+     67,
+     90,
+     90,
+     90,
+     86,
+     90,
+     90,
+     90
+    ],
+    "rywale": [
+     "Haiti",
+     "AEK Athens",
+     "PAOK",
+     "PAOK",
+     "Panathinaikos",
+     "AEK Athens",
+     "OFI Crete",
+     "PAOK",
+     "MGS Panserraikos",
+     "Bayer 04 Leverkusen"
+    ],
+    "kadra": [
+     true,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
+    "srednia90": 3.7
+   }
+  }
+ },
+ {
+  "id": 979128,
+  "nazwa": "Rayan Cherki",
+  "pozycja": "M",
+  "druzyna": "France",
+  "minuty_lacznie": 3211,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     3,
+     3,
+     4,
+     5,
+     8,
+     3,
+     2,
+     1,
+     0,
+     1
+    ],
+    "minuty": [
+     78,
+     60,
+     90,
+     90,
+     90,
+     85,
+     76,
+     71,
+     78,
+     89
+    ],
+    "rywale": [
+     "Côte d'Ivoire",
+     "Brentford",
+     "Everton",
+     "Southampton",
+     "Burnley",
+     "Arsenal",
+     "Chelsea",
+     "Liverpool",
+     "Colombia",
+     "Arsenal"
+    ],
+    "kadra": [
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
+    "srednia90": 2.58
+   }
+  }
+ },
+ {
+  "id": 1126569,
+  "nazwa": "Bilal El Khannouss",
+  "pozycja": "M",
+  "druzyna": "Morocco",
+  "minuty_lacznie": 3176,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     1,
+     2,
+     2,
+     1,
+     2,
+     2,
+     4,
+     3,
+     1,
+     3
+    ],
+    "minuty": [
+     87,
+     90,
+     84,
+     80,
+     45,
+     76,
+     90,
+     90,
+     66,
+     90
+    ],
+    "rywale": [
+     "Netherlands",
+     "Haiti",
+     "Scotland",
+     "Brazil",
+     "Madagascar",
+     "TSG Hoffenheim",
+     "SV Werder Bremen",
+     "FC Bayern München",
+     "Paraguay",
+     "FC Porto"
+    ],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
+    "srednia90": 2.18
+   }
+  }
+ },
+ {
+  "id": 1134470,
+  "nazwa": "Zakaria El Ouahdi",
+  "pozycja": "D",
+  "druzyna": "Morocco",
+  "minuty_lacznie": 3570,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     1,
+     6,
+     6,
+     3,
+     2,
+     2,
+     2,
+     2,
+     4,
+     0
+    ],
+    "minuty": [
+     81,
+     90,
+     90,
+     90,
+     90,
+     90,
+     90,
+     90,
+     90,
+     90
+    ],
+    "rywale": [
+     "Oud-Heverlee Leuven",
+     "Royal Antwerp FC",
+     "Standard Liège",
+     "KVC Westerlo",
+     "RC Sporting Charleroi",
+     "Standard Liège",
+     "RC Sporting Charleroi",
+     "KVC Westerlo",
+     "Oud-Heverlee Leuven",
+     "Royal Antwerp FC"
+    ],
+    "kadra": [
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
+    "srednia90": 1.94
+   }
+  }
+ },
+ {
+  "id": 1392829,
+  "nazwa": "Amine Sbai",
+  "pozycja": "M",
+  "druzyna": "Morocco",
+  "minuty_lacznie": 2968,
+  "forma": {
+   "shots": {
+    "ostatnie": [
+     2,
+     1,
+     1,
+     1,
+     2,
+     1,
+     4,
+     1,
+     3,
+     0
+    ],
+    "minuty": [
+     90,
+     47,
+     66,
+     89,
+     89,
+     89,
+     90,
+     90,
+     87,
+     90
+    ],
+    "rywale": [
+     "Stade Brestois",
+     "Auxerre",
+     "Paris Saint-Germain",
+     "Le Havre",
+     "Stade Rennais",
+     "Olympique Lyonnais",
+     "RC Lens",
+     "Nice",
+     "Nantes",
+     "Lille"
+    ],
+    "kadra": [
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
+    "srednia90": 1.73
+   }
+  }
+ },
+ {
+  "id": 859025,
+  "nazwa": "Aurelien Tchouameni",
+  "pozycja": "M",
+  "druzyna": "France",
+  "minuty_lacznie": 3283,
+  "forma": {
+   "tackles": {
+    "ostatnie": [
+     3,
+     7,
+     3,
+     4,
+     2,
+     3,
+     1,
+     1,
+     3,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     90,
+     82,
+     45,
+     70,
+     64,
+     90,
+     84,
+     63
+    ],
+    "rywale": [
+     "Sweden",
+     "Norway",
+     "Senegal",
+     "Northern Ireland",
+     "Côte d'Ivoire",
+     "Sevilla",
+     "Real Oviedo",
+     "Barcelona",
+     "Espanyol",
+     "Deportivo Alavés"
+    ],
+    "kadra": [
+     true,
+     true,
+     true,
+     true,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
+    "srednia90": 2.55
+   }
+  }
+ },
+ {
+  "id": 879674,
+  "nazwa": "Maxence Lacroix",
+  "pozycja": "D",
+  "druzyna": "France",
+  "minuty_lacznie": 3492,
+  "forma": {
+   "tackles": {
+    "ostatnie": [
+     2,
+     2,
+     1,
+     3,
+     1,
+     3,
+     2,
+     1,
+     1,
+     0
+    ],
+    "minuty": [
+     90,
+     90,
+     61,
+     90,
+     90,
+     90,
+     90,
+     90,
+     90,
+     90
+    ],
+    "rywale": [
+     "Norway",
+     "Rayo Vallecano",
+     "Brentford",
+     "Manchester City",
+     "Everton",
+     "Shakhtar Donetsk",
+     "Bournemouth",
+     "Shakhtar Donetsk",
+     "Liverpool",
+     "West Ham United"
+    ],
+    "kadra": [
+     true,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
+    "srednia90": 1.75
+   }
+  }
+ },
+ {
+  "id": 1142672,
+  "nazwa": "Warren Zaire Emery",
+  "pozycja": "M",
+  "druzyna": "France",
+  "minuty_lacznie": 3344,
+  "forma": {
+   "tackles": {
+    "ostatnie": [
+     1,
+     3,
+     1,
+     2,
+     1,
+     1,
+     3,
+     1,
+     1,
+     2
+    ],
+    "minuty": [
+     58,
+     90,
+     64,
+     60,
+     81,
+     90,
+     90,
+     64,
+     90,
+     90
+    ],
+    "rywale": [
+     "Paris FC",
+     "FC Bayern München",
+     "FC Bayern München",
+     "Nantes",
+     "Liverpool",
+     "Liverpool",
+     "Toulouse",
+     "Colombia",
+     "Nice",
+     "Chelsea"
+    ],
+    "kadra": [
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
+    "srednia90": 1.8
+   }
+  }
+ },
+ {
+  "id": 1638338,
+  "nazwa": "Gessime Yassine",
+  "pozycja": "M",
+  "druzyna": "Morocco",
+  "minuty_lacznie": 2915,
+  "forma": {
+   "tackles": {
+    "ostatnie": [
+     1,
+     1,
+     3,
+     2,
+     3,
+     9,
+     3,
+     3,
+     5,
+     1
+    ],
+    "minuty": [
+     20,
+     90,
+     85,
+     57,
+     64,
+     90,
+     67,
+     90,
+     69,
+     45
+    ],
+    "rywale": [
+     "Haiti",
+     "Toulouse",
+     "Lorient",
+     "Stade Rennais",
+     "1. FSV Mainz 05",
+     "Nice",
+     "Paraguay",
+     "HNK Rijeka",
+     "Paris FC",
+     "Auxerre"
+    ],
+    "kadra": [
+     true,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
+    "srednia90": 2.87
    }
   }
  },
