@@ -12,11 +12,6 @@ export function fmtLinia(l: number): string {
   return l.toFixed(1).replace(".", ",");
 }
 
-export function fmtPP(pp: number): string {
-  const sign = pp > 0 ? "+" : "";
-  return `${sign}${pp.toFixed(1).replace(".", ",")} p.p.`;
-}
-
 export function fmtEV(ev: number): string {
   const sign = ev > 0 ? "+" : "";
   return `${sign}${ev.toFixed(1).replace(".", ",")}%`;
@@ -24,14 +19,6 @@ export function fmtEV(ev: number): string {
 
 export function fmtMnoznik(m: number): string {
   return `×${m.toFixed(2).replace(".", ",")}`;
-}
-
-export function fmtData(ts: number): string {
-  return new Date(ts * 1000).toLocaleDateString("pl-PL", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-  });
 }
 
 export function fmtDataCzas(ts: number): string {
@@ -58,11 +45,4 @@ export const RYZYKO_LABEL: Record<string, string> = {
   niskie: "niskie",
   srednie: "średnie",
   wysokie: "wysokie",
-};
-
-export const POZYCJA_LABEL: Record<string, string> = {
-  G: "Bramkarz",
-  D: "Obrońca",
-  M: "Pomocnik",
-  F: "Napastnik",
 };

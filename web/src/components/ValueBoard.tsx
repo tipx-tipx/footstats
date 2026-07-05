@@ -152,7 +152,7 @@ export function ValueBoard({
     setPewnosc("kazda");
     setMinEv(1);
     setMeczId(undefined);
-    setSortuj("ranking");
+    setSortuj("pewnosc"); // spójnie ze stanem początkowym
   };
 
   const filtered = useMemo(() => {
@@ -214,7 +214,7 @@ export function ValueBoard({
       <div className="mb-4 rounded-(--radius-card) border border-hairline bg-card p-3.5 shadow-(--shadow-card) sm:p-4">
         {(liczbaSugestii > 0 || liczbaPewniakow > 0) && (
           <div
-            className="mb-3.5 inline-flex rounded-lg bg-paper p-0.5 text-sm"
+            className="mb-3.5 inline-flex flex-wrap gap-0.5 rounded-lg bg-paper p-0.5 text-sm"
             role="tablist"
             aria-label="Rodzaj pozycji"
           >
@@ -229,7 +229,7 @@ export function ValueBoard({
                 role="tab"
                 aria-selected={rodzaj === kod}
                 onClick={() => setRodzaj(kod)}
-                className={`rounded-md px-3 py-1.5 font-medium transition-colors ${
+                className={`rounded-md px-3 py-2 font-medium transition-colors ${
                   rodzaj === kod
                     ? "bg-card text-brand-deep shadow-(--shadow-card)"
                     : "text-muted hover:text-ink"

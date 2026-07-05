@@ -75,7 +75,7 @@ export default async function KuponyPage() {
                 {grupa.map((k, i) => (
             <Reveal key={`${k.horyzont}-${k.cel}`} delay={Math.min(i * 0.06, 0.25)}>
               <article className="flex h-full flex-col rounded-2xl border border-hairline bg-card shadow-(--shadow-card) transition-shadow hover:shadow-(--shadow-card-hover)">
-                <header className="flex items-center justify-between gap-3 border-b border-hairline px-5 py-4">
+                <header className="flex flex-col gap-3 border-b border-hairline px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
                   <span className="flex items-center gap-2">
                     <span className="font-data rounded-lg bg-brand px-3 py-1 text-lg font-bold text-white">
                       ×{k.cel_label ?? k.cel}
@@ -90,7 +90,7 @@ export default async function KuponyPage() {
                       {k.styl === "value" ? "value" : "pewniaki"}
                     </span>
                   </span>
-                  <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-right">
+                  <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-left sm:text-right">
                     <div>
                       <p className="text-[10px] uppercase tracking-wide text-faint">
                         kurs łączny

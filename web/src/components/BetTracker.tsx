@@ -234,11 +234,11 @@ export function BetTracker() {
 
                 <button
                   onClick={() => removeZaklad(z.id)}
-                  className="rounded-md p-1.5 text-faint transition-colors hover:bg-data-red-wash hover:text-data-red"
+                  className="rounded-md p-2.5 text-faint transition-colors hover:bg-data-red-wash hover:text-data-red"
                   aria-label={`Usuń zakład: ${z.podmiot} ${z.rynek}`}
                   title="Usuń"
                 >
-                  <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden>
+                  <svg width="16" height="16" viewBox="0 0 14 14" aria-hidden>
                     <path
                       d="M3 3 L11 11 M11 3 L3 11"
                       stroke="currentColor"

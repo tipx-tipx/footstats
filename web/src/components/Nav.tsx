@@ -64,7 +64,7 @@ export function Nav() {
                     key={href}
                     href={href}
                     aria-current={active ? "page" : undefined}
-                    className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-sm transition-colors ${
+                    className={`whitespace-nowrap rounded-lg px-3 py-2 text-sm transition-colors ${
                       active
                         ? "bg-brand-wash font-semibold text-brand-deep"
                         : "text-muted hover:bg-paper hover:text-ink"
@@ -84,9 +84,9 @@ export function Nav() {
           }}
           title="Wyloguj"
           aria-label="Wyloguj"
-          className="shrink-0 rounded-lg p-2 text-faint transition-colors hover:bg-paper hover:text-ink"
+          className="shrink-0 rounded-lg p-2.5 text-faint transition-colors hover:bg-paper hover:text-ink"
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>

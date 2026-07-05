@@ -1,11 +1,11 @@
 "use client";
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 
 import { ConfidenceBadge, EdgeBadge, PewnoscDots, RiskBadge } from "./badges";
 import { ChanceBar, OutcomeColumns } from "./DistributionStrip";
-import { FormBars } from "./Sparkline";
+import { FormBars } from "./FormBars";
 import { addZakladFromBet, isTracked, onZakladyChange } from "@/lib/tracker";
 import {
   fmtDataCzas,
@@ -19,7 +19,8 @@ import {
 } from "@/lib/format";
 import type { ValueBet, Zawodnik } from "@/lib/types";
 
-export function BetCard({
+/** memo: przy zmianie filtrów listy nie przerenderowują się wszystkie karty */
+export const BetCard = memo(function BetCard({
   bet,
   rank,
   zawodnik,
@@ -48,7 +49,7 @@ export function BetCard({
       <button
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        className="grid w-full grid-cols-[auto_1fr_auto] items-center gap-x-4 gap-y-2 px-4 py-3 text-left sm:grid-cols-[auto_1.4fr_1fr_auto_auto]"
+        className="grid w-full grid-cols-[1fr_auto_auto] items-center gap-x-3 gap-y-2 px-3.5 py-3 text-left sm:grid-cols-[auto_1.4fr_1fr_auto_auto] sm:gap-x-4 sm:px-4"
       >
         <span
           aria-hidden
@@ -410,4 +411,4 @@ export function BetCard({
       </AnimatePresence>
     </motion.article>
   );
-}
+});

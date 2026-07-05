@@ -79,27 +79,3 @@ export function RiskBadge({ level }: { level: Ryzyko }) {
     </span>
   );
 }
-
-/** Mała pastylka z etykietą i wartością liczbową (kursy, linie). */
-export function DataPill({
-  label,
-  value,
-  emphasis = false,
-}: {
-  label: string;
-  value: string;
-  emphasis?: boolean;
-}) {
-  return (
-    <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap">
-      <span className="text-xs text-faint">{label}</span>
-      <span
-        className={`font-data text-sm ${
-          emphasis ? "font-semibold text-ink" : "text-ink-soft"
-        }`}
-      >
-        {value}
-      </span>
-    </span>
-  );
-}

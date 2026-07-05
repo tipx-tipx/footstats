@@ -29,6 +29,8 @@ export const metadata: Metadata = {
   description:
     "Osobisty silnik decyzyjny: model matematyczny szacuje prawdopodobieństwa statystyk zawodników i drużyn, porównuje je z kursami bukmacherów i pokazuje, gdzie kurs jest zawyżony.",
   icons: { icon: "/favicon.png" },
+  // narzędzie prywatne za hasłem — nie indeksować
+  robots: { index: false, follow: false },
 };
 
 export default async function RootLayout({

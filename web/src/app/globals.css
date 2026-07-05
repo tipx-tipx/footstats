@@ -12,7 +12,7 @@
   --color-ink: #13202a;          /* atrament — nagłówki, tekst główny */
   --color-ink-soft: #33434d;     /* tekst drugorzędny */
   --color-muted: #5f6f6a;        /* tekst pomocniczy */
-  --color-faint: #8b9a94;        /* podpisy, metadane */
+  --color-faint: #67766f;        /* podpisy, metadane (>=4.5:1 na bieli — WCAG AA) */
   --color-brand: #16583f;        /* butelkowa zieleń — akcent marki, UI */
   --color-brand-deep: #0e3d2b;
   --color-brand-wash: #e7f0ea;   /* delikatne tło zielone */

@@ -24,10 +24,10 @@ export function CalibrationChart({
   const maxN = Math.max(...bins.map((b) => b.n), 1);
 
   return (
-    <div className="relative inline-block">
+    <div className="relative inline-block w-full" style={{ maxWidth: size }}>
       <svg
-        width={size}
-        height={size}
+        viewBox={`0 0 ${size} ${size}`}
+        className="h-auto w-full"
         role="img"
         aria-label="Wykres kalibracji: przewidywana szansa na osi poziomej, rzeczywista częstość na pionowej"
       >

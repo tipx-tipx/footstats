@@ -208,13 +208,16 @@ export default async function ModelPage() {
             (zawodnik nie zagrał) wyłącza go z kursu — jak u bukmachera.
             Statystyki liczone w regularnym czasie gry, bez dogrywek.
           </p>
-          <div className="mt-4 grid max-w-4xl gap-3 sm:grid-cols-2">
+          {/* items-start: rozwinięcie jednego kuponu nie rozciąga sąsiada
+              w rzędzie (puste białe tło) — każda karta trzyma swoją wysokość */}
+          <div className="mt-4 grid max-w-4xl items-start gap-3 sm:grid-cols-2">
             {typy.kupony!.slice(0, 12).map((k) => {
               const rozliczone = k.legi_rozliczone ?? 0;
               const trafione = k.legi_trafione ?? 0;
               return (
                 <details
                   key={k.klucz ?? `${k.horyzont}-${k.cel_label}-${k.dzien}`}
+                  name="kupon-historia"
                   className={`group rounded-xl border bg-card shadow-(--shadow-card) ${
                     k.wynik === "wygrany"
                       ? "border-data-green/40"

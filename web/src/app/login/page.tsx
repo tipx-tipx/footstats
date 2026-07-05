@@ -82,7 +82,7 @@ export default function LoginPage() {
                   type="button"
                   onClick={() => setPokaz((p) => !p)}
                   aria-label={pokaz ? "Ukryj hasło" : "Pokaż hasło"}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded p-1 text-faint transition-colors hover:text-ink"
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-lg p-2.5 text-faint transition-colors hover:text-ink"
                 >
                   {pokaz ? (
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
