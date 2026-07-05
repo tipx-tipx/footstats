@@ -12,6 +12,10 @@ Przepływ (wywoływane na końcu każdego cyklu):
        * odbiory — tylko bank trendów (365 ich nie podaje),
        * zawodnik nie zagrał (brak w statystykach meczu / 0 minut) -> "zwrot",
        * brak danych źródłowych po 48 h -> "zwrot" (nic nie wisi "w grze"),
+       * SUPERZMIANA (Superbet): gdy zawodnik zszedł, a jego zmiennik dołożył
+         brakującą statystykę, leg "powyżej" rozliczamy z sumy (patrz
+         SUPERZMIANA_RYNKI); rewizja wsteczna naprawia też stare przegrane,
+
   3. podsumowanie `typy_wyniki` (trafienia, ROI flat, per rynek) idzie na
      stronę Skuteczności. Odchylenie trafień od średniego p_model per rynek
      (bias) to surowiec do dokręcenia kalibracji — STOSUJEMY je w modelu
@@ -37,6 +41,16 @@ MARKETY_365 = {
 MARKETY_365_STATY = {"fouls_committed", "fouls_won", "interceptions"}
 # rynki rozliczane z banku trendów statshub (odbiory nie występują w 365)
 MARKETY_LIB = {"fouls_committed", "tackles", "fouls_won", "interceptions"}
+
+# --- Superzmiana (Superbet): gdy wytypowany zawodnik zostanie zmieniony,
+# statystyki jego zmiennika doliczają się do zakładu. Objęte rynki wg
+# regulaminu (potwierdzone przez usera). Stosujemy WYŁĄCZNIE na korzyść
+# gracza: upgrade przegrany -> wygrany na stronie "powyżej". Dla "poniżej"
+# dolewka zmiennika mogłaby typ pogrążyć — takich legów nie ruszamy.
+SUPERZMIANA_RYNKI = {
+    "shots", "sot", "shots_outside_box", "sot_outside_box",
+    "tackles", "fouls_committed", "fouls_won",
+}
 
 
 # próbuj rozliczać już ~105 min po kickoffie (źródła i tak wymagają statusu
@@ -155,6 +169,86 @@ def _wartosc_z_banku(rec: dict, lib: dict) -> float | None:
         if abs(ts - rec["kickoff_ts"]) < OKNO_PAROWANIA_S:
             cnts = t.get("counts", [])
             return float(cnts[i]) if i < len(cnts) else None
+    return None
+
+
+def _wartosc_zmiennika(
+    nazwisko_norm: str, mk: str, gid: int | None, staty: dict | None,
+    lib: dict, rec: dict,
+) -> float | None:
+    """Statystyka zmiennika w rozliczanym meczu (cały jego czas gry jest
+    z definicji PO wejściu, więc pełnomeczowa wartość = wkład po zmianie)."""
+    if mk in MARKETY_365 and gid is not None:
+        try:
+            gra = scores365.game_player_shots(gid)
+        except Exception:
+            gra = None
+        if gra is not None:
+            skey = scores365.resolve_player_key(set(gra), nazwisko_norm)
+            if skey:
+                return float(gra[skey].get(MARKETY_365[mk], 0))
+            return 0.0  # wszedł, a nie ma go w mapie strzałów = 0 zdarzeń
+    if (
+        mk in MARKETY_365_STATY and staty
+        and gid is not None and not scores365.after_extra_time(gid)
+    ):
+        skey = scores365.resolve_player_key(set(staty), nazwisko_norm)
+        if skey:
+            w = staty[skey].get(mk)
+            if w is not None:
+                return float(w)
+    # bank trendów (jedyne źródło odbiorów) — zmiennika szukamy po nazwisku,
+    # bo nie znamy jego statshubowego id
+    kandydaci = {
+        rotowire._norm(str(t.get("player_name", ""))): t
+        for t in lib.values()
+        if t.get("market_code") == mk
+    }
+    tkey = scores365.resolve_player_key(set(kandydaci), nazwisko_norm)
+    if tkey:
+        t = kandydaci[tkey]
+        for i, ts in enumerate(t.get("timestamps", [])):
+            if abs(ts - rec["kickoff_ts"]) < OKNO_PAROWANIA_S:
+                cnts = t.get("counts", [])
+                return float(cnts[i]) if i < len(cnts) else None
+    return None
+
+
+def _superzmiana(
+    rec: dict, gid: int | None, staty: dict | None, lib: dict,
+    wartosc: float | None,
+) -> tuple[float, str] | None:
+    """Superzmiana Superbetu: dolicz statystyki zmiennika, jeśli ratują lega.
+
+    Zwraca (nowa_wartość, powód) tylko gdy suma przebija linię — nigdy nie
+    pogarsza wyniku. None = nie dotyczy / brak danych / suma dalej za niska.
+    """
+    if (
+        rec.get("strona") != "powyzej"
+        or rec.get("rynek_kod") not in SUPERZMIANA_RYNKI
+        or "superbet" not in str(rec.get("bukmacher") or "").lower()
+        or gid is None
+    ):
+        return None
+    try:
+        subs = scores365.game_substitutions(gid)
+    except Exception:
+        return None
+    klucz = scores365.resolve_player_key(set(subs), str(rec["podmiot"]))
+    if not klucz:
+        return None  # grał do końca albo brak danych o zmianie
+    zmiennik = subs[klucz]["wszedl"]
+    dodatek = _wartosc_zmiennika(
+        zmiennik, rec["rynek_kod"], gid, staty, lib, rec
+    )
+    if not dodatek:
+        return None
+    suma = float(wartosc or 0.0) + dodatek
+    if suma > rec["linia"]:
+        return suma, (
+            f"superzmiana: {zmiennik} dołożył {dodatek:g} po wejściu "
+            f"za {rec['podmiot']} ({subs[klucz]['minuta']:.0f}')"
+        )
     return None
 
 
@@ -353,6 +447,21 @@ def _rozlicz_kupony(log_kuponow: dict, typy_log: dict, now: int) -> list[dict]:
             statusy.append((l, s))
         rec["legi_trafione"] = sum(1 for _, s in statusy if s == "wygrany")
         rec["legi_rozliczone"] = sum(1 for _, s in statusy if s)
+        # superzmiana potrafi odwrócić lega PO rozliczeniu kuponu: gdy po
+        # rewizji wszystkie legi siadły, przegrany kupon wraca do wygranego
+        if (
+            rec.get("wynik") == "przegrany"
+            and statusy
+            and all(s in ("wygrany", "zwrot") for _, s in statusy)
+        ):
+            kurs = 1.0
+            for l, s in statusy:
+                if s == "wygrany" and l.get("kurs"):
+                    kurs *= l["kurs"]
+            rec.update(wynik="wygrany", kurs_rozliczony=round(kurs, 2),
+                       rozliczono_ts=now,
+                       powod="superzmiana odwróciła przegranego lega")
+            continue
         if rec.get("wynik"):
             continue
         if any(s == "przegrany" for _, s in statusy):
@@ -460,6 +569,14 @@ def rozlicz(
         trafiony = (
             wartosc > rec["linia"] if rec["strona"] == "powyzej" else wartosc < rec["linia"]
         )
+        if not trafiony:
+            sz = _superzmiana(rec, gid, staty, lib, wartosc)
+            if sz:
+                wartosc, rec["powod"] = sz
+                rec["superzmiana"] = True
+                trafiony = True
+            if gid is not None:
+                rec["superzmiana_spr"] = True  # sprawdzone — rewizja nie dubluje
         rec.update(
             wynik="wygrany" if trafiony else "przegrany",
             faktyczna=wartosc, rozliczono_ts=now,
@@ -468,6 +585,31 @@ def rozlicz(
             rec["clv_pct"] = round(
                 (rec["kurs"] / rec["kurs_zamkniecia"] - 1.0) * 100.0, 1
             )
+
+    # rewizja WSTECZ: legi przegrane przed wdrożeniem superzmiany (albo gdy
+    # danych o zmianie jeszcze nie było) — każdy rekord sprawdzamy raz
+    for rec in log.values():
+        if (
+            rec.get("wynik") != "przegrany"
+            or rec.get("superzmiana_spr")
+            or rec.get("strona") != "powyzej"
+            or rec.get("rynek_kod") not in SUPERZMIANA_RYNKI
+            or "superbet" not in str(rec.get("bukmacher") or "").lower()
+        ):
+            continue
+        rec["superzmiana_spr"] = True
+        gid = _gid_365(rec, cache_365)
+        if gid is None:
+            continue
+        try:
+            staty = scores365.game_player_match_stats(gid)
+        except Exception:
+            staty = None
+        sz = _superzmiana(rec, gid, staty, lib, rec.get("faktyczna"))
+        if sz:
+            wartosc, powod = sz
+            rec.update(wynik="wygrany", faktyczna=wartosc, rozliczono_ts=now,
+                       superzmiana=True, powod=powod)
 
     supa.put_key("typy_log", log)
 

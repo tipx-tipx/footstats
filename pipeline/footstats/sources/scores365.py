@@ -295,6 +295,46 @@ def game_player_shots(game_id: int) -> dict[str, dict[str, int]]:
     return per_player
 
 
+_subs_cache: dict[int, dict[str, dict]] = {}
+
+
+def game_substitutions(game_id: int) -> dict[str, dict]:
+    """Zmiany w meczu: {znormalizowane nazwisko SCHODZĄCEGO: {"wszedl":
+    znormalizowane nazwisko wchodzącego, "minuta": float}}.
+
+    Z game.events (eventType.id == 1000): playerId = WCHODZĄCY,
+    extraPlayers[0] = SCHODZĄCY — kierunek potwierdzony minutami i składem
+    wyjściowym (wchodzący ma started=0 i minuty = 90 − minuta zmiany).
+    Tylko regularny czas — zmiany w dogrywce nie dotyczą rynków 90 min.
+    """
+    if game_id in _subs_cache:
+        return _subs_cache[game_id]
+    data = _get(f"{BASE}/game/?{Q}&gameId={game_id}")
+    game = data.get("game", {})
+    _zapamietaj_et(game_id, game)
+    names = {
+        int(m["id"]): str(m.get("name", ""))
+        for m in game.get("members", [])
+        if m.get("id")
+    }
+    out: dict[str, dict] = {}
+    for e in game.get("events") or []:
+        if (e.get("eventType") or {}).get("id") != 1000:
+            continue
+        try:
+            gt = float(e.get("gameTime") or 0)
+        except (TypeError, ValueError):
+            continue
+        if gt > REGULARNY_CZAS_MIN:
+            continue
+        wszedl = names.get(int(e.get("playerId") or 0))
+        zszedl = names.get(int((e.get("extraPlayers") or [0])[0] or 0))
+        if wszedl and zszedl:
+            out[_norm(zszedl)] = {"wszedl": _norm(wszedl), "minuta": gt}
+    _subs_cache[game_id] = out
+    return out
+
+
 def team_shot_history(
     competitor_id: int, n_games: int = 6
 ) -> list[tuple[int, dict[str, dict[str, int]]]]:

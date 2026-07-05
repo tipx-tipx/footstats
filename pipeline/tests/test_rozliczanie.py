@@ -125,6 +125,107 @@ def test_przegrany_od_pierwszego_pudla():
     assert hist[0]["wynik"] == "przegrany"
 
 
+def test_kupon_odwrocony_gdy_superzmiana_uratowala_lega():
+    log = {}
+    rozliczanie._kupon_do_logu(log, [_kupon()], now=1_000)
+    typy_log = {
+        "1:p11:shots:1.5:powyzej": {"wynik": "przegrany"},
+        "2:p22:shots:1.5:powyzej": {"wynik": "wygrany"},
+        "3:p33:shots:1.5:powyzej": {"wynik": "wygrany"},
+    }
+    hist = rozliczanie._rozlicz_kupony(log, typy_log, now=50_000)
+    assert hist[0]["wynik"] == "przegrany"
+    # rewizja superzmiany odwraca lega -> kolejny cykl odwraca kupon
+    typy_log["1:p11:shots:1.5:powyzej"]["wynik"] = "wygrany"
+    hist = rozliczanie._rozlicz_kupony(log, typy_log, now=60_000)
+    assert hist[0]["wynik"] == "wygrany"
+    assert hist[0]["kurs_rozliczony"] == 8.0
+    assert "superzmiana" in hist[0]["powod"]
+
+
+# ---- superzmiana (Superbet): zmiennik dolicza się do lega "powyżej" ----
+
+def _rec_superzmiana(**over):
+    rec = {
+        "mecz_id": 1, "mecz": "A – B", "kickoff_ts": 10_000,
+        "podmiot": "Jan Kowalski", "rynek_kod": "shots", "rynek": "Strzały",
+        "linia": 1.5, "strona": "powyzej", "kurs": 1.5, "bukmacher": "Superbet",
+    }
+    rec.update(over)
+    return rec
+
+
+def test_superzmiana_ratuje_lega(monkeypatch):
+    monkeypatch.setattr(
+        scores365, "game_substitutions",
+        lambda gid: {"jan kowalski": {"wszedl": "adam nowak", "minuta": 60.0}},
+    )
+    monkeypatch.setattr(
+        scores365, "game_player_shots",
+        lambda gid: {"jan kowalski": {"shots": 1}, "adam nowak": {"shots": 1}},
+    )
+    sz = rozliczanie._superzmiana(_rec_superzmiana(), 7, None, {}, 1.0)
+    assert sz is not None
+    suma, powod = sz
+    assert suma == 2.0
+    assert "adam nowak" in powod
+
+
+def test_superzmiana_nie_dotyczy(monkeypatch):
+    monkeypatch.setattr(
+        scores365, "game_substitutions",
+        lambda gid: {"jan kowalski": {"wszedl": "adam nowak", "minuta": 60.0}},
+    )
+    monkeypatch.setattr(
+        scores365, "game_player_shots",
+        lambda gid: {"adam nowak": {"shots": 5}},
+    )
+    # strona "poniżej" — nie ruszamy
+    assert rozliczanie._superzmiana(
+        _rec_superzmiana(strona="ponizej"), 7, None, {}, 1.0) is None
+    # rynek spoza regulaminu superzmiany
+    assert rozliczanie._superzmiana(
+        _rec_superzmiana(rynek_kod="interceptions"), 7, None, {}, 1.0) is None
+    # inny bukmacher
+    assert rozliczanie._superzmiana(
+        _rec_superzmiana(bukmacher="STS"), 7, None, {}, 1.0) is None
+    # zawodnik nie był zmieniany
+    monkeypatch.setattr(scores365, "game_substitutions", lambda gid: {})
+    assert rozliczanie._superzmiana(
+        _rec_superzmiana(), 7, None, {}, 1.0) is None
+
+
+def test_superzmiana_suma_za_niska(monkeypatch):
+    monkeypatch.setattr(
+        scores365, "game_substitutions",
+        lambda gid: {"jan kowalski": {"wszedl": "adam nowak", "minuta": 60.0}},
+    )
+    monkeypatch.setattr(
+        scores365, "game_player_shots",
+        lambda gid: {"adam nowak": {"shots": 1}},
+    )
+    # 0 + 1 = 1 <= linia 1.5 — dalej przegrany
+    assert rozliczanie._superzmiana(
+        _rec_superzmiana(), 7, None, {}, 0.0) is None
+
+
+def test_superzmiana_odbiory_z_banku(monkeypatch):
+    monkeypatch.setattr(
+        scores365, "game_substitutions",
+        lambda gid: {"jan kowalski": {"wszedl": "adam nowak", "minuta": 55.0}},
+    )
+    lib = {
+        "77:tackles": {
+            "player_name": "Adam Nowak", "market_code": "tackles",
+            "timestamps": [10_500], "counts": [3.0],
+        },
+    }
+    sz = rozliczanie._superzmiana(
+        _rec_superzmiana(rynek_kod="tackles", linia=2.5), 7, None, lib, 0.0)
+    assert sz is not None
+    assert sz[0] == 3.0
+
+
 def test_minuta_regularny_czas():
     assert scores365._minuta("4'") == 4
     assert scores365._minuta("90 + 2'") == 90

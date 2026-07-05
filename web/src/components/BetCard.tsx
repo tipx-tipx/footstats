@@ -70,6 +70,52 @@ const SWIATLO_STYL = {
   },
 } as const;
 
+/**
+ * Oznaczenie typu z puli pewniaków wg szansy modelu. Sama etykieta "pewniak"
+ * przy 55% wprowadzała w błąd — pula zawiera typy od ~42% (perełki) do 90%+.
+ * Progi: ≥75% pewniak, 62–74% mocny typ, 52–61% umiarkowany, <52% perełka
+ * (do puli poniżej 52% wchodzą tylko typy z kursem 1,9+).
+ */
+function tierPewniaka(bet: ValueBet): {
+  label: string;
+  cls: string;
+  opis: string;
+} {
+  if (bet.wyzsza_linia) {
+    return {
+      label: "✦ wyższa linia",
+      cls: "bg-data-amber-wash text-[#8a5613]",
+      opis: "Perełka: wyższa linia (1,5+) przy wciąż solidnej szansie — wyraźnie lepszy kurs niż na linii 0,5",
+    };
+  }
+  if (bet.p_model < 0.52) {
+    return {
+      label: "◆ perełka",
+      cls: "bg-data-amber-wash text-[#8a5613]",
+      opis: "Wyższy kurs (1,9+) przy wciąż sensownej szansie — okazjonalny rodzynek na kupon, nie pewniak",
+    };
+  }
+  if (bet.p_model >= 0.75) {
+    return {
+      label: "★ pewniak",
+      cls: "bg-brand-wash text-brand-deep",
+      opis: "Szansa modelu 75%+ — najmocniejsza kategoria typów",
+    };
+  }
+  if (bet.p_model >= 0.62) {
+    return {
+      label: "mocny typ",
+      cls: "bg-data-green-wash text-brand-deep",
+      opis: "Szansa modelu 62–74% — solidny typ, ale jeszcze nie pewniak",
+    };
+  }
+  return {
+    label: "umiarkowany",
+    cls: "bg-paper text-muted",
+    opis: "Szansa modelu 52–61% — niewiele ponad 50/50, traktuj ostrożnie",
+  };
+}
+
 /** memo: przy zmianie filtrów listy nie przerenderowują się wszystkie karty */
 export const BetCard = memo(function BetCard({
   bet,
@@ -148,20 +194,18 @@ export const BetCard = memo(function BetCard({
 
         <span className="flex items-center justify-end gap-2.5">
           <span className="flex flex-col items-end gap-1">
-            {bet.pewniak && bet.wyzsza_linia ? (
-              <span
-                className="font-data inline-flex items-center rounded-md bg-data-amber-wash px-2 py-0.5 text-xs font-semibold text-[#8a5613]"
-                title="Perełka: wyższa linia (1,5+) przy wciąż solidnej szansie — wyraźnie lepszy kurs niż na linii 0,5"
-              >
-                ✦ wyższa linia · {fmtProc(bet.p_model)}
-              </span>
-            ) : bet.pewniak ? (
-              <span
-                className="font-data inline-flex items-center rounded-md bg-brand-wash px-2 py-0.5 text-xs font-semibold text-brand-deep"
-                title="Top typ meczu wg szansy modelu — bez wymogu matematycznej przewagi nad kursem"
-              >
-                pewniak · {fmtProc(bet.p_model)}
-              </span>
+            {bet.pewniak ? (
+              (() => {
+                const t = tierPewniaka(bet);
+                return (
+                  <span
+                    className={`font-data inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold ${t.cls}`}
+                    title={t.opis}
+                  >
+                    {t.label} · {fmtProc(bet.p_model)}
+                  </span>
+                );
+              })()
             ) : bet.sugestia || bet.ev_pct == null ? (
               <span
                 className="inline-flex items-center rounded-md bg-data-amber-wash px-2 py-0.5 text-xs font-semibold text-[#8a5613]"
@@ -255,11 +299,29 @@ export const BetCard = memo(function BetCard({
                     <strong className="font-data">
                       {bet.kurs != null ? fmtKurs(bet.kurs) : "—"}
                     </strong>
-                    {bet.ev_pct != null && (
+                    {bet.ev_pct != null && bet.ev_pct >= 1 && (
                       <>
                         {" "}
                         — o <strong className="font-data">{fmtEV(bet.ev_pct)}</strong>{" "}
-                        lepiej, niż powinien
+                        więcej, niż wynosi uczciwa wycena. To jest matematyczna
+                        przewaga tego typu
+                      </>
+                    )}
+                    {bet.ev_pct != null &&
+                      bet.ev_pct > -1 &&
+                      bet.ev_pct < 1 && (
+                        <> — niemal dokładnie tyle, ile wynosi uczciwa wycena</>
+                      )}
+                    {bet.ev_pct != null && bet.ev_pct <= -1 && (
+                      <>
+                        {" "}
+                        — o{" "}
+                        <strong className="font-data">
+                          {Math.abs(bet.ev_pct).toFixed(1).replace(".", ",")}%
+                        </strong>{" "}
+                        mniej, niż wynosi uczciwa wycena. Kurs nie daje
+                        matematycznej przewagi — ten typ jest na liście dla
+                        wysokiej szansy trafienia, nie dla wartości
                       </>
                     )}
                     .
