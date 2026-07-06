@@ -9,8 +9,10 @@ Dwa style (oba liczone co cykl):
    na jednostkę kursu". Do 2 legów z jednego meczu (różni zawodnicy, jak w
    bet builderze), z karą korelacyjną do szansy kuponu.
 
-2. VALUE: tylko typy z dodatnią wartością i pewnością >= średnią, cele ~5/~10,
-   max 1 leg na mecz — kupon "dla zysku długoterminowego".
+2. VALUE: te same reguły składania (maksymalny iloczyn szans przy zadanym
+   kursie = maksymalne EV kuponu), ale wyłącznie typy z WYRAŹNĄ wartością
+   (EV lega >= 2%) i pewnością >= średnią, max 1 leg na mecz (zero
+   korelacji) — kupon "dla zysku długoterminowego".
 
 Wspólne: max 1 typ na zawodnika, szansa kuponu = iloczyn szans (x kara),
 EV = szansa x kurs - 1. Za mało legów = brak kuponu (nie sklejamy na siłę).
@@ -21,16 +23,18 @@ from __future__ import annotations
 import math
 import time
 
-CELE = (5.0, 10.0)
-# przedziały kursowe — KOMPAKTOWO (user: kilka dopracowanych kuponów,
-# nie taśma 8-10 wariantów): dwa dzienne + jeden długoterminowy
-PRZEDZIALY_DZIENNE = ((5.0, 10.0), (12.0, 25.0))
-PRZEDZIALY_DLUGOTERMINOWE = ((10.0, 20.0),)
+# przedziały kursowe — do 4 aktywnych kuponów w każdym horyzoncie (user)
+PRZEDZIALY_DZIENNE = (
+    (5.0, 10.0), (10.0, 15.0), (15.0, 20.0), (20.0, 25.0),
+)
+PRZEDZIALY_DLUGOTERMINOWE = (
+    (10.0, 15.0), (15.0, 20.0), (20.0, 25.0), (25.0, 35.0),
+)
+PRZEDZIALY_VALUE = ((4.0, 8.0), (8.0, 16.0))
 OKNO_DZIS_S = 20 * 3600       # "dziś" = mecze w ciągu ~20 h
 OKNO_JUTRO_S = 44 * 3600      # rozszerzenie na jutro, gdy dziś < 2 mecze
 OKNO_DLUGO_S = 4 * 86400      # długoterminowy: mecze z najbliższych 4 dni
-MIN_LEG_EV = 0.0          # leg value musi mieć nieujemną wartość
-MAX_LEGI = 8
+MIN_LEG_EV = 2.0          # leg value: wyraźna przewaga w %, nie kosmetyczne 0,1
 MAX_LEGI_PEWNIAKI = 12
 MAX_NA_MECZ = 4           # do 4 wydarzeń z jednego meczu (jak w bet builderze)
 KARA_KORELACJI = 0.95     # mnożnik szansy kuponu za KAŻDY dodatkowy leg z 1 meczu
@@ -49,32 +53,12 @@ def _kandydaci(bets: list[dict]) -> list[dict]:
     return out
 
 
-def _zloz(cands: list[dict], cel: float) -> dict | None:
-    kurs, p = 1.0, 1.0
-    legi: list[dict] = []
-    uzyte_mecze: set[int] = set()
-    uzyci: set[int] = set()
-    for b in cands:
-        if len(legi) >= MAX_LEGI or kurs >= cel * 0.85:
-            break
-        if b["mecz_id"] in uzyte_mecze or b["podmiot_id"] in uzyci:
-            continue
-        legi.append(b)
-        uzyte_mecze.add(b["mecz_id"])
-        uzyci.add(b["podmiot_id"])
-        kurs *= b["kurs"]
-        p *= b["p_model"]
-    if len(legi) < 2 or not (cel * 0.85 <= kurs <= cel * 1.6):
-        return None
-    legi.sort(key=lambda b: (b["kickoff_ts"], b["mecz_id"]))
-    return {
-        "cel": int(cel),
-        "kurs_laczny": round(kurs, 2),
-        "p_model": round(p, 4),
-        "fair_kurs": round(1.0 / max(p, 1e-9), 2),
-        "ev_pct": round((p * kurs - 1.0) * 100.0, 1),
-        "legi": [_leg_dict(b) for b in legi],
-    }
+def _sygnatura(kupon: dict) -> frozenset:
+    """Zestaw legów kuponu — do wykrywania duplikatów między stylami."""
+    return frozenset(
+        (l["mecz_id"], l["podmiot"], l.get("rynek_kod", ""), l["linia"], l["strona"])
+        for l in kupon["legi"]
+    )
 
 
 def _leg_dict(b: dict) -> dict:
@@ -96,12 +80,20 @@ def _leg_dict(b: dict) -> dict:
     }
 
 
-def _zloz_pewniaki(pool: list[dict], cmin: float, cmax: float) -> dict | None:
+def _zloz_pewniaki(
+    pool: list[dict],
+    cmin: float,
+    cmax: float,
+    max_na_mecz: int = MAX_NA_MECZ,
+    min_legi: int = 3,
+) -> dict | None:
     """Maksymalizuj szansę kuponu przy kursie łącznym w przedziale [cmin, cmax].
 
     Jakość lega = ln(p) / ln(kurs): ile "kosztu pewności" płacimy za każdą
     jednostkę logarytmu kursu. Im bliżej zera, tym leg bezpieczniejszy
-    względem tego, co dokłada do kursu.
+    względem tego, co dokłada do kursu. Przy ustalonym kursie łącznym
+    maksymalna szansa = maksymalne EV, więc ten sam builder składa też
+    kupony value (z pulą ograniczoną do legów z przewagą).
     """
     cands = sorted(
         (b for b in pool if b["kurs"] > 1.0 and 0 < b["p_model"] < 1),
@@ -115,7 +107,7 @@ def _zloz_pewniaki(pool: list[dict], cmin: float, cmax: float) -> dict | None:
     for b in cands:
         if len(legi) >= MAX_LEGI_PEWNIAKI or kurs >= cmin:
             break
-        if b["podmiot_id"] in uzyci or na_mecz.get(b["mecz_id"], 0) >= MAX_NA_MECZ:
+        if b["podmiot_id"] in uzyci or na_mecz.get(b["mecz_id"], 0) >= max_na_mecz:
             continue
         if kurs * b["kurs"] > cmax:
             continue  # ten leg przestrzeliłby przedział — szukaj mniejszego
@@ -127,7 +119,7 @@ def _zloz_pewniaki(pool: list[dict], cmin: float, cmax: float) -> dict | None:
         kurs *= b["kurs"]
         p *= b["p_model"]
     p *= kara
-    if len(legi) < 3 or not (cmin <= kurs <= cmax):
+    if len(legi) < min_legi or not (cmin <= kurs <= cmax):
         return None
     # legi z tego samego meczu obok siebie, mecze chronologicznie
     legi.sort(key=lambda b: (b["kickoff_ts"], b["mecz_id"], -b["p_model"]))
@@ -198,8 +190,9 @@ def build_kupony(
     """Kupony pewniaków w dwóch horyzontach + kupony value.
 
     DZIENNY: mecze z dziś (gdy dziś < 2 mecze — również jutro); przedziały
-    kursowe 5-10 / 10-15 / 15-20 / 20-25.
-    DŁUGOTERMINOWY: mecze z najbliższych 4 dni; przedziały od 10-15 do 25-35.
+    kursowe 5-10 / 10-15 / 15-20 / 20-25 (do 4 aktywnych kuponów).
+    DŁUGOTERMINOWY: mecze z najbliższych 4 dni; 10-15 / 15-20 / 20-25 / 25-35.
+    VALUE: przedziały 4-8 / 8-16, tylko legi z EV >= 2%, max 1 leg na mecz.
     """
     now = now_ts if now_ts is not None else int(time.time())
     pool = [b for b in (pool or []) if b["kickoff_ts"] > now - 3600]
@@ -229,14 +222,18 @@ def build_kupony(
             _rentgen(k, dlugo, cmin, cmax)
             out.append(k)
 
-    cands = _kandydaci(bets)
-    for cel in CELE:
-        k = _zloz(cands, cel)
-        if k is not None:
-            k["styl"] = "value"
-            k["horyzont"] = "value"
-            k["cel_label"] = f"~{int(cel)}"
-            # value: max 1 leg z meczu — alternatywa musi to respektować
-            _rentgen(k, cands, cel * 0.85, cel * 1.6, max_na_mecz=1)
-            out.append(k)
+    # VALUE: ten sam builder co pewniaki (max iloczyn szans przy zadanym
+    # kursie = max EV), ale pula tylko z wyraźną przewagą i 1 leg na mecz;
+    # kupon identyczny z którymś kuponem pewniaków nie wchodzi drugi raz
+    cands = [b for b in _kandydaci(bets) if b["kickoff_ts"] > now - 3600]
+    sygnatury = {_sygnatura(k) for k in out}
+    for cmin, cmax in PRZEDZIALY_VALUE:
+        k = _zloz_pewniaki(cands, cmin, cmax, max_na_mecz=1, min_legi=2)
+        if k is None or _sygnatura(k) in sygnatury:
+            continue
+        k["styl"] = "value"
+        k["horyzont"] = "value"
+        _rentgen(k, cands, cmin, cmax, max_na_mecz=1)
+        out.append(k)
+        sygnatury.add(_sygnatura(k))
     return out

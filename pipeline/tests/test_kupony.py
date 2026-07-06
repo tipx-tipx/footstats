@@ -14,18 +14,19 @@ def _bet(id_, mecz_id, podmiot_id, kurs, p, ev=5.0, pewnosc="wysoka", rank=1.0):
     }
 
 
-def test_kupon_x5_from_three_legs():
+def test_kupon_value_sklada_sie_w_przedziale_4_8():
     bets = [
         _bet(1, 1, 11, 1.8, 0.62, rank=3.0),
         _bet(2, 2, 22, 1.7, 0.65, rank=2.5),
         _bet(3, 3, 33, 1.75, 0.63, rank=2.0),
     ]
-    out = kupony.build_kupony(bets)
-    x5 = next((k for k in out if k["cel"] == 5), None)
-    assert x5 is not None
-    assert 4.25 <= x5["kurs_laczny"] <= 8.0
-    assert len(x5["legi"]) == 3
-    assert abs(x5["p_model"] - 0.62 * 0.65 * 0.63) < 1e-4  # zaokrąglenie do 4 miejsc
+    out = kupony.build_kupony(bets, now_ts=0)
+    v = next((k for k in out if k.get("styl") == "value" and k["cel"] == 4), None)
+    assert v is not None
+    assert 4.0 <= v["kurs_laczny"] <= 8.0
+    assert v["cel_label"] == "4–8"
+    assert len(v["legi"]) == 3
+    assert abs(v["p_model"] - 0.62 * 0.65 * 0.63) < 1e-4  # zaokrąglenie do 4 miejsc
 
 
 def test_max_one_leg_per_match_and_player():
@@ -36,7 +37,7 @@ def test_max_one_leg_per_match_and_player():
         _bet(4, 3, 44, 2.0, 0.6, rank=2.0),
         _bet(5, 4, 55, 1.6, 0.68, rank=1.5),
     ]
-    out = kupony.build_kupony(bets)
+    out = kupony.build_kupony(bets, now_ts=0)
     for k in out:
         mecze = [l["mecz_id"] for l in k["legi"]]
         gracze = [l["podmiot"] for l in k["legi"]]
@@ -46,7 +47,7 @@ def test_max_one_leg_per_match_and_player():
 
 def test_no_coupon_when_not_enough_legs():
     bets = [_bet(1, 1, 11, 1.5, 0.72)]
-    assert kupony.build_kupony(bets) == []
+    assert kupony.build_kupony(bets, now_ts=0) == []
 
 
 def _leg(mecz_id, podmiot_id, kurs, p, kickoff=10_000):
@@ -92,11 +93,24 @@ def test_pewniaki_two_horizons_and_max_4_per_match():
         assert k["p_model"] <= round(iloczyn, 4) + 1e-9
 
 
-def test_low_confidence_and_negative_ev_excluded():
+def test_low_confidence_and_small_ev_excluded():
     bets = [
         _bet(1, 1, 11, 2.0, 0.6, pewnosc="niska"),
         _bet(2, 2, 22, 2.0, 0.6, ev=-3.0),
-        _bet(3, 3, 33, 2.0, 0.6),
+        _bet(3, 3, 33, 2.0, 0.6, ev=1.0),   # poniżej progu 2% — odpada
+        _bet(4, 4, 44, 2.0, 0.6),
     ]
-    out = kupony.build_kupony(bets)
+    out = kupony.build_kupony(bets, now_ts=0)
     assert out == []  # tylko 1 kwalifikowany leg -> brak kuponu
+
+
+def test_dzienne_do_czterech_przedzialow():
+    pool = [
+        _leg(mecz, mecz * 10 + i, 1.45, 0.72, kickoff=10_000)
+        for mecz in range(1, 4)
+        for i in range(6)
+    ]
+    out = kupony.build_kupony([], pool, now_ts=0)
+    dzienne = [k for k in out if k.get("horyzont") == "dzienny"]
+    assert 2 <= len(dzienne) <= 4
+    assert len({k["cel_label"] for k in dzienne}) == len(dzienne)

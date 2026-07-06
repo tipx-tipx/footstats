@@ -274,6 +274,14 @@ export default async function ModelPage() {
                               : "długoterminowy"}{" "}
                           · {k.dzien}
                         </span>
+                        {k.pominiety && (
+                          <span
+                            className="rounded bg-paper px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-faint"
+                            title="Pominięty przyciskiem — niezagrany, rozliczony tylko po to, żeby model się uczył"
+                          >
+                            pominięty
+                          </span>
+                        )}
                       </span>
                       <span
                         className={`text-xs font-semibold ${

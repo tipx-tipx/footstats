@@ -27,6 +27,7 @@ from __future__ import annotations
 import time
 
 from .. import supa
+from ..model import kupony as kupony_model
 from ..sources import rotowire, scores365
 
 # rynek -> pole w agregacie 365Scores (classify_event)
@@ -370,11 +371,33 @@ def _snapshot_zamkniecia(
             rec["kurs_zamkniecia"] = kursy_teraz[kk]
 
 
+def _sloty_aktualne() -> set[str]:
+    """Sloty wynikające z AKTUALNEJ konfiguracji przedziałów kursowych —
+    na stronie wisi maks. jeden kupon na przedział (user: razem max 4
+    dzienne i max 4 długoterminowe)."""
+    return (
+        {f"dzienny:{int(a)}–{int(b)}"
+         for a, b in kupony_model.PRZEDZIALY_DZIENNE}
+        | {f"dlugoterminowy:{int(a)}–{int(b)}"
+           for a, b in kupony_model.PRZEDZIALY_DLUGOTERMINOWE}
+        | {f"value:{int(a)}–{int(b)}"
+           for a, b in kupony_model.PRZEDZIALY_VALUE}
+    )
+
+
+def _sygnatura_legow(legi: list[dict]) -> frozenset:
+    return frozenset(
+        (l["mecz_id"], l["podmiot"], l.get("rynek_kod", ""), l["linia"], l["strona"])
+        for l in legi
+    )
+
+
 def _kupon_do_logu(
     log_kuponow: dict,
     kupony_list: list[dict],
     now: int,
     niedostepni: set[int] | None = None,
+    pominiete: set[str] | None = None,
 ) -> None:
     """Cykl życia kuponu — przemyślany raz, potem ZAMROŻONY.
 
@@ -385,10 +408,16 @@ def _kupon_do_logu(
         (zawodnik poza XI, a jego mecz jeszcze się nie zaczął) -> stary kupon
         dostaje wynik "anulowany" z powodem, a slot się zwalnia,
       * nowy kupon w danym slocie (horyzont+przedział) powstaje TYLKO, gdy
-        poprzedni jest rozliczony (wygrany/przegrany) albo anulowany,
+        poprzedni jest rozliczony (wygrany/przegrany), anulowany albo
+        POMINIĘTY przez usera (przycisk w UI — klucz w `kupony_pominiete`);
+        pominięty kupon znika z aktywnych, ale rozlicza się dalej w tle,
+        żeby model uczył się także z niezagranych kuponów,
+      * do zwolnionego przez pominięcie slotu nie wraca IDENTYCZNY zestaw
+        legów — czekamy, aż pula da inny kupon,
       * nie publikujemy kuponu, którego pierwszy mecz już trwa.
     """
     niedostepni = niedostepni or set()
+    pominiete = pominiete or set()
     dzien = time.strftime("%Y-%m-%d", time.localtime(now))
 
     # migracja starych rekordów (klucz = "horyzont:przedział:data")
@@ -410,8 +439,37 @@ def _kupon_do_logu(
                 powod="zmiana składu: " + ", ".join(l["podmiot"] for l in poza),
             )
 
+    # 1b) kupony pominięte przez usera: zwalniają slot, ale wynik zostaje
+    # pusty — legi i kupon rozliczą się normalnie (dane do nauki modelu)
+    for rec in log_kuponow.values():
+        if rec.get("klucz") in pominiete and not rec.get("pominiety"):
+            rec["pominiety"] = True
+            rec["pominieto_ts"] = now
+
+    # 1c) sloty wycofane (zmiana konfiguracji przedziałów): aktywny kupon ze
+    # starego przedziału schodzi z widoku jak pominięty i rozlicza się w tle
+    # — na stronie zostaje maks. JEDEN kupon na każdy aktualny przedział
+    aktualne_sloty = _sloty_aktualne()
+    for rec in log_kuponow.values():
+        if (
+            not rec.get("wynik")
+            and not rec.get("pominiety")
+            and rec.get("slot") not in aktualne_sloty
+        ):
+            rec["pominiety"] = True
+            rec["pominieto_ts"] = now
+
     # 2) nowe kupony wyłącznie do wolnych slotów
-    zajete = {r["slot"] for r in log_kuponow.values() if not r.get("wynik")}
+    zajete = {
+        r["slot"] for r in log_kuponow.values()
+        if not r.get("wynik") and not r.get("pominiety")
+    }
+    # zestawy legów pominiętych, jeszcze nierozliczonych kuponów per slot —
+    # user właśnie je odrzucił, nie publikujemy ich ponownie 1:1
+    odrzucone: dict[str, set[frozenset]] = {}
+    for r in log_kuponow.values():
+        if r.get("pominiety") and not r.get("wynik"):
+            odrzucone.setdefault(r["slot"], set()).add(_sygnatura_legow(r["legi"]))
     for k in kupony_list:
         if not k.get("legi"):
             continue
@@ -422,6 +480,8 @@ def _kupon_do_logu(
             continue  # pierwszy mecz już trwa — za późno na publikację
         if any(l.get("podmiot_id") in niedostepni for l in k["legi"]):
             continue  # leg z zawodnikiem poza składem — czekaj na kolejny cykl
+        if _sygnatura_legow(k["legi"]) in odrzucone.get(slot, set()):
+            continue  # identyczny z kuponem, który user właśnie pominął
         klucz, n = f"{slot}:{dzien}", 2
         while klucz in log_kuponow:
             klucz, n = f"{slot}:{dzien}#{n}", n + 1
@@ -615,7 +675,17 @@ def rozlicz(
 
     # ---- historia kuponów ----
     log_kuponow = supa.get_key("kupony_log") or {}
-    _kupon_do_logu(log_kuponow, kupony_list or [], now, niedostepni)
+    # kupony pominięte przyciskiem w UI (web zapisuje klucz -> ts);
+    # wpisy starsze niż 14 dni wypadają, żeby payload nie rósł bez końca
+    pominiete_raw = supa.get_key("kupony_pominiete") or {}
+    pominiete = {
+        k: ts for k, ts in pominiete_raw.items()
+        if now - int(ts or 0) < 14 * 86400
+    }
+    if len(pominiete) != len(pominiete_raw):
+        supa.put_key("kupony_pominiete", pominiete)
+    _kupon_do_logu(log_kuponow, kupony_list or [], now, niedostepni,
+                   set(pominiete))
     kupony_hist = _rozlicz_kupony(log_kuponow, log, now)
     supa.put_key("kupony_log", log_kuponow)
 

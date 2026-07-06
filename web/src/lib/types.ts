@@ -172,6 +172,8 @@ export interface Kupon {
   /** indeks lega o najniższej szansie (najsłabsze ogniwo) */
   najslabszy_idx?: number;
   alternatywa?: KuponAlternatywa;
+  /** klucz rekordu w logu kuponów — identyfikator do pomijania */
+  klucz?: string;
 }
 
 /** Rozliczony (lub czekający) typ z automatycznego logu. */
@@ -206,6 +208,8 @@ export interface KuponHistoria extends Kupon {
   kurs_rozliczony?: number;
   legi_trafione?: number;
   legi_rozliczone?: number;
+  /** true = user pominął kupon (nie zagrał) — rozliczony tylko do nauki */
+  pominiety?: boolean;
 }
 
 /** Skuteczność realnych typów (log rozliczany automatycznie po meczach). */

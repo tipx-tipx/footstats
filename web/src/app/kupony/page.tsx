@@ -1,4 +1,5 @@
 import { PageHeader } from "@/components/PageHeader";
+import { PominKupon } from "@/components/PominKupon";
 import { Reveal } from "@/components/Reveal";
 import { getKupony, getMeta } from "@/lib/data";
 import { fmtDataCzas, fmtKurs, fmtLinia, fmtProc, STRONA_LABEL } from "@/lib/format";
@@ -23,7 +24,7 @@ const HORYZONTY: {
   {
     kod: "value",
     tytul: "Value",
-    opis: "Wyłącznie typy z matematyczną przewagą nad bukmacherem, maksymalnie jeden z meczu — kupon nastawiony na zysk w długiej serii.",
+    opis: "Tu wchodzą wyłącznie typy, za które bukmacher płaci wyraźnie więcej, niż wynosi ich uczciwy kurs (co najmniej +2% na typ) — i maksymalnie jeden typ z meczu. Trafia rzadziej niż pewniaki, ale przy dłuższej serii to matematyka gra dla Ciebie.",
   },
 ];
 
@@ -40,9 +41,11 @@ export default async function KuponyPage() {
             Każdy leg przechodzi pełną analizę modelu (historia, minuty, składy
             z dwóch źródeł, matchup), a do kuponu wchodzą legi o najlepszym
             stosunku pewności do kursu. Kupon po publikacji jest zamrożony —
-            nowy w danym przedziale powstaje dopiero, gdy poprzedni się
-            rozliczy albo gdy ogłoszone składy wywrócą któryś leg. Szansa
-            kuponu = iloczyn szans legów (z karą korelacyjną w ramach meczu).
+            nowy w danym przedziale powstaje, gdy poprzedni się rozliczy,
+            gdy ogłoszone składy wywrócą któryś leg albo gdy sam go pominiesz
+            przyciskiem pod kartą (pominięty i tak rozliczy się w tle, żeby
+            model się uczył). Szansa kuponu = iloczyn szans legów (z karą
+            korelacyjną w ramach meczu).
           </>
         }
       />
@@ -81,7 +84,11 @@ export default async function KuponyPage() {
                       0,
                     );
                   return (
-            <Reveal key={`${k.horyzont}-${k.cel}`} delay={Math.min(i * 0.06, 0.25)}>
+            <Reveal
+              key={k.klucz ?? `${k.horyzont}-${k.cel_label ?? k.cel}`}
+              delay={Math.min(i * 0.06, 0.25)}
+            >
+              <PominKupon klucz={k.klucz}>
               <article className="flex h-full flex-col rounded-2xl border border-hairline bg-card shadow-(--shadow-card) transition-shadow hover:shadow-(--shadow-card-hover)">
                 <header className="flex flex-col gap-3 border-b border-hairline px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
                   <span className="flex items-center gap-2">
@@ -117,15 +124,10 @@ export default async function KuponyPage() {
                     </div>
                     <div>
                       <p className="text-[10px] uppercase tracking-wide text-faint">
-                        wartość
+                        z 10 zł robi się
                       </p>
-                      <p
-                        className={`font-data text-lg font-semibold ${
-                          k.ev_pct > 0 ? "text-data-green" : "text-data-red"
-                        }`}
-                      >
-                        {k.ev_pct > 0 ? "+" : ""}
-                        {k.ev_pct.toFixed(1).replace(".", ",")}%
+                      <p className="font-data text-lg font-semibold">
+                        {Math.round(k.kurs_laczny * 10)} zł
                       </p>
                     </div>
                   </div>
@@ -226,12 +228,28 @@ export default async function KuponyPage() {
                     </p>
                   </div>
                 )}
-                <footer className="border-t border-hairline px-5 py-3 text-xs text-faint">
-                  uczciwy kurs kuponu: {fmtKurs(k.fair_kurs)} · {k.legi.length}{" "}
+                <footer className="border-t border-hairline px-5 py-3 text-xs leading-relaxed text-faint">
+                  taki kupon trafia się statystycznie ~1 na{" "}
+                  {Math.max(2, Math.round(1 / Math.max(k.p_model, 1e-9)))} prób ·{" "}
+                  {k.legi.length}{" "}
                   {k.legi.length === 1 ? "typ" : k.legi.length < 5 ? "typy" : "typów"}{" "}
                   · kursy: {k.legi[0]?.bukmacher ?? "Superbet"}
+                  {k.styl === "value" && k.ev_pct > 0 && (
+                    <span className="mt-0.5 block">
+                      wg modelu ten kupon jest wart kurs{" "}
+                      <span className="font-data text-ink-soft">
+                        {fmtKurs(k.fair_kurs)}
+                      </span>
+                      , a bukmacher płaci{" "}
+                      <span className="font-data text-ink-soft">
+                        {fmtKurs(k.kurs_laczny)}
+                      </span>{" "}
+                      — to jest cała przewaga tego kuponu
+                    </span>
+                  )}
                 </footer>
               </article>
+              </PominKupon>
             </Reveal>
                   );
                 })}

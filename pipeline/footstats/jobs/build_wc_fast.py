@@ -72,7 +72,10 @@ def _rozlicz_i_zapisz(
         print(f"Rozliczanie pominięte ({ex}) — poprzednie wyniki bez zmian")
         return
     _dump("typy_wyniki.json", wyniki)
-    _dump("kupony.json", [k for k in wyniki["kupony"] if k.get("wynik") is None])
+    _dump("kupony.json", [
+        k for k in wyniki["kupony"]
+        if k.get("wynik") is None and not k.get("pominiety")
+    ])
     p = wyniki["podsumowanie"]
     print(f"Typy: {p['opublikowane']} w logu, {p['rozliczone']} rozliczonych, "
           f"{p['trafione']} trafionych, ROI flat {p['roi_flat']:+.2f} j.")

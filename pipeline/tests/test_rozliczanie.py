@@ -125,6 +125,38 @@ def test_przegrany_od_pierwszego_pudla():
     assert hist[0]["wynik"] == "przegrany"
 
 
+def test_pominiety_kupon_zwalnia_slot_ale_rozlicza_sie_w_tle():
+    log = {}
+    rozliczanie._kupon_do_logu(log, [_kupon()], now=1_000)
+    klucz = next(iter(log))
+    # user klika "pomiń" — slot wolny, ale wynik pusty (rozliczanie w tle)
+    rozliczanie._kupon_do_logu(log, [_kupon()], now=2_000, pominiete={klucz})
+    rec = log[klucz]
+    assert rec["pominiety"] is True
+    assert rec["wynik"] is None
+    # identyczny zestaw legów NIE wraca do zwolnionego slotu
+    assert len(log) == 1
+    # inny zestaw legów — wchodzi normalnie
+    inny = _kupon(legi=[_leg(4, 44), _leg(5, 55), _leg(6, 66)])
+    rozliczanie._kupon_do_logu(log, [inny], now=3_000, pominiete={klucz})
+    assert len(log) == 2
+    # pominięty kupon rozlicza się z legów jak każdy inny
+    typy_log = {"1:p11:shots:1.5:powyzej": {"wynik": "przegrany"}}
+    rozliczanie._rozlicz_kupony(log, typy_log, now=50_000)
+    assert log[klucz]["wynik"] == "przegrany"
+
+
+def test_stary_przedzial_schodzi_z_widoku_jak_pominiety():
+    log = {}
+    rozliczanie._kupon_do_logu(log, [_kupon(cel_label="12–25")], now=1_000)
+    # przedziału 12–25 nie ma już w konfiguracji — kolejny cykl chowa kupon
+    # (rozliczy się w tle), a aktualne przedziały mają wolne sloty
+    rozliczanie._kupon_do_logu(log, [_kupon(cel_label="5–10")], now=2_000)
+    stary = next(r for r in log.values() if r["slot"] == "dzienny:12–25")
+    assert stary["pominiety"] is True and stary["wynik"] is None
+    assert any(r["slot"] == "dzienny:5–10" for r in log.values())
+
+
 def test_kupon_odwrocony_gdy_superzmiana_uratowala_lega():
     log = {}
     rozliczanie._kupon_do_logu(log, [_kupon()], now=1_000)
