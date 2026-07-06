@@ -104,6 +104,36 @@ def test_low_confidence_and_small_ev_excluded():
     assert out == []  # tylko 1 kwalifikowany leg -> brak kuponu
 
 
+def _pleg(mecz_id, podmiot_id, kurs, p):
+    return {**_leg(mecz_id, podmiot_id, kurs, p), "p_model": p}
+
+
+def test_rentgen_najslabszy_i_alternatywa_z_kara_korelacji():
+    # mecz 1 ma już 2 legi (kara ×0.95 w p kuponu), mecz 2 — najsłabszego lega
+    legi = [_pleg(1, 11, 1.5, 0.7), _pleg(1, 12, 1.5, 0.7), _pleg(2, 22, 2.0, 0.5)]
+    p_kuponu = 0.7 * 0.7 * 0.5 * kupony.KARA_KORELACJI
+    kupon = {"legi": legi, "kurs_laczny": 4.5, "p_model": p_kuponu}
+    # kandydat z meczu 1: pewniejszy, ale dokłada TRZECIEGO lega z meczu 1
+    pool = [_pleg(1, 13, 2.0, 0.9)]
+    kupony._rentgen(kupon, pool, 4.0, 8.0)
+    assert kupon["najslabszy_idx"] == 2
+    alt = kupon["alternatywa"]
+    assert alt["podmiot_id"] == 13 and alt["zamiast_idx"] == 2
+    # p_po = iloczyn szans po zamianie x kara za DWA dodatkowe legi z meczu 1
+    oczekiwane = 0.7 * 0.7 * 0.9 * kupony.KARA_KORELACJI ** 2
+    assert abs(alt["p_po"] - oczekiwane) < 1e-4
+    assert alt["kurs_po"] == 4.5
+
+
+def test_rentgen_bez_alternatywy_gdy_nic_nie_poprawia():
+    legi = [_pleg(1, 11, 1.5, 0.7), _pleg(2, 22, 2.0, 0.5)]
+    kupon = {"legi": legi, "kurs_laczny": 3.0, "p_model": 0.35}
+    # kandydat słabszy od najsłabszego lega — nie ma czego proponować
+    kupony._rentgen(kupon, [_pleg(3, 33, 2.0, 0.4)], 2.5, 6.0)
+    assert kupon["najslabszy_idx"] == 1
+    assert "alternatywa" not in kupon
+
+
 def test_dzienne_do_czterech_przedzialow():
     pool = [
         _leg(mecz, mecz * 10 + i, 1.45, 0.72, kickoff=10_000)

@@ -92,10 +92,12 @@ export function ValueBoard({
   bets,
   zawodnicy,
   initialMatchId,
+  initialRodzaj,
 }: {
   bets: ValueBet[];
   zawodnicy: Zawodnik[];
   initialMatchId?: number;
+  initialRodzaj?: "okazje" | "pewniaki" | "sugestie" | "wszystko";
 }) {
   const [rynek, setRynek] = useState("wszystkie");
   const [pewnosc, setPewnosc] = useState<Pewnosc | "kazda">("kazda");
@@ -106,7 +108,10 @@ export function ValueBoard({
   // sort po pewności — przewaga nad kursem to informacja, nie kryterium
   const [rodzaj, setRodzaj] = useState<
     "okazje" | "pewniaki" | "sugestie" | "wszystko"
-  >(() => (bets.some((b) => b.pewniak) ? "pewniaki" : "wszystko"));
+  >(
+    () =>
+      initialRodzaj ?? (bets.some((b) => b.pewniak) ? "pewniaki" : "wszystko"),
+  );
   const [sortuj, setSortuj] = useState<SortKey>("pewnosc");
   const [limit, setLimit] = useState(25);
   const reduced = useReducedMotion();

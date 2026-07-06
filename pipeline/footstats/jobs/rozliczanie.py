@@ -255,6 +255,9 @@ def _superzmiana(
 
 MIN_N_KALIBRACJI = 25          # od tylu rozliczonych typów na rynek korygujemy
 BIAS_CAP = (0.85, 1.15)        # ostrożnie: maks. +-15% korekty szansy
+# sugestie STS (bez kursu, bez bezpieczników rynkowych) kalibrują się OSOBNO
+# i mylą się dużo mocniej niż typy z kursem — cap w dół musi być szerszy
+SUGESTIA_BIAS_CAP = (0.60, 1.15)
 # kalibracja PRZEDZIAŁOWA: bias liczony osobno per przedział szansy (model
 # może przeszacowywać longshoty, a pewniaki mieć dobrze)
 BIAS_PRZEDZIALY = [(0.0, 0.55), (0.55, 0.70), (0.70, 1.01)]
@@ -278,8 +281,8 @@ def _bias_surowy(grp: list[dict]) -> float:
     return (traf + 2.0) / (sum(r["p_model"] for r in grp) + 2.0)
 
 
-def _cap_bias(b: float) -> float:
-    return round(max(BIAS_CAP[0], min(BIAS_CAP[1], b)), 3)
+def _cap_bias(b: float, cap: tuple[float, float] = BIAS_CAP) -> float:
+    return round(max(cap[0], min(cap[1], b)), 3)
 
 
 def compute_bias(log: dict, min_n: int = MIN_N_KALIBRACJI) -> dict[str, float]:
@@ -295,7 +298,12 @@ def compute_bias(log: dict, min_n: int = MIN_N_KALIBRACJI) -> dict[str, float]:
     }
 
 
-def compute_bias_full(log: dict, min_n: int = MIN_N_KALIBRACJI) -> dict[str, dict]:
+def compute_bias_full(
+    log: dict,
+    min_n: int = MIN_N_KALIBRACJI,
+    sugestie: bool = False,
+    cap: tuple[float, float] = BIAS_CAP,
+) -> dict[str, dict]:
     """Kalibracja przedziałowa z shrinkage: rodzina -> rynek -> przedział.
 
     Trzy poziomy (każdy ściągany do nadrzędnego proporcjonalnie do próby):
@@ -306,8 +314,12 @@ def compute_bias_full(log: dict, min_n: int = MIN_N_KALIBRACJI) -> dict[str, dic
     Zwraca {rynek: {"global": bias, "bins": [[lo, hi, bias], ...]}} —
     format rozumiany przez engine._select_bias.
     """
+    # sugestie STS trafiają fatalnie względem typów z kursem (inne progi, brak
+    # bezpieczników) — mieszanie ich z typami zaniżało bias całych rodzin
     settled = [
-        r for r in log.values() if r.get("wynik") in ("wygrany", "przegrany")
+        r for r in log.values()
+        if r.get("wynik") in ("wygrany", "przegrany")
+        and bool(r.get("sugestia")) == sugestie
     ]
     rodziny: dict[str, list[dict]] = {}
     for r in settled:
@@ -337,8 +349,8 @@ def compute_bias_full(log: dict, min_n: int = MIN_N_KALIBRACJI) -> dict[str, dic
             if len(bgrp) >= MIN_N_PRZEDZIAL:
                 k = len(bgrp) / (len(bgrp) + MIN_N_PRZEDZIAL)
                 bb = g + k * (_bias_surowy(bgrp) - g)
-            bins.append([lo, hi, _cap_bias(bb)])
-        out[mk] = {"global": _cap_bias(g), "bins": bins}
+            bins.append([lo, hi, _cap_bias(bb, cap)])
+        out[mk] = {"global": _cap_bias(g, cap), "bins": bins}
     return out
 
 
@@ -346,6 +358,13 @@ def market_bias() -> dict[str, dict]:
     """Korekty kalibracyjne z logu w Supabase (puste, gdy brak danych/env)."""
     log = _migruj_log(supa.get_key("typy_log") or {})
     return compute_bias_full(log)
+
+
+def market_bias_sugestie() -> dict[str, dict]:
+    """Osobna kalibracja sugestii STS — liczona wyłącznie z rozliczonych
+    sugestii, z szerszym capem w dół (przeszacowania rzędu 20 pp)."""
+    log = _migruj_log(supa.get_key("typy_log") or {})
+    return compute_bias_full(log, sugestie=True, cap=SUGESTIA_BIAS_CAP)
 
 
 def _snapshot_zamkniecia(
@@ -531,7 +550,9 @@ def _rozlicz_kupony(log_kuponow: dict, typy_log: dict, now: int) -> list[dict]:
             for l, s in statusy:
                 if s == "wygrany":
                     kurs *= l["kurs"]
-            rec.update(wynik="wygrany", kurs_rozliczony=round(kurs, 2),
+            # same zwroty = stawka wraca (kurs 1.0), nie "wygrany"
+            wynik = "wygrany" if any(s == "wygrany" for _, s in statusy) else "zwrot"
+            rec.update(wynik=wynik, kurs_rozliczony=round(kurs, 2),
                        rozliczono_ts=now)
     return sorted(
         log_kuponow.values(),
@@ -562,6 +583,15 @@ def rozlicz(
     lib = supa.get_key("trend_lib") or {}
     now = int(time.time())
     cache_365: dict = {}
+    # mecze przełożone: jeśli mecz wciąż figuruje w nadchodzących typach,
+    # deadline braku danych nie może zamknąć jego legów jako zwrot
+    mecze_przyszle = {
+        b["mecz"] for b in value_bets if (b.get("kickoff_ts") or 0) > now
+    }
+    for k in kupony_list or []:
+        for l in k["legi"]:
+            if (l.get("kickoff_ts") or 0) > now:
+                mecze_przyszle.add(l["mecz"])
 
     _snapshot_zamkniecia(log, value_bets, kupony_list or [], now)
 
@@ -622,7 +652,10 @@ def rozlicz(
         if wartosc is None:
             # źródło nie ma jeszcze meczu — spróbujemy w kolejnym cyklu;
             # po terminie zamykamy jako zwrot, żeby nic nie wisiało "w grze"
-            if now - rec["kickoff_ts"] > TERMIN_BRAK_DANYCH_S:
+            if (
+                now - rec["kickoff_ts"] > TERMIN_BRAK_DANYCH_S
+                and rec.get("mecz") not in mecze_przyszle
+            ):
                 rec.update(wynik="zwrot", faktyczna=None, rozliczono_ts=now,
                            powod="brak danych źródła")
             continue
@@ -657,10 +690,14 @@ def rozlicz(
             or "superbet" not in str(rec.get("bukmacher") or "").lower()
         ):
             continue
-        rec["superzmiana_spr"] = True
         gid = _gid_365(rec, cache_365)
         if gid is None:
+            # dane 365 mogą dojść później — flagę "sprawdzone" wolno ustawić
+            # dopiero, gdy mecz znaleziono (albo gdy szanse na dane minęły)
+            if now - (rec.get("rozliczono_ts") or 0) > 72 * 3600:
+                rec["superzmiana_spr"] = True
             continue
+        rec["superzmiana_spr"] = True
         try:
             staty = scores365.game_player_match_stats(gid)
         except Exception:
@@ -671,6 +708,12 @@ def rozlicz(
             rec.update(wynik="wygrany", faktyczna=wartosc, rozliczono_ts=now,
                        superzmiana=True, powod=powod)
 
+    # przycinanie: wpisy bez wyniku, których mecz był >30 dni temu, to śmieci
+    # (nigdy się nie rozliczą); ROZLICZONE zostają — to dataset kalibracji
+    log = {
+        k: r for k, r in log.items()
+        if r.get("wynik") or now - (r.get("kickoff_ts") or now) < 30 * 86400
+    }
     supa.put_key("typy_log", log)
 
     # ---- historia kuponów ----
@@ -687,6 +730,13 @@ def rozlicz(
     _kupon_do_logu(log_kuponow, kupony_list or [], now, niedostepni,
                    set(pominiete))
     kupony_hist = _rozlicz_kupony(log_kuponow, log, now)
+    # przycinanie: kupony rozliczone/anulowane starsze niż 21 dni wypadają
+    # (UI i tak pokazuje top 40; payload nie może rosnąć bez końca)
+    log_kuponow = {
+        k: r for k, r in log_kuponow.items()
+        if not r.get("wynik")
+        or now - (r.get("rozliczono_ts") or now) < 21 * 86400
+    }
     supa.put_key("kupony_log", log_kuponow)
 
     # ---- podsumowanie do UI ----

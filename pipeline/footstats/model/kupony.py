@@ -53,6 +53,11 @@ def _kandydaci(bets: list[dict]) -> list[dict]:
     return out
 
 
+def _kara_korelacji(na_mecz: dict[int, int]) -> float:
+    """Łączna kara szansy kuponu za skorelowane legi (kolejne z 1 meczu)."""
+    return KARA_KORELACJI ** sum(max(c - 1, 0) for c in na_mecz.values())
+
+
 def _sygnatura(kupon: dict) -> frozenset:
     """Zestaw legów kuponu — do wykrywania duplikatów między stylami."""
     return frozenset(
@@ -173,7 +178,16 @@ def _rentgen(
             best = b
     if best is None:
         return
-    p_po = p_bez * best["p_model"]
+    # p kuponu zawiera karę korelacyjną — zamiana lega może ją zmienić
+    # (np. replacement dokłada drugiego lega z meczu, który już ma jeden)
+    na_mecz_przed = dict(na_mecz)
+    na_mecz_przed[slaby["mecz_id"]] = na_mecz_przed.get(slaby["mecz_id"], 0) + 1
+    na_mecz_po = dict(na_mecz)
+    na_mecz_po[best["mecz_id"]] = na_mecz_po.get(best["mecz_id"], 0) + 1
+    p_po = (
+        p_bez * best["p_model"]
+        * _kara_korelacji(na_mecz_po) / _kara_korelacji(na_mecz_przed)
+    )
     if p_po <= kupon["p_model"] + 1e-9:
         return
     kupon["alternatywa"] = {

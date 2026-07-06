@@ -5,9 +5,9 @@ import { getMeta, getValueBets, getZawodnicy } from "@/lib/data";
 export default async function OkazjePage({
   searchParams,
 }: {
-  searchParams: Promise<{ mecz?: string }>;
+  searchParams: Promise<{ mecz?: string; rodzaj?: string }>;
 }) {
-  const { mecz } = await searchParams;
+  const { mecz, rodzaj } = await searchParams;
   const [bets, zawodnicy, meta] = await Promise.all([
     getValueBets(),
     getZawodnicy(),
@@ -52,6 +52,14 @@ export default async function OkazjePage({
         bets={bets}
         zawodnicy={zawodnicy}
         initialMatchId={mecz ? Number(mecz) : undefined}
+        initialRodzaj={
+          rodzaj === "okazje" ||
+          rodzaj === "pewniaki" ||
+          rodzaj === "sugestie" ||
+          rodzaj === "wszystko"
+            ? rodzaj
+            : undefined
+        }
       />
     </>
   );

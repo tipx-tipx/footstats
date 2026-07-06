@@ -22,6 +22,15 @@ export function PominKupon({
   >("aktywny");
 
   useEffect(() => {
+    // sprzątanie: wpisy starsze niż 14 dni (pipeline dawno zwolnił slot);
+    // wartości sprzed wersji z timestampem ("1") też wypadają
+    const teraz = Date.now();
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i);
+      if (!k?.startsWith("kupon-pominiety:")) continue;
+      const ts = Number(localStorage.getItem(k));
+      if (!ts || teraz - ts > 14 * 86_400_000) localStorage.removeItem(k);
+    }
     if (klucz && localStorage.getItem(`kupon-pominiety:${klucz}`)) {
       setStan("pominiety");
     }
@@ -30,6 +39,14 @@ export function PominKupon({
   if (!klucz) return <>{children}</>;
 
   const pomin = async () => {
+    // nieodwracalne (globalny stan pipeline'u) — jeden klik to za mało
+    if (
+      !window.confirm(
+        "Pominąć ten kupon? Zniknie z aktywnych, a w jego miejsce po następnym cyklu powstanie nowy.",
+      )
+    ) {
+      return;
+    }
     setStan("wysylam");
     try {
       const r = await fetch("/api/kupon-pomin", {
@@ -38,7 +55,7 @@ export function PominKupon({
         body: JSON.stringify({ klucz }),
       });
       if (!r.ok) throw new Error(String(r.status));
-      localStorage.setItem(`kupon-pominiety:${klucz}`, "1");
+      localStorage.setItem(`kupon-pominiety:${klucz}`, String(Date.now()));
       setStan("pominiety");
     } catch {
       setStan("blad");

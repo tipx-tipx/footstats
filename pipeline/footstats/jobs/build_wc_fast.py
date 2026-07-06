@@ -30,7 +30,9 @@ from curl_cffi import requests
 from dataclasses import replace as dc_replace
 
 from .. import supa
-from ..engine import MatchContext, PlayerHistory, RARE_MARKETS, score_player_market
+from ..engine import (
+    MatchContext, PlayerHistory, RARE_MARKETS, _select_bias, score_player_market,
+)
 from ..model import betting, context, counts, kupony, matchup_lite, tempo
 from ..sources import eloratings, rotowire, scores365, statshub, superbet
 from . import rozliczanie
@@ -702,6 +704,14 @@ def main():
                 f"{mk} ×{v['global']}" for mk, v in bias_map.items()))
     except Exception:
         bias_map = {}
+    # sugestie STS uczą się na własnych rozliczeniach (osobna pula błędu)
+    try:
+        bias_map_sug = rozliczanie.market_bias_sugestie()
+        if bias_map_sug:
+            print("Kalibracja sugestii: " + ", ".join(
+                f"{mk} ×{v['global']}" for mk, v in bias_map_sug.items()))
+    except Exception:
+        bias_map_sug = {}
 
     ev_by_id = {e["id"]: e for e in events}
     sb_cache: dict[int, dict] = {}
@@ -940,7 +950,9 @@ def main():
             # pula pewniaków pod kupony: wysoka szansa + rozsądny kurs,
             # bez wymogu value, ale z TYMI SAMYMI bezpiecznikami rozbieżności
             # co okazje — model skrajnie niezgodny z rynkiem zwykle się myli
-            for side_key, side_pl in (("over", "powyzej"), ("under", "ponizej")):
+            # gramy wyłącznie "powyżej" (decyzja usera); under ma też wadę
+            # modelową: P(nie zagra) wchodzi do dołu, a buk daje wtedy zwrot
+            for side_key, side_pl in (("over", "powyzej"),):
                 sv = slot.get(side_key)
                 if not sv:
                     continue
@@ -962,6 +974,7 @@ def main():
                 )
                 if (
                     (pewny or perelka)
+                    and len(tr.counts) >= 5  # pewniak nie powstaje z 2 meczów
                     and (sm.ci_high - sm.ci_low) <= 0.35
                     and abs(p_side - implied) <= betting.MAX_MODEL_MARKET_DIVERGENCE
                     and (implied <= 0 or p_side / implied <= betting.MAX_RELATIVE_DIVERGENCE)
@@ -995,6 +1008,8 @@ def main():
                     best_by_side[a.side] = a
                     chosen[a.side] = (sm, l, slot)
         for a in best_by_side.values():
+            if a.side != "powyzej":
+                continue  # underów nie gramy (decyzja usera)
             sm, l, slot = chosen[a.side]
             side_key = "over" if a.side == "powyzej" else "under"
             kurs_wziety, book = slot[side_key]
@@ -1076,6 +1091,10 @@ def main():
         for linia_s in (0.5, 1.5, 2.5, 3.5):
             thr = int(linia_s) + 1  # "powyżej 1.5" = X >= 2
             p_over_l = float(sum(dist_r[thr:])) if thr < len(dist_r) else 0.0
+            # kalibracja sugestii z ich własnych rozliczeń (rozkład jej nie ma)
+            p_over_l = min(
+                1.0, p_over_l * _select_bias(bias_map_sug.get(mk, 1.0), p_over_l)
+            )
             # linia bazowa musi być prawdopodobna; wyższe warianty pokazujemy
             # już od ~38% (fair ~2.6 — typowy zakres kursów STS)
             if p_over_l < (0.5 if linia_s == 0.5 else 0.38):
@@ -1104,6 +1123,9 @@ def main():
             for line in (0.5, 1.5, 2.5):
                 thr = int(line)  # "powyżej line" = X > floor(line)
                 p_over = float(_st.poisson.sf(thr, lam))
+                p_over = min(
+                    1.0, p_over * _select_bias(bias_map_sug.get(mk, 1.0), p_over)
+                )
                 if p_over < (0.5 if line == 0.5 else 0.38):
                     break
                 _push_sugestia(pid, mk, info, lam, p_over, line, {

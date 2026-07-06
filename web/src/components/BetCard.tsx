@@ -89,10 +89,17 @@ function tierPewniaka(bet: ValueBet): {
     };
   }
   if (bet.p_model < 0.52) {
+    if ((bet.kurs ?? 0) >= 1.9) {
+      return {
+        label: "◆ perełka",
+        cls: "bg-data-amber-wash text-[#8a5613]",
+        opis: "Wyższy kurs (1,9+) przy wciąż sensownej szansie — okazjonalny rodzynek na kupon, nie pewniak",
+      };
+    }
     return {
-      label: "◆ perełka",
-      cls: "bg-data-amber-wash text-[#8a5613]",
-      opis: "Wyższy kurs (1,9+) przy wciąż sensownej szansie — okazjonalny rodzynek na kupon, nie pewniak",
+      label: "ryzykowny",
+      cls: "bg-paper text-muted",
+      opis: "Szansa modelu poniżej 52% bez wysokiego kursu — najsłabsza kategoria, traktuj ostrożnie",
     };
   }
   if (bet.p_model >= 0.75) {

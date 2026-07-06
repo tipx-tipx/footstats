@@ -24,7 +24,7 @@
   --color-hairline-strong: #cbd6cf;
 
   /* --- kolory danych (wykresy, badge) — zwalidowane --- */
-  --color-data-green: #1f9d66;
+  --color-data-green: #17824f; /* 4.84:1 na bieli i pod białym tekstem (WCAG AA) */
   --color-data-amber: #c77e1f;
   --color-data-red: #c2452d;
   --color-data-green-wash: #e3f3ea;

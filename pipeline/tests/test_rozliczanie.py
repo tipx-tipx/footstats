@@ -32,6 +32,32 @@ def test_bias_capped_and_ignores_voids():
     assert bias == rozliczanie.BIAS_CAP[1]  # capowane, mimo że surowo ~1.9
 
 
+def _rec_s(mk, p, wynik, sugestia=False):
+    return {"rynek_kod": mk, "p_model": p, "wynik": wynik, "sugestia": sugestia}
+
+
+def test_bias_sugestii_liczony_osobno():
+    log = {}
+    # typy z kursem: dobrze skalibrowane (70% traf przy p=0.7)
+    for i in range(30):
+        log[f"t{i}"] = _rec_s("shots", 0.7, "wygrany" if i < 21 else "przegrany")
+    # sugestie STS: fatalne (17% traf przy p=0.6) — nie mogą psuć typów
+    for i in range(30):
+        log[f"s{i}"] = _rec_s(
+            "shots_off_target", 0.6, "wygrany" if i < 5 else "przegrany",
+            sugestia=True,
+        )
+    typy = rozliczanie.compute_bias_full(log)
+    assert "shots_off_target" not in typy          # sugestie odfiltrowane
+    assert abs(typy["shots"]["global"] - 1.0) < 0.05
+    sug = rozliczanie.compute_bias_full(
+        log, sugestie=True, cap=rozliczanie.SUGESTIA_BIAS_CAP
+    )
+    assert "shots" not in sug                      # typy odfiltrowane
+    # surowo ~0.35, ale cap sugestii pozwala zejść niżej niż typom
+    assert sug["shots_off_target"]["global"] == rozliczanie.SUGESTIA_BIAS_CAP[0]
+
+
 # ---- cykl życia kuponów w logu ----
 
 def _leg(mecz_id, podmiot_id, kickoff=10_000, kurs=2.0):
@@ -115,6 +141,19 @@ def test_rozliczenie_kuponu_z_legow():
     hist = rozliczanie._rozlicz_kupony(log, typy_log, now=50_000)
     assert hist[0]["wynik"] == "wygrany"
     assert hist[0]["kurs_rozliczony"] == 4.0  # zwrot wyłącza lega z kursu
+
+
+def test_kupon_z_samych_zwrotow_to_zwrot():
+    log = {}
+    rozliczanie._kupon_do_logu(log, [_kupon()], now=1_000)
+    typy_log = {
+        "1:p11:shots:1.5:powyzej": {"wynik": "zwrot"},
+        "2:p22:shots:1.5:powyzej": {"wynik": "zwrot"},
+        "3:p33:shots:1.5:powyzej": {"wynik": "zwrot"},
+    }
+    hist = rozliczanie._rozlicz_kupony(log, typy_log, now=50_000)
+    assert hist[0]["wynik"] == "zwrot"          # stawka wraca, nie "wygrany"
+    assert hist[0]["kurs_rozliczony"] == 1.0
 
 
 def test_przegrany_od_pierwszego_pudla():

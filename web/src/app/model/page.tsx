@@ -301,7 +301,9 @@ export default async function ModelPage() {
                             ? "✗ przegrany"
                             : k.wynik === "anulowany"
                               ? "anulowany (składy)"
-                              : "w grze"}
+                              : k.wynik === "zwrot"
+                                ? "zwrot (stawka wraca)"
+                                : "w grze"}
                       </span>
                     </div>
                     <p className="font-data mt-2 flex items-center justify-between text-xs text-muted">

@@ -200,8 +200,9 @@ export interface TypRozliczony {
 export interface KuponHistoria extends Kupon {
   dzien: string;
   opublikowano_ts: number;
-  /** "anulowany" = unieważniony przez zmianę ogłoszonych składów */
-  wynik: "wygrany" | "przegrany" | "anulowany" | null;
+  /** "anulowany" = unieważniony przez zmianę ogłoszonych składów;
+   *  "zwrot" = wszystkie legi zwrócone (stawka wraca, kurs 1.0) */
+  wynik: "wygrany" | "przegrany" | "anulowany" | "zwrot" | null;
   powod?: string;
   slot?: string;
   klucz?: string;

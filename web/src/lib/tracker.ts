@@ -66,6 +66,7 @@ export function onZakladyChange(cb: () => void): () => void {
 
 /** CLV — o ile lepszy kurs wzięliśmy niż kurs zamknięcia. */
 export function clvPct(z: MojZaklad): number | null {
-  if (!z.kurs_zamkniecia) return null;
+  // kurs < 1 nie istnieje — literówka w polu dawałaby absurdalne CLV
+  if (!z.kurs_zamkniecia || z.kurs_zamkniecia < 1) return null;
   return (z.kurs / z.kurs_zamkniecia - 1) * 100;
 }

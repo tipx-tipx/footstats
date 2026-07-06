@@ -169,11 +169,15 @@ export function BetTracker() {
                     step={10}
                     value={z.stawka ?? ""}
                     placeholder="zł"
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const v = Number(e.target.value);
                       updateZaklad(z.id, {
-                        stawka: e.target.value ? Number(e.target.value) : null,
-                      })
-                    }
+                        stawka:
+                          e.target.value && Number.isFinite(v)
+                            ? Math.max(0, v)
+                            : null,
+                      });
+                    }}
                     className="font-data w-20 rounded-md border border-hairline bg-paper px-2 py-1 text-sm"
                   />
                 </label>
@@ -186,13 +190,13 @@ export function BetTracker() {
                     step={0.01}
                     value={z.kurs_zamkniecia ?? ""}
                     placeholder="—"
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const v = Number(e.target.value);
                       updateZaklad(z.id, {
-                        kurs_zamkniecia: e.target.value
-                          ? Number(e.target.value)
-                          : null,
-                      })
-                    }
+                        kurs_zamkniecia:
+                          e.target.value && Number.isFinite(v) ? v : null,
+                      });
+                    }}
                     className="font-data w-20 rounded-md border border-hairline bg-paper px-2 py-1 text-sm"
                   />
                 </label>
