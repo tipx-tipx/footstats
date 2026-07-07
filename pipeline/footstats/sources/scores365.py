@@ -373,11 +373,26 @@ def _stat_val(v) -> float:
         return 0.0
 
 
+def _poz_z_formacji(m: dict) -> str:
+    """365 formation.name ("Centre Back", "Central Midfield") -> G/D/M/F."""
+    nm = str(((m.get("formation") or {}).get("name")) or "").upper()
+    if "GOALKEEPER" in nm:
+        return "G"
+    if "MIDFIELD" in nm:               # też Defensive/Attacking Midfield
+        return "M"
+    if "BACK" in nm or "DEFEN" in nm:  # też Left/Right Wing Back
+        return "D"
+    if "WING" in nm or "FORWARD" in nm or "STRIKER" in nm or "ATTACK" in nm:
+        return "F"
+    return ""
+
+
 def game_player_match_stats(game_id: int) -> dict[str, dict[str, float]]:
     """Pełne staty meczu per zawodnik: minuty, strzały, faule, przechwyty...
 
     Zwraca {znormalizowane nazwisko: {"minutes": 90, "shots": 2, ...,
-    "started": 1.0/0.0, "sot": ... (z chartEvents)}}.
+    "started": 1.0/0.0, "sot": ... (z chartEvents), "pos": "D"/"M"/"F"/"G"
+    (litera formacji — pod kubełki profilu rywala)}}.
     """
     if game_id in _full_cache:
         return _full_cache[game_id]
@@ -392,8 +407,9 @@ def game_player_match_stats(game_id: int) -> dict[str, dict[str, float]]:
             name = names.get(int(m.get("id") or 0))
             if not name:
                 continue
-            rec: dict[str, float] = {
+            rec: dict = {
                 "started": 1.0 if m.get("statusText") == "Starting" else 0.0,
+                "pos": _poz_z_formacji(m),
             }
             for s in m.get("stats") or []:
                 kod = STAT_NAME_MAP.get(str(s.get("name")))

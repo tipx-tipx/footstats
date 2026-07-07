@@ -49,3 +49,17 @@ def test_resolve_player_key_exact_and_fuzzy():
     assert s365.resolve_player_key(keys, "Mohamed Salah") == "mohamed salah"
     assert s365.resolve_player_key(keys, "Nicolás Paz") == "nico paz"
     assert s365.resolve_player_key(keys, "Julian Alvarez") is None
+
+
+def test_poz_z_formacji_mapuje_kubelki():
+    def m(nazwa):
+        return {"formation": {"name": nazwa}}
+    assert s365._poz_z_formacji(m("Goalkeeper")) == "G"
+    assert s365._poz_z_formacji(m("Centre Back")) == "D"
+    assert s365._poz_z_formacji(m("Left Wing Back")) == "D"   # wahadlowy to obrona
+    assert s365._poz_z_formacji(m("Central Midfield")) == "M"
+    assert s365._poz_z_formacji(m("Defensive Midfield")) == "M"
+    assert s365._poz_z_formacji(m("Right Winger")) == "F"
+    assert s365._poz_z_formacji(m("Striker")) == "F"
+    assert s365._poz_z_formacji(m("")) == ""
+    assert s365._poz_z_formacji({}) == ""

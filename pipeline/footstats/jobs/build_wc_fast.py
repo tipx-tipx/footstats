@@ -483,9 +483,21 @@ def main():
     # meczów MŚ i przepinamy na nowy event (rywal/kontekst neutralne, składy
     # z Rotowire, kursy z Superbetu).
     covered = {t.event_id for t in trends}
+    # sygnał przewidywanego/oficjalnego składu (in_predicted_lineup) jest
+    # wiarygodny per (mecz, zawodnik) TYLKO dla trendów z żywego feedu —
+    # dokładane niżej trendy z banku/365 mają tam zawsze False i bez tej
+    # mapy wyglądałyby przy ogłoszonym składzie jak "wszyscy poza XI"
+    xi_zywy: dict[tuple[int, int], bool] = {}
+    for t in trends:
+        if t.event_id and t.player_id:
+            k_xi = (t.event_id, t.player_id)
+            xi_zywy[k_xi] = xi_zywy.get(k_xi, False) or t.in_predicted_lineup
     uncovered = [
         e for e in events
         if e["id"] not in covered and e.get("homeTeamId") and e.get("awayTeamId")
+    ]
+    wszystkie_ev = [
+        e for e in events if e.get("homeTeamId") and e.get("awayTeamId")
     ]
     # timestampy meczów reprezentacji per drużyna (z historii 365Scores) —
     # do oznaczania "kadra vs klub" w formie zawodnika
@@ -523,7 +535,11 @@ def main():
         }
         save_trend_lib(bank_recs)
 
-        # 3) mecze bez propsów statshub: przepnij najświeższe trendy z biblioteki
+        # 3) przepnij najświeższe trendy z biblioteki na KAŻDY nadchodzący
+        #    mecz, którego żywy feed nie pokrywa w danym (zawodnik, rynek) —
+        #    wcześniej robiliśmy to tylko dla meczów CAŁKIEM bez propsów,
+        #    przez co 2-3 żywe trendy "zasłaniały" cały bank (odbiory,
+        #    faule ról drugoplanowych) i pula pewniaków była samymi gwiazdami
         team_by_id: dict[int, str] = {}
         for t in lib.values():
             if t.team_id:
@@ -531,13 +547,19 @@ def main():
             if t.opponent_id:
                 team_by_id[t.opponent_id] = t.opponent_name
         n_lib = 0
-        for e in uncovered:
+        juz_w_trendach = {
+            (t.event_id, t.player_id, t.market_code) for t in trends
+        }
+        for e in wszystkie_ev:
             hid, aid = e["homeTeamId"], e["awayTeamId"]
             if not team_by_id.get(hid) or not team_by_id.get(aid):
                 continue  # nieznana drużyna = brak historii i pusta karta meczu
             for (pid, mk), t in lib.items():
                 if t.team_id not in (hid, aid):
                     continue
+                if (e["id"], pid, mk) in juz_w_trendach:
+                    continue  # żywy feed już to pokrywa
+                juz_w_trendach.add((e["id"], pid, mk))
                 opp_id = aid if t.team_id == hid else hid
                 trends.append(dc_replace(
                     t,
@@ -546,25 +568,27 @@ def main():
                     opponent_name=team_by_id.get(opp_id, ""),
                     is_home=(t.team_id == hid),
                     opponent_average=None, opponent_rank=None,
-                    in_predicted_lineup=False, ref_odds=[],
+                    in_predicted_lineup=xi_zywy.get((e["id"], pid), False),
+                    ref_odds=[],
                 ))
                 n_lib += 1
         if n_lib:
             print(f"Biblioteka historii ({len(lib)} trendów w banku): "
-                  f"+{n_lib} przepiętych na mecze bez propsów statshub")
+                  f"+{n_lib} przepiętych na nadchodzące mecze")
 
         # 4) uzupełnij braki PER ZAWODNIK×RYNEK z pełnych statystyk meczowych
-        #    365Scores (minuty, strzały, faule, faule na zawodniku, przechwyty;
-        #    odbiory — brak w 365). Bank rzadko ma całą kadrę — wcześniejsza
-        #    wersja pomijała drużynę, gdy miała w banku choć jeden trend.
+        #    365Scores (minuty, strzały, faule, faule na zawodniku, przechwyty,
+        #    spalone; odbiory — brak w 365). Dla WSZYSTKICH meczów — nie tylko
+        #    niepokrytych: bank rzadko ma całą kadrę, a to właśnie tu rodzą
+        #    się typy kontekstowe na role drugoplanowe (nie same gwiazdy).
         MARKETY_365_FULL = ("shots", "sot", "fouls_committed", "fouls_won",
-                            "interceptions")
+                            "interceptions", "offsides")
         pokryci = {
             (t.team_id, rotowire._norm(t.player_name), t.market_code)
             for t in trends
         }
         zespoly: list[tuple[dict, int, int, bool, str, str]] = []
-        for e in uncovered:
+        for e in wszystkie_ev:
             hid, aid = e["homeTeamId"], e["awayTeamId"]
             slug_parts = str(e.get("slug", "")).replace("-vs-", "|").split("|")
             if len(slug_parts) != 2:
@@ -597,10 +621,24 @@ def main():
                     zagrane = [w for w in wpisy if w[1] and w[1].get("minutes", 0) > 0]
                     if len(zagrane) < 3:
                         continue
+                    # pozycja z formacji 365 (dominująca litera) — trafia do
+                    # kubełka profilu rywala; wcześniejsze "M" na sztywno
+                    # wrzucało obrońców i napastników do złego kubełka
+                    poz_licznik: dict[str, int] = {}
+                    for _, rec in zagrane:
+                        p_l = str(rec.get("pos") or "")
+                        if p_l:
+                            poz_licznik[p_l] = poz_licznik.get(p_l, 0) + 1
+                    poz_gl = max(poz_licznik, key=poz_licznik.get) \
+                        if poz_licznik else "M"
+                    if poz_gl == "G":
+                        continue  # rynki zawodników z pola — bramkarz zbędny
+                    pid_365 = (900_000_000
+                               + zlib.crc32(pkey.encode("utf-8")) % 90_000_000)
                     for mk in MARKETY_365_FULL:
                         if (tid, pkey, mk) in pokryci:
                             continue  # jest już trend z banku/statshub
-                        c_l, m_l, tss, st_l = [], [], [], []
+                        c_l, m_l, tss, st_l, poz_l = [], [], [], [], []
                         for ts_g, rec in wpisy:
                             if rec is None:
                                 continue
@@ -608,23 +646,24 @@ def main():
                             m_l.append(float(rec.get("minutes", 0)))
                             tss.append(int(ts_g))
                             st_l.append(bool(rec.get("started")))
+                            poz_l.append(str(rec.get("pos") or ""))
                         trends.append(statshub.StatshubTrend(
                             # hash() jest randomizowany per proces — id musi
                             # być STABILNE między cyklami (log typów, kupony)
-                            player_id=900_000_000
-                            + zlib.crc32(pkey.encode("utf-8")) % 90_000_000,
+                            player_id=pid_365,
                             player_name=pkey.title(),
-                            position="M",
+                            position=poz_gl,
                             team_id=tid, team_name=team_nm,
                             opponent_id=opp_tid, opponent_name=opp_nm,
                             is_home=is_home, market_code=mk, line=0.5,
-                            in_predicted_lineup=False,
+                            in_predicted_lineup=xi_zywy.get(
+                                (e["id"], pid_365), False),
                             league_average=None, opponent_average=None,
                             opponent_rank=None, total_ranks=None,
                             event_id=e["id"],
                             counts=c_l, minutes=m_l,
                             timestamps=tss, started=st_l,
-                            game_positions=[""] * len(c_l),
+                            game_positions=poz_l,
                         ))
                         n_365 += 1
             if n_365:
@@ -837,8 +876,9 @@ def main():
 
     # zawodnicy POZA ogłoszonym składem (twardy sygnał z statshub lub Rotowire)
     # — unieważniają zamrożone kupony z ich legami (patrz rozliczanie).
-    # in_predicted_lineup jest wiarygodne TYLKO dla trendów z żywego feedu
-    # statshub (covered) — trendy z banku/365 mają tam zawsze False.
+    # in_predicted_lineup jest wiarygodne TYLKO dla (mecz, zawodnik) z żywego
+    # feedu statshub (xi_zywy) — trendy z banku/365 spoza niego mają False,
+    # które znaczy "brak sygnału", nie "poza składem".
     niedostepni: set[int] = set()
     for t in trends:
         if not t.player_id or not t.event_id:
@@ -846,7 +886,7 @@ def main():
         rp = rotowire.predicted_status(roto, t.team_name, t.player_name)
         if (
             lineup_confirmed.get(t.event_id)
-            and t.event_id in covered
+            and (t.event_id, t.player_id) in xi_zywy
             and not t.in_predicted_lineup
         ) or (rotowire.is_confirmed(roto, t.team_name) and rp is False):
             niedostepni.add(t.player_id)
@@ -939,10 +979,13 @@ def main():
         )
         built, hist = score_from_trend(
             tr, tr.opponent_average,
-            # potwierdzony skład wolno czytać z in_predicted_lineup tylko dla
-            # trendów z żywego feedu statshub — bank/365 mają tam False
-            lineup_confirmed=lineup_confirmed.get(mid, False) and mid in covered,
-            predicted_available=predicted_available.get(mid, False),
+            # potwierdzony/przewidywany skład wolno czytać z in_predicted_lineup
+            # tylko dla (mecz, zawodnik) z żywego feedu statshub — trendy
+            # banku/365 spoza niego mają False = "brak sygnału"
+            lineup_confirmed=lineup_confirmed.get(mid, False)
+            and (mid, tr.player_id) in xi_zywy,
+            predicted_available=predicted_available.get(mid, False)
+            and (mid, tr.player_id) in xi_zywy,
             roto_pred=rotowire.predicted_status(roto, tr.team_name, tr.player_name),
             roto_confirmed=rotowire.is_confirmed(roto, tr.team_name),
             matchup_factor=mf if mf != 1.0 else None,
