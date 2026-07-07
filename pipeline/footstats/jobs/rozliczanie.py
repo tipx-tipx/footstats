@@ -41,9 +41,10 @@ MARKETY_365 = {
 }
 # rynki z pełnych statystyk meczowych 365Scores (lineups.members[].stats) —
 # dostępne od razu po meczu, bez czekania na odświeżenie banku trendów
-MARKETY_365_STATY = {"fouls_committed", "fouls_won", "interceptions"}
+MARKETY_365_STATY = {"fouls_committed", "fouls_won", "interceptions", "offsides"}
 # rynki rozliczane z banku trendów statshub (odbiory nie występują w 365)
-MARKETY_LIB = {"fouls_committed", "tackles", "fouls_won", "interceptions"}
+MARKETY_LIB = {"fouls_committed", "tackles", "fouls_won", "interceptions",
+               "offsides"}
 
 # --- Superzmiana (Superbet): gdy wytypowany zawodnik zostanie zmieniony,
 # statystyki jego zmiennika doliczają się do zakładu. Objęte rynki wg
