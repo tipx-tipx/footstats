@@ -204,6 +204,37 @@ def test_pominiety_blokuje_tez_prawie_identyczny_zestaw():
     assert len(log) == 2
 
 
+def test_wymiana_lega_publikuje_wariant_w_slocie():
+    log = {}
+    rozliczanie._kupon_do_logu(log, [_kupon()], now=1_000)
+    klucz = next(iter(log))
+    rec = log[klucz]
+    rec["alternatywa"] = {
+        **_leg(3, 99, kickoff=14_000, kurs=2.5),
+        "zamiast_idx": 2, "kurs_po": 10.0, "p_po": 0.35,
+    }
+    rozliczanie._kupon_do_logu(log, [], now=2_000, wymiany={klucz})
+    assert rec["pominiety"] is True
+    assert rec["pomin_powod"] == "wymiana lega"
+    nowe = [r for r in log.values() if r.get("z_wymiany")]
+    assert len(nowe) == 1
+    n = nowe[0]
+    assert n["slot"] == rec["slot"] and n["wynik"] is None
+    assert n["kurs_laczny"] == 10.0 and n["p_model"] == 0.35
+    assert {l["podmiot_id"] for l in n["legi"]} == {11, 22, 99}
+
+
+def test_przywrocenie_pominietego_gdy_slot_wolny():
+    log = {}
+    rozliczanie._kupon_do_logu(log, [_kupon()], now=1_000)
+    klucz = next(iter(log))
+    rozliczanie._kupon_do_logu(log, [], now=2_000, pominiete={klucz})
+    assert log[klucz]["pominiety"] is True
+    # klucz znika z pominiętych (user kliknął "przywróć") -> kupon wraca
+    rozliczanie._kupon_do_logu(log, [], now=3_000, pominiete=set())
+    assert log[klucz]["pominiety"] is False
+
+
 def test_stary_przedzial_schodzi_z_widoku_jak_pominiety():
     log = {}
     rozliczanie._kupon_do_logu(log, [_kupon(cel_label="12–25")], now=1_000)

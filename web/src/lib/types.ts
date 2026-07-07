@@ -156,6 +156,10 @@ export interface KuponLeg {
   kickoff_ts: number;
   /** wynik lega z logu rozliczeń (null/brak = jeszcze w grze) */
   wynik?: "wygrany" | "przegrany" | "zwrot" | null;
+  /** kontekst lega: profil rywala / debiut w XI / niespójna siatka buka */
+  matchup?: boolean;
+  rotacja?: boolean;
+  miekka_linia?: boolean;
 }
 
 /** Propozycja wymiany najsłabszego lega (rentgen kuponu — doradcza). */
@@ -192,6 +196,10 @@ export interface Kupon {
   /** ile meczów kuponu miało POTWIERDZONE składy w chwili budowy */
   mecze_ze_skladami?: number;
   mecze_lacznie?: number;
+  /** alternatywny, wyraźnie inny zestaw z tej samej puli (podglądowy) */
+  wariant_b?: Kupon;
+  /** true = kupon powstał z wymiany lega (zastosowana alternatywa rentgena) */
+  z_wymiany?: boolean;
   /** klucz rekordu w logu kuponów — identyfikator do pomijania */
   klucz?: string;
 }
@@ -231,6 +239,8 @@ export interface KuponHistoria extends Kupon {
   legi_rozliczone?: number;
   /** true = user pominął kupon (nie zagrał) — rozliczony tylko do nauki */
   pominiety?: boolean;
+  /** powód pominięcia (user) albo techniczny: wymiana lega / przebudowa */
+  pomin_powod?: string | null;
 }
 
 /** Skuteczność realnych typów (log rozliczany automatycznie po meczach). */
@@ -256,6 +266,11 @@ export interface TypyWyniki {
   }[];
   ostatnie: TypRozliczony[];
   kupony?: KuponHistoria[];
+  /** ROI kuponów per horyzont (stawka 1 j./kupon; bez pominiętych) */
+  kupony_roi?: Record<
+    string,
+    { n: number; wygrane: number; zwrot_j: number; roi_j: number }
+  >;
 }
 
 /** Zakład zapisany w trackerze (localStorage). */

@@ -146,6 +146,31 @@ def test_rentgen_bez_alternatywy_gdy_nic_nie_poprawia():
     assert "alternatywa" not in kupon
 
 
+def test_wariant_b_wyraznie_inny():
+    pool = [
+        _leg(mecz, mecz * 10 + i, 1.45, 0.72, kickoff=10_000)
+        for mecz in range(1, 4)
+        for i in range(6)
+    ]
+    out = kupony.build_kupony([], pool, now_ts=0)
+    k = next(k for k in out if k.get("horyzont") == "dzienny")
+    wb = k.get("wariant_b")
+    assert wb is not None
+    assert wb["cel_label"] == k["cel_label"]
+    sa = {(l["mecz_id"], l["podmiot_id"]) for l in k["legi"]}
+    sb = {(l["mecz_id"], l["podmiot_id"]) for l in wb["legi"]}
+    assert len(sa & sb) / len(sa | sb) < 0.5  # wyraźnie inny zestaw
+
+
+def test_profil_bezpieczny_odrzuca_ryzykowne_legi():
+    pool = [_leg(m, m * 10 + i, 1.45, 0.72, kickoff=10_000)
+            for m in range(1, 4) for i in range(4)]
+    ryzykowne = [_leg(m, 900 + m, 2.4, 0.45, kickoff=10_000) for m in range(1, 4)]
+    out = kupony.build_kupony([], pool + ryzykowne, now_ts=0, profil="bezpieczny")
+    for k in out:
+        assert all(l["p_model"] >= 0.58 for l in k["legi"])
+
+
 def test_dzienne_do_czterech_przedzialow():
     pool = [
         _leg(mecz, mecz * 10 + i, 1.45, 0.72, kickoff=10_000)

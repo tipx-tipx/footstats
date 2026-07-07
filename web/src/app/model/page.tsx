@@ -242,6 +242,49 @@ export default async function ModelPage() {
             (zawodnik nie zagrał) wyłącza go z kursu — jak u bukmachera.
             Statystyki liczone w regularnym czasie gry, bez dogrywek.
           </p>
+          {/* ROI kuponów per horyzont: stawka 1 j./kupon, pominięte nie grają */}
+          {typy.kupony_roi && Object.keys(typy.kupony_roi).length > 0 && (
+            <div className="mt-4 grid max-w-4xl gap-3 sm:grid-cols-3">
+              {(["dzienny", "dlugoterminowy", "value"] as const).map((h) => {
+                const d = typy.kupony_roi![h];
+                if (!d) return null;
+                const label =
+                  h === "dzienny"
+                    ? "dzienne"
+                    : h === "value"
+                      ? "value"
+                      : "długoterminowe";
+                return (
+                  <div
+                    key={h}
+                    className="rounded-xl border border-hairline bg-card px-4 py-3 shadow-(--shadow-card)"
+                  >
+                    <p className="text-[10px] uppercase tracking-wide text-faint">
+                      kupony {label} · zagrane {d.n}
+                    </p>
+                    <p className="font-data mt-1 text-lg font-semibold">
+                      <span
+                        className={
+                          d.roi_j > 0
+                            ? "text-data-green"
+                            : d.roi_j < 0
+                              ? "text-data-red"
+                              : ""
+                        }
+                      >
+                        {d.roi_j > 0 ? "+" : ""}
+                        {d.roi_j.toFixed(2).replace(".", ",")} j.
+                      </span>
+                    </p>
+                    <p className="mt-0.5 text-xs text-muted">
+                      wygrane {d.wygrane}/{d.n} · z {d.n} j. wróciło{" "}
+                      {d.zwrot_j.toFixed(2).replace(".", ",")} j.
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
           {/* items-start: rozwinięcie jednego kuponu nie rozciąga sąsiada
               w rzędzie (puste białe tło) — każda karta trzyma swoją wysokość */}
           <div className="mt-4 grid max-w-4xl items-start gap-3 sm:grid-cols-2">
@@ -277,7 +320,11 @@ export default async function ModelPage() {
                         {k.pominiety && (
                           <span
                             className="rounded bg-paper px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-faint"
-                            title="Pominięty przyciskiem — niezagrany, rozliczony tylko po to, żeby model się uczył"
+                            title={
+                              k.pomin_powod
+                                ? `Pominięty (${k.pomin_powod}) — niezagrany, rozliczony tylko do nauki modelu`
+                                : "Pominięty przyciskiem — niezagrany, rozliczony tylko po to, żeby model się uczył"
+                            }
                           >
                             pominięty
                           </span>

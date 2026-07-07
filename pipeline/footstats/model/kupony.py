@@ -101,6 +101,7 @@ def _leg_dict(b: dict) -> dict:
         "druzyna": b.get("druzyna", ""),
         "matchup": bool(b.get("matchup")),
         "rotacja": bool(b.get("rotacja")),
+        "miekka_linia": bool(b.get("miekka_linia")),
         "rynek_kod": b.get("rynek_kod", ""),
         "rynek": b["rynek"],
         "linia": b["linia"],
@@ -134,6 +135,7 @@ def _zloz_pewniaki(
     cmax: float,
     max_na_mecz: int = MAX_NA_MECZ,
     min_legi: int = 3,
+    profil: str = "zbalansowany",
 ) -> dict | None:
     """Maksymalizuj szansę kuponu przy kursie łącznym w przedziale [cmin, cmax].
 
@@ -145,12 +147,20 @@ def _zloz_pewniaki(
     dostają lekki priorytet. Przy ustalonym kursie max szansa = max EV,
     więc ten sam builder składa też kupony value.
     """
+    # profil charakteru (ustawienie usera): bezpieczny = same kotwice,
+    # agresywny = mocniejsza preferencja matchupów i wyższych linii
+    if profil == "bezpieczny":
+        pool = [b for b in pool if b["p_model"] >= 0.58]
+
     def _q(b: dict) -> float:
         q = math.log(b["p_model"]) / math.log(b["kurs"])
-        if b.get("matchup"):
-            q *= 0.93   # bliżej zera = wyżej w kolejce
-        if b.get("swieze_sklady"):
-            q *= 0.96
+        if profil != "bezpieczny":
+            if b.get("matchup"):
+                q *= 0.88 if profil == "agresywny" else 0.93
+            if b.get("swieze_sklady"):
+                q *= 0.93 if profil == "agresywny" else 0.96
+            if profil == "agresywny" and (b.get("linia") or 0) >= 1.5:
+                q *= 0.95   # wyższe linie wyżej w kolejce
         return q
 
     cands = sorted(
@@ -194,20 +204,41 @@ def _zloz_pewniaki(
         beam = [st for _, st in ocenione[:BEAM_W]]
     if not komplety:
         return None
-    kurs, p_raw, legi_t = max(komplety, key=lambda s: _score_selekcji(s[1], s[2]))
-    p = p_raw * _kara_koszyka(legi_t)
-    # legi z tego samego meczu obok siebie, mecze chronologicznie
-    legi = sorted(legi_t, key=lambda b: (b["kickoff_ts"], b["mecz_id"], -b["p_model"]))
-    return {
-        "cel": int(cmin),
-        "cel_label": f"{int(cmin)}–{int(cmax)}",
-        "styl": "pewniaki",
-        "kurs_laczny": round(kurs, 2),
-        "p_model": round(p, 4),
-        "fair_kurs": round(1.0 / max(p, 1e-9), 2),
-        "ev_pct": round((p * kurs - 1.0) * 100.0, 1),
-        "legi": [_leg_dict(b) for b in legi],
+
+    def _kupon_z(kurs: float, p_raw: float, legi_t: tuple) -> dict:
+        p = p_raw * _kara_koszyka(legi_t)
+        legi = sorted(
+            legi_t, key=lambda b: (b["kickoff_ts"], b["mecz_id"], -b["p_model"])
+        )
+        return {
+            "cel": int(cmin),
+            "cel_label": f"{int(cmin)}–{int(cmax)}",
+            "styl": "pewniaki",
+            "kurs_laczny": round(kurs, 2),
+            "p_model": round(p, 4),
+            "fair_kurs": round(1.0 / max(p, 1e-9), 2),
+            "ev_pct": round((p * kurs - 1.0) * 100.0, 1),
+            "legi": [_leg_dict(b) for b in legi],
+        }
+
+    komplety.sort(key=lambda s: -_score_selekcji(s[1], s[2]))
+    kurs, p_raw, legi_t = komplety[0]
+    kupon = _kupon_z(kurs, p_raw, legi_t)
+    # wariant B: najlepszy WYRAŹNIE INNY komplet (Jaccard < 0.5) — do wyboru
+    # przez usera; czysto podglądowy, nie zajmuje slotu
+    sygn_a = {
+        (l["mecz_id"], l["podmiot_id"], l.get("rynek_kod", ""), l["linia"])
+        for l in legi_t
     }
+    for kurs_b, p_b, legi_b in komplety[1:]:
+        sygn_b = {
+            (l["mecz_id"], l["podmiot_id"], l.get("rynek_kod", ""), l["linia"])
+            for l in legi_b
+        }
+        if len(sygn_a & sygn_b) / max(len(sygn_a | sygn_b), 1) < 0.5:
+            kupon["wariant_b"] = _kupon_z(kurs_b, p_b, legi_b)
+            break
+    return kupon
 
 
 def _rentgen(
@@ -302,7 +333,10 @@ def _dolozenie(
 
 
 def build_kupony(
-    bets: list[dict], pool: list[dict] | None = None, now_ts: int | None = None
+    bets: list[dict],
+    pool: list[dict] | None = None,
+    now_ts: int | None = None,
+    profil: str = "zbalansowany",
 ) -> list[dict]:
     """Kupony pewniaków w dwóch horyzontach + kupony value.
 
@@ -321,10 +355,13 @@ def build_kupony(
     dzis44 = [b for b in pool if b["kickoff_ts"] <= now + OKNO_JUTRO_S]
     tylko_dzis_ok = len({b["mecz_id"] for b in dzis20}) >= 2
     for cmin, cmax in PRZEDZIALY_DZIENNE:
-        k = _zloz_pewniaki(dzis20, cmin, cmax) if tylko_dzis_ok else None
+        k = (
+            _zloz_pewniaki(dzis20, cmin, cmax, profil=profil)
+            if tylko_dzis_ok else None
+        )
         pula_k = dzis20
         if k is None:
-            k = _zloz_pewniaki(dzis44, cmin, cmax)
+            k = _zloz_pewniaki(dzis44, cmin, cmax, profil=profil)
             pula_k = dzis44
         if k is not None:
             k["horyzont"] = "dzienny"
@@ -334,7 +371,7 @@ def build_kupony(
 
     dlugo = [b for b in pool if b["kickoff_ts"] <= now + OKNO_DLUGO_S]
     for cmin, cmax in PRZEDZIALY_DLUGOTERMINOWE:
-        k = _zloz_pewniaki(dlugo, cmin, cmax)
+        k = _zloz_pewniaki(dlugo, cmin, cmax, profil=profil)
         if k is not None:
             k["horyzont"] = "dlugoterminowy"
             _rentgen(k, dlugo, cmin, cmax)
@@ -347,7 +384,9 @@ def build_kupony(
     cands = [b for b in _kandydaci(bets) if b["kickoff_ts"] > now - 3600]
     sygnatury = {_sygnatura(k) for k in out}
     for cmin, cmax in PRZEDZIALY_VALUE:
-        k = _zloz_pewniaki(cands, cmin, cmax, max_na_mecz=1, min_legi=2)
+        k = _zloz_pewniaki(
+            cands, cmin, cmax, max_na_mecz=1, min_legi=2, profil=profil
+        )
         if k is None or _sygnatura(k) in sygnatury:
             continue
         k["styl"] = "value"

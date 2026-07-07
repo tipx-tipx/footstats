@@ -1,8 +1,45 @@
 import { PageHeader } from "@/components/PageHeader";
-import { PominKupon } from "@/components/PominKupon";
+import {
+  PominKupon,
+  ProfilKuponow,
+  ZastosujZamiane,
+} from "@/components/PominKupon";
 import { Reveal } from "@/components/Reveal";
 import { getKupony, getMeta } from "@/lib/data";
 import { fmtDataCzas, fmtKurs, fmtLinia, fmtProc, STRONA_LABEL } from "@/lib/format";
+import type { KuponLeg } from "@/lib/types";
+
+/** mini-ikonki kontekstu lega (matchup / debiut w XI / miękka linia) */
+function LegBadges({ l }: { l: KuponLeg }) {
+  return (
+    <>
+      {l.matchup && (
+        <span
+          className="shrink-0 text-[11px]"
+          title="Profil rywala wyraźnie sprzyja temu rynkowi (matchup)"
+        >
+          🎯
+        </span>
+      )}
+      {l.rotacja && (
+        <span
+          className="shrink-0 text-[11px]"
+          title="Pierwszy występ w XI na tym turnieju — linia rynku bywa niedograna"
+        >
+          ⬆
+        </span>
+      )}
+      {l.miekka_linia && (
+        <span
+          className="shrink-0 text-[11px]"
+          title="Linia płaci więcej, niż wynika z reszty siatki Superbetu"
+        >
+          ↑
+        </span>
+      )}
+    </>
+  );
+}
 
 export const metadata = { title: "Kupony — FootStats" };
 
@@ -49,6 +86,7 @@ export default async function KuponyPage() {
           </>
         }
       />
+      <ProfilKuponow />
 
       {kupony.length === 0 ? (
         <Reveal className="mt-8">
@@ -88,7 +126,10 @@ export default async function KuponyPage() {
               key={k.klucz ?? `${k.horyzont}-${k.cel_label ?? k.cel}`}
               delay={Math.min(i * 0.06, 0.25)}
             >
-              <PominKupon klucz={k.klucz}>
+              <PominKupon
+                klucz={k.klucz}
+                pokazPrzebuduj={k.horyzont === "dzienny"}
+              >
               <article className="flex h-full flex-col rounded-2xl border border-hairline bg-card shadow-(--shadow-card) transition-shadow hover:shadow-(--shadow-card-hover)">
                 <header className="flex flex-col gap-3 border-b border-hairline px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
                   <span className="flex items-center gap-2">
@@ -132,6 +173,48 @@ export default async function KuponyPage() {
                     </div>
                   </div>
                 </header>
+                {/* oś czasu: który mecz kiedy gra i jak stoją jego legi */}
+                {(() => {
+                  const mecze: {
+                    mecz: string;
+                    kickoff: number;
+                    legi: typeof k.legi;
+                  }[] = [];
+                  for (const l of k.legi) {
+                    const m = mecze.find((x) => x.mecz === l.mecz);
+                    if (m) m.legi.push(l);
+                    else
+                      mecze.push({ mecz: l.mecz, kickoff: l.kickoff_ts, legi: [l] });
+                  }
+                  if (mecze.length < 2) return null;
+                  return (
+                    <div className="flex flex-wrap items-center gap-1.5 border-b border-hairline bg-paper/50 px-4 py-2 sm:px-5">
+                      {mecze.map((m) => {
+                        const wyniki = m.legi.map((l) => l.wynik);
+                        const kolor = wyniki.some((w) => w === "przegrany")
+                          ? "bg-data-red"
+                          : wyniki.length &&
+                              wyniki.every((w) => w === "wygrany" || w === "zwrot")
+                            ? "bg-data-green"
+                            : "bg-hairline-strong";
+                        return (
+                          <span
+                            key={m.mecz}
+                            className="inline-flex items-center gap-1.5 rounded-md bg-card px-2 py-0.5 text-[10px] text-muted"
+                            title={m.mecz}
+                          >
+                            <span
+                              className={`h-1.5 w-1.5 rounded-full ${kolor}`}
+                              aria-hidden
+                            />
+                            {fmtDataCzas(m.kickoff)} ·{" "}
+                            {m.legi.length === 1 ? "1 typ" : `${m.legi.length} typy`}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
                 {/* legi zgrupowane po meczu — jak w bet builderze */}
                 <div className="flex-1">
                   {k.legi.map((l, li) => {
@@ -158,6 +241,7 @@ export default async function KuponyPage() {
                                 </span>
                               </p>
                             </div>
+                            <LegBadges l={l} />
                             {li === weakIdx && k.legi.length > 1 && (
                               <span
                                 className="shrink-0 rounded-md bg-data-amber-wash px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[#8a5613]"
@@ -226,7 +310,41 @@ export default async function KuponyPage() {
                       · kurs {fmtKurs(k.kurs_laczny)} →{" "}
                       {fmtKurs(k.alternatywa.kurs_po)}
                     </p>
+                    <ZastosujZamiane klucz={k.klucz} />
                   </div>
+                )}
+                {/* wariant B: wyraźnie inny zestaw z tej samej puli */}
+                {k.wariant_b && (
+                  <details className="border-t border-dashed border-hairline">
+                    <summary className="cursor-pointer list-none px-4 py-2.5 text-[10px] font-semibold uppercase tracking-widest text-muted transition-colors hover:text-ink-soft sm:px-5 [&::-webkit-details-marker]:hidden">
+                      ⇄ pokaż inny wariant — kurs{" "}
+                      {fmtKurs(k.wariant_b.kurs_laczny)}, szansa{" "}
+                      {fmtProc(k.wariant_b.p_model)}
+                    </summary>
+                    <div className="space-y-1 px-4 pb-3 sm:px-5">
+                      {k.wariant_b.legi.map((l, wi) => (
+                        <p
+                          key={`${l.mecz_id}-${l.value_bet_id}-${wi}`}
+                          className="flex items-baseline justify-between gap-2 text-xs"
+                        >
+                          <span className="min-w-0 truncate">
+                            <strong>{l.podmiot}</strong>{" "}
+                            <span className="text-muted">
+                              {l.rynek.toLowerCase()} {STRONA_LABEL[l.strona]}{" "}
+                              {fmtLinia(l.linia)} · {l.mecz}
+                            </span>
+                          </span>
+                          <span className="font-data shrink-0">
+                            {fmtKurs(l.kurs)}
+                          </span>
+                        </p>
+                      ))}
+                      <p className="pt-1 text-[10px] text-faint">
+                        wariant podglądowy — jeśli wolisz ten zestaw, zagraj go
+                        ręcznie (slot zajmuje wariant główny)
+                      </p>
+                    </div>
+                  </details>
                 )}
                 {/* rentgen v2: dołożenie pewnego lega, gdy kurs wisi nisko */}
                 {k.dolozenie && (

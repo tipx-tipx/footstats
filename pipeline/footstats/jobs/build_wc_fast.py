@@ -59,6 +59,7 @@ def _rozlicz_i_zapisz(
     value_bets: list[dict],
     kupony_list: list[dict],
     niedostepni: set[int] | None = None,
+    conf_mids: set[int] | None = None,
 ) -> None:
     """Rozliczanie + zapis wyników. Wywoływane w KAŻDYM cyklu — także gdy
     statshub nie ma propsów (rozliczenia nie mogą czekać na nowe typy).
@@ -69,7 +70,9 @@ def _rozlicz_i_zapisz(
     Przy błędzie NIE nadpisujemy plików — zostają wyniki z poprzedniego cyklu.
     """
     try:
-        wyniki = rozliczanie.rozlicz(value_bets, kupony_list, niedostepni)
+        wyniki = rozliczanie.rozlicz(
+            value_bets, kupony_list, niedostepni, conf_mids=conf_mids
+        )
     except Exception as ex:
         print(f"Rozliczanie pominięte ({ex}) — poprzednie wyniki bez zmian")
         return
@@ -1453,7 +1456,12 @@ def main():
     n_dzis = len({b["mecz_id"] for b in legi_pool
                   if b["kickoff_ts"] <= time.time() + kupony.OKNO_DZIS_S})
     print(f"Pula kuponów: {len(legi_pool)} legów, meczów w oknie dziennym: {n_dzis}")
-    kupony_list = kupony.build_kupony(value_bets, legi_pool)
+    profil_kuponow = str(supa.get_key("kupony_profil") or "zbalansowany")
+    if profil_kuponow not in ("bezpieczny", "zbalansowany", "agresywny"):
+        profil_kuponow = "zbalansowany"
+    if profil_kuponow != "zbalansowany":
+        print(f"Profil kuponów: {profil_kuponow}")
+    kupony_list = kupony.build_kupony(value_bets, legi_pool, profil=profil_kuponow)
     # znacznik: na ilu meczach kuponu składy były już POTWIERDZONE przy
     # budowie (mniejsze ryzyko anulowań/zwrotów niż na prognozach XI)
     for k in kupony_list:
@@ -1468,7 +1476,7 @@ def main():
         ))
     # publikacja kuponów idzie przez log (zamrożenie/anulowanie/rozliczenie)
     # wewnątrz _rozlicz_i_zapisz — kupony.json to aktywne kupony z logu
-    _rozlicz_i_zapisz(value_bets, kupony_list, niedostepni)
+    _rozlicz_i_zapisz(value_bets, kupony_list, niedostepni, conf_mids=conf_mids)
     _dump("meta.json", {
         "wygenerowano_ts": int(time.time()), "tryb": "ms2026",
         "liga": "Mistrzostwa Świata", "sezon": "2026",

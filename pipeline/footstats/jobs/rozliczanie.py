@@ -518,6 +518,10 @@ def _kupon_do_logu(
     now: int,
     niedostepni: set[int] | None = None,
     pominiete: set[str] | None = None,
+    powody: dict[str, str] | None = None,
+    wymiany: set[str] | None = None,
+    przebudowy: set[str] | None = None,
+    conf_mids: set[int] | None = None,
 ) -> None:
     """Cykl życia kuponu — przemyślany raz, potem ZAMROŻONY.
 
@@ -565,6 +569,85 @@ def _kupon_do_logu(
         if rec.get("klucz") in pominiete and not rec.get("pominiety"):
             rec["pominiety"] = True
             rec["pominieto_ts"] = now
+            rec["pominiety_przez"] = "user"
+            rec["pomin_powod"] = (powody or {}).get(rec.get("klucz"))
+
+    # 1b2) PRZYWRACANIE: user cofnął pominięcie (klucz zniknął z
+    # kupony_pominiete) — wraca, o ile slot nie został już zajęty nowszym
+    zajete_teraz = {
+        r["slot"] for r in log_kuponow.values()
+        if not r.get("wynik") and not r.get("pominiety")
+    }
+    for rec in log_kuponow.values():
+        if (
+            rec.get("pominiety")
+            and rec.get("pominiety_przez") == "user"
+            and not rec.get("wynik")
+            and rec.get("klucz") not in pominiete
+            and rec.get("pomin_powod")
+            not in ("wymiana lega", "przebudowa po składach")
+            and rec.get("slot") not in zajete_teraz
+        ):
+            rec["pominiety"] = False
+            rec.pop("pominieto_ts", None)
+            rec.pop("pominiety_przez", None)
+            rec.pop("pomin_powod", None)
+            zajete_teraz.add(rec["slot"])
+
+    # 1b3) WYMIANA LEGA jednym klikiem: pomiń bieżący kupon i opublikuj
+    # w jego slocie wariant z alternatywą rentgena (kurs_po / p_po już
+    # policzone z karą korelacyjną)
+    for rec in list(log_kuponow.values()):
+        kl = rec.get("klucz")
+        if (
+            kl not in (wymiany or set())
+            or rec.get("wynik") or rec.get("pominiety")
+            or not rec.get("alternatywa")
+        ):
+            continue
+        alt = rec["alternatywa"]
+        idx = int(alt.get("zamiast_idx") or 0)
+        legi = [dict(l) for i, l in enumerate(rec["legi"]) if i != idx]
+        legi.append({
+            k2: v for k2, v in alt.items()
+            if k2 not in ("zamiast_idx", "kurs_po", "p_po")
+        })
+        legi.sort(key=lambda l: (l["kickoff_ts"], l["mecz_id"], -l["p_model"]))
+        if min(l["kickoff_ts"] for l in legi) <= now + 15 * 60:
+            continue  # pierwszy mecz za chwilę — za późno na wymianę
+        rec.update(pominiety=True, pominieto_ts=now,
+                   pominiety_przez="user", pomin_powod="wymiana lega")
+        kurs_po = float(alt.get("kurs_po") or 0) or None
+        p_po = float(alt.get("p_po") or 0) or None
+        if not kurs_po or not p_po:
+            continue
+        klucz_n, n = f"{rec['slot']}:{dzien}#w", 2
+        while klucz_n in log_kuponow:
+            klucz_n, n = f"{rec['slot']}:{dzien}#w{n}", n + 1
+        log_kuponow[klucz_n] = {
+            **{k2: rec[k2] for k2 in ("cel", "cel_label", "styl", "horyzont")
+               if k2 in rec},
+            "kurs_laczny": round(kurs_po, 2), "p_model": round(p_po, 4),
+            "fair_kurs": round(1.0 / max(p_po, 1e-9), 2),
+            "ev_pct": round((p_po * kurs_po - 1.0) * 100.0, 1),
+            "legi": legi, "slot": rec["slot"], "klucz": klucz_n,
+            "dzien": dzien, "opublikowano_ts": now, "wynik": None,
+            "z_wymiany": True,
+        }
+
+    # 1b4) PRZEBUDOWA PO SKŁADACH (opt-in): pomiń, gdy WSZYSTKIE mecze legów
+    # mają potwierdzone XI — builder w tym samym cyklu złoży nowy kupon już
+    # na pewnych składach
+    for rec in log_kuponow.values():
+        if (
+            rec.get("klucz") in (przebudowy or set())
+            and not rec.get("wynik") and not rec.get("pominiety")
+        ):
+            mids = {l["mecz_id"] for l in rec["legi"]}
+            if mids and mids <= (conf_mids or set()):
+                rec.update(pominiety=True, pominieto_ts=now,
+                           pominiety_przez="user",
+                           pomin_powod="przebudowa po składach")
 
     # 1c) sloty wycofane (zmiana konfiguracji przedziałów): aktywny kupon ze
     # starego przedziału schodzi z widoku jak pominięty i rozlicza się w tle
@@ -578,6 +661,7 @@ def _kupon_do_logu(
         ):
             rec["pominiety"] = True
             rec["pominieto_ts"] = now
+            rec["pominiety_przez"] = "konfiguracja"
 
     # 2) nowe kupony wyłącznie do wolnych slotów
     zajete = {
@@ -585,10 +669,16 @@ def _kupon_do_logu(
         if not r.get("wynik") and not r.get("pominiety")
     }
     # zestawy legów pominiętych, jeszcze nierozliczonych kuponów per slot —
-    # user właśnie je odrzucił, nie publikujemy ich ponownie 1:1
+    # user właśnie je odrzucił, nie publikujemy ich ponownie 1:1; pominięcia
+    # TECHNICZNE (wymiana/przebudowa/zmiana konfiguracji) nie blokują puli
     odrzucone: dict[str, set[frozenset]] = {}
     for r in log_kuponow.values():
-        if r.get("pominiety") and not r.get("wynik"):
+        if (
+            r.get("pominiety") and not r.get("wynik")
+            and r.get("pominiety_przez") != "konfiguracja"
+            and r.get("pomin_powod")
+            not in ("wymiana lega", "przebudowa po składach")
+        ):
             odrzucone.setdefault(r["slot"], set()).add(_sygnatura_legow(r["legi"]))
     for k in kupony_list:
         if not k.get("legi"):
@@ -671,6 +761,7 @@ def rozlicz(
     value_bets: list[dict],
     kupony_list: list[dict] | None = None,
     niedostepni: set[int] | None = None,
+    conf_mids: set[int] | None = None,
 ) -> dict:
     """Dopisz nowe typy do logu, rozlicz zakończone, zwróć podsumowanie."""
     log = _migruj_log(supa.get_key("typy_log") or {})
@@ -826,18 +917,62 @@ def rozlicz(
 
     # ---- historia kuponów ----
     log_kuponow = supa.get_key("kupony_log") or {}
-    # kupony pominięte przyciskiem w UI (web zapisuje klucz -> ts);
-    # wpisy starsze niż 14 dni wypadają, żeby payload nie rósł bez końca
+    # kupony pominięte przyciskiem w UI (web zapisuje klucz -> ts albo
+    # {ts, powod}); wpisy starsze niż 14 dni wypadają
     pominiete_raw = supa.get_key("kupony_pominiete") or {}
+
+    def _pomin_ts(v) -> int:
+        return int((v.get("ts") if isinstance(v, dict) else v) or 0)
+
     pominiete = {
-        k: ts for k, ts in pominiete_raw.items()
-        if now - int(ts or 0) < 14 * 86400
+        k: v for k, v in pominiete_raw.items()
+        if now - _pomin_ts(v) < 14 * 86400
     }
     if len(pominiete) != len(pominiete_raw):
         supa.put_key("kupony_pominiete", pominiete)
+    powody = {
+        k: v.get("powod") for k, v in pominiete.items() if isinstance(v, dict)
+    }
+    # akcje z UI: wymiana lega (zastosuj alternatywę) i przebudowa po
+    # składach (opt-in) — klucze z TTL 3 dni
+    wymiany_raw = supa.get_key("kupony_wymiana") or {}
+    wymiany = {
+        k: ts for k, ts in wymiany_raw.items() if now - int(ts or 0) < 3 * 86400
+    }
+    if len(wymiany) != len(wymiany_raw):
+        supa.put_key("kupony_wymiana", wymiany)
+    przebudowy_raw = supa.get_key("kupony_przebudowa") or {}
+    przebudowy = {
+        k: ts for k, ts in przebudowy_raw.items()
+        if now - int(ts or 0) < 3 * 86400
+    }
+    if len(przebudowy) != len(przebudowy_raw):
+        supa.put_key("kupony_przebudowa", przebudowy)
     _kupon_do_logu(log_kuponow, kupony_list or [], now, niedostepni,
-                   set(pominiete))
+                   set(pominiete), powody=powody, wymiany=set(wymiany),
+                   przebudowy=set(przebudowy), conf_mids=conf_mids)
     kupony_hist = _rozlicz_kupony(log_kuponow, log, now)
+    # ROI kuponów per horyzont (stawka 1 j./kupon; pominięte = niezagrane,
+    # nie wchodzą) — liczone z PEŁNEGO logu przed przycinaniem
+    kupony_roi: dict[str, dict] = {}
+    for r in log_kuponow.values():
+        if r.get("pominiety") or r.get("wynik") not in (
+            "wygrany", "przegrany", "zwrot"
+        ):
+            continue
+        h = r.get("horyzont") or "value"
+        d = kupony_roi.setdefault(h, {"n": 0, "wygrane": 0, "zwrot_j": 0.0})
+        d["n"] += 1
+        if r["wynik"] == "wygrany":
+            d["wygrane"] += 1
+            d["zwrot_j"] += float(
+                r.get("kurs_rozliczony") or r.get("kurs_laczny") or 0
+            )
+        elif r["wynik"] == "zwrot":
+            d["zwrot_j"] += 1.0
+    for d in kupony_roi.values():
+        d["zwrot_j"] = round(d["zwrot_j"], 2)
+        d["roi_j"] = round(d["zwrot_j"] - d["n"], 2)
     # przycinanie: kupony rozliczone/anulowane starsze niż 21 dni wypadają
     # (UI i tak pokazuje top 40; payload nie może rosnąć bez końca)
     log_kuponow = {
@@ -901,4 +1036,5 @@ def rozlicz(
         "po_rynku": po_rynku,
         "ostatnie": ostatnie,
         "kupony": kupony_hist,
+        "kupony_roi": kupony_roi,
     }
