@@ -17,14 +17,28 @@ DISCIPLINARY_MARKETS = {"fouls_committed", "yellow_card", "team_fouls", "team_ca
 
 
 def _select_bias(market_bias, p: float) -> float:
-    """Kalibracja z rozliczeń: skalar (stary format) albo dict z przedziałami
-    szansy {"global": g, "bins": [[lo, hi, bias], ...]} (rozliczanie.py)."""
+    """Kalibracja z rozliczeń: skalar-mnożnik (stary format) albo dict
+    z przedziałami szansy {"global": g, "bins": [[lo, hi, b], ...]}.
+    Dict z "logit": True niesie DELTY LOGITOWE (neutralne = 0.0)."""
     if isinstance(market_bias, dict):
+        neutral = 0.0 if market_bias.get("logit") else 1.0
         for lo, hi, b in market_bias.get("bins", []):
             if lo <= p < hi:
                 return float(b)
-        return float(market_bias.get("global", 1.0))
+        return float(market_bias.get("global", neutral))
     return float(market_bias)
+
+
+def apply_bias(market_bias, p: float) -> float:
+    """Zastosuj kalibrację do pojedynczej szansy p (poza pełnym scoringiem —
+    np. sugestie STS liczone z rozkładu). Obsługuje oba formaty."""
+    b = _select_bias(market_bias, p)
+    if isinstance(market_bias, dict) and market_bias.get("logit"):
+        if abs(b) < 1e-9:
+            return float(p)
+        x = min(max(float(p), 1e-6), 1.0 - 1e-6)
+        return float(1.0 / (1.0 + np.exp(-(np.log(x / (1.0 - x)) + b))))
+    return float(min(max(float(p) * b, 0.0), 1.0))
 
 
 @dataclass
@@ -288,13 +302,25 @@ def score_player_market(
         lam = pred_center.lam
 
     p_over = minutes_mod.p_over_mixture(mm, p_over_given_minutes)
+    # samokalibracja z rozliczeń: nowy format = delta logitowa
+    # (p' = sigmoid(logit(p)+b), równa korekta w całej skali), stary = mnożnik
     bias = _select_bias(market_bias, p_over)
-    if bias != 1.0:
-        # samokalibracja: skaluj szansę zmierzonym odchyleniem (cap w rozliczanie.py)
-        p_over *= bias
+    logit_mode = isinstance(market_bias, dict) and bool(market_bias.get("logit"))
+    neutral = (abs(bias) < 1e-9) if logit_mode else (bias == 1.0)
+
+    def _kalibruj(x: float) -> float:
+        x = float(np.clip(x, 1e-4, 1.0 - 1e-4))
+        if logit_mode:
+            return float(1.0 / (1.0 + np.exp(-(np.log(x / (1.0 - x)) + bias))))
+        return float(np.clip(x * bias, 1e-4, 1.0 - 1e-4))
+
+    if not neutral:
+        p_przed = p_over
+        p_over = _kalibruj(p_over)
+        eff = p_over / max(p_przed, 1e-9)
         cf.notes["kalibracja"] = (
-            f"Korekta z rozliczonych typów: ×{bias:.2f} "
-            f"({'model niedoszacowywał' if bias > 1 else 'model przeszacowywał'})"
+            f"Korekta z rozliczonych typów: ×{eff:.2f} "
+            f"({'model niedoszacowywał' if eff > 1 else 'model przeszacowywał'})"
         )
     p_over = float(np.clip(p_over, 1e-4, 1.0 - 1e-4))
 
@@ -302,6 +328,9 @@ def score_player_market(
     ci_low, ci_high = counts.p_over_credible_interval(
         posterior, mm.expected_minutes, cf.combined, line
     )
+    if not neutral:
+        # CI w tej samej skali co skalibrowane p — karta pokazuje spójne liczby
+        ci_low, ci_high = _kalibruj(ci_low), _kalibruj(ci_high)
     if market_code == "yellow_card":
         # dla kartek CI liczymy uproszczeniowo wokół p_over
         half = (ci_high - ci_low) / 2.0 if ci_high > ci_low else 0.08

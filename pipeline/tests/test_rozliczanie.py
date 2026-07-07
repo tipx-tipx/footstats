@@ -49,13 +49,13 @@ def test_bias_sugestii_liczony_osobno():
         )
     typy = rozliczanie.compute_bias_full(log)
     assert "shots_off_target" not in typy          # sugestie odfiltrowane
-    assert abs(typy["shots"]["global"] - 1.0) < 0.05
+    assert abs(typy["shots"]["global"]) < 0.10     # dobrze skalibrowane ~0
     sug = rozliczanie.compute_bias_full(
-        log, sugestie=True, cap=rozliczanie.SUGESTIA_BIAS_CAP
+        log, sugestie=True, cap=rozliczanie.SUGESTIA_BIAS_CAP_LOGIT
     )
     assert "shots" not in sug                      # typy odfiltrowane
-    # surowo ~0.35, ale cap sugestii pozwala zejść niżej niż typom
-    assert sug["shots_off_target"]["global"] == rozliczanie.SUGESTIA_BIAS_CAP[0]
+    # surowa delta ~-1.9, ale cap sugestii pozwala zejść niżej niż typom
+    assert sug["shots_off_target"]["global"] == rozliczanie.SUGESTIA_BIAS_CAP_LOGIT[0]
 
 
 # ---- cykl życia kuponów w logu ----
@@ -183,6 +183,25 @@ def test_pominiety_kupon_zwalnia_slot_ale_rozlicza_sie_w_tle():
     typy_log = {"1:p11:shots:1.5:powyzej": {"wynik": "przegrany"}}
     rozliczanie._rozlicz_kupony(log, typy_log, now=50_000)
     assert log[klucz]["wynik"] == "przegrany"
+
+
+def test_pominiety_blokuje_tez_prawie_identyczny_zestaw():
+    log = {}
+    legi7 = [_leg(i, 10 + i, kickoff=100_000 + i) for i in range(7)]
+    rozliczanie._kupon_do_logu(log, [_kupon(legi=legi7)], now=1_000)
+    klucz = next(iter(log))
+    # 7 legów z JEDNĄ zamianą (Jaccard 6/8 = 0.75) — nie wraca do slotu
+    podobne = legi7[:6] + [_leg(9, 99, kickoff=100_009)]
+    rozliczanie._kupon_do_logu(
+        log, [_kupon(legi=podobne)], now=2_000, pominiete={klucz}
+    )
+    assert len(log) == 1
+    # wyraźnie inny zestaw (3 wspólne z 7) — wchodzi normalnie
+    inne = legi7[:3] + [_leg(20 + i, 200 + i, kickoff=100_020 + i) for i in range(4)]
+    rozliczanie._kupon_do_logu(
+        log, [_kupon(legi=inne)], now=3_000, pominiete={klucz}
+    )
+    assert len(log) == 2
 
 
 def test_stary_przedzial_schodzi_z_widoku_jak_pominiety():

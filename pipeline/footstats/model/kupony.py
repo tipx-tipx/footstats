@@ -23,6 +23,8 @@ from __future__ import annotations
 import math
 import time
 
+from . import betting
+
 # przedziały kursowe — do 4 aktywnych kuponów w każdym horyzoncie (user)
 PRZEDZIALY_DZIENNE = (
     (5.0, 10.0), (10.0, 15.0), (15.0, 20.0), (20.0, 25.0),
@@ -37,7 +39,37 @@ OKNO_DLUGO_S = 4 * 86400      # długoterminowy: mecze z najbliższych 4 dni
 MIN_LEG_EV = 2.0          # leg value: wyraźna przewaga w %, nie kosmetyczne 0,1
 MAX_LEGI_PEWNIAKI = 12
 MAX_NA_MECZ = 4           # do 4 wydarzeń z jednego meczu (jak w bet builderze)
-KARA_KORELACJI = 0.95     # mnożnik szansy kuponu za KAŻDY dodatkowy leg z 1 meczu
+# kary korelacyjne — legi z JEDNEGO meczu nie są niezależne:
+KARA_KORELACJI = 0.95         # relacja drużyn nieznana (stare dane)
+KARA_TA_SAMA_DRUZYNA = 0.92   # wspólny scenariusz (dominacja/tempo drużyny)
+KARA_PRZECIWNE_DRUZYNY = 0.97 # słabsza zależność (bywa wręcz przeciwna)
+# dywersyfikacja: kara SELEKCJI (nie szansy) za 3. i kolejny leg z tej samej
+# rodziny rynków — rodziny korelują przez tempo meczu, a kupony z samych
+# strzałów 0,5 padają razem w jednym nudnym meczu
+DYWERSYFIKACJA_RODZIN = 0.985
+BEAM_W = 60               # szerokość wiązki w składaniu kuponu
+
+
+def _kara_koszyka(legi) -> float:
+    """Łączna kara korelacyjna kuponu (mnożnik szansy).
+
+    Za każdy KOLEJNY leg z tego samego meczu: ×0.92 gdy z tej samej drużyny
+    co któryś już obecny, ×0.97 gdy z przeciwnej, ×0.95 gdy drużyn nie znamy.
+    """
+    kara = 1.0
+    seen: dict[int, list[str]] = {}
+    for l in legi:
+        m, d = l["mecz_id"], str(l.get("druzyna") or "")
+        prev = seen.get(m)
+        if prev is not None:
+            if d and d in prev:
+                kara *= KARA_TA_SAMA_DRUZYNA
+            elif d and all(x and x != d for x in prev):
+                kara *= KARA_PRZECIWNE_DRUZYNY
+            else:
+                kara *= KARA_KORELACJI
+        seen.setdefault(m, []).append(d)
+    return kara
 
 
 def _kandydaci(bets: list[dict]) -> list[dict]:
@@ -53,11 +85,6 @@ def _kandydaci(bets: list[dict]) -> list[dict]:
     return out
 
 
-def _kara_korelacji(na_mecz: dict[int, int]) -> float:
-    """Łączna kara szansy kuponu za skorelowane legi (kolejne z 1 meczu)."""
-    return KARA_KORELACJI ** sum(max(c - 1, 0) for c in na_mecz.values())
-
-
 def _sygnatura(kupon: dict) -> frozenset:
     """Zestaw legów kuponu — do wykrywania duplikatów między stylami."""
     return frozenset(
@@ -71,6 +98,9 @@ def _leg_dict(b: dict) -> dict:
         "value_bet_id": b.get("id", 0),
         "podmiot_id": b.get("podmiot_id", 0),
         "podmiot": b["podmiot"],
+        "druzyna": b.get("druzyna", ""),
+        "matchup": bool(b.get("matchup")),
+        "rotacja": bool(b.get("rotacja")),
         "rynek_kod": b.get("rynek_kod", ""),
         "rynek": b["rynek"],
         "linia": b["linia"],
@@ -85,6 +115,19 @@ def _leg_dict(b: dict) -> dict:
     }
 
 
+def _score_selekcji(p_raw: float, legi) -> float:
+    """Funkcja celu składania: szansa z karami korelacji + kara SELEKCJI za
+    monotonię rynków (3+ legi z jednej rodziny padają razem w nudnym meczu)."""
+    s = p_raw * _kara_koszyka(legi)
+    rodziny: dict[str, int] = {}
+    for l in legi:
+        f = betting.RODZINY_RYNKOW.get(l.get("rynek_kod", ""))
+        if f:
+            rodziny[f] = rodziny.get(f, 0) + 1
+    nadmiar = sum(max(0, c - 2) for c in rodziny.values())
+    return s * (DYWERSYFIKACJA_RODZIN ** nadmiar)
+
+
 def _zloz_pewniaki(
     pool: list[dict],
     cmin: float,
@@ -94,40 +137,67 @@ def _zloz_pewniaki(
 ) -> dict | None:
     """Maksymalizuj szansę kuponu przy kursie łącznym w przedziale [cmin, cmax].
 
-    Jakość lega = ln(p) / ln(kurs): ile "kosztu pewności" płacimy za każdą
-    jednostkę logarytmu kursu. Im bliżej zera, tym leg bezpieczniejszy
-    względem tego, co dokłada do kursu. Przy ustalonym kursie łącznym
-    maksymalna szansa = maksymalne EV, więc ten sam builder składa też
-    kupony value (z pulą ograniczoną do legów z przewagą).
+    Beam search (wiązka BEAM_W stanów) zamiast zachłannego dokładania —
+    przy ograniczeniach (przedział kursu, max/mecz, dywersyfikacja) greedy
+    bywał daleki od optimum albo "nie składał" istniejącej kombinacji.
+    Jakość lega = ln(p)/ln(kurs) (koszt pewności na jednostkę kursu) decyduje
+    o kolejności kandydatów; legi kontekstowe (matchup / świeże składy)
+    dostają lekki priorytet. Przy ustalonym kursie max szansa = max EV,
+    więc ten sam builder składa też kupony value.
     """
+    def _q(b: dict) -> float:
+        q = math.log(b["p_model"]) / math.log(b["kurs"])
+        if b.get("matchup"):
+            q *= 0.93   # bliżej zera = wyżej w kolejce
+        if b.get("swieze_sklady"):
+            q *= 0.96
+        return q
+
     cands = sorted(
         (b for b in pool if b["kurs"] > 1.0 and 0 < b["p_model"] < 1),
-        key=lambda b: -(math.log(b["p_model"]) / math.log(b["kurs"])),
-    )
-    kurs, p = 1.0, 1.0
-    legi: list[dict] = []
-    na_mecz: dict[int, int] = {}
-    uzyci: set[int] = set()
-    kara = 1.0
+        key=lambda b: -_q(b),
+    )[:80]
+    # stan wiązki: (kurs_łączny, iloczyn_p, legi jako krotka)
+    beam: list[tuple[float, float, tuple]] = [(1.0, 1.0, ())]
+    komplety: list[tuple[float, float, tuple]] = []
     for b in cands:
-        if len(legi) >= MAX_LEGI_PEWNIAKI or kurs >= cmin:
-            break
-        if b["podmiot_id"] in uzyci or na_mecz.get(b["mecz_id"], 0) >= max_na_mecz:
-            continue
-        if kurs * b["kurs"] > cmax:
-            continue  # ten leg przestrzeliłby przedział — szukaj mniejszego
-        if na_mecz.get(b["mecz_id"], 0) >= 1:
-            kara *= KARA_KORELACJI  # każdy dodatkowy leg z tego samego meczu
-        legi.append(b)
-        na_mecz[b["mecz_id"]] = na_mecz.get(b["mecz_id"], 0) + 1
-        uzyci.add(b["podmiot_id"])
-        kurs *= b["kurs"]
-        p *= b["p_model"]
-    p *= kara
-    if len(legi) < min_legi or not (cmin <= kurs <= cmax):
+        nowe = []
+        for kurs, p, legi in beam:
+            if len(legi) >= MAX_LEGI_PEWNIAKI:
+                continue
+            if any(l["podmiot_id"] == b["podmiot_id"] for l in legi):
+                continue
+            if sum(1 for l in legi if l["mecz_id"] == b["mecz_id"]) >= max_na_mecz:
+                continue
+            kurs2 = kurs * b["kurs"]
+            if kurs2 > cmax:
+                continue
+            legi2 = legi + (b,)
+            p2 = p * b["p_model"]
+            nowe.append((kurs2, p2, legi2))
+            if kurs2 >= cmin and len(legi2) >= min_legi:
+                komplety.append((kurs2, p2, legi2))
+        beam.extend(nowe)
+        # prune: obiecujące = wysoka szansa × jak blisko dolnej granicy kursu;
+        # dedup równoważnych stanów (permutacje identycznych legów zapychałyby
+        # wiązkę i blokowały dojście do dłuższych kuponów)
+        ocenione = []
+        seen_keys: set = set()
+        for st in beam:
+            sc = _score_selekcji(st[1], st[2])
+            key = (len(st[2]), round(st[0], 4), round(sc, 8))
+            if key in seen_keys:
+                continue
+            seen_keys.add(key)
+            ocenione.append((sc * min(st[0] / cmin, 1.0), st))
+        ocenione.sort(key=lambda x: -x[0])
+        beam = [st for _, st in ocenione[:BEAM_W]]
+    if not komplety:
         return None
+    kurs, p_raw, legi_t = max(komplety, key=lambda s: _score_selekcji(s[1], s[2]))
+    p = p_raw * _kara_koszyka(legi_t)
     # legi z tego samego meczu obok siebie, mecze chronologicznie
-    legi.sort(key=lambda b: (b["kickoff_ts"], b["mecz_id"], -b["p_model"]))
+    legi = sorted(legi_t, key=lambda b: (b["kickoff_ts"], b["mecz_id"], -b["p_model"]))
     return {
         "cel": int(cmin),
         "cel_label": f"{int(cmin)}–{int(cmax)}",
@@ -180,13 +250,10 @@ def _rentgen(
         return
     # p kuponu zawiera karę korelacyjną — zamiana lega może ją zmienić
     # (np. replacement dokłada drugiego lega z meczu, który już ma jeden)
-    na_mecz_przed = dict(na_mecz)
-    na_mecz_przed[slaby["mecz_id"]] = na_mecz_przed.get(slaby["mecz_id"], 0) + 1
-    na_mecz_po = dict(na_mecz)
-    na_mecz_po[best["mecz_id"]] = na_mecz_po.get(best["mecz_id"], 0) + 1
+    legi_po = [l for i, l in enumerate(legi) if i != idx] + [best]
     p_po = (
         p_bez * best["p_model"]
-        * _kara_korelacji(na_mecz_po) / _kara_korelacji(na_mecz_przed)
+        * _kara_koszyka(legi_po) / max(_kara_koszyka(legi), 1e-9)
     )
     if p_po <= kupon["p_model"] + 1e-9:
         return
@@ -194,6 +261,42 @@ def _rentgen(
         **_leg_dict(best),
         "zamiast_idx": idx,
         "kurs_po": round(kurs_bez * best["kurs"], 2),
+        "p_po": round(p_po, 4),
+    }
+
+
+def _dolozenie(
+    kupon: dict,
+    pool: list[dict],
+    cmin: float,
+    cmax: float,
+    max_na_mecz: int = MAX_NA_MECZ,
+) -> None:
+    """Rentgen v2: kupon wisi w dolnej połowie przedziału — zaproponuj
+    DOŁOŻENIE bardzo pewnego lega (p >= 0.70), który dobija kurs bliżej
+    górnej granicy przy niewielkiej utracie szansy. Czysto doradcze."""
+    if kupon["kurs_laczny"] >= (cmin + cmax) / 2.0:
+        return
+    legi = kupon["legi"]
+    uzyci = {l["podmiot_id"] for l in legi}
+    best = None
+    for b in pool:
+        if b["podmiot_id"] in uzyci or b["p_model"] < 0.70:
+            continue
+        if sum(1 for l in legi if l["mecz_id"] == b["mecz_id"]) >= max_na_mecz:
+            continue
+        if kupon["kurs_laczny"] * b["kurs"] > cmax:
+            continue
+        if best is None or b["p_model"] > best["p_model"]:
+            best = b
+    if best is None:
+        return
+    legi_po = list(legi) + [best]
+    p_raw = kupon["p_model"] / max(_kara_koszyka(legi), 1e-9)
+    p_po = p_raw * best["p_model"] * _kara_koszyka(legi_po)
+    kupon["dolozenie"] = {
+        **_leg_dict(best),
+        "kurs_po": round(kupon["kurs_laczny"] * best["kurs"], 2),
         "p_po": round(p_po, 4),
     }
 
@@ -226,6 +329,7 @@ def build_kupony(
         if k is not None:
             k["horyzont"] = "dzienny"
             _rentgen(k, pula_k, cmin, cmax)
+            _dolozenie(k, pula_k, cmin, cmax)
             out.append(k)
 
     dlugo = [b for b in pool if b["kickoff_ts"] <= now + OKNO_DLUGO_S]
@@ -234,6 +338,7 @@ def build_kupony(
         if k is not None:
             k["horyzont"] = "dlugoterminowy"
             _rentgen(k, dlugo, cmin, cmax)
+            _dolozenie(k, dlugo, cmin, cmax)
             out.append(k)
 
     # VALUE: ten sam builder co pewniaki (max iloczyn szans przy zadanym
@@ -248,6 +353,7 @@ def build_kupony(
         k["styl"] = "value"
         k["horyzont"] = "value"
         _rentgen(k, cands, cmin, cmax, max_na_mecz=1)
+        _dolozenie(k, cands, cmin, cmax, max_na_mecz=1)
         out.append(k)
         sygnatury.add(_sygnatura(k))
     return out

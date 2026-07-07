@@ -257,6 +257,14 @@ export const BetCard = memo(function BetCard({
                 ⬆ wchodzi do składu
               </span>
             )}
+            {bet.swieze_sklady && (
+              <span
+                className="inline-flex rounded-md bg-data-amber-wash px-1.5 py-0.5 text-[10px] font-semibold text-[#8a5613]"
+                title="Składy tego meczu potwierdzono w ostatnich ~45 minutach — kursy bywają jeszcze sprzed ogłoszenia XI"
+              >
+                🕐 świeże składy
+              </span>
+            )}
             <span
               className="hidden items-center gap-1 text-[10px] text-faint sm:flex"
               title="Pewność modelu: ile danych i jak stabilnych stoi za tą predykcją"

@@ -108,6 +108,18 @@ def _pleg(mecz_id, podmiot_id, kurs, p):
     return {**_leg(mecz_id, podmiot_id, kurs, p), "p_model": p}
 
 
+def test_kara_koszyka_dwupoziomowa():
+    l_a1 = {"mecz_id": 1, "druzyna": "A"}
+    l_a2 = {"mecz_id": 1, "druzyna": "A"}
+    l_b = {"mecz_id": 1, "druzyna": "B"}
+    l_inny = {"mecz_id": 2, "druzyna": "C"}
+    l_bez = {"mecz_id": 1, "druzyna": ""}
+    assert kupony._kara_koszyka([l_a1, l_inny]) == 1.0     # różne mecze
+    assert kupony._kara_koszyka([l_a1, l_a2]) == kupony.KARA_TA_SAMA_DRUZYNA
+    assert kupony._kara_koszyka([l_a1, l_b]) == kupony.KARA_PRZECIWNE_DRUZYNY
+    assert kupony._kara_koszyka([l_a1, l_bez]) == kupony.KARA_KORELACJI
+
+
 def test_rentgen_najslabszy_i_alternatywa_z_kara_korelacji():
     # mecz 1 ma już 2 legi (kara ×0.95 w p kuponu), mecz 2 — najsłabszego lega
     legi = [_pleg(1, 11, 1.5, 0.7), _pleg(1, 12, 1.5, 0.7), _pleg(2, 22, 2.0, 0.5)]

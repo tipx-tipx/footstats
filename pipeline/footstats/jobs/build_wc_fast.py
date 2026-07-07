@@ -31,7 +31,7 @@ from dataclasses import replace as dc_replace
 
 from .. import supa
 from ..engine import (
-    MatchContext, PlayerHistory, RARE_MARKETS, _select_bias, score_player_market,
+    MatchContext, PlayerHistory, RARE_MARKETS, apply_bias, score_player_market,
 )
 from ..model import betting, context, counts, koncesje, kupony, matchup_lite, tempo
 from ..sources import eloratings, rotowire, scores365, statshub, superbet
@@ -169,18 +169,27 @@ def profil_sedziow(
 
     Źródło: 365Scores — officials (obsada znana 1-2 dni przed meczem) +
     suma fauli wszystkich zawodników z rozegranych meczów MŚ tego sędziego.
-    Mnożnik = średnia fauli sędziego / średnia turnieju; mecze z dogrywką
-    pomijane (staty obejmują 120 min i zawyżałyby profil). Wyniki per mecz
-    cache'owane w Supabase (sedziowie_cache) — kolejne cykle nie odpytują
-    365 o rozegrane mecze ponownie.
+    Mnożnik = średnia z ilorazów (faule meczu / OCZEKIWANE faule tej pary
+    drużyn) — oczekiwania z pozostałych meczów tych drużyn, żeby nie mylić
+    stylu sędziego ze stylem drużyn (Maroko fauluje dużo u każdego arbitra).
+    Mecze z dogrywką pomijane (staty obejmują 120 min i zawyżałyby profil).
+    Wyniki per mecz cache'owane w Supabase (sedziowie_cache).
     """
     cache = supa.get_key("sedziowie_cache") or {}
     zmieniony = False
     for g in scores365.finished_games_by_competition():
         gid = str(g["id"])
+        druzyny = [g.get("home") or "", g.get("away") or ""]
         if gid in cache:
+            # starsze wpisy sprzed pola "druzyny" — uzupełnij przy okazji
+            if not cache[gid].get("druzyny") and all(druzyny):
+                cache[gid]["druzyny"] = druzyny
+                zmieniony = True
             continue
-        rec = {"sedzia": scores365.game_referee(g["id"]), "faule": None}
+        rec = {
+            "sedzia": scores365.game_referee(g["id"]), "faule": None,
+            "druzyny": druzyny if all(druzyny) else None,
+        }
         try:
             if not scores365.after_extra_time(g["id"]):
                 staty = scores365.game_player_match_stats(g["id"])
@@ -195,14 +204,33 @@ def profil_sedziow(
     if zmieniony:
         supa.put_key("sedziowie_cache", cache)
 
-    per_sedzia: dict[str, list[float]] = {}
+    per_sedzia: dict[str, list[tuple[float, list | None]]] = {}
+    sr_druzyny: dict[str, list[float]] = {}
     for rec in cache.values():
-        if rec.get("sedzia") and rec.get("faule"):
-            per_sedzia.setdefault(rec["sedzia"], []).append(float(rec["faule"]))
-    wszystkie = [f for fl in per_sedzia.values() for f in fl]
+        if not rec.get("faule"):
+            continue
+        if rec.get("sedzia"):
+            per_sedzia.setdefault(rec["sedzia"], []).append(
+                (float(rec["faule"]), rec.get("druzyny"))
+            )
+        for d in rec.get("druzyny") or []:
+            sr_druzyny.setdefault(d, []).append(float(rec["faule"]))
+    wszystkie = [f for fl in per_sedzia.values() for f, _ in fl]
     if not wszystkie:
         return {}
     turniej_sr = sum(wszystkie) / len(wszystkie)
+
+    def _oczekiwane(druzyny: list | None, f_meczu: float) -> float:
+        """Faule, jakich spodziewamy się po TEJ parze drużyn (styl drużyn);
+        bieżący mecz wyłączony z oczekiwań (leave-one-out)."""
+        srednie = []
+        for d in druzyny or []:
+            fl = list(sr_druzyny.get(d) or [])
+            if f_meczu in fl:
+                fl.remove(f_meczu)
+            if len(fl) >= 2:
+                srednie.append(sum(fl) / len(fl))
+        return sum(srednie) / len(srednie) if len(srednie) == 2 else turniej_sr
 
     # obsady nadchodzących meczów: parowanie fixtures 365 z eventami statshub
     # po znormalizowanych nazwach drużyn (awaryjnie kickoff +-3h + jedna nazwa)
@@ -226,10 +254,11 @@ def profil_sedziow(
         if not ref:
             continue
         proby = per_sedzia.get(ref, [])
+        ilorazy = [f / max(_oczekiwane(dr, f), 1e-6) for f, dr in proby]
         out[e["id"]] = {
             "sedzia": ref,
             "mnoznik": (
-                round(sum(proby) / len(proby) / turniej_sr, 3) if proby else None
+                round(sum(ilorazy) / len(ilorazy), 3) if ilorazy else None
             ),
             "n": len(proby),
         }
@@ -736,16 +765,16 @@ def main():
     try:
         bias_map = rozliczanie.market_bias()
         if bias_map:
-            print("Kalibracja z rozliczeń: " + ", ".join(
-                f"{mk} ×{v['global']}" for mk, v in bias_map.items()))
+            print("Kalibracja z rozliczeń (Δlogit): " + ", ".join(
+                f"{mk} {v['global']:+.2f}" for mk, v in bias_map.items()))
     except Exception:
         bias_map = {}
     # sugestie STS uczą się na własnych rozliczeniach (osobna pula błędu)
     try:
         bias_map_sug = rozliczanie.market_bias_sugestie()
         if bias_map_sug:
-            print("Kalibracja sugestii: " + ", ".join(
-                f"{mk} ×{v['global']}" for mk, v in bias_map_sug.items()))
+            print("Kalibracja sugestii (Δlogit): " + ", ".join(
+                f"{mk} {v['global']:+.2f}" for mk, v in bias_map_sug.items()))
     except Exception:
         bias_map_sug = {}
 
@@ -773,6 +802,35 @@ def main():
     n_conf = sum(lineup_confirmed.values())
     if n_conf:
         print(f"Składy ogłoszone: {n_conf} z {len(events)} meczów")
+
+    # okno "rynek nie zdążył": zapamiętujemy PIERWSZY moment potwierdzenia
+    # składów per mecz — typy z meczu potwierdzonego <45 min temu dostają
+    # bonus w rankingu (kursy często jeszcze nie zareagowały na ogłoszone XI)
+    swieze_mids: set[int] = set()
+    conf_mids: set[int] = set()
+    try:
+        potw = supa.get_key("sklady_potwierdzone_ts") or {}
+        now_p = int(time.time())
+        for e in events:
+            mid_e = e["id"]
+            conf_e = lineup_confirmed.get(mid_e, False) or (
+                rotowire.is_confirmed(roto, team_name.get(e.get("homeTeamId"), ""))
+                and rotowire.is_confirmed(roto, team_name.get(e.get("awayTeamId"), ""))
+            )
+            if conf_e:
+                conf_mids.add(mid_e)
+            if conf_e and str(mid_e) not in potw:
+                potw[str(mid_e)] = now_p
+        potw = {k: v for k, v in potw.items() if now_p - int(v) < 3 * 86400}
+        supa.put_key("sklady_potwierdzone_ts", potw)
+        swieze_mids = {
+            int(k) for k, v in potw.items() if now_p - int(v) < 45 * 60
+        }
+        if swieze_mids:
+            print(f"Świeżo potwierdzone składy (okno na stare linie): "
+                  f"{len(swieze_mids)} meczów")
+    except Exception:
+        swieze_mids = set()
 
     # zawodnicy POZA ogłoszonym składem (twardy sygnał z statshub lub Rotowire)
     # — unieważniają zamrożone kupony z ich legami (patrz rozliczanie).
@@ -906,6 +964,11 @@ def main():
             (ctx.official_started or ctx.predicted_started)
             and not gral_na_turnieju
         )
+        # sygnał składu przy publikacji — trafia do typy_log (kalibracja p_start)
+        xi_sygnal = (
+            "official" if ctx.official_started
+            else "predicted" if ctx.predicted_started else None
+        )
 
         probe = score_player_market(mk, 0.5, hist, prior, ctx, None, None,
                                     market_calibrated=True,
@@ -1019,15 +1082,26 @@ def main():
                     and p_side >= 0.42
                     and p_side * odd - 1.0 >= 0.0
                 )
+                # furtka kontekstowa: rynki niszowe (spalone / głową / celne
+                # zza pola) prawie nigdy nie przechodzą zwykłych progów, a to
+                # tam rynek myli się najbardziej — wpuszczamy je wyłącznie
+                # przy wyraźnie sprzyjającym profilu rywala (matchup)
+                czynnik_rywala = float(sm.factors.get("rywal", 1.0) or 1.0)
+                matchup_typ = czynnik_rywala >= 1.12
+                niszowa = (
+                    mk in RARE_MARKETS
+                    and matchup_typ
+                    and 1.90 <= odd <= 3.60
+                    and p_side >= 0.40
+                    and p_side * odd - 1.0 >= -0.05
+                )
                 # typ kontekstowy (matchup): profil rywala wyraźnie sprzyja —
                 # model może rozejść się z rynkiem mocniej niż zwykle, bo zna
                 # kontekst, którego kurs mógł nie wycenić (weryfikują rozliczenia)
-                czynnik_rywala = float(sm.factors.get("rywal", 1.0) or 1.0)
-                matchup_typ = czynnik_rywala >= 1.12
                 max_div = 0.30 if matchup_typ else betting.MAX_MODEL_MARKET_DIVERGENCE
                 max_rel = 2.3 if matchup_typ else betting.MAX_RELATIVE_DIVERGENCE
                 if (
-                    (pewny or perelka)
+                    (pewny or perelka or niszowa)
                     and len(tr.counts) >= 5  # pewniak nie powstaje z 2 meczów
                     and (sm.ci_high - sm.ci_low) <= 0.35
                     and abs(p_side - implied) <= max_div
@@ -1042,6 +1116,8 @@ def main():
                         "strona": side_pl, "kurs": odd,
                         "bukmacher": sv[1], "p_model": round(p_side, 4),
                         "matchup": matchup_typ, "rotacja": rotacja,
+                        "xi_sygnal": xi_sygnal,
+                        "swieze_sklady": mid in swieze_mids,
                         "ci": [sm.ci_low, sm.ci_high],
                         "oczekiwane_minuty": sm.expected_minutes,
                         "ryzyko": betting.risk_level(
@@ -1102,7 +1178,7 @@ def main():
                 "p_model": a.model_prob, "p_rynku": a.implied_prob,
                 "fair_kurs": a.fair_odds, "edge_pp": a.edge_pp, "ev_pct": a.ev_pct,
                 "matchup": float(sm.factors.get("rywal", 1.0) or 1.0) >= 1.12,
-                "rotacja": rotacja,
+                "rotacja": rotacja, "xi_sygnal": xi_sygnal,
                 "pewnosc": a.confidence, "pewnosc_score": a.confidence_score,
                 "ryzyko": a.risk, "rank_score": a.rank_score,
                 "ci": [sm.ci_low, sm.ci_high],
@@ -1116,6 +1192,25 @@ def main():
     # scoring modelu: prior, minuty, składy, matchup). Gdy 365 nie ma zawodnika,
     # fallback: szacunek "strzały − celne" z podziałem wg danych ligowych.
     OFF_SHARE, BLK_SHARE = 0.556, 0.444
+    # udział niecelnych vs zablokowanych per formacja — z realnych historii
+    # 365 w banku (obrońca bijący zza pola ma więcej bloków niż drybler
+    # wchodzący w pole karne); stałe ligowe tylko jako fallback
+    off_share_poz: dict[str, float] = {}
+    _agg_ob: dict[str, list[float]] = {}
+    for rec_b in bank_recs.values():
+        mk_b = rec_b.get("market_code")
+        if mk_b not in ("shots_off_target", "shots_blocked"):
+            continue
+        kub_b = koncesje.kubelek_pozycji(rec_b.get("position"))
+        if not kub_b:
+            continue
+        s = float(sum(rec_b.get("counts") or []))
+        _agg_ob.setdefault(f"{kub_b}:{mk_b}", []).append(s)
+    for kub_b in ("obrona", "pomoc", "atak"):
+        off = sum(_agg_ob.get(f"{kub_b}:shots_off_target", []) or [0.0])
+        blk = sum(_agg_ob.get(f"{kub_b}:shots_blocked", []) or [0.0])
+        if off + blk >= 30:  # sensowna próba zdarzeń
+            off_share_poz[kub_b] = off / (off + blk)
     from scipy import stats as _st
 
     def _push_sugestia(pid, mk, info, lam, p_over, line, extra):
@@ -1149,9 +1244,7 @@ def main():
             thr = int(linia_s) + 1  # "powyżej 1.5" = X >= 2
             p_over_l = float(sum(dist_r[thr:])) if thr < len(dist_r) else 0.0
             # kalibracja sugestii z ich własnych rozliczeń (rozkład jej nie ma)
-            p_over_l = min(
-                1.0, p_over_l * _select_bias(bias_map_sug.get(mk, 1.0), p_over_l)
-            )
+            p_over_l = apply_bias(bias_map_sug.get(mk, 1.0), p_over_l)
             # linia bazowa musi być prawdopodobna; wyższe warianty pokazujemy
             # już od ~38% (fair ~2.6 — typowy zakres kursów STS)
             if p_over_l < (0.5 if linia_s == 0.5 else 0.38):
@@ -1171,7 +1264,9 @@ def main():
             continue
         lam_sot = slot.get("sot", lam_shots * 0.34)  # brak celnych → typowy udział 34%
         lam_not_on = max(lam_shots - lam_sot, 0.1)
-        for mk, share in (("shots_off_target", OFF_SHARE), ("shots_blocked", BLK_SHARE)):
+        kub_poz = koncesje.kubelek_pozycji(info.get("position"))
+        off_sh = off_share_poz.get(kub_poz, OFF_SHARE)
+        for mk, share in (("shots_off_target", off_sh), ("shots_blocked", 1.0 - off_sh)):
             if (pid, mk) in real_split_reserved or (pid, mk) in real_split:
                 continue  # jest prawdziwa historia 365 — szacunek zbędny
             lam = lam_not_on * share
@@ -1180,9 +1275,7 @@ def main():
             for line in (0.5, 1.5, 2.5):
                 thr = int(line)  # "powyżej line" = X > floor(line)
                 p_over = float(_st.poisson.sf(thr, lam))
-                p_over = min(
-                    1.0, p_over * _select_bias(bias_map_sug.get(mk, 1.0), p_over)
-                )
+                p_over = apply_bias(bias_map_sug.get(mk, 1.0), p_over)
                 if p_over < (0.5 if line == 0.5 else 0.38):
                     break
                 _push_sugestia(pid, mk, info, lam, p_over, line, {
@@ -1211,6 +1304,24 @@ def main():
         for b in value_bets
     }
     per_mecz_rynek: set[tuple[int, str]] = set()
+
+    def _atrakcyjnosc(b: dict) -> float:
+        """Ranking pewniaka: nie sama szansa (zawsze wygrywałaby linia 0,5),
+        ale szansa × pierwiastek kursu, z bonusem za kontekst (profil rywala,
+        wejście do XI) i karą za chwiejną predykcję (szerokie CI)."""
+        ci = b.get("ci") or [None, None]
+        ci_w = (ci[1] - ci[0]) if ci[0] is not None else 0.30
+        r = b["p_model"] * (b["kurs"] ** 0.5)
+        if b.get("matchup"):
+            r *= 1.15
+        if b.get("rotacja"):
+            r *= 1.10
+        if b.get("swieze_sklady"):
+            r *= 1.12  # składy ogłoszone <45 min temu — kurs mógł nie zdążyć
+        if ci_w > 0.25:
+            r *= 0.90
+        return r
+
     # perełki: do 2 wpisów z wyższym kursem (>=2.0) per mecz, po wartości
     perelki_kandydaci = sorted(
         (b for b in legi_pool if b["kurs"] >= 1.90),
@@ -1218,7 +1329,7 @@ def main():
     )
     perelki_per_mecz: dict[int, int] = {}
     do_emisji: list[dict] = []
-    for b in sorted(legi_pool, key=lambda x: -x["p_model"]):
+    for b in sorted(legi_pool, key=lambda x: -_atrakcyjnosc(x)):
         if (b["mecz_id"], b["rynek_kod"]) in per_mecz_rynek:
             continue
         per_mecz_rynek.add((b["mecz_id"], b["rynek_kod"]))
@@ -1265,6 +1376,8 @@ def main():
             "wyzsza_linia": bool(b.get("wyzsza_linia")),
             "matchup": bool(b.get("matchup")),
             "rotacja": bool(b.get("rotacja")),
+            "swieze_sklady": bool(b.get("swieze_sklady")),
+            "xi_sygnal": b.get("xi_sygnal"),
             "kurs": b["kurs"], "bukmacher": b["bukmacher"],
             "p_model": b["p_model"], "p_rynku": None,
             "fair_kurs": round(1.0 / max(b["p_model"], 1e-6), 2),
@@ -1273,7 +1386,7 @@ def main():
             "pewnosc": "wysoka" if ci_w <= 0.18 else "srednia",
             "pewnosc_score": 55.0,
             "ryzyko": b.get("ryzyko", "srednie"),
-            "rank_score": b["p_model"],
+            "rank_score": round(_atrakcyjnosc(b), 4),
             "ci": ci, "oczekiwane_minuty": b.get("oczekiwane_minuty"),
             "lambda": round(b.get("lambda", 0.0), 3),
             "rozklad": b.get("rozklad"),
@@ -1303,6 +1416,12 @@ def main():
                   if b["kickoff_ts"] <= time.time() + kupony.OKNO_DZIS_S})
     print(f"Pula kuponów: {len(legi_pool)} legów, meczów w oknie dziennym: {n_dzis}")
     kupony_list = kupony.build_kupony(value_bets, legi_pool)
+    # znacznik: na ilu meczach kuponu składy były już POTWIERDZONE przy
+    # budowie (mniejsze ryzyko anulowań/zwrotów niż na prognozach XI)
+    for k in kupony_list:
+        mids_k = {l["mecz_id"] for l in k["legi"]}
+        k["mecze_lacznie"] = len(mids_k)
+        k["mecze_ze_skladami"] = sum(1 for m in mids_k if m in conf_mids)
     if kupony_list:
         print("Kandydaci na kupony:", ", ".join(
             f"{k.get('horyzont', '?')[:5]} x{k.get('cel_label', k['cel'])} "

@@ -228,12 +228,42 @@ export default async function KuponyPage() {
                     </p>
                   </div>
                 )}
+                {/* rentgen v2: dołożenie pewnego lega, gdy kurs wisi nisko */}
+                {k.dolozenie && (
+                  <div className="border-t border-dashed border-hairline bg-paper/60 px-4 py-3 sm:px-5">
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-muted">
+                      + dobij kurs pewnym legiem
+                    </p>
+                    <p className="mt-1 text-sm leading-relaxed">
+                      <strong>{k.dolozenie.podmiot}</strong>{" "}
+                      <span className="text-muted">
+                        {k.dolozenie.rynek.toLowerCase()}{" "}
+                        {STRONA_LABEL[k.dolozenie.strona]}{" "}
+                        {fmtLinia(k.dolozenie.linia)}
+                      </span>{" "}
+                      <span className="font-data font-semibold">
+                        @{fmtKurs(k.dolozenie.kurs)}
+                      </span>
+                    </p>
+                    <p className="font-data mt-1 text-xs text-muted">
+                      kurs {fmtKurs(k.kurs_laczny)} →{" "}
+                      {fmtKurs(k.dolozenie.kurs_po)} · szansa{" "}
+                      {fmtProc(k.p_model)} → {fmtProc(k.dolozenie.p_po)}
+                    </p>
+                  </div>
+                )}
                 <footer className="border-t border-hairline px-5 py-3 text-xs leading-relaxed text-faint">
                   taki kupon trafia się statystycznie ~1 na{" "}
                   {Math.max(2, Math.round(1 / Math.max(k.p_model, 1e-9)))} prób ·{" "}
                   {k.legi.length}{" "}
                   {k.legi.length === 1 ? "typ" : k.legi.length < 5 ? "typy" : "typów"}{" "}
                   · kursy: {k.legi[0]?.bukmacher ?? "Superbet"}
+                  {k.mecze_lacznie != null && k.mecze_ze_skladami != null && (
+                    <>
+                      {" "}· składy przy budowie: {k.mecze_ze_skladami}/
+                      {k.mecze_lacznie} meczów
+                    </>
+                  )}
                   {k.styl === "value" && k.ev_pct > 0 && (
                     <span className="mt-0.5 block">
                       wg modelu ten kupon jest wart kurs{" "}

@@ -67,6 +67,8 @@ export interface ValueBet {
   matchup?: boolean;
   /** true = pierwszy występ w XI na turnieju — linie rynku bywają niedograne */
   rotacja?: boolean;
+  /** true = składy potwierdzono <45 min temu — kurs mógł nie zdążyć zareagować */
+  swieze_sklady?: boolean;
 }
 
 export interface Mecz {
@@ -159,6 +161,12 @@ export interface KuponAlternatywa extends KuponLeg {
   p_po: number;
 }
 
+/** Propozycja DOŁOŻENIA pewnego lega, gdy kurs wisi nisko w przedziale. */
+export interface KuponDolozenie extends KuponLeg {
+  kurs_po: number;
+  p_po: number;
+}
+
 /** Kupon (AKO) budowany przez model pod docelowy kurs (x5/x10/x15/x20/x25). */
 export interface Kupon {
   cel: number;
@@ -176,6 +184,10 @@ export interface Kupon {
   /** indeks lega o najniższej szansie (najsłabsze ogniwo) */
   najslabszy_idx?: number;
   alternatywa?: KuponAlternatywa;
+  dolozenie?: KuponDolozenie;
+  /** ile meczów kuponu miało POTWIERDZONE składy w chwili budowy */
+  mecze_ze_skladami?: number;
+  mecze_lacznie?: number;
   /** klucz rekordu w logu kuponów — identyfikator do pomijania */
   klucz?: string;
 }

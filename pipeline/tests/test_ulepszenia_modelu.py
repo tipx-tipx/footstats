@@ -154,11 +154,13 @@ def test_bias_full_rodzina_i_przedzialy():
         log[f"o{i}"] = _rec("sot", 0.60, "wygrany" if i < 4 else "przegrany")
     full = rozliczanie.compute_bias_full(log, min_n=25)
     assert "shots" in full and "sot" in full        # sot dzięki rodzinie
-    assert full["shots"]["global"] < 1.0            # przeszacowanie wykryte
+    assert full["shots"]["logit"] is True           # nowy format: delta logitowa
+    assert full["shots"]["global"] < 0.0            # przeszacowanie wykryte
     assert len(full["shots"]["bins"]) == 3
     # przedział 0.70-1.01 ma 30 obserwacji -> bias przedziałowy aktywny
     hi_bin = full["shots"]["bins"][2]
-    assert hi_bin[0] == 0.70 and 0.85 <= hi_bin[2] <= 1.15
+    lo_cap, hi_cap = rozliczanie.BIAS_CAP_LOGIT
+    assert hi_bin[0] == 0.70 and lo_cap <= hi_bin[2] <= hi_cap
 
 
 def test_bias_full_pomija_rynek_bez_danych_i_rodziny():

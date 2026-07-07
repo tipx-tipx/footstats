@@ -24,9 +24,11 @@ Przepływ (wywoływane na końcu każdego cyklu):
 
 from __future__ import annotations
 
+import math
 import time
 
 from .. import supa
+from ..model import betting
 from ..model import kupony as kupony_model
 from ..sources import rotowire, scores365
 
@@ -109,6 +111,13 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
             "kurs": b.get("kurs"), "bukmacher": b.get("bukmacher"),
             "p_model": b["p_model"], "pewnosc": b.get("pewnosc"),
             "sugestia": bool(b.get("sugestia")),
+            # kategorie typu — do diagnostyki per kategoria (Brier/log-loss)
+            "matchup": bool(b.get("matchup")),
+            "rotacja": bool(b.get("rotacja")),
+            "wyzsza_linia": bool(b.get("wyzsza_linia")),
+            "pewniak": bool(b.get("pewniak")),
+            # sygnał składu przy publikacji — do kalibracji p_start z rozliczeń
+            "xi_sygnal": b.get("xi_sygnal"),
             "opublikowano_ts": int(time.time()),
             "wynik": None, "faktyczna": None,
         }
@@ -254,24 +263,22 @@ def _superzmiana(
 
 
 MIN_N_KALIBRACJI = 25          # od tylu rozliczonych typów na rynek korygujemy
-BIAS_CAP = (0.85, 1.15)        # ostrożnie: maks. +-15% korekty szansy
+BIAS_CAP = (0.85, 1.15)        # (stary format mnożnikowy — compute_bias/raport)
+# kalibracja w PRZESTRZENI LOGITÓW: p' = sigmoid(logit(p) + b) — mnożnik
+# psuł ogony (p=95% ściągał za mocno, p=50% za słabo); delta logitowa
+# koryguje równomiernie. Cap ±0.40 ≈ dawne ±15% w środku skali.
+BIAS_CAP_LOGIT = (-0.40, 0.40)
 # sugestie STS (bez kursu, bez bezpieczników rynkowych) kalibrują się OSOBNO
 # i mylą się dużo mocniej niż typy z kursem — cap w dół musi być szerszy
-SUGESTIA_BIAS_CAP = (0.60, 1.15)
+SUGESTIA_BIAS_CAP_LOGIT = (-1.0, 0.40)
 # kalibracja PRZEDZIAŁOWA: bias liczony osobno per przedział szansy (model
 # może przeszacowywać longshoty, a pewniaki mieć dobrze)
 BIAS_PRZEDZIALY = [(0.0, 0.55), (0.55, 0.70), (0.70, 1.01)]
 MIN_N_PRZEDZIAL = 15
 # pokrewne rynki dzielą błąd modelu (shots i sot mylą się razem) — shrinkage
-# rodzinny: rynek z małą próbą jest ściągany do biasu swojej rodziny
-RODZINY_RYNKOW = {
-    "shots": "strzelanie", "sot": "strzelanie",
-    "shots_outside_box": "strzelanie", "sot_outside_box": "strzelanie",
-    "headed_shots": "strzelanie", "headed_sot": "strzelanie",
-    "shots_blocked": "strzelanie", "shots_off_target": "strzelanie",
-    "fouls_committed": "faule", "fouls_won": "faule", "yellow_card": "faule",
-    "tackles": "defensywa", "interceptions": "defensywa",
-}
+# rodzinny: rynek z małą próbą jest ściągany do biasu swojej rodziny;
+# mapa wspólna z kuponami (dywersyfikacja) — mieszka w model/betting.py
+RODZINY_RYNKOW = betting.RODZINY_RYNKOW
 
 
 def _bias_surowy(grp: list[dict]) -> float:
@@ -283,6 +290,38 @@ def _bias_surowy(grp: list[dict]) -> float:
 
 def _cap_bias(b: float, cap: tuple[float, float] = BIAS_CAP) -> float:
     return round(max(cap[0], min(cap[1], b)), 3)
+
+
+def _logit(p: float) -> float:
+    p = min(max(p, 1e-6), 1.0 - 1e-6)
+    return math.log(p / (1.0 - p))
+
+
+def _bias_logit(grp: list[dict]) -> float:
+    """Delta logitowa b: rozwiązanie Σ sigmoid(logit(p_i)+b) = trafienia.
+
+    Pseudozliczenia stabilizujące jak w _bias_surowy: dwie wirtualne
+    obserwacje p=0.5 (jedna trafiona, jedna nie). Bisekcja — bez zależności.
+    """
+    ps = [min(max(float(r["p_model"]), 1e-6), 1 - 1e-6) for r in grp]
+    ps += [0.5, 0.5]
+    traf = sum(1 for r in grp if r["wynik"] == "wygrany") + 1.0
+
+    def f(b: float) -> float:
+        return sum(1.0 / (1.0 + math.exp(-(_logit(p) + b))) for p in ps) - traf
+
+    lo, hi = -3.0, 3.0
+    if f(lo) > 0:
+        return lo
+    if f(hi) < 0:
+        return hi
+    for _ in range(40):
+        mid = (lo + hi) / 2.0
+        if f(mid) > 0:
+            hi = mid
+        else:
+            lo = mid
+    return (lo + hi) / 2.0
 
 
 def compute_bias(log: dict, min_n: int = MIN_N_KALIBRACJI) -> dict[str, float]:
@@ -302,17 +341,19 @@ def compute_bias_full(
     log: dict,
     min_n: int = MIN_N_KALIBRACJI,
     sugestie: bool = False,
-    cap: tuple[float, float] = BIAS_CAP,
+    cap: tuple[float, float] = BIAS_CAP_LOGIT,
 ) -> dict[str, dict]:
     """Kalibracja przedziałowa z shrinkage: rodzina -> rynek -> przedział.
 
+    Wartości to DELTY LOGITOWE (p' = sigmoid(logit(p) + b)) — równomierna
+    korekta w całej skali szans, w przeciwieństwie do mnożnika.
     Trzy poziomy (każdy ściągany do nadrzędnego proporcjonalnie do próby):
       1. rodzina rynków (strzelanie/faule/defensywa) — od min_n rozliczeń,
       2. rynek — bias ściągany do rodziny wagą n/(n+min_n),
       3. przedział szansy — ściągany do biasu rynku wagą n/(n+MIN_N_PRZEDZIAL).
 
-    Zwraca {rynek: {"global": bias, "bins": [[lo, hi, bias], ...]}} —
-    format rozumiany przez engine._select_bias.
+    Zwraca {rynek: {"logit": True, "global": b, "bins": [[lo, hi, b], ...]}}
+    — format rozumiany przez engine (stary mnożnikowy dalej wspierany).
     """
     # sugestie STS trafiają fatalnie względem typów z kursem (inne progi, brak
     # bezpieczników) — mieszanie ich z typami zaniżało bias całych rodzin
@@ -327,7 +368,7 @@ def compute_bias_full(
         if fam:
             rodziny.setdefault(fam, []).append(r)
     fam_bias = {
-        f: _bias_surowy(g) for f, g in rodziny.items() if len(g) >= min_n
+        f: _bias_logit(g) for f, g in rodziny.items() if len(g) >= min_n
     }
     grupy: dict[str, list[dict]] = {}
     for r in settled:
@@ -335,7 +376,7 @@ def compute_bias_full(
     out: dict[str, dict] = {}
     for mk, grp in grupy.items():
         fb = fam_bias.get(RODZINY_RYNKOW.get(mk, ""))
-        n, raw = len(grp), _bias_surowy(grp)
+        n, raw = len(grp), _bias_logit(grp)
         if fb is not None:
             g = fb + (n / (n + min_n)) * (raw - fb)
         elif n >= min_n:
@@ -348,9 +389,9 @@ def compute_bias_full(
             bb = g
             if len(bgrp) >= MIN_N_PRZEDZIAL:
                 k = len(bgrp) / (len(bgrp) + MIN_N_PRZEDZIAL)
-                bb = g + k * (_bias_surowy(bgrp) - g)
+                bb = g + k * (_bias_logit(bgrp) - g)
             bins.append([lo, hi, _cap_bias(bb, cap)])
-        out[mk] = {"global": _cap_bias(g, cap), "bins": bins}
+        out[mk] = {"logit": True, "global": _cap_bias(g, cap), "bins": bins}
     return out
 
 
@@ -364,7 +405,67 @@ def market_bias_sugestie() -> dict[str, dict]:
     """Osobna kalibracja sugestii STS — liczona wyłącznie z rozliczonych
     sugestii, z szerszym capem w dół (przeszacowania rzędu 20 pp)."""
     log = _migruj_log(supa.get_key("typy_log") or {})
-    return compute_bias_full(log, sugestie=True, cap=SUGESTIA_BIAS_CAP)
+    return compute_bias_full(log, sugestie=True, cap=SUGESTIA_BIAS_CAP_LOGIT)
+
+
+def compute_diagnostyka(log: dict) -> dict:
+    """Samokontrola modelu z rozliczeń: Brier / log-loss per kategoria typów.
+
+    Kategorie nie wykluczają się (typ bywa matchup i pewniak naraz);
+    "zwykle" = bez żadnej flagi specjalnej. Dodatkowo skuteczność sygnałów
+    składu — P(zagrał | sygnał XI) — do przyszłej kalibracji modelu minut
+    (od n>=40 na sygnał można zastąpić ręczne wagi zmierzonymi).
+    """
+    settled = [
+        r for r in log.values() if r.get("wynik") in ("wygrany", "przegrany")
+    ]
+
+    def _stats(grp: list[dict]) -> dict | None:
+        n = len(grp)
+        if not n:
+            return None
+        brier = ll = 0.0
+        traf = 0
+        for r in grp:
+            p = min(max(float(r["p_model"]), 1e-6), 1.0 - 1e-6)
+            y = 1.0 if r["wynik"] == "wygrany" else 0.0
+            brier += (p - y) ** 2
+            ll += -(y * math.log(p) + (1.0 - y) * math.log(1.0 - p))
+            traf += int(y)
+        sr_p = sum(float(r["p_model"]) for r in grp) / n
+        return {
+            "n": n, "trafione": traf, "hit": round(traf / n, 3),
+            "sr_p": round(sr_p, 3),
+            "brier": round(brier / n, 4), "logloss": round(ll / n, 4),
+        }
+
+    FLAGI = ("sugestia", "matchup", "rotacja", "wyzsza_linia")
+    kategorie = {
+        "wszystkie": settled,
+        "zwykle": [r for r in settled if not any(r.get(f) for f in FLAGI)],
+        "matchup": [r for r in settled if r.get("matchup")],
+        "rotacja": [r for r in settled if r.get("rotacja")],
+        "wyzsza_linia": [r for r in settled if r.get("wyzsza_linia")],
+        "sugestie": [r for r in settled if r.get("sugestia")],
+    }
+    out: dict = {"kategorie": {}}
+    for nazwa, grp in kategorie.items():
+        s = _stats(grp)
+        if s:
+            out["kategorie"][nazwa] = s
+    sklady: dict[str, list[int]] = {}
+    for r in log.values():
+        if r.get("zagral") is None:
+            continue
+        s = r.get("xi_sygnal") or "brak"
+        d = sklady.setdefault(str(s), [0, 0])
+        d[1] += 1
+        d[0] += int(bool(r["zagral"]))
+    out["sklady"] = {
+        k: {"zagral": a, "n": b, "pct": round(a / b, 3)}
+        for k, (a, b) in sklady.items()
+    }
+    return out
 
 
 def _snapshot_zamkniecia(
@@ -495,12 +596,18 @@ def _kupon_do_logu(
         slot = f"{k.get('horyzont', '?')}:{k.get('cel_label', k.get('cel'))}"
         if slot in zajete:
             continue  # poprzedni kupon wciąż w grze — nie podmieniamy go
-        if min(l["kickoff_ts"] for l in k["legi"]) <= now:
-            continue  # pierwszy mecz już trwa — za późno na publikację
+        if min(l["kickoff_ts"] for l in k["legi"]) <= now + 15 * 60:
+            continue  # pierwszy mecz trwa lub startuje za chwilę — za późno
         if any(l.get("podmiot_id") in niedostepni for l in k["legi"]):
             continue  # leg z zawodnikiem poza składem — czekaj na kolejny cykl
-        if _sygnatura_legow(k["legi"]) in odrzucone.get(slot, set()):
-            continue  # identyczny z kuponem, który user właśnie pominął
+        sygn = _sygnatura_legow(k["legi"])
+        # user właśnie pominął ten zestaw — nie wraca ani identyczny, ani
+        # prawie identyczny (Jaccard >= 0.7, np. 7 legów z 1 zamianą)
+        if any(
+            len(sygn & odrz) / max(len(sygn | odrz), 1) >= 0.7
+            for odrz in odrzucone.get(slot, set())
+        ):
+            continue
         klucz, n = f"{slot}:{dzien}", 2
         while klucz in log_kuponow:
             klucz, n = f"{slot}:{dzien}#{n}", n + 1
@@ -579,6 +686,7 @@ def rozlicz(
             "kurs": l["kurs"], "bukmacher": l.get("bukmacher"),
             "p_model": l["p_model"], "pewnosc": l.get("pewnosc"),
             "sugestia": False,
+            "matchup": l.get("matchup"), "rotacja": l.get("rotacja"),
         } for l in k["legi"]])
     lib = supa.get_key("trend_lib") or {}
     now = int(time.time())
@@ -620,7 +728,7 @@ def rozlicz(
             minuty = _minuty_z_banku(rec, lib)
         if minuty is not None and minuty <= 0:
             rec.update(wynik="zwrot", faktyczna=0.0, rozliczono_ts=now,
-                       powod="nie zagrał")
+                       powod="nie zagrał", zagral=False)
             continue
 
         wartosc = None
@@ -672,7 +780,7 @@ def rozlicz(
                 rec["superzmiana_spr"] = True  # sprawdzone — rewizja nie dubluje
         rec.update(
             wynik="wygrany" if trafiony else "przegrany",
-            faktyczna=wartosc, rozliczono_ts=now,
+            faktyczna=wartosc, rozliczono_ts=now, zagral=True,
         )
         if rec.get("kurs") and rec.get("kurs_zamkniecia"):
             rec["clv_pct"] = round(
@@ -764,7 +872,19 @@ def rozlicz(
         key=lambda r: -(r.get("rozliczono_ts") or 0),
     )[:60]
     z_clv = [r for r in settled if r.get("clv_pct") is not None]
+    diagnostyka = compute_diagnostyka(log)
+    for nazwa, s in diagnostyka["kategorie"].items():
+        print(
+            f"Diag {nazwa}: n={s['n']} hit={s['hit']} śr.p={s['sr_p']} "
+            f"Brier={s['brier']} logloss={s['logloss']}"
+        )
+    if diagnostyka["sklady"]:
+        print("Sygnały XI: " + ", ".join(
+            f"{k}: zagrał {v['zagral']}/{v['n']} ({v['pct']:.0%})"
+            for k, v in diagnostyka["sklady"].items()
+        ))
     return {
+        "diagnostyka": diagnostyka,
         "podsumowanie": {
             "opublikowane": len(log),
             "rozliczone": len(settled),

@@ -121,6 +121,13 @@ def matchup_lite_factor(
         if res is None:
             return 1.0, ""
         ratio, n = res
+    elif market_code == "tackles" and is_defensive(player_positions):
+        # odbiory obrońcy rosną, gdy naprzeciwko drybler — fouls_won rywala
+        # to najbliższe proxy liczby pojedynków 1 na 1 po tej stronie
+        res = _side_ratio(opp_players, "fouls_won", facing, defensive_only=False)
+        if res is None:
+            return 1.0, ""
+        ratio, n = res
     else:
         return 1.0, ""
 
@@ -135,6 +142,11 @@ def matchup_lite_factor(
         opis = (
             f"Po jego ({strona_pl}) stronie rywal fauluje "
             f"{'częściej' if factor > 1 else 'rzadziej'} niż średnio"
+        )
+    elif market_code == "tackles":
+        opis = (
+            f"Po jego ({strona_pl}) stronie rywal "
+            f"{'często wchodzi w pojedynki 1v1 — więcej okazji do odbiorów' if factor > 1 else 'rzadko dryblingu je — mniej okazji do odbiorów'}"
         )
     else:
         opis = (

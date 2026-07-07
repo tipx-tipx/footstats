@@ -21,6 +21,17 @@ from scipy import optimize
 # Typowa marża polskich bukmacherów na player props (do jednostronnych kwotowań).
 DEFAULT_ONE_SIDED_MARGIN = 0.07
 
+# pokrewne rynki dzielą błąd modelu i korelują przez tempo meczu — wspólna
+# mapa dla kalibracji (rozliczanie) i dywersyfikacji kuponów (kupony)
+RODZINY_RYNKOW = {
+    "shots": "strzelanie", "sot": "strzelanie",
+    "shots_outside_box": "strzelanie", "sot_outside_box": "strzelanie",
+    "headed_shots": "strzelanie", "headed_sot": "strzelanie",
+    "shots_blocked": "strzelanie", "shots_off_target": "strzelanie",
+    "fouls_committed": "faule", "fouls_won": "faule", "yellow_card": "faule",
+    "tackles": "defensywa", "interceptions": "defensywa",
+}
+
 
 def implied_probs_two_way(over_odds: float, under_odds: float) -> tuple[float, float]:
     """Devig dwustronny metodą potęgową.
