@@ -54,6 +54,29 @@ def test_koncesje_lookup_i_filtr_klubowy():
     assert k.lookup("Francja", "tackles", "GK") is None
 
 
+def test_koncesje_wazenie_sila_rywala():
+    # Norwegia dopuszczała: obrońcom MOCNEJ drużyny 3.0, słabej 1.0 —
+    # przed meczem z mocną drużyną profil ma ciążyć ku 3.0
+    lib = {}
+    for pid in range(6):
+        lib[f"{pid}:tackles"] = {**_rec(pid, "tackles", ["Norwegia"], [3.0]),
+                                 "team_name": "France"}
+    for pid in range(6, 12):
+        lib[f"{pid}:tackles"] = {**_rec(pid, "tackles", ["Norwegia"], [1.0]),
+                                 "team_name": "Botswana"}
+    k = koncesje.zbuduj_koncesje(lib, {"norwegia"})
+    elo = {"france": 2100, "england": 2050, "botswana": 1300}
+    bez_wag = k.lookup("Norwegia", "tackles", "D")
+    z_wagami = k.lookup("Norwegia", "tackles", "D", elo_map=elo,
+                        team_name="England")
+    assert bez_wag is not None and z_wagami is not None
+    assert abs(bez_wag[0] - 2.0) < 1e-9          # zwykła średnia
+    assert z_wagami[0] > 2.3                      # mocni ważą więcej
+    # bez_teamu w elo -> wagi neutralne, dalej liczy się sensownie
+    assert k.lookup("Norwegia", "tackles", "D", elo_map=elo,
+                    team_name="Marsjanie") is not None
+
+
 def test_koncesje_min_ts_odcina_stare_mecze():
     wc = {"francja", "norwegia"}
     lib = {

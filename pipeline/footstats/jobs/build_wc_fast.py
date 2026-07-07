@@ -385,7 +385,8 @@ def score_from_trend(
     koncesja_opis = ""
     if opp_allowed is None and koncesje_tab is not None:
         kc = koncesje_tab.lookup(
-            trend.opponent_name, trend.market_code, trend.position
+            trend.opponent_name, trend.market_code, trend.position,
+            elo_map=elo_map, team_name=trend.team_name,
         )
         if kc:
             opp_allowed, opp_avg, opp_n = kc
@@ -689,11 +690,12 @@ def main():
         if x
     }
 
-    # profil rywala per rynek×pozycja — z meczów TEGO turnieju (bank trendów);
-    # zasila czynnik "rywal" i typy kontekstowe (matchup jak u tipsterów)
+    # profil rywala per rynek×pozycja — ze WSZYSTKICH meczów turnieju w banku
+    # (nie tylko przeciw aktualnym przeciwnikom: drużyny, które odpadły, też
+    # budują normę i profile); filtr klubów załatwia min_ts (sezon skończony)
     try:
         koncesje_tab = koncesje.zbuduj_koncesje(
-            bank_recs, wc_names, min_ts=WC_START_TS,
+            bank_recs, wc_names=None, min_ts=WC_START_TS,
         )
         n_prof = len({k[0] for k in koncesje_tab._obs})
         print(f"Profil rywali: {n_prof} drużyn, "
