@@ -69,6 +69,10 @@ export interface ValueBet {
   rotacja?: boolean;
   /** true = składy potwierdzono <45 min temu — kurs mógł nie zdążyć zareagować */
   swieze_sklady?: boolean;
+  /** true = linia płaci >=12% ponad kurs wynikający z RESZTY siatki Superbetu */
+  miekka_linia?: boolean;
+  /** kurs, jaki wynika z pozostałych linii buka (gdy miekka_linia) */
+  kurs_oczekiwany?: number | null;
 }
 
 export interface Mecz {

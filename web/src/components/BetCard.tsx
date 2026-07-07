@@ -265,6 +265,14 @@ export const BetCard = memo(function BetCard({
                 🕐 świeże składy
               </span>
             )}
+            {bet.miekka_linia && (
+              <span
+                className="inline-flex rounded-md bg-brand-wash px-1.5 py-0.5 text-[10px] font-semibold text-brand-deep"
+                title={`Z pozostałych linii Superbetu na ten rynek wynika kurs ~${(bet.kurs_oczekiwany ?? 0).toFixed(2).replace(".", ",")} — ta linia płaci wyraźnie więcej (niespójność siatki bukmachera)`}
+              >
+                ↑ miękka linia
+              </span>
+            )}
             <span
               className="hidden items-center gap-1 text-[10px] text-faint sm:flex"
               title="Pewność modelu: ile danych i jak stabilnych stoi za tą predykcją"

@@ -1049,6 +1049,17 @@ def main():
         if not merged:
             continue  # brak realnego kursu — nie tworzymy okazji
 
+        # 1a: samospójność siatki linii Superbetu (line shopping bez
+        # zewnętrznych kursów) — fair kurs każdej linii z fitu do POZOSTAŁYCH
+        fair_wewn: dict[float, float] = {}
+        if len(merged) >= 3:
+            probs_w = {
+                l0: betting.implied_prob_one_sided(s0["over"][0])
+                for l0, s0 in merged.items() if s0.get("over")
+            }
+            if len(probs_w) >= 3:
+                fair_wewn = betting.internal_fair_odds(probs_w)
+
         best_by_side, chosen = {}, {}
         for l, slot in sorted(merged.items()):
             over_odd = slot.get("over", (None,))[0]
@@ -1069,6 +1080,17 @@ def main():
                 odd = sv[0]
                 p_side = sm.p_over if side_key == "over" else 1.0 - sm.p_over
                 implied = betting.implied_prob_one_sided(odd)
+                # miękka linia: płaci >=12% ponad kurs wynikający z RESZTY
+                # siatki Superbetu na ten rynek (fair netto -> brutto z marżą)
+                fw = fair_wewn.get(l)
+                kurs_oczekiwany = (
+                    round(fw * (1.0 - betting.DEFAULT_ONE_SIDED_MARGIN), 2)
+                    if fw else None
+                )
+                miekka = (
+                    kurs_oczekiwany is not None
+                    and odd >= kurs_oczekiwany * 1.12
+                )
                 # dwa profile lega: PEWNIAK (niski kurs, wysoka szansa) oraz
                 # PEREŁKA (kurs 2.0-3.6 przy wciąż solidnej szansie i
                 # nieujemnej wartości — okazjonalne rodzynki na kupony)
@@ -1118,6 +1140,8 @@ def main():
                         "matchup": matchup_typ, "rotacja": rotacja,
                         "xi_sygnal": xi_sygnal,
                         "swieze_sklady": mid in swieze_mids,
+                        "miekka_linia": miekka,
+                        "kurs_oczekiwany": kurs_oczekiwany if miekka else None,
                         "ci": [sm.ci_low, sm.ci_high],
                         "oczekiwane_minuty": sm.expected_minutes,
                         "ryzyko": betting.risk_level(
@@ -1159,11 +1183,19 @@ def main():
                 and (tr.odds_type == "over") == (a.side == "powyzej")
             ):
                 kurs_ref = round(statistics.median(tr.ref_odds), 2)
-            # OKAZJA Z KURSEM tylko, gdy Superbet płaci >= 0.10 więcej niż
-            # konsensus innych bukmacherów (decyzja usera — sygnał miękkiej
-            # linii ważniejszy niż sama przewaga modelu). Bez referencji nie
-            # ma dowodu odstawania — typ zostaje w puli pewniaków.
-            if kurs_ref is None or kurs_wziety - kurs_ref < 0.10:
+            # OKAZJA Z KURSEM, gdy jest DOWÓD miękkiej linii: Superbet płaci
+            # >= 0.10 ponad konsensus UK (gdy dostępny) LUB >= 12% ponad kurs
+            # wynikający z JEGO WŁASNEJ siatki pozostałych linii (1a — line
+            # shopping bez zewnętrznych źródeł). Bez dowodu — typ zostaje
+            # w puli pewniaków.
+            odstaje_zewn = kurs_ref is not None and kurs_wziety - kurs_ref >= 0.10
+            fw_a = fair_wewn.get(l)
+            oczek_a = (
+                round(fw_a * (1.0 - betting.DEFAULT_ONE_SIDED_MARGIN), 2)
+                if fw_a else None
+            )
+            miekka_a = oczek_a is not None and kurs_wziety >= oczek_a * 1.12
+            if not odstaje_zewn and not miekka_a:
                 continue
             value_bets.append({
                 "id": vb_id, "mecz_id": mid, "mecz": match_label, "kickoff_ts": ts,
@@ -1179,6 +1211,8 @@ def main():
                 "fair_kurs": a.fair_odds, "edge_pp": a.edge_pp, "ev_pct": a.ev_pct,
                 "matchup": float(sm.factors.get("rywal", 1.0) or 1.0) >= 1.12,
                 "rotacja": rotacja, "xi_sygnal": xi_sygnal,
+                "miekka_linia": miekka_a,
+                "kurs_oczekiwany": oczek_a if miekka_a else None,
                 "pewnosc": a.confidence, "pewnosc_score": a.confidence_score,
                 "ryzyko": a.risk, "rank_score": a.rank_score,
                 "ci": [sm.ci_low, sm.ci_high],
@@ -1318,6 +1352,8 @@ def main():
             r *= 1.10
         if b.get("swieze_sklady"):
             r *= 1.12  # składy ogłoszone <45 min temu — kurs mógł nie zdążyć
+        if b.get("miekka_linia"):
+            r *= 1.10  # linia odstaje od własnej siatki buka (błąd tradera)
         if ci_w > 0.25:
             r *= 0.90
         return r
@@ -1377,6 +1413,8 @@ def main():
             "matchup": bool(b.get("matchup")),
             "rotacja": bool(b.get("rotacja")),
             "swieze_sklady": bool(b.get("swieze_sklady")),
+            "miekka_linia": bool(b.get("miekka_linia")),
+            "kurs_oczekiwany": b.get("kurs_oczekiwany"),
             "xi_sygnal": b.get("xi_sygnal"),
             "kurs": b["kurs"], "bukmacher": b["bukmacher"],
             "p_model": b["p_model"], "p_rynku": None,

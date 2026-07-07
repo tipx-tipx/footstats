@@ -2,8 +2,34 @@
 
 import numpy as np
 import pytest
+from scipy import stats as _st
 
 from footstats.model import betting, cards
+
+
+def test_internal_fair_odds_wykrywa_miekka_linie():
+    # siatka spójna z Poissonem lam=2.0, ale linia 1.5 zaniżona (kurs zawyżony)
+    lam = 2.0
+    probs = {
+        0.5: float(_st.poisson.sf(0, lam)),
+        1.5: 0.45,                             # powinno być ~0.594
+        2.5: float(_st.poisson.sf(2, lam)),
+        3.5: float(_st.poisson.sf(3, lam)),
+    }
+    fair = betting.internal_fair_odds(probs)
+    # fair linii 1.5 liczony z POZOSTAŁYCH -> ~1/0.594
+    assert abs(fair[1.5] - 1.0 / float(_st.poisson.sf(1, lam))) < 0.02
+    # linie spójne dostają fair ~1/p (fit odtwarza lambdę)
+    assert abs(fair[0.5] - 1.0 / probs[0.5]) < 0.15
+
+
+def test_internal_fair_odds_wymaga_spojnej_siatki():
+    # dwie linie to za mało na werdykt
+    assert betting.internal_fair_odds({0.5: 0.8, 1.5: 0.5}) == {}
+    # linia, której POZOSTAŁE punkty są wzajemnie niespójne (rozrzut lambd
+    # > 1.35x), nie dostaje fair kursu — fitowi nie można ufać
+    chaos = {0.5: 0.95, 1.5: 0.30, 2.5: 0.60}
+    assert 0.5 not in betting.internal_fair_odds(chaos)
 
 
 def test_two_way_devig_removes_margin():

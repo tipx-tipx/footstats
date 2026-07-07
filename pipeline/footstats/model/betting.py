@@ -13,10 +13,12 @@ Kroki:
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 import numpy as np
 from scipy import optimize
+from scipy import stats as _stats
 
 # Typowa marża polskich bukmacherów na player props (do jednostronnych kwotowań).
 DEFAULT_ONE_SIDED_MARGIN = 0.07
@@ -60,6 +62,54 @@ def implied_probs_two_way(over_odds: float, under_odds: float) -> tuple[float, f
 def implied_prob_one_sided(odds: float, margin: float = DEFAULT_ONE_SIDED_MARGIN) -> float:
     """Devig jednostronny: odejmij szacowaną marżę rynku od kursu."""
     return float(np.clip((1.0 / odds) * (1.0 - margin), 1e-6, 1.0 - 1e-6))
+
+
+def internal_fair_odds(lines_probs: dict[float, float]) -> dict[float, float]:
+    """Samospójność SIATKI LINII jednego bukmachera — line shopping bez
+    zewnętrznych kursów.
+
+    Wszystkie linie jednego rynku (0,5 / 1,5 / 2,5...) opisują JEDEN rozkład
+    zliczeniowy. Dla każdej linii dopasowujemy Poissona do POZOSTAŁYCH
+    (leave-one-out) i liczymy jej fair kurs netto. Linia płacąca wyraźnie
+    więcej, niż wynika z reszty siatki, to pomyłka tradera — dokładnie
+    wzorzec "reszta rynku 1,55, a tu 2,20", tylko z własnej oferty buka.
+
+    lines_probs: {linia: p_over po devigu}. Zwraca {linia: fair_kurs_netto}
+    tylko dla linii, gdzie fit z pozostałych jest wiarygodny (>=2 zgodne
+    punkty, rozrzut lambd <= 1.35x).
+    """
+    out: dict[float, float] = {}
+    items = sorted(lines_probs.items())
+    if len(items) < 3:
+        return out
+
+    def _lam(line: float, p: float) -> float | None:
+        thr = math.floor(line)          # "powyżej l,5" = X > floor(l)
+
+        def f(lam: float) -> float:
+            return float(_stats.poisson.sf(thr, lam)) - p
+
+        try:
+            if f(0.01) * f(15.0) > 0:
+                return None
+            return float(optimize.brentq(f, 0.01, 15.0))
+        except Exception:
+            return None
+
+    lams = {
+        l: _lam(l, p) for l, p in items if 0.03 < p < 0.97
+    }
+    for l, _p in items:
+        rest = [v for k, v in lams.items() if k != l and v is not None]
+        if len(rest) < 2 or min(rest) <= 0:
+            continue
+        if max(rest) / min(rest) > 1.35:
+            continue  # siatka wewnętrznie niespójna — nie ufaj fitowi
+        lam_ref = sum(rest) / len(rest)
+        p_fair = float(_stats.poisson.sf(math.floor(l), lam_ref))
+        if p_fair > 1e-6:
+            out[l] = 1.0 / p_fair
+    return out
 
 
 @dataclass(frozen=True)
