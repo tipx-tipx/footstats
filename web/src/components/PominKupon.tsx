@@ -120,31 +120,31 @@ export function PominKupon({
           potwierdzone, model złoży ten kupon od nowa na pewnych XI
         </p>
       )}
-      <div className="mt-1.5 flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
-        {pokazPrzebuduj && !przebudowa && (
+      <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
+        {pokazPrzebuduj && !przebudowa && stan !== "wybor" && (
           <button
             onClick={zaplanujPrzebudowe}
-            className="rounded px-1 text-xs text-faint underline-offset-2 transition-colors hover:text-muted hover:underline"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-hairline bg-card px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:border-data-amber/50 hover:text-[#8a5613]"
             title="Kupon zostanie pominięty i złożony od nowa dopiero, gdy składy WSZYSTKICH jego meczów będą potwierdzone — mniej zwrotów i anulowań"
           >
             🔄 przebuduj po składach
           </button>
         )}
         {stan === "wybor" ? (
-          <span className="flex flex-wrap items-center gap-1.5 text-xs">
-            <span className="text-faint">powód:</span>
+          <span className="flex flex-wrap items-center gap-1.5 rounded-lg border border-hairline bg-card px-2 py-1.5">
+            <span className="pl-1 text-xs text-faint">dlaczego pomijasz?</span>
             {POWODY.map((p) => (
               <button
                 key={p}
                 onClick={() => pomin(p)}
-                className="rounded-md border border-hairline px-2 py-0.5 text-xs text-ink-soft transition-colors hover:bg-paper"
+                className="rounded-md bg-paper px-2.5 py-1 text-xs font-medium text-ink-soft transition-colors hover:bg-data-red/10 hover:text-data-red"
               >
                 {p}
               </button>
             ))}
             <button
               onClick={() => setStan("aktywny")}
-              className="px-1 text-xs text-faint hover:text-muted"
+              className="px-1.5 text-xs text-faint hover:text-muted"
               aria-label="anuluj pomijanie"
             >
               ✕
@@ -154,14 +154,14 @@ export function PominKupon({
           <button
             onClick={() => setStan("wybor")}
             disabled={stan === "wysylam"}
-            className="rounded px-1 text-xs text-faint underline-offset-2 transition-colors hover:text-muted hover:underline disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-hairline bg-card px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:border-data-red/40 hover:text-data-red disabled:opacity-50"
             title="Kupon zniknie z aktywnych i zwolni miejsce na nowy; w tle zostanie rozliczony, żeby model się uczył"
           >
             {stan === "blad"
               ? "nie udało się — spróbuj ponownie"
               : stan === "wysylam"
                 ? "pomijam…"
-                : "Nie zagrałem — pomiń i wygeneruj nowy"}
+                : "✕ Nie zagrałem — pomiń"}
           </button>
         )}
       </div>

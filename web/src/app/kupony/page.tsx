@@ -105,14 +105,27 @@ export default async function KuponyPage() {
       ) : (
         HORYZONTY.map((h) => {
           const grupa = kupony.filter((k) => (k.horyzont ?? "value") === h.kod);
-          if (grupa.length === 0) return null;
+          // sloty to MAKSIMA (1 kupon na przedział kursowy) — przedział bez
+          // kuponu czeka, aż pula legów pozwoli domknąć kurs w widełkach
+          const przedzialy =
+            h.kod === "dzienny"
+              ? ["5–10", "10–15", "15–20", "20–25"]
+              : h.kod === "dlugoterminowy"
+                ? ["10–15", "15–20", "20–25", "25–35"]
+                : ["4–8", "8–16"];
+          const puste = przedzialy.filter(
+            (p) => !grupa.some((k) => (k.cel_label ?? String(k.cel)) === p),
+          );
+          if (grupa.length === 0 && puste.length === 0) return null;
           return (
             <section key={h.kod} className="mt-9">
               <Reveal>
                 <h2 className="text-lg font-semibold">{h.tytul}</h2>
                 <p className="mt-1 max-w-3xl text-sm text-muted">{h.opis}</p>
               </Reveal>
-              <div className="mt-4 grid gap-4 lg:grid-cols-2">
+              {/* columns (masonry): karty układają się gęsto w dwóch
+                  kolumnach — nieparzysty kupon nie wisi samotnie w rzędzie */}
+              <div className="mt-4 columns-1 gap-4 lg:columns-2">
                 {grupa.map((k, i) => {
                   // najsłabsze ogniwo: z pipeline'u, awaryjnie liczone z legów
                   const weakIdx =
@@ -125,6 +138,7 @@ export default async function KuponyPage() {
             <Reveal
               key={k.klucz ?? `${k.horyzont}-${k.cel_label ?? k.cel}`}
               delay={Math.min(i * 0.06, 0.25)}
+              className="mb-4 break-inside-avoid"
             >
               <PominKupon
                 klucz={k.klucz}
@@ -401,6 +415,20 @@ export default async function KuponyPage() {
             </Reveal>
                   );
                 })}
+                {puste.map((p) => (
+                  <div
+                    key={p}
+                    className="mb-4 break-inside-avoid rounded-2xl border border-dashed border-hairline bg-paper/40 px-5 py-6 text-center"
+                  >
+                    <p className="font-data text-sm font-semibold text-faint">
+                      ×{p}
+                    </p>
+                    <p className="mx-auto mt-1 max-w-[30ch] text-xs leading-relaxed text-faint">
+                      przedział czeka — kupon powstanie, gdy z puli legów da
+                      się złożyć kurs w tych widełkach (zwykle bliżej meczów)
+                    </p>
+                  </div>
+                ))}
               </div>
             </section>
           );
