@@ -63,6 +63,10 @@ export interface ValueBet {
   pewniak?: boolean;
   /** true = perełka na wyższej linii (>= 1,5) przy wciąż solidnej szansie */
   wyzsza_linia?: boolean;
+  /** true = profil rywala wyraźnie sprzyja (koncesje per rynek × pozycja) */
+  matchup?: boolean;
+  /** true = pierwszy występ w XI na turnieju — linie rynku bywają niedograne */
+  rotacja?: boolean;
 }
 
 export interface Mecz {

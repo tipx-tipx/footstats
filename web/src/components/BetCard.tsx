@@ -82,6 +82,13 @@ function tierPewniaka(bet: ValueBet): {
   opis: string;
 } {
   if (bet.wyzsza_linia) {
+    if (bet.p_model < 0.52) {
+      return {
+        label: "✦ opcja ryzykowna",
+        cls: "bg-data-amber-wash text-[#8a5613]",
+        opis: "Wyższa linia przy szansie 40–52% i kursie 1,9+ — świadomie ryzykowny wariant typu bazowego, nie pewniak",
+      };
+    }
     return {
       label: "✦ wyższa linia",
       cls: "bg-data-amber-wash text-[#8a5613]",
@@ -234,6 +241,22 @@ export const BetCard = memo(function BetCard({
                   ↑ odstaje od rynku
                 </span>
               )}
+            {bet.matchup && (
+              <span
+                className="inline-flex rounded-md bg-brand-wash px-1.5 py-0.5 text-[10px] font-semibold text-brand-deep"
+                title="Profil rywala wyraźnie sprzyja temu rynkowi (co ta drużyna dopuszcza zawodnikom z tej formacji) — liczby w rozwinięciu karty, czynnik „Profil rywala”"
+              >
+                🎯 matchup
+              </span>
+            )}
+            {bet.rotacja && (
+              <span
+                className="inline-flex rounded-md bg-data-amber-wash px-1.5 py-0.5 text-[10px] font-semibold text-[#8a5613]"
+                title="Pierwszy występ w XI na tym turnieju — rynek często nie zdążył dograć jego linii; baza modelu z sezonu klubowego"
+              >
+                ⬆ wchodzi do składu
+              </span>
+            )}
             <span
               className="hidden items-center gap-1 text-[10px] text-faint sm:flex"
               title="Pewność modelu: ile danych i jak stabilnych stoi za tą predykcją"

@@ -53,6 +53,8 @@ class MatchContext:
     opponent_allowed_per90: float | None = None   # ile rywal dopuszcza tej statystyki
     league_avg_per90: float | None = None
     opponent_sample_matches: int = 0
+    # gotowy opis koncesji rywala z liczbami (model/koncesje.py) do uzasadnienia
+    opponent_concession_opis: str = ""
     referee_fouls_multiplier: float | None = None
     referee_cards_multiplier: float | None = None
     referee_sample_matches: int = 0
@@ -126,8 +128,9 @@ def _build_reasoning(
         kier = "więcej" if ctx_factors.opponent > 1 else "mniej"
         czynniki.append(
             {
-                "nazwa": "Rywal",
-                "opis": f"{ctx.opponent_name} dopuszcza {kier} takich akcji niż średnia ligi",
+                "nazwa": "Profil rywala",
+                "opis": ctx.opponent_concession_opis
+                or f"{ctx.opponent_name} dopuszcza {kier} takich akcji niż średnia ligi",
                 "mnoznik": round(ctx_factors.opponent, 2),
             }
         )

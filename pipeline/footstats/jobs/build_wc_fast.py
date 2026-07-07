@@ -33,7 +33,7 @@ from .. import supa
 from ..engine import (
     MatchContext, PlayerHistory, RARE_MARKETS, _select_bias, score_player_market,
 )
-from ..model import betting, context, counts, kupony, matchup_lite, tempo
+from ..model import betting, context, counts, koncesje, kupony, matchup_lite, tempo
 from ..sources import eloratings, rotowire, scores365, statshub, superbet
 from . import rozliczanie
 from .build_demo import MARKET_NAMES_PL, WEB_DATA_DIR, line_for_lambda
@@ -303,6 +303,7 @@ def score_from_trend(
     elo_map: dict[str, int] | None = None,
     tempo_meczu: dict | None = None,
     sedzia: dict | None = None,
+    koncesje_tab: "koncesje.Koncesje | None" = None,
 ):
     """Zbuduj PlayerHistory z recentGames i policz predykcję (bez kursów).
 
@@ -376,16 +377,34 @@ def score_from_trend(
     spread_teamu = None
     if spread_home is not None:
         spread_teamu = spread_home if trend.is_home else -spread_home
-    # kontekst: średnia rywala względem ligi (jeśli statshub podał)
+    # kontekst: średnia rywala względem ligi (żywy feed statshub), a gdy jej
+    # nie ma — profil koncesji rywala per rynek×pozycja z banku (koncesje.py)
+    opp_allowed = trend.opponent_average
+    opp_avg = trend.league_average
+    opp_n = 6 if trend.opponent_average else 0
+    koncesja_opis = ""
+    if opp_allowed is None and koncesje_tab is not None:
+        kc = koncesje_tab.lookup(
+            trend.opponent_name, trend.market_code, trend.position
+        )
+        if kc:
+            opp_allowed, opp_avg, opp_n = kc
+            kub = koncesje.kubelek_pozycji(trend.position) or "tej formacji"
+            koncesja_opis = (
+                f"Na tym turnieju zawodnicy z formacji „{kub}” notują przeciw "
+                f"{trend.opponent_name} ~{opp_allowed:.2f} na 90 min przy "
+                f"normie {opp_avg:.2f} (próba: {opp_n} meczów)"
+            )
     ctx = MatchContext(
         is_home=trend.is_home,
         is_favourite=bool(spread_teamu is not None and spread_teamu > 0.15),
         neutral_venue=True,
         implied_spread=spread_teamu,
         implied_total=total,
-        opponent_allowed_per90=trend.opponent_average,
-        league_avg_per90=trend.league_average,
-        opponent_sample_matches=6 if trend.opponent_average else 0,
+        opponent_allowed_per90=opp_allowed,
+        league_avg_per90=opp_avg,
+        opponent_sample_matches=opp_n,
+        opponent_concession_opis=koncesja_opis,
         # profil sędziego (365Scores): mnożnik fauli vs średnia turnieju —
         # shrinkowany i capowany w context.referee_factor
         referee_fouls_multiplier=(sedzia or {}).get("mnoznik"),
@@ -438,6 +457,7 @@ def main():
     # timestampy meczów reprezentacji per drużyna (z historii 365Scores) —
     # do oznaczania "kadra vs klub" w formie zawodnika
     nt_ts: dict[str, set] = {}
+    bank_recs: dict = {}
     try:
         # 1) trwała biblioteka z Supabase (przeżywa kasowanie propsów przez statshub)
         stored = load_trend_lib()
@@ -465,9 +485,10 @@ def main():
                     _merge(t)
         for t in trends:
             _merge(t)
-        save_trend_lib({
+        bank_recs = {
             f"{t.player_id}:{t.market_code}": asdict(t) for t in lib.values()
-        })
+        }
+        save_trend_lib(bank_recs)
 
         # 3) mecze bez propsów statshub: przepnij najświeższe trendy z biblioteki
         team_by_id: dict[int, str] = {}
@@ -668,6 +689,19 @@ def main():
         if x
     }
 
+    # profil rywala per rynek×pozycja — z meczów TEGO turnieju (bank trendów);
+    # zasila czynnik "rywal" i typy kontekstowe (matchup jak u tipsterów)
+    try:
+        koncesje_tab = koncesje.zbuduj_koncesje(
+            bank_recs, wc_names, min_ts=WC_START_TS,
+        )
+        n_prof = len({k[0] for k in koncesje_tab._obs})
+        print(f"Profil rywali: {n_prof} drużyn, "
+              f"{sum(len(v) for v in koncesje_tab._obs.values())} obserwacji")
+    except Exception as e:
+        koncesje_tab = None
+        print(f"Profil rywali pominięty ({e})")
+
     # kursy Superbetu
     try:
         sb_events = superbet.list_events(days_ahead=8)
@@ -854,11 +888,22 @@ def main():
             elo_map=elo_map,
             tempo_meczu=tempo_cache.get(mid),
             sedzia=sedzia_by_mid.get(mid),
+            koncesje_tab=koncesje_tab,
         )
         if built is None:
             continue
         prior, ctx = built
         mk = tr.market_code
+        # trigger rotacyjny: zawodnik w (przewidywanym) XI bez ani jednego
+        # występu na turnieju — rynek często nie zdążył dograć jego linii
+        gral_na_turnieju = any(
+            ts_g >= WC_START_TS and m_g > 0
+            for ts_g, m_g in zip(tr.timestamps, tr.minutes)
+        )
+        rotacja = bool(
+            (ctx.official_started or ctx.predicted_started)
+            and not gral_na_turnieju
+        )
 
         probe = score_player_market(mk, 0.5, hist, prior, ctx, None, None,
                                     market_calibrated=True,
@@ -972,12 +1017,19 @@ def main():
                     and p_side >= 0.42
                     and p_side * odd - 1.0 >= 0.0
                 )
+                # typ kontekstowy (matchup): profil rywala wyraźnie sprzyja —
+                # model może rozejść się z rynkiem mocniej niż zwykle, bo zna
+                # kontekst, którego kurs mógł nie wycenić (weryfikują rozliczenia)
+                czynnik_rywala = float(sm.factors.get("rywal", 1.0) or 1.0)
+                matchup_typ = czynnik_rywala >= 1.12
+                max_div = 0.30 if matchup_typ else betting.MAX_MODEL_MARKET_DIVERGENCE
+                max_rel = 2.3 if matchup_typ else betting.MAX_RELATIVE_DIVERGENCE
                 if (
                     (pewny or perelka)
                     and len(tr.counts) >= 5  # pewniak nie powstaje z 2 meczów
                     and (sm.ci_high - sm.ci_low) <= 0.35
-                    and abs(p_side - implied) <= betting.MAX_MODEL_MARKET_DIVERGENCE
-                    and (implied <= 0 or p_side / implied <= betting.MAX_RELATIVE_DIVERGENCE)
+                    and abs(p_side - implied) <= max_div
+                    and (implied <= 0 or p_side / implied <= max_rel)
                 ):
                     legi_pool.append({
                         "id": 0, "mecz_id": mid, "mecz": match_label,
@@ -987,6 +1039,7 @@ def main():
                         "rynek_kod": mk, "rynek": MARKET_NAMES_PL[mk], "linia": l,
                         "strona": side_pl, "kurs": odd,
                         "bukmacher": sv[1], "p_model": round(p_side, 4),
+                        "matchup": matchup_typ, "rotacja": rotacja,
                         "ci": [sm.ci_low, sm.ci_high],
                         "oczekiwane_minuty": sm.expected_minutes,
                         "ryzyko": betting.risk_level(
@@ -1046,6 +1099,8 @@ def main():
                 "kurs_ref": kurs_ref,
                 "p_model": a.model_prob, "p_rynku": a.implied_prob,
                 "fair_kurs": a.fair_odds, "edge_pp": a.edge_pp, "ev_pct": a.ev_pct,
+                "matchup": float(sm.factors.get("rywal", 1.0) or 1.0) >= 1.12,
+                "rotacja": rotacja,
                 "pewnosc": a.confidence, "pewnosc_score": a.confidence_score,
                 "ryzyko": a.risk, "rank_score": a.rank_score,
                 "ci": [sm.ci_low, sm.ci_high],
@@ -1172,7 +1227,10 @@ def main():
     # dokładamy najlepszego kandydata z linią >= 1,5 po jakości p×kurs.
     wyzsze: dict[tuple[int, str], dict] = {}
     for b in legi_pool:
-        if b["linia"] < 1.5 or b["p_model"] < 0.52:
+        # przy kursie 1,9+ dopuszczamy "opcję ryzykowną" już od p>=40%
+        # (format tipsterski: linia wyżej, kurs wyraźnie wyższy)
+        prog_p = 0.40 if b["kurs"] >= 1.9 else 0.52
+        if b["linia"] < 1.5 or b["p_model"] < prog_p:
             continue
         kw = (b["mecz_id"], b["rynek_kod"])
         w = wyzsze.get(kw)
@@ -1203,6 +1261,8 @@ def main():
             "linia": b["linia"], "strona": b["strona"],
             "pewniak": True,
             "wyzsza_linia": bool(b.get("wyzsza_linia")),
+            "matchup": bool(b.get("matchup")),
+            "rotacja": bool(b.get("rotacja")),
             "kurs": b["kurs"], "bukmacher": b["bukmacher"],
             "p_model": b["p_model"], "p_rynku": None,
             "fair_kurs": round(1.0 / max(b["p_model"], 1e-6), 2),
