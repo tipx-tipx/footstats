@@ -102,6 +102,20 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
     for b in value_bets:
         k = _klucz(b)
         if k in log:
+            # flagi kategorii potrafią pojawić się PO pierwszej publikacji
+            # (miękka linia w dniu meczu, matchup gdy urośnie profil rywala,
+            # świeży skład) — bez aktualizacji stare klucze byłyby na zawsze
+            # "bezkategoriowe" i diagnostyka per kategoria nie miałaby danych.
+            # Aktualizujemy OR-em wyłącznie wpisy jeszcze nierozliczone;
+            # kurs/p_model zostają z pierwszej publikacji (dataset kalibracji).
+            rec = log[k]
+            if rec.get("wynik") is None:
+                for f in ("matchup", "rotacja", "wyzsza_linia",
+                          "pewniak", "miekka_linia"):
+                    if b.get(f):
+                        rec[f] = True
+                if b.get("xi_sygnal") is not None:
+                    rec["xi_sygnal"] = b["xi_sygnal"]  # najświeższy przed meczem
             continue
         log[k] = {
             "mecz_id": b["mecz_id"], "mecz": b["mecz"],
@@ -117,6 +131,7 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
             "rotacja": bool(b.get("rotacja")),
             "wyzsza_linia": bool(b.get("wyzsza_linia")),
             "pewniak": bool(b.get("pewniak")),
+            "miekka_linia": bool(b.get("miekka_linia")),
             # sygnał składu przy publikacji — do kalibracji p_start z rozliczeń
             "xi_sygnal": b.get("xi_sygnal"),
             "opublikowano_ts": int(time.time()),
@@ -440,13 +455,14 @@ def compute_diagnostyka(log: dict) -> dict:
             "brier": round(brier / n, 4), "logloss": round(ll / n, 4),
         }
 
-    FLAGI = ("sugestia", "matchup", "rotacja", "wyzsza_linia")
+    FLAGI = ("sugestia", "matchup", "rotacja", "wyzsza_linia", "miekka_linia")
     kategorie = {
         "wszystkie": settled,
         "zwykle": [r for r in settled if not any(r.get(f) for f in FLAGI)],
         "matchup": [r for r in settled if r.get("matchup")],
         "rotacja": [r for r in settled if r.get("rotacja")],
         "wyzsza_linia": [r for r in settled if r.get("wyzsza_linia")],
+        "miekka_linia": [r for r in settled if r.get("miekka_linia")],
         "sugestie": [r for r in settled if r.get("sugestia")],
     }
     out: dict = {"kategorie": {}}
