@@ -289,7 +289,10 @@ BIAS_CAP_LOGIT = (-0.40, 0.40)
 SUGESTIA_BIAS_CAP_LOGIT = (-1.0, 0.40)
 # kalibracja PRZEDZIAŁOWA: bias liczony osobno per przedział szansy (model
 # może przeszacowywać longshoty, a pewniaki mieć dobrze)
-BIAS_PRZEDZIALY = [(0.0, 0.55), (0.55, 0.70), (0.70, 1.01)]
+# przedział 0.70-1.01 sklejał dobrze skalibrowane 0.75-0.85 (hit ~ p) z
+# przeszacowanym 0.85+ (hit 70% vs p 89%) — korekta się uśredniała; osobny
+# bin góry pozwala kalibracji dociskać tam, gdzie faktycznie przeszacowuje
+BIAS_PRZEDZIALY = [(0.0, 0.55), (0.55, 0.70), (0.70, 0.85), (0.85, 1.01)]
 MIN_N_PRZEDZIAL = 15
 # pokrewne rynki dzielą błąd modelu (shots i sot mylą się razem) — shrinkage
 # rodzinny: rynek z małą próbą jest ściągany do biasu swojej rodziny;

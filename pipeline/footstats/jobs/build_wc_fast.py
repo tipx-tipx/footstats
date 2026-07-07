@@ -686,7 +686,6 @@ def main():
         "shots_blocked": "blocked",
         "shots_off_target": "off_target",
     }
-    real_split_reserved: set = set()
     try:
         shots_trends = [t for t in trends if t.market_code == "shots"]
         team_names = sorted({t.team_name for t in shots_trends if t.team_name})
@@ -732,11 +731,6 @@ def main():
                     league_average=None, ref_odds=[],
                 ))
                 n_syn += 1
-                if mk2 in ("shots_blocked", "shots_off_target"):
-                    # rezerwacja: jest prawdziwa historia -> fallbackowy
-                    # szacunek (strzały − celne) ma się NIE odzywać, nawet
-                    # gdy scoring odrzuci rynek jako zbyt rzadki
-                    real_split_reserved.add((t.player_id, mk2))
         if n_syn:
             print(f"365Scores: dołożono {n_syn} trendów map strzałów "
                   f"(drużyn z historią: {len(hist365)})")
@@ -910,7 +904,6 @@ def main():
     value_bets, matches_out, players_out = [], {}, {}
     vb_id = 0
     seen_player_market = set()  # (player_id, market) — statshub bywa zdublowany
-    shot_lam = {}  # player_id -> {'shots': λ, 'sot': λ, 'info': {...}} — pod sugestie STS
     real_split = {}  # (player_id, mk) -> pełny scoring niecelnych/zablokowanych z 365
     legi_pool = []   # wszystkie kwotowane linie z wysoką szansą — pula pod kupony pewniaków
 
@@ -1022,17 +1015,6 @@ def main():
         if probe.lam < (0.35 if mk not in RARE_MARKETS else 0.2):
             continue
         line = line_for_lambda(probe.lam)
-
-        # zapamiętaj λ strzałów/celnych — do sugestii niecelne/zablokowane (STS)
-        if mk in ("shots", "sot"):
-            slot = shot_lam.setdefault(tr.player_id, {})
-            slot[mk] = probe.lam
-            slot["info"] = {
-                "name": tr.player_name, "team": tr.team_name,
-                "opp": tr.opponent_name, "mid": mid, "ts": ts,
-                "match": match_label, "minutes": int(sum(tr.minutes)),
-                "position": tr.position or "?",
-            }
 
         # niecelne/zablokowane z PRAWDZIWEJ historii 365Scores: pełny scoring
         # (Superbet nie kwotuje tych rynków — wynik trafi do sugestii STS)
@@ -1268,31 +1250,11 @@ def main():
             matches_out[mid]["okazje"].append(vb_id)
 
     # --- SUGESTIE bez kursów: niecelne / zablokowane (rynki STS, blokowany w chmurze) ---
-    # Preferujemy PRAWDZIWĄ historię per strzał z 365Scores (real_split — pełny
-    # scoring modelu: prior, minuty, składy, matchup). Gdy 365 nie ma zawodnika,
-    # fallback: szacunek "strzały − celne" z podziałem wg danych ligowych.
-    OFF_SHARE, BLK_SHARE = 0.556, 0.444
-    # udział niecelnych vs zablokowanych per formacja — z realnych historii
-    # 365 w banku (obrońca bijący zza pola ma więcej bloków niż drybler
-    # wchodzący w pole karne); stałe ligowe tylko jako fallback
-    off_share_poz: dict[str, float] = {}
-    _agg_ob: dict[str, list[float]] = {}
-    for rec_b in bank_recs.values():
-        mk_b = rec_b.get("market_code")
-        if mk_b not in ("shots_off_target", "shots_blocked"):
-            continue
-        kub_b = koncesje.kubelek_pozycji(rec_b.get("position"))
-        if not kub_b:
-            continue
-        s = float(sum(rec_b.get("counts") or []))
-        _agg_ob.setdefault(f"{kub_b}:{mk_b}", []).append(s)
-    for kub_b in ("obrona", "pomoc", "atak"):
-        off = sum(_agg_ob.get(f"{kub_b}:shots_off_target", []) or [0.0])
-        blk = sum(_agg_ob.get(f"{kub_b}:shots_blocked", []) or [0.0])
-        if off + blk >= 30:  # sensowna próba zdarzeń
-            off_share_poz[kub_b] = off / (off + blk)
-    from scipy import stats as _st
-
+    # WYŁĄCZNIE z prawdziwej historii per strzał z 365Scores (real_split —
+    # pełny scoring modelu: prior, minuty, składy, matchup). Dawny fallback
+    # "strzały − celne z podziałem ligowym" USUNIĘTY: rozliczenia pokazały
+    # hit 23.5% przy śr. p 55.2% (real_split: 48.8% przy 58.1%) — szacunek
+    # był czystym szumem i psuł kalibrację oraz zaufanie do sekcji.
     def _push_sugestia(pid, mk, info, lam, p_over, line, extra):
         nonlocal vb_id
         vb_id += 1
@@ -1325,9 +1287,10 @@ def main():
             p_over_l = float(sum(dist_r[thr:])) if thr < len(dist_r) else 0.0
             # kalibracja sugestii z ich własnych rozliczeń (rozkład jej nie ma)
             p_over_l = apply_bias(bias_map_sug.get(mk, 1.0), p_over_l)
-            # linia bazowa musi być prawdopodobna; wyższe warianty pokazujemy
-            # już od ~38% (fair ~2.6 — typowy zakres kursów STS)
-            if p_over_l < (0.5 if linia_s == 0.5 else 0.38):
+            # progi PO kalibracji podniesione z 0.50/0.38: rozliczenia pokazały,
+            # że sugestie p<0.60 trafiały 37.8%, a p>=0.70 — 100% (mała próba,
+            # ale kierunek jasny) — mniej pozycji, za to grywalnych
+            if p_over_l < (0.60 if linia_s == 0.5 else 0.45):
                 break
             _push_sugestia(pid, mk, real["info"], sm_r.lam, p_over_l, linia_s, {
                 "pewnosc": "srednia", "pewnosc_score": 45.0, "ryzyko": "wysokie",
@@ -1335,43 +1298,6 @@ def main():
                 "oczekiwane_minuty": sm_r.expected_minutes,
                 "rozklad": dist_r, "czynniki": sm_r.factors,
                 "uzasadnienie": sm_r.reasoning,
-            })
-
-    for pid, slot in shot_lam.items():
-        lam_shots = slot.get("shots")
-        info = slot.get("info")
-        if not lam_shots or not info:
-            continue
-        lam_sot = slot.get("sot", lam_shots * 0.34)  # brak celnych → typowy udział 34%
-        lam_not_on = max(lam_shots - lam_sot, 0.1)
-        kub_poz = koncesje.kubelek_pozycji(info.get("position"))
-        off_sh = off_share_poz.get(kub_poz, OFF_SHARE)
-        for mk, share in (("shots_off_target", off_sh), ("shots_blocked", 1.0 - off_sh)):
-            if (pid, mk) in real_split_reserved or (pid, mk) in real_split:
-                continue  # jest prawdziwa historia 365 — szacunek zbędny
-            lam = lam_not_on * share
-            if lam < 0.5:
-                continue  # za rzadkie na sensowną sugestię
-            for line in (0.5, 1.5, 2.5):
-                thr = int(line)  # "powyżej line" = X > floor(line)
-                p_over = float(_st.poisson.sf(thr, lam))
-                p_over = apply_bias(bias_map_sug.get(mk, 1.0), p_over)
-                if p_over < (0.5 if line == 0.5 else 0.38):
-                    break
-                _push_sugestia(pid, mk, info, lam, p_over, line, {
-                "pewnosc": "niska", "pewnosc_score": 30.0, "ryzyko": "wysokie",
-                "ci": [None, None], "oczekiwane_minuty": None,
-                "rozklad": [float(_st.poisson.pmf(k, lam)) for k in range(6)]
-                + [float(_st.poisson.sf(5, lam))],
-                "czynniki": {}, "uzasadnienie": {
-                    "czynniki": [{
-                        "nazwa": "Szacunek z modelu",
-                        "opis": f"Oczekiwane {lam:.2f} na mecz (z: strzały − celne, "
-                        f"podział {int(share*100)}% wg danych ligowych)",
-                        "mnoznik": None,
-                    }],
-                    "oczekiwana_liczba": round(lam, 2), "rynek_rzadki": True,
-                },
             })
 
     # --- PEWNIAKI: najlepszy typ KAŻDEGO rynku dla każdego meczu ---

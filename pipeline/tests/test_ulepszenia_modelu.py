@@ -156,8 +156,8 @@ def test_bias_full_rodzina_i_przedzialy():
     assert "shots" in full and "sot" in full        # sot dzięki rodzinie
     assert full["shots"]["logit"] is True           # nowy format: delta logitowa
     assert full["shots"]["global"] < 0.0            # przeszacowanie wykryte
-    assert len(full["shots"]["bins"]) == 3
-    # przedział 0.70-1.01 ma 30 obserwacji -> bias przedziałowy aktywny
+    assert len(full["shots"]["bins"]) == 4
+    # przedział 0.70-0.85 ma 30 obserwacji -> bias przedziałowy aktywny
     hi_bin = full["shots"]["bins"][2]
     lo_cap, hi_cap = rozliczanie.BIAS_CAP_LOGIT
     assert hi_bin[0] == 0.70 and lo_cap <= hi_bin[2] <= hi_cap
