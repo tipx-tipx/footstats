@@ -32,13 +32,17 @@ const PEWNOSC_FILTRY: { kod: Pewnosc | "kazda"; label: string }[] = [
 
 type SortKey = "ranking" | "ev" | "pewnosc" | "kickoff" | "kurs";
 
+// Kolejność wejściowa bets = ranking silnika (szansa × kurs + kontekst:
+// matchup, świeże składy, miękka linia) — to jest "Polecane".
 const SORTOWANIA: { kod: SortKey; label: string }[] = [
-  { kod: "ranking", label: "Najtrafniejsze (wartość × pewność)" },
-  { kod: "ev", label: "Największa wartość" },
-  { kod: "pewnosc", label: "Najwyższa pewność" },
-  { kod: "kickoff", label: "Najbliższy mecz" },
+  { kod: "ranking", label: "Polecane przez model" },
+  { kod: "pewnosc", label: "Największa szansa trafienia" },
+  { kod: "ev", label: "Największa przewaga nad kursem" },
   { kod: "kurs", label: "Najwyższy kurs" },
+  { kod: "kickoff", label: "Najbliższy mecz" },
 ];
+// sugestie nie mają kursu — sorty po kursie/przewadze nic by nie mówiły
+const SORTY_BEZ_KURSU: SortKey[] = ["ranking", "pewnosc", "kickoff"];
 
 /** Ostylowany select z etykietą — wspólny wygląd wszystkich filtrów. */
 function FilterSelect({
@@ -101,18 +105,17 @@ export function ValueBoard({
 }) {
   const [rynek, setRynek] = useState("wszystkie");
   const [pewnosc, setPewnosc] = useState<Pewnosc | "kazda">("kazda");
-  const [minEv, setMinEv] = useState(1);
   const [meczId, setMeczId] = useState<number | undefined>(initialMatchId);
-  // gdy rynek chwilowo nie daje okazji z kursem, otwórz od razu sugestie
   // Pewniaki pierwsze i domyślne (user wybiera z nich legi na kupony);
-  // sort po pewności — przewaga nad kursem to informacja, nie kryterium
+  // domyślny sort = ranking silnika ("Polecane") — samo p_model wynosiłoby
+  // na górę zawsze linie 0,5 gwiazd i chowało typy kontekstowe (matchup)
   const [rodzaj, setRodzaj] = useState<
     "okazje" | "pewniaki" | "sugestie" | "wszystko"
   >(
     () =>
       initialRodzaj ?? (bets.some((b) => b.pewniak) ? "pewniaki" : "wszystko"),
   );
-  const [sortuj, setSortuj] = useState<SortKey>("pewnosc");
+  const [sortuj, setSortuj] = useState<SortKey>("ranking");
   const [limit, setLimit] = useState(25);
   const reduced = useReducedMotion();
 
@@ -155,10 +158,18 @@ export function ValueBoard({
   const wyczyscFiltry = () => {
     setRynek("wszystkie");
     setPewnosc("kazda");
-    setMinEv(1);
     setMeczId(undefined);
-    setSortuj("pewnosc"); // spójnie ze stanem początkowym
+    setSortuj("ranking"); // spójnie ze stanem początkowym
   };
+
+  // sorty dostępne w bieżącej zakładce (sugestie są bez kursów)
+  const dostepneSorty = useMemo(
+    () =>
+      rodzaj === "sugestie"
+        ? SORTOWANIA.filter((s) => SORTY_BEZ_KURSU.includes(s.kod))
+        : SORTOWANIA,
+    [rodzaj],
+  );
 
   const filtered = useMemo(() => {
     const wynik = bets.filter((b) => {
@@ -180,27 +191,20 @@ export function ValueBoard({
       if (rodzaj === "sugestie" && !b.sugestia) return false;
       if (pewnosc === "wysoka" && b.pewnosc !== "wysoka") return false;
       if (pewnosc === "srednia" && b.pewnosc === "niska") return false;
-      // sugestie i pewniaki nie podlegają filtrowi wartości
-      if (!b.sugestia && !b.pewniak && (b.ev_pct == null || b.ev_pct < minEv))
-        return false;
       if (meczId !== undefined && b.mecz_id !== meczId) return false;
       return true;
     });
-    // kolejność wejściowa = ranking (wartość × pewność) z pipeline
+    // kolejność wejściowa = ranking silnika ("Polecane"); sort jest stabilny,
+    // więc remisy każdego kryterium zachowują tę kolejność — m.in. przy
+    // "najbliższym meczu" typy w obrębie meczu idą od najlepiej ocenianych
     switch (sortuj) {
       case "ev":
-        wynik.sort((a, b) => (b.ev_pct ?? -1) - (a.ev_pct ?? -1));
+        wynik.sort((a, b) => (b.ev_pct ?? -999) - (a.ev_pct ?? -999));
         break;
-      case "pewnosc": {
-        const poziom = { wysoka: 2, srednia: 1, niska: 0 } as const;
-        wynik.sort(
-          (a, b) =>
-            poziom[b.pewnosc] - poziom[a.pewnosc] ||
-            b.pewnosc_score - a.pewnosc_score ||
-            b.p_model - a.p_model,
-        );
+      case "pewnosc":
+        // "największa szansa" = liczba, którą user widzi na karcie
+        wynik.sort((a, b) => b.p_model - a.p_model);
         break;
-      }
       case "kickoff":
         wynik.sort((a, b) => a.kickoff_ts - b.kickoff_ts);
         break;
@@ -209,7 +213,7 @@ export function ValueBoard({
         break;
     }
     return wynik;
-  }, [bets, rynek, pewnosc, minEv, meczId, rodzaj, sortuj]);
+  }, [bets, rynek, pewnosc, meczId, rodzaj, sortuj]);
 
   const shown = filtered.slice(0, limit);
 
@@ -233,7 +237,16 @@ export function ValueBoard({
                 key={kod}
                 role="tab"
                 aria-selected={rodzaj === kod}
-                onClick={() => setRodzaj(kod)}
+                onClick={() => {
+                  setRodzaj(kod);
+                  // sugestie nie mają kursów — sort po kursie/przewadze
+                  // wraca do "Polecane", zamiast udawać, że działa
+                  if (
+                    kod === "sugestie" &&
+                    !SORTY_BEZ_KURSU.includes(sortuj)
+                  )
+                    setSortuj("ranking");
+                }}
                 className={`rounded-md px-3 py-2 font-medium transition-colors ${
                   rodzaj === kod
                     ? "bg-card text-brand-deep shadow-(--shadow-card)"
@@ -246,7 +259,7 @@ export function ValueBoard({
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-[1.2fr_1fr_1.2fr_1.4fr_auto]">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-[1.2fr_1fr_1.2fr_1.4fr]">
           <FilterSelect label="Rynek" value={rynek} onChange={setRynek}>
             {RYNKI_FILTRY.map((r) => {
               const n = liczbaPerRynek.get(r.kod) ?? 0;
@@ -288,35 +301,19 @@ export function ValueBoard({
             value={sortuj}
             onChange={(v) => setSortuj(v as SortKey)}
           >
-            {SORTOWANIA.map((s) => (
+            {dostepneSorty.map((s) => (
               <option key={s.kod} value={s.kod}>
                 {s.label}
               </option>
             ))}
           </FilterSelect>
-
-          <label className="col-span-2 flex flex-col gap-1 sm:col-span-4 lg:col-span-1 lg:w-44">
-            <span className="text-[10px] font-semibold uppercase tracking-wide text-faint">
-              Min. wartość: <span className="font-data text-ink">+{minEv}%</span>
-            </span>
-            <input
-              type="range"
-              min={1}
-              max={20}
-              step={1}
-              value={minEv}
-              onChange={(e) => setMinEv(Number(e.target.value))}
-              className="h-8 accent-(--color-brand)"
-              aria-label="Minimalna wartość okazji w procentach"
-            />
-          </label>
         </div>
       </div>
 
       <p className="mb-3 text-xs text-faint" aria-live="polite">
         {filtered.length > 0 &&
           `${filtered.length} ${filtered.length === 1 ? "pozycja" : "pozycji"}${
-            sortuj === "ranking" ? " · od najtrafniejszej" : ""
+            sortuj === "ranking" ? " · najlepiej oceniane przez model najpierw" : ""
           }`}
       </p>
 
@@ -346,8 +343,8 @@ export function ValueBoard({
               Brak pozycji spełniających obecne filtry
             </p>
             <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-muted">
-              Zmniejsz minimalną wartość, ustaw pewność na „Każda” albo wybierz
-              inny rynek — lub zacznij od czysta.
+              Ustaw pewność na „Każda”, wybierz inny rynek albo mecz — lub
+              zacznij od czysta.
             </p>
             <button
               onClick={wyczyscFiltry}
