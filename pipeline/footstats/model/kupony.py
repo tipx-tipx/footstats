@@ -36,6 +36,11 @@ PRZEDZIALY_VALUE = ((4.0, 8.0), (8.0, 16.0))
 OKNO_DZIS_S = 20 * 3600       # "dziś" = mecze w ciągu ~20 h
 OKNO_JUTRO_S = 44 * 3600      # rozszerzenie na jutro, gdy dziś < 2 mecze
 OKNO_DLUGO_S = 4 * 86400      # długoterminowy: mecze z najbliższych 4 dni
+# nowy kupon bierze WYŁĄCZNIE mecze jeszcze nierozpoczęte, z zapasem na
+# obstawienie — leg z meczu, który już się odbył/trwa, nie może wejść do
+# świeżo składanego kuponu (spójnie z regułą publikacji: kupon z pierwszym
+# meczem startującym za <15 min i tak nie jest publikowany)
+MARGINES_STARTU_S = 15 * 60
 MIN_LEG_EV = 2.0          # leg value: wyraźna przewaga w %, nie kosmetyczne 0,1
 MAX_LEGI_PEWNIAKI = 12
 MAX_NA_MECZ = 4           # do 4 wydarzeń z jednego meczu (jak w bet builderze)
@@ -346,7 +351,7 @@ def build_kupony(
     VALUE: przedziały 4-8 / 8-16, tylko legi z EV >= 2%, max 1 leg na mecz.
     """
     now = now_ts if now_ts is not None else int(time.time())
-    pool = [b for b in (pool or []) if b["kickoff_ts"] > now - 3600]
+    pool = [b for b in (pool or []) if b["kickoff_ts"] > now + MARGINES_STARTU_S]
     out: list[dict] = []
 
     # dzienny: każdy przedział NAJPIERW z samego "dziś"; dopiero gdy się nie
@@ -381,7 +386,7 @@ def build_kupony(
     # VALUE: ten sam builder co pewniaki (max iloczyn szans przy zadanym
     # kursie = max EV), ale pula tylko z wyraźną przewagą i 1 leg na mecz;
     # kupon identyczny z którymś kuponem pewniaków nie wchodzi drugi raz
-    cands = [b for b in _kandydaci(bets) if b["kickoff_ts"] > now - 3600]
+    cands = [b for b in _kandydaci(bets) if b["kickoff_ts"] > now + MARGINES_STARTU_S]
     sygnatury = {_sygnatura(k) for k in out}
     for cmin, cmax in PRZEDZIALY_VALUE:
         k = _zloz_pewniaki(

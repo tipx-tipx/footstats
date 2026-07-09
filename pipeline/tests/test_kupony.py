@@ -9,7 +9,7 @@ def _bet(id_, mecz_id, podmiot_id, kurs, p, ev=5.0, pewnosc="wysoka", rank=1.0):
         "podmiot": f"P{podmiot_id}", "rynek": "Strzały", "linia": 1.5,
         "strona": "powyzej", "kurs": kurs, "bukmacher": "Superbet",
         "p_model": p, "ev_pct": ev, "pewnosc": pewnosc,
-        "rank_score": rank, "mecz": f"M{mecz_id}", "kickoff_ts": 0,
+        "rank_score": rank, "mecz": f"M{mecz_id}", "kickoff_ts": 100_000,
         "sugestia": False,
     }
 
@@ -27,6 +27,24 @@ def test_kupon_value_sklada_sie_w_przedziale_4_8():
     assert v["cel_label"] == "4–8"
     assert len(v["legi"]) == 3
     assert abs(v["p_model"] - 0.62 * 0.65 * 0.63) < 1e-4  # zaokrąglenie do 4 miejsc
+
+
+def test_kupon_pomija_mecze_juz_rozpoczete():
+    # nowy kupon nie może zawierać legów z meczów, które już się odbyły/trwają
+    # (ani startujących w ciągu 15 min) — tylko świeże, obstawialne wydarzenia
+    teraz = 1_000_000
+    bets = [
+        _bet(1, 1, 11, 1.8, 0.62, rank=3.0),
+        _bet(2, 2, 22, 1.7, 0.65, rank=2.5),
+        _bet(3, 3, 33, 1.75, 0.63, rank=2.0),
+    ]
+    for b in bets:
+        b["kickoff_ts"] = teraz - 60  # mecze zaczęły się minutę temu
+    assert kupony.build_kupony(bets, now_ts=teraz) == []
+    # ten sam zestaw, ale mecze w przyszłości — kupon powstaje
+    for b in bets:
+        b["kickoff_ts"] = teraz + 3 * 3600
+    assert kupony.build_kupony(bets, now_ts=teraz) != []
 
 
 def test_max_one_leg_per_match_and_player():
