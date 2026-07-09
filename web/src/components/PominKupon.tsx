@@ -6,12 +6,12 @@ import { useEffect, useState, type ReactNode } from "react";
  * Owijka aktywnego kuponu z akcjami: pomiń (z powodem), przywróć,
  * przebuduj po składach.
  *
- * Pominięcie zapisuje klucz kuponu w Supabase (API route) — pipeline
- * w następnym cyklu zwalnia slot i buduje nowy kupon, a pominięty dalej
- * rozlicza się w tle (model uczy się też z niezagranych). Kartę chowamy
- * od razu (localStorage), bo snapshot danych odświeża się do ~15 minut.
- * Przywrócenie usuwa klucz — pipeline cofa pominięcie, o ile slot nie
- * został już zajęty nowszym kuponem.
+ * Pominięcie zapisuje klucz kuponu w Supabase (API route), który OD RAZU
+ * odpala przeliczenie pipeline'u (workflow_dispatch) — slot się zwalnia i
+ * powstaje nowy kupon, a pominięty dalej rozlicza się w tle (model uczy się
+ * też z niezagranych). Kartę chowamy od razu (localStorage), bo snapshot
+ * danych odświeża się co ~60 s. Przywrócenie usuwa klucz — pipeline cofa
+ * pominięcie, o ile slot nie został już zajęty nowszym kuponem.
  */
 
 const POWODY = ["nie zagrałem", "słaby zestaw", "za niski kurs"] as const;
@@ -98,8 +98,9 @@ export function PominKupon({
       <div className="rounded-2xl border border-dashed border-hairline bg-paper/60 px-6 py-8 text-center">
         <p className="text-sm font-medium text-ink">Kupon pominięty</p>
         <p className="mx-auto mt-1 max-w-sm text-xs leading-relaxed text-muted">
-          Model i tak rozliczy go w tle (do nauki), a nowy kupon w tym
-          przedziale pojawi się po następnym cyklu — zwykle do ~30 minut.
+          Model i tak rozliczy go w tle (do nauki). Zamówiliśmy przeliczenie —
+          nowy kupon w tym przedziale pojawi się w kilka minut, o ile pula ma
+          inny sensowny zestaw dla tych widełek kursu.
         </p>
         <button
           onClick={przywroc}
@@ -176,8 +177,8 @@ export function ZastosujZamiane({ klucz }: { klucz?: string }) {
   if (st === "done") {
     return (
       <p className="mt-2 text-xs font-medium text-brand-deep">
-        ✓ zamiana zaplanowana — nowy kupon z wymienionym legiem pojawi się po
-        następnym cyklu (do ~30 minut)
+        ✓ zamiana zaplanowana — nowy kupon z wymienionym legiem pojawi się przy
+        najbliższym przeliczeniu (zwykle w kilka minut)
       </p>
     );
   }

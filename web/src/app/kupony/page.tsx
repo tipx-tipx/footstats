@@ -98,7 +98,7 @@ export default async function KuponyPage() {
               Kupon wymaga co najmniej dwóch niezależnych typów z dodatnią
               wartością i przyzwoitą pewnością. Model nie skleja legów na siłę
               — kupony pojawią się, gdy rynek da okazje ({meta.liga}{" "}
-              {meta.sezon}, kursy odświeżane co ~30 minut).
+              {meta.sezon}).
             </p>
           </div>
         </Reveal>
