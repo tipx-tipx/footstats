@@ -14,6 +14,16 @@ import { NextResponse } from "next/server";
 const POWODY = new Set(["nie zagrałem", "słaby zestaw", "za niski kurs"]);
 const PROFILE = new Set(["bezpieczny", "zbalansowany", "agresywny"]);
 
+// Odpalenie pipeline'u od razu po akcji usera. Bez tego nowy kupon w
+// zwolnionym slocie czeka na kolejny cron GitHub Actions, który na prywatnym
+// repo bywa dławiony do kilku godzin. GH_DISPATCH_TOKEN = fine-grained PAT z
+// uprawnieniem Actions: write na tym repo (jeśli brak — zostajemy przy cronie).
+const GH_REPO = process.env.GH_REPO ?? "tipx-tipx/footstats";
+const GH_TOKEN = process.env.GH_DISPATCH_TOKEN;
+const GH_WORKFLOW = "cycle.yml";
+const GH_REF = process.env.GH_REF ?? "master";
+const DISPATCH_THROTTLE_S = 90; // jeden cykl i tak przelicza wszystkie zmiany
+
 export async function POST(req: Request) {
   const url = process.env.SUPABASE_URL?.replace(/\/$/, "");
   const key = process.env.SUPABASE_SERVICE_KEY;
@@ -65,6 +75,35 @@ export async function POST(req: Request) {
 
   const now = Math.floor(Date.now() / 1000);
 
+  // odpal cykl pipeline'u, chyba że któryś odpalił się w ostatnich ~90 s;
+  // dispatch jest bonusem — akcja usera jest już zapisana, więc błąd tu nie
+  // wywraca odpowiedzi (cron i tak w końcu dogoni)
+  async function odpalCykl(): Promise<void> {
+    if (!GH_TOKEN) return;
+    try {
+      const stan = await readKey("cykl_dispatch");
+      const ostatni = typeof stan.ts === "number" ? stan.ts : 0;
+      if (now - ostatni < DISPATCH_THROTTLE_S) return;
+      const res = await fetch(
+        `https://api.github.com/repos/${GH_REPO}/actions/workflows/${GH_WORKFLOW}/dispatches`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${GH_TOKEN}`,
+            Accept: "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "Content-Type": "application/json",
+            "User-Agent": "footstats-kupony",
+          },
+          body: JSON.stringify({ ref: GH_REF }),
+        },
+      );
+      if (res.ok) await writeKey("cykl_dispatch", { ts: now });
+    } catch {
+      /* dispatch nieudany — zostaje cron */
+    }
+  }
+
   if (akcja === "profil") {
     if (typeof body.profil !== "string" || !PROFILE.has(body.profil)) {
       return NextResponse.json({ error: "zły profil" }, { status: 400 });
@@ -72,6 +111,7 @@ export async function POST(req: Request) {
     if (!(await writeKey("kupony_profil", body.profil))) {
       return NextResponse.json({ error: "zapis nieudany" }, { status: 502 });
     }
+    await odpalCykl();
     return NextResponse.json({ ok: true, profil: body.profil });
   }
 
@@ -90,6 +130,7 @@ export async function POST(req: Request) {
     if (!(await writeKey("kupony_pominiete", pominiete))) {
       return NextResponse.json({ error: "zapis nieudany" }, { status: 502 });
     }
+    await odpalCykl();
     return NextResponse.json({ ok: true });
   }
 
@@ -99,6 +140,7 @@ export async function POST(req: Request) {
     if (!(await writeKey("kupony_pominiete", pominiete))) {
       return NextResponse.json({ error: "zapis nieudany" }, { status: 502 });
     }
+    await odpalCykl();
     return NextResponse.json({ ok: true });
   }
 
@@ -109,6 +151,7 @@ export async function POST(req: Request) {
     if (!(await writeKey(name, payload))) {
       return NextResponse.json({ error: "zapis nieudany" }, { status: 502 });
     }
+    await odpalCykl();
     return NextResponse.json({ ok: true });
   }
 

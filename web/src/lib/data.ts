@@ -74,7 +74,10 @@ async function loadBundle(): Promise<Bundle> {
           apikey: SUPABASE_ANON,
           Authorization: `Bearer ${SUPABASE_ANON}`,
         },
-        next: { revalidate: 900 }, // odśwież co 15 min
+        next: { revalidate: 60 }, // odśwież co 60 s — po pominięciu kuponu
+        // pipeline jest odpalany od razu (patrz /api/kupon-pomin), więc nowy
+        // kupon ma być widoczny w ~2-3 min, nie po 15 min cache
+
       },
     );
     if (!res.ok) return tylkoNadchodzace(LOCAL);
