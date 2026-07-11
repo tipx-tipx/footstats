@@ -31,6 +31,7 @@ export const RYNEK_LABEL: Record<string, string> = {
 const RYNKI_POKRYCIA = [
   "shots",
   "sot",
+  "shots_outside_box",
   "shots_off_target",
   "shots_blocked",
   "fouls_committed",
