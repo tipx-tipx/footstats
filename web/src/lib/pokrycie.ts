@@ -69,14 +69,16 @@ export interface WierszPokrycia {
   player_id: number;
   zawodnik: string;
   druzyna: string;
-  xi: boolean;
   rynek_kod: string;
   rynek: string;
   /** 5 startów użytych do liczenia (najnowszy pierwszy) */
   ostatnie: GraForma[];
   probka: number;
-  /** true = pokrycie z meczów reprezentacji; false = fallback klubowy */
+  /** true = pokrycie z meczów reprezentacji; false = fallback klubowy (ten rynek) */
   kadraBasis: boolean;
+  /** true = zawodnik jest regularny w kadrze (≥5 startów kadry w najbogatszym
+   *  rynku) — sygnał na poziomie GRACZA, spójny między rynkami (kolejność + flaga) */
+  kadraRegularny: boolean;
   /** timestamp (s) najnowszego meczu w próbce — świeżość */
   ostatniMeczTs: number;
   /** pokrycie per linia (tylko te ≥ MIN_POKRYTE) */
@@ -88,13 +90,13 @@ export interface WierszPokrycia {
 }
 
 /**
- * Ranga trafności na mecz REPREZENTACJI:
- *  0 = przewidywany skład (xi), 1 = pokrycie z kadry, 2 = fallback klubowy.
+ * Ranga trafności na mecz REPREZENTACJI: 0 = regularny w kadrze (realnie zagra),
+ * 1 = rezerwa kadry (forma klubowa, niżej). Sygnał na poziomie GRACZA — spójny
+ * między jego rynkami. Świadomie NIE używamy statshub `in_predicted_lineup` —
+ * jest rzadki i migocze między cyklami (raz XI, raz nie); baza kadry jest stabilna.
  */
 function ranga(w: WierszPokrycia): number {
-  if (w.xi) return 0;
-  if (w.kadraBasis) return 1;
-  return 2;
+  return w.kadraRegularny ? 0 : 1;
 }
 
 /** Zawodnik po scaleniu duplikatów — trzyma wszystkie źródłowe ID (do kursów). */
@@ -159,6 +161,19 @@ export function topPokrycia(
       }
     }
 
+    // regularny w kadrze na poziomie GRACZA: czy w NAJBOGATSZYM rynku ma ≥5
+    // startów w reprezentacji. Steruje kolejnością i flagą spójnie dla wszystkich
+    // jego rynków (statshub daje różną głębię historii per statystyka).
+    let maxKadraStarty = 0;
+    for (const f of Object.values(z.forma ?? {})) {
+      let n = 0;
+      for (let i = 0; i < f.ostatnie.length; i++) {
+        if ((f.minuty?.[i] ?? 0) >= PROG_STARTU && f.kadra?.[i] === true) n++;
+      }
+      if (n > maxKadraStarty) maxKadraStarty = n;
+    }
+    const kadraRegularny = maxKadraStarty >= PROBKA;
+
     for (const kod of RYNKI_POKRYCIA) {
       const f = z.forma?.[kod];
       if (!f) continue;
@@ -203,12 +218,12 @@ export function topPokrycia(
         player_id: z.id,
         zawodnik: z.nazwa,
         druzyna: z.druzyna,
-        xi: z.xi === true,
         rynek_kod: kod,
         rynek: RYNEK_LABEL[kod] ?? kod,
         ostatnie: probka,
         probka: probka.length,
         kadraBasis,
+        kadraRegularny,
         ostatniMeczTs: probka[0]?.ts ?? 0,
         linie,
         maxPokryte: Math.max(...linie.map((l) => l.pokryte)),

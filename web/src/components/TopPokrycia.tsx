@@ -111,17 +111,15 @@ export function TopPokrycia({
     <div className="mt-5">
       {/* legenda */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted">
-        <span className="flex items-center gap-1.5">
-          <span className="rounded bg-brand-wash px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-brand-deep">
-            XI
-          </span>
-          przewidywany skład
+        <span>
+          Na górze <strong className="font-semibold text-ink">regularni w kadrze</strong>{" "}
+          (pokrycie z reprezentacji).
         </span>
         <span className="flex items-center gap-1.5">
           <span className="rounded bg-data-amber-wash px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[#8a5613]">
             forma klubowa
           </span>
-          brak 5 startów w kadrze → liczone z klubu (niżej)
+          rezerwa kadry — liczone z klubu (niżej)
         </span>
         <span className="text-faint">
           1+/2+/3+ = pokrycie linii · najedź na boks: rywal, minuty, data
@@ -199,20 +197,12 @@ export function TopPokrycia({
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
-                    {w.xi && (
-                      <span
-                        className="inline-flex rounded bg-brand-wash px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-brand-deep"
-                        title="W przewidywanym pierwszym składzie"
-                      >
-                        XI
-                      </span>
-                    )}
                     <span className="font-medium">{w.zawodnik}</span>
                     <span className="text-xs text-faint">{w.druzyna}</span>
-                    {!w.kadraBasis && (
+                    {!w.kadraRegularny && (
                       <span
                         className="inline-flex rounded bg-data-amber-wash px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[#8a5613]"
-                        title="Zawodnik nie ma 5 startów w reprezentacji w dostępnej historii — pokrycie liczone z meczów klubowych. Na kadrę traktuj ostrożnie."
+                        title="Zawodnik nie ma 5 startów w reprezentacji w dostępnej historii — rezerwa kadry, statystyki liczone z klubu. Na mecz reprezentacji traktuj ostrożnie."
                       >
                         forma klubowa
                       </span>
@@ -268,7 +258,7 @@ export function TopPokrycia({
           {widoczne.length === 1 ? "propozycja" : "propozycji"}
           {!rozwin &&
             widoczne.length > LIMIT &&
-            ` · na górze przewidywany skład i forma z kadry`}
+            ` · na górze regularni w kadrze, rezerwa niżej`}
         </p>
         {widoczne.length > LIMIT && (
           <button
