@@ -1,5 +1,7 @@
 """Testy kalibracji z rozliczonych typów + cyklu życia kuponów (bez sieci)."""
 
+import time
+
 from footstats.jobs import rozliczanie
 from footstats.sources import scores365
 
@@ -375,3 +377,39 @@ def test_migracja_scala_duplikaty_po_nazwisku():
     assert r["kurs"] == 1.42          # zamrozony z pierwszej publikacji
     assert r["wynik"] == "przegrany"  # wynik z rozliczonego duplikatu
     assert r["faktyczna"] == 0.0
+
+
+# ---- skuteczność dzień po dniu (przełącznik na Skuteczności) ----
+
+def test_skutecznosc_per_dzien_grupuje_i_liczy_roi():
+    A = 100_000            # ~1970-01-02, dowolna doba
+    B = A + 86_400         # kolejny dzień
+    settled = [
+        {"kickoff_ts": A, "wynik": "wygrany", "kurs": 2.0, "sugestia": False},
+        {"kickoff_ts": A, "wynik": "przegrany", "kurs": 2.0, "sugestia": False},
+        {"kickoff_ts": B, "wynik": "wygrany", "kurs": 3.0, "sugestia": False},
+        # sugestia (bez zakładu) — liczy się do rozliczonych, ale NIE do ROI
+        {"kickoff_ts": B, "wynik": "wygrany", "kurs": 9.0, "sugestia": True},
+    ]
+    out = rozliczanie.skutecznosc_per_dzien(settled)
+    # posortowane malejąco po dniu (najnowszy pierwszy)
+    assert [d["dzien"] for d in out] == sorted(
+        (d["dzien"] for d in out), reverse=True
+    )
+    by = {d["dzien"]: d for d in out}
+    da = time.strftime("%Y-%m-%d", time.localtime(A))
+    db = time.strftime("%Y-%m-%d", time.localtime(B))
+    assert by[da]["rozliczone"] == 2 and by[da]["trafione"] == 1
+    assert by[da]["okazje"] == 2 and by[da]["roi_flat"] == 0.0   # 2.0 - 2 j.
+    assert by[db]["rozliczone"] == 2 and by[db]["trafione"] == 2
+    assert by[db]["okazje"] == 1 and by[db]["roi_flat"] == 2.0   # 3.0 - 1 j.
+    assert "_zwrot_j" not in by[da]           # pole robocze usunięte
+
+
+def test_skutecznosc_per_dzien_limit_dni():
+    settled = [
+        {"kickoff_ts": i * 86_400, "wynik": "wygrany", "kurs": 2.0,
+         "sugestia": False}
+        for i in range(1, 40)
+    ]
+    assert len(rozliczanie.skutecznosc_per_dzien(settled, dni=7)) == 7

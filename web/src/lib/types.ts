@@ -243,6 +243,29 @@ export interface KuponHistoria extends Kupon {
   pomin_powod?: string | null;
 }
 
+/** Skuteczność jednego rynku (trafienia vs. średnia szansa modelu). */
+export interface RynekSkutecznosc {
+  rynek_kod: string;
+  rynek: string;
+  n: number;
+  trafione: number;
+  sr_p_model: number;
+  czestosc: number;
+  bias: number;
+}
+
+/** Skuteczność realnych typów jednego dnia (grupowane po dniu meczu). */
+export interface SkutecznoscDnia {
+  /** "YYYY-MM-DD" — dzień meczu */
+  dzien: string;
+  rozliczone: number;
+  trafione: number;
+  /** typy z realnym kursem (bez sugestii) — podstawa ROI */
+  okazje: number;
+  /** ROI flat: stawka 1 j. na okazję (zwrot − postawione) */
+  roi_flat: number;
+}
+
 /** Skuteczność realnych typów (log rozliczany automatycznie po meczach). */
 export interface TypyWyniki {
   podsumowanie: {
@@ -255,22 +278,26 @@ export interface TypyWyniki {
     clv_sr_pct?: number | null;
     clv_n?: number;
   } | null;
-  po_rynku: {
-    rynek_kod: string;
-    rynek: string;
-    n: number;
+  po_rynku: RynekSkutecznosc[];
+  /** strzały niecelne/zablokowane — liczone CAŁKOWICIE OSOBNO (poza zbiorczą skutecznością) */
+  podsumowanie_osobne?: {
+    rozliczone: number;
     trafione: number;
-    sr_p_model: number;
-    czestosc: number;
-    bias: number;
-  }[];
+    roi_flat: number;
+    okazje_rozliczone: number;
+  } | null;
+  po_rynku_osobne?: RynekSkutecznosc[];
   ostatnie: TypRozliczony[];
+  /** skuteczność dzień po dniu (do przełącznika); najnowszy dzień pierwszy */
+  skutecznosc_dzienna?: SkutecznoscDnia[];
   kupony?: KuponHistoria[];
   /** ROI kuponów per horyzont (stawka 1 j./kupon; bez pominiętych) */
   kupony_roi?: Record<
     string,
     { n: number; wygrane: number; zwrot_j: number; roi_j: number }
   >;
+  /** WSZYSTKIE wygrane kupony (trwały log — nigdy nie znikają) */
+  kupony_wygrane?: KuponHistoria[];
 }
 
 /** Zakład zapisany w trackerze (localStorage). */

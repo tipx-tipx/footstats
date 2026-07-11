@@ -1,14 +1,10 @@
 import { CalibrationChart } from "@/components/CalibrationChart";
+import { KuponHistoriaCard } from "@/components/KuponHistoriaCard";
 import { PageHeader } from "@/components/PageHeader";
 import { Reveal } from "@/components/Reveal";
+import { SkutecznoscDzienna } from "@/components/SkutecznoscDzienna";
 import { getKalibracja, getMeta, getTypyWyniki } from "@/lib/data";
-import {
-  fmtDataCzas,
-  fmtKurs,
-  fmtLinia,
-  fmtProc,
-  STRONA_LABEL,
-} from "@/lib/format";
+import { fmtLinia, fmtProc } from "@/lib/format";
 
 export const metadata = { title: "Skuteczność modelu — FootStats" };
 
@@ -231,6 +227,115 @@ export default async function ModelPage() {
         )}
       </Reveal>
 
+      {/* skuteczność dzień po dniu — przełącznik (realne typy, bez osobnych) */}
+      {(typy.skutecznosc_dzienna?.length ?? 0) > 0 && (
+        <Reveal className="mt-10">
+          <h2 className="text-lg font-semibold">Skuteczność dzień po dniu</h2>
+          <p className="mt-1 max-w-3xl text-sm text-muted">
+            Trafienia i ROI realnych typów rozliczonych danego dnia. Przełączaj
+            się strzałkami albo klikaj słupki — cofniesz się nawet o ~2 tygodnie.
+          </p>
+          <SkutecznoscDzienna dni={typy.skutecznosc_dzienna!} />
+        </Reveal>
+      )}
+
+      {/* strzały niecelne/zablokowane — CAŁKOWICIE OSOBNO (poza skutecznością) */}
+      {typy.podsumowanie_osobne &&
+        typy.podsumowanie_osobne.rozliczone > 0 && (
+          <Reveal className="mt-10">
+            <h2 className="text-lg font-semibold">
+              Strzały niecelne i zablokowane — osobno
+            </h2>
+            <p className="mt-1 max-w-3xl text-sm text-muted">
+              Te rynki liczymy zupełnie osobno — <strong>nie wchodzą</strong> do
+              zbiorczej skuteczności ani ROI powyżej. Rynek „Strzały” (ogółem)
+              obejmuje je tak jak u bukmachera, więc jego rozliczenie zostaje bez
+              zmian.
+            </p>
+            <dl className="mt-4 grid max-w-2xl grid-cols-2 gap-2.5 sm:grid-cols-3">
+              {[
+                {
+                  label: "rozliczonych",
+                  value: String(typy.podsumowanie_osobne.rozliczone),
+                  tone: "",
+                },
+                {
+                  label: "trafionych",
+                  value: `${typy.podsumowanie_osobne.trafione}/${
+                    typy.podsumowanie_osobne.rozliczone
+                  } (${Math.round(
+                    (typy.podsumowanie_osobne.trafione /
+                      Math.max(typy.podsumowanie_osobne.rozliczone, 1)) *
+                      100,
+                  )}%)`,
+                  tone: "",
+                },
+                {
+                  label: "ROI (stawka 1 j.)",
+                  value: `${
+                    typy.podsumowanie_osobne.roi_flat >= 0 ? "+" : ""
+                  }${typy.podsumowanie_osobne.roi_flat
+                    .toFixed(2)
+                    .replace(".", ",")} j.`,
+                  tone:
+                    typy.podsumowanie_osobne.roi_flat > 0
+                      ? "text-data-green"
+                      : typy.podsumowanie_osobne.roi_flat < 0
+                        ? "text-data-red"
+                        : "",
+                },
+              ].map((s) => (
+                <div
+                  key={s.label}
+                  className="rounded-xl border border-hairline bg-card px-3.5 py-3 shadow-(--shadow-card)"
+                >
+                  <dd className={`font-data text-xl font-semibold ${s.tone}`}>
+                    {s.value}
+                  </dd>
+                  <dt className="mt-0.5 text-[11px] leading-tight text-faint">
+                    {s.label}
+                  </dt>
+                </div>
+              ))}
+            </dl>
+            {(typy.po_rynku_osobne?.length ?? 0) > 0 && (
+              <div className="mt-4 max-w-3xl overflow-x-auto rounded-xl border border-hairline bg-card shadow-(--shadow-card)">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-hairline text-left text-[11px] uppercase tracking-wide text-faint">
+                      <th className="px-4 py-2.5 font-medium">rynek</th>
+                      <th className="px-4 py-2.5 font-medium">trafione</th>
+                      <th
+                        className="px-4 py-2.5 font-medium"
+                        title="Średnia szansa, jaką dawał model"
+                      >
+                        model mówił
+                      </th>
+                      <th className="px-4 py-2.5 font-medium">było</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-hairline">
+                    {typy.po_rynku_osobne!.map((r) => (
+                      <tr key={r.rynek_kod}>
+                        <td className="px-4 py-2.5 font-medium">{r.rynek}</td>
+                        <td className="font-data px-4 py-2.5">
+                          {r.trafione}/{r.n}
+                        </td>
+                        <td className="font-data px-4 py-2.5 text-muted">
+                          {fmtProc(r.sr_p_model)}
+                        </td>
+                        <td className="font-data px-4 py-2.5">
+                          {fmtProc(r.czestosc)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Reveal>
+        )}
+
       {/* historia kuponów — zamrażane przy starcie 1. meczu, rozliczane z legów */}
       {(typy.kupony?.length ?? 0) > 0 && (
         <Reveal className="mt-10">
@@ -288,150 +393,39 @@ export default async function ModelPage() {
           {/* items-start: rozwinięcie jednego kuponu nie rozciąga sąsiada
               w rzędzie (puste białe tło) — każda karta trzyma swoją wysokość */}
           <div className="mt-4 grid max-w-4xl items-start gap-3 sm:grid-cols-2">
-            {typy.kupony!.slice(0, 12).map((k) => {
-              const rozliczone = k.legi_rozliczone ?? 0;
-              const trafione = k.legi_trafione ?? 0;
-              return (
-                <details
-                  key={k.klucz ?? `${k.horyzont}-${k.cel_label}-${k.dzien}`}
-                  name="kupon-historia"
-                  className={`group rounded-xl border bg-card shadow-(--shadow-card) ${
-                    k.wynik === "wygrany"
-                      ? "border-data-green/40"
-                      : k.wynik === "przegrany"
-                        ? "border-data-red/30"
-                        : "border-hairline"
-                  }`}
-                >
-                  <summary className="cursor-pointer list-none px-4 py-3.5 [&::-webkit-details-marker]:hidden">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="flex items-center gap-2">
-                        <span className="font-data rounded-md bg-brand px-2 py-0.5 text-sm font-bold text-white">
-                          ×{k.cel_label ?? k.cel}
-                        </span>
-                        <span className="text-xs text-muted">
-                          {k.horyzont === "dzienny"
-                            ? "dzienny"
-                            : k.horyzont === "value"
-                              ? "value"
-                              : "długoterminowy"}{" "}
-                          · {k.dzien}
-                        </span>
-                        {k.pominiety && (
-                          <span
-                            className="rounded bg-paper px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-faint"
-                            title={
-                              k.pomin_powod
-                                ? `Pominięty (${k.pomin_powod}) — niezagrany, rozliczony tylko do nauki modelu`
-                                : "Pominięty przyciskiem — niezagrany, rozliczony tylko po to, żeby model się uczył"
-                            }
-                          >
-                            pominięty
-                          </span>
-                        )}
-                      </span>
-                      <span
-                        className={`text-xs font-semibold ${
-                          k.wynik === "wygrany"
-                            ? "text-data-green"
-                            : k.wynik === "przegrany"
-                              ? "text-data-red"
-                              : k.wynik === "anulowany"
-                                ? "text-faint"
-                                : "text-[#8a5613]"
-                        }`}
-                        title={k.powod}
-                      >
-                        {k.wynik === "wygrany"
-                          ? `✓ wygrany${k.kurs_rozliczony ? ` @${k.kurs_rozliczony.toFixed(2).replace(".", ",")}` : ""}`
-                          : k.wynik === "przegrany"
-                            ? "✗ przegrany"
-                            : k.wynik === "anulowany"
-                              ? "anulowany (składy)"
-                              : k.wynik === "zwrot"
-                                ? "zwrot (stawka wraca)"
-                                : "w grze"}
-                      </span>
-                    </div>
-                    <p className="font-data mt-2 flex items-center justify-between text-xs text-muted">
-                      <span>
-                        kurs {k.kurs_laczny.toFixed(2).replace(".", ",")} ·
-                        szansa {fmtProc(k.p_model)} · legi: {trafione}/
-                        {rozliczone} rozliczonych z {k.legi.length}
-                      </span>
-                      <span className="text-faint transition-transform group-open:rotate-180">
-                        ▾
-                      </span>
-                    </p>
-                  </summary>
-                  {/* rozwinięcie: pełny kupon — legi zgrupowane po meczu */}
-                  <div className="border-t border-hairline pb-2">
-                    {k.legi.map((l, li) => {
-                      const nowyMecz =
-                        li === 0 || k.legi[li - 1].mecz_id !== l.mecz_id;
-                      return (
-                        <div key={`${l.mecz_id}-${l.podmiot}-${l.rynek}-${li}`}>
-                          {nowyMecz && (
-                            <p className="flex items-baseline justify-between gap-2 border-b border-hairline bg-paper px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-ink-soft">
-                              {l.mecz}
-                              <span className="font-normal normal-case tracking-normal text-faint">
-                                {fmtDataCzas(l.kickoff_ts)}
-                              </span>
-                            </p>
-                          )}
-                          <div className="flex items-center gap-2.5 px-4 py-2">
-                            <span
-                              aria-hidden
-                              className={`h-2 w-2 shrink-0 rounded-full ${
-                                l.wynik === "wygrany"
-                                  ? "bg-data-green"
-                                  : l.wynik === "przegrany"
-                                    ? "bg-data-red"
-                                    : l.wynik === "zwrot"
-                                      ? "bg-data-amber"
-                                      : "bg-hairline"
-                              }`}
-                              title={
-                                l.wynik === "wygrany"
-                                  ? "trafiony"
-                                  : l.wynik === "przegrany"
-                                    ? "nietrafiony"
-                                    : l.wynik === "zwrot"
-                                      ? "zwrot (nie zagrał / brak danych)"
-                                      : "w grze"
-                              }
-                            />
-                            <p className="min-w-0 flex-1 truncate text-sm">
-                              <span
-                                className={`font-semibold ${
-                                  l.wynik === "przegrany"
-                                    ? "text-data-red"
-                                    : l.wynik === "zwrot"
-                                      ? "text-faint line-through"
-                                      : ""
-                                }`}
-                              >
-                                {l.podmiot}
-                              </span>{" "}
-                              <span className="text-muted">
-                                {l.rynek.toLowerCase()}{" "}
-                                {STRONA_LABEL[l.strona]} {fmtLinia(l.linia)}
-                              </span>
-                            </p>
-                            <span className="font-data shrink-0 text-xs text-muted">
-                              {fmtProc(l.p_model)}
-                            </span>
-                            <span className="font-data shrink-0 rounded-md bg-paper px-1.5 py-0.5 text-xs font-semibold">
-                              {fmtKurs(l.kurs)}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </details>
-              );
-            })}
+            {typy.kupony!.slice(0, 12).map((k) => (
+              <KuponHistoriaCard
+                key={k.klucz ?? `${k.horyzont}-${k.cel_label}-${k.dzien}`}
+                k={k}
+                name="kupon-historia"
+              />
+            ))}
+          </div>
+        </Reveal>
+      )}
+
+      {/* WSZYSTKIE wygrane kupony — trwały log, nigdy nie znikają */}
+      {(typy.kupony_wygrane?.length ?? 0) > 0 && (
+        <Reveal className="mt-10">
+          <h2 className="text-lg font-semibold">
+            Wygrane kupony{" "}
+            <span className="font-data text-base font-normal text-data-green">
+              ({typy.kupony_wygrane!.length})
+            </span>
+          </h2>
+          <p className="mt-1 max-w-3xl text-sm text-muted">
+            Każdy kupon, który się kiedykolwiek trafił — zostaje tu na stałe,
+            niezależnie od tego, jak dawno temu (i czy był grany, czy pominięty).
+            To pełna kronika trafień modelu.
+          </p>
+          <div className="mt-4 grid max-w-4xl items-start gap-3 sm:grid-cols-2">
+            {typy.kupony_wygrane!.map((k) => (
+              <KuponHistoriaCard
+                key={k.klucz ?? `${k.horyzont}-${k.cel_label}-${k.dzien}`}
+                k={k}
+                name="kupon-wygrany"
+              />
+            ))}
           </div>
         </Reveal>
       )}

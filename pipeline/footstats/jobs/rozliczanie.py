@@ -45,6 +45,11 @@ MARKETY_365_STATY = {"fouls_committed", "fouls_won", "interceptions", "offsides"
 # rynki rozliczane z banku trendów statshub (odbiory nie występują w 365)
 MARKETY_LIB = {"fouls_committed", "tackles", "fouls_won", "interceptions",
                "offsides"}
+# strzały NIECELNE i ZABLOKOWANE liczymy CAŁKOWICIE OSOBNO — nie wchodzą do
+# zbiorczej skuteczności modelu (podsumowanie trafień/ROI ani tabela per rynek).
+# Rynek "shots" (strzały ogółem) zostaje bez zmian = wszystkie strzały, zgodnie
+# z regulaminem bukmachera; osobność dotyczy tylko raportu skuteczności.
+RYNKI_OSOBNE = {"shots_off_target", "shots_blocked"}
 
 # --- Superzmiana (Superbet): gdy wytypowany zawodnik zostanie zmieniony,
 # statystyki jego zmiennika doliczają się do zakładu. Objęte rynki wg
@@ -777,6 +782,34 @@ def _rozlicz_kupony(log_kuponow: dict, typy_log: dict, now: int) -> list[dict]:
     )[:40]
 
 
+def skutecznosc_per_dzien(settled: list[dict], dni: int = 21) -> list[dict]:
+    """Skuteczność realnych typów pogrupowana po DNIU meczu (kickoff).
+
+    Zwraca ostatnie `dni` dni (od najnowszego): trafienia, ROI flat (stawka
+    1 j./okazję) i liczbę okazji. Zasila przełącznik dnia na Skuteczności.
+    ROZLICZONE typy tylko — `settled` powinno być już bez rynków osobnych.
+    """
+    dzienne: dict[str, dict] = {}
+    for r in settled:
+        d = time.strftime("%Y-%m-%d", time.localtime(r.get("kickoff_ts") or 0))
+        agg = dzienne.setdefault(d, {
+            "dzien": d, "rozliczone": 0, "trafione": 0,
+            "okazje": 0, "_zwrot_j": 0.0,
+        })
+        agg["rozliczone"] += 1
+        if r.get("wynik") == "wygrany":
+            agg["trafione"] += 1
+        if not r.get("sugestia") and r.get("kurs"):
+            agg["okazje"] += 1
+            agg["_zwrot_j"] += r["kurs"] if r.get("wynik") == "wygrany" else 0.0
+    out = []
+    for d in sorted(dzienne, reverse=True)[:dni]:
+        agg = dzienne[d]
+        agg["roi_flat"] = round(agg.pop("_zwrot_j") - agg["okazje"], 2)
+        out.append(agg)
+    return out
+
+
 def rozlicz(
     value_bets: list[dict],
     kupony_list: list[dict] | None = None,
@@ -993,6 +1026,25 @@ def rozlicz(
     for d in kupony_roi.values():
         d["zwrot_j"] = round(d["zwrot_j"], 2)
         d["roi_j"] = round(d["zwrot_j"] - d["n"], 2)
+    # WSZYSTKIE wygrane kupony — trwały log, który NIGDY nie znika (osobna
+    # sekcja na Skuteczności). Zbierany z PEŁNEGO logu przed przycinaniem; raz
+    # wygrany kupon zostaje na zawsze (superzmiana tylko dokłada wygrane).
+    # Odchudzamy o pola doradcze aktywnego kuponu (rentgen), które w historii
+    # są zbędne i tylko puchłyby payload.
+    wygrane_log = supa.get_key("kupony_wygrane") or {}
+    _POMIN_POLA = ("alternatywa", "wariant_b", "dolozenie", "najslabszy_idx")
+    for r in log_kuponow.values():
+        if r.get("wynik") != "wygrany" or not r.get("klucz"):
+            continue
+        wygrane_log[r["klucz"]] = {
+            k: v for k, v in r.items() if k not in _POMIN_POLA
+        }
+    if wygrane_log:
+        supa.put_key("kupony_wygrane", wygrane_log)
+    kupony_wygrane = sorted(
+        wygrane_log.values(),
+        key=lambda r: -(r.get("rozliczono_ts") or r.get("opublikowano_ts") or 0),
+    )
     # przycinanie: kupony rozliczone/anulowane starsze niż 21 dni wypadają
     # (UI i tak pokazuje top 40; payload nie może rosnąć bez końca)
     log_kuponow = {
@@ -1003,27 +1055,61 @@ def rozlicz(
     supa.put_key("kupony_log", log_kuponow)
 
     # ---- podsumowanie do UI ----
-    settled = [r for r in log.values() if r.get("wynik") in ("wygrany", "przegrany")]
+    # strzały niecelne/zablokowane (RYNKI_OSOBNE) liczymy CAŁKOWICIE OSOBNO —
+    # nie wchodzą do zbiorczych trafień/ROI ani do tabeli per rynek
+    settled_all = [
+        r for r in log.values() if r.get("wynik") in ("wygrany", "przegrany")
+    ]
+    settled = [r for r in settled_all if r.get("rynek_kod") not in RYNKI_OSOBNE]
+    settled_osobne = [r for r in settled_all if r.get("rynek_kod") in RYNKI_OSOBNE]
     okazje = [r for r in settled if not r["sugestia"] and r.get("kurs")]
     roi = sum(
         (r["kurs"] - 1.0) if r["wynik"] == "wygrany" else -1.0 for r in okazje
     )
-    po_rynku = []
-    for mk in sorted({r["rynek_kod"] for r in settled}):
-        grp = [r for r in settled if r["rynek_kod"] == mk]
-        traf = sum(1 for r in grp if r["wynik"] == "wygrany")
-        sr_p = sum(r["p_model"] for r in grp) / len(grp)
-        po_rynku.append({
-            "rynek_kod": mk, "rynek": grp[0]["rynek"], "n": len(grp),
-            "trafione": traf,
-            "sr_p_model": round(sr_p, 3),
-            "czestosc": round(traf / len(grp), 3),
-            # bias > 1 = model niedoszacowuje, < 1 = przeszacowuje;
-            # stosowany w modelu dopiero od n>=25 (na razie raport)
-            "bias": round((traf + 2.0) / (sr_p * len(grp) + 2.0), 3),
-        })
+
+    def _po_rynku(recs: list[dict]) -> list[dict]:
+        out = []
+        for mk in sorted({r["rynek_kod"] for r in recs}):
+            grp = [r for r in recs if r["rynek_kod"] == mk]
+            traf = sum(1 for r in grp if r["wynik"] == "wygrany")
+            sr_p = sum(r["p_model"] for r in grp) / len(grp)
+            out.append({
+                "rynek_kod": mk, "rynek": grp[0]["rynek"], "n": len(grp),
+                "trafione": traf,
+                "sr_p_model": round(sr_p, 3),
+                "czestosc": round(traf / len(grp), 3),
+                # bias > 1 = model niedoszacowuje, < 1 = przeszacowuje;
+                # stosowany w modelu dopiero od n>=25 (na razie raport)
+                "bias": round((traf + 2.0) / (sr_p * len(grp) + 2.0), 3),
+            })
+        return out
+
+    po_rynku = _po_rynku(settled)
+    # OSOBNY blok skuteczności dla niecelnych/zablokowanych
+    okazje_osobne = [
+        r for r in settled_osobne if not r["sugestia"] and r.get("kurs")
+    ]
+    podsumowanie_osobne = ({
+        "rozliczone": len(settled_osobne),
+        "trafione": sum(1 for r in settled_osobne if r["wynik"] == "wygrany"),
+        "roi_flat": round(sum(
+            (r["kurs"] - 1.0) if r["wynik"] == "wygrany" else -1.0
+            for r in okazje_osobne
+        ), 2),
+        "okazje_rozliczone": len(okazje_osobne),
+    } if settled_osobne else None)
+    po_rynku_osobne = _po_rynku(settled_osobne)
+
+    # skuteczność DZIEŃ PO DNIU (realne typy, bez rynków osobnych) — zasila
+    # przełącznik dnia na Skuteczności
+    skutecznosc_dzienna = skutecznosc_per_dzien(settled)
+
     ostatnie = sorted(
-        settled + [r for r in log.values() if r.get("wynik") == "zwrot"],
+        settled + [
+            r for r in log.values()
+            if r.get("wynik") == "zwrot"
+            and r.get("rynek_kod") not in RYNKI_OSOBNE
+        ],
         key=lambda r: -(r.get("rozliczono_ts") or 0),
     )[:60]
     z_clv = [r for r in settled if r.get("clv_pct") is not None]
@@ -1041,7 +1127,11 @@ def rozlicz(
     return {
         "diagnostyka": diagnostyka,
         "podsumowanie": {
-            "opublikowane": len(log),
+            # bez rynków osobnych (niecelne/zablokowane) — te są liczone osobno
+            "opublikowane": sum(
+                1 for r in log.values()
+                if r.get("rynek_kod") not in RYNKI_OSOBNE
+            ),
             "rozliczone": len(settled),
             "trafione": sum(1 for r in settled if r["wynik"] == "wygrany"),
             "roi_flat": round(roi, 2),
@@ -1054,7 +1144,14 @@ def rozlicz(
             "clv_n": len(z_clv),
         },
         "po_rynku": po_rynku,
+        # strzały niecelne/zablokowane — osobny blok (poza zbiorczą skutecznością)
+        "podsumowanie_osobne": podsumowanie_osobne,
+        "po_rynku_osobne": po_rynku_osobne,
         "ostatnie": ostatnie,
+        # skuteczność dzień po dniu (realne typy) — do przełącznika w UI
+        "skutecznosc_dzienna": skutecznosc_dzienna,
         "kupony": kupony_hist,
         "kupony_roi": kupony_roi,
+        # WSZYSTKIE wygrane kupony (trwały log, nigdy nie znikają)
+        "kupony_wygrane": kupony_wygrane,
     }
