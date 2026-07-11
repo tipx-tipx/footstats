@@ -95,6 +95,50 @@ function ranga(w: WierszPokrycia): number {
  * Wiersze TOP POKRYCIA dla zawodników meczu (już odfiltrowanych po drużynie),
  * posortowane: najlepsze pokrycie → wyższa linia → lepszy kurs.
  */
+/** Zawodnik po scaleniu duplikatów — trzyma wszystkie źródłowe ID (do kursów). */
+type ZawodnikScalony = Zawodnik & { ids: number[] };
+
+const _norm = (s: string) =>
+  s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z ]/g, "")
+    .trim();
+
+/**
+ * Statshub bywa zwraca tego samego zawodnika pod kilkoma ID, z ROZBITĄ formą
+ * (jeden rekord ma strzały, inny faule) i różną flagą składu — przez co ten
+ * sam gracz pojawiał się raz z „XI", raz bez. Scalamy po nazwisku+drużynie:
+ * suma rynków (rynek z większą próbką wygrywa), xi = OR, wszystkie ID zebrane
+ * (kursy szukamy po każdym z nich).
+ */
+function scalDuplikaty(zawodnicy: Zawodnik[]): ZawodnikScalony[] {
+  const map = new Map<string, ZawodnikScalony>();
+  for (const z of zawodnicy) {
+    const key = `${_norm(z.nazwa)}|${z.druzyna}`;
+    const cur = map.get(key);
+    if (!cur) {
+      map.set(key, {
+        ...z,
+        forma: { ...z.forma },
+        xi: z.xi === true,
+        ids: [z.id],
+      });
+      continue;
+    }
+    cur.ids.push(z.id);
+    if (z.xi === true) cur.xi = true;
+    for (const [mk, f] of Object.entries(z.forma ?? {})) {
+      const ist = cur.forma[mk];
+      if (!ist || (f.ostatnie?.length ?? 0) > (ist.ostatnie?.length ?? 0)) {
+        cur.forma[mk] = f;
+      }
+    }
+  }
+  return [...map.values()];
+}
+
 export function topPokrycia(
   zawodnicy: Zawodnik[],
   meczId: number,
@@ -103,8 +147,16 @@ export function topPokrycia(
   const oddsMecz = odds?.[String(meczId)] ?? {};
   const rows: WierszPokrycia[] = [];
 
-  for (const z of zawodnicy) {
-    const oddsGracz = oddsMecz[String(z.id)] ?? {};
+  for (const z of scalDuplikaty(zawodnicy)) {
+    // kursy zbierane ze WSZYSTKICH ID duplikatu (rynek->linia->kurs)
+    const oddsGracz: Record<string, Record<string, number>> = {};
+    for (const id of z.ids) {
+      const o = oddsMecz[String(id)];
+      if (!o) continue;
+      for (const [mk, linie] of Object.entries(o)) {
+        oddsGracz[mk] = { ...(oddsGracz[mk] ?? {}), ...linie };
+      }
+    }
     for (const kod of RYNKI_POKRYCIA) {
       const f = z.forma?.[kod];
       if (!f) continue;

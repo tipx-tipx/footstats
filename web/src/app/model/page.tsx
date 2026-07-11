@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { Reveal } from "@/components/Reveal";
 import { SkutecznoscDzienna } from "@/components/SkutecznoscDzienna";
 import { getKalibracja, getMeta, getTypyWyniki } from "@/lib/data";
-import { fmtLinia, fmtProc } from "@/lib/format";
+import { fmtProc } from "@/lib/format";
 
 export const metadata = { title: "Skuteczność modelu — FootStats" };
 
@@ -161,62 +161,8 @@ export default async function ModelPage() {
                 </table>
               </div>
             )}
-            {typy.ostatnie.length > 0 && (
-              <ul className="mt-4 max-w-3xl space-y-1.5">
-                {typy.ostatnie.slice(0, 12).map((t, i) => (
-                  <li
-                    key={`${t.mecz}-${t.podmiot}-${t.rynek_kod}-${i}`}
-                    className="flex items-center gap-3 rounded-lg border border-hairline bg-card px-3.5 py-2 text-sm"
-                  >
-                    <span
-                      aria-hidden
-                      className={`h-2 w-2 shrink-0 rounded-full ${
-                        t.wynik === "wygrany"
-                          ? "bg-data-green"
-                          : t.wynik === "przegrany"
-                            ? "bg-data-red"
-                            : "bg-data-amber"
-                      }`}
-                    />
-                    <span className="min-w-0 flex-1 truncate">
-                      <span className="font-medium">{t.podmiot}</span>{" "}
-                      <span className="text-muted">
-                        {t.rynek.toLowerCase()} pow. {fmtLinia(t.linia)} · {t.mecz}
-                      </span>
-                    </span>
-                    <span className="font-data shrink-0 text-xs text-muted">
-                      było: {t.faktyczna != null ? t.faktyczna : "—"}
-                    </span>
-                    {t.clv_pct != null && (
-                      <span
-                        className={`font-data hidden shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-semibold sm:inline-flex ${
-                          t.clv_pct > 0
-                            ? "bg-data-green-wash text-brand-deep"
-                            : t.clv_pct < 0
-                              ? "bg-data-red-wash text-data-red"
-                              : "bg-paper text-muted"
-                        }`}
-                        title={`Wzięty @${t.kurs?.toFixed(2).replace(".", ",")}, zamknięcie @${t.kurs_zamkniecia?.toFixed(2).replace(".", ",")} — dodatnie CLV = kurs lepszy niż wycena rynku na koniec`}
-                      >
-                        CLV {t.clv_pct > 0 ? "+" : ""}
-                        {t.clv_pct.toFixed(0)}%
-                      </span>
-                    )}
-                    <span
-                      className={`shrink-0 text-xs font-semibold ${
-                        t.wynik === "wygrany"
-                          ? "text-data-green"
-                          : t.wynik === "przegrany"
-                            ? "text-data-red"
-                            : "text-[#8a5613]"
-                      }`}
-                    >
-                      {t.wynik === "wygrany" ? "✓ trafiony" : t.wynik === "przegrany" ? "✗ nietrafiony" : "zwrot"}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
+            {/* lista rozliczonych typów przeniesiona do „Skuteczność dzień
+                po dniu" (per dzień, co siadło) — tu już jej nie dublujemy */}
           </>
         ) : (
           <p className="mt-4 max-w-3xl rounded-xl border border-hairline bg-card px-4 py-3.5 text-sm text-muted shadow-(--shadow-card)">
