@@ -46,6 +46,7 @@ export function TopPokrycia({
 }) {
   const [druzyna, setDruzyna] = useState<string | null>(null);
   const [rynek, setRynek] = useState<string | null>(null);
+  const [rozwin, setRozwin] = useState(false);
   const [tip, setTip] = useState<Tip>(null);
 
   const rynki = useMemo(() => {
@@ -62,7 +63,7 @@ export function TopPokrycia({
       ),
     [wiersze, druzyna, rynek],
   );
-  const pokazane = widoczne.slice(0, LIMIT);
+  const pokazane = rozwin ? widoczne : widoczne.slice(0, LIMIT);
 
   if (wiersze.length === 0) {
     return (
@@ -109,6 +110,12 @@ export function TopPokrycia({
             XI
           </span>
           przewidywany skład (na górze)
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="rounded bg-data-amber-wash px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[#8a5613]">
+            rzadko w kadrze
+          </span>
+          forma z klubu, nie z reprezentacji (niżej)
         </span>
       </div>
 
@@ -185,6 +192,14 @@ export function TopPokrycia({
                   )}
                   <span className="font-medium">{w.zawodnik}</span>
                   <span className="ml-1.5 text-xs text-faint">{w.druzyna}</span>
+                  {!w.xi && w.kadraLiczba <= 1 && (
+                    <span
+                      className="ml-2 inline-flex rounded bg-data-amber-wash px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[#8a5613]"
+                      title="Ostatnie starty głównie w klubie, nie w reprezentacji — w kadrze gra rzadko, może nie wejść do składu. Statystyki to forma klubowa."
+                    >
+                      rzadko w kadrze
+                    </span>
+                  )}
                 </td>
                 <td className="px-4 py-3">
                   <span className="flex gap-1">
@@ -218,13 +233,25 @@ export function TopPokrycia({
         </table>
       </div>
 
-      <p className="mt-2 text-xs text-faint">
-        {widoczne.length > LIMIT
-          ? `Pokazujemy top ${LIMIT} z ${widoczne.length} propozycji.`
-          : `${widoczne.length} ${
-              widoczne.length === 1 ? "propozycja" : "propozycji"
-            }.`}
-      </p>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs text-faint">
+          {widoczne.length}{" "}
+          {widoczne.length === 1 ? "propozycja" : "propozycji"}
+          {!rozwin &&
+            widoczne.length > LIMIT &&
+            ` · na górze regularni w kadrze, rezerwa niżej`}
+        </p>
+        {widoczne.length > LIMIT && (
+          <button
+            onClick={() => setRozwin((v) => !v)}
+            className="rounded-lg border border-hairline bg-card px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-paper hover:text-ink"
+          >
+            {rozwin
+              ? "Zwiń listę"
+              : `Pokaż pozostałe (${widoczne.length - LIMIT})`}
+          </button>
+        )}
+      </div>
 
       {/* płynny tooltip kafelka (fixed — nigdy nieprzycięty przez tabelę) */}
       <div

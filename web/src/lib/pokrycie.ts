@@ -72,8 +72,23 @@ export interface WierszPokrycia {
   /** ile z próbki pokryło linię */
   pokryte: number;
   probka: number;
+  /** ile z 5 startów to mecze reprezentacji (0–1 = rzadko w kadrze) */
+  kadraLiczba: number;
   /** kurs Superbet dla tej linii (strona „powyżej"), jeśli jest */
   kurs: number | null;
+}
+
+/**
+ * Ranga trafności zawodnika na mecz REPREZENTACJI:
+ *  0 = potwierdzony/przewidywany skład (xi),
+ *  1 = regularny w kadrze (≥2 z ostatnich startów w reprezentacji),
+ *  2 = rzadko w kadrze / forma klubowa (0–1 startu w reprezentacji).
+ * Sortujemy najpierw po randze (regularni na górę), potem po pokryciu.
+ */
+function ranga(w: WierszPokrycia): number {
+  if (w.xi) return 0;
+  if (w.kadraLiczba >= 2) return 1;
+  return 2;
 }
 
 /**
@@ -123,6 +138,7 @@ export function topPokrycia(
           ostatnie: starty,
           pokryte,
           probka: starty.length,
+          kadraLiczba: starty.filter((g) => g.kadra).length,
           kurs: oddsGracz[kod]?.[String(linia)] ?? null,
         });
       }
@@ -131,11 +147,19 @@ export function topPokrycia(
 
   rows.sort(
     (a, b) =>
-      // przewidywany skład na górę, potem najlepsze pokrycie / linia / kurs
-      Number(b.xi) - Number(a.xi) ||
+      // regularni w kadrze / przewidywany skład na górę, potem pokrycie
+      ranga(a) - ranga(b) ||
       b.pokryte - a.pokryte ||
       b.linia - a.linia ||
       (b.kurs ?? 0) - (a.kurs ?? 0),
   );
-  return rows;
+  // deduplikacja: statshub bywa duplikuje zawodnika (ten sam gracz, inny rekord)
+  // — jeden zawodnik/rynek/linia tylko raz (zostaje najlepszy po sortowaniu)
+  const seen = new Set<string>();
+  return rows.filter((w) => {
+    const key = `${w.zawodnik}|${w.rynek_kod}|${w.linia}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
