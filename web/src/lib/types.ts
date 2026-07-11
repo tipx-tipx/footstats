@@ -97,6 +97,8 @@ export interface FormaRynku {
   rywale?: string[];
   /** true = mecz reprezentacji (false/brak = klub) */
   kadra?: boolean[];
+  /** timestamp (s) każdego meczu — do daty ostatniego meczu (świeżość) */
+  ts?: number[];
   srednia90: number;
 }
 

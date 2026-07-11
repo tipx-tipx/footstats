@@ -1,11 +1,14 @@
 /**
  * TOP POKRYCIA — zawodnicy z najlepszym pokryciem linii w ostatnich meczach.
  *
- * Reguła (wg ustaleń z użytkownikiem): bierzemy ostatnie 5 meczów, w których
- * zawodnik ZACZYNAŁ w pierwszym składzie (dowolne rozgrywki — klub lub kadra),
- * i liczymy, ile z nich pokryło linię +0.5/+1.5/+2.5. Zostają pokrycia ≥ 2/5
- * (40%). „Start" przybliżamy przez minuty ≥ 60 — tak samo jak pipeline
- * (statshub.py: started = minutesPlayed >= 60). Kurs Superbet z siatki odds.
+ * Zasady (wypracowane z użytkownikiem):
+ *  • Próbka = ostatnie 5 meczów, w których zawodnik ZACZYNAŁ (minuty ≥ 60).
+ *  • Na mecz REPREZENTACJI (MŚ) PREFERUJEMY starty w kadrze: jeśli zawodnik ma
+ *    ≥ 5 startów w kadrze w dostępnej historii, liczymy pokrycie z nich (prawdziwa
+ *    forma reprezentacyjna). Jeśli nie (rezerwa kadry / klubowiec) — fallback na
+ *    5 ostatnich startów jakichkolwiek, z flagą „forma klubowa".
+ *  • Jeden wiersz na (zawodnik, rynek) — linie 1+/2+/3+ zwinięte obok siebie.
+ *  • Zostają pokrycia ≥ 2/5. Kurs Superbet z siatki odds.
  */
 
 import type { OddsSuperbet, Zawodnik } from "./types";
@@ -14,9 +17,9 @@ import type { OddsSuperbet, Zawodnik } from "./types";
 export const RYNEK_LABEL: Record<string, string> = {
   shots: "Strzały",
   sot: "Strzały celne",
+  shots_outside_box: "Strzały zza pola",
   shots_off_target: "Strzały niecelne",
   shots_blocked: "Strzały zablokowane",
-  shots_outside_box: "Strzały zza pola",
   sot_outside_box: "Celne zza pola",
   headed_shots: "Strzały głową",
   headed_sot: "Celne głową",
@@ -27,7 +30,7 @@ export const RYNEK_LABEL: Record<string, string> = {
   offsides: "Spalone",
 };
 
-/** Rynki brane pod uwagę w TOP POKRYCIA (kolejność = domyślny priorytet). */
+/** Rynki brane pod uwagę (kolejność = domyślny priorytet). */
 const RYNKI_POKRYCIA = [
   "shots",
   "sot",
@@ -42,59 +45,58 @@ const RYNKI_POKRYCIA = [
 
 const LINIE = [0.5, 1.5, 2.5];
 const PROBKA = 5; // ostatnie 5 startów
-const PROG_STARTU = 60; // minuty ≥ 60 = zaczynał w składzie (jak w pipeline)
+const PROG_STARTU = 60; // minuty ≥ 60 = zaczynał w składzie (jak pipeline)
 const MIN_POKRYTE = 2; // ≥ 2/5 = 40%
 
-/** Jedna gra w próbce: wartość statystyki + kontekst (z kim, ile minut). */
+/** Jedna gra w próbce. */
 export interface GraForma {
   v: number;
-  /** rywal w tym meczu (może brakować) */
   rywal: string | null;
-  /** minuty w tym meczu (≥ 60 = start) */
   minuty: number;
-  /** true = mecz reprezentacji; false = klub */
   kadra: boolean;
+  ts: number;
+}
+
+/** Pokrycie jednej linii (1+/2+/3+) w obrębie rynku. */
+export interface LiniaPokrycie {
+  linia: number;
+  prog: number;
+  pokryte: number;
+  kurs: number | null;
 }
 
 export interface WierszPokrycia {
   player_id: number;
   zawodnik: string;
   druzyna: string;
-  /** true = w przewidywanym pierwszym składzie (sortowany na górę) */
   xi: boolean;
   rynek_kod: string;
   rynek: string;
-  linia: number;
-  /** próg pokrycia dla tej linii (0.5→1, 1.5→2, 2.5→3) */
-  prog: number;
-  /** ostatnie 5 startów (najnowszy pierwszy) z kontekstem */
+  /** 5 startów użytych do liczenia (najnowszy pierwszy) */
   ostatnie: GraForma[];
-  /** ile z próbki pokryło linię */
-  pokryte: number;
   probka: number;
-  /** ile z 5 startów to mecze reprezentacji (0–1 = rzadko w kadrze) */
-  kadraLiczba: number;
-  /** kurs Superbet dla tej linii (strona „powyżej"), jeśli jest */
-  kurs: number | null;
+  /** true = pokrycie z meczów reprezentacji; false = fallback klubowy */
+  kadraBasis: boolean;
+  /** timestamp (s) najnowszego meczu w próbce — świeżość */
+  ostatniMeczTs: number;
+  /** pokrycie per linia (tylko te ≥ MIN_POKRYTE) */
+  linie: LiniaPokrycie[];
+  /** najlepsze pokrycie w wierszu (do sortowania) */
+  maxPokryte: number;
+  /** true = któraś linia ma kurs Superbet */
+  maKurs: boolean;
 }
 
 /**
- * Ranga trafności zawodnika na mecz REPREZENTACJI:
- *  0 = potwierdzony/przewidywany skład (xi),
- *  1 = regularny w kadrze (≥2 z ostatnich startów w reprezentacji),
- *  2 = rzadko w kadrze / forma klubowa (0–1 startu w reprezentacji).
- * Sortujemy najpierw po randze (regularni na górę), potem po pokryciu.
+ * Ranga trafności na mecz REPREZENTACJI:
+ *  0 = przewidywany skład (xi), 1 = pokrycie z kadry, 2 = fallback klubowy.
  */
 function ranga(w: WierszPokrycia): number {
   if (w.xi) return 0;
-  if (w.kadraLiczba >= 2) return 1;
+  if (w.kadraBasis) return 1;
   return 2;
 }
 
-/**
- * Wiersze TOP POKRYCIA dla zawodników meczu (już odfiltrowanych po drużynie),
- * posortowane: najlepsze pokrycie → wyższa linia → lepszy kurs.
- */
 /** Zawodnik po scaleniu duplikatów — trzyma wszystkie źródłowe ID (do kursów). */
 type ZawodnikScalony = Zawodnik & { ids: number[] };
 
@@ -110,8 +112,7 @@ const _norm = (s: string) =>
  * Statshub bywa zwraca tego samego zawodnika pod kilkoma ID, z ROZBITĄ formą
  * (jeden rekord ma strzały, inny faule) i różną flagą składu — przez co ten
  * sam gracz pojawiał się raz z „XI", raz bez. Scalamy po nazwisku+drużynie:
- * suma rynków (rynek z większą próbką wygrywa), xi = OR, wszystkie ID zebrane
- * (kursy szukamy po każdym z nich).
+ * suma rynków (rynek z większą próbką wygrywa), xi = OR, wszystkie ID zebrane.
  */
 function scalDuplikaty(zawodnicy: Zawodnik[]): ZawodnikScalony[] {
   const map = new Map<string, ZawodnikScalony>();
@@ -148,7 +149,7 @@ export function topPokrycia(
   const rows: WierszPokrycia[] = [];
 
   for (const z of scalDuplikaty(zawodnicy)) {
-    // kursy zbierane ze WSZYSTKICH ID duplikatu (rynek->linia->kurs)
+    // kursy zbierane ze WSZYSTKICH ID duplikatu (rynek→linia→kurs)
     const oddsGracz: Record<string, Record<string, number>> = {};
     for (const id of z.ids) {
       const o = oddsMecz[String(id)];
@@ -157,59 +158,76 @@ export function topPokrycia(
         oddsGracz[mk] = { ...(oddsGracz[mk] ?? {}), ...linie };
       }
     }
+
     for (const kod of RYNKI_POKRYCIA) {
       const f = z.forma?.[kod];
       if (!f) continue;
-      // ostatnie 5 STARTÓW (minuty ≥ 60), najnowszy pierwszy, z kontekstem
-      const starty: GraForma[] = [];
-      for (let i = 0; i < f.ostatnie.length && starty.length < PROBKA; i++) {
-        const min = f.minuty?.[i] ?? 0;
-        if (min >= PROG_STARTU) {
-          starty.push({
-            v: f.ostatnie[i],
-            rywal: f.rywale?.[i] ?? null,
-            minuty: min,
-            kadra: f.kadra?.[i] === true,
-          });
-        }
+
+      // wszystkie gry (najnowszy pierwszy) z kontekstem
+      const gry: GraForma[] = f.ostatnie.map((v, i) => ({
+        v,
+        rywal: f.rywale?.[i] ?? null,
+        minuty: f.minuty?.[i] ?? 0,
+        kadra: f.kadra?.[i] === true,
+        ts: f.ts?.[i] ?? 0,
+      }));
+      const starty = gry.filter((g) => g.minuty >= PROG_STARTU);
+      const kadraStarty = starty.filter((g) => g.kadra);
+
+      // PREFERUJ kadrę: ≥5 startów w reprezentacji → licz z nich; inaczej
+      // fallback na 5 ostatnich startów jakichkolwiek (forma klubowa)
+      let probka: GraForma[];
+      let kadraBasis: boolean;
+      if (kadraStarty.length >= PROBKA) {
+        probka = kadraStarty.slice(0, PROBKA);
+        kadraBasis = true;
+      } else if (starty.length >= PROBKA) {
+        probka = starty.slice(0, PROBKA);
+        kadraBasis = false;
+      } else {
+        continue; // za mało startów
       }
-      if (starty.length < PROBKA) continue; // za mało meczów w składzie
-      for (const linia of LINIE) {
-        const prog = Math.ceil(linia); // 0.5→1, 1.5→2, 2.5→3
-        const pokryte = starty.filter((g) => g.v >= prog).length;
-        if (pokryte < MIN_POKRYTE) continue;
-        rows.push({
-          player_id: z.id,
-          zawodnik: z.nazwa,
-          druzyna: z.druzyna,
-          xi: z.xi === true,
-          rynek_kod: kod,
-          rynek: RYNEK_LABEL[kod] ?? kod,
+
+      const linie = LINIE.map((linia) => {
+        const prog = Math.ceil(linia);
+        return {
           linia,
           prog,
-          ostatnie: starty,
-          pokryte,
-          probka: starty.length,
-          kadraLiczba: starty.filter((g) => g.kadra).length,
+          pokryte: probka.filter((g) => g.v >= prog).length,
           kurs: oddsGracz[kod]?.[String(linia)] ?? null,
-        });
-      }
+        };
+      }).filter((l) => l.pokryte >= MIN_POKRYTE);
+      if (linie.length === 0) continue;
+
+      rows.push({
+        player_id: z.id,
+        zawodnik: z.nazwa,
+        druzyna: z.druzyna,
+        xi: z.xi === true,
+        rynek_kod: kod,
+        rynek: RYNEK_LABEL[kod] ?? kod,
+        ostatnie: probka,
+        probka: probka.length,
+        kadraBasis,
+        ostatniMeczTs: probka[0]?.ts ?? 0,
+        linie,
+        maxPokryte: Math.max(...linie.map((l) => l.pokryte)),
+        maKurs: linie.some((l) => l.kurs != null),
+      });
     }
   }
 
   rows.sort(
     (a, b) =>
-      // regularni w kadrze / przewidywany skład na górę, potem pokrycie
       ranga(a) - ranga(b) ||
-      b.pokryte - a.pokryte ||
-      b.linia - a.linia ||
-      (b.kurs ?? 0) - (a.kurs ?? 0),
+      b.maxPokryte - a.maxPokryte ||
+      b.linie[0].linia - a.linie[0].linia ||
+      (b.linie[0].kurs ?? 0) - (a.linie[0].kurs ?? 0),
   );
-  // deduplikacja: statshub bywa duplikuje zawodnika (ten sam gracz, inny rekord)
-  // — jeden zawodnik/rynek/linia tylko raz (zostaje najlepszy po sortowaniu)
+  // deduplikacja bezpieczeństwa: jeden zawodnik/rynek tylko raz
   const seen = new Set<string>();
   return rows.filter((w) => {
-    const key = `${w.zawodnik}|${w.rynek_kod}|${w.linia}`;
+    const key = `${w.zawodnik}|${w.rynek_kod}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;

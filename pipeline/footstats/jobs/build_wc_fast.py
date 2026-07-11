@@ -1080,14 +1080,19 @@ def main():
         elif tr.in_predicted_lineup:
             players_out[tr.player_id]["xi"] = True
         nt_zbior = nt_ts.get(tr.team_name, set())
+        # statshub daje ~40 meczów historii — trzymamy 20, żeby na stronie meczu
+        # dało się PREFEROWAĆ ostatnie 5 startów w KADRZE (a nie klubowe) i pokazać
+        # datę ostatniego meczu (świeżość). Model i tak liczy z pełnego tr.counts.
+        N = 20
         players_out[tr.player_id]["forma"][mk] = {
-            "ostatnie": [int(c) for c in tr.counts[:10]],
-            "minuty": [int(m) for m in tr.minutes[:10]],
-            "rywale": [str(o) for o in tr.game_opponents[:10]],
+            "ostatnie": [int(c) for c in tr.counts[:N]],
+            "minuty": [int(m) for m in tr.minutes[:N]],
+            "rywale": [str(o) for o in tr.game_opponents[:N]],
             "kadra": [
                 any(abs(ts_g - g) < 36 * 3600 for g in nt_zbior)
-                for ts_g in tr.timestamps[:10]
+                for ts_g in tr.timestamps[:N]
             ],
+            "ts": [int(t) for t in tr.timestamps[:N]],
             "srednia90": round(
                 float(np.sum(tr.counts) / max(np.sum(tr.minutes), 1) * 90.0), 2
             ),

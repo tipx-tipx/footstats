@@ -147,11 +147,11 @@ export default async function MeczPage({
           </h2>
         </div>
         <p className="mt-1 max-w-3xl text-sm text-muted">
-          Zawodnicy z najlepszym pokryciem w{" "}
-          <strong>ostatnich 5 meczach, które zaczynali w składzie</strong>{" "}
-          (dowolne rozgrywki — klub lub kadra) — ile z nich pokryło linię 1+, 2+
-          lub 3+ (od 2/5). Najedź na boks, by zobaczyć rywala i minuty. Kursy:
-          Superbet.
+          Pokrycie z <strong>ostatnich 5 startów</strong>. Na mecz reprezentacji{" "}
+          <strong>preferujemy starty w kadrze</strong> — a gdy zawodnik gra w niej
+          za rzadko, liczymy z klubu (oznaczone „forma klubowa”, niżej). Kolumna{" "}
+          1+/2+/3+ to pokrycie linii z kursem Superbet. Najedź na boks: rywal,
+          minuty, data.
         </p>
         <TopPokrycia
           wiersze={wiersze}

@@ -2,16 +2,24 @@
 
 import { useMemo, useState } from "react";
 
-import { fmtKurs, fmtLinia } from "@/lib/format";
+import { fmtKurs } from "@/lib/format";
 import {
   RYNEK_LABEL,
   type GraForma,
   type WierszPokrycia,
 } from "@/lib/pokrycie";
 
-const LIMIT = 50;
+const LIMIT = 40;
 
 type Tip = { x: number; y: number; g: GraForma } | null;
+
+function dataMeczu(ts: number): string {
+  if (!ts) return "—";
+  return new Intl.DateTimeFormat("pl-PL", {
+    day: "numeric",
+    month: "short",
+  }).format(new Date(ts * 1000));
+}
 
 function Chip({
   active,
@@ -46,22 +54,28 @@ export function TopPokrycia({
 }) {
   const [druzyna, setDruzyna] = useState<string | null>(null);
   const [rynek, setRynek] = useState<string | null>(null);
+  const [bezKursu, setBezKursu] = useState(false);
   const [rozwin, setRozwin] = useState(false);
   const [tip, setTip] = useState<Tip>(null);
 
+  // domyślnie chowamy rynki bez kursu Superbet (niecelne/zablokowane = „—")
+  const zKursem = useMemo(
+    () => (bezKursu ? wiersze : wiersze.filter((w) => w.maKurs)),
+    [wiersze, bezKursu],
+  );
   const rynki = useMemo(() => {
-    const obecne = new Set(wiersze.map((w) => w.rynek_kod));
+    const obecne = new Set(zKursem.map((w) => w.rynek_kod));
     return Object.keys(RYNEK_LABEL).filter((k) => obecne.has(k));
-  }, [wiersze]);
+  }, [zKursem]);
 
   const widoczne = useMemo(
     () =>
-      wiersze.filter(
+      zKursem.filter(
         (w) =>
           (druzyna === null || w.druzyna === druzyna) &&
           (rynek === null || w.rynek_kod === rynek),
       ),
-    [wiersze, druzyna, rynek],
+    [zKursem, druzyna, rynek],
   );
   const pokazane = rozwin ? widoczne : widoczne.slice(0, LIMIT);
 
@@ -74,8 +88,8 @@ export function TopPokrycia({
     );
   }
 
-  const boks = (g: GraForma, prog: number, key: number) => {
-    const pokryl = g.v >= prog;
+  const boks = (g: GraForma, key: number) => {
+    const zaliczyl = g.v >= 1;
     return (
       <span
         key={key}
@@ -85,7 +99,7 @@ export function TopPokrycia({
         }}
         onMouseLeave={() => setTip(null)}
         className={`font-data inline-flex h-6 w-6 cursor-default items-center justify-center rounded text-[11px] font-semibold text-white transition-transform hover:scale-110 ${
-          pokryl ? "bg-data-green" : "bg-data-red"
+          zaliczyl ? "bg-data-green" : "bg-data-red"
         }`}
       >
         {g.v}
@@ -98,24 +112,19 @@ export function TopPokrycia({
       {/* legenda */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted">
         <span className="flex items-center gap-1.5">
-          <span className="inline-block h-3.5 w-3.5 rounded bg-data-green" />
-          pokrył linię
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block h-3.5 w-3.5 rounded bg-data-red" />
-          nie pokrył
-        </span>
-        <span className="flex items-center gap-1.5">
           <span className="rounded bg-brand-wash px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-brand-deep">
             XI
           </span>
-          przewidywany skład (na górze)
+          przewidywany skład
         </span>
         <span className="flex items-center gap-1.5">
           <span className="rounded bg-data-amber-wash px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[#8a5613]">
-            rzadko w kadrze
+            forma klubowa
           </span>
-          forma z klubu, nie z reprezentacji (niżej)
+          brak 5 startów w kadrze → liczone z klubu (niżej)
+        </span>
+        <span className="text-faint">
+          1+/2+/3+ = pokrycie linii · najedź na boks: rywal, minuty, data
         </span>
       </div>
 
@@ -138,94 +147,114 @@ export function TopPokrycia({
             </Chip>
           ))}
         </div>
-        {rynki.length > 1 && (
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="mr-1 text-[11px] uppercase tracking-wide text-faint">
-              rynek
-            </span>
-            <Chip active={rynek === null} onClick={() => setRynek(null)}>
-              wszystkie
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="mr-1 text-[11px] uppercase tracking-wide text-faint">
+            rynek
+          </span>
+          <Chip active={rynek === null} onClick={() => setRynek(null)}>
+            wszystkie
+          </Chip>
+          {rynki.map((k) => (
+            <Chip
+              key={k}
+              active={rynek === k}
+              onClick={() => setRynek(rynek === k ? null : k)}
+            >
+              {RYNEK_LABEL[k]}
             </Chip>
-            {rynki.map((k) => (
-              <Chip
-                key={k}
-                active={rynek === k}
-                onClick={() => setRynek(rynek === k ? null : k)}
-              >
-                {RYNEK_LABEL[k]}
-              </Chip>
-            ))}
-          </div>
-        )}
+          ))}
+          <button
+            onClick={() => setBezKursu((v) => !v)}
+            className={`ml-1 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+              bezKursu
+                ? "border-brand/40 bg-brand-wash text-brand-deep"
+                : "border-hairline bg-card text-faint hover:bg-paper"
+            }`}
+            title="Rynki, których Superbet nie kwotuje (niecelne, zablokowane) — zawsze bez kursu"
+          >
+            {bezKursu ? "✓ rynki bez kursu" : "+ rynki bez kursu"}
+          </button>
+        </div>
       </div>
 
       {/* tabela */}
       <div className="mt-3 overflow-x-auto rounded-2xl border border-hairline bg-card shadow-(--shadow-card)">
-        <table className="w-full min-w-[680px] text-sm">
+        <table className="w-full min-w-[720px] text-sm">
           <thead>
             <tr className="border-b border-hairline text-left text-[11px] uppercase tracking-wide text-faint">
               <th className="px-4 py-2.5 font-medium">rynek</th>
               <th className="px-4 py-2.5 font-medium">zawodnik</th>
               <th className="px-4 py-2.5 font-medium">ostatnie 5 startów</th>
-              <th className="px-4 py-2.5 font-medium">pokrycie</th>
-              <th className="px-4 py-2.5 font-medium">linia</th>
-              <th className="px-4 py-2.5 text-right font-medium">Superbet</th>
+              <th className="px-4 py-2.5 font-medium">pokrycie · kurs (Superbet)</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-hairline">
             {pokazane.map((w, i) => (
               <tr
-                key={`${w.player_id}-${w.rynek_kod}-${w.linia}-${i}`}
-                className="transition-colors hover:bg-paper/50"
+                key={`${w.player_id}-${w.rynek_kod}-${i}`}
+                className="align-top transition-colors hover:bg-paper/50"
               >
                 <td className="whitespace-nowrap px-4 py-3 font-medium">
                   {w.rynek}
                 </td>
                 <td className="px-4 py-3">
-                  {w.xi && (
-                    <span
-                      className="mr-2 inline-flex rounded bg-brand-wash px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-brand-deep"
-                      title="W przewidywanym pierwszym składzie"
-                    >
-                      XI
-                    </span>
-                  )}
-                  <span className="font-medium">{w.zawodnik}</span>
-                  <span className="ml-1.5 text-xs text-faint">{w.druzyna}</span>
-                  {!w.xi && w.kadraLiczba <= 1 && (
-                    <span
-                      className="ml-2 inline-flex rounded bg-data-amber-wash px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[#8a5613]"
-                      title="Ostatnie starty głównie w klubie, nie w reprezentacji — w kadrze gra rzadko, może nie wejść do składu. Statystyki to forma klubowa."
-                    >
-                      rzadko w kadrze
-                    </span>
-                  )}
+                  <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                    {w.xi && (
+                      <span
+                        className="inline-flex rounded bg-brand-wash px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-brand-deep"
+                        title="W przewidywanym pierwszym składzie"
+                      >
+                        XI
+                      </span>
+                    )}
+                    <span className="font-medium">{w.zawodnik}</span>
+                    <span className="text-xs text-faint">{w.druzyna}</span>
+                    {!w.kadraBasis && (
+                      <span
+                        className="inline-flex rounded bg-data-amber-wash px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[#8a5613]"
+                        title="Zawodnik nie ma 5 startów w reprezentacji w dostępnej historii — pokrycie liczone z meczów klubowych. Na kadrę traktuj ostrożnie."
+                      >
+                        forma klubowa
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-0.5 text-[11px] text-faint">
+                    {w.kadraBasis ? "starty w kadrze" : "starty (klub)"} · ost.
+                    mecz {dataMeczu(w.ostatniMeczTs)}
+                  </p>
                 </td>
                 <td className="px-4 py-3">
                   <span className="flex gap-1">
-                    {w.ostatnie.map((g, gi) => boks(g, w.prog, gi))}
+                    {w.ostatnie.map((g, gi) => boks(g, gi))}
                   </span>
                 </td>
                 <td className="px-4 py-3">
-                  <span
-                    className={`font-data font-semibold ${
-                      w.pokryte === w.probka
-                        ? "text-data-green"
-                        : "text-brand-deep"
-                    }`}
-                  >
-                    {w.pokryte}/{w.probka}
+                  <span className="flex flex-wrap gap-1.5">
+                    {w.linie.map((l) => (
+                      <span
+                        key={l.linia}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-hairline bg-paper px-2 py-1 text-xs"
+                      >
+                        <span className="font-data font-semibold text-faint">
+                          {l.prog}+
+                        </span>
+                        <span
+                          className={`font-data font-semibold ${
+                            l.pokryte === w.probka
+                              ? "text-data-green"
+                              : "text-brand-deep"
+                          }`}
+                        >
+                          {l.pokryte}/{w.probka}
+                        </span>
+                        {l.kurs != null && (
+                          <span className="font-data text-muted">
+                            @{fmtKurs(l.kurs)}
+                          </span>
+                        )}
+                      </span>
+                    ))}
                   </span>
-                </td>
-                <td className="font-data whitespace-nowrap px-4 py-3">
-                  +{fmtLinia(w.linia)}
-                </td>
-                <td className="font-data px-4 py-3 text-right">
-                  {w.kurs != null ? (
-                    <span className="font-semibold">{fmtKurs(w.kurs)}</span>
-                  ) : (
-                    <span className="text-faint">—</span>
-                  )}
                 </td>
               </tr>
             ))}
@@ -239,7 +268,7 @@ export function TopPokrycia({
           {widoczne.length === 1 ? "propozycja" : "propozycji"}
           {!rozwin &&
             widoczne.length > LIMIT &&
-            ` · na górze regularni w kadrze, rezerwa niżej`}
+            ` · na górze przewidywany skład i forma z kadry`}
         </p>
         {widoczne.length > LIMIT && (
           <button
@@ -259,11 +288,7 @@ export function TopPokrycia({
         className={`pointer-events-none fixed z-50 -translate-x-1/2 -translate-y-full rounded-lg bg-ink px-2.5 py-1.5 text-white shadow-lg transition-all duration-150 ease-out ${
           tip ? "opacity-100" : "translate-y-[calc(-100%+4px)] opacity-0"
         }`}
-        style={
-          tip
-            ? { left: tip.x, top: tip.y - 8 }
-            : { left: -9999, top: -9999 }
-        }
+        style={tip ? { left: tip.x, top: tip.y - 8 } : { left: -9999, top: -9999 }}
       >
         {tip && (
           <>
@@ -271,7 +296,8 @@ export function TopPokrycia({
               {tip.g.rywal ? `vs ${tip.g.rywal}` : "mecz"}
             </span>
             <span className="block text-[10px] text-white/70">
-              {tip.g.minuty}′ · {tip.g.kadra ? "reprezentacja" : "klub"}
+              {dataMeczu(tip.g.ts)} · {tip.g.minuty}′ ·{" "}
+              {tip.g.kadra ? "reprezentacja" : "klub"}
             </span>
             <span className="absolute left-1/2 top-full h-2 w-2 -translate-x-1/2 -translate-y-1 rotate-45 bg-ink" />
           </>
