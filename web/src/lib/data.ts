@@ -15,12 +15,14 @@ import calibrationLocal from "@/data/demo/calibration.json";
 import metaLocal from "@/data/demo/meta.json";
 import kuponyLocal from "@/data/demo/kupony.json";
 import typyWynikiLocal from "@/data/demo/typy_wyniki.json";
+import oddsSuperbetLocal from "@/data/demo/odds_superbet.json";
 
 import type {
   Kalibracja,
   Kupon,
   Mecz,
   Meta,
+  OddsSuperbet,
   TypyWyniki,
   ValueBet,
   Zawodnik,
@@ -34,6 +36,7 @@ type Bundle = {
   meta: Meta;
   kupony: Kupon[];
   typy_wyniki: TypyWyniki;
+  odds_superbet: OddsSuperbet;
 };
 
 const LOCAL: Bundle = {
@@ -44,6 +47,7 @@ const LOCAL: Bundle = {
   meta: metaLocal as unknown as Meta,
   kupony: kuponyLocal as unknown as Kupon[],
   typy_wyniki: typyWynikiLocal as unknown as TypyWyniki,
+  odds_superbet: oddsSuperbetLocal as unknown as OddsSuperbet,
 };
 
 const SUPABASE_URL = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -91,6 +95,7 @@ async function loadBundle(): Promise<Bundle> {
       meta: (map.meta ?? LOCAL.meta) as Meta,
       kupony: (map.kupony ?? LOCAL.kupony) as Kupon[],
       typy_wyniki: (map.typy_wyniki ?? LOCAL.typy_wyniki) as TypyWyniki,
+      odds_superbet: (map.odds_superbet ?? LOCAL.odds_superbet) as OddsSuperbet,
     });
   } catch {
     return tylkoNadchodzace(LOCAL);
@@ -131,4 +136,8 @@ export async function getKupony(): Promise<Kupon[]> {
 
 export async function getTypyWyniki(): Promise<TypyWyniki> {
   return (await loadBundle()).typy_wyniki;
+}
+
+export async function getOddsSuperbet(): Promise<OddsSuperbet> {
+  return (await loadBundle()).odds_superbet;
 }

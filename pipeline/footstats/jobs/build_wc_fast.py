@@ -817,6 +817,10 @@ def main():
     ev_by_id = {e["id"]: e for e in events}
     sb_cache: dict[int, dict] = {}
     tempo_cache: dict[int, dict | None] = {}  # mid -> tempo z kursów 1X2/goli
+    # pełna siatka kursów Superbet (over) do widoku TOP POKRYCIA na stronie
+    # meczu: mecz_id -> player_id -> rynek -> "linia" -> kurs. Zbierana z tej
+    # samej siatki co scoring (merged), tylko zapisywana na dysk (JSON).
+    odds_grid: dict[int, dict[int, dict[str, dict[str, float]]]] = {}
 
     # przewidywane XI z Rotowire (drugie źródło, działa z chmury)
     try:
@@ -1052,6 +1056,17 @@ def main():
                 odd = v.get(side)
                 if odd and (side not in slot or odd > slot[side][0]):
                     slot[side] = (odd, "Superbet")
+
+        # siatka kursów Superbet (over) do TOP POKRYCIA — wszystkie linie danego
+        # zawodnika/rynku, keyed po player_id (players.json nie ma mecz_id)
+        over_linie = {
+            str(l): round(slot["over"][0], 2)
+            for l, slot in merged.items() if slot.get("over")
+        }
+        if over_linie:
+            odds_grid.setdefault(mid, {}).setdefault(tr.player_id, {})[mk] = (
+                over_linie
+            )
 
         # zapisz formę zawodnika (dla UI)
         if tr.player_id not in players_out:
@@ -1422,6 +1437,7 @@ def main():
     _dump("value_bets.json", value_bets)
     _dump("matches.json", list(matches_out.values()))
     _dump("players.json", list(players_out.values()))
+    _dump("odds_superbet.json", odds_grid)   # siatka kursów do TOP POKRYCIA
     n_dzis = len({b["mecz_id"] for b in legi_pool
                   if b["kickoff_ts"] <= time.time() + kupony.OKNO_DZIS_S})
     print(f"Pula kuponów: {len(legi_pool)} legów, meczów w oknie dziennym: {n_dzis}")

@@ -52,7 +52,7 @@ export default async function MeczePage() {
       <PageHeader
         eyebrow="terminarz skanu"
         title="Mecze w analizie"
-        lead="Każdy mecz przeskanowany przez model — kliknij, żeby zobaczyć wszystkie okazje i sugestie z tego spotkania."
+        lead="Każdy mecz przeskanowany przez model — kliknij, żeby wejść na stronę meczu z TOP POKRYCIA (zawodnicy z najlepszym pokryciem linii) i okazjami."
       />
 
       <div className="mt-7 grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
@@ -64,7 +64,7 @@ export default async function MeczePage() {
           return (
             <Reveal key={m.id} delay={Math.min(i * 0.05, 0.3)}>
               <Link
-                href={`/?mecz=${m.id}`}
+                href={`/mecze/${m.id}`}
                 className="group flex h-full flex-col rounded-2xl border border-hairline bg-card p-5 shadow-(--shadow-card) transition-all hover:-translate-y-1 hover:border-brand/30 hover:shadow-(--shadow-card-hover)"
               >
                 <div className="flex items-center justify-between gap-2">

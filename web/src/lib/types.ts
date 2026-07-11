@@ -294,6 +294,16 @@ export interface TypyWyniki {
   kupony_wygrane?: KuponHistoria[];
 }
 
+/**
+ * Siatka kursów Superbet (strona „powyżej") do widoku TOP POKRYCIA:
+ * mecz_id → player_id → rynek_kod → "linia" (np. "0.5") → kurs.
+ * Klucze to stringi (JSON), bo mecz_id/player_id/linia serializują się jako tekst.
+ */
+export type OddsSuperbet = Record<
+  string,
+  Record<string, Record<string, Record<string, number>>>
+>;
+
 /** Zakład zapisany w trackerze (localStorage). */
 export interface MojZaklad {
   id: string;
