@@ -107,6 +107,8 @@ export interface Zawodnik {
   druzyna: string;
   minuty_lacznie: number;
   forma: Record<string, FormaRynku>;
+  /** true = w przewidywanym/potwierdzonym pierwszym składzie (na górę TOP POKRYCIA) */
+  xi?: boolean;
 }
 
 export interface KubelekKalibracji {

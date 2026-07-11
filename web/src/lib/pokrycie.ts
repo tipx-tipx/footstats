@@ -59,6 +59,8 @@ export interface WierszPokrycia {
   player_id: number;
   zawodnik: string;
   druzyna: string;
+  /** true = w przewidywanym pierwszym składzie (sortowany na górę) */
+  xi: boolean;
   rynek_kod: string;
   rynek: string;
   linia: number;
@@ -112,6 +114,7 @@ export function topPokrycia(
           player_id: z.id,
           zawodnik: z.nazwa,
           druzyna: z.druzyna,
+          xi: z.xi === true,
           rynek_kod: kod,
           rynek: RYNEK_LABEL[kod] ?? kod,
           linia,
@@ -127,6 +130,8 @@ export function topPokrycia(
 
   rows.sort(
     (a, b) =>
+      // przewidywany skład na górę, potem najlepsze pokrycie / linia / kurs
+      Number(b.xi) - Number(a.xi) ||
       b.pokryte - a.pokryte ||
       b.linia - a.linia ||
       (b.kurs ?? 0) - (a.kurs ?? 0),

@@ -1074,7 +1074,11 @@ def main():
                 "id": tr.player_id, "nazwa": tr.player_name,
                 "pozycja": tr.position or "?", "druzyna": tr.team_name,
                 "minuty_lacznie": int(sum(tr.minutes)), "forma": {},
+                # w przewidywanym/potwierdzonym pierwszym składzie (na górę TOP POKRYCIA)
+                "xi": bool(tr.in_predicted_lineup),
             }
+        elif tr.in_predicted_lineup:
+            players_out[tr.player_id]["xi"] = True
         nt_zbior = nt_ts.get(tr.team_name, set())
         players_out[tr.player_id]["forma"][mk] = {
             "ostatnie": [int(c) for c in tr.counts[:10]],
