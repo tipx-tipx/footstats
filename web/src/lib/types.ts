@@ -264,6 +264,8 @@ export interface SkutecznoscDnia {
   okazje: number;
   /** ROI flat: stawka 1 j. na okazję (zwrot − postawione) */
   roi_flat: number;
+  /** realne typy tego dnia (co siadło / nie siadło) — trafione na górze */
+  typy?: TypRozliczony[];
 }
 
 /** Skuteczność realnych typów (log rozliczany automatycznie po meczach). */
@@ -279,14 +281,6 @@ export interface TypyWyniki {
     clv_n?: number;
   } | null;
   po_rynku: RynekSkutecznosc[];
-  /** strzały niecelne/zablokowane — liczone CAŁKOWICIE OSOBNO (poza zbiorczą skutecznością) */
-  podsumowanie_osobne?: {
-    rozliczone: number;
-    trafione: number;
-    roi_flat: number;
-    okazje_rozliczone: number;
-  } | null;
-  po_rynku_osobne?: RynekSkutecznosc[];
   ostatnie: TypRozliczony[];
   /** skuteczność dzień po dniu (do przełącznika); najnowszy dzień pierwszy */
   skutecznosc_dzienna?: SkutecznoscDnia[];

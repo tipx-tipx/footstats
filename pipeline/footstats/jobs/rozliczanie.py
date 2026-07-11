@@ -782,19 +782,32 @@ def _rozlicz_kupony(log_kuponow: dict, typy_log: dict, now: int) -> list[dict]:
     )[:40]
 
 
+def _typ_dnia(r: dict) -> dict:
+    """Odchudzony typ do listy dziennej (co siadło danego dnia)."""
+    return {
+        "mecz": r.get("mecz"), "kickoff_ts": r.get("kickoff_ts"),
+        "podmiot": r.get("podmiot"), "rynek_kod": r.get("rynek_kod"),
+        "rynek": r.get("rynek"), "linia": r.get("linia"),
+        "strona": r.get("strona"), "kurs": r.get("kurs"),
+        "p_model": r.get("p_model"), "wynik": r.get("wynik"),
+        "faktyczna": r.get("faktyczna"), "clv_pct": r.get("clv_pct"),
+    }
+
+
 def skutecznosc_per_dzien(settled: list[dict], dni: int = 21) -> list[dict]:
     """Skuteczność realnych typów pogrupowana po DNIU meczu (kickoff).
 
     Zwraca ostatnie `dni` dni (od najnowszego): trafienia, ROI flat (stawka
-    1 j./okazję) i liczbę okazji. Zasila przełącznik dnia na Skuteczności.
-    ROZLICZONE typy tylko — `settled` powinno być już bez rynków osobnych.
+    1 j./okazję), liczbę okazji ORAZ listę typów tego dnia (`typy` — realne
+    typy, które siadły/nie siadły), żeby dzień można było rozwinąć. ROZLICZONE
+    typy tylko — `settled` powinno być już bez rynków osobnych.
     """
     dzienne: dict[str, dict] = {}
     for r in settled:
         d = time.strftime("%Y-%m-%d", time.localtime(r.get("kickoff_ts") or 0))
         agg = dzienne.setdefault(d, {
             "dzien": d, "rozliczone": 0, "trafione": 0,
-            "okazje": 0, "_zwrot_j": 0.0,
+            "okazje": 0, "_zwrot_j": 0.0, "typy": [],
         })
         agg["rozliczone"] += 1
         if r.get("wynik") == "wygrany":
@@ -802,10 +815,15 @@ def skutecznosc_per_dzien(settled: list[dict], dni: int = 21) -> list[dict]:
         if not r.get("sugestia") and r.get("kurs"):
             agg["okazje"] += 1
             agg["_zwrot_j"] += r["kurs"] if r.get("wynik") == "wygrany" else 0.0
+        agg["typy"].append(_typ_dnia(r))
     out = []
     for d in sorted(dzienne, reverse=True)[:dni]:
         agg = dzienne[d]
         agg["roi_flat"] = round(agg.pop("_zwrot_j") - agg["okazje"], 2)
+        # trafione na górze, potem reszta; w obrębie grupy po nazwie
+        agg["typy"].sort(
+            key=lambda t: (t.get("wynik") != "wygrany", str(t.get("podmiot")))
+        )
         out.append(agg)
     return out
 
@@ -1055,13 +1073,13 @@ def rozlicz(
     supa.put_key("kupony_log", log_kuponow)
 
     # ---- podsumowanie do UI ----
-    # strzały niecelne/zablokowane (RYNKI_OSOBNE) liczymy CAŁKOWICIE OSOBNO —
-    # nie wchodzą do zbiorczych trafień/ROI ani do tabeli per rynek
-    settled_all = [
-        r for r in log.values() if r.get("wynik") in ("wygrany", "przegrany")
+    # strzały niecelne/zablokowane (RYNKI_OSOBNE) NIE wchodzą do skuteczności
+    # ani ROI — uczą się w tle (typy_log/kalibracja), ale nie są pokazywane
+    settled = [
+        r for r in log.values()
+        if r.get("wynik") in ("wygrany", "przegrany")
+        and r.get("rynek_kod") not in RYNKI_OSOBNE
     ]
-    settled = [r for r in settled_all if r.get("rynek_kod") not in RYNKI_OSOBNE]
-    settled_osobne = [r for r in settled_all if r.get("rynek_kod") in RYNKI_OSOBNE]
     okazje = [r for r in settled if not r["sugestia"] and r.get("kurs")]
     roi = sum(
         (r["kurs"] - 1.0) if r["wynik"] == "wygrany" else -1.0 for r in okazje
@@ -1085,23 +1103,9 @@ def rozlicz(
         return out
 
     po_rynku = _po_rynku(settled)
-    # OSOBNY blok skuteczności dla niecelnych/zablokowanych
-    okazje_osobne = [
-        r for r in settled_osobne if not r["sugestia"] and r.get("kurs")
-    ]
-    podsumowanie_osobne = ({
-        "rozliczone": len(settled_osobne),
-        "trafione": sum(1 for r in settled_osobne if r["wynik"] == "wygrany"),
-        "roi_flat": round(sum(
-            (r["kurs"] - 1.0) if r["wynik"] == "wygrany" else -1.0
-            for r in okazje_osobne
-        ), 2),
-        "okazje_rozliczone": len(okazje_osobne),
-    } if settled_osobne else None)
-    po_rynku_osobne = _po_rynku(settled_osobne)
 
-    # skuteczność DZIEŃ PO DNIU (realne typy, bez rynków osobnych) — zasila
-    # przełącznik dnia na Skuteczności
+    # skuteczność DZIEŃ PO DNIU (realne typy, bez rynków osobnych) — z listą
+    # typów danego dnia (co siadło); zasila przełącznik dnia na Skuteczności
     skutecznosc_dzienna = skutecznosc_per_dzien(settled)
 
     ostatnie = sorted(
@@ -1144,9 +1148,6 @@ def rozlicz(
             "clv_n": len(z_clv),
         },
         "po_rynku": po_rynku,
-        # strzały niecelne/zablokowane — osobny blok (poza zbiorczą skutecznością)
-        "podsumowanie_osobne": podsumowanie_osobne,
-        "po_rynku_osobne": po_rynku_osobne,
         "ostatnie": ostatnie,
         # skuteczność dzień po dniu (realne typy) — do przełącznika w UI
         "skutecznosc_dzienna": skutecznosc_dzienna,

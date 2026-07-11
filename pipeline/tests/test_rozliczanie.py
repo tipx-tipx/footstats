@@ -385,8 +385,10 @@ def test_skutecznosc_per_dzien_grupuje_i_liczy_roi():
     A = 100_000            # ~1970-01-02, dowolna doba
     B = A + 86_400         # kolejny dzień
     settled = [
-        {"kickoff_ts": A, "wynik": "wygrany", "kurs": 2.0, "sugestia": False},
-        {"kickoff_ts": A, "wynik": "przegrany", "kurs": 2.0, "sugestia": False},
+        {"kickoff_ts": A, "wynik": "wygrany", "kurs": 2.0, "sugestia": False,
+         "podmiot": "B"},
+        {"kickoff_ts": A, "wynik": "przegrany", "kurs": 2.0, "sugestia": False,
+         "podmiot": "A"},
         {"kickoff_ts": B, "wynik": "wygrany", "kurs": 3.0, "sugestia": False},
         # sugestia (bez zakładu) — liczy się do rozliczonych, ale NIE do ROI
         {"kickoff_ts": B, "wynik": "wygrany", "kurs": 9.0, "sugestia": True},
@@ -404,6 +406,10 @@ def test_skutecznosc_per_dzien_grupuje_i_liczy_roi():
     assert by[db]["rozliczone"] == 2 and by[db]["trafione"] == 2
     assert by[db]["okazje"] == 1 and by[db]["roi_flat"] == 2.0   # 3.0 - 1 j.
     assert "_zwrot_j" not in by[da]           # pole robocze usunięte
+    # lista typów dnia (co siadło): trafiony na górze, komplet wpisów
+    assert len(by[da]["typy"]) == 2
+    assert by[da]["typy"][0]["wynik"] == "wygrany"   # trafione przed przegranymi
+    assert len(by[db]["typy"]) == 2                  # sugestia też jest na liście
 
 
 def test_skutecznosc_per_dzien_limit_dni():

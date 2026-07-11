@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
+import { fmtLinia, STRONA_LABEL } from "@/lib/format";
 import type { SkutecznoscDnia } from "@/lib/types";
 
 /** "2026-07-10" -> "czw, 10 lip" (bez skoków stref: południe lokalne). */
@@ -16,21 +17,23 @@ function etykietaDnia(dzien: string, dlugo = false): string {
 
 /**
  * Skuteczność realnych typów DZIEŃ PO DNIU z przełącznikiem: strzałki
- * wcześniej/później + pasek klikalnych dni. `dni` przychodzi posortowane
- * malejąco (najnowszy pierwszy).
+ * wcześniej/później + pasek klikalnych dni, a pod spodem LISTA typów tego dnia
+ * (co siadło / nie siadło). `dni` przychodzi posortowane malejąco (najnowszy
+ * pierwszy).
  */
 export function SkutecznoscDzienna({ dni }: { dni: SkutecznoscDnia[] }) {
   const [i, setI] = useState(0);
   const dzien = dni[i];
 
-  // pasek dni: pokazujemy do 14 najświeższych, najstarszy z lewej
-  const pasek = useMemo(() => dni.slice(0, 14).slice().reverse(), [dni]);
+  // pasek dni: do 14 najświeższych, najstarszy z lewej
+  const pasek = dni.slice(0, 14).slice().reverse();
 
   if (!dzien) return null;
 
   const proc = dzien.rozliczone
     ? Math.round((dzien.trafione / dzien.rozliczone) * 100)
     : 0;
+  const typy = dzien.typy ?? [];
 
   return (
     <div className="mt-4 max-w-3xl rounded-2xl border border-hairline bg-card p-4 shadow-(--shadow-card)">
@@ -61,42 +64,6 @@ export function SkutecznoscDzienna({ dni }: { dni: SkutecznoscDnia[] }) {
           później →
         </button>
       </div>
-
-      {/* kafelki dnia */}
-      <dl className="mt-4 grid grid-cols-3 gap-2.5">
-        <div className="rounded-xl border border-hairline bg-paper px-3.5 py-3">
-          <dd className="font-data text-xl font-semibold">
-            {dzien.trafione}/{dzien.rozliczone}
-            <span className="ml-1 text-sm font-normal text-muted">({proc}%)</span>
-          </dd>
-          <dt className="mt-0.5 text-[11px] leading-tight text-faint">
-            trafionych
-          </dt>
-        </div>
-        <div className="rounded-xl border border-hairline bg-paper px-3.5 py-3">
-          <dd
-            className={`font-data text-xl font-semibold ${
-              dzien.roi_flat > 0
-                ? "text-data-green"
-                : dzien.roi_flat < 0
-                  ? "text-data-red"
-                  : ""
-            }`}
-          >
-            {dzien.roi_flat >= 0 ? "+" : ""}
-            {dzien.roi_flat.toFixed(2).replace(".", ",")} j.
-          </dd>
-          <dt className="mt-0.5 text-[11px] leading-tight text-faint">
-            ROI (stawka 1 j./okazję)
-          </dt>
-        </div>
-        <div className="rounded-xl border border-hairline bg-paper px-3.5 py-3">
-          <dd className="font-data text-xl font-semibold">{dzien.okazje}</dd>
-          <dt className="mt-0.5 text-[11px] leading-tight text-faint">
-            okazji z kursem
-          </dt>
-        </div>
-      </dl>
 
       {/* pasek klikalnych dni */}
       {pasek.length > 1 && (
@@ -137,6 +104,109 @@ export function SkutecznoscDzienna({ dni }: { dni: SkutecznoscDnia[] }) {
             );
           })}
         </div>
+      )}
+
+      {/* kafelki dnia */}
+      <dl className="mt-4 grid grid-cols-3 gap-2.5">
+        <div className="rounded-xl border border-hairline bg-paper px-3.5 py-3">
+          <dd className="font-data text-xl font-semibold">
+            {dzien.trafione}/{dzien.rozliczone}
+            <span className="ml-1 text-sm font-normal text-muted">({proc}%)</span>
+          </dd>
+          <dt className="mt-0.5 text-[11px] leading-tight text-faint">
+            trafionych
+          </dt>
+        </div>
+        <div className="rounded-xl border border-hairline bg-paper px-3.5 py-3">
+          <dd
+            className={`font-data text-xl font-semibold ${
+              dzien.roi_flat > 0
+                ? "text-data-green"
+                : dzien.roi_flat < 0
+                  ? "text-data-red"
+                  : ""
+            }`}
+          >
+            {dzien.roi_flat >= 0 ? "+" : ""}
+            {dzien.roi_flat.toFixed(2).replace(".", ",")} j.
+          </dd>
+          <dt className="mt-0.5 text-[11px] leading-tight text-faint">
+            ROI (stawka 1 j./okazję)
+          </dt>
+        </div>
+        <div className="rounded-xl border border-hairline bg-paper px-3.5 py-3">
+          <dd className="font-data text-xl font-semibold">{dzien.okazje}</dd>
+          <dt className="mt-0.5 text-[11px] leading-tight text-faint">
+            okazji z kursem
+          </dt>
+        </div>
+      </dl>
+
+      {/* co siadło tego dnia — realne typy (trafione na górze) */}
+      {typy.length > 0 ? (
+        <ul className="mt-4 space-y-1.5">
+          {typy.map((t, ti) => (
+            <li
+              key={`${t.podmiot}-${t.rynek_kod}-${t.linia}-${ti}`}
+              className="flex items-center gap-3 rounded-lg border border-hairline bg-paper px-3 py-2 text-sm"
+            >
+              <span
+                aria-hidden
+                className={`h-2 w-2 shrink-0 rounded-full ${
+                  t.wynik === "wygrany"
+                    ? "bg-data-green"
+                    : t.wynik === "przegrany"
+                      ? "bg-data-red"
+                      : "bg-data-amber"
+                }`}
+              />
+              <span className="min-w-0 flex-1 truncate">
+                <span className="font-medium">{t.podmiot}</span>{" "}
+                <span className="text-muted">
+                  {t.rynek.toLowerCase()} {STRONA_LABEL[t.strona]}{" "}
+                  {fmtLinia(t.linia)} · {t.mecz}
+                </span>
+              </span>
+              <span className="font-data shrink-0 text-xs text-muted">
+                było: {t.faktyczna != null ? t.faktyczna : "—"}
+              </span>
+              {t.clv_pct != null && (
+                <span
+                  className={`font-data hidden shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-semibold sm:inline-flex ${
+                    t.clv_pct > 0
+                      ? "bg-data-green-wash text-brand-deep"
+                      : t.clv_pct < 0
+                        ? "bg-data-red-wash text-data-red"
+                        : "bg-card text-muted"
+                  }`}
+                  title="Closing Line Value — kurs wzięty vs. zamknięcie rynku"
+                >
+                  CLV {t.clv_pct > 0 ? "+" : ""}
+                  {t.clv_pct.toFixed(0)}%
+                </span>
+              )}
+              <span
+                className={`shrink-0 text-xs font-semibold ${
+                  t.wynik === "wygrany"
+                    ? "text-data-green"
+                    : t.wynik === "przegrany"
+                      ? "text-data-red"
+                      : "text-[#8a5613]"
+                }`}
+              >
+                {t.wynik === "wygrany"
+                  ? "✓ siadło"
+                  : t.wynik === "przegrany"
+                    ? "✗ nie"
+                    : "zwrot"}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-4 rounded-lg border border-hairline bg-paper px-3.5 py-3 text-sm text-muted">
+          Brak rozliczonych typów tego dnia.
+        </p>
       )}
     </div>
   );
