@@ -27,7 +27,6 @@ export async function generateMetadata({
 }
 
 function kiedy(ts: number): string {
-  const d = new Date(ts * 1000);
   return new Intl.DateTimeFormat("pl-PL", {
     weekday: "long",
     day: "numeric",
@@ -35,7 +34,7 @@ function kiedy(ts: number): string {
     hour: "2-digit",
     minute: "2-digit",
     timeZone: "Europe/Warsaw",
-  }).format(d);
+  }).format(new Date(ts * 1000));
 }
 
 export default async function MeczPage({
@@ -58,9 +57,7 @@ export default async function MeczPage({
   // zawodnicy tego meczu = grający w jednej z dwóch drużyn (mapowanie po nazwie)
   const druzyny = new Set([mecz.gospodarz, mecz.gosc]);
   const gracze = zawodnicy.filter((z) => druzyny.has(z.druzyna));
-  const wszystkie = topPokrycia(gracze, meczId, odds);
-  const LIMIT = 40;
-  const wiersze = wszystkie.slice(0, LIMIT);
+  const wiersze = topPokrycia(gracze, meczId, odds);
   const okazje = bets.filter((b) => b.mecz_id === meczId && !b.sugestia).length;
 
   return (
@@ -70,40 +67,60 @@ export default async function MeczPage({
           href="/mecze"
           className="inline-flex items-center gap-1.5 text-sm text-muted transition-colors hover:text-ink"
         >
-          <span aria-hidden>←</span> Mecze
+          <span aria-hidden>←</span> Wszystkie mecze
         </Link>
 
-        <div className="mt-4 rounded-2xl border border-hairline bg-card p-5 shadow-(--shadow-card) sm:p-6">
-          <p className="text-xs font-medium uppercase tracking-widest text-faint">
-            {kiedy(mecz.kickoff_ts)}
-          </p>
-          <h1 className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-2xl font-bold sm:text-3xl">
-            {mecz.gospodarz}
-            <span className="text-base font-medium uppercase tracking-widest text-faint">
-              vs
-            </span>
-            {mecz.gosc}
-          </h1>
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-            {okazje > 0 && (
-              <Link
-                href={`/?mecz=${mecz.id}`}
-                className="inline-flex items-center gap-1 rounded-full bg-brand-wash px-2.5 py-1 font-medium text-brand-deep transition-colors hover:bg-brand-wash/70"
-              >
-                {okazje === 1 ? "1 okazja modelu" : `${okazje} okazji modelu`} →
-              </Link>
-            )}
+        {/* nagłówek meczu */}
+        <div className="mt-4 rounded-2xl border border-hairline bg-card px-5 py-5 shadow-(--shadow-card) sm:px-8 sm:py-7">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs font-medium uppercase tracking-widest text-faint">
+              {kiedy(mecz.kickoff_ts)}
+            </p>
             {mecz.sklady_ogloszone ? (
-              <span className="inline-flex items-center rounded-full bg-data-green-wash px-2.5 py-1 font-medium text-brand-deep">
+              <span className="inline-flex items-center rounded-full bg-data-green-wash px-2.5 py-1 text-[11px] font-medium text-brand-deep">
                 ✓ składy ogłoszone
               </span>
             ) : (
-              <span className="inline-flex items-center rounded-full bg-paper px-2.5 py-1 text-faint">
+              <span className="inline-flex items-center rounded-full bg-paper px-2.5 py-1 text-[11px] text-faint">
                 składy ~1 h przed
               </span>
             )}
+          </div>
+
+          <div className="mt-5 grid grid-cols-[1fr_auto_1fr] items-center gap-3 sm:gap-8">
+            <div className="text-right">
+              <p className="text-xl font-bold leading-tight sm:text-3xl">
+                {mecz.gospodarz}
+              </p>
+              <p className="mt-1 text-[10px] uppercase tracking-widest text-faint">
+                gospodarz
+              </p>
+            </div>
+            <span className="font-data flex h-9 w-9 items-center justify-center rounded-full bg-paper text-xs font-semibold text-muted sm:h-11 sm:w-11 sm:text-sm">
+              vs
+            </span>
+            <div>
+              <p className="text-xl font-bold leading-tight sm:text-3xl">
+                {mecz.gosc}
+              </p>
+              <p className="mt-1 text-[10px] uppercase tracking-widest text-faint">
+                gość
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-2 border-t border-hairline pt-4 text-xs">
+            {okazje > 0 && (
+              <Link
+                href={`/?mecz=${mecz.id}`}
+                className="inline-flex items-center gap-1 rounded-full bg-brand-wash px-3 py-1.5 font-medium text-brand-deep transition-colors hover:bg-brand-wash/70"
+              >
+                {okazje === 1 ? "1 okazja modelu" : `${okazje} okazji modelu`}{" "}
+                <span aria-hidden>→</span>
+              </Link>
+            )}
             {mecz.sedzia && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-paper px-2.5 py-1 text-muted">
+              <span className="inline-flex items-center gap-1 rounded-full bg-paper px-3 py-1.5 text-muted">
                 Sędzia: {mecz.sedzia}
                 {Math.abs(mecz.sedzia_mnoznik_fauli - 1) > 0.05 && (
                   <span
@@ -124,23 +141,21 @@ export default async function MeczPage({
       </Reveal>
 
       <Reveal className="mt-8">
-        <h2 className="flex items-center gap-2 text-lg font-semibold">
-          <span aria-hidden>✅</span> TOP POKRYCIA
-        </h2>
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 className="flex items-center gap-2 text-lg font-semibold">
+            <span aria-hidden>✅</span> TOP POKRYCIA
+          </h2>
+        </div>
         <p className="mt-1 max-w-3xl text-sm text-muted">
-          Zawodnicy z najlepszym pokryciem historycznym (≥ 60%) — ile z{" "}
-          <strong>ostatnich 5 rozegranych</strong> meczów pokryło linię 1+, 2+
-          lub 3+. Zielony boks = mecz pokrył linię, czerwony = nie. Kursy:
-          Superbet (kolejne buki wkrótce).
-          {wszystkie.length > LIMIT && (
-            <>
-              {" "}
-              Pokazujemy <strong>top {LIMIT}</strong> z {wszystkie.length}{" "}
-              propozycji.
-            </>
-          )}
+          Zawodnicy z najlepszym pokryciem w <strong>ostatnich 5 rozegranych</strong>{" "}
+          meczach — ile z nich pokryło linię 1+, 2+ lub 3+ (próg 60%). Boks{" "}
+          <strong>pełnym kolorem</strong> to mecz reprezentacji, przygaszony to
+          klub — na mecz kadry patrz głównie na pełne kolory. Kursy: Superbet.
         </p>
-        <TopPokrycia wiersze={wiersze} />
+        <TopPokrycia
+          wiersze={wiersze}
+          druzyny={[mecz.gospodarz, mecz.gosc]}
+        />
       </Reveal>
     </div>
   );

@@ -4,7 +4,9 @@
  * Liczone z players.json → forma[rynek].ostatnie (surowe wartości statystyki
  * mecz po meczu, NAJNOWSZY PIERWSZY). Bierzemy ostatnie 5 ROZEGRANYCH meczów
  * (filtr DNP po minutach), sprawdzamy pokrycie linii +0.5/+1.5/+2.5 i zostawiamy
- * te z pokryciem ≥ 3/5 (60%). Kurs Superbet dołączamy z siatki odds_superbet.
+ * te z pokryciem ≥ 3/5 (60%). Do każdej gry dokładamy rywala i znacznik
+ * klub/kadra — na meczu reprezentacji strzały z ligi klubowej trzeba widzieć
+ * jako osobny kontekst. Kurs Superbet dołączamy z siatki odds_superbet.
  */
 
 import type { OddsSuperbet, Zawodnik } from "./types";
@@ -42,6 +44,15 @@ const LINIE = [0.5, 1.5, 2.5];
 const PROBKA = 5; // ostatnie 5 rozegranych
 const MIN_POKRYTE = 3; // ≥ 3/5 = 60%
 
+/** Jedna gra w próbce: wartość statystyki + kontekst (z kim, klub czy kadra). */
+export interface GraForma {
+  v: number;
+  /** rywal w tym meczu (może brakować) */
+  rywal: string | null;
+  /** true = mecz reprezentacji; false = klub */
+  kadra: boolean;
+}
+
 export interface WierszPokrycia {
   player_id: number;
   zawodnik: string;
@@ -51,11 +62,13 @@ export interface WierszPokrycia {
   linia: number;
   /** próg pokrycia dla tej linii (0.5→1, 1.5→2, 2.5→3) */
   prog: number;
-  /** ostatnie N rozegranych (najnowszy pierwszy) — surowe wartości */
-  ostatnie: number[];
+  /** ostatnie N rozegranych (najnowszy pierwszy) z kontekstem */
+  ostatnie: GraForma[];
   /** ile z próbki pokryło linię */
   pokryte: number;
   probka: number;
+  /** ile z próbki to mecze reprezentacji (reszta = klub) */
+  kadraLiczba: number;
   /** kurs Superbet dla tej linii (strona „powyżej"), jeśli jest */
   kurs: number | null;
 }
@@ -77,15 +90,21 @@ export function topPokrycia(
     for (const kod of RYNKI_POKRYCIA) {
       const f = z.forma?.[kod];
       if (!f) continue;
-      // ostatnie 5 ROZEGRANYCH (minuty > 0), najnowszy pierwszy
-      const grane: number[] = [];
+      // ostatnie 5 ROZEGRANYCH (minuty > 0), najnowszy pierwszy, z kontekstem
+      const grane: GraForma[] = [];
       for (let i = 0; i < f.ostatnie.length && grane.length < PROBKA; i++) {
-        if ((f.minuty?.[i] ?? 0) > 0) grane.push(f.ostatnie[i]);
+        if ((f.minuty?.[i] ?? 0) > 0) {
+          grane.push({
+            v: f.ostatnie[i],
+            rywal: f.rywale?.[i] ?? null,
+            kadra: f.kadra?.[i] === true,
+          });
+        }
       }
       if (grane.length < PROBKA) continue; // za mało rozegranych meczów
       for (const linia of LINIE) {
         const prog = Math.ceil(linia); // 0.5→1, 1.5→2, 2.5→3
-        const pokryte = grane.filter((v) => v >= prog).length;
+        const pokryte = grane.filter((g) => g.v >= prog).length;
         if (pokryte < MIN_POKRYTE) continue;
         rows.push({
           player_id: z.id,
@@ -97,7 +116,8 @@ export function topPokrycia(
           prog,
           ostatnie: grane,
           pokryte,
-          probka: PROBKA,
+          probka: grane.length,
+          kadraLiczba: grane.filter((g) => g.kadra).length,
           kurs: oddsGracz[kod]?.[String(linia)] ?? null,
         });
       }
