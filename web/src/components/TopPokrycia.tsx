@@ -7,24 +7,18 @@ import { RYNEK_LABEL, type WierszPokrycia } from "@/lib/pokrycie";
 
 const LIMIT = 50;
 
-/** Boks jednej gry: wartość + kontekst (kadra pełny kolor, klub przygaszony). */
+/** Boks jednej gry: wartość + tooltip z rywalem, minutami i typem meczu. */
 function Boks({ g, prog }: { g: WierszPokrycia["ostatnie"][number]; prog: number }) {
   const pokryl = g.v >= prog;
-  const tytul = `${g.rywal ?? "—"} · ${g.kadra ? "kadra" : "klub"}${
-    pokryl ? " · pokrył" : " · nie pokrył"
-  }`;
-  // kadra = pełny kolor (liczy się dla reprezentacji); klub = przygaszony
-  const styl = g.kadra
-    ? pokryl
-      ? "bg-data-green text-white"
-      : "bg-data-red text-white"
-    : pokryl
-      ? "border border-data-green/40 bg-data-green-wash text-brand-deep"
-      : "border border-data-red/30 bg-data-red-wash text-data-red";
+  const tytul = `${g.rywal ?? "mecz"} · ${g.minuty}′ · ${
+    g.kadra ? "kadra" : "klub"
+  } · ${pokryl ? "pokrył" : "nie pokrył"}`;
   return (
     <span
       title={tytul}
-      className={`font-data inline-flex h-6 w-6 items-center justify-center rounded text-[11px] font-semibold ${styl}`}
+      className={`font-data inline-flex h-6 w-6 items-center justify-center rounded text-[11px] font-semibold text-white ${
+        pokryl ? "bg-data-green" : "bg-data-red"
+      }`}
     >
       {g.v}
     </span>
@@ -97,17 +91,15 @@ export function TopPokrycia({
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted">
         <span className="flex items-center gap-1.5">
           <span className="inline-block h-3.5 w-3.5 rounded bg-data-green" />
-          <span className="inline-block h-3.5 w-3.5 rounded border border-data-green/40 bg-data-green-wash" />
           pokrył linię
         </span>
         <span className="flex items-center gap-1.5">
           <span className="inline-block h-3.5 w-3.5 rounded bg-data-red" />
-          <span className="inline-block h-3.5 w-3.5 rounded border border-data-red/30 bg-data-red-wash" />
           nie pokrył
         </span>
         <span className="text-faint">
-          pełny kolor = mecz kadry · przygaszony = klub (najedź, by zobaczyć
-          rywala)
+          tylko mecze zaczynane w składzie (≥ 60 min) · najedź na boks, by
+          zobaczyć rywala i minuty
         </span>
       </div>
 
@@ -176,14 +168,6 @@ export function TopPokrycia({
                 <td className="px-4 py-3">
                   <span className="font-medium">{w.zawodnik}</span>
                   <span className="ml-1.5 text-xs text-faint">{w.druzyna}</span>
-                  {w.kadraLiczba <= 1 && (
-                    <span
-                      className="ml-2 inline-flex rounded bg-data-amber-wash px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[#8a5613]"
-                      title="Pokrycie oparte głównie na meczach klubowych — na reprezentację traktuj ostrożnie"
-                    >
-                      gł. klub
-                    </span>
-                  )}
                 </td>
                 <td className="px-4 py-3">
                   <span className="flex gap-1">

@@ -147,10 +147,11 @@ export default async function MeczPage({
           </h2>
         </div>
         <p className="mt-1 max-w-3xl text-sm text-muted">
-          Zawodnicy z najlepszym pokryciem w <strong>ostatnich 5 rozegranych</strong>{" "}
-          meczach — ile z nich pokryło linię 1+, 2+ lub 3+ (próg 60%). Boks{" "}
-          <strong>pełnym kolorem</strong> to mecz reprezentacji, przygaszony to
-          klub — na mecz kadry patrz głównie na pełne kolory. Kursy: Superbet.
+          Zawodnicy z najlepszym pokryciem w{" "}
+          <strong>ostatnich 5 meczach, które zaczynali w składzie</strong>{" "}
+          (dowolne rozgrywki — klub lub kadra) — ile z nich pokryło linię 1+, 2+
+          lub 3+ (od 2/5). Najedź na boks, by zobaczyć rywala i minuty. Kursy:
+          Superbet.
         </p>
         <TopPokrycia
           wiersze={wiersze}
