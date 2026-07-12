@@ -124,6 +124,14 @@ export function TopPokrycia({
         <span className="text-faint">
           1+/2+/3+ = pokrycie linii · najedź na boks: rywal, minuty, data
         </span>
+        <span className="flex items-center gap-1.5">
+          <span className="font-data font-semibold text-data-green">+%</span>
+          <span>
+            wartość: ile płaci kurs względem pokrycia (zgrubnie, próba 5 —{" "}
+            <span className="text-data-green">zielony</span> = opłaca się,{" "}
+            <span className="text-faint">szary</span> = znikomo)
+          </span>
+        </span>
       </div>
 
       {/* filtry */}
@@ -183,7 +191,7 @@ export function TopPokrycia({
               <th className="px-4 py-2.5 font-medium">rynek</th>
               <th className="px-4 py-2.5 font-medium">zawodnik</th>
               <th className="px-4 py-2.5 font-medium">ostatnie 5 startów</th>
-              <th className="px-4 py-2.5 font-medium">pokrycie · kurs (Superbet)</th>
+              <th className="px-4 py-2.5 font-medium">pokrycie · kurs · wartość</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-hairline">
@@ -240,6 +248,21 @@ export function TopPokrycia({
                         {l.kurs != null && (
                           <span className="font-data text-muted">
                             @{fmtKurs(l.kurs)}
+                          </span>
+                        )}
+                        {l.evPct != null && (
+                          <span
+                            title="Zgrubny sygnał wartości: ile dałby ten zakład, gdyby surowe pokrycie było prawdziwą szansą (pokrycie × kurs − 1). To NIE jest przewaga silnika — próba tylko 5 startów, bez kalibracji i kontekstu. Odsiewa kursy typu „5/5 @1,01”."
+                            className={`font-data font-semibold ${
+                              l.evPct >= 8
+                                ? "text-data-green"
+                                : l.evPct < 0
+                                  ? "text-data-red"
+                                  : "text-faint"
+                            }`}
+                          >
+                            {l.evPct > 0 ? "+" : l.evPct < 0 ? "−" : "±"}
+                            {Math.abs(l.evPct)}%
                           </span>
                         )}
                       </span>

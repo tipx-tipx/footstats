@@ -43,6 +43,10 @@ export interface ValueBet {
   bukmacher: string;
   /** mediana kursów bukmacherów UK (Bet365, WH...) dla tej linii — konsensus rynku */
   kurs_ref?: number | null;
+  /** uczciwy kurs UK po zdjęciu marży (no-vig) — benchmark „prawdziwej" ceny */
+  kurs_novig?: number | null;
+  /** wartość kursu Superbetu względem no-vig UK, w % (dodatnia = miękka linia) */
+  ev_uk?: number | null;
   p_model: number;
   p_rynku: number | null;
   fair_kurs: number;

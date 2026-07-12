@@ -230,17 +230,24 @@ export const BetCard = memo(function BetCard({
             ) : (
               <EdgeBadge ev={bet.ev_pct} />
             )}
-            {!bet.sugestia &&
+            {!bet.sugestia && bet.ev_uk != null && bet.ev_uk >= 4 ? (
+              <span
+                className="hidden rounded-md bg-brand-wash px-1.5 py-0.5 text-[10px] font-semibold text-brand-deep sm:inline-flex"
+                title={`Uczciwa cena wg no-vig UK (mediana buków po zdjęciu marży) to ~${fmtKurs(bet.kurs_novig ?? 0)}. Superbet płaci +${bet.ev_uk.toFixed(1).replace(".", ",")}% wartości ponad ten benchmark — to sygnał miękkiej linii.`}
+              >
+                ↑ +{Math.round(bet.ev_uk)}% vs UK
+              </span>
+            ) : !bet.sugestia &&
               bet.kurs != null &&
               bet.kurs_ref != null &&
-              bet.kurs >= bet.kurs_ref * 1.12 && (
-                <span
-                  className="hidden rounded-md bg-brand-wash px-1.5 py-0.5 text-[10px] font-semibold text-brand-deep sm:inline-flex"
-                  title={`Bukmacherzy w UK płacą za to średnio ${fmtKurs(bet.kurs_ref)} — kurs Superbetu wyraźnie odstaje w górę`}
-                >
-                  ↑ odstaje od rynku
-                </span>
-              )}
+              bet.kurs >= bet.kurs_ref * 1.12 ? (
+              <span
+                className="hidden rounded-md bg-brand-wash px-1.5 py-0.5 text-[10px] font-semibold text-brand-deep sm:inline-flex"
+                title={`Bukmacherzy w UK płacą za to średnio ${fmtKurs(bet.kurs_ref)} — kurs Superbetu wyraźnie odstaje w górę`}
+              >
+                ↑ odstaje od rynku
+              </span>
+            ) : null}
             {bet.matchup && (
               <span
                 className="inline-flex rounded-md bg-brand-wash px-1.5 py-0.5 text-[10px] font-semibold text-brand-deep"
@@ -377,13 +384,35 @@ export const BetCard = memo(function BetCard({
                         <span className="font-data font-medium text-ink-soft">
                           {fmtKurs(bet.kurs_ref)}
                         </span>
-                        {bet.kurs != null && bet.kurs >= bet.kurs_ref * 1.12 && (
+                        {bet.kurs_novig != null && (
                           <>
                             {" "}
-                            — <strong>Superbet wyraźnie odstaje w górę</strong>, a
-                            kurs odstający od reszty rynku to często najlepszy
-                            sygnał wartości.
+                            (uczciwa cena po zdjęciu marży ~
+                            <span className="font-data font-medium text-ink-soft">
+                              {fmtKurs(bet.kurs_novig)}
+                            </span>
+                            )
                           </>
+                        )}
+                        {bet.ev_uk != null && bet.ev_uk >= 4 ? (
+                          <>
+                            {" "}
+                            — Superbet daje{" "}
+                            <strong className="font-data">
+                              +{bet.ev_uk.toFixed(1).replace(".", ",")}%
+                            </strong>{" "}
+                            wartości ponad ten no-vig benchmark, to sygnał miękkiej
+                            linii.
+                          </>
+                        ) : (
+                          bet.kurs != null &&
+                          bet.kurs_ref != null &&
+                          bet.kurs >= bet.kurs_ref * 1.12 && (
+                            <>
+                              {" "}
+                              — <strong>Superbet wyraźnie odstaje w górę</strong>.
+                            </>
+                          )
                         )}
                       </span>
                     )}

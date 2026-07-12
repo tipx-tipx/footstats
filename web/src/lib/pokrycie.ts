@@ -63,6 +63,14 @@ export interface LiniaPokrycie {
   prog: number;
   pokryte: number;
   kurs: number | null;
+  /**
+   * Zgrubny sygnał WARTOŚCI: ile dałby ten zakład, gdyby surowe pokrycie było
+   * prawdziwym prawdopodobieństwem — (pokryte/próba × kurs − 1) × 100%.
+   * NIE jest to EV silnika (brak kalibracji, minut, kontekstu, próba tylko 5) —
+   * to szybki filtr „czy kurs w ogóle opłaca to pokrycie" (odsiewa „5/5 @1,01”).
+   * null, gdy brak kursu Superbet.
+   */
+  evPct: number | null;
 }
 
 export interface WierszPokrycia {
@@ -87,6 +95,14 @@ export interface WierszPokrycia {
   maxPokryte: number;
   /** true = któraś linia ma kurs Superbet */
   maKurs: boolean;
+  /**
+   * Najlepszy sygnał wartości w wierszu do RANKINGU = max( evPct × pokryte/próba )
+   * po liniach z kursem. Ważenie pokryciem premiuje pewne trafienia nad loterią
+   * (2/5 @wysoki kurs nie przebija stabilnego 5/5). null, gdy żadna linia nie ma kursu.
+   */
+  maxRankEv: number | null;
+  /** najlepszy surowy evPct w wierszu (do wyświetlenia nagłówka), null bez kursu */
+  bestEv: number | null;
 }
 
 /**
@@ -203,16 +219,27 @@ export function topPokrycia(
         continue; // za mało startów
       }
 
-      const linie = LINIE.map((linia) => {
+      const n = probka.length;
+      const linie: LiniaPokrycie[] = LINIE.map((linia) => {
         const prog = Math.ceil(linia);
-        return {
-          linia,
-          prog,
-          pokryte: probka.filter((g) => g.v >= prog).length,
-          kurs: oddsGracz[kod]?.[String(linia)] ?? null,
-        };
+        const pokryte = probka.filter((g) => g.v >= prog).length;
+        const kurs = oddsGracz[kod]?.[String(linia)] ?? null;
+        const evPct =
+          kurs != null && n > 0
+            ? Math.round(((pokryte / n) * kurs - 1) * 100)
+            : null;
+        return { linia, prog, pokryte, kurs, evPct };
       }).filter((l) => l.pokryte >= MIN_POKRYTE);
       if (linie.length === 0) continue;
+
+      // wartość ważona pokryciem (do rankingu) i surowa najlepsza (do wyświetlenia)
+      const zKursem = linie.filter((l) => l.kurs != null && l.evPct != null);
+      const maxRankEv = zKursem.length
+        ? Math.max(...zKursem.map((l) => (l.evPct as number) * (l.pokryte / n)))
+        : null;
+      const bestEv = zKursem.length
+        ? Math.max(...zKursem.map((l) => l.evPct as number))
+        : null;
 
       rows.push({
         player_id: z.id,
@@ -228,13 +255,21 @@ export function topPokrycia(
         linie,
         maxPokryte: Math.max(...linie.map((l) => l.pokryte)),
         maKurs: linie.some((l) => l.kurs != null),
+        maxRankEv,
+        bestEv,
       });
     }
   }
 
   rows.sort(
     (a, b) =>
+      // 1) regularni w kadrze (realnie zagrają) zawsze na górze
       ranga(a) - ranga(b) ||
+      // 2) wiersze z kursem (dają się ocenić wartościowo) przed bez kursu
+      (b.maxRankEv != null ? 1 : 0) - (a.maxRankEv != null ? 1 : 0) ||
+      // 3) WARTOŚĆ ważona pokryciem — realna przewaga, nie samo pokrycie
+      (b.maxRankEv ?? -Infinity) - (a.maxRankEv ?? -Infinity) ||
+      // 4) dalej jak dotąd: pokrycie → linia → kurs
       b.maxPokryte - a.maxPokryte ||
       b.linie[0].linia - a.linie[0].linia ||
       (b.linie[0].kurs ?? 0) - (a.linie[0].kurs ?? 0),
