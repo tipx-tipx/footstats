@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { BetCard } from "./BetCard";
 import type { Pewnosc, ValueBet, Zawodnik } from "@/lib/types";
@@ -217,6 +217,21 @@ export function ValueBoard({
 
   const shown = filtered.slice(0, limit);
 
+  // Kotwica ze spotlightu Hero (link „…#bet-<id>”): po wejściu na stronę
+  // przewiń do wskazanej karty. Zakładkę ustawia initialRodzaj z ?rodzaj=,
+  // a key na ValueBoard (page.tsx) wymusza remont, więc karta jest już w DOM.
+  useEffect(() => {
+    const scrollToHash = () => {
+      const h = window.location.hash;
+      if (!/^#bet-\d+$/.test(h)) return;
+      const el = document.querySelector(h);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    };
+    scrollToHash();
+    window.addEventListener("hashchange", scrollToHash);
+    return () => window.removeEventListener("hashchange", scrollToHash);
+  }, []);
+
   return (
     <section aria-label="Lista okazji">
       {/* pasek narzędzi: rodzaj + filtry + sortowanie */}
@@ -360,6 +375,8 @@ export function ValueBoard({
         {shown.map((bet, i) => (
           <motion.div
             key={bet.id}
+            id={`bet-${bet.id}`}
+            className="scroll-mt-24"
             initial={reduced ? false : { opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: Math.min(i * 0.03, 0.4), duration: 0.3 }}

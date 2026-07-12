@@ -189,7 +189,13 @@ export function Hero({
         >
           {topBet ? (
             <Link
-              href={topBet.sugestia ? "/?rodzaj=sugestie" : "/"}
+              href={
+                topBet.sugestia
+                  ? `/?rodzaj=sugestie#bet-${topBet.id}`
+                  : topBet.pewniak
+                    ? `/?rodzaj=pewniaki#bet-${topBet.id}`
+                    : `/?rodzaj=okazje#bet-${topBet.id}`
+              }
               className="group block rounded-2xl border border-brand/25 bg-gradient-to-br from-brand-wash to-card p-6 shadow-(--shadow-card) transition-all hover:-translate-y-1 hover:shadow-(--shadow-card-hover)"
             >
               <p className="text-[11px] font-semibold uppercase tracking-widest text-brand">
