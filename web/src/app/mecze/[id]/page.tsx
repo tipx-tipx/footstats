@@ -1,10 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { GeneratorKuponu } from "@/components/GeneratorKuponu";
 import { Reveal } from "@/components/Reveal";
 import { TopPokrycia } from "@/components/TopPokrycia";
 import {
+  getLegiPool,
   getMecze,
+  getMeta,
   getOddsSuperbet,
   getValueBets,
   getZawodnicy,
@@ -44,15 +47,19 @@ export default async function MeczPage({
 }) {
   const { id } = await params;
   const meczId = Number(id);
-  const [mecze, zawodnicy, bets, odds] = await Promise.all([
+  const [mecze, zawodnicy, bets, odds, legiPool, meta] = await Promise.all([
     getMecze(),
     getZawodnicy(),
     getValueBets(),
     getOddsSuperbet(),
+    getLegiPool(),
+    getMeta(),
   ]);
 
   const mecz = mecze.find((m) => m.id === meczId);
   if (!mecz) notFound();
+
+  const legiMeczu = legiPool.filter((l) => l.mecz_id === meczId);
 
   // zawodnicy tego meczu = grający w jednej z dwóch drużyn (mapowanie po nazwie)
   const druzyny = new Set([mecz.gospodarz, mecz.gosc]);
@@ -139,6 +146,23 @@ export default async function MeczPage({
           </div>
         </div>
       </Reveal>
+
+      {legiMeczu.length > 0 && (
+        <Reveal className="mt-8">
+          <h2 className="flex items-center gap-2 text-lg font-semibold">
+            <span aria-hidden>🧩</span> Kupon na ten mecz
+          </h2>
+          <p className="mt-1 mb-3 max-w-3xl text-sm text-muted">
+            Złóż AKO z najlepszych legów tego meczu (do 4 wydarzeń) — ustaw kurs
+            docelowy i charakter. Ta sama pula i bezpieczniki co kupony automatyczne.
+          </p>
+          <GeneratorKuponu
+            pool={legiPool}
+            kary={meta.kary_korelacji}
+            meczId={meczId}
+          />
+        </Reveal>
+      )}
 
       <Reveal className="mt-8">
         <div className="flex items-baseline justify-between gap-3">

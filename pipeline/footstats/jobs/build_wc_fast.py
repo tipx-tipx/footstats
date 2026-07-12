@@ -1476,6 +1476,19 @@ def main():
     _dump("matches.json", list(matches_out.values()))
     _dump("players.json", list(players_out.values()))
     _dump("odds_superbet.json", odds_grid)   # siatka kursów do TOP POKRYCIA
+    # PULA LEGÓW pod generator kuponów NA ŻĄDANIE (frontend składa kupon w TS
+    # z tej samej, przeanalizowanej puli — te same legi co automatyczne kupony).
+    # Odchudzona o ciężkie pola (czynniki/uzasadnienie/rozkład) — zbędne do składania.
+    _POLA_LEGA = (
+        "mecz_id", "mecz", "kickoff_ts", "podmiot_id", "podmiot", "druzyna",
+        "przeciwnik", "rynek_kod", "rynek", "linia", "strona", "kurs", "bukmacher",
+        "p_model", "matchup", "rotacja", "miekka_linia", "swieze_sklady",
+        "ev_pct", "ev_uk", "kurs_oczekiwany", "ryzyko", "oczekiwane_minuty",
+    )
+    _dump("legi_pool.json", [
+        {**{k: b.get(k) for k in _POLA_LEGA}, "id": i}
+        for i, b in enumerate(legi_pool)
+    ])
     n_dzis = len({b["mecz_id"] for b in legi_pool
                   if b["kickoff_ts"] <= time.time() + kupony.OKNO_DZIS_S})
     print(f"Pula kuponów: {len(legi_pool)} legów, meczów w oknie dziennym: {n_dzis}")
@@ -1516,6 +1529,9 @@ def main():
         "zrodlo": "statshub (statystyki i historia) + Superbet (kursy)",
         "meczow_w_bazie": len(matches_out), "meczow_demo": len(matches_out),
         "meczow_kalibracja": 20, "okazji": len(value_bets),
+        # zmierzone kary korelacji — generator kuponów na żądanie (frontend)
+        # używa tych samych co automatyczne kupony w tym cyklu
+        "kary_korelacji": kary_kor,
     })
     print(f"OK: {len(matches_out)} meczów, {len(value_bets)} okazji, "
           f"{len(players_out)} zawodników.")

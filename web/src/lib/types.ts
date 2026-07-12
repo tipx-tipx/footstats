@@ -79,6 +79,34 @@ export interface ValueBet {
   kurs_oczekiwany?: number | null;
 }
 
+/** Jeden leg z przeanalizowanej puli — fundament generatora kuponów na żądanie. */
+export interface LegPool {
+  id: number;
+  mecz_id: number;
+  mecz: string;
+  kickoff_ts: number;
+  podmiot_id: number;
+  podmiot: string;
+  druzyna: string;
+  przeciwnik: string;
+  rynek_kod: string;
+  rynek: string;
+  linia: number;
+  strona: Strona;
+  kurs: number;
+  bukmacher: string;
+  p_model: number;
+  matchup?: boolean;
+  rotacja?: boolean;
+  miekka_linia?: boolean;
+  swieze_sklady?: boolean;
+  ev_pct?: number | null;
+  ev_uk?: number | null;
+  kurs_oczekiwany?: number | null;
+  ryzyko?: Ryzyko;
+  oczekiwane_minuty?: number | null;
+}
+
 export interface Mecz {
   id: number;
   liga: string;
@@ -146,6 +174,8 @@ export interface Meta {
   meczow_demo: number;
   meczow_kalibracja: number;
   okazji: number;
+  /** zmierzone kary korelacji legów — generator na żądanie używa tych samych co backend */
+  kary_korelacji?: { ta_sama: number; przeciwne: number; nieznane: number };
 }
 
 /** Jeden typ (leg) na kuponie. */

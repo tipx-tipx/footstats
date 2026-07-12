@@ -1,3 +1,4 @@
+import { GeneratorKuponu } from "@/components/GeneratorKuponu";
 import { PageHeader } from "@/components/PageHeader";
 import {
   PominKupon,
@@ -5,7 +6,7 @@ import {
   ZastosujZamiane,
 } from "@/components/PominKupon";
 import { Reveal } from "@/components/Reveal";
-import { getKupony, getMeta } from "@/lib/data";
+import { getKupony, getLegiPool, getMeta } from "@/lib/data";
 import { fmtDataCzas, fmtKurs, fmtLinia, fmtProc, STRONA_LABEL } from "@/lib/format";
 import type { KuponLeg } from "@/lib/types";
 
@@ -66,7 +67,11 @@ const HORYZONTY: {
 ];
 
 export default async function KuponyPage() {
-  const [kupony, meta] = await Promise.all([getKupony(), getMeta()]);
+  const [kupony, meta, legiPool] = await Promise.all([
+    getKupony(),
+    getMeta(),
+    getLegiPool(),
+  ]);
 
   return (
     <div>
@@ -87,6 +92,28 @@ export default async function KuponyPage() {
         }
       />
       <ProfilKuponow />
+
+      {legiPool.length > 0 && (
+        <Reveal className="mt-6">
+          <details className="group rounded-(--radius-card) border border-hairline bg-paper/40">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-sm font-semibold">
+              <span>🧩 Zbuduj własny kupon</span>
+              <span className="text-xs font-normal text-faint group-open:hidden">
+                wybierz mecze i kurs →
+              </span>
+            </summary>
+            <div className="border-t border-hairline p-3 sm:p-4">
+              <p className="mb-3 text-xs leading-relaxed text-muted">
+                Złóż kupon z tej samej przeanalizowanej puli, której model używa
+                automatycznie — te same bezpieczniki, kary korelacji i premia za
+                wartość. Wybierz mecze (albo zostaw wszystkie), ustaw kurs docelowy
+                i charakter.
+              </p>
+              <GeneratorKuponu pool={legiPool} kary={meta.kary_korelacji} />
+            </div>
+          </details>
+        </Reveal>
+      )}
 
       {kupony.length === 0 ? (
         <Reveal className="mt-8">

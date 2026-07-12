@@ -16,10 +16,12 @@ import metaLocal from "@/data/demo/meta.json";
 import kuponyLocal from "@/data/demo/kupony.json";
 import typyWynikiLocal from "@/data/demo/typy_wyniki.json";
 import oddsSuperbetLocal from "@/data/demo/odds_superbet.json";
+import legiPoolLocal from "@/data/demo/legi_pool.json";
 
 import type {
   Kalibracja,
   Kupon,
+  LegPool,
   Mecz,
   Meta,
   OddsSuperbet,
@@ -37,6 +39,7 @@ type Bundle = {
   kupony: Kupon[];
   typy_wyniki: TypyWyniki;
   odds_superbet: OddsSuperbet;
+  legi_pool: LegPool[];
 };
 
 const LOCAL: Bundle = {
@@ -48,6 +51,7 @@ const LOCAL: Bundle = {
   kupony: kuponyLocal as unknown as Kupon[],
   typy_wyniki: typyWynikiLocal as unknown as TypyWyniki,
   odds_superbet: oddsSuperbetLocal as unknown as OddsSuperbet,
+  legi_pool: legiPoolLocal as unknown as LegPool[],
 };
 
 const SUPABASE_URL = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -65,6 +69,8 @@ function tylkoNadchodzace(bundle: Bundle): Bundle {
     ...bundle,
     value_bets: bundle.value_bets.filter((b) => b.kickoff_ts > now),
     matches: bundle.matches.filter((m) => m.kickoff_ts > now),
+    // pula do generatora na żądanie: tylko mecze jeszcze nierozpoczęte
+    legi_pool: bundle.legi_pool.filter((l) => l.kickoff_ts > now),
   };
 }
 
@@ -96,6 +102,7 @@ async function loadBundle(): Promise<Bundle> {
       kupony: (map.kupony ?? LOCAL.kupony) as Kupon[],
       typy_wyniki: (map.typy_wyniki ?? LOCAL.typy_wyniki) as TypyWyniki,
       odds_superbet: (map.odds_superbet ?? LOCAL.odds_superbet) as OddsSuperbet,
+      legi_pool: (map.legi_pool ?? LOCAL.legi_pool) as LegPool[],
     });
   } catch {
     return tylkoNadchodzace(LOCAL);
@@ -140,4 +147,8 @@ export async function getTypyWyniki(): Promise<TypyWyniki> {
 
 export async function getOddsSuperbet(): Promise<OddsSuperbet> {
   return (await loadBundle()).odds_superbet;
+}
+
+export async function getLegiPool(): Promise<LegPool[]> {
+  return (await loadBundle()).legi_pool;
 }
