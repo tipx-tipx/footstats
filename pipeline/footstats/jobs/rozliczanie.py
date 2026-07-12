@@ -129,6 +129,10 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
             "rynek_kod": b["rynek_kod"], "rynek": b["rynek"],
             "linia": b["linia"], "strona": b["strona"],
             "kurs": b.get("kurs"), "bukmacher": b.get("bukmacher"),
+            # konsensus UK (mediana buków) — do KALIBRACJI marży UK z rozliczeń:
+            # po zebraniu próby porównujemy 1/kurs_ref do realnej częstości trafień
+            # i stąd wyliczamy prawdziwą UK_CONSENSUS_MARGIN (dziś założona 0.045)
+            "kurs_ref": b.get("kurs_ref"),
             "p_model": b["p_model"], "pewnosc": b.get("pewnosc"),
             "sugestia": bool(b.get("sugestia")),
             # kategorie typu — do diagnostyki per kategoria (Brier/log-loss)
@@ -490,6 +494,27 @@ def compute_diagnostyka(log: dict) -> dict:
         k: {"zagral": a, "n": b, "pct": round(a / b, 3)}
         for k, (a, b) in sklady.items()
     }
+    # KALIBRACJA marży konsensusu UK (betting.UK_CONSENSUS_MARGIN, dziś założona):
+    # dla rozliczonych okazji „powyżej" z kursem UK porównaj implikowane p rynku
+    # (1/kurs_ref) do realnej częstości trafień. marża_est = 1 − hit/implied_sr.
+    # Gdy marza_est zauważalnie różni się od używanej przy n>=~30 — podmień stałą.
+    uk = [
+        r for r in settled
+        if r.get("kurs_ref") and float(r["kurs_ref"]) > 1.0
+        and not r.get("sugestia") and r.get("strona") == "powyzej"
+    ]
+    if uk:
+        n_uk = len(uk)
+        hit_uk = sum(1 for r in uk if r["wynik"] == "wygrany") / n_uk
+        implied_sr = sum(1.0 / float(r["kurs_ref"]) for r in uk) / n_uk
+        marza_est = round(1.0 - hit_uk / implied_sr, 3) if implied_sr > 0 else None
+        out["marza_uk"] = {
+            "n": n_uk,
+            "hit": round(hit_uk, 3),
+            "implied_sr": round(implied_sr, 3),
+            "marza_est": marza_est,
+            "marza_uzywana": betting.UK_CONSENSUS_MARGIN,
+        }
     return out
 
 

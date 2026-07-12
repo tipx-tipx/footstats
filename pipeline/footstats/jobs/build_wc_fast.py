@@ -275,6 +275,10 @@ WC_START_TS = 1_780_876_800
 PRIOR_TAU_DNI = 240.0
 # minimalna/maksymalna siła priora klubowego (w ekwiwalencie pełnych meczów)
 PRIOR_MIN_MECZE, PRIOR_MAX_MECZE = 4.0, 12.0
+# minimalna WARTOŚĆ (%) Superbetu ponad no-vig UK, by uznać linię za miękką
+# (dowód okazji z kursem). Skaluje się z kursem, w odróżnieniu od dawnej sztywnej
+# różnicy 0.10 kursu. Strojony — kandydat do kalibracji z rozliczeń okazji.
+PROG_EV_UK = 4.0
 
 
 def klub_prior(
@@ -1228,19 +1232,29 @@ def main():
                 sm.expected_minutes, 1.0,
             ).distribution(8)
             # konsensus bukmacherów UK (statshub) dla tej samej linii i strony
-            kurs_ref = None
+            kurs_ref = None       # surowa mediana UK (do UI: „UK płaci średnio X")
+            kurs_novig = None     # uczciwy kurs UK po zdjęciu marży (no-vig benchmark)
+            ev_uk = None          # wartość Superbetu vs no-vig UK, w %
             if (
                 tr.ref_odds
                 and abs(l - tr.line) < 1e-6
                 and (tr.odds_type == "over") == (a.side == "powyzej")
             ):
                 kurs_ref = round(statistics.median(tr.ref_odds), 2)
-            # OKAZJA Z KURSEM, gdy jest DOWÓD miękkiej linii: Superbet płaci
-            # >= 0.10 ponad konsensus UK (gdy dostępny) LUB >= 12% ponad kurs
-            # wynikający z JEGO WŁASNEJ siatki pozostałych linii (1a — line
-            # shopping bez zewnętrznych źródeł). Bez dowodu — typ zostaje
-            # w puli pewniaków.
-            odstaje_zewn = kurs_ref is not None and kurs_wziety - kurs_ref >= 0.10
+                novig = betting.no_vig_prob_uk(tr.ref_odds)
+                if novig is not None:
+                    p_uk, fair_uk = novig
+                    kurs_novig = round(fair_uk, 2)
+                    ev_uk = round((p_uk * kurs_wziety - 1.0) * 100.0, 1)
+            # OKAZJA Z KURSEM, gdy jest DOWÓD miękkiej linii:
+            #  (1) NO-VIG UK: Superbet daje realną WARTOŚĆ >= PROG_EV_UK ponad
+            #      uczciwą cenę UK po zdjęciu marży (nie tylko wyższy surowy kurs —
+            #      to porównanie w przestrzeni prawdopodobieństwa, skalujące się
+            #      z kursem), LUB
+            #  (2) >= 12% ponad kurs z JEGO WŁASNEJ siatki pozostałych linii (1a —
+            #      line shopping bez zewnętrznych źródeł).
+            # Bez dowodu — typ zostaje w puli pewniaków.
+            odstaje_zewn = ev_uk is not None and ev_uk >= PROG_EV_UK
             fw_a = fair_wewn.get(l)
             oczek_a = (
                 round(fw_a * (1.0 - betting.DEFAULT_ONE_SIDED_MARGIN), 2)
@@ -1259,12 +1273,15 @@ def main():
                 "kurs": kurs_wziety,
                 "bukmacher": book,
                 "kurs_ref": kurs_ref,
+                "kurs_novig": kurs_novig, "ev_uk": ev_uk,
                 "p_model": a.model_prob, "p_rynku": a.implied_prob,
                 "fair_kurs": a.fair_odds, "edge_pp": a.edge_pp, "ev_pct": a.ev_pct,
                 "matchup": float(sm.factors.get("rywal", 1.0) or 1.0) >= 1.12,
                 "rotacja": rotacja, "xi_sygnal": xi_sygnal,
-                "miekka_linia": miekka_a,
-                "kurs_oczekiwany": oczek_a if miekka_a else None,
+                "miekka_linia": odstaje_zewn or miekka_a,
+                "kurs_oczekiwany": (
+                    kurs_novig if odstaje_zewn else (oczek_a if miekka_a else None)
+                ),
                 "pewnosc": a.confidence, "pewnosc_score": a.confidence_score,
                 "ryzyko": a.risk, "rank_score": a.rank_score,
                 "ci": [sm.ci_low, sm.ci_high],
