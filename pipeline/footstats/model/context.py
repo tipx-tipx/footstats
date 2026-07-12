@@ -21,6 +21,15 @@ CAP_OPPONENT = (0.78, 1.30)
 CAP_REFEREE = (0.75, 1.35)
 CAP_HOME_AWAY = (0.90, 1.10)
 CAP_GAME_SCRIPT = (0.85, 1.20)
+# Łączny bezpiecznik na ILOCZYN czynników. Każdy czynnik jest już capowany
+# osobno, ale nałożenie kilku skrajnych mnożników (np. rywal + sędzia +
+# scenariusz + matchup, wszystkie w górę) potrafi dać ~2.4x i zdominować bazę,
+# co przeczy zasadzie „kontekst koryguje, nie rządzi". Zakres celowo LUŹNY:
+# na normalnych typach (w tym uzasadnionych matchupach ~1.3x) nieaktywny,
+# ucina tylko ekstremalne złożenia. W trybie MŚ (boisko neutralne, małe próby
+# → mocny shrink) prawie nigdy nie wchodzi; realnie chroni tryb ligowy, gdzie
+# dochodzi efekt dom/wyjazd i większe próby dopychają czynniki do widełek.
+CAP_COMBINED = (0.60, 1.80)
 
 
 def shrink_factor(raw: float, sample_size: float, prior_strength: float = 10.0) -> float:
@@ -52,10 +61,11 @@ class ContextFactors:
 
     @property
     def combined(self) -> float:
-        return (
+        raw = (
             self.opponent * self.referee * self.home_away
             * self.game_script * self.matchup
         )
+        return cap(raw, CAP_COMBINED)
 
     def as_dict(self) -> dict:
         return {

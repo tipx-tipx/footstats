@@ -15,9 +15,25 @@ from scipy import optimize, stats
 
 
 def _devig(odds: list[float]) -> list[float]:
+    """Usuń marżę metodą POTĘGOWĄ — spójnie z betting.implied_probs_two_way.
+
+    Szukamy k: Σ (1/oddsᵢ)^k = 1. Potęgowa lepiej niż proporcjonalna oddaje
+    favourite-longshot bias (rynek zawyża szanse outsiderów); dotyczy to też
+    1X2, z którego liczymy tempo. Fallback proporcjonalny, gdy brak zbieżności.
+    """
     inv = [1.0 / o for o in odds]
     s = sum(inv)
-    return [p / s for p in inv]
+    if s <= 1.0:  # brak marży / arbitraż — bierzemy wprost
+        return inv
+
+    def overround(k: float) -> float:
+        return sum(p**k for p in inv) - 1.0
+
+    try:
+        k = optimize.brentq(overround, 1.0, 5.0, xtol=1e-10)
+        return [p**k for p in inv]
+    except ValueError:
+        return [p / s for p in inv]
 
 
 def _total_from_line(line: float, p_over: float) -> float:

@@ -345,7 +345,10 @@ def score_player_market(
         market_calibrated=market_calibrated,
         is_rare_market=market_code in RARE_MARKETS,
     )
-    assessments = betting.assess(p_over, over_odds, under_odds, conf_inputs, lam)
+    assessments = betting.assess(
+        p_over, over_odds, under_odds, conf_inputs, lam,
+        is_prob_market=(market_code == "yellow_card"),
+    )
 
     return ScoredMarket(
         market_code=market_code,

@@ -64,6 +64,34 @@ def implied_prob_one_sided(odds: float, margin: float = DEFAULT_ONE_SIDED_MARGIN
     return float(np.clip((1.0 / odds) * (1.0 - margin), 1e-6, 1.0 - 1e-6))
 
 
+# Typowa marża JEDNOSTRONNA konsensusu UK na propsach zawodniczych. Niższa niż
+# PL (DEFAULT_ONE_SIDED_MARGIN=0.07), bo mediana z kilku ostrych buków (Bet365,
+# Skybet...) częściowo znosi wychylenia. Świadome założenie — statshub daje tylko
+# stronę „over", więc marży nie da się usunąć dwustronnie (over/under). Kandydat
+# do kalibracji z rozliczeń: porównać p_novig do realnej częstości trafień.
+UK_CONSENSUS_MARGIN = 0.045
+
+
+def no_vig_prob_uk(
+    uk_over_odds: list[float], margin: float = UK_CONSENSUS_MARGIN
+) -> tuple[float, float] | None:
+    """No-vig z konsensusu bukmacherów UK (statshub) — benchmark uczciwej ceny.
+
+    statshub oddaje wyłącznie stronę „over" z kilku buków UK. Bierzemy medianę
+    (odporną na jednego odstającego buka) i zdejmujemy jednostronną marżę UK.
+    To najczystszy dostępny sygnał „prawdziwej" ceny rynku: linia Superbetu
+    płacąca wyraźnie WIĘCEJ, niż wynika z no-vig UK, to miękka linia.
+
+    Zwraca (p_fair, fair_odds) albo None, gdy brak sensownych kursów UK.
+    """
+    ok = [o for o in uk_over_odds if o and o > 1.0]
+    if not ok:
+        return None
+    med = float(np.median(ok))
+    p_fair = implied_prob_one_sided(med, margin)
+    return p_fair, 1.0 / p_fair
+
+
 def internal_fair_odds(lines_probs: dict[float, float]) -> dict[float, float]:
     """Samospójność SIATKI LINII jednego bukmachera — line shopping bez
     zewnętrznych kursów.
@@ -153,8 +181,29 @@ def confidence_level(score: float) -> str:
     return "niska"
 
 
-def risk_level(lam: float, is_rare_market: bool, minutes_certainty: float) -> str:
-    """Ryzyko — niezależne od pewności modelu: zmienność samego zdarzenia."""
+def risk_level(
+    lam: float,
+    is_rare_market: bool,
+    minutes_certainty: float,
+    is_prob_market: bool = False,
+) -> str:
+    """Ryzyko — niezależne od pewności modelu: zmienność samego zdarzenia.
+
+    Dla rynków LICZNIKOWYCH (strzały, faule...) `lam` to oczekiwana liczba
+    zdarzeń — progi 0.6/1.2 mierzą, jak rzadkie (a więc kapryśne) jest zdarzenie.
+
+    Dla rynków BINARNYCH (`is_prob_market`, np. żółta kartka) `lam` to
+    prawdopodobieństwo zdarzenia w [0,1] — progi licznikowe są tu bez sensu
+    (P<0.6 dawało zawsze „wysokie"). Zamiast tego mierzymy zdecydowanie zdarzenia:
+    im bliżej 50/50, tym większa loteria.
+    """
+    if is_prob_market:
+        decisiveness = abs(lam - 0.5) * 2.0   # 0 = rzut monetą, 1 = zdarzenie pewne
+        if minutes_certainty < 0.5 or decisiveness < 0.30:
+            return "wysokie"
+        if decisiveness < 0.60:
+            return "srednie"
+        return "niskie"
     if is_rare_market or lam < 0.6:
         return "wysokie"
     if lam < 1.2 or minutes_certainty < 0.5:
@@ -193,8 +242,13 @@ def assess(
     under_odds: float | None,
     conf_inputs: ConfidenceInputs,
     lam: float,
+    is_prob_market: bool = False,
 ) -> list[ValueAssessment]:
-    """Oceń obie strony rynku. Zwraca tylko strony przechodzące progi."""
+    """Oceń obie strony rynku. Zwraca tylko strony przechodzące progi.
+
+    is_prob_market — rynek binarny (kartka): `lam` to prawdopodobieństwo, nie
+    licznik; ryzyko liczone inną skalą (patrz risk_level).
+    """
     results: list[ValueAssessment] = []
 
     if over_odds is not None and under_odds is not None:
@@ -207,7 +261,9 @@ def assess(
         return results
 
     score = confidence_score(conf_inputs)
-    risk = risk_level(lam, conf_inputs.is_rare_market, conf_inputs.minutes_certainty)
+    risk = risk_level(
+        lam, conf_inputs.is_rare_market, conf_inputs.minutes_certainty, is_prob_market
+    )
     min_ev = MIN_EV_PCT_RARE if conf_inputs.is_rare_market else MIN_EV_PCT
 
     if conf_inputs.ci_width > MAX_CI_WIDTH:
