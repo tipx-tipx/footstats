@@ -52,15 +52,76 @@ KARA_PRZECIWNE_DRUZYNY = 0.97 # słabsza zależność (bywa wręcz przeciwna)
 # rodziny rynków — rodziny korelują przez tempo meczu, a kupony z samych
 # strzałów 0,5 padają razem w jednym nudnym meczu
 DYWERSYFIKACJA_RODZIN = 0.985
-BEAM_W = 60               # szerokość wiązki w składaniu kuponu
+BEAM_W = 90               # szerokość wiązki w składaniu kuponu (szersza = mniej gubienia optimum)
+MAX_KANDYDATOW = 120      # ilu najlepszych legów wchodzi do przeszukiwania
+
+# --- premia za WARTOŚĆ w selekcji legów (profil steruje apetytem na przewagę) ---
+# Cel: kupon ma ciągnąć ku legom z REALNĄ przewagą (no-vig UK / value), nie ku
+# "nudnym faworytom" @1,10. Premia proporcjonalna do ev (liczbowo, nie sztywny
+# mnożnik). Bezpieczny = same kotwice o najwyższej szansie (zero premii value).
+WAGA_VALUE_Q = {"bezpieczny": 0.0, "zbalansowany": 0.006, "agresywny": 0.011}
+BONUS_MIEKKA = {"bezpieczny": 1.0, "zbalansowany": 0.95, "agresywny": 0.92}
+BONUS_MATCHUP = {"bezpieczny": 1.0, "zbalansowany": 0.93, "agresywny": 0.88}
+BONUS_SWIEZE = {"bezpieczny": 1.0, "zbalansowany": 0.96, "agresywny": 0.93}
+# premia za średnią wartość legów w FUNKCJI CELU wyboru kompletu (nie tylko w
+# kolejności kandydatów) — bez tego value wpływałoby marginalnie
+WAGA_VALUE_SELEKCJA = {"bezpieczny": 0.0, "zbalansowany": 0.15, "agresywny": 0.30}
 
 
-def _kara_koszyka(legi) -> float:
+def _leg_value(l: dict) -> float:
+    """Realna przewaga lega w % (0–30, ujęte w widełki): no-vig UK (ev_uk) to
+    najczystszy sygnał, EV vs Superbet (ev_pct) fallback. None/ujemne → 0."""
+    ev = l.get("ev_uk")
+    if ev is None:
+        ev = l.get("ev_pct")
+    try:
+        return max(0.0, min(float(ev), 30.0))
+    except (TypeError, ValueError):
+        return 0.0
+
+
+# domyślne kary korelacji jako mapa (nadpisywalna zmierzonymi z rozliczeń)
+KARY_DEFAULT = {
+    "ta_sama": KARA_TA_SAMA_DRUZYNA,
+    "przeciwne": KARA_PRZECIWNE_DRUZYNY,
+    "nieznane": KARA_KORELACJI,
+}
+KARA_PRIOR = 30.0   # shrinkage zmierzonej korelacji do domyślnej (mała próba par)
+KARA_MIN = 0.50     # nie tniemy szansy kuponu poniżej połowy (ochrona przed szumem)
+
+
+def kary_korelacji_z_diagnostyki(korelacja: dict, prior: float = KARA_PRIOR) -> dict:
+    """Efektywne kary korelacji per relacja legów — ZMIERZONE zamiast zgadywanych.
+
+    `wsp` = obs_oba/exp_indep z rozliczonych kuponów (rozliczanie.compute_kupony_
+    diagnostyka): <1 = legi z jednego meczu padają razem rzadziej niż niezależność
+    (kara w dół słuszna), >1 = częściej. Ściągamy zmierzony wsp shrinkage do kary
+    domyślnej wagą n/(n+prior) — przy małej próbie zostajemy blisko domyślnej,
+    przy dużej ufamy pomiarowi. Cap [KARA_MIN, 1.0]."""
+    out = dict(KARY_DEFAULT)
+    for rel, d in (korelacja or {}).items():
+        if rel not in KARY_DEFAULT:
+            continue
+        wsp, n = d.get("wsp"), d.get("n_par", 0)
+        if wsp is None or n < 1:
+            continue
+        w = n / (n + prior)
+        eff = KARY_DEFAULT[rel] + w * (float(wsp) - KARY_DEFAULT[rel])
+        out[rel] = round(max(KARA_MIN, min(1.0, eff)), 3)
+    return out
+
+
+def _kara_koszyka(legi, kary: dict | None = None) -> float:
     """Łączna kara korelacyjna kuponu (mnożnik szansy).
 
-    Za każdy KOLEJNY leg z tego samego meczu: ×0.92 gdy z tej samej drużyny
-    co któryś już obecny, ×0.97 gdy z przeciwnej, ×0.95 gdy drużyn nie znamy.
+    Za każdy KOLEJNY leg z tego samego meczu: kara zależna od relacji drużyn
+    (ta sama / przeciwna / nieznana). `kary` = mapa ZMIERZONA z rozliczeń
+    (kary_korelacji_z_diagnostyki); None → domyślne stałe.
     """
+    k = kary or KARY_DEFAULT
+    ta = k.get("ta_sama", KARA_TA_SAMA_DRUZYNA)
+    prz = k.get("przeciwne", KARA_PRZECIWNE_DRUZYNY)
+    nzn = k.get("nieznane", KARA_KORELACJI)
     kara = 1.0
     seen: dict[int, list[str]] = {}
     for l in legi:
@@ -68,11 +129,11 @@ def _kara_koszyka(legi) -> float:
         prev = seen.get(m)
         if prev is not None:
             if d and d in prev:
-                kara *= KARA_TA_SAMA_DRUZYNA
+                kara *= ta
             elif d and all(x and x != d for x in prev):
-                kara *= KARA_PRZECIWNE_DRUZYNY
+                kara *= prz
             else:
-                kara *= KARA_KORELACJI
+                kara *= nzn
         seen.setdefault(m, []).append(d)
     return kara
 
@@ -107,6 +168,9 @@ def _leg_dict(b: dict) -> dict:
         "matchup": bool(b.get("matchup")),
         "rotacja": bool(b.get("rotacja")),
         "miekka_linia": bool(b.get("miekka_linia")),
+        # realna przewaga lega — do UI (dlaczego ten leg) i scoringu wartości
+        "ev_uk": b.get("ev_uk"),
+        "ev_pct": b.get("ev_pct"),
         "rynek_kod": b.get("rynek_kod", ""),
         "rynek": b["rynek"],
         "linia": b["linia"],
@@ -121,17 +185,23 @@ def _leg_dict(b: dict) -> dict:
     }
 
 
-def _score_selekcji(p_raw: float, legi) -> float:
+def _score_selekcji(p_raw: float, legi, waga_value: float = 0.0,
+                    kary: dict | None = None) -> float:
     """Funkcja celu składania: szansa z karami korelacji + kara SELEKCJI za
-    monotonię rynków (3+ legi z jednej rodziny padają razem w nudnym meczu)."""
-    s = p_raw * _kara_koszyka(legi)
+    monotonię rynków (3+ legi z jednej rodziny padają razem w nudnym meczu)
+    + premia za średnią WARTOŚĆ legów (waga_value>0 = kupon ciągnie ku przewadze)."""
+    s = p_raw * _kara_koszyka(legi, kary)
     rodziny: dict[str, int] = {}
     for l in legi:
         f = betting.RODZINY_RYNKOW.get(l.get("rynek_kod", ""))
         if f:
             rodziny[f] = rodziny.get(f, 0) + 1
     nadmiar = sum(max(0, c - 2) for c in rodziny.values())
-    return s * (DYWERSYFIKACJA_RODZIN ** nadmiar)
+    s *= DYWERSYFIKACJA_RODZIN ** nadmiar
+    if waga_value > 0 and legi:
+        sr_ev = sum(_leg_value(l) for l in legi) / len(legi)
+        s *= 1.0 + waga_value * sr_ev / 100.0
+    return s
 
 
 def _zloz_pewniaki(
@@ -141,6 +211,7 @@ def _zloz_pewniaki(
     max_na_mecz: int = MAX_NA_MECZ,
     min_legi: int = 3,
     profil: str = "zbalansowany",
+    kary: dict | None = None,
 ) -> dict | None:
     """Maksymalizuj szansę kuponu przy kursie łącznym w przedziale [cmin, cmax].
 
@@ -156,22 +227,31 @@ def _zloz_pewniaki(
     # agresywny = mocniejsza preferencja matchupów i wyższych linii
     if profil == "bezpieczny":
         pool = [b for b in pool if b["p_model"] >= 0.58]
+    waga_sel = WAGA_VALUE_SELEKCJA.get(profil, 0.0)
 
     def _q(b: dict) -> float:
+        # bazowa jakość: koszt pewności na jednostkę kursu (q<0; bliżej 0 = lepiej)
         q = math.log(b["p_model"]) / math.log(b["kurs"])
-        if profil != "bezpieczny":
-            if b.get("matchup"):
-                q *= 0.88 if profil == "agresywny" else 0.93
-            if b.get("swieze_sklady"):
-                q *= 0.93 if profil == "agresywny" else 0.96
-            if profil == "agresywny" and (b.get("linia") or 0) >= 1.5:
-                q *= 0.95   # wyższe linie wyżej w kolejce
+        if profil == "bezpieczny":
+            return q
+        # PREMIA ZA WARTOŚĆ (liczbowo): leg z realną przewagą wchodzi wyżej
+        v = _leg_value(b)
+        if v > 0:
+            q *= 1.0 - v * WAGA_VALUE_Q[profil]
+        if b.get("miekka_linia"):
+            q *= BONUS_MIEKKA[profil]
+        if b.get("matchup"):
+            q *= BONUS_MATCHUP[profil]
+        if b.get("swieze_sklady"):
+            q *= BONUS_SWIEZE[profil]
+        if profil == "agresywny" and (b.get("linia") or 0) >= 1.5:
+            q *= 0.97   # wyższe linie wyżej w kolejce
         return q
 
     cands = sorted(
         (b for b in pool if b["kurs"] > 1.0 and 0 < b["p_model"] < 1),
         key=lambda b: -_q(b),
-    )[:80]
+    )[:MAX_KANDYDATOW]
     # stan wiązki: (kurs_łączny, iloczyn_p, legi jako krotka)
     beam: list[tuple[float, float, tuple]] = [(1.0, 1.0, ())]
     komplety: list[tuple[float, float, tuple]] = []
@@ -199,7 +279,7 @@ def _zloz_pewniaki(
         ocenione = []
         seen_keys: set = set()
         for st in beam:
-            sc = _score_selekcji(st[1], st[2])
+            sc = _score_selekcji(st[1], st[2], waga_sel, kary)
             key = (len(st[2]), round(st[0], 4), round(sc, 8))
             if key in seen_keys:
                 continue
@@ -211,7 +291,7 @@ def _zloz_pewniaki(
         return None
 
     def _kupon_z(kurs: float, p_raw: float, legi_t: tuple) -> dict:
-        p = p_raw * _kara_koszyka(legi_t)
+        p = p_raw * _kara_koszyka(legi_t, kary)
         legi = sorted(
             legi_t, key=lambda b: (b["kickoff_ts"], b["mecz_id"], -b["p_model"])
         )
@@ -226,7 +306,15 @@ def _zloz_pewniaki(
             "legi": [_leg_dict(b) for b in legi],
         }
 
-    komplety.sort(key=lambda s: -_score_selekcji(s[1], s[2]))
+    # stabilny tie-break (zestaw podmiotów) — przy równym score zawsze wygrywa
+    # ten sam komplet, więc drobna zmiana puli nie „przerzuca” kuponu (mniej churnu
+    # zanim slot się zamrozi; opublikowane kupony i tak są zamrożone w logu)
+    komplety.sort(
+        key=lambda s: (
+            -_score_selekcji(s[1], s[2], waga_sel, kary),
+            tuple(sorted(l["podmiot_id"] for l in s[2])),
+        )
+    )
     kurs, p_raw, legi_t = komplety[0]
     kupon = _kupon_z(kurs, p_raw, legi_t)
     # wariant B: najlepszy WYRAŹNIE INNY komplet (Jaccard < 0.5) — do wyboru
@@ -252,6 +340,7 @@ def _rentgen(
     cmin: float,
     cmax: float,
     max_na_mecz: int = MAX_NA_MECZ,
+    kary: dict | None = None,
 ) -> None:
     """Rentgen kuponu (wzorzec HOF Parlay Optimizer): najsłabsze ogniwo
     + propozycja zamiany z puli, która podnosi szansę kuponu.
@@ -289,7 +378,7 @@ def _rentgen(
     legi_po = [l for i, l in enumerate(legi) if i != idx] + [best]
     p_po = (
         p_bez * best["p_model"]
-        * _kara_koszyka(legi_po) / max(_kara_koszyka(legi), 1e-9)
+        * _kara_koszyka(legi_po, kary) / max(_kara_koszyka(legi, kary), 1e-9)
     )
     if p_po <= kupon["p_model"] + 1e-9:
         return
@@ -307,6 +396,7 @@ def _dolozenie(
     cmin: float,
     cmax: float,
     max_na_mecz: int = MAX_NA_MECZ,
+    kary: dict | None = None,
 ) -> None:
     """Rentgen v2: kupon wisi w dolnej połowie przedziału — zaproponuj
     DOŁOŻENIE bardzo pewnego lega (p >= 0.70), który dobija kurs bliżej
@@ -328,8 +418,8 @@ def _dolozenie(
     if best is None:
         return
     legi_po = list(legi) + [best]
-    p_raw = kupon["p_model"] / max(_kara_koszyka(legi), 1e-9)
-    p_po = p_raw * best["p_model"] * _kara_koszyka(legi_po)
+    p_raw = kupon["p_model"] / max(_kara_koszyka(legi, kary), 1e-9)
+    p_po = p_raw * best["p_model"] * _kara_koszyka(legi_po, kary)
     kupon["dolozenie"] = {
         **_leg_dict(best),
         "kurs_po": round(kupon["kurs_laczny"] * best["kurs"], 2),
@@ -342,6 +432,7 @@ def build_kupony(
     pool: list[dict] | None = None,
     now_ts: int | None = None,
     profil: str = "zbalansowany",
+    kary: dict | None = None,
 ) -> list[dict]:
     """Kupony pewniaków w dwóch horyzontach + kupony value.
 
@@ -361,26 +452,26 @@ def build_kupony(
     tylko_dzis_ok = len({b["mecz_id"] for b in dzis20}) >= 2
     for cmin, cmax in PRZEDZIALY_DZIENNE:
         k = (
-            _zloz_pewniaki(dzis20, cmin, cmax, profil=profil)
+            _zloz_pewniaki(dzis20, cmin, cmax, profil=profil, kary=kary)
             if tylko_dzis_ok else None
         )
         pula_k = dzis20
         if k is None:
-            k = _zloz_pewniaki(dzis44, cmin, cmax, profil=profil)
+            k = _zloz_pewniaki(dzis44, cmin, cmax, profil=profil, kary=kary)
             pula_k = dzis44
         if k is not None:
             k["horyzont"] = "dzienny"
-            _rentgen(k, pula_k, cmin, cmax)
-            _dolozenie(k, pula_k, cmin, cmax)
+            _rentgen(k, pula_k, cmin, cmax, kary=kary)
+            _dolozenie(k, pula_k, cmin, cmax, kary=kary)
             out.append(k)
 
     dlugo = [b for b in pool if b["kickoff_ts"] <= now + OKNO_DLUGO_S]
     for cmin, cmax in PRZEDZIALY_DLUGOTERMINOWE:
-        k = _zloz_pewniaki(dlugo, cmin, cmax, profil=profil)
+        k = _zloz_pewniaki(dlugo, cmin, cmax, profil=profil, kary=kary)
         if k is not None:
             k["horyzont"] = "dlugoterminowy"
-            _rentgen(k, dlugo, cmin, cmax)
-            _dolozenie(k, dlugo, cmin, cmax)
+            _rentgen(k, dlugo, cmin, cmax, kary=kary)
+            _dolozenie(k, dlugo, cmin, cmax, kary=kary)
             out.append(k)
 
     # VALUE: ten sam builder co pewniaki (max iloczyn szans przy zadanym
@@ -390,14 +481,14 @@ def build_kupony(
     sygnatury = {_sygnatura(k) for k in out}
     for cmin, cmax in PRZEDZIALY_VALUE:
         k = _zloz_pewniaki(
-            cands, cmin, cmax, max_na_mecz=1, min_legi=2, profil=profil
+            cands, cmin, cmax, max_na_mecz=1, min_legi=2, profil=profil, kary=kary
         )
         if k is None or _sygnatura(k) in sygnatury:
             continue
         k["styl"] = "value"
         k["horyzont"] = "value"
-        _rentgen(k, cands, cmin, cmax, max_na_mecz=1)
-        _dolozenie(k, cands, cmin, cmax, max_na_mecz=1)
+        _rentgen(k, cands, cmin, cmax, max_na_mecz=1, kary=kary)
+        _dolozenie(k, cands, cmin, cmax, max_na_mecz=1, kary=kary)
         out.append(k)
         sygnatury.add(_sygnatura(k))
     return out

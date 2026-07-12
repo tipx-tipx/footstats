@@ -1185,6 +1185,17 @@ def main():
                     and abs(p_side - implied) <= max_div
                     and (implied <= 0 or p_side / implied <= max_rel)
                 ):
+                    # wartość lega (do selekcji kuponów „ku przewadze”):
+                    # EV vs Superbet zawsze; no-vig UK gdy jest konsensus na tej linii
+                    ev_pct_leg = round((p_side * odd - 1.0) * 100.0, 1)
+                    ev_uk_leg = None
+                    if (
+                        tr.ref_odds and abs(l - tr.line) < 1e-6
+                        and tr.odds_type == "over" and side_key == "over"
+                    ):
+                        _nv = betting.no_vig_prob_uk(tr.ref_odds)
+                        if _nv:
+                            ev_uk_leg = round((_nv[0] * odd - 1.0) * 100.0, 1)
                     legi_pool.append({
                         "id": 0, "mecz_id": mid, "mecz": match_label,
                         "kickoff_ts": ts, "podmiot_id": tr.player_id,
@@ -1193,6 +1204,7 @@ def main():
                         "rynek_kod": mk, "rynek": MARKET_NAMES_PL[mk], "linia": l,
                         "strona": side_pl, "kurs": odd,
                         "bukmacher": sv[1], "p_model": round(p_side, 4),
+                        "ev_pct": ev_pct_leg, "ev_uk": ev_uk_leg,
                         "matchup": matchup_typ, "rotacja": rotacja,
                         "xi_sygnal": xi_sygnal,
                         "swieze_sklady": mid in swieze_mids,
@@ -1472,7 +1484,17 @@ def main():
         profil_kuponow = "zbalansowany"
     if profil_kuponow != "zbalansowany":
         print(f"Profil kuponów: {profil_kuponow}")
-    kupony_list = kupony.build_kupony(value_bets, legi_pool, profil=profil_kuponow)
+    # ZMIERZONE kary korelacji legów z rozliczonych kuponów (zastępują zgadywane
+    # 0.92/0.95/0.97; shrinkage do domyślnych przy małej próbie) — kupony dostają
+    # uczciwsze szanse, bo legi z jednego meczu realnie nie padają niezależnie
+    kary_kor = kupony.kary_korelacji_z_diagnostyki(
+        rozliczanie.compute_kupony_diagnostyka(supa.get_key("kupony_log") or {})["korelacja"]
+    )
+    if kary_kor != kupony.KARY_DEFAULT:
+        print(f"Kary korelacji (zmierzone): {kary_kor}")
+    kupony_list = kupony.build_kupony(
+        value_bets, legi_pool, profil=profil_kuponow, kary=kary_kor
+    )
     # znacznik: na ilu meczach kuponu składy były już POTWIERDZONE przy
     # budowie (mniejsze ryzyko anulowań/zwrotów niż na prognozach XI)
     for k in kupony_list:

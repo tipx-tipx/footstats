@@ -518,6 +518,85 @@ def compute_diagnostyka(log: dict) -> dict:
     return out
 
 
+def compute_kupony_diagnostyka(log_kuponow: dict) -> dict:
+    """Uczenie KUPONÓW z rozliczeń (domyka pętlę, której nie zamyka kalibracja
+    per-typ):
+
+    1. KALIBRACJA — czy kupon o deklarowanej szansie X% trafia ~X% (per horyzont).
+       Rozjazd hit << sr_p oznacza, że kara korelacji za słabo tnie szansę
+       (kupony systematycznie przeszacowane) — i odwrotnie.
+    2. Zmierzona KORELACJA legów z jednego meczu: czy padają razem CZĘŚCIEJ
+       (wsp > 1) czy RZADZIEJ (wsp < 1) niż niezależność (iloczyn p_model).
+       To dane pod zastąpienie ZGADYWANYCH kar (0.92 / 0.95 / 0.97) zmierzonymi:
+       wsp < 1 potwierdza karę w dół, wsp > 1 mówi, że karzemy w złą stronę.
+    """
+    settled = [
+        k for k in log_kuponow.values()
+        if isinstance(k, dict) and not k.get("pominiety")
+        and k.get("wynik") in ("wygrany", "przegrany")
+    ]
+
+    per_h: dict[str, dict] = {}
+    for k in settled:
+        h = k.get("horyzont") or "value"
+        d = per_h.setdefault(h, {"n": 0, "traf": 0, "sp": 0.0, "brier": 0.0})
+        y = 1.0 if k["wynik"] == "wygrany" else 0.0
+        p = min(max(float(k.get("p_model") or 0.0), 1e-6), 1.0 - 1e-6)
+        d["n"] += 1
+        d["traf"] += int(y)
+        d["sp"] += p
+        d["brier"] += (p - y) ** 2
+    kalibracja = {
+        h: {
+            "n": d["n"], "hit": round(d["traf"] / d["n"], 3),
+            "sr_p": round(d["sp"] / d["n"], 3),
+            "brier": round(d["brier"] / d["n"], 4),
+        }
+        for h, d in per_h.items() if d["n"]
+    }
+
+    # pary legów z tego samego meczu: [oba_wygrane, n_par, suma_iloczynu_p]
+    grp = {"ta_sama": [0, 0, 0.0], "przeciwne": [0, 0, 0.0], "nieznane": [0, 0, 0.0]}
+    kary = {
+        "ta_sama": kupony_model.KARA_TA_SAMA_DRUZYNA,
+        "przeciwne": kupony_model.KARA_PRZECIWNE_DRUZYNY,
+        "nieznane": kupony_model.KARA_KORELACJI,
+    }
+    for k in settled:
+        legi = [
+            l for l in k.get("legi", [])
+            if l.get("wynik") in ("wygrany", "przegrany")
+        ]
+        for i in range(len(legi)):
+            for j in range(i + 1, len(legi)):
+                a, b = legi[i], legi[j]
+                if a.get("mecz_id") != b.get("mecz_id"):
+                    continue
+                da, db = str(a.get("druzyna") or ""), str(b.get("druzyna") or "")
+                if da and db and da == db:
+                    rel = "ta_sama"
+                elif da and db and da != db:
+                    rel = "przeciwne"
+                else:
+                    rel = "nieznane"
+                g = grp[rel]
+                g[0] += int(a["wynik"] == "wygrany" and b["wynik"] == "wygrany")
+                g[1] += 1
+                g[2] += float(a.get("p_model") or 0) * float(b.get("p_model") or 0)
+    korelacja = {}
+    for rel, (oba, n, sexp) in grp.items():
+        if n < 1:
+            continue
+        obs = oba / n
+        exp = sexp / n
+        korelacja[rel] = {
+            "n_par": n, "obs_oba": round(obs, 3), "exp_indep": round(exp, 3),
+            "wsp": round(obs / exp, 3) if exp > 0 else None,
+            "kara_uzywana": kary[rel],
+        }
+    return {"kalibracja": kalibracja, "korelacja": korelacja}
+
+
 def _snapshot_zamkniecia(
     log: dict, value_bets: list[dict], kupony_list: list[dict], now: int
 ) -> None:
@@ -1153,8 +1232,17 @@ def rozlicz(
             f"{k}: zagrał {v['zagral']}/{v['n']} ({v['pct']:.0%})"
             for k, v in diagnostyka["sklady"].items()
         ))
+    kupony_diag = compute_kupony_diagnostyka(log_kuponow)
+    for h, s in kupony_diag["kalibracja"].items():
+        print(f"Kupony {h}: hit={s['hit']} vs śr.p={s['sr_p']} (n={s['n']}, Brier={s['brier']})")
+    for rel, s in kupony_diag["korelacja"].items():
+        print(
+            f"Korelacja legów [{rel}]: obs={s['obs_oba']} vs indep={s['exp_indep']} "
+            f"wsp={s['wsp']} (n_par={s['n_par']}, kara={s['kara_uzywana']})"
+        )
     return {
         "diagnostyka": diagnostyka,
+        "kupony_diag": kupony_diag,
         "podsumowanie": {
             # bez rynków osobnych (niecelne/zablokowane) — te są liczone osobno
             "opublikowane": sum(
