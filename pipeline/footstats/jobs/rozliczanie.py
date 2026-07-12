@@ -954,6 +954,21 @@ def rozlicz(
             "sugestia": False,
             "matchup": l.get("matchup"), "rotacja": l.get("rotacja"),
         } for l in k["legi"]])
+    # WŁASNE kupony usera (generator „ucz model") — ich legi też do logu, żeby
+    # się rozliczyły; sam kupon trafia do kupony_log jako pominięty (niżej)
+    kupony_wlasne = supa.get_key("kupony_wlasne") or {}
+    for wk in kupony_wlasne.values():
+        _dopisz_nowe(log, [{
+            "mecz_id": l["mecz_id"], "mecz": l["mecz"],
+            "kickoff_ts": l["kickoff_ts"],
+            "podmiot_id": l.get("podmiot_id", 0),
+            "podmiot": l["podmiot"], "rynek_kod": l.get("rynek_kod", ""),
+            "rynek": l["rynek"], "linia": l["linia"], "strona": l["strona"],
+            "kurs": l["kurs"], "bukmacher": l.get("bukmacher"),
+            "p_model": l["p_model"], "pewnosc": l.get("pewnosc"),
+            "sugestia": False,
+            "matchup": l.get("matchup"), "rotacja": l.get("rotacja"),
+        } for l in (wk.get("legi") or []) if l.get("mecz_id") and l.get("podmiot")])
     lib = supa.get_key("trend_lib") or {}
     now = int(time.time())
     cache_365: dict = {}
@@ -1092,6 +1107,22 @@ def rozlicz(
 
     # ---- historia kuponów ----
     log_kuponow = supa.get_key("kupony_log") or {}
+    # wmerguj WŁASNE kupony (generator „ucz model") jako pominięte — rozliczą
+    # się w tle i zasilą korelację/kalibrację (jak automatyczne pominięte)
+    for wkey, wk in kupony_wlasne.items():
+        klucz = f"wlasny:{wkey}"[:150]
+        legi = wk.get("legi") or []
+        if klucz in log_kuponow or len(legi) < 2:
+            continue
+        log_kuponow[klucz] = {
+            "klucz": klucz, "slot": "wlasny", "horyzont": "wlasny", "styl": "wlasny",
+            "cel": 0, "cel_label": "własny",
+            "kurs_laczny": wk.get("kurs_laczny"), "p_model": wk.get("p_model"),
+            "legi": legi, "pominiety": True, "pominiety_przez": "user",
+            "opublikowano_ts": int(wk.get("zapisano_ts") or now), "wynik": None,
+        }
+    if kupony_wlasne:
+        supa.put_key("kupony_wlasne", {})   # bufor przetworzony — czyścimy
     # kupony pominięte przyciskiem w UI (web zapisuje klucz -> ts albo
     # {ts, powod}); wpisy starsze niż 14 dni wypadają
     pominiete_raw = supa.get_key("kupony_pominiete") or {}

@@ -1,4 +1,5 @@
 import { GeneratorKuponu } from "@/components/GeneratorKuponu";
+import { CountUpKurs, PasekSzansy } from "@/components/KuponAnim";
 import { PageHeader } from "@/components/PageHeader";
 import {
   PominKupon,
@@ -192,9 +193,11 @@ export default async function KuponyPage() {
                       <p className="text-[10px] uppercase tracking-wide text-faint">
                         kurs łączny
                       </p>
-                      <p className="font-data text-lg font-semibold">
-                        {fmtKurs(k.kurs_laczny)}
-                      </p>
+                      <CountUpKurs
+                        value={k.kurs_laczny}
+                        prefix=""
+                        className="font-data text-lg font-semibold"
+                      />
                     </div>
                     <div>
                       <p className="text-[10px] uppercase tracking-wide text-faint">
@@ -214,6 +217,7 @@ export default async function KuponyPage() {
                     </div>
                   </div>
                 </header>
+                <PasekSzansy p={k.p_model} className="mt-3" />
                 {/* oś czasu: który mecz kiedy gra i jak stoją jego legi */}
                 {(() => {
                   const mecze: {

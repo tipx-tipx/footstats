@@ -1,7 +1,14 @@
 "use client";
 
+import { AnimatePresence, motion } from "framer-motion";
 import { useMemo, useState } from "react";
 
+import {
+  CountUpKurs,
+  LegiStagger,
+  LegWpada,
+  PasekSzansy,
+} from "./KuponAnim";
 import { fmtDataCzas, fmtEV, fmtKurs, fmtLinia, fmtProc } from "@/lib/format";
 import {
   KARY_DEFAULT,
@@ -47,6 +54,37 @@ export function GeneratorKuponu({
   const [minLegi, setMinLegi] = useState(3);
   const [profil, setProfil] = useState<Profil>("zbalansowany");
   const [wynik, setWynik] = useState<KuponWynik | null | "brak">(null);
+  const [nauka, setNauka] = useState<"idle" | "wysylanie" | "ok" | "blad">("idle");
+
+  const odrzuc = () => {
+    setWynik(null);
+    setNauka("idle");
+  };
+
+  const uczModel = async (k: KuponWynik) => {
+    setNauka("wysylanie");
+    try {
+      const res = await fetch("/api/kupon-pomin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          akcja: "wlasny_nauka",
+          kupon: { legi: k.legi, kurs_laczny: k.kurs_laczny, p_model: k.p_model },
+        }),
+      });
+      if (res.ok) {
+        setNauka("ok");
+        setTimeout(() => {
+          setWynik(null);
+          setNauka("idle");
+        }, 1700);
+      } else {
+        setNauka("blad");
+      }
+    } catch {
+      setNauka("blad");
+    }
+  };
 
   const toggleMecz = (id: number) => {
     setWybrane((s) => {
@@ -184,19 +222,45 @@ export function GeneratorKuponu({
       </button>
 
       {/* wynik */}
-      {wynik === "brak" && (
-        <p className="mt-4 rounded-lg border border-data-amber/40 bg-data-amber-wash px-3 py-2.5 text-xs text-[#8a5613]">
-          Z {wybrane.size > 0 ? "wybranych meczów" : "dostępnej puli"} nie da się
-          domknąć kursu ×{fmtKurs(kursCel)} przy min. {minLegi} legach. Zmień kurs
-          docelowy, liczbę legów{meczId == null ? " lub dobierz więcej meczów" : ""}.
-        </p>
-      )}
-      {wynik && wynik !== "brak" && <KuponKarta k={wynik} />}
+      <AnimatePresence mode="wait">
+        {wynik === "brak" && (
+          <motion.p
+            key="brak"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="mt-4 rounded-lg border border-data-amber/40 bg-data-amber-wash px-3 py-2.5 text-xs text-[#8a5613]"
+          >
+            Z {wybrane.size > 0 ? "wybranych meczów" : "dostępnej puli"} nie da się
+            domknąć kursu ×{fmtKurs(kursCel)} przy min. {minLegi} legach. Zmień kurs
+            docelowy, liczbę legów{meczId == null ? " lub dobierz więcej meczów" : ""}.
+          </motion.p>
+        )}
+        {wynik && wynik !== "brak" && (
+          <KuponKarta
+            key="kupon"
+            k={wynik}
+            nauka={nauka}
+            onOdrzuc={odrzuc}
+            onNauka={() => uczModel(wynik)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
 
-function KuponKarta({ k }: { k: KuponWynik }) {
+function KuponKarta({
+  k,
+  nauka,
+  onOdrzuc,
+  onNauka,
+}: {
+  k: KuponWynik;
+  nauka: "idle" | "wysylanie" | "ok" | "blad";
+  onOdrzuc: () => void;
+  onNauka: () => void;
+}) {
   const zwrot = (STAWKA * k.kurs_laczny).toFixed(0);
   // legi grupowane po meczu (jak bet builder)
   const grupy = useMemo(() => {
@@ -210,61 +274,105 @@ function KuponKarta({ k }: { k: KuponWynik }) {
   }, [k]);
 
   return (
-    <div className="mt-4 rounded-xl border border-brand/25 bg-gradient-to-br from-brand-wash to-card p-4 shadow-(--shadow-card)">
+    <motion.div
+      initial={{ opacity: 0, y: 10, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.98 }}
+      transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+      className="mt-4 rounded-xl border border-brand/25 bg-gradient-to-br from-brand-wash to-card p-4 shadow-(--shadow-card)"
+    >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <span className="font-data text-2xl font-bold text-ink">
-          ×{fmtKurs(k.kurs_laczny)}
-        </span>
+        <CountUpKurs
+          value={k.kurs_laczny}
+          className="font-data text-2xl font-bold text-ink"
+        />
         <span className="text-sm text-muted">
           szansa <strong className="font-data text-ink">{fmtProc(k.p_model)}</strong>
-          {" · "}z {STAWKA} zł robi się <strong className="font-data text-ink">{zwrot} zł</strong>
+          {" · "}z {STAWKA} zł robi się{" "}
+          <strong className="font-data text-ink">{zwrot} zł</strong>
         </span>
       </div>
-      <div className="mt-3 space-y-3">
+      <PasekSzansy p={k.p_model} className="mt-2.5" />
+
+      <LegiStagger className="mt-3 space-y-3">
         {grupy.map((g, gi) => (
           <div key={gi}>
-            <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-faint">
-              {g.mecz}
-            </p>
+            <LegWpada>
+              <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-faint">
+                {g.mecz}
+              </p>
+            </LegWpada>
             <ul className="space-y-1.5">
               {g.legi.map((l, li) => (
-                <li
-                  key={li}
-                  className="flex items-center justify-between gap-2 rounded-lg bg-card/70 px-3 py-2 text-sm"
-                >
-                  <span className="min-w-0">
-                    <span className="font-medium">{l.podmiot}</span>{" "}
-                    <span className="text-muted">
-                      {l.rynek.toLowerCase()} powyżej {fmtLinia(l.linia)}
+                <LegWpada key={li}>
+                  <li className="flex items-center justify-between gap-2 rounded-lg bg-card/70 px-3 py-2 text-sm">
+                    <span className="min-w-0">
+                      <span className="font-medium">{l.podmiot}</span>{" "}
+                      <span className="text-muted">
+                        {l.rynek.toLowerCase()} powyżej {fmtLinia(l.linia)}
+                      </span>
+                      <span className="ml-1.5 inline-flex gap-1 align-middle">
+                        {l.matchup && (
+                          <span title="Profil rywala sprzyja" className="text-[10px]">🎯</span>
+                        )}
+                        {l.ev_uk != null && l.ev_uk >= 4 && (
+                          <span
+                            title={`Wartość vs no-vig UK: ${fmtEV(l.ev_uk)}`}
+                            className="text-[10px] font-semibold text-data-green"
+                          >
+                            {fmtEV(l.ev_uk)}
+                          </span>
+                        )}
+                      </span>
                     </span>
-                    <span className="ml-1.5 inline-flex gap-1 align-middle">
-                      {l.matchup && (
-                        <span title="Profil rywala sprzyja" className="text-[10px]">🎯</span>
-                      )}
-                      {l.ev_uk != null && l.ev_uk >= 4 && (
-                        <span
-                          title={`Wartość vs no-vig UK: ${fmtEV(l.ev_uk)}`}
-                          className="text-[10px] font-semibold text-data-green"
-                        >
-                          {fmtEV(l.ev_uk)}
-                        </span>
-                      )}
+                    <span className="flex shrink-0 items-center gap-2">
+                      <span className="font-data text-xs text-faint">{fmtProc(l.p_model)}</span>
+                      <span className="font-data font-semibold">@{fmtKurs(l.kurs)}</span>
                     </span>
-                  </span>
-                  <span className="flex shrink-0 items-center gap-2">
-                    <span className="font-data text-xs text-faint">{fmtProc(l.p_model)}</span>
-                    <span className="font-data font-semibold">@{fmtKurs(l.kurs)}</span>
-                  </span>
-                </li>
+                  </li>
+                </LegWpada>
               ))}
             </ul>
           </div>
         ))}
-      </div>
+      </LegiStagger>
+
       <p className="mt-3 text-[11px] text-faint">
-        Kupon zbudowany z tej samej przeanalizowanej puli co automatyczne — te same
-        bezpieczniki, kary korelacji i premia za wartość. Kursy zmrożone przy budowie.
+        Ta sama przeanalizowana pula co automatyczne kupony — te same bezpieczniki,
+        kary korelacji i premia za wartość.
       </p>
-    </div>
+
+      {/* usuwanie kuponu: całkowite albo z nauką modelu */}
+      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-hairline pt-3">
+        {nauka === "ok" ? (
+          <span className="text-xs font-medium text-brand-deep">
+            ✓ Kupon trafił do nauki — rozliczy się w tle i poprawi model.
+          </span>
+        ) : (
+          <>
+            <button
+              onClick={onOdrzuc}
+              disabled={nauka === "wysylanie"}
+              className="rounded-lg border border-hairline bg-card px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:text-ink disabled:opacity-50"
+            >
+              ✕ Odrzuć
+            </button>
+            <button
+              onClick={onNauka}
+              disabled={nauka === "wysylanie"}
+              title="Kupon rozliczy się w tle (jak pominięty) i zasili naukę modelu — korelację legów i kalibrację"
+              className="rounded-lg border border-brand/40 bg-brand-wash px-3 py-1.5 text-xs font-medium text-brand-deep transition-colors hover:bg-brand-wash/70 disabled:opacity-50"
+            >
+              {nauka === "wysylanie" ? "zapisuję…" : "✕ Odrzuć i ucz model"}
+            </button>
+            {nauka === "blad" && (
+              <span className="text-xs text-data-red">
+                nie udało się zapisać — spróbuj ponownie
+              </span>
+            )}
+          </>
+        )}
+      </div>
+    </motion.div>
   );
 }

@@ -39,6 +39,7 @@ export async function POST(req: Request) {
     akcja?: unknown;
     powod?: unknown;
     profil?: unknown;
+    kupon?: unknown;
   };
   try {
     body = await req.json();
@@ -113,6 +114,62 @@ export async function POST(req: Request) {
     }
     await odpalCykl();
     return NextResponse.json({ ok: true, profil: body.profil });
+  }
+
+  // własny kupon z generatora — zapisz do nauki (rozliczy się w tle jak
+  // pominięty, zasila korelację/kalibrację i kalibrację legów)
+  if (akcja === "wlasny_nauka") {
+    const kk = body.kupon as
+      | { legi?: unknown; kurs_laczny?: unknown; p_model?: unknown }
+      | undefined;
+    if (!kk || !Array.isArray(kk.legi) || kk.legi.length < 2 || kk.legi.length > 12) {
+      return NextResponse.json({ error: "zły kupon" }, { status: 400 });
+    }
+    const legi = kk.legi
+      .map((l) => {
+        const x = l as Record<string, unknown>;
+        return {
+          mecz_id: Number(x.mecz_id) || 0,
+          mecz: String(x.mecz ?? "").slice(0, 80),
+          kickoff_ts: Number(x.kickoff_ts) || 0,
+          podmiot_id: Number(x.podmiot_id) || 0,
+          podmiot: String(x.podmiot ?? "").slice(0, 60),
+          druzyna: String(x.druzyna ?? "").slice(0, 60),
+          rynek_kod: String(x.rynek_kod ?? "").slice(0, 30),
+          rynek: String(x.rynek ?? "").slice(0, 40),
+          linia: Number(x.linia) || 0,
+          strona: x.strona === "ponizej" ? "ponizej" : "powyzej",
+          kurs: Number(x.kurs) || 0,
+          bukmacher: String(x.bukmacher ?? "Superbet").slice(0, 20),
+          p_model: Number(x.p_model) || 0,
+        };
+      })
+      .filter((l) => l.mecz_id && l.podmiot && l.kurs > 1);
+    if (legi.length < 2) {
+      return NextResponse.json({ error: "za mało poprawnych legów" }, { status: 400 });
+    }
+    const sygn = legi
+      .map((l) => `${l.mecz_id}:${l.podmiot_id}:${l.rynek_kod}:${l.linia}`)
+      .sort()
+      .join("|")
+      .slice(0, 130);
+    const wlasne = await readKey("kupony_wlasne");
+    const klucze = Object.keys(wlasne);
+    // bufor ograniczony (~40 ostatnich) — nie puchnie w nieskończoność
+    for (const k of klucze.slice(0, Math.max(0, klucze.length - 40))) {
+      delete wlasne[k];
+    }
+    wlasne[sygn] = {
+      legi,
+      kurs_laczny: Number(kk.kurs_laczny) || 0,
+      p_model: Number(kk.p_model) || 0,
+      zapisano_ts: now,
+    };
+    if (!(await writeKey("kupony_wlasne", wlasne))) {
+      return NextResponse.json({ error: "zapis nieudany" }, { status: 502 });
+    }
+    await odpalCykl();
+    return NextResponse.json({ ok: true });
   }
 
   const klucz = body.klucz;
