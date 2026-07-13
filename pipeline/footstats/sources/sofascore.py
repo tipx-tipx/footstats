@@ -12,6 +12,14 @@ Uwagi:
   * to nieoficjalne API — zawsze uruchamiać lokalnie, powoli, z cache;
   * bukmacherzy rozliczają propsy wg Opta; Sofascore też bazuje na Opta,
     więc definicje (odbiory, przechwyty) są zgodne z rozliczeniem zakładów.
+
+STATUS: NIEUŻYWANE w cyklu chmurowym (jobs/cycle.py -> build_wc_fast.py, tryb
+produkcyjny "ms2026") — Sofascore blokuje IP serwerowni/datacenter (zweryfikowane
+empirycznie), więc RateLimitedClient stąd działa TYLKO lokalnie (domowe IP).
+Cykl chmurowy MŚ jedzie na statshub+365Scores+Superbet (patrz build_wc_fast.py
+nagłówek). Ten moduł żyje w jobs/backfill.py (lokalny, jednorazowy zasiew
+danych ligowych do build_demo.py) — wróci do gry przy trybie ligowym na
+domowym IP/Pi (patrz PLAN.md).
 """
 
 from __future__ import annotations

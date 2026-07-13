@@ -204,43 +204,6 @@ def fetch_stat_odds(match_id: str, seconds: float = 12.0) -> dict:
     return parse_player_odds(payloads)
 
 
-def find_match_id(payloads: list[dict], home_en_or_pl: str, away_en_or_pl: str) -> str | None:
-    """Znajdź STS match id (fXXXX) po nazwach drużyn w katalogu i_pl (sekcja B)."""
-    from .superbet import TEAM_PL_EN
-
-    en_pl = {v: k for k, v in TEAM_PL_EN.items()}
-    targets = {
-        norm_name(home_en_or_pl), norm_name(en_pl.get(home_en_or_pl, home_en_or_pl)),
-    }, {
-        norm_name(away_en_or_pl), norm_name(en_pl.get(away_en_or_pl, away_en_or_pl)),
-    }
-
-    found = {}
-
-    def walk(o, depth=0):
-        if depth > 16 or not isinstance(o, (dict, list)):
-            return
-        if isinstance(o, dict):
-            pr = o.get("pr")
-            fid = None
-            # fixture ma pr z H/A i klucz zaczyna się od 'f'
-            if isinstance(pr, dict) and "H" in pr and "A" in pr:
-                h = norm_name((pr["H"] or {}).get("n", ""))
-                a = norm_name((pr["A"] or {}).get("n", ""))
-                if h in targets[0] and a in targets[1]:
-                    found["hit"] = o
-            for k, v in o.items():
-                walk(v, depth + 1)
-        else:
-            for v in o:
-                walk(v, depth + 1)
-
-    for body in payloads:
-        walk(body)
-    # zwróć klucz fixture — wymaga osobnego przejścia by mieć klucz; uproszczenie:
-    return found.get("hit", {}).get("_fid")
-
-
 def match_ids_by_teams() -> dict:
     """Zwróć {(norm_home, norm_away): 'fID'} dla wszystkich meczów w katalogu i_pl.
 

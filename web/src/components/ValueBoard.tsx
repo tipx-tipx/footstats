@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { BetCard } from "./BetCard";
 import type { Pewnosc, ValueBet, Zawodnik } from "@/lib/types";
@@ -232,6 +232,39 @@ export function ValueBoard({
     return () => window.removeEventListener("hashchange", scrollToHash);
   }, []);
 
+  // zakładki "rodzaj": role=tab wymaga obsługi strzałek (WAI-ARIA Tabs) —
+  // roving tabindex, Left/Right/Home/End przenoszą FOKUS I WYBÓR
+  const TABY_RODZAJ = [
+    ["pewniaki", `Pewniaki (${liczbaPewniakow})`],
+    ["sugestie", `Sugestie STS (${liczbaSugestii})`],
+    ["okazje", "Okazje z kursem"],
+    ["wszystko", "Wszystko"],
+  ] as const;
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const wybierzRodzaj = (kod: (typeof TABY_RODZAJ)[number][0]) => {
+    setRodzaj(kod);
+    // sugestie nie mają kursów — sort po kursie/przewadze wraca do
+    // "Polecane", zamiast udawać, że działa
+    if (kod === "sugestie" && !SORTY_BEZ_KURSU.includes(sortuj)) {
+      setSortuj("ranking");
+    }
+  };
+  const onTabKeyDown = (
+    e: React.KeyboardEvent<HTMLButtonElement>,
+    idx: number,
+  ) => {
+    let next = idx;
+    if (e.key === "ArrowRight") next = (idx + 1) % TABY_RODZAJ.length;
+    else if (e.key === "ArrowLeft") {
+      next = (idx - 1 + TABY_RODZAJ.length) % TABY_RODZAJ.length;
+    } else if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = TABY_RODZAJ.length - 1;
+    else return;
+    e.preventDefault();
+    wybierzRodzaj(TABY_RODZAJ[next][0]);
+    tabRefs.current[next]?.focus();
+  };
+
   return (
     <section aria-label="Lista okazji">
       {/* pasek narzędzi: rodzaj + filtry + sortowanie */}
@@ -242,26 +275,15 @@ export function ValueBoard({
             role="tablist"
             aria-label="Rodzaj pozycji"
           >
-            {([
-              ["pewniaki", `Pewniaki (${liczbaPewniakow})`],
-              ["sugestie", `Sugestie STS (${liczbaSugestii})`],
-              ["okazje", "Okazje z kursem"],
-              ["wszystko", "Wszystko"],
-            ] as const).map(([kod, label]) => (
+            {TABY_RODZAJ.map(([kod, label], i) => (
               <button
                 key={kod}
+                ref={(el) => { tabRefs.current[i] = el; }}
                 role="tab"
+                tabIndex={rodzaj === kod ? 0 : -1}
                 aria-selected={rodzaj === kod}
-                onClick={() => {
-                  setRodzaj(kod);
-                  // sugestie nie mają kursów — sort po kursie/przewadze
-                  // wraca do "Polecane", zamiast udawać, że działa
-                  if (
-                    kod === "sugestie" &&
-                    !SORTY_BEZ_KURSU.includes(sortuj)
-                  )
-                    setSortuj("ranking");
-                }}
+                onClick={() => wybierzRodzaj(kod)}
+                onKeyDown={(e) => onTabKeyDown(e, i)}
                 className={`rounded-md px-3 py-2 font-medium transition-colors ${
                   rodzaj === kod
                     ? "bg-card text-brand-deep shadow-(--shadow-card)"

@@ -77,6 +77,33 @@ def test_koncesje_wazenie_sila_rywala():
                     team_name="Marsjanie") is not None
 
 
+def test_waga_swiezosci_maleje_z_wiekiem():
+    now = 2_000_000_000.0
+    w_wczoraj = koncesje._waga_swiezosci(now - 86400, now)
+    w_3_tyg = koncesje._waga_swiezosci(now - 21 * 86400, now)
+    assert 0.0 < w_3_tyg < w_wczoraj <= 1.0
+
+
+def test_koncesje_lookup_wazy_swiezoscia():
+    # P2: 6 obserwacji ŚWIEŻYCH (3.0, wczoraj) + 6 STARYCH (1.0, 3 tyg. temu)
+    # — bez wagi świeżości surowa średnia = 2.0; z wagą profil ma ciążyć
+    # WYRAŹNIE ku świeżej (wyższej) wartości, bo stare ważą dużo mniej.
+    now = 2_000_000_000.0
+    lib = {}
+    for pid in range(6):
+        lib[f"{pid}:tackles"] = _rec(
+            pid, "tackles", ["Norwegia"], [3.0], tss=[now - 86400],
+        )
+    for pid in range(6, 12):
+        lib[f"{pid}:tackles"] = _rec(
+            pid, "tackles", ["Norwegia"], [1.0], tss=[now - 21 * 86400],
+        )
+    k = koncesje.zbuduj_koncesje(lib, {"norwegia"})
+    out = k.lookup("Norwegia", "tackles", "D", now=now)
+    assert out is not None
+    assert out[0] > 2.5  # wyraźnie bliżej 3.0 niż surowej średniej 2.0
+
+
 def test_koncesje_min_ts_odcina_stare_mecze():
     wc = {"francja", "norwegia"}
     lib = {

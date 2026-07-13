@@ -121,20 +121,12 @@ export async function getZawodnicy(): Promise<Zawodnik[]> {
   return (await loadBundle()).players;
 }
 
-export async function getZawodnik(id: number): Promise<Zawodnik | undefined> {
-  return (await getZawodnicy()).find((z) => z.id === id);
-}
-
 export async function getKalibracja(): Promise<Kalibracja> {
   return (await loadBundle()).calibration;
 }
 
 export async function getMeta(): Promise<Meta> {
   return (await loadBundle()).meta;
-}
-
-export async function getBetsForMatch(matchId: number): Promise<ValueBet[]> {
-  return (await getValueBets()).filter((b) => b.mecz_id === matchId);
 }
 
 export async function getKupony(): Promise<Kupon[]> {

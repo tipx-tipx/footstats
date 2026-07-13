@@ -47,8 +47,6 @@ export function Nav() {
     };
   }, [open]);
 
-  if (pathname === "/login") return null;
-
   return (
     <header className="sticky top-0 z-40 border-b border-hairline bg-card/90 backdrop-blur-md">
       <div className="mx-auto flex h-14 max-w-6xl items-center gap-5 px-4 sm:px-6">

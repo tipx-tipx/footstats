@@ -1,10 +1,6 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Mono, IBM_Plex_Sans, Sora } from "next/font/google";
 import "./globals.css";
-import { MainShell } from "@/components/MainShell";
-import { Nav } from "@/components/Nav";
-import { SiteFooter } from "@/components/SiteFooter";
-import { getMeta } from "@/lib/data";
 
 const sora = Sora({
   subsets: ["latin", "latin-ext"],
@@ -33,33 +29,15 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const meta = await getMeta();
-  const aktualizacja = new Intl.DateTimeFormat("pl-PL", {
-    day: "numeric",
-    month: "long",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "Europe/Warsaw",
-  }).format(new Date(meta.wygenerowano_ts * 1000));
   return (
     <html
       lang="pl"
       className={`${sora.variable} ${plexSans.variable} ${plexMono.variable} h-full`}
     >
-      <body className="flex min-h-full flex-col">
-        <Nav />
-        <MainShell>{children}</MainShell>
-        <SiteFooter
-          zrodlo={meta.zrodlo}
-          liga={meta.liga}
-          sezon={meta.sezon}
-          meczow={meta.meczow_w_bazie}
-          aktualizacja={aktualizacja}
-        />
-      </body>
+      <body className="flex min-h-full flex-col">{children}</body>
     </html>
   );
 }

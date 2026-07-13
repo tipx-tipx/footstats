@@ -90,14 +90,26 @@ export function TopPokrycia({
 
   const boks = (g: GraForma, key: number) => {
     const zaliczyl = g.v >= 1;
+    const opis = `${g.rywal ? `vs ${g.rywal}` : "mecz"}, ${dataMeczu(g.ts)}, ${g.minuty} minut, ${
+      g.kadra ? "reprezentacja" : "klub"
+    }`;
+    const pokaz = (e: { currentTarget: HTMLElement }) => {
+      const r = e.currentTarget.getBoundingClientRect();
+      setTip({ x: r.left + r.width / 2, y: r.top, g });
+    };
     return (
       <span
         key={key}
-        onMouseEnter={(e) => {
-          const r = e.currentTarget.getBoundingClientRect();
-          setTip({ x: r.left + r.width / 2, y: r.top, g });
-        }}
+        tabIndex={0}
+        aria-label={opis}
+        onMouseEnter={pokaz}
         onMouseLeave={() => setTip(null)}
+        onFocus={pokaz}
+        onBlur={() => setTip(null)}
+        // dotyk: tap pokazuje tooltip (mobile nie ma hover) — zostaje widoczny
+        // do kolejnego tapnięcia gdzie indziej (proste, bez wyścigu ze
+        // zdarzeniami mouseenter, które przeglądarki syntetyzują po dotyku)
+        onClick={pokaz}
         className={`font-data inline-flex h-6 w-6 cursor-default items-center justify-center rounded text-[11px] font-semibold text-white transition-transform hover:scale-110 ${
           zaliczyl ? "bg-data-green" : "bg-data-red"
         }`}

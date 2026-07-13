@@ -13,6 +13,23 @@ from __future__ import annotations
 
 from scipy import optimize, stats
 
+# Licznik cichych fallbacków w BIEŻĄCYM cyklu — _total_from_line/
+# _spread_from_home_prob wracały do neutralnej wartości (2.6 / 0.0) bez
+# śladu, gdy solver nie zbiegł. Bez tego nie było wiadomo, jak często tempo
+# meczu jest ZGADYWANE zamiast liczone z realnych kursów. reset_fallback_
+# stats() wołane na początku cyklu (build_wc_fast.py), fallback_stats() do
+# logu na końcu.
+_fallback_stats = {"total_ok": 0, "total_fallback": 0, "spread_ok": 0, "spread_fallback": 0}
+
+
+def reset_fallback_stats() -> None:
+    for k in _fallback_stats:
+        _fallback_stats[k] = 0
+
+
+def fallback_stats() -> dict:
+    return dict(_fallback_stats)
+
 
 def _devig(odds: list[float]) -> list[float]:
     """Usuń marżę metodą POTĘGOWĄ — spójnie z betting.implied_probs_two_way.
@@ -44,8 +61,11 @@ def _total_from_line(line: float, p_over: float) -> float:
         return float(stats.poisson.sf(thr, t)) - p_over
 
     try:
-        return float(optimize.brentq(f, 0.2, 7.0))
+        v = float(optimize.brentq(f, 0.2, 7.0))
+        _fallback_stats["total_ok"] += 1
+        return v
     except ValueError:
+        _fallback_stats["total_fallback"] += 1
         return 2.6
 
 
@@ -66,8 +86,11 @@ def _spread_from_home_prob(total: float, p_home: float, p_away: float) -> float:
         return ph / max(ph + pa, 1e-9) - cel
 
     try:
-        return float(optimize.brentq(f, -total + 0.1, total - 0.1))
+        v = float(optimize.brentq(f, -total + 0.1, total - 0.1))
+        _fallback_stats["spread_ok"] += 1
+        return v
     except ValueError:
+        _fallback_stats["spread_fallback"] += 1
         return 0.0
 
 

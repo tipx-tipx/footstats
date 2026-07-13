@@ -70,6 +70,12 @@ class MatchContext:
     # gotowy opis koncesji rywala z liczbami (model/koncesje.py) do uzasadnienia
     opponent_concession_opis: str = ""
     referee_fouls_multiplier: float | None = None
+    # NIEUŻYWANE w trybie MŚ: build_wc_fast.py nigdy go nie ustawia (zawsze
+    # None -> referee_factor dostaje neutralne 1.0), bo "yellow_card" nigdy
+    # nie pojawia się jako market_code w tym trybie (statshub/365/bank nie
+    # generują dla niego trendów, choć Superbet kwotuje kartki — superbet.py).
+    # Dopiero gdyby ktoś aktywował rynek kartek w WC, trzeba by go tu wypełnić
+    # osobnym profil_sedziow() dla kartek (dziś liczony tylko dla fauli).
     referee_cards_multiplier: float | None = None
     referee_sample_matches: int = 0
     official_started: bool | None = None          # None = skład nieogłoszony

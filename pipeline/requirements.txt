@@ -1,6 +1,10 @@
-numpy>=1.26
-scipy>=1.11
-curl_cffi>=0.7
-psycopg[binary]>=3.1
-python-dotenv>=1.0
-pytest>=8.0
+# Górne widełki: cron w cycle.yml robi `pip install` na świeżym venv co cykl
+# (brak lock file'a) — bez ograniczenia major/major-w-0.x nowa wersja mogłaby
+# cicho złamać produkcyjny cykl bez żadnego ostrzeżenia. psycopg USUNIĘTE —
+# nieużywane nigdzie w kodzie (Supabase idzie przez REST/curl_cffi, nie
+# bezpośrednie połączenie Postgres) i nawet nie było zainstalowane.
+numpy>=1.26,<3.0
+scipy>=1.11,<2.0
+curl_cffi>=0.7,<1.0
+python-dotenv>=1.0,<2.0
+pytest>=8.0,<10.0

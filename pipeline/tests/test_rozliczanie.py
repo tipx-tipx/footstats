@@ -85,6 +85,27 @@ def _kupon(cel_label="5–10", horyzont="dzienny", legi=None):
     }
 
 
+def test_kupon_leg_niesie_flagi_do_typy_log():
+    # P0: legi trafiające do typy_log WYŁĄCZNIE przez kupon (żaden value_bet
+    # ich nie publikuje osobno) muszą przenosić miekka_linia/xi_sygnal/
+    # kurs_ref/wyzsza_linia — inaczej diagnostyka per kategoria ma ślepą plamę
+    # na większości puli (patrz kupony.py:_leg_dict + rozliczanie.py:rozlicz).
+    leg = _leg(1, 11)
+    leg.update(
+        miekka_linia=True, xi_sygnal="official", kurs_ref=2.05,
+        wyzsza_linia=True, matchup=True, rotacja=False,
+    )
+    log: dict = {}
+    rozliczanie._dopisz_nowe(log, [rozliczanie._kupon_leg_do_logu(leg)])
+    assert len(log) == 1
+    rec = next(iter(log.values()))
+    assert rec["miekka_linia"] is True
+    assert rec["xi_sygnal"] == "official"
+    assert rec["kurs_ref"] == 2.05
+    assert rec["wyzsza_linia"] is True
+    assert rec["matchup"] is True
+
+
 def test_kupon_zamrozony_po_publikacji():
     log = {}
     rozliczanie._kupon_do_logu(log, [_kupon()], now=1_000)

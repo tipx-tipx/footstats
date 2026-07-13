@@ -94,11 +94,48 @@ def test_kupony_diagnostyka_kalibracja_i_korelacja():
     assert d["korelacja"]["przeciwne"]["obs_oba"] == 0.0
 
 
-def test_kupony_diagnostyka_pomija_pominiete():
-    log = {"k": {"horyzont": "value", "p_model": 0.3, "wynik": "wygrany",
-                 "pominiety": True, "legi": []}}
+def test_kupony_diagnostyka_pomija_konfiguracje_i_techniczne():
+    # P0: to jedyne 2 kategorie, które mają wypaść — stare sloty po zmianie
+    # konfiguracji (nie odzwierciedlają żadnej decyzji) i techniczne
+    # pominięcia, gdzie te same legi i tak wejdą do nauki przez nowy wariant
+    log = {
+        "k_konf": {
+            "horyzont": "value", "p_model": 0.3, "wynik": "wygrany",
+            "pominiety": True, "pominiety_przez": "konfiguracja", "legi": [],
+        },
+        "k_wymiana": {
+            "horyzont": "value", "p_model": 0.3, "wynik": "wygrany",
+            "pominiety": True, "pominiety_przez": "user",
+            "pomin_powod": "wymiana lega", "legi": [],
+        },
+        "k_przebudowa": {
+            "horyzont": "value", "p_model": 0.3, "wynik": "przegrany",
+            "pominiety": True, "pominiety_przez": "user",
+            "pomin_powod": "przebudowa po składach", "legi": [],
+        },
+    }
     d = rozliczanie.compute_kupony_diagnostyka(log)
     assert d["kalibracja"] == {} and d["korelacja"] == {}
+
+
+def test_kupony_diagnostyka_liczy_user_pominiete_i_wlasne():
+    # P0 fix: user-pominięte ("nie zagrałem") i własne (generator „ucz
+    # model") MAJĄ realne rozliczone wyniki i są właśnie po to, żeby zasilać
+    # korelację/kalibrację — wcześniej `not pominiety` je wszystkie ucinało.
+    log = {
+        "k_user": {
+            "horyzont": "dzienny", "p_model": 0.4, "wynik": "wygrany",
+            "pominiety": True, "pominiety_przez": "user",
+            "pomin_powod": "nie zagrałem", "legi": [],
+        },
+        "k_wlasny": {
+            "horyzont": "wlasny", "p_model": 0.4, "wynik": "przegrany",
+            "pominiety": True, "pominiety_przez": "user", "legi": [],
+        },
+    }
+    d = rozliczanie.compute_kupony_diagnostyka(log)
+    assert d["kalibracja"]["dzienny"]["n"] == 1
+    assert d["kalibracja"]["wlasny"]["n"] == 1
 
 
 def test_kary_z_diagnostyki_shrinkage():

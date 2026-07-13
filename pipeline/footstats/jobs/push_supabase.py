@@ -16,6 +16,13 @@ import sys
 from pathlib import Path
 
 WEB_DATA_DIR = Path(__file__).resolve().parent.parent.parent.parent / "web" / "src" / "data" / "demo"
+# "calibration" NIE jest generowane przez build_wc_fast.py (tryb MŚ) — tylko
+# przez build_demo.py (tryb ligowy). To NIE martwy klucz: /model faktycznie
+# renderuje getKalibracja() ("Kalibracja po rynkach", jednorazowy backtest
+# silnika na Premier League — dowód, że rdzeń modelu działa, obok bieżącej
+# diagnostyki MŚ z typy_wyniki). Manifest (patrz build_wc_fast._generated_
+# this_run) chroni tę wartość przed nadpisaniem starym plikiem z checkoutu —
+# cykl MŚ po prostu nigdy jej nie dotyka, zostaje ostatni zapis build_demo.
 KEYS = ["value_bets", "matches", "players", "calibration", "meta", "kupony",
         "typy_wyniki", "odds_superbet", "legi_pool"]
 
@@ -28,8 +35,27 @@ def push() -> bool:
 
     from curl_cffi import requests
 
+    # Jeśli job zostawił manifest (_manifest.json = klucze faktycznie
+    # zapisane W TYM uruchomieniu), pushujemy WYŁĄCZNIE te klucze. Bez tego
+    # przy wczesnym przerwaniu cyklu (np. statshub padł w środku) pliki
+    # niedotknięte w tym uruchomieniu zostają w wersji ze świeżego
+    # `git checkout` (stare/puste dane commitowane w repo) i zostałyby
+    # cicho wypchnięte na produkcję, nadpisując żywe dane starymi.
+    # Brak manifestu (stare joby, np. build_demo.py, lub ręczne odpalenie
+    # bez pełnego przebiegu) = stare zachowanie: push wszystkiego co jest.
+    manifest = WEB_DATA_DIR / "_manifest.json"
+    generated: set[str] | None = None
+    if manifest.exists():
+        try:
+            generated = set(json.loads(manifest.read_text(encoding="utf-8")).get("keys", []))
+        except Exception:
+            generated = None
+
     rows = []
     for name in KEYS:
+        if generated is not None and name not in generated:
+            print(f"Supabase: pomijam '{name}' (niewygenerowany w tym cyklu).")
+            continue
         f = WEB_DATA_DIR / f"{name}.json"
         if f.exists():
             rows.append({"key": name, "payload": json.loads(f.read_text(encoding="utf-8"))})

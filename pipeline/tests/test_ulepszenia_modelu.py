@@ -37,6 +37,40 @@ def test_tempo_symetryczny_mecz():
     assert t["total"] == 2.6          # fallback bez rynku goli
 
 
+# ---- P2: telemetria cichych fallbacków tempo (solver nie zbiegł) ----
+
+def test_total_from_line_zlicza_fallback_gdy_solver_nie_zbiega():
+    tempo.reset_fallback_stats()
+    v = tempo._total_from_line(50.0, 0.9)  # próg nieosiągalny w [0.2, 7.0]
+    assert v == 2.6
+    assert tempo.fallback_stats() == {
+        "total_ok": 0, "total_fallback": 1, "spread_ok": 0, "spread_fallback": 0,
+    }
+
+
+def test_total_from_line_zlicza_ok_gdy_solver_zbiega():
+    tempo.reset_fallback_stats()
+    tempo._total_from_line(1.5, 0.5)
+    fs = tempo.fallback_stats()
+    assert fs["total_ok"] == 1 and fs["total_fallback"] == 0
+
+
+def test_spread_from_home_prob_zlicza_fallback_gdy_solver_nie_zbiega():
+    tempo.reset_fallback_stats()
+    v = tempo._spread_from_home_prob(0.05, 0.95, 0.02)
+    assert v == 0.0
+    fs = tempo.fallback_stats()
+    assert fs["spread_fallback"] == 1 and fs["spread_ok"] == 0
+
+
+def test_reset_fallback_stats_zeruje_liczniki():
+    tempo._total_from_line(50.0, 0.9)
+    tempo.reset_fallback_stats()
+    assert tempo.fallback_stats() == {
+        "total_ok": 0, "total_fallback": 0, "spread_ok": 0, "spread_fallback": 0,
+    }
+
+
 # ---- Elo: waga próby i syntetyczny spread ----
 
 def test_elo_waga_proby_ciagla():

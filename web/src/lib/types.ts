@@ -105,6 +105,10 @@ export interface LegPool {
   kurs_oczekiwany?: number | null;
   ryzyko?: Ryzyko;
   oczekiwane_minuty?: number | null;
+  wyzsza_linia?: boolean;
+  xi_sygnal?: string | null;
+  kurs_ref?: number | null;
+  pewnosc?: "wysoka" | "srednia";
 }
 
 export interface Mecz {

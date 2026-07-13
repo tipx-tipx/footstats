@@ -229,6 +229,12 @@ class ValueAssessment:
 MIN_EV_PCT = 1.0   # decyzja użytkownika 2026-07-03: pokazuj każdą dodatnią wartość od +1%
 MIN_EV_PCT_RARE = 5.0
 MIN_CONFIDENCE_SCORE = 25.0
+# MAX_MODEL_MARKET_DIVERGENCE/MAX_RELATIVE_DIVERGENCE: ZAŁOŻENIA ustawione "na
+# oko" (jak było UK_CONSENSUS_MARGIN przed pomiarem) — nie ma jeszcze gruntu
+# kalibracji mierzącego, ile typów odrzuconych tymi progami faktycznie by
+# trafiło, gdyby je przepuścić. Kandydat na kolejny "grunt pomiaru": logować w
+# typy_log próbki TUŻ PONIŻEJ progu (odrzucone, ale bliskie) i porównać ich
+# realny hit-rate z przepuszczonymi, zanim ruszy się same liczby.
 MAX_MODEL_MARKET_DIVERGENCE = 0.22  # różnica p_model vs p_rynku > 22 pp = podejrzana
 MAX_RELATIVE_DIVERGENCE = 1.9       # p_model / p_rynku > 1.9x = podejrzane (longshoty!)
 MAX_ODDS = 6.0                      # kursy wyżej to loteria, nie systematyczny betting

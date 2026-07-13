@@ -92,11 +92,28 @@ def norm_name(name: str) -> str:
     return " ".join(tokens)
 
 
-def _get(url: str, min_interval: float = 1.5) -> dict:
-    time.sleep(min_interval)
-    r = requests.get(url, impersonate="chrome124", timeout=25, headers=HEADERS)
-    r.raise_for_status()
-    return r.json()
+def _get(url: str, min_interval: float = 1.5, retries: int = 3) -> dict:
+    """GET z retry (jak statshub._get) — bez tego jeden nieudany request i
+    dany mecz zostaje bez kursów Superbet do następnego cyklu (typy/kupony na
+    ten mecz milkną). 429/403 (throttling) dostają znacznie dłuższe
+    wychłodzenie niż timeout/5xx — jak http_client.RateLimitedClient — żeby
+    kolejna próba w trakcie "chłodzenia" źródła nie eskalowała blokady."""
+    last: Exception = RuntimeError(f"nie udało się pobrać: {url}")
+    for attempt in range(retries):
+        time.sleep(min_interval)
+        try:
+            r = requests.get(url, impersonate="chrome124", timeout=25, headers=HEADERS)
+        except Exception as e:  # timeout, błąd sieci
+            last = e
+            if attempt < retries - 1:
+                time.sleep(3 * (attempt + 1))
+            continue
+        if r.status_code == 200:
+            return r.json()
+        last = RuntimeError(f"Superbet {r.status_code}: {url}")
+        if attempt < retries - 1:
+            time.sleep(60 * (attempt + 1) if r.status_code in (403, 429) else 3 * (attempt + 1))
+    raise last
 
 
 def list_events(days_ahead: int = 7) -> list[dict]:

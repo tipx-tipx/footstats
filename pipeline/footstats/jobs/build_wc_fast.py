@@ -48,11 +48,22 @@ SH_BASE = "https://www.statshub.com/api"
 SH_HEADERS = {"Accept": "application/json", "Referer": "https://www.statshub.com/"}
 
 
+# Klucze faktycznie zapisane w BIEŻĄCYM uruchomieniu main() — manifest na końcu
+# cyklu mówi push_supabase.py, które pliki wolno wypchnąć. Bez tego awaria w
+# środku cyklu (np. statshub padnie) kończy się `return` PRZED dumpem części
+# plików — zostają w wersji ze świeżego `git checkout` (stare/puste dane
+# commitowane w repo), a push_supabase i tak by je wypchnął na produkcję,
+# cicho nadpisując żywe dane w Supabase starymi.
+_generated_this_run: set[str] = set()
+
+
 def _dump(name: str, obj) -> None:
     WEB_DATA_DIR.mkdir(parents=True, exist_ok=True)
     (WEB_DATA_DIR / name).write_text(
         json.dumps(obj, ensure_ascii=False, indent=1), encoding="utf-8"
     )
+    if name.endswith(".json"):
+        _generated_this_run.add(name[:-5])
 
 
 def _rozlicz_i_zapisz(
@@ -88,6 +99,24 @@ def _rozlicz_i_zapisz(
 WC_UTID = 16
 # nazwy reprezentacji EN -> PL (do dopasowania z Superbetem)
 EN_PL = {v: k for k, v in superbet.TEAM_PL_EN.items()}
+# MŚ 2026 to NIE jest w pełni neutralny turniej — USA/Meksyk/Kanada są
+# współgospodarzami i grają większość swoich meczów u siebie. Nazwy w
+# formacie statshub (angielski), zgodnym z wartościami TEAM_PL_EN wyżej.
+WC26_HOST_NATIONS = {"USA", "Mexico", "Canada"}
+
+
+def venue_context(team_name: str, opponent_name: str, is_home_raw: bool) -> tuple[bool, bool]:
+    """(is_home, neutral_venue) dla MatchContext, z uwzględnieniem gospodarzy
+    MŚ 2026. Gdy jedna z drużyn jest gospodarzem, mecz NIE jest neutralny —
+    gospodarz gra u siebie niezależnie od tego, co statshub oznaczył jako
+    "home team" w samej parze (to pole bywa administracyjne w turniejach).
+    Gdy żadna drużyna nie jest gospodarzem, mecz jest na neutralnym terenie
+    (kraj trzeci) i zostaje bez efektu dom/wyjazd, jak dotychczas."""
+    host_team = team_name in WC26_HOST_NATIONS
+    host_opp = opponent_name in WC26_HOST_NATIONS
+    is_host_match = host_team or host_opp
+    is_home = host_team if is_host_match else is_home_raw
+    return is_home, not is_host_match
 
 
 def _sh(url: str) -> dict:
@@ -417,12 +446,20 @@ def score_from_trend(
     # nie ma — profil koncesji rywala per rynek×pozycja z banku (koncesje.py)
     opp_allowed = trend.opponent_average
     opp_avg = trend.league_average
+    # 6 = ZAŁOŻENIE, nie zmierzona wielkość próby: statshub NIE ujawnia w API
+    # (props/player-trends), z ilu meczów liczy opponentAverage — sprawdzone
+    # w StatshubTrend/fetch_event_trends, brak takiego pola. shrink_factor()
+    # ściąga więc ZAWSZE tym samym k=6/(6+12)=0.33, niezależnie od realnej
+    # (nieznanej) próby. Fallback niżej (koncesje.py, gdy statshub milczy) MA
+    # prawdziwe n_meczy z własnego banku — nie ten przypadek. Nie zgadywać
+    # innej stałej bez danych; ew. do zmierzenia jak marża UK (porównać
+    # kalibrację rekordów z opp_n=6 vs rekordów z realnym n z koncesje.py).
     opp_n = 6 if trend.opponent_average else 0
     koncesja_opis = ""
     if opp_allowed is None and koncesje_tab is not None:
         kc = koncesje_tab.lookup(
             trend.opponent_name, trend.market_code, trend.position,
-            elo_map=elo_map, team_name=trend.team_name,
+            elo_map=elo_map, team_name=trend.team_name, now=now,
         )
         if kc:
             opp_allowed, opp_avg, opp_n = kc
@@ -432,10 +469,13 @@ def score_from_trend(
                 f"{trend.opponent_name} ~{opp_allowed:.2f} na 90 min przy "
                 f"normie {opp_avg:.2f} (próba: {opp_n} meczów)"
             )
+    ctx_is_home, ctx_neutral_venue = venue_context(
+        trend.team_name, trend.opponent_name, trend.is_home
+    )
     ctx = MatchContext(
-        is_home=trend.is_home,
+        is_home=ctx_is_home,
         is_favourite=bool(spread_teamu is not None and spread_teamu > 0.15),
-        neutral_venue=True,
+        neutral_venue=ctx_neutral_venue,
         implied_spread=spread_teamu,
         implied_total=total,
         opponent_allowed_per90=opp_allowed,
@@ -456,7 +496,18 @@ def score_from_trend(
     return (prior, ctx), hist
 
 
-def main():
+def main() -> None:
+    """Cienki wrapper: gwarantuje zapis manifestu (_manifest.json) na KAŻDYM
+    wyjściu z _main_impl (sukces, wczesny return, wyjątek) — patrz komentarz
+    przy _generated_this_run wyżej."""
+    _generated_this_run.clear()
+    try:
+        _main_impl()
+    finally:
+        _dump("_manifest.json", {"keys": sorted(_generated_this_run)})
+
+
+def _main_impl():
     events = upcoming_wc_events()
     print(f"Nadchodzące mecze MŚ (statshub): {len(events)}")
     if not events:
@@ -820,6 +871,7 @@ def main():
 
     ev_by_id = {e["id"]: e for e in events}
     sb_cache: dict[int, dict] = {}
+    tempo.reset_fallback_stats()
     tempo_cache: dict[int, dict | None] = {}  # mid -> tempo z kursów 1X2/goli
     # pełna siatka kursów Superbet (over) do widoku TOP POKRYCIA na stronie
     # meczu: mecz_id -> player_id -> rynek -> "linia" -> kurs. Zbierana z tej
@@ -1189,10 +1241,15 @@ def main():
                     # EV vs Superbet zawsze; no-vig UK gdy jest konsensus na tej linii
                     ev_pct_leg = round((p_side * odd - 1.0) * 100.0, 1)
                     ev_uk_leg = None
+                    kurs_ref_leg = None
                     if (
                         tr.ref_odds and abs(l - tr.line) < 1e-6
                         and tr.odds_type == "over" and side_key == "over"
                     ):
+                        # mediana UK — do KALIBRACJI marży UK z rozliczeń (rozliczanie.py
+                        # potrzebuje kurs_ref w typy_log; bez niego legi trafiające do
+                        # logu WYŁĄCZNIE przez kupon są ślepą plamą dla tej diagnostyki)
+                        kurs_ref_leg = round(statistics.median(tr.ref_odds), 2)
                         _nv = betting.no_vig_prob_uk(tr.ref_odds)
                         if _nv:
                             ev_uk_leg = round((_nv[0] * odd - 1.0) * 100.0, 1)
@@ -1204,7 +1261,11 @@ def main():
                         "rynek_kod": mk, "rynek": MARKET_NAMES_PL[mk], "linia": l,
                         "strona": side_pl, "kurs": odd,
                         "bukmacher": sv[1], "p_model": round(p_side, 4),
-                        "ev_pct": ev_pct_leg, "ev_uk": ev_uk_leg,
+                        "ev_pct": ev_pct_leg, "ev_uk": ev_uk_leg, "kurs_ref": kurs_ref_leg,
+                        # ta sama formuła co w value_bets (spójne z pewnosc_score
+                        # backendu) — generator na żądanie (GeneratorKuponu) tego
+                        # dotąd nie miał, więc nie mógł filtrować jak styl "value"
+                        "pewnosc": "wysoka" if (sm.ci_high - sm.ci_low) <= 0.18 else "srednia",
                         "matchup": matchup_typ, "rotacja": rotacja,
                         "xi_sygnal": xi_sygnal,
                         "swieze_sklady": mid in swieze_mids,
@@ -1484,6 +1545,13 @@ def main():
         "przeciwnik", "rynek_kod", "rynek", "linia", "strona", "kurs", "bukmacher",
         "p_model", "matchup", "rotacja", "miekka_linia", "swieze_sklady",
         "ev_pct", "ev_uk", "kurs_oczekiwany", "ryzyko", "oczekiwane_minuty",
+        # wyzsza_linia/xi_sygnal/kurs_ref — muszą jechać aż do typy_log przez
+        # kupony własne (generator na żądanie), inaczej te legi są ślepą
+        # plamą w diagnostyce miękkich linii/sygnałów XI/marży UK (patrz
+        # kupony.py:_leg_dict i rozliczanie.py:rozlicz, ten sam fix)
+        "wyzsza_linia", "xi_sygnal", "kurs_ref",
+        # pewnosc — do filtrowania w GeneratorKuponu jak backendowy styl "value"
+        "pewnosc",
     )
     _dump("legi_pool.json", [
         {**{k: b.get(k) for k in _POLA_LEGA}, "id": i}
@@ -1492,6 +1560,12 @@ def main():
     n_dzis = len({b["mecz_id"] for b in legi_pool
                   if b["kickoff_ts"] <= time.time() + kupony.OKNO_DZIS_S})
     print(f"Pula kuponów: {len(legi_pool)} legów, meczów w oknie dziennym: {n_dzis}")
+    fs = tempo.fallback_stats()
+    n_total = fs["total_ok"] + fs["total_fallback"]
+    n_spread = fs["spread_ok"] + fs["spread_fallback"]
+    if fs["total_fallback"] or fs["spread_fallback"]:
+        print(f"Tempo meczów: total zgadywany (2.6) {fs['total_fallback']}/{n_total}, "
+              f"spread zgadywany (0.0) {fs['spread_fallback']}/{n_spread}")
     profil_kuponow = str(supa.get_key("kupony_profil") or "zbalansowany")
     if profil_kuponow not in ("bezpieczny", "zbalansowany", "agresywny"):
         profil_kuponow = "zbalansowany"

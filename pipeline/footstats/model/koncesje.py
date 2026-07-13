@@ -13,12 +13,26 @@ istniejący czynnik "rywal" (shrink + cap w context.opponent_factor).
 
 from __future__ import annotations
 
+import math
+import time
 from collections import defaultdict
 
 from ..sources import eloratings, rotowire
 
 MIN_MINUTY_OBS = 20.0   # występ krótszy niż 20 minut nie mówi nic o rywalu
 MIN_OBS_NORMA = 12      # norma turnieju wymaga sensownej próby globalnej
+# half-life świeżości obserwacji koncesji — 5x krótszy niż counts.
+# DEFAULT_TAU_DAYS (180, skalowane pod CAŁY sezon klubowy): profil koncesji
+# żyje tylko w oknie turnieju (tygodnie, nie sezon), więc mecz sprzed 3
+# tygodni powinien ważyć wyraźnie mniej niż wczorajszy — ZAŁOŻENIE (jak
+# UK_CONSENSUS_MARGIN), nie zmierzone: za mało rozliczeń typów z koncesji,
+# żeby to skalibrować jak marżę UK.
+KONCESJA_TAU_DAYS = 14.0
+
+
+def _waga_swiezosci(ts: float, now: float, tau_days: float = KONCESJA_TAU_DAYS) -> float:
+    dni = max(now - ts, 0.0) / 86400.0
+    return math.exp(-dni / tau_days)
 
 
 def _waga_podobienstwa(elo_obs: int | None, elo_ref: int | None) -> float:
@@ -67,12 +81,16 @@ class Koncesje:
         pozycja: str | None,
         elo_map: dict[str, int] | None = None,
         team_name: str | None = None,
+        now: float | None = None,
     ) -> tuple[float, float, int] | None:
         """(dopuszczane_per90, norma_per90, ~liczba_meczy) albo None.
 
         elo_map + team_name (drużyna NASZEGO zawodnika): obserwacje ważone
         podobieństwem siły — to, co rywal dopuszczał drużynom podobnej klasy,
-        mówi najwięcej o nadchodzącym meczu.
+        mówi najwięcej o nadchodzącym meczu. `now` (domyślnie: bieżący czas):
+        obserwacje ważone też ŚWIEŻOŚCIĄ (KONCESJA_TAU_DAYS) — mecz sprzed 3
+        tygodni turnieju liczy się mniej niż wczorajszy, spójnie z resztą
+        modelu (counts.fit_posterior, minutes.estimate_minutes).
         """
         kub = kubelek_pozycji(pozycja)
         if not kub:
@@ -81,11 +99,12 @@ class Koncesje:
         base = self._base.get((market, kub))
         if not obs or not base or len(base) < MIN_OBS_NORMA:
             return None
+        now_ts = now if now is not None else time.time()
         elo_ref = (elo_map or {}).get(eloratings._norm(team_name or ""))
         wagi = [
-            _waga_podobienstwa((elo_map or {}).get(eloratings._norm(tn)), elo_ref)
-            if elo_map else 1.0
-            for _, _, _, tn in obs
+            (_waga_podobienstwa((elo_map or {}).get(eloratings._norm(tn)), elo_ref)
+             if elo_map else 1.0) * _waga_swiezosci(ts, now_ts)
+            for _, _, ts, tn in obs
         ]
         suma_min = sum(w * m for w, (_, m, _, _) in zip(wagi, obs))
         base_min = sum(m for _, m in base)

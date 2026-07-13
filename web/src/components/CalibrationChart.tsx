@@ -28,8 +28,8 @@ export function CalibrationChart({
       <svg
         viewBox={`0 0 ${size} ${size}`}
         className="h-auto w-full"
-        role="img"
-        aria-label="Wykres kalibracji: przewidywana szansa na osi poziomej, rzeczywista częstość na pionowej"
+        role="group"
+        aria-label="Wykres kalibracji: przewidywana szansa na osi poziomej, rzeczywista częstość na pionowej. Punkty poniżej opisują pojedyncze kubełki."
       >
         {/* siatka */}
         {[0, 0.25, 0.5, 0.75, 1].map((t) => (
@@ -72,10 +72,13 @@ export function CalibrationChart({
         >
           ideał
         </text>
-        {/* punkty kubełków */}
+        {/* punkty kubełków — tabIndex/focus dla klawiatury, onClick dla
+            dotyku (mobile nie ma hover, title= tam nigdy się nie pokazuje) */}
         {bins.map((b, i) => (
           <circle
             key={i}
+            tabIndex={0}
+            aria-label={`przewidywane ${fmtProc(b.p_pred)}, realnie ${fmtProc(b.p_real)}, ${b.n} predykcji`}
             cx={x(b.p_pred)}
             cy={y(b.p_real)}
             r={5 + 5 * Math.sqrt(b.n / maxN)}
@@ -83,8 +86,15 @@ export function CalibrationChart({
             fillOpacity={hover === i ? 0.95 : 0.75}
             stroke="var(--color-card)"
             strokeWidth="2"
+            className="cursor-pointer outline-none focus-visible:stroke-(--color-brand)"
             onMouseEnter={() => setHover(i)}
             onMouseLeave={() => setHover(null)}
+            onFocus={() => setHover(i)}
+            onBlur={() => setHover(null)}
+            // dotyk: tap pokazuje tooltip (mobile nie ma hover) — zostaje
+            // widoczny do kolejnego tapnięcia gdzie indziej, bez wyścigu ze
+            // zdarzeniami mouseenter syntetyzowanymi po dotyku
+            onClick={() => setHover(i)}
           />
         ))}
         {/* podpisy osi */}

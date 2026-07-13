@@ -1,8 +1,8 @@
-"use client";
-
-import { usePathname } from "next/navigation";
-
-/** Stopka — ukryta na ekranie logowania. */
+/**
+ * Stopka. Renderowana WYŁĄCZNIE w app/(app)/layout.tsx — /login żyje poza tą
+ * grupą tras i tego nie widzi, więc nie trzeba już sprawdzać pathname
+ * (server component, bez "use client").
+ */
 export function SiteFooter({
   zrodlo,
   liga,
@@ -16,8 +16,6 @@ export function SiteFooter({
   meczow: number;
   aktualizacja: string;
 }) {
-  const pathname = usePathname();
-  if (pathname === "/login") return null;
   return (
     <footer className="border-t border-hairline bg-card">
       <div className="mx-auto flex max-w-6xl flex-col gap-1 px-4 py-6 text-xs text-faint sm:px-6">

@@ -29,6 +29,12 @@ from ..model import betting, counts, matchup
 
 WEB_DATA_DIR = Path(__file__).resolve().parent.parent.parent.parent / "web" / "src" / "data" / "demo"
 
+# Klucze zapisane w BIEŻĄCYM uruchomieniu — patrz komentarz przy tej samej
+# zmiennej w build_wc_fast.py. Manifest chroni push_supabase.py przed
+# wypchnięciem na produkcję plików ze świeżego `git checkout` (stare dane
+# commitowane w repo), gdy main() przerwie się przed dumpem.
+_generated_this_run: set[str] = set()
+
 PLAYER_MARKETS = [
     "shots", "sot", "shots_outside_box", "sot_outside_box", "headed_shots",
     "headed_sot", "fh_shots", "fh_sot", "fouls_committed", "fouls_won",
@@ -336,7 +342,21 @@ def score_one(mk, line, hist, prior, ctx, over_odds, under_odds, card_conv=None)
 # forma zawodnika w UI ma pokazywać FAKTYCZNĄ statystykę rynku (dla kartek: kartki)
 
 
-def main():
+def main() -> None:
+    """Cienki wrapper: gwarantuje zapis manifestu (_manifest.json) na KAŻDYM
+    wyjściu z _main_impl (sukces, wczesny return, wyjątek)."""
+    _generated_this_run.clear()
+    try:
+        _main_impl()
+    finally:
+        WEB_DATA_DIR.mkdir(parents=True, exist_ok=True)
+        (WEB_DATA_DIR / "_manifest.json").write_text(
+            json.dumps({"keys": sorted(_generated_this_run)}, ensure_ascii=False),
+            encoding="utf-8",
+        )
+
+
+def _main_impl():
     rng = np.random.default_rng(2026)
     matches, by_match_players, by_match_teams = load_store()
     if len(matches) < N_DEMO_MATCHES + N_CALIB_MATCHES + 10:
@@ -728,6 +748,8 @@ def main():
         (WEB_DATA_DIR / name).write_text(
             json.dumps(obj, ensure_ascii=False, indent=1), encoding="utf-8"
         )
+        if name.endswith(".json"):
+            _generated_this_run.add(name[:-5])
     dump("value_bets.json", value_bets)
     dump("matches.json", matches_out)
     dump("players.json", list(players_out.values()))

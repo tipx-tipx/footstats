@@ -103,6 +103,31 @@ def _migruj_log(log: dict) -> dict:
     return nowy
 
 
+def _kupon_leg_do_logu(l: dict) -> dict:
+    """Rzutuje leg kuponu (kupony.py:_leg_dict) na rekord dla _dopisz_nowe.
+
+    Leg kuponu jest CZĘSTO jedynym miejscem, w którym dany typ w ogóle
+    trafia do typy_log — value_bets trzyma tylko best-per-side, a spora
+    część legów z legi_pool nigdy nie zostaje osobno opublikowaną okazją.
+    Musi więc przenosić WSZYSTKIE pola, które _dopisz_nowe zapisuje/aktualizuje
+    (patrz tam), inaczej te legi są ślepą plamą dla diagnostyki per kategoria."""
+    return {
+        "mecz_id": l["mecz_id"], "mecz": l["mecz"],
+        "kickoff_ts": l["kickoff_ts"],
+        "podmiot_id": l.get("podmiot_id", 0),
+        "podmiot": l["podmiot"], "rynek_kod": l.get("rynek_kod", ""),
+        "rynek": l["rynek"], "linia": l["linia"], "strona": l["strona"],
+        "kurs": l["kurs"], "bukmacher": l.get("bukmacher"),
+        "kurs_ref": l.get("kurs_ref"),
+        "p_model": l["p_model"], "pewnosc": l.get("pewnosc"),
+        "sugestia": False,
+        "matchup": l.get("matchup"), "rotacja": l.get("rotacja"),
+        "wyzsza_linia": l.get("wyzsza_linia"),
+        "miekka_linia": l.get("miekka_linia"),
+        "xi_sygnal": l.get("xi_sygnal"),
+    }
+
+
 def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
     for b in value_bets:
         k = _klucz(b)
@@ -518,6 +543,31 @@ def compute_diagnostyka(log: dict) -> dict:
     return out
 
 
+# pomin_powod TECHNICZNE: stary kupon żyje dalej jako NOWY rekord w tym samym
+# slocie (wymiana lega) albo zostanie zastąpiony w tym samym cyklu (przebudowa
+# po składach) — jego legi i tak trafią do nauki przez ten nowy wariant, więc
+# licząc OBA (stary+nowy) podwójnie ważylibyśmy te same/prawie te same legi.
+_POMIN_POWOD_TECHNICZNE = ("wymiana lega", "przebudowa po składach")
+
+
+def _kupon_liczy_sie_do_nauki(k: dict) -> bool:
+    """Czy kupon wchodzi do korelacji/kalibracji per-kupon (nauka).
+
+    Kupony NIGDY nie pominięte oczywiście się liczą. Z pominiętych liczą się
+    user-pominięte ("nie zagrałem") i WŁASNE (generator „ucz model") — obie
+    mają realne, rozliczone wyniki i są PO TO, żeby zasilać ten mechanizm
+    (patrz kupony_wlasne wyżej — user explicite godzi się uczyć model).
+    NIE liczą się: stare sloty po zmianie konfiguracji (nie odzwierciedlają
+    żadnej realnej decyzji) i techniczne pominięcia (patrz wyżej)."""
+    if not k.get("pominiety"):
+        return True
+    if k.get("pominiety_przez") == "konfiguracja":
+        return False
+    if k.get("pomin_powod") in _POMIN_POWOD_TECHNICZNE:
+        return False
+    return True
+
+
 def compute_kupony_diagnostyka(log_kuponow: dict) -> dict:
     """Uczenie KUPONÓW z rozliczeń (domyka pętlę, której nie zamyka kalibracja
     per-typ):
@@ -529,10 +579,17 @@ def compute_kupony_diagnostyka(log_kuponow: dict) -> dict:
        (wsp > 1) czy RZADZIEJ (wsp < 1) niż niezależność (iloczyn p_model).
        To dane pod zastąpienie ZGADYWANYCH kar (0.92 / 0.95 / 0.97) zmierzonymi:
        wsp < 1 potwierdza karę w dół, wsp > 1 mówi, że karzemy w złą stronę.
+
+    Włącza user-pominięte i WŁASNE kupony (mają realne rozliczone wyniki —
+    to one najbardziej cierpią na agresywne pomijanie, więc wykluczenie ich
+    tu osłabiałoby dokładnie ten mechanizm, który ma naprawić przeszacowanie
+    kuponów). Wyklucza tylko stare sloty po zmianie konfiguracji i techniczne
+    pominięcia (wymiana lega / przebudowa po składach) — patrz
+    _kupon_liczy_sie_do_nauki.
     """
     settled = [
         k for k in log_kuponow.values()
-        if isinstance(k, dict) and not k.get("pominiety")
+        if isinstance(k, dict) and _kupon_liczy_sie_do_nauki(k)
         and k.get("wynik") in ("wygrany", "przegrany")
     ]
 
@@ -943,32 +1000,13 @@ def rozlicz(
     _dopisz_nowe(log, value_bets)
     # legi kuponów też muszą być w logu (pewniaki spoza publikowanych typów)
     for k in kupony_list or []:
-        _dopisz_nowe(log, [{
-            "mecz_id": l["mecz_id"], "mecz": l["mecz"],
-            "kickoff_ts": l["kickoff_ts"],
-            "podmiot_id": l.get("podmiot_id", 0),
-            "podmiot": l["podmiot"], "rynek_kod": l.get("rynek_kod", ""),
-            "rynek": l["rynek"], "linia": l["linia"], "strona": l["strona"],
-            "kurs": l["kurs"], "bukmacher": l.get("bukmacher"),
-            "p_model": l["p_model"], "pewnosc": l.get("pewnosc"),
-            "sugestia": False,
-            "matchup": l.get("matchup"), "rotacja": l.get("rotacja"),
-        } for l in k["legi"]])
+        _dopisz_nowe(log, [_kupon_leg_do_logu(l) for l in k["legi"]])
     # WŁASNE kupony usera (generator „ucz model") — ich legi też do logu, żeby
     # się rozliczyły; sam kupon trafia do kupony_log jako pominięty (niżej)
     kupony_wlasne = supa.get_key("kupony_wlasne") or {}
     for wk in kupony_wlasne.values():
-        _dopisz_nowe(log, [{
-            "mecz_id": l["mecz_id"], "mecz": l["mecz"],
-            "kickoff_ts": l["kickoff_ts"],
-            "podmiot_id": l.get("podmiot_id", 0),
-            "podmiot": l["podmiot"], "rynek_kod": l.get("rynek_kod", ""),
-            "rynek": l["rynek"], "linia": l["linia"], "strona": l["strona"],
-            "kurs": l["kurs"], "bukmacher": l.get("bukmacher"),
-            "p_model": l["p_model"], "pewnosc": l.get("pewnosc"),
-            "sugestia": False,
-            "matchup": l.get("matchup"), "rotacja": l.get("rotacja"),
-        } for l in (wk.get("legi") or []) if l.get("mecz_id") and l.get("podmiot")])
+        _dopisz_nowe(log, [_kupon_leg_do_logu(l) for l in (wk.get("legi") or [])
+                            if l.get("mecz_id") and l.get("podmiot")])
     lib = supa.get_key("trend_lib") or {}
     now = int(time.time())
     cache_365: dict = {}

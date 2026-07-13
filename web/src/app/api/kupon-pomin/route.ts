@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { mergeAppData, readAppData, writeAppData } from "@/lib/appDataWrite";
+
 /**
  * Akcje na kuponach (za bramką logowania — proxy.ts):
  *  - {klucz, powod?}                — pomiń kupon (opcjonalny powód),
@@ -48,31 +50,10 @@ export async function POST(req: Request) {
   }
   const akcja = typeof body.akcja === "string" ? body.akcja : "pomin";
 
-  const headers = {
-    apikey: key,
-    Authorization: `Bearer ${key}`,
-    "Content-Type": "application/json",
-  };
-
-  async function readKey(name: string): Promise<Record<string, unknown>> {
-    const res = await fetch(
-      `${url}/rest/v1/app_data?select=payload&key=eq.${name}`,
-      { headers, cache: "no-store" },
-    );
-    const rows: { payload: Record<string, unknown> }[] = res.ok
-      ? await res.json()
-      : [];
-    return rows[0]?.payload ?? {};
-  }
-
-  async function writeKey(name: string, payload: unknown): Promise<boolean> {
-    const write = await fetch(`${url}/rest/v1/app_data?on_conflict=key`, {
-      method: "POST",
-      headers: { ...headers, Prefer: "resolution=merge-duplicates" },
-      body: JSON.stringify([{ key: name, payload }]),
-    });
-    return write.ok;
-  }
+  const readKey = (name: string) => readAppData(url, key, name);
+  const writeKey = (name: string, payload: unknown) => writeAppData(url, key, name, payload);
+  const merge = (name: string, patch?: Record<string, unknown>, remove?: string[]) =>
+    mergeAppData(url, key, name, patch, remove);
 
   const now = Math.floor(Date.now() / 1000);
 
@@ -142,6 +123,20 @@ export async function POST(req: Request) {
           kurs: Number(x.kurs) || 0,
           bukmacher: String(x.bukmacher ?? "Superbet").slice(0, 20),
           p_model: Number(x.p_model) || 0,
+          pewnosc: x.pewnosc === "wysoka" || x.pewnosc === "srednia" ? x.pewnosc : undefined,
+          // te same flagi co kupony.py:_leg_dict — bez nich legi trafiające do
+          // nauki WYŁĄCZNIE przez własny kupon są ślepą plamą dla diagnostyki
+          // miękkich linii/sygnałów XI/marży UK (dokładnie ten sam P0 fix z tej
+          // sesji, ale dla ścieżki "wlasny_nauka", którą wtedy pominięto)
+          matchup: Boolean(x.matchup) || undefined,
+          rotacja: Boolean(x.rotacja) || undefined,
+          wyzsza_linia: Boolean(x.wyzsza_linia) || undefined,
+          miekka_linia: Boolean(x.miekka_linia) || undefined,
+          swieze_sklady: Boolean(x.swieze_sklady) || undefined,
+          xi_sygnal: x.xi_sygnal === "official" || x.xi_sygnal === "predicted" ? x.xi_sygnal : undefined,
+          kurs_ref: Number.isFinite(Number(x.kurs_ref)) && x.kurs_ref != null ? Number(x.kurs_ref) : undefined,
+          ev_uk: Number.isFinite(Number(x.ev_uk)) && x.ev_uk != null ? Number(x.ev_uk) : undefined,
+          ev_pct: Number.isFinite(Number(x.ev_pct)) && x.ev_pct != null ? Number(x.ev_pct) : undefined,
         };
       })
       .filter((l) => l.mecz_id && l.podmiot && l.kurs > 1);
@@ -153,19 +148,22 @@ export async function POST(req: Request) {
       .sort()
       .join("|")
       .slice(0, 130);
+    // bufor ograniczony (~40 ostatnich) — nie puchnie w nieskończoność. Lista
+    // do przycięcia to best-effort odczyt (rzadka operacja porządkowa); zapis
+    // nowego wpisu + przycięcie lecą razem w JEDNYM atomowym merge, więc nowy
+    // wpis nigdy nie ginie nawet gdy przycięcie akurat "spóźni się" o jeden.
     const wlasne = await readKey("kupony_wlasne");
     const klucze = Object.keys(wlasne);
-    // bufor ograniczony (~40 ostatnich) — nie puchnie w nieskończoność
-    for (const k of klucze.slice(0, Math.max(0, klucze.length - 40))) {
-      delete wlasne[k];
-    }
-    wlasne[sygn] = {
-      legi,
-      kurs_laczny: Number(kk.kurs_laczny) || 0,
-      p_model: Number(kk.p_model) || 0,
-      zapisano_ts: now,
-    };
-    if (!(await writeKey("kupony_wlasne", wlasne))) {
+    const doUsuniecia = klucze.slice(0, Math.max(0, klucze.length - 40));
+    const ok = await merge("kupony_wlasne", {
+      [sygn]: {
+        legi,
+        kurs_laczny: Number(kk.kurs_laczny) || 0,
+        p_model: Number(kk.p_model) || 0,
+        zapisano_ts: now,
+      },
+    }, doUsuniecia);
+    if (!ok) {
       return NextResponse.json({ error: "zapis nieudany" }, { status: 502 });
     }
     await odpalCykl();
@@ -178,13 +176,11 @@ export async function POST(req: Request) {
   }
 
   if (akcja === "pomin") {
-    const pominiete = await readKey("kupony_pominiete");
     const powod =
       typeof body.powod === "string" && POWODY.has(body.powod)
         ? body.powod
         : null;
-    pominiete[klucz] = powod ? { ts: now, powod } : now;
-    if (!(await writeKey("kupony_pominiete", pominiete))) {
+    if (!(await merge("kupony_pominiete", { [klucz]: powod ? { ts: now, powod } : now }))) {
       return NextResponse.json({ error: "zapis nieudany" }, { status: 502 });
     }
     await odpalCykl();
@@ -192,9 +188,7 @@ export async function POST(req: Request) {
   }
 
   if (akcja === "przywroc") {
-    const pominiete = await readKey("kupony_pominiete");
-    delete pominiete[klucz];
-    if (!(await writeKey("kupony_pominiete", pominiete))) {
+    if (!(await merge("kupony_pominiete", {}, [klucz]))) {
       return NextResponse.json({ error: "zapis nieudany" }, { status: 502 });
     }
     await odpalCykl();
@@ -203,9 +197,7 @@ export async function POST(req: Request) {
 
   if (akcja === "wymien" || akcja === "przebuduj") {
     const name = akcja === "wymien" ? "kupony_wymiana" : "kupony_przebudowa";
-    const payload = await readKey(name);
-    payload[klucz] = now;
-    if (!(await writeKey(name, payload))) {
+    if (!(await merge(name, { [klucz]: now }))) {
       return NextResponse.json({ error: "zapis nieudany" }, { status: 502 });
     }
     await odpalCykl();

@@ -54,6 +54,9 @@ KARA_PRZECIWNE_DRUZYNY = 0.97 # słabsza zależność (bywa wręcz przeciwna)
 DYWERSYFIKACJA_RODZIN = 0.985
 BEAM_W = 90               # szerokość wiązki w składaniu kuponu (szersza = mniej gubienia optimum)
 MAX_KANDYDATOW = 120      # ilu najlepszych legów wchodzi do przeszukiwania
+# ilu RÓŻNYCH zestawów legów o przypadkowo identycznym (długość, kurs, score)
+# przetrwa dedup wiązki — patrz komentarz przy prune w _zloz_pewniaki
+MAX_TIE_REPR = 3
 
 # --- premia za WARTOŚĆ w selekcji legów (profil steruje apetytem na przewagę) ---
 # Cel: kupon ma ciągnąć ku legom z REALNĄ przewagą (no-vig UK / value), nie ku
@@ -167,7 +170,15 @@ def _leg_dict(b: dict) -> dict:
         "druzyna": b.get("druzyna", ""),
         "matchup": bool(b.get("matchup")),
         "rotacja": bool(b.get("rotacja")),
+        "wyzsza_linia": bool(b.get("wyzsza_linia")),
         "miekka_linia": bool(b.get("miekka_linia")),
+        # sygnał składu i konsensus UK w chwili selekcji — MUSZĄ jechać dalej
+        # do typy_log przez rozliczanie.rozlicz(), inaczej legi trafiające do
+        # logu WYŁĄCZNIE przez kupon (większość puli — nie każdy leg zostaje
+        # też best-per-side publikowaną okazją) są na zawsze "bezkategoriowe"
+        # w diagnostyce miękkich linii / sygnałów XI / marży UK.
+        "xi_sygnal": b.get("xi_sygnal"),
+        "kurs_ref": b.get("kurs_ref"),
         # realna przewaga lega — do UI (dlaczego ten leg) i scoringu wartości
         "ev_uk": b.get("ev_uk"),
         "ev_pct": b.get("ev_pct"),
@@ -273,17 +284,30 @@ def _zloz_pewniaki(
             if kurs2 >= cmin and len(legi2) >= min_legi:
                 komplety.append((kurs2, p2, legi2))
         beam.extend(nowe)
-        # prune: obiecujące = wysoka szansa × jak blisko dolnej granicy kursu;
-        # dedup równoważnych stanów (permutacje identycznych legów zapychałyby
-        # wiązkę i blokowały dojście do dłuższych kuponów)
+        # prune: obiecujące = wysoka szansa × jak blisko dolnej granicy kursu.
+        # Dedup w DWÓCH warstwach:
+        #  1) PRAWDZIWE duplikaty (permutacje TEGO SAMEGO zestawu legów) —
+        #     zawsze zwiń do jednego, inaczej zapychają wiązkę.
+        #  2) RÓŻNE zestawy o przypadkowo identycznym (długość, kurs, score)
+        #     (częste przy zbliżonych p_model) — kiedyś zwijane do jednego,
+        #     co po cichu gubiło alternatywną, potencjalnie lepszą ścieżkę
+        #     dalej w przeszukiwaniu; teraz zostaje kilka reprezentantów per
+        #     próg (MAX_TIE_REPR), nie nieskończenie wiele — inaczej pula z
+        #     wieloma niemal identycznymi legami (typowe przy dużej lidze)
+        #     zapycha CAŁĄ wiązkę stanami tej samej długości i blokuje dojście
+        #     do dłuższych kompletów.
         ocenione = []
-        seen_keys: set = set()
+        tie_repr: dict[tuple, set] = {}
         for st in beam:
             sc = _score_selekcji(st[1], st[2], waga_sel, kary)
-            key = (len(st[2]), round(st[0], 4), round(sc, 8))
-            if key in seen_keys:
+            ident = frozenset(l["podmiot_id"] for l in st[2])
+            tier = (len(st[2]), round(st[0], 4), round(sc, 8))
+            repr_seen = tie_repr.setdefault(tier, set())
+            if ident in repr_seen:
                 continue
-            seen_keys.add(key)
+            if len(repr_seen) >= MAX_TIE_REPR:
+                continue
+            repr_seen.add(ident)
             ocenione.append((sc * min(st[0] / cmin, 1.0), st))
         ocenione.sort(key=lambda x: -x[0])
         beam = [st for _, st in ocenione[:BEAM_W]]
