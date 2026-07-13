@@ -63,14 +63,20 @@ const SUPABASE_ANON =
  * wisieć na tablicy (pewniaki/STS/okazje), nawet gdy pipeline chwilowo
  * nie podmienił snapshotu. Kupony zostają — ich status pokazuje historia.
  */
+// zapas na obstawienie — jak pipeline (kupony.MARGINES_STARTU_S): kupon na
+// mecz startujący za 3 minuty jest praktycznie nieobstawialny
+const MARGINES_STARTU_S = 15 * 60;
+
 function tylkoNadchodzace(bundle: Bundle): Bundle {
   const now = Math.floor(Date.now() / 1000);
   return {
     ...bundle,
     value_bets: bundle.value_bets.filter((b) => b.kickoff_ts > now),
     matches: bundle.matches.filter((m) => m.kickoff_ts > now),
-    // pula do generatora na żądanie: tylko mecze jeszcze nierozpoczęte
-    legi_pool: bundle.legi_pool.filter((l) => l.kickoff_ts > now),
+    // pula do generatora na żądanie: tylko mecze z zapasem na obstawienie
+    legi_pool: bundle.legi_pool.filter(
+      (l) => l.kickoff_ts > now + MARGINES_STARTU_S,
+    ),
   };
 }
 

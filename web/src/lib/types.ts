@@ -109,6 +109,9 @@ export interface LegPool {
   xi_sygnal?: string | null;
   kurs_ref?: number | null;
   pewnosc?: "wysoka" | "srednia";
+  /** przedział wiarygodności szansy [dół, góra] — szerokość steruje
+   * zaufaniem do p_model przy składaniu kuponu (kuponBuilder.wagaModelu) */
+  ci?: number[];
 }
 
 export interface Mecz {

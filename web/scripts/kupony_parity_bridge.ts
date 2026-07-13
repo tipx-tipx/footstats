@@ -23,7 +23,13 @@ async function main() {
     pool: LegPool[];
     cmin: number;
     cmax: number;
-    opts?: { profil?: Profil; minLegi?: number; maxNaMecz?: number; kary?: Kary };
+    opts?: {
+      profil?: Profil;
+      minLegi?: number;
+      maxLegi?: number;
+      maxNaMecz?: number;
+      kary?: Kary;
+    };
   };
   const wynik = zlozKupon(input.pool, input.cmin, input.cmax, input.opts ?? {});
   process.stdout.write(JSON.stringify(wynik));

@@ -180,6 +180,74 @@ def test_wariant_b_wyraznie_inny():
     assert len(sa & sb) / len(sa | sb) < 0.5  # wyraźnie inny zestaw
 
 
+def test_limit_ryzykownych_legow_zbalansowany():
+    # pula z wieloma "perełkami" (p<0.55, wysokie kursy) i kotwicami: kupon
+    # o wysokim kursie ma się składać z kotwic + max 1 ryzykownego lega,
+    # a nie z samych grubych strzałów. Bez ev_uk (niezależne potwierdzenie)
+    # zbalansowany nie bierze gambitów W OGÓLE; z ev_uk — najwyżej jeden.
+    kotwice = [_leg(m, m * 10 + i, 1.5, 0.74, kickoff=10_000)
+               for m in range(1, 5) for i in range(4)]
+    samodeklarowane = [
+        {**_leg(m, 800 + m, 2.9, 0.45, kickoff=10_000), "ev_pct": 30.0}
+        for m in range(1, 5)
+    ]
+    out = kupony.build_kupony([], kotwice + samodeklarowane, now_ts=0,
+                              profil="zbalansowany")
+    assert out
+    for k in out:
+        assert all(l["p_model"] >= kupony.PROG_RYZYKA_P for l in k["legi"]), (
+            f"kupon {k['cel_label']} wziął gambit bez potwierdzenia ev_uk"
+        )
+    potwierdzone = [
+        {**_leg(m, 800 + m, 2.9, 0.45, kickoff=10_000), "ev_uk": 20.0}
+        for m in range(1, 5)
+    ]
+    out2 = kupony.build_kupony([], kotwice + potwierdzone, now_ts=0,
+                               profil="zbalansowany")
+    assert out2
+    for k in out2:
+        n_ryzyk = sum(1 for l in k["legi"] if l["p_model"] < kupony.PROG_RYZYKA_P)
+        assert n_ryzyk <= kupony.MAX_RYZYKOWNE["zbalansowany"], (
+            f"kupon {k['cel_label']} ma {n_ryzyk} ryzykownych legów"
+        )
+
+
+def test_waga_modelu_z_ci_i_fallback():
+    # wąskie widełki -> prawie pełna wiara (cap 0.80); szerokie -> 0.50;
+    # brak ci -> kubełek pewności; śmieciowe ci -> też fallback
+    assert kupony._waga_modelu({"ci": [0.70, 0.74]}) == 0.80
+    assert abs(kupony._waga_modelu({"ci": [0.55, 0.75]}) - 0.65) < 1e-9
+    assert kupony._waga_modelu({"ci": [0.30, 0.70]}) == 0.50
+    assert kupony._waga_modelu({"pewnosc": "wysoka"}) == 0.75
+    assert kupony._waga_modelu({"pewnosc": "srednia"}) == 0.55
+    assert kupony._waga_modelu({}) == kupony.WAGA_MODELU_DEFAULT
+    assert kupony._waga_modelu({"ci": ["x", "y"], "pewnosc": "wysoka"}) == 0.75
+
+
+def test_p_skladania_sciaga_do_rynku():
+    # leg "średniej" pewności z ogromną deklarowaną przewagą: szansa składania
+    # ma leżeć między p_model a ceną rynku, bliżej modelu dla "wysokiej"
+    ryzykowny = {"p_model": 0.45, "kurs": 2.9, "pewnosc": "srednia"}
+    p_rynek = (1.0 / 2.9) * (1.0 - kupony.MARZA_RYNKU)
+    p_sel = kupony._p_skladania(ryzykowny)
+    assert p_rynek < p_sel < 0.45
+    pewny = {"p_model": 0.45, "kurs": 2.9, "pewnosc": "wysoka"}
+    assert p_sel < kupony._p_skladania(pewny) < 0.45
+    # leg zgodny z rynkiem prawie nie drga
+    zgodny = {"p_model": 0.62, "kurs": 1.5, "pewnosc": "wysoka"}
+    assert abs(kupony._p_skladania(zgodny) - 0.62) < 0.01
+
+
+def test_leg_value_z_urealnionej_przewagi():
+    # samodeklarowane ev_pct=31% nie wchodzi już wprost — wartość liczona
+    # z urealnionej szansy jest wyraźnie niższa; ev_uk (niezależne) wprost
+    leg = {"p_model": 0.4442, "kurs": 2.95, "pewnosc": "srednia", "ev_pct": 31.0}
+    v = kupony._leg_value(leg)
+    assert 0.0 < v < 20.0
+    leg_uk = {**leg, "ev_uk": 25.0}
+    assert kupony._leg_value(leg_uk) == 25.0
+
+
 def test_profil_bezpieczny_odrzuca_ryzykowne_legi():
     pool = [_leg(m, m * 10 + i, 1.45, 0.72, kickoff=10_000)
             for m in range(1, 4) for i in range(4)]

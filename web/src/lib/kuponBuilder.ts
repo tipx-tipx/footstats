@@ -21,6 +21,26 @@ export const KARY_DEFAULT: Kary = { ta_sama: 0.92, przeciwne: 0.97, nieznane: 0.
 // i max 1 leg/mecz — ten sam próg tutaj, żeby GeneratorKuponu mógł go odtworzyć
 export const MIN_LEG_EV = 2.0;
 
+// urealnienie szansy przy SKŁADANIU (jak kupony.py:_p_skladania): p_model
+// ściągane ku cenie rynku (devig jednostronny) wagą zależną od pewności
+// estymaty — selekcja nie ufa już w 100% samodeklarowanej przewadze modelu.
+// WYŚWIETLANA szansa kuponu pozostaje iloczynem p_model legów.
+const MARZA_RYNKU = 0.07;
+const WAGA_MODELU: Record<string, number> = { wysoka: 0.75, srednia: 0.55 };
+const WAGA_MODELU_DEFAULT = 0.55;
+// płynna waga z szerokości przedziału wiarygodności (ci) — jak kupony.py
+const WAGA_CI_BAZA = 0.85;
+const WAGA_CI_MIN = 0.5;
+const WAGA_CI_MAX = 0.8;
+// twardy limit legów ryzykownych (p_model < progu) per kupon — wysoki kurs
+// ma się składać z większej liczby pewnych zdarzeń, nie z grubych strzałów.
+// Zbalansowany dopuszcza ryzykowny leg tylko z niezależnym potwierdzeniem
+// wartości (ev_uk > 0) — jak kupony.py
+const PROG_RYZYKA_P = 0.55;
+const MAX_RYZYKOWNE: Record<Profil, number> = {
+  bezpieczny: 0, zbalansowany: 1, agresywny: 2,
+};
+
 const WAGA_VALUE_Q: Record<Profil, number> = {
   bezpieczny: 0, zbalansowany: 0.006, agresywny: 0.011,
 };
@@ -46,14 +66,42 @@ const RODZINY: Record<string, string> = {
 const DYWERSYFIKACJA = 0.985;
 const MAX_LEGI = 12;
 const BEAM_W = 90;
+// minimalna reprezentacja każdej długości kuponu w wiązce (jak kupony.py:
+// MIN_NA_DLUGOSC) — bez tego krótkie, drogie stany wypychały długie, tanie
+// trajektorie i "dokładnie 7-8 typów" zwracało brak mimo istniejącego kompletu
+const MIN_NA_DLUGOSC = 10;
 const MAX_KANDYDATOW = 120;
 // ilu RÓŻNYCH zestawów legów o przypadkowo identycznym (długość, kurs, score)
 // przetrwa dedup wiązki — jak kupony.py:MAX_TIE_REPR (ten sam fix, przeniesiony
 // tutaj z opóźnieniem: przy pierwszej naprawie dedupu portowano tylko Python)
 const MAX_TIE_REPR = 3;
 
+function pRynku(kurs: number): number {
+  return Math.min(Math.max((1.0 / kurs) * (1.0 - MARZA_RYNKU), 1e-6), 1.0 - 1e-6);
+}
+
+/** Zaufanie do p_model — jak kupony.py:_waga_modelu (parytet 1:1). */
+function wagaModelu(l: LegPool): number {
+  const ci = l.ci;
+  if (Array.isArray(ci) && ci.length === 2) {
+    const szer = Number(ci[1]) - Number(ci[0]);
+    if (Number.isFinite(szer) && szer >= 0.0) {
+      return Math.min(Math.max(WAGA_CI_BAZA - szer, WAGA_CI_MIN), WAGA_CI_MAX);
+    }
+  }
+  return WAGA_MODELU[String(l.pewnosc ?? "")] ?? WAGA_MODELU_DEFAULT;
+}
+
+/** Szansa lega DO SKŁADANIA — jak kupony.py:_p_skladania (parytet 1:1). */
+function pSkladania(l: LegPool): number {
+  const w = wagaModelu(l);
+  return Math.exp(w * Math.log(l.p_model) + (1.0 - w) * Math.log(pRynku(l.kurs)));
+}
+
 function legValue(l: LegPool): number {
-  const ev = l.ev_uk ?? l.ev_pct ?? 0;
+  // no-vig UK (niezależne) wprost; przewaga deklarowana przez model liczona
+  // z UREALNIONEJ szansy — jak kupony.py:_leg_value
+  const ev = l.ev_uk ?? (pSkladania(l) * l.kurs - 1.0) * 100.0;
   return Math.max(0, Math.min(ev ?? 0, 30));
 }
 
@@ -93,7 +141,8 @@ function scoreSelekcji(pRaw: number, legi: LegPool[], wagaValue: number, kary: K
 }
 
 function qLega(b: LegPool, profil: Profil): number {
-  let q = Math.log(b.p_model) / Math.log(b.kurs);
+  // jakość z UREALNIONEJ szansy (nie surowego p_model) — jak kupony.py:_q
+  let q = Math.log(pSkladania(b)) / Math.log(b.kurs);
   if (profil === "bezpieczny") return q;
   const v = legValue(b);
   if (v > 0) q *= 1 - v * WAGA_VALUE_Q[profil];
@@ -148,6 +197,61 @@ export interface OpcjeKuponu {
 type St = { kurs: number; p: number; legi: LegPool[] };
 
 /**
+ * Pula po filtrach profilu — dokładnie te legi, które beam search ma prawo
+ * wziąć (bezpieczny: p >= 0.58; zbalansowany: gambit p < 0.55 tylko z
+ * niezależnym potwierdzeniem ev_uk > 0). Wspólne źródło prawdy dla
+ * zlozKupon i podpowiedzi osiągalności w UI.
+ */
+export function pulaEfektywna(pool: LegPool[], profil: Profil): LegPool[] {
+  let p = pool.filter((b) => b.kurs > 1 && b.p_model > 0 && b.p_model < 1);
+  if (profil === "bezpieczny") p = p.filter((b) => b.p_model >= 0.58);
+  if (profil === "zbalansowany") {
+    p = p.filter((b) => b.p_model >= PROG_RYZYKA_P || (b.ev_uk ?? 0) > 0);
+  }
+  return p;
+}
+
+/**
+ * Osiągalny przedział kursu łącznego przy ograniczeniach beam searchu
+ * (unikalny zawodnik, limit typów z meczu, limit liczby typów) — do uczciwej
+ * podpowiedzi w UI. Zachłanne oszacowanie: najtańsze/najdroższe legi brane
+ * w kolejności kursu z pominięciem naruszeń ograniczeń. Zwraca null, gdy
+ * przy tych ograniczeniach nie da się wybrać nawet minLegi legów.
+ */
+export function zakresOsiagalny(
+  pool: LegPool[],
+  minLegi: number,
+  maxLegi: number,
+  maxNaMecz: number,
+): { min: number; max: number; maxN: number } | null {
+  const wybierz = (rosnaco: boolean, limit: number): number[] => {
+    const posortowane = pool
+      .slice()
+      .sort((a, b) => (rosnaco ? a.kurs - b.kurs : b.kurs - a.kurs));
+    const podmioty = new Set<number>();
+    const naMecz = new Map<number, number>();
+    const kursy: number[] = [];
+    for (const l of posortowane) {
+      if (kursy.length >= limit) break;
+      if (podmioty.has(l.podmiot_id)) continue;
+      if ((naMecz.get(l.mecz_id) ?? 0) >= maxNaMecz) continue;
+      podmioty.add(l.podmiot_id);
+      naMecz.set(l.mecz_id, (naMecz.get(l.mecz_id) ?? 0) + 1);
+      kursy.push(l.kurs);
+    }
+    return kursy;
+  };
+  const najtansze = wybierz(true, minLegi);
+  if (najtansze.length < minLegi) return null;
+  const najdrozsze = wybierz(false, maxLegi);
+  return {
+    min: najtansze.reduce((a, k) => a * k, 1),
+    max: najdrozsze.reduce((a, k) => a * k, 1),
+    maxN: najdrozsze.length,
+  };
+}
+
+/**
  * Złóż kupon: maksymalna szansa przy kursie łącznym w [cmin, cmax].
  * `pool` = już przefiltrowana pula (np. wybrane mecze). Zwraca null, gdy z
  * dostępnych legów nie da się domknąć przedziału.
@@ -165,25 +269,33 @@ export function zlozKupon(
   const kary = opts.kary ?? KARY_DEFAULT;
   const wagaSel = WAGA_VALUE_SELEKCJA[profil];
 
-  let p = pool.filter((b) => b.kurs > 1 && b.p_model > 0 && b.p_model < 1);
-  if (profil === "bezpieczny") p = p.filter((b) => b.p_model >= 0.58);
-  const cands = p
-    .slice()
+  const p = pool.filter((b) => b.kurs > 1 && b.p_model > 0 && b.p_model < 1);
+  const maxRyzykowne = MAX_RYZYKOWNE[profil];
+  const cands = pulaEfektywna(pool, profil)
     .sort((a, b) => qLega(b, profil) - qLega(a, profil))
     .slice(0, MAX_KANDYDATOW);
 
+  // stan wiązki: p = iloczyn UREALNIONYCH szans (selekcja); wyświetlana
+  // szansa kuponu i tak liczy się z p_model legów w buildBase
   let beam: St[] = [{ kurs: 1, p: 1, legi: [] }];
   const komplety: St[] = [];
   for (const b of cands) {
+    const ryzykowny = b.p_model < PROG_RYZYKA_P;
     const nowe: St[] = [];
+    const pSelB = pSkladania(b);
     for (const st of beam) {
       if (st.legi.length >= maxLegi) continue;
       if (st.legi.some((l) => l.podmiot_id === b.podmiot_id)) continue;
       if (st.legi.filter((l) => l.mecz_id === b.mecz_id).length >= maxNaMecz) continue;
+      // wysoki kurs = WIĘCEJ pewnych zdarzeń, nie grubsze pojedyncze strzały
+      if (
+        ryzykowny &&
+        st.legi.filter((l) => l.p_model < PROG_RYZYKA_P).length >= maxRyzykowne
+      ) continue;
       const kurs2 = st.kurs * b.kurs;
       if (kurs2 > cmax) continue;
       const legi2 = [...st.legi, b];
-      const p2 = st.p * b.p_model;
+      const p2 = st.p * pSelB;
       nowe.push({ kurs: kurs2, p: p2, legi: legi2 });
       if (kurs2 >= cmin && legi2.length >= minLegi) {
         komplety.push({ kurs: kurs2, p: p2, legi: legi2 });
@@ -198,6 +310,7 @@ export function zlozKupon(
     // inaczej pula z wieloma podobnymi legami zapycha całą wiązkę stanami tej
     // samej długości i blokuje dojście do dłuższych kompletów.
     const tieRepr = new Map<string, Set<string>>();
+    const perDl = new Map<number, number>();
     beam = beam
       .map((st) => {
         const sc = scoreSelekcji(st.p, st.legi, wagaSel, kary);
@@ -215,7 +328,17 @@ export function zlozKupon(
       })
       .map((o) => ({ st: o.st, rank: o.sc * Math.min(o.st.kurs / cmin, 1) }))
       .sort((a, b) => b.rank - a.rank)
-      .slice(0, BEAM_W)
+      // top BEAM_W ogółem + gwarancja MIN_NA_DLUGOSC reprezentantów każdej
+      // długości (jak kupony.py) — nadzbiór starej wiązki, nigdy gorszy wynik
+      .filter((o, i) => {
+        const dl = o.st.legi.length;
+        const licznik = perDl.get(dl) ?? 0;
+        if (i < BEAM_W || licznik < MIN_NA_DLUGOSC) {
+          perDl.set(dl, licznik + 1);
+          return true;
+        }
+        return false;
+      })
       .map((o) => o.st);
   }
   if (!komplety.length) return null;
@@ -238,7 +361,9 @@ export function zlozKupon(
   });
 
   const buildBase = (st: St): KuponWynik => {
-    const pF = st.p * karaKoszyka(st.legi, kary);
+    // wyświetlana szansa: iloczyn p_model legów (bez shrinku selekcji)
+    const pRaw = st.legi.reduce((a, l) => a * l.p_model, 1);
+    const pF = pRaw * karaKoszyka(st.legi, kary);
     const legiSort = st.legi
       .slice()
       .sort(

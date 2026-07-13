@@ -17,14 +17,24 @@ import {
   type KuponWynik,
   type OpcjeKuponu,
   type Profil,
+  pulaEfektywna,
+  zakresOsiagalny,
   zlozKupon,
 } from "@/lib/kuponBuilder";
 import type { LegPool } from "@/lib/types";
 
 const PROFILE: { kod: Profil; label: string; opis: string }[] = [
   { kod: "bezpieczny", label: "Bezpieczny", opis: "same kotwice o najwyższej szansie" },
-  { kod: "zbalansowany", label: "Zbalansowany", opis: "szansa + realna wartość" },
-  { kod: "agresywny", label: "Agresywny", opis: "mocno ku przewadze i matchupom" },
+  {
+    kod: "zbalansowany",
+    label: "Zbalansowany",
+    opis: "pewne typy; ryzykowny dołoży tylko, gdy kurs jest wyraźnie zawyżony",
+  },
+  {
+    kod: "agresywny",
+    label: "Agresywny",
+    opis: "dopuszcza ryzykowne typy, mocno ku przewadze i matchupom",
+  },
 ];
 
 const STAWKA = 10; // do „z 10 zł robi się X zł"
@@ -98,26 +108,33 @@ export function GeneratorKuponu({
 
   const podpowiedzBrak = useMemo(() => {
     if (podglad) return null;
-    if (pulaFiltrowana.length < liczbaTypow) {
-      return `Za mało dostępnych typów w tej puli (masz ${pulaFiltrowana.length}, potrzeba ${
+    // osiągalność liczona z TYMI SAMYMI ograniczeniami co dobór typów:
+    // filtry profilu (bezpieczny/gambity), unikalny zawodnik, limit z meczu —
+    // wcześniej podpowiedź zawyżała sufit (liczyła np. dwie linie tego
+    // samego zawodnika jak dwa typy) i myliła
+    const efektywna = pulaEfektywna(pulaFiltrowana, profil);
+    const maxNaMecz = opcje.maxNaMecz ?? 4;
+    const gornyLimit = trybDokladny ? liczbaTypow : 12;
+    const zakres = zakresOsiagalny(efektywna, liczbaTypow, gornyLimit, maxNaMecz);
+    const dopisekProfil =
+      profil !== "agresywny" && efektywna.length < pulaFiltrowana.length
+        ? " Charakter kuponu pomija najbardziej ryzykowne typy — agresywny ma ich więcej."
+        : "";
+    if (!zakres) {
+      return `Za mało dostępnych typów przy tych ustawieniach (potrzeba ${
         trybDokladny ? "dokładnie" : "co najmniej"
-      } ${liczbaTypow}).`;
+      } ${liczbaTypow}, maks. ${maxNaMecz} z meczu).${dopisekProfil}`;
     }
-    const gornyLimit = trybDokladny ? liczbaTypow : Math.min(pulaFiltrowana.length, 12);
-    const rosnaco = pulaFiltrowana.map((l) => l.kurs).sort((a, b) => a - b);
-    const malejaco = pulaFiltrowana.map((l) => l.kurs).sort((a, b) => b - a);
-    const minKursN = rosnaco.slice(0, liczbaTypow).reduce((a, b) => a * b, 1);
-    const maxKursN = malejaco.slice(0, gornyLimit).reduce((a, b) => a * b, 1);
     const cmin = kursCel * 0.85;
     const cmax = kursCel * 1.18;
-    if (cmax < minKursN) {
-      return `Przy ${trybDokladny ? "dokładnie" : "co najmniej"} ${liczbaTypow} ${odmienTyp(liczbaTypow)} najniższy osiągalny kurs w tej puli to ok. ×${fmtKurs(minKursN)} — podnieś kurs docelowy albo zmniejsz liczbę typów.`;
+    if (cmax < zakres.min) {
+      return `Przy ${trybDokladny ? "dokładnie" : "co najmniej"} ${liczbaTypow} ${odmienTyp(liczbaTypow)} najniższy osiągalny kurs to ok. ×${fmtKurs(zakres.min)} — podnieś kurs docelowy albo zmniejsz liczbę typów.`;
     }
-    if (cmin > maxKursN) {
-      return `Przy ${trybDokladny ? "dokładnie" : "maks."} ${gornyLimit} ${odmienTyp(gornyLimit)} najwyższy osiągalny kurs w tej puli to ok. ×${fmtKurs(maxKursN)} — obniż kurs docelowy albo zwiększ liczbę typów${meczId == null ? " lub dobierz więcej meczów" : ""}.`;
+    if (cmin > zakres.max) {
+      return `Przy ${trybDokladny ? "dokładnie" : "maks."} ${zakres.maxN} ${odmienTyp(zakres.maxN)} najwyższy osiągalny kurs to ok. ×${fmtKurs(zakres.max)} — obniż kurs docelowy${trybDokladny ? " albo zwiększ liczbę typów" : ""}${meczId == null ? " lub dobierz więcej meczów" : ""}.${dopisekProfil}`;
     }
-    return "Ten zestaw parametrów nie daje się złożyć z tej puli — spróbuj innego charakteru kuponu albo profilu.";
-  }, [podglad, pulaFiltrowana, liczbaTypow, trybDokladny, kursCel, meczId]);
+    return `Ten zestaw parametrów nie daje się złożyć z tej puli — zmień kurs docelowy, liczbę typów albo charakter kuponu.${dopisekProfil}`;
+  }, [podglad, pulaFiltrowana, profil, opcje.maxNaMecz, liczbaTypow, trybDokladny, kursCel, meczId]);
 
   const odrzuc = () => {
     setWynik(null);

@@ -53,10 +53,46 @@ KARA_PRZECIWNE_DRUZYNY = 0.97 # słabsza zależność (bywa wręcz przeciwna)
 # strzałów 0,5 padają razem w jednym nudnym meczu
 DYWERSYFIKACJA_RODZIN = 0.985
 BEAM_W = 90               # szerokość wiązki w składaniu kuponu (szersza = mniej gubienia optimum)
+# minimalna reprezentacja KAŻDEJ długości kuponu w wiązce — ranking miesza
+# stany różnych długości i premiuje bliskość dolnej granicy kursu, więc
+# krótkie, drogie stany wypychały długie, tanie trajektorie zanim zdążyły
+# urosnąć (zmierzone: "dokładnie 7-8 legów" zwracało brak kuponu, choć
+# komplet istniał). Stany ponad BEAM_W wchodzą dodatkowo, jeśli ich długość
+# ma mniej niż tylu reprezentantów — wiązka jest NADZBIOREM starej, więc
+# wynik nigdy nie jest gorszy.
+MIN_NA_DLUGOSC = 10
 MAX_KANDYDATOW = 120      # ilu najlepszych legów wchodzi do przeszukiwania
 # ilu RÓŻNYCH zestawów legów o przypadkowo identycznym (długość, kurs, score)
 # przetrwa dedup wiązki — patrz komentarz przy prune w _zloz_pewniaki
 MAX_TIE_REPR = 3
+
+# --- urealnienie szansy przy SKŁADANIU (selekcja, nie wyświetlanie) ---
+# p_model bywa najbardziej przestrzelone dokładnie tam, gdzie deklaruje
+# największą przewagę (wysokie linie, legi "średniej" pewności) — a stary
+# scoring ufał mu w 100%, więc beam ładował do kuponów o wysokim kursie
+# pojedyncze ryzykowne legi (strzały 2,5+ @2,9 z "przewagą" +30%) zamiast
+# dokładać pewniejsze zdarzenia. Przy wyborze legów ściągamy więc szansę
+# modelu ku cenie rynku (devig jednostronny, lustro betting.DEFAULT_ONE_
+# SIDED_MARGIN) wagą zależną od pewności estymaty. WYŚWIETLANA szansa
+# kuponu pozostaje iloczynem p_model — zmienia się tylko dobór legów.
+MARZA_RYNKU = 0.07
+WAGA_MODELU = {"wysoka": 0.75, "srednia": 0.55}
+WAGA_MODELU_DEFAULT = 0.55
+# płynna waga z szerokości przedziału wiarygodności (ci z puli legów):
+# w = 0.85 - szerokość, ujęte w [0.50, 0.80]. Wąski przedział (duża próba,
+# stabilna estymata) -> prawie pełna wiara; szeroki -> pół na pół z rynkiem.
+# Progi spójne z kubełkami pewności (wysoka = ci<=0.18 -> w>=0.67).
+WAGA_CI_BAZA = 0.85
+WAGA_CI_MIN = 0.50
+WAGA_CI_MAX = 0.80
+# twardy limit legów ryzykownych (p_model < progu) per kupon — "wysoki kurs"
+# ma się składać z WIĘKSZEJ liczby pewnych zdarzeń, nie z coraz grubszych
+# pojedynczych strzałów; agresywny świadomie dopuszcza dwa. W profilu
+# zbalansowanym (domyślnym) ryzykowny leg wchodzi WYŁĄCZNIE z niezależnym
+# potwierdzeniem wartości (ev_uk > 0, no-vig konsensusu UK) — sam model nie
+# może już przekonać kuponu do gambita własną, niezweryfikowaną przewagą
+PROG_RYZYKA_P = 0.55
+MAX_RYZYKOWNE = {"bezpieczny": 0, "zbalansowany": 1, "agresywny": 2}
 
 # --- premia za WARTOŚĆ w selekcji legów (profil steruje apetytem na przewagę) ---
 # Cel: kupon ma ciągnąć ku legom z REALNĄ przewagą (no-vig UK / value), nie ku
@@ -71,12 +107,56 @@ BONUS_SWIEZE = {"bezpieczny": 1.0, "zbalansowany": 0.96, "agresywny": 0.93}
 WAGA_VALUE_SELEKCJA = {"bezpieczny": 0.0, "zbalansowany": 0.15, "agresywny": 0.30}
 
 
+def _zaokr(x: float, dp: int) -> float:
+    """Zaokrąglenie "pół w górę" jak Math.round w JS — wbudowany round()
+    Pythona zaokrągla bankiersko (pół do parzystej) i przy wartości dokładnie
+    na granicy dawał inną końcówkę niż kuponBuilder.ts (złamany parytet)."""
+    m = 10 ** dp
+    return math.floor(x * m + 0.5) / m
+
+
+def _p_rynku(kurs: float) -> float:
+    """Cena rynku po zdjęciu szacowanej marży (devig jednostronny)."""
+    return min(max((1.0 / kurs) * (1.0 - MARZA_RYNKU), 1e-6), 1.0 - 1e-6)
+
+
+def _waga_modelu(l: dict) -> float:
+    """Ile ufamy p_model vs cenie rynku: płynnie z szerokości przedziału
+    wiarygodności (ci), fallback na kubełek pewności, gdy ci brak."""
+    ci = l.get("ci")
+    if isinstance(ci, (list, tuple)) and len(ci) == 2:
+        try:
+            szer = float(ci[1]) - float(ci[0])
+        except (TypeError, ValueError):
+            szer = -1.0
+        if szer >= 0.0:
+            return min(max(WAGA_CI_BAZA - szer, WAGA_CI_MIN), WAGA_CI_MAX)
+    return WAGA_MODELU.get(str(l.get("pewnosc") or ""), WAGA_MODELU_DEFAULT)
+
+
+def _p_skladania(l: dict) -> float:
+    """Szansa lega DO SKŁADANIA: p_model ściągnięte ku cenie rynku.
+
+    Średnia geometryczna (log-liniowa) p_model i p_rynku, ważona zaufaniem
+    do estymaty (_waga_modelu). Im mocniej model rozjeżdża się z rynkiem i im
+    szersze widełki szansy, tym mocniej ta korekta obcina deklarowaną
+    przewagę; legi zgodne z rynkiem prawie nie drgną.
+    """
+    w = _waga_modelu(l)
+    return math.exp(
+        w * math.log(l["p_model"]) + (1.0 - w) * math.log(_p_rynku(l["kurs"]))
+    )
+
+
 def _leg_value(l: dict) -> float:
     """Realna przewaga lega w % (0–30, ujęte w widełki): no-vig UK (ev_uk) to
-    najczystszy sygnał, EV vs Superbet (ev_pct) fallback. None/ujemne → 0."""
+    najczystszy sygnał (niezależny od naszego modelu — wchodzi wprost).
+    Fallback: przewaga deklarowana przez model, ale liczona z UREALNIONEJ
+    szansy (_p_skladania) — samodeklarowane +30% na legu średniej pewności
+    nie może już windować go w rankingu selekcji. None/ujemne → 0."""
     ev = l.get("ev_uk")
     if ev is None:
-        ev = l.get("ev_pct")
+        ev = (_p_skladania(l) * l["kurs"] - 1.0) * 100.0
     try:
         return max(0.0, min(float(ev), 30.0))
     except (TypeError, ValueError):
@@ -230,19 +310,26 @@ def _zloz_pewniaki(
     przy ograniczeniach (przedział kursu, max/mecz, dywersyfikacja) greedy
     bywał daleki od optimum albo "nie składał" istniejącej kombinacji.
     Jakość lega = ln(p)/ln(kurs) (koszt pewności na jednostkę kursu) decyduje
-    o kolejności kandydatów; legi kontekstowe (matchup / świeże składy)
-    dostają lekki priorytet. Przy ustalonym kursie max szansa = max EV,
-    więc ten sam builder składa też kupony value.
+    o kolejności kandydatów, przy czym p to szansa UREALNIONA (_p_skladania:
+    shrink p_model ku cenie rynku wg pewności estymaty) — model nie może już
+    sam siebie przekonać, że ryzykowny leg z deklarowaną przewagą jest lepszy
+    od kotwicy. Legi kontekstowe (matchup / świeże składy) dostają lekki
+    priorytet. Dodatkowo twardy limit legów ryzykownych (PROG_RYZYKA_P /
+    MAX_RYZYKOWNE): wysoki kurs docelowy składa się z większej liczby
+    pewnych zdarzeń, nie z pojedynczych grubych strzałów. Przy ustalonym
+    kursie max szansa = max EV, więc ten sam builder składa też kupony value.
     """
     # profil charakteru (ustawienie usera): bezpieczny = same kotwice,
     # agresywny = mocniejsza preferencja matchupów i wyższych linii
     if profil == "bezpieczny":
         pool = [b for b in pool if b["p_model"] >= 0.58]
     waga_sel = WAGA_VALUE_SELEKCJA.get(profil, 0.0)
+    max_ryzykowne = MAX_RYZYKOWNE.get(profil, 1)
 
     def _q(b: dict) -> float:
-        # bazowa jakość: koszt pewności na jednostkę kursu (q<0; bliżej 0 = lepiej)
-        q = math.log(b["p_model"]) / math.log(b["kurs"])
+        # bazowa jakość: koszt pewności na jednostkę kursu (q<0; bliżej 0 =
+        # lepiej), liczony z UREALNIONEJ szansy — patrz _p_skladania
+        q = math.log(_p_skladania(b)) / math.log(b["kurs"])
         if profil == "bezpieczny":
             return q
         # PREMIA ZA WARTOŚĆ (liczbowo): leg z realną przewagą wchodzi wyżej
@@ -259,15 +346,29 @@ def _zloz_pewniaki(
             q *= 0.97   # wyższe linie wyżej w kolejce
         return q
 
+    def _dopuszczalny(b: dict) -> bool:
+        # zbalansowany: gambit (p_model < progu) tylko z niezależnym
+        # potwierdzeniem ceny (ev_uk > 0) — filtr na wejściu do przeszukiwania,
+        # żeby nie zajmował slotu kandydata
+        if profil != "zbalansowany" or b["p_model"] >= PROG_RYZYKA_P:
+            return True
+        return (b.get("ev_uk") or 0) > 0
+
     cands = sorted(
-        (b for b in pool if b["kurs"] > 1.0 and 0 < b["p_model"] < 1),
+        (
+            b for b in pool
+            if b["kurs"] > 1.0 and 0 < b["p_model"] < 1 and _dopuszczalny(b)
+        ),
         key=lambda b: -_q(b),
     )[:MAX_KANDYDATOW]
-    # stan wiązki: (kurs_łączny, iloczyn_p, legi jako krotka)
+    # stan wiązki: (kurs_łączny, iloczyn UREALNIONYCH szans do selekcji, legi
+    # jako krotka) — wyświetlana szansa kuponu i tak liczy się z p_model legów
     beam: list[tuple[float, float, tuple]] = [(1.0, 1.0, ())]
     komplety: list[tuple[float, float, tuple]] = []
     for b in cands:
+        ryzykowny = b["p_model"] < PROG_RYZYKA_P
         nowe = []
+        p_sel_b = _p_skladania(b)
         for kurs, p, legi in beam:
             if len(legi) >= MAX_LEGI_PEWNIAKI:
                 continue
@@ -275,11 +376,17 @@ def _zloz_pewniaki(
                 continue
             if sum(1 for l in legi if l["mecz_id"] == b["mecz_id"]) >= max_na_mecz:
                 continue
+            # wysoki kurs = WIĘCEJ pewnych zdarzeń, nie grubsze pojedyncze
+            # strzały — limit legów o szansie modelu poniżej progu
+            if ryzykowny and sum(
+                1 for l in legi if l["p_model"] < PROG_RYZYKA_P
+            ) >= max_ryzykowne:
+                continue
             kurs2 = kurs * b["kurs"]
             if kurs2 > cmax:
                 continue
             legi2 = legi + (b,)
-            p2 = p * b["p_model"]
+            p2 = p * p_sel_b
             nowe.append((kurs2, p2, legi2))
             if kurs2 >= cmin and len(legi2) >= min_legi:
                 komplety.append((kurs2, p2, legi2))
@@ -301,7 +408,7 @@ def _zloz_pewniaki(
         for st in beam:
             sc = _score_selekcji(st[1], st[2], waga_sel, kary)
             ident = frozenset(l["podmiot_id"] for l in st[2])
-            tier = (len(st[2]), round(st[0], 4), round(sc, 8))
+            tier = (len(st[2]), _zaokr(st[0], 4), _zaokr(sc, 8))
             repr_seen = tie_repr.setdefault(tier, set())
             if ident in repr_seen:
                 continue
@@ -310,11 +417,22 @@ def _zloz_pewniaki(
             repr_seen.add(ident)
             ocenione.append((sc * min(st[0] / cmin, 1.0), st))
         ocenione.sort(key=lambda x: -x[0])
-        beam = [st for _, st in ocenione[:BEAM_W]]
+        # top BEAM_W ogółem + gwarancja MIN_NA_DLUGOSC reprezentantów każdej
+        # długości (patrz komentarz przy stałej) — nadzbiór starej wiązki
+        wybrane = []
+        per_dl: dict[int, int] = {}
+        for i, (_, st) in enumerate(ocenione):
+            dl = len(st[2])
+            if i < BEAM_W or per_dl.get(dl, 0) < MIN_NA_DLUGOSC:
+                wybrane.append(st)
+                per_dl[dl] = per_dl.get(dl, 0) + 1
+        beam = wybrane
     if not komplety:
         return None
 
-    def _kupon_z(kurs: float, p_raw: float, legi_t: tuple) -> dict:
+    def _kupon_z(kurs: float, legi_t: tuple) -> dict:
+        # wyświetlana szansa: iloczyn p_model legów (bez shrinku selekcji)
+        p_raw = math.prod(l["p_model"] for l in legi_t)
         p = p_raw * _kara_koszyka(legi_t, kary)
         legi = sorted(
             legi_t, key=lambda b: (b["kickoff_ts"], b["mecz_id"], -b["p_model"])
@@ -323,10 +441,10 @@ def _zloz_pewniaki(
             "cel": int(cmin),
             "cel_label": f"{int(cmin)}–{int(cmax)}",
             "styl": "pewniaki",
-            "kurs_laczny": round(kurs, 2),
-            "p_model": round(p, 4),
-            "fair_kurs": round(1.0 / max(p, 1e-9), 2),
-            "ev_pct": round((p * kurs - 1.0) * 100.0, 1),
+            "kurs_laczny": _zaokr(kurs, 2),
+            "p_model": _zaokr(p, 4),
+            "fair_kurs": _zaokr(1.0 / max(p, 1e-9), 2),
+            "ev_pct": _zaokr((p * kurs - 1.0) * 100.0, 1),
             "legi": [_leg_dict(b) for b in legi],
         }
 
@@ -339,21 +457,21 @@ def _zloz_pewniaki(
             tuple(sorted(l["podmiot_id"] for l in s[2])),
         )
     )
-    kurs, p_raw, legi_t = komplety[0]
-    kupon = _kupon_z(kurs, p_raw, legi_t)
+    kurs, _p_sel, legi_t = komplety[0]
+    kupon = _kupon_z(kurs, legi_t)
     # wariant B: najlepszy WYRAŹNIE INNY komplet (Jaccard < 0.5) — do wyboru
     # przez usera; czysto podglądowy, nie zajmuje slotu
     sygn_a = {
         (l["mecz_id"], l["podmiot_id"], l.get("rynek_kod", ""), l["linia"])
         for l in legi_t
     }
-    for kurs_b, p_b, legi_b in komplety[1:]:
+    for kurs_b, _p_b, legi_b in komplety[1:]:
         sygn_b = {
             (l["mecz_id"], l["podmiot_id"], l.get("rynek_kod", ""), l["linia"])
             for l in legi_b
         }
         if len(sygn_a & sygn_b) / max(len(sygn_a | sygn_b), 1) < 0.5:
-            kupon["wariant_b"] = _kupon_z(kurs_b, p_b, legi_b)
+            kupon["wariant_b"] = _kupon_z(kurs_b, legi_b)
             break
     return kupon
 
@@ -409,8 +527,8 @@ def _rentgen(
     kupon["alternatywa"] = {
         **_leg_dict(best),
         "zamiast_idx": idx,
-        "kurs_po": round(kurs_bez * best["kurs"], 2),
-        "p_po": round(p_po, 4),
+        "kurs_po": _zaokr(kurs_bez * best["kurs"], 2),
+        "p_po": _zaokr(p_po, 4),
     }
 
 
@@ -446,8 +564,8 @@ def _dolozenie(
     p_po = p_raw * best["p_model"] * _kara_koszyka(legi_po, kary)
     kupon["dolozenie"] = {
         **_leg_dict(best),
-        "kurs_po": round(kupon["kurs_laczny"] * best["kurs"], 2),
-        "p_po": round(p_po, 4),
+        "kurs_po": _zaokr(kupon["kurs_laczny"] * best["kurs"], 2),
+        "p_po": _zaokr(p_po, 4),
     }
 
 

@@ -17,10 +17,16 @@ def _leg(mecz_id, pid, p, kurs, ev_uk=None, ev_pct=None, matchup=False, miekka=F
 
 def test_leg_value_priorytet_ev_uk():
     assert kupony._leg_value({"ev_uk": 12.0, "ev_pct": 3.0}) == 12.0  # no-vig wygrywa
-    assert kupony._leg_value({"ev_pct": 8.0}) == 8.0                  # fallback na EV
-    assert kupony._leg_value({"ev_uk": None, "ev_pct": None}) == 0.0
     assert kupony._leg_value({"ev_uk": -5.0}) == 0.0                  # ujemne -> 0
     assert kupony._leg_value({"ev_uk": 99.0}) == 30.0                 # widelki 0-30
+    # bez ev_uk: przewaga liczona z UREALNIONEJ szansy (_p_skladania), nie
+    # z surowego ev_pct — samodeklarowana przewaga jest obcinana shrinkiem
+    bez_uk = {"p_model": 0.62, "kurs": 1.8, "pewnosc": "wysoka", "ev_pct": 11.6}
+    v = kupony._leg_value(bez_uk)
+    assert 0.0 < v < 11.6
+    # model pod rynkiem -> urealniona przewaga ujemna -> 0
+    slaby = {"p_model": 0.40, "kurs": 1.8, "pewnosc": "srednia", "ev_pct": None}
+    assert kupony._leg_value(slaby) == 0.0
 
 
 def test_score_selekcji_premiuje_wartosc():

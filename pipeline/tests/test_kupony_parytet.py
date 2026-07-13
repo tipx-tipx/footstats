@@ -48,6 +48,9 @@ def _run_ts(pool: list[dict], cmin: float, cmax: float, opts: dict) -> dict | No
     proc = subprocess.run(
         [NODE, str(BRIDGE)],
         input=payload, capture_output=True, text=True, cwd=WEB_DIR, timeout=30,
+        # Node pisze UTF-8; bez tego Windows dekoduje cp1252 i wywraca się
+        # na nazwiskach/pauzach z prawdziwych danych (test na migawce puli)
+        encoding="utf-8", errors="replace",
     )
     assert proc.returncode == 0, f"bridge TS padł: {proc.stderr}"
     return json.loads(proc.stdout)
@@ -123,3 +126,29 @@ def test_parytet_zmierzone_kary():
 def test_parytet_brak_kompletu_w_obu():
     pool = [_leg(1, 11, 1.5, 0.70)]
     _assert_parity(pool, 10.0, 20.0, {"minLegi": 3})
+
+
+def test_parytet_urealnienie_i_limit_ryzykownych():
+    # mieszanka kotwic i ryzykownych legów z dużą deklarowaną przewagą —
+    # pokrywa _p_skladania (wagi wysoka/srednia/brak), _leg_value z urealnionej
+    # przewagi oraz limit MAX_RYZYKOWNE w rozszerzaniu wiązki
+    pool = [
+        _leg(1, 11, 1.25, 0.86, pewnosc="wysoka", ev_pct=4.0),
+        _leg(1, 12, 2.90, 0.45, pewnosc="srednia", ev_pct=30.5),
+        _leg(2, 22, 1.65, 0.78, pewnosc="srednia", ev_pct=28.7),
+        _leg(2, 23, 2.87, 0.446, pewnosc="srednia", ev_pct=27.9),
+        _leg(3, 33, 1.71, 0.717, pewnosc="srednia", ev_pct=22.5),
+        _leg(3, 34, 1.55, 0.732, pewnosc="srednia", ev_pct=13.4),
+        _leg(4, 44, 1.43, 0.778, ev_pct=11.3),  # bez pewności → waga domyślna
+        _leg(4, 45, 2.25, 0.513, pewnosc="srednia", ev_pct=15.4),
+        # ryzykowny Z niezależnym potwierdzeniem (ev_uk) — jedyny gambit,
+        # który zbalansowany ma prawo wziąć
+        _leg(5, 55, 2.60, 0.50, pewnosc="srednia", ev_uk=18.0),
+        # legi z ci — płynna waga zaufania (wąskie/szerokie widełki) musi
+        # liczyć się identycznie po obu stronach
+        _leg(6, 66, 1.50, 0.75, pewnosc="srednia", ci=[0.68, 0.80]),
+        _leg(6, 67, 1.72, 0.70, pewnosc="wysoka", ci=[0.48, 0.82]),
+    ]
+    for profil in ("bezpieczny", "zbalansowany", "agresywny"):
+        _assert_parity(pool, 8.0, 16.0, {"minLegi": 3, "profil": profil})
+        _assert_parity(pool, 17.0, 29.5, {"minLegi": 3, "profil": profil})

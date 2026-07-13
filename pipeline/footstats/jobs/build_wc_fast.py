@@ -1552,6 +1552,11 @@ def _main_impl():
         "wyzsza_linia", "xi_sygnal", "kurs_ref",
         # pewnosc — do filtrowania w GeneratorKuponu jak backendowy styl "value"
         "pewnosc",
+        # ci — waga zaufania do p_model przy składaniu (kupony.py:_waga_modelu
+        # / kuponBuilder.wagaModelu). BEZ tego generator na żądanie liczyłby
+        # inne wagi (fallback z pewności) niż silnik automatyczny na tej
+        # samej puli — cicha rozbieżność mimo parytetu algorytmów
+        "ci",
     )
     _dump("legi_pool.json", [
         {**{k: b.get(k) for k in _POLA_LEGA}, "id": i}
