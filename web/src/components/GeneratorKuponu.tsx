@@ -29,6 +29,10 @@ const PROFILE: { kod: Profil; label: string; opis: string }[] = [
 
 const STAWKA = 10; // do „z 10 zł robi się X zł"
 
+function odmienTyp(n: number): string {
+  return n === 1 ? "typ" : n < 5 ? "typy" : "typów";
+}
+
 export function GeneratorKuponu({
   pool,
   kary = KARY_DEFAULT,
@@ -53,7 +57,7 @@ export function GeneratorKuponu({
 
   const [wybrane, setWybrane] = useState<Set<number>>(new Set());
   const [kursCel, setKursCel] = useState(meczId != null ? 4 : 10);
-  const [liczbaNog, setLiczbaNog] = useState(3);
+  const [liczbaTypow, setLiczbaTypow] = useState(3);
   const [trybDokladny, setTrybDokladny] = useState(false);
   const [profil, setProfil] = useState<Profil>("zbalansowany");
   const [tylkoValue, setTylkoValue] = useState(false);
@@ -75,12 +79,12 @@ export function GeneratorKuponu({
   const opcje: OpcjeKuponu = useMemo(
     () => ({
       profil,
-      minLegi: liczbaNog,
-      maxLegi: trybDokladny ? liczbaNog : undefined,
+      minLegi: liczbaTypow,
+      maxLegi: trybDokladny ? liczbaTypow : undefined,
       maxNaMecz: tylkoValue || maxJedenZMeczu ? 1 : undefined,
       kary,
     }),
-    [profil, liczbaNog, trybDokladny, tylkoValue, maxJedenZMeczu, kary],
+    [profil, liczbaTypow, trybDokladny, tylkoValue, maxJedenZMeczu, kary],
   );
 
   // ŻYWY podgląd — liczony na bieżąco przy każdej zmianie suwaka, żeby user
@@ -94,26 +98,26 @@ export function GeneratorKuponu({
 
   const podpowiedzBrak = useMemo(() => {
     if (podglad) return null;
-    if (pulaFiltrowana.length < liczbaNog) {
+    if (pulaFiltrowana.length < liczbaTypow) {
       return `Za mało dostępnych typów w tej puli (masz ${pulaFiltrowana.length}, potrzeba ${
         trybDokladny ? "dokładnie" : "co najmniej"
-      } ${liczbaNog}).`;
+      } ${liczbaTypow}).`;
     }
-    const gornyLimit = trybDokladny ? liczbaNog : Math.min(pulaFiltrowana.length, 12);
+    const gornyLimit = trybDokladny ? liczbaTypow : Math.min(pulaFiltrowana.length, 12);
     const rosnaco = pulaFiltrowana.map((l) => l.kurs).sort((a, b) => a - b);
     const malejaco = pulaFiltrowana.map((l) => l.kurs).sort((a, b) => b - a);
-    const minKursN = rosnaco.slice(0, liczbaNog).reduce((a, b) => a * b, 1);
+    const minKursN = rosnaco.slice(0, liczbaTypow).reduce((a, b) => a * b, 1);
     const maxKursN = malejaco.slice(0, gornyLimit).reduce((a, b) => a * b, 1);
     const cmin = kursCel * 0.85;
     const cmax = kursCel * 1.18;
     if (cmax < minKursN) {
-      return `Przy ${trybDokladny ? "dokładnie" : "co najmniej"} ${liczbaNog} nogach najniższy osiągalny kurs w tej puli to ok. ×${fmtKurs(minKursN)} — podnieś kurs docelowy albo zmniejsz liczbę nóg.`;
+      return `Przy ${trybDokladny ? "dokładnie" : "co najmniej"} ${liczbaTypow} ${odmienTyp(liczbaTypow)} najniższy osiągalny kurs w tej puli to ok. ×${fmtKurs(minKursN)} — podnieś kurs docelowy albo zmniejsz liczbę typów.`;
     }
     if (cmin > maxKursN) {
-      return `Przy ${trybDokladny ? "dokładnie" : "maks."} ${gornyLimit} nogach najwyższy osiągalny kurs w tej puli to ok. ×${fmtKurs(maxKursN)} — obniż kurs docelowy albo zwiększ liczbę nóg${meczId == null ? " lub dobierz więcej meczów" : ""}.`;
+      return `Przy ${trybDokladny ? "dokładnie" : "maks."} ${gornyLimit} ${odmienTyp(gornyLimit)} najwyższy osiągalny kurs w tej puli to ok. ×${fmtKurs(maxKursN)} — obniż kurs docelowy albo zwiększ liczbę typów${meczId == null ? " lub dobierz więcej meczów" : ""}.`;
     }
-    return "Ograniczenia korelacyjne i różnorodności rynków nie pozwalają domknąć tego kompletu — spróbuj innego charakteru kuponu albo profilu.";
-  }, [podglad, pulaFiltrowana, liczbaNog, trybDokladny, kursCel, meczId]);
+    return "Ten zestaw parametrów nie daje się złożyć z tej puli — spróbuj innego charakteru kuponu albo profilu.";
+  }, [podglad, pulaFiltrowana, liczbaTypow, trybDokladny, kursCel, meczId]);
 
   const odrzuc = () => {
     setWynik(null);
@@ -160,7 +164,7 @@ export function GeneratorKuponu({
   if (bazowa.length === 0) {
     return (
       <p className="rounded-xl border border-hairline bg-card px-4 py-3.5 text-sm text-muted">
-        Brak legów w puli do złożenia kuponu{meczId != null ? " na ten mecz" : ""} —
+        Brak typów w puli do złożenia kuponu{meczId != null ? " na ten mecz" : ""} —
         pojawią się, gdy Superbet dokwotuje linie (zwykle 1–2 dni przed meczem).
       </p>
     );
@@ -203,7 +207,7 @@ export function GeneratorKuponu({
         </div>
       )}
 
-      {/* kurs docelowy + liczba legów */}
+      {/* kurs docelowy + liczba typów */}
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block">
           <span className="mb-1 flex items-baseline justify-between text-[11px] font-medium uppercase tracking-wide text-faint">
@@ -227,22 +231,22 @@ export function GeneratorKuponu({
         </label>
         <label className="block">
           <span className="mb-1 flex items-baseline justify-between text-[11px] font-medium uppercase tracking-wide text-faint">
-            <span>{trybDokladny ? "dokładnie legów" : "co najmniej legów"}</span>
-            <span className="font-data text-sm font-semibold text-ink">{liczbaNog}</span>
+            <span>{trybDokladny ? "dokładnie typów" : "co najmniej typów"}</span>
+            <span className="font-data text-sm font-semibold text-ink">{liczbaTypow}</span>
           </span>
           <input
             type="range"
             min={2}
             max={8}
             step={1}
-            value={liczbaNog}
-            onChange={(e) => { setLiczbaNog(Number(e.target.value)); setWynik(null); }}
+            value={liczbaTypow}
+            onChange={(e) => { setLiczbaTypow(Number(e.target.value)); setWynik(null); }}
             className="w-full accent-[var(--color-brand)]"
           />
           <div className="mt-1 flex items-center justify-between gap-2">
             <span className="text-[10px] text-faint">
               {trybDokladny
-                ? "kupon będzie miał DOKŁADNIE tyle nóg"
+                ? "kupon będzie miał dokładnie tyle typów"
                 : "model może dołożyć więcej, jeśli to podnosi szansę"}
             </span>
             <button
@@ -252,7 +256,7 @@ export function GeneratorKuponu({
                   ? "border-brand/40 bg-brand-wash text-brand-deep"
                   : "border-hairline bg-paper text-faint hover:text-ink"
               }`}
-              title="Przełącz między 'co najmniej N' a 'dokładnie N' nóg"
+              title="Przełącz między 'co najmniej N' a 'dokładnie N' typów"
             >
               {trybDokladny ? "✓ dokładnie" : "co najmniej"}
             </button>
@@ -283,8 +287,11 @@ export function GeneratorKuponu({
         </div>
       </div>
 
-      <div className="mt-3 space-y-2">
-        <label className="flex cursor-pointer items-start gap-2 text-xs text-muted">
+      <div className="mt-3 space-y-2.5">
+        <label
+          className="flex cursor-pointer items-start gap-2 text-xs"
+          title={`Techniczne kryterium: typ z przewagą liczoną na ≥${MIN_LEG_EV}% i maks. 1 typ z meczu`}
+        >
           <input
             type="checkbox"
             checked={tylkoValue}
@@ -292,14 +299,18 @@ export function GeneratorKuponu({
             className="mt-0.5 accent-[var(--color-brand)]"
           />
           <span>
-            Tylko z wyraźną przewagą (jak styl „value”) — filtruje legi z EV ≥{" "}
-            {MIN_LEG_EV}% i maks. 1 leg na mecz, jak automatyczne kupony value
+            <span className="font-medium text-ink">Tylko pewne typy z przewagą</span>
+            <br />
+            <span className="text-muted">
+              Bukmacher płaci za nie więcej, niż powinien. Maks. 1 typ z meczu.
+            </span>
           </span>
         </label>
         <label
           className={`flex items-start gap-2 text-xs ${
-            tylkoValue ? "cursor-not-allowed text-faint" : "cursor-pointer text-muted"
+            tylkoValue ? "cursor-not-allowed" : "cursor-pointer"
           }`}
+          title="Ogranicza kupon do jednego typu z każdego meczu, niezależnie od opcji powyżej"
         >
           <input
             type="checkbox"
@@ -309,7 +320,14 @@ export function GeneratorKuponu({
             className="mt-0.5 accent-[var(--color-brand)]"
           />
           <span>
-            Maks. 1 noga z meczu (zero korelacji){tylkoValue && " — wymuszone przez filtr value"}
+            <span className={`font-medium ${tylkoValue ? "text-faint" : "text-ink"}`}>
+              Nie więcej niż 1 typ z jednego meczu
+            </span>
+            <br />
+            <span className={tylkoValue ? "text-faint" : "text-muted"}>
+              Typy z tego samego meczu często wygrywają albo przegrywają razem
+              {tylkoValue ? " (już włączone powyżej)" : ""}.
+            </span>
           </span>
         </label>
       </div>
@@ -323,7 +341,7 @@ export function GeneratorKuponu({
         {podglad
           ? `✓ da się złożyć: kurs ×${fmtKurs(podglad.kurs_laczny)} · szansa ${fmtProc(
               podglad.p_model,
-            )} · ${podglad.legi.length} ${podglad.legi.length === 1 ? "noga" : "nóg"}`
+            )} · ${podglad.legi.length} ${odmienTyp(podglad.legi.length)}`
           : `✕ ${podpowiedzBrak}`}
       </p>
 
@@ -442,7 +460,7 @@ function KuponKarta({
                         )}
                         {globalIdx === k.najslabszy_idx && k.legi.length > 1 && (
                           <span
-                            title="Leg o najniższej szansie — najmocniej ciągnie szansę kuponu w dół"
+                            title="Typ o najniższej szansie — najmocniej ciągnie szansę kuponu w dół"
                             className="rounded-md bg-data-amber-wash px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[#8a5613]"
                           >
                             ⚠ najsłabsze
@@ -489,11 +507,11 @@ function KuponKarta({
         </div>
       )}
 
-      {/* dołożenie: dobicie kursu pewnym legiem, gdy kupon wisi nisko */}
+      {/* dołożenie: dobicie kursu pewnym typem, gdy kupon wisi nisko */}
       {k.dolozenie && (
         <div className="mt-3 rounded-lg border border-dashed border-hairline bg-paper/60 px-3 py-2.5">
           <p className="text-[10px] font-semibold uppercase tracking-widest text-muted">
-            + dobij kurs pewnym legiem
+            + dobij kurs pewnym typem
           </p>
           <p className="mt-1 text-sm leading-relaxed">
             <strong>{k.dolozenie.podmiot}</strong>{" "}
@@ -540,8 +558,8 @@ function KuponKarta({
 
       <p className="mt-3 text-[11px] text-faint">
         {tylkoValue
-          ? "Filtr jak styl „value”: tylko legi z wyraźną przewagą, maks. 1 na mecz — te same bezpieczniki, kary korelacji i premia za wartość co automatyczne kupony value."
-          : "Ta sama przeanalizowana pula pewniaków co automatyczne kupony — te same bezpieczniki, kary korelacji i premia za wartość."}
+          ? "Ten sam dobór co w automatycznych kuponach value — tylko typy z wyraźną przewagą, maks. 1 z meczu."
+          : "Ta sama przeanalizowana pula i te same reguły doboru typów co w automatycznych kuponach."}
       </p>
 
       {/* usuwanie kuponu: całkowite albo z nauką modelu */}
@@ -562,7 +580,7 @@ function KuponKarta({
             <button
               onClick={onNauka}
               disabled={nauka === "wysylanie"}
-              title="Kupon rozliczy się w tle (jak pominięty) i zasili naukę modelu — korelację legów i kalibrację"
+              title="Kupon rozliczy się w tle (jak pominięty) i pomoże modelowi lepiej dobierać typy w przyszłości"
               className="rounded-lg border border-brand/40 bg-brand-wash px-3 py-1.5 text-xs font-medium text-brand-deep transition-colors hover:bg-brand-wash/70 disabled:opacity-50"
             >
               {nauka === "wysylanie" ? "zapisuję…" : "✕ Odrzuć i ucz model"}
