@@ -32,6 +32,11 @@ const WAGA_MODELU_DEFAULT = 0.55;
 const WAGA_CI_BAZA = 0.85;
 const WAGA_CI_MIN = 0.5;
 const WAGA_CI_MAX = 0.8;
+// twarde widełki wagi EFEKTYWNEJ po nałożeniu zmierzonych delt zaufania
+// (kupony.py: WAGA_EFF_MIN/MAX; delty liczy backend z rozliczeń i podaje
+// w meta.wagi_zaufania — front tylko je stosuje, parytet 1:1)
+const WAGA_EFF_MIN = 0.35;
+const WAGA_EFF_MAX = 0.85;
 // twardy limit legów ryzykownych (p_model < progu) per kupon — wysoki kurs
 // ma się składać z większej liczby pewnych zdarzeń, nie z grubych strzałów.
 // Zbalansowany dopuszcza ryzykowny leg tylko z niezależnym potwierdzeniem
@@ -80,28 +85,37 @@ function pRynku(kurs: number): number {
   return Math.min(Math.max((1.0 / kurs) * (1.0 - MARZA_RYNKU), 1e-6), 1.0 - 1e-6);
 }
 
-/** Zaufanie do p_model — jak kupony.py:_waga_modelu (parytet 1:1). */
-function wagaModelu(l: LegPool): number {
+/** Zaufanie do p_model — jak kupony.py:_waga_modelu (parytet 1:1).
+ * `wagi` = zmierzone delty per kubełek pewności (meta.wagi_zaufania). */
+function wagaModelu(l: LegPool, wagi?: Record<string, number>): number {
   const ci = l.ci;
+  let w = WAGA_MODELU[String(l.pewnosc ?? "")] ?? WAGA_MODELU_DEFAULT;
   if (Array.isArray(ci) && ci.length === 2) {
     const szer = Number(ci[1]) - Number(ci[0]);
     if (Number.isFinite(szer) && szer >= 0.0) {
-      return Math.min(Math.max(WAGA_CI_BAZA - szer, WAGA_CI_MIN), WAGA_CI_MAX);
+      w = Math.min(Math.max(WAGA_CI_BAZA - szer, WAGA_CI_MIN), WAGA_CI_MAX);
     }
   }
-  return WAGA_MODELU[String(l.pewnosc ?? "")] ?? WAGA_MODELU_DEFAULT;
+  if (wagi) {
+    const kubelek = String(l.pewnosc ?? "srednia");
+    w = Math.min(
+      Math.max(w + (wagi[kubelek] ?? 0), WAGA_EFF_MIN),
+      WAGA_EFF_MAX,
+    );
+  }
+  return w;
 }
 
 /** Szansa lega DO SKŁADANIA — jak kupony.py:_p_skladania (parytet 1:1). */
-function pSkladania(l: LegPool): number {
-  const w = wagaModelu(l);
+function pSkladania(l: LegPool, wagi?: Record<string, number>): number {
+  const w = wagaModelu(l, wagi);
   return Math.exp(w * Math.log(l.p_model) + (1.0 - w) * Math.log(pRynku(l.kurs)));
 }
 
-function legValue(l: LegPool): number {
+function legValue(l: LegPool, wagi?: Record<string, number>): number {
   // no-vig UK (niezależne) wprost; przewaga deklarowana przez model liczona
   // z UREALNIONEJ szansy — jak kupony.py:_leg_value
-  const ev = l.ev_uk ?? (pSkladania(l) * l.kurs - 1.0) * 100.0;
+  const ev = l.ev_uk ?? (pSkladania(l, wagi) * l.kurs - 1.0) * 100.0;
   return Math.max(0, Math.min(ev ?? 0, 30));
 }
 
@@ -123,7 +137,13 @@ function karaKoszyka(legi: LegPool[], kary: Kary): number {
   return kara;
 }
 
-function scoreSelekcji(pRaw: number, legi: LegPool[], wagaValue: number, kary: Kary): number {
+function scoreSelekcji(
+  pRaw: number,
+  legi: LegPool[],
+  wagaValue: number,
+  kary: Kary,
+  wagi?: Record<string, number>,
+): number {
   let s = pRaw * karaKoszyka(legi, kary);
   const rodz = new Map<string, number>();
   for (const l of legi) {
@@ -134,17 +154,17 @@ function scoreSelekcji(pRaw: number, legi: LegPool[], wagaValue: number, kary: K
   for (const c of rodz.values()) nadmiar += Math.max(0, c - 2);
   s *= DYWERSYFIKACJA ** nadmiar;
   if (wagaValue > 0 && legi.length) {
-    const srEv = legi.reduce((a, l) => a + legValue(l), 0) / legi.length;
+    const srEv = legi.reduce((a, l) => a + legValue(l, wagi), 0) / legi.length;
     s *= 1 + (wagaValue * srEv) / 100;
   }
   return s;
 }
 
-function qLega(b: LegPool, profil: Profil): number {
+function qLega(b: LegPool, profil: Profil, wagi?: Record<string, number>): number {
   // jakość z UREALNIONEJ szansy (nie surowego p_model) — jak kupony.py:_q
-  let q = Math.log(pSkladania(b)) / Math.log(b.kurs);
+  let q = Math.log(pSkladania(b, wagi)) / Math.log(b.kurs);
   if (profil === "bezpieczny") return q;
-  const v = legValue(b);
+  const v = legValue(b, wagi);
   if (v > 0) q *= 1 - v * WAGA_VALUE_Q[profil];
   if (b.miekka_linia) q *= BONUS_MIEKKA[profil];
   if (b.matchup) q *= BONUS_MATCHUP[profil];
@@ -201,6 +221,9 @@ export interface OpcjeKuponu {
   /** klucze typów (legKey) usuniętych przez użytkownika — nie wejdą do kuponu
    * ani do propozycji rentgena/dołożenia. Rozszerzenie frontowe, jak wyżej. */
   wykluczone?: ReadonlySet<string>;
+  /** zmierzone delty wag zaufania per kubełek pewności (meta.wagi_zaufania,
+   * liczone z rozliczeń przez backend) — jak kupony.py:build_kupony(wagi=) */
+  wagi?: Record<string, number>;
 }
 
 /** Stabilny klucz typu w puli — ta sama czwórka co sygnatury kuponów. */
@@ -281,6 +304,7 @@ export function zlozKupon(
   const maxLegi = opts.maxLegi ?? MAX_LEGI;
   const maxNaMecz = opts.maxNaMecz ?? 4;
   const kary = opts.kary ?? KARY_DEFAULT;
+  const wagi = opts.wagi;
   const wagaSel = WAGA_VALUE_SELEKCJA[profil];
 
   // wybory użytkownika: usunięte typy znikają z każdej roli (kandydat,
@@ -309,7 +333,7 @@ export function zlozKupon(
   const maxRyzykowne = MAX_RYZYKOWNE[profil];
   const cands = pulaEfektywna(bezUsunietych, profil)
     .filter((b) => !pinIds.has(b.podmiot_id))
-    .sort((a, b) => qLega(b, profil) - qLega(a, profil))
+    .sort((a, b) => qLega(b, profil, wagi) - qLega(a, profil, wagi))
     .slice(0, MAX_KANDYDATOW);
 
   // stan wiązki: p = iloczyn UREALNIONYCH szans (selekcja); wyświetlana
@@ -317,7 +341,7 @@ export function zlozKupon(
   // Start NIE od pustego stanu, tylko od przypiętych typów usera.
   let beam: St[] = [{
     kurs: przypiete.reduce((a, l) => a * l.kurs, 1),
-    p: przypiete.reduce((a, l) => a * pSkladania(l), 1),
+    p: przypiete.reduce((a, l) => a * pSkladania(l, wagi), 1),
     legi: [...przypiete],
   }];
   const komplety: St[] = [];
@@ -328,7 +352,7 @@ export function zlozKupon(
   for (const b of cands) {
     const ryzykowny = b.p_model < PROG_RYZYKA_P;
     const nowe: St[] = [];
-    const pSelB = pSkladania(b);
+    const pSelB = pSkladania(b, wagi);
     for (const st of beam) {
       if (st.legi.length >= maxLegi) continue;
       if (st.legi.some((l) => l.podmiot_id === b.podmiot_id)) continue;
@@ -359,7 +383,7 @@ export function zlozKupon(
     const perDl = new Map<number, number>();
     beam = beam
       .map((st) => {
-        const sc = scoreSelekcji(st.p, st.legi, wagaSel, kary);
+        const sc = scoreSelekcji(st.p, st.legi, wagaSel, kary, wagi);
         const tier = `${st.legi.length}|${st.kurs.toFixed(4)}|${sc.toFixed(8)}`;
         const ident = st.legi.map((l) => l.podmiot_id).sort((x, y) => x - y).join(",");
         return { st, sc, tier, ident };
@@ -390,8 +414,8 @@ export function zlozKupon(
   if (!komplety.length) return null;
 
   komplety.sort((a, b) => {
-    const sb = scoreSelekcji(b.p, b.legi, wagaSel, kary);
-    const sa = scoreSelekcji(a.p, a.legi, wagaSel, kary);
+    const sb = scoreSelekcji(b.p, b.legi, wagaSel, kary, wagi);
+    const sa = scoreSelekcji(a.p, a.legi, wagaSel, kary, wagi);
     if (sb !== sa) return sb - sa;
     // deterministyczny tie-break po zestawie podmiotów — porównanie LICZBOWE
     // element po elemencie (jak Python tuple(sorted(...))), NIE stringowe:

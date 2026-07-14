@@ -120,21 +120,29 @@ def _p_rynku(kurs: float) -> float:
     return min(max((1.0 / kurs) * (1.0 - MARZA_RYNKU), 1e-6), 1.0 - 1e-6)
 
 
-def _waga_modelu(l: dict) -> float:
+def _waga_modelu(l: dict, wagi: dict | None = None) -> float:
     """Ile ufamy p_model vs cenie rynku: płynnie z szerokości przedziału
-    wiarygodności (ci), fallback na kubełek pewności, gdy ci brak."""
+    wiarygodności (ci), fallback na kubełek pewności, gdy ci brak.
+
+    `wagi` — ZMIERZONE delty per kubełek (wagi_zaufania_z_pomiaru): korekta
+    z realnej trafności rozliczonych typów, nakładana NA wagę z ci."""
     ci = l.get("ci")
+    w = WAGA_MODELU.get(str(l.get("pewnosc") or ""), WAGA_MODELU_DEFAULT)
     if isinstance(ci, (list, tuple)) and len(ci) == 2:
         try:
             szer = float(ci[1]) - float(ci[0])
         except (TypeError, ValueError):
             szer = -1.0
         if szer >= 0.0:
-            return min(max(WAGA_CI_BAZA - szer, WAGA_CI_MIN), WAGA_CI_MAX)
-    return WAGA_MODELU.get(str(l.get("pewnosc") or ""), WAGA_MODELU_DEFAULT)
+            w = min(max(WAGA_CI_BAZA - szer, WAGA_CI_MIN), WAGA_CI_MAX)
+    if wagi:
+        kubelek = str(l.get("pewnosc") or "srednia")
+        w = min(max(w + float(wagi.get(kubelek, 0.0)), WAGA_EFF_MIN),
+                WAGA_EFF_MAX)
+    return w
 
 
-def _p_skladania(l: dict) -> float:
+def _p_skladania(l: dict, wagi: dict | None = None) -> float:
     """Szansa lega DO SKŁADANIA: p_model ściągnięte ku cenie rynku.
 
     Średnia geometryczna (log-liniowa) p_model i p_rynku, ważona zaufaniem
@@ -142,13 +150,13 @@ def _p_skladania(l: dict) -> float:
     szersze widełki szansy, tym mocniej ta korekta obcina deklarowaną
     przewagę; legi zgodne z rynkiem prawie nie drgną.
     """
-    w = _waga_modelu(l)
+    w = _waga_modelu(l, wagi)
     return math.exp(
         w * math.log(l["p_model"]) + (1.0 - w) * math.log(_p_rynku(l["kurs"]))
     )
 
 
-def _leg_value(l: dict) -> float:
+def _leg_value(l: dict, wagi: dict | None = None) -> float:
     """Realna przewaga lega w % (0–30, ujęte w widełki): no-vig UK (ev_uk) to
     najczystszy sygnał (niezależny od naszego modelu — wchodzi wprost).
     Fallback: przewaga deklarowana przez model, ale liczona z UREALNIONEJ
@@ -156,11 +164,41 @@ def _leg_value(l: dict) -> float:
     nie może już windować go w rankingu selekcji. None/ujemne → 0."""
     ev = l.get("ev_uk")
     if ev is None:
-        ev = (_p_skladania(l) * l["kurs"] - 1.0) * 100.0
+        ev = (_p_skladania(l, wagi) * l["kurs"] - 1.0) * 100.0
     try:
         return max(0.0, min(float(ev), 30.0))
     except (TypeError, ValueError):
         return 0.0
+
+
+# --- kalibracja WAG ZAUFANIA z rozliczeń (pomiar: rozliczanie.compute_wagi_
+# zaufania). Zmierzone "ile naprawdę ufać p_model" per kubełek pewności
+# zastępuje zgadywane stałe — ten sam wzorzec co kary korelacji niżej.
+WAGI_PRIOR = 60.0        # shrink zmierzonej wagi do bazowej (n/(n+prior))
+WAGI_DELTA_CAP = 0.25    # maksymalne przesunięcie wagi względem bazowej
+WAGA_EFF_MIN, WAGA_EFF_MAX = 0.35, 0.85   # twarde widełki wagi efektywnej
+
+
+def wagi_zaufania_z_pomiaru(pomiar: dict, prior: float = WAGI_PRIOR) -> dict:
+    """Delty wag zaufania per kubełek pewności — ZMIERZONE zamiast zgadywanych.
+
+    `pomiar` = rozliczanie.compute_wagi_zaufania (per kubełek: n, sr_p,
+    sr_rynek, hit, w_cel). Delta = (w_cel - waga_bazowa) ściągnięta wagą
+    n/(n+prior) i capowana ±WAGI_DELTA_CAP. Zwraca {kubelek: delta}; pusta
+    mapa / brak kubełka = zachowanie bez kalibracji.
+    """
+    out: dict[str, float] = {}
+    for kubelek, d in (pomiar or {}).items():
+        w_cel, n = d.get("w_cel"), d.get("n", 0)
+        if w_cel is None or n < 1:
+            continue
+        baza = WAGA_MODELU.get(kubelek, WAGA_MODELU_DEFAULT)
+        k = n / (n + prior)
+        delta = k * (float(w_cel) - baza)
+        out[kubelek] = round(
+            max(-WAGI_DELTA_CAP, min(WAGI_DELTA_CAP, delta)), 3
+        )
+    return out
 
 
 # domyślne kary korelacji jako mapa (nadpisywalna zmierzonymi z rozliczeń)
@@ -249,6 +287,7 @@ def _leg_dict(b: dict) -> dict:
         "podmiot": b["podmiot"],
         "druzyna": b.get("druzyna", ""),
         "matchup": bool(b.get("matchup")),
+        "matchup_styl": bool(b.get("matchup_styl")),
         "rotacja": bool(b.get("rotacja")),
         "wyzsza_linia": bool(b.get("wyzsza_linia")),
         "miekka_linia": bool(b.get("miekka_linia")),
@@ -277,7 +316,8 @@ def _leg_dict(b: dict) -> dict:
 
 
 def _score_selekcji(p_raw: float, legi, waga_value: float = 0.0,
-                    kary: dict | None = None) -> float:
+                    kary: dict | None = None,
+                    wagi: dict | None = None) -> float:
     """Funkcja celu składania: szansa z karami korelacji + kara SELEKCJI za
     monotonię rynków (3+ legi z jednej rodziny padają razem w nudnym meczu)
     + premia za średnią WARTOŚĆ legów (waga_value>0 = kupon ciągnie ku przewadze)."""
@@ -290,7 +330,7 @@ def _score_selekcji(p_raw: float, legi, waga_value: float = 0.0,
     nadmiar = sum(max(0, c - 2) for c in rodziny.values())
     s *= DYWERSYFIKACJA_RODZIN ** nadmiar
     if waga_value > 0 and legi:
-        sr_ev = sum(_leg_value(l) for l in legi) / len(legi)
+        sr_ev = sum(_leg_value(l, wagi) for l in legi) / len(legi)
         s *= 1.0 + waga_value * sr_ev / 100.0
     return s
 
@@ -303,6 +343,7 @@ def _zloz_pewniaki(
     min_legi: int = 3,
     profil: str = "zbalansowany",
     kary: dict | None = None,
+    wagi: dict | None = None,
 ) -> dict | None:
     """Maksymalizuj szansę kuponu przy kursie łącznym w przedziale [cmin, cmax].
 
@@ -329,11 +370,11 @@ def _zloz_pewniaki(
     def _q(b: dict) -> float:
         # bazowa jakość: koszt pewności na jednostkę kursu (q<0; bliżej 0 =
         # lepiej), liczony z UREALNIONEJ szansy — patrz _p_skladania
-        q = math.log(_p_skladania(b)) / math.log(b["kurs"])
+        q = math.log(_p_skladania(b, wagi)) / math.log(b["kurs"])
         if profil == "bezpieczny":
             return q
         # PREMIA ZA WARTOŚĆ (liczbowo): leg z realną przewagą wchodzi wyżej
-        v = _leg_value(b)
+        v = _leg_value(b, wagi)
         if v > 0:
             q *= 1.0 - v * WAGA_VALUE_Q[profil]
         if b.get("miekka_linia"):
@@ -368,7 +409,7 @@ def _zloz_pewniaki(
     for b in cands:
         ryzykowny = b["p_model"] < PROG_RYZYKA_P
         nowe = []
-        p_sel_b = _p_skladania(b)
+        p_sel_b = _p_skladania(b, wagi)
         for kurs, p, legi in beam:
             if len(legi) >= MAX_LEGI_PEWNIAKI:
                 continue
@@ -406,7 +447,7 @@ def _zloz_pewniaki(
         ocenione = []
         tie_repr: dict[tuple, set] = {}
         for st in beam:
-            sc = _score_selekcji(st[1], st[2], waga_sel, kary)
+            sc = _score_selekcji(st[1], st[2], waga_sel, kary, wagi)
             ident = frozenset(l["podmiot_id"] for l in st[2])
             tier = (len(st[2]), _zaokr(st[0], 4), _zaokr(sc, 8))
             repr_seen = tie_repr.setdefault(tier, set())
@@ -453,7 +494,7 @@ def _zloz_pewniaki(
     # zanim slot się zamrozi; opublikowane kupony i tak są zamrożone w logu)
     komplety.sort(
         key=lambda s: (
-            -_score_selekcji(s[1], s[2], waga_sel, kary),
+            -_score_selekcji(s[1], s[2], waga_sel, kary, wagi),
             tuple(sorted(l["podmiot_id"] for l in s[2])),
         )
     )
@@ -575,6 +616,7 @@ def build_kupony(
     now_ts: int | None = None,
     profil: str = "zbalansowany",
     kary: dict | None = None,
+    wagi: dict | None = None,
 ) -> list[dict]:
     """Kupony pewniaków w dwóch horyzontach + kupony value.
 
@@ -594,12 +636,12 @@ def build_kupony(
     tylko_dzis_ok = len({b["mecz_id"] for b in dzis20}) >= 2
     for cmin, cmax in PRZEDZIALY_DZIENNE:
         k = (
-            _zloz_pewniaki(dzis20, cmin, cmax, profil=profil, kary=kary)
+            _zloz_pewniaki(dzis20, cmin, cmax, profil=profil, kary=kary, wagi=wagi)
             if tylko_dzis_ok else None
         )
         pula_k = dzis20
         if k is None:
-            k = _zloz_pewniaki(dzis44, cmin, cmax, profil=profil, kary=kary)
+            k = _zloz_pewniaki(dzis44, cmin, cmax, profil=profil, kary=kary, wagi=wagi)
             pula_k = dzis44
         if k is not None:
             k["horyzont"] = "dzienny"
@@ -609,7 +651,7 @@ def build_kupony(
 
     dlugo = [b for b in pool if b["kickoff_ts"] <= now + OKNO_DLUGO_S]
     for cmin, cmax in PRZEDZIALY_DLUGOTERMINOWE:
-        k = _zloz_pewniaki(dlugo, cmin, cmax, profil=profil, kary=kary)
+        k = _zloz_pewniaki(dlugo, cmin, cmax, profil=profil, kary=kary, wagi=wagi)
         if k is not None:
             k["horyzont"] = "dlugoterminowy"
             _rentgen(k, dlugo, cmin, cmax, kary=kary)
@@ -623,7 +665,8 @@ def build_kupony(
     sygnatury = {_sygnatura(k) for k in out}
     for cmin, cmax in PRZEDZIALY_VALUE:
         k = _zloz_pewniaki(
-            cands, cmin, cmax, max_na_mecz=1, min_legi=2, profil=profil, kary=kary
+            cands, cmin, cmax, max_na_mecz=1, min_legi=2, profil=profil,
+            kary=kary, wagi=wagi
         )
         if k is None or _sygnatura(k) in sygnatury:
             continue

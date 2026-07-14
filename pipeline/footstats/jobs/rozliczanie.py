@@ -45,6 +45,14 @@ MARKETY_365_STATY = {"fouls_committed", "fouls_won", "interceptions", "offsides"
 # rynki rozliczane z banku trendów statshub (odbiory nie występują w 365)
 MARKETY_LIB = {"fouls_committed", "tackles", "fouls_won", "interceptions",
                "offsides"}
+# rynki DRUŻYNOWE -> pole w statystykach drużynowych 365 (game_team_stats).
+# Rozliczane osobną, prostszą ścieżką: bez modelu minut, bez superzmiany;
+# mecz z dogrywką NIE rozlicza się z tych statystyk (obejmują 120 min,
+# a rynek dotyczy 90) — po terminie zamyka się jako zwrot
+MARKETY_DRUZYNOWE = {
+    "team_shots": "shots", "team_sot": "sot",
+    "team_fouls": "fouls", "team_cards": "kartki",
+}
 # strzały NIECELNE i ZABLOKOWANE liczymy CAŁKOWICIE OSOBNO — nie wchodzą do
 # zbiorczej skuteczności modelu (podsumowanie trafień/ROI ani tabela per rynek).
 # Rynek "shots" (strzały ogółem) zostaje bez zmian = wszystkie strzały, zgodnie
@@ -122,6 +130,7 @@ def _kupon_leg_do_logu(l: dict) -> dict:
         "p_model": l["p_model"], "pewnosc": l.get("pewnosc"),
         "sugestia": False,
         "matchup": l.get("matchup"), "rotacja": l.get("rotacja"),
+        "matchup_styl": l.get("matchup_styl"),
         "wyzsza_linia": l.get("wyzsza_linia"),
         "miekka_linia": l.get("miekka_linia"),
         "xi_sygnal": l.get("xi_sygnal"),
@@ -140,12 +149,19 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
             # kurs/p_model zostają z pierwszej publikacji (dataset kalibracji).
             rec = log[k]
             if rec.get("wynik") is None:
-                for f in ("matchup", "rotacja", "wyzsza_linia",
+                for f in ("matchup", "matchup_styl", "rotacja", "wyzsza_linia",
                           "pewniak", "miekka_linia"):
                     if b.get(f):
                         rec[f] = True
                 if b.get("xi_sygnal") is not None:
                     rec["xi_sygnal"] = b["xi_sygnal"]  # najświeższy przed meczem
+                # typ pomiarowy (odrzucony przy progu), który PÓŹNIEJ przeszedł
+                # progi i został opublikowany — przestaje być pomiarowy (wraca
+                # do kalibracji/skuteczności); w drugą stronę NIGDY nie
+                # degradujemy opublikowanego typu do pomiarowego
+                if rec.get("odrzucony") and not b.get("odrzucony"):
+                    rec["odrzucony"] = False
+                    rec.pop("odrzucenie_powod", None)
             continue
         log[k] = {
             "mecz_id": b["mecz_id"], "mecz": b["mecz"],
@@ -162,12 +178,19 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
             "sugestia": bool(b.get("sugestia")),
             # kategorie typu — do diagnostyki per kategoria (Brier/log-loss)
             "matchup": bool(b.get("matchup")),
+            "matchup_styl": bool(b.get("matchup_styl")),
             "rotacja": bool(b.get("rotacja")),
             "wyzsza_linia": bool(b.get("wyzsza_linia")),
             "pewniak": bool(b.get("pewniak")),
             "miekka_linia": bool(b.get("miekka_linia")),
             # sygnał składu przy publikacji — do kalibracji p_start z rozliczeń
             "xi_sygnal": b.get("xi_sygnal"),
+            # POMIAR PROGÓW: typ odrzucony tuż przy progu (betting.NEAR_*) —
+            # rozlicza się w tle, POZA kalibracją/skutecznością/UI; diagnostyka
+            # porównuje jego hit-rate z przepuszczonymi (kategoria
+            # odrzucone_pomiar), zanim ktokolwiek ruszy same progi
+            "odrzucony": bool(b.get("odrzucony")),
+            "odrzucenie_powod": b.get("odrzucenie_powod"),
             "opublikowano_ts": int(time.time()),
             "wynik": None, "faktyczna": None,
         }
@@ -381,7 +404,7 @@ def compute_bias(log: dict, min_n: int = MIN_N_KALIBRACJI) -> dict[str, float]:
     """Płaski bias per rynek (stary format) — zachowany dla raportu i testów."""
     grupy: dict[str, list[dict]] = {}
     for r in log.values():
-        if r.get("wynik") in ("wygrany", "przegrany"):
+        if r.get("wynik") in ("wygrany", "przegrany") and not r.get("odrzucony"):
             grupy.setdefault(r["rynek_kod"], []).append(r)
     return {
         mk: _cap_bias(_bias_surowy(grp))
@@ -409,11 +432,14 @@ def compute_bias_full(
     — format rozumiany przez engine (stary mnożnikowy dalej wspierany).
     """
     # sugestie STS trafiają fatalnie względem typów z kursem (inne progi, brak
-    # bezpieczników) — mieszanie ich z typami zaniżało bias całych rodzin
+    # bezpieczników) — mieszanie ich z typami zaniżało bias całych rodzin.
+    # Typy POMIAROWE (odrzucone przy progu) też zostają poza kalibracją —
+    # nie były publikowane i z definicji łamią któryś bezpiecznik.
     settled = [
         r for r in log.values()
         if r.get("wynik") in ("wygrany", "przegrany")
         and bool(r.get("sugestia")) == sugestie
+        and not r.get("odrzucony")
     ]
     rodziny: dict[str, list[dict]] = {}
     for r in settled:
@@ -461,6 +487,52 @@ def market_bias_sugestie() -> dict[str, dict]:
     return compute_bias_full(log, sugestie=True, cap=SUGESTIA_BIAS_CAP_LOGIT)
 
 
+def compute_wagi_zaufania(log: dict) -> dict[str, dict]:
+    """Pomiar zaufania do p_model per KUBEŁEK PEWNOŚCI (wysoka/średnia).
+
+    Dla rozliczonych, publikowanych typów z kursem porównujemy: średnie
+    p_model (deklarację modelu), średnią cenę rynku po devigu i realny
+    hit-rate. Składanie kuponów miesza p_model z ceną rynku log-liniowo
+    (kupony._p_skladania: p^w * r^(1-w)), więc DOCELOWĄ wagę w — taką, przy
+    której mieszanka średnio trafiałaby w realny hit — wyznacza wprost:
+
+        w* = (ln hit − ln r̄) / (ln p̄ − ln r̄)
+
+    Zwraca surowy pomiar per kubełek {n, sr_p, sr_rynek, hit, w_cel};
+    shrink do wag bazowych i cap stosuje kupony.wagi_zaufania_z_pomiaru
+    (ten sam wzorzec co kary korelacji z diagnostyki).
+    """
+    out: dict[str, dict] = {}
+    for kubelek in ("wysoka", "srednia"):
+        grp = [
+            r for r in log.values()
+            if r.get("wynik") in ("wygrany", "przegrany")
+            and not r.get("sugestia") and not r.get("odrzucony")
+            and r.get("kurs") and float(r["kurs"]) > 1.0
+            and (r.get("pewnosc") or "srednia") == kubelek
+        ]
+        n = len(grp)
+        if n < 5:
+            continue
+        sr_p = sum(float(r["p_model"]) for r in grp) / n
+        sr_rynek = sum(
+            betting.implied_prob_one_sided(float(r["kurs"])) for r in grp
+        ) / n
+        hit = sum(1 for r in grp if r["wynik"] == "wygrany") / n
+        rec = {
+            "n": n, "sr_p": round(sr_p, 3),
+            "sr_rynek": round(sr_rynek, 3), "hit": round(hit, 3),
+        }
+        mianownik = math.log(max(sr_p, 1e-6)) - math.log(max(sr_rynek, 1e-6))
+        if abs(mianownik) > 1e-3 and 0.0 < hit < 1.0:
+            w = (math.log(hit) - math.log(max(sr_rynek, 1e-6))) / mianownik
+            # w>1 = model lepszy niż sam deklaruje (rzadkie), w<0 = gorszy
+            # niż rynek; sensowny zakres ucinamy, resztę robi shrink+cap
+            rec["w_cel"] = round(min(max(w, 0.0), 1.2), 3)
+        out[kubelek] = rec
+    return out
+
+
 def compute_diagnostyka(log: dict) -> dict:
     """Samokontrola modelu z rozliczeń: Brier / log-loss per kategoria typów.
 
@@ -469,9 +541,12 @@ def compute_diagnostyka(log: dict) -> dict:
     składu — P(zagrał | sygnał XI) — do przyszłej kalibracji modelu minut
     (od n>=40 na sygnał można zastąpić ręczne wagi zmierzonymi).
     """
-    settled = [
+    # typy pomiarowe (odrzucone przy progu) NIE wchodzą do kategorii jakości
+    # modelu — mają własną kategorię porównawczą niżej
+    wszystkie_settled = [
         r for r in log.values() if r.get("wynik") in ("wygrany", "przegrany")
     ]
+    settled = [r for r in wszystkie_settled if not r.get("odrzucony")]
 
     def _stats(grp: list[dict]) -> dict | None:
         n = len(grp)
@@ -492,21 +567,34 @@ def compute_diagnostyka(log: dict) -> dict:
             "brier": round(brier / n, 4), "logloss": round(ll / n, 4),
         }
 
-    FLAGI = ("sugestia", "matchup", "rotacja", "wyzsza_linia", "miekka_linia")
+    FLAGI = ("sugestia", "matchup", "matchup_styl", "rotacja",
+             "wyzsza_linia", "miekka_linia")
     kategorie = {
         "wszystkie": settled,
         "zwykle": [r for r in settled if not any(r.get(f) for f in FLAGI)],
         "matchup": [r for r in settled if r.get("matchup")],
+        # pełne matchupy STYLU (model/styl.py + matchup.py) — mierzone osobno
+        # od "matchup" (profil koncesji rywala); wdrożone 2026-07-14, ocena
+        # czy analogie stylu zarabiają możliwa dopiero od n>=~25
+        "matchup_styl": [r for r in settled if r.get("matchup_styl")],
         "rotacja": [r for r in settled if r.get("rotacja")],
         "wyzsza_linia": [r for r in settled if r.get("wyzsza_linia")],
         "miekka_linia": [r for r in settled if r.get("miekka_linia")],
         "sugestie": [r for r in settled if r.get("sugestia")],
+        # POMIAR PROGÓW: jak trafiają typy odrzucone tuż przy progu vs
+        # przepuszczone — dopiero ta para liczb uzasadnia ruszanie progów
+        "odrzucone_pomiar": [
+            r for r in wszystkie_settled if r.get("odrzucony")
+        ],
     }
     out: dict = {"kategorie": {}}
     for nazwa, grp in kategorie.items():
         s = _stats(grp)
         if s:
             out["kategorie"][nazwa] = s
+    # pomiar wag zaufania per kubełek pewności — raport w typy_wyniki
+    # (stosowanie: kupony.wagi_zaufania_z_pomiaru w build_wc_fast)
+    out["wagi_zaufania"] = compute_wagi_zaufania(log)
     sklady: dict[str, list[int]] = {}
     for r in log.values():
         if r.get("zagral") is None:
@@ -1027,6 +1115,42 @@ def rozlicz(
             continue
         mk = rec["rynek_kod"]
 
+        # RYNKI DRUŻYNOWE — osobna, prosta ścieżka (statystyki drużynowe 365)
+        if mk in MARKETY_DRUZYNOWE:
+            gid_t = _gid_365(rec, cache_365)
+            wartosc_t = None
+            if gid_t is not None and not scores365.after_extra_time(gid_t):
+                try:
+                    st_t = scores365.game_team_stats(gid_t)
+                except Exception:
+                    st_t = None
+                if st_t:
+                    tk = rotowire._norm(str(rec["podmiot"]))
+                    if tk in st_t:
+                        w_t = st_t[tk].get(MARKETY_DRUZYNOWE[mk])
+                        wartosc_t = float(w_t) if w_t is not None else None
+            if wartosc_t is None:
+                if (
+                    now - rec["kickoff_ts"] > TERMIN_BRAK_DANYCH_S
+                    and rec.get("mecz") not in mecze_przyszle
+                ):
+                    rec.update(wynik="zwrot", faktyczna=None,
+                               rozliczono_ts=now, powod="brak danych źródła")
+                continue
+            traf_t = (
+                wartosc_t > rec["linia"] if rec["strona"] == "powyzej"
+                else wartosc_t < rec["linia"]
+            )
+            rec.update(
+                wynik="wygrany" if traf_t else "przegrany",
+                faktyczna=wartosc_t, rozliczono_ts=now, zagral=True,
+            )
+            if rec.get("kurs") and rec.get("kurs_zamkniecia"):
+                rec["clv_pct"] = round(
+                    (rec["kurs"] / rec["kurs_zamkniecia"] - 1.0) * 100.0, 1
+                )
+            continue
+
         # pełne statystyki meczu z 365 (minuty + faule/przechwyty) — dostępne
         # tuż po końcowym gwizdku, niezależnie od odświeżeń banku trendów
         gid = _gid_365(rec, cache_365)
@@ -1247,11 +1371,14 @@ def rozlicz(
 
     # ---- podsumowanie do UI ----
     # strzały niecelne/zablokowane (RYNKI_OSOBNE) NIE wchodzą do skuteczności
-    # ani ROI — uczą się w tle (typy_log/kalibracja), ale nie są pokazywane
+    # ani ROI — uczą się w tle (typy_log/kalibracja), ale nie są pokazywane.
+    # Typy POMIAROWE (odrzucone przy progu) też zostają poza wszystkim —
+    # nigdy nie były opublikowane, mierzy je tylko diagnostyka kategorii.
     settled = [
         r for r in log.values()
         if r.get("wynik") in ("wygrany", "przegrany")
         and r.get("rynek_kod") not in RYNKI_OSOBNE
+        and not r.get("odrzucony")
     ]
     okazje = [r for r in settled if not r["sugestia"] and r.get("kurs")]
     roi = sum(
@@ -1286,6 +1413,7 @@ def rozlicz(
             r for r in log.values()
             if r.get("wynik") == "zwrot"
             and r.get("rynek_kod") not in RYNKI_OSOBNE
+            and not r.get("odrzucony")
         ],
         key=lambda r: -(r.get("rozliczono_ts") or 0),
     )[:60]
@@ -1317,6 +1445,7 @@ def rozlicz(
             "opublikowane": sum(
                 1 for r in log.values()
                 if r.get("rynek_kod") not in RYNKI_OSOBNE
+                and not r.get("odrzucony")
             ),
             "rozliczone": len(settled),
             "trafione": sum(1 for r in settled if r["wynik"] == "wygrany"),

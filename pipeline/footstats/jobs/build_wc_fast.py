@@ -33,7 +33,9 @@ from .. import supa
 from ..engine import (
     MatchContext, PlayerHistory, RARE_MARKETS, apply_bias, score_player_market,
 )
-from ..model import betting, context, counts, koncesje, kupony, matchup_lite, tempo
+from ..model import (
+    betting, context, counts, koncesje, kupony, matchup_lite, styl, tempo,
+)
 from ..sources import eloratings, rotowire, scores365, statshub, superbet
 from . import rozliczanie
 from .build_demo import MARKET_NAMES_PL, WEB_DATA_DIR, line_for_lambda
@@ -71,6 +73,7 @@ def _rozlicz_i_zapisz(
     kupony_list: list[dict],
     niedostepni: set[int] | None = None,
     conf_mids: set[int] | None = None,
+    odrzucone_pomiar: list[dict] | None = None,
 ) -> None:
     """Rozliczanie + zapis wyników. Wywoływane w KAŻDYM cyklu — także gdy
     statshub nie ma propsów (rozliczenia nie mogą czekać na nowe typy).
@@ -81,8 +84,11 @@ def _rozlicz_i_zapisz(
     Przy błędzie NIE nadpisujemy plików — zostają wyniki z poprzedniego cyklu.
     """
     try:
+        # typy pomiarowe (odrzucone przy progu) dokładamy WYŁĄCZNIE do logu
+        # rozliczeń — value_bets.json (UI) idzie bez nich
         wyniki = rozliczanie.rozlicz(
-            value_bets, kupony_list, niedostepni, conf_mids=conf_mids
+            value_bets + (odrzucone_pomiar or []),
+            kupony_list, niedostepni, conf_mids=conf_mids,
         )
     except Exception as ex:
         print(f"Rozliczanie pominięte ({ex}) — poprzednie wyniki bez zmian")
@@ -161,10 +167,10 @@ def save_trend_lib(lib: dict) -> None:
     supa.put_key("trend_lib", lib)
 
 
-def past_wc_event_ids(days_back: int = 25) -> list[int]:
-    """ID rozegranych meczów MŚ z ostatnich dni (do biblioteki historii)."""
+def past_wc_events(days_back: int = 25) -> list[dict]:
+    """Rozegrane mecze MŚ z ostatnich dni (pełne eventy: id, drużyny, kickoff)."""
     now = int(time.time())
-    out: dict[int, bool] = {}
+    out: dict[int, dict] = {}
     for d in range(1, days_back + 1):
         start = now - d * 86400
         start -= start % 86400
@@ -180,8 +186,13 @@ def past_wc_event_ids(days_back: int = 25) -> list[int]:
                 "uniqueTournamentId"
             )
             if utid == WC_UTID and ev.get("status") != "notstarted":
-                out[ev["id"]] = True
-    return list(out)
+                out[ev["id"]] = ev
+    return list(out.values())
+
+
+def past_wc_event_ids(days_back: int = 25) -> list[int]:
+    """ID rozegranych meczów MŚ z ostatnich dni (do biblioteki historii)."""
+    return [ev["id"] for ev in past_wc_events(days_back)]
 
 
 def group_prior_from_context(trend: statshub.StatshubTrend) -> counts.GroupPrior:
@@ -297,6 +308,132 @@ def profil_sedziow(
     return out
 
 
+# --- BANK STYLU (pełne matchupy, model/styl.py) ---
+# limity per cykl: pierwszy przebieg dogania cały turniej w 1-2 cyklach,
+# kolejne dolewają po kilka meczów dziennie — bez zalewania API
+LIMIT_NOWYCH_GIER_STYLU = 40
+LIMIT_WZROSTOW_NA_CYKL = 30
+
+
+def aktualizuj_bank_stylu(gracze_id_sh: set[int]) -> dict:
+    """Dolej do banku stylu (Supabase `styl_bank`) nowe rozegrane mecze MŚ:
+    statystyki drużynowe i styl zawodników (365Scores), sytuacje strzałów
+    (shotmapy statshub) oraz wzrosty zawodników (statshub /player).
+
+    Bank jest trwały — 365/statshub trzymają dane meczu długo, ale wolimy
+    nie zależeć od ich retencji, a shotmapy/staty pobierać RAZ per mecz.
+    """
+    bank = supa.get_key("styl_bank") or {}
+    gry = bank.setdefault("gry", {})
+    zaw = bank.setdefault("zawodnicy", {})
+    smapy = bank.setdefault("shotmap", {})
+    wzrost = bank.setdefault("wzrost", {})
+    zmienione = False
+
+    # 1) mecze 365Scores: statystyki drużynowe + styl zawodników per mecz
+    nowych = 0
+    try:
+        for g in scores365.finished_games_by_competition():
+            gid = str(g["id"])
+            if gid in gry:
+                continue
+            if nowych >= LIMIT_NOWYCH_GIER_STYLU:
+                break
+            try:
+                druzyny = scores365.game_team_stats(g["id"])
+                pelne = scores365.game_player_match_stats(g["id"])
+            except Exception:
+                continue
+            if len(druzyny) != 2:
+                continue
+            gry[gid] = {"ts": g["ts"], "druzyny": druzyny}
+            for pkey, rec in pelne.items():
+                if not rec.get("minutes"):
+                    continue
+                z = zaw.setdefault(
+                    pkey, {"druzyna": rec.get("druzyna", ""), "gry": {}}
+                )
+                if rec.get("druzyna"):
+                    z["druzyna"] = rec["druzyna"]
+                z["gry"][gid] = {
+                    "ts": g["ts"], "min": rec.get("minutes", 0),
+                    "dribbles_att": rec.get("dribbles_att", 0),
+                    "dribbled_past": rec.get("dribbled_past", 0),
+                    "aerial_won": rec.get("aerial_won", 0),
+                    "aerial_att": rec.get("aerial_att", 0),
+                    "ground_att": rec.get("ground_att", 0),
+                    "key_passes": rec.get("key_passes", 0),
+                    "crosses_att": rec.get("crosses_att", 0),
+                }
+                # przycinamy do ostatnich 10 meczów (profil i tak bierze 8)
+                if len(z["gry"]) > 10:
+                    najstarsze = sorted(
+                        z["gry"], key=lambda k: z["gry"][k].get("ts", 0)
+                    )[: len(z["gry"]) - 10]
+                    for k in najstarsze:
+                        del z["gry"][k]
+            nowych += 1
+            zmienione = True
+            time.sleep(0.3)
+    except Exception as e:
+        print(f"Bank stylu: mecze 365 pominięte ({e})")
+
+    # 2) shotmapy statshub (kontry per drużyna, stałe fragmenty per zawodnik)
+    try:
+        for ev in past_wc_events():
+            eid = str(ev["id"])
+            if eid in smapy:
+                continue
+            try:
+                strzaly = statshub.fetch_event_shotmap(ev["id"])
+            except Exception:
+                continue
+            if not strzaly:
+                continue
+            dr: dict[str, dict] = {}
+            stale: dict[str, int] = {}
+            for s in strzaly:
+                tid = str(s.get("teamId") or "")
+                if tid:
+                    slot = dr.setdefault(tid, {"shots": 0, "kontra": 0})
+                    slot["shots"] += 1
+                    if s.get("situation") == "fast-break":
+                        slot["kontra"] += 1
+                if str(s.get("situation") or "") in (
+                    "corner", "free-kick", "set-piece", "penalty"
+                ):
+                    pid = str(s.get("playerId") or "")
+                    if pid:
+                        stale[pid] = stale.get(pid, 0) + 1
+            smapy[eid] = {
+                "ts": ev.get("timeStartTimestamp") or 0,
+                "druzyny": dr, "stale": stale,
+            }
+            zmienione = True
+            time.sleep(0.4)
+    except Exception as e:
+        print(f"Bank stylu: shotmapy pominięte ({e})")
+
+    # 3) wzrosty zawodników (tylko prawdziwe id statshub; 0 = "pytaliśmy,
+    # brak danych" — nie odpytujemy w kółko)
+    brakujace = [
+        pid for pid in gracze_id_sh
+        if pid and pid < 900_000_000 and str(pid) not in wzrost
+    ]
+    for pid in brakujace[:LIMIT_WZROSTOW_NA_CYKL]:
+        try:
+            meta_p = statshub.fetch_player_meta(pid)
+        except Exception:
+            continue
+        wzrost[str(pid)] = meta_p.get("height") or 0
+        zmienione = True
+        time.sleep(0.25)
+
+    if zmienione:
+        supa.put_key("styl_bank", bank)
+    return bank
+
+
 # start MŚ 2026 (2026-06-08 UTC, kilka dni zapasu przed 1. meczem) — granica
 # między "sezonem klubowym" (prior) a "turniejem" (aktualizacja posteriora)
 WC_START_TS = 1_780_876_800
@@ -369,6 +506,8 @@ def score_from_trend(
     tempo_meczu: dict | None = None,
     sedzia: dict | None = None,
     koncesje_tab: "koncesje.Koncesje | None" = None,
+    player_style=None,
+    opponent_style=None,
 ):
     """Zbuduj PlayerHistory z recentGames i policz predykcję (bez kursów).
 
@@ -490,6 +629,10 @@ def score_from_trend(
         official_started=official,
         predicted_started=predicted,
         opponent_name=trend.opponent_name,
+        # PEŁNE matchupy stylu (model/styl.py -> model/matchup.py) — gdy
+        # profile są, engine używa ich ZAMIAST matchup-lite (elif w engine)
+        player_style=player_style,
+        opponent_style=opponent_style,
         matchup_factor=matchup_factor,
         matchup_opis=matchup_opis,
     )
@@ -824,6 +967,30 @@ def _main_impl():
         koncesje_tab = None
         print(f"Profil rywali pominięty ({e})")
 
+    # PEŁNE MATCHUPY STYLU: bank (drużyny 365 + shotmapy statshub + wzrosty)
+    # -> profile OpponentStyle/PlayerStyle -> engine (model/matchup.py).
+    # Awaria któregokolwiek źródła = degradacja do matchup-lite, nie błąd.
+    style_turnieju = None
+    bank_stylu: dict = {}
+    try:
+        bank_stylu = aktualizuj_bank_stylu({t.player_id for t in trends})
+        strony_zaw: dict[str, str] = {}
+        for t in trends:
+            k_st = rotowire._norm(t.player_name)
+            if k_st not in strony_zaw:
+                s_st = matchup_lite.dominant_side(t.game_positions[:8])
+                if s_st != "C":
+                    strony_zaw[k_st] = s_st
+        tid_by_norm = {
+            rotowire._norm(n): tid for tid, n in team_name.items() if n
+        }
+        style_turnieju = styl.StyleTurnieju(bank_stylu, strony_zaw, tid_by_norm)
+        print(f"Bank stylu: {len(bank_stylu.get('gry', {}))} meczów 365, "
+              f"{len(bank_stylu.get('shotmap', {}))} shotmap, "
+              f"{len(bank_stylu.get('wzrost', {}))} wzrostów")
+    except Exception as e:
+        print(f"Bank stylu pominięty ({e}) — matchupy w trybie lite")
+
     # kursy Superbetu
     try:
         sb_events = superbet.list_events(days_ahead=8)
@@ -966,6 +1133,28 @@ def _main_impl():
     seen_player_market = set()  # (player_id, market) — statshub bywa zdublowany
     real_split = {}  # (player_id, mk) -> pełny scoring niecelnych/zablokowanych z 365
     legi_pool = []   # wszystkie kwotowane linie z wysoką szansą — pula pod kupony pewniaków
+    pstyle_cache: dict[int, object] = {}  # PlayerStyle per zawodnik (styl.py)
+
+    # REJESTR ODRZUCEŃ: dla każdej pary (mecz, zawodnik, rynek), która weszła
+    # do scoringu, a NIE dała typu — jeden wpis z powodem. Odpowiada na pytanie
+    # "czemu nie ma typu na X" na stronie meczu; wcześniej odrzucenia były
+    # cichymi `continue` i wymagały debugowania kodu.
+    odrzucenia: dict[tuple, dict] = {}
+
+    def _odrzuc(mid_o, tr_o, powod: str, szczegol: str = "") -> None:
+        odrzucenia[(mid_o, tr_o.player_id, tr_o.market_code)] = {
+            "mecz_id": mid_o, "podmiot": tr_o.player_name,
+            "druzyna": tr_o.team_name,
+            "rynek_kod": tr_o.market_code,
+            "rynek": MARKET_NAMES_PL.get(tr_o.market_code, tr_o.market_code),
+            "powod": powod, "szczegol": szczegol,
+        }
+
+    # POMIAR PROGÓW: typy odrzucone TUŻ przy progu (betting.NEAR_*) — trafiają
+    # do typy_log jako `odrzucony=True` (rozliczą się w tle, POZA kalibracją,
+    # skutecznością i UI). Diagnostyka porówna ich hit-rate z przepuszczonymi.
+    odrzucone_pomiar: list[dict] = []
+    ODRZUCONE_POMIAR_MAX = 80   # bezpiecznik objętości logu per cykl
 
     for tr in trends:
         if (tr.player_id, tr.market_code) in seen_player_market:
@@ -1030,6 +1219,17 @@ def _main_impl():
             tr.game_positions[:6],
             opp_players_by_team.get((mid, tr.opponent_id), []),
         )
+        # pełne profile stylu (cache per zawodnik — nie zależą od rynku)
+        pstyle = ostyle = None
+        if style_turnieju is not None:
+            ostyle = style_turnieju.opponent(tr.opponent_name)
+            if ostyle is not None:
+                if tr.player_id not in pstyle_cache:
+                    pstyle_cache[tr.player_id] = style_turnieju.player(
+                        tr.player_name, tr.position or "M",
+                        tr.game_positions[:8], player_id_sh=tr.player_id,
+                    )
+                pstyle = pstyle_cache[tr.player_id]
         built, hist = score_from_trend(
             tr, tr.opponent_average,
             # potwierdzony/przewidywany skład wolno czytać z in_predicted_lineup
@@ -1048,8 +1248,12 @@ def _main_impl():
             tempo_meczu=tempo_cache.get(mid),
             sedzia=sedzia_by_mid.get(mid),
             koncesje_tab=koncesje_tab,
+            player_style=pstyle,
+            opponent_style=ostyle,
         )
         if built is None:
+            _odrzuc(mid, tr, "za_malo_historii",
+                    "mniej niż 3 mecze z minutami w historii")
             continue
         prior, ctx = built
         mk = tr.market_code
@@ -1073,6 +1277,8 @@ def _main_impl():
                                     market_calibrated=True,
                                     market_bias=bias_map.get(mk, 1.0))
         if probe.lam < (0.35 if mk not in RARE_MARKETS else 0.2):
+            _odrzuc(mid, tr, "za_malo_zdarzen",
+                    f"model oczekuje ~{probe.lam:.2f} na mecz — za mało na typ")
             continue
         line = line_for_lambda(probe.lam)
 
@@ -1155,6 +1361,8 @@ def _main_impl():
         }
 
         if not merged:
+            _odrzuc(mid, tr, "brak_kursu",
+                    "Superbet nie kwotuje tego rynku dla zawodnika")
             continue  # brak realnego kursu — nie tworzymy okazji
 
         # 1a: samospójność siatki linii Superbetu (line shopping bez
@@ -1169,6 +1377,11 @@ def _main_impl():
                 fair_wewn = betting.internal_fair_odds(probs_w)
 
         best_by_side, chosen = {}, {}
+        # śledzenie powodu, gdy ŻADNA linia nie wejdzie do puli kuponów —
+        # zasila rejestr odrzuceń precyzyjniejszym powodem niż "nie wyszło"
+        n_pool_przed = len(legi_pool)
+        prof_ok = ci_fail = div_fail = False
+        hist_krotka = len(tr.counts) < 5
         for l, slot in sorted(merged.items()):
             over_odd = slot.get("over", (None,))[0]
             under_odd = slot.get("under", (None,))[0]
@@ -1176,6 +1389,28 @@ def _main_impl():
                                      over_odd, under_odd,
                                      market_calibrated=True,
                                      market_bias=bias_map.get(mk, 1.0))
+            # POMIAR PROGÓW: odrzucenia tuż przy progu (betting.NEAR_*) —
+            # rozliczą się w tle poza kalibracją/skutecznością/UI
+            for od in sm.odrzucone:
+                if (
+                    od.get("side") != "powyzej"
+                    or len(odrzucone_pomiar) >= ODRZUCONE_POMIAR_MAX
+                ):
+                    continue
+                odrzucone_pomiar.append({
+                    "id": 0, "mecz_id": mid, "mecz": match_label,
+                    "kickoff_ts": ts, "podmiot_typ": "zawodnik",
+                    "podmiot_id": tr.player_id, "podmiot": tr.player_name,
+                    "rynek_kod": mk, "rynek": MARKET_NAMES_PL[mk],
+                    "linia": l, "strona": "powyzej",
+                    "kurs": od.get("odds"), "bukmacher": "Superbet",
+                    "p_model": od.get("p_model"),
+                    "pewnosc": "wysoka" if (sm.ci_high - sm.ci_low) <= 0.18
+                    else "srednia",
+                    "sugestia": False,
+                    "odrzucony": True,
+                    "odrzucenie_powod": od.get("powod"),
+                })
             # pula pewniaków pod kupony: wysoka szansa + rozsądny kurs,
             # bez wymogu value, ale z TYMI SAMYMI bezpiecznikami rozbieżności
             # co okazje — model skrajnie niezgodny z rynkiem zwykle się myli
@@ -1230,6 +1465,14 @@ def _main_impl():
                 # kontekst, którego kurs mógł nie wycenić (weryfikują rozliczenia)
                 max_div = 0.30 if matchup_typ else betting.MAX_MODEL_MARKET_DIVERGENCE
                 max_rel = 2.3 if matchup_typ else betting.MAX_RELATIVE_DIVERGENCE
+                if pewny or perelka or niszowa:
+                    prof_ok = True
+                    if (sm.ci_high - sm.ci_low) > 0.35:
+                        ci_fail = True
+                    if abs(p_side - implied) > max_div or (
+                        implied > 0 and p_side / implied > max_rel
+                    ):
+                        div_fail = True
                 if (
                     (pewny or perelka or niszowa)
                     and len(tr.counts) >= 5  # pewniak nie powstaje z 2 meczów
@@ -1267,6 +1510,12 @@ def _main_impl():
                         # dotąd nie miał, więc nie mógł filtrować jak styl "value"
                         "pewnosc": "wysoka" if (sm.ci_high - sm.ci_low) <= 0.18 else "srednia",
                         "matchup": matchup_typ, "rotacja": rotacja,
+                        # PEŁNY matchup stylu realnie ruszył predykcję — flaga
+                        # do diagnostyki kategorii (czy analogie stylu trafiają)
+                        "matchup_styl": bool(
+                            pstyle is not None and ostyle is not None
+                            and abs(float(sm.factors.get("matchup", 1.0) or 1.0) - 1.0) >= 0.05
+                        ),
                         "xi_sygnal": xi_sygnal,
                         "swieze_sklady": mid in swieze_mids,
                         "miekka_linia": miekka,
@@ -1291,6 +1540,20 @@ def _main_impl():
                 if a.side not in best_by_side or a.rank_score > best_by_side[a.side].rank_score:
                     best_by_side[a.side] = a
                     chosen[a.side] = (sm, l, slot)
+        # żadna linia nie weszła do puli kuponów — zapisz precyzyjny powód
+        if len(legi_pool) == n_pool_przed:
+            if not prof_ok:
+                _odrzuc(mid, tr, "kurs_lub_szansa_poza_widelkami",
+                        "kwotowane linie nie łączą sensownego kursu z szansą")
+            elif hist_krotka:
+                _odrzuc(mid, tr, "krotka_historia",
+                        f"tylko {len(tr.counts)} meczów w historii (potrzeba 5)")
+            elif ci_fail and not div_fail:
+                _odrzuc(mid, tr, "chwiejna_predykcja",
+                        "za szerokie widełki szansy — model sam nie jest pewny")
+            else:
+                _odrzuc(mid, tr, "rozjazd_z_rynkiem",
+                        "model za daleko od kursu — zwykle to my czegoś nie wiemy")
         for a in best_by_side.values():
             if a.side != "powyzej":
                 continue  # underów nie gramy (decyzja usera)
@@ -1350,6 +1613,10 @@ def _main_impl():
                 "p_model": a.model_prob, "p_rynku": a.implied_prob,
                 "fair_kurs": a.fair_odds, "edge_pp": a.edge_pp, "ev_pct": a.ev_pct,
                 "matchup": float(sm.factors.get("rywal", 1.0) or 1.0) >= 1.12,
+                "matchup_styl": bool(
+                    pstyle is not None and ostyle is not None
+                    and abs(float(sm.factors.get("matchup", 1.0) or 1.0) - 1.0) >= 0.05
+                ),
                 "rotacja": rotacja, "xi_sygnal": xi_sygnal,
                 "miekka_linia": odstaje_zewn or miekka_a,
                 "kurs_oczekiwany": (
@@ -1413,6 +1680,244 @@ def _main_impl():
                 "rozklad": dist_r, "czynniki": sm_r.factors,
                 "uzasadnienie": sm_r.reasoning,
             })
+
+    # --- RYNKI DRUŻYNOWE: strzały / celne / kartki (historia: statshub
+    # team-trends, ~20 meczów) + faule (bank stylu, mecze MŚ). Kursy Superbetu
+    # (TEAM_MARKET_SUFFIX) są już w sb_cache. Legi drużynowe wchodzą do
+    # legi_pool tymi samymi progami co zawodnicze i płyną dalej istniejącą
+    # ścieżką pewniaków/kuponów; rozliczanie: scores365.game_team_stats.
+    try:
+        try:
+            team_trends = statshub.fetch_team_trends([e["id"] for e in events])
+        except Exception as e:
+            team_trends = []
+            print(f"team-trends niedostępne ({e})")
+
+        TEAM_POLE_BANKU = {
+            "team_shots": "shots", "team_sot": "sot",
+            "team_fouls": "fouls", "team_cards": "kartki",
+        }
+        gry_banku = list((bank_stylu.get("gry") or {}).values())
+
+        def _hist_z_banku(team_nm: str, pole: str) -> tuple[list, list]:
+            tn = rotowire._norm(team_nm)
+            pary = []
+            for rec_g in gry_banku:
+                dr = rec_g.get("druzyny") or {}
+                if tn in dr and dr[tn].get(pole) is not None:
+                    pary.append((int(rec_g.get("ts") or 0), float(dr[tn][pole])))
+            pary.sort(key=lambda x: -x[0])
+            return [c for _, c in pary], [t for t, _ in pary]
+
+        def _srednia_turnieju(pole: str) -> tuple[float | None, int]:
+            vals = [
+                float(d[pole])
+                for rec_g in gry_banku
+                for d in (rec_g.get("druzyny") or {}).values()
+                if d.get(pole) is not None
+            ]
+            return (sum(vals) / len(vals), len(vals)) if vals else (None, 0)
+
+        def _koncesja_druzynowa(opp_nm: str, pole: str) -> tuple[float | None, int]:
+            """Ile tej statystyki notują PRZECIW rywalowi jego przeciwnicy."""
+            tn = rotowire._norm(opp_nm)
+            vals = []
+            for rec_g in gry_banku:
+                dr = rec_g.get("druzyny") or {}
+                if tn in dr and len(dr) == 2:
+                    inny = next(k for k in dr if k != tn)
+                    v = dr[inny].get(pole)
+                    if v is not None:
+                        vals.append(float(v))
+            return (sum(vals) / len(vals), len(vals)) if vals else (None, 0)
+
+        # faule drużyn: team-trends ich nie wystawia — syntetyczny trend z banku
+        widziane_tt = {(t.event_id, t.team_id, t.market_code) for t in team_trends}
+        for e in wszystkie_ev:
+            for tid_e, opp_e, is_home_e in (
+                (e["homeTeamId"], e["awayTeamId"], True),
+                (e["awayTeamId"], e["homeTeamId"], False),
+            ):
+                nm_e = team_name.get(tid_e, "")
+                if not nm_e or (e["id"], tid_e, "team_fouls") in widziane_tt:
+                    continue
+                c_f, t_f = _hist_z_banku(nm_e, "fouls")
+                if len(c_f) < 3:
+                    continue
+                team_trends.append(statshub.TeamTrend(
+                    team_id=tid_e, team_name=nm_e,
+                    opponent_name=team_name.get(opp_e, ""),
+                    event_id=e["id"], is_home=is_home_e,
+                    market_code="team_fouls", line=0.0,
+                    counts=c_f, timestamps=t_f,
+                ))
+
+        n_team = 0
+        seen_team = set()
+        for tt in team_trends:
+            klucz_t = (tt.event_id, tt.team_id, tt.market_code)
+            if klucz_t in seen_team or tt.event_id not in ev_by_id:
+                continue
+            seen_team.add(klucz_t)
+            ev = ev_by_id[tt.event_id]
+            mid = tt.event_id
+            ts = ev.get("timeStartTimestamp") or int(time.time())
+            home_name = team_name.get(ev.get("homeTeamId"), "")
+            away_name = team_name.get(ev.get("awayTeamId"), "")
+            match_label = f"{home_name} – {away_name}"
+            sb_odds = sb_cache.get(mid) or {}
+            linie_t = (
+                sb_odds.get("teams", {})
+                .get("home" if tt.is_home else "away", {})
+                .get(tt.market_code, {})
+            )
+            if not linie_t or len(tt.counts) < 5:
+                continue
+            pole = TEAM_POLE_BANKU[tt.market_code]
+            lg_mean, _lg_n = _srednia_turnieju(pole)
+            if lg_mean is None:
+                lg_mean = float(np.mean(tt.counts))
+            prior_t = counts.GroupPrior(
+                mean_per90=max(lg_mean, 0.5), pseudo_matches=4.0
+            )
+            n_h = min(len(tt.counts), 20)
+            now_t = int(time.time())
+            posterior_t = counts.fit_posterior(
+                np.array(tt.counts[:n_h]),
+                np.array([90.0] * n_h),
+                np.array([
+                    max((now_t - t) / 86400.0, 0.0)
+                    for t in (tt.timestamps[:n_h] or [now_t] * n_h)
+                ]),
+                prior=prior_t,
+            )
+            sed_t = sedzia_by_mid.get(mid) or {}
+            dyscyplinarny = tt.market_code in ("team_fouls", "team_cards")
+            f_sedzia = context.referee_factor(
+                sed_t.get("mnoznik"), sed_t.get("n", 0),
+                market_is_disciplinary=dyscyplinarny,
+            )
+            tempo_m = tempo_cache.get(mid) or {}
+            spread_home = tempo_m.get("spread")
+            spread_teamu = (
+                spread_home if tt.is_home else -spread_home
+            ) if spread_home is not None else None
+            f_script = context.game_script_factor(
+                spread_teamu, tempo_m.get("total"), tt.market_code,
+                bool(spread_teamu is not None and spread_teamu > 0.15),
+            )
+            konc, konc_n = _koncesja_druzynowa(tt.opponent_name, pole)
+            f_opp = (
+                context.opponent_factor(konc, lg_mean, konc_n)
+                if konc is not None and lg_mean else 1.0
+            )
+            factor_t = f_sedzia * f_script * f_opp
+            srednia_hist = float(np.mean(tt.counts[:n_h]))
+            for l_t, slot_t in sorted(linie_t.items()):
+                odd_t = (slot_t or {}).get("over")
+                if not odd_t:
+                    continue
+                pred_t = counts.predict_match(posterior_t, 90.0, factor_t)
+                p_t = pred_t.p_over(l_t)
+                lo_t, hi_t = counts.p_over_credible_interval(
+                    posterior_t, 90.0, factor_t, l_t
+                )
+                implied_t = betting.implied_prob_one_sided(odd_t)
+                pewny_t = (
+                    betting.MIN_ODDS <= odd_t <= 2.80
+                    and p_t >= 0.52 and p_t * odd_t - 1.0 >= -0.12
+                )
+                perelka_t = (
+                    1.90 <= odd_t <= 3.60
+                    and p_t >= 0.42 and p_t * odd_t - 1.0 >= 0.0
+                )
+                if not (pewny_t or perelka_t):
+                    continue
+                if (hi_t - lo_t) > 0.35:
+                    continue
+                if abs(p_t - implied_t) > betting.MAX_MODEL_MARKET_DIVERGENCE:
+                    continue
+                if implied_t > 0 and p_t / implied_t > betting.MAX_RELATIVE_DIVERGENCE:
+                    continue
+                ev_uk_t = kurs_ref_t = None
+                if (
+                    tt.ref_odds and abs(l_t - tt.line) < 1e-6
+                    and tt.odds_type == "over"
+                ):
+                    kurs_ref_t = round(statistics.median(tt.ref_odds), 2)
+                    nv_t = betting.no_vig_prob_uk(tt.ref_odds)
+                    if nv_t:
+                        ev_uk_t = round((nv_t[0] * odd_t - 1.0) * 100.0, 1)
+                czynniki_t = []
+                czynniki_t.append({
+                    "nazwa": "Poziom bazowy",
+                    "opis": f"Średnio {srednia_hist:.1f} na mecz "
+                            f"(próba: {n_h} meczów)",
+                    "mnoznik": None,
+                })
+                if abs(f_opp - 1.0) > 0.02:
+                    czynniki_t.append({
+                        "nazwa": "Profil rywala",
+                        "opis": f"Rywale notują przeciw {tt.opponent_name} "
+                                f"~{konc:.1f} przy normie {lg_mean:.1f} "
+                                f"(próba: {konc_n} meczów)",
+                        "mnoznik": round(f_opp, 2),
+                    })
+                if abs(f_sedzia - 1.0) > 0.02 and sed_t.get("sedzia"):
+                    czynniki_t.append({
+                        "nazwa": "Sędzia",
+                        "opis": f"{sed_t['sedzia']} — "
+                                f"{'surowy' if f_sedzia > 1 else 'pobłażliwy'}",
+                        "mnoznik": round(f_sedzia, 2),
+                    })
+                if abs(f_script - 1.0) > 0.02:
+                    czynniki_t.append({
+                        "nazwa": "Scenariusz meczu",
+                        "opis": "Z kursów meczowych: przewidywany przebieg "
+                                + ("sprzyja" if f_script > 1 else "nie sprzyja"),
+                        "mnoznik": round(f_script, 2),
+                    })
+                legi_pool.append({
+                    "id": 0, "mecz_id": mid, "mecz": match_label,
+                    "kickoff_ts": ts, "podmiot_id": tt.team_id,
+                    "podmiot": tt.team_name, "druzyna": tt.team_name,
+                    "przeciwnik": tt.opponent_name,
+                    "podmiot_typ": "druzyna",
+                    "rynek_kod": tt.market_code,
+                    "rynek": MARKET_NAMES_PL[tt.market_code],
+                    "linia": l_t, "strona": "powyzej", "kurs": odd_t,
+                    "bukmacher": "Superbet", "p_model": round(p_t, 4),
+                    "ev_pct": round((p_t * odd_t - 1.0) * 100.0, 1),
+                    "ev_uk": ev_uk_t, "kurs_ref": kurs_ref_t,
+                    "pewnosc": "wysoka" if (hi_t - lo_t) <= 0.18 else "srednia",
+                    "matchup": bool(f_opp >= 1.12),
+                    "matchup_styl": False,
+                    "rotacja": False, "xi_sygnal": None,
+                    "swieze_sklady": mid in swieze_mids,
+                    "miekka_linia": False, "kurs_oczekiwany": None,
+                    "ci": [round(lo_t, 4), round(hi_t, 4)],
+                    "oczekiwane_minuty": None,
+                    "ryzyko": betting.risk_level(pred_t.lam, False, 1.0),
+                    "czynniki": {
+                        "rywal": round(f_opp, 3), "sedzia": round(f_sedzia, 3),
+                        "dom_wyjazd": 1.0,
+                        "scenariusz_meczu": round(f_script, 3),
+                        "matchup": 1.0,
+                        "lacznie": round(factor_t, 3), "opisy": {},
+                    },
+                    "uzasadnienie": {
+                        "czynniki": czynniki_t,
+                        "oczekiwana_liczba": round(float(pred_t.lam), 2),
+                        "rynek_rzadki": False,
+                    },
+                    "lambda": round(float(pred_t.lam), 3),
+                })
+                n_team += 1
+        if n_team:
+            print(f"Rynki drużynowe: +{n_team} legów w puli "
+                  f"({len(team_trends)} trendów drużynowych)")
+    except Exception as e:
+        print(f"Rynki drużynowe pominięte ({e})")
 
     # --- PEWNIAKI: najlepszy typ KAŻDEGO rynku dla każdego meczu ---
     # Nie top-N po samej szansie (wygrywałyby zawsze zwykłe strzały 0.5) —
@@ -1489,7 +1994,8 @@ def _main_impl():
         vb_id += 1
         value_bets.append({
             "id": vb_id, "mecz_id": b["mecz_id"], "mecz": b["mecz"],
-            "kickoff_ts": b["kickoff_ts"], "podmiot_typ": "zawodnik",
+            "kickoff_ts": b["kickoff_ts"],
+            "podmiot_typ": b.get("podmiot_typ", "zawodnik"),
             "podmiot_id": b["podmiot_id"], "podmiot": b["podmiot"],
             "druzyna": b.get("druzyna", ""), "przeciwnik": b.get("przeciwnik", ""),
             "rynek_kod": b["rynek_kod"], "rynek": b["rynek"],
@@ -1497,6 +2003,7 @@ def _main_impl():
             "pewniak": True,
             "wyzsza_linia": bool(b.get("wyzsza_linia")),
             "matchup": bool(b.get("matchup")),
+            "matchup_styl": bool(b.get("matchup_styl")),
             "rotacja": bool(b.get("rotacja")),
             "swieze_sklady": bool(b.get("swieze_sklady")),
             "miekka_linia": bool(b.get("miekka_linia")),
@@ -1521,6 +2028,31 @@ def _main_impl():
 
     value_bets.sort(key=lambda b: -b["rank_score"])
 
+    # REJESTR ODRZUCEŃ — domknięcie: para (zawodnik, rynek) opublikowana
+    # (typ/sugestia) wypada z rejestru; obecna w puli kuponów, ale nie na
+    # karcie meczu, dostaje uczciwe "tylko_w_puli" (jest w generatorze)
+    opublikowane_pary = {(b["podmiot_id"], b["rynek_kod"]) for b in value_bets}
+    pary_puli = {(b["podmiot_id"], b["rynek_kod"]) for b in legi_pool}
+    odrzucenia_out = [
+        r for (mid_o, pid_o, mk_o), r in odrzucenia.items()
+        if (pid_o, mk_o) not in opublikowane_pary
+        and (pid_o, mk_o) not in pary_puli
+    ]
+    w_puli_dodane = set()
+    for b in legi_pool:
+        para = (b["podmiot_id"], b["rynek_kod"])
+        if para in opublikowane_pary or para in w_puli_dodane:
+            continue
+        w_puli_dodane.add(para)
+        odrzucenia_out.append({
+            "mecz_id": b["mecz_id"], "podmiot": b["podmiot"],
+            "druzyna": b.get("druzyna", ""),
+            "rynek_kod": b["rynek_kod"], "rynek": b["rynek"],
+            "powod": "tylko_w_puli",
+            "szczegol": "typ dostępny w generatorze kuponów — na karcie meczu "
+                        "wygrał inny typ tego rynku",
+        })
+
     # NIE degraduj aplikacji do pustej planszy: dopóki nie ma realnych okazji MŚ,
     # zostaw dotychczasowe dane (tryb pokazowy). Przełączamy na MŚ dopiero,
     # gdy propsy i kursy dają choć jedną okazję.
@@ -1537,6 +2069,9 @@ def _main_impl():
     _dump("matches.json", list(matches_out.values()))
     _dump("players.json", list(players_out.values()))
     _dump("odds_superbet.json", odds_grid)   # siatka kursów do TOP POKRYCIA
+    _dump("odrzucenia.json", odrzucenia_out)  # "czemu nie ma typu" per mecz
+    print(f"Rejestr odrzuceń: {len(odrzucenia_out)} wpisów, "
+          f"pomiar progów: {len(odrzucone_pomiar)} typów przy progu")
     # PULA LEGÓW pod generator kuponów NA ŻĄDANIE (frontend składa kupon w TS
     # z tej samej, przeanalizowanej puli — te same legi co automatyczne kupony).
     # Odchudzona o ciężkie pola (czynniki/uzasadnienie/rozkład) — zbędne do składania.
@@ -1552,6 +2087,10 @@ def _main_impl():
         "wyzsza_linia", "xi_sygnal", "kurs_ref",
         # pewnosc — do filtrowania w GeneratorKuponu jak backendowy styl "value"
         "pewnosc",
+        # matchup_styl — flaga pełnych matchupów stylu; musi płynąć przez
+        # kupony (własne i automatyczne) do typy_log, żeby diagnostyka
+        # kategorii mierzyła skuteczność analogii stylu
+        "matchup_styl",
         # ci — waga zaufania do p_model przy składaniu (kupony.py:_waga_modelu
         # / kuponBuilder.wagaModelu). BEZ tego generator na żądanie liczyłby
         # inne wagi (fallback z pewności) niż silnik automatyczny na tej
@@ -1584,8 +2123,25 @@ def _main_impl():
     )
     if kary_kor != kupony.KARY_DEFAULT:
         print(f"Kary korelacji (zmierzone): {kary_kor}")
+    # ZMIERZONE wagi zaufania do p_model per kubełek pewności (z rozliczonych
+    # typów) — składanie ufa modelowi dokładnie tyle, ile pokazały rozliczenia
+    wagi_zauf: dict = {}
+    try:
+        pomiar_wag = rozliczanie.compute_wagi_zaufania(
+            rozliczanie._migruj_log(supa.get_key("typy_log") or {})
+        )
+        wagi_zauf = kupony.wagi_zaufania_z_pomiaru(pomiar_wag)
+        if wagi_zauf:
+            print("Wagi zaufania (zmierzone): " + ", ".join(
+                f"{k} {v:+.3f} (n={pomiar_wag[k]['n']}, "
+                f"hit {pomiar_wag[k]['hit']:.0%} vs p {pomiar_wag[k]['sr_p']:.0%})"
+                for k, v in wagi_zauf.items()
+            ))
+    except Exception as e:
+        print(f"Wagi zaufania pominięte ({e})")
     kupony_list = kupony.build_kupony(
-        value_bets, legi_pool, profil=profil_kuponow, kary=kary_kor
+        value_bets, legi_pool, profil=profil_kuponow, kary=kary_kor,
+        wagi=wagi_zauf or None,
     )
     # znacznik: na ilu meczach kuponu składy były już POTWIERDZONE przy
     # budowie (mniejsze ryzyko anulowań/zwrotów niż na prognozach XI)
@@ -1601,7 +2157,8 @@ def _main_impl():
         ))
     # publikacja kuponów idzie przez log (zamrożenie/anulowanie/rozliczenie)
     # wewnątrz _rozlicz_i_zapisz — kupony.json to aktywne kupony z logu
-    _rozlicz_i_zapisz(value_bets, kupony_list, niedostepni, conf_mids=conf_mids)
+    _rozlicz_i_zapisz(value_bets, kupony_list, niedostepni,
+                      conf_mids=conf_mids, odrzucone_pomiar=odrzucone_pomiar)
     _dump("meta.json", {
         "wygenerowano_ts": int(time.time()), "tryb": "ms2026",
         "liga": "Mistrzostwa Świata", "sezon": "2026",
@@ -1611,6 +2168,9 @@ def _main_impl():
         # zmierzone kary korelacji — generator kuponów na żądanie (frontend)
         # używa tych samych co automatyczne kupony w tym cyklu
         "kary_korelacji": kary_kor,
+        # zmierzone delty wag zaufania per kubełek pewności — jw., frontend
+        # stosuje te same co backend (kuponBuilder.wagaModelu)
+        "wagi_zaufania": wagi_zauf,
     })
     print(f"OK: {len(matches_out)} meczów, {len(value_bets)} okazji, "
           f"{len(players_out)} zawodników.")

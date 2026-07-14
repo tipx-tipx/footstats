@@ -350,7 +350,11 @@ def team_shot_history(
 
 
 # ---- pełne statystyki meczowe per zawodnik (lineups.members[].stats) ----
-# nazwa statystyki 365 -> nasz kod rynku (odbiory NIE występują w 365)
+# nazwa statystyki 365 -> nasz kod rynku. UWAGA: wbrew wcześniejszej nocie
+# "odbiory nie występują w 365" — istnieje "Tackles Won" ("8/17"), ale jako
+# para udane/próby, NIE licznik zdarzeń jak w statshub, więc do ROZLICZANIA
+# rynku tackles się nie nadaje (definicje bukmacherskie liczą próby odbioru
+# wg Opta) — zostaje w banku STYLU niżej, nie tutaj.
 STAT_NAME_MAP = {
     "Minutes": "minutes",
     "Total Shots": "shots",
@@ -358,6 +362,20 @@ STAT_NAME_MAP = {
     "Was Fouled": "fouls_won",
     "Interceptions": "interceptions",
     "Offsides": "offsides",
+}
+
+# statystyki STYLU zawodnika (pełne matchupy, model/styl.py):
+# nazwa 365 -> (klucz licznika, klucz mianownika | None) — "12/16 (75%)"
+# niesie i udane (12), i PRÓBY (16); dotychczasowy _stat_val gubił mianownik,
+# a to właśnie próby (dryblingi, pojedynki) opisują styl gry
+STAT_STYLE_MAP = {
+    "Successful Dribbles": ("dribbles_succ", "dribbles_att"),
+    "Was Dribbled Past": ("dribbled_past", None),
+    "Aerial Duels Won": ("aerial_won", "aerial_att"),
+    "Ground Duels Won": ("ground_won", "ground_att"),
+    "Key Passes": ("key_passes", None),
+    "Crosses Completed": ("crosses_succ", "crosses_att"),
+    "Long Passes Completed": ("longballs_succ", "longballs_att"),
 }
 
 _full_cache: dict[int, dict] = {}
@@ -371,6 +389,22 @@ def _stat_val(v) -> float:
         return float(s)
     except ValueError:
         return 0.0
+
+
+def _stat_pair(v) -> tuple[float, float | None]:
+    """"20/26 (77%)" -> (20, 26); "59%" -> (59, None); "3" -> (3, None)."""
+    s = str(v).strip().rstrip("'").split("(")[0].strip()
+    parts = [p.strip().rstrip("%") for p in s.split("/")]
+    try:
+        num = float(parts[0])
+    except (ValueError, IndexError):
+        return 0.0, None
+    if len(parts) >= 2:
+        try:
+            return num, float(parts[1])
+        except ValueError:
+            return num, None
+    return num, None
 
 
 def _poz_z_formacji(m: dict) -> str:
@@ -403,6 +437,7 @@ def game_player_match_stats(game_id: int) -> dict[str, dict[str, float]]:
     out: dict[str, dict[str, float]] = {}
     for side in ("homeCompetitor", "awayCompetitor"):
         lu = (game.get(side) or {}).get("lineups") or {}
+        druzyna = _norm(str((game.get(side) or {}).get("name", "")))
         for m in lu.get("members") or []:
             name = names.get(int(m.get("id") or 0))
             if not name:
@@ -410,11 +445,20 @@ def game_player_match_stats(game_id: int) -> dict[str, dict[str, float]]:
             rec: dict = {
                 "started": 1.0 if m.get("statusText") == "Starting" else 0.0,
                 "pos": _poz_z_formacji(m),
+                # drużyna zawodnika — bank stylu (model/styl.py) grupuje po niej
+                "druzyna": druzyna,
             }
             for s in m.get("stats") or []:
-                kod = STAT_NAME_MAP.get(str(s.get("name")))
+                nazwa = str(s.get("name"))
+                kod = STAT_NAME_MAP.get(nazwa)
                 if kod:
                     rec[kod] = _stat_val(s.get("value"))
+                para = STAT_STYLE_MAP.get(nazwa)
+                if para:
+                    num, den = _stat_pair(s.get("value"))
+                    rec[para[0]] = num
+                    if para[1] and den is not None:
+                        rec[para[1]] = den
             if rec.get("minutes"):
                 out[_norm(name)] = rec
     # celne strzały z mapy strzałów (nie ma ich w lineups)
@@ -439,4 +483,66 @@ def team_match_history(
         except Exception:
             continue
         _time.sleep(0.3)
+    return out
+
+
+# ---- statystyki DRUŻYNOWE per mecz (endpoint game/stats) — bank STYLU ----
+# id statystyki 365 -> (nasz klucz, czy brać MIANOWNIK pary "x/y")
+# Mianownik = PRÓBY (dośrodkowania, długie piłki, dryblingi) — to one opisują
+# styl gry drużyny, nie skuteczność. Sprawdzone na żywym meczu MŚ 2026-07-14.
+TEAM_STATS_MAP = {
+    1: ("zolte", False), 2: ("czerwone", False),
+    3: ("shots", False), 4: ("sot", False), 6: ("shots_blocked", False),
+    8: ("corners", False), 9: ("offsides", False),
+    10: ("possession", False), 12: ("fouls", False),
+    52: ("crosses_att", True), 53: ("longballs_att", True),
+    54: ("dribbles_att", True), 150: ("duels_won", False),
+    56: ("aerial", None),          # para: won i attempts — oba potrzebne
+    147: ("shots_outside", False),
+}
+
+_team_stats_cache: dict[int, dict] = {}
+
+
+def game_team_stats(game_id: int) -> dict[str, dict[str, float]]:
+    """Statystyki drużynowe meczu: {znormalizowana nazwa: {klucz: wartość}}.
+
+    Endpoint `game/stats/?...&games=` (NIE `game/`) — płaska lista ~40
+    statystyk per competitorId; nazwy drużyn z pola `competitors` tej samej
+    odpowiedzi. `kartki` = żółte + czerwone (skala matchup.LG_TEAM_CARDS).
+    """
+    if game_id in _team_stats_cache:
+        return _team_stats_cache[game_id]
+    data = _get(f"{BASE}/game/stats/?{Q}&games={game_id}")
+    nazwa_cid = {
+        int(c["id"]): _norm(str(c.get("name", "")))
+        for c in data.get("competitors") or []
+        if c.get("id")
+    }
+    per_cid: dict[int, dict[str, float]] = {}
+    for s in data.get("statistics") or []:
+        mapowanie = TEAM_STATS_MAP.get(s.get("id"))
+        cid = s.get("competitorId")
+        if not mapowanie or cid is None:
+            continue
+        klucz, bierz_mianownik = mapowanie
+        num, den = _stat_pair(s.get("value"))
+        slot = per_cid.setdefault(int(cid), {})
+        if klucz == "aerial":
+            slot["aerial_won"] = num
+            if den is not None:
+                slot["aerial_att"] = den
+        elif bierz_mianownik:
+            if den is not None:
+                slot[klucz] = den
+        else:
+            slot[klucz] = num
+    out: dict[str, dict[str, float]] = {}
+    for cid, st in per_cid.items():
+        nm = nazwa_cid.get(cid)
+        if not nm:
+            continue
+        st["kartki"] = st.pop("zolte", 0.0) + st.pop("czerwone", 0.0)
+        out[nm] = st
+    _team_stats_cache[game_id] = out
     return out

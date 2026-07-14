@@ -9,9 +9,11 @@ import {
   getMecze,
   getMeta,
   getOddsSuperbet,
+  getOdrzucenia,
   getValueBets,
   getZawodnicy,
 } from "@/lib/data";
+import type { Odrzucenie } from "@/lib/types";
 import { fmtMnoznik } from "@/lib/format";
 import { topPokrycia } from "@/lib/pokrycie";
 
@@ -47,14 +49,16 @@ export default async function MeczPage({
 }) {
   const { id } = await params;
   const meczId = Number(id);
-  const [mecze, zawodnicy, bets, odds, legiPool, meta] = await Promise.all([
-    getMecze(),
-    getZawodnicy(),
-    getValueBets(),
-    getOddsSuperbet(),
-    getLegiPool(),
-    getMeta(),
-  ]);
+  const [mecze, zawodnicy, bets, odds, legiPool, meta, odrzucenia] =
+    await Promise.all([
+      getMecze(),
+      getZawodnicy(),
+      getValueBets(),
+      getOddsSuperbet(),
+      getLegiPool(),
+      getMeta(),
+      getOdrzucenia(Number(id)),
+    ]);
 
   const mecz = mecze.find((m) => m.id === meczId);
   if (!mecz) notFound();
@@ -159,6 +163,7 @@ export default async function MeczPage({
           <GeneratorKuponu
             pool={legiPool}
             kary={meta.kary_korelacji}
+            wagi={meta.wagi_zaufania}
             meczId={meczId}
           />
         </Reveal>
@@ -182,6 +187,69 @@ export default async function MeczPage({
           druzyny={[mecz.gospodarz, mecz.gosc]}
         />
       </Reveal>
+
+      {odrzucenia.length > 0 && (
+        <Reveal className="mt-8">
+          <details className="rounded-(--radius-card) border border-hairline bg-paper/40">
+            <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+              🔍 Czego nie typujemy w tym meczu — i dlaczego
+              <span className="ml-2 text-xs font-normal text-faint">
+                ({odrzucenia.length} sprawdzonych bez typu)
+              </span>
+            </summary>
+            <div className="space-y-4 border-t border-hairline p-4">
+              <p className="text-xs leading-relaxed text-muted">
+                Model sprawdza każdego zawodnika i każdy rynek. Gdy typ się nie
+                pojawia, to nie przeoczenie — poniżej dokładny powód dla każdej
+                sprawdzonej pary.
+              </p>
+              {grupyOdrzucen(odrzucenia).map(([powod, wpisy]) => (
+                <div key={powod}>
+                  <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-faint">
+                    {POWOD_LABEL[powod] ?? powod}
+                    <span className="ml-1.5 normal-case">
+                      · {wpisy.length} — {wpisy[0].szczegol}
+                    </span>
+                  </p>
+                  <p className="text-xs leading-relaxed text-muted">
+                    {wpisy
+                      .slice(0, 40)
+                      .map((w) => `${w.podmiot} (${w.rynek.toLowerCase()})`)
+                      .join(", ")}
+                    {wpisy.length > 40 && ` … i ${wpisy.length - 40} więcej`}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </details>
+        </Reveal>
+      )}
     </div>
+  );
+}
+
+const POWOD_LABEL: Record<string, string> = {
+  tylko_w_puli: "Dostępne w generatorze kuponów",
+  brak_kursu: "Superbet nie kwotuje tego rynku",
+  za_malo_zdarzen: "Model oczekuje za mało zdarzeń",
+  za_malo_historii: "Za mało meczów w historii",
+  krotka_historia: "Za krótka historia",
+  chwiejna_predykcja: "Model sam nie jest pewny swojej liczby",
+  rozjazd_z_rynkiem: "Model za daleko od kursu bukmachera",
+  kurs_lub_szansa_poza_widelkami: "Kurs i szansa nie składają się w grywalny typ",
+};
+
+/** Grupuj wpisy po powodzie, w kolejności z POWOD_LABEL (reszta na końcu). */
+function grupyOdrzucen(wpisy: Odrzucenie[]): [string, Odrzucenie[]][] {
+  const m = new Map<string, Odrzucenie[]>();
+  for (const w of wpisy) {
+    const g = m.get(w.powod) ?? [];
+    g.push(w);
+    m.set(w.powod, g);
+  }
+  const kolejnosc = Object.keys(POWOD_LABEL);
+  return [...m.entries()].sort(
+    (a, b) =>
+      (kolejnosc.indexOf(a[0]) + 99) % 99 - (kolejnosc.indexOf(b[0]) + 99) % 99,
   );
 }

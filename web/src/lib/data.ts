@@ -17,6 +17,7 @@ import kuponyLocal from "@/data/demo/kupony.json";
 import typyWynikiLocal from "@/data/demo/typy_wyniki.json";
 import oddsSuperbetLocal from "@/data/demo/odds_superbet.json";
 import legiPoolLocal from "@/data/demo/legi_pool.json";
+import odrzuceniaLocal from "@/data/demo/odrzucenia.json";
 
 import type {
   Kalibracja,
@@ -25,6 +26,7 @@ import type {
   Mecz,
   Meta,
   OddsSuperbet,
+  Odrzucenie,
   TypyWyniki,
   ValueBet,
   Zawodnik,
@@ -40,6 +42,7 @@ type Bundle = {
   typy_wyniki: TypyWyniki;
   odds_superbet: OddsSuperbet;
   legi_pool: LegPool[];
+  odrzucenia: Odrzucenie[];
 };
 
 const LOCAL: Bundle = {
@@ -52,6 +55,7 @@ const LOCAL: Bundle = {
   typy_wyniki: typyWynikiLocal as unknown as TypyWyniki,
   odds_superbet: oddsSuperbetLocal as unknown as OddsSuperbet,
   legi_pool: legiPoolLocal as unknown as LegPool[],
+  odrzucenia: odrzuceniaLocal as unknown as Odrzucenie[],
 };
 
 const SUPABASE_URL = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -109,6 +113,7 @@ async function loadBundle(): Promise<Bundle> {
       typy_wyniki: (map.typy_wyniki ?? LOCAL.typy_wyniki) as TypyWyniki,
       odds_superbet: (map.odds_superbet ?? LOCAL.odds_superbet) as OddsSuperbet,
       legi_pool: (map.legi_pool ?? LOCAL.legi_pool) as LegPool[],
+      odrzucenia: (map.odrzucenia ?? LOCAL.odrzucenia) as Odrzucenie[],
     });
   } catch {
     return tylkoNadchodzace(LOCAL);
@@ -121,6 +126,14 @@ export async function getValueBets(): Promise<ValueBet[]> {
 
 export async function getMecze(): Promise<Mecz[]> {
   return (await loadBundle()).matches;
+}
+
+/** Rejestr odrzuceń: czemu para (zawodnik, rynek) nie dostała typu. */
+export async function getOdrzucenia(meczId?: number): Promise<Odrzucenie[]> {
+  const wszystkie = (await loadBundle()).odrzucenia;
+  return meczId == null
+    ? wszystkie
+    : wszystkie.filter((o) => o.mecz_id === meczId);
 }
 
 export async function getZawodnicy(): Promise<Zawodnik[]> {

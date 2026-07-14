@@ -111,7 +111,11 @@ export default async function KuponyPage() {
                 i charakter. Gotowy kupon możesz poprawiać: usuń typ (✕), a model
                 dobierze inny; przypnij typ (📌), a zostanie na pewno.
               </p>
-              <GeneratorKuponu pool={legiPool} kary={meta.kary_korelacji} />
+              <GeneratorKuponu
+                pool={legiPool}
+                kary={meta.kary_korelacji}
+                wagi={meta.wagi_zaufania}
+              />
             </div>
           </details>
         </Reveal>

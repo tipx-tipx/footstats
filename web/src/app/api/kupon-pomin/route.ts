@@ -129,6 +129,7 @@ export async function POST(req: Request) {
           // miękkich linii/sygnałów XI/marży UK (dokładnie ten sam P0 fix z tej
           // sesji, ale dla ścieżki "wlasny_nauka", którą wtedy pominięto)
           matchup: Boolean(x.matchup) || undefined,
+          matchup_styl: Boolean(x.matchup_styl) || undefined,
           rotacja: Boolean(x.rotacja) || undefined,
           wyzsza_linia: Boolean(x.wyzsza_linia) || undefined,
           miekka_linia: Boolean(x.miekka_linia) || undefined,

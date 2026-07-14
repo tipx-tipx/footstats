@@ -30,3 +30,4 @@ pipeline/odds/
 # systemowe
 .DS_Store
 Thumbs.db
+web/src/data/demo/_manifest.json

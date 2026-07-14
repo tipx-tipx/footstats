@@ -1,15 +1,14 @@
 """Silnik matchupów — "kto na kogo gra".
 
-STATUS: NIEAKTYWNE w trybie MŚ (build_wc_fast.py / jobs/cycle.py, tryb
-produkcyjny "ms2026") — statshub nie dostarcza danych stylu (kontesty,
-aerial duels, dribbled_past per mecz na poziomie potrzebnym do budowy
-PlayerStyle/OpponentStyle), więc engine.MatchContext.player_style/
-opponent_style nigdy nie są tam ustawiane (zweryfikowane grepem — zero
-konstrukcji PlayerStyle/OpponentStyle w build_wc_fast.py). Tryb MŚ korzysta
-zamiast tego z UPROSZCZONEGO substytutu w matchup_lite.py (3 rynki, strony
-boiska). Ten moduł OŻYWA w trybie ligowym (build_demo.py, jobs/cycle.py
-MODE="liga") — tam statshub/Sofascore mają wystarczające dane per-mecz i
-compute_team_style()/build_player_style() faktycznie budują oba profile.
+STATUS: AKTYWNE także w trybie MŚ (od 2026-07-14). Profile PlayerStyle/
+OpponentStyle buduje model/styl.py z banku stylu (Supabase `styl_bank`):
+statystyki drużynowe i styl zawodników z 365Scores (game/stats + lineups,
+scores365.STAT_STYLE_MAP), sytuacje strzałów z shotmap statshub i wzrosty
+z /api/player — patrz build_wc_fast.aktualizuj_bank_stylu. Gdy zawodnika/
+drużyny nie ma w banku, engine spada na matchup_lite.py (strony boiska).
+Skuteczność mierzona osobno flagą `matchup_styl` w diagnostyce kategorii
+(rozliczanie.compute_diagnostyka) — analogie mają zarabiać, nie tylko
+istnieć. W trybie ligowym profile jak dotąd buduje build_demo.py.
 
 Styl KONKRETNEGO rywala i profil zawodnika tworzą przewidywalne efekty na
 statystyki. To osobna warstwa mnożników, obok czynnika "ile rywal dopuszcza".

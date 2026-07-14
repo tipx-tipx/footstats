@@ -29,6 +29,7 @@ async function main() {
       maxLegi?: number;
       maxNaMecz?: number;
       kary?: Kary;
+      wagi?: Record<string, number>;
     };
   };
   const wynik = zlozKupon(input.pool, input.cmin, input.cmax, input.opts ?? {});

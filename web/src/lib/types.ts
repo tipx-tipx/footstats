@@ -79,6 +79,26 @@ export interface ValueBet {
   kurs_oczekiwany?: number | null;
 }
 
+/** Wpis rejestru odrzuceń: czemu para (zawodnik, rynek) NIE dostała typu. */
+export interface Odrzucenie {
+  mecz_id: number;
+  podmiot: string;
+  druzyna: string;
+  rynek_kod: string;
+  rynek: string;
+  powod:
+    | "za_malo_historii"
+    | "za_malo_zdarzen"
+    | "brak_kursu"
+    | "kurs_lub_szansa_poza_widelkami"
+    | "krotka_historia"
+    | "chwiejna_predykcja"
+    | "rozjazd_z_rynkiem"
+    | "tylko_w_puli"
+    | string;
+  szczegol: string;
+}
+
 /** Jeden leg z przeanalizowanej puli — fundament generatora kuponów na żądanie. */
 export interface LegPool {
   id: number;
@@ -97,6 +117,8 @@ export interface LegPool {
   bukmacher: string;
   p_model: number;
   matchup?: boolean;
+  /** pełny matchup STYLU (silnik matchup.py) realnie ruszył predykcję */
+  matchup_styl?: boolean;
   rotacja?: boolean;
   miekka_linia?: boolean;
   swieze_sklady?: boolean;
@@ -183,6 +205,8 @@ export interface Meta {
   okazji: number;
   /** zmierzone kary korelacji legów — generator na żądanie używa tych samych co backend */
   kary_korelacji?: { ta_sama: number; przeciwne: number; nieznane: number };
+  /** zmierzone delty wag zaufania per kubełek pewności (kalibracja z rozliczeń) */
+  wagi_zaufania?: Record<string, number>;
 }
 
 /** Jeden typ (leg) na kuponie. */
@@ -203,6 +227,7 @@ export interface KuponLeg {
   wynik?: "wygrany" | "przegrany" | "zwrot" | null;
   /** kontekst lega: profil rywala / debiut w XI / niespójna siatka buka */
   matchup?: boolean;
+  matchup_styl?: boolean;
   rotacja?: boolean;
   miekka_linia?: boolean;
 }

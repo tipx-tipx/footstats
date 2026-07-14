@@ -63,6 +63,7 @@ def _run_py(pool: list[dict], cmin: float, cmax: float, opts: dict) -> dict | No
         min_legi=opts.get("minLegi", 3),
         profil=opts.get("profil", "zbalansowany"),
         kary=opts.get("kary"),
+        wagi=opts.get("wagi"),
     )
 
 
@@ -152,3 +153,21 @@ def test_parytet_urealnienie_i_limit_ryzykownych():
     for profil in ("bezpieczny", "zbalansowany", "agresywny"):
         _assert_parity(pool, 8.0, 16.0, {"minLegi": 3, "profil": profil})
         _assert_parity(pool, 17.0, 29.5, {"minLegi": 3, "profil": profil})
+
+
+def test_parytet_zmierzone_wagi_zaufania():
+    # delty wag zaufania (kalibracja z rozliczeń) muszą przesuwać selekcję
+    # IDENTYCZNIE po obu stronach — mieszanka kubełków i legów z ci
+    pool = [
+        _leg(1, 11, 1.30, 0.84, pewnosc="wysoka"),
+        _leg(1, 12, 2.60, 0.47, pewnosc="srednia", ev_uk=9.0),
+        _leg(2, 22, 1.62, 0.71, pewnosc="srednia", ci=[0.64, 0.78]),
+        _leg(3, 33, 1.48, 0.74, pewnosc="srednia"),
+        _leg(4, 44, 1.55, 0.72),          # bez pewności → kubełek "srednia"
+        _leg(5, 55, 1.90, 0.60, pewnosc="wysoka", ci=[0.55, 0.66]),
+    ]
+    wagi = {"wysoka": -0.08, "srednia": -0.15}
+    for profil in ("bezpieczny", "zbalansowany", "agresywny"):
+        _assert_parity(
+            pool, 6.0, 12.0, {"minLegi": 3, "profil": profil, "wagi": wagi}
+        )

@@ -47,10 +47,13 @@ function odmienTyp(n: number): string {
 export function GeneratorKuponu({
   pool,
   kary = KARY_DEFAULT,
+  wagi,
   meczId,
 }: {
   pool: LegPool[];
   kary?: Kary;
+  /** zmierzone delty wag zaufania (meta.wagi_zaufania) — te same co backend */
+  wagi?: Record<string, number>;
   /** gdy podany — generator ograniczony do jednego meczu (wersja na stronie meczu) */
   meczId?: number;
 }) {
@@ -100,10 +103,11 @@ export function GeneratorKuponu({
       maxLegi: trybDokladny ? liczbaTypow : undefined,
       maxNaMecz: tylkoValue || maxJedenZMeczu ? 1 : undefined,
       kary,
+      wagi,
       przypiete: [...przypiete.values()],
       wykluczone: new Set(wykluczone.keys()),
     }),
-    [profil, liczbaTypow, trybDokladny, tylkoValue, maxJedenZMeczu, kary, przypiete, wykluczone],
+    [profil, liczbaTypow, trybDokladny, tylkoValue, maxJedenZMeczu, kary, wagi, przypiete, wykluczone],
   );
 
   // ŻYWY podgląd — liczony na bieżąco przy każdej zmianie suwaka, żeby user

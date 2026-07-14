@@ -241,6 +241,16 @@ MAX_ODDS = 6.0                      # kursy wyżej to loteria, nie systematyczny
 MIN_ODDS = 1.19                     # poniżej 1.19 gra się nie opłaca (decyzja użytkownika)
 MAX_CI_WIDTH = 0.30                 # zbyt szerokie widełki szansy = nie stawiamy
 
+# GRUNT POMIARU progów (zapowiadany w komentarzu wyżej): typ odrzucony
+# DOKŁADNIE JEDNYM kryterium o mniej niż poniższe tolerancje trafia do
+# typy_log z flagą `odrzucony` — rozlicza się w tle (POZA kalibracją,
+# skutecznością i UI), a diagnostyka porównuje jego realny hit-rate z
+# przepuszczonymi. Dopiero ten pomiar uzasadni ruszanie samych progów.
+NEAR_EV_PP = 3.0        # EV do 3 pp poniżej progu
+NEAR_CONF = 10.0        # confidence do 10 pkt poniżej progu
+NEAR_DIV = 0.06         # rozjazd model-rynek do 6 pp ponad limit
+NEAR_REL = 0.3          # rozjazd względny do 0.3x ponad limit
+
 
 def assess(
     p_model_over: float,
@@ -249,11 +259,15 @@ def assess(
     conf_inputs: ConfidenceInputs,
     lam: float,
     is_prob_market: bool = False,
+    odrzucone_out: list | None = None,
 ) -> list[ValueAssessment]:
     """Oceń obie strony rynku. Zwraca tylko strony przechodzące progi.
 
     is_prob_market — rynek binarny (kartka): `lam` to prawdopodobieństwo, nie
     licznik; ryzyko liczone inną skalą (patrz risk_level).
+    odrzucone_out — kolektor odrzuceń TUŻ przy progu (patrz NEAR_*): strony
+    odrzucone dokładnie jednym kryterium w tolerancji lądują tu jako
+    {side, powod, p_model, implied, odds, ev_pct, confidence_score}.
     """
     results: list[ValueAssessment] = []
 
@@ -284,19 +298,38 @@ def assess(
             continue
         edge_pp = (p_model - implied) * 100.0
         ev_pct = (p_model * odds - 1.0) * 100.0
-        if ev_pct < min_ev or score < MIN_CONFIDENCE_SCORE:
-            continue
+        # bramki publikacji — każda z parą (odrzuca?, czy TUŻ przy progu?);
+        # komentarze przy stałych MAX_* wyżej tłumaczą intuicje
+        powody: list[tuple[str, bool]] = []
+        if ev_pct < min_ev:
+            powody.append(("ev_ponizej_progu", ev_pct >= min_ev - NEAR_EV_PP))
+        if score < MIN_CONFIDENCE_SCORE:
+            powody.append(
+                ("niska_pewnosc", score >= MIN_CONFIDENCE_SCORE - NEAR_CONF)
+            )
         if odds > MAX_ODDS or odds < MIN_ODDS:
-            # Wysokie kursy = mały błąd modelu daje absurdalne EV;
-            # bardzo niskie kursy = groszowa wartość niewarta ryzyka. Pomijamy.
-            continue
+            # wysokie kursy = loteria, groszowe = niewarte ryzyka; celowo BEZ
+            # strefy pomiaru (decyzja o widełkach kursów jest usera, nie modelu)
+            powody.append(("kurs_poza_widelkami", False))
         if abs(p_model - implied) > MAX_MODEL_MARKET_DIVERGENCE:
-            # Model skrajnie niezgodny z rynkiem — najpewniej my się mylimy
-            # (kontuzja, rotacja, wiadomość, której nie znamy). Nie publikujemy.
-            continue
+            powody.append((
+                "rozjazd_z_rynkiem",
+                abs(p_model - implied) <= MAX_MODEL_MARKET_DIVERGENCE + NEAR_DIV,
+            ))
         if implied > 0 and p_model / implied > MAX_RELATIVE_DIVERGENCE:
-            # Przy małych prawdopodobieństwach różnica względna zdradza
-            # "fałszywy edge" lepiej niż różnica w punktach procentowych.
+            powody.append((
+                "rozjazd_wzgledny",
+                p_model / implied <= MAX_RELATIVE_DIVERGENCE + NEAR_REL,
+            ))
+        if powody:
+            if odrzucone_out is not None and len(powody) == 1 and powody[0][1]:
+                odrzucone_out.append({
+                    "side": side, "powod": powody[0][0],
+                    "p_model": round(p_model, 4),
+                    "implied": round(implied, 4), "odds": odds,
+                    "ev_pct": round(ev_pct, 2),
+                    "confidence_score": round(score, 1),
+                })
             continue
         # Ranking: przewaga w pp ważona pewnością — celowo NIE po EV,
         # żeby longshoty nie wypychały solidnych okazji.

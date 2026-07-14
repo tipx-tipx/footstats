@@ -104,6 +104,8 @@ class ScoredMarket:
     factors: dict
     assessments: list[betting.ValueAssessment] = field(default_factory=list)
     reasoning: dict = field(default_factory=dict)
+    # odrzucenia TUŻ przy progu (betting.NEAR_*) — do rejestru pomiaru progów
+    odrzucone: list = field(default_factory=list)
 
 
 def _build_reasoning(
@@ -351,9 +353,11 @@ def score_player_market(
         market_calibrated=market_calibrated,
         is_rare_market=market_code in RARE_MARKETS,
     )
+    odrzucone_przy_progu: list = []
     assessments = betting.assess(
         p_over, over_odds, under_odds, conf_inputs, lam,
         is_prob_market=(market_code == "yellow_card"),
+        odrzucone_out=odrzucone_przy_progu,
     )
 
     return ScoredMarket(
@@ -369,4 +373,5 @@ def score_player_market(
         assessments=assessments,
         reasoning=_build_reasoning(market_code, posterior, mm, cf, ctx, lam,
                                    prior=group_prior),
+        odrzucone=odrzucone_przy_progu,
     )

@@ -146,3 +146,99 @@ def props_available(event_id: int) -> bool:
         return len(fetch_event_trends([event_id])) > 0
     except Exception:
         return False
+
+
+# statType team-trends -> nasz kod rynku DRUŻYNOWEGO. UWAGA na nazwy statshub:
+# "totalShotsOnGoal" to strzały OGÓŁEM (statDisplay "Shots"), "shotsOnGoal" —
+# celne. Fauli drużynowych team-trends nie wystawia (historia z banku stylu).
+TEAM_STATTYPE_MAP = {
+    "totalShotsOnGoal": "team_shots",
+    "shotsOnGoal": "team_sot",
+    "cards": "team_cards",
+}
+
+
+@dataclass
+class TeamTrend:
+    """Trend DRUŻYNOWY: (drużyna, rynek) z historią ~20 meczów i linią."""
+
+    team_id: int
+    team_name: str
+    opponent_name: str
+    event_id: int
+    is_home: bool
+    market_code: str
+    line: float
+    odds_type: str = "over"
+    counts: list[float] = field(default_factory=list)
+    timestamps: list[int] = field(default_factory=list)
+    game_opponents: list[str] = field(default_factory=list)
+    ref_odds: list[float] = field(default_factory=list)
+
+
+def fetch_team_trends(event_ids: list[int]) -> list[TeamTrend]:
+    """Trendy drużynowe (`/api/props/team-trends`) dla podanych meczów.
+
+    Zwraca strzały / celne / kartki per drużyna z historią recentGames
+    (statValue per mecz, ~20 wstecz) i kursami referencyjnymi bukmacherów.
+    Gole pomijamy (nie modelujemy 1X2/goli), rożne — brak kursów Superbetu.
+    """
+    if not event_ids:
+        return []
+    games = ",".join(str(e) for e in event_ids)
+    data = _get(f"{BASE}/props/team-trends?games={games}").get("data", [])
+    out: list[TeamTrend] = []
+    for rec in data:
+        mk = TEAM_STATTYPE_MAP.get(rec.get("statType"))
+        if mk is None:
+            continue
+        rg = rec.get("recentGames", [])
+        out.append(TeamTrend(
+            team_id=int(rec.get("teamId") or 0),
+            team_name=rec.get("teamName", ""),
+            opponent_name=rec.get("opponentTeamName", ""),
+            event_id=int(rec.get("eventId") or 0),
+            is_home=rec.get("homeTeamId") == rec.get("teamId"),
+            market_code=mk,
+            line=float(rec.get("line", 0.5)),
+            odds_type=str(rec.get("oddsType") or "over"),
+            counts=[float(g.get("statValue") or 0) for g in rg],
+            timestamps=[int(g.get("eventTimestamp") or 0) for g in rg],
+            game_opponents=[str(g.get("opponentName") or "") for g in rg],
+            ref_odds=[
+                float(b["oddsValue"])
+                for b in rec.get("bookmakers", [])
+                if b.get("oddsValue")
+            ],
+        ))
+    return out
+
+
+def fetch_event_shotmap(event_id: int) -> list[dict]:
+    """Mapa strzałów meczu — lista strzałów z `playerId`, `teamId`, `minute`,
+    `situation` (assisted/regular/fast-break/corner/free-kick/set-piece),
+    `bodyPart`, `isBlockedShot`, `blockedByPlayerId`, `xG`.
+
+    Dla banku STYLU (model/styl.py): udział strzałów z kontr per drużyna
+    i strzały ze stałych fragmentów per zawodnik. Kształt sprawdzony na
+    żywym meczu MŚ (2026-07-14)."""
+    data = _get(f"{BASE}/event/{event_id}/shotmap").get("data", [])
+    return data if isinstance(data, list) else []
+
+
+def fetch_player_meta(player_id: int) -> dict:
+    """Metadane zawodnika: {"height": int|None, "foot": str|None}.
+
+    `/api/player/{id}` zwraca {"data": {"players": [rekord]}} — m.in. height
+    (cm) i preferredfoot. Wzrost zasila matchup.is_target_man."""
+    data = _get(f"{BASE}/player/{player_id}").get("data", {})
+    rec = data.get("players")
+    if isinstance(rec, list):
+        rec = rec[0] if rec else {}
+    if not isinstance(rec, dict):
+        rec = {}
+    h = rec.get("height")
+    return {
+        "height": int(h) if isinstance(h, (int, float)) and h else None,
+        "foot": rec.get("preferredfoot") or None,
+    }
