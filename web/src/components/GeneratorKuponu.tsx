@@ -17,6 +17,7 @@ import {
   type KuponWynik,
   type OpcjeKuponu,
   type Profil,
+  legKey,
   pulaEfektywna,
   zakresOsiagalny,
   zlozKupon,
@@ -72,7 +73,13 @@ export function GeneratorKuponu({
   const [profil, setProfil] = useState<Profil>("zbalansowany");
   const [tylkoValue, setTylkoValue] = useState(false);
   const [maxJedenZMeczu, setMaxJedenZMeczu] = useState(false);
-  const [wynik, setWynik] = useState<KuponWynik | null | "brak">(null);
+  // wybory typów usera: przypięte MUSZĄ wejść do kuponu, usunięte nie wejdą.
+  // Mapy (klucz -> typ), żeby chipy znały nazwy nawet gdy kupon się nie składa.
+  const [przypiete, setPrzypiete] = useState<Map<string, LegPool>>(new Map());
+  const [wykluczone, setWykluczone] = useState<Map<string, LegPool>>(new Map());
+  // karta kuponu pokazuje ŻYWY podgląd (nie zamrożoną kopię) — dzięki temu
+  // przypięcie/usunięcie typu przelicza kupon na oczach usera
+  const [pokazany, setPokazany] = useState(false);
   const [nauka, setNauka] = useState<"idle" | "wysylanie" | "ok" | "blad">("idle");
 
   // pula po filtrach meczów/value — bez tego podgląd liczyłby się na całej puli
@@ -93,8 +100,10 @@ export function GeneratorKuponu({
       maxLegi: trybDokladny ? liczbaTypow : undefined,
       maxNaMecz: tylkoValue || maxJedenZMeczu ? 1 : undefined,
       kary,
+      przypiete: [...przypiete.values()],
+      wykluczone: new Set(wykluczone.keys()),
     }),
-    [profil, liczbaTypow, trybDokladny, tylkoValue, maxJedenZMeczu, kary],
+    [profil, liczbaTypow, trybDokladny, tylkoValue, maxJedenZMeczu, kary, przypiete, wykluczone],
   );
 
   // ŻYWY podgląd — liczony na bieżąco przy każdej zmianie suwaka, żeby user
@@ -108,36 +117,64 @@ export function GeneratorKuponu({
 
   const podpowiedzBrak = useMemo(() => {
     if (podglad) return null;
-    // osiągalność liczona z TYMI SAMYMI ograniczeniami co dobór typów:
-    // filtry profilu (bezpieczny/gambity), unikalny zawodnik, limit z meczu —
-    // wcześniej podpowiedź zawyżała sufit (liczyła np. dwie linie tego
-    // samego zawodnika jak dwa typy) i myliła
-    const efektywna = pulaEfektywna(pulaFiltrowana, profil);
     const maxNaMecz = opcje.maxNaMecz ?? 4;
     const gornyLimit = trybDokladny ? liczbaTypow : 12;
-    const zakres = zakresOsiagalny(efektywna, liczbaTypow, gornyLimit, maxNaMecz);
+    const cmin = kursCel * 0.85;
+    const cmax = kursCel * 1.18;
+    const piny = [...przypiete.values()];
+    // najpierw powody wynikające z WYBORÓW usera — są najłatwiejsze do cofnięcia
+    if (piny.length > gornyLimit) {
+      return `Wybrałeś ${piny.length} typów „na pewno”, a kupon ma mieć ${
+        trybDokladny ? `dokładnie ${liczbaTypow}` : `najwyżej ${gornyLimit}`
+      } — zwiększ liczbę typów albo odepnij któryś.`;
+    }
+    const naMeczPin = new Map<number, number>();
+    for (const l of piny) naMeczPin.set(l.mecz_id, (naMeczPin.get(l.mecz_id) ?? 0) + 1);
+    if ([...naMeczPin.values()].some((c) => c > maxNaMecz)) {
+      return `Masz przypięte więcej niż ${maxNaMecz} ${odmienTyp(maxNaMecz)} z jednego meczu — odepnij któryś albo wyłącz ograniczenie „1 typ z meczu”.`;
+    }
+    const kursPin = piny.reduce((a, l) => a * l.kurs, 1);
+    if (kursPin > cmax) {
+      return `Same wybrane typy dają już kurs ×${fmtKurs(kursPin)} — powyżej celu. Podnieś kurs docelowy albo odepnij któryś typ.`;
+    }
+    // osiągalność liczona z TYMI SAMYMI ograniczeniami co dobór typów:
+    // filtry profilu (bezpieczny/gambity), unikalny zawodnik, limit z meczu —
+    // plus wybory usera (bez usuniętych, sloty zajęte przez przypięte)
+    const pinIds = new Set(piny.map((l) => l.podmiot_id));
+    const dostepna = pulaFiltrowana.filter(
+      (l) => !wykluczone.has(legKey(l)) && !pinIds.has(l.podmiot_id),
+    );
+    const efektywna = pulaEfektywna(dostepna, profil);
+    const zakres = zakresOsiagalny(
+      efektywna,
+      Math.max(liczbaTypow - piny.length, 0),
+      gornyLimit - piny.length,
+      maxNaMecz,
+    );
     const dopisekProfil =
-      profil !== "agresywny" && efektywna.length < pulaFiltrowana.length
+      profil !== "agresywny" && efektywna.length < dostepna.length
         ? " Charakter kuponu pomija najbardziej ryzykowne typy — agresywny ma ich więcej."
         : "";
+    const dopisekUsuniete = wykluczone.size
+      ? " Możesz też przywrócić usunięte typy."
+      : "";
     if (!zakres) {
       return `Za mało dostępnych typów przy tych ustawieniach (potrzeba ${
         trybDokladny ? "dokładnie" : "co najmniej"
-      } ${liczbaTypow}, maks. ${maxNaMecz} z meczu).${dopisekProfil}`;
+      } ${liczbaTypow}, maks. ${maxNaMecz} z meczu).${dopisekProfil}${dopisekUsuniete}`;
     }
-    const cmin = kursCel * 0.85;
-    const cmax = kursCel * 1.18;
-    if (cmax < zakres.min) {
-      return `Przy ${trybDokladny ? "dokładnie" : "co najmniej"} ${liczbaTypow} ${odmienTyp(liczbaTypow)} najniższy osiągalny kurs to ok. ×${fmtKurs(zakres.min)} — podnieś kurs docelowy albo zmniejsz liczbę typów.`;
+    if (cmax < zakres.min * kursPin) {
+      return `Przy ${trybDokladny ? "dokładnie" : "co najmniej"} ${liczbaTypow} ${odmienTyp(liczbaTypow)} najniższy osiągalny kurs to ok. ×${fmtKurs(zakres.min * kursPin)} — podnieś kurs docelowy albo zmniejsz liczbę typów.`;
     }
-    if (cmin > zakres.max) {
-      return `Przy ${trybDokladny ? "dokładnie" : "maks."} ${zakres.maxN} ${odmienTyp(zakres.maxN)} najwyższy osiągalny kurs to ok. ×${fmtKurs(zakres.max)} — obniż kurs docelowy${trybDokladny ? " albo zwiększ liczbę typów" : ""}${meczId == null ? " lub dobierz więcej meczów" : ""}.${dopisekProfil}`;
+    if (cmin > zakres.max * kursPin) {
+      const nMax = zakres.maxN + piny.length;
+      return `Przy ${trybDokladny ? "dokładnie" : "maks."} ${nMax} ${odmienTyp(nMax)} najwyższy osiągalny kurs to ok. ×${fmtKurs(zakres.max * kursPin)} — obniż kurs docelowy${trybDokladny ? " albo zwiększ liczbę typów" : ""}${meczId == null ? " lub dobierz więcej meczów" : ""}.${dopisekProfil}${dopisekUsuniete}`;
     }
-    return `Ten zestaw parametrów nie daje się złożyć z tej puli — zmień kurs docelowy, liczbę typów albo charakter kuponu.${dopisekProfil}`;
-  }, [podglad, pulaFiltrowana, profil, opcje.maxNaMecz, liczbaTypow, trybDokladny, kursCel, meczId]);
+    return `Ten zestaw parametrów nie daje się złożyć z tej puli — zmień kurs docelowy, liczbę typów albo charakter kuponu.${dopisekProfil}${dopisekUsuniete}`;
+  }, [podglad, pulaFiltrowana, profil, opcje.maxNaMecz, liczbaTypow, trybDokladny, kursCel, meczId, przypiete, wykluczone]);
 
   const odrzuc = () => {
-    setWynik(null);
+    setPokazany(false);
     setNauka("idle");
   };
 
@@ -155,7 +192,7 @@ export function GeneratorKuponu({
       if (res.ok) {
         setNauka("ok");
         setTimeout(() => {
-          setWynik(null);
+          setPokazany(false);
           setNauka("idle");
         }, 1700);
       } else {
@@ -173,10 +210,59 @@ export function GeneratorKuponu({
       else n.add(id);
       return n;
     });
-    setWynik(null);
+    setPokazany(false);
   };
 
-  const zloz = () => setWynik(podglad ?? "brak");
+  // przypnij typ ("na pewno w kuponie") — ponowne kliknięcie odpina.
+  // Jeden typ na zawodnika: nowy pin zastępuje wcześniejszy pin tego samego
+  // zawodnika (np. inna linia strzałów). Pin zdejmuje wcześniejsze usunięcie.
+  const przypnij = (l: LegPool) => {
+    const k = legKey(l);
+    setPrzypiete((m) => {
+      const n = new Map(m);
+      if (n.has(k)) {
+        n.delete(k);
+        return n;
+      }
+      for (const [kk, ll] of n) {
+        if (ll.podmiot_id === l.podmiot_id) n.delete(kk);
+      }
+      n.set(k, l);
+      return n;
+    });
+    setWykluczone((m) => {
+      if (!m.has(k)) return m;
+      const n = new Map(m);
+      n.delete(k);
+      return n;
+    });
+  };
+
+  // usuń typ z kuponu — model od razu dobiera inny (karta przelicza się sama)
+  const usunTyp = (l: LegPool) => {
+    const k = legKey(l);
+    setWykluczone((m) => new Map(m).set(k, l));
+    setPrzypiete((m) => {
+      if (!m.has(k)) return m;
+      const n = new Map(m);
+      n.delete(k);
+      return n;
+    });
+  };
+
+  const przywrocTyp = (k: string) =>
+    setWykluczone((m) => {
+      const n = new Map(m);
+      n.delete(k);
+      return n;
+    });
+
+  const wyczyscWybory = () => {
+    setPrzypiete(new Map());
+    setWykluczone(new Map());
+  };
+
+  const zloz = () => setPokazany(true);
 
   if (bazowa.length === 0) {
     return (
@@ -198,7 +284,7 @@ export function GeneratorKuponu({
             </span>
             {wybrane.size > 0 && (
               <button
-                onClick={() => { setWybrane(new Set()); setWynik(null); }}
+                onClick={() => { setWybrane(new Set()); setPokazany(false); }}
                 className="text-xs text-brand hover:underline"
               >
                 wyczyść
@@ -239,7 +325,7 @@ export function GeneratorKuponu({
             max={meczId != null ? 12 : 30}
             step={0.5}
             value={kursCel}
-            onChange={(e) => { setKursCel(Number(e.target.value)); setWynik(null); }}
+            onChange={(e) => { setKursCel(Number(e.target.value)); setPokazany(false); }}
             className="w-full accent-[var(--color-brand)]"
           />
           <span className="text-[10px] text-faint">
@@ -257,7 +343,7 @@ export function GeneratorKuponu({
             max={8}
             step={1}
             value={liczbaTypow}
-            onChange={(e) => { setLiczbaTypow(Number(e.target.value)); setWynik(null); }}
+            onChange={(e) => { setLiczbaTypow(Number(e.target.value)); setPokazany(false); }}
             className="w-full accent-[var(--color-brand)]"
           />
           <div className="mt-1 flex items-center justify-between gap-2">
@@ -267,7 +353,7 @@ export function GeneratorKuponu({
                 : "model może dołożyć więcej, jeśli to podnosi szansę"}
             </span>
             <button
-              onClick={() => { setTrybDokladny((v) => !v); setWynik(null); }}
+              onClick={() => { setTrybDokladny((v) => !v); setPokazany(false); }}
               className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium transition-colors ${
                 trybDokladny
                   ? "border-brand/40 bg-brand-wash text-brand-deep"
@@ -290,7 +376,7 @@ export function GeneratorKuponu({
           {PROFILE.map((pr) => (
             <button
               key={pr.kod}
-              onClick={() => { setProfil(pr.kod); setWynik(null); }}
+              onClick={() => { setProfil(pr.kod); setPokazany(false); }}
               title={pr.opis}
               className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
                 profil === pr.kod
@@ -312,7 +398,7 @@ export function GeneratorKuponu({
           <input
             type="checkbox"
             checked={tylkoValue}
-            onChange={(e) => { setTylkoValue(e.target.checked); setWynik(null); }}
+            onChange={(e) => { setTylkoValue(e.target.checked); setPokazany(false); }}
             className="mt-0.5 accent-[var(--color-brand)]"
           />
           <span>
@@ -333,7 +419,7 @@ export function GeneratorKuponu({
             type="checkbox"
             checked={tylkoValue || maxJedenZMeczu}
             disabled={tylkoValue}
-            onChange={(e) => { setMaxJedenZMeczu(e.target.checked); setWynik(null); }}
+            onChange={(e) => { setMaxJedenZMeczu(e.target.checked); setPokazany(false); }}
             className="mt-0.5 accent-[var(--color-brand)]"
           />
           <span>
@@ -348,6 +434,101 @@ export function GeneratorKuponu({
           </span>
         </label>
       </div>
+
+      {/* własny wybór typów: przypnij z puli — resztę dobiera model */}
+      <details className="mt-3 rounded-lg border border-dashed border-hairline">
+        <summary className="cursor-pointer list-none px-3 py-2 text-xs font-medium text-muted transition-colors hover:text-ink [&::-webkit-details-marker]:hidden">
+          📌 Chcę konkretne typy w kuponie
+          {przypiete.size > 0 && (
+            <span className="ml-1.5 rounded-full bg-brand-wash px-1.5 py-0.5 text-[10px] font-semibold text-brand-deep">
+              {przypiete.size}
+            </span>
+          )}
+        </summary>
+        <div className="space-y-2.5 px-3 pb-3">
+          <p className="text-[11px] leading-relaxed text-faint">
+            Kliknij typ, żeby na pewno wszedł do kuponu — resztę dobierze model.
+            Kliknij drugi raz, żeby odpiąć.
+          </p>
+          {mecze.map(([mid, { label }]) => {
+            const typyMeczu = pulaFiltrowana
+              .filter((l) => l.mecz_id === mid && !wykluczone.has(legKey(l)))
+              .sort((a, b) => b.p_model - a.p_model);
+            if (typyMeczu.length === 0) return null;
+            return (
+              <div key={mid}>
+                <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-faint">
+                  {label}
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  {typyMeczu.map((l) => {
+                    const k = legKey(l);
+                    const pin = przypiete.has(k);
+                    return (
+                      <button
+                        key={k}
+                        onClick={() => przypnij(l)}
+                        title={`Szansa ${fmtProc(l.p_model)}${pin ? " — kliknij, żeby odpiąć" : ""}`}
+                        className={`rounded-md border px-2 py-1 text-[11px] transition-colors ${
+                          pin
+                            ? "border-brand bg-brand-wash font-medium text-brand-deep"
+                            : "border-hairline bg-paper text-muted hover:text-ink"
+                        }`}
+                      >
+                        {pin ? "📌 " : ""}
+                        {l.podmiot} · {l.rynek.toLowerCase()} {fmtLinia(l.linia)}+{" "}
+                        <span className="font-data">@{fmtKurs(l.kurs)}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </details>
+
+      {/* podsumowanie wyborów usera — widoczne też, gdy kupon się nie składa */}
+      {(przypiete.size > 0 || wykluczone.size > 0) && (
+        <div className="mt-3 space-y-1.5 text-xs">
+          {przypiete.size > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-faint">na pewno w kuponie:</span>
+              {[...przypiete.entries()].map(([k, l]) => (
+                <button
+                  key={k}
+                  onClick={() => przypnij(l)}
+                  title="Kliknij, żeby odpiąć — model będzie mógł wybrać inny typ"
+                  className="rounded-full border border-brand/40 bg-brand-wash px-2 py-0.5 text-[11px] font-medium text-brand-deep transition-colors hover:bg-brand-wash/70"
+                >
+                  📌 {l.podmiot} · {l.rynek.toLowerCase()} {fmtLinia(l.linia)}+ ✕
+                </button>
+              ))}
+            </div>
+          )}
+          {wykluczone.size > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-faint">usunięte z kuponu:</span>
+              {[...wykluczone.entries()].map(([k, l]) => (
+                <button
+                  key={k}
+                  onClick={() => przywrocTyp(k)}
+                  title="Kliknij, żeby przywrócić — typ znów będzie mógł wejść do kuponu"
+                  className="rounded-full border border-hairline bg-paper px-2 py-0.5 text-[11px] text-muted line-through transition-colors hover:text-ink"
+                >
+                  {l.podmiot} · {l.rynek.toLowerCase()} {fmtLinia(l.linia)}+ ↺
+                </button>
+              ))}
+            </div>
+          )}
+          <button
+            onClick={wyczyscWybory}
+            className="text-[11px] text-brand hover:underline"
+          >
+            wyczyść moje wybory
+          </button>
+        </div>
+      )}
 
       {/* żywy podgląd osiągalności — zanim user w ogóle kliknie */}
       <p
@@ -370,9 +551,10 @@ export function GeneratorKuponu({
         {meczId != null ? "Złóż kupon na ten mecz" : "Złóż kupon"}
       </button>
 
-      {/* wynik */}
+      {/* wynik — karta pokazuje ŻYWY podgląd: usunięcie/przypięcie typu
+          przelicza kupon od razu, bez ponownego klikania "Złóż kupon" */}
       <AnimatePresence mode="wait">
-        {wynik === "brak" && (
+        {pokazany && !podglad && (
           <motion.p
             key="brak"
             initial={{ opacity: 0, y: 6 }}
@@ -383,14 +565,17 @@ export function GeneratorKuponu({
             {podpowiedzBrak ?? "Nie da się domknąć tego kompletu — zmień parametry."}
           </motion.p>
         )}
-        {wynik && wynik !== "brak" && (
+        {pokazany && podglad && (
           <KuponKarta
             key="kupon"
-            k={wynik}
+            k={podglad}
             nauka={nauka}
             tylkoValue={tylkoValue}
+            przypieteKeys={przypiete}
             onOdrzuc={odrzuc}
-            onNauka={() => uczModel(wynik)}
+            onNauka={() => uczModel(podglad)}
+            onPrzypnij={przypnij}
+            onUsun={usunTyp}
           />
         )}
       </AnimatePresence>
@@ -402,14 +587,20 @@ function KuponKarta({
   k,
   nauka,
   tylkoValue,
+  przypieteKeys,
   onOdrzuc,
   onNauka,
+  onPrzypnij,
+  onUsun,
 }: {
   k: KuponWynik;
   nauka: "idle" | "wysylanie" | "ok" | "blad";
   tylkoValue: boolean;
+  przypieteKeys: ReadonlyMap<string, LegPool>;
   onOdrzuc: () => void;
   onNauka: () => void;
+  onPrzypnij: (l: LegPool) => void;
+  onUsun: (l: LegPool) => void;
 }) {
   const zwrot = (STAWKA * k.kurs_laczny).toFixed(0);
   // legi grupowane po meczu (jak bet builder)
@@ -488,6 +679,30 @@ function KuponKarta({
                     <span className="flex shrink-0 items-center gap-2">
                       <span className="font-data text-xs text-faint">{fmtProc(l.p_model)}</span>
                       <span className="font-data font-semibold">@{fmtKurs(l.kurs)}</span>
+                      <span className="flex items-center gap-1">
+                        <button
+                          onClick={() => onPrzypnij(l)}
+                          title={
+                            przypieteKeys.has(legKey(l))
+                              ? "Typ przypięty — kliknij, żeby odpiąć"
+                              : "Zostaw ten typ na pewno (model nie będzie go wymieniał)"
+                          }
+                          className={`rounded-md px-1.5 py-1 text-xs transition-colors ${
+                            przypieteKeys.has(legKey(l))
+                              ? "bg-brand-wash"
+                              : "opacity-40 hover:opacity-100"
+                          }`}
+                        >
+                          📌
+                        </button>
+                        <button
+                          onClick={() => onUsun(l)}
+                          title="Usuń ten typ — model dobierze inny"
+                          className="rounded-md px-1.5 py-1 text-xs text-muted opacity-40 transition-all hover:text-data-red hover:opacity-100"
+                        >
+                          ✕
+                        </button>
+                      </span>
                     </span>
                   </li>
                 </LegWpada>

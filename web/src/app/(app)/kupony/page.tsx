@@ -108,7 +108,8 @@ export default async function KuponyPage() {
                 Złóż kupon z tej samej przeanalizowanej puli, której model używa
                 automatycznie — te same bezpieczniki, kary korelacji i premia za
                 wartość. Wybierz mecze (albo zostaw wszystkie), ustaw kurs docelowy
-                i charakter.
+                i charakter. Gotowy kupon możesz poprawiać: usuń typ (✕), a model
+                dobierze inny; przypnij typ (📌), a zostanie na pewno.
               </p>
               <GeneratorKuponu pool={legiPool} kary={meta.kary_korelacji} />
             </div>

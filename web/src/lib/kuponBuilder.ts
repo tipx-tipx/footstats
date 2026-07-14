@@ -192,6 +192,20 @@ export interface OpcjeKuponu {
   maxLegi?: number;
   maxNaMecz?: number;
   kary?: Kary;
+  /** typy, które MUSZĄ wejść do kuponu (wybór użytkownika w generatorze).
+   * Wchodzą zawsze — z pominięciem filtrów profilu (świadoma decyzja usera
+   * bije bezpieczniki doboru) — a beam search dobiera do nich resztę.
+   * Rozszerzenie WYŁĄCZNIE frontowe (generator własnego kuponu) — kupony.py
+   * celowo tego nie ma, automatyczne kupony zawsze składa model od zera. */
+  przypiete?: LegPool[];
+  /** klucze typów (legKey) usuniętych przez użytkownika — nie wejdą do kuponu
+   * ani do propozycji rentgena/dołożenia. Rozszerzenie frontowe, jak wyżej. */
+  wykluczone?: ReadonlySet<string>;
+}
+
+/** Stabilny klucz typu w puli — ta sama czwórka co sygnatury kuponów. */
+export function legKey(l: LegPool): string {
+  return `${l.mecz_id}:${l.podmiot_id}:${l.rynek_kod}:${l.linia}`;
 }
 
 type St = { kurs: number; p: number; legi: LegPool[] };
@@ -269,16 +283,48 @@ export function zlozKupon(
   const kary = opts.kary ?? KARY_DEFAULT;
   const wagaSel = WAGA_VALUE_SELEKCJA[profil];
 
-  const p = pool.filter((b) => b.kurs > 1 && b.p_model > 0 && b.p_model < 1);
+  // wybory użytkownika: usunięte typy znikają z każdej roli (kandydat,
+  // rentgen, dołożenie), przypięte wchodzą do kuponu bezwarunkowo
+  const wykluczone = opts.wykluczone;
+  const bezUsunietych = wykluczone?.size
+    ? pool.filter((b) => !wykluczone.has(legKey(b)))
+    : pool;
+  const przypiete = (opts.przypiete ?? []).filter(
+    (b) => b.kurs > 1 && b.p_model > 0 && b.p_model < 1,
+  );
+  if (przypiete.length) {
+    // przypięte muszą same spełniać ograniczenia kuponu — inaczej żaden
+    // komplet nie istnieje i uczciwie zwracamy null (UI tłumaczy dlaczego)
+    if (przypiete.length > maxLegi) return null;
+    if (new Set(przypiete.map((l) => l.podmiot_id)).size < przypiete.length) return null;
+    const naMecz = new Map<number, number>();
+    for (const l of przypiete) naMecz.set(l.mecz_id, (naMecz.get(l.mecz_id) ?? 0) + 1);
+    for (const c of naMecz.values()) if (c > maxNaMecz) return null;
+    if (przypiete.reduce((a, l) => a * l.kurs, 1) > cmax) return null;
+  }
+  const pinIds = new Set(przypiete.map((l) => l.podmiot_id));
+  const pinKeys = new Set(przypiete.map(legKey));
+
+  const p = bezUsunietych.filter((b) => b.kurs > 1 && b.p_model > 0 && b.p_model < 1);
   const maxRyzykowne = MAX_RYZYKOWNE[profil];
-  const cands = pulaEfektywna(pool, profil)
+  const cands = pulaEfektywna(bezUsunietych, profil)
+    .filter((b) => !pinIds.has(b.podmiot_id))
     .sort((a, b) => qLega(b, profil) - qLega(a, profil))
     .slice(0, MAX_KANDYDATOW);
 
   // stan wiązki: p = iloczyn UREALNIONYCH szans (selekcja); wyświetlana
-  // szansa kuponu i tak liczy się z p_model legów w buildBase
-  let beam: St[] = [{ kurs: 1, p: 1, legi: [] }];
+  // szansa kuponu i tak liczy się z p_model legów w buildBase.
+  // Start NIE od pustego stanu, tylko od przypiętych typów usera.
+  let beam: St[] = [{
+    kurs: przypiete.reduce((a, l) => a * l.kurs, 1),
+    p: przypiete.reduce((a, l) => a * pSkladania(l), 1),
+    legi: [...przypiete],
+  }];
   const komplety: St[] = [];
+  // same przypięte potrafią już domykać kupon (user złożył go w całości sam)
+  if (przypiete.length >= minLegi && beam[0].kurs >= cmin) {
+    komplety.push(beam[0]);
+  }
   for (const b of cands) {
     const ryzykowny = b.p_model < PROG_RYZYKA_P;
     const nowe: St[] = [];
@@ -391,20 +437,29 @@ export function zlozKupon(
 
   // rentgen (jak kupony.py:_rentgen): najsłabsze ogniwo + czy pula ma lepszą
   // zamianę, która realnie podnosi szansę kuponu. Czysto doradcze — kupon
-  // (legi) zostaje bez zmian.
+  // (legi) zostaje bez zmian. Badge "najsłabsze" pokazuje globalnie najsłabszy
+  // typ, ale wymianę proponujemy tylko dla NIEPRZYPIĘTYCH (przypięty = user
+  // powiedział "ten ma zostać" — nie doradzamy wbrew niemu).
   const weakIdx = legi.reduce(
     (mi, l, i, arr) => (l.p_model < arr[mi].p_model ? i : mi), 0,
   );
   wynik.najslabszy_idx = weakIdx;
-  const weak = legi[weakIdx];
+  const doWymiany = legi
+    .map((_, i) => i)
+    .filter((i) => !pinKeys.has(legKey(legi[i])));
+  const swapIdx = doWymiany.length
+    ? doWymiany.reduce((mi, i) => (legi[i].p_model < legi[mi].p_model ? i : mi), doWymiany[0])
+    : -1;
+  if (swapIdx >= 0) {
+  const weak = legi[swapIdx];
   const kursBez = wynik.kurs_laczny / weak.kurs;
   const pBez = wynik.p_model / Math.max(weak.p_model, 1e-9);
   const uzyciRentgen = new Set(
-    legi.filter((_, i) => i !== weakIdx).map((l) => l.podmiot_id),
+    legi.filter((_, i) => i !== swapIdx).map((l) => l.podmiot_id),
   );
   const naMeczRentgen = new Map<number, number>();
   legi.forEach((l, i) => {
-    if (i !== weakIdx) naMeczRentgen.set(l.mecz_id, (naMeczRentgen.get(l.mecz_id) ?? 0) + 1);
+    if (i !== swapIdx) naMeczRentgen.set(l.mecz_id, (naMeczRentgen.get(l.mecz_id) ?? 0) + 1);
   });
   let bestSwap: LegPool | null = null;
   for (const b of p) {
@@ -415,17 +470,18 @@ export function zlozKupon(
     if (!bestSwap || b.p_model > bestSwap.p_model) bestSwap = b;
   }
   if (bestSwap) {
-    const legiPo = [...legi.filter((_, i) => i !== weakIdx), bestSwap];
+    const legiPo = [...legi.filter((_, i) => i !== swapIdx), bestSwap];
     const pPo = pBez * bestSwap.p_model
       * karaKoszyka(legiPo, kary) / Math.max(karaKoszyka(legi, kary), 1e-9);
     if (pPo > wynik.p_model + 1e-9) {
       wynik.alternatywa = {
         ...bestSwap,
-        zamiast_idx: weakIdx,
+        zamiast_idx: swapIdx,
         kurs_po: Math.round(kursBez * bestSwap.kurs * 100) / 100,
         p_po: Math.round(pPo * 10000) / 10000,
       };
     }
+  }
   }
 
   // dołożenie (jak kupony.py:_dolozenie): kupon wisi w dolnej połowie
