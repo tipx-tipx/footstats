@@ -368,7 +368,7 @@ export function ValueBoard({
             {liczbaSugestii > 0 && (
               <button
                 onClick={() => setRodzaj("sugestie")}
-                className="mt-4 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-deep"
+                className="mt-4 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-on-brand transition-colors hover:bg-brand-deep"
               >
                 Zobacz sugestie STS ({liczbaSugestii})
               </button>
@@ -385,7 +385,7 @@ export function ValueBoard({
             </p>
             <button
               onClick={wyczyscFiltry}
-              className="mt-4 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-deep"
+              className="mt-4 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-on-brand transition-colors hover:bg-brand-deep"
             >
               Wyczyść filtry
             </button>

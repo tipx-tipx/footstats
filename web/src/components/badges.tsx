@@ -8,7 +8,7 @@ export function EdgeBadge({ ev }: { ev: number }) {
     <span
       className={`font-data inline-flex items-center rounded-md px-2 py-0.5 text-sm font-semibold ${
         strong
-          ? "bg-data-green text-white"
+          ? "bg-data-green text-on-brand"
           : "bg-data-green-wash text-brand-deep"
       }`}
       title="Wartość oczekiwana zakładu: o ile procent kurs jest lepszy, niż być powinien według modelu"
@@ -20,7 +20,7 @@ export function EdgeBadge({ ev }: { ev: number }) {
 
 const PEWNOSC_STYLE: Record<Pewnosc, string> = {
   wysoka: "bg-data-green-wash text-brand-deep",
-  srednia: "bg-data-amber-wash text-[#8a5613]",
+  srednia: "bg-data-amber-wash text-data-amber-ink",
   niska: "bg-paper text-muted",
 };
 
@@ -55,7 +55,7 @@ export function PewnoscDots({ level }: { level: Pewnosc }) {
 
 const RYZYKO_STYLE: Record<Ryzyko, string> = {
   niskie: "text-muted",
-  srednie: "text-[#8a5613]",
+  srednie: "text-data-amber-ink",
   wysokie: "text-data-red",
 };
 

@@ -116,7 +116,7 @@ export function PominKupon({
     <div>
       {children}
       {przebudowa && (
-        <p className="mt-1.5 rounded-md bg-data-amber-wash px-2 py-1 text-[11px] text-[#8a5613]">
+        <p className="mt-1.5 rounded-md bg-data-amber-wash px-2 py-1 text-[11px] text-data-amber-ink">
           🔄 zaplanowano przebudowę: gdy składy wszystkich meczów zostaną
           potwierdzone, model złoży ten kupon od nowa na pewnych XI
         </p>
@@ -125,7 +125,7 @@ export function PominKupon({
         {pokazPrzebuduj && !przebudowa && stan !== "wybor" && (
           <button
             onClick={zaplanujPrzebudowe}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-hairline bg-card px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:border-data-amber/50 hover:text-[#8a5613]"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-hairline bg-card px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:border-data-amber/50 hover:text-data-amber-ink"
             title="Kupon zostanie pominięty i złożony od nowa dopiero, gdy składy WSZYSTKICH jego meczów będą potwierdzone — mniej zwrotów i anulowań"
           >
             🔄 przebuduj po składach
@@ -234,7 +234,7 @@ export function ProfilKuponow() {
             disabled={zapis}
             className={`px-2.5 py-1 transition-colors ${
               profil === p
-                ? "bg-brand text-white"
+                ? "bg-brand text-on-brand"
                 : "bg-card text-muted hover:bg-paper"
             }`}
             title={

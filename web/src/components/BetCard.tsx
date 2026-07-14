@@ -85,13 +85,13 @@ function tierPewniaka(bet: ValueBet): {
     if (bet.p_model < 0.52) {
       return {
         label: "✦ opcja ryzykowna",
-        cls: "bg-data-amber-wash text-[#8a5613]",
+        cls: "bg-data-amber-wash text-data-amber-ink",
         opis: "Wyższa linia przy szansie 40–52% i kursie 1,9+ — świadomie ryzykowny wariant typu bazowego, nie pewniak",
       };
     }
     return {
       label: "✦ wyższa linia",
-      cls: "bg-data-amber-wash text-[#8a5613]",
+      cls: "bg-data-amber-wash text-data-amber-ink",
       opis: "Perełka: wyższa linia (1,5+) przy wciąż solidnej szansie — wyraźnie lepszy kurs niż na linii 0,5",
     };
   }
@@ -99,7 +99,7 @@ function tierPewniaka(bet: ValueBet): {
     if ((bet.kurs ?? 0) >= 1.9) {
       return {
         label: "◆ perełka",
-        cls: "bg-data-amber-wash text-[#8a5613]",
+        cls: "bg-data-amber-wash text-data-amber-ink",
         opis: "Wyższy kurs (1,9+) przy wciąż sensownej szansie — okazjonalny rodzynek na kupon, nie pewniak",
       };
     }
@@ -222,7 +222,7 @@ export const BetCard = memo(function BetCard({
               })()
             ) : bet.sugestia || bet.ev_pct == null ? (
               <span
-                className="inline-flex items-center rounded-md bg-data-amber-wash px-2 py-0.5 text-xs font-semibold text-[#8a5613]"
+                className="inline-flex items-center rounded-md bg-data-amber-wash px-2 py-0.5 text-xs font-semibold text-data-amber-ink"
                 title="Rynek dostępny w STS — sprawdź kurs ręcznie"
               >
                 sprawdź w STS
@@ -258,7 +258,7 @@ export const BetCard = memo(function BetCard({
             )}
             {bet.rotacja && (
               <span
-                className="inline-flex rounded-md bg-data-amber-wash px-1.5 py-0.5 text-[10px] font-semibold text-[#8a5613]"
+                className="inline-flex rounded-md bg-data-amber-wash px-1.5 py-0.5 text-[10px] font-semibold text-data-amber-ink"
                 title="Pierwszy występ w XI na tym turnieju — rynek często nie zdążył dograć jego linii; baza modelu z sezonu klubowego"
               >
                 ⬆ wchodzi do składu
@@ -266,7 +266,7 @@ export const BetCard = memo(function BetCard({
             )}
             {bet.swieze_sklady && (
               <span
-                className="inline-flex rounded-md bg-data-amber-wash px-1.5 py-0.5 text-[10px] font-semibold text-[#8a5613]"
+                className="inline-flex rounded-md bg-data-amber-wash px-1.5 py-0.5 text-[10px] font-semibold text-data-amber-ink"
                 title="Składy tego meczu potwierdzono w ostatnich ~45 minutach — kursy bywają jeszcze sprzed ogłoszenia XI"
               >
                 🕐 świeże składy
@@ -326,7 +326,7 @@ export const BetCard = memo(function BetCard({
               {/* lewa: podsumowanie po ludzku i uzasadnienie */}
               <div className="space-y-4">
                 {bet.sugestia ? (
-                  <div className="rounded-lg border border-data-amber/40 bg-data-amber-wash px-3.5 py-3 text-sm leading-relaxed text-[#6d4410]">
+                  <div className="rounded-lg border border-data-amber/40 bg-data-amber-wash px-3.5 py-3 text-sm leading-relaxed text-data-amber-ink-strong">
                     Model daje temu zdarzeniu{" "}
                     <strong className="font-data">{fmtProc(bet.p_model)}</strong>{" "}
                     szans, czyli uczciwy kurs to{" "}
@@ -612,7 +612,7 @@ export const BetCard = memo(function BetCard({
                     className={`w-full rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${
                       tracked
                         ? "cursor-default bg-brand-wash text-brand"
-                        : "bg-brand text-white hover:bg-brand-deep"
+                        : "bg-brand text-on-brand hover:bg-brand-deep"
                     }`}
                   >
                     {tracked ? "✓ W moich zakładach" : "Dodaj do moich zakładów"}

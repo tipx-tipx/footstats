@@ -52,7 +52,7 @@ export default function LoginPage() {
               width={160}
               height={51}
               priority
-              className="h-11 w-auto"
+              className="logo-adaptacyjne h-11 w-auto"
             />
             <p className="mt-4 text-xs font-medium uppercase tracking-widest text-brand">
               narzędzie prywatne
@@ -107,7 +107,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={wysylanie || !haslo}
-              className="w-full rounded-xl bg-brand px-4 py-3 text-sm font-semibold text-white transition-all hover:bg-brand-deep disabled:cursor-not-allowed disabled:opacity-50"
+              className="w-full rounded-xl bg-brand px-4 py-3 text-sm font-semibold text-on-brand transition-all hover:bg-brand-deep disabled:cursor-not-allowed disabled:opacity-50"
             >
               {wysylanie ? "Sprawdzam…" : "Wejdź"}
             </button>

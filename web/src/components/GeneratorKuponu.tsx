@@ -213,7 +213,7 @@ export function GeneratorKuponu({
                 title={fmtDataCzas(ts)}
                 className={`whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
                   wybrane.has(id)
-                    ? "bg-brand text-white"
+                    ? "bg-brand text-on-brand"
                     : "bg-paper text-muted hover:text-ink"
                 }`}
               >
@@ -352,7 +352,7 @@ export function GeneratorKuponu({
       {/* żywy podgląd osiągalności — zanim user w ogóle kliknie */}
       <p
         className={`mt-3 text-xs leading-relaxed ${
-          podglad ? "text-brand-deep" : "text-[#8a5613]"
+          podglad ? "text-brand-deep" : "text-data-amber-ink"
         }`}
       >
         {podglad
@@ -365,7 +365,7 @@ export function GeneratorKuponu({
       <button
         onClick={zloz}
         disabled={!podglad}
-        className="mt-2 w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:translate-y-0"
+        className="mt-2 w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-on-brand transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:translate-y-0"
       >
         {meczId != null ? "Złóż kupon na ten mecz" : "Złóż kupon"}
       </button>
@@ -378,7 +378,7 @@ export function GeneratorKuponu({
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            className="mt-4 rounded-lg border border-data-amber/40 bg-data-amber-wash px-3 py-2.5 text-xs text-[#8a5613]"
+            className="mt-4 rounded-lg border border-data-amber/40 bg-data-amber-wash px-3 py-2.5 text-xs text-data-amber-ink"
           >
             {podpowiedzBrak ?? "Nie da się domknąć tego kompletu — zmień parametry."}
           </motion.p>
@@ -478,7 +478,7 @@ function KuponKarta({
                         {globalIdx === k.najslabszy_idx && k.legi.length > 1 && (
                           <span
                             title="Typ o najniższej szansie — najmocniej ciągnie szansę kuponu w dół"
-                            className="rounded-md bg-data-amber-wash px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[#8a5613]"
+                            className="rounded-md bg-data-amber-wash px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-data-amber-ink"
                           >
                             ⚠ najsłabsze
                           </span>

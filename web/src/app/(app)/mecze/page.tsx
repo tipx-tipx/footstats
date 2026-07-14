@@ -71,7 +71,7 @@ export default async function MeczePage() {
                   <span
                     className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium ${
                       czas.soon
-                        ? "bg-data-amber-wash text-[#8a5613]"
+                        ? "bg-data-amber-wash text-data-amber-ink"
                         : "bg-paper text-muted"
                     }`}
                   >
@@ -131,7 +131,7 @@ export default async function MeczePage() {
                       {n === 0 ? "0 okazji" : n === 1 ? "1 okazja" : `${n} okazji`}
                     </span>
                     {nSug > 0 && (
-                      <span className="inline-flex items-center rounded-md bg-data-amber-wash px-2 py-0.5 text-xs font-medium text-[#8a5613]">
+                      <span className="inline-flex items-center rounded-md bg-data-amber-wash px-2 py-0.5 text-xs font-medium text-data-amber-ink">
                         {nSug} sug. STS
                       </span>
                     )}

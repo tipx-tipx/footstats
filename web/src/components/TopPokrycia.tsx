@@ -35,7 +35,7 @@ function Chip({
       onClick={onClick}
       className={`whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
         active
-          ? "bg-brand text-white"
+          ? "bg-brand text-on-brand"
           : "bg-card text-muted hover:bg-paper hover:text-ink"
       }`}
     >
@@ -110,7 +110,7 @@ export function TopPokrycia({
         // do kolejnego tapnięcia gdzie indziej (proste, bez wyścigu ze
         // zdarzeniami mouseenter, które przeglądarki syntetyzują po dotyku)
         onClick={pokaz}
-        className={`font-data inline-flex h-6 w-6 cursor-default items-center justify-center rounded text-[11px] font-semibold text-white transition-transform hover:scale-110 ${
+        className={`font-data inline-flex h-6 w-6 cursor-default items-center justify-center rounded text-[11px] font-semibold text-on-brand transition-transform hover:scale-110 ${
           zaliczyl ? "bg-data-green" : "bg-data-red"
         }`}
       >
@@ -128,7 +128,7 @@ export function TopPokrycia({
           (pokrycie z reprezentacji).
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="rounded bg-data-amber-wash px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[#8a5613]">
+          <span className="rounded bg-data-amber-wash px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-data-amber-ink">
             forma klubowa
           </span>
           rezerwa kadry — liczone z klubu (niżej)
@@ -221,7 +221,7 @@ export function TopPokrycia({
                     <span className="text-xs text-faint">{w.druzyna}</span>
                     {!w.kadraRegularny && (
                       <span
-                        className="inline-flex rounded bg-data-amber-wash px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[#8a5613]"
+                        className="inline-flex rounded bg-data-amber-wash px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-data-amber-ink"
                         title="Zawodnik nie ma 5 startów w reprezentacji w dostępnej historii — rezerwa kadry, statystyki liczone z klubu. Na mecz reprezentacji traktuj ostrożnie."
                       >
                         forma klubowa
@@ -310,7 +310,7 @@ export function TopPokrycia({
       {/* płynny tooltip kafelka (fixed — nigdy nieprzycięty przez tabelę) */}
       <div
         aria-hidden
-        className={`pointer-events-none fixed z-50 -translate-x-1/2 -translate-y-full rounded-lg bg-ink px-2.5 py-1.5 text-white shadow-lg transition-all duration-150 ease-out ${
+        className={`pointer-events-none fixed z-50 -translate-x-1/2 -translate-y-full rounded-lg bg-ink px-2.5 py-1.5 text-paper shadow-lg transition-all duration-150 ease-out ${
           tip ? "opacity-100" : "translate-y-[calc(-100%+4px)] opacity-0"
         }`}
         style={tip ? { left: tip.x, top: tip.y - 8 } : { left: -9999, top: -9999 }}
@@ -320,7 +320,7 @@ export function TopPokrycia({
             <span className="block text-[11px] font-semibold">
               {tip.g.rywal ? `vs ${tip.g.rywal}` : "mecz"}
             </span>
-            <span className="block text-[10px] text-white/70">
+            <span className="block text-[10px] text-paper/70">
               {dataMeczu(tip.g.ts)} · {tip.g.minuty}′ ·{" "}
               {tip.g.kadra ? "reprezentacja" : "klub"}
             </span>

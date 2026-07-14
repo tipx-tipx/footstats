@@ -191,7 +191,7 @@ export function SkutecznoscDzienna({ dni }: { dni: SkutecznoscDnia[] }) {
                     ? "text-data-green"
                     : t.wynik === "przegrany"
                       ? "text-data-red"
-                      : "text-[#8a5613]"
+                      : "text-data-amber-ink"
                 }`}
               >
                 {t.wynik === "wygrany"

@@ -30,7 +30,7 @@ export function KuponHistoriaCard({
       <summary className="cursor-pointer list-none px-4 py-3.5 [&::-webkit-details-marker]:hidden">
         <div className="flex items-center justify-between gap-2">
           <span className="flex items-center gap-2">
-            <span className="font-data rounded-md bg-brand px-2 py-0.5 text-sm font-bold text-white">
+            <span className="font-data rounded-md bg-brand px-2 py-0.5 text-sm font-bold text-on-brand">
               ×{k.cel_label ?? k.cel}
             </span>
             <span className="text-xs text-muted">
@@ -62,7 +62,7 @@ export function KuponHistoriaCard({
                   ? "text-data-red"
                   : k.wynik === "anulowany"
                     ? "text-faint"
-                    : "text-[#8a5613]"
+                    : "text-data-amber-ink"
             }`}
             title={k.powod}
           >

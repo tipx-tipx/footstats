@@ -175,7 +175,7 @@ export default async function KuponyPage() {
               <article className="flex h-full flex-col rounded-2xl border border-hairline bg-card shadow-(--shadow-card) transition-shadow hover:shadow-(--shadow-card-hover)">
                 <header className="flex flex-col gap-3 border-b border-hairline px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
                   <span className="flex items-center gap-2">
-                    <span className="font-data rounded-lg bg-brand px-3 py-1 text-lg font-bold text-white">
+                    <span className="font-data rounded-lg bg-brand px-3 py-1 text-lg font-bold text-on-brand">
                       ×{k.cel_label ?? k.cel}
                     </span>
                     <span
@@ -289,7 +289,7 @@ export default async function KuponyPage() {
                             <LegBadges l={l} />
                             {li === weakIdx && k.legi.length > 1 && (
                               <span
-                                className="shrink-0 rounded-md bg-data-amber-wash px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[#8a5613]"
+                                className="shrink-0 rounded-md bg-data-amber-wash px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-data-amber-ink"
                                 title="Leg o najniższej szansie — to on najmocniej ciągnie szansę kuponu w dół"
                               >
                                 ⚠ najsłabsze

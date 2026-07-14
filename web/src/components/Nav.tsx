@@ -5,6 +5,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { ThemeToggle } from "./ThemeToggle";
+
 /**
  * Nawigacja w trzech logicznych grupach:
  *   1. codzienna praca — Okazje, Kupony, Mecze
@@ -61,7 +63,7 @@ export function Nav() {
             width={126}
             height={40}
             priority
-            className="h-9 w-auto"
+            className="logo-adaptacyjne h-9 w-auto"
           />
         </Link>
 
@@ -99,6 +101,9 @@ export function Nav() {
           ))}
         </nav>
 
+        {/* przełącznik motywu — widoczny na desktopie i mobile'u */}
+        <ThemeToggle className="ml-auto sm:ml-0" />
+
         <button
           onClick={wyloguj}
           title="Wyloguj"
@@ -113,7 +118,7 @@ export function Nav() {
         {/* hamburger — tylko mobile */}
         <button
           onClick={() => setOpen((v) => !v)}
-          className="relative ml-auto flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-ink transition-colors hover:bg-paper sm:hidden"
+          className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-ink transition-colors hover:bg-paper sm:hidden"
           aria-label={open ? "Zamknij menu" : "Otwórz menu"}
           aria-expanded={open}
           aria-controls="menu-mobilne"

@@ -80,7 +80,7 @@ export default function JakToDzialaPage() {
       </ol>
 
       <Reveal className="mt-10">
-        <div className="max-w-3xl rounded-2xl border border-data-amber/40 bg-data-amber-wash p-5 text-sm leading-relaxed text-[#6d4410]">
+        <div className="max-w-3xl rounded-2xl border border-data-amber/40 bg-data-amber-wash p-5 text-sm leading-relaxed text-data-amber-ink-strong">
           <h2 className="font-semibold">Uczciwe zastrzeżenie</h2>
           <p className="mt-1">
             Model nie zna kontuzji ogłoszonej godzinę temu, konfliktu w szatni

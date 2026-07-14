@@ -40,7 +40,7 @@ export default async function OkazjePage({
       />
 
       {meta.tryb === "demo" ? (
-        <p className="mb-6 inline-flex items-center gap-2 rounded-lg border border-data-amber/40 bg-data-amber-wash px-3 py-2 text-xs text-[#8a5613]">
+        <p className="mb-6 inline-flex items-center gap-2 rounded-lg border border-data-amber/40 bg-data-amber-wash px-3 py-2 text-xs text-data-amber-ink">
           <span aria-hidden>ⓘ</span>
           Tryb pokazowy: statystyki zawodników są prawdziwe ({meta.liga}{" "}
           {meta.sezon}), ale kursy są przykładowe — trwa przerwa między

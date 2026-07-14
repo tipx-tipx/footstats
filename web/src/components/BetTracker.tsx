@@ -75,7 +75,7 @@ export function BetTracker() {
         </p>
         <Link
           href="/"
-          className="mt-5 inline-block rounded-lg bg-brand px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-deep"
+          className="mt-5 inline-block rounded-lg bg-brand px-5 py-2.5 text-sm font-semibold text-on-brand transition-colors hover:bg-brand-deep"
         >
           Przeglądaj okazje
         </Link>

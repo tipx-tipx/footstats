@@ -88,7 +88,7 @@ export function Hero({
         className="pointer-events-none absolute -left-32 -top-32 h-96 w-96 rounded-full opacity-50"
         style={{
           background:
-            "radial-gradient(closest-side, rgb(22 88 63 / 0.10), transparent)",
+            "radial-gradient(closest-side, color-mix(in oklab, var(--color-brand) 10%, transparent), transparent)",
         }}
       />
 

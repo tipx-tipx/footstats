@@ -1,10 +1,17 @@
 @import "tailwindcss";
 
+/* wariant dark: sterowany atrybutem data-theme na <html> (przełącznik w
+   nawigacji + skrypt anty-mignięciowy w layout.tsx), nie preferencją systemu —
+   preferencja systemowa jest tylko wartością startową */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 /* ============================================================
    FootStats — system designu
    Marka (z logo): atramentowy grafit + butelkowa zieleń na bieli.
    Kolory DANYCH (wykresy) zwalidowane pod CVD i kontrast:
    zieleń #1F9D66 · bursztyn #C77E1F · czerwień #C2452D
+   Ciemny motyw: te same TOKENY, inne wartości (niżej) — komponenty
+   nie znają trybu, mówią rolami (ink/paper/card/brand/data-*).
    ============================================================ */
 
 @theme {
@@ -16,6 +23,9 @@
   --color-brand: #16583f;        /* butelkowa zieleń — akcent marki, UI */
   --color-brand-deep: #0e3d2b;
   --color-brand-wash: #e7f0ea;   /* delikatne tło zielone */
+  --color-on-brand: #ffffff;     /* tekst NA wypełnieniach brand/data (nie "white":
+                                    w ciemnym motywie zielenie są jaśniejsze i to
+                                    ciemny atrament daje kontrast, nie biel) */
 
   /* --- powierzchnie --- */
   --color-paper: #f2f5f3;        /* tło strony — chłodny papier z nutą zieleni */
@@ -30,6 +40,10 @@
   --color-data-green-wash: #e3f3ea;
   --color-data-amber-wash: #f7ecdc;
   --color-data-red-wash: #f7e3de;
+  /* atrament bursztynowy — tekst na amber-wash (ostrzeżenia, podpowiedzi);
+     strong = dłuższe akapity (wyższy kontrast) */
+  --color-data-amber-ink: #8a5613;
+  --color-data-amber-ink-strong: #6d4410;
 
   /* --- typografia --- */
   --font-display: var(--font-sora), system-ui, sans-serif;
@@ -40,6 +54,48 @@
 
   --shadow-card: 0 1px 2px rgb(19 32 42 / 0.04), 0 4px 16px rgb(19 32 42 / 0.05);
   --shadow-card-hover: 0 2px 4px rgb(19 32 42 / 0.06), 0 10px 32px rgb(19 32 42 / 0.10);
+}
+
+/* ============================================================
+   CIEMNY MOTYW — nadpisania tokenów pod data-theme="dark".
+   Kolory danych zwalidowane na powierzchni karty #13202a
+   (pasmo jasności, CVD, kontrast >= 3:1; teksty >= 4.5:1 AA).
+   Symetria marki: atrament światła (#13202a) staje się kartą.
+   ============================================================ */
+html[data-theme="dark"] {
+  color-scheme: dark; /* natywne kontrolki (suwaki, checkboxy) po ciemnej stronie */
+
+  --color-ink: #e9eef1;
+  --color-ink-soft: #c6d1d6;
+  --color-muted: #9aa9a6;
+  --color-faint: #8b9b98;
+  --color-brand: #2f9d6d;
+  --color-brand-deep: #8ed3b4;
+  --color-brand-wash: #143428;
+  --color-on-brand: #06130d;
+
+  --color-paper: #0b1218;
+  --color-card: #13202a;
+  --color-hairline: #23313c;
+  --color-hairline-strong: #364754;
+
+  --color-data-green: #2fae74;
+  --color-data-amber: #c9832d;
+  --color-data-red: #d8604a;
+  --color-data-green-wash: #10301f;
+  --color-data-amber-wash: #2f2410;
+  --color-data-red-wash: #2d1410;
+  --color-data-amber-ink: #e3b269;
+  --color-data-amber-ink-strong: #ecc07b;
+
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.35), 0 4px 16px rgb(0 0 0 / 0.35);
+  --shadow-card-hover: 0 2px 4px rgb(0 0 0 / 0.4), 0 10px 32px rgb(0 0 0 / 0.5);
+}
+
+/* logo ma atramentowe kreski — na ciemnym tle odwracamy je do jasnych,
+   a hue-rotate zawraca zieleń akcentu na swoje miejsce */
+html[data-theme="dark"] .logo-adaptacyjne {
+  filter: invert(0.93) hue-rotate(180deg) saturate(1.4);
 }
 
 html {
@@ -75,11 +131,12 @@ h1, h2, h3, .font-display {
   50%      { opacity: 0.7; box-shadow: 0 0 0 4px rgb(31 157 102 / 0); }
 }
 
-/* delikatna siatka "boiska" w tle hero */
+/* delikatna siatka "boiska" w tle hero — z tokenu marki, więc żyje w obu
+   motywach (w ciemnym jaśniejsza zieleń daje tę samą subtelność) */
 .pitch-grid {
   background-image:
-    linear-gradient(to right, rgb(22 88 63 / 0.05) 1px, transparent 1px),
-    linear-gradient(to bottom, rgb(22 88 63 / 0.05) 1px, transparent 1px);
+    linear-gradient(to right, color-mix(in oklab, var(--color-brand) 6%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in oklab, var(--color-brand) 6%, transparent) 1px, transparent 1px);
   background-size: 48px 48px;
 }
 
