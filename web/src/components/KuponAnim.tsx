@@ -8,9 +8,15 @@
  */
 
 import { motion, useInView, useReducedMotion, type Variants } from "framer-motion";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 
-/** Kurs łączny „dobijający" do wartości (rośnie jak przy składaniu kuponu). */
+/** Kurs łączny „dobijający" do wartości (rośnie jak przy składaniu kuponu).
+
+ * Płynność: licznik pisze PROSTO do textContent w pętli rAF — bez setState.
+ * Wersja ze stanem renderowała React 60×/s na każdą kartę naraz (na /kupony
+ * ~9 kart podczas wejścia), co dławiło główny wątek dokładnie w trakcie
+ * animacji wejściowych; na ciemnym motywie zacięcia są najbardziej widoczne
+ * (wysoki kontrast krawędzi kart), stąd wrażenie "30 fps". */
 export function CountUpKurs({
   value,
   className,
@@ -23,11 +29,13 @@ export function CountUpKurs({
   const ref = useRef<HTMLSpanElement>(null);
   const inView = useInView(ref, { once: true, margin: "-20px" });
   const reduced = useReducedMotion();
-  const [v, setV] = useState(value);
 
   useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const fmt = (x: number) => `${prefix}${x.toFixed(2).replace(".", ",")}`;
     if (reduced || !inView) {
-      setV(value);
+      el.textContent = fmt(value);
       return;
     }
     const from = Math.max(1, value * 0.55);
@@ -38,23 +46,29 @@ export function CountUpKurs({
       if (!t0) t0 = t;
       const p = Math.min(1, (t - t0) / dur);
       const e = 1 - Math.pow(1 - p, 3); // easeOutCubic
-      setV(from + (value - from) * e);
+      el.textContent = fmt(from + (value - from) * e);
       if (p < 1) raf = requestAnimationFrame(tick);
     };
-    setV(from);
+    el.textContent = fmt(from);
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [inView, value, reduced]);
+  }, [inView, value, reduced, prefix]);
 
   return (
     <span ref={ref} className={className}>
       {prefix}
-      {v.toFixed(2).replace(".", ",")}
+      {value.toFixed(2).replace(".", ",")}
     </span>
   );
 }
 
-/** Pasek szansy narastający od 0 do p (0..1) gdy karta wejdzie w kadr. */
+/** Pasek szansy narastający od 0 do p (0..1) gdy karta wejdzie w kadr.
+
+ * Płynność: animujemy transform (scaleX), NIE width — zmiana szerokości to
+ * właściwość LAYOUTU (przeliczenie układu + malowanie w każdej klatce, dla
+ * wszystkich kart naraz, w środku układu kolumnowego /kupony), a transform
+ * idzie w całości na kompozytorze. Pasek ma stałą szerokość = pct i rośnie
+ * skalą od lewej — wygląda identycznie, kosztuje ułamek. */
 export function PasekSzansy({
   p,
   className,
@@ -75,8 +89,12 @@ export function PasekSzansy({
       aria-label={`szansa ${pct}%`}
     >
       <div
-        className="h-full rounded-full bg-gradient-to-r from-brand to-data-green transition-[width] duration-[900ms] ease-out motion-reduce:transition-none"
-        style={{ width: wypelnij ? `${pct}%` : "0%" }}
+        className="h-full rounded-full bg-gradient-to-r from-brand to-data-green transition-transform duration-[900ms] ease-out motion-reduce:transition-none"
+        style={{
+          width: `${pct}%`,
+          transform: wypelnij ? "scaleX(1)" : "scaleX(0)",
+          transformOrigin: "left",
+        }}
       />
     </div>
   );
