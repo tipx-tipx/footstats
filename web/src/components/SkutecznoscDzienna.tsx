@@ -36,19 +36,19 @@ export function SkutecznoscDzienna({ dni }: { dni: SkutecznoscDnia[] }) {
   const typy = dzien.typy ?? [];
 
   return (
-    <div className="mt-4 max-w-3xl rounded-2xl border border-hairline bg-card p-4 shadow-(--shadow-card)">
+    <div className="mt-5 max-w-3xl rounded-(--radius-card) border border-hairline bg-card p-4 shadow-(--shadow-card) sm:p-5">
       {/* nawigacja: wcześniej / dzień / później */}
       <div className="flex items-center justify-between gap-3">
         <button
           onClick={() => setI((v) => Math.min(v + 1, dni.length - 1))}
           disabled={i >= dni.length - 1}
-          className="rounded-lg border border-hairline px-2.5 py-1.5 text-sm text-muted transition-colors hover:bg-paper hover:text-ink disabled:opacity-40"
+          className="rounded-(--radius-control) border border-hairline bg-card px-2.5 py-1.5 text-sm text-muted transition-colors hover:bg-card-soft hover:text-ink disabled:opacity-40"
           aria-label="Wcześniejszy dzień"
         >
           ← wcześniej
         </button>
         <p className="text-center">
-          <span className="block font-semibold capitalize">
+          <span className="block font-display font-semibold capitalize tracking-tight">
             {etykietaDnia(dzien.dzien, true)}
           </span>
           <span className="text-xs text-faint">
@@ -58,7 +58,7 @@ export function SkutecznoscDzienna({ dni }: { dni: SkutecznoscDnia[] }) {
         <button
           onClick={() => setI((v) => Math.max(v - 1, 0))}
           disabled={i <= 0}
-          className="rounded-lg border border-hairline px-2.5 py-1.5 text-sm text-muted transition-colors hover:bg-paper hover:text-ink disabled:opacity-40"
+          className="rounded-(--radius-control) border border-hairline bg-card px-2.5 py-1.5 text-sm text-muted transition-colors hover:bg-card-soft hover:text-ink disabled:opacity-40"
           aria-label="Późniejszy dzień"
         >
           później →
@@ -77,20 +77,21 @@ export function SkutecznoscDzienna({ dni }: { dni: SkutecznoscDnia[] }) {
                 key={d.dzien}
                 onClick={() => setI(idx)}
                 title={`${etykietaDnia(d.dzien, true)} — ${d.trafione}/${d.rozliczone} trafionych`}
-                className={`flex shrink-0 flex-col items-center gap-1 rounded-lg px-2 py-1.5 transition-colors ${
-                  aktywny ? "bg-brand-wash" : "hover:bg-paper"
+                className={`flex shrink-0 flex-col items-center gap-1 rounded-(--radius-control) px-2 py-1.5 transition-colors ${
+                  aktywny ? "bg-brand-wash" : "hover:bg-card-soft"
                 }`}
               >
-                {/* mini-słupek trafień dnia */}
+                {/* mini-słupek trafień dnia: zakotwiczony w linii bazowej,
+                    zaokrąglona tylko górna końcówka (4px) */}
                 <span
                   aria-hidden
-                  className="flex h-10 w-2.5 items-end overflow-hidden rounded-full bg-hairline"
+                  className="flex h-10 w-3 items-end border-b border-hairline-strong"
                 >
                   <span
-                    className={`w-full rounded-full ${
+                    className={`w-full rounded-t-[4px] ${
                       d.roi_flat >= 0 ? "bg-data-green" : "bg-data-red"
                     }`}
-                    style={{ height: `${Math.max(8, Math.round(p * 100))}%` }}
+                    style={{ height: `${Math.max(10, Math.round(p * 100))}%` }}
                   />
                 </span>
                 <span
@@ -106,20 +107,20 @@ export function SkutecznoscDzienna({ dni }: { dni: SkutecznoscDnia[] }) {
         </div>
       )}
 
-      {/* kafelki dnia */}
-      <dl className="mt-4 grid grid-cols-3 gap-2.5">
-        <div className="rounded-xl border border-hairline bg-paper px-3.5 py-3">
-          <dd className="font-data text-xl font-semibold">
+      {/* statystyki dnia — pasek z separatorami na panelu wewnętrznym */}
+      <dl className="mt-4 grid grid-cols-3 divide-x divide-hairline rounded-(--radius-control) border border-hairline bg-card-soft">
+        <div className="min-w-0 px-3.5 py-3">
+          <dd className="font-data text-xl font-semibold leading-none">
             {dzien.trafione}/{dzien.rozliczone}
             <span className="ml-1 text-sm font-normal text-muted">({proc}%)</span>
           </dd>
-          <dt className="mt-0.5 text-[11px] leading-tight text-faint">
+          <dt className="mt-1.5 text-[11px] leading-tight text-faint">
             trafionych
           </dt>
         </div>
-        <div className="rounded-xl border border-hairline bg-paper px-3.5 py-3">
+        <div className="min-w-0 px-3.5 py-3">
           <dd
-            className={`font-data text-xl font-semibold ${
+            className={`font-data text-xl font-semibold leading-none ${
               dzien.roi_flat > 0
                 ? "text-data-green"
                 : dzien.roi_flat < 0
@@ -130,13 +131,15 @@ export function SkutecznoscDzienna({ dni }: { dni: SkutecznoscDnia[] }) {
             {dzien.roi_flat >= 0 ? "+" : ""}
             {dzien.roi_flat.toFixed(2).replace(".", ",")} j.
           </dd>
-          <dt className="mt-0.5 text-[11px] leading-tight text-faint">
+          <dt className="mt-1.5 text-[11px] leading-tight text-faint">
             ROI (stawka 1 j./okazję)
           </dt>
         </div>
-        <div className="rounded-xl border border-hairline bg-paper px-3.5 py-3">
-          <dd className="font-data text-xl font-semibold">{dzien.okazje}</dd>
-          <dt className="mt-0.5 text-[11px] leading-tight text-faint">
+        <div className="min-w-0 px-3.5 py-3">
+          <dd className="font-data text-xl font-semibold leading-none">
+            {dzien.okazje}
+          </dd>
+          <dt className="mt-1.5 text-[11px] leading-tight text-faint">
             okazji z kursem
           </dt>
         </div>
@@ -148,7 +151,7 @@ export function SkutecznoscDzienna({ dni }: { dni: SkutecznoscDnia[] }) {
           {typy.map((t, ti) => (
             <li
               key={`${t.podmiot}-${t.rynek_kod}-${t.linia}-${ti}`}
-              className="flex items-center gap-3 rounded-lg border border-hairline bg-paper px-3 py-2 text-sm"
+              className="flex items-center gap-3 rounded-(--radius-control) border border-hairline bg-card-soft px-3 py-2 text-sm"
             >
               <span
                 aria-hidden
@@ -172,11 +175,11 @@ export function SkutecznoscDzienna({ dni }: { dni: SkutecznoscDnia[] }) {
               </span>
               {t.clv_pct != null && (
                 <span
-                  className={`font-data hidden shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-semibold sm:inline-flex ${
+                  className={`font-data hidden shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold sm:inline-flex ${
                     t.clv_pct > 0
-                      ? "bg-data-green-wash text-brand-deep"
+                      ? "bg-data-green-wash text-data-green-ink"
                       : t.clv_pct < 0
-                        ? "bg-data-red-wash text-data-red"
+                        ? "bg-data-red-wash text-data-red-ink"
                         : "bg-card text-muted"
                   }`}
                   title="Closing Line Value — kurs wzięty vs. zamknięcie rynku"
@@ -204,7 +207,7 @@ export function SkutecznoscDzienna({ dni }: { dni: SkutecznoscDnia[] }) {
           ))}
         </ul>
       ) : (
-        <p className="mt-4 rounded-lg border border-hairline bg-paper px-3.5 py-3 text-sm text-muted">
+        <p className="mt-4 rounded-(--radius-control) border border-hairline bg-card-soft px-3.5 py-3 text-sm text-muted">
           Brak rozliczonych typów tego dnia.
         </p>
       )}

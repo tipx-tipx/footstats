@@ -44,6 +44,27 @@ function odmienTyp(n: number): string {
   return n === 1 ? "typ" : n < 5 ? "typy" : "typów";
 }
 
+/** pinezka „na pewno w kuponie" — glif zamiast emoji, dziedziczy kolor */
+function PinIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden
+      width="11"
+      height="11"
+      viewBox="0 0 12 12"
+      className={className}
+    >
+      <circle cx="7.4" cy="4.6" r="2.7" fill="currentColor" />
+      <path
+        d="M5.2 6.8 L2.2 9.8"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 export function GeneratorKuponu({
   pool,
   kary = KARY_DEFAULT,
@@ -270,7 +291,7 @@ export function GeneratorKuponu({
 
   if (bazowa.length === 0) {
     return (
-      <p className="rounded-xl border border-hairline bg-card px-4 py-3.5 text-sm text-muted">
+      <p className="rounded-(--radius-card) border border-hairline bg-card px-4 py-3.5 text-sm text-muted shadow-(--shadow-card)">
         Brak typów w puli do złożenia kuponu{meczId != null ? " na ten mecz" : ""} —
         pojawią się, gdy Superbet dokwotuje linie (zwykle 1–2 dni przed meczem).
       </p>
@@ -301,10 +322,10 @@ export function GeneratorKuponu({
                 key={id}
                 onClick={() => toggleMecz(id)}
                 title={fmtDataCzas(ts)}
-                className={`whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
                   wybrane.has(id)
-                    ? "bg-brand text-on-brand"
-                    : "bg-paper text-muted hover:text-ink"
+                    ? "border-brand bg-brand text-on-brand shadow-(--shadow-card)"
+                    : "border-hairline bg-card-soft text-muted hover:border-hairline-strong hover:text-ink"
                 }`}
               >
                 {label}
@@ -330,7 +351,7 @@ export function GeneratorKuponu({
             step={0.5}
             value={kursCel}
             onChange={(e) => { setKursCel(Number(e.target.value)); setPokazany(false); }}
-            className="w-full accent-[var(--color-brand)]"
+            className="h-8 w-full cursor-pointer accent-brand"
           />
           <span className="text-[10px] text-faint">
             składamy w przedziale ×{fmtKurs(kursCel * 0.85)}–{fmtKurs(kursCel * 1.18)}
@@ -348,7 +369,7 @@ export function GeneratorKuponu({
             step={1}
             value={liczbaTypow}
             onChange={(e) => { setLiczbaTypow(Number(e.target.value)); setPokazany(false); }}
-            className="w-full accent-[var(--color-brand)]"
+            className="h-8 w-full cursor-pointer accent-brand"
           />
           <div className="mt-1 flex items-center justify-between gap-2">
             <span className="text-[10px] text-faint">
@@ -361,7 +382,7 @@ export function GeneratorKuponu({
               className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium transition-colors ${
                 trybDokladny
                   ? "border-brand/40 bg-brand-wash text-brand-deep"
-                  : "border-hairline bg-paper text-faint hover:text-ink"
+                  : "border-hairline bg-card-soft text-faint hover:text-ink"
               }`}
               title="Przełącz między 'co najmniej N' a 'dokładnie N' typów"
             >
@@ -376,16 +397,16 @@ export function GeneratorKuponu({
         <span className="mb-2 block text-[11px] font-medium uppercase tracking-wide text-faint">
           charakter kuponu
         </span>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="inline-flex max-w-full flex-wrap rounded-(--radius-control) border border-hairline bg-paper p-0.5">
           {PROFILE.map((pr) => (
             <button
               key={pr.kod}
               onClick={() => { setProfil(pr.kod); setPokazany(false); }}
               title={pr.opis}
-              className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+              className={`rounded-lg px-3 py-1.5 text-xs transition-colors ${
                 profil === pr.kod
-                  ? "border-brand bg-brand-wash text-brand-deep"
-                  : "border-hairline bg-paper text-muted hover:text-ink"
+                  ? "bg-card font-semibold text-ink shadow-(--shadow-card)"
+                  : "font-medium text-muted hover:text-ink"
               }`}
             >
               {pr.label}
@@ -403,7 +424,7 @@ export function GeneratorKuponu({
             type="checkbox"
             checked={tylkoValue}
             onChange={(e) => { setTylkoValue(e.target.checked); setPokazany(false); }}
-            className="mt-0.5 accent-[var(--color-brand)]"
+            className="mt-0.5 accent-brand"
           />
           <span>
             <span className="font-medium text-ink">Tylko pewne typy z przewagą</span>
@@ -424,7 +445,7 @@ export function GeneratorKuponu({
             checked={tylkoValue || maxJedenZMeczu}
             disabled={tylkoValue}
             onChange={(e) => { setMaxJedenZMeczu(e.target.checked); setPokazany(false); }}
-            className="mt-0.5 accent-[var(--color-brand)]"
+            className="mt-0.5 accent-brand"
           />
           <span>
             <span className={`font-medium ${tylkoValue ? "text-faint" : "text-ink"}`}>
@@ -440,9 +461,10 @@ export function GeneratorKuponu({
       </div>
 
       {/* własny wybór typów: przypnij z puli — resztę dobiera model */}
-      <details className="mt-3 rounded-lg border border-dashed border-hairline">
-        <summary className="cursor-pointer list-none px-3 py-2 text-xs font-medium text-muted transition-colors hover:text-ink [&::-webkit-details-marker]:hidden">
-          📌 Chcę konkretne typy w kuponie
+      <details className="mt-3 rounded-(--radius-control) border border-dashed border-hairline">
+        <summary className="flex cursor-pointer list-none items-center gap-1.5 px-3 py-2 text-xs font-medium text-muted transition-colors hover:text-ink [&::-webkit-details-marker]:hidden">
+          <PinIcon className="shrink-0 text-brand" />
+          Chcę konkretne typy w kuponie
           {przypiete.size > 0 && (
             <span className="ml-1.5 rounded-full bg-brand-wash px-1.5 py-0.5 text-[10px] font-semibold text-brand-deep">
               {przypiete.size}
@@ -473,15 +495,17 @@ export function GeneratorKuponu({
                         key={k}
                         onClick={() => przypnij(l)}
                         title={`Szansa ${fmtProc(l.p_model)}${pin ? " — kliknij, żeby odpiąć" : ""}`}
-                        className={`rounded-md border px-2 py-1 text-[11px] transition-colors ${
+                        className={`inline-flex items-center gap-1 rounded-(--radius-control) border px-2 py-1 text-[11px] transition-colors ${
                           pin
                             ? "border-brand bg-brand-wash font-medium text-brand-deep"
-                            : "border-hairline bg-paper text-muted hover:text-ink"
+                            : "border-hairline bg-card text-muted hover:border-hairline-strong hover:text-ink"
                         }`}
                       >
-                        {pin ? "📌 " : ""}
-                        {l.podmiot} · {l.rynek.toLowerCase()} {fmtLinia(l.linia)}+{" "}
-                        <span className="font-data">@{fmtKurs(l.kurs)}</span>
+                        {pin && <PinIcon className="shrink-0" />}
+                        <span>
+                          {l.podmiot} · {l.rynek.toLowerCase()} {fmtLinia(l.linia)}+{" "}
+                          <span className="font-data">@{fmtKurs(l.kurs)}</span>
+                        </span>
                       </button>
                     );
                   })}
@@ -503,9 +527,10 @@ export function GeneratorKuponu({
                   key={k}
                   onClick={() => przypnij(l)}
                   title="Kliknij, żeby odpiąć — model będzie mógł wybrać inny typ"
-                  className="rounded-full border border-brand/40 bg-brand-wash px-2 py-0.5 text-[11px] font-medium text-brand-deep transition-colors hover:bg-brand-wash/70"
+                  className="inline-flex items-center gap-1 rounded-full border border-brand/40 bg-brand-wash px-2 py-0.5 text-[11px] font-medium text-brand-deep transition-colors hover:bg-brand-wash/70"
                 >
-                  📌 {l.podmiot} · {l.rynek.toLowerCase()} {fmtLinia(l.linia)}+ ✕
+                  <PinIcon className="shrink-0" />
+                  {l.podmiot} · {l.rynek.toLowerCase()} {fmtLinia(l.linia)}+ ✕
                 </button>
               ))}
             </div>
@@ -518,7 +543,7 @@ export function GeneratorKuponu({
                   key={k}
                   onClick={() => przywrocTyp(k)}
                   title="Kliknij, żeby przywrócić — typ znów będzie mógł wejść do kuponu"
-                  className="rounded-full border border-hairline bg-paper px-2 py-0.5 text-[11px] text-muted line-through transition-colors hover:text-ink"
+                  className="rounded-full border border-hairline bg-card-soft px-2 py-0.5 text-[11px] text-muted line-through transition-colors hover:text-ink"
                 >
                   {l.podmiot} · {l.rynek.toLowerCase()} {fmtLinia(l.linia)}+ ↺
                 </button>
@@ -536,8 +561,10 @@ export function GeneratorKuponu({
 
       {/* żywy podgląd osiągalności — zanim user w ogóle kliknie */}
       <p
-        className={`mt-3 text-xs leading-relaxed ${
-          podglad ? "text-brand-deep" : "text-data-amber-ink"
+        className={`mt-3 rounded-(--radius-control) px-3 py-2 text-xs leading-relaxed ${
+          podglad
+            ? "bg-data-green-wash text-data-green-ink"
+            : "bg-data-amber-wash text-data-amber-ink"
         }`}
       >
         {podglad
@@ -550,7 +577,7 @@ export function GeneratorKuponu({
       <button
         onClick={zloz}
         disabled={!podglad}
-        className="mt-2 w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-on-brand transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:translate-y-0"
+        className="mt-2.5 w-full rounded-(--radius-control) bg-brand px-4 py-2.5 text-sm font-semibold text-on-brand shadow-(--shadow-card) transition-colors hover:bg-brand-strong disabled:cursor-not-allowed disabled:bg-card-soft disabled:text-faint disabled:shadow-none"
       >
         {meczId != null ? "Złóż kupon na ten mecz" : "Złóż kupon"}
       </button>
@@ -564,7 +591,7 @@ export function GeneratorKuponu({
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            className="mt-4 rounded-lg border border-data-amber/40 bg-data-amber-wash px-3 py-2.5 text-xs text-data-amber-ink"
+            className="mt-4 rounded-(--radius-control) border border-data-amber/40 bg-data-amber-wash px-3 py-2.5 text-xs text-data-amber-ink"
           >
             {podpowiedzBrak ?? "Nie da się domknąć tego kompletu — zmień parametry."}
           </motion.p>
@@ -624,22 +651,37 @@ function KuponKarta({
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, scale: 0.98 }}
       transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-      className="mt-4 rounded-xl border border-brand/25 bg-gradient-to-br from-brand-wash to-card p-4 shadow-(--shadow-card)"
+      className="mt-4 overflow-hidden rounded-(--radius-card) border border-brand/25 bg-card shadow-(--shadow-card)"
     >
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <CountUpKurs
-          value={k.kurs_laczny}
-          className="font-data text-2xl font-bold text-ink"
-        />
-        <span className="text-sm text-muted">
-          szansa <strong className="font-data text-ink">{fmtProc(k.p_model)}</strong>
-          {" · "}z {STAWKA} zł robi się{" "}
-          <strong className="font-data text-ink">{zwrot} zł</strong>
-        </span>
+      {/* nagłówek biletu */}
+      <div className="bg-gradient-to-br from-brand-wash via-brand-wash/60 to-card px-4 pb-4 pt-4">
+        <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-widest text-brand">
+          <span aria-hidden className="h-px w-5 bg-brand-bright" />
+          twój kupon
+        </p>
+        <div className="mt-2.5 flex flex-wrap items-baseline justify-between gap-2">
+          <CountUpKurs
+            value={k.kurs_laczny}
+            className="font-data text-3xl font-bold text-ink"
+          />
+          <span className="text-sm text-muted">
+            szansa <strong className="font-data text-ink">{fmtProc(k.p_model)}</strong>
+            {" · "}z {STAWKA} zł robi się{" "}
+            <strong className="font-data text-ink">{zwrot} zł</strong>
+          </span>
+        </div>
+        <PasekSzansy p={k.p_model} className="mt-3" />
       </div>
-      <PasekSzansy p={k.p_model} className="mt-2.5" />
 
-      <LegiStagger className="mt-3 space-y-3">
+      {/* perforacja biletu */}
+      <div aria-hidden className="relative">
+        <span className="absolute -left-2.5 top-1/2 h-5 w-5 -translate-y-1/2 rounded-full border border-brand/25 bg-card" />
+        <span className="absolute -right-2.5 top-1/2 h-5 w-5 -translate-y-1/2 rounded-full border border-brand/25 bg-card" />
+        <span className="mx-4 block border-t border-dashed border-hairline-strong" />
+      </div>
+
+      <div className="px-4 pb-4 pt-3">
+      <LegiStagger className="space-y-3">
         {grupy.map((g, gi) => (
           <div key={gi}>
             <LegWpada>
@@ -652,7 +694,7 @@ function KuponKarta({
                 const globalIdx = k.legi.indexOf(l);
                 return (
                 <LegWpada key={li}>
-                  <li className="flex items-center justify-between gap-2 rounded-lg bg-card/70 px-3 py-2 text-sm">
+                  <li className="flex items-center justify-between gap-2 rounded-(--radius-control) bg-card-soft px-3 py-2 text-sm">
                     <span className="min-w-0">
                       <span className="font-medium">{l.podmiot}</span>{" "}
                       <span className="text-muted">
@@ -660,7 +702,12 @@ function KuponKarta({
                       </span>
                       <span className="ml-1.5 inline-flex gap-1 align-middle">
                         {l.matchup && (
-                          <span title="Profil rywala sprzyja" className="text-[10px]">🎯</span>
+                          <span
+                            title="Profil rywala sprzyja"
+                            className="text-[10px] font-semibold text-brand"
+                          >
+                            ◎
+                          </span>
                         )}
                         {l.ev_uk != null && l.ev_uk >= 4 && (
                           <span
@@ -673,9 +720,9 @@ function KuponKarta({
                         {globalIdx === k.najslabszy_idx && k.legi.length > 1 && (
                           <span
                             title="Typ o najniższej szansie — najmocniej ciągnie szansę kuponu w dół"
-                            className="rounded-md bg-data-amber-wash px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-data-amber-ink"
+                            className="rounded-full bg-data-amber-wash px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-data-amber-ink"
                           >
-                            ⚠ najsłabsze
+                            najsłabszy typ
                           </span>
                         )}
                       </span>
@@ -691,18 +738,18 @@ function KuponKarta({
                               ? "Typ przypięty — kliknij, żeby odpiąć"
                               : "Zostaw ten typ na pewno (model nie będzie go wymieniał)"
                           }
-                          className={`rounded-md px-1.5 py-1 text-xs transition-colors ${
+                          className={`rounded-md px-1.5 py-1 transition-colors ${
                             przypieteKeys.has(legKey(l))
-                              ? "bg-brand-wash"
-                              : "opacity-40 hover:opacity-100"
+                              ? "bg-brand-wash text-brand-deep"
+                              : "text-faint hover:bg-card hover:text-ink"
                           }`}
                         >
-                          📌
+                          <PinIcon />
                         </button>
                         <button
                           onClick={() => onUsun(l)}
                           title="Usuń ten typ — model dobierze inny"
-                          className="rounded-md px-1.5 py-1 text-xs text-muted opacity-40 transition-all hover:text-data-red hover:opacity-100"
+                          className="rounded-md px-1.5 py-1 text-xs text-faint transition-colors hover:bg-data-red-wash hover:text-data-red-ink"
                         >
                           ✕
                         </button>
@@ -719,7 +766,7 @@ function KuponKarta({
 
       {/* rentgen: propozycja wymiany najsłabszego ogniwa (doradcza) */}
       {k.alternatywa && (
-        <div className="mt-3 rounded-lg border border-dashed border-brand/30 bg-brand-wash/40 px-3 py-2.5">
+        <div className="mt-3 rounded-(--radius-control) border border-dashed border-brand/30 bg-brand-wash/40 px-3 py-2.5">
           <p className="text-[10px] font-semibold uppercase tracking-widest text-brand">
             ✦ mocniejsza wersja tego kuponu
           </p>
@@ -745,7 +792,7 @@ function KuponKarta({
 
       {/* dołożenie: dobicie kursu pewnym typem, gdy kupon wisi nisko */}
       {k.dolozenie && (
-        <div className="mt-3 rounded-lg border border-dashed border-hairline bg-paper/60 px-3 py-2.5">
+        <div className="mt-3 rounded-(--radius-control) border border-dashed border-hairline bg-card-soft/70 px-3 py-2.5">
           <p className="text-[10px] font-semibold uppercase tracking-widest text-muted">
             + dobij kurs pewnym typem
           </p>
@@ -765,7 +812,7 @@ function KuponKarta({
 
       {/* wariant B: wyraźnie inny zestaw z tej samej puli */}
       {k.wariant_b && (
-        <details className="mt-3 rounded-lg border border-dashed border-hairline">
+        <details className="mt-3 rounded-(--radius-control) border border-dashed border-hairline">
           <summary className="cursor-pointer list-none px-3 py-2 text-[10px] font-semibold uppercase tracking-widest text-muted transition-colors hover:text-ink-soft [&::-webkit-details-marker]:hidden">
             ⇄ pokaż inny wariant — kurs {fmtKurs(k.wariant_b.kurs_laczny)}, szansa{" "}
             {fmtProc(k.wariant_b.p_model)}
@@ -809,7 +856,7 @@ function KuponKarta({
             <button
               onClick={onOdrzuc}
               disabled={nauka === "wysylanie"}
-              className="rounded-lg border border-hairline bg-card px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:text-ink disabled:opacity-50"
+              className="rounded-(--radius-control) border border-hairline bg-card px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:text-ink disabled:bg-card-soft disabled:text-faint"
             >
               ✕ Odrzuć
             </button>
@@ -817,7 +864,7 @@ function KuponKarta({
               onClick={onNauka}
               disabled={nauka === "wysylanie"}
               title="Kupon rozliczy się w tle (jak pominięty) i pomoże modelowi lepiej dobierać typy w przyszłości"
-              className="rounded-lg border border-brand/40 bg-brand-wash px-3 py-1.5 text-xs font-medium text-brand-deep transition-colors hover:bg-brand-wash/70 disabled:opacity-50"
+              className="rounded-(--radius-control) border border-brand/40 bg-brand-wash px-3 py-1.5 text-xs font-medium text-brand-deep transition-colors hover:bg-brand-wash/70 disabled:border-hairline disabled:bg-card-soft disabled:text-faint"
             >
               {nauka === "wysylanie" ? "zapisuję…" : "✕ Odrzuć i ucz model"}
             </button>
@@ -828,6 +875,7 @@ function KuponKarta({
             )}
           </>
         )}
+      </div>
       </div>
     </motion.div>
   );

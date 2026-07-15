@@ -84,12 +84,12 @@ export function PasekSzansy({
   return (
     <div
       ref={ref}
-      className={`h-1.5 w-full overflow-hidden rounded-full bg-paper ${className ?? ""}`}
+      className={`h-1.5 w-full overflow-hidden rounded-full bg-ink/10 ${className ?? ""}`}
       role="img"
       aria-label={`szansa ${pct}%`}
     >
       <div
-        className="h-full rounded-full bg-gradient-to-r from-brand to-data-green transition-transform duration-[900ms] ease-out motion-reduce:transition-none"
+        className="h-full rounded-full bg-gradient-to-r from-brand to-brand-bright transition-transform duration-[900ms] ease-out motion-reduce:transition-none"
         style={{
           width: `${pct}%`,
           transform: wypelnij ? "scaleX(1)" : "scaleX(0)",

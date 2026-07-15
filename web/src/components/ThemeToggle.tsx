@@ -44,7 +44,7 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
       onClick={przelacz}
       title={opis}
       aria-label={opis}
-      className={`shrink-0 rounded-lg p-2.5 text-faint transition-colors hover:bg-paper hover:text-ink ${className}`}
+      className={`shrink-0 rounded-(--radius-control) p-2.5 text-faint transition-colors hover:bg-paper hover:text-ink ${className}`}
     >
       {ciemny ? (
         // słońce — wracamy do jasnego

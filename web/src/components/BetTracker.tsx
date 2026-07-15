@@ -20,6 +20,21 @@ const WYNIKI: { kod: MojZaklad["wynik"]; label: string }[] = [
   { kod: "zwrot", label: "zwrot" },
 ];
 
+/** Wygląd chipa statusu (select stylizowany na pastylkę z etykietą). */
+const WYNIK_STYL: Record<MojZaklad["wynik"], string> = {
+  oczekuje: "border-hairline bg-card-soft text-muted",
+  wygrany: "border-transparent bg-data-green-wash text-data-green-ink",
+  przegrany: "border-transparent bg-data-red-wash text-data-red-ink",
+  zwrot: "border-transparent bg-data-amber-wash text-data-amber-ink",
+};
+
+/** Pasek akcentu statusu przy lewej krawędzi wiersza (tylko rozliczone). */
+const WYNIK_PASEK: Partial<Record<MojZaklad["wynik"], string>> = {
+  wygrany: "bg-data-green",
+  przegrany: "bg-data-red",
+  zwrot: "bg-data-amber",
+};
+
 export function BetTracker() {
   const [zaklady, setZaklady] = useState<MojZaklad[]>([]);
   const [mounted, setMounted] = useState(false);
@@ -61,7 +76,7 @@ export function BetTracker() {
 
   if (zaklady.length === 0) {
     return (
-      <div className="mt-8 rounded-2xl border border-dashed border-hairline-strong bg-card px-8 py-14 text-center">
+      <div className="mt-8 rounded-(--radius-card) border border-dashed border-hairline-strong bg-card px-8 py-14 text-center shadow-(--shadow-card)">
         <span
           aria-hidden
           className="font-data mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-brand-wash text-xl text-brand"
@@ -75,7 +90,7 @@ export function BetTracker() {
         </p>
         <Link
           href="/"
-          className="mt-5 inline-block rounded-lg bg-brand px-5 py-2.5 text-sm font-semibold text-on-brand transition-colors hover:bg-brand-deep"
+          className="mt-5 inline-block rounded-(--radius-control) bg-brand px-5 py-2.5 text-sm font-semibold text-on-brand shadow-(--shadow-card) transition-colors hover:bg-brand-strong"
         >
           Przeglądaj okazje
         </Link>
@@ -85,67 +100,84 @@ export function BetTracker() {
 
   return (
     <>
-      {/* podsumowanie — kafelki jak w hero */}
-      <dl className="mt-7 grid max-w-3xl grid-cols-2 gap-2.5 sm:grid-cols-4">
-        {[
-          { label: "zakładów", value: String(podsumowanie.n), tone: "" },
-          {
-            label: "trafionych",
-            value: `${podsumowanie.wygrane}/${podsumowanie.rozliczone}`,
-            tone: "",
-          },
-          {
-            label: "zysk (dla podanych stawek)",
-            value: `${podsumowanie.zysk >= 0 ? "+" : ""}${podsumowanie.zysk
-              .toFixed(2)
-              .replace(".", ",")} zł`,
-            tone:
-              podsumowanie.zysk > 0
-                ? "text-data-green"
-                : podsumowanie.zysk < 0
-                  ? "text-data-red"
-                  : "",
-          },
-          {
-            label: "średni CLV",
-            value:
-              podsumowanie.sredniCLV === null
-                ? "—"
-                : `${podsumowanie.sredniCLV > 0 ? "+" : ""}${podsumowanie.sredniCLV
-                    .toFixed(1)
-                    .replace(".", ",")}%`,
-            tone:
-              (podsumowanie.sredniCLV ?? 0) > 0
-                ? "text-data-green"
-                : (podsumowanie.sredniCLV ?? 0) < 0
-                  ? "text-data-red"
-                  : "",
-            hint: "Czy Twój kurs był lepszy niż kurs tuż przed meczem. Dodatni = wyprzedzasz rynek.",
-          },
-        ].map((s) => (
-          <div
-            key={s.label}
-            className="rounded-xl border border-hairline bg-card px-3.5 py-3 shadow-(--shadow-card)"
-            title={"hint" in s ? s.hint : undefined}
-          >
-            <dd className={`font-data text-xl font-semibold ${s.tone}`}>{s.value}</dd>
-            <dt className="mt-0.5 text-[11px] leading-tight text-faint">
-              {s.label}
-              {"hint" in s && " ⓘ"}
-            </dt>
-          </div>
-        ))}
-      </dl>
+      {/* podsumowanie — pasek statystyk z separatorami (wzór: hero) */}
+      <div className="mt-7 max-w-3xl rounded-(--radius-card) border border-hairline bg-card px-5 py-4 shadow-(--shadow-card) sm:px-6 sm:py-5">
+        <dl className="grid grid-cols-2 gap-y-5 sm:flex sm:items-stretch sm:gap-0">
+          {[
+            { label: "zakładów", value: String(podsumowanie.n), tone: "" },
+            {
+              label: "trafionych",
+              value: `${podsumowanie.wygrane}/${podsumowanie.rozliczone}`,
+              tone: "",
+            },
+            {
+              label: "zysk (dla podanych stawek)",
+              value: `${podsumowanie.zysk >= 0 ? "+" : ""}${podsumowanie.zysk
+                .toFixed(2)
+                .replace(".", ",")} zł`,
+              tone:
+                podsumowanie.zysk > 0
+                  ? "text-data-green"
+                  : podsumowanie.zysk < 0
+                    ? "text-data-red"
+                    : "",
+            },
+            {
+              label: "średni CLV",
+              value:
+                podsumowanie.sredniCLV === null
+                  ? "—"
+                  : `${podsumowanie.sredniCLV > 0 ? "+" : ""}${podsumowanie.sredniCLV
+                      .toFixed(1)
+                      .replace(".", ",")}%`,
+              tone:
+                (podsumowanie.sredniCLV ?? 0) > 0
+                  ? "text-data-green"
+                  : (podsumowanie.sredniCLV ?? 0) < 0
+                    ? "text-data-red"
+                    : "",
+              hint: "Czy Twój kurs był lepszy niż kurs tuż przed meczem. Dodatni = wyprzedzasz rynek.",
+            },
+          ].map((s, i) => (
+            <div
+              key={s.label}
+              className={`min-w-0 ${
+                i > 0
+                  ? "sm:ml-6 sm:border-l sm:border-hairline-strong/60 sm:pl-6"
+                  : ""
+              }`}
+              title={"hint" in s ? s.hint : undefined}
+            >
+              <dd
+                className={`font-data text-[1.45rem] font-semibold leading-none ${s.tone}`}
+              >
+                {s.value}
+              </dd>
+              <dt className="mt-1.5 text-[11px] leading-tight text-faint">
+                {s.label}
+                {"hint" in s && " ⓘ"}
+              </dt>
+            </div>
+          ))}
+        </dl>
+      </div>
 
-      {/* lista */}
+      {/* lista — dziennik wpisów */}
       <div className="mt-6 space-y-2.5">
         {zaklady.map((z) => {
           const clv = clvPct(z);
           return (
             <div
               key={z.id}
-              className="rounded-(--radius-card) border border-hairline bg-card px-4 py-3 shadow-(--shadow-card)"
+              className="relative overflow-hidden rounded-(--radius-card) border border-hairline bg-card px-4 py-3 shadow-(--shadow-card) transition-shadow hover:shadow-(--shadow-card-hover)"
             >
+              {/* akcent statusu przy krawędzi — czytelny przy przewijaniu */}
+              {WYNIK_PASEK[z.wynik] && (
+                <span
+                  aria-hidden
+                  className={`absolute inset-y-0 left-0 w-1 ${WYNIK_PASEK[z.wynik]}`}
+                />
+              )}
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-semibold">
@@ -155,9 +187,11 @@ export function BetTracker() {
                       {fmtLinia(z.linia)}
                     </span>
                   </p>
-                  <p className="truncate text-xs text-faint">
+                  <p className="mt-0.5 truncate text-xs text-faint">
                     {z.mecz} · {z.bukmacher} · kurs{" "}
-                    <span className="font-data">{fmtKurs(z.kurs)}</span>
+                    <span className="font-data text-ink-soft">
+                      {fmtKurs(z.kurs)}
+                    </span>
                   </p>
                 </div>
 
@@ -178,7 +212,7 @@ export function BetTracker() {
                             : null,
                       });
                     }}
-                    className="font-data w-20 rounded-md border border-hairline bg-paper px-2 py-1 text-sm"
+                    className="font-data w-20 rounded-(--radius-control) border border-hairline bg-card-soft px-2 py-1 text-sm text-ink"
                   />
                 </label>
 
@@ -197,14 +231,16 @@ export function BetTracker() {
                           e.target.value && Number.isFinite(v) ? v : null,
                       });
                     }}
-                    className="font-data w-20 rounded-md border border-hairline bg-paper px-2 py-1 text-sm"
+                    className="font-data w-20 rounded-(--radius-control) border border-hairline bg-card-soft px-2 py-1 text-sm text-ink"
                   />
                 </label>
 
                 {clv !== null && (
                   <span
-                    className={`font-data text-sm font-semibold ${
-                      clv > 0 ? "text-data-green" : "text-data-red"
+                    className={`font-data inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                      clv > 0
+                        ? "bg-data-green-wash text-data-green-ink"
+                        : "bg-data-red-wash text-data-red-ink"
                     }`}
                     title="Closing Line Value"
                   >
@@ -220,13 +256,7 @@ export function BetTracker() {
                       wynik: e.target.value as MojZaklad["wynik"],
                     })
                   }
-                  className={`rounded-md border border-hairline px-2 py-1 text-sm ${
-                    z.wynik === "wygrany"
-                      ? "bg-data-green-wash text-brand-deep"
-                      : z.wynik === "przegrany"
-                        ? "bg-data-red-wash text-data-red"
-                        : "bg-paper"
-                  }`}
+                  className={`cursor-pointer rounded-full border px-2.5 py-1 text-xs font-semibold ${WYNIK_STYL[z.wynik]}`}
                   aria-label="Wynik zakładu"
                 >
                   {WYNIKI.map((w) => (
@@ -238,7 +268,7 @@ export function BetTracker() {
 
                 <button
                   onClick={() => removeZaklad(z.id)}
-                  className="rounded-md p-2.5 text-faint transition-colors hover:bg-data-red-wash hover:text-data-red"
+                  className="rounded-(--radius-control) p-2.5 text-faint transition-colors hover:bg-data-red-wash hover:text-data-red-ink"
                   aria-label={`Usuń zakład: ${z.podmiot} ${z.rynek}`}
                   title="Usuń"
                 >

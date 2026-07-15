@@ -1,11 +1,13 @@
+import { MotionConfig } from "framer-motion";
 import type { Metadata } from "next";
-import { IBM_Plex_Mono, IBM_Plex_Sans, Sora } from "next/font/google";
+import { Chakra_Petch, IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import "./globals.css";
 
-const sora = Sora({
+// nagłówki: Chakra Petch — ścięte narożniki, klimat transmisji sportowej
+const chakra = Chakra_Petch({
   subsets: ["latin", "latin-ext"],
-  variable: "--font-sora",
-  weight: ["400", "600", "700"],
+  variable: "--font-chakra",
+  weight: ["500", "600", "700"],
 });
 
 const plexSans = IBM_Plex_Sans({
@@ -40,14 +42,20 @@ export default function RootLayout({
   return (
     <html
       lang="pl"
-      className={`${sora.variable} ${plexSans.variable} ${plexMono.variable} h-full`}
+      className={`${chakra.variable} ${plexSans.variable} ${plexMono.variable} h-full`}
       // data-theme ustawia skrypt przed hydracją — React ma tego nie zgłaszać
       suppressHydrationWarning
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: SKRYPT_MOTYWU }} />
       </head>
-      <body className="flex min-h-full flex-col">{children}</body>
+      <body className="flex min-h-full flex-col">
+        {/* reducedMotion="user": framer sam wyłącza animacje transform u osób
+            z ograniczeniem ruchu. Dzięki temu komponenty NIE rozgałęziają
+            initial po useReducedMotion (SSR nie zna preferencji → hydration
+            mismatch #418, który potrafił skasować data-theme) */}
+        <MotionConfig reducedMotion="user">{children}</MotionConfig>
+      </body>
     </html>
   );
 }

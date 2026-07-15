@@ -11,29 +11,29 @@ import { getKupony, getLegiPool, getMeta } from "@/lib/data";
 import { fmtDataCzas, fmtKurs, fmtLinia, fmtProc, STRONA_LABEL } from "@/lib/format";
 import type { KuponLeg } from "@/lib/types";
 
-/** mini-ikonki kontekstu lega (matchup / debiut w XI / miękka linia) */
+/** mini-znaczniki kontekstu typu (matchup / debiut w XI / miękka linia) */
 function LegBadges({ l }: { l: KuponLeg }) {
   return (
     <>
       {l.matchup && (
         <span
-          className="shrink-0 text-[11px]"
+          className="shrink-0 text-[11px] font-semibold text-brand"
           title="Profil rywala wyraźnie sprzyja temu rynkowi (matchup)"
         >
-          🎯
+          ◎
         </span>
       )}
       {l.rotacja && (
         <span
-          className="shrink-0 text-[11px]"
+          className="shrink-0 text-[11px] font-semibold text-data-amber-ink"
           title="Pierwszy występ w XI na tym turnieju — linia rynku bywa niedograna"
         >
-          ⬆
+          ↥
         </span>
       )}
       {l.miekka_linia && (
         <span
-          className="shrink-0 text-[11px]"
+          className="shrink-0 text-[11px] font-semibold text-brand"
           title="Linia płaci więcej, niż wynika z reszty siatki Superbetu"
         >
           ↑
@@ -77,7 +77,7 @@ export default async function KuponyPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="ako po analizie"
+        eyebrow="kupony po analizie"
         title="Kupony budowane przez model"
         lead={
           <>
@@ -96,20 +96,41 @@ export default async function KuponyPage() {
 
       {legiPool.length > 0 && (
         <Reveal className="mt-6">
-          <details className="group rounded-(--radius-card) border border-hairline bg-paper/40">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-sm font-semibold">
-              <span>🧩 Zbuduj własny kupon</span>
-              <span className="text-xs font-normal text-faint group-open:hidden">
-                wybierz mecze i kurs →
+          <details className="group overflow-hidden rounded-(--radius-card) border border-hairline bg-card shadow-(--shadow-card)">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3.5 sm:px-5 [&::-webkit-details-marker]:hidden">
+              <span className="flex items-center gap-2.5 text-sm font-semibold">
+                <span aria-hidden className="h-px w-6 bg-brand-bright" />
+                Zbuduj własny kupon
+              </span>
+              <span className="flex shrink-0 items-center gap-2">
+                <span className="text-xs font-normal text-faint group-open:hidden">
+                  wybierz mecze i kurs
+                </span>
+                <svg
+                  aria-hidden
+                  width="14"
+                  height="14"
+                  viewBox="0 0 14 14"
+                  className="text-faint transition-transform group-open:rotate-180"
+                >
+                  <path
+                    d="M3 5.5 L7 9.5 L11 5.5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
               </span>
             </summary>
-            <div className="border-t border-hairline p-3 sm:p-4">
+            <div className="border-t border-hairline bg-card-soft p-3 sm:p-4">
               <p className="mb-3 text-xs leading-relaxed text-muted">
                 Złóż kupon z tej samej przeanalizowanej puli, której model używa
                 automatycznie — te same bezpieczniki, kary korelacji i premia za
                 wartość. Wybierz mecze (albo zostaw wszystkie), ustaw kurs docelowy
-                i charakter. Gotowy kupon możesz poprawiać: usuń typ (✕), a model
-                dobierze inny; przypnij typ (📌), a zostanie na pewno.
+                i charakter. Gotowy kupon możesz poprawiać: usuń typ, a model
+                dobierze inny; przypnij typ, a zostanie na pewno.
               </p>
               <GeneratorKuponu
                 pool={legiPool}
@@ -123,7 +144,7 @@ export default async function KuponyPage() {
 
       {kupony.length === 0 ? (
         <Reveal className="mt-8">
-          <div className="rounded-2xl border border-hairline bg-card px-8 py-14 text-center shadow-(--shadow-card)">
+          <div className="rounded-(--radius-card) border border-hairline bg-card px-8 py-14 text-center shadow-(--shadow-card)">
             <p className="font-semibold">
               Za mało typów z wartością na sensowny kupon
             </p>
@@ -151,9 +172,16 @@ export default async function KuponyPage() {
           );
           if (grupa.length === 0 && puste.length === 0) return null;
           return (
-            <section key={h.kod} className="mt-9">
+            <section key={h.kod} className="mt-10">
               <Reveal>
-                <h2 className="text-lg font-semibold">{h.tytul}</h2>
+                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                  <h2 className="text-xl font-bold tracking-tight">{h.tytul}</h2>
+                  {grupa.length > 0 && (
+                    <span className="font-data text-xs text-faint">
+                      {grupa.length}/{przedzialy.length} przedziałów
+                    </span>
+                  )}
+                </div>
                 <p className="mt-1 max-w-3xl text-sm text-muted">{h.opis}</p>
               </Reveal>
               {/* columns (masonry): karty układają się gęsto w dwóch
@@ -177,38 +205,40 @@ export default async function KuponyPage() {
                 klucz={k.klucz}
                 pokazPrzebuduj={k.horyzont === "dzienny"}
               >
-              <article className="flex h-full flex-col rounded-2xl border border-hairline bg-card shadow-(--shadow-card) transition-shadow hover:shadow-(--shadow-card-hover)">
-                <header className="flex flex-col gap-3 border-b border-hairline px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-                  <span className="flex items-center gap-2">
-                    <span className="font-data rounded-lg bg-brand px-3 py-1 text-lg font-bold text-on-brand">
-                      ×{k.cel_label ?? k.cel}
-                    </span>
+              <article className="flex h-full flex-col overflow-hidden rounded-(--radius-card) border border-hairline bg-card shadow-(--shadow-card) transition-shadow hover:shadow-(--shadow-card-hover)">
+                {/* nagłówek biletu */}
+                <header className="bg-gradient-to-br from-brand-wash via-brand-wash/60 to-card px-4 pb-4 pt-4 sm:px-5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-widest text-brand">
+                      <span aria-hidden className="h-px w-5 bg-brand-bright" />
+                      kupon ×{k.cel_label ?? k.cel}
+                    </p>
                     <span
-                      className={`rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                      className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
                         k.styl === "value"
-                          ? "bg-data-green-wash text-brand-deep"
-                          : "bg-paper text-muted"
+                          ? "bg-data-green-wash text-data-green-ink"
+                          : "bg-card-soft text-muted"
                       }`}
                     >
                       {k.styl === "value" ? "value" : "pewniaki"}
                     </span>
-                  </span>
-                  <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-left sm:text-right">
+                  </div>
+                  <div className="mt-3.5 flex flex-wrap items-end gap-x-7 gap-y-2.5">
                     <div>
                       <p className="text-[10px] uppercase tracking-wide text-faint">
                         kurs łączny
                       </p>
                       <CountUpKurs
                         value={k.kurs_laczny}
-                        prefix=""
-                        className="font-data text-lg font-semibold"
+                        prefix="×"
+                        className="font-data mt-0.5 block text-[1.7rem] font-bold leading-none"
                       />
                     </div>
                     <div>
                       <p className="text-[10px] uppercase tracking-wide text-faint">
                         szansa modelu
                       </p>
-                      <p className="font-data text-lg font-semibold">
+                      <p className="font-data mt-0.5 text-lg font-semibold leading-tight">
                         {fmtProc(k.p_model)}
                       </p>
                     </div>
@@ -216,13 +246,19 @@ export default async function KuponyPage() {
                       <p className="text-[10px] uppercase tracking-wide text-faint">
                         z 10 zł robi się
                       </p>
-                      <p className="font-data text-lg font-semibold">
+                      <p className="font-data mt-0.5 text-lg font-semibold leading-tight">
                         {Math.round(k.kurs_laczny * 10)} zł
                       </p>
                     </div>
                   </div>
+                  <PasekSzansy p={k.p_model} className="mt-3.5" />
                 </header>
-                <PasekSzansy p={k.p_model} className="mt-3" />
+                {/* perforacja biletu */}
+                <div aria-hidden className="relative">
+                  <span className="absolute -left-2.5 top-1/2 h-5 w-5 -translate-y-1/2 rounded-full border border-hairline bg-paper" />
+                  <span className="absolute -right-2.5 top-1/2 h-5 w-5 -translate-y-1/2 rounded-full border border-hairline bg-paper" />
+                  <span className="mx-4 block border-t border-dashed border-hairline-strong sm:mx-5" />
+                </div>
                 {/* oś czasu: który mecz kiedy gra i jak stoją jego legi */}
                 {(() => {
                   const mecze: {
@@ -238,7 +274,7 @@ export default async function KuponyPage() {
                   }
                   if (mecze.length < 2) return null;
                   return (
-                    <div className="flex flex-wrap items-center gap-1.5 border-b border-hairline bg-paper/50 px-4 py-2 sm:px-5">
+                    <div className="flex flex-wrap items-center gap-1.5 px-4 pb-2.5 pt-3 sm:px-5">
                       {mecze.map((m) => {
                         const wyniki = m.legi.map((l) => l.wynik);
                         const kolor = wyniki.some((w) => w === "przegrany")
@@ -250,7 +286,7 @@ export default async function KuponyPage() {
                         return (
                           <span
                             key={m.mecz}
-                            className="inline-flex items-center gap-1.5 rounded-md bg-card px-2 py-0.5 text-[10px] text-muted"
+                            className="inline-flex items-center gap-1.5 rounded-full border border-hairline bg-card-soft px-2 py-0.5 text-[10px] text-muted"
                             title={m.mecz}
                           >
                             <span
@@ -273,7 +309,7 @@ export default async function KuponyPage() {
                     return (
                       <div key={`${l.mecz_id}-${l.value_bet_id}-${li}`}>
                         {nowyMecz && (
-                          <p className="flex items-baseline justify-between gap-2 border-y border-hairline bg-paper px-5 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-ink-soft first:border-t-0">
+                          <p className="flex items-baseline justify-between gap-2 border-b border-hairline bg-card-soft px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-ink-soft sm:px-5">
                             {l.mecz}
                             <span className="font-normal normal-case tracking-normal text-faint">
                               {fmtDataCzas(l.kickoff_ts)}
@@ -294,22 +330,22 @@ export default async function KuponyPage() {
                             <LegBadges l={l} />
                             {li === weakIdx && k.legi.length > 1 && (
                               <span
-                                className="shrink-0 rounded-md bg-data-amber-wash px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-data-amber-ink"
+                                className="shrink-0 rounded-full bg-data-amber-wash px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-data-amber-ink"
                                 title="Leg o najniższej szansie — to on najmocniej ciągnie szansę kuponu w dół"
                               >
-                                ⚠ najsłabsze
+                                najsłabszy typ
                               </span>
                             )}
                             <span className="font-data shrink-0 text-xs text-muted">
                               {fmtProc(l.p_model)}
                             </span>
-                            <span className="font-data shrink-0 rounded-md bg-paper px-2 py-0.5 text-sm font-semibold">
+                            <span className="font-data shrink-0 rounded-(--radius-control) border border-hairline bg-card-soft px-2 py-0.5 text-sm font-semibold">
                               {fmtKurs(l.kurs)}
                             </span>
                           </div>
                           {/* pasek szansy lega — rentgen kuponu na jeden rzut oka */}
                           <div
-                            className="mt-1.5 h-[3px] overflow-hidden rounded-full bg-paper"
+                            className="mt-1.5 h-[3px] overflow-hidden rounded-full bg-hairline/60"
                             aria-hidden
                           >
                             <div
@@ -398,7 +434,7 @@ export default async function KuponyPage() {
                 )}
                 {/* rentgen v2: dołożenie pewnego lega, gdy kurs wisi nisko */}
                 {k.dolozenie && (
-                  <div className="border-t border-dashed border-hairline bg-paper/60 px-4 py-3 sm:px-5">
+                  <div className="border-t border-dashed border-hairline bg-card-soft/70 px-4 py-3 sm:px-5">
                     <p className="text-[10px] font-semibold uppercase tracking-widest text-muted">
                       + dobij kurs pewnym legiem
                     </p>
@@ -420,7 +456,7 @@ export default async function KuponyPage() {
                     </p>
                   </div>
                 )}
-                <footer className="border-t border-hairline px-5 py-3 text-xs leading-relaxed text-faint">
+                <footer className="border-t border-hairline bg-card-soft/70 px-4 py-3 text-xs leading-relaxed text-faint sm:px-5">
                   taki kupon trafia się statystycznie ~1 na{" "}
                   {Math.max(2, Math.round(1 / Math.max(k.p_model, 1e-9)))} prób ·{" "}
                   {k.legi.length}{" "}
@@ -454,12 +490,15 @@ export default async function KuponyPage() {
                 {puste.map((p) => (
                   <div
                     key={p}
-                    className="mb-4 break-inside-avoid rounded-2xl border border-dashed border-hairline bg-paper/40 px-5 py-6 text-center"
+                    className="mb-4 break-inside-avoid rounded-(--radius-card) border border-dashed border-hairline bg-card-soft/50 px-5 py-7 text-center"
                   >
-                    <p className="font-data text-sm font-semibold text-faint">
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-faint">
+                      wolne miejsce
+                    </p>
+                    <p className="font-data mt-1.5 text-lg font-semibold text-faint">
                       ×{p}
                     </p>
-                    <p className="mx-auto mt-1 max-w-[30ch] text-xs leading-relaxed text-faint">
+                    <p className="mx-auto mt-1.5 max-w-[30ch] text-xs leading-relaxed text-faint">
                       przedział czeka — kupon powstanie, gdy z puli legów da
                       się złożyć kurs w tych widełkach (zwykle bliżej meczów)
                     </p>

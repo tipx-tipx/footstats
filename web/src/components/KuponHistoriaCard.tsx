@@ -19,7 +19,7 @@ export function KuponHistoriaCard({
   return (
     <details
       name={name}
-      className={`group rounded-xl border bg-card shadow-(--shadow-card) ${
+      className={`group overflow-hidden rounded-(--radius-card) border bg-card shadow-(--shadow-card) ${
         k.wynik === "wygrany"
           ? "border-data-green/40"
           : k.wynik === "przegrany"
@@ -29,8 +29,8 @@ export function KuponHistoriaCard({
     >
       <summary className="cursor-pointer list-none px-4 py-3.5 [&::-webkit-details-marker]:hidden">
         <div className="flex items-center justify-between gap-2">
-          <span className="flex items-center gap-2">
-            <span className="font-data rounded-md bg-brand px-2 py-0.5 text-sm font-bold text-on-brand">
+          <span className="flex flex-wrap items-center gap-2">
+            <span className="font-data rounded-(--radius-control) bg-brand px-2 py-0.5 text-sm font-bold text-on-brand">
               ×{k.cel_label ?? k.cel}
             </span>
             <span className="text-xs text-muted">
@@ -43,7 +43,7 @@ export function KuponHistoriaCard({
             </span>
             {k.pominiety && (
               <span
-                className="rounded bg-paper px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-faint"
+                className="rounded-full bg-card-soft px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-faint"
                 title={
                   k.pomin_powod
                     ? `Pominięty (${k.pomin_powod}) — niezagrany, rozliczony tylko do nauki modelu`
@@ -55,14 +55,14 @@ export function KuponHistoriaCard({
             )}
           </span>
           <span
-            className={`text-xs font-semibold ${
+            className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
               k.wynik === "wygrany"
-                ? "text-data-green"
+                ? "bg-data-green-wash text-data-green-ink"
                 : k.wynik === "przegrany"
-                  ? "text-data-red"
+                  ? "bg-data-red-wash text-data-red-ink"
                   : k.wynik === "anulowany"
-                    ? "text-faint"
-                    : "text-data-amber-ink"
+                    ? "bg-card-soft text-faint"
+                    : "bg-data-amber-wash text-data-amber-ink"
             }`}
             title={k.powod}
           >
@@ -83,7 +83,7 @@ export function KuponHistoriaCard({
             {fmtProc(k.p_model)} · legi: {trafione}/{rozliczone} rozliczonych z{" "}
             {k.legi.length}
           </span>
-          <span className="text-faint transition-transform group-open:rotate-180">
+          <span aria-hidden className="text-faint transition-transform group-open:rotate-180">
             ▾
           </span>
         </p>
@@ -95,7 +95,7 @@ export function KuponHistoriaCard({
           return (
             <div key={`${l.mecz_id}-${l.podmiot}-${l.rynek}-${li}`}>
               {nowyMecz && (
-                <p className="flex items-baseline justify-between gap-2 border-b border-hairline bg-paper px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-ink-soft">
+                <p className="flex items-baseline justify-between gap-2 border-b border-hairline bg-card-soft px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-ink-soft">
                   {l.mecz}
                   <span className="font-normal normal-case tracking-normal text-faint">
                     {fmtDataCzas(l.kickoff_ts)}
@@ -144,7 +144,7 @@ export function KuponHistoriaCard({
                 <span className="font-data shrink-0 text-xs text-muted">
                   {fmtProc(l.p_model)}
                 </span>
-                <span className="font-data shrink-0 rounded-md bg-paper px-1.5 py-0.5 text-xs font-semibold">
+                <span className="font-data shrink-0 rounded-md bg-card-soft px-1.5 py-0.5 text-xs font-semibold">
                   {fmtKurs(l.kurs)}
                 </span>
               </div>

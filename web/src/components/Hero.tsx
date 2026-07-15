@@ -1,227 +1,152 @@
 "use client";
 
-import {
-  animate,
-  motion,
-  useMotionValue,
-  useReducedMotion,
-  useTransform,
-} from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
-import { fmtKurs, fmtProc } from "@/lib/format";
+import { fmtKurs, fmtLinia, fmtProc } from "@/lib/format";
 import type { ValueBet } from "@/lib/types";
-
-/** Licznik animowany od 0 do wartości (szanuje reduced-motion). */
-function CountUp({
-  value,
-  suffix = "",
-  decimals = 0,
-}: {
-  value: number;
-  suffix?: string;
-  decimals?: number;
-}) {
-  const reduced = useReducedMotion();
-  const mv = useMotionValue(reduced ? value : 0);
-  const text = useTransform(mv, (v) =>
-    `${v.toFixed(decimals).replace(".", ",")}${suffix}`,
-  );
-  useEffect(() => {
-    if (reduced) {
-      mv.set(value);
-      return;
-    }
-    const ctrl = animate(mv, value, { duration: 1.1, ease: [0.22, 1, 0.36, 1] });
-    return () => ctrl.stop();
-  }, [value, mv, reduced]);
-  return <motion.span>{text}</motion.span>;
-}
 
 const wejscie = {
   hidden: { opacity: 0, y: 18 },
   show: (i: number) => ({
     opacity: 1,
     y: 0,
-    transition: { delay: 0.08 * i, duration: 0.55, ease: [0.22, 1, 0.36, 1] as const },
+    transition: { delay: 0.07 * i, duration: 0.55, ease: [0.22, 1, 0.36, 1] as const },
   }),
 };
 
-export function Hero({
-  liga,
-  sezon,
-  aktualizacja,
-  okazje,
-  wysokaPewnosc,
-  najlepszaEv,
-  mecze,
-  topBet,
-  liczbaSugestii,
-}: {
-  liga: string;
-  sezon: string;
-  aktualizacja: string;
-  okazje: number;
-  wysokaPewnosc: number;
-  najlepszaEv: number | null;
-  mecze: number;
-  topBet: ValueBet | null;
-  liczbaSugestii: number;
-}) {
-  const reduced = useReducedMotion();
+function hrefPozycji(b: ValueBet): string {
+  return b.sugestia
+    ? `/?rodzaj=sugestie#bet-${b.id}`
+    : b.pewniak
+      ? `/?rodzaj=pewniaki#bet-${b.id}`
+      : `/?rodzaj=okazje#bet-${b.id}`;
+}
 
-  const kafelki = [
-    { label: "okazje z kursem", value: okazje, suffix: "", green: false },
-    { label: "z wysoką pewnością", value: wysokaPewnosc, suffix: "", green: false },
-    ...(najlepszaEv != null
-      ? [{ label: "najlepsza wartość", value: najlepszaEv, suffix: "%", green: true, plus: true, decimals: 1 }]
-      : [{ label: "sugestie STS", value: liczbaSugestii, suffix: "", green: false }]),
-    { label: "meczów w analizie", value: mecze, suffix: "", green: false },
-  ];
+/**
+ * Żywy podgląd skanera: karta-bilet rotująca po top-okazjach co ~5 s
+ * z pierścieniem „namierzenia" przy każdej zmianie. Pauza na hover
+ * i w ukrytej karcie przeglądarki; przy ograniczonym ruchu stoi na
+ * najlepszej pozycji (kropki dalej działają ręcznie).
+ */
+function ZywyPodglad({ bets }: { bets: ValueBet[] }) {
+  const reduced = useReducedMotion();
+  const [idx, setIdx] = useState(0);
+  const [wstrzymany, setWstrzymany] = useState(false);
+
+  useEffect(() => {
+    if (reduced || wstrzymany || bets.length < 2) return;
+    const t = setInterval(() => {
+      if (document.hidden) return;
+      setIdx((i) => (i + 1) % bets.length);
+    }, 5200);
+    return () => clearInterval(t);
+  }, [reduced, wstrzymany, bets.length]);
+
+  if (bets.length === 0) {
+    return (
+      <div className="relative rounded-(--radius-card) border border-hairline bg-card p-6 text-center shadow-(--shadow-card)">
+        <p className="text-[11px] font-semibold uppercase tracking-widest text-faint">
+          stan rynku
+        </p>
+        <p className="mt-3 font-display text-lg font-bold">
+          Rynek wycenia blisko modelu
+        </p>
+        <p className="mx-auto mt-1.5 max-w-xs text-sm leading-relaxed text-muted">
+          W tej chwili bukmacher nie przepłaca za żadne zdarzenie. Skan trwa —
+          nowe kursy co ok. 30 minut.
+        </p>
+      </div>
+    );
+  }
+
+  const bet = bets[idx];
 
   return (
-    <section className="pitch-grid relative -mx-4 mb-8 overflow-hidden border-b border-hairline bg-card px-4 pb-10 pt-12 sm:-mx-6 sm:px-6">
-      {/* miękka zielona poświata za nagłówkiem */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -left-32 -top-32 h-96 w-96 rounded-full opacity-50"
-        style={{
-          background:
-            "radial-gradient(closest-side, color-mix(in oklab, var(--color-brand) 10%, transparent), transparent)",
-        }}
-      />
+    <div
+      onMouseEnter={() => setWstrzymany(true)}
+      onMouseLeave={() => setWstrzymany(false)}
+      className="relative"
+    >
+      {/* celownik HUD — narożniki „namierzają" kartę przy każdej zmianie */}
+      <span aria-hidden className="pointer-events-none absolute -inset-2.5">
+        {[
+          "left-0 top-0 border-l-2 border-t-2",
+          "right-0 top-0 border-r-2 border-t-2",
+          "bottom-0 left-0 border-b-2 border-l-2",
+          "bottom-0 right-0 border-b-2 border-r-2",
+        ].map((rog) => (
+          <motion.span
+            key={`${rog}-${idx}`}
+            initial={{ opacity: 0.3, scale: 1.25 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+            className={`absolute h-5 w-5 border-brand-bright ${rog}`}
+          />
+        ))}
+      </span>
 
-      <div className="relative mx-auto grid max-w-6xl items-center gap-10 lg:grid-cols-[1.25fr_1fr]">
-        {/* lewa: przekaz */}
-        <div>
+      <div className="relative overflow-hidden rounded-(--radius-card) border border-brand/25 bg-card shadow-(--shadow-pop)">
+        {/* pasek postępu do następnego namierzenia; przy ograniczonym ruchu
+            chowa go CSS (motion-reduce) — warunek w JS dawałby inny HTML na
+            serwerze niż u klienta (hydration mismatch) */}
+        {bets.length > 1 && (
+          <span
+            key={`postep-${idx}`}
+            aria-hidden
+            className="postep-skanu absolute inset-x-0 bottom-0 z-10 h-0.5 bg-gradient-to-r from-brand to-brand-bright motion-reduce:hidden"
+            style={{ animationPlayState: wstrzymany ? "paused" : "running" }}
+          />
+        )}
+        <AnimatePresence initial={false} mode="popLayout">
           <motion.div
-            variants={wejscie}
-            initial={reduced ? false : "hidden"}
-            animate="show"
-            custom={0}
-            className="flex flex-wrap items-center gap-3"
+            key={bet.id}
+            initial={{ opacity: 0, y: 26 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -18 }}
+            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
           >
-            <p className="text-xs font-semibold uppercase tracking-widest text-brand">
-              Skan rynków · {liga} {sezon}
-            </p>
-            <span
-              className="inline-flex items-center gap-1.5 rounded-full border border-hairline bg-paper px-2.5 py-1 text-[11px] text-muted"
-              title="Cykl w chmurze pobiera statystyki i kursy, przelicza model i odświeża tę stronę"
-            >
-              <span aria-hidden className="live-dot h-1.5 w-1.5 rounded-full bg-data-green" />
-              żywe dane · aktualizacja{" "}
-              <span className="font-data font-medium text-ink-soft">{aktualizacja}</span>
-            </span>
-          </motion.div>
-
-          <motion.h1
-            variants={wejscie}
-            initial={reduced ? false : "hidden"}
-            animate="show"
-            custom={1}
-            className="mt-4 max-w-xl text-4xl font-bold leading-[1.08] tracking-tight sm:text-5xl"
-          >
-            Gdzie kurs płaci{" "}
-            <span className="relative inline-block text-brand">
-              więcej, niż powinien
-              <motion.span
-                aria-hidden
-                initial={reduced ? { scaleX: 1 } : { scaleX: 0 }}
-                animate={{ scaleX: 1 }}
-                transition={{ delay: 0.7, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-                className="absolute -bottom-1 left-0 h-[3px] w-full origin-left rounded-full bg-data-green/60"
-              />
-            </span>
-          </motion.h1>
-
-          <motion.p
-            variants={wejscie}
-            initial={reduced ? false : "hidden"}
-            animate="show"
-            custom={2}
-            className="mt-4 max-w-xl text-[15px] leading-relaxed text-muted"
-          >
-            Model liczy prawdziwe szanse na strzały, faule czy odbiory — z
-            historii zawodnika, przewidywanych składów, rywala i stron boiska.
-            Potem porównuje je z kursami i zostawia tylko zakłady, w których
-            bukmacher się przelicza.{" "}
-            <Link
-              href="/jak-to-dziala"
-              className="font-medium text-brand underline-offset-2 hover:underline"
-            >
-              Jak to działa? →
-            </Link>
-          </motion.p>
-
-          <motion.dl
-            variants={wejscie}
-            initial={reduced ? false : "hidden"}
-            animate="show"
-            custom={3}
-            className="mt-7 grid max-w-xl grid-cols-2 gap-2.5 sm:grid-cols-4"
-          >
-            {kafelki.map((s) => (
-              <div
-                key={s.label}
-                className="rounded-xl border border-hairline bg-card/80 px-3.5 py-3 shadow-(--shadow-card) backdrop-blur-sm transition-transform hover:-translate-y-0.5"
-              >
-                <dd
-                  className={`font-data text-2xl font-semibold ${
-                    s.green ? "text-data-green" : "text-ink"
-                  }`}
-                >
-                  {"plus" in s && s.plus ? "+" : ""}
-                  <CountUp value={s.value} suffix={s.suffix} decimals={("decimals" in s ? s.decimals : 0) as number} />
-                </dd>
-                <dt className="mt-0.5 text-[11px] leading-tight text-faint">{s.label}</dt>
+            <Link href={hrefPozycji(bet)} className="group block">
+              <div className="bg-gradient-to-br from-brand-wash via-brand-wash/60 to-card px-6 pb-5 pt-5">
+                <p className="font-display flex items-center justify-between gap-3 text-[11px] font-semibold uppercase tracking-widest text-brand">
+                  {idx === 0
+                    ? bet.sugestia
+                      ? "najmocniejsza sugestia STS"
+                      : "najlepsza okazja teraz"
+                    : `namierzone przez skan · ${idx + 1} z ${bets.length}`}
+                  <span aria-hidden className="live-dot h-1.5 w-1.5 rounded-full bg-data-green" />
+                </p>
+                <p className="mt-3.5 font-display text-[1.7rem] font-bold leading-tight tracking-tight">
+                  {bet.podmiot}
+                </p>
+                <p className="mt-1 text-sm text-muted">
+                  {bet.rynek.toLowerCase()} powyżej{" "}
+                  {fmtLinia(bet.linia)} · {bet.mecz}
+                </p>
               </div>
-            ))}
-          </motion.dl>
-        </div>
 
-        {/* prawa: spotlight — najciekawsza pozycja teraz */}
-        <motion.div
-          variants={wejscie}
-          initial={reduced ? false : "hidden"}
-          animate="show"
-          custom={4}
-        >
-          {topBet ? (
-            <Link
-              href={
-                topBet.sugestia
-                  ? `/?rodzaj=sugestie#bet-${topBet.id}`
-                  : topBet.pewniak
-                    ? `/?rodzaj=pewniaki#bet-${topBet.id}`
-                    : `/?rodzaj=okazje#bet-${topBet.id}`
-              }
-              className="group block rounded-2xl border border-brand/25 bg-gradient-to-br from-brand-wash to-card p-6 shadow-(--shadow-card) transition-all hover:-translate-y-1 hover:shadow-(--shadow-card-hover)"
-            >
-              <p className="text-[11px] font-semibold uppercase tracking-widest text-brand">
-                {topBet.sugestia ? "najmocniejsza sugestia STS" : "najlepsza okazja teraz"}
-              </p>
-              <p className="mt-3 text-xl font-bold leading-snug">
-                {topBet.podmiot}
-              </p>
-              <p className="mt-0.5 text-sm text-muted">
-                {topBet.rynek.toLowerCase()} powyżej{" "}
-                {topBet.linia.toFixed(1).replace(".", ",")} · {topBet.mecz}
-              </p>
-              <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2">
+              {/* perforacja biletu */}
+              <div aria-hidden className="relative">
+                <span className="absolute -left-2.5 top-1/2 h-5 w-5 -translate-y-1/2 rounded-full border border-brand/25 bg-paper" />
+                <span className="absolute -right-2.5 top-1/2 h-5 w-5 -translate-y-1/2 rounded-full border border-brand/25 bg-paper" />
+                <span className="mx-6 block border-t border-dashed border-hairline-strong" />
+              </div>
+
+              <div className="flex flex-wrap items-center gap-x-8 gap-y-3 px-6 pb-4 pt-4">
                 <div>
                   <p className="text-[10px] uppercase tracking-wide text-faint">szansa modelu</p>
-                  <p className="font-data text-2xl font-semibold text-ink">
-                    {fmtProc(topBet.p_model)}
+                  <p className="font-data mt-0.5 text-2xl font-semibold text-ink">
+                    {fmtProc(bet.p_model)}
                   </p>
                 </div>
-                {topBet.kurs != null ? (
+                {bet.kurs != null ? (
                   <div>
                     <p className="text-[10px] uppercase tracking-wide text-faint">
-                      kurs ({topBet.bukmacher})
+                      kurs ({bet.bukmacher})
                     </p>
-                    <p className="font-data text-2xl font-semibold text-ink">
-                      {fmtKurs(topBet.kurs)}
+                    <p className="font-data mt-0.5 text-2xl font-semibold text-ink">
+                      {fmtKurs(bet.kurs)}
                     </p>
                   </div>
                 ) : (
@@ -229,38 +154,322 @@ export function Hero({
                     <p className="text-[10px] uppercase tracking-wide text-faint">
                       opłaca się od kursu
                     </p>
-                    <p className="font-data text-2xl font-semibold text-ink">
-                      ~{fmtKurs(topBet.fair_kurs * 1.05)}
+                    <p className="font-data mt-0.5 text-2xl font-semibold text-ink">
+                      ~{fmtKurs(bet.fair_kurs * 1.05)}
                     </p>
                   </div>
                 )}
-                {topBet.ev_pct != null && (
+                {bet.ev_pct != null && bet.ev_pct > 0 && (
                   <div>
                     <p className="text-[10px] uppercase tracking-wide text-faint">wartość</p>
-                    <p className="font-data text-2xl font-semibold text-data-green">
-                      +{topBet.ev_pct.toFixed(1).replace(".", ",")}%
+                    <p className="font-data mt-0.5 text-2xl font-semibold text-data-green">
+                      +{bet.ev_pct.toFixed(1).replace(".", ",")}%
                     </p>
                   </div>
                 )}
               </div>
-              <p className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-brand transition-transform group-hover:translate-x-0.5">
-                zobacz szczegóły niżej →
+              <p className="px-6 pb-5">
+                <span className="inline-flex items-center gap-1 text-sm font-medium text-brand transition-transform group-hover:translate-x-0.5">
+                  zobacz szczegóły niżej →
+                </span>
               </p>
             </Link>
-          ) : (
-            <div className="rounded-2xl border border-hairline bg-card p-6 text-center shadow-(--shadow-card)">
-              <p className="text-[11px] font-semibold uppercase tracking-widest text-faint">
-                stan rynku
-              </p>
-              <p className="mt-3 text-lg font-bold">Rynek wycenia blisko modelu</p>
-              <p className="mx-auto mt-1.5 max-w-xs text-sm leading-relaxed text-muted">
-                W tej chwili bukmacher nie przepłaca za żadne zdarzenie. Skan
-                trwa — nowe kursy co ok. 30 minut.
-              </p>
-            </div>
+          </motion.div>
+        </AnimatePresence>
+      </div>
+
+      {/* strzałki + licznik: ręczne przełączanie pozycji podglądu */}
+      {bets.length > 1 && (
+        <div className="mt-3.5 flex items-center justify-end gap-2.5">
+          <button
+            onClick={() => setIdx((i) => (i - 1 + bets.length) % bets.length)}
+            aria-label="Poprzednia pozycja"
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-hairline bg-card/70 text-ink-soft shadow-(--shadow-card) backdrop-blur transition-colors hover:border-brand hover:text-brand"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
+              <path d="M15 5l-7 7 7 7" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+          <span
+            className="font-data min-w-9 text-center text-sm text-faint"
+            aria-live="polite"
+          >
+            {idx + 1}/{bets.length}
+          </span>
+          <button
+            onClick={() => setIdx((i) => (i + 1) % bets.length)}
+            aria-label="Następna pozycja"
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-hairline bg-card/70 text-ink-soft shadow-(--shadow-card) backdrop-blur transition-colors hover:border-brand hover:text-brand"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
+              <path d="M9 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Blueprint boiska — techniczny rysunek połowy boiska cienką kreską
+ * (tablica taktyczna), wtopiony w tło hero za kartą podglądu.
+ * Kolor z tokenu marki, wygaszany maską — piłka nożna bez kiczu.
+ */
+function BlueprintBoiska({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 420 560"
+      fill="none"
+      aria-hidden
+      className={className}
+      style={{ stroke: "color-mix(in oklab, var(--color-brand) 30%, transparent)" }}
+    >
+      <g strokeWidth="1.6">
+        {/* obrys połowy boiska */}
+        <rect x="10" y="10" width="400" height="540" rx="2" />
+        {/* pole karne i bramkowe */}
+        <rect x="95" y="10" width="230" height="118" />
+        <rect x="152" y="10" width="116" height="44" />
+        {/* punkt karny i łuk pola karnego */}
+        <circle cx="210" cy="90" r="2.6" fill="color-mix(in oklab, var(--color-brand) 30%, transparent)" strokeWidth="0" />
+        <path d="M158 128 A 62 62 0 0 0 262 128" />
+        {/* koło środkowe przecięte linią połowy */}
+        <path d="M118 550 A 92 92 0 0 1 302 550" />
+        <circle cx="210" cy="550" r="2.6" fill="color-mix(in oklab, var(--color-brand) 30%, transparent)" strokeWidth="0" />
+        {/* łuki rożne */}
+        <path d="M10 26 A 16 16 0 0 0 26 10" />
+        <path d="M394 10 A 16 16 0 0 0 410 26" />
+      </g>
+    </svg>
+  );
+}
+
+/**
+ * Feed skanu: żywe pozycje suną powoli jako klikalne chipy w języku HUD
+ * (ścięty róg), za stałą plakietką „skan na żywo". Hover/fokus pauzuje.
+ */
+function TickerRynkow({ bets }: { bets: ValueBet[] }) {
+  if (bets.length === 0) return null;
+  // za krótka lista = dziury w pętli; powielaj aż tor ma sensowną długość
+  let lista = bets;
+  while (lista.length < 8) lista = [...lista, ...bets];
+  const tor = (ariaHidden: boolean) => (
+    <ul
+      aria-hidden={ariaHidden || undefined}
+      className="flex shrink-0 items-center gap-3 pr-3"
+    >
+      {lista.map((b, i) => (
+        <li key={`${b.id}-${i}`} className="shrink-0">
+          <Link
+            href={hrefPozycji(b)}
+            tabIndex={ariaHidden ? -1 : undefined}
+            className="cut-corner-sm group/chip flex items-center gap-3 whitespace-nowrap border border-hairline bg-card/70 py-2 pl-3.5 pr-4 backdrop-blur-sm transition-colors hover:border-brand/50 hover:bg-brand-wash/60"
+          >
+            <span className="text-sm">
+              <span className="font-medium text-ink">{b.podmiot}</span>{" "}
+              <span className="text-muted">
+                {b.rynek.toLowerCase()} {fmtLinia(b.linia)}+
+              </span>
+            </span>
+            {b.kurs != null ? (
+              <span className="font-data text-sm font-semibold text-brand">
+                @{fmtKurs(b.kurs)}
+              </span>
+            ) : (
+              <span className="font-data text-sm font-semibold text-brand">
+                {fmtProc(b.p_model)}
+              </span>
+            )}
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+  return (
+    <div className="relative mt-10 flex items-center gap-4">
+      {/* stała plakietka — nie jedzie z feedem */}
+      <span className="cut-corner-sm font-display flex shrink-0 items-center gap-2 border border-brand/30 bg-brand-wash/70 px-3.5 py-2.5 text-[11px] font-semibold uppercase tracking-widest text-brand-deep">
+        <span aria-hidden className="live-dot h-1.5 w-1.5 rounded-full bg-data-green" />
+        skan na żywo
+      </span>
+      <div
+        className="ticker relative flex-1"
+        title="Żywe pozycje z bieżącego skanu — pełna lista niżej"
+      >
+        <div className="ticker-tor">
+          {tor(false)}
+          {tor(true)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function Hero({
+  liga,
+  sezon,
+  aktualizacja,
+  liczbaOkazji,
+  predykcjeSprawdzone,
+  spotlightBets,
+  tickerBets = [],
+}: {
+  liga: string;
+  sezon: string;
+  aktualizacja: string;
+  liczbaOkazji: number;
+  predykcjeSprawdzone: number | null;
+  spotlightBets: ValueBet[];
+  tickerBets?: ValueBet[];
+}) {
+  return (
+    <section className="relative mb-12 pt-10 sm:pt-14">
+      {/* aurora marki — oddychające tło hero; pełna szerokość OKNA
+          (kalkulacja 50%−50vw), żeby kolor nigdy nie ucinał się na
+          krawędzi kontenera treści */}
+      <div
+        aria-hidden
+        className="aurora pointer-events-none absolute -bottom-6 -top-28"
+        style={{ left: "calc(50% - 50vw)", right: "calc(50% - 50vw)" }}
+      />
+
+      {/* blueprint boiska — taktyczny rysunek wtopiony za prawą kolumną */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -right-40 -top-16 hidden lg:block"
+        style={{
+          WebkitMaskImage:
+            "radial-gradient(80% 75% at 45% 40%, black 20%, transparent 74%)",
+          maskImage:
+            "radial-gradient(80% 75% at 45% 40%, black 20%, transparent 74%)",
+        }}
+      >
+        <BlueprintBoiska className="h-[620px] w-auto" />
+      </div>
+
+      <div className="relative grid items-center gap-12 lg:grid-cols-[1.3fr_1fr] lg:gap-10">
+        {/* lewa: obietnica → liczba → zaufanie → akcja */}
+        <div>
+          <motion.div
+            variants={wejscie}
+            initial="hidden"
+            animate="show"
+            custom={0}
+            className="flex flex-wrap items-center gap-3"
+          >
+            <p className="flex items-center gap-2.5 text-xs font-semibold uppercase tracking-widest text-brand">
+              <span aria-hidden className="h-px w-6 bg-brand-bright" />
+              Skan rynków · {liga} {sezon}
+            </p>
+            <span
+              className="inline-flex items-center gap-1.5 rounded-full border border-hairline bg-card px-2.5 py-1 text-[11px] text-muted shadow-(--shadow-card)"
+              title="Cykl w chmurze pobiera statystyki i kursy, przelicza model i odświeża tę stronę"
+            >
+              <span aria-hidden className="live-dot h-1.5 w-1.5 rounded-full bg-data-green" />
+              żywe dane · {aktualizacja}
+            </span>
+          </motion.div>
+
+          <motion.h1
+            variants={wejscie}
+            initial="hidden"
+            animate="show"
+            custom={1}
+            className="mt-6 max-w-2xl text-balance text-[2.7rem] font-bold leading-[1.06] tracking-tight sm:text-[3.5rem]"
+          >
+            Gdzie kurs płaci{" "}
+            <span className="text-brand">więcej, niż powinien</span>
+          </motion.h1>
+
+          <motion.p
+            variants={wejscie}
+            initial="hidden"
+            animate="show"
+            custom={3}
+            className="mt-6 max-w-xl text-base leading-relaxed text-muted"
+          >
+            Model liczy prawdziwe szanse na strzały, faule czy odbiory — i
+            zostawia tylko zakłady, w których bukmacher się przelicza.
+          </motion.p>
+
+          <motion.div
+            variants={wejscie}
+            initial="hidden"
+            animate="show"
+            custom={4}
+            className="mt-7 flex flex-wrap items-center gap-3"
+          >
+            <span className="glow-drop inline-flex transition-transform hover:-translate-y-0.5">
+              <a
+                href="#okazje"
+                className="cut-corner-sm font-display inline-flex items-center gap-2 bg-brand px-6 py-3 text-sm font-semibold uppercase tracking-wide text-on-brand transition-colors hover:bg-brand-strong"
+              >
+                Przeglądaj {liczbaOkazji > 0 ? `${liczbaOkazji} ` : ""}
+                {liczbaOkazji === 1
+                  ? "okazję"
+                  : liczbaOkazji > 1 && liczbaOkazji < 5
+                    ? "okazje"
+                    : "okazji"}
+                <span aria-hidden>↓</span>
+              </a>
+            </span>
+            <Link
+              href="/jak-to-dziala"
+              className="cut-corner-sm font-display inline-flex items-center gap-2 border border-hairline-strong bg-card/60 px-6 py-3 text-sm font-medium uppercase tracking-wide text-ink-soft backdrop-blur transition-colors hover:border-brand hover:text-brand"
+            >
+              Jak to działa?
+            </Link>
+          </motion.div>
+
+          {predykcjeSprawdzone != null && predykcjeSprawdzone > 0 && (
+            <motion.p
+              variants={wejscie}
+              initial="hidden"
+              animate="show"
+              custom={5}
+              className="mt-6 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-faint"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--color-brand)" strokeWidth="2.2" aria-hidden>
+                <path d="M20 6 9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Model rozliczany publicznie —{" "}
+              <span className="font-data font-semibold text-ink-soft">
+                {predykcjeSprawdzone.toLocaleString("pl-PL")}
+              </span>{" "}
+              sprawdzonych predykcji ·{" "}
+              <Link
+                href="/model"
+                className="font-medium text-brand underline-offset-2 hover:underline"
+              >
+                zobacz skuteczność →
+              </Link>
+            </motion.p>
           )}
+        </div>
+
+        {/* prawa: żywy podgląd skanera */}
+        <motion.div
+          variants={wejscie}
+          initial="hidden"
+          animate="show"
+          custom={3}
+          className="relative"
+        >
+          <div aria-hidden className="glow-brand pointer-events-none absolute -inset-16" />
+          <ZywyPodglad bets={spotlightBets} />
         </motion.div>
       </div>
+
+      {/* ticker: żywy skan rynków */}
+      <motion.div
+        variants={wejscie}
+        initial="hidden"
+        animate="show"
+        custom={6}
+      >
+        <TickerRynkow bets={tickerBets} />
+      </motion.div>
     </section>
   );
 }

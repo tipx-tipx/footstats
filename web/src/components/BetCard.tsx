@@ -3,7 +3,7 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { memo, useEffect, useState } from "react";
 
-import { ConfidenceBadge, EdgeBadge, PewnoscDots, RiskBadge } from "./badges";
+import { ConfidenceBadge, EdgeBadge, PewnoscDots, RiskBadge, SignalChip } from "./badges";
 import { ChanceBar, OutcomeColumns } from "./DistributionStrip";
 import { FormBars } from "./FormBars";
 import { addZakladFromBet, isTracked, onZakladyChange } from "@/lib/tracker";
@@ -34,6 +34,177 @@ function oknaFormy(forma: FormaRynku, linia: number) {
     l10: okno(10),
     all: okno(zagrane.length),
   };
+}
+
+/**
+ * Splity kontekstowe z formy: hit-rate linii w podpróbkach, które dane
+ * uczciwie wspierają (kadra vs klub, pełne występy 60+ min). Pokazujemy
+ * split dopiero od 3 meczów — mniejsza próba myli bardziej, niż pomaga.
+ */
+function splityFormy(forma: FormaRynku, linia: number) {
+  const gry = forma.ostatnie.map((v, i) => ({
+    v,
+    min: forma.minuty[i] ?? 0,
+    kadra: forma.kadra?.[i] ?? false,
+  }));
+  const licz = (xs: { v: number }[]) => ({
+    traf: xs.filter((x) => x.v > linia).length,
+    n: xs.length,
+  });
+  const zagrane = gry.filter((g) => g.min > 0);
+  const wynik: { label: string; opis: string; traf: number; n: number }[] = [];
+  const kadra = licz(zagrane.filter((g) => g.kadra));
+  const klub = licz(zagrane.filter((g) => !g.kadra));
+  // splity kadra/klub tylko gdy OBA mają próbę — inaczej to zwykłe "razem"
+  if (kadra.n >= 3 && klub.n >= 3) {
+    wynik.push(
+      { label: "kadra", opis: "mecze reprezentacji w próbce", ...kadra },
+      { label: "klub", opis: "mecze klubowe w próbce", ...klub },
+    );
+  }
+  const pelne = licz(zagrane.filter((g) => g.min >= 60));
+  if (pelne.n >= 3 && pelne.n < zagrane.length) {
+    wynik.push({
+      label: "pełne występy",
+      opis: "mecze z co najmniej 60 minutami gry",
+      ...pelne,
+    });
+  }
+  return wynik;
+}
+
+/**
+ * Odznaki przewagi — policzalny system sygnałów typu (wzorzec Linemate:
+ * każdy typ nosi 0–4 odznaki). Jedno źródło prawdy dla wiersza karty
+ * (chipy) i rozwinięcia (lista z wyjaśnieniami).
+ */
+function odznakiPrzewagi(bet: ValueBet): {
+  znak: string;
+  label: string;
+  opis: string;
+  tone: "brand" | "amber";
+}[] {
+  const o: ReturnType<typeof odznakiPrzewagi> = [];
+  if (!bet.sugestia && bet.ev_uk != null && bet.ev_uk >= 4) {
+    o.push({
+      znak: "↑",
+      label: `+${Math.round(bet.ev_uk)}% vs UK`,
+      opis: `Uczciwa cena wg bukmacherów UK (po zdjęciu marży) to ~${fmtKurs(bet.kurs_novig ?? 0)} — Superbet płaci +${bet.ev_uk.toFixed(1).replace(".", ",")}% ponad ten poziom`,
+      tone: "brand",
+    });
+  } else if (
+    !bet.sugestia &&
+    bet.kurs != null &&
+    bet.kurs_ref != null &&
+    bet.kurs >= bet.kurs_ref * 1.12
+  ) {
+    o.push({
+      znak: "↑",
+      label: "odstaje od rynku",
+      opis: `Bukmacherzy w UK płacą za to średnio ${fmtKurs(bet.kurs_ref)} — kurs Superbetu wyraźnie odstaje w górę`,
+      tone: "brand",
+    });
+  }
+  if (bet.matchup) {
+    o.push({
+      znak: "◎",
+      label: "matchup",
+      opis: "Profil rywala wyraźnie sprzyja temu rynkowi (co ta drużyna dopuszcza zawodnikom z tej formacji) — liczby w czynniku „Profil rywala”",
+      tone: "brand",
+    });
+  }
+  if (bet.miekka_linia) {
+    o.push({
+      znak: "↗",
+      label: "miękka linia",
+      opis: `Z pozostałych linii Superbetu na ten rynek wynika kurs ~${(bet.kurs_oczekiwany ?? 0).toFixed(2).replace(".", ",")} — ta linia płaci wyraźnie więcej (niespójność siatki bukmachera)`,
+      tone: "brand",
+    });
+  }
+  if (bet.rotacja) {
+    o.push({
+      znak: "↥",
+      label: "wchodzi do składu",
+      opis: "Pierwszy występ w XI na tym turnieju — rynek często nie zdążył dograć jego linii",
+      tone: "amber",
+    });
+  }
+  if (bet.swieze_sklady) {
+    o.push({
+      znak: "◷",
+      label: "świeże składy",
+      opis: "Składy potwierdzono w ostatnich ~45 minutach — kursy bywają jeszcze sprzed ogłoszenia XI",
+      tone: "amber",
+    });
+  }
+  return o;
+}
+
+/**
+ * Historia vs model vs wycena kursu na JEDNEJ skali — kotwica zaufania
+ * (standard kategorii: props.cash). Trzy znaczniki na wspólnym torze
+ * 0–100% + wartości pod spodem. Wycena kursu = 1/kurs (z marżą — uczciwie
+ * opisane w tooltipie).
+ */
+function PorownanieWycen({
+  historia,
+  model,
+  kurs,
+}: {
+  historia: { traf: number; n: number } | null;
+  model: number;
+  kurs: number | null;
+}) {
+  const hist = historia && historia.n >= 3 ? historia.traf / historia.n : null;
+  const implied = kurs != null && kurs > 1 ? 1 / kurs : null;
+  if (implied == null && hist == null) return null;
+  const znaczniki = [
+    ...(hist != null
+      ? [{ p: hist, label: `historia ${historia!.traf}/${historia!.n}`, kolor: "var(--color-data-green)" }]
+      : []),
+    { p: model, label: "model", kolor: "var(--color-brand)" },
+    ...(implied != null
+      ? [{ p: implied, label: "kurs wycenia", kolor: "var(--color-ink)" }]
+      : []),
+  ];
+  return (
+    <div
+      className="rounded-(--radius-control) border border-hairline bg-card p-3.5"
+      title="Trzy spojrzenia na tę samą szansę: jak często wchodziło w ostatnich meczach, ile daje model i na ile wycenia to kurs bukmachera (wycena z kursu zawiera marżę — realna opinia rynku jest odrobinę niższa). Gdy historia i model stoją WYŻEJ niż wycena kursu, bukmacher płaci za dużo."
+    >
+      <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-faint">
+        Historia · model · wycena kursu
+      </h4>
+      <div className="relative mx-1 h-6">
+        {/* tor */}
+        <span className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-hairline" />
+        {/* znacznik 50% */}
+        <span className="absolute left-1/2 top-1/2 h-3.5 w-px -translate-y-1/2 bg-hairline-strong" />
+        {znaczniki.map((z) => (
+          <span
+            key={z.label}
+            className="absolute top-1/2 h-6 w-[3px] -translate-x-1/2 -translate-y-1/2 rounded-full"
+            style={{ left: `${Math.min(Math.max(z.p * 100, 2), 98)}%`, background: z.kolor }}
+          />
+        ))}
+      </div>
+      <dl className="mt-2.5 flex flex-wrap items-baseline gap-x-5 gap-y-1.5">
+        {znaczniki.map((z) => (
+          <div key={z.label} className="flex items-baseline gap-1.5">
+            <span
+              aria-hidden
+              className="inline-block h-2 w-2 translate-y-px rounded-full"
+              style={{ background: z.kolor }}
+            />
+            <dt className="text-[11px] text-faint">{z.label}</dt>
+            <dd className="font-data text-sm font-semibold text-ink">
+              {fmtProc(z.p)}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
 }
 
 /**
@@ -119,7 +290,7 @@ function tierPewniaka(bet: ValueBet): {
   if (bet.p_model >= 0.62) {
     return {
       label: "mocny typ",
-      cls: "bg-data-green-wash text-brand-deep",
+      cls: "bg-data-green-wash text-data-green-ink",
       opis: "Szansa modelu 62–74% — solidny typ, ale jeszcze nie pewniak",
     };
   }
@@ -151,6 +322,11 @@ export const BetCard = memo(function BetCard({
 
   const forma = zawodnik?.forma[bet.rynek_kod];
   const swiatlo = swiatloTypu(forma, bet.linia, bet.p_model);
+  const odznaki = odznakiPrzewagi(bet);
+  const okna = forma ? oknaFormy(forma, bet.linia) : null;
+  // historia do porównania wycen: L10 gdy jest sensowna próba, inaczej całość
+  const historiaOkno =
+    okna == null ? null : okna.l10.n >= 5 ? okna.l10 : okna.all;
 
   return (
     <motion.article
@@ -169,7 +345,7 @@ export const BetCard = memo(function BetCard({
       <button
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        className="grid w-full grid-cols-[1fr_auto_auto] items-center gap-x-3 gap-y-2 px-3.5 py-3 text-left sm:grid-cols-[auto_1.4fr_1fr_auto_auto] sm:gap-x-4 sm:px-4"
+        className="grid w-full grid-cols-[1fr_auto] items-center gap-x-3 gap-y-2.5 px-3.5 py-3 text-left sm:grid-cols-[auto_1.4fr_1fr_auto_auto] sm:gap-x-4 sm:px-4"
       >
         <span
           aria-hidden
@@ -189,6 +365,10 @@ export const BetCard = memo(function BetCard({
           <span className="mt-0.5 block truncate text-xs text-faint">
             {bet.mecz} · {fmtDataCzas(bet.kickoff_ts)}
           </span>
+          {/* pasek szansy na mobile — pod nazwą, żeby triage działał też kciukiem */}
+          <span className="mt-2 block max-w-56 sm:hidden">
+            <ChanceBar p={bet.p_model} line={bet.linia} side={bet.strona} />
+          </span>
         </span>
 
         <span className="hidden min-w-0 items-center gap-3 sm:flex">
@@ -197,17 +377,19 @@ export const BetCard = memo(function BetCard({
           </span>
         </span>
 
-        <span className="flex flex-col items-end gap-0.5">
-          <span className="font-data text-base font-semibold">
+        {/* kurs w "pudełku" jak u bukmachera */}
+        <span className="flex flex-col items-center gap-0.5 justify-self-end rounded-(--radius-control) border border-hairline bg-card-soft px-2.5 py-1.5 shadow-(--shadow-card)">
+          <span className="font-data text-base font-semibold leading-none">
             {bet.kurs != null ? fmtKurs(bet.kurs) : fmtProc(bet.p_model)}
           </span>
-          <span className="text-[10px] uppercase tracking-wide text-faint">
-            {bet.kurs != null ? bet.bukmacher : "szansa modelu"}
+          <span className="text-[9px] uppercase tracking-wide text-faint">
+            {bet.kurs != null ? bet.bukmacher : "szansa"}
           </span>
         </span>
 
-        <span className="flex items-center justify-end gap-2.5">
-          <span className="flex flex-col items-end gap-1">
+        {/* mobile: sygnały schodzą do własnego wiersza na całą szerokość */}
+        <span className="col-span-2 flex items-center justify-between gap-2.5 sm:col-span-1 sm:justify-end">
+          <span className="flex flex-row flex-wrap items-center gap-1.5 sm:flex-col sm:items-end sm:gap-1">
             {bet.pewniak ? (
               (() => {
                 const t = tierPewniaka(bet);
@@ -230,56 +412,20 @@ export const BetCard = memo(function BetCard({
             ) : (
               <EdgeBadge ev={bet.ev_pct} />
             )}
-            {!bet.sugestia && bet.ev_uk != null && bet.ev_uk >= 4 ? (
+            {/* odznaki przewagi — jedno źródło prawdy (odznakiPrzewagi) */}
+            {odznaki.length > 0 && (
               <span
-                className="hidden rounded-md bg-brand-wash px-1.5 py-0.5 text-[10px] font-semibold text-brand-deep sm:inline-flex"
-                title={`Uczciwa cena wg no-vig UK (mediana buków po zdjęciu marży) to ~${fmtKurs(bet.kurs_novig ?? 0)}. Superbet płaci +${bet.ev_uk.toFixed(1).replace(".", ",")}% wartości ponad ten benchmark — to sygnał miękkiej linii.`}
+                className="font-data hidden items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-brand sm:inline-flex"
+                title={`Ten typ nosi ${odznaki.length} ${odznaki.length === 1 ? "odznakę" : odznaki.length < 5 ? "odznaki" : "odznak"} przewagi — szczegóły w rozwinięciu`}
               >
-                ↑ +{Math.round(bet.ev_uk)}% vs UK
-              </span>
-            ) : !bet.sugestia &&
-              bet.kurs != null &&
-              bet.kurs_ref != null &&
-              bet.kurs >= bet.kurs_ref * 1.12 ? (
-              <span
-                className="hidden rounded-md bg-brand-wash px-1.5 py-0.5 text-[10px] font-semibold text-brand-deep sm:inline-flex"
-                title={`Bukmacherzy w UK płacą za to średnio ${fmtKurs(bet.kurs_ref)} — kurs Superbetu wyraźnie odstaje w górę`}
-              >
-                ↑ odstaje od rynku
-              </span>
-            ) : null}
-            {bet.matchup && (
-              <span
-                className="inline-flex rounded-md bg-brand-wash px-1.5 py-0.5 text-[10px] font-semibold text-brand-deep"
-                title="Profil rywala wyraźnie sprzyja temu rynkowi (co ta drużyna dopuszcza zawodnikom z tej formacji) — liczby w rozwinięciu karty, czynnik „Profil rywala”"
-              >
-                🎯 matchup
+                ⬡ ×{odznaki.length}
               </span>
             )}
-            {bet.rotacja && (
-              <span
-                className="inline-flex rounded-md bg-data-amber-wash px-1.5 py-0.5 text-[10px] font-semibold text-data-amber-ink"
-                title="Pierwszy występ w XI na tym turnieju — rynek często nie zdążył dograć jego linii; baza modelu z sezonu klubowego"
-              >
-                ⬆ wchodzi do składu
-              </span>
-            )}
-            {bet.swieze_sklady && (
-              <span
-                className="inline-flex rounded-md bg-data-amber-wash px-1.5 py-0.5 text-[10px] font-semibold text-data-amber-ink"
-                title="Składy tego meczu potwierdzono w ostatnich ~45 minutach — kursy bywają jeszcze sprzed ogłoszenia XI"
-              >
-                🕐 świeże składy
-              </span>
-            )}
-            {bet.miekka_linia && (
-              <span
-                className="inline-flex rounded-md bg-brand-wash px-1.5 py-0.5 text-[10px] font-semibold text-brand-deep"
-                title={`Z pozostałych linii Superbetu na ten rynek wynika kurs ~${(bet.kurs_oczekiwany ?? 0).toFixed(2).replace(".", ",")} — ta linia płaci wyraźnie więcej (niespójność siatki bukmachera)`}
-              >
-                ↑ miękka linia
-              </span>
-            )}
+            {odznaki.map((o) => (
+              <SignalChip key={o.label} tone={o.tone} title={o.opis}>
+                {o.znak} {o.label}
+              </SignalChip>
+            ))}
             <span
               className="hidden items-center gap-1 text-[10px] text-faint sm:flex"
               title="Pewność modelu: ile danych i jak stabilnych stoi za tą predykcją"
@@ -317,9 +463,9 @@ export const BetCard = memo(function BetCard({
         {open && (
           <motion.div
             key="detail"
-            initial={reduced ? false : { height: 0, opacity: 0 }}
+            initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
-            exit={reduced ? undefined : { height: 0, opacity: 0 }}
+            exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.28, ease: [0.25, 0.9, 0.3, 1] }}
           >
             <div className="grid gap-6 border-t border-hairline bg-paper/50 px-4 py-5 sm:grid-cols-2 sm:px-6">
@@ -427,10 +573,45 @@ export const BetCard = memo(function BetCard({
                     — im węższe, tym stabilniejsza predykcja.
                   </p>
                 )}
+
+                {/* kotwica zaufania: trzy wyceny na jednej skali */}
+                <PorownanieWycen
+                  historia={historiaOkno}
+                  model={bet.p_model}
+                  kurs={bet.kurs}
+                />
+
                 <div className="flex flex-wrap items-center gap-3">
                   <ConfidenceBadge level={bet.pewnosc} />
                   <RiskBadge level={bet.ryzyko} />
                 </div>
+
+                {/* przewagi tego typu — pełna lista z wyjaśnieniami */}
+                {odznaki.length > 0 && (
+                  <div>
+                    <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-faint">
+                      Przewagi tego typu ({odznaki.length})
+                    </h4>
+                    <ul className="space-y-1.5">
+                      {odznaki.map((o) => (
+                        <li key={o.label} className="flex items-start gap-2.5 text-sm">
+                          <span
+                            aria-hidden
+                            className={`font-data mt-px shrink-0 ${
+                              o.tone === "brand" ? "text-brand" : "text-data-amber-ink"
+                            }`}
+                          >
+                            {o.znak}
+                          </span>
+                          <span>
+                            <span className="font-medium">{o.label}:</span>{" "}
+                            <span className="text-ink-soft">{o.opis}</span>
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
 
                 <div>
                   <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-faint">
@@ -448,11 +629,11 @@ export const BetCard = memo(function BetCard({
                         </span>
                         {c.mnoznik !== null && (
                           <span
-                            className={`font-data shrink-0 rounded px-1.5 py-0.5 text-xs ${
+                            className={`font-data shrink-0 rounded-full px-1.5 py-0.5 text-xs ${
                               c.mnoznik > 1.02
-                                ? "bg-data-green-wash text-brand-deep"
+                                ? "bg-data-green-wash text-data-green-ink"
                                 : c.mnoznik < 0.98
-                                  ? "bg-data-red-wash text-data-red"
+                                  ? "bg-data-red-wash text-data-red-ink"
                                   : "bg-paper text-muted"
                             }`}
                           >
@@ -552,9 +733,9 @@ export const BetCard = memo(function BetCard({
                                   key={c.label}
                                   className={`font-data inline-flex items-baseline gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-semibold ${
                                     c.n >= 3 && r >= 0.6
-                                      ? "bg-data-green-wash text-brand-deep"
+                                      ? "bg-data-green-wash text-data-green-ink"
                                       : c.n >= 3 && r < 0.45
-                                        ? "bg-data-red-wash text-data-red"
+                                        ? "bg-data-red-wash text-data-red-ink"
                                         : "bg-paper text-muted"
                                   }`}
                                 >
@@ -593,6 +774,39 @@ export const BetCard = memo(function BetCard({
                             : "—"}
                         </span>
                       </p>
+                      {/* splity kontekstowe — jak linia wchodzi w podpróbkach */}
+                      {(() => {
+                        const splity = splityFormy(forma, bet.linia);
+                        if (splity.length === 0) return null;
+                        return (
+                          <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-hairline pt-3">
+                            <span className="mr-0.5 text-[10px] font-semibold uppercase tracking-wide text-faint">
+                              splity
+                            </span>
+                            {splity.map((s) => {
+                              const r = s.traf / s.n;
+                              return (
+                                <span
+                                  key={s.label}
+                                  title={`${s.opis} — linia ${fmtLinia(bet.linia)} przebita w ${s.traf} z ${s.n} meczów`}
+                                  className={`font-data inline-flex items-baseline gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                                    r >= 0.6
+                                      ? "bg-data-green-wash text-data-green-ink"
+                                      : r < 0.45
+                                        ? "bg-data-red-wash text-data-red-ink"
+                                        : "bg-paper text-muted"
+                                  }`}
+                                >
+                                  <span className="text-[9px] font-medium uppercase opacity-70">
+                                    {s.label}
+                                  </span>
+                                  {s.traf}/{s.n}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        );
+                      })()}
                     </div>
                   );
                 })()}
@@ -609,10 +823,10 @@ export const BetCard = memo(function BetCard({
                   <button
                     onClick={() => addZakladFromBet(bet, null)}
                     disabled={tracked}
-                    className={`w-full rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${
+                    className={`w-full rounded-(--radius-control) px-4 py-2.5 text-sm font-semibold transition-colors ${
                       tracked
                         ? "cursor-default bg-brand-wash text-brand"
-                        : "bg-brand text-on-brand hover:bg-brand-deep"
+                        : "bg-brand text-on-brand shadow-(--shadow-card) hover:bg-brand-strong"
                     }`}
                   >
                     {tracked ? "✓ W moich zakładach" : "Dodaj do moich zakładów"}

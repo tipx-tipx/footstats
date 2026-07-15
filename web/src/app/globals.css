@@ -6,108 +6,153 @@
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 /* ============================================================
-   FootStats — system designu
-   Marka (z logo): atramentowy grafit + butelkowa zieleń na bieli.
-   Kolory DANYCH (wykresy) zwalidowane pod CVD i kontrast:
-   zieleń #1F9D66 · bursztyn #C77E1F · czerwień #C2452D
-   Ciemny motyw: te same TOKENY, inne wartości (niżej) — komponenty
-   nie znają trybu, mówią rolami (ink/paper/card/brand/data-*).
+   FootStats — system designu v2
+   Marka (z logo): atramentowy grafit + butelkowa zieleń.
+   Zasada: komponenty nie znają trybu — mówią rolami
+   (ink/paper/card/brand/data-*), tryb podmienia wartości tokenów.
+
+   Kolory DANYCH (status: dobrze / uwaga / źle) zwalidowane
+   walidatorem palet (pasmo jasności, CVD, próg normal-vision,
+   kontrast >= 3:1 na powierzchni karty) dla OBU motywów:
+     jasny:  zieleń #17824F · złoto #C08A00 · malina #BE3455
+     ciemny: zieleń #2FAE74 · złoto #BD8A18 · malina #E4586E
+   Uwaga CVD: para złoto–malina ma ΔE w paśmie 6–8 (deutan) —
+   legalne wyłącznie z drugim kodowaniem: te kolory NIGDY nie
+   występują u nas bez etykiety tekstowej / liczby / pozycji.
    ============================================================ */
 
 @theme {
+  /* --- atramenty (tekst) --- */
+  --color-ink: #0f1d28;          /* nagłówki, tekst główny */
+  --color-ink-soft: #33434e;     /* tekst drugorzędny */
+  --color-muted: #5b6c69;        /* tekst pomocniczy */
+  --color-faint: #64746e;        /* podpisy, metadane (>=4.5:1 na bieli) */
+
   /* --- marka --- */
-  --color-ink: #13202a;          /* atrament — nagłówki, tekst główny */
-  --color-ink-soft: #33434d;     /* tekst drugorzędny */
-  --color-muted: #5f6f6a;        /* tekst pomocniczy */
-  --color-faint: #67766f;        /* podpisy, metadane (>=4.5:1 na bieli — WCAG AA) */
-  --color-brand: #16583f;        /* butelkowa zieleń — akcent marki, UI */
-  --color-brand-deep: #0e3d2b;
-  --color-brand-wash: #e7f0ea;   /* delikatne tło zielone */
-  --color-on-brand: #ffffff;     /* tekst NA wypełnieniach brand/data (nie "white":
-                                    w ciemnym motywie zielenie są jaśniejsze i to
-                                    ciemny atrament daje kontrast, nie biel) */
+  --color-brand: #0f6c46;        /* butelkowa zieleń — akcent, UI, tekst-link */
+  --color-brand-strong: #0b5335; /* hover wypełnień */
+  --color-brand-deep: #083b27;   /* najciemniejszy zestaw marki (tekst na wash) */
+  --color-brand-bright: #16a468; /* gradienty, wskaźniki, kreski ozdobne */
+  --color-brand-wash: #e3f1e9;   /* delikatne tło zielone */
+  --color-on-brand: #ffffff;     /* tekst NA wypełnieniu brand (w dark: atrament) */
 
   /* --- powierzchnie --- */
-  --color-paper: #f2f5f3;        /* tło strony — chłodny papier z nutą zieleni */
-  --color-card: #ffffff;
-  --color-hairline: #e1e8e3;
-  --color-hairline-strong: #cbd6cf;
+  --color-paper: #f3f6f4;        /* tło strony — chłodny papier z nutą zieleni */
+  --color-card: #ffffff;         /* karta */
+  --color-card-soft: #f9fbfa;    /* panel wewnętrzny / wiersz zebra */
+  --color-hairline: #e3eae5;
+  --color-hairline-strong: #c9d5cd;
+  --color-scrim: rgb(15 29 40 / 0.45); /* przyciemnienie pod panelami mobile */
 
-  /* --- kolory danych (wykresy, badge) — zwalidowane --- */
-  --color-data-green: #17824f; /* 4.84:1 na bieli i pod białym tekstem (WCAG AA) */
-  --color-data-amber: #c77e1f;
-  --color-data-red: #c2452d;
-  --color-data-green-wash: #e3f3ea;
-  --color-data-amber-wash: #f7ecdc;
-  --color-data-red-wash: #f7e3de;
-  /* atrament bursztynowy — tekst na amber-wash (ostrzeżenia, podpowiedzi);
-     strong = dłuższe akapity (wyższy kontrast) */
-  --color-data-amber-ink: #8a5613;
-  --color-data-amber-ink-strong: #6d4410;
+  /* --- kolory danych (status; zwalidowane — patrz nagłówek) --- */
+  --color-data-green: #17824f;
+  --color-data-amber: #c08a00;
+  --color-data-red: #be3455;
+  --color-data-green-wash: #e2f3e9;
+  --color-data-amber-wash: #f8efd7;
+  --color-data-red-wash: #fae5ea;
+  /* atramenty do TEKSTU na wash (>=4.5:1); strong = dłuższe akapity */
+  --color-data-green-ink: #115e3a;
+  --color-data-amber-ink: #7a5a06;
+  --color-data-amber-ink-strong: #5f4605;
+  --color-data-red-ink: #972944;
 
   /* --- typografia --- */
-  --font-display: var(--font-sora), system-ui, sans-serif;
+  --font-display: var(--font-chakra), var(--font-plex-sans), system-ui, sans-serif;
   --font-body: var(--font-plex-sans), system-ui, sans-serif;
   --font-data: var(--font-plex-mono), ui-monospace, monospace;
 
-  --radius-card: 0.875rem;
+  /* --- geometria --- */
+  --radius-card: 1.25rem;        /* karty */
+  --radius-control: 0.75rem;     /* przyciski, inputy, pastylki nav */
 
-  --shadow-card: 0 1px 2px rgb(19 32 42 / 0.04), 0 4px 16px rgb(19 32 42 / 0.05);
-  --shadow-card-hover: 0 2px 4px rgb(19 32 42 / 0.06), 0 10px 32px rgb(19 32 42 / 0.10);
+  /* --- elewacja --- */
+  --shadow-card: 0 1px 2px rgb(15 29 40 / 0.04), 0 6px 20px rgb(15 29 40 / 0.05);
+  --shadow-card-hover: 0 2px 4px rgb(15 29 40 / 0.05), 0 12px 32px rgb(15 29 40 / 0.10);
+  --shadow-pop: 0 4px 8px rgb(15 29 40 / 0.06), 0 16px 48px rgb(15 29 40 / 0.16);
+  /* poświata CTA / bohaterów sceny */
+  --shadow-glow: 0 4px 14px color-mix(in oklab, var(--color-brand) 35%, transparent),
+    0 1px 2px rgb(15 29 40 / 0.1);
+
+  /* --- ruch --- */
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* ============================================================
-   CIEMNY MOTYW — nadpisania tokenów pod data-theme="dark".
-   Kolory danych zwalidowane na powierzchni karty #13202a
-   (pasmo jasności, CVD, kontrast >= 3:1; teksty >= 4.5:1 AA).
-   Symetria marki: atrament światła (#13202a) staje się kartą.
+   CIEMNY MOTYW — te same tokeny, inne wartości.
+   Trzy warstwy głębi: paper (tło) < card < card-soft (raised).
+   Karty dostają wbudowany "sheen" (inset top-highlight w cieniu),
+   żeby ciemny wyglądał na zaprojektowany, nie odwrócony.
    ============================================================ */
 html[data-theme="dark"] {
-  color-scheme: dark; /* natywne kontrolki (suwaki, checkboxy) po ciemnej stronie */
+  color-scheme: dark;
 
-  --color-ink: #e9eef1;
-  --color-ink-soft: #c6d1d6;
-  --color-muted: #9aa9a6;
-  --color-faint: #8b9b98;
-  --color-brand: #2f9d6d;
-  --color-brand-deep: #8ed3b4;
-  --color-brand-wash: #143428;
-  --color-on-brand: #06130d;
+  --color-ink: #e9eff2;
+  --color-ink-soft: #c3cfd5;
+  --color-muted: #97a7a4;
+  --color-faint: #869790;
 
-  --color-paper: #0b1218;
-  --color-card: #13202a;
-  --color-hairline: #23313c;
-  --color-hairline-strong: #364754;
+  --color-brand: #31b27c;
+  --color-brand-strong: #3cc78d;
+  --color-brand-deep: #9fdec0;
+  --color-brand-bright: #46d698;
+  --color-brand-wash: #123625;
+  --color-on-brand: #051209;
+
+  --color-paper: #0a1016;
+  --color-card: #111b23;
+  --color-card-soft: #172430;
+  --color-hairline: #223240;
+  --color-hairline-strong: #35495a;
+  --color-scrim: rgb(2 6 10 / 0.6);
 
   --color-data-green: #2fae74;
-  --color-data-amber: #c9832d;
-  --color-data-red: #d8604a;
-  --color-data-green-wash: #10301f;
-  --color-data-amber-wash: #2f2410;
-  --color-data-red-wash: #2d1410;
-  --color-data-amber-ink: #e3b269;
-  --color-data-amber-ink-strong: #ecc07b;
+  --color-data-amber: #bd8a18;
+  --color-data-red: #e4586e;
+  --color-data-green-wash: #0f2e20;
+  --color-data-amber-wash: #2d2410;
+  --color-data-red-wash: #331522;
+  --color-data-green-ink: #7cd3a8;
+  --color-data-amber-ink: #dcb257;
+  --color-data-amber-ink-strong: #e6c377;
+  --color-data-red-ink: #f0899a;
 
-  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.35), 0 4px 16px rgb(0 0 0 / 0.35);
-  --shadow-card-hover: 0 2px 4px rgb(0 0 0 / 0.4), 0 10px 32px rgb(0 0 0 / 0.5);
-}
-
-/* logo ma atramentowe kreski — na ciemnym tle odwracamy je do jasnych,
-   a hue-rotate zawraca zieleń akcentu na swoje miejsce */
-html[data-theme="dark"] .logo-adaptacyjne {
-  filter: invert(0.93) hue-rotate(180deg) saturate(1.4);
+  --shadow-card: inset 0 1px 0 rgb(255 255 255 / 0.045),
+    0 1px 2px rgb(0 0 0 / 0.4), 0 6px 20px rgb(0 0 0 / 0.35);
+  --shadow-card-hover: inset 0 1px 0 rgb(255 255 255 / 0.06),
+    0 2px 4px rgb(0 0 0 / 0.45), 0 14px 36px rgb(0 0 0 / 0.5);
+  --shadow-pop: inset 0 1px 0 rgb(255 255 255 / 0.06),
+    0 4px 8px rgb(0 0 0 / 0.5), 0 20px 56px rgb(0 0 0 / 0.6);
 }
 
 html {
   scroll-behavior: smooth;
 }
 
+/* Tło jako scena: pod treścią leży warstwowy gradient papieru plus dwie
+   ambientowe poświaty marki (fixed — nie przewijają się z treścią).
+   Wartości z tokenów, więc motywy dostają scenę „za darmo". */
 body {
-  background: var(--color-paper);
+  background:
+    radial-gradient(60rem 42rem at 82% -12rem,
+      color-mix(in oklab, var(--color-brand-bright) 7%, transparent), transparent 70%),
+    radial-gradient(48rem 36rem at -12rem 30rem,
+      color-mix(in oklab, var(--color-brand) 5%, transparent), transparent 70%),
+    linear-gradient(180deg,
+      color-mix(in oklab, var(--color-paper) 97%, var(--color-brand) 3%) 0%,
+      var(--color-paper) 26rem);
+  background-attachment: fixed;
+  background-color: var(--color-paper);
   color: var(--color-ink);
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+/* Tailwind 4 nie nadaje kursora przyciskom — klikalne ma wyglądać na klikalne */
+button:not(:disabled),
+[role="button"]:not(:disabled) {
+  cursor: pointer;
 }
 
 /* liczby zawsze tabelaryczne w danych */
@@ -119,7 +164,32 @@ body {
 
 h1, h2, h3, .font-display {
   font-family: var(--font-display);
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
+}
+
+/* motyw przewodni marki: ścięty narożnik (rym ze ściętymi rogami Chakra
+   Petch i z estetyką grafik transmisji). Cień dawać przez filter:
+   drop-shadow — box-shadow zostałby obcięty przez clip-path. */
+.cut-corner {
+  clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%);
+}
+.cut-corner-sm {
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
+}
+
+/* poświata dla elementów z clip-path (box-shadow byłby obcięty) */
+.glow-drop {
+  filter: drop-shadow(0 4px 14px color-mix(in oklab, var(--color-brand) 40%, transparent));
+}
+
+/* pasek postępu rotacji żywego podglądu (restart przez key={idx}) */
+.postep-skanu {
+  animation: postep-skanu-jazda 5.2s linear forwards;
+  transform-origin: left;
+}
+@keyframes postep-skanu-jazda {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
 }
 
 /* kropka "dane na żywo" — spokojny puls */
@@ -127,17 +197,78 @@ h1, h2, h3, .font-display {
   animation: live-pulse 2.4s ease-in-out infinite;
 }
 @keyframes live-pulse {
-  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgb(31 157 102 / 0.45); }
-  50%      { opacity: 0.7; box-shadow: 0 0 0 4px rgb(31 157 102 / 0); }
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-data-green) 45%, transparent); }
+  50%      { opacity: 0.7; box-shadow: 0 0 0 4px transparent; }
 }
 
-/* delikatna siatka "boiska" w tle hero — z tokenu marki, więc żyje w obu
-   motywach (w ciemnym jaśniejsza zieleń daje tę samą subtelność) */
+/* siatka "boiska" w tle hero — wygasa promieniście, żeby nie konkurowała
+   z treścią; z tokenu marki, więc żyje w obu motywach */
 .pitch-grid {
   background-image:
-    linear-gradient(to right, color-mix(in oklab, var(--color-brand) 6%, transparent) 1px, transparent 1px),
-    linear-gradient(to bottom, color-mix(in oklab, var(--color-brand) 6%, transparent) 1px, transparent 1px);
-  background-size: 48px 48px;
+    linear-gradient(to right, color-mix(in oklab, var(--color-brand) 7%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in oklab, var(--color-brand) 7%, transparent) 1px, transparent 1px);
+  background-size: 44px 44px;
+  -webkit-mask-image: radial-gradient(120% 90% at 20% 0%, black 30%, transparent 75%);
+  mask-image: radial-gradient(120% 90% at 20% 0%, black 30%, transparent 75%);
+}
+
+/* aurora marki — płynący mesh-gradient pod hero (pętla 12 s, subtelna);
+   kolory z tokenów, więc w dark jest głębsza, w light akwarelowa */
+.aurora {
+  background:
+    radial-gradient(42% 46% at 18% 22%,
+      color-mix(in oklab, var(--color-brand-bright) 13%, transparent), transparent 78%),
+    radial-gradient(38% 44% at 78% 12%,
+      color-mix(in oklab, var(--color-brand) 11%, transparent), transparent 80%),
+    radial-gradient(46% 52% at 55% 78%,
+      color-mix(in oklab, var(--color-brand-bright) 7%, transparent), transparent 82%);
+  background-size: 170% 170%;
+  animation: aurora-flow 14s ease-in-out infinite alternate;
+  /* blur skleja plamy w jeden kremowy gradient (zero pasm i kantów) */
+  filter: blur(36px) saturate(1.05);
+  /* wygaszenie na wszystkich krawędziach — kolor nigdy nie kończy się kantem */
+  -webkit-mask-image: radial-gradient(120% 95% at 45% 8%, black 30%, transparent 82%);
+  mask-image: radial-gradient(120% 95% at 45% 8%, black 30%, transparent 82%);
+}
+@keyframes aurora-flow {
+  from { background-position: 0% 0%, 100% 0%, 50% 100%; }
+  to   { background-position: 60% 40%, 40% 30%, 20% 60%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .aurora { animation: none; }
+}
+
+/* miękka poświata marki (hero, spotlight) */
+.glow-brand {
+  background: radial-gradient(
+    closest-side,
+    color-mix(in oklab, var(--color-brand-bright) 14%, transparent),
+    transparent
+  );
+}
+
+/* ticker skanu rynków: tor z podwojoną treścią sunie o połowę szerokości,
+   pauza na hover/fokus; przy ograniczonym ruchu stoi (patrz niżej) */
+.ticker {
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
+  mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
+}
+.ticker-tor {
+  display: flex;
+  width: max-content;
+  animation: ticker-jazda 70s linear infinite;
+}
+.ticker:hover .ticker-tor,
+.ticker:focus-within .ticker-tor {
+  animation-play-state: paused;
+}
+@keyframes ticker-jazda {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ticker-tor { animation: none; }
 }
 
 /* pasek przewijania w duchu designu */

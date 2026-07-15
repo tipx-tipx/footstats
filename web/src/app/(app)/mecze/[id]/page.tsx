@@ -81,82 +81,92 @@ export default async function MeczPage({
           <span aria-hidden>←</span> Wszystkie mecze
         </Link>
 
-        {/* nagłówek meczu */}
-        <div className="mt-4 rounded-2xl border border-hairline bg-card px-5 py-5 shadow-(--shadow-card) sm:px-8 sm:py-7">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-xs font-medium uppercase tracking-widest text-faint">
-              {kiedy(mecz.kickoff_ts)}
-            </p>
-            {mecz.sklady_ogloszone ? (
-              <span className="inline-flex items-center rounded-full bg-data-green-wash px-2.5 py-1 text-[11px] font-medium text-brand-deep">
-                ✓ składy ogłoszone
-              </span>
-            ) : (
-              <span className="inline-flex items-center rounded-full bg-paper px-2.5 py-1 text-[11px] text-faint">
-                składy ~1 h przed
-              </span>
-            )}
-          </div>
+        {/* nagłówek meczu — hero-karta z tłem boiska */}
+        <div className="relative mt-4 overflow-hidden rounded-(--radius-card) border border-hairline bg-card px-5 py-6 shadow-(--shadow-card) sm:px-8 sm:py-8">
+          <div aria-hidden className="pitch-grid absolute inset-0" />
+          <div
+            aria-hidden
+            className="glow-brand pointer-events-none absolute -right-40 -top-40 h-96 w-96"
+          />
 
-          <div className="mt-5 grid grid-cols-[1fr_auto_1fr] items-center gap-3 sm:gap-8">
-            <div className="text-right">
-              <p className="text-xl font-bold leading-tight sm:text-3xl">
-                {mecz.gospodarz}
+          <div className="relative">
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+              <p className="flex items-center gap-2.5 text-xs font-semibold uppercase tracking-widest text-brand">
+                <span aria-hidden className="h-px w-6 bg-brand-bright" />
+                {kiedy(mecz.kickoff_ts)}
               </p>
-              <p className="mt-1 text-[10px] uppercase tracking-widest text-faint">
-                gospodarz
-              </p>
+              {mecz.sklady_ogloszone ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-data-green-wash px-2.5 py-1 text-[11px] font-medium text-data-green-ink">
+                  ✓ składy ogłoszone
+                </span>
+              ) : (
+                <span className="inline-flex items-center rounded-full border border-hairline bg-card-soft px-2.5 py-1 text-[11px] text-faint">
+                  składy ~1 h przed
+                </span>
+              )}
             </div>
-            <span className="font-data flex h-9 w-9 items-center justify-center rounded-full bg-paper text-xs font-semibold text-muted sm:h-11 sm:w-11 sm:text-sm">
-              vs
-            </span>
-            <div>
-              <p className="text-xl font-bold leading-tight sm:text-3xl">
-                {mecz.gosc}
-              </p>
-              <p className="mt-1 text-[10px] uppercase tracking-widest text-faint">
-                gość
-              </p>
-            </div>
-          </div>
 
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-2 border-t border-hairline pt-4 text-xs">
-            {okazje > 0 && (
-              <Link
-                href={`/?mecz=${mecz.id}`}
-                className="inline-flex items-center gap-1 rounded-full bg-brand-wash px-3 py-1.5 font-medium text-brand-deep transition-colors hover:bg-brand-wash/70"
-              >
-                {okazje === 1 ? "1 okazja modelu" : `${okazje} okazji modelu`}{" "}
-                <span aria-hidden>→</span>
-              </Link>
-            )}
-            {mecz.sedzia && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-paper px-3 py-1.5 text-muted">
-                Sędzia: {mecz.sedzia}
-                {Math.abs(mecz.sedzia_mnoznik_fauli - 1) > 0.05 && (
-                  <span
-                    className={`font-data ml-1 rounded px-1 ${
-                      mecz.sedzia_mnoznik_fauli > 1
-                        ? "bg-data-red-wash text-data-red"
-                        : "bg-data-green-wash text-brand-deep"
-                    }`}
-                    title="Ile fauli gwiżdże ten sędzia względem średniej ligi"
-                  >
-                    faule {fmtMnoznik(mecz.sedzia_mnoznik_fauli)}
-                  </span>
-                )}
+            <div className="mt-6 grid grid-cols-[1fr_auto_1fr] items-center gap-3 sm:gap-8">
+              <div className="text-right">
+                <p className="font-display text-xl font-bold leading-tight tracking-tight sm:text-3xl">
+                  {mecz.gospodarz}
+                </p>
+                <p className="mt-1.5 text-[10px] uppercase tracking-widest text-faint">
+                  gospodarz
+                </p>
+              </div>
+              <span className="font-data flex h-9 w-9 items-center justify-center rounded-full border border-hairline bg-card-soft text-xs font-semibold text-muted shadow-(--shadow-card) sm:h-11 sm:w-11 sm:text-sm">
+                vs
               </span>
-            )}
+              <div>
+                <p className="font-display text-xl font-bold leading-tight tracking-tight sm:text-3xl">
+                  {mecz.gosc}
+                </p>
+                <p className="mt-1.5 text-[10px] uppercase tracking-widest text-faint">
+                  gość
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-7 flex flex-wrap items-center justify-center gap-2 border-t border-hairline pt-4 text-xs">
+              {okazje > 0 && (
+                <Link
+                  href={`/?mecz=${mecz.id}`}
+                  className="inline-flex items-center gap-1 rounded-full bg-brand-wash px-3 py-1.5 font-medium text-brand-deep transition-colors hover:bg-brand-wash/70"
+                >
+                  {okazje === 1 ? "1 okazja modelu" : `${okazje} okazji modelu`}{" "}
+                  <span aria-hidden>→</span>
+                </Link>
+              )}
+              {mecz.sedzia && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-hairline bg-card-soft px-3 py-1.5 text-muted">
+                  Sędzia: {mecz.sedzia}
+                  {Math.abs(mecz.sedzia_mnoznik_fauli - 1) > 0.05 && (
+                    <span
+                      className={`font-data ml-1 rounded-full px-1.5 py-0.5 font-semibold ${
+                        mecz.sedzia_mnoznik_fauli > 1
+                          ? "bg-data-red-wash text-data-red-ink"
+                          : "bg-data-green-wash text-data-green-ink"
+                      }`}
+                      title="Ile fauli gwiżdże ten sędzia względem średniej ligi"
+                    >
+                      faule {fmtMnoznik(mecz.sedzia_mnoznik_fauli)}
+                    </span>
+                  )}
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </Reveal>
 
       {legiMeczu.length > 0 && (
-        <Reveal className="mt-8">
-          <h2 className="flex items-center gap-2 text-lg font-semibold">
-            <span aria-hidden>🧩</span> Kupon na ten mecz
+        <Reveal className="mt-10">
+          <h2 className="flex items-center gap-2.5 font-body text-xs font-semibold uppercase tracking-widest text-brand">
+            <span aria-hidden className="h-px w-6 bg-brand-bright" />
+            Kupon na ten mecz
           </h2>
-          <p className="mt-1 mb-3 max-w-3xl text-sm text-muted">
+          <p className="mt-2 mb-4 max-w-3xl text-sm leading-relaxed text-muted">
             Złóż AKO z najlepszych legów tego meczu (do 4 wydarzeń) — ustaw kurs
             docelowy i charakter. Ta sama pula i bezpieczniki co kupony automatyczne.
           </p>
@@ -169,13 +179,12 @@ export default async function MeczPage({
         </Reveal>
       )}
 
-      <Reveal className="mt-8">
-        <div className="flex items-baseline justify-between gap-3">
-          <h2 className="flex items-center gap-2 text-lg font-semibold">
-            <span aria-hidden>✅</span> TOP POKRYCIA
-          </h2>
-        </div>
-        <p className="mt-1 max-w-3xl text-sm text-muted">
+      <Reveal className="mt-10">
+        <h2 className="flex items-center gap-2.5 font-body text-xs font-semibold uppercase tracking-widest text-brand">
+          <span aria-hidden className="h-px w-6 bg-brand-bright" />
+          TOP POKRYCIA
+        </h2>
+        <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted">
           Pokrycie z <strong>ostatnich 5 startów</strong>. Na mecz reprezentacji{" "}
           <strong>preferujemy starty w kadrze</strong> — a gdy zawodnik gra w niej
           za rzadko, liczymy z klubu (oznaczone „forma klubowa”, niżej). Kolumna{" "}
@@ -189,15 +198,33 @@ export default async function MeczPage({
       </Reveal>
 
       {odrzucenia.length > 0 && (
-        <Reveal className="mt-8">
-          <details className="rounded-(--radius-card) border border-hairline bg-paper/40">
-            <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold [&::-webkit-details-marker]:hidden">
-              🔍 Czego nie typujemy w tym meczu — i dlaczego
-              <span className="ml-2 text-xs font-normal text-faint">
-                ({odrzucenia.length} sprawdzonych bez typu)
+        <Reveal className="mt-10">
+          <details className="group overflow-hidden rounded-(--radius-card) border border-hairline bg-card shadow-(--shadow-card)">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+              <span>
+                Czego nie typujemy w tym meczu — i dlaczego
+                <span className="ml-2 text-xs font-normal text-faint">
+                  ({odrzucenia.length} sprawdzonych bez typu)
+                </span>
               </span>
+              <svg
+                aria-hidden
+                width="14"
+                height="14"
+                viewBox="0 0 14 14"
+                className="shrink-0 text-faint transition-transform group-open:rotate-180"
+              >
+                <path
+                  d="M3 5.5 L7 9.5 L11 5.5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
             </summary>
-            <div className="space-y-4 border-t border-hairline p-4">
+            <div className="space-y-4 border-t border-hairline bg-card-soft px-5 py-4">
               <p className="text-xs leading-relaxed text-muted">
                 Model sprawdza każdego zawodnika i każdy rynek. Gdy typ się nie
                 pojawia, to nie przeoczenie — poniżej dokładny powód dla każdej

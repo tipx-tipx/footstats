@@ -95,7 +95,7 @@ export function PominKupon({
 
   if (stan === "pominiety") {
     return (
-      <div className="rounded-2xl border border-dashed border-hairline bg-paper/60 px-6 py-8 text-center">
+      <div className="rounded-(--radius-card) border border-dashed border-hairline bg-card-soft/60 px-6 py-8 text-center">
         <p className="text-sm font-medium text-ink">Kupon pominięty</p>
         <p className="mx-auto mt-1 max-w-sm text-xs leading-relaxed text-muted">
           Model i tak rozliczy go w tle (do nauki). Zamówiliśmy przeliczenie —
@@ -104,7 +104,7 @@ export function PominKupon({
         </p>
         <button
           onClick={przywroc}
-          className="mt-3 rounded-md border border-hairline px-3 py-1.5 text-xs font-medium text-ink-soft transition-colors hover:bg-paper"
+          className="mt-3 rounded-(--radius-control) border border-hairline bg-card px-3 py-1.5 text-xs font-medium text-ink-soft shadow-(--shadow-card) transition-colors hover:bg-card-soft"
         >
           Cofnij — przywróć kupon
         </button>
@@ -116,8 +116,8 @@ export function PominKupon({
     <div>
       {children}
       {przebudowa && (
-        <p className="mt-1.5 rounded-md bg-data-amber-wash px-2 py-1 text-[11px] text-data-amber-ink">
-          🔄 zaplanowano przebudowę: gdy składy wszystkich meczów zostaną
+        <p className="mt-1.5 rounded-(--radius-control) bg-data-amber-wash px-2.5 py-1 text-[11px] text-data-amber-ink">
+          ↻ zaplanowano przebudowę: gdy składy wszystkich meczów zostaną
           potwierdzone, model złoży ten kupon od nowa na pewnych XI
         </p>
       )}
@@ -125,27 +125,27 @@ export function PominKupon({
         {pokazPrzebuduj && !przebudowa && stan !== "wybor" && (
           <button
             onClick={zaplanujPrzebudowe}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-hairline bg-card px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:border-data-amber/50 hover:text-data-amber-ink"
+            className="inline-flex items-center gap-1.5 rounded-(--radius-control) border border-hairline bg-card px-3 py-1.5 text-xs font-medium text-muted shadow-(--shadow-card) transition-colors hover:border-data-amber/50 hover:text-data-amber-ink"
             title="Kupon zostanie pominięty i złożony od nowa dopiero, gdy składy WSZYSTKICH jego meczów będą potwierdzone — mniej zwrotów i anulowań"
           >
-            🔄 przebuduj po składach
+            ↻ przebuduj po składach
           </button>
         )}
         {stan === "wybor" ? (
-          <span className="flex flex-wrap items-center gap-1.5 rounded-lg border border-hairline bg-card px-2 py-1.5">
+          <span className="flex flex-wrap items-center gap-1.5 rounded-(--radius-control) border border-hairline bg-card px-2 py-1.5 shadow-(--shadow-card)">
             <span className="pl-1 text-xs text-faint">dlaczego pomijasz?</span>
             {POWODY.map((p) => (
               <button
                 key={p}
                 onClick={() => pomin(p)}
-                className="rounded-md bg-paper px-2.5 py-1 text-xs font-medium text-ink-soft transition-colors hover:bg-data-red/10 hover:text-data-red"
+                className="rounded-md bg-card-soft px-2.5 py-1 text-xs font-medium text-ink-soft transition-colors hover:bg-data-red-wash hover:text-data-red-ink"
               >
                 {p}
               </button>
             ))}
             <button
               onClick={() => setStan("aktywny")}
-              className="px-1.5 text-xs text-faint hover:text-muted"
+              className="px-1.5 text-xs text-faint transition-colors hover:text-muted"
               aria-label="anuluj pomijanie"
             >
               ✕
@@ -155,7 +155,7 @@ export function PominKupon({
           <button
             onClick={() => setStan("wybor")}
             disabled={stan === "wysylam"}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-hairline bg-card px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:border-data-red/40 hover:text-data-red disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-(--radius-control) border border-hairline bg-card px-3 py-1.5 text-xs font-medium text-muted shadow-(--shadow-card) transition-colors hover:border-data-red/40 hover:text-data-red-ink disabled:border-hairline disabled:bg-card-soft disabled:text-faint disabled:shadow-none"
             title="Kupon zniknie z aktywnych i zwolni miejsce na nowy; w tle zostanie rozliczony, żeby model się uczył"
           >
             {stan === "blad"
@@ -194,7 +194,7 @@ export function ZastosujZamiane({ klucz }: { klucz?: string }) {
         }
       }}
       disabled={st === "sending"}
-      className="mt-2 rounded-md border border-brand/40 bg-brand-wash px-2.5 py-1 text-xs font-semibold text-brand-deep transition-colors hover:bg-brand-wash/70 disabled:opacity-50"
+      className="mt-2 rounded-(--radius-control) border border-brand/40 bg-brand-wash px-2.5 py-1 text-xs font-semibold text-brand-deep transition-colors hover:bg-brand-wash/70 disabled:border-hairline disabled:bg-card-soft disabled:text-faint"
     >
       {st === "err"
         ? "nie udało się — spróbuj ponownie"
@@ -226,16 +226,16 @@ export function ProfilKuponow() {
   return (
     <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
       <span className="text-faint">charakter kuponów:</span>
-      <span className="inline-flex overflow-hidden rounded-lg border border-hairline">
+      <span className="inline-flex rounded-(--radius-control) border border-hairline bg-paper p-0.5">
         {(["bezpieczny", "zbalansowany", "agresywny"] as const).map((p) => (
           <button
             key={p}
             onClick={() => ustaw(p)}
             disabled={zapis}
-            className={`px-2.5 py-1 transition-colors ${
+            className={`rounded-lg px-2.5 py-1 transition-colors ${
               profil === p
-                ? "bg-brand text-on-brand"
-                : "bg-card text-muted hover:bg-paper"
+                ? "bg-card font-medium text-ink shadow-(--shadow-card)"
+                : "text-muted hover:text-ink"
             }`}
             title={
               p === "bezpieczny"

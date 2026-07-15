@@ -55,7 +55,7 @@ export default async function MeczePage() {
         lead="Każdy mecz przeskanowany przez model — kliknij, żeby wejść na stronę meczu z TOP POKRYCIA (zawodnicy z najlepszym pokryciem linii) i okazjami."
       />
 
-      <div className="mt-7 grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {posortowane.map((m, i) => {
           const n = okazjeByMecz.get(m.id) ?? 0;
           const nSug = sugestieByMecz.get(m.id) ?? 0;
@@ -65,29 +65,35 @@ export default async function MeczePage() {
             <Reveal key={m.id} delay={Math.min(i * 0.05, 0.3)}>
               <Link
                 href={`/mecze/${m.id}`}
-                className="group flex h-full flex-col rounded-2xl border border-hairline bg-card p-5 shadow-(--shadow-card) transition-all hover:-translate-y-1 hover:border-brand/30 hover:shadow-(--shadow-card-hover)"
+                className="group flex h-full flex-col rounded-(--radius-card) border border-hairline bg-card p-5 shadow-(--shadow-card) transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-(--shadow-card-hover)"
               >
+                {/* pasek górny: termin gry + status składów */}
                 <div className="flex items-center justify-between gap-2">
                   <span
-                    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium ${
+                    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
                       czas.soon
                         ? "bg-data-amber-wash text-data-amber-ink"
-                        : "bg-paper text-muted"
+                        : "border border-hairline bg-card-soft text-ink-soft"
                     }`}
                   >
-                    {czas.soon && <span aria-hidden className="live-dot h-1.5 w-1.5 rounded-full bg-data-amber" />}
+                    {czas.soon && (
+                      <span
+                        aria-hidden
+                        className="live-dot h-1.5 w-1.5 rounded-full bg-data-amber"
+                      />
+                    )}
                     {czas.label}
                   </span>
                   {m.sklady_ogloszone ? (
                     <span
-                      className="inline-flex items-center gap-1 rounded-full bg-data-green-wash px-2.5 py-1 text-[11px] font-medium text-brand-deep"
+                      className="inline-flex items-center gap-1 rounded-full bg-data-green-wash px-2.5 py-1 text-[11px] font-medium text-data-green-ink"
                       title="Oficjalne jedenastki znane — model przeliczony na pewnych składach"
                     >
                       ✓ składy
                     </span>
                   ) : (
                     <span
-                      className="inline-flex items-center rounded-full bg-paper px-2.5 py-1 text-[11px] text-faint"
+                      className="inline-flex items-center rounded-full bg-card-soft px-2.5 py-1 text-[11px] text-faint"
                       title="Oficjalne składy ok. 1 h przed meczem — wtedy model przelicza wszystko od nowa"
                     >
                       składy ~1 h przed
@@ -95,23 +101,31 @@ export default async function MeczePage() {
                   )}
                 </div>
 
-                <div className="mt-4 flex-1">
-                  <p className="text-lg font-bold leading-snug">{m.gospodarz}</p>
-                  <p className="my-0.5 text-xs font-medium uppercase tracking-widest text-faint">
+                {/* drużyny */}
+                <div className="mt-5 flex-1">
+                  <p className="font-display text-lg font-bold leading-snug tracking-tight">
+                    {m.gospodarz}
+                  </p>
+                  <p className="my-1 flex items-center gap-2 text-[10px] font-medium uppercase tracking-widest text-faint">
+                    <span aria-hidden className="h-px w-4 bg-hairline-strong" />
                     kontra
                   </p>
-                  <p className="text-lg font-bold leading-snug">{m.gosc}</p>
+                  <p className="font-display text-lg font-bold leading-snug tracking-tight">
+                    {m.gosc}
+                  </p>
                 </div>
 
                 {m.sedzia && (
-                  <p className="mt-3 text-xs text-muted">
-                    Sędzia: {m.sedzia}{" "}
+                  <p className="mt-4 flex flex-wrap items-center gap-1.5 text-xs text-muted">
+                    <span className="inline-flex items-center rounded-full border border-hairline bg-card-soft px-2.5 py-1">
+                      Sędzia: {m.sedzia}
+                    </span>
                     {Math.abs(m.sedzia_mnoznik_fauli - 1) > 0.05 && (
                       <span
-                        className={`font-data ml-1 rounded px-1 py-0.5 ${
+                        className={`font-data inline-flex items-center rounded-full px-2 py-1 font-semibold ${
                           m.sedzia_mnoznik_fauli > 1
-                            ? "bg-data-red-wash text-data-red"
-                            : "bg-data-green-wash text-brand-deep"
+                            ? "bg-data-red-wash text-data-red-ink"
+                            : "bg-data-green-wash text-data-green-ink"
                         }`}
                         title="Ile fauli gwiżdże ten sędzia względem średniej ligi"
                       >
@@ -124,21 +138,23 @@ export default async function MeczePage() {
                 <div className="mt-4 flex items-center justify-between gap-2 border-t border-hairline pt-3.5 text-sm">
                   <span className="flex items-center gap-2">
                     <span
-                      className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${
-                        n > 0 ? "bg-brand-wash text-brand-deep" : "bg-paper text-faint"
+                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                        n > 0
+                          ? "bg-brand-wash text-brand-deep"
+                          : "bg-card-soft text-faint"
                       }`}
                     >
                       {n === 0 ? "0 okazji" : n === 1 ? "1 okazja" : `${n} okazji`}
                     </span>
                     {nSug > 0 && (
-                      <span className="inline-flex items-center rounded-md bg-data-amber-wash px-2 py-0.5 text-xs font-medium text-data-amber-ink">
+                      <span className="inline-flex items-center rounded-full bg-data-amber-wash px-2.5 py-0.5 text-xs font-medium text-data-amber-ink">
                         {nSug} sug. STS
                       </span>
                     )}
                   </span>
                   {best !== undefined ? (
                     <span
-                      className="font-data font-semibold text-data-green"
+                      className="font-data font-semibold text-data-green-ink"
                       title="Najlepsza wartość wśród okazji z tego meczu"
                     >
                       do +{best.toFixed(0)}%

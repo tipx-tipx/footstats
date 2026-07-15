@@ -31,29 +31,38 @@ export function CalibrationChart({
         role="group"
         aria-label="Wykres kalibracji: przewidywana szansa na osi poziomej, rzeczywista częstość na pionowej. Punkty poniżej opisują pojedyncze kubełki."
       >
-        {/* siatka */}
+        {/* siatka recesywna: linie hairline co 25%, etykiety wybiórczo
+            (0 / 50 / 100), oś bazowa odrobinę mocniejsza */}
         {[0, 0.25, 0.5, 0.75, 1].map((t) => (
           <g key={t}>
             <line
               x1={x(t)} y1={y(0)} x2={x(t)} y2={y(1)}
-              stroke="var(--color-hairline)" strokeWidth="1"
+              stroke={t === 0 ? "var(--color-hairline-strong)" : "var(--color-hairline)"}
+              strokeWidth="1"
+              strokeLinecap="round"
             />
             <line
               x1={x(0)} y1={y(t)} x2={x(1)} y2={y(t)}
-              stroke="var(--color-hairline)" strokeWidth="1"
+              stroke={t === 0 ? "var(--color-hairline-strong)" : "var(--color-hairline)"}
+              strokeWidth="1"
+              strokeLinecap="round"
             />
-            <text
-              x={x(t)} y={size - pad + 16} textAnchor="middle"
-              className="fill-(--color-faint)" fontSize="10"
-            >
-              {Math.round(t * 100)}%
-            </text>
-            <text
-              x={pad - 8} y={y(t) + 3} textAnchor="end"
-              className="fill-(--color-faint)" fontSize="10"
-            >
-              {Math.round(t * 100)}%
-            </text>
+            {(t === 0 || t === 0.5 || t === 1) && (
+              <>
+                <text
+                  x={x(t)} y={size - pad + 16} textAnchor="middle"
+                  className="fill-(--color-faint)" fontSize="10"
+                >
+                  {Math.round(t * 100)}%
+                </text>
+                <text
+                  x={pad - 8} y={y(t) + 3} textAnchor="end"
+                  className="fill-(--color-faint)" fontSize="10"
+                >
+                  {Math.round(t * 100)}%
+                </text>
+              </>
+            )}
           </g>
         ))}
         {/* przekątna ideału */}
@@ -82,8 +91,10 @@ export function CalibrationChart({
             cx={x(b.p_pred)}
             cy={y(b.p_real)}
             r={5 + 5 * Math.sqrt(b.n / maxN)}
-            fill="var(--color-data-green)"
-            fillOpacity={hover === i ? 0.95 : 0.75}
+            // kolor MARKI, nie statusowy: punkt nie mówi "dobrze/źle",
+            // tylko "tu leży kubełek" — zieleń statusowa byłaby myląca
+            fill="var(--color-brand)"
+            fillOpacity={hover === i ? 0.95 : 0.72}
             stroke="var(--color-card)"
             strokeWidth="2"
             className="cursor-pointer outline-none focus-visible:stroke-(--color-brand)"
@@ -114,7 +125,7 @@ export function CalibrationChart({
       </svg>
       {hover !== null && bins[hover] && (
         <div
-          className="pointer-events-none absolute rounded-lg border border-hairline bg-card px-2.5 py-1.5 text-xs shadow-(--shadow-card-hover)"
+          className="pointer-events-none absolute rounded-(--radius-control) border border-hairline bg-card px-2.5 py-1.5 text-xs shadow-(--shadow-card-hover)"
           style={{
             left: Math.min(x(bins[hover].p_pred) + 10, size - 190),
             top: Math.max(y(bins[hover].p_real) - 34, 2),

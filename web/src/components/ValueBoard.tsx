@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, useReducedMotion } from "framer-motion";
+import { motion } from "framer-motion";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { BetCard } from "./BetCard";
@@ -117,7 +117,6 @@ export function ValueBoard({
   );
   const [sortuj, setSortuj] = useState<SortKey>("ranking");
   const [limit, setLimit] = useState(25);
-  const reduced = useReducedMotion();
 
   const liczbaSugestii = useMemo(
     () => bets.filter((b) => b.sugestia).length,
@@ -368,7 +367,7 @@ export function ValueBoard({
             {liczbaSugestii > 0 && (
               <button
                 onClick={() => setRodzaj("sugestie")}
-                className="mt-4 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-on-brand transition-colors hover:bg-brand-deep"
+                className="mt-4 rounded-(--radius-control) bg-brand px-4 py-2 text-sm font-semibold text-on-brand shadow-(--shadow-card) transition-colors hover:bg-brand-strong"
               >
                 Zobacz sugestie STS ({liczbaSugestii})
               </button>
@@ -385,7 +384,7 @@ export function ValueBoard({
             </p>
             <button
               onClick={wyczyscFiltry}
-              className="mt-4 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-on-brand transition-colors hover:bg-brand-deep"
+              className="mt-4 rounded-(--radius-control) bg-brand px-4 py-2 text-sm font-semibold text-on-brand shadow-(--shadow-card) transition-colors hover:bg-brand-strong"
             >
               Wyczyść filtry
             </button>
@@ -399,7 +398,7 @@ export function ValueBoard({
             key={bet.id}
             id={`bet-${bet.id}`}
             className="scroll-mt-24"
-            initial={reduced ? false : { opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: Math.min(i * 0.03, 0.4), duration: 0.3 }}
           >

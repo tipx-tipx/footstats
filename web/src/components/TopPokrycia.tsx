@@ -33,10 +33,10 @@ function Chip({
   return (
     <button
       onClick={onClick}
-      className={`whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+      className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
         active
-          ? "bg-brand text-on-brand"
-          : "bg-card text-muted hover:bg-paper hover:text-ink"
+          ? "border-brand bg-brand text-on-brand shadow-(--shadow-card)"
+          : "border-hairline bg-card text-muted hover:bg-card-soft hover:text-ink"
       }`}
     >
       {children}
@@ -81,7 +81,7 @@ export function TopPokrycia({
 
   if (wiersze.length === 0) {
     return (
-      <p className="mt-5 rounded-xl border border-hairline bg-card px-4 py-3.5 text-sm text-muted shadow-(--shadow-card)">
+      <p className="mt-5 rounded-(--radius-card) border border-hairline bg-card px-4 py-3.5 text-sm text-muted shadow-(--shadow-card)">
         Brak zawodników z pokryciem w ostatnich 5 startach — pojawią się, gdy
         zbierze się dość historii (albo po ogłoszeniu składów).
       </p>
@@ -110,8 +110,10 @@ export function TopPokrycia({
         // do kolejnego tapnięcia gdzie indziej (proste, bez wyścigu ze
         // zdarzeniami mouseenter, które przeglądarki syntetyzują po dotyku)
         onClick={pokaz}
-        className={`font-data inline-flex h-6 w-6 cursor-default items-center justify-center rounded text-[11px] font-semibold text-on-brand transition-transform hover:scale-110 ${
-          zaliczyl ? "bg-data-green" : "bg-data-red"
+        className={`font-data inline-flex h-6 w-6 cursor-default items-center justify-center rounded-md text-[11px] font-semibold transition-transform hover:scale-110 ${
+          zaliczyl
+            ? "bg-data-green text-on-brand"
+            : "border border-hairline-strong bg-card-soft text-muted"
         }`}
       >
         {g.v}
@@ -128,7 +130,7 @@ export function TopPokrycia({
           (pokrycie z reprezentacji).
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="rounded bg-data-amber-wash px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-data-amber-ink">
+          <span className="rounded-full bg-data-amber-wash px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-data-amber-ink">
             forma klubowa
           </span>
           rezerwa kadry — liczone z klubu (niżej)
@@ -137,17 +139,17 @@ export function TopPokrycia({
           1+/2+/3+ = pokrycie linii · najedź na boks: rywal, minuty, data
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="font-data font-semibold text-data-green">+%</span>
+          <span className="font-data font-semibold text-data-green-ink">+%</span>
           <span>
             wartość: ile płaci kurs względem pokrycia (zgrubnie, próba 5 —{" "}
-            <span className="text-data-green">zielony</span> = opłaca się,{" "}
+            <span className="text-data-green-ink">zielony</span> = opłaca się,{" "}
             <span className="text-faint">szary</span> = znikomo)
           </span>
         </span>
       </div>
 
       {/* filtry */}
-      <div className="mt-3 flex flex-col gap-2">
+      <div className="mt-3.5 flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="mr-1 text-[11px] uppercase tracking-wide text-faint">
             drużyna
@@ -186,7 +188,7 @@ export function TopPokrycia({
             className={`ml-1 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
               bezKursu
                 ? "border-brand/40 bg-brand-wash text-brand-deep"
-                : "border-hairline bg-card text-faint hover:bg-paper"
+                : "border-hairline bg-card text-faint hover:bg-card-soft hover:text-ink"
             }`}
             title="Rynki, których Superbet nie kwotuje (niecelne, zablokowane) — zawsze bez kursu"
           >
@@ -195,22 +197,31 @@ export function TopPokrycia({
         </div>
       </div>
 
-      {/* tabela */}
-      <div className="mt-3 overflow-x-auto rounded-2xl border border-hairline bg-card shadow-(--shadow-card)">
+      {/* tabela — przewija się w kontenerze (poziomo na mobile),
+          nagłówek kolumn przyklejony u góry */}
+      <div className="mt-3.5 max-h-[75vh] overflow-auto rounded-(--radius-card) border border-hairline bg-card shadow-(--shadow-card)">
         <table className="w-full min-w-[720px] text-sm">
           <thead>
-            <tr className="border-b border-hairline text-left text-[11px] uppercase tracking-wide text-faint">
-              <th className="px-4 py-2.5 font-medium">rynek</th>
-              <th className="px-4 py-2.5 font-medium">zawodnik</th>
-              <th className="px-4 py-2.5 font-medium">ostatnie 5 startów</th>
-              <th className="px-4 py-2.5 font-medium">pokrycie · kurs · wartość</th>
+            <tr className="text-left text-[11px] uppercase tracking-wide text-faint">
+              <th className="sticky top-0 z-[1] border-b border-hairline bg-card px-4 py-2.5 font-medium">
+                rynek
+              </th>
+              <th className="sticky top-0 z-[1] border-b border-hairline bg-card px-4 py-2.5 font-medium">
+                zawodnik
+              </th>
+              <th className="sticky top-0 z-[1] border-b border-hairline bg-card px-4 py-2.5 font-medium">
+                ostatnie 5 startów
+              </th>
+              <th className="sticky top-0 z-[1] border-b border-hairline bg-card px-4 py-2.5 font-medium">
+                pokrycie · kurs · wartość
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-hairline">
             {pokazane.map((w, i) => (
               <tr
                 key={`${w.player_id}-${w.rynek_kod}-${i}`}
-                className="align-top transition-colors hover:bg-paper/50"
+                className="align-top transition-colors even:bg-card-soft hover:bg-brand-wash/40"
               >
                 <td className="whitespace-nowrap px-4 py-3 font-medium">
                   {w.rynek}
@@ -221,7 +232,7 @@ export function TopPokrycia({
                     <span className="text-xs text-faint">{w.druzyna}</span>
                     {!w.kadraRegularny && (
                       <span
-                        className="inline-flex rounded bg-data-amber-wash px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-data-amber-ink"
+                        className="inline-flex rounded-full bg-data-amber-wash px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-data-amber-ink"
                         title="Zawodnik nie ma 5 startów w reprezentacji w dostępnej historii — rezerwa kadry, statystyki liczone z klubu. Na mecz reprezentacji traktuj ostrożnie."
                       >
                         forma klubowa
@@ -243,33 +254,33 @@ export function TopPokrycia({
                     {w.linie.map((l) => (
                       <span
                         key={l.linia}
-                        className="inline-flex items-center gap-1.5 rounded-md border border-hairline bg-paper px-2 py-1 text-xs"
+                        className="inline-flex items-stretch overflow-hidden rounded-(--radius-control) border border-hairline bg-card text-xs"
                       >
-                        <span className="font-data font-semibold text-faint">
+                        <span className="font-data flex items-center bg-card-soft px-2 py-1 font-semibold text-ink-soft">
                           {l.prog}+
                         </span>
                         <span
-                          className={`font-data font-semibold ${
+                          className={`font-data flex items-center border-l border-hairline px-2 py-1 font-semibold ${
                             l.pokryte === w.probka
-                              ? "text-data-green"
-                              : "text-brand-deep"
+                              ? "text-data-green-ink"
+                              : "text-ink"
                           }`}
                         >
                           {l.pokryte}/{w.probka}
                         </span>
                         {l.kurs != null && (
-                          <span className="font-data text-muted">
+                          <span className="font-data flex items-center border-l border-hairline px-2 py-1 text-muted">
                             @{fmtKurs(l.kurs)}
                           </span>
                         )}
                         {l.evPct != null && (
                           <span
                             title="Zgrubny sygnał wartości: ile dałby ten zakład, gdyby surowe pokrycie było prawdziwą szansą (pokrycie × kurs − 1). To NIE jest przewaga silnika — próba tylko 5 startów, bez kalibracji i kontekstu. Odsiewa kursy typu „5/5 @1,01”."
-                            className={`font-data font-semibold ${
+                            className={`font-data flex items-center border-l border-hairline px-2 py-1 font-semibold ${
                               l.evPct >= 8
-                                ? "text-data-green"
+                                ? "bg-data-green-wash text-data-green-ink"
                                 : l.evPct < 0
-                                  ? "text-data-red"
+                                  ? "bg-data-red-wash text-data-red-ink"
                                   : "text-faint"
                             }`}
                           >
@@ -298,7 +309,7 @@ export function TopPokrycia({
         {widoczne.length > LIMIT && (
           <button
             onClick={() => setRozwin((v) => !v)}
-            className="rounded-lg border border-hairline bg-card px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-paper hover:text-ink"
+            className="rounded-(--radius-control) border border-hairline bg-card px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-card-soft hover:text-ink"
           >
             {rozwin
               ? "Zwiń listę"
@@ -310,7 +321,7 @@ export function TopPokrycia({
       {/* płynny tooltip kafelka (fixed — nigdy nieprzycięty przez tabelę) */}
       <div
         aria-hidden
-        className={`pointer-events-none fixed z-50 -translate-x-1/2 -translate-y-full rounded-lg bg-ink px-2.5 py-1.5 text-paper shadow-lg transition-all duration-150 ease-out ${
+        className={`pointer-events-none fixed z-50 -translate-x-1/2 -translate-y-full rounded-lg bg-ink px-2.5 py-1.5 text-paper shadow-(--shadow-pop) transition-all duration-150 ease-out ${
           tip ? "opacity-100" : "translate-y-[calc(-100%+4px)] opacity-0"
         }`}
         style={tip ? { left: tip.x, top: tip.y - 8 } : { left: -9999, top: -9999 }}

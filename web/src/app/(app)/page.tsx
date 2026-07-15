@@ -1,6 +1,6 @@
 import { Hero } from "@/components/Hero";
 import { ValueBoard } from "@/components/ValueBoard";
-import { getMeta, getValueBets, getZawodnicy } from "@/lib/data";
+import { getKalibracja, getMeta, getValueBets, getZawodnicy } from "@/lib/data";
 
 export default async function OkazjePage({
   searchParams,
@@ -8,17 +8,18 @@ export default async function OkazjePage({
   searchParams: Promise<{ mecz?: string; rodzaj?: string }>;
 }) {
   const { mecz, rodzaj } = await searchParams;
-  const [bets, zawodnicy, meta] = await Promise.all([
+  const [bets, zawodnicy, meta, kalibracja] = await Promise.all([
     getValueBets(),
     getZawodnicy(),
     getMeta(),
+    getKalibracja(),
   ]);
 
   const okazje = bets.filter((b) => !b.sugestia);
   const sugestie = bets.filter((b) => b.sugestia);
-  const naj = okazje.find((b) => b.ev_pct != null);
-  const wysokaPewnosc = okazje.filter((b) => b.pewnosc === "wysoka").length;
-  const topBet = naj ?? sugestie[0] ?? null;
+  // żywy podgląd w hero: do 4 najlepszych pozycji rankingu silnika
+  // (kolejność wejściowa = ranking), sugestie tylko gdy brak innych
+  const spotlight = (okazje.length > 0 ? okazje : sugestie).slice(0, 4);
   const aktualizacja = new Intl.DateTimeFormat("pl-PL", {
     hour: "2-digit",
     minute: "2-digit",
@@ -31,12 +32,10 @@ export default async function OkazjePage({
         liga={meta.liga}
         sezon={meta.sezon}
         aktualizacja={aktualizacja}
-        okazje={okazje.length}
-        wysokaPewnosc={wysokaPewnosc}
-        najlepszaEv={naj?.ev_pct ?? null}
-        mecze={meta.meczow_demo}
-        topBet={topBet}
-        liczbaSugestii={sugestie.length}
+        liczbaOkazji={bets.filter((b) => !b.sugestia).length}
+        predykcjeSprawdzone={kalibracja.razem?.n ?? null}
+        spotlightBets={spotlight}
+        tickerBets={bets.filter((b) => !b.sugestia).slice(0, 14)}
       />
 
       {meta.tryb === "demo" ? (
@@ -55,6 +54,7 @@ export default async function OkazjePage({
         </p>
       ) : null}
 
+      <div id="okazje" className="scroll-mt-24">
       <ValueBoard
         key={rodzaj ?? "domyslny"}
         bets={bets}
@@ -69,6 +69,7 @@ export default async function OkazjePage({
             : undefined
         }
       />
+      </div>
     </>
   );
 }

@@ -54,22 +54,27 @@ export default function JakToDzialaPage() {
       />
 
       <ol className="relative mt-9 max-w-3xl space-y-5">
-        {/* linia łącząca kroki */}
+        {/* linia łącząca kroki — u góry w kolorze marki, niżej wygasa */}
         <span
           aria-hidden
-          className="absolute bottom-8 left-[19px] top-8 w-px bg-hairline-strong"
+          className="absolute bottom-8 left-[19px] top-8 w-px bg-gradient-to-b from-brand-bright/50 via-hairline-strong to-transparent"
         />
         {KROKI.map((k, i) => (
           <Reveal key={k.tytul} delay={Math.min(i * 0.04, 0.2)}>
-            <li className="relative flex gap-5">
+            <li className="relative flex gap-4 sm:gap-5">
               <span
                 aria-hidden
                 className="font-data relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-brand/25 bg-brand-wash text-sm font-semibold text-brand shadow-(--shadow-card)"
               >
                 {i + 1}
               </span>
-              <div className="rounded-2xl border border-hairline bg-card p-5 shadow-(--shadow-card)">
-                <h2 className="font-semibold">{k.tytul}</h2>
+              <div className="min-w-0 flex-1 rounded-(--radius-card) border border-hairline bg-card p-5 shadow-(--shadow-card) transition-shadow hover:shadow-(--shadow-card-hover)">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-faint">
+                  krok {i + 1} z {KROKI.length}
+                </p>
+                <h2 className="mt-1 font-display text-lg font-bold tracking-tight">
+                  {k.tytul}
+                </h2>
                 <p className="mt-1.5 text-sm leading-relaxed text-ink-soft">
                   {k.opis}
                 </p>
@@ -80,7 +85,7 @@ export default function JakToDzialaPage() {
       </ol>
 
       <Reveal className="mt-10">
-        <div className="max-w-3xl rounded-2xl border border-data-amber/40 bg-data-amber-wash p-5 text-sm leading-relaxed text-data-amber-ink-strong">
+        <div className="max-w-3xl rounded-(--radius-card) border border-data-amber/40 bg-data-amber-wash p-5 text-sm leading-relaxed text-data-amber-ink-strong">
           <h2 className="font-semibold">Uczciwe zastrzeżenie</h2>
           <p className="mt-1">
             Model nie zna kontuzji ogłoszonej godzinę temu, konfliktu w szatni

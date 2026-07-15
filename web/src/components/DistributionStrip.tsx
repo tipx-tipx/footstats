@@ -23,7 +23,6 @@ export function ChanceBar({
   line: number;
   side?: "powyzej" | "ponizej";
 }) {
-  const reduced = useReducedMotion();
   return (
     <div className="w-full">
       <div className="flex items-center gap-2.5">
@@ -33,7 +32,7 @@ export function ChanceBar({
           aria-label={`Szansa modelu na ${side === "powyzej" ? "powyżej" : "poniżej"} ${fmtLinia(line)}: ${fmtProc(p)}`}
         >
           <motion.div
-            initial={reduced ? false : { width: 0 }}
+            initial={{ width: `0%` }}
             animate={{ width: `${p * 100}%` }}
             transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
             className="absolute inset-y-0 left-0 rounded-full"
@@ -98,7 +97,7 @@ export function OutcomeColumns({
           return (
             <div key={k} className="relative flex-1" style={{ minWidth: 14 }}>
               <motion.div
-                initial={reduced ? false : { height: 0 }}
+                initial={{ height: 0 }}
                 animate={{ height: h }}
                 transition={{
                   delay: reduced ? 0 : 0.04 * k,

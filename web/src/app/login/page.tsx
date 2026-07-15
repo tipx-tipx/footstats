@@ -1,9 +1,10 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+
+import { Logo } from "@/components/Logo";
 
 export default function LoginPage() {
   const [haslo, setHaslo] = useState("");
@@ -34,8 +35,13 @@ export default function LoginPage() {
 
   return (
     <main className="pitch-grid relative flex min-h-dvh w-full items-center justify-center overflow-hidden px-4">
+      {/* poświata marki za kartą */}
+      <div
+        aria-hidden
+        className="glow-brand pointer-events-none absolute left-1/2 top-1/2 h-[36rem] w-[36rem] -translate-x-1/2 -translate-y-1/2"
+      />
       <motion.div
-        initial={reduced ? false : { opacity: 0, y: 16, scale: 0.98 }}
+        initial={{ opacity: 0, y: 16, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
         className="relative w-full max-w-sm"
@@ -43,21 +49,16 @@ export default function LoginPage() {
         <motion.div
           animate={blad && !reduced ? { x: [0, -8, 8, -5, 5, 0] } : {}}
           transition={{ duration: 0.4 }}
-          className="rounded-2xl border border-hairline bg-card p-8 shadow-(--shadow-card-hover)"
+          className="rounded-(--radius-card) border border-hairline bg-card p-8 shadow-(--shadow-pop)"
         >
           <div className="flex flex-col items-center text-center">
-            <Image
-              src="/logo.png"
-              alt="FootStats"
-              width={160}
-              height={51}
-              priority
-              className="logo-adaptacyjne h-11 w-auto"
-            />
-            <p className="mt-4 text-xs font-medium uppercase tracking-widest text-brand">
+            <Logo className="h-20 w-auto" />
+            <p className="mt-4 text-[11px] font-semibold uppercase tracking-widest text-brand">
               narzędzie prywatne
             </p>
-            <h1 className="mt-1 text-lg font-bold">Podaj hasło, żeby wejść</h1>
+            <h1 className="mt-1 text-base font-semibold text-ink-soft">
+              Podaj hasło, żeby wejść
+            </h1>
           </div>
 
           <form onSubmit={zaloguj} className="mt-6 space-y-3">
@@ -107,7 +108,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={wysylanie || !haslo}
-              className="w-full rounded-xl bg-brand px-4 py-3 text-sm font-semibold text-on-brand transition-all hover:bg-brand-deep disabled:cursor-not-allowed disabled:opacity-50"
+              className="w-full rounded-(--radius-control) bg-brand px-4 py-3 text-sm font-semibold text-on-brand shadow-(--shadow-card) transition-all hover:bg-brand-strong disabled:cursor-not-allowed disabled:bg-card-soft disabled:text-faint disabled:shadow-none"
             >
               {wysylanie ? "Sprawdzam…" : "Wejdź"}
             </button>
