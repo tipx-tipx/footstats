@@ -87,7 +87,7 @@ export function Nav() {
         <Link
           href="/"
           className="shrink-0 rounded-lg transition-opacity hover:opacity-80"
-          aria-label="FootStats — strona główna"
+          aria-label="FootStats, strona główna"
         >
           <Logo className="h-10 w-auto" />
         </Link>

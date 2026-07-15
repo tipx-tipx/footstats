@@ -142,7 +142,7 @@ export async function POST(req: Request) {
       })
       .filter((l) => l.mecz_id && l.podmiot && l.kurs > 1);
     if (legi.length < 2) {
-      return NextResponse.json({ error: "za mało poprawnych legów" }, { status: 400 });
+      return NextResponse.json({ error: "za mało poprawnych typów" }, { status: 400 });
     }
     const sygn = legi
       .map((l) => `${l.mecz_id}:${l.podmiot_id}:${l.rynek_kod}:${l.linia}`)

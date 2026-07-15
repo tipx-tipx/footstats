@@ -1278,7 +1278,7 @@ def _main_impl():
                                     market_bias=bias_map.get(mk, 1.0))
         if probe.lam < (0.35 if mk not in RARE_MARKETS else 0.2):
             _odrzuc(mid, tr, "za_malo_zdarzen",
-                    f"model oczekuje ~{probe.lam:.2f} na mecz — za mało na typ")
+                    f"model oczekuje ~{probe.lam:.2f} na mecz, za mało na typ")
             continue
         line = line_for_lambda(probe.lam)
 
@@ -1550,10 +1550,10 @@ def _main_impl():
                         f"tylko {len(tr.counts)} meczów w historii (potrzeba 5)")
             elif ci_fail and not div_fail:
                 _odrzuc(mid, tr, "chwiejna_predykcja",
-                        "za szerokie widełki szansy — model sam nie jest pewny")
+                        "za szerokie widełki szansy, model sam nie jest pewny")
             else:
                 _odrzuc(mid, tr, "rozjazd_z_rynkiem",
-                        "model za daleko od kursu — zwykle to my czegoś nie wiemy")
+                        "model za daleko od kursu, zwykle to my czegoś nie wiemy")
         for a in best_by_side.values():
             if a.side != "powyzej":
                 continue  # underów nie gramy (decyzja usera)
@@ -1866,7 +1866,7 @@ def _main_impl():
                 if abs(f_sedzia - 1.0) > 0.02 and sed_t.get("sedzia"):
                     czynniki_t.append({
                         "nazwa": "Sędzia",
-                        "opis": f"{sed_t['sedzia']} — "
+                        "opis": f"{sed_t['sedzia']}: "
                                 f"{'surowy' if f_sedzia > 1 else 'pobłażliwy'}",
                         "mnoznik": round(f_sedzia, 2),
                     })
@@ -2049,7 +2049,7 @@ def _main_impl():
             "druzyna": b.get("druzyna", ""),
             "rynek_kod": b["rynek_kod"], "rynek": b["rynek"],
             "powod": "tylko_w_puli",
-            "szczegol": "typ dostępny w generatorze kuponów — na karcie meczu "
+            "szczegol": "typ dostępny w generatorze kuponów. Na karcie meczu "
                         "wygrał inny typ tego rynku",
         })
 

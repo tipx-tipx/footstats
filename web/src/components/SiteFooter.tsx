@@ -29,7 +29,7 @@ export function SiteFooter({
         <div className="max-w-sm">
           <Logo className="h-9 w-auto" />
           <p className="mt-2.5 text-xs leading-relaxed text-faint">
-            Narzędzie analityczne — nie gwarantuje wygranych. Graj
+            Narzędzie analityczne, nie gwarantuje wygranych. Graj
             odpowiedzialnie, obstawiaj wyłącznie u legalnych bukmacherów.
           </p>
         </div>

@@ -167,21 +167,21 @@ def matchup_factor(
         if is_favourite and deep > 1.03:
             if market_code == "shots":
                 f *= 1.0 + 0.5 * (deep - 1.0)
-                opis = "Faworyt przeciw głębokiemu blokowi — dużo prób z dystansu"
+                opis = "Faworyt przeciw głębokiemu blokowi, dużo prób z dystansu"
             else:  # sot
                 f *= 1.0 - 0.25 * (deep - 1.0)
-                opis = "Głęboki blok rywala — trudniej o celny strzał"
+                opis = "Głęboki blok rywala, trudniej o celny strzał"
         # 2: egzekutor stałych/karnych
         if player.takes_setpieces:
             f *= 1.10
-            opis = "Egzekutor stałych fragmentów — dodatkowe strzały"
+            opis = "Egzekutor stałych fragmentów, dodatkowe strzały"
 
     # ---------- STRZAŁY ZZA POLA ----------
     if market_code == "shots_outside_box":
         # 3: strzelec z dystansu vs głęboki blok
         if deep > 1.03:
             f *= 1.0 + 0.6 * (deep - 1.0)
-            opis = "Rywal broni nisko — brak miejsca w polu, strzały z dystansu"
+            opis = "Rywal broni nisko: brak miejsca w polu, strzały z dystansu"
         if player.takes_setpieces:
             f *= 1.08
 
@@ -191,7 +191,7 @@ def matchup_factor(
         blk = _ratio(opp.blocks_made_pm, LG_BLOCKS_MADE, opp.sample)
         f *= 1.0 + 0.5 * (blk - 1.0) + 0.3 * (deep - 1.0)
         if blk > 1.08 or deep > 1.08:
-            opis = "Rywal ustawia dużo ciał w polu — więcej zablokowanych strzałów"
+            opis = "Rywal ustawia dużo ciał w polu, więcej zablokowanych strzałów"
 
     # ---------- STRZAŁY GŁOWĄ ----------
     if market_code in ("headed_shots", "headed_sot"):
@@ -224,31 +224,31 @@ def matchup_factor(
             f *= 1.0 + 0.25 * (_ratio(opp.duels_pm, LG_TEAM_DUELS, opp.sample) - 1.0)
         if player.is_weak_1v1 and press > 1.0:             # 16 (ogrywany 1v1)
             f *= 1.12
-            opis = "Obrońca często ogrywany 1v1 przeciw dryblerom — faule ratunkowe"
+            opis = "Obrońca często ogrywany 1v1 przeciw dryblerom, faule ratunkowe"
         if opp.fastbreak_share is not None:                # 17 (kontry)
             fb = _ratio(opp.fastbreak_share, LG_FASTBREAK_SHARE, opp.sample)
             f *= 1.0 + 0.2 * (fb - 1.0)
             if fb > 1.15 and not opis:
-                opis = "Rywal groźny z kontr — więcej fauli taktycznych"
+                opis = "Rywal groźny z kontr, więcej fauli taktycznych"
         if pos == "M" and player.is_playmaker is False and opp.possession is not None:  # 18
             centralplay = _ratio(opp.possession, LG_TEAM_POSSESSION, opp.sample)
             f *= 1.0 + 0.1 * (centralplay - 1.0)
         if not opis and press > 1.06:
-            opis = "Rywal dużo dryblinguje — więcej fauli w pojedynkach"
+            opis = "Rywal dużo dryblinguje, więcej fauli w pojedynkach"
 
     # ---------- FAULE WYWALCZONE ----------
     if market_code == "fouls_won":
         if player.is_dribbler:                             # 19
             f *= 1.08 + 0.5 * max(_ratio(opp.fouls_pm, LG_TEAM_FOULS, opp.sample) - 1.0, 0)
-            opis = "Dużo dryblinguje — często faulowany"
+            opis = "Dużo dryblinguje, często faulowany"
         if player.is_holdup:                               # 20
             phys = _ratio(opp.duels_pm, LG_TEAM_DUELS, opp.sample)
             f *= 1.06 + 0.3 * (phys - 1.0)
-            opis = "Gra ciałem przeciw fizycznemu rywalowi — wymusza faule"
+            opis = "Gra ciałem przeciw fizycznemu rywalowi, wymusza faule"
         if player.is_playmaker:                            # 21
             f *= 1.07
             if not opis:
-                opis = "Rozgrywający w środku — faulowany, by zatrzymać akcję"
+                opis = "Rozgrywający w środku: faulowany, by zatrzymać akcję"
 
     # ---------- ODBIORY ----------
     if market_code == "tackles" and pos in DEF_POS:
@@ -266,9 +266,9 @@ def matchup_factor(
             st = _ratio(side_threat, LG_TEAM_CONTESTS / 2.0, opp.sample)
             f *= 1.0 + 0.4 * (st - 1.0)
             if st > 1.12:
-                opis = "Broni flanki, którą rywal mocno atakuje — dużo pojedynków"
+                opis = "Broni flanki, którą rywal mocno atakuje – dużo pojedynków"
         if not opis and press > 1.06:
-            opis = "Rywal dużo dryblinguje i wchodzi w pojedynki — więcej odbiorów"
+            opis = "Rywal dużo dryblinguje i wchodzi w pojedynki, więcej odbiorów"
 
     # ---------- PRZECHWYTY ----------
     if market_code == "interceptions" and pos in DEF_POS:
@@ -277,12 +277,12 @@ def matchup_factor(
             lb = _ratio(opp.long_balls_pm, LG_TEAM_LONGBALLS, opp.sample)
             f *= 1.0 + 0.35 * (lb - 1.0)
             if lb > 1.12:
-                opis = "Rywal gra długimi piłkami — więcej okazji do przechwytu"
+                opis = "Rywal gra długimi piłkami, więcej okazji do przechwytu"
         if opp.possession is not None:                     # 29
             pos_ratio = _ratio(opp.possession, LG_TEAM_POSSESSION, opp.sample)
             f *= 1.0 + 0.2 * (pos_ratio - 1.0)
             if not opis and pos_ratio > 1.1:
-                opis = "Rywal dużo gra piłką — więcej podań do przechwycenia"
+                opis = "Rywal dużo gra piłką, więcej podań do przechwycenia"
 
     # ---------- SPALONE ----------
     if market_code == "offsides" and pos in ATT_POS and opp.offsides_forced is not None:
@@ -297,7 +297,7 @@ def matchup_factor(
     if market_code == "yellow_card" and pos in DEF_POS:
         if press > 1.0:                                    # 33
             f *= 1.0 + 0.35 * (press - 1.0)
-            opis = "Broni przeciw dryblerom — większe ryzyko kartki"
+            opis = "Broni przeciw dryblerom, większe ryzyko kartki"
         side = player.side                                 # 35 gwiazda-skrzydło po stronie
         side_threat = opp.right_threat_pm if side == "L" else (
             opp.left_threat_pm if side == "R" else None)
@@ -305,7 +305,7 @@ def matchup_factor(
             st = _ratio(side_threat, LG_TEAM_CONTESTS / 2.0, opp.sample)
             if st > 1.1:
                 f *= 1.0 + 0.25 * (st - 1.0)
-                opis = "Kryje groźnego skrzydłowego — cyniczne faule i kartka"
+                opis = "Kryje groźnego skrzydłowego, cyniczne faule i kartka"
         if player.is_weak_1v1 and opp.fastbreak_share is not None:  # 36
             fb = _ratio(opp.fastbreak_share, LG_FASTBREAK_SHARE, opp.sample)
             if fb > 1.1:
@@ -323,7 +323,7 @@ def matchup_factor(
         if opp.cards_pm is not None:
             f *= 1.0 + 0.3 * (_ratio(opp.cards_pm, LG_TEAM_CARDS, opp.sample) - 1.0)
             if opp.cards_pm > LG_TEAM_CARDS * 1.15:
-                opis = "Obie drużyny grają ostro — więcej kartek"
+                opis = "Obie drużyny grają ostro, więcej kartek"
 
     return cap(f, CAP_MATCHUP), opis
 

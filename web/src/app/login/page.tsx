@@ -101,7 +101,7 @@ export default function LoginPage() {
 
             {blad && (
               <p role="alert" className="text-center text-xs font-medium text-data-red">
-                Nieprawidłowe hasło — spróbuj ponownie.
+                Nieprawidłowe hasło, spróbuj ponownie.
               </p>
             )}
 

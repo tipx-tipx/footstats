@@ -66,7 +66,7 @@ export function FormBars({
                       : "var(--color-hairline-strong)",
                     opacity: short ? 0.45 : 1,
                   }}
-                  title={`${v}${opps?.[i] ? ` vs ${opps[i]}` : ""} — ${
+                  title={`${v}${opps?.[i] ? ` vs ${opps[i]}` : ""}: ${
                     mins ? `${mins[i]} min gry, ` : ""
                   }${values.length - i} ${values.length - i === 1 ? "mecz" : "mecze/-ów"} temu${
                     nt?.[i] ? " · reprezentacja" : ""

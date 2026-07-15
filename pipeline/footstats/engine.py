@@ -135,8 +135,8 @@ def _build_reasoning(
         {
             "nazwa": "Minuty",
             "opis": (
-                "Skład ogłoszony — pewny występ" if mm.official_lineup and mm.p_start > 0.5
-                else "Skład ogłoszony — zawodnik poza XI (możliwe wejście z ławki)"
+                "Skład ogłoszony: pewny występ" if mm.official_lineup and mm.p_start > 0.5
+                else "Skład ogłoszony: zawodnik poza XI (możliwe wejście z ławki)"
                 if mm.official_lineup
                 else f"Przewidywane minuty: {mm.expected_minutes:.0f} "
                 f"(szansa na pierwszy skład: {mm.p_start * 100:.0f}%"
@@ -161,7 +161,7 @@ def _build_reasoning(
         czynniki.append(
             {
                 "nazwa": "Sędzia",
-                "opis": f"{ctx.referee_name} — {kier} (vs średnia ligi)",
+                "opis": f"{ctx.referee_name}: {kier} (vs średnia ligi)",
                 "mnoznik": round(ctx_factors.referee, 2),
             }
         )

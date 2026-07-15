@@ -89,7 +89,7 @@ function odznakiPrzewagi(bet: ValueBet): {
     o.push({
       znak: "↑",
       label: `+${Math.round(bet.ev_uk)}% vs UK`,
-      opis: `Uczciwa cena wg bukmacherów UK (po zdjęciu marży) to ~${fmtKurs(bet.kurs_novig ?? 0)} — Superbet płaci +${bet.ev_uk.toFixed(1).replace(".", ",")}% ponad ten poziom`,
+      opis: `Uczciwa cena wg bukmacherów UK (po zdjęciu marży) to ~${fmtKurs(bet.kurs_novig ?? 0)}, a Superbet płaci +${bet.ev_uk.toFixed(1).replace(".", ",")}% ponad ten poziom`,
       tone: "brand",
     });
   } else if (
@@ -101,7 +101,7 @@ function odznakiPrzewagi(bet: ValueBet): {
     o.push({
       znak: "↑",
       label: "odstaje od rynku",
-      opis: `Bukmacherzy w UK płacą za to średnio ${fmtKurs(bet.kurs_ref)} — kurs Superbetu wyraźnie odstaje w górę`,
+      opis: `Bukmacherzy w UK płacą za to średnio ${fmtKurs(bet.kurs_ref)}, a kurs Superbetu wyraźnie odstaje w górę`,
       tone: "brand",
     });
   }
@@ -109,7 +109,7 @@ function odznakiPrzewagi(bet: ValueBet): {
     o.push({
       znak: "◎",
       label: "matchup",
-      opis: "Profil rywala wyraźnie sprzyja temu rynkowi (co ta drużyna dopuszcza zawodnikom z tej formacji) — liczby w czynniku „Profil rywala”",
+      opis: "Profil rywala wyraźnie sprzyja temu rynkowi (co ta drużyna dopuszcza zawodnikom z tej formacji). Liczby w czynniku „Profil rywala”",
       tone: "brand",
     });
   }
@@ -117,7 +117,7 @@ function odznakiPrzewagi(bet: ValueBet): {
     o.push({
       znak: "↗",
       label: "miękka linia",
-      opis: `Z pozostałych linii Superbetu na ten rynek wynika kurs ~${(bet.kurs_oczekiwany ?? 0).toFixed(2).replace(".", ",")} — ta linia płaci wyraźnie więcej (niespójność siatki bukmachera)`,
+      opis: `Z pozostałych linii Superbetu na ten rynek wynika kurs ~${(bet.kurs_oczekiwany ?? 0).toFixed(2).replace(".", ",")}, a ta linia płaci wyraźnie więcej (niespójność siatki bukmachera)`,
       tone: "brand",
     });
   }
@@ -125,7 +125,7 @@ function odznakiPrzewagi(bet: ValueBet): {
     o.push({
       znak: "↥",
       label: "wchodzi do składu",
-      opis: "Pierwszy występ w XI na tym turnieju — rynek często nie zdążył dograć jego linii",
+      opis: "Pierwszy występ w XI na tym turnieju, rynek często nie zdążył dograć jego linii",
       tone: "amber",
     });
   }
@@ -133,7 +133,7 @@ function odznakiPrzewagi(bet: ValueBet): {
     o.push({
       znak: "◷",
       label: "świeże składy",
-      opis: "Składy potwierdzono w ostatnich ~45 minutach — kursy bywają jeszcze sprzed ogłoszenia XI",
+      opis: "Składy potwierdzono w ostatnich ~45 minutach, więc kursy bywają jeszcze sprzed ogłoszenia XI",
       tone: "amber",
     });
   }
@@ -170,7 +170,7 @@ function PorownanieWycen({
   return (
     <div
       className="rounded-(--radius-control) border border-hairline bg-card p-3.5"
-      title="Trzy spojrzenia na tę samą szansę: jak często wchodziło w ostatnich meczach, ile daje model i na ile wycenia to kurs bukmachera (wycena z kursu zawiera marżę — realna opinia rynku jest odrobinę niższa). Gdy historia i model stoją WYŻEJ niż wycena kursu, bukmacher płaci za dużo."
+      title="Trzy spojrzenia na tę samą szansę: jak często wchodziło w ostatnich meczach, ile daje model i na ile wycenia to kurs bukmachera (wycena z kursu zawiera marżę, więc realna opinia rynku jest odrobinę niższa). Gdy historia i model stoją WYŻEJ niż wycena kursu, bukmacher płaci za dużo."
     >
       <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-faint">
         Historia · model · wycena kursu
@@ -233,11 +233,11 @@ const SWIATLO_STYL = {
   },
   amber: {
     pasek: "bg-data-amber",
-    opis: "Żółte światło: historia i model nie mówią jednym głosem — przeczytaj szczegóły",
+    opis: "Żółte światło: historia i model nie mówią jednym głosem. Przeczytaj szczegóły",
   },
   red: {
     pasek: "bg-data-red",
-    opis: "Czerwone światło: linia przebita w mniej niż 45% ostatnich 10 meczów — historia przeczy typowi",
+    opis: "Czerwone światło: linia przebita w mniej niż 45% ostatnich 10 meczów. Historia przeczy typowi",
   },
 } as const;
 
@@ -257,13 +257,13 @@ function tierPewniaka(bet: ValueBet): {
       return {
         label: "✦ opcja ryzykowna",
         cls: "bg-data-amber-wash text-data-amber-ink",
-        opis: "Wyższa linia przy szansie 40–52% i kursie 1,9+ — świadomie ryzykowny wariant typu bazowego, nie pewniak",
+        opis: "Wyższa linia przy szansie 40–52% i kursie 1,9+: świadomie ryzykowny wariant typu bazowego, nie pewniak",
       };
     }
     return {
       label: "✦ wyższa linia",
       cls: "bg-data-amber-wash text-data-amber-ink",
-      opis: "Perełka: wyższa linia (1,5+) przy wciąż solidnej szansie — wyraźnie lepszy kurs niż na linii 0,5",
+      opis: "Perełka: wyższa linia (1,5+) przy wciąż solidnej szansie i wyraźnie lepszym kursie niż na linii 0,5",
     };
   }
   if (bet.p_model < 0.52) {
@@ -271,33 +271,33 @@ function tierPewniaka(bet: ValueBet): {
       return {
         label: "◆ perełka",
         cls: "bg-data-amber-wash text-data-amber-ink",
-        opis: "Wyższy kurs (1,9+) przy wciąż sensownej szansie — okazjonalny rodzynek na kupon, nie pewniak",
+        opis: "Wyższy kurs (1,9+) przy wciąż sensownej szansie: okazjonalny rodzynek na kupon, nie pewniak",
       };
     }
     return {
       label: "ryzykowny",
       cls: "bg-paper text-muted",
-      opis: "Szansa modelu poniżej 52% bez wysokiego kursu — najsłabsza kategoria, traktuj ostrożnie",
+      opis: "Szansa modelu poniżej 52% bez wysokiego kursu to najsłabsza kategoria, traktuj ostrożnie",
     };
   }
   if (bet.p_model >= 0.75) {
     return {
       label: "★ pewniak",
       cls: "bg-brand-wash text-brand-deep",
-      opis: "Szansa modelu 75%+ — najmocniejsza kategoria typów",
+      opis: "Szansa modelu 75%+ to najmocniejsza kategoria typów",
     };
   }
   if (bet.p_model >= 0.62) {
     return {
       label: "mocny typ",
       cls: "bg-data-green-wash text-data-green-ink",
-      opis: "Szansa modelu 62–74% — solidny typ, ale jeszcze nie pewniak",
+      opis: "Szansa modelu 62–74% to solidny typ, ale jeszcze nie pewniak",
     };
   }
   return {
     label: "umiarkowany",
     cls: "bg-paper text-muted",
-    opis: "Szansa modelu 52–61% — niewiele ponad 50/50, traktuj ostrożnie",
+    opis: "Szansa modelu 52–61% to niewiele ponad 50/50, traktuj ostrożnie",
   };
 }
 
@@ -405,7 +405,7 @@ export const BetCard = memo(function BetCard({
             ) : bet.sugestia || bet.ev_pct == null ? (
               <span
                 className="inline-flex items-center rounded-md bg-data-amber-wash px-2 py-0.5 text-xs font-semibold text-data-amber-ink"
-                title="Rynek dostępny w STS — sprawdź kurs ręcznie"
+                title="Rynek dostępny w STS, sprawdź kurs ręcznie"
               >
                 sprawdź w STS
               </span>
@@ -416,7 +416,7 @@ export const BetCard = memo(function BetCard({
             {odznaki.length > 0 && (
               <span
                 className="font-data hidden items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-brand sm:inline-flex"
-                title={`Ten typ nosi ${odznaki.length} ${odznaki.length === 1 ? "odznakę" : odznaki.length < 5 ? "odznaki" : "odznak"} przewagi — szczegóły w rozwinięciu`}
+                title={`Ten typ nosi ${odznaki.length} ${odznaki.length === 1 ? "odznakę" : odznaki.length < 5 ? "odznaki" : "odznak"} przewagi, szczegóły w rozwinięciu`}
               >
                 ⬡ ×{odznaki.length}
               </span>
@@ -478,9 +478,9 @@ export const BetCard = memo(function BetCard({
                     szans, czyli uczciwy kurs to{" "}
                     <strong className="font-data">{fmtKurs(bet.fair_kurs)}</strong>.
                     <span className="mt-1.5 block">
-                      Kursu nie pobieramy automatycznie (rynek tylko w STS) —{" "}
+                      Kursu nie pobieramy automatycznie (rynek tylko w STS).{" "}
                       <strong>
-                        wartość jest, gdy STS płaci więcej niż ~
+                        Wartość jest, gdy STS płaci więcej niż ~
                         <span className="font-data">
                           {fmtKurs(bet.fair_kurs * 1.05)}
                         </span>
@@ -496,12 +496,11 @@ export const BetCard = memo(function BetCard({
                     <strong className="font-data">{fmtKurs(bet.fair_kurs)}</strong>.{" "}
                     {bet.bukmacher} płaci{" "}
                     <strong className="font-data">
-                      {bet.kurs != null ? fmtKurs(bet.kurs) : "—"}
+                      {bet.kurs != null ? fmtKurs(bet.kurs) : "–"}
                     </strong>
                     {bet.ev_pct != null && bet.ev_pct >= 1 && (
                       <>
-                        {" "}
-                        — o <strong className="font-data">{fmtEV(bet.ev_pct)}</strong>{" "}
+                        , czyli o <strong className="font-data">{fmtEV(bet.ev_pct)}</strong>{" "}
                         więcej, niż wynosi uczciwa wycena. To jest matematyczna
                         przewaga tego typu
                       </>
@@ -509,17 +508,16 @@ export const BetCard = memo(function BetCard({
                     {bet.ev_pct != null &&
                       bet.ev_pct > -1 &&
                       bet.ev_pct < 1 && (
-                        <> — niemal dokładnie tyle, ile wynosi uczciwa wycena</>
+                        <>, czyli niemal dokładnie tyle, ile wynosi uczciwa wycena</>
                       )}
                     {bet.ev_pct != null && bet.ev_pct <= -1 && (
                       <>
-                        {" "}
-                        — o{" "}
+                        , czyli o{" "}
                         <strong className="font-data">
                           {Math.abs(bet.ev_pct).toFixed(1).replace(".", ",")}%
                         </strong>{" "}
                         mniej, niż wynosi uczciwa wycena. Kurs nie daje
-                        matematycznej przewagi — ten typ jest na liście dla
+                        matematycznej przewagi. Ten typ jest na liście dla
                         wysokiej szansy trafienia, nie dla wartości
                       </>
                     )}
@@ -542,8 +540,7 @@ export const BetCard = memo(function BetCard({
                         )}
                         {bet.ev_uk != null && bet.ev_uk >= 4 ? (
                           <>
-                            {" "}
-                            — Superbet daje{" "}
+                            . Superbet daje{" "}
                             <strong className="font-data">
                               +{bet.ev_uk.toFixed(1).replace(".", ",")}%
                             </strong>{" "}
@@ -555,8 +552,7 @@ export const BetCard = memo(function BetCard({
                           bet.kurs_ref != null &&
                           bet.kurs >= bet.kurs_ref * 1.12 && (
                             <>
-                              {" "}
-                              — <strong>Superbet wyraźnie odstaje w górę</strong>.
+                              . <strong>Superbet wyraźnie odstaje w górę</strong>.
                             </>
                           )
                         )}
@@ -569,8 +565,8 @@ export const BetCard = memo(function BetCard({
                     Widełki szansy:{" "}
                     <span className="font-data">
                       {fmtProc(bet.ci[0])}–{fmtProc(bet.ci[1] as number)}
-                    </span>{" "}
-                    — im węższe, tym stabilniejsza predykcja.
+                    </span>
+                    . Im węższe, tym stabilniejsza predykcja.
                   </p>
                 )}
 
@@ -719,7 +715,7 @@ export const BetCard = memo(function BetCard({
                     <div className="rounded-xl border border-hairline bg-card p-4">
                       <div className="mb-3 flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
                         <h4 className="text-xs font-semibold uppercase tracking-wide text-faint">
-                          Ostatnie mecze — {bet.rynek.toLowerCase()}
+                          Ostatnie mecze: {bet.rynek.toLowerCase()}
                         </h4>
                         {zagrane > 0 && (
                           <span
@@ -771,7 +767,7 @@ export const BetCard = memo(function BetCard({
                         <span className="font-data text-ink-soft">
                           {bet.oczekiwane_minuty != null
                             ? Math.round(bet.oczekiwane_minuty)
-                            : "—"}
+                            : "–"}
                         </span>
                       </p>
                       {/* splity kontekstowe — jak linia wchodzi w podpróbkach */}
@@ -788,7 +784,7 @@ export const BetCard = memo(function BetCard({
                               return (
                                 <span
                                   key={s.label}
-                                  title={`${s.opis} — linia ${fmtLinia(bet.linia)} przebita w ${s.traf} z ${s.n} meczów`}
+                                  title={`${s.opis}: linia ${fmtLinia(bet.linia)} przebita w ${s.traf} z ${s.n} meczów`}
                                   className={`font-data inline-flex items-baseline gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
                                     r >= 0.6
                                       ? "bg-data-green-wash text-data-green-ink"
@@ -817,7 +813,7 @@ export const BetCard = memo(function BetCard({
                     <span className="font-data font-semibold text-ink">
                       ~{fmtKurs(bet.fair_kurs * 1.05)}
                     </span>
-                    ? Jest wartość — dodaj zakład w „Moich zakładach”.
+                    ? Jest wartość. Dodaj zakład w „Moich zakładach”.
                   </p>
                 ) : (
                   <button

@@ -76,7 +76,7 @@ export function SkutecznoscDzienna({ dni }: { dni: SkutecznoscDnia[] }) {
               <button
                 key={d.dzien}
                 onClick={() => setI(idx)}
-                title={`${etykietaDnia(d.dzien, true)} — ${d.trafione}/${d.rozliczone} trafionych`}
+                title={`${etykietaDnia(d.dzien, true)}: ${d.trafione}/${d.rozliczone} trafionych`}
                 className={`flex shrink-0 flex-col items-center gap-1 rounded-(--radius-control) px-2 py-1.5 transition-colors ${
                   aktywny ? "bg-brand-wash" : "hover:bg-card-soft"
                 }`}
@@ -171,7 +171,7 @@ export function SkutecznoscDzienna({ dni }: { dni: SkutecznoscDnia[] }) {
                 </span>
               </span>
               <span className="font-data shrink-0 text-xs text-muted">
-                było: {t.faktyczna != null ? t.faktyczna : "—"}
+                było: {t.faktyczna != null ? t.faktyczna : "–"}
               </span>
               {t.clv_pct != null && (
                 <span
@@ -182,7 +182,7 @@ export function SkutecznoscDzienna({ dni }: { dni: SkutecznoscDnia[] }) {
                         ? "bg-data-red-wash text-data-red-ink"
                         : "bg-card text-muted"
                   }`}
-                  title="Closing Line Value — kurs wzięty vs. zamknięcie rynku"
+                  title="Closing Line Value: kurs wzięty vs. zamknięcie rynku"
                 >
                   CLV {t.clv_pct > 0 ? "+" : ""}
                   {t.clv_pct.toFixed(0)}%

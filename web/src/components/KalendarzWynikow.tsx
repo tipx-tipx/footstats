@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 
+import { fmtU } from "@/lib/format";
 import type { SkutecznoscDnia } from "@/lib/types";
 
 /**
@@ -19,11 +20,6 @@ const MIESIACE = [
   "styczeń", "luty", "marzec", "kwiecień", "maj", "czerwiec",
   "lipiec", "sierpień", "wrzesień", "październik", "listopad", "grudzień",
 ];
-
-function fmtU(v: number): string {
-  const s = v.toFixed(2).replace(".", ",").replace(/,?0+$/, "");
-  return `${v > 0 ? "+" : ""}${s === "" || s === "-" ? "0" : s}u`;
-}
 
 /** "YYYY-MM-DD" → [rok, miesiąc 0-11, dzień] bez pułapek stref czasowych. */
 function rozbijDate(dzien: string): [number, number, number] {
@@ -174,7 +170,7 @@ export function KalendarzWynikow({ dni }: { dni: SkutecznoscDnia[] }) {
       </div>
 
       <p className="mt-3 text-[11px] leading-relaxed text-faint">
-        Każdy dzień zostaje w kalendarzu — także stratny. Puste pola = brak
+        Każdy dzień zostaje w kalendarzu, także stratny. Puste pola = brak
         rozliczonych typów.
       </p>
     </div>

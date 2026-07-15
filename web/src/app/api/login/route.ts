@@ -46,7 +46,7 @@ export async function POST(request: Request) {
 
   if (rateLimitOn && rec && rec.count >= RATE_LIMIT_MAX_PROB) {
     return NextResponse.json(
-      { ok: false, error: "zbyt wiele prób — spróbuj ponownie za kilkanaście minut" },
+      { ok: false, error: "zbyt wiele prób, spróbuj ponownie za kilkanaście minut" },
       { status: 429 },
     );
   }

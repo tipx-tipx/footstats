@@ -1,6 +1,15 @@
 import { fmtDataCzas, fmtKurs, fmtLinia, fmtProc, STRONA_LABEL } from "@/lib/format";
 import type { KuponHistoria } from "@/lib/types";
 
+/** Techniczne powody z pipeline'u mówią „leg" (magiczne stringi logiki +
+ *  historyczne dane w Supabase — nie wolno ich zmieniać u źródła);
+ *  tu tłumaczymy je na język UI („typ") wyłącznie do wyświetlenia. */
+function powodPoLudzku(powod: string): string {
+  return powod
+    .replace("wymiana lega", "wymiana typu")
+    .replace("przegranego lega", "przegrany typ");
+}
+
 /**
  * Karta kuponu w historii — zamrożona przy publikacji, rozwijana do pełnego
  * składu legów (zgrupowanych po meczu). Używana i w „Kupony — historia",
@@ -46,8 +55,8 @@ export function KuponHistoriaCard({
                 className="rounded-full bg-card-soft px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-faint"
                 title={
                   k.pomin_powod
-                    ? `Pominięty (${k.pomin_powod}) — niezagrany, rozliczony tylko do nauki modelu`
-                    : "Pominięty przyciskiem — niezagrany, rozliczony tylko po to, żeby model się uczył"
+                    ? `Pominięty (${powodPoLudzku(k.pomin_powod)}): niezagrany, rozliczony tylko do nauki modelu`
+                    : "Pominięty przyciskiem: niezagrany, rozliczony tylko po to, żeby model się uczył"
                 }
               >
                 pominięty
@@ -64,7 +73,7 @@ export function KuponHistoriaCard({
                     ? "bg-card-soft text-faint"
                     : "bg-data-amber-wash text-data-amber-ink"
             }`}
-            title={k.powod}
+            title={k.powod ? powodPoLudzku(k.powod) : undefined}
           >
             {k.wynik === "wygrany"
               ? `✓ wygrany${k.kurs_rozliczony ? ` @${k.kurs_rozliczony.toFixed(2).replace(".", ",")}` : ""}`

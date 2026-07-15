@@ -98,15 +98,15 @@ export function PominKupon({
       <div className="rounded-(--radius-card) border border-dashed border-hairline bg-card-soft/60 px-6 py-8 text-center">
         <p className="text-sm font-medium text-ink">Kupon pominięty</p>
         <p className="mx-auto mt-1 max-w-sm text-xs leading-relaxed text-muted">
-          Model i tak rozliczy go w tle (do nauki). Zamówiliśmy przeliczenie —
-          nowy kupon w tym przedziale pojawi się w kilka minut, o ile pula ma
+          Model i tak rozliczy go w tle (do nauki). Zamówiliśmy przeliczenie.
+          Nowy kupon w tym przedziale pojawi się w kilka minut, o ile pula ma
           inny sensowny zestaw dla tych widełek kursu.
         </p>
         <button
           onClick={przywroc}
           className="mt-3 rounded-(--radius-control) border border-hairline bg-card px-3 py-1.5 text-xs font-medium text-ink-soft shadow-(--shadow-card) transition-colors hover:bg-card-soft"
         >
-          Cofnij — przywróć kupon
+          Cofnij i przywróć kupon
         </button>
       </div>
     );
@@ -126,7 +126,7 @@ export function PominKupon({
           <button
             onClick={zaplanujPrzebudowe}
             className="inline-flex items-center gap-1.5 rounded-(--radius-control) border border-hairline bg-card px-3 py-1.5 text-xs font-medium text-muted shadow-(--shadow-card) transition-colors hover:border-data-amber/50 hover:text-data-amber-ink"
-            title="Kupon zostanie pominięty i złożony od nowa dopiero, gdy składy WSZYSTKICH jego meczów będą potwierdzone — mniej zwrotów i anulowań"
+            title="Kupon zostanie pominięty i złożony od nowa dopiero, gdy składy WSZYSTKICH jego meczów będą potwierdzone. Mniej zwrotów i anulowań"
           >
             ↻ przebuduj po składach
           </button>
@@ -159,10 +159,10 @@ export function PominKupon({
             title="Kupon zniknie z aktywnych i zwolni miejsce na nowy; w tle zostanie rozliczony, żeby model się uczył"
           >
             {stan === "blad"
-              ? "nie udało się — spróbuj ponownie"
+              ? "nie udało się, spróbuj ponownie"
               : stan === "wysylam"
                 ? "pomijam…"
-                : "✕ Nie zagrałem — pomiń"}
+                : "✕ Nie zagrałem – pomiń"}
           </button>
         )}
       </div>
@@ -177,7 +177,7 @@ export function ZastosujZamiane({ klucz }: { klucz?: string }) {
   if (st === "done") {
     return (
       <p className="mt-2 text-xs font-medium text-brand-deep">
-        ✓ zamiana zaplanowana — nowy kupon z wymienionym legiem pojawi się przy
+        ✓ zamiana zaplanowana. Nowy kupon z wymienionym typem pojawi się przy
         najbliższym przeliczeniu (zwykle w kilka minut)
       </p>
     );
@@ -197,7 +197,7 @@ export function ZastosujZamiane({ klucz }: { klucz?: string }) {
       className="mt-2 rounded-(--radius-control) border border-brand/40 bg-brand-wash px-2.5 py-1 text-xs font-semibold text-brand-deep transition-colors hover:bg-brand-wash/70 disabled:border-hairline disabled:bg-card-soft disabled:text-faint"
     >
       {st === "err"
-        ? "nie udało się — spróbuj ponownie"
+        ? "nie udało się, spróbuj ponownie"
         : st === "sending"
           ? "stosuję…"
           : "⇄ Zastosuj zamianę (nowy kupon w tym slocie)"}
@@ -239,9 +239,9 @@ export function ProfilKuponow() {
             }`}
             title={
               p === "bezpieczny"
-                ? "Same kotwice: tylko legi z szansą 58%+"
+                ? "Same kotwice: tylko typy z szansą 58%+"
                 : p === "agresywny"
-                  ? "Więcej matchupów i wyższych linii — styl bet buildera z rodzynkami"
+                  ? "Więcej matchupów i wyższych linii, styl bet buildera z rodzynkami"
                   : "Domyślny balans pewności i kursu"
             }
           >
@@ -249,7 +249,7 @@ export function ProfilKuponow() {
           </button>
         ))}
       </span>
-      <span className="text-faint">— dotyczy nowych kuponów (zamrożone bez zmian)</span>
+      <span className="text-faint">· dotyczy nowych kuponów (zamrożone bez zmian)</span>
     </div>
   );
 }

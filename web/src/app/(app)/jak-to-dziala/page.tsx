@@ -1,12 +1,12 @@
 import { PageHeader } from "@/components/PageHeader";
 import { Reveal } from "@/components/Reveal";
 
-export const metadata = { title: "Jak to działa — FootStats" };
+export const metadata = { title: "Jak to działa – FootStats" };
 
 const KROKI = [
   {
     tytul: "Zbieramy historię",
-    opis: "Dla każdego zawodnika system zna każdy mecz: ile grał minut, ile miał strzałów, fauli, odbiorów. Świeże mecze ważą więcej niż te sprzed pół roku — forma się liczy, ale nie zapominamy o dłuższej historii.",
+    opis: "Dla każdego zawodnika system zna każdy mecz: ile grał minut, ile miał strzałów, fauli, odbiorów. Świeże mecze ważą więcej niż te sprzed pół roku: forma się liczy, ale nie zapominamy o dłuższej historii.",
   },
   {
     tytul: "Liczymy „prawdziwy poziom” zawodnika",
@@ -26,15 +26,15 @@ const KROKI = [
   },
   {
     tytul: "Porównujemy z kursem bukmachera",
-    opis: "Z kursu bukmachera zdejmujemy jego marżę i sprawdzamy, co naprawdę „mówi” o szansie. Jeśli bukmacher wycenia zdarzenie na 45%, a model na 58% — kurs płaci za dużo. Dodatkowo patrzymy na średnią bukmacherów zagranicznych: kurs wyraźnie odstający od reszty rynku to często najlepszy sygnał.",
+    opis: "Z kursu bukmachera zdejmujemy jego marżę i sprawdzamy, co naprawdę „mówi” o szansie. Jeśli bukmacher wycenia zdarzenie na 45%, a model na 58%, to kurs płaci za dużo. Dodatkowo patrzymy na średnią bukmacherów zagranicznych: kurs wyraźnie odstający od reszty rynku to często najlepszy sygnał.",
   },
   {
     tytul: "Oceniamy pewność i ryzyko",
-    opis: "Pewność mówi, ile danych i jak stabilnych stoi za predykcją (mała próba, niepewne minuty = niska pewność). Ryzyko mówi, jak kapryśne jest samo zdarzenie — rzadkie zdarzenia (np. strzały głową) to loteria nawet przy dobrym modelu. Wysokiej wartości bez pewności nie traktujemy poważnie.",
+    opis: "Pewność mówi, ile danych i jak stabilnych stoi za predykcją (mała próba, niepewne minuty = niska pewność). Ryzyko mówi, jak kapryśne jest samo zdarzenie: rzadkie zdarzenia (np. strzały głową) to loteria nawet przy dobrym modelu. Wysokiej wartości bez pewności nie traktujemy poważnie.",
   },
   {
     tytul: "Sprawdzamy sami siebie",
-    opis: "Zakładka „Skuteczność” to test na meczach, których model nie widział podczas nauki. Jeśli mówi „60%”, a zdarzenia zachodzą w 60% przypadków — możesz mu ufać. A Twój dziennik zakładów z CLV pokazuje, czy realnie wyprzedzasz rynek.",
+    opis: "Zakładka „Skuteczność” to test na meczach, których model nie widział podczas nauki. Jeśli mówi „60%”, a zdarzenia zachodzą w 60% przypadków, możesz mu ufać. A Twój dziennik zakładów z CLV pokazuje, czy realnie wyprzedzasz rynek.",
   },
 ];
 
@@ -47,7 +47,7 @@ export default function JakToDzialaPage() {
         lead={
           <>
             Bez żargonu: co się dzieje między „mecz w sobotę” a „ten kurs jest
-            zawyżony”. Osiem kroków — dokładnie w tej kolejności system
+            zawyżony”. Osiem kroków, dokładnie w tej kolejności system
             wykonuje je dla każdego zawodnika i każdego rynku.
           </>
         }
@@ -90,7 +90,7 @@ export default function JakToDzialaPage() {
           <p className="mt-1">
             Model nie zna kontuzji ogłoszonej godzinę temu, konfliktu w szatni
             ani planów trenera. Dlatego nigdy nie pokazujemy zakładów, w których
-            model drastycznie nie zgadza się z rynkiem — najczęściej to rynek
+            model drastycznie nie zgadza się z rynkiem, bo najczęściej to rynek
             wie coś, czego nie wie model. Wartość dodatnia w długiej serii, a
             nie pojedynczy „pewniak”, jest celem tego narzędzia.
           </p>

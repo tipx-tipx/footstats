@@ -110,7 +110,7 @@ export function OutcomeColumns({
                     ? "var(--color-data-green)"
                     : "var(--color-hairline-strong)",
                 }}
-                title={`${k === norm.length - 1 ? `${k}+` : k} — szansa ${fmtProc(p, 1)}`}
+                title={`${k === norm.length - 1 ? `${k}+` : k}: szansa ${fmtProc(p, 1)}`}
               />
               {p >= 0.04 && (
                 <span

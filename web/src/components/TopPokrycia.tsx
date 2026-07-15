@@ -14,7 +14,7 @@ const LIMIT = 40;
 type Tip = { x: number; y: number; g: GraForma } | null;
 
 function dataMeczu(ts: number): string {
-  if (!ts) return "—";
+  if (!ts) return "–";
   return new Intl.DateTimeFormat("pl-PL", {
     day: "numeric",
     month: "short",
@@ -82,7 +82,7 @@ export function TopPokrycia({
   if (wiersze.length === 0) {
     return (
       <p className="mt-5 rounded-(--radius-card) border border-hairline bg-card px-4 py-3.5 text-sm text-muted shadow-(--shadow-card)">
-        Brak zawodników z pokryciem w ostatnich 5 startach — pojawią się, gdy
+        Brak zawodników z pokryciem w ostatnich 5 startach. Pojawią się, gdy
         zbierze się dość historii (albo po ogłoszeniu składów).
       </p>
     );
@@ -133,7 +133,7 @@ export function TopPokrycia({
           <span className="rounded-full bg-data-amber-wash px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-data-amber-ink">
             forma klubowa
           </span>
-          rezerwa kadry — liczone z klubu (niżej)
+          rezerwa kadry, liczone z klubu (niżej)
         </span>
         <span className="text-faint">
           1+/2+/3+ = pokrycie linii · najedź na boks: rywal, minuty, data
@@ -141,7 +141,7 @@ export function TopPokrycia({
         <span className="flex items-center gap-1.5">
           <span className="font-data font-semibold text-data-green-ink">+%</span>
           <span>
-            wartość: ile płaci kurs względem pokrycia (zgrubnie, próba 5 —{" "}
+            wartość: ile płaci kurs względem pokrycia (zgrubnie, próba 5;{" "}
             <span className="text-data-green-ink">zielony</span> = opłaca się,{" "}
             <span className="text-faint">szary</span> = znikomo)
           </span>
@@ -190,7 +190,7 @@ export function TopPokrycia({
                 ? "border-brand/40 bg-brand-wash text-brand-deep"
                 : "border-hairline bg-card text-faint hover:bg-card-soft hover:text-ink"
             }`}
-            title="Rynki, których Superbet nie kwotuje (niecelne, zablokowane) — zawsze bez kursu"
+            title="Rynki, których Superbet nie kwotuje (niecelne, zablokowane), zawsze bez kursu"
           >
             {bezKursu ? "✓ rynki bez kursu" : "+ rynki bez kursu"}
           </button>
@@ -233,7 +233,7 @@ export function TopPokrycia({
                     {!w.kadraRegularny && (
                       <span
                         className="inline-flex rounded-full bg-data-amber-wash px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-data-amber-ink"
-                        title="Zawodnik nie ma 5 startów w reprezentacji w dostępnej historii — rezerwa kadry, statystyki liczone z klubu. Na mecz reprezentacji traktuj ostrożnie."
+                        title="Zawodnik nie ma 5 startów w reprezentacji w dostępnej historii. Rezerwa kadry, statystyki liczone z klubu. Na mecz reprezentacji traktuj ostrożnie."
                       >
                         forma klubowa
                       </span>
@@ -275,7 +275,7 @@ export function TopPokrycia({
                         )}
                         {l.evPct != null && (
                           <span
-                            title="Zgrubny sygnał wartości: ile dałby ten zakład, gdyby surowe pokrycie było prawdziwą szansą (pokrycie × kurs − 1). To NIE jest przewaga silnika — próba tylko 5 startów, bez kalibracji i kontekstu. Odsiewa kursy typu „5/5 @1,01”."
+                            title="Zgrubny sygnał wartości: ile dałby ten zakład, gdyby surowe pokrycie było prawdziwą szansą (pokrycie × kurs − 1). To NIE jest przewaga silnika, bo próba to tylko 5 startów, bez kalibracji i kontekstu. Odsiewa kursy typu „5/5 @1,01”."
                             className={`font-data flex items-center border-l border-hairline px-2 py-1 font-semibold ${
                               l.evPct >= 8
                                 ? "bg-data-green-wash text-data-green-ink"

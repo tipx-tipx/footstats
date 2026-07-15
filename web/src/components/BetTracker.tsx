@@ -85,8 +85,8 @@ export function BetTracker() {
         </span>
         <p className="mt-4 font-semibold">Nie masz jeszcze żadnych zakładów</p>
         <p className="mx-auto mt-1 max-w-sm text-sm leading-relaxed text-muted">
-          Rozwiń interesującą okazję i kliknij „Dodaj do moich zakładów” —
-          wróci tutaj jako wpis do rozliczenia.
+          Rozwiń interesującą okazję i kliknij „Dodaj do moich zakładów”.
+          Wróci tutaj jako wpis do rozliczenia.
         </p>
         <Link
           href="/"
@@ -126,7 +126,7 @@ export function BetTracker() {
               label: "średni CLV",
               value:
                 podsumowanie.sredniCLV === null
-                  ? "—"
+                  ? "–"
                   : `${podsumowanie.sredniCLV > 0 ? "+" : ""}${podsumowanie.sredniCLV
                       .toFixed(1)
                       .replace(".", ",")}%`,
@@ -223,7 +223,7 @@ export function BetTracker() {
                     min={1}
                     step={0.01}
                     value={z.kurs_zamkniecia ?? ""}
-                    placeholder="—"
+                    placeholder="–"
                     onChange={(e) => {
                       const v = Number(e.target.value);
                       updateZaklad(z.id, {

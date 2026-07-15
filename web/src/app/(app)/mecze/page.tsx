@@ -5,7 +5,7 @@ import { Reveal } from "@/components/Reveal";
 import { getMecze, getValueBets } from "@/lib/data";
 import { fmtMnoznik } from "@/lib/format";
 
-export const metadata = { title: "Mecze — FootStats" };
+export const metadata = { title: "Mecze – FootStats" };
 
 /** "dziś 20:00" / "jutro 03:30" / "sob 21:00" — po ludzku, Europe/Warsaw. */
 function kiedy(ts: number): { label: string; soon: boolean } {
@@ -52,7 +52,7 @@ export default async function MeczePage() {
       <PageHeader
         eyebrow="terminarz skanu"
         title="Mecze w analizie"
-        lead="Każdy mecz przeskanowany przez model — kliknij, żeby wejść na stronę meczu z TOP POKRYCIA (zawodnicy z najlepszym pokryciem linii) i okazjami."
+        lead="Każdy mecz przeskanowany przez model. Kliknij, żeby wejść na stronę meczu z TOP POKRYCIA (zawodnicy z najlepszym pokryciem linii) i okazjami."
       />
 
       <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -87,14 +87,14 @@ export default async function MeczePage() {
                   {m.sklady_ogloszone ? (
                     <span
                       className="inline-flex items-center gap-1 rounded-full bg-data-green-wash px-2.5 py-1 text-[11px] font-medium text-data-green-ink"
-                      title="Oficjalne jedenastki znane — model przeliczony na pewnych składach"
+                      title="Oficjalne jedenastki znane, model przeliczony na pewnych składach"
                     >
                       ✓ składy
                     </span>
                   ) : (
                     <span
                       className="inline-flex items-center rounded-full bg-card-soft px-2.5 py-1 text-[11px] text-faint"
-                      title="Oficjalne składy ok. 1 h przed meczem — wtedy model przelicza wszystko od nowa"
+                      title="Oficjalne składy ok. 1 h przed meczem, wtedy model przelicza wszystko od nowa"
                     >
                       składy ~1 h przed
                     </span>

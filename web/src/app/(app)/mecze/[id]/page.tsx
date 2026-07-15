@@ -26,8 +26,8 @@ export async function generateMetadata({
   const mecz = (await getMecze()).find((m) => m.id === Number(id));
   return {
     title: mecz
-      ? `${mecz.gospodarz} – ${mecz.gosc} — FootStats`
-      : "Mecz — FootStats",
+      ? `${mecz.gospodarz} – ${mecz.gosc} · FootStats`
+      : "Mecz · FootStats",
   };
 }
 
@@ -167,7 +167,7 @@ export default async function MeczPage({
             Kupon na ten mecz
           </h2>
           <p className="mt-2 mb-4 max-w-3xl text-sm leading-relaxed text-muted">
-            Złóż AKO z najlepszych legów tego meczu (do 4 wydarzeń) — ustaw kurs
+            Złóż AKO z najlepszych typów tego meczu (do 4 wydarzeń): ustaw kurs
             docelowy i charakter. Ta sama pula i bezpieczniki co kupony automatyczne.
           </p>
           <GeneratorKuponu
@@ -186,7 +186,7 @@ export default async function MeczPage({
         </h2>
         <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted">
           Pokrycie z <strong>ostatnich 5 startów</strong>. Na mecz reprezentacji{" "}
-          <strong>preferujemy starty w kadrze</strong> — a gdy zawodnik gra w niej
+          <strong>preferujemy starty w kadrze</strong>, a gdy zawodnik gra w niej
           za rzadko, liczymy z klubu (oznaczone „forma klubowa”, niżej). Kolumna{" "}
           1+/2+/3+ to pokrycie linii z kursem Superbet. Najedź na boks: rywal,
           minuty, data.
@@ -202,7 +202,7 @@ export default async function MeczPage({
           <details className="group overflow-hidden rounded-(--radius-card) border border-hairline bg-card shadow-(--shadow-card)">
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 text-sm font-semibold [&::-webkit-details-marker]:hidden">
               <span>
-                Czego nie typujemy w tym meczu — i dlaczego
+                Czego nie typujemy w tym meczu i dlaczego
                 <span className="ml-2 text-xs font-normal text-faint">
                   ({odrzucenia.length} sprawdzonych bez typu)
                 </span>
@@ -227,7 +227,7 @@ export default async function MeczPage({
             <div className="space-y-4 border-t border-hairline bg-card-soft px-5 py-4">
               <p className="text-xs leading-relaxed text-muted">
                 Model sprawdza każdego zawodnika i każdy rynek. Gdy typ się nie
-                pojawia, to nie przeoczenie — poniżej dokładny powód dla każdej
+                pojawia, to nie przeoczenie: poniżej dokładny powód dla każdej
                 sprawdzonej pary.
               </p>
               {grupyOdrzucen(odrzucenia).map(([powod, wpisy]) => (
@@ -235,7 +235,7 @@ export default async function MeczPage({
                   <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-faint">
                     {POWOD_LABEL[powod] ?? powod}
                     <span className="ml-1.5 normal-case">
-                      · {wpisy.length} — {wpisy[0].szczegol}
+                      · {wpisy.length} · {wpisy[0].szczegol}
                     </span>
                   </p>
                   <p className="text-xs leading-relaxed text-muted">

@@ -26,7 +26,7 @@ function LegBadges({ l }: { l: KuponLeg }) {
       {l.rotacja && (
         <span
           className="shrink-0 text-[11px] font-semibold text-data-amber-ink"
-          title="Pierwszy występ w XI na tym turnieju — linia rynku bywa niedograna"
+          title="Pierwszy występ w XI na tym turnieju, linia rynku bywa niedograna"
         >
           ↥
         </span>
@@ -43,7 +43,7 @@ function LegBadges({ l }: { l: KuponLeg }) {
   );
 }
 
-export const metadata = { title: "Kupony — FootStats" };
+export const metadata = { title: "Kupony – FootStats" };
 
 const HORYZONTY: {
   kod: "dzienny" | "dlugoterminowy" | "value";
@@ -53,17 +53,17 @@ const HORYZONTY: {
   {
     kod: "dzienny",
     tytul: "Na dziś",
-    opis: "Mecze z dzisiaj (a gdy gra mało drużyn — także z jutra). Krótkie oczekiwanie, więcej wydarzeń z jednego meczu.",
+    opis: "Mecze z dzisiaj (a gdy gra mało drużyn, także z jutra). Krótkie oczekiwanie, więcej wydarzeń z jednego meczu.",
   },
   {
     kod: "dlugoterminowy",
     tytul: "Długoterminowe (1–4 dni)",
-    opis: "Legi rozłożone na kilka dni — model wybiera z pełnej puli nadchodzących meczów, więc jakość legów jest najwyższa.",
+    opis: "Typy rozłożone na kilka dni: model wybiera z pełnej puli nadchodzących meczów, więc jakość typów jest najwyższa.",
   },
   {
     kod: "value",
     tytul: "Value",
-    opis: "Tu wchodzą wyłącznie typy, za które bukmacher płaci wyraźnie więcej, niż wynosi ich uczciwy kurs (co najmniej +2% na typ) — i maksymalnie jeden typ z meczu. Trafia rzadziej niż pewniaki, ale przy dłuższej serii to matematyka gra dla Ciebie.",
+    opis: "Tu wchodzą wyłącznie typy, za które bukmacher płaci wyraźnie więcej, niż wynosi ich uczciwy kurs (co najmniej +2% na typ), i maksymalnie jeden typ z meczu. Trafia rzadziej niż pewniaki, ale przy dłuższej serii to matematyka gra dla Ciebie.",
   },
 ];
 
@@ -81,13 +81,13 @@ export default async function KuponyPage() {
         title="Kupony budowane przez model"
         lead={
           <>
-            Każdy leg przechodzi pełną analizę modelu (historia, minuty, składy
-            z dwóch źródeł, matchup), a do kuponu wchodzą legi o najlepszym
-            stosunku pewności do kursu. Kupon po publikacji jest zamrożony —
+            Każdy typ przechodzi pełną analizę modelu (historia, minuty, składy
+            z dwóch źródeł, matchup), a do kuponu wchodzą typy o najlepszym
+            stosunku pewności do kursu. Kupon po publikacji jest zamrożony:
             nowy w danym przedziale powstaje, gdy poprzedni się rozliczy,
-            gdy ogłoszone składy wywrócą któryś leg albo gdy sam go pominiesz
+            gdy ogłoszone składy wywrócą któryś typ albo gdy sam go pominiesz
             przyciskiem pod kartą (pominięty i tak rozliczy się w tle, żeby
-            model się uczył). Szansa kuponu = iloczyn szans legów (z karą
+            model się uczył). Szansa kuponu = iloczyn szans typów (z karą
             korelacyjną w ramach meczu).
           </>
         }
@@ -127,7 +127,7 @@ export default async function KuponyPage() {
             <div className="border-t border-hairline bg-card-soft p-3 sm:p-4">
               <p className="mb-3 text-xs leading-relaxed text-muted">
                 Złóż kupon z tej samej przeanalizowanej puli, której model używa
-                automatycznie — te same bezpieczniki, kary korelacji i premia za
+                automatycznie: te same bezpieczniki, kary korelacji i premia za
                 wartość. Wybierz mecze (albo zostaw wszystkie), ustaw kurs docelowy
                 i charakter. Gotowy kupon możesz poprawiać: usuń typ, a model
                 dobierze inny; przypnij typ, a zostanie na pewno.
@@ -150,8 +150,8 @@ export default async function KuponyPage() {
             </p>
             <p className="mx-auto mt-1.5 max-w-md text-sm leading-relaxed text-muted">
               Kupon wymaga co najmniej dwóch niezależnych typów z dodatnią
-              wartością i przyzwoitą pewnością. Model nie skleja legów na siłę
-              — kupony pojawią się, gdy rynek da okazje ({meta.liga}{" "}
+              wartością i przyzwoitą pewnością. Model nie skleja typów na siłę.
+              Kupony pojawią się, gdy rynek da okazje ({meta.liga}{" "}
               {meta.sezon}).
             </p>
           </div>
@@ -331,7 +331,7 @@ export default async function KuponyPage() {
                             {li === weakIdx && k.legi.length > 1 && (
                               <span
                                 className="shrink-0 rounded-full bg-data-amber-wash px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-data-amber-ink"
-                                title="Leg o najniższej szansie — to on najmocniej ciągnie szansę kuponu w dół"
+                                title="Leg o najniższej szansie. To on najmocniej ciągnie szansę kuponu w dół"
                               >
                                 najsłabszy typ
                               </span>
@@ -403,7 +403,7 @@ export default async function KuponyPage() {
                 {k.wariant_b && (
                   <details className="border-t border-dashed border-hairline">
                     <summary className="cursor-pointer list-none px-4 py-2.5 text-[10px] font-semibold uppercase tracking-widest text-muted transition-colors hover:text-ink-soft sm:px-5 [&::-webkit-details-marker]:hidden">
-                      ⇄ pokaż inny wariant — kurs{" "}
+                      ⇄ pokaż inny wariant: kurs{" "}
                       {fmtKurs(k.wariant_b.kurs_laczny)}, szansa{" "}
                       {fmtProc(k.wariant_b.p_model)}
                     </summary>
@@ -426,7 +426,7 @@ export default async function KuponyPage() {
                         </p>
                       ))}
                       <p className="pt-1 text-[10px] text-faint">
-                        wariant podglądowy — jeśli wolisz ten zestaw, zagraj go
+                        wariant podglądowy. Jeśli wolisz ten zestaw, zagraj go
                         ręcznie (slot zajmuje wariant główny)
                       </p>
                     </div>
@@ -436,7 +436,7 @@ export default async function KuponyPage() {
                 {k.dolozenie && (
                   <div className="border-t border-dashed border-hairline bg-card-soft/70 px-4 py-3 sm:px-5">
                     <p className="text-[10px] font-semibold uppercase tracking-widest text-muted">
-                      + dobij kurs pewnym legiem
+                      + dobij kurs pewnym typem
                     </p>
                     <p className="mt-1 text-sm leading-relaxed">
                       <strong>{k.dolozenie.podmiot}</strong>{" "}
@@ -477,8 +477,8 @@ export default async function KuponyPage() {
                       , a bukmacher płaci{" "}
                       <span className="font-data text-ink-soft">
                         {fmtKurs(k.kurs_laczny)}
-                      </span>{" "}
-                      — to jest cała przewaga tego kuponu
+                      </span>
+                      . To jest cała przewaga tego kuponu
                     </span>
                   )}
                 </footer>
@@ -499,7 +499,7 @@ export default async function KuponyPage() {
                       ×{p}
                     </p>
                     <p className="mx-auto mt-1.5 max-w-[30ch] text-xs leading-relaxed text-faint">
-                      przedział czeka — kupon powstanie, gdy z puli legów da
+                      przedział czeka: kupon powstanie, gdy z puli typów da
                       się złożyć kurs w tych widełkach (zwykle bliżej meczów)
                     </p>
                   </div>

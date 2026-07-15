@@ -7,7 +7,7 @@ import { SkutecznoscDzienna } from "@/components/SkutecznoscDzienna";
 import { getKalibracja, getMeta, getTypyWyniki } from "@/lib/data";
 import { fmtProc } from "@/lib/format";
 
-export const metadata = { title: "Skuteczność modelu — FootStats" };
+export const metadata = { title: "Skuteczność modelu – FootStats" };
 
 /** Nagłówek sekcji: eyebrow z kreską marki + tytuł display. */
 function SectionHead({
@@ -47,10 +47,10 @@ export default async function ModelPage() {
           <>
             Zanim zaufasz jakiejkolwiek predykcji, sprawdź ją. Model przewidywał
             zdarzenia w {meta.meczow_kalibracja} meczach, których{" "}
-            <strong>nie widział podczas nauki</strong> — a potem porównaliśmy
+            <strong>nie widział podczas nauki</strong>, a potem porównaliśmy
             przewidywania z tym, co naprawdę się wydarzyło.
             {meta.tryb === "ms2026" &&
-              " Test przeprowadzono na Premier League — to ten sam rdzeń modelu, który liczy predykcje MŚ."}
+              " Test przeprowadzono na Premier League. To ten sam rdzeń modelu, który liczy predykcje MŚ."}
           </>
         }
       />
@@ -203,7 +203,7 @@ export default async function ModelPage() {
           </>
         ) : (
           <p className="mt-4 max-w-3xl rounded-(--radius-card) border border-hairline bg-card px-4 py-3.5 text-sm text-muted shadow-(--shadow-card)">
-            Log już zbiera publikowane typy — pierwsze rozliczenia pojawią się
+            Log już zbiera publikowane typy. Pierwsze rozliczenia pojawią się
             automatycznie po zakończeniu najbliższych meczów
             {pods ? ` (w logu: ${pods.opublikowane})` : ""}.
           </p>
@@ -215,8 +215,8 @@ export default async function ModelPage() {
         <Reveal className="mt-12">
           <SectionHead eyebrow="kalendarz wyników" title="Dzień po dniu, bez retuszu" />
           <p className="mt-2 max-w-3xl text-sm text-muted">
-            Bilans realnych typów każdego dnia przy stawce 1 jednostki na typ —
-            dni stratne zostają w kalendarzu tak samo jak zyskowne.
+            Bilans realnych typów każdego dnia przy stawce 1 jednostki na typ.
+            Dni stratne zostają w kalendarzu tak samo jak zyskowne.
           </p>
           <div className="mt-4 max-w-3xl">
             <KalendarzWynikow dni={typy.skutecznosc_dzienna!} />
@@ -230,7 +230,7 @@ export default async function ModelPage() {
           <SectionHead eyebrow="dzień po dniu" title="Skuteczność" />
           <p className="mt-2 max-w-3xl text-sm text-muted">
             Trafienia i ROI realnych typów rozliczonych danego dnia. Przełączaj
-            się strzałkami albo klikaj słupki — cofniesz się nawet o ~2 tygodnie.
+            się strzałkami albo klikaj słupki, cofniesz się nawet o ~2 tygodnie.
           </p>
           <SkutecznoscDzienna dni={typy.skutecznosc_dzienna!} />
         </Reveal>
@@ -241,10 +241,10 @@ export default async function ModelPage() {
         <Reveal className="mt-12">
           <SectionHead eyebrow="historia" title="Kupony" />
           <p className="mt-2 max-w-3xl text-sm text-muted">
-            Kupon zamraża się w chwili publikacji — zmienia się tylko wtedy,
-            gdy ogłoszone składy wywrócą któryś leg (wtedy jest anulowany
-            i powstaje nowy). Jedno pudło = kupon przegrany, zwrot lega
-            (zawodnik nie zagrał) wyłącza go z kursu — jak u bukmachera.
+            Kupon zamraża się w chwili publikacji. Zmienia się tylko wtedy,
+            gdy ogłoszone składy wywrócą któryś typ (wtedy jest anulowany
+            i powstaje nowy). Jedno pudło = kupon przegrany, a zwrot typu
+            (zawodnik nie zagrał) wyłącza go z kursu, jak u bukmachera.
             Statystyki liczone w regularnym czasie gry, bez dogrywek.
           </p>
           {/* ROI kuponów per horyzont: stawka 1 j./kupon, pominięte nie grają */}
@@ -318,7 +318,7 @@ export default async function ModelPage() {
             }
           />
           <p className="mt-2 max-w-3xl text-sm text-muted">
-            Każdy kupon, który się kiedykolwiek trafił — zostaje tu na stałe,
+            Każdy kupon, który się kiedykolwiek trafił, zostaje tu na stałe,
             niezależnie od tego, jak dawno temu (i czy był grany, czy pominięty).
             To pełna kronika trafień modelu.
           </p>
@@ -361,7 +361,7 @@ export default async function ModelPage() {
 
       {kal.rynki.length === 0 && (
         <p className="mt-6 rounded-(--radius-card) border border-hairline bg-card p-4 text-sm text-muted shadow-(--shadow-card)">
-          Za mało danych do kalibracji — uruchom dłuższy backfill w pipeline.
+          Za mało danych do kalibracji. Uruchom dłuższy backfill w pipeline.
         </p>
       )}
     </div>

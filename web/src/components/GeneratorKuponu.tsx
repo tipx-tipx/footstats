@@ -151,16 +151,16 @@ export function GeneratorKuponu({
     if (piny.length > gornyLimit) {
       return `Wybrałeś ${piny.length} typów „na pewno”, a kupon ma mieć ${
         trybDokladny ? `dokładnie ${liczbaTypow}` : `najwyżej ${gornyLimit}`
-      } — zwiększ liczbę typów albo odepnij któryś.`;
+      }. Zwiększ liczbę typów albo odepnij któryś.`;
     }
     const naMeczPin = new Map<number, number>();
     for (const l of piny) naMeczPin.set(l.mecz_id, (naMeczPin.get(l.mecz_id) ?? 0) + 1);
     if ([...naMeczPin.values()].some((c) => c > maxNaMecz)) {
-      return `Masz przypięte więcej niż ${maxNaMecz} ${odmienTyp(maxNaMecz)} z jednego meczu — odepnij któryś albo wyłącz ograniczenie „1 typ z meczu”.`;
+      return `Masz przypięte więcej niż ${maxNaMecz} ${odmienTyp(maxNaMecz)} z jednego meczu. Odepnij któryś albo wyłącz ograniczenie „1 typ z meczu”.`;
     }
     const kursPin = piny.reduce((a, l) => a * l.kurs, 1);
     if (kursPin > cmax) {
-      return `Same wybrane typy dają już kurs ×${fmtKurs(kursPin)} — powyżej celu. Podnieś kurs docelowy albo odepnij któryś typ.`;
+      return `Same wybrane typy dają już kurs ×${fmtKurs(kursPin)}, czyli powyżej celu. Podnieś kurs docelowy albo odepnij któryś typ.`;
     }
     // osiągalność liczona z TYMI SAMYMI ograniczeniami co dobór typów:
     // filtry profilu (bezpieczny/gambity), unikalny zawodnik, limit z meczu —
@@ -178,7 +178,7 @@ export function GeneratorKuponu({
     );
     const dopisekProfil =
       profil !== "agresywny" && efektywna.length < dostepna.length
-        ? " Charakter kuponu pomija najbardziej ryzykowne typy — agresywny ma ich więcej."
+        ? " Charakter kuponu pomija najbardziej ryzykowne typy. Agresywny ma ich więcej."
         : "";
     const dopisekUsuniete = wykluczone.size
       ? " Możesz też przywrócić usunięte typy."
@@ -189,13 +189,13 @@ export function GeneratorKuponu({
       } ${liczbaTypow}, maks. ${maxNaMecz} z meczu).${dopisekProfil}${dopisekUsuniete}`;
     }
     if (cmax < zakres.min * kursPin) {
-      return `Przy ${trybDokladny ? "dokładnie" : "co najmniej"} ${liczbaTypow} ${odmienTyp(liczbaTypow)} najniższy osiągalny kurs to ok. ×${fmtKurs(zakres.min * kursPin)} — podnieś kurs docelowy albo zmniejsz liczbę typów.`;
+      return `Przy ${trybDokladny ? "dokładnie" : "co najmniej"} ${liczbaTypow} ${odmienTyp(liczbaTypow)} najniższy osiągalny kurs to ok. ×${fmtKurs(zakres.min * kursPin)}. Podnieś kurs docelowy albo zmniejsz liczbę typów.`;
     }
     if (cmin > zakres.max * kursPin) {
       const nMax = zakres.maxN + piny.length;
-      return `Przy ${trybDokladny ? "dokładnie" : "maks."} ${nMax} ${odmienTyp(nMax)} najwyższy osiągalny kurs to ok. ×${fmtKurs(zakres.max * kursPin)} — obniż kurs docelowy${trybDokladny ? " albo zwiększ liczbę typów" : ""}${meczId == null ? " lub dobierz więcej meczów" : ""}.${dopisekProfil}${dopisekUsuniete}`;
+      return `Przy ${trybDokladny ? "dokładnie" : "maks."} ${nMax} ${odmienTyp(nMax)} najwyższy osiągalny kurs to ok. ×${fmtKurs(zakres.max * kursPin)}. Obniż kurs docelowy${trybDokladny ? " albo zwiększ liczbę typów" : ""}${meczId == null ? " lub dobierz więcej meczów" : ""}.${dopisekProfil}${dopisekUsuniete}`;
     }
-    return `Ten zestaw parametrów nie daje się złożyć z tej puli — zmień kurs docelowy, liczbę typów albo charakter kuponu.${dopisekProfil}${dopisekUsuniete}`;
+    return `Ten zestaw parametrów nie daje się złożyć z tej puli. Zmień kurs docelowy, liczbę typów albo charakter kuponu.${dopisekProfil}${dopisekUsuniete}`;
   }, [podglad, pulaFiltrowana, profil, opcje.maxNaMecz, liczbaTypow, trybDokladny, kursCel, meczId, przypiete, wykluczone]);
 
   const odrzuc = () => {
@@ -292,8 +292,8 @@ export function GeneratorKuponu({
   if (bazowa.length === 0) {
     return (
       <p className="rounded-(--radius-card) border border-hairline bg-card px-4 py-3.5 text-sm text-muted shadow-(--shadow-card)">
-        Brak typów w puli do złożenia kuponu{meczId != null ? " na ten mecz" : ""} —
-        pojawią się, gdy Superbet dokwotuje linie (zwykle 1–2 dni przed meczem).
+        Brak typów w puli do złożenia kuponu{meczId != null ? " na ten mecz" : ""}.
+        Pojawią się, gdy Superbet dokwotuje linie (zwykle 1–2 dni przed meczem).
       </p>
     );
   }
@@ -473,8 +473,8 @@ export function GeneratorKuponu({
         </summary>
         <div className="space-y-2.5 px-3 pb-3">
           <p className="text-[11px] leading-relaxed text-faint">
-            Kliknij typ, żeby na pewno wszedł do kuponu — resztę dobierze model.
-            Kliknij drugi raz, żeby odpiąć.
+            Kliknij typ, żeby na pewno wszedł do kuponu, a resztę dobierze
+            model. Kliknij drugi raz, żeby odpiąć.
           </p>
           {mecze.map(([mid, { label }]) => {
             const typyMeczu = pulaFiltrowana
@@ -494,7 +494,7 @@ export function GeneratorKuponu({
                       <button
                         key={k}
                         onClick={() => przypnij(l)}
-                        title={`Szansa ${fmtProc(l.p_model)}${pin ? " — kliknij, żeby odpiąć" : ""}`}
+                        title={`Szansa ${fmtProc(l.p_model)}${pin ? ". Kliknij, żeby odpiąć" : ""}`}
                         className={`inline-flex items-center gap-1 rounded-(--radius-control) border px-2 py-1 text-[11px] transition-colors ${
                           pin
                             ? "border-brand bg-brand-wash font-medium text-brand-deep"
@@ -526,7 +526,7 @@ export function GeneratorKuponu({
                 <button
                   key={k}
                   onClick={() => przypnij(l)}
-                  title="Kliknij, żeby odpiąć — model będzie mógł wybrać inny typ"
+                  title="Kliknij, żeby odpiąć. Model będzie mógł wybrać inny typ"
                   className="inline-flex items-center gap-1 rounded-full border border-brand/40 bg-brand-wash px-2 py-0.5 text-[11px] font-medium text-brand-deep transition-colors hover:bg-brand-wash/70"
                 >
                   <PinIcon className="shrink-0" />
@@ -542,7 +542,7 @@ export function GeneratorKuponu({
                 <button
                   key={k}
                   onClick={() => przywrocTyp(k)}
-                  title="Kliknij, żeby przywrócić — typ znów będzie mógł wejść do kuponu"
+                  title="Kliknij, żeby przywrócić. Typ znów będzie mógł wejść do kuponu"
                   className="rounded-full border border-hairline bg-card-soft px-2 py-0.5 text-[11px] text-muted line-through transition-colors hover:text-ink"
                 >
                   {l.podmiot} · {l.rynek.toLowerCase()} {fmtLinia(l.linia)}+ ↺
@@ -593,7 +593,7 @@ export function GeneratorKuponu({
             exit={{ opacity: 0 }}
             className="mt-4 rounded-(--radius-control) border border-data-amber/40 bg-data-amber-wash px-3 py-2.5 text-xs text-data-amber-ink"
           >
-            {podpowiedzBrak ?? "Nie da się domknąć tego kompletu — zmień parametry."}
+            {podpowiedzBrak ?? "Nie da się domknąć tego kompletu. Zmień parametry."}
           </motion.p>
         )}
         {pokazany && podglad && (
@@ -719,7 +719,7 @@ function KuponKarta({
                         )}
                         {globalIdx === k.najslabszy_idx && k.legi.length > 1 && (
                           <span
-                            title="Typ o najniższej szansie — najmocniej ciągnie szansę kuponu w dół"
+                            title="Typ o najniższej szansie, najmocniej ciągnie szansę kuponu w dół"
                             className="rounded-full bg-data-amber-wash px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-data-amber-ink"
                           >
                             najsłabszy typ
@@ -735,7 +735,7 @@ function KuponKarta({
                           onClick={() => onPrzypnij(l)}
                           title={
                             przypieteKeys.has(legKey(l))
-                              ? "Typ przypięty — kliknij, żeby odpiąć"
+                              ? "Typ przypięty. Kliknij, żeby odpiąć"
                               : "Zostaw ten typ na pewno (model nie będzie go wymieniał)"
                           }
                           className={`rounded-md px-1.5 py-1 transition-colors ${
@@ -748,7 +748,7 @@ function KuponKarta({
                         </button>
                         <button
                           onClick={() => onUsun(l)}
-                          title="Usuń ten typ — model dobierze inny"
+                          title="Usuń ten typ, a model dobierze inny"
                           className="rounded-md px-1.5 py-1 text-xs text-faint transition-colors hover:bg-data-red-wash hover:text-data-red-ink"
                         >
                           ✕
@@ -814,7 +814,7 @@ function KuponKarta({
       {k.wariant_b && (
         <details className="mt-3 rounded-(--radius-control) border border-dashed border-hairline">
           <summary className="cursor-pointer list-none px-3 py-2 text-[10px] font-semibold uppercase tracking-widest text-muted transition-colors hover:text-ink-soft [&::-webkit-details-marker]:hidden">
-            ⇄ pokaż inny wariant — kurs {fmtKurs(k.wariant_b.kurs_laczny)}, szansa{" "}
+            ⇄ pokaż inny wariant: kurs {fmtKurs(k.wariant_b.kurs_laczny)}, szansa{" "}
             {fmtProc(k.wariant_b.p_model)}
           </summary>
           <div className="space-y-1 px-3 pb-2.5">
@@ -833,7 +833,7 @@ function KuponKarta({
               </p>
             ))}
             <p className="pt-1 text-[10px] text-faint">
-              wariant podglądowy — jeśli wolisz ten zestaw, zbuduj go wybierając te mecze
+              wariant podglądowy. Jeśli wolisz ten zestaw, zbuduj go wybierając te mecze
             </p>
           </div>
         </details>
@@ -841,7 +841,7 @@ function KuponKarta({
 
       <p className="mt-3 text-[11px] text-faint">
         {tylkoValue
-          ? "Ten sam dobór co w automatycznych kuponach value — tylko typy z wyraźną przewagą, maks. 1 z meczu."
+          ? "Ten sam dobór co w automatycznych kuponach value: tylko typy z wyraźną przewagą, maks. 1 z meczu."
           : "Ta sama przeanalizowana pula i te same reguły doboru typów co w automatycznych kuponach."}
       </p>
 
@@ -849,7 +849,7 @@ function KuponKarta({
       <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-hairline pt-3">
         {nauka === "ok" ? (
           <span className="text-xs font-medium text-brand-deep">
-            ✓ Kupon trafił do nauki — rozliczy się w tle i poprawi model.
+            ✓ Kupon trafił do nauki. Rozliczy się w tle i poprawi model.
           </span>
         ) : (
           <>
@@ -870,7 +870,7 @@ function KuponKarta({
             </button>
             {nauka === "blad" && (
               <span className="text-xs text-data-red">
-                nie udało się zapisać — spróbuj ponownie
+                nie udało się zapisać, spróbuj ponownie
               </span>
             )}
           </>

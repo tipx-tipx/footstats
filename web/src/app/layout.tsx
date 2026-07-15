@@ -28,7 +28,7 @@ const plexMono = IBM_Plex_Mono({
 const SKRYPT_MOTYWU = `(function(){try{var m=localStorage.getItem("footstats-motyw");if(m!=="dark"&&m!=="light"){m=window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"}document.documentElement.dataset.theme=m}catch(e){}})()`;
 
 export const metadata: Metadata = {
-  title: "FootStats — okazje na statystyki piłkarskie",
+  title: "FootStats – okazje na statystyki piłkarskie",
   description:
     "Osobisty silnik decyzyjny: model matematyczny szacuje prawdopodobieństwa statystyk zawodników i drużyn, porównuje je z kursami bukmacherów i pokazuje, gdzie kurs jest zawyżony.",
   icons: { icon: "/favicon.png" },

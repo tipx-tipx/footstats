@@ -21,6 +21,12 @@ export function fmtMnoznik(m: number): string {
   return `×${m.toFixed(2).replace(".", ",")}`;
 }
 
+/** Bilans w jednostkach (stawka 1 j. na typ): "+8,2u", "−3u", "0u". */
+export function fmtU(v: number): string {
+  const s = v.toFixed(2).replace(".", ",").replace(/,?0+$/, "");
+  return `${v > 0 ? "+" : ""}${s === "" || s === "-" ? "0" : s}u`;
+}
+
 export function fmtDataCzas(ts: number): string {
   return new Date(ts * 1000).toLocaleDateString("pl-PL", {
     day: "numeric",

@@ -146,7 +146,7 @@ def matchup_lite_factor(
     elif market_code == "tackles":
         opis = (
             f"Po jego ({strona_pl}) stronie rywal "
-            f"{'często wchodzi w pojedynki 1v1 — więcej okazji do odbiorów' if factor > 1 else 'rzadko dryblingu je — mniej okazji do odbiorów'}"
+            f"{'często wchodzi w pojedynki 1v1, więcej okazji do odbiorów' if factor > 1 else 'rzadko dryblinguje, mniej okazji do odbiorów'}"
         )
     else:
         opis = (

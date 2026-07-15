@@ -182,6 +182,17 @@ h1, h2, h3, .font-display {
   filter: drop-shadow(0 4px 14px color-mix(in oklab, var(--color-brand) 40%, transparent));
 }
 
+/* cień „pop" dla kart ze ściętym rogiem — odpowiednik --shadow-pop,
+   ale jako filter na wrapperze, bo box-shadow obcina clip-path */
+.glow-pop {
+  filter: drop-shadow(0 4px 8px rgb(15 29 40 / 0.07))
+    drop-shadow(0 16px 40px rgb(15 29 40 / 0.15));
+}
+html[data-theme="dark"] .glow-pop {
+  filter: drop-shadow(0 4px 10px rgb(0 0 0 / 0.4))
+    drop-shadow(0 18px 44px rgb(0 0 0 / 0.45));
+}
+
 /* pasek postępu rotacji żywego podglądu (restart przez key={idx}) */
 .postep-skanu {
   animation: postep-skanu-jazda 5.2s linear forwards;
@@ -251,8 +262,10 @@ h1, h2, h3, .font-display {
    pauza na hover/fokus; przy ograniczonym ruchu stoi (patrz niżej) */
 .ticker {
   overflow: hidden;
-  -webkit-mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
-  mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
+  /* stopy w px, nie w % — przy szerokim torze 8% dawało ledwo widoczny
+     zanik i chipy „ucinały się" twardo przy plakietce */
+  -webkit-mask-image: linear-gradient(to right, transparent, black 64px, black calc(100% - 64px), transparent);
+  mask-image: linear-gradient(to right, transparent, black 64px, black calc(100% - 64px), transparent);
 }
 .ticker-tor {
   display: flex;

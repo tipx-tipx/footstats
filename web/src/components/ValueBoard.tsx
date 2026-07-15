@@ -360,9 +360,9 @@ export function ValueBoard({
               Rynek w tej chwili nie daje okazji z kursem
             </p>
             <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-muted">
-              Bukmacher wycenia dostępne zdarzenia blisko szans modelu — nie ma
-              czego przepłacać. To się zmienia z każdą aktualizacją kursów:
-              zajrzyj do sugestii STS albo wróć za pół godziny.
+              Bukmacher wycenia dostępne zdarzenia blisko szans modelu, więc
+              nie ma czego przepłacać. To się zmienia z każdą aktualizacją
+              kursów: zajrzyj do sugestii STS albo wróć za jakiś czas.
             </p>
             {liczbaSugestii > 0 && (
               <button
@@ -379,7 +379,7 @@ export function ValueBoard({
               Brak pozycji spełniających obecne filtry
             </p>
             <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-muted">
-              Ustaw pewność na „Każda”, wybierz inny rynek albo mecz — lub
+              Ustaw pewność na „Każda”, wybierz inny rynek albo mecz, albo
               zacznij od czysta.
             </p>
             <button
