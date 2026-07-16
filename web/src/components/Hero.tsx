@@ -36,7 +36,7 @@ function odmienOkazje(n: number): string {
 /**
  * Teza produktu jednym spojrzeniem: wycena kursu (1/kurs) i szansa modelu
  * na wspólnym torze 0–100%; zielony odcinek między znacznikami = o ile
- * bukmacher przepłaca. Kieszonkowa wersja PorownanieWycen z BetCard
+ * bukmacher przepłaca. Kieszonkowa wersja toru dowodu z BetCard
  * (bez historii — w hero liczy się 2-sekundowa czytelność).
  */
 function TorWyceny({ model, kurs }: { model: number; kurs: number }) {

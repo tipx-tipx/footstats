@@ -1,5 +1,5 @@
 import type { Pewnosc, Ryzyko } from "@/lib/types";
-import { fmtEV, PEWNOSC_LABEL, RYZYKO_LABEL } from "@/lib/format";
+import { fmtEV, RYZYKO_LABEL } from "@/lib/format";
 
 /** Badge wartości zakładu (EV%) — im wyższa wartość, tym mocniejszy sygnał. */
 export function EdgeBadge({ ev }: { ev: number }) {
@@ -14,25 +14,6 @@ export function EdgeBadge({ ev }: { ev: number }) {
       title="Wartość oczekiwana zakładu: o ile procent kurs jest lepszy, niż być powinien według modelu"
     >
       {fmtEV(ev)}
-    </span>
-  );
-}
-
-const PEWNOSC_STYLE: Record<Pewnosc, string> = {
-  wysoka: "bg-data-green-wash text-data-green-ink",
-  srednia: "bg-data-amber-wash text-data-amber-ink",
-  niska: "bg-paper text-muted",
-};
-
-/** Ile ufamy tej predykcji (próba, minuty, precyzja). */
-export function ConfidenceBadge({ level }: { level: Pewnosc }) {
-  return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${PEWNOSC_STYLE[level]}`}
-      title="Pewność modelu: ile danych i jak stabilnych stoi za tą predykcją"
-    >
-      <PewnoscDots level={level} />
-      pewność: {PEWNOSC_LABEL[level]}
     </span>
   );
 }

@@ -2,11 +2,13 @@
 
 import { fmtLinia } from "@/lib/format";
 
+import type { Strona } from "@/lib/types";
+
 /**
  * Forma zawodnika: liczba zdarzeń w ostatnich meczach (najnowszy z prawej),
  * jako słupki z kreskowaną linią zakładu.
- *   zielony słupek  = wynik nad linią (zakład "powyżej" by wszedł)
- *   szary słupek    = wynik pod linią
+ *   zielony słupek  = typ by wszedł (nad linią przy "powyżej", pod przy "poniżej")
+ *   szary słupek    = typ by nie wszedł
  *   półprzezroczysty = zawodnik grał krótko (<30 min) — wynik mało mówi
  * Nad każdym słupkiem mała liczba — konkretny wynik z tamtego meczu.
  */
@@ -16,6 +18,7 @@ export function FormBars({
   opponents,
   kadra,
   line,
+  side = "powyzej",
   height = 56,
 }: {
   counts: number[];
@@ -23,6 +26,7 @@ export function FormBars({
   opponents?: string[];
   kadra?: boolean[];
   line: number;
+  side?: Strona;
   height?: number;
 }) {
   const values = [...counts].reverse(); // najstarszy z lewej
@@ -50,7 +54,7 @@ export function FormBars({
           style={{ height: plotH }}
         >
           {values.map((v, i) => {
-            const over = v > line;
+            const over = side === "ponizej" ? v < line : v > line;
             const short = mins != null && mins[i] > 0 && mins[i] < 30;
             // zero = cienka kreska przy podstawie (nie udaje słupka)
             const h = v > 0 ? Math.max((v / max) * 100, 8) : 3;
