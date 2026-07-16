@@ -1,7 +1,9 @@
 "use client";
 
+import { motion } from "framer-motion";
 import { useMemo, useState } from "react";
 
+import { FilterDropdown } from "./FilterDropdown";
 import { fmtKurs } from "@/lib/format";
 import {
   RYNEK_LABEL,
@@ -21,27 +23,13 @@ function dataMeczu(ts: number): string {
   }).format(new Date(ts * 1000));
 }
 
-function Chip({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
-        active
-          ? "border-brand bg-brand text-on-brand shadow-(--shadow-card)"
-          : "border-hairline bg-card text-muted hover:bg-card-soft hover:text-ink"
-      }`}
-    >
-      {children}
-    </button>
-  );
+/** Poprawna polska odmiana: "1 propozycja", "3 propozycje", "8 propozycji". */
+function odmienPropozycje(n: number): string {
+  if (n === 1) return "1 propozycja";
+  const r10 = n % 10;
+  const r100 = n % 100;
+  const kilka = r10 >= 2 && r10 <= 4 && (r100 < 12 || r100 > 14);
+  return `${n} ${kilka ? "propozycje" : "propozycji"}`;
 }
 
 export function TopPokrycia({
@@ -123,78 +111,85 @@ export function TopPokrycia({
 
   return (
     <div className="mt-5">
-      {/* legenda */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted">
-        <span>
-          Na górze <strong className="font-semibold text-ink">regularni w kadrze</strong>{" "}
-          (pokrycie z reprezentacji).
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="rounded-full bg-data-amber-wash px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-data-amber-ink">
-            forma klubowa
-          </span>
-          rezerwa kadry, liczone z klubu (niżej)
-        </span>
-        <span className="text-faint">
-          1+/2+/3+ = pokrycie linii · najedź na boks: rywal, minuty, data
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="font-data font-semibold text-data-green-ink">+%</span>
-          <span>
-            wartość: ile płaci kurs względem pokrycia (zgrubnie, próba 5;{" "}
-            <span className="text-data-green-ink">zielony</span> = opłaca się,{" "}
-            <span className="text-faint">szary</span> = znikomo)
-          </span>
-        </span>
+      {/* zakładki drużyn — tablica wyników, jak na liście okazji */}
+      <div className="flex flex-wrap items-end gap-x-6 gap-y-1 border-b border-hairline">
+        {([[null, "Wszyscy"], ...druzyny.map((d) => [d, d] as const)] as const).map(
+          ([kod, label]) => (
+            <button
+              key={label}
+              onClick={() => setDruzyna(kod)}
+              aria-pressed={druzyna === kod}
+              className={`font-display -mb-px border-b-2 px-0.5 pb-2.5 pt-1 text-xs font-semibold uppercase tracking-wide transition-colors ${
+                druzyna === kod
+                  ? "border-brand text-brand-deep"
+                  : "border-transparent text-muted hover:text-ink"
+              }`}
+            >
+              {label}
+            </button>
+          ),
+        )}
       </div>
 
-      {/* filtry */}
-      <div className="mt-3.5 flex flex-col gap-2">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="mr-1 text-[11px] uppercase tracking-wide text-faint">
-            drużyna
+      {/* konsola filtrów + żywy odczyt wyniku */}
+      <div className="mb-4 flex flex-wrap items-end gap-x-8 gap-y-4 pt-4">
+        <FilterDropdown
+          label="Rynek"
+          value={rynek ?? ""}
+          onChange={(v) => setRynek(v || null)}
+          className="w-48"
+          options={[
+            { value: "", label: "Wszystkie rynki" },
+            ...rynki.map((k) => ({ value: k, label: RYNEK_LABEL[k] })),
+          ]}
+        />
+
+        <button
+          onClick={() => setBezKursu((v) => !v)}
+          aria-pressed={bezKursu}
+          className={`font-display pb-1.5 text-[11px] font-semibold uppercase tracking-wide transition-colors ${
+            bezKursu ? "text-brand-deep" : "text-faint hover:text-ink"
+          }`}
+          title="Rynki, których Superbet nie kwotuje (niecelne, zablokowane), zawsze bez kursu"
+        >
+          {bezKursu ? "✓ z rynkami bez kursu" : "+ rynki bez kursu"}
+        </button>
+
+        <div
+          aria-live="polite"
+          className="ml-auto flex flex-col items-end gap-1"
+          title="Wiersze spełniające obecne filtry: regularni w kadrze najpierw"
+        >
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-faint">
+            w tabeli
           </span>
-          <Chip active={druzyna === null} onClick={() => setDruzyna(null)}>
-            wszyscy
-          </Chip>
-          {druzyny.map((d) => (
-            <Chip
-              key={d}
-              active={druzyna === d}
-              onClick={() => setDruzyna(druzyna === d ? null : d)}
-            >
-              {d}
-            </Chip>
-          ))}
-        </div>
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="mr-1 text-[11px] uppercase tracking-wide text-faint">
-            rynek
-          </span>
-          <Chip active={rynek === null} onClick={() => setRynek(null)}>
-            wszystkie
-          </Chip>
-          {rynki.map((k) => (
-            <Chip
-              key={k}
-              active={rynek === k}
-              onClick={() => setRynek(rynek === k ? null : k)}
-            >
-              {RYNEK_LABEL[k]}
-            </Chip>
-          ))}
-          <button
-            onClick={() => setBezKursu((v) => !v)}
-            className={`ml-1 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
-              bezKursu
-                ? "border-brand/40 bg-brand-wash text-brand-deep"
-                : "border-hairline bg-card text-faint hover:bg-card-soft hover:text-ink"
-            }`}
-            title="Rynki, których Superbet nie kwotuje (niecelne, zablokowane), zawsze bez kursu"
+          <motion.span
+            key={widoczne.length}
+            initial={{ opacity: 0, y: 5 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+            className="font-data text-sm font-semibold text-brand-deep"
           >
-            {bezKursu ? "✓ rynki bez kursu" : "+ rynki bez kursu"}
-          </button>
+            {odmienPropozycje(widoczne.length)}
+          </motion.span>
         </div>
+      </div>
+
+      {/* legenda — jedna linia mikro-odczytów zamiast ściany tekstu */}
+      <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-faint">
+        <span>
+          Pokrycie z ostatnich 5 startów, regularni w kadrze na górze.
+        </span>
+        <span>
+          <span className="font-semibold uppercase tracking-wide text-data-amber-ink">
+            forma klubowa
+          </span>{" "}
+          = rezerwa kadry, liczone z klubu
+        </span>
+        <span title="Zgrubny sygnał wartości: pokrycie × kurs − 1. To NIE jest przewaga silnika (próba to 5 startów, bez kalibracji i kontekstu), tylko sito na kursy typu „5/5 @1,01”.">
+          <span className="font-data font-semibold text-data-green-ink">+%</span> = ile
+          płaci kurs względem pokrycia (zgrubnie, próba 5)
+        </span>
       </div>
 
       {/* tabela — przewija się w kontenerze (poziomo na mobile),
@@ -249,38 +244,37 @@ export function TopPokrycia({
                     {w.ostatnie.map((g, gi) => boks(g, gi))}
                   </span>
                 </td>
+                {/* linie jako odczyty w stałych kolumnach: próg, pokrycie,
+                    kurs, wartość. Segmentowe pudełka z ramkami robiły z każdego
+                    wiersza pas przycisków */}
                 <td className="px-4 py-3">
-                  <span className="flex flex-wrap gap-1.5">
+                  <span className="flex flex-col gap-1">
                     {w.linie.map((l) => (
                       <span
                         key={l.linia}
-                        className="inline-flex items-stretch overflow-hidden rounded-(--radius-control) border border-hairline bg-card text-xs"
+                        className="font-data flex items-baseline gap-x-3 text-xs"
                       >
-                        <span className="font-data flex items-center bg-card-soft px-2 py-1 font-semibold text-ink-soft">
+                        <span className="w-5 shrink-0 font-semibold text-faint">
                           {l.prog}+
                         </span>
                         <span
-                          className={`font-data flex items-center border-l border-hairline px-2 py-1 font-semibold ${
-                            l.pokryte === w.probka
-                              ? "text-data-green-ink"
-                              : "text-ink"
+                          className={`w-8 shrink-0 font-semibold ${
+                            l.pokryte === w.probka ? "text-data-green-ink" : "text-ink"
                           }`}
                         >
                           {l.pokryte}/{w.probka}
                         </span>
-                        {l.kurs != null && (
-                          <span className="font-data flex items-center border-l border-hairline px-2 py-1 text-muted">
-                            @{fmtKurs(l.kurs)}
-                          </span>
-                        )}
+                        <span className="w-12 shrink-0 text-muted">
+                          {l.kurs != null ? `@${fmtKurs(l.kurs)}` : "–"}
+                        </span>
                         {l.evPct != null && (
                           <span
                             title="Zgrubny sygnał wartości: ile dałby ten zakład, gdyby surowe pokrycie było prawdziwą szansą (pokrycie × kurs − 1). To NIE jest przewaga silnika, bo próba to tylko 5 startów, bez kalibracji i kontekstu. Odsiewa kursy typu „5/5 @1,01”."
-                            className={`font-data flex items-center border-l border-hairline px-2 py-1 font-semibold ${
+                            className={`w-12 shrink-0 font-semibold ${
                               l.evPct >= 8
-                                ? "bg-data-green-wash text-data-green-ink"
+                                ? "text-data-green-ink"
                                 : l.evPct < 0
-                                  ? "bg-data-red-wash text-data-red-ink"
+                                  ? "text-data-red-ink"
                                   : "text-faint"
                             }`}
                           >
@@ -309,11 +303,12 @@ export function TopPokrycia({
         {widoczne.length > LIMIT && (
           <button
             onClick={() => setRozwin((v) => !v)}
-            className="rounded-(--radius-control) border border-hairline bg-card px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-card-soft hover:text-ink"
+            className="font-display inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-brand transition-colors hover:text-brand-strong"
           >
-            {rozwin
-              ? "Zwiń listę"
-              : `Pokaż pozostałe (${widoczne.length - LIMIT})`}
+            {rozwin ? "Zwiń listę" : `Pokaż pozostałe (${widoczne.length - LIMIT})`}
+            <span aria-hidden className={rozwin ? "rotate-180" : ""}>
+              ↓
+            </span>
           </button>
         )}
       </div>
