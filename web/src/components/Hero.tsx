@@ -214,7 +214,7 @@ function ZywyPodglad({ bets }: { bets: ValueBet[] }) {
                       </div>
                       <div>
                         <p className="text-[10px] uppercase tracking-wide text-faint">
-                          opłaca się od kursu
+                          dobry kurs od
                         </p>
                         <p className="font-data mt-0.5 text-2xl font-semibold text-ink">
                           ~{fmtKurs(bet.fair_kurs * 1.05)}
@@ -326,39 +326,35 @@ function TickerRynkow({ bets }: { bets: ValueBet[] }) {
   const tor = (ariaHidden: boolean) => (
     <ul
       aria-hidden={ariaHidden || undefined}
-      className="flex shrink-0 items-center gap-3 pr-3"
+      className="flex shrink-0 items-center pr-2"
     >
       {lista.map((b, i) => (
-        <li key={`${b.id}-${i}`} className="shrink-0">
+        <li key={`${b.id}-${i}`} className="flex shrink-0 items-center">
+          {/* czysty tekst zamiast chipów-naklejek: feed jak pasek notowań */}
           <Link
             href={hrefPozycji(b)}
             tabIndex={ariaHidden ? -1 : undefined}
-            className="cut-corner-sm group/chip flex items-center gap-3 whitespace-nowrap border border-hairline bg-card/70 py-2 pl-3.5 pr-4 backdrop-blur-sm transition-colors hover:border-brand/50 hover:bg-brand-wash/60"
+            className="group/poz flex items-center gap-2 whitespace-nowrap py-1 text-sm transition-colors"
           >
-            <span className="text-sm">
-              <span className="font-medium text-ink">{b.podmiot}</span>{" "}
-              <span className="text-muted">
-                {b.rynek.toLowerCase()} {fmtLinia(b.linia)}+
-              </span>
+            <span className="font-medium text-ink transition-colors group-hover/poz:text-brand">
+              {b.podmiot}
             </span>
-            {b.kurs != null ? (
-              <span className="font-data text-sm font-semibold text-brand">
-                @{fmtKurs(b.kurs)}
-              </span>
-            ) : (
-              <span className="font-data text-sm font-semibold text-brand">
-                {fmtProc(b.p_model)}
-              </span>
-            )}
+            <span className="text-muted">
+              {b.rynek.toLowerCase()} {fmtLinia(b.linia)}+
+            </span>
+            <span className="font-data font-semibold text-brand-deep">
+              {b.kurs != null ? `@${fmtKurs(b.kurs)}` : fmtProc(b.p_model)}
+            </span>
           </Link>
+          <span aria-hidden className="mx-4 h-3.5 w-px rotate-12 bg-hairline-strong" />
         </li>
       ))}
     </ul>
   );
   return (
-    <div className="relative mt-10 flex items-center gap-4">
+    <div className="relative mt-10 flex items-center gap-5 border-y border-hairline py-2.5">
       {/* stała plakietka — nie jedzie z feedem */}
-      <span className="cut-corner-sm font-display flex shrink-0 items-center gap-2 border border-brand/30 bg-brand-wash/70 px-3.5 py-2.5 text-[11px] font-semibold uppercase tracking-widest text-brand-deep">
+      <span className="font-display flex shrink-0 items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-brand-deep">
         <span aria-hidden className="live-dot h-1.5 w-1.5 rounded-full bg-data-green" />
         skan na żywo
       </span>
@@ -479,9 +475,10 @@ export function Hero({
             </span>
             <Link
               href="/jak-to-dziala"
-              className="cut-corner-sm font-display inline-flex items-center gap-2 border border-hairline-strong bg-card/60 px-6 py-3 text-sm font-medium uppercase tracking-wide text-ink-soft backdrop-blur transition-colors hover:border-brand hover:text-brand"
+              className="font-display inline-flex items-center gap-1.5 px-2 py-3 text-sm font-medium uppercase tracking-wide text-ink-soft transition-colors hover:text-brand"
             >
               Jak to działa?
+              <span aria-hidden className="transition-transform group-hover:translate-x-0.5">→</span>
             </Link>
           </motion.div>
 

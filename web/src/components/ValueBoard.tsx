@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { BetCard } from "./BetCard";
@@ -44,51 +44,197 @@ const SORTOWANIA: { kod: SortKey; label: string }[] = [
 // sugestie nie mają kursu — sorty po kursie/przewadze nic by nie mówiły
 const SORTY_BEZ_KURSU: SortKey[] = ["ranking", "pewnosc", "kickoff"];
 
-/** Ostylowany select z etykietą — wspólny wygląd wszystkich filtrów. */
-function FilterSelect({
+/** Poprawna polska odmiana: "1 pozycja", "3 pozycje", "8 pozycji". */
+function odmienPozycje(n: number): string {
+  if (n === 1) return "1 pozycja";
+  const r10 = n % 10;
+  const r100 = n % 100;
+  const kilka = r10 >= 2 && r10 <= 4 && (r100 < 12 || r100 > 14);
+  return `${n} ${kilka ? "pozycje" : "pozycji"}`;
+}
+
+type OpcjaFiltra = { value: string; label: string; n?: number };
+
+/**
+ * Dopracowany wybór z listą (zamiast natywnego selecta, którego nie da
+ * się ostylować): podkreślenie rośnie od lewej przy hoverze/otwarciu,
+ * panel wjeżdża z animacją, wybrana opcja ma znacznik, liczniki po
+ * prawej. Klawiatura: Enter/spacja otwiera, strzałki chodzą po liście,
+ * Esc zamyka i wraca na przycisk.
+ */
+function FilterDropdown({
   label,
   value,
+  options,
   onChange,
-  children,
   className = "",
 }: {
   label: string;
   value: string;
+  options: OpcjaFiltra[];
   onChange: (v: string) => void;
-  children: React.ReactNode;
   className?: string;
 }) {
+  const [open, setOpen] = useState(false);
+  const kontener = useRef<HTMLDivElement | null>(null);
+  const panel = useRef<HTMLUListElement | null>(null);
+  const trigger = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const klik = (e: PointerEvent) => {
+      if (!kontener.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const klawisz = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setOpen(false);
+        trigger.current?.focus();
+      }
+    };
+    document.addEventListener("pointerdown", klik);
+    document.addEventListener("keydown", klawisz);
+    return () => {
+      document.removeEventListener("pointerdown", klik);
+      document.removeEventListener("keydown", klawisz);
+    };
+  }, [open]);
+
+  const wybrana = options.find((o) => o.value === value);
+  const przesunFokus = (kierunek: 1 | -1) => {
+    const przyciski = Array.from(
+      panel.current?.querySelectorAll("button") ?? [],
+    );
+    if (przyciski.length === 0) return;
+    const i = przyciski.indexOf(document.activeElement as HTMLButtonElement);
+    przyciski[(i + kierunek + przyciski.length) % przyciski.length]?.focus();
+  };
+
   return (
-    <label className={`flex min-w-0 flex-col gap-1 ${className}`}>
-      <span className="text-[10px] font-semibold uppercase tracking-wide text-faint">
-        {label}
-      </span>
-      <span className="relative">
-        <select
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="w-full cursor-pointer appearance-none rounded-lg border border-hairline bg-paper py-1.5 pl-3 pr-8 text-sm text-ink transition-colors hover:border-hairline-strong focus:border-brand"
-        >
-          {children}
-        </select>
-        <svg
-          aria-hidden
-          width="12"
-          height="12"
-          viewBox="0 0 14 14"
-          className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-faint"
-        >
-          <path
-            d="M3 5.5 L7 9.5 L11 5.5"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+    <div ref={kontener} className={`relative min-w-0 ${className}`}>
+      <button
+        ref={trigger}
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowDown" && open) {
+            e.preventDefault();
+            przesunFokus(1);
+          }
+        }}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        className="group flex w-full flex-col items-start gap-1 text-left"
+      >
+        <span className="text-[10px] font-semibold uppercase tracking-wide text-faint">
+          {label}
+        </span>
+        <span className="relative flex w-full items-center justify-between gap-2 pb-1.5">
+          <span className="truncate text-sm font-medium text-ink">
+            {wybrana?.label ?? "–"}
+            {wybrana?.n != null && (
+              <span className="font-data text-xs text-faint"> ({wybrana.n})</span>
+            )}
+          </span>
+          <svg
+            aria-hidden
+            width="12"
+            height="12"
+            viewBox="0 0 14 14"
+            className={`shrink-0 transition-transform duration-200 ${
+              open ? "rotate-180 text-brand" : "text-faint"
+            }`}
+          >
+            <path
+              d="M3 5.5 L7 9.5 L11 5.5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          {/* podkreślenie: baza hairline + linia brand rosnąca od lewej */}
+          <span aria-hidden className="absolute inset-x-0 bottom-0 h-px bg-hairline" />
+          <span
+            aria-hidden
+            className={`absolute inset-x-0 bottom-0 h-px origin-left bg-brand transition-transform duration-300 ${
+              open ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"
+            }`}
           />
-        </svg>
-      </span>
-    </label>
+        </span>
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.ul
+            ref={panel}
+            role="listbox"
+            aria-label={label}
+            initial={{ opacity: 0, y: -6, scale: 0.99 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -4, scale: 0.99 }}
+            transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
+            onKeyDown={(e) => {
+              if (e.key === "ArrowDown") {
+                e.preventDefault();
+                przesunFokus(1);
+              }
+              if (e.key === "ArrowUp") {
+                e.preventDefault();
+                przesunFokus(-1);
+              }
+            }}
+            className="absolute left-0 top-full z-30 mt-2 max-h-80 w-max min-w-full overflow-auto rounded-xl border border-hairline bg-card py-1.5 shadow-(--shadow-pop)"
+          >
+            {options.map((o) => {
+              const aktywna = o.value === value;
+              return (
+                <li key={o.value}>
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={aktywna}
+                    onClick={() => {
+                      onChange(o.value);
+                      setOpen(false);
+                      trigger.current?.focus();
+                    }}
+                    className={`flex w-full items-center justify-between gap-6 px-3.5 py-2 text-left text-sm transition-colors hover:bg-brand-wash ${
+                      aktywna ? "font-medium text-brand-deep" : "text-ink"
+                    }`}
+                  >
+                    <span className="truncate">{o.label}</span>
+                    <span className="flex shrink-0 items-center gap-2">
+                      {o.n != null && (
+                        <span className="font-data text-xs text-faint">{o.n}</span>
+                      )}
+                      {aktywna && (
+                        <svg
+                          aria-hidden
+                          width="12"
+                          height="12"
+                          viewBox="0 0 14 14"
+                          className="text-brand"
+                        >
+                          <path
+                            d="M2.5 7.5 L5.5 10.5 L11.5 3.5"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      )}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </motion.ul>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
 
@@ -234,10 +380,10 @@ export function ValueBoard({
   // zakładki "rodzaj": role=tab wymaga obsługi strzałek (WAI-ARIA Tabs) —
   // roving tabindex, Left/Right/Home/End przenoszą FOKUS I WYBÓR
   const TABY_RODZAJ = [
-    ["pewniaki", `Pewniaki (${liczbaPewniakow})`],
-    ["sugestie", `Sugestie STS (${liczbaSugestii})`],
-    ["okazje", "Okazje z kursem"],
-    ["wszystko", "Wszystko"],
+    ["pewniaki", "Pewniaki", liczbaPewniakow],
+    ["sugestie", "Sugestie STS", liczbaSugestii],
+    ["okazje", "Okazje z kursem", null],
+    ["wszystko", "Wszystko", null],
   ] as const;
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const wybierzRodzaj = (kod: (typeof TABY_RODZAJ)[number][0]) => {
@@ -266,96 +412,112 @@ export function ValueBoard({
 
   return (
     <section aria-label="Lista okazji">
-      {/* pasek narzędzi: rodzaj + filtry + sortowanie */}
-      <div className="mb-4 rounded-(--radius-card) border border-hairline bg-card p-3.5 shadow-(--shadow-card) sm:p-4">
-        {(liczbaSugestii > 0 || liczbaPewniakow > 0) && (
-          <div
-            className="mb-3.5 inline-flex flex-wrap gap-0.5 rounded-lg bg-paper p-0.5 text-sm"
-            role="tablist"
-            aria-label="Rodzaj pozycji"
-          >
-            {TABY_RODZAJ.map(([kod, label], i) => (
-              <button
-                key={kod}
-                ref={(el) => { tabRefs.current[i] = el; }}
-                role="tab"
-                tabIndex={rodzaj === kod ? 0 : -1}
-                aria-selected={rodzaj === kod}
-                onClick={() => wybierzRodzaj(kod)}
-                onKeyDown={(e) => onTabKeyDown(e, i)}
-                className={`rounded-md px-3 py-2 font-medium transition-colors ${
-                  rodzaj === kod
-                    ? "bg-card text-brand-deep shadow-(--shadow-card)"
-                    : "text-muted hover:text-ink"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        )}
+      {/* przełącznik rodzaju — tablica wyników: czysty tekst, aktywna
+          zakładka z podkreśleniem marki (żadnych kolejnych "przycisków") */}
+      {(liczbaSugestii > 0 || liczbaPewniakow > 0) && (
+        <div
+          className="flex flex-wrap items-end gap-x-6 gap-y-1 border-b border-hairline"
+          role="tablist"
+          aria-label="Rodzaj pozycji"
+        >
+          {TABY_RODZAJ.map(([kod, label, liczba], i) => (
+            <button
+              key={kod}
+              ref={(el) => { tabRefs.current[i] = el; }}
+              role="tab"
+              tabIndex={rodzaj === kod ? 0 : -1}
+              aria-selected={rodzaj === kod}
+              onClick={() => wybierzRodzaj(kod)}
+              onKeyDown={(e) => onTabKeyDown(e, i)}
+              className={`font-display -mb-px inline-flex items-baseline gap-1.5 border-b-2 px-0.5 pb-2.5 pt-1 text-xs font-semibold uppercase tracking-wide transition-colors ${
+                rodzaj === kod
+                  ? "border-brand text-brand-deep"
+                  : "border-transparent text-muted hover:text-ink"
+              }`}
+            >
+              {label}
+              {liczba != null && (
+                <span
+                  className={`font-data text-[11px] ${
+                    rodzaj === kod ? "" : "text-faint"
+                  }`}
+                >
+                  {liczba}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
 
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-[1.2fr_1fr_1.2fr_1.4fr]">
-          <FilterSelect label="Rynek" value={rynek} onChange={setRynek}>
-            {RYNKI_FILTRY.map((r) => {
-              const n = liczbaPerRynek.get(r.kod) ?? 0;
-              return (
-                <option key={r.kod} value={r.kod}>
-                  {r.label} ({n})
-                </option>
-              );
-            })}
-          </FilterSelect>
+      {/* konsola filtrów: dopracowane dropdowny + żywy odczyt wyniku */}
+      <div className="mb-6 grid grid-cols-2 items-end gap-x-6 gap-y-4 pt-4 lg:flex lg:gap-x-9">
+        <FilterDropdown
+          label="Rynek"
+          value={rynek}
+          onChange={setRynek}
+          className="lg:w-48"
+          options={RYNKI_FILTRY.map((r) => ({
+            value: r.kod,
+            label: r.label,
+            n: liczbaPerRynek.get(r.kod) ?? 0,
+          }))}
+        />
 
-          <FilterSelect
-            label="Pewność"
-            value={pewnosc}
-            onChange={(v) => setPewnosc(v as Pewnosc | "kazda")}
-          >
-            {PEWNOSC_FILTRY.map((p) => (
-              <option key={p.kod} value={p.kod}>
-                {p.label}
-              </option>
-            ))}
-          </FilterSelect>
+        <FilterDropdown
+          label="Pewność"
+          value={pewnosc}
+          onChange={(v) => setPewnosc(v as Pewnosc | "kazda")}
+          className="lg:w-40"
+          options={PEWNOSC_FILTRY.map((p) => ({ value: p.kod, label: p.label }))}
+        />
 
-          <FilterSelect
-            label="Mecz"
-            value={meczId != null ? String(meczId) : ""}
-            onChange={(v) => setMeczId(v ? Number(v) : undefined)}
-          >
-            <option value="">Wszystkie mecze</option>
-            {mecze.map(([id, nazwa]) => (
-              <option key={id} value={id}>
-                {nazwa}
-              </option>
-            ))}
-          </FilterSelect>
+        <FilterDropdown
+          label="Mecz"
+          value={meczId != null ? String(meczId) : ""}
+          onChange={(v) => setMeczId(v ? Number(v) : undefined)}
+          className="lg:w-56"
+          options={[
+            { value: "", label: "Wszystkie mecze" },
+            ...mecze.map(([id, nazwa]) => ({
+              value: String(id),
+              label: nazwa,
+            })),
+          ]}
+        />
 
-          <FilterSelect
-            label="Sortuj"
-            value={sortuj}
-            onChange={(v) => setSortuj(v as SortKey)}
+        <FilterDropdown
+          label="Sortuj"
+          value={sortuj}
+          onChange={(v) => setSortuj(v as SortKey)}
+          className="lg:w-56"
+          options={dostepneSorty.map((s) => ({ value: s.kod, label: s.label }))}
+        />
+
+        {/* żywy odczyt: liczba wjeżdża przy każdej zmianie filtrów */}
+        <div
+          aria-live="polite"
+          className="col-span-2 flex items-baseline justify-between gap-2 lg:ml-auto lg:flex-col lg:items-end lg:justify-start lg:gap-1"
+          title="Pozycje spełniające obecne filtry, najlepiej oceniane przez model najpierw"
+        >
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-faint">
+            wynik skanu
+          </span>
+          <motion.span
+            key={filtered.length}
+            initial={{ opacity: 0, y: 5 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+            className="font-data text-sm font-semibold text-brand-deep"
           >
-            {dostepneSorty.map((s) => (
-              <option key={s.kod} value={s.kod}>
-                {s.label}
-              </option>
-            ))}
-          </FilterSelect>
+            {odmienPozycje(filtered.length)}
+          </motion.span>
         </div>
       </div>
 
-      <p className="mb-3 text-xs text-faint" aria-live="polite">
-        {filtered.length > 0 &&
-          `${filtered.length} ${filtered.length === 1 ? "pozycja" : "pozycji"}${
-            sortuj === "ranking" ? " · najlepiej oceniane przez model najpierw" : ""
-          }`}
-      </p>
-
       {filtered.length === 0 &&
         (rodzaj === "okazje" && !bets.some((b) => !b.sugestia && !b.pewniak) ? (
-          <div className="rounded-(--radius-card) border border-hairline bg-card px-6 py-10 text-center shadow-(--shadow-card)">
+          <div className="rounded-(--radius-card) border border-hairline bg-card px-6 py-12 text-center shadow-(--shadow-card)">
             <p className="text-sm font-medium text-ink">
               Rynek w tej chwili nie daje okazji z kursem
             </p>
@@ -374,7 +536,7 @@ export function ValueBoard({
             )}
           </div>
         ) : (
-          <div className="rounded-(--radius-card) border border-hairline bg-card px-6 py-10 text-center shadow-(--shadow-card)">
+          <div className="rounded-(--radius-card) border border-hairline bg-card px-6 py-12 text-center shadow-(--shadow-card)">
             <p className="text-sm font-medium text-ink">
               Brak pozycji spełniających obecne filtry
             </p>
@@ -391,8 +553,9 @@ export function ValueBoard({
           </div>
         ))}
 
-      {/* lista */}
-      <div className="space-y-2.5">
+      {/* lista kart typów */}
+      {shown.length > 0 && (
+      <div className="space-y-3">
         {shown.map((bet, i) => (
           <motion.div
             key={bet.id}
@@ -410,14 +573,19 @@ export function ValueBoard({
           </motion.div>
         ))}
       </div>
+      )}
 
       {filtered.length > limit && (
         <div className="mt-5 text-center">
           <button
             onClick={() => setLimit((l) => l + 25)}
-            className="rounded-lg border border-hairline bg-card px-5 py-2 text-sm font-medium text-ink-soft transition-colors hover:border-brand hover:text-brand"
+            className="font-display inline-flex items-center gap-2 px-2 py-1 text-xs font-semibold uppercase tracking-widest text-muted transition-colors hover:text-brand"
           >
-            Pokaż więcej ({filtered.length - limit} pozostało)
+            Pokaż więcej
+            <span className="font-data tracking-normal">
+              ({filtered.length - limit} pozostało)
+            </span>
+            <span aria-hidden>↓</span>
           </button>
         </div>
       )}

@@ -39,12 +39,14 @@ export function ConfidenceBadge({ level }: { level: Pewnosc }) {
 
 export function PewnoscDots({ level }: { level: Pewnosc }) {
   const filled = level === "wysoka" ? 3 : level === "srednia" ? 2 : 1;
+  // rosnące kreski jak wskaźnik zasięgu — czytelniejsze "ile" niż kropki
+  const wysokosci = ["h-1.5", "h-2.5", "h-3"];
   return (
-    <span aria-hidden className="flex items-center gap-0.5">
+    <span aria-hidden className="flex items-end gap-[3px]">
       {[0, 1, 2].map((i) => (
         <span
           key={i}
-          className={`h-1.5 w-1.5 rounded-full ${
+          className={`w-1 rounded-[1px] ${wysokosci[i]} ${
             i < filled ? "bg-current" : "bg-current opacity-25"
           }`}
         />

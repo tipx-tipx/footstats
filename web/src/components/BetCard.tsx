@@ -3,7 +3,7 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { memo, useEffect, useState } from "react";
 
-import { ConfidenceBadge, EdgeBadge, PewnoscDots, RiskBadge, SignalChip } from "./badges";
+import { ConfidenceBadge, EdgeBadge, PewnoscDots, RiskBadge } from "./badges";
 import { ChanceBar, OutcomeColumns } from "./DistributionStrip";
 import { FormBars } from "./FormBars";
 import { addZakladFromBet, isTracked, onZakladyChange } from "@/lib/tracker";
@@ -331,128 +331,151 @@ export const BetCard = memo(function BetCard({
   return (
     <motion.article
       layout={!reduced}
-      className="relative overflow-hidden rounded-(--radius-card) border border-hairline bg-card shadow-(--shadow-card) transition-shadow hover:shadow-(--shadow-card-hover)"
+      className="relative overflow-hidden rounded-(--radius-card) border border-hairline bg-card shadow-(--shadow-card) transition-[border-color,box-shadow] duration-200 hover:border-brand/30 hover:shadow-(--shadow-card-hover)"
     >
-      {/* sygnalizacja świetlna — triage wzrokiem przy przewijaniu listy */}
-      {swiatlo && (
-        <span
-          aria-hidden
-          title={SWIATLO_STYL[swiatlo].opis}
-          className={`absolute inset-y-0 left-0 z-10 w-1 ${SWIATLO_STYL[swiatlo].pasek}`}
-        />
-      )}
-      {/* wiersz główny */}
       <button
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        className="grid w-full grid-cols-[1fr_auto] items-center gap-x-3 gap-y-2.5 px-3.5 py-3 text-left sm:grid-cols-[auto_1.4fr_1fr_auto_auto] sm:gap-x-4 sm:px-4"
+        className="group w-full text-left"
       >
-        <span
-          aria-hidden
-          className="font-data hidden w-7 text-right text-sm text-faint sm:block"
-        >
-          {rank}
-        </span>
+        {/* wiersz główny: numer z koszulki · kto i co · szansa · kurs */}
+        <span className="grid grid-cols-[1fr_auto] items-center gap-x-4 px-4 pb-3 pt-3.5 sm:grid-cols-[auto_1.4fr_1fr_auto] sm:px-5">
+          {/* ghost-numer jak nadruk na koszulce — orientacja w rankingu bez
+              kolejnego "pudełka"; przy hoverze nabiera koloru marki */}
+          <span
+            aria-hidden
+            className="font-display hidden w-10 shrink-0 text-center text-[1.7rem] font-bold leading-none text-ink/15 transition-colors group-hover:text-brand/40 sm:block"
+          >
+            {rank}
+          </span>
 
-        <span className="min-w-0">
-          <span className="block truncate font-semibold">
-            {bet.podmiot}
-            <span className="ml-2 font-normal text-muted">
-              {bet.rynek.toLowerCase()} {STRONA_LABEL[bet.strona]}{" "}
-              {fmtLinia(bet.linia)}
+          <span className="min-w-0">
+            <span className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
+              {/* dioda formy: historia vs model jednym rzutem oka (zamiast
+                  paska na krawędzi, który ginął przy zielonych miernikach) */}
+              {swiatlo && (
+                <span
+                  title={SWIATLO_STYL[swiatlo].opis}
+                  className="relative inline-flex h-2 w-2 shrink-0 translate-y-px items-center justify-center"
+                >
+                  <span
+                    aria-hidden
+                    className={`absolute -inset-1 rounded-full opacity-20 ${SWIATLO_STYL[swiatlo].pasek}`}
+                  />
+                  <span
+                    aria-hidden
+                    className={`h-2 w-2 rounded-full ${SWIATLO_STYL[swiatlo].pasek}`}
+                  />
+                </span>
+              )}
+              <span className="truncate font-semibold">{bet.podmiot}</span>
+              <span className="text-sm text-muted">
+                {bet.rynek.toLowerCase()} {STRONA_LABEL[bet.strona]}{" "}
+                {fmtLinia(bet.linia)}
+              </span>
+            </span>
+            <span className="mt-1 block truncate text-xs text-faint">
+              {bet.mecz} · {fmtDataCzas(bet.kickoff_ts)}
+            </span>
+            {/* pasek szansy na mobile — pod nazwą, żeby triage działał też kciukiem */}
+            <span className="mt-2 block max-w-56 sm:hidden">
+              <ChanceBar p={bet.p_model} line={bet.linia} side={bet.strona} />
             </span>
           </span>
-          <span className="mt-0.5 block truncate text-xs text-faint">
-            {bet.mecz} · {fmtDataCzas(bet.kickoff_ts)}
-          </span>
-          {/* pasek szansy na mobile — pod nazwą, żeby triage działał też kciukiem */}
-          <span className="mt-2 block max-w-56 sm:hidden">
-            <ChanceBar p={bet.p_model} line={bet.linia} side={bet.strona} />
-          </span>
-        </span>
 
-        <span className="hidden min-w-0 items-center gap-3 sm:flex">
-          <span className="w-full max-w-48">
-            <ChanceBar p={bet.p_model} line={bet.linia} side={bet.strona} />
+          <span className="hidden min-w-0 items-center sm:flex">
+            <span className="w-full max-w-48">
+              <ChanceBar p={bet.p_model} line={bet.linia} side={bet.strona} />
+            </span>
           </span>
-        </span>
 
-        {/* kurs w "pudełku" jak u bukmachera */}
-        <span className="flex flex-col items-center gap-0.5 justify-self-end rounded-(--radius-control) border border-hairline bg-card-soft px-2.5 py-1.5 shadow-(--shadow-card)">
-          <span className="font-data text-base font-semibold leading-none">
-            {bet.kurs != null ? fmtKurs(bet.kurs) : fmtProc(bet.p_model)}
-          </span>
-          <span className="text-[9px] uppercase tracking-wide text-faint">
-            {bet.kurs != null ? bet.bukmacher : "szansa"}
-          </span>
-        </span>
-
-        {/* mobile: sygnały schodzą do własnego wiersza na całą szerokość */}
-        <span className="col-span-2 flex items-center justify-between gap-2.5 sm:col-span-1 sm:justify-end">
-          <span className="flex flex-row flex-wrap items-center gap-1.5 sm:flex-col sm:items-end sm:gap-1">
-            {bet.pewniak ? (
-              (() => {
-                const t = tierPewniaka(bet);
-                return (
-                  <span
-                    className={`font-data inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold ${t.cls}`}
-                    title={t.opis}
-                  >
-                    {t.label} · {fmtProc(bet.p_model)}
-                  </span>
-                );
-              })()
-            ) : bet.sugestia || bet.ev_pct == null ? (
-              <span
-                className="inline-flex items-center rounded-md bg-data-amber-wash px-2 py-0.5 text-xs font-semibold text-data-amber-ink"
-                title="Rynek dostępny w STS, sprawdź kurs ręcznie"
-              >
-                sprawdź w STS
-              </span>
-            ) : (
-              <EdgeBadge ev={bet.ev_pct} />
-            )}
-            {/* odznaki przewagi — jedno źródło prawdy (odznakiPrzewagi) */}
-            {odznaki.length > 0 && (
-              <span
-                className="font-data hidden items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-brand sm:inline-flex"
-                title={`Ten typ nosi ${odznaki.length} ${odznaki.length === 1 ? "odznakę" : odznaki.length < 5 ? "odznaki" : "odznak"} przewagi, szczegóły w rozwinięciu`}
-              >
-                ⬡ ×{odznaki.length}
-              </span>
-            )}
-            {odznaki.map((o) => (
-              <SignalChip key={o.label} tone={o.tone} title={o.opis}>
-                {o.znak} {o.label}
-              </SignalChip>
-            ))}
+          {/* rubryka kursu za gradientową linią — liczba, nie przycisk;
+              bez kursu: od jakiego kursu w STS typ jest wart zagrania */}
+          <span
+            className="relative flex flex-col items-end justify-center gap-1 self-stretch justify-self-end pl-5 sm:pl-6"
+            title={
+              bet.kurs == null
+                ? `Otwórz STS i porównaj: kurs ~${fmtKurs(bet.fair_kurs * 1.05)} lub wyższy = warto grać, niższy = odpuść`
+                : undefined
+            }
+          >
             <span
-              className="hidden items-center gap-1 text-[10px] text-faint sm:flex"
+              aria-hidden
+              className="absolute inset-y-0 left-0 hidden w-px bg-gradient-to-b from-transparent via-hairline-strong to-transparent sm:block"
+            />
+            <span className="font-data text-xl font-semibold leading-none tracking-tight">
+              {bet.kurs != null ? fmtKurs(bet.kurs) : `~${fmtKurs(bet.fair_kurs * 1.05)}`}
+            </span>
+            <span className="text-[9px] uppercase tracking-wide text-faint">
+              {bet.kurs != null ? bet.bukmacher : "dobry kurs od"}
+            </span>
+          </span>
+        </span>
+
+        {/* linia meta: ocena typu + odznaki przewagi + pewność + detale —
+            bez własnego pudełka, wcięta do kolumny nazwiska */}
+        <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1.5 px-4 pb-3.5 sm:pl-[4.75rem] sm:pr-5">
+          {bet.pewniak ? (
+            (() => {
+              const t = tierPewniaka(bet);
+              return (
+                <span
+                  className={`font-data inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${t.cls}`}
+                  title={t.opis}
+                >
+                  {t.label}
+                </span>
+              );
+            })()
+          ) : bet.sugestia || bet.ev_pct == null ? (
+            <span
+              className="inline-flex items-center rounded-full bg-data-amber-wash px-2.5 py-0.5 text-xs font-semibold text-data-amber-ink"
+              title="Rynek dostępny w STS, sprawdź kurs ręcznie"
+            >
+              sprawdź w STS
+            </span>
+          ) : (
+            <EdgeBadge ev={bet.ev_pct} />
+          )}
+          {/* odznaki przewagi — tekstowe odczyty HUD zamiast kolejnych
+              chipów; jedno źródło prawdy (odznakiPrzewagi) */}
+          {odznaki.map((o) => (
+            <span
+              key={o.label}
+              title={o.opis}
+              className={`inline-flex items-center gap-1 px-1 text-[11px] font-medium ${
+                o.tone === "brand" ? "text-brand-deep" : "text-data-amber-ink"
+              }`}
+            >
+              <span aria-hidden className="font-data">{o.znak}</span> {o.label}
+            </span>
+          ))}
+          <span className="ml-auto flex items-center gap-3">
+            <span
+              className="flex items-center gap-1 text-[10px] text-faint"
               title="Pewność modelu: ile danych i jak stabilnych stoi za tą predykcją"
             >
               <PewnoscDots level={bet.pewnosc} />
               {PEWNOSC_LABEL[bet.pewnosc]} pewność
             </span>
-          </span>
-          <span className="flex flex-col items-center gap-0.5">
-            <svg
-              aria-hidden
-              width="14"
-              height="14"
-              viewBox="0 0 14 14"
-              className={`text-faint transition-transform ${open ? "rotate-180" : ""}`}
-            >
-              <path
-                d="M3 5.5 L7 9.5 L11 5.5"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            <span className="hidden text-[9px] uppercase tracking-wide text-faint sm:block">
+            <span className="flex items-center gap-1 text-[10px] uppercase tracking-wide text-faint">
               {open ? "zwiń" : "detale"}
+              <svg
+                aria-hidden
+                width="12"
+                height="12"
+                viewBox="0 0 14 14"
+                className={`transition-transform ${open ? "rotate-180" : ""}`}
+              >
+                <path
+                  d="M3 5.5 L7 9.5 L11 5.5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
             </span>
           </span>
         </span>

@@ -23,37 +23,53 @@ export function ChanceBar({
   line: number;
   side?: "powyzej" | "ponizej";
 }) {
+  const strona = side === "powyzej" ? "powyżej" : "poniżej";
+  const poz = (x: number) => Math.min(Math.max(x * 100, 2), 98);
   return (
-    <div className="w-full">
+    <div
+      className="w-full"
+      title={`Szansa modelu na ${strona} ${fmtLinia(line)}: ${fmtProc(p)}. Kreska na środku toru to 50%, rzut monetą`}
+    >
       <div className="flex items-center gap-2.5">
+        {/* tor szansy w języku karty hero: gładki tor, delikatne
+            wypełnienie i znacznik modelu dojeżdżający animacją */}
         <div
-          className="relative h-2.5 flex-1 overflow-hidden rounded-full bg-hairline"
+          className="relative h-4 flex-1"
           role="img"
-          aria-label={`Szansa modelu na ${side === "powyzej" ? "powyżej" : "poniżej"} ${fmtLinia(line)}: ${fmtProc(p)}`}
+          aria-label={`Szansa modelu na ${strona} ${fmtLinia(line)}: ${fmtProc(p)}`}
         >
-          <motion.div
-            initial={{ width: `0%` }}
-            animate={{ width: `${p * 100}%` }}
+          <span
+            aria-hidden
+            className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-hairline"
+          />
+          {/* delikatne wypełnienie do szansy modelu — czytanie wielkości */}
+          <motion.span
+            aria-hidden
+            initial={{ width: 0 }}
+            animate={{ width: `${poz(p)}%` }}
             transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-            className="absolute inset-y-0 left-0 rounded-full"
-            style={{
-              background:
-                "linear-gradient(to right, var(--color-brand), var(--color-data-green))",
-            }}
+            className="absolute left-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-brand/20"
           />
           {/* znacznik 50% — punkt odniesienia rzutu monetą */}
           <span
             aria-hidden
-            className="absolute inset-y-0 left-1/2 w-px bg-card/70"
+            className="absolute left-1/2 top-1/2 h-3 w-px -translate-y-1/2 bg-hairline-strong"
+          />
+          {/* znacznik modelu — dojeżdża na miejsce razem z wypełnieniem */}
+          <motion.span
+            aria-hidden
+            initial={{ left: "2%", opacity: 0 }}
+            animate={{ left: `${poz(p)}%`, opacity: 1 }}
+            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+            className="absolute top-1/2 h-3.5 w-[3px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand"
           />
         </div>
-        <span className="font-data shrink-0 text-sm font-semibold text-brand-deep">
+        <span className="font-data shrink-0 text-[15px] font-semibold leading-none text-brand-deep">
           {fmtProc(p)}
         </span>
       </div>
-      <p className="mt-1 text-[10px] leading-tight text-faint">
-        szansa na {side === "powyzej" ? "powyżej" : "poniżej"} {fmtLinia(line)}{" "}
-        wg modelu
+      <p className="mt-1.5 text-[10px] leading-tight text-faint">
+        szansa na {strona} {fmtLinia(line)} wg modelu
       </p>
     </div>
   );
