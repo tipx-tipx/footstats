@@ -4,11 +4,10 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { memo, useState } from "react";
 
 import { PewnoscDots } from "./badges";
-import { fmtDataCzas, fmtEV, fmtKurs, fmtProc, PEWNOSC_LABEL } from "@/lib/format";
+import { OsSzans, type OsZnacznik } from "./OsSzans";
+import { Sygnaly, type Sygnal } from "./Sygnaly";
+import { fmtDataCzas, fmtEV, fmtKurs, fmtProc } from "@/lib/format";
 import type { StsAlert } from "@/lib/types";
-
-/** Pozycja na torze 0–100% z marginesem, żeby znacznik nie uciekał za krawędź. */
-const pozNaTorze = (p: number) => Math.min(Math.max(p * 100, 2), 98);
 
 /** Nadwyżka kursu STS nad Superbetem w %: (ratio − 1) × 100. */
 const przeplaca = (a: StsAlert) => Math.round((a.ratio - 1) * 100);
@@ -24,13 +23,13 @@ function potwierdzenia(a: StsAlert): { label: string; opis: string; on: boolean 
       label: "siatka Superbetu",
       opis: `Z pozostałych linii Superbetu na ten rynek wynika kurs ~${
         a.fair_kurs_siatka != null ? fmtKurs(a.fair_kurs_siatka) : "podobny do oferowanego"
-      } — czyli sam Superbet „w środku" wycenia to drożej, niż płaci STS.`,
+      }. Czyli sam Superbet „w środku" wycenia to drożej, niż płaci STS.`,
     },
     {
       label: "ponad tło meczu",
       opis: `STS bywa globalnie luźniejszy, ale ta selekcja odstaje ×${a.nadwyzka_vs_baseline
         .toFixed(2)
-        .replace(".", ",")} ponad typową różnicę STS/Superbet w tym meczu — to nie sama ogólna luźność.`,
+        .replace(".", ",")} ponad typową różnicę STS/Superbet w tym meczu. To nie sama ogólna luźność.`,
     },
     {
       label: "pełna drabinka linii",
@@ -42,174 +41,65 @@ function potwierdzenia(a: StsAlert): { label: string; opis: string; on: boolean 
   return lista.map((p, i) => ({ ...p, on: i < a.sygnaly }));
 }
 
-/** Werdykt: dwie wyceny obok siebie + o ile STS przepłaca. Bohater rozwinięcia. */
-function Werdykt({ a }: { a: StsAlert }) {
-  const pola = [
-    { label: "superbet płaci", val: fmtKurs(a.kurs_superbet), kolor: "text-ink" },
-    { label: "sts płaci", val: fmtKurs(a.kurs_sts), kolor: "text-brand-deep" },
-    {
-      label: "przepłaca",
-      val: `+${przeplaca(a)}%`,
-      kolor: "text-data-green-ink",
-    },
-  ];
-  return (
-    <div>
-      <dl className="flex max-w-xl items-stretch">
-        {pola.map((p, i) => (
-          <div
-            key={p.label}
-            className={`flex flex-1 flex-col ${
-              i > 0 ? "border-l border-hairline pl-4 sm:pl-5" : ""
-            } ${i < pola.length - 1 ? "pr-4 sm:pr-5" : ""}`}
-          >
-            <dt className="text-[10px] uppercase tracking-wide text-faint">{p.label}</dt>
-            <dd
-              className={`font-data mt-auto pt-1 text-2xl font-semibold leading-none tracking-tight ${p.kolor}`}
-            >
-              {p.val}
-            </dd>
-          </div>
-        ))}
-      </dl>
-      <p className="mt-3 max-w-prose text-sm leading-relaxed text-ink-soft">
-        Superbet wycenia to zdarzenie na{" "}
-        <span className="font-data text-ink">{fmtKurs(a.kurs_superbet)}</span>, a STS płaci{" "}
-        <span className="font-data font-semibold text-brand-deep">{fmtKurs(a.kurs_sts)}</span>{" "}
-        na dokładnie to samo. Ta sama rzecz do wykręcenia, o{" "}
-        <span className="font-semibold text-data-green-ink">{przeplaca(a)}%</span> wyżej wyceniona.
-      </p>
-    </div>
-  );
-}
-
 /**
- * Tor: gdzie sytuują się dwie wyceny i model na jednej skali szans 0–100%.
- * Historia STS: kurs STS wycenia zdarzenie NISKO (długi kurs = mała szansa),
- * a Superbet i nasz model dają wyraźnie wyżej — ta odległość to wartość.
+ * Sygnały rozwinięcia: potwierdzenia cross-book + głos modelu + SuperZmiana.
+ * Jedna linia etykiet, opisy na klik (komponent Sygnaly) — zamiast dwóch
+ * kolumn pełnych akapitów.
  */
-function TorWyceny({ a }: { a: StsAlert }) {
-  const pSts = 1 / a.kurs_sts;
-  const pSb = 1 / a.kurs_superbet;
-  const model = a.ma_model && a.p_model != null ? a.p_model : null;
-  // prawy koniec przewagi = model (jeśli jest) albo wycena Superbetu
-  const gora = model ?? pSb;
-  const przewaga = gora > pSts ? { od: pozNaTorze(pSts), do: pozNaTorze(gora) } : null;
-  const etykieta =
-    a.value_potwierdzony && a.ev_model_pct != null
-      ? `${fmtEV(a.ev_model_pct)} wg modelu`
-      : `STS przepłaca`;
+function sygnalyAlertu(a: StsAlert): Sygnal[] {
+  const s: Sygnal[] = potwierdzenia(a).map((p) => ({
+    id: p.label,
+    znak: p.on ? "✓" : "·",
+    label: p.label,
+    ton: p.on ? "brand" : "cichy",
+    opis: p.on ? p.opis : `Tego potwierdzenia zabrakło przy tym skanie. ${p.opis}`,
+  }));
 
-  const znaczniki = [
-    {
-      p: pSts,
-      label: "kurs STS wycenia",
-      klasa: "bg-ink",
-      tytul: `Kurs ${fmtKurs(a.kurs_sts)} odpowiada szansie ${fmtProc(pSts)} — tyle „daje" STS. Jeśli realna szansa jest wyższa, kurs jest za wysoki (dla ciebie dobry).`,
-    },
-    {
-      p: pSb,
-      label: "Superbet wycenia",
-      klasa: "bg-brand/60",
-      tytul: `Kurs Superbetu ${fmtKurs(a.kurs_superbet)} odpowiada szansie ${fmtProc(pSb)} (z marżą buka) — drugi bukmacher widzi to zdarzenie znacznie częściej niż STS.`,
-    },
-    ...(model != null
-      ? [
-          {
-            p: model,
-            label: "szansa wg modelu",
-            klasa: "bg-brand",
-            tytul: `Model FootStats daje temu ${fmtProc(model)} szans${
-              a.oczekiwane_minuty != null
-                ? ` przy przewidywanych ${Math.round(a.oczekiwane_minuty)} min`
-                : ""
-            } — niezależnie od obu bukmacherów.`,
-          },
-        ]
-      : []),
-  ];
+  if (a.model_odrzucil) {
+    s.push({
+      id: "model",
+      znak: "⚠",
+      label: "model ostrzega",
+      ton: "czerwony",
+      opis: `Własne sito modelu odrzuciło tę parę zawodnik+rynek: ${a.odrzucenie_powod}. Nie traktuj jej jak potwierdzoną, to sama różnica kursowa STS vs Superbet. Graj ostrożnie albo odpuść.`,
+    });
+  } else if (a.ma_model && a.p_model != null) {
+    s.push({
+      id: "model",
+      znak: "◎",
+      label:
+        a.ev_model_pct != null
+          ? `model potwierdza ${fmtEV(a.ev_model_pct)}`
+          : "model potwierdza",
+      ton: "brand",
+      opis: `Model FootStats daje temu zdarzeniu ${fmtProc(a.p_model)} szans${
+        a.oczekiwane_minuty != null
+          ? ` przy przewidywanych ${Math.round(a.oczekiwane_minuty)} minutach`
+          : ""
+      }. Na kursie STS ${fmtKurs(a.kurs_sts)} to ${
+        a.ev_model_pct != null ? fmtEV(a.ev_model_pct) : "dodatnia"
+      } przewagi, niezależnie od tego, co robi Superbet.`,
+    });
+  } else {
+    s.push({
+      id: "model",
+      znak: "·",
+      label: "bez oceny modelu",
+      ton: "cichy",
+      opis: "Model nie ocenił tej selekcji (za mało danych albo poza jego rynkami), więc to sama różnica kursowa STS vs Superbet. Sygnał słabszy niż przy typach z potwierdzeniem modelu.",
+    });
+  }
 
-  return (
-    <div>
-      <div className="mb-3">
-        <h4 className="text-xs font-semibold uppercase tracking-wide text-faint">
-          Gdzie leży wartość
-        </h4>
-      </div>
-
-      <div className="relative h-4">
-        {przewaga && (
-          <motion.span
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.5, duration: 0.3 }}
-            className="font-data absolute -translate-x-1/2 whitespace-nowrap text-[10px] font-semibold text-data-green-ink"
-            style={{
-              left: `${Math.min(Math.max((przewaga.od + przewaga.do) / 2, 14), 86)}%`,
-            }}
-          >
-            {etykieta}
-          </motion.span>
-        )}
-      </div>
-
-      <div className="relative h-6">
-        <span
-          aria-hidden
-          className="absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 rounded-full bg-hairline"
-        />
-        {przewaga && (
-          <motion.span
-            aria-hidden
-            initial={{ width: 0 }}
-            animate={{ width: `${przewaga.do - przewaga.od}%` }}
-            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-            className="absolute top-1/2 h-2 -translate-y-1/2 rounded-full bg-data-green/45"
-            style={{ left: `${przewaga.od}%` }}
-          />
-        )}
-        {[25, 50, 75].map((x) => (
-          <span
-            key={x}
-            aria-hidden
-            className={`absolute top-1/2 w-px -translate-y-1/2 ${
-              x === 50 ? "h-4 bg-hairline-strong" : "h-2.5 bg-hairline-strong/60"
-            }`}
-            style={{ left: `${x}%` }}
-          />
-        ))}
-        {znaczniki.map((z) => (
-          <motion.span
-            key={z.label}
-            title={z.tytul}
-            initial={{ left: "2%", opacity: 0 }}
-            animate={{ left: `${pozNaTorze(z.p)}%`, opacity: 1 }}
-            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-            className={`absolute top-1/2 h-5 w-[3px] -translate-x-1/2 -translate-y-1/2 rounded-full ${z.klasa}`}
-          />
-        ))}
-      </div>
-
-      <div className="relative mt-1 h-3 text-[9px] text-faint">
-        <span className="absolute left-0">0</span>
-        <span className="absolute left-1/2 -translate-x-1/2">50%</span>
-        <span className="absolute right-0">100%</span>
-      </div>
-
-      <dl className="mt-2.5 flex flex-wrap items-baseline gap-x-5 gap-y-1.5">
-        {znaczniki.map((z) => (
-          <div key={z.label} className="flex items-baseline gap-1.5" title={z.tytul}>
-            <span
-              aria-hidden
-              className={`inline-block h-[3px] w-3 translate-y-[-2px] rounded-full ${z.klasa}`}
-            />
-            <dt className="text-[11px] text-faint">{z.label}</dt>
-            <dd className="font-data text-sm font-semibold text-ink">{fmtProc(z.p)}</dd>
-          </div>
-        ))}
-      </dl>
-    </div>
-  );
+  if (a.z_dogrywka) {
+    s.push({
+      id: "dogrywka",
+      znak: "⏱",
+      label: "z dogrywką, SuperZmiana",
+      ton: "amber",
+      opis: "Ten rynek STS rozlicza się z dogrywką i ma SuperZmianę: jeśli zawodnik zejdzie, zakład przechodzi na zmiennika. Znika największe ryzyko typów na zawodnika (czy w ogóle zagra), a dogrywka dokłada czasu. Realna szansa jest więc jeszcze wyższa, niż liczymy.",
+    });
+  }
+  return s;
 }
 
 /** memo: przy zmianie filtrów listy karty się nie przerenderowują wszystkie. */
@@ -229,7 +119,56 @@ export const StsBetCard = memo(function StsBetCard({
   const stan = potw ? "potw" : a.model_odrzucil ? "ostrzega" : "roznica";
   const diodaBg =
     stan === "potw" ? "bg-brand" : stan === "ostrzega" ? "bg-data-red" : "bg-data-amber";
-  const lista = potwierdzenia(a);
+  const sygnaly = sygnalyAlertu(a);
+
+  // oś szans: obie wyceny + model na jednej skali, liczby przy znacznikach
+  const pSts = 1 / a.kurs_sts;
+  const pSb = 1 / a.kurs_superbet;
+  const model = a.ma_model && a.p_model != null ? a.p_model : null;
+  const gora = model ?? pSb;
+  const znaczniki: OsZnacznik[] = [
+    {
+      id: "sb",
+      p: pSb,
+      wartosc: fmtProc(pSb),
+      podpis: "superbet",
+      ton: "duch-brand",
+      // bez modelu Superbet jest drugim głosem osi — wtedy dostaje etykietę
+      etykieta: model != null ? "gora" : "dol",
+      tytul: `Kurs Superbetu ${fmtKurs(a.kurs_superbet)} odpowiada szansie ${fmtProc(
+        pSb,
+      )} (z marżą buka). Drugi bukmacher widzi to zdarzenie znacznie częściej niż STS`,
+    },
+    ...(model != null
+      ? [
+          {
+            id: "model",
+            p: model,
+            wartosc: fmtProc(model),
+            podpis: "model",
+            ton: "brand" as const,
+            etykieta: "dol" as const,
+            tytul: `Model FootStats daje temu ${fmtProc(model)} szans${
+              a.oczekiwane_minuty != null
+                ? ` przy przewidywanych ${Math.round(a.oczekiwane_minuty)} min`
+                : ""
+            }, niezależnie od obu bukmacherów`,
+          },
+        ]
+      : []),
+    {
+      id: "sts",
+      p: pSts,
+      wartosc: fmtProc(pSts),
+      podpis: "sts wycenia",
+      ton: "ink",
+      etykieta: "dol",
+      tytul: `Kurs ${fmtKurs(a.kurs_sts)} odpowiada szansie ${fmtProc(
+        pSts,
+      )}, tyle „daje" STS. Jeśli realna szansa jest wyższa, kurs jest za wysoki (dla ciebie dobry)`,
+    },
+  ];
+  const przewaga = gora > pSts ? { od: pSts, do: gora } : null;
 
   return (
     <motion.article
@@ -306,7 +245,7 @@ export const StsBetCard = memo(function StsBetCard({
           </span>
         </span>
 
-        {/* meta: status + znaczniki + pewność + detale */}
+        {/* meta: status + pewność + detale */}
         <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 px-4 pb-3.5 sm:pl-[4.75rem] sm:pr-5">
           <span
             className={`font-data inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
@@ -391,6 +330,7 @@ export const StsBetCard = memo(function StsBetCard({
         </span>
       </button>
 
+      {/* rozwinięcie: pojedynek kursów → oś szans → sygnały → akcja */}
       <AnimatePresence initial={false}>
         {open && (
           <motion.div
@@ -401,116 +341,111 @@ export const StsBetCard = memo(function StsBetCard({
             transition={{ duration: 0.28, ease: [0.25, 0.9, 0.3, 1] }}
           >
             <div className="border-t border-hairline bg-paper/50 px-4 py-5 sm:px-6">
-              {/* akt 1: ile STS przepłaca */}
+              {/* moment 1: pojedynek dwóch wycen tego samego zdarzenia,
+                  liczby raz (duże), interpretacja jednym zdaniem pod spodem */}
               <motion.div
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, delay: 0.04 }}
               >
-                <Werdykt a={a} />
+                <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-faint">
+                  werdykt
+                </span>
+                <div className="mt-2.5 grid max-w-md grid-cols-[1fr_auto_1fr] items-end gap-x-5">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wide text-faint">
+                      superbet wycenia
+                    </p>
+                    <p className="font-data mt-1 text-[1.7rem] font-bold leading-none tracking-tight text-ink">
+                      {fmtKurs(a.kurs_superbet)}
+                    </p>
+                  </div>
+                  <div className="pb-0.5 text-center">
+                    <span
+                      aria-hidden
+                      className="block text-[10px] leading-none text-data-green"
+                    >
+                      ▲
+                    </span>
+                    <span className="font-data mt-0.5 block text-base font-bold leading-none text-data-green-ink">
+                      +{przeplaca(a)}%
+                    </span>
+                    <span className="mt-1 block text-[9px] uppercase tracking-wide text-faint">
+                      sts płaci więcej
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] uppercase tracking-wide text-faint">
+                      sts płaci
+                    </p>
+                    <p className="font-data mt-1 text-[1.7rem] font-bold leading-none tracking-tight text-brand-deep">
+                      {fmtKurs(a.kurs_sts)}
+                    </p>
+                  </div>
+                </div>
+                <p className="mt-3 max-w-prose text-sm leading-relaxed text-ink-soft">
+                  Dokładnie to samo zdarzenie, dwie ceny.{" "}
+                  {stan === "potw" && a.p_model != null ? (
+                    <>
+                      Model daje mu{" "}
+                      <span className="font-data font-semibold text-ink">
+                        {fmtProc(a.p_model)}
+                      </span>{" "}
+                      szans, więc kurs STS niesie{" "}
+                      <span className="font-semibold text-data-green-ink">
+                        {a.ev_model_pct != null ? fmtEV(a.ev_model_pct) : "dodatnią"}
+                      </span>{" "}
+                      przewagi niezależnie od Superbetu.
+                    </>
+                  ) : stan === "ostrzega" ? (
+                    <span className="text-data-red-ink">
+                      Model odrzucił tę selekcję ({a.odrzucenie_powod}), więc to
+                      sama różnica kursowa. Graj ostrożnie albo odpuść.
+                    </span>
+                  ) : (
+                    <>
+                      Model nie ocenił tej selekcji, więc to sama różnica
+                      kursowa między bukmacherami.
+                    </>
+                  )}
+                </p>
               </motion.div>
 
-              {/* akt 2: gdzie leży wartość — dwie wyceny + model na jednej skali */}
+              {/* moment 2: ta sama różnica na skali szans (jak w Pewniakach) */}
               <motion.div
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, delay: 0.1 }}
-                className="mt-6"
+                className="mt-5"
               >
-                <TorWyceny a={a} />
+                <OsSzans
+                  znaczniki={znaczniki}
+                  przewaga={przewaga}
+                  przewagaWartosc={
+                    potw && a.ev_model_pct != null
+                      ? fmtEV(a.ev_model_pct)
+                      : undefined
+                  }
+                  przewagaPodpis="wg modelu"
+                  ariaLabel={`Oś szans: ${znaczniki
+                    .map((z) => `${z.podpis} ${z.wartosc}`)
+                    .join(", ")}`}
+                />
               </motion.div>
 
-              {/* akt 3: dlaczego temu wierzyć + kontekst */}
+              {/* moment 3: sygnały w jednej linii, opis na klik */}
               <motion.div
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, delay: 0.16 }}
-                className="mt-7 grid gap-x-10 gap-y-7 sm:grid-cols-2"
+                className="mt-5 border-t border-hairline pt-4"
               >
-                {/* lewa: potwierdzenia cross-book */}
-                <div>
-                  <h4 className="mb-2.5 text-xs font-semibold uppercase tracking-wide text-faint">
-                    Dlaczego to nie przypadek ({a.sygnaly}/3)
-                  </h4>
-                  <ul className="space-y-2">
-                    {lista.map((p) => (
-                      <li key={p.label} className="flex items-start gap-2.5 text-sm">
-                        <span
-                          aria-hidden
-                          className={`font-data mt-px shrink-0 ${
-                            p.on ? "text-brand" : "text-faint"
-                          }`}
-                        >
-                          {p.on ? "✓" : "·"}
-                        </span>
-                        <span className={p.on ? "" : "opacity-55"}>
-                          <span className="font-medium">{p.label}:</span>{" "}
-                          <span className="text-ink-soft">{p.opis}</span>
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                {/* prawa: model + kontekst rynku */}
-                <div className="space-y-5">
-                  <div>
-                    <h4 className="mb-2.5 text-xs font-semibold uppercase tracking-wide text-faint">
-                      Strona modelu
-                    </h4>
-                    {a.model_odrzucil ? (
-                      <p className="rounded-(--radius-control) border border-data-red/30 bg-data-red-wash px-3 py-2.5 text-sm leading-relaxed text-data-red-ink">
-                        <span className="font-semibold">⚠ Model odrzucił tę selekcję:</span>{" "}
-                        {a.odrzucenie_powod}. Nie traktuj jej jak potwierdzoną — to sama
-                        różnica kursowa STS vs Superbet. Własne sito modelu by jej nie
-                        wystawiło, więc graj ostrożnie albo odpuść.
-                      </p>
-                    ) : a.ma_model && a.p_model != null ? (
-                      <p className="text-sm leading-relaxed text-ink-soft">
-                        Model FootStats daje temu zdarzeniu{" "}
-                        <span className="font-data font-semibold text-ink">
-                          {fmtProc(a.p_model)}
-                        </span>{" "}
-                        szans
-                        {a.oczekiwane_minuty != null && (
-                          <>
-                            {" "}
-                            przy przewidywanych{" "}
-                            <span className="font-data text-ink">
-                              {Math.round(a.oczekiwane_minuty)}
-                            </span>{" "}
-                            minutach
-                          </>
-                        )}
-                        . Na kursie STS {fmtKurs(a.kurs_sts)} to{" "}
-                        <span className="font-semibold text-data-green-ink">
-                          {a.ev_model_pct != null ? fmtEV(a.ev_model_pct) : "dodatnia"}
-                        </span>{" "}
-                        przewagi — niezależnie od tego, co robi Superbet.
-                      </p>
-                    ) : (
-                      <p className="text-sm leading-relaxed text-ink-soft">
-                        Model nie ocenił tej selekcji (za mało danych albo poza jego rynkami),
-                        więc to sama różnica kursowa STS vs Superbet. Sygnał słabszy niż przy
-                        typach z potwierdzeniem modelu.
-                      </p>
-                    )}
-                  </div>
-
-                  {a.z_dogrywka && (
-                    <div>
-                      <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-faint">
-                        Dogrywka + SuperZmiana
-                      </h4>
-                      <p className="text-sm leading-relaxed text-ink-soft">
-                        Ten rynek STS rozlicza się z dogrywką i ma SuperZmianę: jeśli zawodnik
-                        zejdzie, zakład przechodzi na zmiennika. Znika największe ryzyko typów na
-                        zawodnika (czy w ogóle zagra), a dogrywka dokłada czasu na „powyżej".
-                        Realna szansa jest więc jeszcze wyższa, niż liczymy.
-                      </p>
-                    </div>
-                  )}
-                </div>
+                <Sygnaly
+                  naglowek={
+                    stan === "ostrzega" ? "Za i przeciw" : "Dlaczego to nie przypadek"
+                  }
+                  sygnaly={sygnaly}
+                />
               </motion.div>
 
               {/* akcja: kurs bywa ulotny */}
@@ -518,7 +453,7 @@ export const StsBetCard = memo(function StsBetCard({
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, delay: 0.22 }}
-                className="mt-7 flex flex-col gap-3 border-t border-hairline pt-5 sm:flex-row sm:items-center sm:justify-between"
+                className="mt-6 flex flex-col gap-3 border-t border-hairline pt-4 sm:flex-row sm:items-center sm:justify-between"
               >
                 <p className="text-xs leading-relaxed text-muted">
                   Taki kurs bywa krótko: STS zwykle koryguje go w dół albo zdejmuje linię, gdy

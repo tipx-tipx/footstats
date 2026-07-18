@@ -1,11 +1,13 @@
 "use client";
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { memo, useEffect, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 
 import { EdgeBadge, PewnoscDots, RiskBadge } from "./badges";
 import { ChanceBar, OutcomeColumns } from "./DistributionStrip";
 import { FormBars } from "./FormBars";
+import { OsSzans, type OsZnacznik } from "./OsSzans";
+import { Sygnaly, type Sygnal } from "./Sygnaly";
 import { addZakladFromBet, isTracked, onZakladyChange } from "@/lib/tracker";
 import {
   fmtDataCzas,
@@ -80,7 +82,7 @@ function splityFormy(forma: FormaRynku, linia: number, strona: Strona) {
 /**
  * Odznaki przewagi — policzalny system sygnałów typu (wzorzec Linemate:
  * każdy typ nosi 0–4 odznaki). Jedno źródło prawdy dla wiersza karty
- * (chipy) i rozwinięcia (lista z wyjaśnieniami).
+ * (chipy) i rozwinięcia (sygnały na klik).
  */
 function odznakiPrzewagi(bet: ValueBet): {
   znak: string;
@@ -144,306 +146,135 @@ function odznakiPrzewagi(bet: ValueBet): {
   return o;
 }
 
-/** Pozycja na torze 0–100% z marginesem, żeby znacznik nie uciekał za krawędź. */
-const pozNaTorze = (p: number) => Math.min(Math.max(p * 100, 2), 98);
-
 /**
- * Werdykt: trzy liczby, po które user w ogóle otwiera detale. Gołe liczby
- * za pionowymi liniami (język kolumny kursu z wiersza), nie wash-box z prozą.
+ * Sygnały rozwinięcia: odznaki przewagi + głos historii + neutralne tło
+ * rynku UK. Jedna linia etykiet, opisy dopiero na klik (komponent Sygnaly).
  */
-function Werdykt({ bet }: { bet: ValueBet }) {
-  const brakKursu = bet.sugestia || bet.kurs == null;
-  const ev = bet.ev_pct;
-  const pola: { label: string; val: string; kolor: string }[] = brakKursu
-    ? [
-        { label: "uczciwy kurs", val: fmtKurs(bet.fair_kurs), kolor: "text-ink" },
-        {
-          label: "dobry kurs od",
-          val: `~${fmtKurs(bet.fair_kurs * 1.05)}`,
-          kolor: "text-brand-deep",
-        },
-      ]
-    : [
-        { label: "uczciwy kurs", val: fmtKurs(bet.fair_kurs), kolor: "text-ink" },
-        {
-          label: `${bet.bukmacher.toLowerCase()} płaci`,
-          val: fmtKurs(bet.kurs as number),
-          kolor: "text-ink",
-        },
-        ...(ev != null
-          ? [
-              {
-                label: ev >= 1 ? "twoja przewaga" : "przewaga",
-                val: fmtEV(ev),
-                kolor:
-                  ev >= 1
-                    ? "text-data-green-ink"
-                    : ev <= -1
-                      ? "text-data-red-ink"
-                      : "text-muted",
-              },
-            ]
-          : []),
-      ];
-
-  return (
-    <div>
-      {/* liczby rozdzielone pionową kreską — bez pudełek, jak rubryka kursu;
-          max-w trzyma je jako jedną grupę zamiast rozrzucać po całej karcie */}
-      <dl className="flex max-w-xl items-stretch">
-        {pola.map((p, i) => (
-          // flex-col + mt-auto: gdy label łamie się na dwie linie (mobile),
-          // liczby i tak stoją na jednej linii bazowej
-          <div
-            key={p.label}
-            className={`flex flex-1 flex-col ${
-              i > 0 ? "border-l border-hairline pl-4 sm:pl-5" : ""
-            } ${i < pola.length - 1 ? "pr-4 sm:pr-5" : ""}`}
-          >
-            <dt className="text-[10px] uppercase tracking-wide text-faint">
-              {p.label}
-            </dt>
-            <dd
-              className={`font-data mt-auto pt-1 text-2xl font-semibold leading-none tracking-tight ${p.kolor}`}
-            >
-              {p.val}
-            </dd>
-          </div>
-        ))}
-      </dl>
-      <p className="mt-3 max-w-prose text-sm leading-relaxed text-ink-soft">
-        {zdanieWerdyktu(bet)}
-      </p>
-      {!brakKursu && bet.kurs_ref != null && <LiniaUK bet={bet} />}
-    </div>
-  );
+function sygnalyTypu(
+  bet: ValueBet,
+  okna: ReturnType<typeof oknaFormy> | null,
+): Sygnal[] {
+  const s: Sygnal[] = odznakiPrzewagi(bet).map((o) => ({
+    id: o.label,
+    znak: o.znak,
+    label: o.label,
+    opis: `${o.opis}.`,
+    ton: o.tone,
+  }));
+  if (okna) {
+    const w = okna.l10.n >= 5 ? okna.l10 : okna.all;
+    if (w.n >= 5) {
+      const hr = w.traf / w.n;
+      if (hr >= 0.65) {
+        s.push({
+          id: "forma-za",
+          znak: "✓",
+          label: `weszło w ${w.traf} z ${w.n} meczów`,
+          ton: "brand",
+          opis: `Linia tego typu została przebita w ${w.traf} z ostatnich ${w.n} meczów z minutami. Pełny wykres mecz po meczu znajdziesz niżej, w zakładce Forma.`,
+        });
+      } else if (hr < 0.45) {
+        s.push({
+          id: "forma-przeciw",
+          znak: "↓",
+          label: `weszło tylko w ${w.traf} z ${w.n}`,
+          ton: "czerwony",
+          opis: `Historia przeczy tej linii: weszła w ${w.traf} z ostatnich ${w.n} meczów z minutami. Obejrzyj wykres w zakładce Forma, zanim zagrasz.`,
+        });
+      }
+    }
+  }
+  const maUk = s.some((x) => x.id.includes("vs UK") || x.id === "odstaje od rynku");
+  if (!bet.sugestia && bet.kurs_ref != null && !maUk) {
+    s.push({
+      id: "tlo-uk",
+      znak: "·",
+      label: `rynek UK płaci ${fmtKurs(bet.kurs_ref)}`,
+      ton: "cichy",
+      opis:
+        bet.kurs_novig != null
+          ? `Bukmacherzy w UK płacą za to średnio ${fmtKurs(bet.kurs_ref)}, a uczciwa cena po zdjęciu ich marży to ${fmtKurs(bet.kurs_novig)}. To niezależny punkt odniesienia dla kursu wyżej.`
+          : `Bukmacherzy w UK płacą za to średnio ${fmtKurs(bet.kurs_ref)}. To niezależny punkt odniesienia dla kursu wyżej.`,
+    });
+  }
+  return s;
 }
 
-/** Werdykt po ludzku: jedno zdanie zamiast akapitu żargonu. */
-function zdanieWerdyktu(bet: ValueBet): string {
+/** Liczba w zdaniu werdyktu — mono, żeby czytała się jak odczyt, nie proza. */
+function Num({ children }: { children: React.ReactNode }) {
+  return <span className="font-data font-semibold">{children}</span>;
+}
+
+/**
+ * Werdykt jednym zdaniem: największa typografia rozwinięcia. Liczby wchodzą
+ * do zdania (zamiast osobnego rządka trzech liczb + akapitu, które mówiły
+ * to samo dwa razy). Drugie zdanie tłumaczy skąd wniosek.
+ */
+function WerdyktZdanie({ bet }: { bet: ValueBet }) {
+  const fair = fmtKurs(bet.fair_kurs);
   const p = fmtProc(bet.p_model);
   if (bet.sugestia || bet.kurs == null) {
-    return `Model daje temu zdarzeniu ${p} szans, więc uczciwa cena to ${fmtKurs(
-      bet.fair_kurs,
-    )}. Kursu nie pobieramy automatycznie, bo ten rynek jest tylko w STS. Jeśli STS płaci powyżej ~${fmtKurs(
-      bet.fair_kurs * 1.05,
-    )}, masz przewagę. Im wyżej, tym lepiej.`;
+    return (
+      <>
+        <p className="text-[17px] font-semibold leading-snug tracking-tight text-ink sm:text-lg">
+          Uczciwa cena to <Num>{fair}</Num>. W STS warto grać od{" "}
+          <span className="text-brand-deep">
+            <Num>~{fmtKurs(bet.fair_kurs * 1.05)}</Num>
+          </span>{" "}
+          w górę.
+        </p>
+        <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-muted">
+          Model daje temu zdarzeniu {p} szans. Kursu nie pobieramy automatycznie,
+          bo ten rynek jest tylko w STS. Jeśli grasz, dodaj zakład ręcznie w
+          Moich zakładach.
+        </p>
+      </>
+    );
   }
+  const kurs = fmtKurs(bet.kurs);
   const wycena = fmtProc(1 / bet.kurs);
   const ev = bet.ev_pct;
   if (ev != null && ev >= 1) {
-    return `Model daje temu zdarzeniu ${p} szans, a kurs ${fmtKurs(
-      bet.kurs,
-    )} wycenia je na ${wycena}. Bukmacher płaci więcej, niż powinien, i ta różnica jest twoją przewagą.`;
+    return (
+      <>
+        <p className="text-[17px] font-semibold leading-snug tracking-tight text-ink sm:text-lg">
+          Warte <Num>{fair}</Num>, {bet.bukmacher} płaci <Num>{kurs}</Num>.{" "}
+          <span className="text-data-green-ink">
+            <Num>{fmtEV(ev)}</Num> ponad wartość.
+          </span>
+        </p>
+        <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-muted">
+          Model daje temu zdarzeniu {p} szans, a kurs wycenia je na {wycena}.
+          Ta różnica jest twoją przewagą.
+        </p>
+      </>
+    );
   }
   if (ev != null && ev <= -1) {
-    return `Model daje temu zdarzeniu ${p} szans, a kurs ${fmtKurs(
-      bet.kurs,
-    )} wycenia je aż na ${wycena}. Ten kurs nie daje przewagi. Typ jest na liście za wysoką szansę trafienia, nie za wartość.`;
+    return (
+      <>
+        <p className="text-[17px] font-semibold leading-snug tracking-tight text-ink sm:text-lg">
+          Warte <Num>{fair}</Num>, {bet.bukmacher} płaci tylko <Num>{kurs}</Num>.{" "}
+          <span className="text-muted">Bez przewagi w kursie.</span>
+        </p>
+        <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-muted">
+          Kurs wycenia szansę aż na {wycena}, więc nie płaci ponad wartość. Typ
+          jest na liście za wysoką szansę trafienia ({p}), nie za kurs.
+        </p>
+      </>
+    );
   }
-  return `Model daje temu zdarzeniu ${p} szans, a kurs ${fmtKurs(
-    bet.kurs,
-  )} wycenia je na ${wycena}. Cena jest praktycznie uczciwa, bez przewagi po żadnej stronie.`;
-}
-
-/** Niezależny dowód: co za ten sam typ płaci rynek brytyjski. */
-function LiniaUK({ bet }: { bet: ValueBet }) {
-  const odstaje =
-    bet.kurs != null && bet.kurs_ref != null && bet.kurs >= bet.kurs_ref * 1.12;
   return (
-    <p className="mt-2 max-w-prose text-xs leading-relaxed text-faint">
-      Bukmacherzy w UK płacą za to średnio{" "}
-      <span className="font-data text-ink-soft">{fmtKurs(bet.kurs_ref as number)}</span>
-      {bet.kurs_novig != null && (
-        <>
-          , a uczciwa cena po zdjęciu ich marży to{" "}
-          <span className="font-data text-ink-soft">{fmtKurs(bet.kurs_novig)}</span>
-        </>
-      )}
-      .{" "}
-      {bet.ev_uk != null && bet.ev_uk >= 4 ? (
-        <>
-          {bet.bukmacher} daje{" "}
-          <span className="font-data font-semibold text-data-green-ink">
-            +{bet.ev_uk.toFixed(1).replace(".", ",")}%
-          </span>{" "}
-          ponad ten poziom, czyli jego linia jest miękka.
-        </>
-      ) : (
-        odstaje && (
-          <span className="text-data-green-ink">
-            {bet.bukmacher} wyraźnie odstaje w górę.
-          </span>
-        )
-      )}
-    </p>
-  );
-}
-
-/**
- * Dowód: historia, model i wycena kursu na JEDNEJ skali 0–100% (kotwica
- * zaufania, standard kategorii). Bez ramki, bo to bohater rozwinięcia:
- *   zielony odcinek  = ile bukmacher przepłaca (teza produktu jako odległość),
- *   znaczniki        = trzy spojrzenia dojeżdżające animacją przy otwarciu.
- *
- * Świadomie BEZ strefy `ci` na torze: ci to przedział szansy przy
- * przewidywanych minutach (engine.py liczy go dla mm.expected_minutes),
- * a p_model to mieszanka po scenariuszach minut (minutes.p_over_mixture),
- * więc ci NIE jest przedziałem wokół p_model i bywa całkiem obok niego
- * (w demo 11/39 typów). Narysowany jako strefa wyglądałby na błąd —
- * liczby zostają w tooltipie znacznika, uczciwie opisane.
- */
-function TorDowodu({
-  bet,
-  historia,
-}: {
-  bet: ValueBet;
-  historia: { traf: number; n: number } | null;
-}) {
-  const hist = historia && historia.n >= 3 ? historia.traf / historia.n : null;
-  const implied = bet.kurs != null && bet.kurs > 1 ? 1 / bet.kurs : null;
-  const model = bet.p_model;
-  const ci = bet.ci[0] != null ? ([bet.ci[0], bet.ci[1]] as [number, number]) : null;
-  if (implied == null && hist == null) return null;
-
-  const przewaga =
-    implied != null && model > implied
-      ? { od: pozNaTorze(implied), do: pozNaTorze(model) }
-      : null;
-  const pokazEtykiete = przewaga != null && bet.ev_pct != null && bet.ev_pct >= 1;
-
-  // historia jest „duchem”: cieńsza i przygaszona, żeby dwie zielenie
-  // (brand modelu i data-green historii) nie konkurowały ze sobą na torze
-  const znaczniki = [
-    ...(hist != null
-      ? [
-          {
-            p: hist,
-            label: `historia ${historia!.traf}/${historia!.n}`,
-            klasa: "bg-data-green/70",
-            slaby: true,
-            tytul: `W ${historia!.traf} z ostatnich ${historia!.n} meczów ten typ by wszedł`,
-          },
-        ]
-      : []),
-    {
-      p: model,
-      label: "szansa wg modelu",
-      klasa: "bg-brand",
-      slaby: false,
-      tytul: ci
-        ? `Model daje ${fmtProc(model)}. Gdyby zawodnik zagrał przewidywane ${
-            bet.oczekiwane_minuty != null ? Math.round(bet.oczekiwane_minuty) : "wszystkie"
-          } minut, szansa mieściłaby się w ${fmtProc(ci[0])}–${fmtProc(
-            ci[1],
-          )}. Model podaje ostrożniejszą liczbę, bo wlicza też ryzyko, że zagra krócej`
-        : `Model daje ${fmtProc(model)}`,
-    },
-    ...(implied != null
-      ? [
-          {
-            p: implied,
-            label: "kurs wycenia",
-            klasa: "bg-ink",
-            slaby: false,
-            tytul: `Kurs ${fmtKurs(bet.kurs as number)} odpowiada szansie ${fmtProc(
-              implied,
-            )} (z marżą bukmachera, więc realna opinia rynku jest odrobinę niższa)`,
-          },
-        ]
-      : []),
-  ];
-
-  return (
-    <div>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-        <h4 className="text-xs font-semibold uppercase tracking-wide text-faint">
-          Trzy spojrzenia na tę samą szansę
-        </h4>
-        <RiskBadge level={bet.ryzyko} />
-      </div>
-
-      {/* etykieta przewagi siedzi nad swoim odcinkiem, nie w legendzie */}
-      <div className="relative h-4">
-        {pokazEtykiete && (
-          <motion.span
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.5, duration: 0.3 }}
-            className="font-data absolute -translate-x-1/2 whitespace-nowrap text-[10px] font-semibold text-data-green-ink"
-            style={{
-              left: `${Math.min(Math.max((przewaga!.od + przewaga!.do) / 2, 12), 88)}%`,
-            }}
-          >
-            {fmtEV(bet.ev_pct as number)} wartości
-          </motion.span>
-        )}
-      </div>
-
-      <div className="relative h-6">
-        {/* tor */}
-        <span
-          aria-hidden
-          className="absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 rounded-full bg-hairline"
-        />
-        {/* ile bukmacher przepłaca */}
-        {przewaga && (
-          <motion.span
-            aria-hidden
-            initial={{ width: 0 }}
-            animate={{ width: `${przewaga.do - przewaga.od}%` }}
-            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-            className="absolute top-1/2 h-2 -translate-y-1/2 rounded-full bg-data-green/45"
-            style={{ left: `${przewaga.od}%` }}
-          />
-        )}
-        {/* podziałki: 50% mocniej (rzut monetą), ćwiartki subtelnie */}
-        {[25, 50, 75].map((x) => (
-          <span
-            key={x}
-            aria-hidden
-            className={`absolute top-1/2 w-px -translate-y-1/2 ${
-              x === 50 ? "h-4 bg-hairline-strong" : "h-2.5 bg-hairline-strong/60"
-            }`}
-            style={{ left: `${x}%` }}
-          />
-        ))}
-        {znaczniki.map((z) => (
-          <motion.span
-            key={z.label}
-            title={z.tytul}
-            initial={{ left: "2%", opacity: 0 }}
-            animate={{ left: `${pozNaTorze(z.p)}%`, opacity: 1 }}
-            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-            className={`absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full ${
-              z.slaby ? "h-3.5 w-[2px]" : "h-5 w-[3px]"
-            } ${z.klasa}`}
-          />
-        ))}
-      </div>
-
-      {/* skala — bez niej znaczniki wiszą w próżni */}
-      <div className="relative mt-1 h-3 text-[9px] text-faint">
-        <span className="absolute left-0">0</span>
-        <span className="absolute left-1/2 -translate-x-1/2">50%</span>
-        <span className="absolute right-0">100%</span>
-      </div>
-
-      <dl className="mt-2.5 flex flex-wrap items-baseline gap-x-5 gap-y-1.5">
-        {znaczniki.map((z) => (
-          <div key={z.label} className="flex items-baseline gap-1.5" title={z.tytul}>
-            <span
-              aria-hidden
-              className={`inline-block w-3 translate-y-[-2px] rounded-full ${
-                z.slaby ? "h-[2px]" : "h-[3px]"
-              } ${z.klasa}`}
-            />
-            <dt className="text-[11px] text-faint">{z.label}</dt>
-            <dd className="font-data text-sm font-semibold text-ink">{fmtProc(z.p)}</dd>
-          </div>
-        ))}
-      </dl>
-    </div>
+    <>
+      <p className="text-[17px] font-semibold leading-snug tracking-tight text-ink sm:text-lg">
+        Warte <Num>{fair}</Num>, {bet.bukmacher} płaci <Num>{kurs}</Num>. Cena
+        praktycznie uczciwa.
+      </p>
+      <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-muted">
+        Model daje temu zdarzeniu {p} szans, a kurs wycenia je na {wycena}. Bez
+        przewagi po żadnej stronie.
+      </p>
+    </>
   );
 }
 
@@ -670,6 +501,8 @@ function tierPewniaka(bet: ValueBet): {
   };
 }
 
+type TabSzczegolow = "forma" | "czynniki" | "wyniki";
+
 /** memo: przy zmianie filtrów listy nie przerenderowują się wszystkie karty */
 export const BetCard = memo(function BetCard({
   bet,
@@ -696,6 +529,91 @@ export const BetCard = memo(function BetCard({
   // historia do porównania wycen: L10 gdy jest sensowna próba, inaczej całość
   const historiaOkno =
     okna == null ? null : okna.l10.n >= 5 ? okna.l10 : okna.all;
+  const sygnaly = sygnalyTypu(bet, okna);
+
+  // głębia na żądanie: jedna sekcja naraz zamiast siatki wszystkiego
+  const taby: { kod: TabSzczegolow; label: string }[] = [
+    ...(forma ? [{ kod: "forma" as const, label: "Forma" }] : []),
+    ...(bet.uzasadnienie.czynniki.length > 0
+      ? [{ kod: "czynniki" as const, label: "Czynniki modelu" }]
+      : []),
+    ...(bet.rozklad ? [{ kod: "wyniki" as const, label: "Możliwe wyniki" }] : []),
+  ];
+  const [tab, setTab] = useState<TabSzczegolow>(taby[0]?.kod ?? "czynniki");
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const onTabKeyDown = (
+    e: React.KeyboardEvent<HTMLButtonElement>,
+    idx: number,
+  ) => {
+    let next = idx;
+    if (e.key === "ArrowRight") next = (idx + 1) % taby.length;
+    else if (e.key === "ArrowLeft") next = (idx - 1 + taby.length) % taby.length;
+    else if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = taby.length - 1;
+    else return;
+    e.preventDefault();
+    setTab(taby[next].kod);
+    tabRefs.current[next]?.focus();
+  };
+
+  // oś wyceny: trzy głosy na jednej skali szans, liczby przy znacznikach
+  const hist =
+    historiaOkno && historiaOkno.n >= 3
+      ? historiaOkno.traf / historiaOkno.n
+      : null;
+  const implied = bet.kurs != null && bet.kurs > 1 ? 1 / bet.kurs : null;
+  const ci = bet.ci[0] != null ? ([bet.ci[0], bet.ci[1]] as [number, number]) : null;
+  const znaczniki: OsZnacznik[] = [
+    ...(hist != null
+      ? [
+          {
+            id: "forma",
+            p: hist,
+            wartosc: `${historiaOkno!.traf}/${historiaOkno!.n}`,
+            podpis: "forma",
+            ton: "duch-zielony" as const,
+            etykieta: "gora" as const,
+            tytul: `W ${historiaOkno!.traf} z ostatnich ${historiaOkno!.n} meczów ten typ by wszedł`,
+          },
+        ]
+      : []),
+    {
+      id: "model",
+      p: bet.p_model,
+      wartosc: fmtProc(bet.p_model),
+      podpis: "model",
+      ton: "brand",
+      etykieta: "dol",
+      tytul: ci
+        ? `Model daje ${fmtProc(bet.p_model)}. Gdyby zawodnik zagrał przewidywane ${
+            bet.oczekiwane_minuty != null
+              ? Math.round(bet.oczekiwane_minuty)
+              : "wszystkie"
+          } minut, szansa mieściłaby się w ${fmtProc(ci[0])}–${fmtProc(
+            ci[1],
+          )}. Model podaje ostrożniejszą liczbę, bo wlicza też ryzyko, że zagra krócej`
+        : `Model daje ${fmtProc(bet.p_model)}`,
+    },
+    ...(implied != null
+      ? [
+          {
+            id: "kurs",
+            p: implied,
+            wartosc: fmtProc(implied),
+            podpis: "kurs wycenia",
+            ton: "ink" as const,
+            etykieta: "dol" as const,
+            tytul: `Kurs ${fmtKurs(bet.kurs as number)} odpowiada szansie ${fmtProc(
+              implied,
+            )} (z marżą bukmachera, więc realna opinia rynku jest odrobinę niższa)`,
+          },
+        ]
+      : []),
+  ];
+  const przewaga =
+    implied != null && bet.p_model > implied
+      ? { od: implied, do: bet.p_model }
+      : null;
 
   // rozkład (i „inne linie”) liczą się przy przewidywanych minutach, p_model
   // dokłada do tego scenariusze rotacji — te dwie liczby potrafią się rozjechać
@@ -865,7 +783,7 @@ export const BetCard = memo(function BetCard({
         </span>
       </button>
 
-      {/* szczegóły */}
+      {/* rozwinięcie: werdykt z akcją → oś wyceny → sygnały → głębia w zakładkach */}
       <AnimatePresence initial={false}>
         {open && (
           <motion.div
@@ -876,227 +794,32 @@ export const BetCard = memo(function BetCard({
             transition={{ duration: 0.28, ease: [0.25, 0.9, 0.3, 1] }}
           >
             <div className="border-t border-hairline bg-paper/50 px-4 py-5 sm:px-6">
-              {/* akt 1: ile to jest warte */}
+              {/* moment 1: werdykt jednym zdaniem, akcja od razu obok */}
               <motion.div
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, delay: 0.04 }}
+                className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-8"
               >
-                <Werdykt bet={bet} />
-              </motion.div>
-
-              {/* akt 2: dowód na jednej skali */}
-              <motion.div
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: 0.1 }}
-                className="mt-6"
-              >
-                <TorDowodu bet={bet} historia={historiaOkno} />
-              </motion.div>
-
-              {/* akt 3: dlaczego model tak uważa */}
-              <motion.div
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: 0.16 }}
-                className="mt-7 grid gap-x-10 gap-y-7 sm:grid-cols-2"
-              >
-                <div className="space-y-6">
-                {/* przewagi tego typu — pełna lista z wyjaśnieniami */}
-                {odznaki.length > 0 && (
-                  <div>
-                    <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-faint">
-                      Przewagi tego typu ({odznaki.length})
-                    </h4>
-                    <ul className="space-y-1.5">
-                      {odznaki.map((o) => (
-                        <li key={o.label} className="flex items-start gap-2.5 text-sm">
-                          <span
-                            aria-hidden
-                            className={`font-data mt-px shrink-0 ${
-                              o.tone === "brand" ? "text-brand" : "text-data-amber-ink"
-                            }`}
-                          >
-                            {o.znak}
-                          </span>
-                          <span>
-                            <span className="font-medium">{o.label}:</span>{" "}
-                            <span className="text-ink-soft">{o.opis}</span>
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                <div>
-                  <h4 className="mb-2.5 text-xs font-semibold uppercase tracking-wide text-faint">
-                    Dlaczego ten typ
-                  </h4>
-                  <ul className="space-y-2">
-                    {bet.uzasadnienie.czynniki.map((c) => (
-                      <li key={c.nazwa} className="flex items-start gap-3 text-sm">
-                        <span className="flex-1">
-                          <span className="font-medium">{c.nazwa}:</span>{" "}
-                          <span className="text-ink-soft">{c.opis}</span>
-                        </span>
-                        {c.mnoznik !== null && (
-                          <span
-                            className="flex shrink-0 items-center gap-2 pt-1"
-                            title={`Ten czynnik ${
-                              c.mnoznik > 1.02
-                                ? "podnosi"
-                                : c.mnoznik < 0.98
-                                  ? "obniża"
-                                  : "praktycznie nie rusza"
-                            } przewidywaną liczbę zdarzeń (1,00 = bez wpływu)`}
-                          >
-                            <MnoznikBar m={c.mnoznik} />
-                            <span
-                              className={`font-data w-12 text-right text-xs font-semibold ${
-                                c.mnoznik > 1.02
-                                  ? "text-data-green-ink"
-                                  : c.mnoznik < 0.98
-                                    ? "text-data-red-ink"
-                                    : "text-faint"
-                              }`}
-                            >
-                              {fmtMnoznik(c.mnoznik)}
-                            </span>
-                          </span>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                {/* historia to też „dlaczego” — i domyka wysokość kolumny */}
-                {forma && <SekcjaFormy bet={bet} forma={forma} />}
-                </div>
-
-                {/* prawa: co z modelu wychodzi */}
-                <div className="space-y-6">
-                {bet.rozklad && (
-                  <div>
-                    <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3">
-                      <h4 className="text-xs font-semibold uppercase tracking-wide text-faint">
-                        Możliwe wyniki i ich szanse
-                      </h4>
-                      {przyMinutach && (
-                        <span className="text-[10px] uppercase tracking-wide text-faint">
-                          przy {przyMinutach} min
-                        </span>
-                      )}
-                    </div>
-                    <OutcomeColumns
-                      dist={bet.rozklad}
-                      line={bet.linia}
-                      side={bet.strona}
-                    />
-                    {/* rozkład liczy się przy przewidywanych minutach, a p_model
-                        wlicza jeszcze ryzyko rotacji — bez tego zdania user widzi
-                        dwie różne liczby na tej samej karcie i traci zaufanie */}
-                    {rozjazdMinut && (
-                      <p className="mt-2 text-xs leading-relaxed text-faint">
-                        Model daje temu typowi{" "}
-                        <span className="font-data text-ink-soft">
-                          {fmtProc(bet.p_model)}
-                        </span>
-                        , czyli mniej, bo wlicza też ryzyko, że zawodnik zagra
-                        krócej albo w ogóle nie wyjdzie.
-                      </p>
-                    )}
-                  </div>
-                )}
-                {bet.rozklad && (
-                  <div>
-                    <div className="mb-2.5 flex flex-wrap items-baseline justify-between gap-x-3">
-                      <h4 className="text-xs font-semibold uppercase tracking-wide text-faint">
-                        Szanse na inne linie
-                      </h4>
-                      {przyMinutach && (
-                        <span className="text-[10px] uppercase tracking-wide text-faint">
-                          przy {przyMinutach} min
-                        </span>
-                      )}
-                    </div>
-                    {/* podkreślenie zamiast kafelka — linia tego typu czyta się
-                        jak aktywna zakładka */}
-                    <div className="flex items-end gap-3">
-                      {[0.5, 1.5, 2.5, 3.5].map((l) => {
-                        const total =
-                          bet.rozklad!.reduce((a, b) => a + b, 0) || 1;
-                        const pOver =
-                          bet.rozklad!
-                            .slice(Math.floor(l) + 1)
-                            .reduce((a, b) => a + b, 0) / total;
-                        const p = bet.strona === "ponizej" ? 1 - pOver : pOver;
-                        const aktualna = Math.abs(l - bet.linia) < 0.01;
-                        if (p < 0.02 && !aktualna) return null;
-                        const skrot = bet.strona === "ponizej" ? "pon." : "pow.";
-                        return (
-                          <div
-                            key={l}
-                            className={`flex-1 border-b-2 pb-1.5 ${
-                              aktualna ? "border-brand" : "border-hairline"
-                            }`}
-                            title={
-                              aktualna
-                                ? "Linia tego typu"
-                                : `Szansa modelu na ${
-                                    bet.strona === "ponizej" ? "poniżej" : "powyżej"
-                                  } ${fmtLinia(l)}`
-                            }
-                          >
-                            <p className="text-[10px] uppercase tracking-wide text-faint">
-                              {skrot} {fmtLinia(l)}
-                            </p>
-                            <p
-                              className={`font-data mt-0.5 text-base font-semibold leading-none ${
-                                aktualna ? "text-brand-deep" : "text-ink"
-                              }`}
-                            >
-                              {fmtProc(p)}
-                            </p>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-                </div>
-              </motion.div>
-
-              {/* akcja domyka narrację: ile → dowód → dlaczego → zagraj */}
-              <motion.div
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: 0.22 }}
-                className="mt-7 flex flex-col gap-3 border-t border-hairline pt-5 sm:flex-row sm:items-center sm:justify-between"
-              >
-                {bet.sugestia ? (
-                  <>
-                    <p className="text-xs leading-relaxed text-muted">
-                      Znajdź ten rynek w STS. Płacą powyżej{" "}
-                      <span className="font-data font-semibold text-ink">
-                        ~{fmtKurs(bet.fair_kurs * 1.05)}
-                      </span>
-                      ? Masz przewagę, dodaj zakład w „Moich zakładach”.
-                    </p>
-                    <span className="font-data shrink-0 text-[10px] uppercase tracking-wide text-faint">
-                      kurs sprawdzasz ręcznie
+                <div className="min-w-0 max-w-xl flex-1">
+                  <div className="mb-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-faint">
+                      werdykt
                     </span>
-                  </>
+                    <RiskBadge level={bet.ryzyko} />
+                  </div>
+                  <WerdyktZdanie bet={bet} />
+                </div>
+                {bet.sugestia || bet.kurs == null ? (
+                  <span className="font-data shrink-0 text-[10px] uppercase tracking-wide text-faint sm:pt-6">
+                    kurs sprawdzasz ręcznie
+                  </span>
                 ) : (
-                  <>
-                    <p className="text-xs leading-relaxed text-muted">
-                      Zapisz typ u siebie, a rozliczymy go automatycznie po meczu.
-                    </p>
+                  <div className="w-full shrink-0 sm:w-auto sm:pt-5 sm:text-right">
                     <button
                       onClick={() => addZakladFromBet(bet, null)}
                       disabled={tracked}
-                      className={`w-full shrink-0 rounded-(--radius-control) px-5 py-2.5 text-sm font-semibold transition-colors sm:w-auto ${
+                      className={`w-full rounded-(--radius-control) px-5 py-2.5 text-sm font-semibold transition-colors sm:w-auto ${
                         tracked
                           ? "cursor-default bg-brand-wash text-brand"
                           : "bg-brand text-on-brand shadow-(--shadow-card) hover:bg-brand-strong"
@@ -1104,9 +827,230 @@ export const BetCard = memo(function BetCard({
                     >
                       {tracked ? "✓ W moich zakładach" : "Dodaj do moich zakładów"}
                     </button>
-                  </>
+                    <p className="mt-1.5 text-[10px] text-faint">
+                      rozliczymy go automatycznie po meczu
+                    </p>
+                  </div>
                 )}
               </motion.div>
+
+              {/* moment 2: jedna oś wyceny (liczby przy znacznikach, bez legendy) */}
+              {(implied != null || hist != null) && (
+                <motion.div
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: 0.1 }}
+                  className="mt-5"
+                >
+                  <OsSzans
+                    znaczniki={znaczniki}
+                    przewaga={przewaga}
+                    przewagaWartosc={
+                      przewaga && bet.ev_pct != null && bet.ev_pct >= 1
+                        ? fmtEV(bet.ev_pct)
+                        : undefined
+                    }
+                    przewagaPodpis="twoja przewaga"
+                    ariaLabel={`Oś szans: ${znaczniki
+                      .map((z) => `${z.podpis} ${z.wartosc}`)
+                      .join(", ")}`}
+                  />
+                </motion.div>
+              )}
+
+              {/* moment 3: sygnały w jednej linii, opis na klik */}
+              {sygnaly.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: 0.16 }}
+                  className="mt-5 border-t border-hairline pt-4"
+                >
+                  <Sygnaly
+                    naglowek={
+                      sygnaly.some((s) => s.ton === "czerwony")
+                        ? "Za i przeciw"
+                        : "Za tym typem"
+                    }
+                    sygnaly={sygnaly}
+                  />
+                </motion.div>
+              )}
+
+              {/* głębia na żądaniu: jedna sekcja naraz = jeden wykres naraz */}
+              {taby.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: 0.22 }}
+                  className="mt-6"
+                >
+                  <div
+                    role="tablist"
+                    aria-label="Szczegóły typu"
+                    className="flex flex-wrap items-end gap-x-5 border-b border-hairline"
+                  >
+                    {taby.map((t, i) => (
+                      <button
+                        key={t.kod}
+                        ref={(el) => {
+                          tabRefs.current[i] = el;
+                        }}
+                        role="tab"
+                        tabIndex={tab === t.kod ? 0 : -1}
+                        aria-selected={tab === t.kod}
+                        onClick={() => setTab(t.kod)}
+                        onKeyDown={(e) => onTabKeyDown(e, i)}
+                        className={`font-display -mb-px border-b-2 px-0.5 pb-2 pt-1 text-[11px] font-semibold uppercase tracking-wide transition-colors ${
+                          tab === t.kod
+                            ? "border-brand text-brand-deep"
+                            : "border-transparent text-muted hover:text-ink"
+                        }`}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <AnimatePresence mode="wait" initial={false}>
+                    <motion.div
+                      key={tab}
+                      initial={reduced ? false : { opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={reduced ? undefined : { opacity: 0 }}
+                      transition={{ duration: 0.16 }}
+                      className="pt-4"
+                    >
+                      {tab === "forma" && forma && (
+                        <SekcjaFormy bet={bet} forma={forma} />
+                      )}
+
+                      {tab === "czynniki" && (
+                        <ul className="max-w-2xl space-y-2">
+                          {bet.uzasadnienie.czynniki.map((c) => (
+                            <li
+                              key={c.nazwa}
+                              className="flex items-start gap-3 text-sm"
+                            >
+                              <span className="flex-1">
+                                <span className="font-medium">{c.nazwa}:</span>{" "}
+                                <span className="text-ink-soft">{c.opis}</span>
+                              </span>
+                              {c.mnoznik !== null && (
+                                <span
+                                  className="flex shrink-0 items-center gap-2 pt-1"
+                                  title={`Ten czynnik ${
+                                    c.mnoznik > 1.02
+                                      ? "podnosi"
+                                      : c.mnoznik < 0.98
+                                        ? "obniża"
+                                        : "praktycznie nie rusza"
+                                  } przewidywaną liczbę zdarzeń (1,00 = bez wpływu)`}
+                                >
+                                  <MnoznikBar m={c.mnoznik} />
+                                  <span
+                                    className={`font-data w-12 text-right text-xs font-semibold ${
+                                      c.mnoznik > 1.02
+                                        ? "text-data-green-ink"
+                                        : c.mnoznik < 0.98
+                                          ? "text-data-red-ink"
+                                          : "text-faint"
+                                    }`}
+                                  >
+                                    {fmtMnoznik(c.mnoznik)}
+                                  </span>
+                                </span>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+
+                      {tab === "wyniki" && bet.rozklad && (
+                        <div className="max-w-md">
+                          <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3">
+                            <span className="text-[10px] uppercase tracking-wide text-faint">
+                              liczba zdarzeń w meczu
+                            </span>
+                            {przyMinutach && (
+                              <span className="text-[10px] uppercase tracking-wide text-faint">
+                                przy {przyMinutach} min
+                              </span>
+                            )}
+                          </div>
+                          <OutcomeColumns
+                            dist={bet.rozklad}
+                            line={bet.linia}
+                            side={bet.strona}
+                          />
+                          {/* rozkład liczy się przy przewidywanych minutach, a p_model
+                              wlicza jeszcze ryzyko rotacji — bez tego zdania user widzi
+                              dwie różne liczby na tej samej karcie i traci zaufanie */}
+                          {rozjazdMinut && (
+                            <p className="mt-2 text-xs leading-relaxed text-faint">
+                              Model daje temu typowi{" "}
+                              <span className="font-data text-ink-soft">
+                                {fmtProc(bet.p_model)}
+                              </span>
+                              , czyli mniej, bo wlicza też ryzyko, że zawodnik
+                              zagra krócej albo w ogóle nie wyjdzie.
+                            </p>
+                          )}
+                          <h4 className="mb-2.5 mt-5 text-xs font-semibold uppercase tracking-wide text-faint">
+                            Szanse na inne linie
+                          </h4>
+                          {/* podkreślenie zamiast kafelka — linia tego typu czyta się
+                              jak aktywna zakładka */}
+                          <div className="flex items-end gap-3">
+                            {[0.5, 1.5, 2.5, 3.5].map((l) => {
+                              const total =
+                                bet.rozklad!.reduce((a, b) => a + b, 0) || 1;
+                              const pOver =
+                                bet.rozklad!
+                                  .slice(Math.floor(l) + 1)
+                                  .reduce((a, b) => a + b, 0) / total;
+                              const p =
+                                bet.strona === "ponizej" ? 1 - pOver : pOver;
+                              const aktualna = Math.abs(l - bet.linia) < 0.01;
+                              if (p < 0.02 && !aktualna) return null;
+                              const skrot =
+                                bet.strona === "ponizej" ? "pon." : "pow.";
+                              return (
+                                <div
+                                  key={l}
+                                  className={`flex-1 border-b-2 pb-1.5 ${
+                                    aktualna ? "border-brand" : "border-hairline"
+                                  }`}
+                                  title={
+                                    aktualna
+                                      ? "Linia tego typu"
+                                      : `Szansa modelu na ${
+                                          bet.strona === "ponizej"
+                                            ? "poniżej"
+                                            : "powyżej"
+                                        } ${fmtLinia(l)}`
+                                  }
+                                >
+                                  <p className="text-[10px] uppercase tracking-wide text-faint">
+                                    {skrot} {fmtLinia(l)}
+                                  </p>
+                                  <p
+                                    className={`font-data mt-0.5 text-base font-semibold leading-none ${
+                                      aktualna ? "text-brand-deep" : "text-ink"
+                                    }`}
+                                  >
+                                    {fmtProc(p)}
+                                  </p>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </motion.div>
+                  </AnimatePresence>
+                </motion.div>
+              )}
             </div>
           </motion.div>
         )}
