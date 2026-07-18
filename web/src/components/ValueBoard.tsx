@@ -64,7 +64,7 @@ export function ValueBoard({
   stsAlerty?: StsAlert[];
   zawodnicy: Zawodnik[];
   initialMatchId?: number;
-  initialRodzaj?: "okazje" | "pewniaki" | "value" | "wszystko";
+  initialRodzaj?: "pewniaki" | "value" | "wszystko";
 }) {
   const [rynek, setRynek] = useState("wszystkie");
   const [pewnosc, setPewnosc] = useState<Pewnosc | "kazda">("kazda");
@@ -72,9 +72,7 @@ export function ValueBoard({
   // Pewniaki pierwsze i domyślne (user wybiera z nich legi na kupony);
   // domyślny sort = ranking silnika ("Polecane") — samo p_model wynosiłoby
   // na górę zawsze linie 0,5 gwiazd i chowało typy kontekstowe (matchup)
-  const [rodzaj, setRodzaj] = useState<
-    "okazje" | "pewniaki" | "value" | "wszystko"
-  >(
+  const [rodzaj, setRodzaj] = useState<"pewniaki" | "value" | "wszystko">(
     () =>
       initialRodzaj ?? (bets.some((b) => b.pewniak) ? "pewniaki" : "wszystko"),
   );
@@ -102,7 +100,6 @@ export function ValueBoard({
   const liczbaPerRynek = useMemo(() => {
     const m = new Map<string, number>();
     for (const b of bets) {
-      if (rodzaj === "okazje" && (b.sugestia || b.pewniak)) continue;
       if (rodzaj === "pewniaki" && !b.pewniak) continue;
       let kod = b.rynek_kod;
       if (b.rynek_kod.startsWith("team_")) kod = "druzyny";
@@ -137,7 +134,6 @@ export function ValueBoard({
         b.rynek_kod !== rynek
       )
         return false;
-      if (rodzaj === "okazje" && (b.sugestia || b.pewniak)) return false;
       if (rodzaj === "pewniaki" && !b.pewniak) return false;
       if (pewnosc === "wysoka" && b.pewnosc !== "wysoka") return false;
       if (pewnosc === "srednia" && b.pewnosc === "niska") return false;
@@ -187,7 +183,6 @@ export function ValueBoard({
   const TABY_RODZAJ = [
     ["pewniaki", "Pewniaki", liczbaPewniakow],
     ["value", "Value Bety", liczbaValueSts],
-    ["okazje", "Okazje z kursem", null],
     ["wszystko", "Wszystko", null],
   ] as const;
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -359,43 +354,23 @@ export function ValueBoard({
         </div>
       </div>
 
-      {filtered.length === 0 &&
-        (rodzaj === "okazje" && !bets.some((b) => !b.sugestia && !b.pewniak) ? (
-          <div className="rounded-(--radius-card) border border-hairline bg-card px-6 py-12 text-center shadow-(--shadow-card)">
-            <p className="text-sm font-medium text-ink">
-              Rynek w tej chwili nie daje okazji z kursem
-            </p>
-            <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-muted">
-              Bukmacher wycenia dostępne zdarzenia blisko szans modelu, więc
-              nie ma czego przepłacać. To się zmienia z każdą aktualizacją
-              kursów: zajrzyj do value betów STS albo wróć za jakiś czas.
-            </p>
-            {liczbaValueSts > 0 && (
-              <button
-                onClick={() => setRodzaj("value")}
-                className="mt-4 rounded-(--radius-control) bg-brand px-4 py-2 text-sm font-semibold text-on-brand shadow-(--shadow-card) transition-colors hover:bg-brand-strong"
-              >
-                Zobacz value bety STS ({liczbaValueSts})
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="rounded-(--radius-card) border border-hairline bg-card px-6 py-12 text-center shadow-(--shadow-card)">
-            <p className="text-sm font-medium text-ink">
-              Brak pozycji spełniających obecne filtry
-            </p>
-            <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-muted">
-              Ustaw pewność na „Każda”, wybierz inny rynek albo mecz, albo
-              zacznij od czysta.
-            </p>
-            <button
-              onClick={wyczyscFiltry}
-              className="mt-4 rounded-(--radius-control) bg-brand px-4 py-2 text-sm font-semibold text-on-brand shadow-(--shadow-card) transition-colors hover:bg-brand-strong"
-            >
-              Wyczyść filtry
-            </button>
-          </div>
-        ))}
+      {filtered.length === 0 && (
+        <div className="rounded-(--radius-card) border border-hairline bg-card px-6 py-12 text-center shadow-(--shadow-card)">
+          <p className="text-sm font-medium text-ink">
+            Brak pozycji spełniających obecne filtry
+          </p>
+          <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-muted">
+            Ustaw pewność na „Każda”, wybierz inny rynek albo mecz, albo
+            zacznij od czysta.
+          </p>
+          <button
+            onClick={wyczyscFiltry}
+            className="mt-4 rounded-(--radius-control) bg-brand px-4 py-2 text-sm font-semibold text-on-brand shadow-(--shadow-card) transition-colors hover:bg-brand-strong"
+          >
+            Wyczyść filtry
+          </button>
+        </div>
+      )}
 
       {/* lista kart typów */}
       {shown.length > 0 && (

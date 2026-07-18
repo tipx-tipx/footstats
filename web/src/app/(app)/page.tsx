@@ -116,10 +116,7 @@ export default async function OkazjePage({
         zawodnicy={zawodnicy}
         initialMatchId={mecz ? Number(mecz) : undefined}
         initialRodzaj={
-          rodzaj === "okazje" ||
-          rodzaj === "pewniaki" ||
-          rodzaj === "value" ||
-          rodzaj === "wszystko"
+          rodzaj === "pewniaki" || rodzaj === "value" || rodzaj === "wszystko"
             ? rodzaj
             : undefined
         }
