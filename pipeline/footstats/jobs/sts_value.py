@@ -244,19 +244,21 @@ def scan_match(m: dict, ws_seconds: float, min_ev: float, min_ratio: float) -> l
 
 
 def _load_model_index() -> dict:
-    """Indeks p_model z Supabase (legi_pool): {(zawodnik_norm, rynek_kod, linia): wpis}.
+    """Indeks p_model per (zawodnik_norm, rynek_kod, linia) — strona „powyzej".
 
-    legi_pool to selekcje, które przeanalizował model (p_model + kurs Superbet).
-    Bierzemy tylko stronę „powyzej" (STS gra wyłącznie „powyżej"). Klucz po
-    znormalizowanej nazwie zawodnika — ta sama norm_name, po której scan_match
-    paruje STS↔Superbet, więc pasuje do `alert['zawodnik']`. Puste, gdy brak env
-    Supabase (tryb czysto lokalny) — wtedy alerty po prostu nie dostają p_model.
+    Preferuje `sts_model` (PEŁNE pokrycie: każda kwotowana linia, nie tylko pula
+    kuponów), z fallbackiem na `legi_pool` (gdyby cykl nie wyemitował jeszcze
+    sts_model). Klucz po znormalizowanej nazwie — ta sama norm_name, po której
+    scan_match paruje STS↔Superbet, więc pasuje do `alert['zawodnik']`. Puste bez
+    env Supabase (tryb lokalny) — wtedy alerty po prostu nie dostają p_model.
     """
-    pool = supa.get_key("legi_pool")
+    src = supa.get_key("sts_model")
+    if not isinstance(src, list) or not src:
+        src = supa.get_key("legi_pool")
     index: dict = {}
-    if not isinstance(pool, list):
+    if not isinstance(src, list):
         return index
-    for e in pool:
+    for e in src:
         if not isinstance(e, dict) or str(e.get("strona")) != "powyzej":
             continue
         try:
@@ -271,22 +273,63 @@ def _load_model_index() -> dict:
     return index
 
 
-def _enrich_with_model(alerts: list[dict], model_index: dict) -> None:
+# powody z rejestru odrzuceń, które znaczą „model NIE ufa tej selekcji" — weto
+# potwierdzenia. Pomijamy `tylko_w_puli` (typ jest, wygrał inny na karcie meczu),
+# `brak_kursu` (to nie model) i `kurs_lub_szansa_poza_widelkami` (dotyczy kwotowania
+# Superbetu, a STS ma inny kurs).
+_POWOD_WETO = {
+    "za_malo_historii": "za mało historii, by model policzył szansę",
+    "za_malo_zdarzen": "za mało zdarzeń w historii na ten rynek",
+    "krotka_historia": "za krótka historia (poniżej progu)",
+    "chwiejna_predykcja": "chwiejna predykcja, model sam nie jest pewny",
+    "rozjazd_z_rynkiem": "model mocno rozjeżdża się z rynkiem",
+}
+
+
+def _load_rejections() -> dict:
+    """Mapa (zawodnik_norm, rynek_kod) -> powód po ludzku, z klucza `odrzucenia`.
+
+    Tylko powody z `_POWOD_WETO` (brak zaufania modelu). Zamyka scenariusz, w
+    którym „value potwierdzony" ląduje na selekcji, którą własne sito modelu
+    by wyrzuciło. Granulacja (zawodnik, rynek) — bo model odrzuca całą parę,
+    niezależnie od linii.
+    """
+    rej = supa.get_key("odrzucenia")
+    out: dict = {}
+    if not isinstance(rej, list):
+        return out
+    for r in rej:
+        if not isinstance(r, dict):
+            continue
+        opis = _POWOD_WETO.get(str(r.get("powod")))
+        if not opis:
+            continue
+        key = (norm_name(r.get("podmiot") or ""), r.get("rynek_kod"))
+        if key[0] and key[1]:
+            out[key] = opis
+    return out
+
+
+def _enrich_with_model(alerts: list[dict], model_index: dict, rejections: dict) -> None:
     """Dołącz stronę modelu do alertów STS (in place).
 
     value bet STS = MODEL analizuje selekcję ORAZ STS przepłaca vs Superbet.
     scan_match dał już drugą część (STS > Superbet, EV z devigu). Tu dokładamy
-    p_model z legi_pool i EV liczone jako p_model * kurs_STS - 1 — to jest EV wg
-    NIEZALEŻNEJ wyceny modelu (nie tylko odwrócony kurs Superbetu). `value_
-    potwierdzony` = model ma zdanie i też widzi dodatni EV na kursie STS.
+    p_model (pełne pokrycie z sts_model) i EV wg NIEZALEŻNEJ wyceny modelu
+    (p_model * kurs_STS - 1). `value_potwierdzony` wymaga: model widzi dodatni EV
+    ORAZ NIE odrzucił tej selekcji. `model_odrzucil` + `odrzucenie_powod` to weto
+    z rejestru odrzuceń (własne sito modelu) — zamyka „potwierdzone" na typie,
+    którego model sam by nie wystawił.
     """
     for a in alerts:
+        powod_weto = rejections.get((a["zawodnik"], a["rynek_kod"]))
         key = (a["zawodnik"], a["rynek_kod"], round(float(a["linia"]), 1))
         e = model_index.get(key)
         if e is None:
             a.update(zawodnik_nazwa=None, p_model=None, ev_model_pct=None,
-                     oczekiwane_minuty=None, druzyna=None,
-                     ma_model=False, value_potwierdzony=False)
+                     oczekiwane_minuty=None, druzyna=None, ma_model=False,
+                     model_odrzucil=bool(powod_weto), odrzucenie_powod=powod_weto,
+                     value_potwierdzony=False)
             continue
         p = float(e.get("p_model") or 0) or None
         ev_model = round((p * a["kurs_sts"] - 1.0) * 100.0, 1) if p else None
@@ -297,7 +340,10 @@ def _enrich_with_model(alerts: list[dict], model_index: dict) -> None:
             oczekiwane_minuty=e.get("oczekiwane_minuty"),
             druzyna=e.get("druzyna"),
             ma_model=True,
-            value_potwierdzony=bool(ev_model is not None and ev_model > 0),
+            model_odrzucil=bool(powod_weto),
+            odrzucenie_powod=powod_weto,
+            # potwierdzony TYLKO gdy model widzi dodatni EV I NIE odrzucił selekcji
+            value_potwierdzony=bool(ev_model is not None and ev_model > 0 and not powod_weto),
         )
 
 
@@ -369,10 +415,11 @@ def main() -> None:
         pass
 
     model_index = _load_model_index()
+    rejections = _load_rejections()
     if model_index:
-        print(f"· model: {len(model_index)} selekcji z p_model (legi_pool)")
+        print(f"· model: {len(model_index)} selekcji z p_model, {len(rejections)} odrzuceń (weto)")
     else:
-        print("· model: brak p_model (brak env Supabase lub pusty legi_pool) — alerty bez potwierdzenia modelu")
+        print("· model: brak p_model (brak env Supabase lub pusty sts_model/legi_pool) — alerty bez potwierdzenia modelu")
 
     common = build_common_matches(args.dni, args.druzyna)
     print(f"\n· wspólnych meczów STS∩Superbet (≤{args.dni} dni): {len(common)}")
@@ -384,7 +431,7 @@ def main() -> None:
     print(f"· skanuję {len(common)} meczów po {workers} naraz (STS ~{args.ws_sekundy:.0f} s nasłuchu/mecz)...")
     all_alerts = _scan_all(common, workers, args.ws_sekundy, args.min_ev, args.min_ratio)
 
-    _enrich_with_model(all_alerts, model_index)
+    _enrich_with_model(all_alerts, model_index, rejections)
 
     # sortowanie: najpierw POTWIERDZONE przez model (model + cross-book = pełny
     # value bet STS), potem PEWNOŚĆ cross-book, potem EV — bo sam duży EV bywa

@@ -113,6 +113,7 @@ export default async function OkazjePage({
         key={rodzaj ?? "domyslny"}
         bets={bets}
         stsAlerty={stsValue.alerty}
+        stsGeneratedTs={stsValue.generated_ts}
         zawodnicy={zawodnicy}
         initialMatchId={mecz ? Number(mecz) : undefined}
         initialRodzaj={

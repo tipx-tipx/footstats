@@ -225,6 +225,10 @@ export const StsBetCard = memo(function StsBetCard({
 
   const nazwa = a.zawodnik_nazwa || a.zawodnik;
   const potw = a.value_potwierdzony;
+  // trzy stany: pełny value bet / model ostrzega (weto z odrzuceń) / sama różnica
+  const stan = potw ? "potw" : a.model_odrzucil ? "ostrzega" : "roznica";
+  const diodaBg =
+    stan === "potw" ? "bg-brand" : stan === "ostrzega" ? "bg-data-red" : "bg-data-amber";
   const lista = potwierdzenia(a);
 
   return (
@@ -252,20 +256,19 @@ export const StsBetCard = memo(function StsBetCard({
                   cross-book = bursztyn */}
               <span
                 title={
-                  potw
+                  stan === "potw"
                     ? "Pełny value bet STS: model potwierdza i STS przepłaca"
-                    : "Różnica kursowa STS vs Superbet (model nie ocenił tej selekcji)"
+                    : stan === "ostrzega"
+                      ? "Model odrzucił tę selekcję — sama różnica kursowa, ostrożnie"
+                      : "Różnica kursowa STS vs Superbet (model nie ocenił tej selekcji)"
                 }
                 className="relative inline-flex h-2 w-2 shrink-0 translate-y-px items-center justify-center"
               >
                 <span
                   aria-hidden
-                  className={`absolute -inset-1 rounded-full opacity-20 ${potw ? "bg-brand" : "bg-data-amber"}`}
+                  className={`absolute -inset-1 rounded-full opacity-20 ${diodaBg}`}
                 />
-                <span
-                  aria-hidden
-                  className={`h-2 w-2 rounded-full ${potw ? "bg-brand" : "bg-data-amber"}`}
-                />
+                <span aria-hidden className={`h-2 w-2 rounded-full ${diodaBg}`} />
               </span>
               <span className="truncate font-semibold">{nazwa}</span>
               <span className="text-sm text-muted">
@@ -307,18 +310,28 @@ export const StsBetCard = memo(function StsBetCard({
         <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 px-4 pb-3.5 sm:pl-[4.75rem] sm:pr-5">
           <span
             className={`font-data inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-              potw ? "bg-brand-wash text-brand-deep" : "bg-data-amber-wash text-data-amber-ink"
+              stan === "potw"
+                ? "bg-brand-wash text-brand-deep"
+                : stan === "ostrzega"
+                  ? "bg-data-red-wash text-data-red-ink"
+                  : "bg-data-amber-wash text-data-amber-ink"
             }`}
             title={
-              potw
+              stan === "potw"
                 ? "Model potwierdza tę selekcję i STS płaci ponad wartość"
-                : "Sama różnica kursowa STS vs Superbet — bez potwierdzenia modelu"
+                : stan === "ostrzega"
+                  ? `Model odrzucił tę selekcję: ${a.odrzucenie_powod}. To sama różnica kursowa — ostrożnie.`
+                  : "Sama różnica kursowa STS vs Superbet — bez potwierdzenia modelu"
             }
           >
-            {potw ? "★ value potwierdzony" : "różnica kursowa"}
+            {stan === "potw"
+              ? "★ value potwierdzony"
+              : stan === "ostrzega"
+                ? "⚠ model ostrzega"
+                : "różnica kursowa"}
           </span>
 
-          {a.ma_model && a.ev_model_pct != null && (
+          {a.ma_model && a.ev_model_pct != null && !a.model_odrzucil && (
             <span
               className="inline-flex items-center gap-1 px-1 text-[11px] font-medium text-brand-deep"
               title={`Wartość wg NIEZALEŻNEJ wyceny modelu: przy szansie ${
@@ -326,6 +339,15 @@ export const StsBetCard = memo(function StsBetCard({
               } kurs STS ${fmtKurs(a.kurs_sts)} daje ${fmtEV(a.ev_model_pct)} przewagi`}
             >
               <span aria-hidden className="font-data">◎</span> model {fmtEV(a.ev_model_pct)}
+            </span>
+          )}
+
+          {a.model_odrzucil && a.odrzucenie_powod && (
+            <span
+              className="inline-flex items-center gap-1 px-1 text-[11px] font-medium text-data-red-ink"
+              title={`Własne sito modelu odrzuciło tę parę zawodnik+rynek: ${a.odrzucenie_powod}`}
+            >
+              <span aria-hidden className="font-data">⚠</span> {a.odrzucenie_powod}
             </span>
           )}
 
@@ -436,7 +458,14 @@ export const StsBetCard = memo(function StsBetCard({
                     <h4 className="mb-2.5 text-xs font-semibold uppercase tracking-wide text-faint">
                       Strona modelu
                     </h4>
-                    {a.ma_model && a.p_model != null ? (
+                    {a.model_odrzucil ? (
+                      <p className="rounded-(--radius-control) border border-data-red/30 bg-data-red-wash px-3 py-2.5 text-sm leading-relaxed text-data-red-ink">
+                        <span className="font-semibold">⚠ Model odrzucił tę selekcję:</span>{" "}
+                        {a.odrzucenie_powod}. Nie traktuj jej jak potwierdzoną — to sama
+                        różnica kursowa STS vs Superbet. Własne sito modelu by jej nie
+                        wystawiło, więc graj ostrożnie albo odpuść.
+                      </p>
+                    ) : a.ma_model && a.p_model != null ? (
                       <p className="text-sm leading-relaxed text-ink-soft">
                         Model FootStats daje temu zdarzeniu{" "}
                         <span className="font-data font-semibold text-ink">

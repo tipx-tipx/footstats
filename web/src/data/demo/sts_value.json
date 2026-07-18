@@ -1,7 +1,7 @@
 {
   "generated_ts": 1784419000,
   "n_meczow": 12,
-  "n_alertow": 5,
+  "n_alertow": 6,
   "n_potwierdzonych": 4,
   "alerty": [
     {
@@ -138,6 +138,35 @@
       "value_potwierdzony": false,
       "oczekiwane_minuty": null,
       "druzyna": "Hiszpania"
+    },
+    {
+      "mecz": "Hiszpania – Argentyna",
+      "mecz_ts": 1789000000,
+      "zawodnik": "nicolas otamendi",
+      "zawodnik_nazwa": "Nicolás Otamendi",
+      "rynek_kod": "fouls_committed",
+      "rynek": "Faule popełnione",
+      "linia": 1.5,
+      "linia_opis": "przynajmniej 2",
+      "z_dogrywka": false,
+      "superzmiana": false,
+      "kurs_sts": 3.9,
+      "kurs_superbet": 2.4,
+      "ratio": 1.63,
+      "nadwyzka_vs_baseline": 1.48,
+      "p_fair_superbet": 0.4,
+      "ev_pct": 56.0,
+      "fair_kurs_siatka": 2.35,
+      "sygnaly": 2,
+      "pewnosc": "srednia",
+      "p_model": null,
+      "ev_model_pct": null,
+      "ma_model": false,
+      "model_odrzucil": true,
+      "odrzucenie_powod": "chwiejna predykcja, model sam nie jest pewny",
+      "value_potwierdzony": false,
+      "oczekiwane_minuty": null,
+      "druzyna": "Argentyna"
     }
   ]
 }

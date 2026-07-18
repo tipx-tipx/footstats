@@ -43,6 +43,24 @@ const SORTOWANIA: { kod: SortKey; label: string }[] = [
   { kod: "kurs", label: "Najwyższy kurs" },
   { kod: "kickoff", label: "Najbliższy mecz" },
 ];
+/** Ile czasu temu był skan STS (liczone po stronie klienta — patrz useEffect). */
+function odswiezTemu(ts?: number): { label: string; minuty: number } | null {
+  if (!ts) return null;
+  const minuty = Math.max(0, Math.floor((Date.now() / 1000 - ts) / 60));
+  const label =
+    minuty < 1
+      ? "przed chwilą"
+      : minuty < 60
+        ? `${minuty} min temu`
+        : minuty < 1440
+          ? `${Math.round(minuty / 60)} h temu`
+          : `${Math.round(minuty / 1440)} dni temu`;
+  return { label, minuty };
+}
+
+/** Powyżej tylu minut skan uznajemy za nieświeży (kurs STS mógł się ruszyć). */
+const STS_STALE_MIN = 45;
+
 /** Poprawna polska odmiana: "1 pozycja", "3 pozycje", "8 pozycji". */
 function odmienPozycje(n: number): string {
   if (n === 1) return "1 pozycja";
@@ -56,12 +74,14 @@ function odmienPozycje(n: number): string {
 export function ValueBoard({
   bets,
   stsAlerty = [],
+  stsGeneratedTs,
   zawodnicy,
   initialMatchId,
   initialRodzaj,
 }: {
   bets: ValueBet[];
   stsAlerty?: StsAlert[];
+  stsGeneratedTs?: number;
   zawodnicy: Zawodnik[];
   initialMatchId?: number;
   initialRodzaj?: "pewniaki" | "value" | "wszystko";
@@ -78,6 +98,12 @@ export function ValueBoard({
   );
   const [sortuj, setSortuj] = useState<SortKey>("ranking");
   const [limit, setLimit] = useState(25);
+  // świeżość skanu STS liczona PO stronie klienta (po mount), żeby Date.now()
+  // nie rozjechał SSR/hydracji — do mount pole zostaje puste
+  const [swiezosc, setSwiezosc] = useState<ReturnType<typeof odswiezTemu>>(null);
+  useEffect(() => {
+    setSwiezosc(odswiezTemu(stsGeneratedTs));
+  }, [stsGeneratedTs]);
 
   const liczbaValueSts = stsAlerty.length;
   const liczbaPewniakow = useMemo(
@@ -260,7 +286,7 @@ export function ValueBoard({
             </div>
           ) : (
             <>
-              <div className="mb-4 flex items-baseline justify-between gap-3">
+              <div className="mb-2 flex items-baseline justify-between gap-3">
                 <p className="max-w-prose text-xs leading-relaxed text-muted">
                   STS przepłaca te selekcje względem Superbetu, a model potwierdza
                   szansę na ich trafienie. Kursy bywają ulotne, bierz póki są.
@@ -269,6 +295,24 @@ export function ValueBoard({
                   {odmienPozycje(stsAlerty.length)}
                 </span>
               </div>
+              {swiezosc && (
+                <p className="mb-3 flex items-center gap-1.5 text-[11px] text-faint">
+                  <span
+                    aria-hidden
+                    className={`h-1.5 w-1.5 rounded-full ${
+                      swiezosc.minuty >= STS_STALE_MIN ? "bg-data-amber" : "bg-data-green"
+                    }`}
+                  />
+                  ostatni skan STS:{" "}
+                  <span className="font-data text-muted">{swiezosc.label}</span>
+                </p>
+              )}
+              {swiezosc && swiezosc.minuty >= STS_STALE_MIN && (
+                <div className="mb-4 rounded-(--radius-control) border border-data-amber/30 bg-data-amber-wash px-3 py-2 text-xs leading-relaxed text-data-amber-ink">
+                  Ten skan ma już {swiezosc.label} — kursy STS bywają ulotne i mogły się
+                  ruszyć. Odśwież skan STS (klik na PC), żeby złapać aktualne linie.
+                </div>
+              )}
               <div className="space-y-3">
                 {stsAlerty.map((a, i) => (
                   <motion.div

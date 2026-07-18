@@ -122,8 +122,12 @@ export interface StsAlert {
   ev_model_pct?: number | null;
   /** true = model ma zdanie o tej selekcji */
   ma_model?: boolean;
-  /** true = pełny value bet STS: model + cross-book (EV modelu > 0) */
+  /** true = pełny value bet STS: model + cross-book (EV modelu > 0, bez weta) */
   value_potwierdzony?: boolean;
+  /** true = model odrzucił tę parę (zawodnik, rynek) — weto „potwierdzenia" */
+  model_odrzucil?: boolean;
+  /** powód odrzucenia po ludzku (gdy model_odrzucil) */
+  odrzucenie_powod?: string | null;
   oczekiwane_minuty?: number | null;
   druzyna?: string | null;
 }

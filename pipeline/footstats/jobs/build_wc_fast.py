@@ -1156,6 +1156,12 @@ def _main_impl():
     odrzucone_pomiar: list[dict] = []
     ODRZUCONE_POMIAR_MAX = 80   # bezpiecznik objętości logu per cykl
 
+    # PEŁNE POKRYCIE p_model per (zawodnik, rynek, linia) — dla scannera value
+    # betów STS. Model „widzi" KAŻDĄ kwotowaną linię, nie tylko te, które weszły
+    # do puli/okazji, więc STS może łączyć swój kurs z p_model dużo częściej.
+    # Klucz sts_model jest backendowy (apka go nie czyta).
+    model_pokrycie: list[dict] = []
+
     for tr in trends:
         if (tr.player_id, tr.market_code) in seen_player_market:
             continue
@@ -1423,6 +1429,12 @@ def _main_impl():
                 odd = sv[0]
                 p_side = sm.p_over if side_key == "over" else 1.0 - sm.p_over
                 implied = betting.implied_prob_one_sided(odd)
+                # pełne pokrycie p_model (PRZED filtrami puli/okazji) — do STS
+                model_pokrycie.append({
+                    "podmiot": tr.player_name, "rynek_kod": mk, "linia": l,
+                    "strona": side_pl, "p_model": round(p_side, 4),
+                    "oczekiwane_minuty": sm.expected_minutes,
+                })
                 # miękka linia: płaci >=12% ponad kurs wynikający z RESZTY
                 # siatki Superbetu na ten rynek (fair netto -> brutto z marżą)
                 fw = fair_wewn.get(l)
@@ -2052,6 +2064,10 @@ def _main_impl():
             "szczegol": "typ dostępny w generatorze kuponów. Na karcie meczu "
                         "wygrał inny typ tego rynku",
         })
+
+    # pełne pokrycie p_model (backend-only, dla scannera STS) — emitujemy ZAWSZE,
+    # także w trybie „0 okazji" niżej, bo model i tak policzył wszystkie linie
+    _dump("sts_model.json", model_pokrycie)
 
     # NIE degraduj aplikacji do pustej planszy: dopóki nie ma realnych okazji MŚ,
     # zostaw dotychczasowe dane (tryb pokazowy). Przełączamy na MŚ dopiero,
