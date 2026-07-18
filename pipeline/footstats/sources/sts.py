@@ -55,7 +55,20 @@ MARKET_MAP = {
 }
 
 _LINE_RE = re.compile(r"(\d+)\s+lub\s+więcej")
+_PLUS_RE = re.compile(r"^\s*(\d+)\s*\+\s*$")  # próg jako nazwa wyniku: "1+", "2 +"
+_TAK_RE = re.compile(r"^\s*tak\s*$", re.IGNORECASE)
 MAX_SANE_ODDS = 50.0  # wyżej = zablokowane/placeholder
+
+
+def _threshold_from_text(txt: str) -> int | None:
+    """Wyciągnij próg N z 'N lub więcej' (układ A) albo 'N+' (układ B)."""
+    m = _LINE_RE.search(txt) or _PLUS_RE.match(txt)
+    return int(m.group(1)) if m else None
+
+
+def _player_from_line_name(lname: str) -> str:
+    """Układ B: 'Nazwisko Imię - <rynek> (z dogrywką)' -> 'Nazwisko Imię'."""
+    return lname.split(" - ", 1)[0].strip()
 
 
 def _ws_collect(channels: list[dict], seconds: float = 12.0) -> list[dict]:
@@ -138,11 +151,34 @@ def _market_name_catalog(payloads: list[dict]) -> dict:
     return catalog
 
 
-def parse_player_odds(payloads: list[dict]) -> dict:
-    """Zbuduj {norm_name: {market_code: {line: {'over': kurs}}}} z ramek WS."""
+def parse_player_odds(payloads: list[dict], include_overtime: bool = False) -> dict:
+    """Zbuduj {norm_name: {market_code: {line: {'over': kurs}}}} z ramek WS.
+
+    Obsługuje DWA układy danych STS spotykane w tej samej ofercie:
+      * układ A (popularne rynki 90-min): linia = '<rynek> - N lub więcej',
+        wynik = zawodnik (grupowanie po progu, zawodnicy jako wyniki);
+      * układ B (rynki „(z dogrywką)" / karta zawodnika): linia = 'Zawodnik -
+        <rynek> (z dogrywką)', wynik = 'N+' (lub 'Tak'/'Nie' przy kartce) —
+        grupowanie po zawodniku, progi jako wyniki.
+
+    include_overtime — dołącz rynki „(z dogrywką)" pod kodem `code + '_ot'`.
+    Przy meczach pucharowych część rynków (odbiory/niecelne/przechwyty/
+    zablokowane) STS wystawia WYŁĄCZNIE z dogrywką, a to sztandarowe rynki
+    value — rozliczają się z dogrywką, więc strona porównująca musi to oznaczyć.
+    """
     catalog = _market_name_catalog(payloads)
-    # nazwa rynku -> kod (dopasowanie po nazwie z katalogu ORAZ z nazw linii)
     players: dict = {}
+
+    def _emit(player_name, code, line, odd, is_ot):
+        if not player_name or not odd or odd > MAX_SANE_ODDS or odd <= 1.0:
+            return
+        key = norm_name(player_name)
+        if not key:
+            return
+        cc = f"{code}_ot" if is_ot else code
+        slot = players.setdefault(key, {}).setdefault(cc, {})
+        if line not in slot or odd > slot[line]["over"]:  # najlepszy kurs przy duplikatach
+            slot[line] = {"over": float(odd)}
 
     for body in payloads:
         P = body.get("P") if isinstance(body, dict) else None
@@ -155,9 +191,11 @@ def parse_player_odds(payloads: list[dict]) -> dict:
                 if not isinstance(mv, dict):
                     continue
                 mname = catalog.get(mid, "")
-                # pomiń warianty "(z dogrywką)"
+                is_ot = "(z dogrywką)" in mname
+                if is_ot and not include_overtime:
+                    continue
                 base = mname.replace(" (z dogrywką)", "").strip()
-                code = MARKET_MAP.get(base)
+                code0 = MARKET_MAP.get(base)
                 lines = mv.get("l", {})
                 if not isinstance(lines, dict):
                     continue
@@ -165,43 +203,87 @@ def parse_player_odds(payloads: list[dict]) -> dict:
                     if not isinstance(lv, dict):
                         continue
                     lname = lv.get("n", "") or ""
-                    # kod może wynikać z nazwy linii, gdy katalog nie miał rynku
+                    outs = [o for o in (lv.get("o", {}) or {}).values() if isinstance(o, dict)]
+                    if not outs:
+                        continue
+                    # kod rynku: z katalogu, a gdy brak — z nazwy linii (oba układy)
+                    code = code0
                     if not code:
-                        lbase = _LINE_RE.sub("", lname).strip(" -")
-                        code = MARKET_MAP.get(lbase)
+                        cand = _LINE_RE.sub("", lname).replace(" (z dogrywką)", "").strip(" -")
+                        code = MARKET_MAP.get(cand) or MARKET_MAP.get(
+                            lname.split(" - ", 1)[-1].replace(" (z dogrywką)", "").strip()
+                        )
                     if not code:
                         continue
-                    if "(z dogrywką)" in lname:
+                    onames = [str(o.get("n") or "") for o in outs]
+                    # układ B binarny: kartka (Tak/Nie), zawodnik w nazwie linii
+                    if code == "yellow_card" and any(_TAK_RE.match(x) for x in onames):
+                        player = _player_from_line_name(lname)
+                        for ov in outs:
+                            if ov.get("Bx") or not _TAK_RE.match(str(ov.get("n") or "")):
+                                continue
+                            _emit(player, code, 0.5, ov.get("O"), is_ot)
                         continue
+                    # układ B numeryczny: progi 'N+' jako wyniki, zawodnik w linii
+                    if any(_PLUS_RE.match(x) for x in onames):
+                        player = _player_from_line_name(lname)
+                        for ov in outs:
+                            if ov.get("Bx"):
+                                continue
+                            thr = _threshold_from_text(str(ov.get("n") or ""))
+                            if thr is None:
+                                continue
+                            _emit(player, code, float(thr) - 0.5, ov.get("O"), is_ot)
+                        continue
+                    # układ A: kartka -> linia 0.5; reszta -> próg z nazwy linii,
+                    # a każdy wynik to zawodnik
                     if code == "yellow_card":
                         line = 0.5
                     else:
-                        m = _LINE_RE.search(lname)
-                        if not m:
+                        thr = _threshold_from_text(lname)
+                        if thr is None:
                             continue
-                        line = float(int(m.group(1)) - 0.5)  # "N lub więcej" = > N-0.5
-                    for ov in (lv.get("o", {}) or {}).values():
-                        if not isinstance(ov, dict) or ov.get("Bx"):
+                        line = float(thr) - 0.5  # "N lub więcej" = > N-0.5
+                    for ov in outs:
+                        if ov.get("Bx"):
                             continue
-                        odd = ov.get("O")
-                        name = ov.get("n")
-                        if not name or not odd or odd > MAX_SANE_ODDS or odd <= 1.0:
-                            continue
-                        key = norm_name(name)
-                        slot = players.setdefault(key, {}).setdefault(code, {})
-                        # bierz najlepszy (najwyższy) kurs, gdy duplikaty
-                        if line not in slot or odd > slot[line]["over"]:
-                            slot[line] = {"over": float(odd)}
+                        _emit(ov.get("n"), code, line, ov.get("O"), is_ot)
     return {"players": players, "teams": {}}
 
 
-def fetch_stat_odds(match_id: str, seconds: float = 12.0) -> dict:
+def normalized_players(sts_result: dict) -> dict:
+    """{player: {base_code: {line: (kurs, is_ot)}}} z wyniku fetch_stat_odds.
+
+    Sprowadza kody „_ot" (z dogrywką) do bazowych. Gdy STS ma na tę samą linię
+    i wersję 90-min, i z dogrywką — preferuje 90-min (czyste porównanie); przy
+    tym samym typie bierze wyższy kurs. is_ot mówi, czy wybrany kurs jest
+    z dogrywką (wtedy działa SuperSub — patrz parse_player_odds).
+    """
+    out: dict = {}
+    for pkey, markets in (sts_result.get("players") or {}).items():
+        for code, lines in markets.items():
+            is_ot = code.endswith("_ot")
+            base = code[:-3] if is_ot else code
+            for line, slot in lines.items():
+                odd = slot.get("over")
+                if not odd:
+                    continue
+                d = out.setdefault(pkey, {}).setdefault(base, {})
+                cur = d.get(line)
+                if cur is None or (cur[1] and not is_ot) or (cur[1] == is_ot and odd > cur[0]):
+                    d[line] = (float(odd), is_ot)
+    return out
+
+
+def fetch_stat_odds(match_id: str, seconds: float = 12.0,
+                    include_overtime: bool = False) -> dict:
     """Pobierz kursy statystyczne meczu STS po jego ID (np. 'f482692').
 
     Zwraca {players: {norm_name: {market_code: {line: {'over': kurs}}}}}.
+    include_overtime — patrz parse_player_odds (rynki '(z dogrywką)' jako `_ot`).
     """
     payloads = _fetch_frames(match_id, seconds)
-    return parse_player_odds(payloads)
+    return parse_player_odds(payloads, include_overtime=include_overtime)
 
 
 def match_ids_by_teams() -> dict:

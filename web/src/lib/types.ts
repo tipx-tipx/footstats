@@ -79,6 +79,64 @@ export interface ValueBet {
   kurs_oczekiwany?: number | null;
 }
 
+/**
+ * Value bet STS: selekcja „powyżej", gdzie STS przepłaca vs Superbet, a model
+ * potwierdza. Generowane on-demand (jobs/sts_value.py) z domowego IP i wpychane
+ * do Supabase (klucz sts_value). Osobny kształt niż ValueBet — STS to porównanie
+ * dwóch kursów + strona modelu, nie pełny rentgen predykcji.
+ */
+export interface StsAlert {
+  mecz: string;
+  mecz_ts: number | null;
+  /** znormalizowany klucz zawodnika (parowanie STS↔Superbet↔model) */
+  zawodnik: string;
+  /** ładna nazwa z modelu (legi_pool.podmiot); brak = pokaż klucz */
+  zawodnik_nazwa?: string | null;
+  rynek_kod: string;
+  rynek: string;
+  linia: number;
+  /** „przynajmniej N" (STS: „N lub więcej") */
+  linia_opis: string;
+  /** rynek rozliczany z dogrywką (STS wystawia część rynków tylko tak) */
+  z_dogrywka: boolean;
+  /** SuperZmiana: przy zejściu zawodnika zakład przechodzi na zmiennika */
+  superzmiana: boolean;
+  kurs_sts: number;
+  kurs_superbet: number;
+  /** kurs_sts / kurs_superbet */
+  ratio: number;
+  /** iloraz ponad medianę różnicy STS/Superbet tego meczu (odjęte tło luźności) */
+  nadwyzka_vs_baseline: number;
+  /** szansa „fair" z devigu kursu Superbetu (dolne, ostrożne oszacowanie) */
+  p_fair_superbet: number;
+  /** EV wzięcia kursu STS liczone z fair Superbetu, w % */
+  ev_pct: number;
+  /** kurs „fair" z samospójności siatki Superbetu (kontrolna referencja) */
+  fair_kurs_siatka: number | null;
+  /** 0–3 niezależne potwierdzenia cross-book (siatka, baseline, drabinka) */
+  sygnaly: number;
+  pewnosc: Pewnosc;
+  /** szansa modelu FootStats na tę selekcję (z legi_pool); null = poza modelem */
+  p_model?: number | null;
+  /** EV wg NIEZALEŻNEJ wyceny modelu: p_model * kurs_STS - 1, w % */
+  ev_model_pct?: number | null;
+  /** true = model ma zdanie o tej selekcji */
+  ma_model?: boolean;
+  /** true = pełny value bet STS: model + cross-book (EV modelu > 0) */
+  value_potwierdzony?: boolean;
+  oczekiwane_minuty?: number | null;
+  druzyna?: string | null;
+}
+
+/** Payload klucza `sts_value` w Supabase (snapshot z ostatniego klika użytkownika). */
+export interface StsValue {
+  generated_ts: number;
+  n_meczow: number;
+  n_alertow: number;
+  n_potwierdzonych: number;
+  alerty: StsAlert[];
+}
+
 /** Wpis rejestru odrzuceń: czemu para (zawodnik, rynek) NIE dostała typu. */
 export interface Odrzucenie {
   mecz_id: number;

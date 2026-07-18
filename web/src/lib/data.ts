@@ -18,6 +18,7 @@ import typyWynikiLocal from "@/data/demo/typy_wyniki.json";
 import oddsSuperbetLocal from "@/data/demo/odds_superbet.json";
 import legiPoolLocal from "@/data/demo/legi_pool.json";
 import odrzuceniaLocal from "@/data/demo/odrzucenia.json";
+import stsValueLocal from "@/data/demo/sts_value.json";
 
 import type {
   Kalibracja,
@@ -27,6 +28,7 @@ import type {
   Meta,
   OddsSuperbet,
   Odrzucenie,
+  StsValue,
   TypyWyniki,
   ValueBet,
   Zawodnik,
@@ -43,6 +45,7 @@ type Bundle = {
   odds_superbet: OddsSuperbet;
   legi_pool: LegPool[];
   odrzucenia: Odrzucenie[];
+  sts_value: StsValue;
 };
 
 const LOCAL: Bundle = {
@@ -56,6 +59,7 @@ const LOCAL: Bundle = {
   odds_superbet: oddsSuperbetLocal as unknown as OddsSuperbet,
   legi_pool: legiPoolLocal as unknown as LegPool[],
   odrzucenia: odrzuceniaLocal as unknown as Odrzucenie[],
+  sts_value: stsValueLocal as unknown as StsValue,
 };
 
 const SUPABASE_URL = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -81,6 +85,11 @@ function tylkoNadchodzace(bundle: Bundle): Bundle {
     legi_pool: bundle.legi_pool.filter(
       (l) => l.kickoff_ts > now + MARGINES_STARTU_S,
     ),
+    // value bety STS: kurs bywa ulotny, ale mecz po starcie i tak nie do zagrania
+    sts_value: {
+      ...bundle.sts_value,
+      alerty: bundle.sts_value.alerty.filter((a) => (a.mecz_ts ?? 0) > now),
+    },
   };
 }
 
@@ -114,6 +123,7 @@ async function loadBundle(): Promise<Bundle> {
       odds_superbet: (map.odds_superbet ?? LOCAL.odds_superbet) as OddsSuperbet,
       legi_pool: (map.legi_pool ?? LOCAL.legi_pool) as LegPool[],
       odrzucenia: (map.odrzucenia ?? LOCAL.odrzucenia) as Odrzucenie[],
+      sts_value: (map.sts_value ?? LOCAL.sts_value) as StsValue,
     });
   } catch {
     return tylkoNadchodzace(LOCAL);
@@ -162,4 +172,9 @@ export async function getOddsSuperbet(): Promise<OddsSuperbet> {
 
 export async function getLegiPool(): Promise<LegPool[]> {
   return (await loadBundle()).legi_pool;
+}
+
+/** Value bety STS (klik użytkownika → Supabase). Alerty już po filtrze startu. */
+export async function getStsValue(): Promise<StsValue> {
+  return (await loadBundle()).sts_value;
 }

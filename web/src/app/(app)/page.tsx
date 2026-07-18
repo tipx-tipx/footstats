@@ -4,6 +4,7 @@ import {
   getMecze,
   getMeta,
   getOdrzucenia,
+  getStsValue,
   getValueBets,
   getZawodnicy,
 } from "@/lib/data";
@@ -22,12 +23,13 @@ export default async function OkazjePage({
   searchParams: Promise<{ mecz?: string; rodzaj?: string }>;
 }) {
   const { mecz, rodzaj } = await searchParams;
-  const [bets, zawodnicy, meta, mecze, odrzucenia] = await Promise.all([
+  const [bets, zawodnicy, meta, mecze, odrzucenia, stsValue] = await Promise.all([
     getValueBets(),
     getZawodnicy(),
     getMeta(),
     getMecze(),
     getOdrzucenia(),
+    getStsValue(),
   ]);
 
   // dowód selekcji do paska "sito modelu": rejestr odrzuceń liczymy tylko
@@ -110,12 +112,13 @@ export default async function OkazjePage({
       <ValueBoard
         key={rodzaj ?? "domyslny"}
         bets={bets}
+        stsAlerty={stsValue.alerty}
         zawodnicy={zawodnicy}
         initialMatchId={mecz ? Number(mecz) : undefined}
         initialRodzaj={
           rodzaj === "okazje" ||
           rodzaj === "pewniaki" ||
-          rodzaj === "sugestie" ||
+          rodzaj === "value" ||
           rodzaj === "wszystko"
             ? rodzaj
             : undefined

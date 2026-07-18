@@ -5,7 +5,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { BetCard } from "./BetCard";
 import { FilterDropdown } from "./FilterDropdown";
-import type { Pewnosc, ValueBet, Zawodnik } from "@/lib/types";
+import { StsBetCard } from "./StsBetCard";
+import type { Pewnosc, StsAlert, ValueBet, Zawodnik } from "@/lib/types";
 
 const RYNKI_FILTRY: { kod: string; label: string }[] = [
   { kod: "wszystkie", label: "Wszystkie rynki" },
@@ -42,9 +43,6 @@ const SORTOWANIA: { kod: SortKey; label: string }[] = [
   { kod: "kurs", label: "Najwyższy kurs" },
   { kod: "kickoff", label: "Najbliższy mecz" },
 ];
-// sugestie nie mają kursu — sorty po kursie/przewadze nic by nie mówiły
-const SORTY_BEZ_KURSU: SortKey[] = ["ranking", "pewnosc", "kickoff"];
-
 /** Poprawna polska odmiana: "1 pozycja", "3 pozycje", "8 pozycji". */
 function odmienPozycje(n: number): string {
   if (n === 1) return "1 pozycja";
@@ -57,14 +55,16 @@ function odmienPozycje(n: number): string {
 
 export function ValueBoard({
   bets,
+  stsAlerty = [],
   zawodnicy,
   initialMatchId,
   initialRodzaj,
 }: {
   bets: ValueBet[];
+  stsAlerty?: StsAlert[];
   zawodnicy: Zawodnik[];
   initialMatchId?: number;
-  initialRodzaj?: "okazje" | "pewniaki" | "sugestie" | "wszystko";
+  initialRodzaj?: "okazje" | "pewniaki" | "value" | "wszystko";
 }) {
   const [rynek, setRynek] = useState("wszystkie");
   const [pewnosc, setPewnosc] = useState<Pewnosc | "kazda">("kazda");
@@ -73,7 +73,7 @@ export function ValueBoard({
   // domyślny sort = ranking silnika ("Polecane") — samo p_model wynosiłoby
   // na górę zawsze linie 0,5 gwiazd i chowało typy kontekstowe (matchup)
   const [rodzaj, setRodzaj] = useState<
-    "okazje" | "pewniaki" | "sugestie" | "wszystko"
+    "okazje" | "pewniaki" | "value" | "wszystko"
   >(
     () =>
       initialRodzaj ?? (bets.some((b) => b.pewniak) ? "pewniaki" : "wszystko"),
@@ -81,10 +81,7 @@ export function ValueBoard({
   const [sortuj, setSortuj] = useState<SortKey>("ranking");
   const [limit, setLimit] = useState(25);
 
-  const liczbaSugestii = useMemo(
-    () => bets.filter((b) => b.sugestia).length,
-    [bets],
-  );
+  const liczbaValueSts = stsAlerty.length;
   const liczbaPewniakow = useMemo(
     () => bets.filter((b) => b.pewniak).length,
     [bets],
@@ -107,7 +104,6 @@ export function ValueBoard({
     for (const b of bets) {
       if (rodzaj === "okazje" && (b.sugestia || b.pewniak)) continue;
       if (rodzaj === "pewniaki" && !b.pewniak) continue;
-      if (rodzaj === "sugestie" && !b.sugestia) continue;
       let kod = b.rynek_kod;
       if (b.rynek_kod.startsWith("team_")) kod = "druzyny";
       else if (!GLOWNE_KODY.has(b.rynek_kod)) kod = "inne";
@@ -124,14 +120,7 @@ export function ValueBoard({
     setSortuj("ranking"); // spójnie ze stanem początkowym
   };
 
-  // sorty dostępne w bieżącej zakładce (sugestie są bez kursów)
-  const dostepneSorty = useMemo(
-    () =>
-      rodzaj === "sugestie"
-        ? SORTOWANIA.filter((s) => SORTY_BEZ_KURSU.includes(s.kod))
-        : SORTOWANIA,
-    [rodzaj],
-  );
+  const dostepneSorty = SORTOWANIA;
 
   const filtered = useMemo(() => {
     const wynik = bets.filter((b) => {
@@ -150,7 +139,6 @@ export function ValueBoard({
         return false;
       if (rodzaj === "okazje" && (b.sugestia || b.pewniak)) return false;
       if (rodzaj === "pewniaki" && !b.pewniak) return false;
-      if (rodzaj === "sugestie" && !b.sugestia) return false;
       if (pewnosc === "wysoka" && b.pewnosc !== "wysoka") return false;
       if (pewnosc === "srednia" && b.pewnosc === "niska") return false;
       if (meczId !== undefined && b.mecz_id !== meczId) return false;
@@ -198,18 +186,13 @@ export function ValueBoard({
   // roving tabindex, Left/Right/Home/End przenoszą FOKUS I WYBÓR
   const TABY_RODZAJ = [
     ["pewniaki", "Pewniaki", liczbaPewniakow],
-    ["sugestie", "Sugestie STS", liczbaSugestii],
+    ["value", "Value Bety", liczbaValueSts],
     ["okazje", "Okazje z kursem", null],
     ["wszystko", "Wszystko", null],
   ] as const;
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const wybierzRodzaj = (kod: (typeof TABY_RODZAJ)[number][0]) => {
     setRodzaj(kod);
-    // sugestie nie mają kursów — sort po kursie/przewadze wraca do
-    // "Polecane", zamiast udawać, że działa
-    if (kod === "sugestie" && !SORTY_BEZ_KURSU.includes(sortuj)) {
-      setSortuj("ranking");
-    }
   };
   const onTabKeyDown = (
     e: React.KeyboardEvent<HTMLButtonElement>,
@@ -231,7 +214,7 @@ export function ValueBoard({
     <section aria-label="Lista okazji">
       {/* przełącznik rodzaju — tablica wyników: czysty tekst, aktywna
           zakładka z podkreśleniem marki (żadnych kolejnych "przycisków") */}
-      {(liczbaSugestii > 0 || liczbaPewniakow > 0) && (
+      {(liczbaValueSts > 0 || liczbaPewniakow > 0) && (
         <div
           className="flex flex-wrap items-end gap-x-6 gap-y-1 border-b border-hairline"
           role="tablist"
@@ -267,6 +250,50 @@ export function ValueBoard({
         </div>
       )}
 
+      {rodzaj === "value" ? (
+        <div className="pt-4">
+          {stsAlerty.length === 0 ? (
+            <div className="rounded-(--radius-card) border border-hairline bg-card px-6 py-12 text-center shadow-(--shadow-card)">
+              <p className="text-sm font-medium text-ink">
+                Brak value betów STS w tej chwili
+              </p>
+              <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-muted">
+                Value bet STS to selekcja, na którą STS płaci wyraźnie więcej niż
+                Superbet, a model potwierdza szansę. Takie różnice pojawiają się
+                nieregularnie i szybko znikają, gdy STS je koryguje.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="mb-4 flex items-baseline justify-between gap-3">
+                <p className="max-w-prose text-xs leading-relaxed text-muted">
+                  STS przepłaca te selekcje względem Superbetu, a model potwierdza
+                  szansę na ich trafienie. Kursy bywają ulotne, bierz póki są.
+                </p>
+                <span className="font-data shrink-0 text-sm font-semibold text-brand-deep">
+                  {odmienPozycje(stsAlerty.length)}
+                </span>
+              </div>
+              <div className="space-y-3">
+                {stsAlerty.map((a, i) => (
+                  <motion.div
+                    key={`${a.zawodnik}-${a.rynek_kod}-${a.linia}`}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{
+                      delay: Math.min(i * 0.03, 0.4),
+                      duration: 0.3,
+                    }}
+                  >
+                    <StsBetCard a={a} rank={i + 1} />
+                  </motion.div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      ) : (
+        <>
       {/* konsola filtrów: dopracowane dropdowny + żywy odczyt wyniku */}
       <div className="mb-6 grid grid-cols-2 items-end gap-x-6 gap-y-4 pt-4 lg:flex lg:gap-x-9">
         <FilterDropdown
@@ -341,14 +368,14 @@ export function ValueBoard({
             <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-muted">
               Bukmacher wycenia dostępne zdarzenia blisko szans modelu, więc
               nie ma czego przepłacać. To się zmienia z każdą aktualizacją
-              kursów: zajrzyj do sugestii STS albo wróć za jakiś czas.
+              kursów: zajrzyj do value betów STS albo wróć za jakiś czas.
             </p>
-            {liczbaSugestii > 0 && (
+            {liczbaValueSts > 0 && (
               <button
-                onClick={() => setRodzaj("sugestie")}
+                onClick={() => setRodzaj("value")}
                 className="mt-4 rounded-(--radius-control) bg-brand px-4 py-2 text-sm font-semibold text-on-brand shadow-(--shadow-card) transition-colors hover:bg-brand-strong"
               >
-                Zobacz sugestie STS ({liczbaSugestii})
+                Zobacz value bety STS ({liczbaValueSts})
               </button>
             )}
           </div>
@@ -405,6 +432,8 @@ export function ValueBoard({
             <span aria-hidden>↓</span>
           </button>
         </div>
+      )}
+        </>
       )}
     </section>
   );
