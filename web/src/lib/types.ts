@@ -157,6 +157,7 @@ export interface Odrzucenie {
     | "chwiejna_predykcja"
     | "rozjazd_z_rynkiem"
     | "tylko_w_puli"
+    | "kwarantanna_rynku"
     | string;
   szczegol: string;
 }
@@ -354,6 +355,9 @@ export interface TypRozliczony {
   kurs_zamkniecia?: number | null;
   /** CLV: o ile % kurs wzięty był lepszy od zamknięcia (dodatnie = bijemy rynek) */
   clv_pct?: number | null;
+  /** typ rozliczony poza publikacją: "kwarantanna_rynku" | "limit_meczu";
+   *  widoczny w Skuteczności z oznaczeniem, poza licznikami trafień/ROI */
+  poza_publikacja?: string | null;
 }
 
 /** Kupon w historii: zamrożony przy publikacji, rozliczany z legów. */
@@ -396,7 +400,11 @@ export interface SkutecznoscDnia {
   okazje: number;
   /** ROI flat: stawka 1 j. na okazję (zwrot − postawione) */
   roi_flat: number;
-  /** realne typy tego dnia (co siadło / nie siadło) — trafione na górze */
+  /** typy rozliczone poza publikacją tego dnia (kwarantanna/limit meczu) */
+  poza_n?: number;
+  poza_trafione?: number;
+  /** realne typy tego dnia (co siadło / nie siadło) — trafione na górze,
+   *  typy poza publikacją na końcu z oznaczeniem */
   typy?: TypRozliczony[];
 }
 

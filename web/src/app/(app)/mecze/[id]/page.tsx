@@ -282,6 +282,7 @@ export default async function MeczPage({
 
 const POWOD_LABEL: Record<string, string> = {
   tylko_w_puli: "Dostępne w generatorze kuponów",
+  kwarantanna_rynku: "Rynek chwilowo wstrzymany (trafiał poniżej deklaracji)",
   brak_kursu: "Superbet nie kwotuje tego rynku",
   za_malo_zdarzen: "Model oczekuje za mało zdarzeń",
   za_malo_historii: "Za mało meczów w historii",

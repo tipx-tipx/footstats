@@ -162,6 +162,11 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
                 if rec.get("odrzucony") and not b.get("odrzucony"):
                     rec["odrzucony"] = False
                     rec.pop("odrzucenie_powod", None)
+                # typ spoza publikacji (kwarantanna/limit meczu), który w
+                # kolejnym cyklu WSZEDŁ do publikacji — awansuje; w drugą
+                # stronę nigdy nie degradujemy opublikowanego typu
+                if rec.get("poza_publikacja") and not b.get("poza_publikacja"):
+                    rec.pop("poza_publikacja", None)
             continue
         log[k] = {
             "mecz_id": b["mecz_id"], "mecz": b["mecz"],
@@ -191,6 +196,12 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
             # odrzucone_pomiar), zanim ktokolwiek ruszy same progi
             "odrzucony": bool(b.get("odrzucony")),
             "odrzucenie_powod": b.get("odrzucenie_powod"),
+            # POZA PUBLIKACJĄ: "kwarantanna_rynku" (rynek trafia poniżej
+            # deklaracji) albo "limit_meczu" (nadmiar typów z jednego meczu).
+            # Rozlicza się i UCZY kalibrację, ale nie wchodzi do
+            # skuteczności/kalendarza/UI — w odróżnieniu od `odrzucony`,
+            # który jest też poza kalibracją.
+            "poza_publikacja": b.get("poza_publikacja"),
             "opublikowano_ts": int(time.time()),
             "wynik": None, "faktyczna": None,
         }
@@ -339,8 +350,11 @@ MIN_N_KALIBRACJI = 25          # od tylu rozliczonych typów na rynek korygujemy
 BIAS_CAP = (0.85, 1.15)        # (stary format mnożnikowy — compute_bias/raport)
 # kalibracja w PRZESTRZENI LOGITÓW: p' = sigmoid(logit(p) + b) — mnożnik
 # psuł ogony (p=95% ściągał za mocno, p=50% za słabo); delta logitowa
-# koryguje równomiernie. Cap ±0.40 ≈ dawne ±15% w środku skali.
-BIAS_CAP_LOGIT = (-0.40, 0.40)
+# koryguje równomiernie. Cap w dół poszerzony do −0.80 (2026-07-19): zmierzone
+# błędy realnych rynków wymagały delty −0.58 (shots) i −1.1 (fouls_committed),
+# a cap −0.40 ucinał korektę w połowie — model NIE MÓGŁ się skalibrować mimo
+# danych. Przed przestrzeleniem chroni shrinkage (waga n/(n+25)), nie cap.
+BIAS_CAP_LOGIT = (-0.80, 0.40)
 # sugestie STS (bez kursu, bez bezpieczników rynkowych) kalibrują się OSOBNO
 # i mylą się dużo mocniej niż typy z kursem — cap w dół musi być szerszy
 SUGESTIA_BIAS_CAP_LOGIT = (-1.0, 0.40)
@@ -351,6 +365,13 @@ SUGESTIA_BIAS_CAP_LOGIT = (-1.0, 0.40)
 # bin góry pozwala kalibracji dociskać tam, gdzie faktycznie przeszacowuje
 BIAS_PRZEDZIALY = [(0.0, 0.55), (0.55, 0.70), (0.70, 0.85), (0.85, 1.01)]
 MIN_N_PRZEDZIAL = 15
+# WAŻENIE ŚWIEŻOŚCI kalibracji: rozliczenie sprzed 14 dni waży połowę
+# najnowszego (półokres). Warunki gry zmieniają się (faza grupowa vs
+# pucharowa, klub vs turniej) — bez wygaszania stara prawda przykrywa nową
+# i korekta reaguje z tygodniowym opóźnieniem. Punktem "teraz" jest
+# najnowsze rozliczenie w logu (nie zegar) — przerwa w cyklach nie
+# wyzerowuje kalibracji.
+KALIBRACJA_POLOWICZNY_DNI = 14.0
 # pokrewne rynki dzielą błąd modelu (shots i sot mylą się razem) — shrinkage
 # rodzinny: rynek z małą próbą jest ściągany do biasu swojej rodziny;
 # mapa wspólna z kuponami (dywersyfikacja) — mieszka w model/betting.py
@@ -373,18 +394,23 @@ def _logit(p: float) -> float:
     return math.log(p / (1.0 - p))
 
 
-def _bias_logit(grp: list[dict]) -> float:
-    """Delta logitowa b: rozwiązanie Σ sigmoid(logit(p_i)+b) = trafienia.
+def _bias_logit(grp: list[dict], wagi: list[float] | None = None) -> float:
+    """Delta logitowa b: rozwiązanie Σ w·sigmoid(logit(p_i)+b) = Σ w·trafienia.
 
     Pseudozliczenia stabilizujące jak w _bias_surowy: dwie wirtualne
-    obserwacje p=0.5 (jedna trafiona, jedna nie). Bisekcja — bez zależności.
+    obserwacje p=0.5 (jedna trafiona, jedna nie, waga 1). Opcjonalne wagi =
+    ważenie świeżości. Bisekcja — bez zależności.
     """
     ps = [min(max(float(r["p_model"]), 1e-6), 1 - 1e-6) for r in grp]
+    w = list(wagi) if wagi is not None else [1.0] * len(grp)
+    traf = sum(wi for r, wi in zip(grp, w) if r["wynik"] == "wygrany") + 1.0
     ps += [0.5, 0.5]
-    traf = sum(1 for r in grp if r["wynik"] == "wygrany") + 1.0
+    w += [1.0, 1.0]
 
     def f(b: float) -> float:
-        return sum(1.0 / (1.0 + math.exp(-(_logit(p) + b))) for p in ps) - traf
+        return sum(
+            wi / (1.0 + math.exp(-(_logit(p) + b))) for p, wi in zip(ps, w)
+        ) - traf
 
     lo, hi = -3.0, 3.0
     if f(lo) > 0:
@@ -441,13 +467,24 @@ def compute_bias_full(
         and bool(r.get("sugestia")) == sugestie
         and not r.get("odrzucony")
     ]
+    # ważenie świeżości względem najnowszego rozliczenia w logu — świeże
+    # błędy ważą więcej, stare wygasają (półokres KALIBRACJA_POLOWICZNY_DNI)
+    ts_max = max(
+        (float(r.get("kickoff_ts") or 0) for r in settled), default=0.0
+    )
+
+    def _w(r: dict) -> float:
+        dni = max(ts_max - float(r.get("kickoff_ts") or 0), 0.0) / 86400.0
+        return 0.5 ** (dni / KALIBRACJA_POLOWICZNY_DNI)
+
     rodziny: dict[str, list[dict]] = {}
     for r in settled:
         fam = RODZINY_RYNKOW.get(r["rynek_kod"])
         if fam:
             rodziny.setdefault(fam, []).append(r)
     fam_bias = {
-        f: _bias_logit(g) for f, g in rodziny.items() if len(g) >= min_n
+        f: _bias_logit(g, [_w(r) for r in g])
+        for f, g in rodziny.items() if len(g) >= min_n
     }
     grupy: dict[str, list[dict]] = {}
     for r in settled:
@@ -455,10 +492,14 @@ def compute_bias_full(
     out: dict[str, dict] = {}
     for mk, grp in grupy.items():
         fb = fam_bias.get(RODZINY_RYNKOW.get(mk, ""))
-        n, raw = len(grp), _bias_logit(grp)
+        # shrink liczony na EFEKTYWNEJ próbie (suma wag świeżości): stare
+        # rozliczenia nie tylko mniej znaczą w biasie, ale i słabiej
+        # emancypują rynek od rodziny
+        n_eff = sum(_w(r) for r in grp)
+        raw = _bias_logit(grp, [_w(r) for r in grp])
         if fb is not None:
-            g = fb + (n / (n + min_n)) * (raw - fb)
-        elif n >= min_n:
+            g = fb + (n_eff / (n_eff + min_n)) * (raw - fb)
+        elif len(grp) >= min_n:
             g = raw
         else:
             continue  # za mało danych i brak rozliczonej rodziny
@@ -467,11 +508,56 @@ def compute_bias_full(
             bgrp = [r for r in grp if lo <= r["p_model"] < hi]
             bb = g
             if len(bgrp) >= MIN_N_PRZEDZIAL:
-                k = len(bgrp) / (len(bgrp) + MIN_N_PRZEDZIAL)
-                bb = g + k * (_bias_logit(bgrp) - g)
+                b_eff = sum(_w(r) for r in bgrp)
+                k = b_eff / (b_eff + MIN_N_PRZEDZIAL)
+                bb = g + k * (_bias_logit(bgrp, [_w(r) for r in bgrp]) - g)
             bins.append([lo, hi, _cap_bias(bb, cap)])
         out[mk] = {"logit": True, "global": _cap_bias(g, cap), "bins": bins}
     return out
+
+
+# KWARANTANNA RYNKU: rynek, który w rozliczeniach trafia wyraźnie poniżej
+# deklaracji modelu, wypada z PUBLIKACJI (pewniaki, pula kuponów), ale dalej
+# jest scorowany i logowany (poza_publikacja="kwarantanna_rynku") — kalibracja
+# mierzy go nadal i rynek wraca sam, gdy okno rozliczeń się poprawi.
+KWARANTANNA_PROG_BIAS = 0.80   # wejście do kwarantanny poniżej tego biasu
+KWARANTANNA_MIN_N = 15         # od tylu rozliczonych typów oceniamy rynek
+KWARANTANNA_OKNO = 40          # okno kroczące: tylko ostatnie N rozliczeń
+
+
+def rynki_kwarantanna(log: dict | None = None) -> dict[str, dict]:
+    """Rynki chwilowo poza publikacją: bias (traf vs deklaracja) z okna
+    ostatnich rozliczeń poniżej progu. Zwraca {rynek: {bias, n, hit, sr_p}}."""
+    if log is None:
+        log = _migruj_log(supa.get_key("typy_log") or {})
+    settled = [
+        r for r in log.values()
+        if r.get("wynik") in ("wygrany", "przegrany")
+        and not r.get("sugestia") and not r.get("odrzucony")
+    ]
+    out: dict[str, dict] = {}
+    for mk in {r["rynek_kod"] for r in settled}:
+        grp = sorted(
+            (r for r in settled if r["rynek_kod"] == mk),
+            key=lambda r: r.get("kickoff_ts") or 0,
+        )[-KWARANTANNA_OKNO:]
+        if len(grp) < KWARANTANNA_MIN_N:
+            continue
+        traf = sum(1 for r in grp if r["wynik"] == "wygrany")
+        sr_p = sum(r["p_model"] for r in grp) / len(grp)
+        bias = (traf + 2.0) / (sr_p * len(grp) + 2.0)
+        if bias < KWARANTANNA_PROG_BIAS:
+            out[mk] = {
+                "bias": round(bias, 3), "n": len(grp),
+                "hit": round(traf / len(grp), 3), "sr_p": round(sr_p, 3),
+            }
+    return out
+
+
+def kwarantanna() -> dict[str, dict]:
+    """Kwarantanna rynków z logu w Supabase (pusta, gdy brak danych/env)."""
+    log = _migruj_log(supa.get_key("typy_log") or {})
+    return rynki_kwarantanna(log)
 
 
 def market_bias() -> dict[str, dict]:
@@ -1040,24 +1126,38 @@ def _typ_dnia(r: dict) -> dict:
         "strona": r.get("strona"), "kurs": r.get("kurs"),
         "p_model": r.get("p_model"), "wynik": r.get("wynik"),
         "faktyczna": r.get("faktyczna"), "clv_pct": r.get("clv_pct"),
+        # typ poza publikacją (kwarantanna/limit meczu) — w liście dnia
+        # widoczny z oznaczeniem, ale poza licznikami skuteczności
+        "poza_publikacja": r.get("poza_publikacja"),
     }
 
 
-def skutecznosc_per_dzien(settled: list[dict], dni: int = 21) -> list[dict]:
+def skutecznosc_per_dzien(
+    settled: list[dict], dni: int = 21, poza: list[dict] | None = None,
+) -> list[dict]:
     """Skuteczność realnych typów pogrupowana po DNIU meczu (kickoff).
 
     Zwraca ostatnie `dni` dni (od najnowszego): trafienia, ROI flat (stawka
     1 j./okazję), liczbę okazji ORAZ listę typów tego dnia (`typy` — realne
     typy, które siadły/nie siadły), żeby dzień można było rozwinąć. ROZLICZONE
     typy tylko — `settled` powinno być już bez rynków osobnych.
+
+    `poza` = typy poza publikacją (kwarantanna rynku / limit meczu): trafiają
+    do listy dnia z oznaczeniem i osobnych liczników (poza_n/poza_trafione),
+    ale NIE wchodzą do trafień/ROI — user ich nie widział na liście typów.
     """
     dzienne: dict[str, dict] = {}
-    for r in settled:
+
+    def _agg(r: dict) -> dict:
         d = time.strftime("%Y-%m-%d", time.localtime(r.get("kickoff_ts") or 0))
-        agg = dzienne.setdefault(d, {
+        return dzienne.setdefault(d, {
             "dzien": d, "rozliczone": 0, "trafione": 0,
             "okazje": 0, "_zwrot_j": 0.0, "typy": [],
+            "poza_n": 0, "poza_trafione": 0,
         })
+
+    for r in settled:
+        agg = _agg(r)
         agg["rozliczone"] += 1
         if r.get("wynik") == "wygrany":
             agg["trafione"] += 1
@@ -1065,13 +1165,24 @@ def skutecznosc_per_dzien(settled: list[dict], dni: int = 21) -> list[dict]:
             agg["okazje"] += 1
             agg["_zwrot_j"] += r["kurs"] if r.get("wynik") == "wygrany" else 0.0
         agg["typy"].append(_typ_dnia(r))
+    for r in poza or []:
+        agg = _agg(r)
+        agg["poza_n"] += 1
+        if r.get("wynik") == "wygrany":
+            agg["poza_trafione"] += 1
+        agg["typy"].append(_typ_dnia(r))
     out = []
     for d in sorted(dzienne, reverse=True)[:dni]:
         agg = dzienne[d]
         agg["roi_flat"] = round(agg.pop("_zwrot_j") - agg["okazje"], 2)
-        # trafione na górze, potem reszta; w obrębie grupy po nazwie
+        # publikowane przed typami poza publikacją; w obrębie grupy trafione
+        # na górze, potem po nazwie
         agg["typy"].sort(
-            key=lambda t: (t.get("wynik") != "wygrany", str(t.get("podmiot")))
+            key=lambda t: (
+                bool(t.get("poza_publikacja")),
+                t.get("wynik") != "wygrany",
+                str(t.get("podmiot")),
+            )
         )
         out.append(agg)
     return out
@@ -1379,11 +1490,23 @@ def rozlicz(
         if r.get("wynik") in ("wygrany", "przegrany")
         and r.get("rynek_kod") not in RYNKI_OSOBNE
         and not r.get("odrzucony")
+        # typy spoza publikacji uczą kalibrację, ale nie liczą się do
+        # pokazywanej skuteczności — user ich nie widział, nie mógł zagrać
+        and not r.get("poza_publikacja")
     ]
     okazje = [r for r in settled if not r["sugestia"] and r.get("kurs")]
     roi = sum(
         (r["kurs"] - 1.0) if r["wynik"] == "wygrany" else -1.0 for r in okazje
     )
+    # typy poza publikacją (kwarantanna/limit meczu): w Skuteczności widoczne
+    # z oznaczeniem (pełna transparentność), ale poza licznikami trafień/ROI
+    poza_pub = [
+        r for r in log.values()
+        if r.get("wynik") in ("wygrany", "przegrany")
+        and r.get("rynek_kod") not in RYNKI_OSOBNE
+        and not r.get("odrzucony")
+        and r.get("poza_publikacja")
+    ]
 
     def _po_rynku(recs: list[dict]) -> list[dict]:
         out = []
@@ -1406,10 +1529,10 @@ def rozlicz(
 
     # skuteczność DZIEŃ PO DNIU (realne typy, bez rynków osobnych) — z listą
     # typów danego dnia (co siadło); zasila przełącznik dnia na Skuteczności
-    skutecznosc_dzienna = skutecznosc_per_dzien(settled)
+    skutecznosc_dzienna = skutecznosc_per_dzien(settled, poza=poza_pub)
 
     ostatnie = sorted(
-        settled + [
+        settled + poza_pub + [
             r for r in log.values()
             if r.get("wynik") == "zwrot"
             and r.get("rynek_kod") not in RYNKI_OSOBNE
@@ -1446,6 +1569,7 @@ def rozlicz(
                 1 for r in log.values()
                 if r.get("rynek_kod") not in RYNKI_OSOBNE
                 and not r.get("odrzucony")
+                and not r.get("poza_publikacja")
             ),
             "rozliczone": len(settled),
             "trafione": sum(1 for r in settled if r["wynik"] == "wygrany"),

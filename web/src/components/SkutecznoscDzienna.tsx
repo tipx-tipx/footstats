@@ -5,6 +5,12 @@ import { useState } from "react";
 import { fmtLinia, STRONA_LABEL } from "@/lib/format";
 import type { SkutecznoscDnia } from "@/lib/types";
 
+/** Typ rozliczony w tle: dlaczego nie było go na liście typów. */
+const POZA_LABEL: Record<string, string> = {
+  kwarantanna_rynku: "Rynek był wstrzymany (trafiał poniżej deklaracji), typ rozliczył się w tle",
+  limit_meczu: "Ponad limit typów z jednego meczu, typ był dostępny tylko w generatorze kuponów",
+};
+
 /** "2026-07-10" -> "czw, 10 lip" (bez skoków stref: południe lokalne). */
 function etykietaDnia(dzien: string, dlugo = false): string {
   const d = new Date(`${dzien}T12:00:00`);
@@ -145,13 +151,27 @@ export function SkutecznoscDzienna({ dni }: { dni: SkutecznoscDnia[] }) {
         </div>
       </dl>
 
+      {/* typy rozliczone w tle: nie były na liście, więc nie liczą się do
+          skuteczności wyżej — ale pokazujemy je uczciwie w liście niżej */}
+      {(dzien.poza_n ?? 0) > 0 && (
+        <p className="mt-2 text-xs leading-relaxed text-faint">
+          Do tego model rozliczył w tle {dzien.poza_n}{" "}
+          {dzien.poza_n === 1 ? "typ" : (dzien.poza_n as number) < 5 ? "typy" : "typów"}{" "}
+          (weszło {dzien.poza_trafione ?? 0}). Nie było ich na liście typów,
+          więc nie liczą się do skuteczności wyżej. Na liście niżej mają
+          oznaczenie „w tle".
+        </p>
+      )}
+
       {/* co siadło tego dnia — realne typy (trafione na górze) */}
       {typy.length > 0 ? (
         <ul className="mt-4 space-y-1.5">
           {typy.map((t, ti) => (
             <li
               key={`${t.podmiot}-${t.rynek_kod}-${t.linia}-${ti}`}
-              className="flex items-center gap-3 rounded-(--radius-control) border border-hairline bg-card-soft px-3 py-2 text-sm"
+              className={`flex items-center gap-3 rounded-(--radius-control) border border-hairline px-3 py-2 text-sm ${
+                t.poza_publikacja ? "bg-card opacity-75" : "bg-card-soft"
+              }`}
             >
               <span
                 aria-hidden
@@ -170,6 +190,14 @@ export function SkutecznoscDzienna({ dni }: { dni: SkutecznoscDnia[] }) {
                   {fmtLinia(t.linia)} · {t.mecz}
                 </span>
               </span>
+              {t.poza_publikacja && (
+                <span
+                  className="hidden shrink-0 text-[10px] uppercase tracking-wide text-faint sm:inline"
+                  title={POZA_LABEL[t.poza_publikacja] ?? "Typ rozliczony w tle"}
+                >
+                  w tle
+                </span>
+              )}
               <span className="font-data shrink-0 text-xs text-muted">
                 było: {t.faktyczna != null ? t.faktyczna : "–"}
               </span>

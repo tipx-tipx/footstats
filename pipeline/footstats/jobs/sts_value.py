@@ -456,7 +456,7 @@ def main() -> None:
             model_txt = f"\n   model: p={a['p_model']}, EV(model) {znak}{a['ev_model_pct']}%{ptw}"
         print(
             f"\n🔵 VALUE ALERT!  [{kropki} {a['pewnosc']}]  {a['mecz']}  ({_when(a['mecz_ts'])})\n"
-            f"   {nazwa} — {a['rynek']}: {a['linia_opis']}{tagi}\n"
+            f"   {nazwa} – {a['rynek']}: {a['linia_opis']}{tagi}\n"
             f"   STS {a['kurs_sts']}  vs  Superbet {a['kurs_superbet']}  "
             f"(x{a['ratio']}, EV +{a['ev_pct']}%, ponad tło x{a['nadwyzka_vs_baseline']}{fair}){model_txt}"
         )

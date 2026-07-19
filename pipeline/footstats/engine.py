@@ -119,15 +119,17 @@ def _build_reasoning(
 ) -> dict:
     """Uzasadnienie po polsku — najważniejsze czynniki dla UI."""
     czynniki = []
+    # liczby w opisach po polsku (przecinek dziesiętny) — te teksty idą 1:1 do UI
+    sr90 = f"{posterior.mean_per90:.2f}".replace(".", ",")
     if prior is not None and prior.source == "klub":
         opis_bazy = (
-            f"Średnio {posterior.mean_per90:.2f} na 90 minut "
+            f"Średnio {sr90} na 90 minut "
             f"(baza: {prior.pseudo_matches:.0f} meczów sprzed turnieju "
             f"+ {posterior.effective_matches:.0f} na turnieju)"
         )
     else:
         opis_bazy = (
-            f"Średnio {posterior.mean_per90:.2f} na 90 minut "
+            f"Średnio {sr90} na 90 minut "
             f"(efektywna próba: {posterior.effective_matches:.0f} meczów)"
         )
     czynniki.append({"nazwa": "Poziom bazowy", "opis": opis_bazy, "mnoznik": None})
@@ -138,10 +140,9 @@ def _build_reasoning(
                 "Skład ogłoszony: pewny występ" if mm.official_lineup and mm.p_start > 0.5
                 else "Skład ogłoszony: zawodnik poza XI (możliwe wejście z ławki)"
                 if mm.official_lineup
-                else f"Przewidywane minuty: {mm.expected_minutes:.0f} "
-                f"(szansa na pierwszy skład: {mm.p_start * 100:.0f}%"
-                + (", wg przewidywanego składu" if ctx.predicted_started is not None else "")
-                + ")"
+                else f"Przewidywane {mm.expected_minutes:.0f} min gry, "
+                f"{mm.p_start * 100:.0f}% szans na pierwszy skład"
+                + (" (wg przewidywanego składu)" if ctx.predicted_started is not None else "")
             ),
             "mnoznik": round(mm.expected_minutes / 90.0, 2),
         }
@@ -326,8 +327,9 @@ def score_player_market(
         p_przed = p_over
         p_over = _kalibruj(p_over)
         eff = p_over / max(p_przed, 1e-9)
+        eff_s = f"{eff:.2f}".replace(".", ",")
         cf.notes["kalibracja"] = (
-            f"Korekta z rozliczonych typów: ×{eff:.2f} "
+            f"Korekta z rozliczonych typów: ×{eff_s} "
             f"({'model niedoszacowywał' if eff > 1 else 'model przeszacowywał'})"
         )
     p_over = float(np.clip(p_over, 1e-4, 1.0 - 1e-4))

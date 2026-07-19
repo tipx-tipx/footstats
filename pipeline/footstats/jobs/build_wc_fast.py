@@ -74,6 +74,7 @@ def _rozlicz_i_zapisz(
     niedostepni: set[int] | None = None,
     conf_mids: set[int] | None = None,
     odrzucone_pomiar: list[dict] | None = None,
+    poza_publikacja: list[dict] | None = None,
 ) -> None:
     """Rozliczanie + zapis wyników. Wywoływane w KAŻDYM cyklu — także gdy
     statshub nie ma propsów (rozliczenia nie mogą czekać na nowe typy).
@@ -84,10 +85,11 @@ def _rozlicz_i_zapisz(
     Przy błędzie NIE nadpisujemy plików — zostają wyniki z poprzedniego cyklu.
     """
     try:
-        # typy pomiarowe (odrzucone przy progu) dokładamy WYŁĄCZNIE do logu
-        # rozliczeń — value_bets.json (UI) idzie bez nich
+        # typy pomiarowe (odrzucone przy progu) i typy poza publikacją
+        # (kwarantanna/limit meczu) dokładamy WYŁĄCZNIE do logu rozliczeń —
+        # value_bets.json (UI) idzie bez nich
         wyniki = rozliczanie.rozlicz(
-            value_bets + (odrzucone_pomiar or []),
+            value_bets + (odrzucone_pomiar or []) + (poza_publikacja or []),
             kupony_list, niedostepni, conf_mids=conf_mids,
         )
     except Exception as ex:
@@ -445,6 +447,11 @@ PRIOR_MIN_MECZE, PRIOR_MAX_MECZE = 4.0, 12.0
 # (dowód okazji z kursem). Skaluje się z kursem, w odróżnieniu od dawnej sztywnej
 # różnicy 0.10 kursu. Strojony — kandydat do kalibracji z rozliczeń okazji.
 PROG_EV_UK = 4.0
+# limit ekspozycji: maks. tylu publikowanych pewniaków z JEDNEGO meczu —
+# typy z tego samego meczu padają razem (korelacja), a czerwone dni
+# kalendarza to głównie dni z wieloma typami z jednego zamulonego meczu.
+# Nadmiar zostaje w puli generatora kuponów (decyzja usera: 4)
+MAX_PEWNIAKOW_MECZ = 4
 
 
 def klub_prior(
@@ -1035,6 +1042,18 @@ def _main_impl():
                 f"{mk} {v['global']:+.2f}" for mk, v in bias_map_sug.items()))
     except Exception:
         bias_map_sug = {}
+    # BRAMA PUBLIKACJI: rynki trafiające wyraźnie poniżej deklaracji wypadają
+    # z publikacji (pewniaki, pula kuponów), ale dalej są scorowane i logowane
+    # (poza_publikacja) — kalibracja mierzy je nadal i rynek wraca sam
+    try:
+        kwarantanna_rynkow = rozliczanie.kwarantanna()
+        if kwarantanna_rynkow:
+            print("Kwarantanna rynków: " + ", ".join(
+                f"{mk} (hit {v['hit']:.0%} vs p {v['sr_p']:.0%}, n={v['n']})"
+                for mk, v in kwarantanna_rynkow.items()))
+    except Exception as e:
+        kwarantanna_rynkow = {}
+        print(f"Kwarantanna rynków pominięta ({e})")
 
     ev_by_id = {e["id"]: e for e in events}
     sb_cache: dict[int, dict] = {}
@@ -1861,17 +1880,21 @@ def _main_impl():
                     if nv_t:
                         ev_uk_t = round((nv_t[0] * odd_t - 1.0) * 100.0, 1)
                 czynniki_t = []
+                # liczby w opisach po polsku (przecinek) — teksty idą 1:1 do UI
+                sr_t = f"{srednia_hist:.1f}".replace(".", ",")
                 czynniki_t.append({
                     "nazwa": "Poziom bazowy",
-                    "opis": f"Średnio {srednia_hist:.1f} na mecz "
+                    "opis": f"Średnio {sr_t} na mecz "
                             f"(próba: {n_h} meczów)",
                     "mnoznik": None,
                 })
                 if abs(f_opp - 1.0) > 0.02:
+                    konc_s = f"{konc:.1f}".replace(".", ",")
+                    norma_s = f"{lg_mean:.1f}".replace(".", ",")
                     czynniki_t.append({
                         "nazwa": "Profil rywala",
                         "opis": f"Rywale notują przeciw {tt.opponent_name} "
-                                f"~{konc:.1f} przy normie {lg_mean:.1f} "
+                                f"~{konc_s} przy normie {norma_s} "
                                 f"(próba: {konc_n} meczów)",
                         "mnoznik": round(f_opp, 2),
                     })
@@ -1996,6 +2019,13 @@ def _main_impl():
             continue
         perelki_per_mecz[b["mecz_id"]] = perelki_per_mecz.get(b["mecz_id"], 0) + 1
         do_emisji.append(b)
+    # LIMIT EKSPOZYCJI DZIENNEJ: do publikacji wchodzi maks. MAX_PEWNIAKOW_MECZ
+    # pewniaków z jednego meczu (w kolejności atrakcyjności) — czerwone dni
+    # kalendarza brały się z 5+ skorelowanych typów z jednego zamulonego
+    # meczu. Nadmiar oraz rynki w kwarantannie dalej się rozliczają i UCZĄ
+    # kalibrację (flaga poza_publikacja), ale nie wchodzą do apki/kalendarza.
+    typy_poza_publikacja: list[dict] = []
+    pewniaki_per_mecz: dict[int, int] = {}
     for b in do_emisji:
         klucz = (b["podmiot_id"], b["rynek_kod"], b["linia"], b["strona"])
         if klucz in juz_opublikowane:
@@ -2004,7 +2034,12 @@ def _main_impl():
         ci = b.get("ci") or [None, None]
         ci_w = (ci[1] - ci[0]) if ci[0] is not None else 1.0
         vb_id += 1
-        value_bets.append({
+        powod_poza = None
+        if b["rynek_kod"] in kwarantanna_rynkow:
+            powod_poza = "kwarantanna_rynku"
+        elif pewniaki_per_mecz.get(b["mecz_id"], 0) >= MAX_PEWNIAKOW_MECZ:
+            powod_poza = "limit_meczu"
+        rec_pewniaka = {
             "id": vb_id, "mecz_id": b["mecz_id"], "mecz": b["mecz"],
             "kickoff_ts": b["kickoff_ts"],
             "podmiot_typ": b.get("podmiot_typ", "zawodnik"),
@@ -2035,23 +2070,41 @@ def _main_impl():
             "rozklad": b.get("rozklad"),
             "czynniki": b.get("czynniki", {}),
             "uzasadnienie": b.get("uzasadnienie", {"czynniki": []}),
-        })
+        }
+        if powod_poza:
+            rec_pewniaka["poza_publikacja"] = powod_poza
+            typy_poza_publikacja.append(rec_pewniaka)
+            continue
+        pewniaki_per_mecz[b["mecz_id"]] = pewniaki_per_mecz.get(b["mecz_id"], 0) + 1
+        value_bets.append(rec_pewniaka)
         matches_out.setdefault(b["mecz_id"], {}).setdefault("okazje", []).append(vb_id)
+    if typy_poza_publikacja:
+        n_kw = sum(1 for t in typy_poza_publikacja
+                   if t["poza_publikacja"] == "kwarantanna_rynku")
+        print(f"Poza publikacją: {n_kw} typów (kwarantanna rynku), "
+              f"{len(typy_poza_publikacja) - n_kw} (limit na mecz) — "
+              "rozliczą się i uczą kalibrację w tle")
 
     value_bets.sort(key=lambda b: -b["rank_score"])
+
+    # rynki w kwarantannie wypadają też z puli kuponów (generator i kupony
+    # automatyczne nie budują na rynku, który trafia poniżej deklaracji)
+    legi_pool_pub = [
+        b for b in legi_pool if b["rynek_kod"] not in kwarantanna_rynkow
+    ]
 
     # REJESTR ODRZUCEŃ — domknięcie: para (zawodnik, rynek) opublikowana
     # (typ/sugestia) wypada z rejestru; obecna w puli kuponów, ale nie na
     # karcie meczu, dostaje uczciwe "tylko_w_puli" (jest w generatorze)
     opublikowane_pary = {(b["podmiot_id"], b["rynek_kod"]) for b in value_bets}
-    pary_puli = {(b["podmiot_id"], b["rynek_kod"]) for b in legi_pool}
+    pary_puli = {(b["podmiot_id"], b["rynek_kod"]) for b in legi_pool_pub}
     odrzucenia_out = [
         r for (mid_o, pid_o, mk_o), r in odrzucenia.items()
         if (pid_o, mk_o) not in opublikowane_pary
         and (pid_o, mk_o) not in pary_puli
     ]
     w_puli_dodane = set()
-    for b in legi_pool:
+    for b in legi_pool_pub:
         para = (b["podmiot_id"], b["rynek_kod"])
         if para in opublikowane_pary or para in w_puli_dodane:
             continue
@@ -2063,6 +2116,27 @@ def _main_impl():
             "powod": "tylko_w_puli",
             "szczegol": "typ dostępny w generatorze kuponów. Na karcie meczu "
                         "wygrał inny typ tego rynku",
+        })
+    # transparentność kwarantanny: typy zdjęte z publikacji dostają uczciwy
+    # wpis w rejestrze ("czemu nie ma typu"), zamiast znikać bez śladu
+    for t in typy_poza_publikacja:
+        if t["poza_publikacja"] != "kwarantanna_rynku":
+            continue  # limit_meczu: typ i tak jest w generatorze (tylko_w_puli)
+        para = (t["podmiot_id"], t["rynek_kod"])
+        if para in opublikowane_pary or para in w_puli_dodane:
+            continue
+        w_puli_dodane.add(para)
+        kw = kwarantanna_rynkow.get(t["rynek_kod"], {})
+        odrzucenia_out.append({
+            "mecz_id": t["mecz_id"], "podmiot": t["podmiot"],
+            "druzyna": t.get("druzyna", ""),
+            "rynek_kod": t["rynek_kod"], "rynek": t["rynek"],
+            "powod": "kwarantanna_rynku",
+            "szczegol": (
+                f"rynek chwilowo poza publikacją: ostatnie typy wchodziły w "
+                f"{kw.get('hit', 0):.0%} przy deklarowanych {kw.get('sr_p', 0):.0%} "
+                f"(próba: {kw.get('n', 0)}). Wróci, gdy kalibracja dogoni"
+            ),
         })
 
     # pełne pokrycie p_model (backend-only, dla scannera STS) — emitujemy ZAWSZE,
@@ -2078,7 +2152,8 @@ def _main_impl():
             f"{len(players_out)} zawodników ma propsy). Nie podmieniam danych "
             "aplikacji — czekam na pełne propsy/kursy ćwierćfinałów."
         )
-        _rozlicz_i_zapisz([], [], niedostepni)
+        _rozlicz_i_zapisz([], [], niedostepni,
+                          poza_publikacja=typy_poza_publikacja)
         return
 
     _dump("value_bets.json", value_bets)
@@ -2115,11 +2190,11 @@ def _main_impl():
     )
     _dump("legi_pool.json", [
         {**{k: b.get(k) for k in _POLA_LEGA}, "id": i}
-        for i, b in enumerate(legi_pool)
+        for i, b in enumerate(legi_pool_pub)
     ])
-    n_dzis = len({b["mecz_id"] for b in legi_pool
+    n_dzis = len({b["mecz_id"] for b in legi_pool_pub
                   if b["kickoff_ts"] <= time.time() + kupony.OKNO_DZIS_S})
-    print(f"Pula kuponów: {len(legi_pool)} legów, meczów w oknie dziennym: {n_dzis}")
+    print(f"Pula kuponów: {len(legi_pool_pub)} legów, meczów w oknie dziennym: {n_dzis}")
     fs = tempo.fallback_stats()
     n_total = fs["total_ok"] + fs["total_fallback"]
     n_spread = fs["spread_ok"] + fs["spread_fallback"]
@@ -2156,7 +2231,7 @@ def _main_impl():
     except Exception as e:
         print(f"Wagi zaufania pominięte ({e})")
     kupony_list = kupony.build_kupony(
-        value_bets, legi_pool, profil=profil_kuponow, kary=kary_kor,
+        value_bets, legi_pool_pub, profil=profil_kuponow, kary=kary_kor,
         wagi=wagi_zauf or None,
     )
     # znacznik: na ilu meczach kuponu składy były już POTWIERDZONE przy
@@ -2174,7 +2249,8 @@ def _main_impl():
     # publikacja kuponów idzie przez log (zamrożenie/anulowanie/rozliczenie)
     # wewnątrz _rozlicz_i_zapisz — kupony.json to aktywne kupony z logu
     _rozlicz_i_zapisz(value_bets, kupony_list, niedostepni,
-                      conf_mids=conf_mids, odrzucone_pomiar=odrzucone_pomiar)
+                      conf_mids=conf_mids, odrzucone_pomiar=odrzucone_pomiar,
+                      poza_publikacja=typy_poza_publikacja)
     _dump("meta.json", {
         "wygenerowano_ts": int(time.time()), "tryb": "ms2026",
         "liga": "Mistrzostwa Świata", "sezon": "2026",

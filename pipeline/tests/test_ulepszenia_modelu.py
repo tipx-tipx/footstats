@@ -149,7 +149,7 @@ def test_maska_likelihood_nie_liczy_podwojnie():
     ctx = MatchContext(is_home=True, is_favourite=False, neutral_venue=True)
     sm = score_player_market("shots", 1.5, hist, prior, ctx)
     # efektywna próba posteriora ~2 mecze turnieju (nie 12)
-    assert sm.reasoning["czynniki"][0]["opis"].startswith("Średnio 2.0")
+    assert sm.reasoning["czynniki"][0]["opis"].startswith("Średnio 2,0")
     assert "sprzed turnieju" in sm.reasoning["czynniki"][0]["opis"]
 
 
