@@ -8,7 +8,7 @@
  * korelacji legów z jednego meczu i dywersyfikacją rodzin rynków.
  */
 
-import type { LegPool, Strona } from "./types";
+import type { LegPool } from "./types";
 
 export type Profil = "bezpieczny" | "zbalansowany" | "agresywny";
 export interface Kary {
@@ -81,6 +81,14 @@ const MAX_KANDYDATOW = 120;
 // tutaj z opóźnieniem: przy pierwszej naprawie dedupu portowano tylko Python)
 const MAX_TIE_REPR = 3;
 
+/** Zaokrąglenie „pół w górę" — parytet z kupony.py:_zaokr. `toFixed` ma inne
+ * reguły połówek/precyzji, przez co kubełki dedupu wiązki potrafiły się
+ * różnić od backendu na 8. miejscu po przecinku. */
+function zaokr(x: number, m: number): string {
+  const k = 10 ** m;
+  return String(Math.floor(x * k + 0.5) / k);
+}
+
 function pRynku(kurs: number): number {
   return Math.min(Math.max((1.0 / kurs) * (1.0 - MARZA_RYNKU), 1e-6), 1.0 - 1e-6);
 }
@@ -112,10 +120,12 @@ function pSkladania(l: LegPool, wagi?: Record<string, number>): number {
   return Math.exp(w * Math.log(l.p_model) + (1.0 - w) * Math.log(pRynku(l.kurs)));
 }
 
-function legValue(l: LegPool, wagi?: Record<string, number>): number {
+function legValue(l: LegPool, pSel: number): number {
   // no-vig UK (niezależne) wprost; przewaga deklarowana przez model liczona
-  // z UREALNIONEJ szansy — jak kupony.py:_leg_value
-  const ev = l.ev_uk ?? (pSkladania(l, wagi) * l.kurs - 1.0) * 100.0;
+  // z UREALNIONEJ szansy — jak kupony.py:_leg_value. pSel podaje wywołujący
+  // (policzone raz i cache'owane — transcendentne funkcje w komparatorach
+  // sortowania kładły płynność UI przy dużej puli sezonu ligowego)
+  const ev = l.ev_uk ?? (pSel * l.kurs - 1.0) * 100.0;
   return Math.max(0, Math.min(ev ?? 0, 30));
 }
 
@@ -142,7 +152,7 @@ function scoreSelekcji(
   legi: LegPool[],
   wagaValue: number,
   kary: Kary,
-  wagi?: Record<string, number>,
+  valOf: (l: LegPool) => number,
 ): number {
   let s = pRaw * karaKoszyka(legi, kary);
   const rodz = new Map<string, number>();
@@ -154,17 +164,17 @@ function scoreSelekcji(
   for (const c of rodz.values()) nadmiar += Math.max(0, c - 2);
   s *= DYWERSYFIKACJA ** nadmiar;
   if (wagaValue > 0 && legi.length) {
-    const srEv = legi.reduce((a, l) => a + legValue(l, wagi), 0) / legi.length;
+    const srEv = legi.reduce((a, l) => a + valOf(l), 0) / legi.length;
     s *= 1 + (wagaValue * srEv) / 100;
   }
   return s;
 }
 
-function qLega(b: LegPool, profil: Profil, wagi?: Record<string, number>): number {
+function qLega(b: LegPool, profil: Profil, pSel: number, val: number): number {
   // jakość z UREALNIONEJ szansy (nie surowego p_model) — jak kupony.py:_q
-  let q = Math.log(pSkladania(b, wagi)) / Math.log(b.kurs);
+  let q = Math.log(pSel) / Math.log(b.kurs);
   if (profil === "bezpieczny") return q;
-  const v = legValue(b, wagi);
+  const v = val;
   if (v > 0) q *= 1 - v * WAGA_VALUE_Q[profil];
   if (b.miekka_linia) q *= BONUS_MIEKKA[profil];
   if (b.matchup) q *= BONUS_MATCHUP[profil];
@@ -194,7 +204,6 @@ export interface KuponWynik {
   fair_kurs: number;
   ev_pct: number;
   cel_label: string;
-  strona: Strona;
   legi: LegPool[];
   /** indeks (w `legi`, po sortowaniu do wyświetlenia) lega o najniższej szansie */
   najslabszy_idx?: number;
@@ -260,7 +269,12 @@ export function zakresOsiagalny(
   minLegi: number,
   maxLegi: number,
   maxNaMecz: number,
+  profil: Profil = "zbalansowany",
 ): { min: number; max: number; maxN: number } | null {
+  // ten sam limit legów ryzykownych co beam search — bez niego oszacowanie
+  // górne obiecywało kursy, których dobór nigdy nie osiągnie (drogie legi
+  // to zwykle legi ryzykowne)
+  const maxRyzykowne = MAX_RYZYKOWNE[profil];
   const wybierz = (rosnaco: boolean, limit: number): number[] => {
     const posortowane = pool
       .slice()
@@ -268,10 +282,14 @@ export function zakresOsiagalny(
     const podmioty = new Set<number>();
     const naMecz = new Map<number, number>();
     const kursy: number[] = [];
+    let ryzykowne = 0;
     for (const l of posortowane) {
       if (kursy.length >= limit) break;
       if (podmioty.has(l.podmiot_id)) continue;
       if ((naMecz.get(l.mecz_id) ?? 0) >= maxNaMecz) continue;
+      const ryzykowny = l.p_model < PROG_RYZYKA_P;
+      if (ryzykowny && ryzykowne >= maxRyzykowne) continue;
+      if (ryzykowny) ryzykowne += 1;
       podmioty.add(l.podmiot_id);
       naMecz.set(l.mecz_id, (naMecz.get(l.mecz_id) ?? 0) + 1);
       kursy.push(l.kurs);
@@ -331,17 +349,42 @@ export function zlozKupon(
 
   const p = bezUsunietych.filter((b) => b.kurs > 1 && b.p_model > 0 && b.p_model < 1);
   const maxRyzykowne = MAX_RYZYKOWNE[profil];
+
+  // cache przeliczeń per leg: pSkladania/legValue mają log/exp w środku i
+  // były liczone w komparatorach sortowania (2·n·log n wywołań na każdy ruch
+  // suwaka) — przy puli sezonu ligowego kładło to płynność podglądu na żywo
+  const pSelCache = new Map<LegPool, number>();
+  const pSelOf = (l: LegPool): number => {
+    let v = pSelCache.get(l);
+    if (v === undefined) {
+      v = pSkladania(l, wagi);
+      pSelCache.set(l, v);
+    }
+    return v;
+  };
+  const valCache = new Map<LegPool, number>();
+  const valOf = (l: LegPool): number => {
+    let v = valCache.get(l);
+    if (v === undefined) {
+      v = legValue(l, pSelOf(l));
+      valCache.set(l, v);
+    }
+    return v;
+  };
+
   const cands = pulaEfektywna(bezUsunietych, profil)
     .filter((b) => !pinIds.has(b.podmiot_id))
-    .sort((a, b) => qLega(b, profil, wagi) - qLega(a, profil, wagi))
-    .slice(0, MAX_KANDYDATOW);
+    .map((b) => ({ b, q: qLega(b, profil, pSelOf(b), valOf(b)) }))
+    .sort((x, y) => y.q - x.q)
+    .slice(0, MAX_KANDYDATOW)
+    .map((o) => o.b);
 
   // stan wiązki: p = iloczyn UREALNIONYCH szans (selekcja); wyświetlana
   // szansa kuponu i tak liczy się z p_model legów w buildBase.
   // Start NIE od pustego stanu, tylko od przypiętych typów usera.
   let beam: St[] = [{
     kurs: przypiete.reduce((a, l) => a * l.kurs, 1),
-    p: przypiete.reduce((a, l) => a * pSkladania(l, wagi), 1),
+    p: przypiete.reduce((a, l) => a * pSelOf(l), 1),
     legi: [...przypiete],
   }];
   const komplety: St[] = [];
@@ -352,7 +395,7 @@ export function zlozKupon(
   for (const b of cands) {
     const ryzykowny = b.p_model < PROG_RYZYKA_P;
     const nowe: St[] = [];
-    const pSelB = pSkladania(b, wagi);
+    const pSelB = pSelOf(b);
     for (const st of beam) {
       if (st.legi.length >= maxLegi) continue;
       if (st.legi.some((l) => l.podmiot_id === b.podmiot_id)) continue;
@@ -383,8 +426,8 @@ export function zlozKupon(
     const perDl = new Map<number, number>();
     beam = beam
       .map((st) => {
-        const sc = scoreSelekcji(st.p, st.legi, wagaSel, kary, wagi);
-        const tier = `${st.legi.length}|${st.kurs.toFixed(4)}|${sc.toFixed(8)}`;
+        const sc = scoreSelekcji(st.p, st.legi, wagaSel, kary, valOf);
+        const tier = `${st.legi.length}|${zaokr(st.kurs, 4)}|${zaokr(sc, 8)}`;
         const ident = st.legi.map((l) => l.podmiot_id).sort((x, y) => x - y).join(",");
         return { st, sc, tier, ident };
       })
@@ -413,22 +456,25 @@ export function zlozKupon(
   }
   if (!komplety.length) return null;
 
-  komplety.sort((a, b) => {
-    const sb = scoreSelekcji(b.p, b.legi, wagaSel, kary, wagi);
-    const sa = scoreSelekcji(a.p, a.legi, wagaSel, kary, wagi);
-    if (sb !== sa) return sb - sa;
+  // score liczony RAZ per komplet (dekoracja), nie w komparatorze
+  const ocenione = komplety.map((st) => ({
+    st,
+    sc: scoreSelekcji(st.p, st.legi, wagaSel, kary, valOf),
+    ident: st.legi.map((l) => l.podmiot_id).sort((x, y) => x - y),
+  }));
+  ocenione.sort((a, b) => {
+    if (b.sc !== a.sc) return b.sc - a.sc;
     // deterministyczny tie-break po zestawie podmiotów — porównanie LICZBOWE
     // element po elemencie (jak Python tuple(sorted(...))), NIE stringowe:
     // "10,11" < "9,20" leksykograficznie, ale (9,20) < (10,11) liczbowo —
     // przy remisie score backend i frontend potrafiły wybrać inny komplet
-    const ka = a.legi.map((l) => l.podmiot_id).sort((x, y) => x - y);
-    const kb = b.legi.map((l) => l.podmiot_id).sort((x, y) => x - y);
-    const n = Math.min(ka.length, kb.length);
+    const n = Math.min(a.ident.length, b.ident.length);
     for (let i = 0; i < n; i++) {
-      if (ka[i] !== kb[i]) return ka[i] - kb[i];
+      if (a.ident[i] !== b.ident[i]) return a.ident[i] - b.ident[i];
     }
-    return ka.length - kb.length;
+    return a.ident.length - b.ident.length;
   });
+  const posortowane = ocenione.map((o) => o.st);
 
   const buildBase = (st: St): KuponWynik => {
     // wyświetlana szansa: iloczyn p_model legów (bez shrinku selekcji)
@@ -450,12 +496,11 @@ export function zlozKupon(
       fair_kurs: Math.round((1 / Math.max(pF, 1e-9)) * 100) / 100,
       ev_pct: Math.round((pF * st.kurs - 1) * 1000) / 10,
       cel_label: `${Math.round(cmin)}–${Math.round(cmax)}`,
-      strona: "powyzej",
       legi: legiSort,
     };
   };
 
-  const best = komplety[0];
+  const best = posortowane[0];
   const wynik = buildBase(best);
   const legi = wynik.legi;
 
@@ -485,26 +530,32 @@ export function zlozKupon(
   legi.forEach((l, i) => {
     if (i !== swapIdx) naMeczRentgen.set(l.mecz_id, (naMeczRentgen.get(l.mecz_id) ?? 0) + 1);
   });
+  // zamiennik wybierany po p CAŁEGO kuponu (z karą korelacji), nie po
+  // najwyższym p_model lega — leg o niższym p_model, ale z innego meczu,
+  // potrafi dać lepszy kupon niż skorelowany pewniak
+  const legiBezWeak = legi.filter((_, i) => i !== swapIdx);
+  const karaBaza = Math.max(karaKoszyka(legi, kary), 1e-9);
   let bestSwap: LegPool | null = null;
+  let bestPPo = wynik.p_model;
   for (const b of p) {
-    if (uzyciRentgen.has(b.podmiot_id) || b.p_model <= weak.p_model) continue;
+    if (uzyciRentgen.has(b.podmiot_id)) continue;
     if ((naMeczRentgen.get(b.mecz_id) ?? 0) >= maxNaMecz) continue;
     const kursPo = kursBez * b.kurs;
     if (!(cmin * 0.8 <= kursPo && kursPo <= cmax)) continue;
-    if (!bestSwap || b.p_model > bestSwap.p_model) bestSwap = b;
+    const pPo =
+      (pBez * b.p_model * karaKoszyka([...legiBezWeak, b], kary)) / karaBaza;
+    if (pPo > bestPPo + 1e-9) {
+      bestPPo = pPo;
+      bestSwap = b;
+    }
   }
   if (bestSwap) {
-    const legiPo = [...legi.filter((_, i) => i !== swapIdx), bestSwap];
-    const pPo = pBez * bestSwap.p_model
-      * karaKoszyka(legiPo, kary) / Math.max(karaKoszyka(legi, kary), 1e-9);
-    if (pPo > wynik.p_model + 1e-9) {
-      wynik.alternatywa = {
-        ...bestSwap,
-        zamiast_idx: swapIdx,
-        kurs_po: Math.round(kursBez * bestSwap.kurs * 100) / 100,
-        p_po: Math.round(pPo * 10000) / 10000,
-      };
-    }
+    wynik.alternatywa = {
+      ...bestSwap,
+      zamiast_idx: swapIdx,
+      kurs_po: Math.round(kursBez * bestSwap.kurs * 100) / 100,
+      p_po: Math.round(bestPPo * 10000) / 10000,
+    };
   }
   }
 
@@ -536,7 +587,7 @@ export function zlozKupon(
   const sygnA = new Set(
     legi.map((l) => `${l.mecz_id}:${l.podmiot_id}:${l.rynek_kod}:${l.linia}`),
   );
-  for (const alt of komplety.slice(1)) {
+  for (const alt of posortowane.slice(1)) {
     const sygnB = new Set(
       alt.legi.map((l) => `${l.mecz_id}:${l.podmiot_id}:${l.rynek_kod}:${l.linia}`),
     );

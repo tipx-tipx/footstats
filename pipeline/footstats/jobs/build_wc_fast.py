@@ -75,6 +75,7 @@ def _rozlicz_i_zapisz(
     conf_mids: set[int] | None = None,
     odrzucone_pomiar: list[dict] | None = None,
     poza_publikacja: list[dict] | None = None,
+    legi_pool: list[dict] | None = None,
 ) -> None:
     """Rozliczanie + zapis wyników. Wywoływane w KAŻDYM cyklu — także gdy
     statshub nie ma propsów (rozliczenia nie mogą czekać na nowe typy).
@@ -91,6 +92,7 @@ def _rozlicz_i_zapisz(
         wyniki = rozliczanie.rozlicz(
             value_bets + (odrzucone_pomiar or []) + (poza_publikacja or []),
             kupony_list, niedostepni, conf_mids=conf_mids,
+            legi_pool=legi_pool,
         )
     except Exception as ex:
         print(f"Rozliczanie pominięte ({ex}) — poprzednie wyniki bez zmian")
@@ -2250,7 +2252,8 @@ def _main_impl():
     # wewnątrz _rozlicz_i_zapisz — kupony.json to aktywne kupony z logu
     _rozlicz_i_zapisz(value_bets, kupony_list, niedostepni,
                       conf_mids=conf_mids, odrzucone_pomiar=odrzucone_pomiar,
-                      poza_publikacja=typy_poza_publikacja)
+                      poza_publikacja=typy_poza_publikacja,
+                      legi_pool=legi_pool_pub)
     _dump("meta.json", {
         "wygenerowano_ts": int(time.time()), "tryb": "ms2026",
         "liga": "Mistrzostwa Świata", "sezon": "2026",

@@ -543,33 +543,34 @@ def _rentgen(
     for i, l in enumerate(legi):
         if i != idx:
             na_mecz[l["mecz_id"]] = na_mecz.get(l["mecz_id"], 0) + 1
+    # zamiennik wybierany po p CAŁEGO kuponu (z karą korelacyjną), nie po
+    # najwyższym p_model lega — leg o niższym p_model, ale z innego meczu,
+    # potrafi dać lepszy kupon niż skorelowany pewniak z tego samego meczu
+    legi_bez = [l for i, l in enumerate(legi) if i != idx]
+    kara_baza = max(_kara_koszyka(legi, kary), 1e-9)
     best = None
+    best_p_po = kupon["p_model"]
     for b in pool:
-        if b["podmiot_id"] in uzyci or b["p_model"] <= slaby["p_model"]:
+        if b["podmiot_id"] in uzyci:
             continue
         if na_mecz.get(b["mecz_id"], 0) >= max_na_mecz:
             continue
         kurs_po = kurs_bez * b["kurs"]
         if not (cmin * 0.8 <= kurs_po <= cmax):
             continue
-        if best is None or b["p_model"] > best["p_model"]:
-            best = b
+        p_po = (
+            p_bez * b["p_model"]
+            * _kara_koszyka(legi_bez + [b], kary) / kara_baza
+        )
+        if p_po > best_p_po + 1e-9:
+            best_p_po, best = p_po, b
     if best is None:
-        return
-    # p kuponu zawiera karę korelacyjną — zamiana lega może ją zmienić
-    # (np. replacement dokłada drugiego lega z meczu, który już ma jeden)
-    legi_po = [l for i, l in enumerate(legi) if i != idx] + [best]
-    p_po = (
-        p_bez * best["p_model"]
-        * _kara_koszyka(legi_po, kary) / max(_kara_koszyka(legi, kary), 1e-9)
-    )
-    if p_po <= kupon["p_model"] + 1e-9:
         return
     kupon["alternatywa"] = {
         **_leg_dict(best),
         "zamiast_idx": idx,
         "kurs_po": _zaokr(kurs_bez * best["kurs"], 2),
-        "p_po": _zaokr(p_po, 4),
+        "p_po": _zaokr(best_p_po, 4),
     }
 
 

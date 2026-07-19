@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   CountUpKurs,
@@ -9,6 +9,8 @@ import {
   LegWpada,
   PasekSzansy,
 } from "./KuponAnim";
+import { Segmented } from "./Segmented";
+import { useStawka } from "./useStawka";
 import { fmtDataCzas, fmtEV, fmtKurs, fmtLinia, fmtProc } from "@/lib/format";
 import {
   KARY_DEFAULT,
@@ -38,7 +40,8 @@ const PROFILE: { kod: Profil; label: string; opis: string }[] = [
   },
 ];
 
-const STAWKA = 10; // do „z 10 zł robi się X zł"
+// zapas na obstawienie — jak pipeline (kupony.py: MARGINES_STARTU_S)
+const MARGINES_STARTU_S = 15 * 60;
 
 function odmienTyp(n: number): string {
   return n === 1 ? "typ" : n < 5 ? "typy" : "typów";
@@ -78,10 +81,19 @@ export function GeneratorKuponu({
   /** gdy podany — generator ograniczony do jednego meczu (wersja na stronie meczu) */
   meczId?: number;
 }) {
-  const bazowa = useMemo(
-    () => (meczId != null ? pool.filter((l) => l.mecz_id === meczId) : pool),
-    [pool, meczId],
-  );
+  // odcięcie startu jak backend (kupony.py: MARGINES_STARTU_S) — bez tego
+  // dało się złożyć (i wysłać do nauki) kupon z meczem już trwającym;
+  // znacznik czasu w stanie, żeby nie liczyć Date.now() w renderze
+  const [teraz, setTeraz] = useState<number | null>(null);
+  useEffect(() => {
+    setTeraz(Math.floor(Date.now() / 1000));
+  }, []);
+  const bazowa = useMemo(() => {
+    const zrodlo =
+      meczId != null ? pool.filter((l) => l.mecz_id === meczId) : pool;
+    if (teraz == null) return zrodlo;
+    return zrodlo.filter((l) => l.kickoff_ts > teraz + MARGINES_STARTU_S);
+  }, [pool, meczId, teraz]);
   const mecze = useMemo(() => {
     const m = new Map<number, { label: string; ts: number }>();
     for (const l of bazowa) {
@@ -105,6 +117,129 @@ export function GeneratorKuponu({
   // przypięcie/usunięcie typu przelicza kupon na oczach usera
   const [pokazany, setPokazany] = useState(false);
   const [nauka, setNauka] = useState<"idle" | "wysylanie" | "ok" | "blad">("idle");
+  const [stawka, setStawka] = useStawka();
+  // komunikat mostu ze sceny (ile typów kuponu udało się przypiąć)
+  const [mostInfo, setMostInfo] = useState<string | null>(null);
+
+  // pamięć ustawień (tylko pełna wersja na /kupony) — generator bez amnezji
+  useEffect(() => {
+    if (meczId != null) return;
+    try {
+      const u = JSON.parse(
+        localStorage.getItem("footstats.generator.v1") ?? "null",
+      );
+      if (!u) return;
+      if (typeof u.kursCel === "number")
+        setKursCel(Math.min(30, Math.max(3, u.kursCel)));
+      if (typeof u.liczbaTypow === "number")
+        setLiczbaTypow(Math.min(8, Math.max(2, u.liczbaTypow)));
+      if (typeof u.trybDokladny === "boolean") setTrybDokladny(u.trybDokladny);
+      if (
+        u.profil === "bezpieczny" ||
+        u.profil === "zbalansowany" ||
+        u.profil === "agresywny"
+      )
+        setProfil(u.profil);
+      if (typeof u.tylkoValue === "boolean") setTylkoValue(u.tylkoValue);
+      if (typeof u.maxJedenZMeczu === "boolean")
+        setMaxJedenZMeczu(u.maxJedenZMeczu);
+    } catch {
+      /* uszkodzony wpis — zostają domyślne */
+    }
+    // mądry start: konsola nie może otwierać się w stanie „nie da się
+    // złożyć" — jeśli zapamiętany/domyślny cel jest poza zasięgiem puli,
+    // dosuwamy go do osiągalnych widełek
+    try {
+      const u = JSON.parse(
+        localStorage.getItem("footstats.generator.v1") ?? "null",
+      );
+      const cel: number =
+        typeof u?.kursCel === "number"
+          ? Math.min(30, Math.max(3, u.kursCel))
+          : 10;
+      const prof =
+        u?.profil === "bezpieczny" || u?.profil === "agresywny"
+          ? u.profil
+          : "zbalansowany";
+      const zakres = zakresOsiagalny(pulaEfektywna(bazowa, prof), 2, 12, 4, prof);
+      if (!zakres) return;
+      if (cel * 0.85 > zakres.max) {
+        setKursCel(
+          Math.min(30, Math.max(3, Math.round(zakres.max * 0.95 * 2) / 2)),
+        );
+      } else if (cel * 1.18 < zakres.min) {
+        setKursCel(
+          Math.min(30, Math.max(3, Math.round(zakres.min * 1.1 * 2) / 2)),
+        );
+      }
+    } catch {
+      /* bez dopasowania */
+    }
+  }, [meczId, bazowa]);
+  useEffect(() => {
+    if (meczId != null) return;
+    localStorage.setItem(
+      "footstats.generator.v1",
+      JSON.stringify({
+        kursCel,
+        liczbaTypow,
+        trybDokladny,
+        profil,
+        tylkoValue,
+        maxJedenZMeczu,
+      }),
+    );
+  }, [meczId, kursCel, liczbaTypow, trybDokladny, profil, tylkoValue, maxJedenZMeczu]);
+
+  // most ze sceny („zmień coś w tym kuponie"): przypnij typy kuponu modelu,
+  // ustaw cel na jego kurs i od razu pokaż wynik — dalej edytuje się tu
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const det = (e as CustomEvent).detail as
+        | {
+            legi?: {
+              mecz_id: number;
+              podmiot: string;
+              rynek: string;
+              linia: number;
+              strona: string;
+            }[];
+            cel?: number;
+          }
+        | undefined;
+      if (!det?.legi?.length) return;
+      const szukane = det.legi;
+      const legi = bazowa.filter((l) =>
+        szukane.some(
+          (s) =>
+            s.mecz_id === l.mecz_id &&
+            s.podmiot === l.podmiot &&
+            s.rynek === l.rynek &&
+            s.strona === l.strona &&
+            Math.abs(s.linia - l.linia) < 0.01,
+        ),
+      );
+      // pula żyje (Superbet zmienia ofertę), kupon jest zamrożony — więc
+      // przypinamy co się da i mówimy wprost, ile typów już nie ma w puli
+      setPrzypiete(new Map(legi.map((l) => [legKey(l), l])));
+      setWykluczone(new Map());
+      setWybrane(new Set());
+      setTrybDokladny(false);
+      setLiczbaTypow(Math.min(8, Math.max(2, szukane.length)));
+      if (det.cel)
+        setKursCel(Math.min(30, Math.max(3, Math.round(det.cel * 2) / 2)));
+      setPokazany(true);
+      setMostInfo(
+        legi.length === szukane.length
+          ? `Przypięliśmy wszystkie ${legi.length} typy tego kuponu. Usuń albo dodaj, co chcesz — resztę dobierze model.`
+          : legi.length > 0
+            ? `Przypięliśmy ${legi.length} z ${szukane.length} typów tego kuponu. Reszty nie ma już w aktualnej puli (oferta bukmachera się zmieniła), model dobierze zastępstwa.`
+            : `Typów tego kuponu nie ma już w aktualnej puli (oferta bukmachera się zmieniła). Składamy podobny kupon od nowa przy kursie ×${det.cel ? fmtKurs(det.cel) : ""}.`,
+      );
+    };
+    window.addEventListener("footstats:kupon-edytuj", handler);
+    return () => window.removeEventListener("footstats:kupon-edytuj", handler);
+  }, [bazowa]);
 
   // pula po filtrach meczów/value — bez tego podgląd liczyłby się na całej puli
   const pulaFiltrowana = useMemo(() => {
@@ -175,6 +310,7 @@ export function GeneratorKuponu({
       Math.max(liczbaTypow - piny.length, 0),
       gornyLimit - piny.length,
       maxNaMecz,
+      profil,
     );
     const dopisekProfil =
       profil !== "agresywny" && efektywna.length < dostepna.length
@@ -201,6 +337,37 @@ export function GeneratorKuponu({
   const odrzuc = () => {
     setPokazany(false);
     setNauka("idle");
+  };
+
+  // ratunek ze stanu „nie da się złożyć": dosuń kurs docelowy do widełek
+  // osiągalnych przy OBECNYCH ograniczeniach (piny, wykluczenia, profil)
+  const dopasujKurs = () => {
+    const maxNaMecz = opcje.maxNaMecz ?? 4;
+    const gornyLimit = trybDokladny ? liczbaTypow : 12;
+    const piny = [...przypiete.values()];
+    const pinIds = new Set(piny.map((l) => l.podmiot_id));
+    const kursPin = piny.reduce((a, l) => a * l.kurs, 1);
+    const dostepna = pulaFiltrowana.filter(
+      (l) => !wykluczone.has(legKey(l)) && !pinIds.has(l.podmiot_id),
+    );
+    const zakres = zakresOsiagalny(
+      pulaEfektywna(dostepna, profil),
+      Math.max(liczbaTypow - piny.length, 0),
+      gornyLimit - piny.length,
+      maxNaMecz,
+      profil,
+    );
+    if (!zakres) return;
+    const min = zakres.min * kursPin;
+    const max = zakres.max * kursPin;
+    const cel = Math.min(Math.max(kursCel, min * 1.05), max * 0.95);
+    setKursCel(
+      Math.min(
+        meczId != null ? 12 : 30,
+        Math.max(meczId != null ? 2 : 3, Math.round(cel * 2) / 2),
+      ),
+    );
+    setPokazany(false);
   };
 
   const uczModel = async (k: KuponWynik) => {
@@ -299,216 +466,363 @@ export function GeneratorKuponu({
   }
 
   return (
-    <div className="rounded-(--radius-card) border border-hairline bg-card p-4 shadow-(--shadow-card) sm:p-5">
+    <div className="overflow-hidden rounded-(--radius-card) border border-hairline bg-card shadow-(--shadow-card)">
+      <div className="grid lg:grid-cols-[1.3fr_1fr]">
+      {/* KONSOLA — sterowanie krok po kroku */}
+      <div className="p-4 sm:p-5 [&>*+*]:mt-5 [&>*+*]:border-t [&>*+*]:border-hairline [&>*+*]:pt-5">
+      {mostInfo && (
+        <p className="flex items-start justify-between gap-3 rounded-(--radius-control) border border-brand/25 bg-brand-wash/50 px-3 py-2.5 text-xs leading-relaxed text-brand-deep">
+          {mostInfo}
+          <button
+            onClick={() => setMostInfo(null)}
+            className="shrink-0 text-brand-deep/60 transition-colors hover:text-brand-deep"
+            aria-label="zamknij"
+          >
+            ✕
+          </button>
+        </p>
+      )}
       {/* wybór meczów — tylko w wersji pełnej (/kupony) */}
       {meczId == null && (
-        <div className="mb-4">
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-[11px] font-medium uppercase tracking-wide text-faint">
-              mecze {wybrane.size > 0 ? `(${wybrane.size} wybrane)` : "(wszystkie)"}
-            </span>
-            {wybrane.size > 0 && (
+        <div>
+          <div className="flex items-baseline justify-between gap-2">
+            <p className="flex items-baseline gap-2 text-[11px] font-semibold uppercase tracking-wide text-ink-soft">
+              <span aria-hidden className="font-data text-[10px] text-brand/70">01</span>
+              mecze
+            </p>
+            {wybrane.size > 0 ? (
               <button
                 onClick={() => { setWybrane(new Set()); setPokazany(false); }}
                 className="text-xs text-brand hover:underline"
               >
-                wyczyść
+                wyczyść ({wybrane.size})
               </button>
+            ) : (
+              <span className="text-[10px] text-faint">wszystkie</span>
             )}
           </div>
-          <div className="flex flex-wrap gap-1.5">
-            {mecze.map(([id, { label, ts }]) => (
-              <button
-                key={id}
-                onClick={() => toggleMecz(id)}
-                title={fmtDataCzas(ts)}
-                className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
-                  wybrane.has(id)
-                    ? "border-brand bg-brand text-on-brand shadow-(--shadow-card)"
-                    : "border-hairline bg-card-soft text-muted hover:border-hairline-strong hover:text-ink"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {mecze.map(([id, { label, ts }]) => {
+              const on = wybrane.has(id);
+              return (
+                <button
+                  key={id}
+                  onClick={() => toggleMecz(id)}
+                  title={fmtDataCzas(ts)}
+                  aria-pressed={on}
+                  className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs transition-colors ${
+                    on
+                      ? "border-brand/50 bg-brand-wash font-semibold text-brand-deep"
+                      : "border-hairline bg-card-soft font-medium text-muted hover:border-hairline-strong hover:text-ink"
+                  }`}
+                >
+                  {on && (
+                    <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-brand" />
+                  )}
+                  {label}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
 
-      {/* kurs docelowy + liczba typów */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        <label className="block">
-          <span className="mb-1 flex items-baseline justify-between text-[11px] font-medium uppercase tracking-wide text-faint">
-            <span>kurs docelowy</span>
-            <span className="font-data text-sm font-semibold text-ink">
-              ×{fmtKurs(kursCel)}
+      {/* cel: kurs docelowy z dużym odczytem */}
+      <div>
+        <div className="flex items-baseline justify-between gap-2">
+          <p className="flex items-baseline gap-2 text-[11px] font-semibold uppercase tracking-wide text-ink-soft">
+            <span aria-hidden className="font-data text-[10px] text-brand/70">
+              {meczId == null ? "02" : "01"}
             </span>
+            kurs docelowy
+          </p>
+          <p className="font-data text-xl font-bold leading-none text-ink">
+            ×{fmtKurs(kursCel)}
+          </p>
+        </div>
+        <input
+          type="range"
+          min={meczId != null ? 2 : 3}
+          max={meczId != null ? 12 : 30}
+          step={0.5}
+          value={kursCel}
+          onChange={(e) => { setKursCel(Number(e.target.value)); setPokazany(false); }}
+          aria-label="Kurs docelowy"
+          className="suwak mt-3 w-full cursor-pointer"
+          style={{
+            "--p": `${(((kursCel - (meczId != null ? 2 : 3)) / ((meczId != null ? 12 : 30) - (meczId != null ? 2 : 3))) * 100).toFixed(1)}%`,
+          } as React.CSSProperties}
+        />
+        <p className="mt-1.5 text-[10px] text-faint">
+          składamy w przedziale{" "}
+          <span className="font-data">
+            ×{fmtKurs(kursCel * 0.85)}–{fmtKurs(kursCel * 1.18)}
           </span>
-          <input
-            type="range"
-            min={meczId != null ? 2 : 3}
-            max={meczId != null ? 12 : 30}
-            step={0.5}
-            value={kursCel}
-            onChange={(e) => { setKursCel(Number(e.target.value)); setPokazany(false); }}
-            className="h-8 w-full cursor-pointer accent-brand"
-          />
-          <span className="text-[10px] text-faint">
-            składamy w przedziale ×{fmtKurs(kursCel * 0.85)}–{fmtKurs(kursCel * 1.18)}
-          </span>
-        </label>
-        <label className="block">
-          <span className="mb-1 flex items-baseline justify-between text-[11px] font-medium uppercase tracking-wide text-faint">
-            <span>{trybDokladny ? "dokładnie typów" : "co najmniej typów"}</span>
-            <span className="font-data text-sm font-semibold text-ink">{liczbaTypow}</span>
-          </span>
-          <input
-            type="range"
-            min={2}
-            max={8}
-            step={1}
-            value={liczbaTypow}
-            onChange={(e) => { setLiczbaTypow(Number(e.target.value)); setPokazany(false); }}
-            className="h-8 w-full cursor-pointer accent-brand"
-          />
-          <div className="mt-1 flex items-center justify-between gap-2">
-            <span className="text-[10px] text-faint">
-              {trybDokladny
-                ? "kupon będzie miał dokładnie tyle typów"
-                : "model może dołożyć więcej, jeśli to podnosi szansę"}
-            </span>
-            <button
-              onClick={() => { setTrybDokladny((v) => !v); setPokazany(false); }}
-              className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium transition-colors ${
-                trybDokladny
-                  ? "border-brand/40 bg-brand-wash text-brand-deep"
-                  : "border-hairline bg-card-soft text-faint hover:text-ink"
-              }`}
-              title="Przełącz między 'co najmniej N' a 'dokładnie N' typów"
-            >
-              {trybDokladny ? "✓ dokładnie" : "co najmniej"}
-            </button>
-          </div>
-        </label>
+        </p>
       </div>
 
-      {/* profil */}
-      <div className="mt-4">
-        <span className="mb-2 block text-[11px] font-medium uppercase tracking-wide text-faint">
-          charakter kuponu
-        </span>
-        <div className="inline-flex max-w-full flex-wrap rounded-(--radius-control) border border-hairline bg-paper p-0.5">
-          {PROFILE.map((pr) => (
-            <button
-              key={pr.kod}
-              onClick={() => { setProfil(pr.kod); setPokazany(false); }}
-              title={pr.opis}
-              className={`rounded-lg px-3 py-1.5 text-xs transition-colors ${
-                profil === pr.kod
-                  ? "bg-card font-semibold text-ink shadow-(--shadow-card)"
-                  : "font-medium text-muted hover:text-ink"
-              }`}
-            >
-              {pr.label}
-            </button>
-          ))}
+      {/* liczba typów + tryb */}
+      <div>
+        <div className="flex items-baseline justify-between gap-2">
+          <p className="flex items-baseline gap-2 text-[11px] font-semibold uppercase tracking-wide text-ink-soft">
+            <span aria-hidden className="font-data text-[10px] text-brand/70">
+              {meczId == null ? "03" : "02"}
+            </span>
+            {trybDokladny ? "dokładnie typów" : "co najmniej typów"}
+          </p>
+          <p className="font-data text-xl font-bold leading-none text-ink">
+            {liczbaTypow}
+          </p>
+        </div>
+        <input
+          type="range"
+          min={2}
+          max={8}
+          step={1}
+          value={liczbaTypow}
+          onChange={(e) => { setLiczbaTypow(Number(e.target.value)); setPokazany(false); }}
+          aria-label="Liczba typów"
+          className="suwak mt-3 w-full cursor-pointer"
+          style={{ "--p": `${(((liczbaTypow - 2) / 6) * 100).toFixed(1)}%` } as React.CSSProperties}
+        />
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+          <Segmented
+            id="generator-tryb"
+            opcje={[
+              {
+                kod: "conajmniej",
+                label: "co najmniej",
+                title: "Model może dołożyć więcej typów, jeśli to podnosi szansę",
+              },
+              {
+                kod: "dokladnie",
+                label: "dokładnie",
+                title: "Kupon będzie miał dokładnie tyle typów",
+              },
+            ]}
+            wartosc={trybDokladny ? "dokladnie" : "conajmniej"}
+            onChange={(v) => { setTrybDokladny(v === "dokladnie"); setPokazany(false); }}
+          />
+          <span className="text-[10px] text-faint">
+            {trybDokladny
+              ? "kupon będzie miał dokładnie tyle typów"
+              : "model może dołożyć więcej, jeśli to podnosi szansę"}
+          </span>
         </div>
       </div>
 
-      <div className="mt-3 space-y-2.5">
-        <label
-          className="flex cursor-pointer items-start gap-2 text-xs"
-          title={`Techniczne kryterium: typ z przewagą liczoną na ≥${MIN_LEG_EV}% i maks. 1 typ z meczu`}
-        >
-          <input
-            type="checkbox"
-            checked={tylkoValue}
-            onChange={(e) => { setTylkoValue(e.target.checked); setPokazany(false); }}
-            className="mt-0.5 accent-brand"
+      {/* profil */}
+      <div>
+        <p className="flex items-baseline gap-2 text-[11px] font-semibold uppercase tracking-wide text-ink-soft">
+          <span aria-hidden className="font-data text-[10px] text-brand/70">
+            {meczId == null ? "04" : "03"}
+          </span>
+          charakter kuponu
+        </p>
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+          <Segmented
+            id="generator-profil"
+            opcje={PROFILE.map((pr) => ({
+              kod: pr.kod,
+              label: pr.label,
+              title: pr.opis,
+            }))}
+            wartosc={profil}
+            onChange={(v) => { setProfil(v); setPokazany(false); }}
           />
-          <span>
-            <span className="font-medium text-ink">Tylko pewne typy z przewagą</span>
-            <br />
-            <span className="text-muted">
+          <span className="text-[11px] text-faint">
+            {PROFILE.find((pr) => pr.kod === profil)?.opis}
+          </span>
+        </div>
+      </div>
+
+      {/* bezpieczniki — przełączniki zamiast checkboxów */}
+      <div className="space-y-3">
+        <button
+          role="switch"
+          aria-checked={tylkoValue}
+          onClick={() => { setTylkoValue(!tylkoValue); setPokazany(false); }}
+          title={`Techniczne kryterium: typ z przewagą liczoną na ≥${MIN_LEG_EV}% i maks. 1 typ z meczu`}
+          className="group flex w-full items-start gap-3 text-left"
+        >
+          <span
+            aria-hidden
+            className={`relative mt-0.5 h-5 w-9 shrink-0 rounded-full transition-colors ${
+              tylkoValue ? "bg-brand" : "bg-hairline-strong group-hover:bg-ink/25"
+            }`}
+          >
+            <span
+              className={`absolute top-0.5 h-4 w-4 rounded-full bg-card shadow-(--shadow-card) transition-all ${
+                tylkoValue ? "left-[18px]" : "left-0.5"
+              }`}
+            />
+          </span>
+          <span className="text-xs">
+            <span className="font-medium text-ink">
+              Tylko pewne typy z przewagą
+            </span>
+            <span className="block text-muted">
               Bukmacher płaci za nie więcej, niż powinien. Maks. 1 typ z meczu.
+              Pula jest tu szersza niż w automatycznych kuponach value.
             </span>
           </span>
-        </label>
-        <label
-          className={`flex items-start gap-2 text-xs ${
-            tylkoValue ? "cursor-not-allowed" : "cursor-pointer"
-          }`}
+        </button>
+        <button
+          role="switch"
+          aria-checked={tylkoValue || maxJedenZMeczu}
+          disabled={tylkoValue}
+          onClick={() => { setMaxJedenZMeczu(!maxJedenZMeczu); setPokazany(false); }}
           title="Ogranicza kupon do jednego typu z każdego meczu, niezależnie od opcji powyżej"
+          className="group flex w-full items-start gap-3 text-left disabled:cursor-not-allowed"
         >
-          <input
-            type="checkbox"
-            checked={tylkoValue || maxJedenZMeczu}
-            disabled={tylkoValue}
-            onChange={(e) => { setMaxJedenZMeczu(e.target.checked); setPokazany(false); }}
-            className="mt-0.5 accent-brand"
-          />
-          <span>
+          <span
+            aria-hidden
+            className={`relative mt-0.5 h-5 w-9 shrink-0 rounded-full transition-colors ${
+              tylkoValue || maxJedenZMeczu
+                ? "bg-brand"
+                : "bg-hairline-strong group-hover:bg-ink/25"
+            } ${tylkoValue ? "opacity-40" : ""}`}
+          >
+            <span
+              className={`absolute top-0.5 h-4 w-4 rounded-full bg-card shadow-(--shadow-card) transition-all ${
+                tylkoValue || maxJedenZMeczu ? "left-[18px]" : "left-0.5"
+              }`}
+            />
+          </span>
+          <span className="text-xs">
             <span className={`font-medium ${tylkoValue ? "text-faint" : "text-ink"}`}>
               Nie więcej niż 1 typ z jednego meczu
             </span>
-            <br />
-            <span className={tylkoValue ? "text-faint" : "text-muted"}>
+            <span className={`block ${tylkoValue ? "text-faint" : "text-muted"}`}>
               Typy z tego samego meczu często wygrywają albo przegrywają razem
               {tylkoValue ? " (już włączone powyżej)" : ""}.
             </span>
           </span>
-        </label>
+        </button>
       </div>
 
       {/* własny wybór typów: przypnij z puli — resztę dobiera model */}
-      <details className="mt-3 rounded-(--radius-control) border border-dashed border-hairline">
-        <summary className="flex cursor-pointer list-none items-center gap-1.5 px-3 py-2 text-xs font-medium text-muted transition-colors hover:text-ink [&::-webkit-details-marker]:hidden">
-          <PinIcon className="shrink-0 text-brand" />
-          Chcę konkretne typy w kuponie
-          {przypiete.size > 0 && (
-            <span className="ml-1.5 rounded-full bg-brand-wash px-1.5 py-0.5 text-[10px] font-semibold text-brand-deep">
-              {przypiete.size}
-            </span>
-          )}
+      <details className="group rounded-(--radius-control) border border-dashed border-hairline transition-colors open:border-solid open:bg-card-soft/50">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2.5 text-xs font-medium text-muted transition-colors hover:text-ink [&::-webkit-details-marker]:hidden">
+          <span className="flex items-center gap-1.5">
+            <PinIcon className="shrink-0 text-brand" />
+            Chcę konkretne typy w kuponie
+            {przypiete.size > 0 && (
+              <span className="font-data ml-1 rounded-full bg-brand-wash px-1.5 py-0.5 text-[10px] font-semibold text-brand-deep">
+                {przypiete.size}
+              </span>
+            )}
+          </span>
+          <svg
+            aria-hidden
+            width="12"
+            height="12"
+            viewBox="0 0 14 14"
+            className="shrink-0 text-faint transition-transform group-open:rotate-180"
+          >
+            <path
+              d="M3 5.5 L7 9.5 L11 5.5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
         </summary>
-        <div className="space-y-2.5 px-3 pb-3">
+        <div className="space-y-3 px-3 pb-3">
           <p className="text-[11px] leading-relaxed text-faint">
-            Kliknij typ, żeby na pewno wszedł do kuponu, a resztę dobierze
-            model. Kliknij drugi raz, żeby odpiąć.
+            Kliknij linię, żeby typ na pewno wszedł do kuponu (drugi klik
+            odpina). Kropka przy linii to szansa modelu: zielona pewna,
+            bursztynowa środek, czerwona ryzyko.
           </p>
           {mecze.map(([mid, { label }]) => {
             const typyMeczu = pulaFiltrowana
               .filter((l) => l.mecz_id === mid && !wykluczone.has(legKey(l)))
               .sort((a, b) => b.p_model - a.p_model);
             if (typyMeczu.length === 0) return null;
+            // wiersze zawodnik+rynek, linie jako przełączane pastylki —
+            // czytelniej niż ściana chipów i skaluje się na sezon ligowy
+            const wiersze: {
+              klucz: string;
+              podmiot: string;
+              rynek: string;
+              linie: LegPool[];
+            }[] = [];
+            for (const l of typyMeczu) {
+              const kw = `${l.podmiot_id}-${l.rynek_kod}`;
+              const w = wiersze.find((x) => x.klucz === kw);
+              if (w) w.linie.push(l);
+              else
+                wiersze.push({
+                  klucz: kw,
+                  podmiot: l.podmiot,
+                  rynek: l.rynek,
+                  linie: [l],
+                });
+            }
+            for (const w of wiersze) w.linie.sort((a, b) => a.linia - b.linia);
             return (
               <div key={mid}>
-                <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-faint">
+                <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-ink-soft">
                   {label}
                 </p>
-                <div className="flex flex-wrap gap-1">
-                  {typyMeczu.map((l) => {
-                    const k = legKey(l);
-                    const pin = przypiete.has(k);
-                    return (
-                      <button
-                        key={k}
-                        onClick={() => przypnij(l)}
-                        title={`Szansa ${fmtProc(l.p_model)}${pin ? ". Kliknij, żeby odpiąć" : ""}`}
-                        className={`inline-flex items-center gap-1 rounded-(--radius-control) border px-2 py-1 text-[11px] transition-colors ${
-                          pin
-                            ? "border-brand bg-brand-wash font-medium text-brand-deep"
-                            : "border-hairline bg-card text-muted hover:border-hairline-strong hover:text-ink"
-                        }`}
-                      >
-                        {pin && <PinIcon className="shrink-0" />}
-                        <span>
-                          {l.podmiot} · {l.rynek.toLowerCase()} {fmtLinia(l.linia)}+{" "}
-                          <span className="font-data">@{fmtKurs(l.kurs)}</span>
+                <div className="max-h-72 divide-y divide-hairline/70 overflow-auto rounded-(--radius-control) border border-hairline bg-card">
+                  {wiersze.map((w) => (
+                    <div
+                      key={w.klucz}
+                      className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2"
+                    >
+                      <p className="min-w-0 flex-1 truncate text-xs">
+                        <span className="font-semibold text-ink">
+                          {w.podmiot}
+                        </span>{" "}
+                        <span className="text-muted">
+                          {w.rynek.toLowerCase()}
                         </span>
-                      </button>
-                    );
-                  })}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-1">
+                        {w.linie.map((l) => {
+                          const kx = legKey(l);
+                          const pin = przypiete.has(kx);
+                          const kropka =
+                            l.p_model >= 0.65
+                              ? "bg-data-green"
+                              : l.p_model >= 0.5
+                                ? "bg-data-amber"
+                                : "bg-data-red";
+                          return (
+                            <button
+                              key={kx}
+                              onClick={() => przypnij(l)}
+                              aria-pressed={pin}
+                              title={`Szansa ${fmtProc(l.p_model)}${
+                                pin ? ". Kliknij, żeby odpiąć" : ""
+                              }`}
+                              className={`font-data inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] transition-colors ${
+                                pin
+                                  ? "border-brand bg-brand-wash font-semibold text-brand-deep"
+                                  : "border-hairline bg-card-soft text-ink-soft hover:border-brand/50 hover:text-ink"
+                              }`}
+                            >
+                              {pin ? (
+                                <PinIcon className="shrink-0" />
+                              ) : (
+                                <span
+                                  aria-hidden
+                                  className={`h-1.5 w-1.5 shrink-0 rounded-full ${kropka}`}
+                                />
+                              )}
+                              {fmtLinia(l.linia)}+
+                              <span className={pin ? "" : "text-muted"}>
+                                @{fmtKurs(l.kurs)}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             );
@@ -518,7 +832,7 @@ export function GeneratorKuponu({
 
       {/* podsumowanie wyborów usera — widoczne też, gdy kupon się nie składa */}
       {(przypiete.size > 0 || wykluczone.size > 0) && (
-        <div className="mt-3 space-y-1.5 text-xs">
+        <div className="space-y-1.5 text-xs">
           {przypiete.size > 0 && (
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="text-faint">na pewno w kuponie:</span>
@@ -559,57 +873,123 @@ export function GeneratorKuponu({
         </div>
       )}
 
-      {/* żywy podgląd osiągalności — zanim user w ogóle kliknie */}
-      <p
-        className={`mt-3 rounded-(--radius-control) px-3 py-2 text-xs leading-relaxed ${
-          podglad
-            ? "bg-data-green-wash text-data-green-ink"
-            : "bg-data-amber-wash text-data-amber-ink"
-        }`}
-      >
-        {podglad
-          ? `✓ da się złożyć: kurs ×${fmtKurs(podglad.kurs_laczny)} · szansa ${fmtProc(
-              podglad.p_model,
-            )} · ${podglad.legi.length} ${odmienTyp(podglad.legi.length)}`
-          : `✕ ${podpowiedzBrak}`}
-      </p>
+      </div>
 
-      <button
-        onClick={zloz}
-        disabled={!podglad}
-        className="mt-2.5 w-full rounded-(--radius-control) bg-brand px-4 py-2.5 text-sm font-semibold text-on-brand shadow-(--shadow-card) transition-colors hover:bg-brand-strong disabled:cursor-not-allowed disabled:bg-card-soft disabled:text-faint disabled:shadow-none"
-      >
-        {meczId != null ? "Złóż kupon na ten mecz" : "Złóż kupon"}
-      </button>
+      {/* PODGLĄD NA ŻYWO — prawa kolumna: osiągalność zanim klikniesz */}
+      <div className="flex flex-col border-t border-hairline bg-card-soft/60 p-4 sm:p-5 lg:border-l lg:border-t-0">
+        <p className="font-display flex items-center gap-2 text-[10px] font-semibold uppercase tracking-widest text-brand">
+          <span
+            aria-hidden
+            className={`live-dot h-1.5 w-1.5 rounded-full ${
+              podglad ? "bg-data-green" : "bg-data-amber"
+            }`}
+          />
+          podgląd na żywo
+        </p>
+
+        {podglad ? (
+          <div className="mt-4">
+            <p className="text-[10px] uppercase tracking-wide text-faint">
+              kurs łączny
+            </p>
+            <p className="font-data mt-1 text-[2rem] font-bold leading-none text-ink">
+              ×{fmtKurs(podglad.kurs_laczny)}
+            </p>
+            <dl className="mt-4 space-y-2 border-t border-hairline pt-3 text-xs">
+              <div className="flex items-baseline justify-between gap-2">
+                <dt className="text-faint">szansa modelu</dt>
+                <dd className="font-data font-semibold text-ink">
+                  {fmtProc(podglad.p_model)}
+                </dd>
+              </div>
+              <div className="flex items-baseline justify-between gap-2">
+                <dt className="text-faint">typów w kuponie</dt>
+                <dd className="font-data font-semibold text-ink">
+                  {podglad.legi.length}
+                </dd>
+              </div>
+              <div className="flex items-baseline justify-between gap-2">
+                <dt className="flex items-baseline gap-1.5 text-faint">
+                  z
+                  <input
+                    type="number"
+                    min={1}
+                    step={5}
+                    value={stawka}
+                    onChange={(e) => setStawka(Number(e.target.value))}
+                    aria-label="Twoja stawka w złotych"
+                    title="Twoja stawka. Zapamiętujemy ją dla wszystkich przeliczników"
+                    className="font-data w-14 rounded-(--radius-control) border border-hairline bg-card px-1.5 py-0.5 text-xs text-ink"
+                  />
+                  zł robi się
+                </dt>
+                <dd className="font-data font-semibold text-ink">
+                  {Math.round(podglad.kurs_laczny * stawka)} zł
+                </dd>
+              </div>
+            </dl>
+            <PasekSzansy p={podglad.p_model} className="mt-4" />
+          </div>
+        ) : (
+          <div className="mt-4">
+            <p className="text-sm font-semibold text-ink">
+              Ten zestaw się nie składa
+            </p>
+            <p className="mt-1.5 text-xs leading-relaxed text-muted">
+              {podpowiedzBrak}
+            </p>
+            <button
+              onClick={dopasujKurs}
+              className="mt-3 rounded-(--radius-control) border border-brand/40 bg-brand-wash px-3 py-1.5 text-xs font-semibold text-brand-deep transition-colors hover:bg-brand-wash/70"
+              title="Ustawia kurs docelowy w widełkach osiągalnych z obecnej puli i ustawień"
+            >
+              dopasuj kurs do puli
+            </button>
+          </div>
+        )}
+
+        <button
+          onClick={zloz}
+          disabled={!podglad}
+          className="font-display mt-5 w-full rounded-(--radius-control) bg-brand px-4 py-3 text-sm font-semibold uppercase tracking-wide text-on-brand shadow-(--shadow-card) transition-colors hover:bg-brand-strong disabled:cursor-not-allowed disabled:bg-card disabled:text-faint disabled:shadow-none lg:mt-auto"
+        >
+          {meczId != null ? "Złóż kupon na ten mecz" : "Złóż kupon"}
+        </button>
+      </div>
+      </div>
 
       {/* wynik — karta pokazuje ŻYWY podgląd: usunięcie/przypięcie typu
           przelicza kupon od razu, bez ponownego klikania "Złóż kupon" */}
-      <AnimatePresence mode="wait">
-        {pokazany && !podglad && (
-          <motion.p
-            key="brak"
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className="mt-4 rounded-(--radius-control) border border-data-amber/40 bg-data-amber-wash px-3 py-2.5 text-xs text-data-amber-ink"
-          >
-            {podpowiedzBrak ?? "Nie da się domknąć tego kompletu. Zmień parametry."}
-          </motion.p>
-        )}
-        {pokazany && podglad && (
-          <KuponKarta
-            key="kupon"
-            k={podglad}
-            nauka={nauka}
-            tylkoValue={tylkoValue}
-            przypieteKeys={przypiete}
-            onOdrzuc={odrzuc}
-            onNauka={() => uczModel(podglad)}
-            onPrzypnij={przypnij}
-            onUsun={usunTyp}
-          />
-        )}
-      </AnimatePresence>
+      {pokazany && (
+        <div className="border-t border-hairline px-4 pb-4 sm:px-5">
+          <AnimatePresence mode="wait">
+            {!podglad ? (
+              <motion.p
+                key="brak"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className="mt-4 rounded-(--radius-control) border border-data-amber/40 bg-data-amber-wash px-3 py-2.5 text-xs text-data-amber-ink"
+              >
+                {podpowiedzBrak ?? "Nie da się domknąć tego kompletu. Zmień parametry."}
+              </motion.p>
+            ) : (
+              <KuponKarta
+                key="kupon"
+                k={podglad}
+                nauka={nauka}
+                stawka={stawka}
+                tylkoValue={tylkoValue}
+                przypieteKeys={przypiete}
+                onOdrzuc={odrzuc}
+                onNauka={() => uczModel(podglad)}
+                onPrzypnij={przypnij}
+                onUsun={usunTyp}
+              />
+            )}
+          </AnimatePresence>
+        </div>
+      )}
     </div>
   );
 }
@@ -617,6 +997,7 @@ export function GeneratorKuponu({
 function KuponKarta({
   k,
   nauka,
+  stawka,
   tylkoValue,
   przypieteKeys,
   onOdrzuc,
@@ -626,6 +1007,7 @@ function KuponKarta({
 }: {
   k: KuponWynik;
   nauka: "idle" | "wysylanie" | "ok" | "blad";
+  stawka: number;
   tylkoValue: boolean;
   przypieteKeys: ReadonlyMap<string, LegPool>;
   onOdrzuc: () => void;
@@ -633,7 +1015,7 @@ function KuponKarta({
   onPrzypnij: (l: LegPool) => void;
   onUsun: (l: LegPool) => void;
 }) {
-  const zwrot = (STAWKA * k.kurs_laczny).toFixed(0);
+  const zwrot = (stawka * k.kurs_laczny).toFixed(0);
   // legi grupowane po meczu (jak bet builder)
   const grupy = useMemo(() => {
     const m = new Map<number, { mecz: string; legi: typeof k.legi }>();
@@ -666,7 +1048,7 @@ function KuponKarta({
           />
           <span className="text-sm text-muted">
             szansa <strong className="font-data text-ink">{fmtProc(k.p_model)}</strong>
-            {" · "}z {STAWKA} zł robi się{" "}
+            {" · "}z {stawka} zł robi się{" "}
             <strong className="font-data text-ink">{zwrot} zł</strong>
           </span>
         </div>

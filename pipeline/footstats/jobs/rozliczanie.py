@@ -872,6 +872,12 @@ def _sygnatura_legow(legi: list[dict]) -> frozenset:
     )
 
 
+# capy wariantów kluczy per slot/dzień — bez nich seryjne pomijanie/wymiany
+# rozdymały log (#2/#3/... bez końca) i koszt skanów Jaccard przy publikacji
+MAX_WARIANTOW_DNIA = 10
+MAX_WYMIAN_DNIA = 5
+
+
 def _kupon_do_logu(
     log_kuponow: dict,
     kupony_list: list[dict],
@@ -882,6 +888,7 @@ def _kupon_do_logu(
     wymiany: set[str] | None = None,
     przebudowy: set[str] | None = None,
     conf_mids: set[int] | None = None,
+    legi_pool: list[dict] | None = None,
 ) -> None:
     """Cykl życia kuponu — przemyślany raz, potem ZAMROŻONY.
 
@@ -938,21 +945,29 @@ def _kupon_do_logu(
         r["slot"] for r in log_kuponow.values()
         if not r.get("wynik") and not r.get("pominiety")
     }
-    for rec in log_kuponow.values():
-        if (
-            rec.get("pominiety")
+    # kolejność DETERMINISTYCZNA: przy dwóch kandydatach do tego samego slotu
+    # wraca najdawniej pominięty (potem tie-break po kluczu) — wcześniej
+    # decydowała przypadkowa kolejność iteracji po dict
+    do_przywrocenia = sorted(
+        (
+            rec for rec in log_kuponow.values()
+            if rec.get("pominiety")
             and rec.get("pominiety_przez") == "user"
             and not rec.get("wynik")
             and rec.get("klucz") not in pominiete
             and rec.get("pomin_powod")
             not in ("wymiana lega", "przebudowa po składach")
-            and rec.get("slot") not in zajete_teraz
-        ):
-            rec["pominiety"] = False
-            rec.pop("pominieto_ts", None)
-            rec.pop("pominiety_przez", None)
-            rec.pop("pomin_powod", None)
-            zajete_teraz.add(rec["slot"])
+        ),
+        key=lambda r: (r.get("pominieto_ts") or 0, r.get("klucz") or ""),
+    )
+    for rec in do_przywrocenia:
+        if rec.get("slot") in zajete_teraz:
+            continue
+        rec["pominiety"] = False
+        rec.pop("pominieto_ts", None)
+        rec.pop("pominiety_przez", None)
+        rec.pop("pomin_powod", None)
+        zajete_teraz.add(rec["slot"])
 
     # 1b3) WYMIANA LEGA jednym klikiem: pomiń bieżący kupon i opublikuj
     # w jego slocie wariant z alternatywą rentgena (kurs_po / p_po już
@@ -967,23 +982,53 @@ def _kupon_do_logu(
             continue
         alt = rec["alternatywa"]
         idx = int(alt.get("zamiast_idx") or 0)
-        legi = [dict(l) for i, l in enumerate(rec["legi"]) if i != idx]
-        legi.append({
+        alt_leg = {
             k2: v for k2, v in alt.items()
             if k2 not in ("zamiast_idx", "kurs_po", "p_po")
-        })
+        }
+        kurs_po = float(alt.get("kurs_po") or 0) or None
+        p_po = float(alt.get("p_po") or 0) or None
+        # ŚWIEŻA wycena wymienianego lega z bieżącej puli — alternatywa była
+        # liczona przy publikacji i jej kurs/p potrafią być nieaktualne.
+        # Kara korelacji zależy tylko od zestawu, więc skalowanie zamrożonych
+        # kurs_po/p_po ilorazem świeżych i zamrożonych wartości lega jest
+        # dokładne. Gdy lega nie ma już w ofercie, wymiana jest niewykonalna
+        # i kupon zostaje bez zmian (zamiast pominięcia w ciemno).
+        if legi_pool is not None:
+            fresh = next(
+                (
+                    b for b in legi_pool
+                    if b.get("mecz_id") == alt_leg.get("mecz_id")
+                    and b.get("podmiot_id") == alt_leg.get("podmiot_id")
+                    and b.get("rynek_kod") == alt_leg.get("rynek_kod")
+                    and abs(float(b.get("linia") or 0)
+                            - float(alt_leg.get("linia") or 0)) < 1e-6
+                    and b.get("strona") == alt_leg.get("strona")
+                ),
+                None,
+            )
+            if fresh is None:
+                continue
+            if kurs_po and float(alt_leg.get("kurs") or 0) > 0:
+                kurs_po = kurs_po * float(fresh["kurs"]) / float(alt_leg["kurs"])
+            if p_po and float(alt_leg.get("p_model") or 0) > 0:
+                p_po = p_po * float(fresh["p_model"]) / float(alt_leg["p_model"])
+            alt_leg = {**alt_leg, "kurs": fresh["kurs"],
+                       "p_model": fresh["p_model"]}
+        legi = [dict(l) for i, l in enumerate(rec["legi"]) if i != idx]
+        legi.append(alt_leg)
         legi.sort(key=lambda l: (l["kickoff_ts"], l["mecz_id"], -l["p_model"]))
         if min(l["kickoff_ts"] for l in legi) <= now + 15 * 60:
             continue  # pierwszy mecz za chwilę — za późno na wymianę
-        rec.update(pominiety=True, pominieto_ts=now,
-                   pominiety_przez="user", pomin_powod="wymiana lega")
-        kurs_po = float(alt.get("kurs_po") or 0) or None
-        p_po = float(alt.get("p_po") or 0) or None
         if not kurs_po or not p_po:
-            continue
+            continue  # bez wyceny nie publikujemy — kupon zostaje bez zmian
         klucz_n, n = f"{rec['slot']}:{dzien}#w", 2
         while klucz_n in log_kuponow:
             klucz_n, n = f"{rec['slot']}:{dzien}#w{n}", n + 1
+        if n > MAX_WYMIAN_DNIA + 2:
+            continue  # cap wariantów wymiany na slot/dzień — log nie puchnie
+        rec.update(pominiety=True, pominieto_ts=now,
+                   pominiety_przez="user", pomin_powod="wymiana lega")
         log_kuponow[klucz_n] = {
             **{k2: rec[k2] for k2 in ("cel", "cel_label", "styl", "horyzont")
                if k2 in rec},
@@ -1061,6 +1106,8 @@ def _kupon_do_logu(
         klucz, n = f"{slot}:{dzien}", 2
         while klucz in log_kuponow:
             klucz, n = f"{slot}:{dzien}#{n}", n + 1
+        if n > MAX_WARIANTOW_DNIA + 2:
+            continue  # cap publikacji na slot/dzień — chroni log i skan Jaccard
         log_kuponow[klucz] = {
             **k, "slot": slot, "klucz": klucz, "dzien": dzien,
             "opublikowano_ts": now, "wynik": None,
@@ -1193,6 +1240,7 @@ def rozlicz(
     kupony_list: list[dict] | None = None,
     niedostepni: set[int] | None = None,
     conf_mids: set[int] | None = None,
+    legi_pool: list[dict] | None = None,
 ) -> dict:
     """Dopisz nowe typy do logu, rozlicz zakończone, zwróć podsumowanie."""
     log = _migruj_log(supa.get_key("typy_log") or {})
@@ -1429,7 +1477,8 @@ def rozlicz(
         supa.put_key("kupony_przebudowa", przebudowy)
     _kupon_do_logu(log_kuponow, kupony_list or [], now, niedostepni,
                    set(pominiete), powody=powody, wymiany=set(wymiany),
-                   przebudowy=set(przebudowy), conf_mids=conf_mids)
+                   przebudowy=set(przebudowy), conf_mids=conf_mids,
+                   legi_pool=legi_pool)
     kupony_hist = _rozlicz_kupony(log_kuponow, log, now)
     # ROI kuponów per horyzont (stawka 1 j./kupon; pominięte = niezagrane,
     # nie wchodzą) — liczone z PEŁNEGO logu przed przycinaniem
