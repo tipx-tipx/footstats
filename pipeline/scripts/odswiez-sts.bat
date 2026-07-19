@@ -7,5 +7,5 @@ cd /d "%~dp0.."
 echo == Odswiezam kursy value STS (STS vs Superbet + model) i wysylam do apki... ==
 python -m footstats.jobs.sts_value --dni 3 --max-mecze 40 --rownolegle 10 --do-supabase --bez-pliku
 echo.
-echo Gotowe. Swieze STS-y sa w apce (zakladka Sugestie STS).
+echo Gotowe. Swieze value bety STS sa w apce (zakladka Value Bety).
 pause

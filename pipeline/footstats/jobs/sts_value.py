@@ -109,6 +109,7 @@ def build_common_matches(days_ahead: int, druzyna: str | None) -> list[dict]:
     seen: set[frozenset] = set()
     now = int(time.time())
     horizon = now + days_ahead * 86400
+    rozpoczete = 0
     for ev in sb_events:
         name = ev.get("matchName") or ""
         parts = [p.strip() for p in name.split("·")]
@@ -128,12 +129,21 @@ def build_common_matches(days_ahead: int, druzyna: str | None) -> list[dict]:
             ts = 0
         if ts and ts > horizon:
             continue
+        # mecz już trwa albo się skończył (lub brak czasu startu): kursy STS
+        # są wtedy LIVE, a Superbet/model przedmeczowe — porównanie daje
+        # fałszywe "value" (np. x3 na kursie live przy 2:0). Apka i tak
+        # chowa alerty rozpoczętych meczów, więc skan to strata ~14 s/mecz.
+        if not ts or ts <= now:
+            rozpoczete += 1
+            continue
         seen.add(pair)
         common.append({
             "pair": pair, "fid": sts_by_pair[pair], "sb_event": ev,
             "home": home, "away": away, "ts": ts,
         })
     common.sort(key=lambda m: m["ts"] or 1 << 62)
+    if rozpoczete:
+        print(f"  pominięte mecze już rozpoczęte/bez czasu startu: {rozpoczete}")
     return common
 
 
