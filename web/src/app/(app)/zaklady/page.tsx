@@ -1,9 +1,19 @@
 import { BetTracker } from "@/components/BetTracker";
+import { MojeKupony } from "@/components/MojeKupony";
 import { PageHeader } from "@/components/PageHeader";
+import { getTypyWyniki } from "@/lib/data";
 
 export const metadata = { title: "Moje zakłady – FootStats" };
 
-export default function ZakladyPage() {
+export default async function ZakladyPage() {
+  // historia kuponów z pipeline'u — zagrane kupony rozliczają się z niej
+  // same (po kluczu), bez ręcznego ustawiania wyniku
+  const typy = await getTypyWyniki();
+  const historia = [
+    ...(typy.kupony ?? []),
+    ...(typy.kupony_wygrane ?? []),
+  ];
+
   return (
     <div>
       <PageHeader
@@ -19,6 +29,7 @@ export default function ZakladyPage() {
           </>
         }
       />
+      <MojeKupony historia={historia} />
       <BetTracker />
     </div>
   );
