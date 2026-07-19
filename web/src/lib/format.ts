@@ -27,6 +27,14 @@ export function fmtU(v: number): string {
   return `${v > 0 ? "+" : ""}${s === "" || s === "-" ? "0" : s}u`;
 }
 
+/**
+ * Teksty z pipeline miewają kropkę dziesiętną ("Średnio 2.80") — na widoku
+ * zamieniamy ją na przecinek. Tylko między cyframi, reszta tekstu nietknięta.
+ */
+export function fmtOpisLiczby(s: string): string {
+  return s.replace(/(\d)\.(\d)/g, "$1,$2");
+}
+
 export function fmtDataCzas(ts: number): string {
   return new Date(ts * 1000).toLocaleDateString("pl-PL", {
     day: "numeric",

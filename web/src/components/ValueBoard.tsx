@@ -309,7 +309,7 @@ export function ValueBoard({
               )}
               {swiezosc && swiezosc.minuty >= STS_STALE_MIN && (
                 <div className="mb-4 rounded-(--radius-control) border border-data-amber/30 bg-data-amber-wash px-3 py-2 text-xs leading-relaxed text-data-amber-ink">
-                  Ten skan ma już {swiezosc.label} — kursy STS bywają ulotne i mogły się
+                  Ten skan ma już {swiezosc.label}. Kursy STS bywają ulotne i mogły się
                   ruszyć. Odśwież skan STS (klik na PC), żeby złapać aktualne linie.
                 </div>
               )}

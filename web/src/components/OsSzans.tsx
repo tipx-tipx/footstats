@@ -2,6 +2,8 @@
 
 import { motion, useReducedMotion } from "framer-motion";
 
+import { useSzerokosc } from "@/lib/useSzerokosc";
+
 /**
  * OsSzans — jedna oś wyceny 0–100% dla rozwinięcia karty typu.
  *
@@ -11,9 +13,12 @@ import { motion, useReducedMotion } from "framer-motion";
  * środkiem. Dzięki temu ta sama informacja czyta się w jednym spojrzeniu,
  * bez skakania między wykresem a legendą.
  *
- * Etykiety dolne rozsuwamy algorytmicznie (realne dane potrafią zejść się
- * na 1–2 pp), etykietę górną gasimy przy kolizji z etykietą przewagi —
- * znacznik zostaje, liczby ratuje tooltip.
+ * Kolizje etykiet liczymy w pikselach na zmierzonej szerokości toru
+ * (procentowy odstęp zawodził na mobile: 13% z ~350 px to mniej niż
+ * szerokość podpisu). Etykieta odsunięta od znacznika dostaje cienką
+ * nóżkę, żeby liczba nie odklejała się od swojej kreski; etykietę górną
+ * gasimy przy kolizji z etykietą odcinka — znacznik zostaje, liczby
+ * ratuje tooltip.
  */
 
 export type OsZnacznik = {
@@ -42,66 +47,139 @@ const ZNACZNIK_STYL: Record<OsZnacznik["ton"], { kreska: string; duch: boolean }
 /** Pozycja na torze z marginesem, żeby znacznik nie uciekał za krawędź. */
 const pozNaTorze = (p: number) => Math.min(Math.max(p * 100, 2), 98);
 
-/** Rozsuwa pozycje etykiet (%) tak, żeby sąsiadki dzieliło min. minGap pp. */
-function rozsunEtykiety(pozycje: number[], minGap: number): number[] {
+/** Szacunek szerokości etykiety w px: podpis 9 px uppercase, liczba mono 15 px. */
+const szerEtykietyPx = (wartosc: string, podpis: string) =>
+  Math.max(podpis.length * 6.4, wartosc.length * 9.5, 24);
+
+/**
+ * Rozsuwa pozycje etykiet (%) tak, żeby sąsiadki się nie nakładały.
+ * Wymagany odstęp pary liczony z realnych szerokości etykiet i zmierzonej
+ * szerokości toru; przed pomiarem zapasowe 13 pp.
+ */
+function rozsunEtykiety(
+  pozycje: number[],
+  szerokosci: number[],
+  torPx: number,
+): number[] {
+  const gap = (a: number, b: number) =>
+    torPx > 0
+      ? Math.min((((szerokosci[a] + szerokosci[b]) / 2 + 8) / torPx) * 100, 46)
+      : 13;
+  // margines krawędzi z realnej szerokości etykiety — żeby tekst nie
+  // wystawał poza tor (przed pomiarem zapasowe 5 pp)
+  const brzeg = (i: number) =>
+    torPx > 0 ? Math.min(((szerokosci[i] / 2 + 2) / torPx) * 100, 30) : 5;
   const idx = pozycje
-    .map((p, i) => ({ p: Math.min(Math.max(p, 5), 95), i }))
+    .map((p, i) => ({
+      p: Math.min(Math.max(p, brzeg(i)), 100 - brzeg(i)),
+      i,
+    }))
     .sort((a, b) => a.p - b.p);
   for (let k = 1; k < idx.length; k++) {
-    if (idx[k].p - idx[k - 1].p < minGap) idx[k].p = idx[k - 1].p + minGap;
+    const g = gap(idx[k - 1].i, idx[k].i);
+    if (idx[k].p - idx[k - 1].p < g) idx[k].p = idx[k - 1].p + g;
   }
   // gdy ogon wyjechał za prawą krawędź, cofamy całą grupę
-  const nadmiar = idx.length > 0 ? idx[idx.length - 1].p - 95 : 0;
+  const ost = idx[idx.length - 1];
+  const nadmiar = ost ? ost.p - (100 - brzeg(ost.i)) : 0;
   if (nadmiar > 0) {
-    for (const x of idx) x.p = Math.max(5, x.p - nadmiar);
+    for (const x of idx) x.p = Math.max(brzeg(x.i), x.p - nadmiar);
   }
   const wynik = new Array<number>(pozycje.length);
   for (const x of idx) wynik[x.i] = x.p;
   return wynik;
 }
 
+/** Odcinek na torze (przewaga = zielony, przepłata = bursztyn). */
+type Odcinek = { od: number; do: number } | null | undefined;
+
 export function OsSzans({
   znaczniki,
   przewaga,
   przewagaWartosc,
   przewagaPodpis,
+  przeplata,
+  przeplataWartosc,
+  przeplataPodpis,
+  przeplataTytul,
   ariaLabel,
 }: {
   znaczniki: OsZnacznik[];
   /** Podświetlony odcinek przewagi, w szansach 0–1. */
-  przewaga?: { od: number; do: number } | null;
+  przewaga?: Odcinek;
   /** Liczba nad odcinkiem przewagi, np. "+13%". */
   przewagaWartosc?: string;
   /** Podpis nad liczbą przewagi, np. "twoja przewaga". */
   przewagaPodpis?: string;
+  /** Odcinek przepłaty (kurs wycenia wyżej niż model), w szansach 0–1. */
+  przeplata?: Odcinek;
+  /** Liczba nad odcinkiem przepłaty, np. "+8 pp". */
+  przeplataWartosc?: string;
+  /** Podpis nad liczbą przepłaty, np. "przepłata". */
+  przeplataPodpis?: string;
+  /** Pełne wyjaśnienie przepłaty w tooltipie. */
+  przeplataTytul?: string;
   ariaLabel: string;
 }) {
   const reduced = useReducedMotion();
+  const { ref: torRef, w: torPx } = useSzerokosc();
 
-  const seg =
+  const segmenty = [
     przewaga && przewaga.do > przewaga.od
-      ? { od: pozNaTorze(przewaga.od), do: pozNaTorze(przewaga.do) }
-      : null;
-  const segSrodek = seg
-    ? Math.min(Math.max((seg.od + seg.do) / 2, 12), 88)
-    : null;
-  const pokazPrzewage = seg != null && przewagaWartosc != null;
+      ? {
+          id: "przewaga",
+          od: pozNaTorze(przewaga.od),
+          do: pozNaTorze(przewaga.do),
+          wartosc: przewagaWartosc,
+          podpis: przewagaPodpis,
+          tytul: undefined as string | undefined,
+          kolorTor: "bg-data-green/45",
+          kolorTekst: "text-data-green-ink",
+          kolorPodpis: "text-data-green-ink/90",
+        }
+      : null,
+    przeplata && przeplata.do > przeplata.od
+      ? {
+          id: "przeplata",
+          od: pozNaTorze(przeplata.od),
+          do: pozNaTorze(przeplata.do),
+          wartosc: przeplataWartosc,
+          podpis: przeplataPodpis,
+          tytul: przeplataTytul,
+          kolorTor: "bg-data-amber/40",
+          kolorTekst: "text-data-amber-ink",
+          kolorPodpis: "text-data-amber-ink/90",
+        }
+      : null,
+  ].filter((s) => s != null);
 
-  // etykiety dolne: rozsunięte, żeby bliskie wyceny się nie nakładały
+  const etykietySegmentow = segmenty
+    .filter((s) => s.wartosc != null || s.podpis != null)
+    .map((s) => ({
+      ...s,
+      x: Math.min(Math.max((s.od + s.do) / 2, 12), 88),
+      szer: szerEtykietyPx(s.wartosc ?? "", s.podpis ?? ""),
+    }));
+
+  // etykiety dolne: rozsunięte na realnych szerokościach, z nóżką przy odsunięciu
   const dolne = znaczniki.filter((z) => z.etykieta === "dol");
   const dolneX = rozsunEtykiety(
     dolne.map((z) => pozNaTorze(z.p)),
-    13,
+    dolne.map((z) => szerEtykietyPx(z.wartosc, z.podpis)),
+    torPx,
   );
 
-  // etykiety górne: gasną przy kolizji z etykietą przewagi (znacznik zostaje)
+  // etykiety górne: gasną przy kolizji z etykietą odcinka (znacznik zostaje)
   const gorne = znaczniki
     .filter((z) => z.etykieta === "gora")
-    .filter(
-      (z) =>
-        !pokazPrzewage ||
-        segSrodek == null ||
-        Math.abs(pozNaTorze(z.p) - segSrodek) >= 16,
+    .filter((z) =>
+      etykietySegmentow.every((s) => {
+        const wymagany =
+          torPx > 0
+            ? (((szerEtykietyPx(z.wartosc, z.podpis) + s.szer) / 2 + 8) / torPx) * 100
+            : 16;
+        return Math.abs(pozNaTorze(z.p) - s.x) >= wymagany;
+      }),
     );
 
   const wjazd = reduced
@@ -109,28 +187,38 @@ export function OsSzans({
     : { initial: { opacity: 0 } };
 
   return (
-    <div role="img" aria-label={ariaLabel}>
-      {/* nad torem: przewaga jako liczba nad swoim odcinkiem + duchy kontekstu */}
-      {(pokazPrzewage || gorne.length > 0) && (
+    <div role="img" aria-label={ariaLabel} ref={torRef}>
+      {/* nad torem: wartości odcinków nad ich środkiem + duchy kontekstu */}
+      {(etykietySegmentow.length > 0 || gorne.length > 0) && (
         <div className="relative h-9">
-          {pokazPrzewage && (
+          {etykietySegmentow.map((s) => (
             <motion.span
+              key={s.id}
               {...wjazd}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.45, duration: 0.3 }}
+              title={s.tytul}
               className="absolute bottom-0 -translate-x-1/2 text-center leading-none"
-              style={{ left: `${segSrodek}%` }}
+              style={{ left: `${s.x}%` }}
             >
-              {przewagaPodpis && (
-                <span className="block whitespace-nowrap text-[9px] uppercase tracking-wide text-faint">
-                  {przewagaPodpis}
+              {s.podpis && (
+                <span
+                  className={`block whitespace-nowrap text-[9px] uppercase tracking-wide ${
+                    s.wartosc != null ? "text-faint" : s.kolorPodpis
+                  }`}
+                >
+                  {s.podpis}
                 </span>
               )}
-              <span className="font-data mt-0.5 block whitespace-nowrap text-sm font-bold text-data-green-ink">
-                {przewagaWartosc}
-              </span>
+              {s.wartosc != null && (
+                <span
+                  className={`font-data mt-0.5 block whitespace-nowrap text-sm font-bold ${s.kolorTekst}`}
+                >
+                  {s.wartosc}
+                </span>
+              )}
             </motion.span>
-          )}
+          ))}
           {gorne.map((z) => (
             <motion.span
               key={z.id}
@@ -162,16 +250,17 @@ export function OsSzans({
           aria-hidden
           className="absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 rounded-full bg-hairline"
         />
-        {seg && (
+        {segmenty.map((s) => (
           <motion.span
+            key={s.id}
             aria-hidden
             initial={reduced ? false : { width: 0 }}
-            animate={{ width: `${seg.do - seg.od}%` }}
+            animate={{ width: `${s.do - s.od}%` }}
             transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-            className="absolute top-1/2 h-2 -translate-y-1/2 rounded-full bg-data-green/45"
-            style={{ left: `${seg.od}%` }}
+            className={`absolute top-1/2 h-2 -translate-y-1/2 rounded-full ${s.kolorTor}`}
+            style={{ left: `${s.od}%` }}
           />
-        )}
+        ))}
         {/* podziałki: 50% mocniej (rzut monetą), ćwiartki subtelnie */}
         {[25, 50, 75].map((x) => (
           <span
@@ -200,8 +289,36 @@ export function OsSzans({
         })}
       </div>
 
+      {/* nóżki: cienka linia od znacznika do odsuniętej etykiety */}
+      <svg
+        aria-hidden
+        className="block h-2 w-full"
+        viewBox="0 0 100 8"
+        preserveAspectRatio="none"
+      >
+        {dolne.map((z, i) => {
+          const od = pozNaTorze(z.p);
+          if (Math.abs(dolneX[i] - od) < 1.5) return null;
+          return (
+            <motion.line
+              key={z.id}
+              {...wjazd}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.35, duration: 0.3 }}
+              x1={od}
+              y1={0.5}
+              x2={dolneX[i]}
+              y2={7.5}
+              stroke="var(--color-hairline-strong)"
+              strokeWidth={1}
+              vectorEffect="non-scaling-stroke"
+            />
+          );
+        })}
+      </svg>
+
       {/* pod torem: liczby zakotwiczone przy znacznikach */}
-      <div className="relative mt-1 h-10">
+      <div className="relative h-10">
         {dolne.map((z, i) => (
           <motion.span
             key={z.id}

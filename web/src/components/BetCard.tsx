@@ -15,6 +15,7 @@ import {
   fmtKurs,
   fmtLinia,
   fmtMnoznik,
+  fmtOpisLiczby,
   fmtProc,
   PEWNOSC_LABEL,
   STRONA_LABEL,
@@ -147,12 +148,14 @@ function odznakiPrzewagi(bet: ValueBet): {
 }
 
 /**
- * Sygnały rozwinięcia: odznaki przewagi + głos historii + neutralne tło
- * rynku UK. Jedna linia etykiet, opisy dopiero na klik (komponent Sygnaly).
+ * Sygnały rozwinięcia: odznaki przewagi + argumenty pewniaka (pewny występ,
+ * zapas nad linią) + głos historii + neutralne tło rynku UK i ceny. Jedna
+ * linia etykiet, opisy dopiero na klik (komponent Sygnaly).
  */
 function sygnalyTypu(
   bet: ValueBet,
   okna: ReturnType<typeof oknaFormy> | null,
+  forma?: FormaRynku,
 ): Sygnal[] {
   const s: Sygnal[] = odznakiPrzewagi(bet).map((o) => ({
     id: o.label,
@@ -161,6 +164,56 @@ function sygnalyTypu(
     opis: `${o.opis}.`,
     ton: o.tone,
   }));
+  if (bet.pewniak) {
+    // pewny występ — dane siedzą w czynniku „Minuty" (pipeline pisze tam
+    // szansę na pierwszy skład), tu wychodzą na światło jako argument
+    const minuty = bet.uzasadnienie.czynniki.find((c) => c.nazwa === "Minuty");
+    const skladOgloszony = minuty?.opis.includes("pewny występ") ?? false;
+    const pSklad = minuty?.opis.includes("pierwszy skład")
+      ? Number(minuty.opis.match(/(\d+)\s*%/)?.[1] ?? NaN)
+      : NaN;
+    if (skladOgloszony) {
+      s.push({
+        id: "xi",
+        znak: "XI",
+        label: "w wyjściowym składzie",
+        ton: "brand",
+        opis: "Trener ogłosił skład i zawodnik wychodzi w pierwszej jedenastce. Typ nie wisi na decyzji o rotacji.",
+      });
+    } else if (pSklad >= 85) {
+      s.push({
+        id: "xi",
+        znak: "XI",
+        label: "pewny występ",
+        ton: "brand",
+        opis: `Szansa na pierwszy skład: ${pSklad}%${
+          bet.oczekiwane_minuty != null
+            ? `, przewidywane ${Math.round(bet.oczekiwane_minuty)} minut gry`
+            : ""
+        }. Typ nie wisi na decyzji trenera.`,
+      });
+    }
+    // duży zapas nad linią: średnia z formy wyraźnie ponad linię zakładu
+    if (
+      forma &&
+      bet.strona === "powyzej" &&
+      okna != null &&
+      okna.zagrane >= 5 &&
+      forma.srednia90 >= bet.linia * 1.6
+    ) {
+      s.push({
+        id: "zapas",
+        znak: "≫",
+        label: "duży zapas nad linią",
+        ton: "brand",
+        opis: `Średnia z ostatnich meczów to ${forma.srednia90
+          .toFixed(2)
+          .replace(".", ",")} na 90 minut, a linia stoi na ${fmtLinia(
+          bet.linia,
+        )}. Zapas jest tak duży, że zwykle wystarcza nawet słabszy mecz.`,
+      });
+    }
+  }
   if (okna) {
     const w = okna.l10.n >= 5 ? okna.l10 : okna.all;
     if (w.n >= 5) {
@@ -171,7 +224,7 @@ function sygnalyTypu(
           znak: "✓",
           label: `weszło w ${w.traf} z ${w.n} meczów`,
           ton: "brand",
-          opis: `Linia tego typu została przebita w ${w.traf} z ostatnich ${w.n} meczów z minutami. Pełny wykres mecz po meczu znajdziesz niżej, w zakładce Forma.`,
+          opis: `Ten typ wszedłby w ${w.traf} z ostatnich ${w.n} meczów, w których zawodnik grał. Wykres mecz po meczu jest niżej, w zakładce Forma.`,
         });
       } else if (hr < 0.45) {
         s.push({
@@ -179,7 +232,7 @@ function sygnalyTypu(
           znak: "↓",
           label: `weszło tylko w ${w.traf} z ${w.n}`,
           ton: "czerwony",
-          opis: `Historia przeczy tej linii: weszła w ${w.traf} z ostatnich ${w.n} meczów z minutami. Obejrzyj wykres w zakładce Forma, zanim zagrasz.`,
+          opis: `Ostrożnie: ten typ wszedłby tylko w ${w.traf} z ostatnich ${w.n} meczów, w których zawodnik grał. Obejrzyj wykres w zakładce Forma, zanim zagrasz.`,
         });
       }
     }
@@ -197,12 +250,113 @@ function sygnalyTypu(
           : `Bukmacherzy w UK płacą za to średnio ${fmtKurs(bet.kurs_ref)}. To niezależny punkt odniesienia dla kursu wyżej.`,
     });
   }
+  // pewniak z kursem sporo poniżej wartości: uczciwa uwaga o cenie zamiast
+  // negatywnego werdyktu na całą kartę
+  if (
+    bet.pewniak &&
+    bet.kurs != null &&
+    bet.ev_pct != null &&
+    bet.ev_pct <= -8
+  ) {
+    s.push({
+      id: "cena",
+      znak: "·",
+      label: "kurs poniżej wartości",
+      ton: "cichy",
+      opis: `${bet.bukmacher} płaci ${fmtKurs(bet.kurs)}, a uczciwa cena to ${fmtKurs(
+        bet.fair_kurs,
+      )}. Różnica to marża bukmachera. Ten typ bierzesz dla wysokiej szansy trafienia, nie dla kursu.`,
+    });
+  }
   return s;
 }
 
 /** Liczba w zdaniu werdyktu — mono, żeby czytała się jak odczyt, nie proza. */
 function Num({ children }: { children: React.ReactNode }) {
   return <span className="font-data font-semibold">{children}</span>;
+}
+
+/**
+ * Werdykt pewniaka: prowadzi szansą trafienia, nie ceną. Pewniaki niemal
+ * zawsze mają ujemne EV (marża + selekcja za szansę), więc werdykt value
+ * („bez przewagi w kursie") mówił „nie graj" na każdej karcie tej sekcji
+ * i zaprzeczał chipowi, który user właśnie kliknął. Zdanie główne niesie
+ * kategorię typu, cena schodzi do drugiego zdania jako kontekst.
+ */
+function WerdyktPewniaka({ bet }: { bet: ValueBet }) {
+  const p = fmtProc(bet.p_model);
+  const fair = fmtKurs(bet.fair_kurs);
+  const kurs = fmtKurs(bet.kurs as number);
+  const ev = bet.ev_pct;
+
+  let glowne: React.ReactNode;
+  if (bet.wyzsza_linia) {
+    glowne = (
+      <>
+        Wyższa linia za lepszy kurs: wciąż <Num>{p}</Num> szans na trafienie.
+      </>
+    );
+  } else if (bet.p_model >= 0.75) {
+    glowne = (
+      <>
+        Model daje temu typowi <Num>{p}</Num> szans. To najpewniejsza
+        kategoria na liście.
+      </>
+    );
+  } else if (bet.p_model >= 0.62) {
+    glowne = (
+      <>
+        Model daje temu typowi <Num>{p}</Num> szans. Mocny typ, dobry
+        kandydat na kupon.
+      </>
+    );
+  } else if (bet.p_model >= 0.52) {
+    glowne = (
+      <>
+        Model daje temu typowi <Num>{p}</Num> szans, niewiele ponad połowę.
+        Graj z rozwagą.
+      </>
+    );
+  } else if ((bet.kurs ?? 0) >= 1.9) {
+    glowne = (
+      <>
+        Perełka na kupon: <Num>{p}</Num> szans, za to kurs <Num>{kurs}</Num>{" "}
+        płaci wyraźnie więcej.
+      </>
+    );
+  } else {
+    glowne = (
+      <>
+        Model daje temu typowi tylko <Num>{p}</Num> szans. To najsłabsza
+        kategoria na liście, graj ostrożnie.
+      </>
+    );
+  }
+
+  return (
+    <>
+      <p className="text-[17px] font-semibold leading-snug tracking-tight text-ink sm:text-lg">
+        {glowne}
+      </p>
+      <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-muted">
+        {bet.bukmacher} płaci <Num>{kurs}</Num>, uczciwa cena to{" "}
+        <Num>{fair}</Num>.{" "}
+        {ev != null && ev >= 1 ? (
+          <span className="text-data-green-ink">
+            Do tego kurs płaci <Num>{fmtEV(ev)}</Num> ponad wartość. Rzadkie
+            połączenie z tak wysoką szansą.
+          </span>
+        ) : ev != null && ev <= -8 ? (
+          <>
+            Różnica to marża bukmachera. Ten typ bierzesz dla wysokiej szansy
+            trafienia, nie dla kursu.
+          </>
+        ) : (
+          <>Cena jest w porządku, a na listę typ trafił za wysoką szansę.</>
+        )}
+      </p>
+    </>
+  );
 }
 
 /**
@@ -213,6 +367,9 @@ function Num({ children }: { children: React.ReactNode }) {
 function WerdyktZdanie({ bet }: { bet: ValueBet }) {
   const fair = fmtKurs(bet.fair_kurs);
   const p = fmtProc(bet.p_model);
+  if (bet.pewniak && bet.kurs != null && !bet.sugestia) {
+    return <WerdyktPewniaka bet={bet} />;
+  }
   if (bet.sugestia || bet.kurs == null) {
     return (
       <>
@@ -348,37 +505,38 @@ function SekcjaFormy({ bet, forma }: { bet: ValueBet; forma: FormaRynku }) {
         line={bet.linia}
         side={bet.strona}
         height={64}
+        rynek={bet.rynek.toLowerCase()}
       />
-      <p className="mt-2 text-xs text-faint">
-        Średnio{" "}
-        <span className="font-data text-ink-soft">
-          {forma.srednia90.toFixed(2).replace(".", ",")}
-        </span>{" "}
-        na 90 minut{" "}
-        <span title="Liczba ostatnich meczów z minutami, z których policzona jest średnia (klub + reprezentacja)">
-          (próba: {zagrane}{" "}
-          {zagrane === 1 ? "mecz" : zagrane < 5 ? "mecze" : "meczów"})
-        </span>{" "}
-        · przewidywane minuty:{" "}
-        <span className="font-data text-ink-soft">
-          {bet.oczekiwane_minuty != null ? Math.round(bet.oczekiwane_minuty) : "–"}
-        </span>
-      </p>
-      {/* splity kontekstowe — jak typ wchodzi w podpróbkach */}
-      {splity.length > 0 && (
-        <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-hairline pt-2.5">
-          <span className="text-[10px] font-semibold uppercase tracking-wide text-faint">
-            splity
+      {/* jedna banda odczytów pod wykresem: średnia, minuty i splity razem */}
+      <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-hairline pt-2.5">
+        <span
+          className="font-data text-[11px] font-semibold text-ink-soft"
+          title={`Średnia z ostatnich ${zagrane} meczów, w których zawodnik grał (klub + reprezentacja)`}
+        >
+          <span className="mr-1 text-[9px] font-medium uppercase opacity-70">
+            średnio na 90 min
           </span>
-          {splity.map((s) => (
-            <OdczytOkna
-              key={s.label}
-              {...s}
-              tytul={`${s.opis}: ten typ wszedłby w ${s.traf} z ${s.n} meczów`}
-            />
-          ))}
-        </div>
-      )}
+          {forma.srednia90.toFixed(2).replace(".", ",")}
+        </span>
+        {bet.oczekiwane_minuty != null && (
+          <span
+            className="font-data text-[11px] font-semibold text-ink-soft"
+            title="Ile minut zawodnik zagra dziś wg przewidywań modelu"
+          >
+            <span className="mr-1 text-[9px] font-medium uppercase opacity-70">
+              przewidywane minuty
+            </span>
+            {Math.round(bet.oczekiwane_minuty)}
+          </span>
+        )}
+        {splity.map((s) => (
+          <OdczytOkna
+            key={s.label}
+            {...s}
+            tytul={`${s.opis}: ten typ wszedłby w ${s.traf} z ${s.n} meczów`}
+          />
+        ))}
+      </div>
     </div>
   );
 }
@@ -501,6 +659,134 @@ function tierPewniaka(bet: ValueBet): {
   };
 }
 
+/** Nazwy czynników w mianowniku prozy „skąd ta liczba". */
+const CZYNNIK_PO_LUDZKU: Record<string, string> = {
+  Minuty: "przewidywane minuty",
+  Rywal: "profil rywala",
+  "Profil rywala": "profil rywala",
+  Sędzia: "sędzia",
+  "Scenariusz meczu": "przewidywany przebieg meczu",
+  "Matchup (kto na kogo)": "zestawienie z rywalem",
+  "Dom / wyjazd": "miejsce meczu",
+};
+
+const listaPoPolsku = (xs: string[]) =>
+  xs.join(", ").replace(/, ([^,]*)$/, " i $1");
+
+/**
+ * Proza „skąd ta liczba": baza z ostatnich meczów → korekty na ten mecz →
+ * oczekiwany wynik → próg linii → szansa. Zamiast osi z kursem bukmachera,
+ * której nikt nie rozumiał — po prostu opowiadamy, jak model doszedł do
+ * swojego procentu. Ostatnie zdanie domyka rozjazd „oczekiwane 2,3 vs 76%"
+ * (model dolicza ryzyko krótszej gry, patrz pułapka p_model vs rozkład).
+ */
+function skadTaLiczba(bet: ValueBet): string | null {
+  const cz = bet.uzasadnienie.czynniki;
+  const baza = cz.find((c) => c.nazwa === "Poziom bazowy");
+  if (!baza) return null;
+  const korekty = cz.filter(
+    (c) => c.mnoznik != null && Math.abs(c.mnoznik - 1) > 0.02,
+  );
+  const nazwa = (n: string) => CZYNNIK_PO_LUDZKU[n] ?? n.toLowerCase();
+  const wGore = korekty
+    .filter((c) => (c.mnoznik as number) > 1)
+    .map((c) => nazwa(c.nazwa));
+  const wDol = korekty
+    .filter((c) => (c.mnoznik as number) < 1)
+    .map((c) => nazwa(c.nazwa));
+  let korekta: string;
+  if (wGore.length > 0 && wDol.length > 0) {
+    korekta = `Na ten mecz w górę ${
+      wGore.length > 1 ? "ciągną" : "ciągnie"
+    } ją ${listaPoPolsku(wGore)}, w dół ${listaPoPolsku(wDol)}`;
+  } else if (wDol.length > 0) {
+    korekta = `Na ten mecz ${
+      wDol.length > 1 ? "obniżają" : "obniża"
+    } ją ${listaPoPolsku(wDol)}`;
+  } else if (wGore.length > 0) {
+    korekta = `Na ten mecz ${
+      wGore.length > 1 ? "podnoszą" : "podnosi"
+    } ją ${listaPoPolsku(wGore)}`;
+  } else {
+    korekta = "Warunki tego meczu niewiele tu zmieniają";
+  }
+  const ocz = bet.uzasadnienie.oczekiwana_liczba
+    .toFixed(1)
+    .replace(".", ",");
+  const prog =
+    bet.strona === "ponizej"
+      ? `Typ wchodzi przy najwyżej ${Math.floor(bet.linia)}`
+      : Math.floor(bet.linia) + 1 === 1
+        ? "Do wejścia typu wystarczy 1"
+        : `Do wejścia typu potrzeba co najmniej ${Math.floor(bet.linia) + 1}`;
+  return (
+    `${fmtOpisLiczby(baza.opis)}. ${korekta} – zostaje ok. ${ocz}. ` +
+    `${prog}, ale model dolicza jeszcze ryzyko krótszej gry i ostatecznie daje ${fmtProc(bet.p_model)}.`
+  );
+}
+
+/** Skala ocen pewniaków — progi te same co w tierPewniaka. */
+const SKALA_OCEN = [
+  { label: "ryzykowny", zakres: "do 52%", od: 0, do: 0.52 },
+  { label: "umiarkowany", zakres: "52–61%", od: 0.52, do: 0.62 },
+  { label: "mocny typ", zakres: "62–74%", od: 0.62, do: 0.75 },
+  { label: "pewniak", zakres: "75% i więcej", od: 0.75, do: 1.01 },
+] as const;
+
+/**
+ * Własny system ocen zamiast osi z wyceną bukmachera: cztery kategorie
+ * naszej skali, ocena tego typu podświetlona, pod spodem proza „skąd ta
+ * liczba". Czyta się jak skala ocen, nie jak wykres do interpretacji.
+ */
+function OcenaTypu({ bet }: { bet: ValueBet }) {
+  const proza = skadTaLiczba(bet);
+  return (
+    <div>
+      <h4 className="mb-2.5 text-xs font-semibold uppercase tracking-wide text-faint">
+        Nasza ocena
+      </h4>
+      <div className="grid max-w-xl grid-cols-4 gap-x-2.5">
+        {SKALA_OCEN.map((s) => {
+          const aktywna = bet.p_model >= s.od && bet.p_model < s.do;
+          return (
+            <div
+              key={s.label}
+              className={`border-t-2 pt-1.5 ${
+                aktywna ? "border-brand" : "border-hairline"
+              }`}
+              title={
+                aktywna
+                  ? `Ocena tego typu: ${s.label} (szansa modelu ${fmtProc(bet.p_model)})`
+                  : `Kategoria ${s.label}: szansa modelu ${s.zakres}`
+              }
+            >
+              <p
+                className={`font-display text-[10px] font-semibold uppercase tracking-wide ${
+                  aktywna ? "text-brand-deep" : "text-faint"
+                }`}
+              >
+                {s.label}
+              </p>
+              <p
+                className={`font-data mt-0.5 text-[10px] ${
+                  aktywna ? "font-semibold text-brand-deep" : "text-faint"
+                }`}
+              >
+                {aktywna ? fmtProc(bet.p_model) : s.zakres}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+      {proza && (
+        <p className="mt-3 max-w-prose text-sm leading-relaxed text-muted">
+          <span className="font-medium text-ink">Skąd ta liczba:</span> {proza}
+        </p>
+      )}
+    </div>
+  );
+}
+
 type TabSzczegolow = "forma" | "czynniki" | "wyniki";
 
 /** memo: przy zmianie filtrów listy nie przerenderowują się wszystkie karty */
@@ -529,7 +815,7 @@ export const BetCard = memo(function BetCard({
   // historia do porównania wycen: L10 gdy jest sensowna próba, inaczej całość
   const historiaOkno =
     okna == null ? null : okna.l10.n >= 5 ? okna.l10 : okna.all;
-  const sygnaly = sygnalyTypu(bet, okna);
+  const sygnaly = sygnalyTypu(bet, okna, forma);
 
   // głębia na żądanie: jedna sekcja naraz zamiast siatki wszystkiego
   const taby: { kod: TabSzczegolow; label: string }[] = [
@@ -613,6 +899,14 @@ export const BetCard = memo(function BetCard({
   const przewaga =
     implied != null && bet.p_model > implied
       ? { od: implied, do: bet.p_model }
+      : null;
+  // odwrotność przewagi: kurs wycenia szansę wyżej niż model (głównie marża)
+  // — bez tego oś pewniaka to dwa znaczniki i pusta luka; odcinek dopiero od
+  // 1 pp na zaokrąglonych liczbach, żeby nie znaczyć szumu
+  const przeplata =
+    implied != null &&
+    Math.round(implied * 100) - Math.round(bet.p_model * 100) >= 1
+      ? { od: bet.p_model, do: implied }
       : null;
 
   // rozkład (i „inne linie”) liczą się przy przewidywanych minutach, p_model
@@ -806,7 +1100,9 @@ export const BetCard = memo(function BetCard({
                     <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-faint">
                       werdykt
                     </span>
-                    <RiskBadge level={bet.ryzyko} />
+                    {/* niskie ryzyko to norma, nie informacja — badge tylko
+                        gdy zdarzenie jest realnie kapryśne */}
+                    {bet.ryzyko !== "niskie" && <RiskBadge level={bet.ryzyko} />}
                   </div>
                   <WerdyktZdanie bet={bet} />
                 </div>
@@ -834,13 +1130,27 @@ export const BetCard = memo(function BetCard({
                 )}
               </motion.div>
 
-              {/* moment 2: jedna oś wyceny (liczby przy znacznikach, bez legendy) */}
-              {(implied != null || hist != null) && (
+              {/* moment 2 (pewniak): nasza skala ocen + „skąd ta liczba" —
+                  oś z wyceną bukmachera nie mówiła tu nic potrzebnego */}
+              {bet.pewniak && (
                 <motion.div
                   initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.3, delay: 0.1 }}
                   className="mt-5"
+                >
+                  <OcenaTypu bet={bet} />
+                </motion.div>
+              )}
+
+              {/* moment 2 (value): jedna oś wyceny (liczby przy znacznikach,
+                  bez legendy); zwężona, żeby znaczniki nie tonęły w torze */}
+              {!bet.pewniak && (implied != null || hist != null) && (
+                <motion.div
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: 0.1 }}
+                  className="mt-5 max-w-xl"
                 >
                   <OsSzans
                     znaczniki={znaczniki}
@@ -851,6 +1161,17 @@ export const BetCard = memo(function BetCard({
                         : undefined
                     }
                     przewagaPodpis="twoja przewaga"
+                    przeplata={przeplata}
+                    przeplataPodpis="marża bukmachera"
+                    przeplataTytul={
+                      przeplata && bet.kurs != null && implied != null
+                        ? `Kurs ${fmtKurs(bet.kurs)} odpowiada szansie ${fmtProc(
+                            implied,
+                          )}, a model daje ${fmtProc(
+                            bet.p_model,
+                          )}. Różnica to w większości marża bukmachera, dlatego kurs płaci mniej, niż typ jest wart`
+                        : undefined
+                    }
                     ariaLabel={`Oś szans: ${znaczniki
                       .map((z) => `${z.podpis} ${z.wartosc}`)
                       .join(", ")}`}
@@ -934,7 +1255,9 @@ export const BetCard = memo(function BetCard({
                             >
                               <span className="flex-1">
                                 <span className="font-medium">{c.nazwa}:</span>{" "}
-                                <span className="text-ink-soft">{c.opis}</span>
+                                <span className="text-ink-soft">
+                                  {fmtOpisLiczby(c.opis)}
+                                </span>
                               </span>
                               {c.mnoznik !== null && (
                                 <span
