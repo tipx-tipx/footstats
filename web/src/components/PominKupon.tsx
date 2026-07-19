@@ -2,6 +2,8 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 
+import { Segmented } from "./Segmented";
+
 /**
  * Owijka aktywnego kuponu z akcjami: pomiń (z powodem), przywróć,
  * przebuduj po składach.
@@ -16,7 +18,7 @@ import { useEffect, useState, type ReactNode } from "react";
 
 const POWODY = ["nie zagrałem", "słaby zestaw", "za niski kurs"] as const;
 
-async function akcjaKuponu(body: Record<string, unknown>): Promise<void> {
+export async function akcjaKuponu(body: Record<string, unknown>): Promise<void> {
   const r = await fetch("/api/kupon-pomin", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -205,6 +207,12 @@ export function ZastosujZamiane({ klucz }: { klucz?: string }) {
   );
 }
 
+const PROFILE_OPIS: Record<string, string> = {
+  bezpieczny: "same kotwice: tylko typy z szansą 58% i wyżej",
+  zbalansowany: "domyślny balans pewności i kursu",
+  agresywny: "więcej matchupów i wyższych linii, kupon z rodzynkami",
+};
+
 /** Charakter buildera kuponów — ustawienie globalne (nowe kupony). */
 export function ProfilKuponow() {
   const [profil, setProfil] = useState<string | null>(null);
@@ -224,32 +232,25 @@ export function ProfilKuponow() {
     setZapis(false);
   };
   return (
-    <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
-      <span className="text-faint">charakter kuponów:</span>
-      <span className="inline-flex rounded-(--radius-control) border border-hairline bg-paper p-0.5">
-        {(["bezpieczny", "zbalansowany", "agresywny"] as const).map((p) => (
-          <button
-            key={p}
-            onClick={() => ustaw(p)}
-            disabled={zapis}
-            className={`rounded-lg px-2.5 py-1 transition-colors ${
-              profil === p
-                ? "bg-card font-medium text-ink shadow-(--shadow-card)"
-                : "text-muted hover:text-ink"
-            }`}
-            title={
-              p === "bezpieczny"
-                ? "Same kotwice: tylko typy z szansą 58%+"
-                : p === "agresywny"
-                  ? "Więcej matchupów i wyższych linii, styl bet buildera z rodzynkami"
-                  : "Domyślny balans pewności i kursu"
-            }
-          >
-            {p}
-          </button>
-        ))}
+    <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+      <span className="text-[10px] font-semibold uppercase tracking-wide text-faint">
+        charakter
       </span>
-      <span className="text-faint">· dotyczy nowych kuponów (zamrożone bez zmian)</span>
+      <Segmented
+        id="profil-kuponow"
+        opcje={(["bezpieczny", "zbalansowany", "agresywny"] as const).map(
+          (p) => ({ kod: p, label: p }),
+        )}
+        wartosc={(profil ?? "zbalansowany") as "bezpieczny" | "zbalansowany" | "agresywny"}
+        onChange={ustaw}
+        disabled={zapis}
+      />
+      <span
+        className="text-[11px] text-faint"
+        title="Dotyczy nowych kuponów. Już opublikowane są zamrożone i się nie zmieniają"
+      >
+        {PROFILE_OPIS[profil ?? "zbalansowany"]}
+      </span>
     </div>
   );
 }
