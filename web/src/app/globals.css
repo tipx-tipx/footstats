@@ -147,6 +147,9 @@ body {
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  /* dekoracje hero (poświata karty, aurora) celowo wystają poza kolumnę —
+     bez klipu robią poziomy scroll na telefonie (clip nie psuje sticky) */
+  overflow-x: clip;
 }
 
 /* Tailwind 4 nie nadaje kursora przyciskom — klikalne ma wyglądać na klikalne */
@@ -282,6 +285,47 @@ html[data-theme="dark"] .glow-pop {
 }
 @media (prefers-reduced-motion: reduce) {
   .ticker-tor { animation: none; }
+}
+
+/* Suwak konsoli (generator kuponów): tor z wypełnieniem marki do bieżącej
+   wartości (procent w --p, ustawiany inline) i kciuk-krążek jak znacznik
+   na osi wyceny. Zamiast surowego accent-color przeglądarki. */
+.suwak {
+  -webkit-appearance: none;
+  appearance: none;
+  /* fallback: gdyby appearance nie chwyciło, natywny suwak ma być w marce,
+     nie w niebieskim akcencie przeglądarki */
+  accent-color: var(--color-brand);
+  height: 6px;
+  border-radius: 9999px;
+  background: linear-gradient(
+    to right,
+    var(--color-brand) 0%,
+    var(--color-brand-bright) var(--p, 50%),
+    var(--color-hairline) var(--p, 50%),
+    var(--color-hairline) 100%
+  );
+}
+.suwak::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  background: var(--color-card);
+  border: 3px solid var(--color-brand);
+  box-shadow: var(--shadow-card);
+  cursor: grab;
+}
+.suwak::-webkit-slider-thumb:active { cursor: grabbing; }
+.suwak::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 9999px;
+  background: var(--color-card);
+  border: 3px solid var(--color-brand);
+  box-shadow: var(--shadow-card);
+  cursor: grab;
 }
 
 /* pasek przewijania w duchu designu */

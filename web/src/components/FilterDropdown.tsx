@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 export type OpcjaFiltra = { value: string; label: string; n?: number };
 
@@ -26,9 +26,19 @@ export function FilterDropdown({
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
+  // panel jest szerszy od przycisku (w-max); przy prawej kolumnie na wąskim
+  // ekranie wyjeżdżałby poza viewport — wtedy dosuwamy go do prawej
+  const [odPrawej, setOdPrawej] = useState(false);
   const kontener = useRef<HTMLDivElement | null>(null);
   const panel = useRef<HTMLUListElement | null>(null);
   const trigger = useRef<HTMLButtonElement | null>(null);
+
+  useLayoutEffect(() => {
+    if (!open || !panel.current || !kontener.current) return;
+    const lewa = kontener.current.getBoundingClientRect().left;
+    const szer = panel.current.offsetWidth;
+    setOdPrawej(lewa + szer > document.documentElement.clientWidth - 8);
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -134,7 +144,9 @@ export function FilterDropdown({
                 przesunFokus(-1);
               }
             }}
-            className="absolute left-0 top-full z-30 mt-2 max-h-80 w-max min-w-full overflow-auto rounded-xl border border-hairline bg-card py-1.5 shadow-(--shadow-pop)"
+            className={`absolute top-full z-30 mt-2 max-h-80 w-max min-w-full max-w-[calc(100vw-2rem)] overflow-auto rounded-xl border border-hairline bg-card py-1.5 shadow-(--shadow-pop) ${
+              odPrawej ? "right-0" : "left-0"
+            }`}
           >
             {options.map((o) => {
               const aktywna = o.value === value;

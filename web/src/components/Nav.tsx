@@ -59,10 +59,13 @@ export function Nav() {
     };
   }, [open]);
 
-  // zmiana trasy zamyka panel (np. wstecz w przeglądarce)
-  useEffect(() => {
+  // zmiana trasy zamyka panel (np. wstecz w przeglądarce) — korekta stanu
+  // w trakcie renderu zamiast effectu (bez kaskadowego renderu)
+  const [prevPathname, setPrevPathname] = useState(pathname);
+  if (prevPathname !== pathname) {
+    setPrevPathname(pathname);
     setOpen(false);
-  }, [pathname]);
+  }
 
   return (
     <header className="sticky top-0 z-40 px-3 pt-3 sm:px-6">
@@ -78,7 +81,7 @@ export function Nav() {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.25 }}
             onClick={() => setOpen(false)}
-            className="fixed inset-0 -z-10 cursor-default bg-scrim md:hidden"
+            className="fixed inset-0 -z-10 cursor-default bg-scrim lg:hidden"
           />
         )}
       </AnimatePresence>
@@ -95,7 +98,7 @@ export function Nav() {
         {/* pasek desktopowy */}
         <nav
           aria-label="Główna nawigacja"
-          className="hidden h-full flex-1 items-center gap-1 md:flex"
+          className="hidden h-full flex-1 items-center gap-1 lg:flex"
         >
           {GRUPY.map((grupa, gi) => (
             <div key={gi} className="flex items-center gap-0.5">
@@ -135,13 +138,13 @@ export function Nav() {
           ))}
         </nav>
 
-        <div className="ml-auto flex items-center gap-1 md:ml-0">
+        <div className="ml-auto flex items-center gap-1 lg:ml-0">
           <ThemeToggle />
           <button
             onClick={wyloguj}
             title="Wyloguj"
             aria-label="Wyloguj"
-            className="hidden shrink-0 rounded-(--radius-control) p-2.5 text-faint transition-colors hover:bg-paper hover:text-ink md:block"
+            className="hidden shrink-0 rounded-(--radius-control) p-2.5 text-faint transition-colors hover:bg-paper hover:text-ink lg:block"
           >
             <IkonaWyloguj />
           </button>
@@ -149,7 +152,7 @@ export function Nav() {
           {/* hamburger — tylko mobile */}
           <button
             onClick={() => setOpen((v) => !v)}
-            className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-(--radius-control) text-ink transition-colors hover:bg-paper md:hidden"
+            className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-(--radius-control) text-ink transition-colors hover:bg-paper lg:hidden"
             aria-label={open ? "Zamknij menu" : "Otwórz menu"}
             aria-expanded={open}
             aria-controls="menu-mobilne"
@@ -179,7 +182,7 @@ export function Nav() {
       <div
         id="menu-mobilne"
         aria-hidden={!open}
-        className={`grid overflow-hidden transition-[grid-template-rows] duration-300 ease-out md:hidden ${
+        className={`grid overflow-hidden transition-[grid-template-rows] duration-300 ease-out lg:hidden ${
           open ? "grid-rows-[1fr] border-t border-hairline" : "grid-rows-[0fr]"
         }`}
       >

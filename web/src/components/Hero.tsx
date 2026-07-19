@@ -251,7 +251,7 @@ function ZywyPodglad({ bets }: { bets: ValueBet[] }) {
             <button
               onClick={() => setIdx((i) => (i - 1 + bets.length) % bets.length)}
               aria-label="Poprzednia pozycja"
-              className="flex h-7 w-7 items-center justify-center rounded-full border border-hairline bg-card/80 text-ink-soft backdrop-blur transition-colors hover:border-brand hover:text-brand"
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-hairline bg-card/80 text-ink-soft backdrop-blur transition-colors hover:border-brand hover:text-brand sm:h-7 sm:w-7"
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden>
                 <path d="M15 5l-7 7 7 7" strokeLinecap="round" strokeLinejoin="round" />
@@ -266,7 +266,7 @@ function ZywyPodglad({ bets }: { bets: ValueBet[] }) {
             <button
               onClick={() => setIdx((i) => (i + 1) % bets.length)}
               aria-label="Następna pozycja"
-              className="flex h-7 w-7 items-center justify-center rounded-full border border-hairline bg-card/80 text-ink-soft backdrop-blur transition-colors hover:border-brand hover:text-brand"
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-hairline bg-card/80 text-ink-soft backdrop-blur transition-colors hover:border-brand hover:text-brand sm:h-7 sm:w-7"
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden>
                 <path d="M9 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
@@ -484,13 +484,14 @@ export function Hero({
 
         </div>
 
-        {/* prawa: żywy podgląd skanera */}
+        {/* prawa: żywy podgląd skanera; poniżej lg (kolumny w stosie) karta
+            nie rozjeżdża się na pełną szerokość — bilet, nie baner */}
         <motion.div
           variants={wejscie}
           initial="hidden"
           animate="show"
           custom={3}
-          className="relative"
+          className="relative mx-auto w-full max-w-xl lg:mx-0 lg:max-w-none"
         >
           <div aria-hidden className="glow-brand pointer-events-none absolute -inset-16" />
           <ZywyPodglad bets={spotlightBets} />

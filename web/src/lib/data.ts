@@ -162,6 +162,23 @@ export async function getKupony(): Promise<Kupon[]> {
   return (await loadBundle()).kupony;
 }
 
+/**
+ * Kupon dnia do zajawki na stronie głównej: najbliższy grywalny zestaw
+ * (wszystkie mecze przed startem), najpierw horyzont dzienny, potem
+ * najniższy cel = największa szansa trafienia.
+ */
+export async function getKuponDnia(): Promise<Kupon | undefined> {
+  const kupony = (await loadBundle()).kupony;
+  const now = Math.floor(Date.now() / 1000);
+  return kupony
+    .filter((k) => k.legi.length > 0 && k.legi.every((l) => l.kickoff_ts > now))
+    .sort(
+      (a, b) =>
+        Number(a.horyzont !== "dzienny") - Number(b.horyzont !== "dzienny") ||
+        a.cel - b.cel,
+    )[0];
+}
+
 export async function getTypyWyniki(): Promise<TypyWyniki> {
   return (await loadBundle()).typy_wyniki;
 }
