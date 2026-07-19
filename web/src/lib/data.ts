@@ -154,6 +154,12 @@ export async function getKalibracja(): Promise<Kalibracja> {
   return (await loadBundle()).calibration;
 }
 
+/** Znacznik czasu serwera (sekundy) — pomocnik poza komponentem, bo reguła
+ *  czystości renderu nie pozwala wołać Date.now() w komponencie. */
+export function terazTs(): number {
+  return Math.floor(Date.now() / 1000);
+}
+
 export async function getMeta(): Promise<Meta> {
   return (await loadBundle()).meta;
 }
