@@ -132,7 +132,7 @@ function odznakiPrzewagi(bet: ValueBet): {
     o.push({
       znak: "↥",
       label: "wchodzi do składu",
-      opis: "Pierwszy występ w XI na tym turnieju, rynek często nie zdążył dograć jego linii",
+      opis: "Wraca do XI po dłuższej przerwie, rynek często nie zdążył dograć jego linii",
       tone: "amber",
     });
   }

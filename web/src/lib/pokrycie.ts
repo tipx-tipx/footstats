@@ -3,10 +3,13 @@
  *
  * Zasady (wypracowane z użytkownikiem):
  *  • Próbka = ostatnie 5 meczów, w których zawodnik ZACZYNAŁ (minuty ≥ 60).
- *  • Na mecz REPREZENTACJI (MŚ) PREFERUJEMY starty w kadrze: jeśli zawodnik ma
- *    ≥ 5 startów w kadrze w dostępnej historii, liczymy pokrycie z nich (prawdziwa
- *    forma reprezentacyjna). Jeśli nie (rezerwa kadry / klubowiec) — fallback na
- *    5 ostatnich startów jakichkolwiek, z flagą „forma klubowa".
+ *  • TRYB TURNIEJOWY (mecz reprezentacji, MŚ): preferujemy starty w kadrze —
+ *    jeśli zawodnik ma ≥ 5 startów w kadrze, liczymy pokrycie z nich; jeśli
+ *    nie (rezerwa kadry) — fallback na 5 ostatnich startów z flagą
+ *    „forma klubowa".
+ *  • TRYB LIGOWY (mecz klubowy): podział klub/kadra nie steruje niczym —
+ *    próbka to po prostu 5 ostatnich startów (mecze reprezentacji z przerw
+ *    kadrowych zostają w próbce, w hoverze widać ich oznaczenie).
  *  • Jeden wiersz na (zawodnik, rynek) — linie 1+/2+/3+ zwinięte obok siebie.
  *  • Zostają pokrycia ≥ 2/5. Kurs Superbet z siatki odds.
  */
@@ -162,6 +165,7 @@ export function topPokrycia(
   zawodnicy: Zawodnik[],
   meczId: number,
   odds: OddsSuperbet,
+  ligowy = false,
 ): WierszPokrycia[] {
   const oddsMecz = odds?.[String(meczId)] ?? {};
   const rows: WierszPokrycia[] = [];
@@ -188,7 +192,9 @@ export function topPokrycia(
       }
       if (n > maxKadraStarty) maxKadraStarty = n;
     }
-    const kadraRegularny = maxKadraStarty >= PROBKA;
+    // w lidze ranga kadrowa nie istnieje (true = ranga 0 dla wszystkich,
+    // badge "rezerwa kadry" się nie renderuje)
+    const kadraRegularny = ligowy || maxKadraStarty >= PROBKA;
 
     for (const kod of RYNKI_POKRYCIA) {
       const f = z.forma?.[kod];
@@ -205,11 +211,11 @@ export function topPokrycia(
       const starty = gry.filter((g) => g.minuty >= PROG_STARTU);
       const kadraStarty = starty.filter((g) => g.kadra);
 
-      // PREFERUJ kadrę: ≥5 startów w reprezentacji → licz z nich; inaczej
-      // fallback na 5 ostatnich startów jakichkolwiek (forma klubowa)
+      // tryb turniejowy: PREFERUJ kadrę (≥5 startów w reprezentacji → licz
+      // z nich); tryb ligowy: po prostu 5 ostatnich startów
       let probka: GraForma[];
       let kadraBasis: boolean;
-      if (kadraStarty.length >= PROBKA) {
+      if (!ligowy && kadraStarty.length >= PROBKA) {
         probka = kadraStarty.slice(0, PROBKA);
         kadraBasis = true;
       } else if (starty.length >= PROBKA) {

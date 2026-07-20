@@ -73,7 +73,8 @@ export default async function MeczPage({
   // zawodnicy tego meczu = grający w jednej z dwóch drużyn (mapowanie po nazwie)
   const druzyny = new Set([mecz.gospodarz, mecz.gosc]);
   const gracze = zawodnicy.filter((z) => druzyny.has(z.druzyna));
-  const wiersze = topPokrycia(gracze, meczId, odds);
+  const ligowy = meta.tryb === "liga";
+  const wiersze = topPokrycia(gracze, meczId, odds, ligowy);
   const okazje = bets.filter((b) => b.mecz_id === meczId && !b.sugestia).length;
 
   return (
@@ -204,13 +205,16 @@ export default async function MeczPage({
           TOP POKRYCIA
         </h2>
         <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted">
-          Kto ostatnio regularnie robił to, na co bukmacher daje kurs. Na mecz
-          reprezentacji liczymy starty w kadrze, a gdy zawodnik gra w niej za
-          rzadko, bierzemy klub. Najedź na kwadrat, żeby zobaczyć rywala i minuty.
+          Kto ostatnio regularnie robił to, na co bukmacher daje kurs.{" "}
+          {ligowy
+            ? "Liczymy z 5 ostatnich meczów, w których zawodnik zaczynał."
+            : "Na mecz reprezentacji liczymy starty w kadrze, a gdy zawodnik gra w niej za rzadko, bierzemy klub."}{" "}
+          Najedź na kwadrat, żeby zobaczyć rywala i minuty.
         </p>
         <TopPokrycia
           wiersze={wiersze}
           druzyny={[mecz.gospodarz, mecz.gosc]}
+          ligowy={ligowy}
         />
       </Reveal>
 

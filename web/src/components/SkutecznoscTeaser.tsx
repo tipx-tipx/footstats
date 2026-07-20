@@ -108,9 +108,9 @@ export function SkutecznoscTeaser({
               </p>
             </div>
           ) : (
-            <div title="Trafione / rozliczone typy w całym turnieju">
+            <div title="Trafione / rozliczone typy od startu modelu">
               <p className="text-[10px] uppercase tracking-wide text-faint">
-                cały turniej
+                łącznie
               </p>
               <p className="font-data mt-0.5 text-[1.7rem] font-bold leading-none">
                 {trafione}
@@ -121,9 +121,9 @@ export function SkutecznoscTeaser({
             </div>
           )}
           {ostatniDzien && (
-            <div title="Trafione / rozliczone typy w całym turnieju">
+            <div title="Trafione / rozliczone typy od startu modelu">
               <p className="text-[10px] uppercase tracking-wide text-faint">
-                cały turniej
+                łącznie
               </p>
               <p className="font-data mt-0.5 text-lg font-semibold leading-tight">
                 {trafione}/{rozliczone}

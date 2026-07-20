@@ -35,10 +35,13 @@ function odmienPropozycje(n: number): string {
 export function TopPokrycia({
   wiersze,
   druzyny,
+  ligowy = false,
 }: {
   wiersze: WierszPokrycia[];
   /** [gospodarz, gość] — do filtra drużyn */
   druzyny: [string, string];
+  /** tryb ligowy: bez podziału klub/kadra w opisach próbki */
+  ligowy?: boolean;
 }) {
   const [druzyna, setDruzyna] = useState<string | null>(null);
   const [rynek, setRynek] = useState<string | null>(null);
@@ -235,8 +238,12 @@ export function TopPokrycia({
                     )}
                   </div>
                   <p className="mt-0.5 text-[11px] text-faint">
-                    {w.kadraBasis ? "starty w kadrze" : "starty (klub)"} · ost.
-                    mecz {dataMeczu(w.ostatniMeczTs)}
+                    {ligowy
+                      ? "ostatnie starty"
+                      : w.kadraBasis
+                        ? "starty w kadrze"
+                        : "starty (klub)"}{" "}
+                    · ost. mecz {dataMeczu(w.ostatniMeczTs)}
                   </p>
                 </td>
                 <td className="px-4 py-3">

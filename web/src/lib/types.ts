@@ -69,7 +69,7 @@ export interface ValueBet {
   wyzsza_linia?: boolean;
   /** true = profil rywala wyraźnie sprzyja (koncesje per rynek × pozycja) */
   matchup?: boolean;
-  /** true = pierwszy występ w XI na turnieju — linie rynku bywają niedograne */
+  /** true = wraca do XI po dłuższej przerwie — linie rynku bywają niedograne */
   rotacja?: boolean;
   /** true = składy potwierdzono <45 min temu — kurs mógł nie zdążyć zareagować */
   swieze_sklady?: boolean;

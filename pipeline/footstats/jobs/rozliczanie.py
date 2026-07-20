@@ -27,10 +27,10 @@ from __future__ import annotations
 import math
 import time
 
-from .. import supa
+from .. import rozgrywki, supa
 from ..model import betting
 from ..model import kupony as kupony_model
-from ..sources import rotowire, scores365
+from ..sources import rotowire, scores365, statshub
 
 # rynek -> pole w agregacie 365Scores (classify_event)
 MARKETY_365 = {
@@ -214,10 +214,12 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
 def _gid_365(rec: dict, cache: dict) -> int | None:
     """Znajdź id zakończonego meczu w 365Scores (cache per mecz).
 
-    Szuka w wynikach rozgrywek MŚ (endpoint /games/results — /games/current
-    ignoruje filtr dat i nie zawiera wczorajszych meczów). Dopasowanie po
-    znormalizowanych nazwach drużyn; awaryjnie po kickoffie + jednej nazwie
-    (rozjazdy typu "USA" vs "United States").
+    Multi-liga: wyniki z rozgrywek ZAKRESU DRUŻYNOWEGO (rozgrywki.comp365)
+    plus MŚ (stare typy w logu). Mecze spoza tych rozgrywek (globalne propsy)
+    nie mają gid — rozliczają się z banku/feedu trendów statshub.
+    Endpoint /games/results per rozgrywki — /games/current ignoruje filtr
+    dat i nie zawiera wczorajszych meczów. Dopasowanie po znormalizowanych
+    nazwach drużyn; awaryjnie po kickoffie + jednej nazwie.
     """
     mid = rec["mecz_id"]
     if mid in cache:
@@ -228,10 +230,16 @@ def _gid_365(rec: dict, cache: dict) -> int | None:
         return None
     home, away = rotowire._norm(teams[0]), rotowire._norm(teams[1])
     if "_wyniki" not in cache:
-        try:
-            cache["_wyniki"] = scores365.finished_games_by_competition()
-        except Exception:
-            cache["_wyniki"] = []
+        wyniki: list[dict] = []
+        for c in [None] + rozgrywki.comp365_druzynowe():
+            try:
+                wyniki += (
+                    scores365.finished_games_by_competition(c)
+                    if c else scores365.finished_games_by_competition()
+                )
+            except Exception:
+                continue
+        cache["_wyniki"] = wyniki
     gid = None
     for g in cache["_wyniki"]:
         if {g["home"], g["away"]} == {home, away}:
@@ -245,6 +253,48 @@ def _gid_365(rec: dict, cache: dict) -> int | None:
             break
     cache[mid] = gid
     return gid
+
+
+def _dolej_swieze_trendy(log: dict, lib: dict, now: int) -> None:
+    """Multi-liga: dolej do banku (IN-MEMORY) trendy rozegranych meczów
+    z nierozliczonych typów zawodniczych.
+
+    mecz_id w logu to event id statshub, a props/player-trends dla
+    ROZEGRANEGO meczu zwraca historię z tym meczem w recentGames — jeden
+    batchowy request rozlicza strzały/celne/faule/odbiory w KAŻDEJ lidze
+    świata, także tam, gdzie 365Scores nie zna rozgrywek (brak comp365).
+    Nie zapisujemy trend_lib (to robi cykl budowy) — dolewka żyje tylko
+    na czas tego rozliczenia.
+    """
+    mids = sorted({
+        r["mecz_id"] for r in log.values()
+        if not r.get("wynik")
+        and str(r.get("podmiot_typ", "zawodnik")) == "zawodnik"
+        and MECZ_KONIEC_PO_S < now - r["kickoff_ts"] < TERMIN_BRAK_DANYCH_S
+        and r.get("mecz_id")
+    })
+    if not mids:
+        return
+    try:
+        trendy = statshub.fetch_event_trends(mids[:60])
+    except Exception:
+        return
+    n_dolane = 0
+    for t in trendy:
+        key = f"{t.player_id}:{t.market_code}"
+        prev = lib.get(key)
+        ts_new = t.timestamps[0] if t.timestamps else 0
+        ts_old = (prev.get("timestamps") or [0])[0] if prev else -1
+        if ts_new >= ts_old:
+            lib[key] = {
+                "timestamps": list(t.timestamps),
+                "counts": list(t.counts),
+                "minutes": list(t.minutes),
+            }
+            n_dolane += 1
+    if n_dolane:
+        print(f"Rozliczanie: dolano świeże trendy {len(mids[:60])} meczów "
+              f"({n_dolane} rekordów) do rozliczeń spoza 365")
 
 
 def _minuty_z_banku(rec: dict, lib: dict) -> float | None:
@@ -1260,6 +1310,12 @@ def rozlicz(
                             if l.get("mecz_id") and l.get("podmiot")])
     lib = supa.get_key("trend_lib") or {}
     now = int(time.time())
+    # multi-liga: świeże trendy rozegranych meczów prosto z feedu statshub —
+    # rozliczają mecze, których 365Scores nie zna (globalne propsy)
+    try:
+        _dolej_swieze_trendy(log, lib, now)
+    except Exception as e:
+        print(f"Dolewka trendów pominięta ({e})")
     cache_365: dict = {}
     # mecze przełożone: jeśli mecz wciąż figuruje w nadchodzących typach,
     # deadline braku danych nie może zamknąć jego legów jako zwrot
@@ -1358,6 +1414,11 @@ def rozlicz(
                 elif minuty:
                     # zagrał (minuty > 0), a nie ma go w mapie = 0 zdarzeń
                     wartosc = 0.0
+            if wartosc is None and mk in ("shots", "sot"):
+                # multi-liga: mecz spoza rozgrywek z comp365 nie ma gid —
+                # strzały/celne rozliczamy z banku trendów statshub
+                # (te same dane Opta, na których stoi scoring)
+                wartosc = _wartosc_z_banku(rec, lib)
         elif mk in MARKETY_LIB:
             # staty lineups obejmują CAŁY mecz — przy dogrywce nie nadają się
             # do rozliczenia rynku regularnego czasu (bank trendów zostaje)

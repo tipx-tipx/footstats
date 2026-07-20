@@ -23,7 +23,7 @@ function LegBadges({ l }: { l: KuponLeg }) {
       {l.rotacja && (
         <span
           className="shrink-0 text-[11px] font-semibold text-data-amber-ink"
-          title="Pierwszy występ w XI na tym turnieju, linia rynku bywa niedograna"
+          title="Wraca do XI po dłuższej przerwie, linia rynku bywa niedograna"
         >
           ↥
         </span>
