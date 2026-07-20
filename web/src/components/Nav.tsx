@@ -18,7 +18,8 @@ import { ThemeToggle } from "./ThemeToggle";
  */
 const GRUPY: { href: string; label: string }[][] = [
   [
-    { href: "/", label: "Okazje" },
+    { href: "/", label: "Zawodnicy" },
+    { href: "/druzyny", label: "Drużyny" },
     { href: "/kupony", label: "Kupony" },
     { href: "/mecze", label: "Mecze" },
   ],

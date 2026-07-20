@@ -2602,6 +2602,9 @@ def _main_impl(tryb=None):
         "wyzsza_linia", "xi_sygnal", "kurs_ref",
         # pewnosc — do filtrowania w GeneratorKuponu jak backendowy styl "value"
         "pewnosc",
+        # podmiot_typ — generator oznacza legi DRUŻYNOWE (gole/rożne/kartki
+        # drużyn) odróżnialnie od propsów zawodniczych
+        "podmiot_typ",
         # matchup_styl — flaga pełnych matchupów stylu; musi płynąć przez
         # kupony (własne i automatyczne) do typy_log, żeby diagnostyka
         # kategorii mierzyła skuteczność analogii stylu

@@ -172,6 +172,8 @@ export interface LegPool {
   kickoff_ts: number;
   podmiot_id: number;
   podmiot: string;
+  /** "zawodnik" (domyślnie) albo "druzyna" — leg na statystykę całej drużyny */
+  podmiot_typ?: string;
   druzyna: string;
   przeciwnik: string;
   rynek_kod: string;

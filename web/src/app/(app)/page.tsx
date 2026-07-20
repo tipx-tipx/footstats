@@ -18,7 +18,7 @@ export default async function OkazjePage({
   searchParams: Promise<{ mecz?: string; rodzaj?: string }>;
 }) {
   const { mecz, rodzaj } = await searchParams;
-  const [bets, zawodnicy, meta, stsValue, kuponDnia, typyWyniki] =
+  const [wszystkieBets, zawodnicy, meta, stsValue, kuponDnia, typyWyniki] =
     await Promise.all([
       getValueBets(),
       getZawodnicy(),
@@ -28,6 +28,13 @@ export default async function OkazjePage({
       getTypyWyniki(),
     ]);
   const pods = typyWyniki.podsumowanie;
+
+  // ta strona to STATYSTYKI ZAWODNIKÓW — typy drużynowe mają własną
+  // podstronę /druzyny (osobna funkcja produktu, nie ta sama lista)
+  const bets = wszystkieBets.filter((b) => b.podmiot_typ !== "druzyna");
+  const druzynoweN = wszystkieBets.filter(
+    (b) => b.podmiot_typ === "druzyna" && !b.sugestia,
+  ).length;
 
   const okazje = bets.filter((b) => !b.sugestia);
   const sugestie = bets.filter((b) => b.sugestia);
@@ -79,6 +86,32 @@ export default async function OkazjePage({
         }
       />
       </div>
+
+      {/* most do statystyk drużynowych: banda-przypis, nie karta */}
+      {druzynoweN > 0 && (
+        <Reveal className="mt-8">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1.5 border-y border-hairline py-3.5">
+            <p className="text-sm text-muted">
+              Model ma dziś także{" "}
+              <strong className="font-semibold text-ink">
+                {druzynoweN}{" "}
+                {druzynoweN === 1
+                  ? "typ drużynowy"
+                  : druzynoweN < 5
+                    ? "typy drużynowe"
+                    : "typów drużynowych"}
+              </strong>{" "}
+              (gole, rożne i kartki całych drużyn).
+            </p>
+            <a
+              href="/druzyny"
+              className="text-sm font-semibold text-brand transition-colors hover:text-brand-bright"
+            >
+              Zobacz drużyny →
+            </a>
+          </div>
+        </Reveal>
+      )}
 
       {/* pod listą: obietnice hero z pokryciem — bilet kuponu dnia i bliźniacza
           karta trafień (ta sama anatomia); oba znikają same, gdy brak danych */}
