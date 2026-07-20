@@ -27,9 +27,41 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Iterator
 
+from curl_cffi import requests as _curl
+
 from ..http_client import RateLimitedClient
 
 BASE = "https://api.sofascore.com/api/v1"
+
+
+def fetch_lineups(event_id: int) -> dict | None:
+    """Składy meczu — BACKUP dla składów statshub (zweryfikowane 2026-07-20:
+    statshub i Sofascore dzielą id eventów i zawodników, a /lineups zwraca
+    pełne XI już ~36 h przed meczem z flagą confirmed).
+
+    Zwraca {'confirmed': bool, 'home': set[pid], 'away': set[pid]} albo None
+    (mecz bez składów, błąd sieci LUB blokada IP — Sofascore blokuje
+    serwerownie, więc w chmurze backup po prostu cicho odpada).
+    """
+    try:
+        r = _curl.get(
+            f"{BASE}/event/{event_id}/lineups",
+            impersonate="chrome124", timeout=15,
+        )
+        if r.status_code != 200:
+            return None
+        d = r.json()
+    except Exception:
+        return None
+    out: dict = {"confirmed": bool(d.get("confirmed")), "home": set(), "away": set()}
+    for side in ("home", "away"):
+        for p in (d.get(side) or {}).get("players") or []:
+            if p.get("substitute"):
+                continue
+            pid = (p.get("player") or {}).get("id")
+            if pid:
+                out[side].add(int(pid))
+    return out if (out["home"] or out["away"]) else None
 
 # unique_tournament_id lig w Sofascore (top 5 na start; rozszerzenie = dopisanie wpisu)
 TOURNAMENTS = {

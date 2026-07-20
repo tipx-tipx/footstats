@@ -36,7 +36,7 @@ from ..engine import (
 from ..model import (
     betting, context, counts, koncesje, kupony, matchup_lite, styl, tempo,
 )
-from ..sources import eloratings, rotowire, scores365, statshub, superbet
+from ..sources import eloratings, rotowire, scores365, sofascore, statshub, superbet
 from . import rozliczanie
 from .build_demo import MARKET_NAMES_PL, WEB_DATA_DIR, line_for_lambda
 
@@ -134,6 +134,82 @@ MIN_MECZE_W_OKNIE = 2               # mniej występów w oknie = historia martwa
 STARE_DANE_S = 45 * 86400           # ostatni występ dawniej -> typ tylko "w tle"
 #   (liczy się, uczy kalibrację, widoczny w Skuteczności; wraca do publikacji
 #    po 1-2 kolejkach, gdy zawodnik znów ma świeże mecze)
+
+
+# --- PEŁNE SKŁADY (predicted/oficjalne) ---
+# okno pobierania: przewidywane XI pojawiają się ~36 h przed meczem
+OKNO_SKLADOW_S = 48 * 3600
+# limit zapytań backupowych do Sofascore per cykl (nieoficjalne API, dławić)
+LIMIT_SOFA_NA_CYKL = 40
+
+
+def sklady_xi(events: list[dict]) -> dict[int, dict]:
+    """Pełne XI nadchodzących meczów: mid -> {xi_by_team, confirmed, zrodlo}.
+
+    xi_by_team: {teamId: set[playerId]} — sygnał składu jest wiarygodny
+    per DRUŻYNA (bywa, że znamy XI tylko jednej strony; zawodnikom drugiej
+    nie wolno wtedy wpisywać "poza składem").
+
+    Hierarchia źródeł (id eventów/zawodników wspólne — statshub jest
+    zbudowany na id Sofascore):
+      1. statshub team-lineup (oficjalny, gdy event.lineupConfirmed),
+      2. statshub predicted-teams-lineup (pełne 11/11 ~36 h przed meczem),
+      3. Sofascore /event/{id}/lineups (backup; blokuje IP serwerowni,
+         więc w chmurze cicho odpada — działa z domowego PC).
+    Migotliwa flaga inPredictedLineup z player-trends zostaje ostatecznym
+    fallbackiem w silniku (nic jej nie nadpisuje, gdy XI drużyny nie znamy).
+    """
+    now = int(time.time())
+    out: dict[int, dict] = {}
+    sofa_uzyte = 0
+    for e in events:
+        mid, ts = e.get("id"), e.get("timeStartTimestamp") or 0
+        h_tid, a_tid = e.get("homeTeamId"), e.get("awayTeamId")
+        if not (mid and h_tid and a_tid) or ts <= now or ts - now > OKNO_SKLADOW_S:
+            continue
+        xi_by_team: dict[int, set] = {}
+        confirmed = bool(e.get("lineupConfirmed"))
+        zrodlo = None
+        if confirmed:
+            for tid in (h_tid, a_tid):
+                try:
+                    xi_t = statshub.fetch_team_lineup(mid, tid)
+                except Exception:
+                    xi_t = []
+                if len(xi_t) >= 10:
+                    xi_by_team[tid] = set(xi_t)
+            if xi_by_team:
+                zrodlo = "statshub oficjalny"
+        if not xi_by_team:
+            try:
+                pred = statshub.fetch_predicted_lineup(mid)
+            except Exception:
+                pred = {}
+            for side, tid in (("home", h_tid), ("away", a_tid)):
+                pids = pred.get(side) or []
+                if len(pids) >= 10:
+                    xi_by_team[tid] = set(pids)
+            if xi_by_team:
+                zrodlo = "statshub przewidywany"
+                confirmed = confirmed or bool(pred.get("confirmed"))
+        if not xi_by_team and sofa_uzyte < LIMIT_SOFA_NA_CYKL:
+            sofa_uzyte += 1
+            sofa = sofascore.fetch_lineups(mid)
+            if sofa:
+                for side, tid in (("home", h_tid), ("away", a_tid)):
+                    if len(sofa[side]) >= 10:
+                        xi_by_team[tid] = sofa[side]
+                if xi_by_team:
+                    zrodlo = "sofascore"
+                    confirmed = confirmed or sofa["confirmed"]
+        if xi_by_team:
+            out[mid] = {
+                "xi_by_team": xi_by_team,
+                "confirmed": confirmed,
+                "zrodlo": zrodlo,
+            }
+        time.sleep(0.15)
+    return out
 
 
 def swiezosc_proby(
@@ -800,6 +876,20 @@ def _main_impl(tryb=None):
     # meczów MŚ i przepinamy na nowy event (rywal/kontekst neutralne, składy
     # z Rotowire, kursy z Superbetu).
     covered = {t.event_id for t in trends}
+    # PEŁNE SKŁADY (statshub predicted/team-lineup + backup Sofascore) —
+    # gdzie znamy całą XI drużyny, nadpisujemy migotliwą flagę
+    # inPredictedLineup z trendów pewniejszym źródłem (pid w XI / poza XI)
+    xi_pelne = sklady_xi(events)
+    if xi_pelne:
+        n_conf_xi = sum(1 for v in xi_pelne.values() if v["confirmed"])
+        zrodla_xi = Counter(v["zrodlo"] for v in xi_pelne.values())
+        print(f"Składy: pełne XI dla {len(xi_pelne)} meczów "
+              f"({n_conf_xi} potwierdzonych; "
+              + ", ".join(f"{k}: {v}" for k, v in zrodla_xi.most_common()) + ")")
+    for t in trends:
+        xi_t = (xi_pelne.get(t.event_id) or {}).get("xi_by_team", {}).get(t.team_id)
+        if xi_t is not None:
+            t.in_predicted_lineup = t.player_id in xi_t
     # sygnał przewidywanego/oficjalnego składu (in_predicted_lineup) jest
     # wiarygodny per (mecz, zawodnik) TYLKO dla trendów z żywego feedu —
     # dokładane niżej trendy z banku/365 mają tam zawsze False i bez tej
@@ -809,6 +899,12 @@ def _main_impl(tryb=None):
         if t.event_id and t.player_id:
             k_xi = (t.event_id, t.player_id)
             xi_zywy[k_xi] = xi_zywy.get(k_xi, False) or t.in_predicted_lineup
+    # zawodnicy z pełnych XI bez żywego trendu (dokładki z banku/365) też
+    # mają wiarygodny sygnał składu — bank czyta go właśnie z tej mapy
+    for mid_x, v in xi_pelne.items():
+        for xi_set in v["xi_by_team"].values():
+            for pid_x in xi_set:
+                xi_zywy[(mid_x, pid_x)] = True
     uncovered = [
         e for e in events
         if e["id"] not in covered and e.get("homeTeamId") and e.get("awayTeamId")
@@ -1226,6 +1322,12 @@ def _main_impl(tryb=None):
             predicted_available[t.event_id] = (
                 predicted_available.get(t.event_id, False) or t.in_predicted_lineup
             )
+    # pełne XI (sklady_xi) wzmacniają oba sygnały: znany skład = przewidywany
+    # dostępny; potwierdzenie z team-lineup/Sofascore = jak lineupConfirmed
+    for mid_x, v in xi_pelne.items():
+        predicted_available[mid_x] = True
+        if v["confirmed"]:
+            lineup_confirmed[mid_x] = True
     n_conf = sum(lineup_confirmed.values())
     if n_conf:
         print(f"Składy ogłoszone: {n_conf} z {len(events)} meczów")

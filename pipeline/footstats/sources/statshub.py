@@ -157,6 +157,43 @@ def fetch_event_trends(event_ids: list[int]) -> list[StatshubTrend]:
     return out
 
 
+def fetch_predicted_lineup(event_id: int) -> dict:
+    """Przewidywane XI OBU drużyn: {'home': [pid...], 'away': [...], 'confirmed': bool}.
+
+    Endpoint NIEUDOKUMENTOWANY (podejrzany w XHR strony fixture 2026-07-20):
+    pełne 11/11 już ~36 h przed meczem dla lig z pokryciem propsów
+    (Brasileirão tak; egzotyka typu Finlandia/Bułgaria bywa pusta do końca).
+    Dużo pewniejsze niż migotliwa flaga inPredictedLineup w player-trends.
+    """
+    d = _get(f"{BASE}/event/{event_id}/predicted-teams-lineup")
+    d = d.get("data", d) or {}
+    out: dict = {"home": [], "away": [], "confirmed": False}
+    for side, key in (("home", "homeTeam"), ("away", "awayTeam")):
+        for p in ((d.get(key) or {}).get("data")) or []:
+            pid = p.get("playerId")
+            if pid:
+                out[side].append(int(pid))
+            if str(p.get("predictionType") or "") == "confirmed":
+                out["confirmed"] = True
+    return out
+
+
+def fetch_team_lineup(event_id: int, team_id: int) -> list[int]:
+    """Oficjalny skład drużyny w meczu (XI bez ławki); [] przed ogłoszeniem.
+
+    Ten sam nieudokumentowany zestaw co predicted-teams-lineup; para z flagą
+    event.lineupConfirmed. eventId = events.id (NIE internalId).
+    """
+    d = _get(f"{BASE}/event/{event_id}/team-lineup?teamId={team_id}&heatmap=false")
+    data = d.get("data", d)
+    if not isinstance(data, list):
+        return []
+    return [
+        int(p["playerId"]) for p in data
+        if p.get("playerId") and p.get("isSubstitute") is not True
+    ]
+
+
 def props_available(event_id: int) -> bool:
     """Czy statshub ma już wystawione propsy dla meczu (feed niepusty)."""
     try:
