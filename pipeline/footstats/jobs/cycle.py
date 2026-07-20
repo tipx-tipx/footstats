@@ -23,10 +23,10 @@ try:
 except Exception:
     pass
 
-# "ms2026" (MŚ, wygasa) / "liga" (tryb ligowy, publikacja) / "demo".
-# Przełączyć na "liga", gdy fazy 2-3 roadmapy będą domknięte (rozliczanie
-# multi-liga + web bez słownictwa kadrowego).
-MODE = "ms2026"
+# "liga" (tryb ligowy, produkcja od 2026-07-21) / "ms2026" (MŚ, zakończone
+# 2026-07-19) / "demo". Fazy 1-3 roadmapy ligowej domknięte — silnik,
+# brama jakości, rynki drużynowe, składy i rozliczanie multi-liga.
+MODE = "liga"
 
 
 def main():
