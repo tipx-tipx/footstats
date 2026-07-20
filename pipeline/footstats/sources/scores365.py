@@ -501,6 +501,31 @@ TEAM_STATS_MAP = {
     147: ("shots_outside", False),
 }
 
+_scores_cache: dict[int, dict] = {}
+
+
+def game_scores(game_id: int) -> dict[str, float]:
+    """Gole drużyn w meczu: {znormalizowana nazwa: gole} (endpoint game/).
+
+    Do rozliczania rynku team_goals. Wynik obejmuje dogrywkę, ale rynki
+    drużynowe z dogrywką i tak zamykają się jako zwrot (after_extra_time)
+    ZANIM ktokolwiek zajrzy do tej funkcji.
+    """
+    if game_id in _scores_cache:
+        return _scores_cache[game_id]
+    game = _get(f"{BASE}/game/?{Q}&gameId={game_id}").get("game", {})
+    out: dict[str, float] = {}
+    for side in ("homeCompetitor", "awayCompetitor"):
+        c = game.get(side) or {}
+        nm = _norm(str(c.get("name") or ""))
+        sc = c.get("score")
+        if nm and sc is not None and float(sc) >= 0:
+            out[nm] = float(sc)
+    _zapamietaj_et(game_id, game)  # przy okazji: cache dogrywki bez 2. requestu
+    _scores_cache[game_id] = out
+    return out
+
+
 _team_stats_cache: dict[int, dict] = {}
 
 

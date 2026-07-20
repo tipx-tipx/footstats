@@ -168,10 +168,15 @@ def props_available(event_id: int) -> bool:
 # statType team-trends -> nasz kod rynku DRUŻYNOWEGO. UWAGA na nazwy statshub:
 # "totalShotsOnGoal" to strzały OGÓŁEM (statDisplay "Shots"), "shotsOnGoal" —
 # celne. Fauli drużynowych team-trends nie wystawia (historia z banku stylu).
+# Sonda klubowa 2026-07-20: dla klubów feed niesie głównie "goals" (673/750
+# rekordów) i "cornerKicks" (75) — a Superbet kwotuje czysto właśnie gole,
+# rożne i kartki drużynowe, więc mapujemy i te.
 TEAM_STATTYPE_MAP = {
     "totalShotsOnGoal": "team_shots",
     "shotsOnGoal": "team_sot",
     "cards": "team_cards",
+    "goals": "team_goals",
+    "cornerKicks": "team_corners",
 }
 
 
@@ -196,14 +201,27 @@ class TeamTrend:
 def fetch_team_trends(event_ids: list[int]) -> list[TeamTrend]:
     """Trendy drużynowe (`/api/props/team-trends`) dla podanych meczów.
 
-    Zwraca strzały / celne / kartki per drużyna z historią recentGames
-    (statValue per mecz, ~20 wstecz) i kursami referencyjnymi bukmacherów.
-    Gole pomijamy (nie modelujemy 1X2/goli), rożne — brak kursów Superbetu.
+    Zwraca gole / rożne / strzały / celne / kartki per drużyna z historią
+    recentGames (statValue per mecz, ~20 wstecz) i kursami referencyjnymi.
+    Z PAGINACJĄ — ta sama pułapka co player-trends (domyślne pageSize=25
+    cicho ucina feed; zmierzone 2026-07-20: 750 rekordów w 8 stronach).
     """
     if not event_ids:
         return []
     games = ",".join(str(e) for e in event_ids)
-    data = _get(f"{BASE}/props/team-trends?games={games}").get("data", [])
+    data: list[dict] = []
+    page = 1
+    PAGE_SIZE = 100
+    while True:
+        czesc = _get(
+            f"{BASE}/props/team-trends?games={games}"
+            f"&pageSize={PAGE_SIZE}&page={page}"
+        ).get("data", [])
+        data += czesc
+        # bezpiecznik 40 stron, jak w fetch_event_trends
+        if len(czesc) < PAGE_SIZE or page >= 40:
+            break
+        page += 1
     out: list[TeamTrend] = []
     for rec in data:
         mk = TEAM_STATTYPE_MAP.get(rec.get("statType"))

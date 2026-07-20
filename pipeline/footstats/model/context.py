@@ -108,7 +108,10 @@ def home_away_factor(is_home: bool, market_code: str) -> float:
     Gospodarze strzelają więcej i faulują mniej; goście odwrotnie.
     Wartości celowo skromne — resztę i tak niesie czynnik rywala i game script.
     """
-    offensive = market_code.startswith(("shots", "sot", "headed", "fh_", "team_shots", "team_sot"))
+    offensive = market_code.startswith(
+        ("shots", "sot", "headed", "fh_",
+         "team_shots", "team_sot", "team_goals", "team_corners")
+    )
     disciplinary = "foul" in market_code or "card" in market_code or market_code == "yellow_card"
     if offensive:
         return 1.06 if is_home else 0.94
@@ -131,7 +134,10 @@ def game_script_factor(
         więcej odbiorów/przechwytów, faworyt więcej strzałów (też z dystansu).
     """
     f = 1.0
-    offensive = market_code.startswith(("shots", "sot", "headed", "fh_", "team_shots", "team_sot"))
+    offensive = market_code.startswith(
+        ("shots", "sot", "headed", "fh_",
+         "team_shots", "team_sot", "team_goals", "team_corners")
+    )
     defensive = market_code in ("tackles", "interceptions")
     disciplinary = "foul" in market_code or "card" in market_code or market_code == "yellow_card"
 

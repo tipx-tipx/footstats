@@ -52,6 +52,10 @@ MARKETY_LIB = {"fouls_committed", "tackles", "fouls_won", "interceptions",
 MARKETY_DRUZYNOWE = {
     "team_shots": "shots", "team_sot": "sot",
     "team_fouls": "fouls", "team_cards": "kartki",
+    "team_corners": "corners",
+    # gole nie występują w game_team_stats — rozliczane z wyniku meczu
+    # (scores365.game_scores), pole tu tylko znacznikiem przynależności
+    "team_goals": "gole",
 }
 # strzały NIECELNE i ZABLOKOWANE liczymy CAŁKOWICIE OSOBNO — nie wchodzą do
 # zbiorczej skuteczności modelu (podsumowanie trafień/ROI ani tabela per rynek).
@@ -1279,13 +1283,19 @@ def rozlicz(
             gid_t = _gid_365(rec, cache_365)
             wartosc_t = None
             if gid_t is not None and not scores365.after_extra_time(gid_t):
-                try:
-                    st_t = scores365.game_team_stats(gid_t)
-                except Exception:
-                    st_t = None
-                if st_t:
-                    tk = rotowire._norm(str(rec["podmiot"]))
-                    if tk in st_t:
+                tk = rotowire._norm(str(rec["podmiot"]))
+                if mk == "team_goals":
+                    # goli nie ma w game/stats — bierzemy wynik meczu
+                    try:
+                        wartosc_t = scores365.game_scores(gid_t).get(tk)
+                    except Exception:
+                        wartosc_t = None
+                else:
+                    try:
+                        st_t = scores365.game_team_stats(gid_t)
+                    except Exception:
+                        st_t = None
+                    if st_t and tk in st_t:
                         w_t = st_t[tk].get(MARKETY_DRUZYNOWE[mk])
                         wartosc_t = float(w_t) if w_t is not None else None
             if wartosc_t is None:

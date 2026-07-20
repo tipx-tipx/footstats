@@ -64,6 +64,7 @@ MARKET_NAMES_PL = {
     "shots_blocked": "Strzały zablokowane", "shots_off_target": "Strzały niecelne",
     "team_fouls": "Faule drużyny", "team_cards": "Kartki drużyny",
     "team_shots": "Strzały drużyny", "team_sot": "Strzały celne drużyny",
+    "team_goals": "Gole drużyny", "team_corners": "Rzuty rożne drużyny",
 }
 BOOKMAKERS = ["Superbet", "Betclic", "STS"]
 

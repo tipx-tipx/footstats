@@ -1844,8 +1844,16 @@ def _main_impl(tryb=None):
     # legi_pool tymi samymi progami co zawodnicze i płyną dalej istniejącą
     # ścieżką pewniaków/kuponów; rozliczanie: scores365.game_team_stats.
     try:
+        # zakres drużynowy: w lidze rynki drużynowe liczymy WYŁĄCZNIE dla
+        # rozgrywek z profilem druzynowe=True (top 5 + Ekstraklasa + puchary,
+        # decyzja zakresu 2026-07-20); w MŚ — wszystkie mecze jak dotąd
+        ids_tt = [e["id"] for e in events]
+        if tryb:
+            ids_tt = [i for i in ids_tt if i in tryb.druzynowe_mids]
+            print(f"Rynki drużynowe: {len(ids_tt)}/{len(events)} meczów "
+                  "w zakresie drużynowym")
         try:
-            team_trends = statshub.fetch_team_trends([e["id"] for e in events])
+            team_trends = statshub.fetch_team_trends(ids_tt) if ids_tt else []
         except Exception as e:
             team_trends = []
             print(f"team-trends niedostępne ({e})")
@@ -1853,6 +1861,10 @@ def _main_impl(tryb=None):
         TEAM_POLE_BANKU = {
             "team_shots": "shots", "team_sot": "sot",
             "team_fouls": "fouls", "team_cards": "kartki",
+            # rożne są w banku (game_team_stats id 8); goli bank nie ma —
+            # nieistniejące pole daje None i uczciwe fallbacki (średnia
+            # z historii trendu, czynnik rywala 1.0)
+            "team_corners": "corners", "team_goals": "gole",
         }
         gry_banku = list((bank_stylu.get("gry") or {}).values())
 
@@ -1891,6 +1903,8 @@ def _main_impl(tryb=None):
         # faule drużyn: team-trends ich nie wystawia — syntetyczny trend z banku
         widziane_tt = {(t.event_id, t.team_id, t.market_code) for t in team_trends}
         for e in wszystkie_ev:
+            if tryb and e["id"] not in tryb.druzynowe_mids:
+                continue  # zakres drużynowy (jw.), gdy bank ligowy powstanie
             for tid_e, opp_e, is_home_e in (
                 (e["homeTeamId"], e["awayTeamId"], True),
                 (e["awayTeamId"], e["homeTeamId"], False),
@@ -1911,6 +1925,7 @@ def _main_impl(tryb=None):
 
         n_team = 0
         seen_team = set()
+        odpadki_t: Counter = Counter()  # diagnostyka: czemu legi drużynowe nie powstają
         for tt in team_trends:
             klucz_t = (tt.event_id, tt.team_id, tt.market_code)
             if klucz_t in seen_team or tt.event_id not in ev_by_id:
@@ -1922,13 +1937,43 @@ def _main_impl(tryb=None):
             home_name = team_name.get(ev.get("homeTeamId"), "")
             away_name = team_name.get(ev.get("awayTeamId"), "")
             match_label = f"{home_name} – {away_name}"
-            sb_odds = sb_cache.get(mid) or {}
+            sb_odds = sb_cache.get(mid)
+            if sb_odds is None and sb_events:
+                # mecz z trendami DRUŻYNOWYMI bez zawodniczych nie przeszedł
+                # przez pętlę główną, więc nikt nie pobrał jego kursów —
+                # typowy przypadek: kwalifikacje pucharów (propsów
+                # zawodniczych brak, gole/rożne drużynowe są). Dociągamy.
+                if tryb:
+                    sb_ev = tryb.sb_ev_by_mid.get(mid)
+                else:
+                    sb_ev = superbet.match_superbet_event(
+                        sb_events, home_name, away_name, ts
+                    )
+                if sb_ev:
+                    parts = [p.strip()
+                             for p in (sb_ev.get("matchName") or "·").split("·")]
+                    try:
+                        sb_odds = superbet.fetch_stat_odds(
+                            sb_ev["eventId"], parts[0], parts[1]
+                        )
+                    except Exception:
+                        sb_odds = {"players": {}, "teams": {}}
+                else:
+                    sb_odds = {"players": {}, "teams": {}}
+                sb_cache[mid] = sb_odds
+                # tempo z tych samych kursów — f_script niżej z niego korzysta
+                tempo_cache[mid] = tempo.tempo_from_match_odds(sb_odds.get("match"))
+            sb_odds = sb_odds or {}
             linie_t = (
                 sb_odds.get("teams", {})
                 .get("home" if tt.is_home else "away", {})
                 .get(tt.market_code, {})
             )
-            if not linie_t or len(tt.counts) < 5:
+            if not linie_t:
+                odpadki_t["brak_kursu"] += 1
+                continue
+            if len(tt.counts) < 5:
+                odpadki_t["krotka_historia"] += 1
                 continue
             pole = TEAM_POLE_BANKU[tt.market_code]
             lg_mean, _lg_n = _srednia_turnieju(pole)
@@ -1970,6 +2015,17 @@ def _main_impl(tryb=None):
             )
             factor_t = f_sedzia * f_script * f_opp
             srednia_hist = float(np.mean(tt.counts[:n_h]))
+            # brama jakości (liga) także dla drużyn: historia klubu sprzed
+            # przerwy/awansu podlega tym samym progom co zawodnicza
+            stare_t = False
+            if tryb and tt.timestamps:
+                n_sw_t, dni_ost_t = swiezosc_proby(
+                    tt.timestamps, [90.0] * len(tt.timestamps), now_t
+                )
+                if n_sw_t < MIN_MECZE_W_OKNIE:
+                    odpadki_t["za_stara_historia"] += 1
+                    continue
+                stare_t = dni_ost_t * 86400 > STARE_DANE_S
             for l_t, slot_t in sorted(linie_t.items()):
                 odd_t = (slot_t or {}).get("over")
                 if not odd_t:
@@ -1989,12 +2045,16 @@ def _main_impl(tryb=None):
                     and p_t >= 0.42 and p_t * odd_t - 1.0 >= 0.0
                 )
                 if not (pewny_t or perelka_t):
+                    odpadki_t["kurs_lub_szansa_poza_widelkami"] += 1
                     continue
                 if (hi_t - lo_t) > 0.35:
+                    odpadki_t["chwiejna_predykcja"] += 1
                     continue
                 if abs(p_t - implied_t) > betting.MAX_MODEL_MARKET_DIVERGENCE:
+                    odpadki_t["rozjazd_z_rynkiem"] += 1
                     continue
                 if implied_t > 0 and p_t / implied_t > betting.MAX_RELATIVE_DIVERGENCE:
+                    odpadki_t["rozjazd_z_rynkiem"] += 1
                     continue
                 ev_uk_t = kurs_ref_t = None
                 if (
@@ -2055,6 +2115,7 @@ def _main_impl(tryb=None):
                     "matchup_styl": False,
                     "rotacja": False, "xi_sygnal": None,
                     "swieze_sklady": mid in swieze_mids,
+                    "stare_dane": stare_t,
                     "miekka_linia": False, "kurs_oczekiwany": None,
                     "ci": [round(lo_t, 4), round(hi_t, 4)],
                     "oczekiwane_minuty": None,
@@ -2074,9 +2135,12 @@ def _main_impl(tryb=None):
                     "lambda": round(float(pred_t.lam), 3),
                 })
                 n_team += 1
-        if n_team:
+        if n_team or team_trends:
             print(f"Rynki drużynowe: +{n_team} legów w puli "
-                  f"({len(team_trends)} trendów drużynowych)")
+                  f"({len(team_trends)} trendów drużynowych)"
+                  + (f"; odpadło: " + ", ".join(
+                      f"{k}={v}" for k, v in odpadki_t.most_common())
+                     if odpadki_t else ""))
     except Exception as e:
         print(f"Rynki drużynowe pominięte ({e})")
 

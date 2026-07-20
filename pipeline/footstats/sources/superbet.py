@@ -42,13 +42,19 @@ PLAYER_MARKET_MAP = {
     "Zawodnik - liczba przechwytów": "interceptions",
 }
 
-# rynki drużynowe (nazwa zawiera nazwę drużyny, np. "Francja liczba fauli")
+# rynki drużynowe (nazwa zawiera nazwę drużyny, np. "Francja liczba fauli").
+# Sonda klubowa 2026-07-20 (Atlético MG–Bahia, 287 rynków): czyste rynki
+# drużynowe z total to "liczba goli", "liczba rzutów rożnych", "liczba
+# kartek"; fauli/strzałów ogółem Superbet dla klubów często nie kwotuje
+# czysto (tylko w combo), ale sufiksy zostają — łapią, gdy są.
 TEAM_MARKET_SUFFIX = {
     "liczba fauli": "team_fouls",
     "liczba strzałów": "team_shots",
     "liczba celnych strzałów": "team_sot",
     "liczba żółtych kartek": "team_cards",
     "liczba kartek": "team_cards",
+    "liczba goli": "team_goals",
+    "liczba rzutów rożnych": "team_corners",
 }
 
 # nazwy reprezentacji: Superbet (PL) -> Sofascore/statshub (EN)

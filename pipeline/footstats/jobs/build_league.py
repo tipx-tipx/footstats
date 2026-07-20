@@ -398,6 +398,9 @@ class TrybLigowy:
     # zmierzona luka pokrycia z parowania (brama jakości: luka jest LOGOWANA,
     # nie ignorowana) — silnik dopisze swoją część i zrzuci pokrycie_liga.json
     pokrycie: dict = field(default_factory=dict)
+    # mecze rozgrywek z zakresu DRUŻYNOWEGO (top 5 + Ekstraklasa + puchary,
+    # rozgrywki.druzynowe=True) — tylko dla nich silnik liczy rynki drużynowe
+    druzynowe_mids: set[int] = field(default_factory=set)
 
 
 def zbuduj_tryb(days: int = 5, publikuj: bool = False) -> TrybLigowy | None:
@@ -448,6 +451,7 @@ def zbuduj_tryb(days: int = 5, publikuj: bool = False) -> TrybLigowy | None:
         liga_glowna="Piłka klubowa",
         sezon="2026/27",
         pokrycie=pokrycie,
+        druzynowe_mids={m.event_id for m in pary if m.druzynowe},
     )
 
 
