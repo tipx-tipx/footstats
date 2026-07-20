@@ -58,13 +58,24 @@ SH_HEADERS = {"Accept": "application/json", "Referer": "https://www.statshub.com
 # cicho nadpisując żywe dane w Supabase starymi.
 _generated_this_run: set[str] = set()
 
+# Adapter trybu ligowego (build_league.TrybLigowy) — None = klasyczny tryb MŚ.
+# Ustawiany na czas JEDNEGO przebiegu przez main(tryb=...). W trybie ligowym
+# bez publikacji (dry-run) dumpy idą do podkatalogu liga_dryrun, a rozliczenia
+# i zapisy do Supabase są pomijane — produkcja zostaje nietknięta.
+_tryb = None
+
+
+def _dry_run() -> bool:
+    return _tryb is not None and not _tryb.publikuj
+
 
 def _dump(name: str, obj) -> None:
-    WEB_DATA_DIR.mkdir(parents=True, exist_ok=True)
-    (WEB_DATA_DIR / name).write_text(
+    katalog = WEB_DATA_DIR / "liga_dryrun" if _dry_run() else WEB_DATA_DIR
+    katalog.mkdir(parents=True, exist_ok=True)
+    (katalog / name).write_text(
         json.dumps(obj, ensure_ascii=False, indent=1), encoding="utf-8"
     )
-    if name.endswith(".json"):
+    if name.endswith(".json") and not _dry_run():
         _generated_this_run.add(name[:-5])
 
 
@@ -85,6 +96,10 @@ def _rozlicz_i_zapisz(
     to, co potem trafi do historii, i nic nie zmienia się między cyklami.
     Przy błędzie NIE nadpisujemy plików — zostają wyniki z poprzedniego cyklu.
     """
+    if _dry_run():
+        print(f"[dry-run liga] rozliczanie i log typów POMINIĘTE "
+              f"({len(value_bets)} typów, {len(kupony_list)} kuponów w pamięci)")
+        return
     try:
         # typy pomiarowe (odrzucone przy progu) i typy poza publikacją
         # (kwarantanna/limit meczu) dokładamy WYŁĄCZNIE do logu rozliczeń —
@@ -517,6 +532,7 @@ def score_from_trend(
     koncesje_tab: "koncesje.Koncesje | None" = None,
     player_style=None,
     opponent_style=None,
+    liga: bool = False,
 ):
     """Zbuduj PlayerHistory z recentGames i policz predykcję (bez kursów).
 
@@ -558,8 +574,9 @@ def score_from_trend(
         return None, hist
     # PRIOR: pełna historia sprzed turnieju jako silny prior Gamma
     # ("sezon klubowy"), mecze turnieju aktualizują posterior; przy małej
-    # próbie przedturniejowej — dotychczasowy słaby prior + cała historia
-    kp = klub_prior(trend, now, opp_w)
+    # próbie przedturniejowej — dotychczasowy słaby prior + cała historia.
+    # W LIDZE podział klub/kadra nie istnieje — ciągła historia + prior grupowy.
+    kp = None if liga else klub_prior(trend, now, opp_w)
     if kp is not None:
         prior, hist.likelihood_mask = kp
     else:
@@ -617,9 +634,14 @@ def score_from_trend(
                 f"{trend.opponent_name} ~{opp_allowed:.2f} na 90 min przy "
                 f"normie {opp_avg:.2f} (próba: {opp_n} meczów)"
             )
-    ctx_is_home, ctx_neutral_venue = venue_context(
-        trend.team_name, trend.opponent_name, trend.is_home
-    )
+    if liga:
+        # liga: realny gospodarz z feedu, neutralne boisko nie występuje
+        # (finały pucharów na neutralnym — do obsłużenia przy okazji finałów)
+        ctx_is_home, ctx_neutral_venue = trend.is_home, False
+    else:
+        ctx_is_home, ctx_neutral_venue = venue_context(
+            trend.team_name, trend.opponent_name, trend.is_home
+        )
     ctx = MatchContext(
         is_home=ctx_is_home,
         is_favourite=bool(spread_teamu is not None and spread_teamu > 0.15),
@@ -648,22 +670,27 @@ def score_from_trend(
     return (prior, ctx), hist
 
 
-def main() -> None:
+def main(tryb=None) -> None:
     """Cienki wrapper: gwarantuje zapis manifestu (_manifest.json) na KAŻDYM
     wyjściu z _main_impl (sukces, wczesny return, wyjątek) — patrz komentarz
-    przy _generated_this_run wyżej."""
+    przy _generated_this_run wyżej.
+
+    tryb: build_league.TrybLigowy albo None (klasyczny przebieg MŚ)."""
+    global _tryb
+    _tryb = tryb
     _generated_this_run.clear()
     try:
-        _main_impl()
+        _main_impl(tryb)
     finally:
         _dump("_manifest.json", {"keys": sorted(_generated_this_run)})
+        _tryb = None
 
 
-def _main_impl():
-    events = upcoming_wc_events()
-    print(f"Nadchodzące mecze MŚ (statshub): {len(events)}")
+def _main_impl(tryb=None):
+    events = tryb.events if tryb else upcoming_wc_events()
+    print(f"Nadchodzące mecze {'ligowe' if tryb else 'MŚ'} (statshub): {len(events)}")
     if not events:
-        print("Brak nadchodzących meczów MŚ w statshub.")
+        print("Brak nadchodzących meczów w statshub.")
         _rozlicz_i_zapisz([], [])  # rozliczenia lecą niezależnie od nowych typów
         return
 
@@ -731,7 +758,7 @@ def _main_impl():
 
         # 2) dołóż co jeszcze zostało z rozegranych eventów + dzisiejsze trendy
         if uncovered:
-            past_ids = past_wc_event_ids()
+            past_ids = list(tryb.past_event_ids) if tryb else past_wc_event_ids()
             for i in range(0, len(past_ids), 8):
                 for t in statshub.fetch_event_trends(past_ids[i:i + 8]):
                     _merge(t)
@@ -740,7 +767,8 @@ def _main_impl():
         bank_recs = {
             f"{t.player_id}:{t.market_code}": asdict(t) for t in lib.values()
         }
-        save_trend_lib(bank_recs)
+        if not _dry_run():
+            save_trend_lib(bank_recs)
 
         # 3) przepnij najświeższe trendy z biblioteki na KAŻDY nadchodzący
         #    mecz, którego żywy feed nie pokrywa w danym (zawodnik, rynek) —
@@ -951,9 +979,14 @@ def _main_impl():
             team_name[t.team_id] = t.team_name
         if t.opponent_id:
             team_name[t.opponent_id] = t.opponent_name
+    if tryb:
+        # w trybie ligowym nazwy z by-date (homeTeam/awayTeam) są pełniejsze
+        # niż z trendów (drużyna bez propsów nie ma trendu) i nadpisują je
+        team_name.update(tryb.team_name)
 
-    # uczestnicy MŚ (znormalizowani) — do ważenia próby siłą rywala
-    wc_names = {
+    # uczestnicy MŚ (znormalizowani) — do ważenia próby siłą rywala;
+    # w lidze brak listy uczestników (waga bazowa dla wszystkich rywali)
+    wc_names = set() if tryb else {
         rotowire._norm(n) for n in team_name.values() if n
     } | {
         rotowire._norm(x)
@@ -967,7 +1000,8 @@ def _main_impl():
     # budują normę i profile); filtr klubów załatwia min_ts (sezon skończony)
     try:
         koncesje_tab = koncesje.zbuduj_koncesje(
-            bank_recs, wc_names=None, min_ts=WC_START_TS,
+            bank_recs, wc_names=None,
+            min_ts=tryb.koncesje_min_ts if tryb else WC_START_TS,
         )
         n_prof = len({k[0] for k in koncesje_tab._obs})
         print(f"Profil rywali: {n_prof} drużyn, "
@@ -982,6 +1016,11 @@ def _main_impl():
     style_turnieju = None
     bank_stylu: dict = {}
     try:
+        if tryb:
+            # bank stylu liczony był per turniej MŚ — wersja ligowa (per
+            # rozgrywki z profilu) to osobny etap roadmapy; do tego czasu
+            # matchupy działają w trybie lite
+            raise RuntimeError("tryb ligowy: bank stylu w późniejszym etapie")
         bank_stylu = aktualizuj_bank_stylu({t.player_id for t in trends})
         strony_zaw: dict[str, str] = {}
         for t in trends:
@@ -1000,21 +1039,30 @@ def _main_impl():
     except Exception as e:
         print(f"Bank stylu pominięty ({e}) — matchupy w trybie lite")
 
-    # kursy Superbetu
-    try:
-        sb_events = superbet.list_events(days_ahead=8)
-    except Exception as e:
-        sb_events = []
-        print(f"Superbet niedostępny: {e}")
+    # kursy Superbetu (w trybie ligowym lista przyjechała już z parownikiem)
+    if tryb:
+        sb_events = tryb.sb_events
+    else:
+        try:
+            sb_events = superbet.list_events(days_ahead=8)
+        except Exception as e:
+            sb_events = []
+            print(f"Superbet niedostępny: {e}")
 
     # Elo reprezentacji (eloratings.net, cache w Supabase) — ciągła waga
-    # próby siłą rywala + syntetyczny spread, gdy brak kursów 1X2
-    elo_map = eloratings.get_ratings()
-    print(f"Elo: {len(elo_map)} reprezentacji" if elo_map
-          else "Elo niedostępne — wagi próby z listy uczestników MŚ")
+    # próby siłą rywala + syntetyczny spread, gdy brak kursów 1X2.
+    # W lidze eloratings nie zna klubów — waga bazowa, spread z kursów 1X2.
+    elo_map = {} if tryb else eloratings.get_ratings()
+    if not tryb:
+        print(f"Elo: {len(elo_map)} reprezentacji" if elo_map
+              else "Elo niedostępne — wagi próby z listy uczestników MŚ")
 
     # profil sędziów: obsada + średnia fauli/mecz vs średnia turnieju
     try:
+        if tryb:
+            # profil sędziów liczony per turniej MŚ; wersja ligowa (statshub
+            # daje refereeName/refereeAvgCards w by-date) — późniejszy etap
+            raise RuntimeError("tryb ligowy: sędziowie w późniejszym etapie")
         sedzia_by_mid = profil_sedziow(events, team_name)
         _ev_by = {e["id"]: e for e in events}
         for mid_s, s in sedzia_by_mid.items():
@@ -1106,7 +1154,8 @@ def _main_impl():
             if conf_e and str(mid_e) not in potw:
                 potw[str(mid_e)] = now_p
         potw = {k: v for k, v in potw.items() if now_p - int(v) < 3 * 86400}
-        supa.put_key("sklady_potwierdzone_ts", potw)
+        if not _dry_run():
+            supa.put_key("sklady_potwierdzone_ts", potw)
         swieze_mids = {
             int(k) for k, v in potw.items() if now_p - int(v) < 45 * 60
         }
@@ -1201,11 +1250,16 @@ def _main_impl():
 
         if mid not in matches_out:
             sed = sedzia_by_mid.get(mid) or {}
+            # etykiety rozgrywek: tryb ligowy niesie je per mecz (z profili
+            # rozgrywek + rund statshub); MŚ zostaje po staremu
+            et = (tryb.liga_by_mid.get(mid) if tryb else None) or {
+                "liga": "MŚ", "sezon": "2026", "kolejka": "Ćwierćfinał",
+            }
             # na karcie meczu pokazujemy mnożnik PO shrinkage (1-2 mecze
             # próby to za słaby dowód na "×1,26") — spójnie ze scoringiem
             matches_out[mid] = {
-                "id": mid, "liga": "MŚ", "sezon": "2026",
-                "kolejka": "Ćwierćfinał", "kickoff_ts": ts,
+                "id": mid, "liga": et["liga"], "sezon": et["sezon"],
+                "kolejka": et["kolejka"], "kickoff_ts": ts,
                 "gospodarz": home_name, "gosc": away_name,
                 "sedzia": sed.get("sedzia"),
                 "sedzia_mnoznik_fauli": round(context.shrink_factor(
@@ -1223,9 +1277,13 @@ def _main_impl():
         # meczu (1X2 + total goli) wchodzi do kontekstu predykcji
         sb_odds = sb_cache.get(mid)
         if sb_odds is None and sb_events:
-            sb_ev = superbet.match_superbet_event(
-                sb_events, home_name, away_name, ts
-            )
+            if tryb:
+                # parowanie klubów zrobił build_league (nazwy + okno czasu)
+                sb_ev = tryb.sb_ev_by_mid.get(mid)
+            else:
+                sb_ev = superbet.match_superbet_event(
+                    sb_events, home_name, away_name, ts
+                )
             if sb_ev:
                 parts = [p.strip() for p in (sb_ev.get("matchName") or "·").split("·")]
                 try:
@@ -1277,6 +1335,7 @@ def _main_impl():
             koncesje_tab=koncesje_tab,
             player_style=pstyle,
             opponent_style=ostyle,
+            liga=tryb is not None,
         )
         if built is None:
             _odrzuc(mid, tr, "za_malo_historii",
@@ -1285,9 +1344,11 @@ def _main_impl():
         prior, ctx = built
         mk = tr.market_code
         # trigger rotacyjny: zawodnik w (przewidywanym) XI bez ani jednego
-        # występu na turnieju — rynek często nie zdążył dograć jego linii
+        # występu na turnieju (w lidze: w oknie świeżości z trybu) — rynek
+        # często nie zdążył dograć jego linii
+        prog_rotacji = tryb.rotacja_min_ts if tryb else WC_START_TS
         gral_na_turnieju = any(
-            ts_g >= WC_START_TS and m_g > 0
+            ts_g >= prog_rotacji and m_g > 0
             for ts_g, m_g in zip(tr.timestamps, tr.minutes)
         )
         rotacja = bool(
@@ -1330,11 +1391,12 @@ def _main_impl():
                 },
             }
 
-        # kursy Superbetu dla tego zawodnika/rynku (mecz pobrany wyżej)
+        # kursy Superbetu dla tego zawodnika/rynku (mecz pobrany wyżej);
+        # znajdz_zawodnika łata rozjazd pełne vs boiskowe nazwiska (kluby)
         sb_lines = {}
         if sb_odds:
-            sb_lines = sb_odds.get("players", {}).get(
-                superbet.norm_name(tr.player_name), {}
+            sb_lines = superbet.znajdz_zawodnika(
+                sb_odds.get("players", {}), tr.player_name
             ).get(mk, {})
 
         # kursy: linia -> strona -> (kurs, bukmacher) — tylko Superbet (patrz nota u góry)
@@ -2150,10 +2212,19 @@ def _main_impl():
     # gdy propsy i kursy dają choć jedną okazję.
     if not value_bets:
         print(
-            f"Na razie 0 okazji MŚ ({len(matches_out)} meczów, "
+            f"Na razie 0 okazji ({len(matches_out)} meczów, "
             f"{len(players_out)} zawodników ma propsy). Nie podmieniam danych "
-            "aplikacji — czekam na pełne propsy/kursy ćwierćfinałów."
+            "aplikacji — czekam na pełne propsy/kursy."
         )
+        # diagnoza "czemu 0": rozkład powodów odrzuceń zamiast ciszy
+        powody: dict[str, int] = {}
+        for o in odrzucenia.values():
+            powody[o["powod"]] = powody.get(o["powod"], 0) + 1
+        if powody:
+            print("Powody odrzuceń: " + ", ".join(
+                f"{k}={v}" for k, v in sorted(powody.items(), key=lambda x: -x[1])
+            ))
+        _dump("odrzucenia_zero_okazji.json", list(odrzucenia.values()))
         _rozlicz_i_zapisz([], [], niedostepni,
                           poza_publikacja=typy_poza_publikacja)
         return
@@ -2255,8 +2326,10 @@ def _main_impl():
                       poza_publikacja=typy_poza_publikacja,
                       legi_pool=legi_pool_pub)
     _dump("meta.json", {
-        "wygenerowano_ts": int(time.time()), "tryb": "ms2026",
-        "liga": "Mistrzostwa Świata", "sezon": "2026",
+        "wygenerowano_ts": int(time.time()),
+        "tryb": "liga" if tryb else "ms2026",
+        "liga": tryb.liga_glowna if tryb else "Mistrzostwa Świata",
+        "sezon": tryb.sezon if tryb else "2026",
         "zrodlo": "statshub (statystyki i historia) + Superbet (kursy)",
         "meczow_w_bazie": len(matches_out), "meczow_demo": len(matches_out),
         "meczow_kalibracja": 20, "okazji": len(value_bets),

@@ -93,3 +93,26 @@ def test_paruj_odrzuca_slabe_podobienstwo():
     sb = [_sb(101, "Nacional Montevideo·CA Tigre", 1_784_673_000)]
     n, luka = bl.paruj_superbet([m], sb)
     assert n == 0 and m.sb_event is None and len(luka) == 1
+
+
+# --- dopasowanie zawodników do kluczy kursów Superbetu ---
+
+def test_znajdz_zawodnika_pelne_vs_boiskowe():
+    """Superbet w klubach kwotuje pod PEŁNYM nazwiskiem, statshub daje
+    boiskowe (żywy przypadek 2026-07-20: Renan Lodi / Ademir, Brasileirão)."""
+    from footstats.sources.superbet import znajdz_zawodnika
+    players = {
+        "augusto dos lodi renan santos": {"shots": {0.5: {"over": 1.5}}},
+        "ademir da junior santos silva": {"shots": {0.5: {"over": 1.8}}},
+        "da jose silva willian": {"shots": {}},
+        "jose silva willian": {"shots": {}},
+    }
+    assert znajdz_zawodnika(players, "Renan Lodi") \
+        == players["augusto dos lodi renan santos"]
+    assert znajdz_zawodnika(players, "Ademir") \
+        == players["ademir da junior santos silva"]
+    # dwóch kandydatów (Willian) = niejednoznaczne = brak dopasowania
+    assert znajdz_zawodnika(players, "Willian") == {}
+    # dokładny klucz ma pierwszeństwo i działa jak dotąd (tryb MŚ)
+    assert znajdz_zawodnika({"kane harry": {"sot": {}}}, "Harry Kane") \
+        == {"sot": {}}

@@ -62,8 +62,26 @@ class MeczLigowy:
     kickoff_ts: int
     has_odd: bool
     druzynowe: bool
+    kolejka: str = ""
+    raw: dict = field(default_factory=dict)  # surowy event statshub (dla silnika)
     sb_event: dict | None = None
     sb_podobienstwo: float = 0.0
+
+
+def _kolejka(ev: dict, tournaments: dict) -> str:
+    """Etykieta rundy: 'Kolejka 3' z roundInfo albo faza z roundSlug/nazwy
+    turnieju ('2nd-qualifying-round' -> '2nd qualifying round')."""
+    slug = str(ev.get("roundSlug") or "").strip()
+    if slug:
+        return slug.replace("-", " ")
+    # "LigaPro Serie A, Second Stage" -> "Second Stage"
+    tname = str((tournaments or {}).get("name") or "")
+    if "," in tname:
+        return tname.split(",", 1)[1].strip()
+    ri = ev.get("roundInfo")
+    if isinstance(ri, int) and ri > 0:
+        return f"Kolejka {ri}"
+    return ""
 
 
 def upcoming_events(days: int = 6) -> list[MeczLigowy]:
@@ -109,8 +127,38 @@ def upcoming_events(days: int = 6) -> list[MeczLigowy]:
                 kickoff_ts=int(ev.get("timeStartTimestamp") or 0),
                 has_odd=bool(e.get("hasOdd")),
                 druzynowe=p.druzynowe,
+                kolejka=_kolejka(ev, e.get("tournaments") or {}),
+                raw=ev,
             )
     return sorted(out.values(), key=lambda m: m.kickoff_ts)
+
+
+def past_event_ids(team_ids: set[int], days_back: int = 10) -> list[int]:
+    """Rozegrane mecze z udziałem podanych drużyn (do banku historii trendów).
+
+    Filtr po drużynach trzyma liczbę zapytań o trendy w ryzach — bank rośnie
+    tylko o zawodników drużyn, które faktycznie gramy w tym cyklu.
+    """
+    now = int(time.time())
+    out: list[int] = []
+    for d in range(1, days_back + 1):
+        start = now - d * 86400
+        start -= start % 86400
+        try:
+            data = _sh(
+                f"{SH_BASE}/event/by-date?startOfDay={start}&endOfDay={start + 86399}"
+            ).get("data", [])
+        except Exception:
+            continue
+        for e in data:
+            ev = e.get("events") or {}
+            if ev.get("status") == "notstarted" or not ev.get("id"):
+                continue
+            ids = {(e.get("homeTeam") or {}).get("id"),
+                   (e.get("awayTeam") or {}).get("id")}
+            if ids & team_ids:
+                out.append(ev["id"])
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -306,9 +354,86 @@ def raport_pokrycia(days: int = 4) -> dict:
     }
 
 
-def main() -> None:
-    raport_pokrycia()
+# ---------------------------------------------------------------------------
+# Adapter trybu — wstrzykiwany w build_wc_fast._main_impl (szwy `tryb`)
+# ---------------------------------------------------------------------------
+
+@dataclass
+class TrybLigowy:
+    """Wszystko, czym tryb ligowy różni się od MŚ z perspektywy silnika."""
+
+    events: list[dict]                 # surowe eventy statshub (jak z upcoming_wc_events)
+    team_name: dict[int, str]          # id -> nazwa (z by-date, pełniejsze niż z trendów)
+    sb_events: list[dict]              # pełna oferta Superbetu (do warunku w pętli)
+    sb_ev_by_mid: dict[int, dict]      # mecz statshub -> sparowany event Superbetu
+    liga_by_mid: dict[int, dict]       # mecz -> {"liga","sezon","kolejka"}
+    past_event_ids: list[int]          # rozegrane mecze do banku historii
+    koncesje_min_ts: int               # okno obserwacji profili rywali
+    rotacja_min_ts: int                # "grał ostatnio" dla triggera rotacji
+    publikuj: bool = False             # False = dry-run (zero zapisów Supabase/web)
+    liga_glowna: str = "Liga"          # etykieta do meta.json
+    sezon: str = "2026/27"
+
+
+def zbuduj_tryb(days: int = 5, publikuj: bool = False) -> TrybLigowy | None:
+    """Odkryj mecze, sparuj z Superbetem i złóż adapter dla silnika.
+
+    Do silnika idą WYŁĄCZNIE mecze sparowane z Superbetem (bez kursów nie
+    powstanie ani typ, ani okazja — szkoda zapytań). Reszta to zmierzona
+    luka pokrycia (raport_pokrycia).
+    """
+    mecze = upcoming_events(days)
+    try:
+        sb_events = superbet.list_events(days_ahead=days)
+    except Exception as e:
+        print(f"Superbet niedostępny: {e}")
+        return None
+    n_par, _ = paruj_superbet(mecze, sb_events)
+    pary = [m for m in mecze if m.sb_event is not None]
+    print(f"Tryb ligowy: {len(mecze)} meczów statshub, {len(sb_events)} Superbet, "
+          f"sparowano {n_par}")
+    if not pary:
+        return None
+    now = int(time.time())
+    team_ids = {m.home_id for m in pary} | {m.away_id for m in pary}
+    return TrybLigowy(
+        events=[m.raw for m in pary],
+        team_name={
+            **{m.home_id: m.home for m in pary},
+            **{m.away_id: m.away for m in pary},
+        },
+        sb_events=sb_events,
+        sb_ev_by_mid={m.event_id: m.sb_event for m in pary},
+        liga_by_mid={
+            m.event_id: {"liga": m.rozgrywki_nazwa, "sezon": "2026/27",
+                         "kolejka": m.kolejka}
+            for m in pary
+        },
+        past_event_ids=past_event_ids(team_ids),
+        koncesje_min_ts=now - 180 * 86400,
+        rotacja_min_ts=now - 45 * 86400,
+        publikuj=publikuj,
+        liga_glowna="Piłka klubowa",
+        sezon="2026/27",
+    )
+
+
+def main(publikuj: bool = False) -> None:
+    """Pełny cykl ligowy. Domyślnie DRY-RUN: silnik liczy wszystko,
+    ale dumpy idą do web/src/data/.../liga_dryrun, a Supabase/rozliczenia
+    są nietknięte (patrz build_wc_fast._dry_run)."""
+    from . import build_wc_fast
+
+    tryb = zbuduj_tryb(publikuj=publikuj)
+    if tryb is None:
+        print("Brak sparowanych meczów — cykl ligowy pominięty.")
+        return
+    build_wc_fast.main(tryb)
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    if "--raport" in sys.argv:
+        raport_pokrycia()
+    else:
+        main(publikuj="--publikuj" in sys.argv)

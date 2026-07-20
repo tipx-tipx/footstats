@@ -92,6 +92,31 @@ def norm_name(name: str) -> str:
     return " ".join(tokens)
 
 
+def znajdz_zawodnika(players: dict, nazwa: str) -> dict:
+    """Rekord propsów zawodnika po nazwisku z innego źródła.
+
+    W ofercie klubowej Superbet używa PEŁNYCH nazwisk ('Renan Augusto Lodi
+    dos Santos'), a statshub boiskowych ('Renan Lodi') — dokładny klucz
+    norm_name wtedy nie trafia (zmierzone 2026-07-20, Brasileirão). Fallback:
+    dopasowanie podzbiorem tokenów w OBIE strony, przyjmowane tylko gdy
+    JEDNOZNACZNE (dwóch kandydatów = brak dopasowania, nie zgadujemy).
+    """
+    key = norm_name(nazwa)
+    rec = players.get(key)
+    if rec is not None:
+        return rec
+    tokeny = set(key.split())
+    if not tokeny:
+        return {}
+    trafienia = [
+        k for k in players
+        if tokeny <= set(k.split()) or set(k.split()) <= tokeny
+    ]
+    if len(trafienia) == 1:
+        return players[trafienia[0]]
+    return {}
+
+
 def _get(url: str, min_interval: float = 1.5, retries: int = 3) -> dict:
     """GET z retry (jak statshub._get) — bez tego jeden nieudany request i
     dany mecz zostaje bez kursów Superbet do następnego cyklu (typy/kupony na

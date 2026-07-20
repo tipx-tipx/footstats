@@ -23,7 +23,10 @@ try:
 except Exception:
     pass
 
-MODE = "ms2026"  # przełączyć na "liga" po starcie sezonu 2026/27
+# "ms2026" (MŚ, wygasa) / "liga" (tryb ligowy, publikacja) / "demo".
+# Przełączyć na "liga", gdy fazy 2-3 roadmapy będą domknięte (rozliczanie
+# multi-liga + web bez słownictwa kadrowego).
+MODE = "ms2026"
 
 
 def main():
@@ -33,6 +36,9 @@ def main():
         if MODE == "ms2026":
             from . import build_wc_fast
             build_wc_fast.main()
+        elif MODE == "liga":
+            from . import build_league
+            build_league.main(publikuj=True)
         else:
             from . import build_demo
             build_demo.main()

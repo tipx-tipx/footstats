@@ -90,14 +90,31 @@ class StatshubTrend:
 
 
 def fetch_event_trends(event_ids: list[int]) -> list[StatshubTrend]:
-    """Pobierz trendy propsów dla podanych meczów (jedno zapytanie).
+    """Pobierz trendy propsów dla podanych meczów (Z PAGINACJĄ).
+
+    PUŁAPKA zmierzona 2026-07-20: endpoint jest stronicowany z domyślnym
+    pageSize=25 — bez iterowania po stronach feed jest CICHO ucinany do
+    25 rekordów niezależnie od liczby meczów (a `limit=` jest ignorowany).
+    Działa pageSize + page; bierzemy pageSize=100 i idziemy do wyczerpania.
 
     Zwraca pustą listę, jeśli propsy nie są jeszcze wystawione (za wcześnie).
     """
     if not event_ids:
         return []
     games = ",".join(str(e) for e in event_ids)
-    data = _get(f"{BASE}/props/player-trends?games={games}").get("data", [])
+    data: list[dict] = []
+    page = 1
+    PAGE_SIZE = 100
+    while True:
+        czesc = _get(
+            f"{BASE}/props/player-trends?games={games}"
+            f"&pageSize={PAGE_SIZE}&page={page}"
+        ).get("data", [])
+        data += czesc
+        # bezpiecznik 40 stron = 4000 rekordów; realnie kilkaset
+        if len(czesc) < PAGE_SIZE or page >= 40:
+            break
+        page += 1
     out: list[StatshubTrend] = []
     for rec in data:
         mk = STATTYPE_MAP.get(rec.get("statType"))

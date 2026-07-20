@@ -31,3 +31,6 @@ pipeline/odds/
 .DS_Store
 Thumbs.db
 web/src/data/demo/_manifest.json
+
+# zrzuty dry-run trybu ligowego (odtwarzalne kazdym przebiegiem build_league)
+web/src/data/demo/liga_dryrun/
