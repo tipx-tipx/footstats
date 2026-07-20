@@ -304,8 +304,38 @@ def paruj_superbet(
 
 
 # ---------------------------------------------------------------------------
-# Raport pokrycia (dry-run etapu 1)
+# Raport pokrycia (dry-run etapu 1 + brama jakości etapu 3)
 # ---------------------------------------------------------------------------
+
+def _per_rozgrywki(mecze: list[MeczLigowy]) -> dict[str, dict]:
+    """Statystyka sparowane/mecze per rozgrywki (wspólna dla raportu
+    na żądanie i raportu pokrycia zapisywanego co cykl)."""
+    out: dict[str, dict] = {}
+    for m in mecze:
+        r = out.setdefault(
+            m.rozgrywki_nazwa,
+            {"kraj": m.kraj, "mecze": 0, "sparowane": 0, "druzynowe": m.druzynowe},
+        )
+        r["mecze"] += 1
+        if m.sb_event is not None:
+            r["sparowane"] += 1
+    return out
+
+
+def _luka_propsy(luka: list[dict]) -> list[dict]:
+    """Mecze Superbetu bez pary w statshub z bogatą ofertą (heurystyka:
+    marketCount>=100 = prawie na pewno propsy) — zmierzona luka pokrycia."""
+    bogate = [ev for ev in luka if (ev.get("marketCount") or 0) >= 100]
+    bogate.sort(key=lambda e: -(e.get("marketCount") or 0))
+    return [
+        {
+            "mecz": str(ev.get("matchName") or "").replace("·", " - "),
+            "rynkow": int(ev.get("marketCount") or 0),
+            "kickoff_ts": _sb_kickoff(ev),
+        }
+        for ev in bogate[:30]
+    ]
+
 
 def raport_pokrycia(days: int = 4) -> dict:
     """Zmierz na żywo: co statshub widzi, co Superbet kwotuje, co się paruje.
@@ -320,15 +350,7 @@ def raport_pokrycia(days: int = 4) -> dict:
     n_par, luka = paruj_superbet(mecze, sb_events)
     print(f"Sparowano: {n_par}")
 
-    per_rozgrywki: dict[str, dict] = {}
-    for m in mecze:
-        r = per_rozgrywki.setdefault(
-            m.rozgrywki_nazwa,
-            {"kraj": m.kraj, "mecze": 0, "sparowane": 0, "druzynowe": m.druzynowe},
-        )
-        r["mecze"] += 1
-        if m.sb_event is not None:
-            r["sparowane"] += 1
+    per_rozgrywki = _per_rozgrywki(mecze)
 
     print("\nPokrycie per rozgrywki (sparowane/mecze; * = zakres drużynowy):")
     for nazwa, r in sorted(per_rozgrywki.items(),
@@ -373,6 +395,9 @@ class TrybLigowy:
     publikuj: bool = False             # False = dry-run (zero zapisów Supabase/web)
     liga_glowna: str = "Liga"          # etykieta do meta.json
     sezon: str = "2026/27"
+    # zmierzona luka pokrycia z parowania (brama jakości: luka jest LOGOWANA,
+    # nie ignorowana) — silnik dopisze swoją część i zrzuci pokrycie_liga.json
+    pokrycie: dict = field(default_factory=dict)
 
 
 def zbuduj_tryb(days: int = 5, publikuj: bool = False) -> TrybLigowy | None:
@@ -388,13 +413,20 @@ def zbuduj_tryb(days: int = 5, publikuj: bool = False) -> TrybLigowy | None:
     except Exception as e:
         print(f"Superbet niedostępny: {e}")
         return None
-    n_par, _ = paruj_superbet(mecze, sb_events)
+    n_par, luka = paruj_superbet(mecze, sb_events)
     pary = [m for m in mecze if m.sb_event is not None]
     print(f"Tryb ligowy: {len(mecze)} meczów statshub, {len(sb_events)} Superbet, "
           f"sparowano {n_par}")
     if not pary:
         return None
     now = int(time.time())
+    pokrycie = {
+        "mecze_statshub": len(mecze),
+        "mecze_superbet": len(sb_events),
+        "sparowane": n_par,
+        "per_rozgrywki": _per_rozgrywki(mecze),
+        "luka_superbet_propsy": _luka_propsy(luka),
+    }
     team_ids = {m.home_id for m in pary} | {m.away_id for m in pary}
     return TrybLigowy(
         events=[m.raw for m in pary],
@@ -415,6 +447,7 @@ def zbuduj_tryb(days: int = 5, publikuj: bool = False) -> TrybLigowy | None:
         publikuj=publikuj,
         liga_glowna="Piłka klubowa",
         sezon="2026/27",
+        pokrycie=pokrycie,
     )
 
 

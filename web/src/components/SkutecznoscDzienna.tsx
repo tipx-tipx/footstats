@@ -9,6 +9,7 @@ import type { SkutecznoscDnia } from "@/lib/types";
 const POZA_LABEL: Record<string, string> = {
   kwarantanna_rynku: "Rynek był wstrzymany (trafiał poniżej deklaracji), typ rozliczył się w tle",
   limit_meczu: "Ponad limit typów z jednego meczu, typ był dostępny tylko w generatorze kuponów",
+  stare_dane: "Zawodnik dawno nie grał (stare dane), typ rozliczył się w tle",
 };
 
 /** "2026-07-10" -> "czw, 10 lip" (bez skoków stref: południe lokalne). */

@@ -158,6 +158,8 @@ export interface Odrzucenie {
     | "rozjazd_z_rynkiem"
     | "tylko_w_puli"
     | "kwarantanna_rynku"
+    | "za_stara_historia"
+    | "stare_dane"
     | string;
   szczegol: string;
 }

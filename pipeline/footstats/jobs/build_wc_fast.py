@@ -19,7 +19,7 @@ import os
 import statistics
 import time
 import zlib
-from collections import defaultdict
+from collections import Counter, defaultdict
 from dataclasses import asdict
 
 from scipy import stats as _stats
@@ -122,6 +122,32 @@ def _rozlicz_i_zapisz(
           f"{p['trafione']} trafionych, ROI flat {p['roi_flat']:+.2f} j.")
 # uniqueTournamentId 16 = Mistrzostwa Świata (jak w Sofascore)
 WC_UTID = 16
+
+# --- BRAMA JAKOŚCI (tylko tryb ligowy): świeżość próby zawodnika ---
+# fit_posterior waży starość meczu z tau=180 dni (skala CAŁEGO sezonu), więc
+# historia sprzed przerwy letniej wciąż waży ~0.66 — model sam z siebie nie
+# odróżni "gra co tydzień" od "ostatni mecz w maju". Świeżości pilnujemy
+# osobno tutaj: historia bez świeżych występów to typ na nieaktualnym
+# zawodniku (kontuzja, wypadł z rotacji, transfer, przerwa w lidze).
+OKNO_SWIEZEJ_PROBY_S = 120 * 86400  # okno "żywej" historii (pokrywa przerwę letnią)
+MIN_MECZE_W_OKNIE = 2               # mniej występów w oknie = historia martwa, typu nie ma
+STARE_DANE_S = 45 * 86400           # ostatni występ dawniej -> typ tylko "w tle"
+#   (liczy się, uczy kalibrację, widoczny w Skuteczności; wraca do publikacji
+#    po 1-2 kolejkach, gdy zawodnik znów ma świeże mecze)
+
+
+def swiezosc_proby(
+    timestamps: list[int], minutes: list[float], now: int
+) -> tuple[int, float]:
+    """(ile występów w oknie świeżości, dni od ostatniego występu).
+
+    Występ = mecz z minutami > 0. Brak jakiegokolwiek występu -> (0, inf).
+    """
+    grane = [ts for ts, m in zip(timestamps, minutes) if m > 0 and ts > 0]
+    if not grane:
+        return 0, float("inf")
+    n_okno = sum(1 for ts in grane if ts >= now - OKNO_SWIEZEJ_PROBY_S)
+    return n_okno, (now - max(grane)) / 86400.0
 # nazwy reprezentacji EN -> PL (do dopasowania z Superbetem)
 EN_PL = {v: k for k, v in superbet.TEAM_PL_EN.items()}
 # MŚ 2026 to NIE jest w pełni neutralny turniej — USA/Meksyk/Kanada są
@@ -1203,6 +1229,10 @@ def _main_impl(tryb=None):
     seen_player_market = set()  # (player_id, market) — statshub bywa zdublowany
     real_split = {}  # (player_id, mk) -> pełny scoring niecelnych/zablokowanych z 365
     legi_pool = []   # wszystkie kwotowane linie z wysoką szansą — pula pod kupony pewniaków
+    # typy zdjęte z publikacji (kwarantanna / stare dane / limit meczu) —
+    # rozliczają się i uczą kalibrację w tle; zasilane w KAŻDYM kanale
+    # emisji: okazje z kursem, sugestie STS, pewniaki
+    typy_poza_publikacja: list[dict] = []
     pstyle_cache: dict[int, object] = {}  # PlayerStyle per zawodnik (styl.py)
 
     # REJESTR ODRZUCEŃ: dla każdej pary (mecz, zawodnik, rynek), która weszła
@@ -1343,6 +1373,20 @@ def _main_impl(tryb=None):
             continue
         prior, ctx = built
         mk = tr.market_code
+        # BRAMA JAKOŚCI (liga): typ tylko przy świeżej próbie. W MŚ nie ma
+        # sensu (turniej sam jest oknem świeżości), w lidze historia bywa
+        # w całości sprzed pauzy/kontuzji/transferu.
+        stare_dane = False
+        if tryb:
+            n_swieze, dni_ostatni = swiezosc_proby(
+                tr.timestamps, tr.minutes, int(time.time())
+            )
+            if n_swieze < MIN_MECZE_W_OKNIE:
+                _odrzuc(mid, tr, "za_stara_historia",
+                        f"tylko {n_swieze} występów w ostatnich 4 miesiącach, "
+                        "dane o zawodniku są nieaktualne")
+                continue
+            stare_dane = dni_ostatni * 86400 > STARE_DANE_S
         # trigger rotacyjny: zawodnik w (przewidywanym) XI bez ani jednego
         # występu na turnieju (w lidze: w oknie świeżości z trybu) — rynek
         # często nie zdążył dograć jego linii
@@ -1384,6 +1428,7 @@ def _main_impl(tryb=None):
             ).distribution(8)
             real_split[(tr.player_id, mk)] = {
                 "sm": sm_r, "line": line, "dist": dist_r,
+                "stare_dane": stare_dane,
                 "info": {
                     "name": tr.player_name, "team": tr.team_name,
                     "opp": tr.opponent_name, "mid": mid, "ts": ts,
@@ -1613,6 +1658,10 @@ def _main_impl(tryb=None):
                         ),
                         "xi_sygnal": xi_sygnal,
                         "swieze_sklady": mid in swieze_mids,
+                        # brama jakości (liga): ostatni występ dawniej niż
+                        # STARE_DANE_S -> typ nie wchodzi do publikacji ani
+                        # do puli generatora, rozlicza się w tle
+                        "stare_dane": stare_dane,
                         "miekka_linia": miekka,
                         "kurs_oczekiwany": kurs_oczekiwany if miekka else None,
                         "ci": [sm.ci_low, sm.ci_high],
@@ -1694,7 +1743,7 @@ def _main_impl(tryb=None):
             miekka_a = oczek_a is not None and kurs_wziety >= oczek_a * 1.12
             if not odstaje_zewn and not miekka_a:
                 continue
-            value_bets.append({
+            rec_okazji = {
                 "id": vb_id, "mecz_id": mid, "mecz": match_label, "kickoff_ts": ts,
                 "podmiot_typ": "zawodnik", "podmiot_id": tr.player_id,
                 "podmiot": tr.player_name, "druzyna": tr.team_name,
@@ -1722,8 +1771,15 @@ def _main_impl(tryb=None):
                 "ci": [sm.ci_low, sm.ci_high],
                 "oczekiwane_minuty": sm.expected_minutes, "lambda": sm.lam,
                 "rozklad": dist, "czynniki": sm.factors, "uzasadnienie": sm.reasoning,
-            })
-            matches_out[mid]["okazje"].append(vb_id)
+            }
+            # brama jakości (liga): okazja na starych danych nie wchodzi do
+            # publikacji, rozlicza się i uczy kalibrację w tle
+            if stare_dane:
+                rec_okazji["poza_publikacja"] = "stare_dane"
+                typy_poza_publikacja.append(rec_okazji)
+            else:
+                value_bets.append(rec_okazji)
+                matches_out[mid]["okazje"].append(vb_id)
 
     # --- SUGESTIE bez kursów: niecelne / zablokowane (rynki STS, blokowany w chmurze) ---
     # WYŁĄCZNIE z prawdziwej historii per strzał z 365Scores (real_split —
@@ -1731,10 +1787,10 @@ def _main_impl(tryb=None):
     # "strzały − celne z podziałem ligowym" USUNIĘTY: rozliczenia pokazały
     # hit 23.5% przy śr. p 55.2% (real_split: 48.8% przy 58.1%) — szacunek
     # był czystym szumem i psuł kalibrację oraz zaufanie do sekcji.
-    def _push_sugestia(pid, mk, info, lam, p_over, line, extra):
+    def _push_sugestia(pid, mk, info, lam, p_over, line, extra, stare_dane=False):
         nonlocal vb_id
         vb_id += 1
-        value_bets.append({
+        rec = {
             "id": vb_id, "mecz_id": info["mid"], "mecz": info["match"],
             "kickoff_ts": info["ts"], "podmiot_typ": "zawodnik",
             "podmiot_id": pid, "podmiot": info["name"], "druzyna": info["team"],
@@ -1749,7 +1805,13 @@ def _main_impl(tryb=None):
             "rank_score": p_over,                  # sortowanie sugestii po szansie
             "lambda": round(lam, 3),
             **extra,
-        })
+        }
+        # brama jakości (liga): sugestia na starych danych tylko w tle
+        if stare_dane:
+            rec["poza_publikacja"] = "stare_dane"
+            typy_poza_publikacja.append(rec)
+            return
+        value_bets.append(rec)
         matches_out.setdefault(info["mid"], {}).setdefault("okazje", []).append(vb_id)
 
     for (pid, mk), real in real_split.items():
@@ -1774,7 +1836,7 @@ def _main_impl(tryb=None):
                 "oczekiwane_minuty": sm_r.expected_minutes,
                 "rozklad": dist_r, "czynniki": sm_r.factors,
                 "uzasadnienie": sm_r.reasoning,
-            })
+            }, stare_dane=real.get("stare_dane", False))
 
     # --- RYNKI DRUŻYNOWE: strzały / celne / kartki (historia: statshub
     # team-trends, ~20 meczów) + faule (bank stylu, mecze MŚ). Kursy Superbetu
@@ -2026,6 +2088,11 @@ def _main_impl(tryb=None):
     juz_opublikowane = {
         (b["podmiot_id"], b["rynek_kod"], b["linia"], b["strona"])
         for b in value_bets
+    } | {
+        # okazje/sugestie zdjęte przez bramę jakości — bez tego ten sam typ
+        # trafiłby do logu drugi raz kanałem pewniaków
+        (b["podmiot_id"], b["rynek_kod"], b["linia"], b["strona"])
+        for b in typy_poza_publikacja
     }
     per_mecz_rynek: set[tuple[int, str]] = set()
 
@@ -2088,7 +2155,8 @@ def _main_impl(tryb=None):
     # kalendarza brały się z 5+ skorelowanych typów z jednego zamulonego
     # meczu. Nadmiar oraz rynki w kwarantannie dalej się rozliczają i UCZĄ
     # kalibrację (flaga poza_publikacja), ale nie wchodzą do apki/kalendarza.
-    typy_poza_publikacja: list[dict] = []
+    # (typy_poza_publikacja zainicjalizowane przed pętlą trendów — zbiera
+    # też okazje z kursem i sugestie zdjęte przez bramę jakości)
     pewniaki_per_mecz: dict[int, int] = {}
     for b in do_emisji:
         klucz = (b["podmiot_id"], b["rynek_kod"], b["linia"], b["strona"])
@@ -2101,6 +2169,8 @@ def _main_impl(tryb=None):
         powod_poza = None
         if b["rynek_kod"] in kwarantanna_rynkow:
             powod_poza = "kwarantanna_rynku"
+        elif b.get("stare_dane"):
+            powod_poza = "stare_dane"
         elif pewniaki_per_mecz.get(b["mecz_id"], 0) >= MAX_PEWNIAKOW_MECZ:
             powod_poza = "limit_meczu"
         rec_pewniaka = {
@@ -2145,16 +2215,21 @@ def _main_impl(tryb=None):
     if typy_poza_publikacja:
         n_kw = sum(1 for t in typy_poza_publikacja
                    if t["poza_publikacja"] == "kwarantanna_rynku")
+        n_st = sum(1 for t in typy_poza_publikacja
+                   if t["poza_publikacja"] == "stare_dane")
         print(f"Poza publikacją: {n_kw} typów (kwarantanna rynku), "
-              f"{len(typy_poza_publikacja) - n_kw} (limit na mecz) — "
+              f"{n_st} (stare dane), "
+              f"{len(typy_poza_publikacja) - n_kw - n_st} (limit na mecz) — "
               "rozliczą się i uczą kalibrację w tle")
 
     value_bets.sort(key=lambda b: -b["rank_score"])
 
     # rynki w kwarantannie wypadają też z puli kuponów (generator i kupony
-    # automatyczne nie budują na rynku, który trafia poniżej deklaracji)
+    # automatyczne nie budują na rynku, który trafia poniżej deklaracji);
+    # to samo legi na starych danych (brama jakości ligi)
     legi_pool_pub = [
-        b for b in legi_pool if b["rynek_kod"] not in kwarantanna_rynkow
+        b for b in legi_pool
+        if b["rynek_kod"] not in kwarantanna_rynkow and not b.get("stare_dane")
     ]
 
     # REJESTR ODRZUCEŃ — domknięcie: para (zawodnik, rynek) opublikowana
@@ -2181,31 +2256,70 @@ def _main_impl(tryb=None):
             "szczegol": "typ dostępny w generatorze kuponów. Na karcie meczu "
                         "wygrał inny typ tego rynku",
         })
-    # transparentność kwarantanny: typy zdjęte z publikacji dostają uczciwy
+    # transparentność bramy: typy zdjęte z publikacji dostają uczciwy
     # wpis w rejestrze ("czemu nie ma typu"), zamiast znikać bez śladu
     for t in typy_poza_publikacja:
-        if t["poza_publikacja"] != "kwarantanna_rynku":
+        if t["poza_publikacja"] == "limit_meczu":
             continue  # limit_meczu: typ i tak jest w generatorze (tylko_w_puli)
         para = (t["podmiot_id"], t["rynek_kod"])
         if para in opublikowane_pary or para in w_puli_dodane:
             continue
         w_puli_dodane.add(para)
-        kw = kwarantanna_rynkow.get(t["rynek_kod"], {})
+        if t["poza_publikacja"] == "stare_dane":
+            szczegol = (
+                "ostatni mecz zawodnika był dawno temu, czekamy aż "
+                "wróci do gry i da świeże dane"
+            )
+        else:
+            kw = kwarantanna_rynkow.get(t["rynek_kod"], {})
+            szczegol = (
+                f"rynek chwilowo poza publikacją: ostatnie typy wchodziły w "
+                f"{kw.get('hit', 0):.0%} przy deklarowanych {kw.get('sr_p', 0):.0%} "
+                f"(próba: {kw.get('n', 0)}). Wróci, gdy kalibracja dogoni"
+            )
         odrzucenia_out.append({
             "mecz_id": t["mecz_id"], "podmiot": t["podmiot"],
             "druzyna": t.get("druzyna", ""),
             "rynek_kod": t["rynek_kod"], "rynek": t["rynek"],
-            "powod": "kwarantanna_rynku",
-            "szczegol": (
-                f"rynek chwilowo poza publikacją: ostatnie typy wchodziły w "
-                f"{kw.get('hit', 0):.0%} przy deklarowanych {kw.get('sr_p', 0):.0%} "
-                f"(próba: {kw.get('n', 0)}). Wróci, gdy kalibracja dogoni"
-            ),
+            "powod": t["poza_publikacja"],
+            "szczegol": szczegol,
         })
 
     # pełne pokrycie p_model (backend-only, dla scannera STS) — emitujemy ZAWSZE,
     # także w trybie „0 okazji" niżej, bo model i tak policzył wszystkie linie
     _dump("sts_model.json", model_pokrycie)
+
+    # RAPORT POKRYCIA (liga): parowanie z build_league + to, co dołożył
+    # silnik — luka jest mierzona i zapisywana co cykl, nie ignorowana.
+    # Jeden plik odpowiada na "czego nie gramy i dlaczego".
+    def _dump_pokrycie() -> None:
+        if not (tryb and tryb.pokrycie):
+            return
+        mecze_z_trendami = set(matches_out)
+        pokrycie = {
+            **tryb.pokrycie,
+            "wygenerowano_ts": int(time.time()),
+            # sparowane z Superbetem, ale statshub nie dał ani jednego trendu
+            # (oferta propsów buków UK nie objęła meczu) — świadoma luka
+            "mecze_bez_trendow": [
+                f'{team_name.get(e.get("homeTeamId"), "?")} - '
+                f'{team_name.get(e.get("awayTeamId"), "?")}'
+                for e in events if e["id"] not in mecze_z_trendami
+            ],
+            "odrzucenia_per_powod": dict(sorted(
+                Counter(o["powod"] for o in odrzucenia.values()).items(),
+                key=lambda kv: -kv[1],
+            )),
+            "poza_publikacja_per_powod": dict(Counter(
+                t["poza_publikacja"] for t in typy_poza_publikacja
+            )),
+            "typy": len(value_bets),
+            "mecze_z_typami": len({b["mecz_id"] for b in value_bets}),
+        }
+        _dump("pokrycie_liga.json", pokrycie)
+        print(f"Pokrycie ligi: {pokrycie['sparowane']}/{pokrycie['mecze_statshub']} "
+              f"meczów sparowanych, {len(pokrycie['mecze_bez_trendow'])} bez trendów, "
+              f"luka propsów Superbetu: {len(pokrycie['luka_superbet_propsy'])} meczów")
 
     # NIE degraduj aplikacji do pustej planszy: dopóki nie ma realnych okazji MŚ,
     # zostaw dotychczasowe dane (tryb pokazowy). Przełączamy na MŚ dopiero,
@@ -2225,10 +2339,12 @@ def _main_impl(tryb=None):
                 f"{k}={v}" for k, v in sorted(powody.items(), key=lambda x: -x[1])
             ))
         _dump("odrzucenia_zero_okazji.json", list(odrzucenia.values()))
+        _dump_pokrycie()
         _rozlicz_i_zapisz([], [], niedostepni,
                           poza_publikacja=typy_poza_publikacja)
         return
 
+    _dump_pokrycie()
     _dump("value_bets.json", value_bets)
     _dump("matches.json", list(matches_out.values()))
     _dump("players.json", list(players_out.values()))
