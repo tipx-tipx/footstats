@@ -225,9 +225,20 @@ export interface FormaRynku {
   rywale?: string[];
   /** true = mecz reprezentacji (false/brak = klub) */
   kadra?: boolean[];
+  /** true = mecz u siebie (forma drużynowa) */
+  dom?: boolean[];
   /** timestamp (s) każdego meczu — do daty ostatniego meczu (świeżość) */
   ts?: number[];
   srednia90: number;
+}
+
+/** Forma DRUŻYNY per rynek drużynowy — karta typu na /druzyny. */
+export interface DruzynaForma {
+  id: number;
+  nazwa: string;
+  druzyna: string;
+  podmiot_typ: "druzyna";
+  forma: Record<string, FormaRynku>;
 }
 
 export interface Zawodnik {

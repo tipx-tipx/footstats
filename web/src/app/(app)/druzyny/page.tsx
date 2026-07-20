@@ -1,7 +1,7 @@
-import { BetCard } from "@/components/BetCard";
+import { DruzynyTablica } from "@/components/DruzynyTablica";
 import { PageHeader } from "@/components/PageHeader";
 import { Reveal } from "@/components/Reveal";
-import { getMeta, getValueBets } from "@/lib/data";
+import { getDruzynyForma, getMecze, getMeta, getValueBets, terazTs } from "@/lib/data";
 
 export const metadata = { title: "Drużyny – FootStats" };
 
@@ -10,10 +10,18 @@ export const metadata = { title: "Drużyny – FootStats" };
  * propsy zawodników): typy na gole, rzuty rożne i kartki CAŁYCH drużyn.
  * Zakres celowo wąski: top 5 lig, Ekstraklasa i puchary europejskie
  * z kwalifikacjami — tylko rozgrywki, dla których model ma głębokie dane.
+ * Tablica jest projektowana pod pełny sezon (dziesiątki meczów dziennie):
+ * najmocniejsze typy doby na górze, reszta dniami, filtry rynku i rozgrywek.
  */
 export default async function DruzynyPage() {
-  const [bets, meta] = await Promise.all([getValueBets(), getMeta()]);
+  const [bets, forma, mecze, meta] = await Promise.all([
+    getValueBets(),
+    getDruzynyForma(),
+    getMecze(),
+    getMeta(),
+  ]);
   const typy = bets.filter((b) => b.podmiot_typ === "druzyna" && !b.sugestia);
+  const ligaByMecz = Object.fromEntries(mecze.map((m) => [m.id, m.liga]));
 
   return (
     <div>
@@ -25,7 +33,8 @@ export default async function DruzynyPage() {
             Gole, rzuty rożne i kartki całych drużyn, nie pojedynczych
             zawodników. Model liczy je tylko dla rozgrywek, które zna od
             podszewki: pięć czołowych lig Europy, Ekstraklasa i puchary
-            europejskie razem z kwalifikacjami.
+            europejskie razem z kwalifikacjami. Każdy typ ma na klik formę
+            drużyny w tym rynku i czynniki, z których wzięła się liczba.
           </>
         }
       />
@@ -43,13 +52,12 @@ export default async function DruzynyPage() {
           </div>
         </Reveal>
       ) : (
-        <div className="mt-7 space-y-4">
-          {typy.map((bet, i) => (
-            <Reveal key={bet.id} delay={Math.min(i * 0.04, 0.4)}>
-              <BetCard bet={bet} rank={i + 1} />
-            </Reveal>
-          ))}
-        </div>
+        <DruzynyTablica
+          bets={typy}
+          forma={forma}
+          ligaByMecz={ligaByMecz}
+          teraz={terazTs()}
+        />
       )}
     </div>
   );

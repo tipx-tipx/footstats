@@ -24,7 +24,8 @@ WEB_DATA_DIR = Path(__file__).resolve().parent.parent.parent.parent / "web" / "s
 # this_run) chroni tę wartość przed nadpisaniem starym plikiem z checkoutu —
 # cykl MŚ po prostu nigdy jej nie dotyka, zostaje ostatni zapis build_demo.
 KEYS = ["value_bets", "matches", "players", "calibration", "meta", "kupony",
-        "typy_wyniki", "odds_superbet", "legi_pool", "odrzucenia", "sts_model"]
+        "typy_wyniki", "odds_superbet", "legi_pool", "odrzucenia", "sts_model",
+        "druzyny_forma"]
 
 
 def push() -> bool:

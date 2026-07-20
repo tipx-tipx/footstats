@@ -229,9 +229,16 @@ class TeamTrend:
     market_code: str
     line: float
     odds_type: str = "over"
+    # kontekst ligi (recentGames całego feedu = próbka ligi i koncesje rywali)
+    opponent_id: int = 0
+    league_id: int = 0
+    league_name: str = ""
     counts: list[float] = field(default_factory=list)
     timestamps: list[int] = field(default_factory=list)
     game_opponents: list[str] = field(default_factory=list)
+    # per mecz historii: id rywala i czy grali u siebie (isHome z feedu)
+    game_opponent_ids: list[int] = field(default_factory=list)
+    game_is_home: list[bool] = field(default_factory=list)
     ref_odds: list[float] = field(default_factory=list)
 
 
@@ -274,9 +281,14 @@ def fetch_team_trends(event_ids: list[int]) -> list[TeamTrend]:
             market_code=mk,
             line=float(rec.get("line", 0.5)),
             odds_type=str(rec.get("oddsType") or "over"),
+            opponent_id=int(rec.get("opponentTeamId") or 0),
+            league_id=int(rec.get("leagueId") or 0),
+            league_name=str(rec.get("leagueName") or ""),
             counts=[float(g.get("statValue") or 0) for g in rg],
             timestamps=[int(g.get("eventTimestamp") or 0) for g in rg],
             game_opponents=[str(g.get("opponentName") or "") for g in rg],
+            game_opponent_ids=[int(g.get("opponentId") or 0) for g in rg],
+            game_is_home=[bool(g.get("isHome")) for g in rg],
             ref_odds=[
                 float(b["oddsValue"])
                 for b in rec.get("bookmakers", [])

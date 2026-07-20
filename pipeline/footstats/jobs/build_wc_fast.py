@@ -2014,6 +2014,7 @@ def _main_impl(tryb=None):
     # (TEAM_MARKET_SUFFIX) są już w sb_cache. Legi drużynowe wchodzą do
     # legi_pool tymi samymi progami co zawodnicze i płyną dalej istniejącą
     # ścieżką pewniaków/kuponów; rozliczanie: scores365.game_team_stats.
+    druzyny_forma: dict[int, dict] = {}  # forma drużyn z legami (dla UI)
     try:
         # zakres drużynowy: w lidze rynki drużynowe liczymy WYŁĄCZNIE dla
         # rozgrywek z profilem druzynowe=True (top 5 + Ekstraklasa + puchary,
@@ -2094,6 +2095,29 @@ def _main_impl(tryb=None):
                     counts=c_f, timestamps=t_f,
                 ))
 
+        # KONTEKST Z FEEDU — w lidze bank stylu bywa młody/pusty, a recentGames
+        # CAŁEGO feedu team-trends to duża próbka: liczymy z niej średnią ligi
+        # (norma rynku) i koncesje rywala (co drużyny notują PRZECIW niemu).
+        # Dedup po (drużyna, rynek, timestamp) — ten sam mecz nie liczy się 2x.
+        liga_probki: dict[tuple[int, str], list[float]] = {}
+        koncesje_feed: dict[tuple[int, str], list[float]] = {}
+        seen_gra: set = set()
+        for tt in team_trends:
+            for v_g, ts_g, opp_g in zip(
+                tt.counts, tt.timestamps, tt.game_opponent_ids
+            ):
+                k_g = (tt.team_id, tt.market_code, ts_g)
+                if k_g in seen_gra:
+                    continue
+                seen_gra.add(k_g)
+                liga_probki.setdefault(
+                    (tt.league_id, tt.market_code), []
+                ).append(v_g)
+                if opp_g:
+                    koncesje_feed.setdefault(
+                        (opp_g, tt.market_code), []
+                    ).append(v_g)
+
         n_team = 0
         seen_team = set()
         odpadki_t: Counter = Counter()  # diagnostyka: czemu legi drużynowe nie powstają
@@ -2148,6 +2172,10 @@ def _main_impl(tryb=None):
                 continue
             pole = TEAM_POLE_BANKU[tt.market_code]
             lg_mean, _lg_n = _srednia_turnieju(pole)
+            # liga: norma rynku z feedu (bank turniejowy tu nie istnieje)
+            lg_feed = liga_probki.get((tt.league_id, tt.market_code)) or []
+            if len(lg_feed) >= 30:
+                lg_mean = float(np.mean(lg_feed))
             if lg_mean is None:
                 lg_mean = float(np.mean(tt.counts))
             prior_t = counts.GroupPrior(
@@ -2180,11 +2208,19 @@ def _main_impl(tryb=None):
                 bool(spread_teamu is not None and spread_teamu > 0.15),
             )
             konc, konc_n = _koncesja_druzynowa(tt.opponent_name, pole)
+            if konc is None:
+                # koncesje z feedu: co drużyny notują przeciw temu rywalowi
+                kf = koncesje_feed.get((tt.opponent_id, tt.market_code)) or []
+                if len(kf) >= 4:
+                    konc, konc_n = float(np.mean(kf)), len(kf)
             f_opp = (
                 context.opponent_factor(konc, lg_mean, konc_n)
                 if konc is not None and lg_mean else 1.0
             )
-            factor_t = f_sedzia * f_script * f_opp
+            # dom/wyjazd: gospodarze wykonują więcej rożnych/strzałów/goli,
+            # goście łapią więcej kartek — dotąd sekcja drużynowa to gubiła
+            f_venue = context.home_away_factor(tt.is_home, tt.market_code)
+            factor_t = f_sedzia * f_script * f_opp * f_venue
             srednia_hist = float(np.mean(tt.counts[:n_h]))
             # brama jakości (liga) także dla drużyn: historia klubu sprzed
             # przerwy/awansu podlega tym samym progom co zawodnicza
@@ -2239,10 +2275,14 @@ def _main_impl(tryb=None):
                 czynniki_t = []
                 # liczby w opisach po polsku (przecinek) — teksty idą 1:1 do UI
                 sr_t = f"{srednia_hist:.1f}".replace(".", ",")
+                sr5_txt = ""
+                if len(tt.counts) >= 5:
+                    sr5 = float(np.mean(tt.counts[:5]))
+                    sr5_txt = f", ostatnie 5 meczów: {sr5:.1f}".replace(".", ",")
                 czynniki_t.append({
                     "nazwa": "Poziom bazowy",
                     "opis": f"Średnio {sr_t} na mecz "
-                            f"(próba: {n_h} meczów)",
+                            f"(próba: {n_h} meczów{sr5_txt})",
                     "mnoznik": None,
                 })
                 if abs(f_opp - 1.0) > 0.02:
@@ -2250,10 +2290,20 @@ def _main_impl(tryb=None):
                     norma_s = f"{lg_mean:.1f}".replace(".", ",")
                     czynniki_t.append({
                         "nazwa": "Profil rywala",
-                        "opis": f"Rywale notują przeciw {tt.opponent_name} "
-                                f"~{konc_s} przy normie {norma_s} "
+                        "opis": f"Drużyny notują przeciw {tt.opponent_name} "
+                                f"średnio {konc_s} przy normie ligi {norma_s} "
                                 f"(próba: {konc_n} meczów)",
                         "mnoznik": round(f_opp, 2),
+                    })
+                if abs(f_venue - 1.0) > 0.02:
+                    czynniki_t.append({
+                        "nazwa": "Dom i wyjazd",
+                        "opis": ("Gra u siebie" if tt.is_home
+                                 else "Gra na wyjeździe")
+                        + (", to zwykle pomaga w tej statystyce"
+                           if f_venue > 1
+                           else ", to zwykle obniża tę statystykę"),
+                        "mnoznik": round(f_venue, 2),
                     })
                 if abs(f_sedzia - 1.0) > 0.02 and sed_t.get("sedzia"):
                     czynniki_t.append({
@@ -2293,7 +2343,7 @@ def _main_impl(tryb=None):
                     "ryzyko": betting.risk_level(pred_t.lam, False, 1.0),
                     "czynniki": {
                         "rywal": round(f_opp, 3), "sedzia": round(f_sedzia, 3),
-                        "dom_wyjazd": 1.0,
+                        "dom_wyjazd": round(f_venue, 3),
                         "scenariusz_meczu": round(f_script, 3),
                         "matchup": 1.0,
                         "lacznie": round(factor_t, 3), "opisy": {},
@@ -2306,6 +2356,27 @@ def _main_impl(tryb=None):
                     "lambda": round(float(pred_t.lam), 3),
                 })
                 n_team += 1
+                # forma drużyny do UI (karta typu: ostatnie mecze tego rynku)
+                f_slot = druzyny_forma.setdefault(tt.team_id, {
+                    "id": tt.team_id, "nazwa": tt.team_name,
+                    "druzyna": tt.team_name, "podmiot_typ": "druzyna",
+                    "forma": {},
+                })
+                if tt.market_code not in f_slot["forma"]:
+                    N_T = 20
+                    n_f = min(len(tt.counts), N_T)
+                    f_slot["forma"][tt.market_code] = {
+                        "ostatnie": [int(c) for c in tt.counts[:N_T]],
+                        # mecz drużyny = zawsze pełne 90 (okna formy w UI
+                        # filtrują po minutach > 0)
+                        "minuty": [90] * n_f,
+                        "rywale": [str(o) for o in tt.game_opponents[:N_T]],
+                        "ts": [int(t) for t in tt.timestamps[:N_T]],
+                        "dom": [bool(h) for h in tt.game_is_home[:N_T]],
+                        "srednia90": round(
+                            float(np.mean(tt.counts[:N_T])), 2
+                        ) if n_f else 0.0,
+                    }
         if n_team or team_trends:
             print(f"Rynki drużynowe: +{n_team} legów w puli "
                   f"({len(team_trends)} trendów drużynowych)"
@@ -2583,6 +2654,7 @@ def _main_impl(tryb=None):
     _dump("value_bets.json", value_bets)
     _dump("matches.json", list(matches_out.values()))
     _dump("players.json", list(players_out.values()))
+    _dump("druzyny_forma.json", list(druzyny_forma.values()))
     _dump("odds_superbet.json", odds_grid)   # siatka kursów do TOP POKRYCIA
     _dump("odrzucenia.json", odrzucenia_out)  # "czemu nie ma typu" per mecz
     print(f"Rejestr odrzuceń: {len(odrzucenia_out)} wpisów, "

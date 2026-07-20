@@ -19,8 +19,10 @@ import oddsSuperbetLocal from "@/data/demo/odds_superbet.json";
 import legiPoolLocal from "@/data/demo/legi_pool.json";
 import odrzuceniaLocal from "@/data/demo/odrzucenia.json";
 import stsValueLocal from "@/data/demo/sts_value.json";
+import druzynyFormaLocal from "@/data/demo/druzyny_forma.json";
 
 import type {
+  DruzynaForma,
   Kalibracja,
   Kupon,
   LegPool,
@@ -46,6 +48,7 @@ type Bundle = {
   legi_pool: LegPool[];
   odrzucenia: Odrzucenie[];
   sts_value: StsValue;
+  druzyny_forma: DruzynaForma[];
 };
 
 const LOCAL: Bundle = {
@@ -60,6 +63,7 @@ const LOCAL: Bundle = {
   legi_pool: legiPoolLocal as unknown as LegPool[],
   odrzucenia: odrzuceniaLocal as unknown as Odrzucenie[],
   sts_value: stsValueLocal as unknown as StsValue,
+  druzyny_forma: druzynyFormaLocal as unknown as DruzynaForma[],
 };
 
 const SUPABASE_URL = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -124,6 +128,7 @@ async function loadBundle(): Promise<Bundle> {
       legi_pool: (map.legi_pool ?? LOCAL.legi_pool) as LegPool[],
       odrzucenia: (map.odrzucenia ?? LOCAL.odrzucenia) as Odrzucenie[],
       sts_value: (map.sts_value ?? LOCAL.sts_value) as StsValue,
+      druzyny_forma: (map.druzyny_forma ?? LOCAL.druzyny_forma) as DruzynaForma[],
     });
   } catch {
     return tylkoNadchodzace(LOCAL);
@@ -148,6 +153,11 @@ export async function getOdrzucenia(meczId?: number): Promise<Odrzucenie[]> {
 
 export async function getZawodnicy(): Promise<Zawodnik[]> {
   return (await loadBundle()).players;
+}
+
+/** Forma drużyn z typami drużynowymi (karta typu na /druzyny). */
+export async function getDruzynyForma(): Promise<DruzynaForma[]> {
+  return (await loadBundle()).druzyny_forma;
 }
 
 export async function getKalibracja(): Promise<Kalibracja> {
