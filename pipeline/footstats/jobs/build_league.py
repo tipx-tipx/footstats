@@ -133,14 +133,19 @@ def upcoming_events(days: int = 6) -> list[MeczLigowy]:
     return sorted(out.values(), key=lambda m: m.kickoff_ts)
 
 
-def past_event_ids(team_ids: set[int], days_back: int = 10) -> list[int]:
-    """Rozegrane mecze z udziałem podanych drużyn (do banku historii trendów).
+def past_events(
+    team_ids: set[int], days_back: int = 10
+) -> tuple[list[int], list[dict]]:
+    """Rozegrane mecze z jednej pętli by-date wstecz, dwa cele naraz:
 
-    Filtr po drużynach trzyma liczbę zapytań o trendy w ryzach — bank rośnie
-    tylko o zawodników drużyn, które faktycznie gramy w tym cyklu.
+    * lista id meczów z udziałem podanych drużyn (bank historii trendów) —
+      filtr po drużynach trzyma liczbę zapytań o trendy w ryzach,
+    * surowe eventy rozgrywek z zakresu DRUŻYNOWEGO (bank stylu: shotmapy
+      statshub potrzebują id + kickoff, niezależnie od drużyn cyklu).
     """
     now = int(time.time())
-    out: list[int] = []
+    ids: list[int] = []
+    druzynowe: list[dict] = []
     for d in range(1, days_back + 1):
         start = now - d * 86400
         start -= start % 86400
@@ -154,11 +159,19 @@ def past_event_ids(team_ids: set[int], days_back: int = 10) -> list[int]:
             ev = e.get("events") or {}
             if ev.get("status") == "notstarted" or not ev.get("id"):
                 continue
-            ids = {(e.get("homeTeam") or {}).get("id"),
-                   (e.get("awayTeam") or {}).get("id")}
-            if ids & team_ids:
-                out.append(ev["id"])
-    return out
+            tids = {(e.get("homeTeam") or {}).get("id"),
+                    (e.get("awayTeam") or {}).get("id")}
+            if tids & team_ids:
+                ids.append(ev["id"])
+            utid = ev.get("uniqueTournamentId") or (e.get("unique_tournaments") or {}).get("id")
+            if rozgrywki.czy_druzynowe(utid):
+                druzynowe.append(ev)
+    return ids, druzynowe
+
+
+def past_event_ids(team_ids: set[int], days_back: int = 10) -> list[int]:
+    """Zgodność wstecz: same id meczów drużyn (patrz past_events)."""
+    return past_events(team_ids, days_back)[0]
 
 
 # ---------------------------------------------------------------------------
@@ -401,6 +414,9 @@ class TrybLigowy:
     # mecze rozgrywek z zakresu DRUŻYNOWEGO (top 5 + Ekstraklasa + puchary,
     # rozgrywki.druzynowe=True) — tylko dla nich silnik liczy rynki drużynowe
     druzynowe_mids: set[int] = field(default_factory=set)
+    # ROZEGRANE eventy zakresu drużynowego (statshub, id+kickoff) —
+    # bank stylu ligowego pobiera z nich shotmapy
+    past_druzynowe_events: list[dict] = field(default_factory=list)
 
 
 def zbuduj_tryb(days: int = 5, publikuj: bool = False) -> TrybLigowy | None:
@@ -431,6 +447,7 @@ def zbuduj_tryb(days: int = 5, publikuj: bool = False) -> TrybLigowy | None:
         "luka_superbet_propsy": _luka_propsy(luka),
     }
     team_ids = {m.home_id for m in pary} | {m.away_id for m in pary}
+    past_ids, past_druzynowe = past_events(team_ids)
     return TrybLigowy(
         events=[m.raw for m in pary],
         team_name={
@@ -444,7 +461,7 @@ def zbuduj_tryb(days: int = 5, publikuj: bool = False) -> TrybLigowy | None:
                          "kolejka": m.kolejka}
             for m in pary
         },
-        past_event_ids=past_event_ids(team_ids),
+        past_event_ids=past_ids,
         koncesje_min_ts=now - 180 * 86400,
         rotacja_min_ts=now - 45 * 86400,
         publikuj=publikuj,
@@ -452,6 +469,7 @@ def zbuduj_tryb(days: int = 5, publikuj: bool = False) -> TrybLigowy | None:
         sezon="2026/27",
         pokrycie=pokrycie,
         druzynowe_mids={m.event_id for m in pary if m.druzynowe},
+        past_druzynowe_events=past_druzynowe,
     )
 
 

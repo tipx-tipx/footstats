@@ -29,7 +29,7 @@ from curl_cffi import requests
 
 from dataclasses import replace as dc_replace
 
-from .. import supa
+from .. import rozgrywki, supa
 from ..engine import (
     MatchContext, PlayerHistory, RARE_MARKETS, apply_bias, score_player_market,
 )
@@ -250,22 +250,43 @@ def group_prior_from_context(trend: statshub.StatshubTrend) -> counts.GroupPrior
     return counts.GroupPrior(mean_per90=max(base, 0.15), pseudo_matches=5.0)
 
 
+# nowe wpisy sędziowskie per cykl (game_referee + pełne staty per mecz) —
+# na MŚ turniej miał kilka meczów dziennie, w sezonie ligowym dziesiątki;
+# pierwszy cykl dogania porcjami jak bank stylu
+LIMIT_NOWYCH_SEDZIOW = 40
+
+
 def profil_sedziow(
-    events: list[dict], team_name: dict[int, str]
+    events: list[dict], team_name: dict[int, str],
+    comp_ids: list[int] | None = None,
+    cache_key: str = "sedziowie_cache",
 ) -> dict[int, dict]:
     """Profil sędziego per nadchodzący mecz: {mid: {sedzia, mnoznik, n}}.
 
     Źródło: 365Scores — officials (obsada znana 1-2 dni przed meczem) +
-    suma fauli wszystkich zawodników z rozegranych meczów MŚ tego sędziego.
+    suma fauli wszystkich zawodników z rozegranych meczów tego sędziego.
     Mnożnik = średnia z ilorazów (faule meczu / OCZEKIWANE faule tej pary
     drużyn) — oczekiwania z pozostałych meczów tych drużyn, żeby nie mylić
     stylu sędziego ze stylem drużyn (Maroko fauluje dużo u każdego arbitra).
     Mecze z dogrywką pomijane (staty obejmują 120 min i zawyżałyby profil).
-    Wyniki per mecz cache'owane w Supabase (sedziowie_cache).
+    Wyniki per mecz cache'owane w Supabase (cache_key).
+
+    Domyślnie MŚ; tryb ligowy podaje comp_ids (rozgrywki drużynowe) i osobny
+    cache (sedziowie_cache_liga) — profile arbitrów klubowych osobno.
     """
-    cache = supa.get_key("sedziowie_cache") or {}
+    cache = supa.get_key(cache_key) or {}
     zmieniony = False
-    for g in scores365.finished_games_by_competition():
+    rozegrane_365: list[dict] = []
+    for c in (comp_ids or [None]):
+        try:
+            rozegrane_365 += (
+                scores365.finished_games_by_competition(c)
+                if c else scores365.finished_games_by_competition()
+            )
+        except Exception:
+            continue
+    nowych_sed = 0
+    for g in rozegrane_365:
         gid = str(g["id"])
         druzyny = [g.get("home") or "", g.get("away") or ""]
         if gid in cache:
@@ -274,6 +295,9 @@ def profil_sedziow(
                 cache[gid]["druzyny"] = druzyny
                 zmieniony = True
             continue
+        if nowych_sed >= LIMIT_NOWYCH_SEDZIOW:
+            break
+        nowych_sed += 1
         rec = {
             "sedzia": scores365.game_referee(g["id"]), "faule": None,
             "druzyny": druzyny if all(druzyny) else None,
@@ -290,7 +314,7 @@ def profil_sedziow(
         cache[gid] = rec
         zmieniony = True
     if zmieniony:
-        supa.put_key("sedziowie_cache", cache)
+        supa.put_key(cache_key, cache)
 
     per_sedzia: dict[str, list[tuple[float, list | None]]] = {}
     sr_druzyny: dict[str, list[float]] = {}
@@ -322,7 +346,15 @@ def profil_sedziow(
 
     # obsady nadchodzących meczów: parowanie fixtures 365 z eventami statshub
     # po znormalizowanych nazwach drużyn (awaryjnie kickoff +-3h + jedna nazwa)
-    sched = scores365.scheduled_games_by_competition()
+    sched: list[dict] = []
+    for c in (comp_ids or [None]):
+        try:
+            sched += (
+                scores365.scheduled_games_by_competition(c)
+                if c else scores365.scheduled_games_by_competition()
+            )
+        except Exception:
+            continue
     out: dict[int, dict] = {}
     for e in events:
         hn = rotowire._norm(team_name.get(e.get("homeTeamId"), ""))
@@ -360,15 +392,25 @@ LIMIT_NOWYCH_GIER_STYLU = 40
 LIMIT_WZROSTOW_NA_CYKL = 30
 
 
-def aktualizuj_bank_stylu(gracze_id_sh: set[int]) -> dict:
-    """Dolej do banku stylu (Supabase `styl_bank`) nowe rozegrane mecze MŚ:
+def aktualizuj_bank_stylu(
+    gracze_id_sh: set[int],
+    comp_ids: list[int] | None = None,
+    past_events: list[dict] | None = None,
+    klucz: str = "styl_bank",
+) -> dict:
+    """Dolej do banku stylu (Supabase `klucz`) nowe rozegrane mecze:
     statystyki drużynowe i styl zawodników (365Scores), sytuacje strzałów
     (shotmapy statshub) oraz wzrosty zawodników (statshub /player).
 
     Bank jest trwały — 365/statshub trzymają dane meczu długo, ale wolimy
     nie zależeć od ich retencji, a shotmapy/staty pobierać RAZ per mecz.
+
+    Domyślnie tryb MŚ (rozgrywki 5930, shotmapy z past_wc_events). Tryb
+    LIGOWY podaje comp_ids (rozgrywki.comp365_druzynowe), rozegrane eventy
+    statshub zakresu drużynowego i osobny klucz banku (styl_bank_liga) —
+    style klubów i reprezentacji to dwa różne światy, nie mieszamy.
     """
-    bank = supa.get_key("styl_bank") or {}
+    bank = supa.get_key(klucz) or {}
     gry = bank.setdefault("gry", {})
     zaw = bank.setdefault("zawodnicy", {})
     smapy = bank.setdefault("shotmap", {})
@@ -378,7 +420,16 @@ def aktualizuj_bank_stylu(gracze_id_sh: set[int]) -> dict:
     # 1) mecze 365Scores: statystyki drużynowe + styl zawodników per mecz
     nowych = 0
     try:
-        for g in scores365.finished_games_by_competition():
+        rozegrane_365: list[dict] = []
+        for c in (comp_ids or [None]):
+            try:
+                rozegrane_365 += (
+                    scores365.finished_games_by_competition(c)
+                    if c else scores365.finished_games_by_competition()
+                )
+            except Exception:
+                continue
+        for g in rozegrane_365:
             gid = str(g["id"])
             if gid in gry:
                 continue
@@ -425,10 +476,15 @@ def aktualizuj_bank_stylu(gracze_id_sh: set[int]) -> dict:
 
     # 2) shotmapy statshub (kontry per drużyna, stałe fragmenty per zawodnik)
     try:
-        for ev in past_wc_events():
+        nowych_smap = 0
+        for ev in (past_events if past_events is not None else past_wc_events()):
             eid = str(ev["id"])
             if eid in smapy:
                 continue
+            # w sezonie ligowym rozegranych meczów jest wielokrotnie więcej
+            # niż na turnieju — pierwszy cykl dogania porcjami, nie zalewa API
+            if nowych_smap >= LIMIT_NOWYCH_GIER_STYLU:
+                break
             try:
                 strzaly = statshub.fetch_event_shotmap(ev["id"])
             except Exception:
@@ -454,6 +510,7 @@ def aktualizuj_bank_stylu(gracze_id_sh: set[int]) -> dict:
                 "ts": ev.get("timeStartTimestamp") or 0,
                 "druzyny": dr, "stale": stale,
             }
+            nowych_smap += 1
             zmienione = True
             time.sleep(0.4)
     except Exception as e:
@@ -475,7 +532,7 @@ def aktualizuj_bank_stylu(gracze_id_sh: set[int]) -> dict:
         time.sleep(0.25)
 
     if zmienione:
-        supa.put_key("styl_bank", bank)
+        supa.put_key(klucz, bank)
     return bank
 
 
@@ -1043,11 +1100,17 @@ def _main_impl(tryb=None):
     bank_stylu: dict = {}
     try:
         if tryb:
-            # bank stylu liczony był per turniej MŚ — wersja ligowa (per
-            # rozgrywki z profilu) to osobny etap roadmapy; do tego czasu
-            # matchupy działają w trybie lite
-            raise RuntimeError("tryb ligowy: bank stylu w późniejszym etapie")
-        bank_stylu = aktualizuj_bank_stylu({t.player_id for t in trends})
+            # wersja ligowa: mecze 365 z rozgrywek drużynowych (comp365),
+            # shotmapy z rozegranych meczów zakresu, OSOBNY klucz banku —
+            # style klubów nie mieszają się z reprezentacjami MŚ
+            bank_stylu = aktualizuj_bank_stylu(
+                {t.player_id for t in trends},
+                comp_ids=rozgrywki.comp365_druzynowe(),
+                past_events=tryb.past_druzynowe_events,
+                klucz="styl_bank_liga",
+            )
+        else:
+            bank_stylu = aktualizuj_bank_stylu({t.player_id for t in trends})
         strony_zaw: dict[str, str] = {}
         for t in trends:
             k_st = rotowire._norm(t.player_name)
@@ -1083,13 +1146,19 @@ def _main_impl(tryb=None):
         print(f"Elo: {len(elo_map)} reprezentacji" if elo_map
               else "Elo niedostępne — wagi próby z listy uczestników MŚ")
 
-    # profil sędziów: obsada + średnia fauli/mecz vs średnia turnieju
+    # profil sędziów: obsada + średnia fauli/mecz vs oczekiwania par drużyn
     try:
         if tryb:
-            # profil sędziów liczony per turniej MŚ; wersja ligowa (statshub
-            # daje refereeName/refereeAvgCards w by-date) — późniejszy etap
-            raise RuntimeError("tryb ligowy: sędziowie w późniejszym etapie")
-        sedzia_by_mid = profil_sedziow(events, team_name)
+            # wersja ligowa: tylko mecze zakresu drużynowego (tam liczymy
+            # rynki dyscyplinarne), rozgrywki z profili, osobny cache
+            sedzia_by_mid = profil_sedziow(
+                [e for e in events if e["id"] in tryb.druzynowe_mids],
+                team_name,
+                comp_ids=rozgrywki.comp365_druzynowe(),
+                cache_key="sedziowie_cache_liga",
+            )
+        else:
+            sedzia_by_mid = profil_sedziow(events, team_name)
         _ev_by = {e["id"]: e for e in events}
         for mid_s, s in sedzia_by_mid.items():
             _e = _ev_by.get(mid_s, {})
@@ -1097,7 +1166,7 @@ def _main_impl(tryb=None):
                    f"{team_name.get(_e.get('awayTeamId'), '?')}")
             print(f"  sędzia {lbl}: {s['sedzia']}"
                   + (f" (faule ×{s['mnoznik']}, {s['n']} m.)"
-                     if s.get("mnoznik") else " (bez historii MŚ)"))
+                     if s.get("mnoznik") else " (bez historii)"))
     except Exception as e:
         sedzia_by_mid = {}
         print(f"Profil sędziów pominięty ({e})")
