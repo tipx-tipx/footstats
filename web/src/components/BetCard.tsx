@@ -719,10 +719,13 @@ function skadTaLiczba(bet: ValueBet): string | null {
       : Math.floor(bet.linia) + 1 === 1
         ? "Do wejścia typu wystarczy 1"
         : `Do wejścia typu potrzeba co najmniej ${Math.floor(bet.linia) + 1}`;
-  return (
-    `${fmtOpisLiczby(baza.opis)}. ${korekta} – zostaje ok. ${ocz}. ` +
-    `${prog}, ale model dolicza jeszcze ryzyko krótszej gry i ostatecznie daje ${fmtProc(bet.p_model)}.`
-  );
+  // "ryzyko krótszej gry" dotyczy zawodnika (rotacja, zmiana); drużyna
+  // gra zawsze pełny mecz — jej szansa wynika z rozkładu możliwych wyników
+  const domkniecie =
+    bet.podmiot_typ === "druzyna"
+      ? `${prog}, a rozkład możliwych wyników daje ${fmtProc(bet.p_model)}.`
+      : `${prog}, ale model dolicza jeszcze ryzyko krótszej gry i ostatecznie daje ${fmtProc(bet.p_model)}.`;
+  return `${fmtOpisLiczby(baza.opis)}. ${korekta} – zostaje ok. ${ocz}. ${domkniecie}`;
 }
 
 /** Skala ocen pewniaków — progi te same co w tierPewniaka. */

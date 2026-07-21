@@ -1,11 +1,1 @@
-{
- "wygenerowano_ts": 1783251951,
- "tryb": "ms2026",
- "liga": "Mistrzostwa Świata",
- "sezon": "2026",
- "zrodlo": "statshub (statystyki i historia) + Superbet (kursy)",
- "meczow_w_bazie": 7,
- "meczow_demo": 7,
- "meczow_kalibracja": 20,
- "okazji": 39
-}
+{"liga": "Piłka klubowa", "tryb": "liga", "sezon": "2026/27", "okazji": 10, "zrodlo": "statshub (statystyki i historia) + Superbet (kursy)", "meczow_demo": 92, "wagi_zaufania": {"wysoka": -0.214, "srednia": -0.25}, "kary_korelacji": {"ta_sama": 0.703, "nieznane": 0.974, "przeciwne": 0.795}, "meczow_w_bazie": 92, "wygenerowano_ts": 1784635723, "meczow_kalibracja": 20}

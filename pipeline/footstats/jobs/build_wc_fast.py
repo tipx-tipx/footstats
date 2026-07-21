@@ -2470,15 +2470,22 @@ def _main_impl(tryb=None):
                     if len(tt.counts) >= 5:
                         sr5 = float(np.mean(tt.counts[:5]))
                         sr5_txt = f", ostatnie 5 meczów: {sr5:.1f}".replace(".", ",")
-                    # korekta kalendarza widocznie ruszyła bazę -> mówimy to
-                    # wprost w opisie, żeby liczba w UI nie kłóciła się ze
-                    # średnią z wykresu formy
+                    # korekta kalendarza/prior widocznie ruszyły bazę ->
+                    # mówimy to wprost. Liczba = baza, od której model
+                    # REALNIE startuje (posterior per-90 = lambda/czynniki),
+                    # nie surowa średnia po korekcie — inaczej proza "liczy
+                    # od 1,1 … zostaje 1,7" kłóciła się sama ze sobą, bo
+                    # gubiła krok "krótka próba ściągana do normy ligi"
+                    # (karta Larne, 2026-07-21)
                     kor_txt = ""
-                    srednia_kor = float(np.mean(hist_t)) if hist_t else srednia_hist
-                    if abs(srednia_kor - srednia_hist) > 0.03 * max(srednia_hist, 0.1):
+                    baza_start = (
+                        float(pred_t.lam) / factor_t if factor_t else srednia_hist
+                    )
+                    if abs(baza_start - srednia_hist) > 0.03 * max(srednia_hist, 0.1):
                         kor_txt = (
-                            f"; po korekcie na siłę rywali i miejsce gry "
-                            f"model liczy od {srednia_kor:.1f}"
+                            f"; po korekcie na siłę rywali i miejsce gry oraz "
+                            f"zderzeniu krótkiej próby z normą ligi model "
+                            f"startuje od {baza_start:.1f}"
                         ).replace(".", ",")
                     czynniki_t.append({
                         "nazwa": "Poziom bazowy",
@@ -2663,7 +2670,10 @@ def _main_impl(tryb=None):
         # przy kursie 1,9+ dopuszczamy "opcję ryzykowną" już od p>=40%
         # (format tipsterski: linia wyżej, kurs wyraźnie wyższy)
         prog_p = 0.40 if b["kurs"] >= 1.9 else 0.52
-        if b["linia"] < 1.5 or b["p_model"] < prog_p:
+        # koncept dotyczy WYŁĄCZNIE strony "powyżej": dla undersów linia 3,5
+        # to nie "ambitniejszy wariant", a werdykt "wyższa linia za lepszy
+        # kurs" na karcie "poniżej 3,5" był bez sensu (Larne, 2026-07-21)
+        if b.get("strona") == "ponizej" or b["linia"] < 1.5 or b["p_model"] < prog_p:
             continue
         kw = (b["mecz_id"], b["rynek_kod"])
         w = wyzsze.get(kw)

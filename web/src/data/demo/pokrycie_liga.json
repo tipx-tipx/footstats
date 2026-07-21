@@ -1,0 +1,483 @@
+{
+ "mecze_statshub": 199,
+ "mecze_superbet": 371,
+ "sparowane": 165,
+ "per_rozgrywki": {
+  "Veikkausliiga": {
+   "kraj": "Finland",
+   "mecze": 3,
+   "sparowane": 3,
+   "druzynowe": false
+  },
+  "Romanian Super Liga": {
+   "kraj": "Romania",
+   "mecze": 4,
+   "sparowane": 3,
+   "druzynowe": false
+  },
+  "Parva Liga": {
+   "kraj": "Bulgaria",
+   "mecze": 3,
+   "sparowane": 3,
+   "druzynowe": false
+  },
+  "Superettan": {
+   "kraj": "Sweden",
+   "mecze": 2,
+   "sparowane": 2,
+   "druzynowe": false
+  },
+  "Allsvenskan": {
+   "kraj": "Sweden",
+   "mecze": 3,
+   "sparowane": 3,
+   "druzynowe": false
+  },
+  "División Profesional": {
+   "kraj": "Bolivia",
+   "mecze": 5,
+   "sparowane": 1,
+   "druzynowe": false
+  },
+  "LigaPro Serie A": {
+   "kraj": "Ecuador",
+   "mecze": 9,
+   "sparowane": 9,
+   "druzynowe": false
+  },
+  "K League 1": {
+   "kraj": "South Korea",
+   "mecze": 6,
+   "sparowane": 6,
+   "druzynowe": false
+  },
+  "Liga Mistrzów": {
+   "kraj": "Europa",
+   "mecze": 15,
+   "sparowane": 14,
+   "druzynowe": true
+  },
+  "Ykkösliiga": {
+   "kraj": "Finland",
+   "mecze": 1,
+   "sparowane": 1,
+   "druzynowe": false
+  },
+  "Botola Pro": {
+   "kraj": "Morocco",
+   "mecze": 2,
+   "sparowane": 0,
+   "druzynowe": false
+  },
+  "Liga Konferencji": {
+   "kraj": "Europa",
+   "mecze": 50,
+   "sparowane": 44,
+   "druzynowe": true
+  },
+  "CONMEBOL Sudamericana": {
+   "kraj": "South America",
+   "mecze": 8,
+   "sparowane": 8,
+   "druzynowe": false
+  },
+  "Brasileirão Série A": {
+   "kraj": "Brazil",
+   "mecze": 7,
+   "sparowane": 7,
+   "druzynowe": false
+  },
+  "Brasileirão Série B": {
+   "kraj": "Brazil",
+   "mecze": 10,
+   "sparowane": 10,
+   "druzynowe": false
+  },
+  "Liga MX, Apertura": {
+   "kraj": "Mexico",
+   "mecze": 2,
+   "sparowane": 2,
+   "druzynowe": false
+  },
+  "UEFA Women's Champions League": {
+   "kraj": "Europe",
+   "mecze": 9,
+   "sparowane": 0,
+   "druzynowe": false
+  },
+  "Eliteserien": {
+   "kraj": "Norway",
+   "mecze": 2,
+   "sparowane": 2,
+   "druzynowe": false
+  },
+  "USL League One": {
+   "kraj": "USA",
+   "mecze": 3,
+   "sparowane": 0,
+   "druzynowe": false
+  },
+  "USL Championship": {
+   "kraj": "USA",
+   "mecze": 2,
+   "sparowane": 2,
+   "druzynowe": false
+  },
+  "MLS": {
+   "kraj": "USA",
+   "mecze": 15,
+   "sparowane": 15,
+   "druzynowe": false
+  },
+  "Liga Europy": {
+   "kraj": "Europa",
+   "mecze": 9,
+   "sparowane": 9,
+   "druzynowe": true
+  },
+  "Liga Profesional de Fútbol": {
+   "kraj": "Argentina",
+   "mecze": 6,
+   "sparowane": 6,
+   "druzynowe": false
+  },
+  "K League 2": {
+   "kraj": "South Korea",
+   "mecze": 2,
+   "sparowane": 2,
+   "druzynowe": false
+  },
+  "ASEAN Championship": {
+   "kraj": "Asia",
+   "mecze": 2,
+   "sparowane": 0,
+   "druzynowe": false
+  },
+  "Ekstraklasa": {
+   "kraj": "Polska",
+   "mecze": 2,
+   "sparowane": 2,
+   "druzynowe": true
+  },
+  "Danish Superliga": {
+   "kraj": "Denmark",
+   "mecze": 1,
+   "sparowane": 1,
+   "druzynowe": false
+  },
+  "Russian Premier League": {
+   "kraj": "Russia",
+   "mecze": 1,
+   "sparowane": 0,
+   "druzynowe": false
+  },
+  "Challenge League": {
+   "kraj": "Switzerland",
+   "mecze": 5,
+   "sparowane": 3,
+   "druzynowe": false
+  },
+  "NB I": {
+   "kraj": "Hungary",
+   "mecze": 1,
+   "sparowane": 0,
+   "druzynowe": false
+  },
+  "Ireland 1st Division": {
+   "kraj": "Ireland",
+   "mecze": 4,
+   "sparowane": 4,
+   "druzynowe": false
+  },
+  "Liga 1": {
+   "kraj": "Peru",
+   "mecze": 1,
+   "sparowane": 1,
+   "druzynowe": false
+  },
+  "Chilean Primera División": {
+   "kraj": "Chile",
+   "mecze": 1,
+   "sparowane": 1,
+   "druzynowe": false
+  },
+  "Canadian Premier League": {
+   "kraj": "Canada",
+   "mecze": 1,
+   "sparowane": 0,
+   "druzynowe": false
+  },
+  "Uruguayan Primera División": {
+   "kraj": "Uruguay",
+   "mecze": 1,
+   "sparowane": 1,
+   "druzynowe": false
+  },
+  "Primera A, Apertura": {
+   "kraj": "Colombia",
+   "mecze": 1,
+   "sparowane": 0,
+   "druzynowe": false
+  }
+ },
+ "luka_superbet_propsy": [
+  {
+   "mecz": "Rapid Bukareszt - Sepsi Sfantu Gheorghe",
+   "rynkow": 196,
+   "kickoff_ts": 1784572200
+  },
+  {
+   "mecz": "Farul Constanta - Corvinul Hunedoara",
+   "rynkow": 131,
+   "kickoff_ts": 1784993400
+  },
+  {
+   "mecz": "IMT Novi Belgrad - Zemun",
+   "rynkow": 131,
+   "kickoff_ts": 1785002400
+  },
+  {
+   "mecz": "Radnicki Nis - Cukaricki",
+   "rynkow": 131,
+   "kickoff_ts": 1785002400
+  },
+  {
+   "mecz": "OFK Belgrad - Radnik Surdulica",
+   "rynkow": 131,
+   "kickoff_ts": 1785002400
+  },
+  {
+   "mecz": "Dinamo Bukareszt - Universitatea Craiova",
+   "rynkow": 131,
+   "kickoff_ts": 1785004200
+  },
+  {
+   "mecz": "Santos  - Chapecoense",
+   "rynkow": 131,
+   "kickoff_ts": 1785015000
+  },
+  {
+   "mecz": "Athletico PR - Internacional RS",
+   "rynkow": 131,
+   "kickoff_ts": 1785015000
+  },
+  {
+   "mecz": "Vasco da Gama - Mirassol",
+   "rynkow": 131,
+   "kickoff_ts": 1785022200
+  },
+  {
+   "mecz": "Jagiellonia Białystok - Korona Kielce",
+   "rynkow": 130,
+   "kickoff_ts": 1784983500
+  },
+  {
+   "mecz": "Górnik Zabrze - Śląsk Wrocław",
+   "rynkow": 130,
+   "kickoff_ts": 1784993400
+  },
+  {
+   "mecz": "Lech Poznań - Cracovia",
+   "rynkow": 130,
+   "kickoff_ts": 1785003300
+  },
+  {
+   "mecz": "Polonia Bytom - Warta Poznań",
+   "rynkow": 129,
+   "kickoff_ts": 1784908800
+  },
+  {
+   "mecz": "Odra Opole - Arka Gdynia",
+   "rynkow": 129,
+   "kickoff_ts": 1784919600
+  },
+  {
+   "mecz": "Atlante - Club America",
+   "rynkow": 129,
+   "kickoff_ts": 1784944800
+  },
+  {
+   "mecz": "Tijuana - Club Leon",
+   "rynkow": 129,
+   "kickoff_ts": 1784944800
+  },
+  {
+   "mecz": "Lechia Gdańsk - Pogoń Grodzisk Mazowiecki",
+   "rynkow": 129,
+   "kickoff_ts": 1784986200
+  },
+  {
+   "mecz": "Pogoń Siedlce - ŁKS Łódź",
+   "rynkow": 129,
+   "kickoff_ts": 1784986200
+  },
+  {
+   "mecz": "Stal Rzeszów - Chrobry Głogów",
+   "rynkow": 129,
+   "kickoff_ts": 1784986200
+  },
+  {
+   "mecz": "Guadalajara - Juarez",
+   "rynkow": 129,
+   "kickoff_ts": 1785020400
+  },
+  {
+   "mecz": "Znicz Pruszków - Resovia Rzeszów",
+   "rynkow": 128,
+   "kickoff_ts": 1784908800
+  },
+  {
+   "mecz": "CA Platense - Union de Santa Fe",
+   "rynkow": 128,
+   "kickoff_ts": 1784938500
+  },
+  {
+   "mecz": "CA Huracan - CA Banfield",
+   "rynkow": 128,
+   "kickoff_ts": 1784938500
+  },
+  {
+   "mecz": "Podhale Nowy Targ - Śląsk Wrocław II",
+   "rynkow": 128,
+   "kickoff_ts": 1784970900
+  },
+  {
+   "mecz": "Legia Warszawa II - Stal Stalowa Wola",
+   "rynkow": 128,
+   "kickoff_ts": 1784977200
+  },
+  {
+   "mecz": "Degerfors - Djurgarden IF",
+   "rynkow": 128,
+   "kickoff_ts": 1784984400
+  },
+  {
+   "mecz": "Kristiansund - Start",
+   "rynkow": 128,
+   "kickoff_ts": 1784988000
+  },
+  {
+   "mecz": "Kalmar FF - Mjallby",
+   "rynkow": 128,
+   "kickoff_ts": 1784993400
+  },
+  {
+   "mecz": "Servette - Basel",
+   "rynkow": 128,
+   "kickoff_ts": 1784995200
+  },
+  {
+   "mecz": "Lausanne Sport - Grasshopper",
+   "rynkow": 128,
+   "kickoff_ts": 1784995200
+  }
+ ],
+ "wygenerowano_ts": 1784548543,
+ "mecze_bez_trendow": [
+  "FC Corvinul Hunedoara - FK Csíkszereda Miercurea Ciuc",
+  "Botev Plovdiv - Lokomotiv Sofia",
+  "Jeju SK - Gangwon FC",
+  "Jeonbuk Hyundai Motors - Daejeon Hana Citizen",
+  "Ulsan HD - Incheon United",
+  "KäPa - HJK Klubi 04",
+  "FC Iberia 1999 - ŠK Slovan Bratislava",
+  "Mjällby AIF - Lincoln Red Imps",
+  "Falkenbergs FF - Helsingborgs IF",
+  "AGF - Lech Poznań",
+  "IFK Göteborg - FCI Levadia Tallinn",
+  "Floriana FC - FC Drita",
+  "Fenerbahçe - Górnik Zabrze",
+  "FC Thun - GNK Dinamo Zagreb",
+  "Atert Bissen - ETO FC Győr",
+  "SK Sturm Graz - Heart of Midlothian",
+  "Víkingur Reykjavík - Hapoel Be'er Sheva",
+  "Larne FC - FK Crvena zvezda",
+  "Libertad - Delfín",
+  "Universidad Católica del Ecuador - Barcelona SC",
+  "FC Seoul - Pohang Steelers",
+  "Gwangju FC - Gimcheon Sangmu FC",
+  "Bucheon FC 1995 - FC Anyang",
+  "Bodø/Glimt - HamKam",
+  "Lillestrøm SK - Viking FK",
+  "Bohemian FC - KF Ballkani",
+  "Levski Sofia - Universitatea Craiova",
+  "Başakşehir FK - Inter Turku",
+  "FK Vardar Skopje - Riga FC",
+  "FC Spartak Trnava - FC CSKA 1948 Sofia",
+  "Macará - Deportivo Cuenca",
+  "KF Egnatia - NK Celje",
+  "FK Železničar Pančevo - Sporting Braga",
+  "Lexington SC - Oakland Roots SC",
+  "Manta FC - LDU",
+  "Colorado Springs Switchbacks FC - Miami FC",
+  "FK Liepaja - Austria Wien",
+  "FC Alashkert - CFR 1907 Cluj",
+  "FK Panevėžys - FC Tobol",
+  "Qarabağ - CSKA Sofia",
+  "HJK - Coleraine FC",
+  "Debreceni VSC - Pyunik Yerevan",
+  "Flora Tallinn - The New Saints",
+  "FC Dila Gori - Apollon Limassol",
+  "Raków Częstochowa - Valletta FC",
+  "AEK Larnaca - Beitar Jerusalem",
+  "Sheriff Tiraspol - Maccabi Tel Aviv",
+  "Dynamo Kyiv - PAOK",
+  "Hammarby IF - RSC Anderlecht",
+  "FC Zimbru Chişinău - FC Noah",
+  "ML Vitebsk - FK Sutjeska Nikšić",
+  "FC Universitatea Cluj - SK Brann",
+  "BATE Borisov - FC Sion",
+  "Dinamo Tbilisi - FK Žalgiris",
+  "FC Santa Coloma - SK Rapid Wien",
+  "Tromsø IL - FC Hradec Králové",
+  "FC Vaduz - Atlètic Club Escaldes",
+  "FCSB - FK Auda",
+  "Beşiktaş - FC Midtjylland",
+  "Paksi FC - Panathinaikos",
+  "FK Vojvodina - AFC Ajax",
+  "NK Varaždin - FK Jablonec",
+  "FC Lugano - Dukagjini",
+  "Hapoel Tel Aviv - Ludogorets",
+  "LNZ Cherkasy - KAA Gent",
+  "FK Borac Banja Luka - FC Petrocub Hîncesti",
+  "MŠK Žilina - GKS Katowice",
+  "HNK Rijeka - Derry City",
+  "Shelbourne - Nõmme Kalju",
+  "Motherwell - HB Tórshavn",
+  "NSÍ Runavík - FC Koper",
+  "HNK Hajduk Split - Pafos FC",
+  "FK Partizan - Una Strassen",
+  "Stjarnan Garðabær - Ilves",
+  "Valur Reykjavík - HŠK Zrinjski Mostar",
+  "Orense SC - Aucas",
+  "Independiente Santa Fe - Caracas F.C.",
+  "Seoul E-Land FC - Cheonan City FC",
+  "Gimhae City FC - Cheongju FC",
+  "UTA Arad - SC Oțelul Galați",
+  "FF Jaro - SJK",
+  "Radomiak Radom - Wieczysta Kraków",
+  "Västerås SK - Örgryte IS",
+  "FC Rapperswil-Jona - FC Wil 1900",
+  "FC Stade-Lausanne-Ouchy - Stade Nyonnais",
+  "Arda Kardzhali - Slavia Sofia",
+  "Étoile Carouge FC - FC Aarau",
+  "Pogoń Szczecin - Legia Warszawa",
+  "FC Argeș Pitești - FC Petrolul Ploieşti",
+  "Cobh Ramblers FC - Bray Wanderers",
+  "Kerry FC - Finn Harps",
+  "Treaty United FC - Athlone Town",
+  "University College Dublin - Cork City",
+  "Alianza Atlético de Sullana - Los Chankas CYC",
+  "Unión La Calera - Everton de Viña del Mar",
+  "Nacional - Progreso"
+ ],
+ "odrzucenia_per_powod": {
+  "brak_kursu": 1110,
+  "za_malo_zdarzen": 954,
+  "za_stara_historia": 153,
+  "kurs_lub_szansa_poza_widelkami": 92
+ },
+ "poza_publikacja_per_powod": {},
+ "typy": 9,
+ "mecze_z_typami": 9
+}
