@@ -107,11 +107,15 @@ async function fetchBundle(): Promise<Bundle> {
           apikey: SUPABASE_ANON,
           Authorization: `Bearer ${SUPABASE_ANON}`,
         },
-        // cache'ujemy SAMI (loadBundle niżej): payload ~14 MB przekracza
-        // limit 2 MB data cache Next, więc `revalidate` i tak nie działał
-        // ("Failed to set fetch cache … over 2MB" przy każdym żądaniu),
-        // a próba zapisu tylko spamowała logi
-        cache: "no-store",
+        // UWAGA: to MUSI być revalidate, nie no-store. Strony są ISR
+        // (prerender statyczny + odświeżanie), a no-store podczas
+        // prerenderu rzuca kontrolny DynamicServerError, który łapał
+        // nasz try/catch — na produkcję zapiekał się LOKALNY fallback
+        // demo zamiast danych z Supabase (incydent 2026-07-21). Zapis
+        // do data cache Next i tak się nie udaje (payload ~14 MB > limit
+        // 2 MB, ostrzeżenie w logach jest kosmetyczne) — realny cache
+        // robi loadBundle niżej, w pamięci instancji.
+        next: { revalidate: 60 },
       },
     );
     if (!res.ok) return tylkoNadchodzace(LOCAL);
