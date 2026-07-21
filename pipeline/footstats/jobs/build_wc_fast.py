@@ -2525,6 +2525,16 @@ def _main_impl(tryb=None):
                             "rynek_rzadki": False,
                         },
                         "lambda": round(float(pred_t.lam), 3),
+                        # surowa historia predykcji — do kalibracji tau
+                        # (pamięci formy drużyn) z własnych rozliczeń:
+                        # jobs/kalibracja_tau.py odtwarza z tego posterior
+                        # przy różnych tau i mierzy Briera na wynikach
+                        "kal_tau": {
+                            "hist": [round(h, 2) for h in hist_t],
+                            "ts": [int(x) for x in tt.timestamps[:n_h]],
+                            "factor": round(factor_t, 4),
+                            "prior": round(float(lg_mean), 3),
+                        },
                     })
                     n_team += 1
                     # forma drużyny do UI (karta typu: ostatnie mecze tego rynku)
@@ -2679,6 +2689,7 @@ def _main_impl(tryb=None):
             "ci": ci, "oczekiwane_minuty": b.get("oczekiwane_minuty"),
             "lambda": round(b.get("lambda", 0.0), 3),
             "rozklad": b.get("rozklad"),
+            **({"kal_tau": b["kal_tau"]} if b.get("kal_tau") else {}),
             "czynniki": b.get("czynniki", {}),
             "uzasadnienie": b.get("uzasadnienie", {"czynniki": []}),
         }
@@ -2822,7 +2833,9 @@ def _main_impl(tryb=None):
         return
 
     _dump_pokrycie()
-    _dump("value_bets.json", value_bets)
+    _dump("value_bets.json", [
+        {k: v for k, v in b.items() if k != "kal_tau"} for b in value_bets
+    ])
     _dump("matches.json", list(matches_out.values()))
     _dump("players.json", list(players_out.values()))
     _dump("druzyny_forma.json", list(druzyny_forma.values()))

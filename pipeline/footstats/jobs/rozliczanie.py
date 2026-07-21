@@ -138,6 +138,7 @@ def _kupon_leg_do_logu(l: dict) -> dict:
         "wyzsza_linia": l.get("wyzsza_linia"),
         "miekka_linia": l.get("miekka_linia"),
         "xi_sygnal": l.get("xi_sygnal"),
+        "kal_tau": l.get("kal_tau"),
     }
 
 
@@ -185,6 +186,8 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
             "kurs_ref": b.get("kurs_ref"),
             "p_model": b["p_model"], "pewnosc": b.get("pewnosc"),
             "sugestia": bool(b.get("sugestia")),
+            # historia predykcji typów DRUŻYNOWYCH — patrz kalibracja_tau.py
+            **({"kal_tau": b["kal_tau"]} if b.get("kal_tau") else {}),
             # kategorie typu — do diagnostyki per kategoria (Brier/log-loss)
             "matchup": bool(b.get("matchup")),
             "matchup_styl": bool(b.get("matchup_styl")),
