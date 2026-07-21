@@ -53,6 +53,51 @@ function OsTrafien({ typy }: { typy: TypRozliczony[] }) {
 }
 
 /**
+ * Mini-wykres skuteczności dziennej: kolumna = dzień, zielone wypełnienie
+ * = odsetek trafień. Wypełnia treścią przestrzeń, którą karta dostaje od
+ * siatki (bliźniak wyższego biletu kuponu) — bez niego środek karty wisiał
+ * z pustymi pasami nad i pod osią trafień.
+ */
+function DniSlupki({ dni }: { dni: SkutecznoscDnia[] }) {
+  // dni[0] = najnowszy; na wykresie czas płynie w prawo
+  const okno = dni.slice(0, 10).reverse();
+  if (okno.length < 3) return null;
+  return (
+    <div className="flex min-h-0 flex-1 flex-col justify-end">
+      <p className="text-[10px] uppercase tracking-wide text-faint">
+        skuteczność dzień po dniu
+      </p>
+      {/* słupki rosną z kartą (bliźniak wyższego biletu kuponu), z sufitem —
+          bez tego środek karty wisiał z pustymi pasami */}
+      <div className="mt-2 flex min-h-14 flex-1 items-end gap-1.5 [max-height:7.5rem]">
+        {okno.map((d) => {
+          const r = d.rozliczone > 0 ? d.trafione / d.rozliczone : 0;
+          return (
+            <div
+              key={d.dzien}
+              className="relative h-full flex-1"
+              title={`${fmtDzien(d.dzien)}: ${d.trafione}/${d.rozliczone} (${fmtProc(r)})`}
+            >
+              <div className="absolute inset-x-0 bottom-0 h-full rounded-t-[3px] bg-ink/5" />
+              <div
+                className={`absolute inset-x-0 bottom-0 rounded-t-[3px] ${
+                  r >= 0.5 ? "bg-data-green" : "bg-data-red/60"
+                }`}
+                style={{ height: `${Math.max(r * 100, 5)}%` }}
+              />
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-1 flex justify-between text-[10px] text-faint">
+        <span>{fmtDzien(okno[0].dzien)}</span>
+        <span>{fmtDzien(okno[okno.length - 1].dzien)}</span>
+      </div>
+    </div>
+  );
+}
+
+/**
  * Dowód trafień na stronie głównej, bliźniak biletu kuponu (ta sama
  * anatomia karty: nagłówek ze statystykami, pasek, treść, akcja na dole).
  * Liczby są prawdziwe w obie strony. To celowe: transparentność jest tezą
@@ -152,7 +197,9 @@ export function SkutecznoscTeaser({
         </div>
       </header>
 
-      <div className="flex flex-1 flex-col justify-center px-4 pb-3 pt-3.5 sm:px-5">
+      <div className="flex flex-1 flex-col justify-center gap-5 px-4 pb-3 pt-3.5 sm:px-5">
+        <DniSlupki dni={dni} />
+        <div>
         <div className="flex items-center justify-between gap-2">
           <p className="text-[10px] uppercase tracking-wide text-faint">
             ostatnie rozliczone typy
@@ -174,6 +221,7 @@ export function SkutecznoscTeaser({
         <p aria-hidden className="mt-1 text-[10px] text-faint">
           najstarszy →
         </p>
+        </div>
       </div>
 
       <Link
