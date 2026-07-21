@@ -147,6 +147,51 @@ def deep_block_signal(opp: OpponentStyle) -> float:
     return shrink_factor(raw, opp.sample, 8.0)
 
 
+def matchup_factor_druzyny(
+    market_code: str,
+    opp: OpponentStyle,
+    is_favourite: bool = False,
+) -> tuple[float, str | None]:
+    """Matchup DRUŻYNOWY: styl rywala vs rynek całej drużyny.
+
+    Zespołowa wersja matchup_factor — te same sygnały banku stylu (głęboki
+    blok, pressing dryblingiem, kontry), bez warstwy pozycji zawodnika.
+    Widełki ciaśniejsze niż u zawodników (0.85–1.20): na poziomie drużyny
+    styl rozmywa się między jedenastu wykonawców. Gole celowo neutralne —
+    głęboki blok daje więcej strzałów, ale mniej goli na strzał, kierunek
+    netto jest niejednoznaczny i lepiej nie udawać, że go znamy.
+    """
+    f = 1.0
+    opis: str | None = None
+    deep = deep_block_signal(opp)
+    press = _ratio(opp.contests_pm, LG_TEAM_CONTESTS, opp.sample)
+    fb = _ratio(opp.fastbreak_share, LG_FASTBREAK_SHARE, opp.sample, prior=8.0)
+
+    if market_code == "team_corners":
+        # głęboki blok = bloki strzałów i zamknięte pole karne -> rożne rosną
+        f *= 1.0 + 0.45 * (deep - 1.0)
+        if deep > 1.03:
+            opis = "Rywal broni głęboko i blokuje strzały, to generuje rożne"
+        elif deep < 0.97:
+            opis = "Rywal gra wysoko i trzyma piłkę, o rożne trudniej"
+    elif market_code in ("team_shots", "team_sot"):
+        if is_favourite and deep > 1.03:
+            if market_code == "team_shots":
+                f *= 1.0 + 0.4 * (deep - 1.0)
+                opis = "Faworyt przeciw głębokiemu blokowi, dużo prób strzeleckich"
+            else:
+                f *= 1.0 - 0.2 * (deep - 1.0)
+                opis = "Głęboki blok rywala, trudniej o czysty celny strzał"
+    elif market_code in ("team_cards", "team_fouls"):
+        raw = 1.0 + 0.35 * (press - 1.0) + 0.25 * (fb - 1.0)
+        f *= raw
+        if raw > 1.03:
+            opis = "Rywal drybluje i kontratakuje, to wymusza faule"
+        elif raw < 0.97:
+            opis = "Rywal gra statycznie, mniej okazji do fauli"
+    return float(np.clip(f, 0.85, 1.20)), opis
+
+
 def matchup_factor(
     market_code: str,
     player: PlayerStyle,

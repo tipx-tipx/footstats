@@ -34,7 +34,8 @@ from ..engine import (
     MatchContext, PlayerHistory, RARE_MARKETS, apply_bias, score_player_market,
 )
 from ..model import (
-    betting, context, counts, koncesje, kupony, matchup_lite, styl, tempo,
+    betting, context, counts, koncesje, kupony, matchup, matchup_lite, styl,
+    tempo,
 )
 from ..sources import eloratings, rotowire, scores365, sofascore, statshub, superbet
 from . import rozliczanie
@@ -2135,6 +2136,8 @@ def _main_impl(tryb=None):
         liga_probki: dict[tuple[int, str], list[float]] = {}
         # (rywal_id, rynek) -> [(wartość, ts)] — ts do wagi świeżości koncesji
         koncesje_feed: dict[tuple[int, str], list[tuple[float, int]]] = {}
+        # (drużyna_id, rynek) -> własne wartości (mostek: atak rywala -> kartki)
+        wlasne_feed: dict[tuple[int, str], list[float]] = {}
         seen_gra: set = set()
         for tt in team_trends:
             for v_g, ts_g, opp_g in zip(
@@ -2146,6 +2149,9 @@ def _main_impl(tryb=None):
                 seen_gra.add(k_g)
                 liga_probki.setdefault(
                     (tt.league_id, tt.market_code), []
+                ).append(v_g)
+                wlasne_feed.setdefault(
+                    (tt.team_id, tt.market_code), []
                 ).append(v_g)
                 if opp_g:
                     koncesje_feed.setdefault(
@@ -2160,6 +2166,38 @@ def _main_impl(tryb=None):
         def _konc_feed_srednia(kf: list[tuple[float, int]]) -> float:
             """Płaska średnia koncesji (do korekty historii — bez świeżości)."""
             return float(np.mean([v for v, _ in kf]))
+
+        # MOSTKI MIĘDZY STATYSTYKAMI: skorelowany rynek jako miękki sygnał —
+        # rywal dopuszczający dużo strzałów zwykle dopuszcza i rożne, a mocno
+        # strzelający rywal wymusza faule i kartki. Tłumienie pierwiastkiem +
+        # shrink + ciasny cap: mostek dopycha obraz, nigdy go nie maluje.
+        MOSTKI = {
+            # rynek typu -> (rynek pokrewny, źródło: koncesje rywala / jego gra)
+            "team_corners": ("team_shots", "koncesje"),
+            "team_goals": ("team_sot", "koncesje"),
+            "team_cards": ("team_shots", "wlasne"),
+            "team_fouls": ("team_shots", "wlasne"),
+        }
+
+        def _mostek(mk_t: str, opp_id: int, lid: int) -> float:
+            para = MOSTKI.get(mk_t)
+            if not para or not opp_id:
+                return 1.0
+            mk_zr, zrodlo = para
+            if zrodlo == "koncesje":
+                probki = [v for v, _ in (koncesje_feed.get((opp_id, mk_zr)) or [])]
+            else:
+                probki = wlasne_feed.get((opp_id, mk_zr)) or []
+            lg_zr = liga_probki.get((lid, mk_zr)) or []
+            if len(probki) < 4 or len(lg_zr) < 30:
+                return 1.0
+            norma_zr = float(np.mean(lg_zr))
+            if norma_zr <= 0:
+                return 1.0
+            raw = float(np.sqrt(float(np.mean(probki)) / norma_zr))
+            return float(np.clip(
+                context.shrink_factor(raw, len(probki), 10.0), 0.92, 1.10
+            ))
 
         n_team = 0
         seen_team = set()
@@ -2307,7 +2345,24 @@ def _main_impl(tryb=None):
             # dom/wyjazd: gospodarze wykonują więcej rożnych/strzałów/goli,
             # goście łapią więcej kartek — dotąd sekcja drużynowa to gubiła
             f_venue = context.home_away_factor(tt.is_home, tt.market_code)
-            factor_t = f_sedzia * f_script * f_opp * f_venue
+            # matchup drużynowy: styl rywala z banku shotmap (głęboki blok,
+            # pressing, kontry) + mostek ze skorelowanej statystyki feedu
+            ostyle_t = None
+            try:
+                ostyle_t = style_turnieju.opponent(tt.opponent_name)
+            except Exception:
+                ostyle_t = None  # bank stylu pusty/pominięty -> neutralnie
+            f_matchup_t, opis_matchup_t = (1.0, None)
+            if ostyle_t is not None:
+                f_matchup_t, opis_matchup_t = matchup.matchup_factor_druzyny(
+                    tt.market_code, ostyle_t,
+                    is_favourite=bool(
+                        spread_teamu is not None and spread_teamu > 0.15
+                    ),
+                )
+            f_mostek_t = _mostek(tt.market_code, tt.opponent_id, tt.league_id)
+            f_styl_t = float(np.clip(f_matchup_t * f_mostek_t, 0.85, 1.20))
+            factor_t = f_sedzia * f_script * f_opp * f_venue * f_styl_t
             srednia_hist = float(np.mean(tt.counts[:n_h]))
             # brama jakości (liga) także dla drużyn: historia klubu sprzed
             # przerwy/awansu podlega tym samym progom co zawodnicza
@@ -2320,160 +2375,179 @@ def _main_impl(tryb=None):
                     odpadki_t["za_stara_historia"] += 1
                     continue
                 stare_t = dni_ost_t * 86400 > STARE_DANE_S
+            pred_t = counts.predict_match(posterior_t, 90.0, factor_t)
             for l_t, slot_t in sorted(linie_t.items()):
-                odd_t = (slot_t or {}).get("over")
-                if not odd_t:
-                    continue
-                pred_t = counts.predict_match(posterior_t, 90.0, factor_t)
-                p_t = pred_t.p_over(l_t)
-                lo_t, hi_t = counts.p_over_credible_interval(
+                p_over_t = pred_t.p_over(l_t)
+                lo_o, hi_o = counts.p_over_credible_interval(
                     posterior_t, 90.0, factor_t, l_t
                 )
-                implied_t = betting.implied_prob_one_sided(odd_t)
-                pewny_t = (
-                    betting.MIN_ODDS <= odd_t <= 2.80
-                    and p_t >= 0.52 and p_t * odd_t - 1.0 >= -0.12
-                )
-                perelka_t = (
-                    1.90 <= odd_t <= 3.60
-                    and p_t >= 0.42 and p_t * odd_t - 1.0 >= 0.0
-                )
-                if not (pewny_t or perelka_t):
-                    odpadki_t["kurs_lub_szansa_poza_widelkami"] += 1
-                    continue
-                if (hi_t - lo_t) > 0.35:
-                    odpadki_t["chwiejna_predykcja"] += 1
-                    continue
-                if abs(p_t - implied_t) > betting.MAX_MODEL_MARKET_DIVERGENCE:
-                    odpadki_t["rozjazd_z_rynkiem"] += 1
-                    continue
-                if implied_t > 0 and p_t / implied_t > betting.MAX_RELATIVE_DIVERGENCE:
-                    odpadki_t["rozjazd_z_rynkiem"] += 1
-                    continue
-                ev_uk_t = kurs_ref_t = None
-                if (
-                    tt.ref_odds and abs(l_t - tt.line) < 1e-6
-                    and tt.odds_type == "over"
+                # obie strony linii: Superbet kwotuje over i under, a model ma
+                # pełny rozkład — "poniżej" to lustro szansy "powyżej"
+                for strona_t, klucz_odds in (
+                    ("powyzej", "over"), ("ponizej", "under")
                 ):
-                    kurs_ref_t = round(statistics.median(tt.ref_odds), 2)
-                    nv_t = betting.no_vig_prob_uk(tt.ref_odds)
-                    if nv_t:
-                        ev_uk_t = round((nv_t[0] * odd_t - 1.0) * 100.0, 1)
-                czynniki_t = []
-                # liczby w opisach po polsku (przecinek) — teksty idą 1:1 do UI
-                sr_t = f"{srednia_hist:.1f}".replace(".", ",")
-                sr5_txt = ""
-                if len(tt.counts) >= 5:
-                    sr5 = float(np.mean(tt.counts[:5]))
-                    sr5_txt = f", ostatnie 5 meczów: {sr5:.1f}".replace(".", ",")
-                # korekta kalendarza widocznie ruszyła bazę -> mówimy to
-                # wprost w opisie, żeby liczba w UI nie kłóciła się ze
-                # średnią z wykresu formy
-                kor_txt = ""
-                srednia_kor = float(np.mean(hist_t)) if hist_t else srednia_hist
-                if abs(srednia_kor - srednia_hist) > 0.03 * max(srednia_hist, 0.1):
-                    kor_txt = (
-                        f"; po korekcie na siłę rywali i miejsce gry "
-                        f"model liczy od {srednia_kor:.1f}"
-                    ).replace(".", ",")
-                czynniki_t.append({
-                    "nazwa": "Poziom bazowy",
-                    "opis": f"Średnio {sr_t} na mecz "
-                            f"(próba: {n_h} meczów{sr5_txt}){kor_txt}",
-                    "mnoznik": None,
-                })
-                if abs(f_opp - 1.0) > 0.02:
-                    konc_s = f"{konc:.1f}".replace(".", ",")
-                    norma_s = f"{lg_mean:.1f}".replace(".", ",")
+                    odd_t = (slot_t or {}).get(klucz_odds)
+                    if not odd_t:
+                        continue
+                    if strona_t == "powyzej":
+                        p_t, lo_t, hi_t = p_over_t, lo_o, hi_o
+                    else:
+                        p_t, lo_t, hi_t = 1.0 - p_over_t, 1.0 - hi_o, 1.0 - lo_o
+                    implied_t = betting.implied_prob_one_sided(odd_t)
+                    pewny_t = (
+                        betting.MIN_ODDS <= odd_t <= 2.80
+                        and p_t >= 0.52 and p_t * odd_t - 1.0 >= -0.12
+                    )
+                    perelka_t = (
+                        1.90 <= odd_t <= 3.60
+                        and p_t >= 0.42 and p_t * odd_t - 1.0 >= 0.0
+                    )
+                    if not (pewny_t or perelka_t):
+                        odpadki_t["kurs_lub_szansa_poza_widelkami"] += 1
+                        continue
+                    if (hi_t - lo_t) > 0.35:
+                        odpadki_t["chwiejna_predykcja"] += 1
+                        continue
+                    if abs(p_t - implied_t) > betting.MAX_MODEL_MARKET_DIVERGENCE:
+                        odpadki_t["rozjazd_z_rynkiem"] += 1
+                        continue
+                    if implied_t > 0 and p_t / implied_t > betting.MAX_RELATIVE_DIVERGENCE:
+                        odpadki_t["rozjazd_z_rynkiem"] += 1
+                        continue
+                    ev_uk_t = kurs_ref_t = None
+                    if (
+                        tt.ref_odds and abs(l_t - tt.line) < 1e-6
+                        and tt.odds_type == klucz_odds
+                    ):
+                        kurs_ref_t = round(statistics.median(tt.ref_odds), 2)
+                        nv_t = betting.no_vig_prob_uk(tt.ref_odds)
+                        if nv_t:
+                            ev_uk_t = round((nv_t[0] * odd_t - 1.0) * 100.0, 1)
+                    czynniki_t = []
+                    # liczby w opisach po polsku (przecinek) — teksty idą 1:1 do UI
+                    sr_t = f"{srednia_hist:.1f}".replace(".", ",")
+                    sr5_txt = ""
+                    if len(tt.counts) >= 5:
+                        sr5 = float(np.mean(tt.counts[:5]))
+                        sr5_txt = f", ostatnie 5 meczów: {sr5:.1f}".replace(".", ",")
+                    # korekta kalendarza widocznie ruszyła bazę -> mówimy to
+                    # wprost w opisie, żeby liczba w UI nie kłóciła się ze
+                    # średnią z wykresu formy
+                    kor_txt = ""
+                    srednia_kor = float(np.mean(hist_t)) if hist_t else srednia_hist
+                    if abs(srednia_kor - srednia_hist) > 0.03 * max(srednia_hist, 0.1):
+                        kor_txt = (
+                            f"; po korekcie na siłę rywali i miejsce gry "
+                            f"model liczy od {srednia_kor:.1f}"
+                        ).replace(".", ",")
                     czynniki_t.append({
-                        "nazwa": "Profil rywala",
-                        "opis": f"Drużyny notują przeciw {tt.opponent_name} "
-                                f"średnio {konc_s} przy normie ligi {norma_s} "
-                                f"(próba: {konc_n} meczów)",
-                        "mnoznik": round(f_opp, 2),
+                        "nazwa": "Poziom bazowy",
+                        "opis": f"Średnio {sr_t} na mecz "
+                                f"(próba: {n_h} meczów{sr5_txt}){kor_txt}",
+                        "mnoznik": None,
                     })
-                if abs(f_venue - 1.0) > 0.02:
-                    czynniki_t.append({
-                        "nazwa": "Dom i wyjazd",
-                        "opis": ("Gra u siebie" if tt.is_home
-                                 else "Gra na wyjeździe")
-                        + (", to zwykle pomaga w tej statystyce"
-                           if f_venue > 1
-                           else ", to zwykle obniża tę statystykę"),
-                        "mnoznik": round(f_venue, 2),
+                    if abs(f_opp - 1.0) > 0.02:
+                        konc_s = f"{konc:.1f}".replace(".", ",")
+                        norma_s = f"{lg_mean:.1f}".replace(".", ",")
+                        czynniki_t.append({
+                            "nazwa": "Profil rywala",
+                            "opis": f"Drużyny notują przeciw {tt.opponent_name} "
+                                    f"średnio {konc_s} przy normie ligi {norma_s} "
+                                    f"(próba: {konc_n} meczów)",
+                            "mnoznik": round(f_opp, 2),
+                        })
+                    if abs(f_venue - 1.0) > 0.02:
+                        czynniki_t.append({
+                            "nazwa": "Dom i wyjazd",
+                            "opis": ("Gra u siebie" if tt.is_home
+                                     else "Gra na wyjeździe")
+                            + (", to zwykle pomaga w tej statystyce"
+                               if f_venue > 1
+                               else ", to zwykle obniża tę statystykę"),
+                            "mnoznik": round(f_venue, 2),
+                        })
+                    if abs(f_styl_t - 1.0) > 0.02:
+                        czynniki_t.append({
+                            "nazwa": "Styl rywala",
+                            "opis": opis_matchup_t or (
+                                "Skorelowane statystyki rywala "
+                                + ("sprzyjają temu rynkowi" if f_styl_t > 1
+                                   else "nie sprzyjają temu rynkowi")
+                            ),
+                            "mnoznik": round(f_styl_t, 2),
+                        })
+                    if abs(f_sedzia - 1.0) > 0.02 and sed_t.get("sedzia"):
+                        czynniki_t.append({
+                            "nazwa": "Sędzia",
+                            "opis": f"{sed_t['sedzia']}: "
+                                    f"{'surowy' if f_sedzia > 1 else 'pobłażliwy'}",
+                            "mnoznik": round(f_sedzia, 2),
+                        })
+                    if abs(f_script - 1.0) > 0.02:
+                        czynniki_t.append({
+                            "nazwa": "Scenariusz meczu",
+                            "opis": "Z kursów meczowych: przewidywany przebieg "
+                                    + ("sprzyja" if f_script > 1 else "nie sprzyja"),
+                            "mnoznik": round(f_script, 2),
+                        })
+                    legi_pool.append({
+                        "id": 0, "mecz_id": mid, "mecz": match_label,
+                        "kickoff_ts": ts, "podmiot_id": tt.team_id,
+                        "podmiot": tt.team_name, "druzyna": tt.team_name,
+                        "przeciwnik": tt.opponent_name,
+                        "podmiot_typ": "druzyna",
+                        "rynek_kod": tt.market_code,
+                        "rynek": MARKET_NAMES_PL[tt.market_code],
+                        "linia": l_t, "strona": strona_t, "kurs": odd_t,
+                        "bukmacher": "Superbet", "p_model": round(p_t, 4),
+                        "ev_pct": round((p_t * odd_t - 1.0) * 100.0, 1),
+                        "ev_uk": ev_uk_t, "kurs_ref": kurs_ref_t,
+                        "pewnosc": "wysoka" if (hi_t - lo_t) <= 0.18 else "srednia",
+                        "matchup": bool(f_opp >= 1.12),
+                        "matchup_styl": bool(f_styl_t >= 1.08),
+                        "rotacja": False, "xi_sygnal": None,
+                        "swieze_sklady": mid in swieze_mids,
+                        "stare_dane": stare_t,
+                        "miekka_linia": False, "kurs_oczekiwany": None,
+                        "ci": [round(lo_t, 4), round(hi_t, 4)],
+                        "oczekiwane_minuty": None,
+                        "ryzyko": betting.risk_level(pred_t.lam, False, 1.0),
+                        "czynniki": {
+                            "rywal": round(f_opp, 3), "sedzia": round(f_sedzia, 3),
+                            "dom_wyjazd": round(f_venue, 3),
+                            "scenariusz_meczu": round(f_script, 3),
+                            "matchup": round(f_styl_t, 3),
+                            "lacznie": round(factor_t, 3), "opisy": {},
+                        },
+                        "uzasadnienie": {
+                            "czynniki": czynniki_t,
+                            "oczekiwana_liczba": round(float(pred_t.lam), 2),
+                            "rynek_rzadki": False,
+                        },
+                        "lambda": round(float(pred_t.lam), 3),
                     })
-                if abs(f_sedzia - 1.0) > 0.02 and sed_t.get("sedzia"):
-                    czynniki_t.append({
-                        "nazwa": "Sędzia",
-                        "opis": f"{sed_t['sedzia']}: "
-                                f"{'surowy' if f_sedzia > 1 else 'pobłażliwy'}",
-                        "mnoznik": round(f_sedzia, 2),
+                    n_team += 1
+                    # forma drużyny do UI (karta typu: ostatnie mecze tego rynku)
+                    f_slot = druzyny_forma.setdefault(tt.team_id, {
+                        "id": tt.team_id, "nazwa": tt.team_name,
+                        "druzyna": tt.team_name, "podmiot_typ": "druzyna",
+                        "forma": {},
                     })
-                if abs(f_script - 1.0) > 0.02:
-                    czynniki_t.append({
-                        "nazwa": "Scenariusz meczu",
-                        "opis": "Z kursów meczowych: przewidywany przebieg "
-                                + ("sprzyja" if f_script > 1 else "nie sprzyja"),
-                        "mnoznik": round(f_script, 2),
-                    })
-                legi_pool.append({
-                    "id": 0, "mecz_id": mid, "mecz": match_label,
-                    "kickoff_ts": ts, "podmiot_id": tt.team_id,
-                    "podmiot": tt.team_name, "druzyna": tt.team_name,
-                    "przeciwnik": tt.opponent_name,
-                    "podmiot_typ": "druzyna",
-                    "rynek_kod": tt.market_code,
-                    "rynek": MARKET_NAMES_PL[tt.market_code],
-                    "linia": l_t, "strona": "powyzej", "kurs": odd_t,
-                    "bukmacher": "Superbet", "p_model": round(p_t, 4),
-                    "ev_pct": round((p_t * odd_t - 1.0) * 100.0, 1),
-                    "ev_uk": ev_uk_t, "kurs_ref": kurs_ref_t,
-                    "pewnosc": "wysoka" if (hi_t - lo_t) <= 0.18 else "srednia",
-                    "matchup": bool(f_opp >= 1.12),
-                    "matchup_styl": False,
-                    "rotacja": False, "xi_sygnal": None,
-                    "swieze_sklady": mid in swieze_mids,
-                    "stare_dane": stare_t,
-                    "miekka_linia": False, "kurs_oczekiwany": None,
-                    "ci": [round(lo_t, 4), round(hi_t, 4)],
-                    "oczekiwane_minuty": None,
-                    "ryzyko": betting.risk_level(pred_t.lam, False, 1.0),
-                    "czynniki": {
-                        "rywal": round(f_opp, 3), "sedzia": round(f_sedzia, 3),
-                        "dom_wyjazd": round(f_venue, 3),
-                        "scenariusz_meczu": round(f_script, 3),
-                        "matchup": 1.0,
-                        "lacznie": round(factor_t, 3), "opisy": {},
-                    },
-                    "uzasadnienie": {
-                        "czynniki": czynniki_t,
-                        "oczekiwana_liczba": round(float(pred_t.lam), 2),
-                        "rynek_rzadki": False,
-                    },
-                    "lambda": round(float(pred_t.lam), 3),
-                })
-                n_team += 1
-                # forma drużyny do UI (karta typu: ostatnie mecze tego rynku)
-                f_slot = druzyny_forma.setdefault(tt.team_id, {
-                    "id": tt.team_id, "nazwa": tt.team_name,
-                    "druzyna": tt.team_name, "podmiot_typ": "druzyna",
-                    "forma": {},
-                })
-                if tt.market_code not in f_slot["forma"]:
-                    N_T = 20
-                    n_f = min(len(tt.counts), N_T)
-                    f_slot["forma"][tt.market_code] = {
-                        "ostatnie": [int(c) for c in tt.counts[:N_T]],
-                        # mecz drużyny = zawsze pełne 90 (okna formy w UI
-                        # filtrują po minutach > 0)
-                        "minuty": [90] * n_f,
-                        "rywale": [str(o) for o in tt.game_opponents[:N_T]],
-                        "ts": [int(t) for t in tt.timestamps[:N_T]],
-                        "dom": [bool(h) for h in tt.game_is_home[:N_T]],
-                        "srednia90": round(
-                            float(np.mean(tt.counts[:N_T])), 2
-                        ) if n_f else 0.0,
-                    }
+                    if tt.market_code not in f_slot["forma"]:
+                        N_T = 20
+                        n_f = min(len(tt.counts), N_T)
+                        f_slot["forma"][tt.market_code] = {
+                            "ostatnie": [int(c) for c in tt.counts[:N_T]],
+                            # mecz drużyny = zawsze pełne 90 (okna formy w UI
+                            # filtrują po minutach > 0)
+                            "minuty": [90] * n_f,
+                            "rywale": [str(o) for o in tt.game_opponents[:N_T]],
+                            "ts": [int(t) for t in tt.timestamps[:N_T]],
+                            "dom": [bool(h) for h in tt.game_is_home[:N_T]],
+                            "srednia90": round(
+                                float(np.mean(tt.counts[:N_T])), 2
+                            ) if n_f else 0.0,
+                        }
         if n_team or team_trends:
             print(f"Rynki drużynowe: +{n_team} legów w puli "
                   f"({len(team_trends)} trendów drużynowych)"
