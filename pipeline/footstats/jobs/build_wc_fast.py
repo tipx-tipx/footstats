@@ -2100,7 +2100,8 @@ def _main_impl(tryb=None):
         # (norma rynku) i koncesje rywala (co drużyny notują PRZECIW niemu).
         # Dedup po (drużyna, rynek, timestamp) — ten sam mecz nie liczy się 2x.
         liga_probki: dict[tuple[int, str], list[float]] = {}
-        koncesje_feed: dict[tuple[int, str], list[float]] = {}
+        # (rywal_id, rynek) -> [(wartość, ts)] — ts do wagi świeżości koncesji
+        koncesje_feed: dict[tuple[int, str], list[tuple[float, int]]] = {}
         seen_gra: set = set()
         for tt in team_trends:
             for v_g, ts_g, opp_g in zip(
@@ -2116,7 +2117,16 @@ def _main_impl(tryb=None):
                 if opp_g:
                     koncesje_feed.setdefault(
                         (opp_g, tt.market_code), []
-                    ).append(v_g)
+                    ).append((v_g, ts_g))
+
+        # świeżość koncesji z feedu: tau 45 dni — ZAŁOŻENIE (rytm ligowy to
+        # mecz co ~tydzień; 14 dni z koncesje.py jest strojone pod turniej
+        # i zabiłoby próbę), do kalibracji po rozliczeniach cykli jak marża UK
+        KONCESJE_FEED_TAU_DNI = 45.0
+
+        def _konc_feed_srednia(kf: list[tuple[float, int]]) -> float:
+            """Płaska średnia koncesji (do korekty historii — bez świeżości)."""
+            return float(np.mean([v for v, _ in kf]))
 
         n_team = 0
         seen_team = set()
@@ -2183,8 +2193,37 @@ def _main_impl(tryb=None):
             )
             n_h = min(len(tt.counts), 20)
             now_t = int(time.time())
+            # KOREKTA KALENDARZA: każdy mecz historii sprowadzamy do warunków
+            # neutralnych — dzielimy przez to, co tamten rywal przeciętnie
+            # dopuszcza (koncesje feedu, ten sam shrink+cap co czynnik rywala)
+            # i przez stały efekt miejsca gry (game_is_home z feedu). Baza
+            # przestaje dziedziczyć łatwy/trudny terminarz i nadmiar meczów
+            # u siebie; kontekst NADCHODZĄCEGO meczu nakłada potem f_opp
+            # i f_venue — bez podwójnego liczenia, bo historia jest już czysta.
+            hist_t: list[float] = []
+            for i_g in range(n_h):
+                mnoznik_gry = 1.0
+                oid_g = (
+                    tt.game_opponent_ids[i_g]
+                    if i_g < len(tt.game_opponent_ids) else 0
+                )
+                kf_g = (
+                    koncesje_feed.get((oid_g, tt.market_code)) if oid_g else None
+                )
+                if kf_g and len(kf_g) >= 4 and lg_mean:
+                    mnoznik_gry *= context.cap(
+                        context.shrink_factor(
+                            _konc_feed_srednia(kf_g) / lg_mean, len(kf_g), 12.0
+                        ),
+                        context.CAP_OPPONENT,
+                    )
+                if i_g < len(tt.game_is_home):
+                    mnoznik_gry *= context.home_away_factor(
+                        tt.game_is_home[i_g], tt.market_code
+                    )
+                hist_t.append(float(tt.counts[i_g]) / max(mnoznik_gry, 0.5))
             posterior_t = counts.fit_posterior(
-                np.array(tt.counts[:n_h]),
+                np.array(hist_t),
                 np.array([90.0] * n_h),
                 np.array([
                     max((now_t - t) / 86400.0, 0.0)
@@ -2209,10 +2248,25 @@ def _main_impl(tryb=None):
             )
             konc, konc_n = _koncesja_druzynowa(tt.opponent_name, pole)
             if konc is None:
-                # koncesje z feedu: co drużyny notują przeciw temu rywalowi
+                # koncesje z feedu: co drużyny notują przeciw temu rywalowi,
+                # ważone świeżością (mecz sprzed tygodnia > sprzed 3 miesięcy)
+                # — spójnie z koncesje.py dla zawodników
                 kf = koncesje_feed.get((tt.opponent_id, tt.market_code)) or []
                 if len(kf) >= 4:
-                    konc, konc_n = float(np.mean(kf)), len(kf)
+                    wagi_kf = np.exp(
+                        -np.maximum(
+                            now_t - np.array([t for _, t in kf], dtype=float),
+                            0.0,
+                        ) / 86400.0 / KONCESJE_FEED_TAU_DNI
+                    )
+                    # feed miewa eventTimestamp=0 -> waga ~0; przy zdegenerowanych
+                    # wagach wracamy do płaskiej średniej zamiast NaN
+                    konc = (
+                        float(np.average([v for v, _ in kf], weights=wagi_kf))
+                        if float(np.sum(wagi_kf)) > 1e-9
+                        else _konc_feed_srednia(kf)
+                    )
+                    konc_n = len(kf)
             f_opp = (
                 context.opponent_factor(konc, lg_mean, konc_n)
                 if konc is not None and lg_mean else 1.0
@@ -2279,10 +2333,20 @@ def _main_impl(tryb=None):
                 if len(tt.counts) >= 5:
                     sr5 = float(np.mean(tt.counts[:5]))
                     sr5_txt = f", ostatnie 5 meczów: {sr5:.1f}".replace(".", ",")
+                # korekta kalendarza widocznie ruszyła bazę -> mówimy to
+                # wprost w opisie, żeby liczba w UI nie kłóciła się ze
+                # średnią z wykresu formy
+                kor_txt = ""
+                srednia_kor = float(np.mean(hist_t)) if hist_t else srednia_hist
+                if abs(srednia_kor - srednia_hist) > 0.03 * max(srednia_hist, 0.1):
+                    kor_txt = (
+                        f"; po korekcie na siłę rywali i miejsce gry "
+                        f"model liczy od {srednia_kor:.1f}"
+                    ).replace(".", ",")
                 czynniki_t.append({
                     "nazwa": "Poziom bazowy",
                     "opis": f"Średnio {sr_t} na mecz "
-                            f"(próba: {n_h} meczów{sr5_txt})",
+                            f"(próba: {n_h} meczów{sr5_txt}){kor_txt}",
                     "mnoznik": None,
                 })
                 if abs(f_opp - 1.0) > 0.02:
