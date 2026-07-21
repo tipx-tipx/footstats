@@ -97,7 +97,7 @@ function tylkoNadchodzace(bundle: Bundle): Bundle {
   };
 }
 
-async function loadBundle(): Promise<Bundle> {
+async function fetchBundle(): Promise<Bundle> {
   if (!SUPABASE_URL || !SUPABASE_ANON) return tylkoNadchodzace(LOCAL);
   try {
     const res = await fetch(
@@ -107,10 +107,11 @@ async function loadBundle(): Promise<Bundle> {
           apikey: SUPABASE_ANON,
           Authorization: `Bearer ${SUPABASE_ANON}`,
         },
-        next: { revalidate: 60 }, // odśwież co 60 s — po pominięciu kuponu
-        // pipeline jest odpalany od razu (patrz /api/kupon-pomin), więc nowy
-        // kupon ma być widoczny w ~2-3 min, nie po 15 min cache
-
+        // cache'ujemy SAMI (loadBundle niżej): payload ~14 MB przekracza
+        // limit 2 MB data cache Next, więc `revalidate` i tak nie działał
+        // ("Failed to set fetch cache … over 2MB" przy każdym żądaniu),
+        // a próba zapisu tylko spamowała logi
+        cache: "no-store",
       },
     );
     if (!res.ok) return tylkoNadchodzace(LOCAL);
@@ -133,6 +134,28 @@ async function loadBundle(): Promise<Bundle> {
   } catch {
     return tylkoNadchodzace(LOCAL);
   }
+}
+
+/**
+ * Cache bundla w pamięci instancji. Bez niego KAŻDY getter KAŻDEGO żądania
+ * pobierał całe ~14 MB app_data od nowa (strona zawodników woła 6 getterów
+ * w Promise.all = ~87 MB i sześć JSON.parse na jedno wejście — stąd
+ * kilkusekundowe ładowanie). Jedna współdzielona obietnica deduplikuje
+ * gettery w ramach renderu i równoległe żądania, a TTL 60 s (intencja
+ * dawnego revalidate) niesie dane między żądaniami — instancja Fluid
+ * Compute żyje dłużej niż pojedynczy request, więc kolejne wejścia mają
+ * bundle od ręki. Świeży kupon po pominięciu nadal pojawia się w ~2-3 min
+ * (pipeline odpalany od razu, patrz /api/kupon-pomin).
+ */
+const BUNDLE_TTL_MS = 60_000;
+let bundleCache: { ts: number; bundle: Promise<Bundle> } | null = null;
+
+function loadBundle(): Promise<Bundle> {
+  if (bundleCache && Date.now() - bundleCache.ts < BUNDLE_TTL_MS) {
+    return bundleCache.bundle;
+  }
+  bundleCache = { ts: Date.now(), bundle: fetchBundle() };
+  return bundleCache.bundle;
 }
 
 export async function getValueBets(): Promise<ValueBet[]> {

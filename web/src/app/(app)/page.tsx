@@ -36,6 +36,28 @@ export default async function OkazjePage({
     (b) => b.podmiot_typ === "druzyna" && !b.sugestia,
   ).length;
 
+  // ODCHUDZENIE payloadu: ValueBoard/BetCard czytają z zawodnika wyłącznie
+  // forma[rynek_kod] typu — a pełna baza (każdy zawodnik × wszystkie rynki
+  // × 20 meczów historii) pompowała megabajty do HTML i strumienia RSC
+  // i to była główna waga tej strony. Na klienta idzie tylko forma rynków,
+  // na które faktycznie są typy.
+  const rynkiZawodnika = new Map<number, Set<string>>();
+  for (const b of bets) {
+    const s = rynkiZawodnika.get(b.podmiot_id) ?? new Set<string>();
+    s.add(b.rynek_kod);
+    rynkiZawodnika.set(b.podmiot_id, s);
+  }
+  const zawodnicyLite = zawodnicy
+    .filter((z) => rynkiZawodnika.has(z.id))
+    .map((z) => ({
+      ...z,
+      forma: Object.fromEntries(
+        Object.entries(z.forma).filter(([kod]) =>
+          rynkiZawodnika.get(z.id)!.has(kod),
+        ),
+      ),
+    }));
+
   const okazje = bets.filter((b) => !b.sugestia);
   const sugestie = bets.filter((b) => b.sugestia);
   // żywy podgląd w hero: do 4 najlepszych pozycji rankingu silnika
@@ -77,7 +99,7 @@ export default async function OkazjePage({
         bets={bets}
         stsAlerty={stsValue.alerty}
         stsGeneratedTs={stsValue.generated_ts}
-        zawodnicy={zawodnicy}
+        zawodnicy={zawodnicyLite}
         initialMatchId={mecz ? Number(mecz) : undefined}
         initialRodzaj={
           rodzaj === "pewniaki" || rodzaj === "value" || rodzaj === "wszystko"
