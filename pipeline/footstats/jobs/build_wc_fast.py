@@ -862,6 +862,17 @@ def _main_impl(tryb=None):
         return
     print(f"Trendów propsów: {len(trends)} "
           f"({len(set(t.player_id for t in trends))} zawodników)")
+    # ostatni mecz KAŻDEJ drużyny wg feedu — do rozróżnienia "zawodnik siedzi"
+    # od "cała liga pauzowała" (przerwa letnia / mundialowa): flaga stare_dane
+    # nie powinna chować typów za przerwę, na którą zawodnik nie miał wpływu
+    ostatni_mecz_druzyny: dict[int, int] = {}
+    for _t in trends:
+        if _t.team_id is None:
+            continue
+        maks = max((ts for ts, m in zip(_t.timestamps, _t.minutes)
+                    if ts > 0 and m is not None), default=0)
+        if maks > ostatni_mecz_druzyny.get(_t.team_id, 0):
+            ostatni_mecz_druzyny[_t.team_id] = maks
     if not trends:
         # statshub schował feed propsów (2026-07-04: /api/props/* zwraca
         # pustkę anonimowo — prawdopodobnie za kontem). NIE przerywamy:
@@ -1592,6 +1603,17 @@ def _main_impl(tryb=None):
                         "dane o zawodniku są nieaktualne")
                 continue
             stare_dane = dni_ostatni * 86400 > STARE_DANE_S
+            if stare_dane:
+                # przerwa CAŁEJ ligi (mundialowa/letnia), nie zawodnika:
+                # jeśli grał w okresie ostatnich meczów swojej drużyny
+                # (różnica do 14 dni), jego dane są tak świeże, jak kalendarz
+                # pozwala — typ wraca do publikacji zamiast wisieć "w tle"
+                # (2026-07: cała MLS po pauzie mundialowej łapała flagę)
+                ost_dr = ostatni_mecz_druzyny.get(tr.team_id or -1, 0)
+                if ost_dr > 0:
+                    dni_druzyny = (int(time.time()) - ost_dr) / 86400.0
+                    if dni_ostatni - dni_druzyny <= 14.0:
+                        stare_dane = False
         # trigger rotacyjny: zawodnik w (przewidywanym) XI bez ani jednego
         # występu na turnieju (w lidze: w oknie świeżości z trybu) — rynek
         # często nie zdążył dograć jego linii
@@ -2199,6 +2221,20 @@ def _main_impl(tryb=None):
                 context.shrink_factor(raw, len(probki), 10.0), 0.92, 1.10
             ))
 
+        # ostatni mecz drużyn per liga (mediana) — jak u zawodników:
+        # rozróżnienie "ta drużyna nie gra" od "cała liga pauzowała"
+        liga_teamy: dict[int, dict[int, int]] = {}
+        for tt0 in team_trends:
+            maks0 = max((t for t in tt0.timestamps if t > 0), default=0)
+            if maks0:
+                slot0 = liga_teamy.setdefault(tt0.league_id, {})
+                if maks0 > slot0.get(tt0.team_id, 0):
+                    slot0[tt0.team_id] = maks0
+        mediana_ligi_ts = {
+            lid: sorted(m.values())[len(m) // 2]
+            for lid, m in liga_teamy.items() if m
+        }
+
         n_team = 0
         seen_team = set()
         odpadki_t: Counter = Counter()  # diagnostyka: czemu legi drużynowe nie powstają
@@ -2375,6 +2411,10 @@ def _main_impl(tryb=None):
                     odpadki_t["za_stara_historia"] += 1
                     continue
                 stare_t = dni_ost_t * 86400 > STARE_DANE_S
+                if stare_t:
+                    med = mediana_ligi_ts.get(tt.league_id, 0)
+                    if med and (now_t - med) / 86400.0 >= dni_ost_t - 14.0:
+                        stare_t = False  # pauzowała cała liga, nie ta drużyna
             pred_t = counts.predict_match(posterior_t, 90.0, factor_t)
             for l_t, slot_t in sorted(linie_t.items()):
                 p_over_t = pred_t.p_over(l_t)
