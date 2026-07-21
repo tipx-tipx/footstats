@@ -1396,6 +1396,39 @@ def _main_impl(tryb=None):
         )
 
     value_bets, matches_out, players_out = [], {}, {}
+
+    def _zapewnij_mecz(mid: int) -> dict:
+        """Pełny rekord meczu w matches_out — także dla meczów, które mają
+        WYŁĄCZNIE typy drużynowe lub sugestie (kwalifikacje pucharów: propsów
+        zawodniczych brak, gole/rożne drużynowe są). Dotąd setdefault tworzył
+        tam kadłubek {"okazje": [...]} bez id/ligi/nazw — web nie umiał
+        przypisać rozgrywek i pokazywał "Inne rozgrywki" zamiast np. Ligi
+        Konferencji, a tylkoNadchodzace wycinało mecz z /mecze (kickoff=None).
+        """
+        rec = matches_out.get(mid)
+        if rec and rec.get("id"):
+            return rec
+        ev = ev_by_id.get(mid) or {}
+        sed = sedzia_by_mid.get(mid) or {}
+        et = (tryb.liga_by_mid.get(mid) if tryb else None) or (
+            {"liga": "", "sezon": tryb.sezon, "kolejka": ""} if tryb
+            else {"liga": "MŚ", "sezon": "2026", "kolejka": ""}
+        )
+        matches_out[mid] = {
+            "id": mid, "liga": et["liga"], "sezon": et["sezon"],
+            "kolejka": et["kolejka"],
+            "kickoff_ts": ev.get("timeStartTimestamp") or int(time.time()),
+            "gospodarz": team_name.get(ev.get("homeTeamId"), ""),
+            "gosc": team_name.get(ev.get("awayTeamId"), ""),
+            "sedzia": sed.get("sedzia"),
+            "sedzia_mnoznik_fauli": round(context.shrink_factor(
+                float(sed.get("mnoznik") or 1.0), sed.get("n", 0), 8.0
+            ), 2),
+            "okazje": (rec or {}).get("okazje", []),
+            "sklady_ogloszone": lineup_confirmed.get(mid, False),
+        }
+        return matches_out[mid]
+
     vb_id = 0
     seen_player_market = set()  # (player_id, market) — statshub bywa zdublowany
     real_split = {}  # (player_id, mk) -> pełny scoring niecelnych/zablokowanych z 365
@@ -1983,7 +2016,7 @@ def _main_impl(tryb=None):
             typy_poza_publikacja.append(rec)
             return
         value_bets.append(rec)
-        matches_out.setdefault(info["mid"], {}).setdefault("okazje", []).append(vb_id)
+        _zapewnij_mecz(info["mid"])["okazje"].append(vb_id)
 
     for (pid, mk), real in real_split.items():
         sm_r, dist_r = real["sm"], real["dist"]
@@ -2581,7 +2614,7 @@ def _main_impl(tryb=None):
             continue
         pewniaki_per_mecz[b["mecz_id"]] = pewniaki_per_mecz.get(b["mecz_id"], 0) + 1
         value_bets.append(rec_pewniaka)
-        matches_out.setdefault(b["mecz_id"], {}).setdefault("okazje", []).append(vb_id)
+        _zapewnij_mecz(b["mecz_id"])["okazje"].append(vb_id)
     if typy_poza_publikacja:
         n_kw = sum(1 for t in typy_poza_publikacja
                    if t["poza_publikacja"] == "kwarantanna_rynku")
