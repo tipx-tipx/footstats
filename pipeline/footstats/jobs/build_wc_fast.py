@@ -2014,8 +2014,17 @@ def _main_impl(tryb=None):
     # "strzały − celne z podziałem ligowym" USUNIĘTY: rozliczenia pokazały
     # hit 23.5% przy śr. p 55.2% (real_split: 48.8% przy 58.1%) — szacunek
     # był czystym szumem i psuł kalibrację oraz zaufanie do sekcji.
+    # DECYZJA PRODUKTOWA 2026-07-21: sugestii STS nie publikujemy. Samotny
+    # typ "sprawdź kurs ręcznie w STS" mylił sekcję Zawodnicy (rodzynek bez
+    # kursu chował zakładki pewniaki/value), a wartość STS niesie skaner
+    # Value Betów (sts_value + sts_model), nie sugestie. Przełącznik zamiast
+    # kasowania kodu — łatwy powrót, gdyby decyzja się zmieniła.
+    SUGESTIE_STS_WLACZONE = False
+
     def _push_sugestia(pid, mk, info, lam, p_over, line, extra, stare_dane=False):
         nonlocal vb_id
+        if not SUGESTIE_STS_WLACZONE:
+            return
         vb_id += 1
         rec = {
             "id": vb_id, "mecz_id": info["mid"], "mecz": info["match"],
