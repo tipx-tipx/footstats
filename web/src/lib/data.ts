@@ -75,6 +75,19 @@ const SUPABASE_ANON =
   process.env.SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 /**
+ * Klucze app_data, które web faktycznie czyta (pola Bundle). MUSI być filtrem
+ * w zapytaniu: tabela trzyma też wewnętrzne dane pipeline'u (trend_lib 5,3 MB,
+ * styl_bank_liga 2,6 MB, logi rozliczeń...), które rosną z czasem — bez filtra
+ * każdy zimny render pobierał i parsował ~12 MB, z czego używał ~2,5 MB
+ * (pomiar 2026-07-22, głównego winowajcę wolnych Zawodników).
+ */
+const BUNDLE_KEYS = [
+  "value_bets", "matches", "players", "calibration", "meta", "kupony",
+  "typy_wyniki", "odds_superbet", "legi_pool", "odrzucenia", "sts_value",
+  "druzyny_forma", "radar",
+] as const;
+
+/**
  * Odetnij mecze, które już się zaczęły: typ nie do obstawienia nie może
  * wisieć na tablicy (pewniaki/STS/okazje), nawet gdy pipeline chwilowo
  * nie podmienił snapshotu. Kupony zostają — ich status pokazuje historia.
@@ -110,7 +123,8 @@ async function fetchBundle(): Promise<Bundle> {
   if (!SUPABASE_URL || !SUPABASE_ANON) return tylkoNadchodzace(LOCAL);
   try {
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/app_data?select=key,payload`,
+      `${SUPABASE_URL}/rest/v1/app_data?select=key,payload` +
+        `&key=in.(${BUNDLE_KEYS.join(",")})`,
       {
         headers: {
           apikey: SUPABASE_ANON,
