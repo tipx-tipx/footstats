@@ -20,6 +20,7 @@ import legiPoolLocal from "@/data/demo/legi_pool.json";
 import odrzuceniaLocal from "@/data/demo/odrzucenia.json";
 import stsValueLocal from "@/data/demo/sts_value.json";
 import druzynyFormaLocal from "@/data/demo/druzyny_forma.json";
+import radarLocal from "@/data/demo/radar.json";
 
 import type {
   DruzynaForma,
@@ -30,6 +31,7 @@ import type {
   Meta,
   OddsSuperbet,
   Odrzucenie,
+  Radar,
   StsValue,
   TypyWyniki,
   ValueBet,
@@ -49,6 +51,7 @@ type Bundle = {
   odrzucenia: Odrzucenie[];
   sts_value: StsValue;
   druzyny_forma: DruzynaForma[];
+  radar: Radar;
 };
 
 const LOCAL: Bundle = {
@@ -64,6 +67,7 @@ const LOCAL: Bundle = {
   odrzucenia: odrzuceniaLocal as unknown as Odrzucenie[],
   sts_value: stsValueLocal as unknown as StsValue,
   druzyny_forma: druzynyFormaLocal as unknown as DruzynaForma[],
+  radar: radarLocal as unknown as Radar,
 };
 
 const SUPABASE_URL = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -93,6 +97,11 @@ function tylkoNadchodzace(bundle: Bundle): Bundle {
     sts_value: {
       ...bundle.sts_value,
       alerty: bundle.sts_value.alerty.filter((a) => (a.mecz_ts ?? 0) > now),
+    },
+    // radar: wpis na mecz, który już się zaczął, nie jest do zagrania
+    radar: {
+      ...bundle.radar,
+      wpisy: bundle.radar.wpisy.filter((w) => w.kickoff_ts > now),
     },
   };
 }
@@ -134,6 +143,7 @@ async function fetchBundle(): Promise<Bundle> {
       odrzucenia: (map.odrzucenia ?? LOCAL.odrzucenia) as Odrzucenie[],
       sts_value: (map.sts_value ?? LOCAL.sts_value) as StsValue,
       druzyny_forma: (map.druzyny_forma ?? LOCAL.druzyny_forma) as DruzynaForma[],
+      radar: (map.radar ?? LOCAL.radar) as Radar,
     });
   } catch {
     return tylkoNadchodzace(LOCAL);
@@ -237,4 +247,9 @@ export async function getLegiPool(): Promise<LegPool[]> {
 /** Value bety STS (klik użytkownika → Supabase). Alerty już po filtrze startu. */
 export async function getStsValue(): Promise<StsValue> {
   return (await loadBundle()).sts_value;
+}
+
+/** Radar okazji kontekstowych (transfery / serie / debiutanci), po filtrze startu. */
+export async function getRadar(): Promise<Radar> {
+  return (await loadBundle()).radar;
 }

@@ -38,7 +38,7 @@ from ..model import (
     tempo,
 )
 from ..sources import eloratings, rotowire, scores365, sofascore, statshub, superbet
-from . import rozliczanie
+from . import radar, rozliczanie
 from .build_demo import MARKET_NAMES_PL, WEB_DATA_DIR, line_for_lambda
 
 # KURSY GŁÓWNE: wyłącznie Superbet. STS blokuje IP serwerowni (chmura = źródło
@@ -2835,6 +2835,40 @@ def _main_impl(tryb=None):
     # pełne pokrycie p_model (backend-only, dla scannera STS) — emitujemy ZAWSZE,
     # także w trybie „0 okazji" niżej, bo model i tak policzył wszystkie linie
     _dump("sts_model.json", model_pokrycie)
+
+    # RADAR okazji kontekstowych (nowi w drużynie / serie formy / debiutanci
+    # kwotowani przez Superbet bez historii) — celowo POZA bramami publikacji
+    # modelu (transfery model zwykle odrzuca jako rozjazd_z_rynkiem, bo liczy
+    # ze starej ligi). Warstwa informacyjna z drabinką kursów, patrz radar.py.
+    # Pusty wynik NIE nadpisuje poprzedniego pliku (jak filozofia „0 okazji").
+    try:
+        events_meta_radar = {
+            e["id"]: {
+                "label": f'{team_name.get(e["homeTeamId"], "?")} – '
+                         f'{team_name.get(e["awayTeamId"], "?")}',
+                "ts": int(e.get("timeStartTimestamp") or 0),
+                "hid": e["homeTeamId"], "aid": e["awayTeamId"],
+                "home": team_name.get(e["homeTeamId"], ""),
+                "away": team_name.get(e["awayTeamId"], ""),
+            }
+            for e in wszystkie_ev
+        }
+        radar_wpisy = radar.zbuduj(
+            trends, events_meta_radar, odds_grid, sb_cache,
+            model_pokrycie, players_out, MARKET_NAMES_PL, int(time.time()),
+        )
+    except Exception as ex:
+        radar_wpisy = []
+        print(f"Radar pominięty w tym cyklu ({ex})")
+    if radar_wpisy:
+        _dump("radar.json", {
+            "wygenerowano_ts": int(time.time()),
+            "wpisy": radar_wpisy,
+        })
+        rodzaje = Counter(w["rodzaj"] for w in radar_wpisy)
+        print("Radar: " + ", ".join(
+            f"{k}={v}" for k, v in sorted(rodzaje.items())
+        ))
 
     # RAPORT POKRYCIA (liga): parowanie z build_league + to, co dołożył
     # silnik — luka jest mierzona i zapisywana co cykl, nie ignorowana.

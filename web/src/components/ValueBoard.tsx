@@ -5,8 +5,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { BetCard } from "./BetCard";
 import { FilterDropdown } from "./FilterDropdown";
+import { RadarCard } from "./RadarCard";
 import { StsBetCard } from "./StsBetCard";
-import type { Pewnosc, StsAlert, ValueBet, Zawodnik } from "@/lib/types";
+import type { Pewnosc, RadarWpis, StsAlert, ValueBet, Zawodnik } from "@/lib/types";
 
 const RYNKI_FILTRY: { kod: string; label: string }[] = [
   { kod: "wszystkie", label: "Wszystkie rynki" },
@@ -75,6 +76,7 @@ export function ValueBoard({
   bets,
   stsAlerty = [],
   stsGeneratedTs,
+  radarWpisy = [],
   zawodnicy,
   initialMatchId,
   initialRodzaj,
@@ -82,9 +84,10 @@ export function ValueBoard({
   bets: ValueBet[];
   stsAlerty?: StsAlert[];
   stsGeneratedTs?: number;
+  radarWpisy?: RadarWpis[];
   zawodnicy: Zawodnik[];
   initialMatchId?: number;
-  initialRodzaj?: "pewniaki" | "value" | "wszystko";
+  initialRodzaj?: "pewniaki" | "value" | "radar" | "wszystko";
 }) {
   const [rynek, setRynek] = useState("wszystkie");
   const [pewnosc, setPewnosc] = useState<Pewnosc | "kazda">("kazda");
@@ -92,7 +95,9 @@ export function ValueBoard({
   // Pewniaki pierwsze i domyślne (user wybiera z nich legi na kupony);
   // domyślny sort = ranking silnika ("Polecane") — samo p_model wynosiłoby
   // na górę zawsze linie 0,5 gwiazd i chowało typy kontekstowe (matchup)
-  const [rodzaj, setRodzaj] = useState<"pewniaki" | "value" | "wszystko">(
+  const [rodzaj, setRodzaj] = useState<
+    "pewniaki" | "value" | "radar" | "wszystko"
+  >(
     () =>
       initialRodzaj ?? (bets.some((b) => b.pewniak) ? "pewniaki" : "wszystko"),
   );
@@ -209,6 +214,7 @@ export function ValueBoard({
   const TABY_RODZAJ = [
     ["pewniaki", "Pewniaki", liczbaPewniakow],
     ["value", "Value Bety", liczbaValueSts],
+    ["radar", "Pod lupą", radarWpisy.length],
     ["wszystko", "Wszystko", null],
   ] as const;
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -235,7 +241,7 @@ export function ValueBoard({
     <section aria-label="Lista okazji">
       {/* przełącznik rodzaju — tablica wyników: czysty tekst, aktywna
           zakładka z podkreśleniem marki (żadnych kolejnych "przycisków") */}
-      {(liczbaValueSts > 0 || liczbaPewniakow > 0) && (
+      {(liczbaValueSts > 0 || liczbaPewniakow > 0 || radarWpisy.length > 0) && (
         <div
           className="flex flex-wrap items-end gap-x-6 gap-y-1 border-b border-hairline"
           role="tablist"
@@ -271,7 +277,52 @@ export function ValueBoard({
         </div>
       )}
 
-      {rodzaj === "value" ? (
+      {rodzaj === "radar" ? (
+        <div className="pt-4">
+          {radarWpisy.length === 0 ? (
+            <div className="rounded-(--radius-card) border border-hairline bg-card px-6 py-12 text-center shadow-(--shadow-card)">
+              <p className="text-sm font-medium text-ink">
+                Nic ciekawego pod lupą w tej chwili
+              </p>
+              <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-muted">
+                Tu trafiają sytuacje, których kursy często nie nadążają wycenić:
+                nowi w drużynie, zawodnicy w wyraźnej serii i debiutanci
+                kwotowani bez historii. Pojawiają się wraz z ofertą Superbetu na
+                najbliższe mecze.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="mb-3 flex items-baseline justify-between gap-3">
+                <p className="max-w-prose text-xs leading-relaxed text-muted">
+                  Sytuacje, które rynek wycenia najsłabiej: nowi w drużynie,
+                  serie formy i debiutanci bez historii. To sygnały z kontekstu,
+                  nie typy modelu, dlatego pokazujemy liczby i kursy, a decyzję
+                  zostawiamy tobie.
+                </p>
+                <span className="font-data shrink-0 text-sm font-semibold text-brand-deep">
+                  {odmienPozycje(radarWpisy.length)}
+                </span>
+              </div>
+              <div className="space-y-3">
+                {radarWpisy.map((w, i) => (
+                  <motion.div
+                    key={w.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{
+                      delay: Math.min(i * 0.03, 0.4),
+                      duration: 0.3,
+                    }}
+                  >
+                    <RadarCard w={w} rank={i + 1} />
+                  </motion.div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      ) : rodzaj === "value" ? (
         <div className="pt-4">
           {stsAlerty.length === 0 ? (
             <div className="rounded-(--radius-card) border border-hairline bg-card px-6 py-12 text-center shadow-(--shadow-card)">

@@ -85,6 +85,16 @@ class StatshubTrend:
     game_positions: list[str] = field(default_factory=list)
     # rywal per mecz — do formy w UI i ważenia próby siłą rywala
     game_opponents: list[str] = field(default_factory=list)
+    # id rywala per mecz — radar: mecz PRZECIW obecnej drużynie w historii
+    # = zawodnik grał wtedy gdzie indziej (transfer wewnątrz ligi)
+    game_opponent_ids: list[int] = field(default_factory=list)
+    # rozgrywki per mecz (uniqueTournamentId) — radar wykrywa z tego zmianę
+    # ligi/klubu (historia podąża za ZAWODNIKIEM, nie klubem)
+    game_utids: list[int] = field(default_factory=list)
+    # ile meczów temu ostatni występ w OBECNEJ drużynie (activityInfo feedu;
+    # None = feed nie podał). Semantyka niepewna (sonda 2026-07-22), radar
+    # traktuje wyłącznie jako sygnał pomocniczy.
+    last_game_with_team: int | None = None
     # kursy referencyjne bukmacherów UK dla linii `line` (Bet365, WH, ...)
     ref_odds: list[float] = field(default_factory=list)
 
@@ -147,6 +157,11 @@ def fetch_event_trends(event_ids: list[int]) -> list[StatshubTrend]:
                 started=[float(g.get("minutesPlayed") or 0) >= 60 for g in rg],
                 game_positions=[str(g.get("position") or "") for g in rg],
                 game_opponents=[str(g.get("opponentName") or "") for g in rg],
+                game_opponent_ids=[int(g.get("opponentId") or 0) for g in rg],
+                game_utids=[int(g.get("uniqueTournamentId") or 0) for g in rg],
+                last_game_with_team=(rec.get("activityInfo") or {}).get(
+                    "lastGameWithTeam"
+                ),
                 ref_odds=[
                     float(b["oddsValue"])
                     for b in rec.get("bookmakers", [])
@@ -308,6 +323,75 @@ def fetch_event_shotmap(event_id: int) -> list[dict]:
     żywym meczu MŚ (2026-07-14)."""
     data = _get(f"{BASE}/event/{event_id}/shotmap").get("data", [])
     return data if isinstance(data, list) else []
+
+
+_TOURNAMENT_NAME_CACHE: dict[int, str] = {}
+
+
+def fetch_tournament_name(utid: int) -> str:
+    """Nazwa rozgrywek po uniqueTournamentId (`/api/unique-tournament/{id}`).
+
+    Radar etykietuje tym „starą ligę" transferu (np. 'Championnat National,
+    Francja'). Cache w pamięci procesu — jeden cykl pyta o kilka utid-ów."""
+    if utid in _TOURNAMENT_NAME_CACHE:
+        return _TOURNAMENT_NAME_CACHE[utid]
+    nazwa = ""
+    try:
+        d = _get(f"{BASE}/unique-tournament/{utid}", timeout=12, retries=1)
+        rec = d.get("data") or {}
+        nazwa = str(rec.get("name") or "")
+        kraj = str(rec.get("categoryName") or "")
+        if nazwa and kraj and kraj.lower() not in nazwa.lower():
+            nazwa = f"{nazwa} ({kraj})"
+    except Exception:
+        pass
+    _TOURNAMENT_NAME_CACHE[utid] = nazwa
+    return nazwa
+
+
+def search_players(nazwa: str) -> list[dict]:
+    """Wyszukiwarka zawodników `/api/search?q=` (odkryta 2026-07-22).
+
+    Zwraca listę {id, name, slug, countrySlug} — radar używa jej do
+    zidentyfikowania debiutantów kwotowanych przez Superbet, których nie ma
+    w feedzie propsów (bukmacherzy UK nie wystawili im linii)."""
+    try:
+        d = _get(f"{BASE}/search?q={nazwa}", timeout=15, retries=2)
+    except Exception:
+        return []
+    out = d.get("players") or []
+    return out if isinstance(out, list) else []
+
+
+def fetch_player_profile(player_id: int) -> dict:
+    """Pełniejszy profil niż fetch_player_meta — pod kartę debiutanta radaru.
+
+    KLUCZOWE pole: team_id (obecny klub wg statshub) — weryfikuje, że
+    wyszukany po nazwisku gracz faktycznie należy do drużyny z meczu."""
+    try:
+        data = _get(f"{BASE}/player/{player_id}", timeout=15, retries=2).get(
+            "data", {}
+        )
+    except Exception:
+        return {}
+    rec = data.get("players")
+    if isinstance(rec, list):
+        rec = rec[0] if rec else {}
+    if not isinstance(rec, dict):
+        return {}
+    h = rec.get("height")
+    mv = rec.get("marketvalue")
+    return {
+        "id": rec.get("id"),
+        "name": rec.get("name"),
+        "position": rec.get("position"),
+        "height": int(h) if isinstance(h, (int, float)) and h else None,
+        "foot": rec.get("preferredfoot") or None,
+        "team_id": int(rec.get("teamid") or 0) or None,
+        "country": rec.get("countrySlug"),
+        "market_value": float(mv) if mv else None,
+        "birth_ts": rec.get("dateofbirth"),
+    }
 
 
 def fetch_player_meta(player_id: int) -> dict:

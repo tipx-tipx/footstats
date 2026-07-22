@@ -197,6 +197,9 @@ def fetch_stat_odds(event_id: int, home_pl: str, away_pl: str) -> dict:
 
     Zwraca:
       players: norm_name -> market_code -> line -> {'over': kurs, 'under': kurs}
+      player_names: norm_name -> surowa nazwa z oferty (radar: wyszukiwarka
+                    statshub potrzebuje nazwiska w naturalnej kolejności,
+                    norm_name sortuje tokeny alfabetycznie)
       teams:   'home'/'away' -> market_code -> line -> {'over': ..., 'under': ...}
     """
     d = _get(f"{BASE}/events/{event_id}")
@@ -205,6 +208,7 @@ def fetch_stat_odds(event_id: int, home_pl: str, away_pl: str) -> dict:
     odds = event.get("odds", [])
 
     players: dict = defaultdict(lambda: defaultdict(dict))
+    player_names: dict[str, str] = {}
     teams: dict = {"home": defaultdict(dict), "away": defaultdict(dict)}
     # kursy meczowe pod tempo/scenariusz meczu (model/tempo.py)
     match: dict = {"h": None, "x": None, "a": None, "totals": defaultdict(dict)}
@@ -249,6 +253,7 @@ def fetch_stat_odds(event_id: int, home_pl: str, away_pl: str) -> dict:
             except ValueError:
                 continue
             key = norm_name(spec["player_name"])
+            player_names.setdefault(key, str(spec["player_name"]))
             players[key][code].setdefault(line, {})[side] = float(price)
             continue
 
@@ -257,6 +262,7 @@ def fetch_stat_odds(event_id: int, home_pl: str, away_pl: str) -> dict:
             "player_name"
         ):
             key = norm_name(spec["player_name"])
+            player_names.setdefault(key, str(spec["player_name"]))
             players[key]["yellow_card"].setdefault(0.5, {})["over"] = float(price)
             continue
 
@@ -278,5 +284,6 @@ def fetch_stat_odds(event_id: int, home_pl: str, away_pl: str) -> dict:
             break
 
     return {"players": {k: dict(v) for k, v in players.items()},
+            "player_names": player_names,
             "teams": {k: dict(v) for k, v in teams.items()},
             "match": {**match, "totals": {k: dict(v) for k, v in match["totals"].items()}}}

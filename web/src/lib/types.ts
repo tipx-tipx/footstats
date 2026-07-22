@@ -141,6 +141,75 @@ export interface StsValue {
   alerty: StsAlert[];
 }
 
+/** Jeden szczebel drabinki kursów Superbetu na karcie radaru. */
+export interface RadarSzczebel {
+  linia: number;
+  kurs: number;
+  /** szansa modelu na „powyżej" tej linii; null = model nie liczył */
+  p_model: number | null;
+}
+
+/** Rynek na karcie radaru: drabinka + ostatnie występy (gdy mamy historię). */
+export interface RadarRynek {
+  rynek_kod: string;
+  rynek: string;
+  drabinka: RadarSzczebel[];
+  /** liczniki z ostatnich rozegranych meczów (najnowszy pierwszy) */
+  ostatnie?: number[];
+  minuty?: number[];
+  rywale?: string[];
+  srednia90?: number;
+}
+
+/**
+ * Wpis radaru okazji kontekstowych (jobs/radar.py) — sygnały, których model
+ * celowo nie gra: nowy w drużynie, seria formy, debiutant bez historii.
+ * To warstwa informacyjna POZA bramami publikacji modelu, nie typ modelu.
+ */
+export interface RadarWpis {
+  id: number;
+  rodzaj: "transfer" | "forma" | "debiutant";
+  mecz_id: number;
+  mecz: string;
+  kickoff_ts: number;
+  podmiot_id: number | null;
+  podmiot: string;
+  druzyna: string;
+  przeciwnik: string;
+  pozycja: string;
+  /** w przewidywanym/potwierdzonym XI (null = nie wiemy) */
+  xi?: boolean | null;
+  powod: "zmiana_ligi" | "gral_przeciw" | "seria" | "brak_historii";
+  /** etykieta poprzedniej ligi (gdy powod = zmiana_ligi) */
+  stara_liga?: string | null;
+  stara_liga_utid?: number | null;
+  mecze_stara?: number | null;
+  mecze_nowa?: number | null;
+  /** profil debiutanta (statshub) — gdy rodzaj = debiutant */
+  profil?: {
+    wzrost?: number | null;
+    wiek?: number | null;
+    kraj?: string | null;
+    noga?: string | null;
+  } | null;
+  forma_rynek?: string | null;
+  forma?: {
+    linia: number;
+    kurs: number;
+    trafienia: number;
+    okno: number;
+    srednia90_okno: number;
+    srednia90_baza: number;
+  } | null;
+  rynki: RadarRynek[];
+}
+
+/** Payload klucza `radar` w Supabase / radar.json. */
+export interface Radar {
+  wygenerowano_ts: number;
+  wpisy: RadarWpis[];
+}
+
 /** Wpis rejestru odrzuceń: czemu para (zawodnik, rynek) NIE dostała typu. */
 export interface Odrzucenie {
   mecz_id: number;

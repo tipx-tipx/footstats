@@ -1,0 +1,207 @@
+"""Testy detektorów radaru (jobs/radar.py) na syntetycznych trendach."""
+
+from footstats.jobs import radar
+from footstats.sources.statshub import StatshubTrend
+
+TERAZ = 1_800_000_000
+DZIEN = 86_400
+
+LIGA_NOWA = 45      # np. austriacka Bundesliga
+LIGA_STARA = 202    # np. Ekstraklasa
+KADRA = 16
+
+
+def _trend(
+    *,
+    player_id=1,
+    team_id=100,
+    market_code="shots",
+    counts=None,
+    minutes=None,
+    utids=None,
+    opponent_ids=None,
+    dni_wstecz_start=2,
+):
+    """Trend z historią co 7 dni od najnowszego (indeks 0) wstecz."""
+    n = len(counts or [])
+    return StatshubTrend(
+        player_id=player_id,
+        player_name=f"Gracz {player_id}",
+        position="M",
+        team_id=team_id,
+        team_name="Klub",
+        opponent_id=200,
+        opponent_name="Rywal",
+        is_home=True,
+        market_code=market_code,
+        line=1.5,
+        in_predicted_lineup=True,
+        league_average=None,
+        opponent_average=None,
+        opponent_rank=None,
+        total_ranks=None,
+        event_id=999,
+        counts=[float(c) for c in (counts or [])],
+        minutes=[float(m) for m in (minutes or [90] * n)],
+        timestamps=[TERAZ - (dni_wstecz_start + 7 * i) * DZIEN for i in range(n)],
+        game_utids=list(utids or [LIGA_NOWA] * n),
+        game_opponent_ids=list(opponent_ids or [0] * n),
+    )
+
+
+def test_liga_konsensus_wybiera_dominujaca_lige_druzyny():
+    trends = [
+        _trend(player_id=1, utids=[LIGA_NOWA] * 10 + [KADRA] * 2,
+               counts=[1] * 12),
+        _trend(player_id=2, utids=[LIGA_NOWA] * 8 + [LIGA_STARA] * 4,
+               counts=[1] * 12),
+        # duplikat rynku tego samego gracza nie liczy się podwójnie
+        _trend(player_id=1, market_code="fouls_committed",
+               utids=[LIGA_STARA] * 12, counts=[1] * 12),
+    ]
+    kons = radar.liga_konsensus(trends)
+    liga, wspolne = kons[100]
+    assert liga == LIGA_NOWA
+    # wspólny utid = grało w nim >= 2 RÓŻNYCH kolegów (liga tak, kadra nie)
+    assert LIGA_NOWA in wspolne and KADRA not in wspolne
+
+
+def test_sygnal_transferu_zmiana_ligi():
+    # 12 ostatnich meczów w starej lidze, 1 w nowej — świeży nabytek
+    tr = _trend(utids=[LIGA_NOWA] + [LIGA_STARA] * 12, counts=[2] * 13)
+    s = radar.sygnal_transferu(tr, LIGA_NOWA, {LIGA_NOWA}, TERAZ)
+    assert s is not None
+    assert s["powod"] == "zmiana_ligi"
+    assert s["stara_liga_utid"] == LIGA_STARA
+    assert s["mecze_nowa"] == 1
+
+
+def test_sygnal_transferu_zadomowiony_bez_sygnalu():
+    # rok w nowej lidze (okno 15 meczów pełne nowej ligi) — cisza
+    tr = _trend(utids=[LIGA_NOWA] * 15 + [LIGA_STARA] * 10, counts=[2] * 25)
+    assert radar.sygnal_transferu(tr, LIGA_NOWA, {LIGA_NOWA}, TERAZ) is None
+
+
+def test_sygnal_transferu_rozgrywki_druzyny_to_nie_stara_liga():
+    # historia pełna pucharu, w którym gra CAŁA drużyna (np. CONCACAF CC,
+    # druga faza tej samej ligi) — to nie transfer, tylko kalendarz klubu
+    PUCHAR = 777
+    tr = _trend(utids=[LIGA_NOWA] * 2 + [PUCHAR] * 11, counts=[2] * 13)
+    assert (
+        radar.sygnal_transferu(tr, LIGA_NOWA, {LIGA_NOWA, PUCHAR}, TERAZ)
+        is None
+    )
+
+
+def test_sygnal_transferu_mundial_to_nie_stara_liga():
+    # reprezentant wraca z MŚ: mundial nie może wyjść jako „stara liga"
+    tr = _trend(
+        utids=[LIGA_NOWA] * 2 + [radar.UTID_MUNDIAL] * 7 + [LIGA_NOWA] * 4,
+        counts=[2] * 13,
+    )
+    assert radar.sygnal_transferu(tr, LIGA_NOWA, {LIGA_NOWA}, TERAZ) is None
+
+
+def test_sygnal_transferu_gral_przeciw_obecnym():
+    # ta sama liga, ale niedawno grał PRZECIW swojej obecnej drużynie
+    tr = _trend(
+        utids=[LIGA_NOWA] * 12,
+        counts=[2] * 12,
+        opponent_ids=[0, 100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    )
+    s = radar.sygnal_transferu(tr, LIGA_NOWA, {LIGA_NOWA}, TERAZ)
+    assert s is not None and s["powod"] == "gral_przeciw"
+
+
+def test_sygnal_transferu_wymaga_swiezej_gry():
+    # historia w innej lidze, ale ostatni występ pół roku temu — cisza
+    tr = _trend(utids=[LIGA_STARA] * 12, counts=[2] * 12,
+                dni_wstecz_start=200)
+    assert radar.sygnal_transferu(tr, LIGA_NOWA, {LIGA_NOWA}, TERAZ) is None
+
+
+def test_ten_sam_cykl_ligi():
+    assert radar._ten_sam_cykl_ligi(
+        "Liga MX, Apertura (Mexico)", "Liga MX, Clausura (Mexico)"
+    )
+    assert not radar._ten_sam_cykl_ligi(
+        "LaLiga (Spain)", "MLS (USA)"
+    )
+
+
+def test_sygnal_formy_seria_nad_linia():
+    # okno: 6 meczów po 3 strzały; baza: 8 meczów po 1 — wyraźny skok
+    tr = _trend(counts=[3, 3, 3, 3, 3, 3] + [1] * 8)
+    s = radar.sygnal_formy(tr, {0.5: 1.30, 1.5: 2.05, 2.5: 3.4}, TERAZ)
+    assert s is not None
+    # linia 0,5 odpada (kurs 1.30 < MIN_KURS_FORMY), zostaje najwyższa grywalna
+    assert s["linia"] == 2.5
+    assert s["trafienia"] == 6
+    assert s["srednia90_okno"] > s["srednia90_baza"]
+
+
+def test_sygnal_formy_bez_boostu_cisza():
+    # równy poziom całą historię — to nie seria, to poziom gracza
+    tr = _trend(counts=[3] * 14)
+    assert radar.sygnal_formy(tr, {1.5: 2.0, 2.5: 3.2}, TERAZ) is None
+
+
+def test_sygnal_formy_krotkie_wystepy_nie_licza_sie():
+    # 3 strzały w 10-minutowych wejściach nie tworzą serii (za mało minut)
+    tr = _trend(
+        counts=[3, 3, 3, 3, 3, 3] + [1] * 8,
+        minutes=[10, 10, 10, 10, 10, 10] + [90] * 8,
+    )
+    assert radar.sygnal_formy(tr, {1.5: 2.0}, TERAZ) is None
+
+
+def test_zbuduj_transfer_z_drabinka_i_p_model(monkeypatch):
+    # bez sieci w testach: etykiety lig z zaślepki (różne nazwy, żeby filtr
+    # faz jednej ligi nie zjadł wpisu)
+    monkeypatch.setattr(
+        radar.statshub,
+        "fetch_tournament_name",
+        lambda utid: {LIGA_STARA: "Stara Liga", LIGA_NOWA: "Nowa Liga"}.get(
+            utid, ""
+        ),
+    )
+    # kolega z drużyny osadza konsensus ligi na LIGA_NOWA
+    kolega = _trend(player_id=7, utids=[LIGA_NOWA] * 12, counts=[1] * 12)
+    nowy = _trend(player_id=1, utids=[LIGA_NOWA] + [LIGA_STARA] * 12,
+                  counts=[2] * 13)
+    wpisy = radar.zbuduj(
+        trends=[kolega, nowy],
+        events_meta={999: {"label": "Klub – Rywal", "ts": TERAZ + DZIEN,
+                           "hid": 100, "aid": 200,
+                           "home": "Klub", "away": "Rywal"}},
+        odds_grid={999: {1: {"shots": {"1.5": 2.05, "2.5": 3.2}}}},
+        sb_cache={},
+        model_pokrycie=[{"podmiot": "Gracz 1", "rynek_kod": "shots",
+                         "linia": 1.5, "strona": "powyzej",
+                         "p_model": 0.44}],
+        players_out={1: {"pozycja": "M", "xi": True}},
+        nazwy_pl={"shots": "Strzały"},
+        teraz=TERAZ,
+    )
+    assert len(wpisy) == 1
+    w = wpisy[0]
+    assert w["rodzaj"] == "transfer" and w["powod"] == "zmiana_ligi"
+    assert w["podmiot"] == "Gracz 1" and w["xi"] is True
+    assert w["mecz"] == "Klub – Rywal"
+    (rynek,) = w["rynki"]
+    assert rynek["rynek"] == "Strzały"
+    assert rynek["drabinka"][0] == {"linia": 1.5, "kurs": 2.05,
+                                    "p_model": 0.44}
+    assert rynek["drabinka"][1]["p_model"] is None
+    assert rynek["ostatnie"][:3] == [2, 2, 2]
+    assert w["stara_liga"] == "Stara Liga"
+
+
+def test_klucze_dopasowane_tokenowo_w_obie_strony():
+    klucze = {"lodi renan", "ba sy", "kane"}
+    # pełne nazwisko z oferty vs boiskowe i odwrotnie
+    assert radar._klucze_dopasowane(klucze, "Renan Augusto Lodi") == {
+        "lodi renan"
+    }
+    assert radar._klucze_dopasowane(klucze, "Amadou Ba-Sy") == {"ba sy"}
+    assert radar._klucze_dopasowane(klucze, "Nowak") == set()

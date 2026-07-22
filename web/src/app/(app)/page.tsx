@@ -6,6 +6,7 @@ import { ValueBoard } from "@/components/ValueBoard";
 import {
   getKuponDnia,
   getMeta,
+  getRadar,
   getStsValue,
   getTypyWyniki,
   getValueBets,
@@ -18,15 +19,23 @@ export default async function OkazjePage({
   searchParams: Promise<{ mecz?: string; rodzaj?: string }>;
 }) {
   const { mecz, rodzaj } = await searchParams;
-  const [wszystkieBets, zawodnicy, meta, stsValue, kuponDnia, typyWyniki] =
-    await Promise.all([
-      getValueBets(),
-      getZawodnicy(),
-      getMeta(),
-      getStsValue(),
-      getKuponDnia(),
-      getTypyWyniki(),
-    ]);
+  const [
+    wszystkieBets,
+    zawodnicy,
+    meta,
+    stsValue,
+    kuponDnia,
+    typyWyniki,
+    radar,
+  ] = await Promise.all([
+    getValueBets(),
+    getZawodnicy(),
+    getMeta(),
+    getStsValue(),
+    getKuponDnia(),
+    getTypyWyniki(),
+    getRadar(),
+  ]);
   const pods = typyWyniki.podsumowanie;
 
   // ta strona to STATYSTYKI ZAWODNIKÓW — typy drużynowe mają własną
@@ -99,10 +108,14 @@ export default async function OkazjePage({
         bets={bets}
         stsAlerty={stsValue.alerty}
         stsGeneratedTs={stsValue.generated_ts}
+        radarWpisy={radar.wpisy}
         zawodnicy={zawodnicyLite}
         initialMatchId={mecz ? Number(mecz) : undefined}
         initialRodzaj={
-          rodzaj === "pewniaki" || rodzaj === "value" || rodzaj === "wszystko"
+          rodzaj === "pewniaki" ||
+          rodzaj === "value" ||
+          rodzaj === "radar" ||
+          rodzaj === "wszystko"
             ? rodzaj
             : undefined
         }

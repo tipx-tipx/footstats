@@ -25,7 +25,7 @@ WEB_DATA_DIR = Path(__file__).resolve().parent.parent.parent.parent / "web" / "s
 # cykl MŚ po prostu nigdy jej nie dotyka, zostaje ostatni zapis build_demo.
 KEYS = ["value_bets", "matches", "players", "calibration", "meta", "kupony",
         "typy_wyniki", "odds_superbet", "legi_pool", "odrzucenia", "sts_model",
-        "druzyny_forma"]
+        "druzyny_forma", "radar"]
 
 
 def push() -> bool:
