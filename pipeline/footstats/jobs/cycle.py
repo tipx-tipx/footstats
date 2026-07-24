@@ -10,6 +10,7 @@ wynik z sygnaturą czasową; nie wymaga otwartej sesji ani terminala.
 
 from __future__ import annotations
 
+import os
 import sys
 import time
 import traceback
@@ -44,7 +45,17 @@ def main():
             build_demo.main()
         # wypchnij wyniki do Supabase (jeśli skonfigurowane) — aplikacja na Vercel je czyta
         from . import push_supabase
-        push_supabase.push()
+        wypchniete = push_supabase.push()
+        # push() zwraca False też gdy Supabase NIE jest skonfigurowany (lokalny
+        # run bez sekretów) — to nie błąd. Ale gdy sekrety SĄ ustawione (GitHub
+        # Actions), False = realny błąd (HTTP/brak danych) i dane NIE trafiły do
+        # bazy. Bez tego job zostawał zielony mimo cichego padu pushu, a front
+        # pokazywał stare mecze (patrz incydent: zamrożenie po formacie 2026-07).
+        if not wypchniete and os.environ.get("SUPABASE_URL") and os.environ.get("SUPABASE_SERVICE_KEY"):
+            raise RuntimeError(
+                "push_supabase.push() zwrócił False mimo ustawionych sekretów — "
+                "dane NIE trafiły do Supabase"
+            )
         print(f"[{stamp}] OK", flush=True)
     except Exception:
         print(f"[{stamp}] BŁĄD:\n{traceback.format_exc()}", file=sys.stderr, flush=True)
