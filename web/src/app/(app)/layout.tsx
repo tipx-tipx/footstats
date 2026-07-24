@@ -3,6 +3,14 @@ import { Nav } from "@/components/Nav";
 import { SiteFooter } from "@/components/SiteFooter";
 import { getMeta } from "@/lib/data";
 
+// ISR: odświeżaj strony grupy (app) co 60 s. Bez tego trasy bez API
+// czasu żądania (druzyny, kupony, model, mecze, zaklady) domyślnie mają
+// revalidate=false = prerender raz przy buildzie, a payload Supabase (~14 MB)
+// przekracza limit 2 MB Data Cache, więc revalidate:60 z fetchu nie obniża
+// interwału trasy. Ustawiony tu, na poziomie segmentu, działa niezależnie
+// od cache'owalności fetchu (Cache Components wyłączony => stary model).
+export const revalidate = 60;
+
 /**
  * Chrome aplikacji (Nav + kolumna treści + stopka) — WYŁĄCZNIE dla stron
  * "wewnątrz" produktu. /login żyje poza tą grupą tras (parenteza w nazwie
