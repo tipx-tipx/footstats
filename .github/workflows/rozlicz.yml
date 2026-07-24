@@ -1,0 +1,46 @@
+name: FootStats — lekkie rozliczanie
+
+# Osobny, LEKKI cykl: tylko rozliczanie zakończonych typów/kuponów (bez
+# przeliczania modelu). Dzięki temu kupony zamykają się szybko, niezależnie od
+# ciężkiego build_league (który bywa dławiony przez cron GitHuba do co 1-3h).
+# Rozliczanie korzysta z fallbacków statshub (wynik + shotmapa), więc domyka
+# także egzotykę spoza 365Scores — w całości z chmury.
+
+on:
+  schedule:
+    - cron: "*/20 * * * *"   # co 20 min (UTC)
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+# TEN SAM group co ciężki cykl (cycle.yml) — oba rozliczają i zapisują
+# typy_log/kupony_log w Supabase, więc NIE mogą biec równocześnie (inaczej
+# wyścig: późniejszy zapis nadpisałby świeże typy dodane przez drugi).
+concurrency:
+  group: footstats-cycle
+  cancel-in-progress: false
+
+jobs:
+  rozlicz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalacja zależności
+        working-directory: pipeline
+        run: pip install -r requirements.txt
+
+      - name: Rozlicz zakończone typy/kupony i wypchnij do Supabase
+        working-directory: pipeline
+        env:
+          PYTHONIOENCODING: utf-8
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: python -m footstats.jobs.rozlicz_only

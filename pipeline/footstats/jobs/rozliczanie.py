@@ -1292,6 +1292,30 @@ def skutecznosc_per_dzien(
     return out
 
 
+def _statshub_wynik(event_id: int, cache: dict) -> dict | None:
+    """Wynik meczu z otwartego API statshub; cache per przebieg rozliczania."""
+    if event_id in cache:
+        return cache[event_id]
+    try:
+        r = statshub.fetch_event_result(event_id)
+    except Exception:
+        r = None
+    cache[event_id] = r
+    return r
+
+
+def _statshub_strzaly(event_id: int, cache: dict) -> dict | None:
+    """Strzały/celne per zawodnik z shotmapy statshub; cache per przebieg."""
+    if event_id in cache:
+        return cache[event_id]
+    try:
+        r = statshub.player_shots_from_shotmap(event_id)
+    except Exception:
+        r = None
+    cache[event_id] = r
+    return r
+
+
 def rozlicz(
     value_bets: list[dict],
     kupony_list: list[dict] | None = None,
@@ -1320,6 +1344,8 @@ def rozlicz(
     except Exception as e:
         print(f"Dolewka trendów pominięta ({e})")
     cache_365: dict = {}
+    cache_sh: dict = {}      # wyniki meczów statshub (fallback egzotyki)
+    cache_sh_sm: dict = {}   # shotmapy statshub (fallback strzałów egzotyki)
     # mecze przełożone: jeśli mecz wciąż figuruje w nadchodzących typach,
     # deadline braku danych nie może zamknąć jego legów jako zwrot
     mecze_przyszle = {
@@ -1357,6 +1383,23 @@ def rozlicz(
                     if st_t and tk in st_t:
                         w_t = st_t[tk].get(MARKETY_DRUZYNOWE[mk])
                         wartosc_t = float(w_t) if w_t is not None else None
+            if wartosc_t is None and mk == "team_goals":
+                # FALLBACK egzotyki: wynik z otwartego API statshub (dowolna
+                # liga, także spoza comp365 — Kosowo/Islandia/niższe). mecz_id
+                # = event_id statshub, więc adresujemy wprost, bez mapowania.
+                sr = _statshub_wynik(rec["mecz_id"], cache_sh)
+                if sr is not None and not sr["extra_time"]:
+                    pid = rec.get("podmiot_id")
+                    if pid and pid == sr.get("home_id"):
+                        wartosc_t = sr["home_goals"]
+                    elif pid and pid == sr.get("away_id"):
+                        wartosc_t = sr["away_goals"]
+                    else:  # brak/niepewne id — awaryjnie po nazwie
+                        tkn = rotowire._norm(str(rec["podmiot"]))
+                        if sr.get("home_name") and rotowire._norm(sr["home_name"]) == tkn:
+                            wartosc_t = sr["home_goals"]
+                        elif sr.get("away_name") and rotowire._norm(sr["away_name"]) == tkn:
+                            wartosc_t = sr["away_goals"]
             if wartosc_t is None:
                 if (
                     now - rec["kickoff_ts"] > TERMIN_BRAK_DANYCH_S
@@ -1422,6 +1465,22 @@ def rozlicz(
                 # strzały/celne rozliczamy z banku trendów statshub
                 # (te same dane Opta, na których stoi scoring)
                 wartosc = _wartosc_z_banku(rec, lib)
+            if wartosc is None and mk in ("shots", "sot"):
+                # FALLBACK egzotyki: shotmapa z otwartego API statshub, gdy
+                # bank propsów pusty (liga bez linii UK). Tylko mecze bez
+                # dogrywki — shotmapa nie oddziela regularnego czasu.
+                sr = _statshub_wynik(rec["mecz_id"], cache_sh)
+                if sr is not None and not sr["extra_time"]:
+                    counts = _statshub_strzaly(rec["mecz_id"], cache_sh_sm)
+                    if counts is not None:
+                        # id zawodników bywają w innej przestrzeni niż shotmapa
+                        # — dopasowujemy po nazwisku, jak ścieżka 365
+                        normed = {scores365._norm(n): v for n, v in counts.items()}
+                        skey = scores365.resolve_player_key(set(normed), rec["podmiot"])
+                        if skey is not None:
+                            wartosc = float(normed[skey][mk])
+                        elif minuty:
+                            wartosc = 0.0  # zagrał, brak strzałów w shotmapie
         elif mk in MARKETY_LIB:
             # staty lineups obejmują CAŁY mecz — przy dogrywce nie nadają się
             # do rozliczenia rynku regularnego czasu (bank trendów zostaje)

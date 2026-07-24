@@ -325,6 +325,80 @@ def fetch_event_shotmap(event_id: int) -> list[dict]:
     return data if isinstance(data, list) else []
 
 
+# wynik strzału w shotmapie -> czy CELNY (on target). Gol i obroniony = celny;
+# blok/niecelny/słupek = niecelny. Zgodne z definicją SoT bukmachera.
+_SHOTMAP_CELNE = {"goal", "save", "saved"}
+
+
+def fetch_event_result(event_id: int) -> dict | None:
+    """Wynik meczu w REGULARNYM czasie dla DOWOLNEJ ligi (otwarte API, z chmury).
+
+    Zwraca {home_id, away_id, home_name, away_name, home_goals, away_goals,
+    extra_time} albo None, gdy mecz niezakończony / brak wyniku. Gole bierze z
+    pól *ScoreNormaltime (bez dogrywki) — pod rynki 90-minutowe; extra_time=True
+    gdy *Current != *Normaltime (była dogrywka/karne). To domyka rozliczanie
+    goli drużynowych egzotyki, której 365Scores nie zna (te same id co statshub).
+    """
+    try:
+        d = _get(f"{BASE}/event/{event_id}")
+    except Exception:
+        return None
+    root = d.get("data", d) or {}
+    ev = root.get("events")
+    ev = (ev[0] if isinstance(ev, list) and ev else ev) or {}
+    if not isinstance(ev, dict):
+        return None
+    hn, an = ev.get("homeScoreNormaltime"), ev.get("awayScoreNormaltime")
+    hc, ac = ev.get("homeScoreCurrent"), ev.get("awayScoreCurrent")
+    hg = hn if hn is not None else hc
+    ag = an if an is not None else ac
+    if hg is None or ag is None:
+        return None
+    extra = hn is not None and hc is not None and (hn != hc or an != ac)
+
+    def _nazwa(side: str) -> str | None:
+        t = root.get(side) or {}
+        t = (t[0] if isinstance(t, list) and t else t) or {}
+        return t.get("name") if isinstance(t, dict) else None
+
+    return {
+        "home_id": ev.get("homeTeamId"),
+        "away_id": ev.get("awayTeamId"),
+        "home_name": _nazwa("homeTeam"),
+        "away_name": _nazwa("awayTeam"),
+        "home_goals": float(hg),
+        "away_goals": float(ag),
+        "extra_time": bool(extra),
+    }
+
+
+def player_shots_from_shotmap(event_id: int) -> dict[str, dict] | None:
+    """{nazwa_zawodnika: {"shots": n, "sot": n}} z shotmapy meczu (otwarte API).
+
+    Kluczem jest NAZWISKO (nie playerId) — id zawodników statshub bywają w innej
+    przestrzeni niż odbiorca (kupon), więc rozliczanie dopasowuje po nazwisku
+    (jak ścieżka 365, resolve_player_key). None = brak shotmapy (egzotyka bez
+    pokrycia — nie mylić z 0 strzałów). Liczy CAŁĄ shotmapę, więc używać tylko
+    dla meczów bez dogrywki (patrz fetch_event_result.extra_time).
+    """
+    try:
+        sm = fetch_event_shotmap(event_id)
+    except Exception:
+        return None
+    if not sm:
+        return None
+    out: dict[str, dict] = {}
+    for s in sm:
+        name = s.get("playerName")
+        if not name:
+            continue
+        d = out.setdefault(str(name), {"shots": 0, "sot": 0})
+        d["shots"] += 1
+        if str(s.get("result") or "").lower() in _SHOTMAP_CELNE:
+            d["sot"] += 1
+    return out
+
+
 _TOURNAMENT_NAME_CACHE: dict[int, str] = {}
 
 
