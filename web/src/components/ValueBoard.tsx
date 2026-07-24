@@ -7,6 +7,7 @@ import { BetCard } from "./BetCard";
 import { FilterDropdown } from "./FilterDropdown";
 import { RadarCard } from "./RadarCard";
 import { StsBetCard } from "./StsBetCard";
+import { fmtDataCzas } from "@/lib/format";
 import type { Pewnosc, RadarWpis, StsAlert, ValueBet, Zawodnik } from "@/lib/types";
 
 const RYNKI_FILTRY: { kod: string; label: string }[] = [
@@ -103,6 +104,33 @@ export function ValueBoard({
   );
   const [sortuj, setSortuj] = useState<SortKey>("ranking");
   const [limit, setLimit] = useState(25);
+  // Drabinki: filtr "tylko sygnały" + grupowanie kart po meczach
+  // (backend sortuje chronologicznie i najlepszym score w meczu)
+  const [tylkoSygnaly, setTylkoSygnaly] = useState(false);
+  const radarGrupy = useMemo(() => {
+    const zrodlo = tylkoSygnaly
+      ? radarWpisy.filter((w) => w.rodzaj !== "drabinka")
+      : radarWpisy;
+    const grupy = new Map<
+      number,
+      { mecz: string; kickoff_ts: number; wpisy: RadarWpis[] }
+    >();
+    for (const w of zrodlo) {
+      const g = grupy.get(w.mecz_id);
+      if (g) g.wpisy.push(w);
+      else
+        grupy.set(w.mecz_id, {
+          mecz: w.mecz,
+          kickoff_ts: w.kickoff_ts,
+          wpisy: [w],
+        });
+    }
+    return [...grupy.values()];
+  }, [radarWpisy, tylkoSygnaly]);
+  const liczbaSygnalow = useMemo(
+    () => radarWpisy.filter((w) => w.rodzaj !== "drabinka").length,
+    [radarWpisy],
+  );
   // świeżość skanu STS liczona PO stronie klienta (po mount), żeby Date.now()
   // nie rozjechał SSR/hydracji — do mount pole zostaje puste
   const [swiezosc, setSwiezosc] = useState<ReturnType<typeof odswiezTemu>>(null);
@@ -293,30 +321,73 @@ export function ValueBoard({
             </div>
           ) : (
             <>
-              <div className="mb-3 flex items-baseline justify-between gap-3">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                 <p className="max-w-prose text-xs leading-relaxed text-muted">
-                  Drabinki kursów Superbetu z pełną analizą zawodnika: ostatnie
-                  mecze, forma, hojność rywala i średnie sezonowe. Na górze
-                  sygnały, które rynek wycenia najsłabiej — nowi w drużynie,
-                  serie formy, debiutanci. Decyzję zostawiamy tobie.
+                  Drabinka kursów Superbetu + pełna analiza zawodnika. Tam,
+                  gdzie widzisz procent, model policzył szansę linii; „8/10" =
+                  linia trafiona w 8 z 10 ostatnich meczów. Decyzja należy do
+                  ciebie.
                 </p>
                 <span className="font-data shrink-0 text-sm font-semibold text-brand-deep">
                   {odmienPozycje(radarWpisy.length)}
                 </span>
               </div>
-              <div className="space-y-3">
-                {radarWpisy.map((w, i) => (
-                  <motion.div
-                    key={w.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{
-                      delay: Math.min(i * 0.03, 0.4),
-                      duration: 0.3,
-                    }}
+
+              {/* filtr: wszystkie karty vs same sygnały */}
+              {liczbaSygnalow > 0 && (
+                <div className="mb-4 flex flex-wrap gap-1.5">
+                  <button
+                    onClick={() => setTylkoSygnaly(false)}
+                    className={`font-data rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
+                      !tylkoSygnaly
+                        ? "border-brand bg-brand-wash text-brand-deep"
+                        : "border-hairline bg-card text-muted hover:border-brand/40"
+                    }`}
                   >
-                    <RadarCard w={w} rank={i + 1} />
-                  </motion.div>
+                    Wszystkie · {radarWpisy.length}
+                  </button>
+                  <button
+                    onClick={() => setTylkoSygnaly(true)}
+                    title="Nowi w drużynie, serie formy i debiutanci — sytuacje, które rynek wycenia najsłabiej"
+                    className={`font-data rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
+                      tylkoSygnaly
+                        ? "border-brand bg-brand-wash text-brand-deep"
+                        : "border-hairline bg-card text-muted hover:border-brand/40"
+                    }`}
+                  >
+                    Tylko sygnały · {liczbaSygnalow}
+                  </button>
+                </div>
+              )}
+
+              {/* karty pogrupowane po meczach, chronologicznie */}
+              <div className="space-y-6">
+                {radarGrupy.map((g) => (
+                  <section key={`${g.mecz}-${g.kickoff_ts}`}>
+                    <div className="mb-2 flex items-baseline justify-between gap-3 border-b border-hairline pb-1.5">
+                      <h3 className="min-w-0 truncate text-sm font-semibold text-ink">
+                        {g.mecz}
+                      </h3>
+                      <span className="font-data shrink-0 text-xs text-muted">
+                        {fmtDataCzas(g.kickoff_ts)}
+                      </span>
+                    </div>
+                    <div className="space-y-3">
+                      {g.wpisy.map((w, i) => (
+                        <motion.div
+                          key={w.id}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{
+                            delay: Math.min(i * 0.03, 0.3),
+                            duration: 0.3,
+                          }}
+                        >
+                          <RadarCard w={w} />
+                        </motion.div>
+                      ))}
+                    </div>
+                  </section>
                 ))}
               </div>
             </>

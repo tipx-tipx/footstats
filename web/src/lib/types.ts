@@ -147,6 +147,8 @@ export interface RadarSzczebel {
   kurs: number;
   /** szansa modelu na „powyżej" tej linii; null = model nie liczył */
   p_model: number | null;
+  /** ile z ostatnich występów przebiło tę linię ("trafione 8/10") */
+  pokrycie?: { traf: number; z: number } | null;
 }
 
 /** Rynek na karcie radaru: drabinka + ostatnie występy (gdy mamy historię). */
@@ -201,6 +203,8 @@ export interface RadarWpis {
   pozycja: string;
   /** w przewidywanym/potwierdzonym XI (null = nie wiemy) */
   xi?: boolean | null;
+  /** średnia minut z 6 ostatnich występów (pełne mecze vs ławka) */
+  minuty_sr6?: number | null;
   /** brak dla rodzaju "drabinka" (nie ma osobnego powodu-sygnału) */
   powod?: "zmiana_ligi" | "gral_przeciw" | "seria" | "brak_historii";
   /** średnie sezonowe gracza (bieżący + poprzednie; cache workera) */

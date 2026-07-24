@@ -190,8 +190,10 @@ def test_zbuduj_transfer_z_drabinka_i_p_model(monkeypatch):
     assert w["mecz"] == "Klub – Rywal"
     (rynek,) = w["rynki"]
     assert rynek["rynek"] == "Strzały"
-    assert rynek["drabinka"][0] == {"linia": 1.5, "kurs": 2.05,
-                                    "p_model": 0.44}
+    s0 = rynek["drabinka"][0]
+    assert (s0["linia"], s0["kurs"], s0["p_model"]) == (1.5, 2.05, 0.44)
+    # pokrycie: wszystkie ostatnie występy (2 zdarzenia) przebiły linię 1,5
+    assert s0["pokrycie"] == {"traf": 10, "z": 10}
     assert rynek["drabinka"][1]["p_model"] is None
     assert rynek["ostatnie"][:3] == [2, 2, 2]
     assert w["stara_liga"] == "Stara Liga"
@@ -273,6 +275,52 @@ def test_zbuduj_sygnaly_przed_drabinkami():
             teraz=TERAZ,
         )
     assert [w["rodzaj"] for w in wpisy] == ["transfer", "drabinka"]
+
+
+def test_drabinka_przycieta_z_szumu():
+    # 8 linii, od 3. wzwyż kosmiczne kursy — karta ma pokazywać grywalne
+    tr = _trend(utids=[LIGA_NOWA] * 14, counts=[2] * 14)
+    wpisy = radar.zbuduj(
+        trends=[tr],
+        events_meta={999: {"label": "Klub – Rywal", "ts": TERAZ + DZIEN,
+                           "hid": 100, "aid": 200,
+                           "home": "Klub", "away": "Rywal"}},
+        odds_grid={999: {1: {"shots": {
+            "0.5": 1.12, "1.5": 1.85, "2.5": 3.4, "3.5": 6.1,
+            "4.5": 13.0, "5.5": 23.0, "6.5": 41.0, "7.5": 67.0,
+        }}}},
+        sb_cache={}, model_pokrycie=[], players_out={}, nazwy_pl={},
+        teraz=TERAZ,
+    )
+    (rynek,) = wpisy[0]["rynki"]
+    linie = [s["linia"] for s in rynek["drabinka"]]
+    # kurs 13.0 na linii 4,5 przekracza MAX_KURS_SZCZEBLA -> reszta ucięta
+    assert linie == [0.5, 1.5, 2.5, 3.5]
+    # minuty_sr6: pełne mecze w historii
+    assert wpisy[0]["minuty_sr6"] == 90
+
+
+def test_sortowanie_po_meczach_potem_po_score():
+    # dwa mecze: późniejszy ma "lepszego" gracza, ale wcześniejszy mecz
+    # i tak idzie pierwszy (chronologia); w meczu decyduje score
+    def _meta(ts):
+        return {"label": "A – B", "ts": ts, "hid": 100, "aid": 200,
+                "home": "A", "away": "B"}
+    slaby = _trend(player_id=1, utids=[LIGA_NOWA] * 14,
+                   counts=[0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0])
+    mocny = _trend(player_id=2, utids=[LIGA_NOWA] * 14, counts=[3] * 14)
+    pozny = _trend(player_id=3, utids=[LIGA_NOWA] * 14, counts=[3] * 14)
+    pozny.event_id = 998
+    wpisy = radar.zbuduj(
+        trends=[slaby, mocny, pozny],
+        events_meta={999: _meta(TERAZ + DZIEN), 998: _meta(TERAZ + 2 * DZIEN)},
+        odds_grid={999: {1: {"shots": {"1.5": 2.1}},
+                         2: {"shots": {"1.5": 2.1}}},
+                   998: {3: {"shots": {"1.5": 2.1}}}},
+        sb_cache={}, model_pokrycie=[], players_out={}, nazwy_pl={},
+        teraz=TERAZ,
+    )
+    assert [w["podmiot_id"] for w in wpisy] == [2, 1, 3]
 
 
 def test_klucze_dopasowane_tokenowo_w_obie_strony():

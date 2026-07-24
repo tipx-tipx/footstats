@@ -50,10 +50,17 @@ MIN_KURS_FORMY = 1.35       # linia serii musi być grywalna (nie 1.05)
 
 MIN_RYNKOW_DEBIUTANTA = 2   # Superbet kwotuje >= tyle rynków (odsiew szumu)
 MAX_WYSZUKAN_CYKL = 12      # limit zapytań /api/search na cykl (grzeczność)
-MAX_WPISOW = 120            # sufit wpisów (drabinki = każdy kwotowany gracz,
-                            # sygnały zawsze przodem — patrz sortowanie)
+MAX_WPISOW = 120            # globalny sufit wpisów (payload i czytelność)
+MAX_WPISOW_MECZ = 8         # sufit kart per mecz (najlepszy score wygrywa)
 OSTATNIE_N = 10             # ile ostatnich występów pokazuje karta rynku
 MAX_SEZONOW_WPISU = 3       # sekcja "sezony" na karcie (bieżący + poprzednie)
+# przycinanie drabinki: nikt nie gra linii 8+ @23.00 z ~0% szans — szum
+MAX_SZCZEBLI = 5            # tyle linii max na rynek
+MIN_P_SZCZEBLA = 0.03       # od 3. szczebla w górę: p_model < 3% ucina resztę
+MAX_KURS_SZCZEBLA = 12.0    # ...podobnie kurs powyżej tego progu
+# score jakości wpisu (sortowanie w meczu): "grywalne pokrycie" linii
+MIN_KURS_SCORE = 1.45       # linia liczy się do score, gdy kurs grywalny
+MIN_PROBA_SCORE = 5         # ...i pokrycie ma sensowną próbę
 MIN_KURS_DRABINKI = 1.10    # niższe kursy to szum, nie zakład (pomiar: 1.01)
 UTID_MUNDIAL = 16           # MŚ nigdy nie jest „starą ligą" (lato 2026:
                             # każdy reprezentant wracał z mundialu)
@@ -300,21 +307,42 @@ def _rynki_wpisu(
     podmiot: str,
     nazwy_pl: dict[str, str],
 ) -> list[dict]:
-    """Sekcja `rynki` wpisu: drabinka kursów + ostatnie występy per rynek."""
+    """Sekcja `rynki` wpisu: przycięta drabinka kursów + pokrycie linii
+    w ostatnich występach + forma i kontekst rywala per rynek."""
     out = []
     for mk, linie in drabinki.items():
         if not linie:
             continue  # rynek bez kursów „powyżej" = pusta drabinka, bez sensu
+        tr = trendy_mk.get(mk)
+        grane = _grane(tr) if tr is not None else []
+        okno = grane[:OSTATNIE_N]
         drabinka = []
         for linia_s, kurs in sorted(linie.items(), key=lambda kv: float(kv[0])):
             if kurs < MIN_KURS_DRABINKI:
                 continue  # 1.01–1.09 to szum siatki, nie zakład
+            if len(drabinka) >= MAX_SZCZEBLI:
+                break
             linia = float(linia_s)
             p = p_model_idx.get((podmiot, mk, linia))
-            drabinka.append({
+            # od 3. szczebla: linie z ~0% szans / kosmicznym kursem = szum;
+            # wyższe linie będą tylko gorsze, więc ucinamy resztę drabinki
+            if len(drabinka) >= 2 and (
+                (p is not None and p < MIN_P_SZCZEBLA)
+                or kurs > MAX_KURS_SZCZEBLA
+            ):
+                break
+            szczebel = {
                 "linia": linia, "kurs": kurs,
                 "p_model": round(p, 3) if p is not None else None,
-            })
+            }
+            if okno:
+                # POKRYCIE: ile z ostatnich występów przebiło tę linię —
+                # rdzeń analizy tipsterskiej ("2+ trafione w 8/10")
+                szczebel["pokrycie"] = {
+                    "traf": sum(1 for c, _, _ in okno if c > linia),
+                    "z": len(okno),
+                }
+            drabinka.append(szczebel)
         if not drabinka:
             continue
         rec: dict = {
@@ -322,9 +350,7 @@ def _rynki_wpisu(
             "rynek": nazwy_pl.get(mk, mk),
             "drabinka": drabinka,
         }
-        tr = trendy_mk.get(mk)
         if tr is not None:
-            grane = _grane(tr)
             N = OSTATNIE_N
             rec["ostatnie"] = [int(c) for c, _, _ in grane[:N]]
             rec["minuty"] = [int(m) for _, m, _ in grane[:N]]
@@ -340,13 +366,13 @@ def _rynki_wpisu(
             # FORMA okno-vs-baza (informacyjnie, na KAŻDYM rynku z historią;
             # sygnal_formy zostaje osobno jako rzadka plakietka "seria")
             if len(grane) >= MIN_GIER_FORMA - 2:
-                okno, baza = grane[:OKNO_FORMY], grane[OKNO_FORMY:]
-                m_o = sum(m for _, m, _ in okno)
+                okno_f, baza = grane[:OKNO_FORMY], grane[OKNO_FORMY:]
+                m_o = sum(m for _, m, _ in okno_f)
                 m_b = sum(m for _, m, _ in baza)
                 if m_o > 0 and m_b > 0:
                     rec["forma"] = {
                         "okno90": round(
-                            sum(c for c, _, _ in okno) / m_o * 90.0, 2
+                            sum(c for c, _, _ in okno_f) / m_o * 90.0, 2
                         ),
                         "baza90": round(
                             sum(c for c, _, _ in baza) / m_b * 90.0, 2
@@ -365,6 +391,29 @@ def _rynki_wpisu(
     # rynki z historią przed rynkami „gołej drabinki", w środku po nazwie
     out.sort(key=lambda r: ("ostatnie" not in r, r["rynek_kod"]))
     return out
+
+
+def _score_wpisu(w: dict) -> float:
+    """Jakość karty do sortowania W OBRĘBIE meczu: „grywalne pokrycie".
+
+    Najlepszy odsetek trafień linii o grywalnym kursie (>= MIN_KURS_SCORE)
+    przy sensownej próbie, plus bonusy: sygnał (transfer/forma/debiutant),
+    miejsce w XI. Debiutant nie ma historii — niesie go sam bonus sygnału."""
+    best = 0.0
+    for r in w.get("rynki", []):
+        for s in r.get("drabinka", []):
+            p = s.get("pokrycie")
+            if not p or p["z"] < MIN_PROBA_SCORE:
+                continue
+            if s["kurs"] < MIN_KURS_SCORE:
+                continue
+            best = max(best, p["traf"] / p["z"])
+    score = best
+    if w.get("rodzaj") != "drabinka":
+        score += 0.15
+    if w.get("xi") is True:
+        score += 0.10
+    return score
 
 
 def _sezony_wpisu(player_sezon: dict | None, pid: int | None) -> list[dict]:
@@ -453,7 +502,15 @@ def zbuduj(
             if not rynki:
                 continue  # same puste drabinki (kursy-szum) = nie ma karty
             info = players_out.get(pid) or {}
+            # średnia minut z ostatnich 6 występów — "gra pełne mecze"
+            # vs "wchodzi z ławki" to pierwsze pytanie każdej analizy
+            gr_ref = _grane(tr_ref)[:6]
+            minuty_sr6 = (
+                round(sum(m for _, m, _ in gr_ref) / len(gr_ref))
+                if gr_ref else None
+            )
             wpis = {
+                "minuty_sr6": minuty_sr6,
                 "rodzaj": (
                     "transfer" if transfer else
                     "forma" if forma else "drabinka"
@@ -557,10 +614,21 @@ def zbuduj(
         przefiltrowane.append(w)
     wpisy = przefiltrowane
 
-    kolejnosc = {"transfer": 0, "debiutant": 1, "forma": 2, "drabinka": 3}
-    wpisy.sort(key=lambda w: (kolejnosc[w["rodzaj"]], w["kickoff_ts"]))
+    # SORTOWANIE (przebudowa 2026-07-24): po MECZACH chronologicznie,
+    # w meczu po jakości (score) — sygnały wyróżnia plakietka na karcie,
+    # nie kolejność listy (stary radar sortował rodzajami, co przy wielu
+    # kartach rozrzucało jeden mecz po całej liście). Sufit per mecz
+    # trzyma eksplozję: każdy kwotowany gracz = kandydat na kartę.
+    for w in wpisy:
+        w["_score"] = _score_wpisu(w)
+    per_mecz: dict[int, list[dict]] = {}
+    for w in sorted(wpisy, key=lambda w: -w["_score"]):
+        per_mecz.setdefault(w["mecz_id"], []).append(w)
+    wpisy = [w for lst in per_mecz.values() for w in lst[:MAX_WPISOW_MECZ]]
+    wpisy.sort(key=lambda w: (w["kickoff_ts"], w["mecz_id"], -w["_score"]))
     wpisy = wpisy[:MAX_WPISOW]
     for i, w in enumerate(wpisy, start=1):
+        w.pop("_score", None)
         w["id"] = i
     return wpisy
 
