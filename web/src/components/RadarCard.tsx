@@ -66,7 +66,7 @@ function heroSzczebel(
   for (const r of w.rynki) {
     for (const s of r.drabinka) {
       const p = s.pokrycie;
-      if (!p || p.z < 5 || s.kurs < 1.45) continue;
+      if (!p || p.z < 5 || s.kurs < 1.65) continue;
       const q = p.traf / p.z + Math.min(s.kurs, 3) / 100; // tiebreak: wyższy kurs
       if (!best || q > best.q) best = { rynek: r, s, q };
     }

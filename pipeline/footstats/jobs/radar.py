@@ -51,17 +51,19 @@ MIN_KURS_FORMY = 1.35       # linia serii musi być grywalna (nie 1.05)
 MIN_RYNKOW_DEBIUTANTA = 2   # Superbet kwotuje >= tyle rynków (odsiew szumu)
 MAX_WYSZUKAN_CYKL = 12      # limit zapytań /api/search na cykl (grzeczność)
 MAX_WPISOW = 120            # globalny sufit wpisów (payload i czytelność)
-MAX_WPISOW_MECZ = 8         # sufit kart per mecz (najlepszy score wygrywa)
+MAX_WPISOW_MECZ = 6         # sufit kart per mecz (najlepszy score wygrywa)
 OSTATNIE_N = 10             # ile ostatnich występów pokazuje karta rynku
 MAX_SEZONOW_WPISU = 3       # sekcja "sezony" na karcie (bieżący + poprzednie)
 # przycinanie drabinki: nikt nie gra linii 8+ @23.00 z ~0% szans — szum
 MAX_SZCZEBLI = 5            # tyle linii max na rynek
 MIN_P_SZCZEBLA = 0.03       # od 3. szczebla w górę: p_model < 3% ucina resztę
 MAX_KURS_SZCZEBLA = 12.0    # ...podobnie kurs powyżej tego progu
+# pierwszy szczebel drabinki od 1.65 (decyzja usera 2026-07-25): linie po
+# 1.2-1.5 to pewniaki bez value — drabinka ma zaczynać się od grywalnej ceny
+MIN_KURS_PIERWSZEGO = 1.65
 # score jakości wpisu (sortowanie w meczu): "grywalne pokrycie" linii
-MIN_KURS_SCORE = 1.45       # linia liczy się do score, gdy kurs grywalny
+MIN_KURS_SCORE = 1.65       # linia liczy się do score, gdy kurs grywalny
 MIN_PROBA_SCORE = 5         # ...i pokrycie ma sensowną próbę
-MIN_KURS_DRABINKI = 1.10    # niższe kursy to szum, nie zakład (pomiar: 1.01)
 UTID_MUNDIAL = 16           # MŚ nigdy nie jest „starą ligą" (lato 2026:
                             # każdy reprezentant wracał z mundialu)
 # utid liczy się jako „rozgrywki drużyny" (nie stara liga zawodnika), gdy
@@ -318,8 +320,8 @@ def _rynki_wpisu(
         okno = grane[:OSTATNIE_N]
         drabinka = []
         for linia_s, kurs in sorted(linie.items(), key=lambda kv: float(kv[0])):
-            if kurs < MIN_KURS_DRABINKI:
-                continue  # 1.01–1.09 to szum siatki, nie zakład
+            if not drabinka and kurs < MIN_KURS_PIERWSZEGO:
+                continue  # drabinka startuje od pierwszej grywalnej ceny
             if len(drabinka) >= MAX_SZCZEBLI:
                 break
             linia = float(linia_s)
@@ -624,9 +626,17 @@ def zbuduj(
     per_mecz: dict[int, list[dict]] = {}
     for w in sorted(wpisy, key=lambda w: -w["_score"]):
         per_mecz.setdefault(w["mecz_id"], []).append(w)
-    wpisy = [w for lst in per_mecz.values() for w in lst[:MAX_WPISOW_MECZ]]
+    listy = {mid: lst[:MAX_WPISOW_MECZ] for mid, lst in per_mecz.items()}
+    # globalny sufit BEZ ucinania ogona chronologicznego (bug 2026-07-25:
+    # późniejsze mecze — np. europejskie po dołączeniu kursów — wypadały
+    # w całości): zdejmujemy najsłabszą kartę z najliczniejszego meczu
+    razem = sum(len(l) for l in listy.values())
+    while razem > MAX_WPISOW:
+        mid = max(listy, key=lambda m: (len(listy[m]), m))
+        listy[mid].pop()  # listy malejąco po score → odpada najsłabsza
+        razem -= 1
+    wpisy = [w for lst in listy.values() for w in lst]
     wpisy.sort(key=lambda w: (w["kickoff_ts"], w["mecz_id"], -w["_score"]))
-    wpisy = wpisy[:MAX_WPISOW]
     for i, w in enumerate(wpisy, start=1):
         w.pop("_score", None)
         w["id"] = i

@@ -267,7 +267,7 @@ def test_zbuduj_sygnaly_przed_drabinkami():
                                "hid": 100, "aid": 200,
                                "home": "Klub", "away": "Rywal"}},
             odds_grid={999: {1: {"shots": {"1.5": 2.05}},
-                             7: {"shots": {"0.5": 1.5}}}},
+                             7: {"shots": {"0.5": 1.7}}}},
             sb_cache={},
             model_pokrycie=[],
             players_out={},
@@ -294,8 +294,9 @@ def test_drabinka_przycieta_z_szumu():
     )
     (rynek,) = wpisy[0]["rynki"]
     linie = [s["linia"] for s in rynek["drabinka"]]
+    # 0,5 @1.12 odpada (pierwszy szczebel od MIN_KURS_PIERWSZEGO=1.65),
     # kurs 13.0 na linii 4,5 przekracza MAX_KURS_SZCZEBLA -> reszta ucięta
-    assert linie == [0.5, 1.5, 2.5, 3.5]
+    assert linie == [1.5, 2.5, 3.5]
     # minuty_sr6: pełne mecze w historii
     assert wpisy[0]["minuty_sr6"] == 90
 
