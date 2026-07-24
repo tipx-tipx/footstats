@@ -4,10 +4,25 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { memo, useState } from "react";
 
 import { fmtDataCzas, fmtKurs, fmtProc } from "@/lib/format";
-import type { RadarRynek, RadarWpis } from "@/lib/types";
+import type { RadarRynek, RadarSezon, RadarWpis } from "@/lib/types";
 
 /** Linia 0,5 to po ludzku „1 lub więcej" — tak mówi też Superbet. */
 const linLabel = (linia: number) => `${Math.ceil(linia)}+`;
+
+/** Krótkie polskie etykiety rynków w wierszach sezonowych. */
+const SEZON_RYNKI_PL: Record<string, string> = {
+  shots: "strzały",
+  sot: "celne",
+  shots_outside_box: "zza pola",
+  fouls_committed: "faule",
+  fouls_won: "faule wyw.",
+  offsides: "spalone",
+  tackles: "odbiory",
+  interceptions: "przechwyty",
+  shots_blocked: "zablokowane",
+};
+
+const liczba = (v: number) => String(v).replace(".", ",");
 
 /** Etykieta i kolor diody per rodzaj sygnału. */
 function rodzajInfo(w: RadarWpis): { label: string; dioda: string; tytul: string } {
@@ -27,11 +42,19 @@ function rodzajInfo(w: RadarWpis): { label: string; dioda: string; tytul: string
         "Superbet kwotuje tego zawodnika, ale w danych nie ma jeszcze żadnej jego historii meczowej. Rynek wycenia go w ciemno.",
     };
   }
+  if (w.rodzaj === "forma") {
+    return {
+      label: "seria formy",
+      dioda: "bg-data-green",
+      tytul:
+        "Zawodnik regularnie przebija linię w ostatnich meczach, wyraźnie ponad swój wcześniejszy poziom. Model celowo nie dolicza formy do szansy, to sygnał dodatkowy.",
+    };
+  }
   return {
-    label: "seria formy",
-    dioda: "bg-data-green",
+    label: "drabinka",
+    dioda: "bg-ink/30",
     tytul:
-      "Zawodnik regularnie przebija linię w ostatnich meczach, wyraźnie ponad swój wcześniejszy poziom. Model celowo nie dolicza formy do szansy, to sygnał dodatkowy.",
+      "Pełna drabinka kursów Superbetu z historią występów, formą i średnimi sezonowymi. Bez osobnego sygnału — materiał do własnej analizy.",
   };
 }
 
@@ -64,12 +87,66 @@ function opisWpisu(w: RadarWpis): string {
       "Sprawdź sam, skąd przyszedł i ile może zagrać, zanim postawisz."
     );
   }
-  const f = w.forma;
-  if (!f) return "";
+  if (w.rodzaj === "forma") {
+    const f = w.forma;
+    if (!f) return "";
+    return (
+      `Przebił ${linLabel(f.linia)} w ${f.trafienia} z ${f.okno} ostatnich meczów. ` +
+      `W tej serii średnio ${liczba(f.srednia90_okno)} na 90 minut, ` +
+      `wcześniej ${liczba(f.srednia90_baza)}.`
+    );
+  }
+  // drabinka: krótka zajawka z najbogatszego rynku + sezonów
+  const zHistoria = w.rynki.find((r) => r.ostatnie && r.ostatnie.length > 0);
+  const czesci: string[] = [];
+  if (zHistoria?.srednia90 != null) {
+    czesci.push(
+      `${zHistoria.rynek.toLowerCase()}: śr. ${liczba(zHistoria.srednia90)}/90`,
+    );
+  }
+  if (w.sezony?.length) {
+    czesci.push(`średnie z ${w.sezony.length} sezonów niżej`);
+  }
   return (
-    `Przebił ${linLabel(f.linia)} w ${f.trafienia} z ${f.okno} ostatnich meczów. ` +
-    `W tej serii średnio ${String(f.srednia90_okno).replace(".", ",")} na 90 minut, ` +
-    `wcześniej ${String(f.srednia90_baza).replace(".", ",")}.`
+    "Kursy Superbetu i pełna historia występów. " +
+    (czesci.length ? `${czesci.join(" · ")}.` : "")
+  );
+}
+
+/** Wiersz jednego sezonu: liga, rok, mecze i średnie per rynek. */
+function SezonWiersz({ s }: { s: RadarSezon }) {
+  const wpisy = Object.entries(s.na_mecz).filter(
+    ([mk]) => SEZON_RYNKI_PL[mk],
+  );
+  if (!wpisy.length) return null;
+  return (
+    <div className="rounded-(--radius-control) border border-hairline bg-card px-3.5 py-2.5">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+        <span className="text-xs font-semibold text-ink">
+          {s.turniej} {s.rok}
+        </span>
+        <span className="font-data text-[11px] text-muted">
+          {s.mecze} meczów · {s.minuty} min
+        </span>
+      </div>
+      <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
+        {wpisy.map(([mk, v]) => (
+          <span
+            key={mk}
+            className="font-data text-[11px] text-ink-soft"
+            title={
+              s.na90[mk] != null
+                ? `${SEZON_RYNKI_PL[mk]}: ${liczba(v)} na mecz, ${liczba(s.na90[mk])} na 90 minut`
+                : `${SEZON_RYNKI_PL[mk]}: ${liczba(v)} na mecz`
+            }
+          >
+            <span className="text-faint">{SEZON_RYNKI_PL[mk]}</span>{" "}
+            <span className="font-semibold">{liczba(v)}</span>
+            <span className="text-faint">/mecz</span>
+          </span>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -118,6 +195,47 @@ function RynekBlok({ r }: { r: RadarRynek }) {
               {c}
             </span>
           ))}
+        </div>
+      )}
+
+      {(r.forma || r.rywal?.srednia != null) && (
+        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted">
+          {r.forma && (
+            <span
+              title="Średnia na 90 minut z 6 ostatnich meczów vs wcześniejsza baza — czy liczby idą w górę, czy w dół"
+            >
+              forma:{" "}
+              <span
+                className={`font-data font-semibold ${
+                  r.forma.okno90 > r.forma.baza90
+                    ? "text-data-green-ink"
+                    : r.forma.okno90 < r.forma.baza90
+                      ? "text-data-amber-ink"
+                      : "text-ink-soft"
+                }`}
+              >
+                {String(r.forma.okno90).replace(".", ",")}
+              </span>
+              /90 ost. 6{" "}
+              <span className="text-faint">
+                (wcześniej {String(r.forma.baza90).replace(".", ",")})
+              </span>
+            </span>
+          )}
+          {r.rywal?.srednia != null && (
+            <span title="Ile rywal średnio oddaje przeciwnikom na tym rynku i które miejsce zajmuje na tle ligi (wyższa pozycja = hojniejszy rywal)">
+              rywal puszcza śr.{" "}
+              <span className="font-data font-semibold text-ink-soft">
+                {String(r.rywal.srednia).replace(".", ",")}
+              </span>
+              {r.rywal.rank != null && r.rywal.z != null && (
+                <span className="text-faint">
+                  {" "}
+                  (#{r.rywal.rank}/{r.rywal.z})
+                </span>
+              )}
+            </span>
+          )}
         </div>
       )}
 
@@ -213,7 +331,9 @@ export const RadarCard = memo(function RadarCard({
                   ? "bg-brand-wash text-brand-deep"
                   : w.rodzaj === "debiutant"
                     ? "bg-data-amber-wash text-data-amber-ink"
-                    : "bg-data-green-wash text-data-green-ink"
+                    : w.rodzaj === "forma"
+                      ? "bg-data-green-wash text-data-green-ink"
+                      : "border border-hairline bg-paper text-muted"
               }`}
             >
               {info.label}
@@ -277,10 +397,27 @@ export const RadarCard = memo(function RadarCard({
                 ))}
               </div>
 
+              {w.sezony && w.sezony.length > 0 && (
+                <div className="mt-4">
+                  <p
+                    className="mb-2 text-[10px] uppercase tracking-wide text-faint"
+                    title="Średnie z całych sezonów (bieżący i poprzednie) — także z poprzedniego klubu i ligi, jeśli zawodnik zmienił barwy"
+                  >
+                    średnie sezonowe
+                  </p>
+                  <div className="space-y-2">
+                    {w.sezony.map((s, i) => (
+                      <SezonWiersz key={`${s.turniej}-${s.rok}-${i}`} s={s} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <p className="mt-4 border-t border-hairline pt-3 text-xs leading-relaxed text-muted">
-                To sygnał z kontekstu (transfer, seria, brak danych), nie typ
-                modelu. Tam, gdzie przy kursie widzisz procent, model policzył
-                szansę tej linii. Resztę oceń sam, zanim postawisz.
+                Drabinka kursów Superbetu z pełnym kontekstem: ostatnie mecze,
+                forma, hojność rywala i średnie sezonowe. Tam, gdzie przy
+                kursie widzisz procent, model policzył szansę tej linii.
+                Resztę oceń sam, zanim postawisz.
               </p>
             </div>
           </motion.div>

@@ -159,6 +159,27 @@ export interface RadarRynek {
   minuty?: number[];
   rywale?: string[];
   srednia90?: number;
+  /** forma okno-vs-baza: śr./90 z 6 ostatnich vs wcześniejszych meczów */
+  forma?: { okno90: number; baza90: number } | null;
+  /** kontekst rywala: ile śr. oddaje na tym rynku i miejsce na tle ligi */
+  rywal?: {
+    srednia?: number | null;
+    rank?: number | null;
+    z?: number | null;
+    liga?: number | null;
+  } | null;
+}
+
+/** Średnie CAŁEGO sezonu gracza (cache workera Sofascore, per liga+rok). */
+export interface RadarSezon {
+  turniej: string;
+  rok: string;
+  mecze: number;
+  minuty: number;
+  /** rynek_kod -> średnia na mecz (np. shots: 2.0) */
+  na_mecz: Record<string, number>;
+  /** rynek_kod -> średnia na 90 minut */
+  na90: Record<string, number>;
 }
 
 /**
@@ -168,7 +189,8 @@ export interface RadarRynek {
  */
 export interface RadarWpis {
   id: number;
-  rodzaj: "transfer" | "forma" | "debiutant";
+  /** "drabinka" = kwotowany gracz z historią, bez osobnego sygnału */
+  rodzaj: "transfer" | "forma" | "debiutant" | "drabinka";
   mecz_id: number;
   mecz: string;
   kickoff_ts: number;
@@ -179,7 +201,10 @@ export interface RadarWpis {
   pozycja: string;
   /** w przewidywanym/potwierdzonym XI (null = nie wiemy) */
   xi?: boolean | null;
-  powod: "zmiana_ligi" | "gral_przeciw" | "seria" | "brak_historii";
+  /** brak dla rodzaju "drabinka" (nie ma osobnego powodu-sygnału) */
+  powod?: "zmiana_ligi" | "gral_przeciw" | "seria" | "brak_historii";
+  /** średnie sezonowe gracza (bieżący + poprzednie; cache workera) */
+  sezony?: RadarSezon[];
   /** etykieta poprzedniej ligi (gdy powod = zmiana_ligi) */
   stara_liga?: string | null;
   stara_liga_utid?: number | null;

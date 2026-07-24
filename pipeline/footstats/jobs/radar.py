@@ -50,7 +50,10 @@ MIN_KURS_FORMY = 1.35       # linia serii musi być grywalna (nie 1.05)
 
 MIN_RYNKOW_DEBIUTANTA = 2   # Superbet kwotuje >= tyle rynków (odsiew szumu)
 MAX_WYSZUKAN_CYKL = 12      # limit zapytań /api/search na cykl (grzeczność)
-MAX_WPISOW = 40             # sufit wpisów radaru (payload i czytelność)
+MAX_WPISOW = 120            # sufit wpisów (drabinki = każdy kwotowany gracz,
+                            # sygnały zawsze przodem — patrz sortowanie)
+OSTATNIE_N = 10             # ile ostatnich występów pokazuje karta rynku
+MAX_SEZONOW_WPISU = 3       # sekcja "sezony" na karcie (bieżący + poprzednie)
 MIN_KURS_DRABINKI = 1.10    # niższe kursy to szum, nie zakład (pomiar: 1.01)
 UTID_MUNDIAL = 16           # MŚ nigdy nie jest „starą ligą" (lato 2026:
                             # każdy reprezentant wracał z mundialu)
@@ -322,7 +325,7 @@ def _rynki_wpisu(
         tr = trendy_mk.get(mk)
         if tr is not None:
             grane = _grane(tr)
-            N = 8
+            N = OSTATNIE_N
             rec["ostatnie"] = [int(c) for c, _, _ in grane[:N]]
             rec["minuty"] = [int(m) for _, m, _ in grane[:N]]
             rec["rywale"] = [
@@ -334,10 +337,46 @@ def _rynki_wpisu(
                 rec["srednia90"] = round(
                     sum(c for c, _, _ in grane) / lacznie_min * 90.0, 2
                 )
+            # FORMA okno-vs-baza (informacyjnie, na KAŻDYM rynku z historią;
+            # sygnal_formy zostaje osobno jako rzadka plakietka "seria")
+            if len(grane) >= MIN_GIER_FORMA - 2:
+                okno, baza = grane[:OKNO_FORMY], grane[OKNO_FORMY:]
+                m_o = sum(m for _, m, _ in okno)
+                m_b = sum(m for _, m, _ in baza)
+                if m_o > 0 and m_b > 0:
+                    rec["forma"] = {
+                        "okno90": round(
+                            sum(c for c, _, _ in okno) / m_o * 90.0, 2
+                        ),
+                        "baza90": round(
+                            sum(c for c, _, _ in baza) / m_b * 90.0, 2
+                        ),
+                    }
+            # KONTEKST RYWALA: ile rywal średnio ODDAJE na tym rynku i jak
+            # wypada na tle ligi (gotowe agregaty z feedu statshub)
+            if tr.opponent_average is not None or tr.opponent_rank is not None:
+                rec["rywal"] = {
+                    "srednia": tr.opponent_average,
+                    "rank": tr.opponent_rank,
+                    "z": tr.total_ranks,
+                    "liga": tr.league_average,
+                }
         out.append(rec)
     # rynki z historią przed rynkami „gołej drabinki", w środku po nazwie
     out.sort(key=lambda r: ("ostatnie" not in r, r["rynek_kod"]))
     return out
+
+
+def _sezony_wpisu(player_sezon: dict | None, pid: int | None) -> list[dict]:
+    """Sekcja `sezony` wpisu z cache Supabase `player_sezon` (worker domowy).
+
+    Średnie CAŁYCH sezonów (bieżący + poprzednie) per rynek — /mecz i /90.
+    Pusta lista, gdy worker jeszcze nie pobrał gracza."""
+    if not player_sezon or not pid:
+        return []
+    rec = player_sezon.get(str(pid)) or player_sezon.get(int(pid)) or {}
+    sez = rec.get("sezony") or []
+    return sez[:MAX_SEZONOW_WPISU]
 
 
 def zbuduj(
@@ -349,12 +388,19 @@ def zbuduj(
     players_out: dict[int, dict],
     nazwy_pl: dict[str, str],
     teraz: int,
+    player_sezon: dict | None = None,
 ) -> list[dict]:
-    """Złóż wpisy radaru ze zbiorów, które cykl i tak już ma w pamięci.
+    """Złóż wpisy radaru/drabinek ze zbiorów, które cykl i tak ma w pamięci.
+
+    DRABINKI (przebudowa 2026-07-24, decyzja produktowa): wpis dostaje KAŻDY
+    kwotowany przez Superbet gracz z historią statshub — drabina linii z
+    kursami + pełna analiza (ostatnie występy, forma okno-vs-baza, kontekst
+    rywala, średnie sezonowe z cache workera). Detektory transfer/forma/
+    debiutant zostają jako PLAKIETKI i priorytet sortowania, nie bramy.
 
     Zwraca listę do radar.json — posortowaną: transfery, debiutanci, serie
-    formy; wewnątrz rodzaju po godzinie meczu. Kickoffem, który minął,
-    zajmuje się web (tylkoNadchodzace), nie my."""
+    formy, reszta drabinek; wewnątrz rodzaju po godzinie meczu. Kickoffem,
+    który minął, zajmuje się web (tylkoNadchodzace), nie my."""
     konsensus = liga_konsensus(trends)
     trendy_pm: dict[tuple[int, int], dict[str, statshub.StatshubTrend]] = {}
     for t in trends:
@@ -400,11 +446,18 @@ def zbuduj(
                         > (forma["trafienia"], forma["kurs"])
                     ):
                         forma, forma_mk = s, mk
-                if forma is None:
-                    continue
+            rynki = _rynki_wpisu(
+                drabinki, trendy_mk, p_model_idx,
+                tr_ref.player_name, nazwy_pl,
+            )
+            if not rynki:
+                continue  # same puste drabinki (kursy-szum) = nie ma karty
             info = players_out.get(pid) or {}
             wpis = {
-                "rodzaj": "transfer" if transfer else "forma",
+                "rodzaj": (
+                    "transfer" if transfer else
+                    "forma" if forma else "drabinka"
+                ),
                 "mecz_id": mid, "mecz": meta["label"],
                 "kickoff_ts": meta["ts"],
                 "podmiot_id": pid,
@@ -413,18 +466,18 @@ def zbuduj(
                 "przeciwnik": tr_ref.opponent_name,
                 "pozycja": info.get("pozycja") or tr_ref.position or "?",
                 "xi": info.get("xi"),
-                "rynki": _rynki_wpisu(
-                    drabinki, trendy_mk, p_model_idx,
-                    tr_ref.player_name, nazwy_pl,
-                ),
+                "rynki": rynki,
             }
             if transfer:
                 wpis.update(transfer)
                 wpis["_liga_druzyny_utid"] = liga_dr
-            else:
+            elif forma:
                 wpis["powod"] = "seria"
                 wpis["forma_rynek"] = forma_mk
                 wpis["forma"] = forma
+            sez = _sezony_wpisu(player_sezon, pid)
+            if sez:
+                wpis["sezony"] = sez
             wpisy.append(wpis)
 
     # debiutanci: Superbet kwotuje, statshub milczy
@@ -452,7 +505,9 @@ def zbuduj(
             wiek = None
             if profil.get("birth_ts"):
                 wiek = int((teraz - int(profil["birth_ts"])) // (365.25 * 86400))
+            sez_deb = _sezony_wpisu(player_sezon, profil.get("id"))
             wpisy.append({
+                **({"sezony": sez_deb} if sez_deb else {}),
                 "rodzaj": "debiutant",
                 "mecz_id": mid, "mecz": meta["label"],
                 "kickoff_ts": meta["ts"],
@@ -502,7 +557,7 @@ def zbuduj(
         przefiltrowane.append(w)
     wpisy = przefiltrowane
 
-    kolejnosc = {"transfer": 0, "debiutant": 1, "forma": 2}
+    kolejnosc = {"transfer": 0, "debiutant": 1, "forma": 2, "drabinka": 3}
     wpisy.sort(key=lambda w: (kolejnosc[w["rodzaj"]], w["kickoff_ts"]))
     wpisy = wpisy[:MAX_WPISOW]
     for i, w in enumerate(wpisy, start=1):

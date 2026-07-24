@@ -2856,6 +2856,7 @@ def _main_impl(tryb=None):
         radar_wpisy = radar.zbuduj(
             trends, events_meta_radar, odds_grid, sb_cache,
             model_pokrycie, players_out, MARKET_NAMES_PL, int(time.time()),
+            player_sezon=supa.get_key("player_sezon") or {},
         )
     except Exception as ex:
         radar_wpisy = []
@@ -2869,6 +2870,20 @@ def _main_impl(tryb=None):
         print("Radar: " + ", ".join(
             f"{k}={v}" for k, v in sorted(rodzaje.items())
         ))
+        # KANDYDACI do średnich sezonowych: worker domowy (sofa_worker,
+        # Sofascore blokuje chmurę) czyta tę listę i wypełnia player_sezon —
+        # następny cykl dolewa sekcję "sezony" do kart drabinek
+        kandydaci = []
+        widziani_pid: set[int] = set()
+        for w in radar_wpisy:
+            pid = w.get("podmiot_id")
+            if pid and pid not in widziani_pid:
+                widziani_pid.add(pid)
+                kandydaci.append({"id": int(pid), "nazwa": w.get("podmiot"),
+                                  "druzyna": w.get("druzyna"),
+                                  "mecz_id": w.get("mecz_id")})
+        if kandydaci:
+            supa.put_key("sezon_kandydaci", kandydaci[:250])
 
     # RAPORT POKRYCIA (liga): parowanie z build_league + to, co dołożył
     # silnik — luka jest mierzona i zapisywana co cykl, nie ignorowana.

@@ -214,7 +214,7 @@ export function ValueBoard({
   const TABY_RODZAJ = [
     ["pewniaki", "Pewniaki", liczbaPewniakow],
     ["value", "Value Bety", liczbaValueSts],
-    ["radar", "Pod lupą", radarWpisy.length],
+    ["radar", "Drabinki", radarWpisy.length],
     ["wszystko", "Wszystko", null],
   ] as const;
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -282,23 +282,23 @@ export function ValueBoard({
           {radarWpisy.length === 0 ? (
             <div className="rounded-(--radius-card) border border-hairline bg-card px-6 py-12 text-center shadow-(--shadow-card)">
               <p className="text-sm font-medium text-ink">
-                Nic ciekawego pod lupą w tej chwili
+                Brak drabinek w tej chwili
               </p>
               <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-muted">
-                Tu trafiają sytuacje, których kursy często nie nadążają wycenić:
-                nowi w drużynie, zawodnicy w wyraźnej serii i debiutanci
-                kwotowani bez historii. Pojawiają się wraz z ofertą Superbetu na
-                najbliższe mecze.
+                Drabinka to pełna analiza zawodnika: kursy Superbetu na kolejne
+                linie, ostatnie mecze, forma, hojność rywala i średnie sezonowe.
+                Karty pojawiają się, gdy Superbet wystawi kursy zawodnicze na
+                najbliższe mecze (zwykle 1–2 dni przed meczem).
               </p>
             </div>
           ) : (
             <>
               <div className="mb-3 flex items-baseline justify-between gap-3">
                 <p className="max-w-prose text-xs leading-relaxed text-muted">
-                  Sytuacje, które rynek wycenia najsłabiej: nowi w drużynie,
-                  serie formy i debiutanci bez historii. To sygnały z kontekstu,
-                  nie typy modelu, dlatego pokazujemy liczby i kursy, a decyzję
-                  zostawiamy tobie.
+                  Drabinki kursów Superbetu z pełną analizą zawodnika: ostatnie
+                  mecze, forma, hojność rywala i średnie sezonowe. Na górze
+                  sygnały, które rynek wycenia najsłabiej — nowi w drużynie,
+                  serie formy, debiutanci. Decyzję zostawiamy tobie.
                 </p>
                 <span className="font-data shrink-0 text-sm font-semibold text-brand-deep">
                   {odmienPozycje(radarWpisy.length)}

@@ -197,6 +197,84 @@ def test_zbuduj_transfer_z_drabinka_i_p_model(monkeypatch):
     assert w["stara_liga"] == "Stara Liga"
 
 
+def test_zbuduj_drabinka_bez_sygnalu_z_forma_i_rywalem():
+    # gracz zadomowiony w lidze, bez serii — kiedyś radar go pomijał,
+    # teraz dostaje wpis rodzaju "drabinka" z pełną analizą
+    tr = _trend(utids=[LIGA_NOWA] * 14, counts=[2] * 14)
+    tr.opponent_average = 11.4
+    tr.opponent_rank = 3
+    tr.total_ranks = 18
+    wpisy = radar.zbuduj(
+        trends=[tr],
+        events_meta={999: {"label": "Klub – Rywal", "ts": TERAZ + DZIEN,
+                           "hid": 100, "aid": 200,
+                           "home": "Klub", "away": "Rywal"}},
+        odds_grid={999: {1: {"shots": {"1.5": 2.05, "2.5": 3.2}}}},
+        sb_cache={},
+        model_pokrycie=[],
+        players_out={1: {"pozycja": "M", "xi": True}},
+        nazwy_pl={"shots": "Strzały"},
+        teraz=TERAZ,
+    )
+    assert len(wpisy) == 1
+    w = wpisy[0]
+    assert w["rodzaj"] == "drabinka"
+    assert "powod" not in w
+    (rynek,) = w["rynki"]
+    # forma okno-vs-baza liczona informacyjnie na każdym rynku z historią
+    assert rynek["forma"]["okno90"] == rynek["forma"]["baza90"] == 2.0
+    assert rynek["rywal"] == {"srednia": 11.4, "rank": 3, "z": 18,
+                              "liga": None}
+    assert len(rynek["ostatnie"]) == 10  # OSTATNIE_N występów na karcie
+
+
+def test_zbuduj_dolacza_srednie_sezonowe_z_cache():
+    tr = _trend(utids=[LIGA_NOWA] * 14, counts=[2] * 14)
+    sezon = {"turniej": "Serie B", "rok": "2025", "mecze": 32,
+             "minuty": 1738, "na_mecz": {"shots": 2.0}, "na90": {"shots": 3.31}}
+    wpisy = radar.zbuduj(
+        trends=[tr],
+        events_meta={999: {"label": "Klub – Rywal", "ts": TERAZ + DZIEN,
+                           "hid": 100, "aid": 200,
+                           "home": "Klub", "away": "Rywal"}},
+        odds_grid={999: {1: {"shots": {"1.5": 2.05}}}},
+        sb_cache={},
+        model_pokrycie=[],
+        players_out={},
+        nazwy_pl={},
+        teraz=TERAZ,
+        player_sezon={"1": {"name": "Gracz 1", "fetched_ts": TERAZ,
+                            "sezony": [sezon]}},
+    )
+    assert wpisy[0]["sezony"] == [sezon]
+
+
+def test_zbuduj_sygnaly_przed_drabinkami():
+    # sortowanie: transfer przodem, zwykla drabinka na koncu
+    kolega = _trend(player_id=7, utids=[LIGA_NOWA] * 12, counts=[1] * 12)
+    nowy = _trend(player_id=1, utids=[LIGA_NOWA] + [LIGA_STARA] * 12,
+                  counts=[2] * 13)
+    zwykly = _trend(player_id=7, utids=[LIGA_NOWA] * 12, counts=[1] * 12)
+    import unittest.mock as _m
+    with _m.patch.object(radar.statshub, "fetch_tournament_name",
+                         lambda utid: {LIGA_STARA: "Stara",
+                                       LIGA_NOWA: "Nowa"}.get(utid, "")):
+        wpisy = radar.zbuduj(
+            trends=[kolega, nowy, zwykly],
+            events_meta={999: {"label": "Klub – Rywal", "ts": TERAZ + DZIEN,
+                               "hid": 100, "aid": 200,
+                               "home": "Klub", "away": "Rywal"}},
+            odds_grid={999: {1: {"shots": {"1.5": 2.05}},
+                             7: {"shots": {"0.5": 1.5}}}},
+            sb_cache={},
+            model_pokrycie=[],
+            players_out={},
+            nazwy_pl={},
+            teraz=TERAZ,
+        )
+    assert [w["rodzaj"] for w in wpisy] == ["transfer", "drabinka"]
+
+
 def test_klucze_dopasowane_tokenowo_w_obie_strony():
     klucze = {"lodi renan", "ba sy", "kane"}
     # pełne nazwisko z oferty vs boiskowe i odwrotnie

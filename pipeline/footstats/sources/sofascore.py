@@ -203,6 +203,46 @@ class SofascoreSource:
             page += 1
         return out
 
+    # -- statystyki sezonowe gracza -----------------------------------------
+
+    def player_profile(self, player_id: int) -> dict | None:
+        """{"name", "team"} gracza albo None (404 = id nie istnieje w Sofascore).
+
+        Do weryfikacji tożsamości przy rozjeździe przestrzeni id (feed propsów
+        statshub miewa własne id) i przy homonimach z wyszukiwarki.
+        """
+        try:
+            d = self.client.get_json(f"{BASE}/player/{player_id}")
+        except LookupError:
+            return None
+        p = d.get("player") or {}
+        return {
+            "name": p.get("name"),
+            "team": (p.get("team") or {}).get("name"),
+        }
+
+    def player_seasons(self, player_id: int) -> list[dict]:
+        """Turnieje+sezony, dla których Sofascore ma staty gracza.
+
+        Zwraca listę {uniqueTournament: {id, name}, seasons: [{id, year}, ...]}.
+        """
+        d = self.client.get_json(f"{BASE}/player/{player_id}/statistics/seasons")
+        return d.get("uniqueTournamentSeasons", [])
+
+    def player_season_stats(self, player_id: int, utid: int, season_id: int) -> dict:
+        """Agregat SUM całego sezonu gracza (overall) — jedno zapytanie.
+
+        Pola m.in.: appearances, minutesPlayed, totalShots, shotsOnTarget,
+        shotsFromOutsideTheBox, fouls (popełnione), wasFouled (wywalczone),
+        offsides, tackles, interceptions, blockedShots. Średnia/mecz = suma /
+        appearances; per-90 = suma / minutesPlayed * 90.
+        """
+        d = self.client.get_json(
+            f"{BASE}/player/{player_id}/unique-tournament/{utid}"
+            f"/season/{season_id}/statistics/overall"
+        )
+        return d.get("statistics", {})
+
     # -- pojedynczy mecz ----------------------------------------------------
 
     def event_details(self, event_id: int, use_cache: bool = True) -> dict:
