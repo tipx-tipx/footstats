@@ -1316,6 +1316,28 @@ def _statshub_strzaly(event_id: int, cache: dict) -> dict | None:
     return r
 
 
+def _sofa_gracz(sofa: dict, rec: dict) -> tuple[dict | None, dict | None]:
+    """Staty zawodnika z cache Sofascore (`sofa_results`, worker domowy) —
+    dopasowanie po nazwisku. Zwraca (staty_lub_None, wpis_meczu_lub_None)."""
+    e = sofa.get(str(rec["mecz_id"]))
+    if not e:
+        return None, None
+    players = e.get("players") or {}
+    normed = {scores365._norm(n): v for n, v in players.items()}
+    skey = scores365.resolve_player_key(set(normed), rec["podmiot"])
+    return (normed.get(skey) if skey else None), e
+
+
+def _sofa_druzyna(sofa: dict, rec: dict) -> tuple[dict | None, dict | None]:
+    """Staty drużyny z cache Sofascore — po znormalizowanej nazwie."""
+    e = sofa.get(str(rec["mecz_id"]))
+    if not e:
+        return None, None
+    teams = e.get("teams") or {}
+    normed = {rotowire._norm(n): v for n, v in teams.items()}
+    return normed.get(rotowire._norm(str(rec["podmiot"]))), e
+
+
 def rozlicz(
     value_bets: list[dict],
     kupony_list: list[dict] | None = None,
@@ -1336,6 +1358,7 @@ def rozlicz(
         _dopisz_nowe(log, [_kupon_leg_do_logu(l) for l in (wk.get("legi") or [])
                             if l.get("mecz_id") and l.get("podmiot")])
     lib = supa.get_key("trend_lib") or {}
+    sofa = supa.get_key("sofa_results") or {}   # cache Sofascore (worker domowy)
     now = int(time.time())
     # multi-liga: świeże trendy rozegranych meczów prosto z feedu statshub —
     # rozliczają mecze, których 365Scores nie zna (globalne propsy)
@@ -1401,6 +1424,14 @@ def rozlicz(
                         elif sr.get("away_name") and rotowire._norm(sr["away_name"]) == tkn:
                             wartosc_t = sr["away_goals"]
             if wartosc_t is None:
+                # FALLBACK egzotyki (Warstwa 2): staty drużynowe z cache
+                # Sofascore (worker domowy) — rożne/kartki/faule/strzały drużyny.
+                tg, e_sofa = _sofa_druzyna(sofa, rec)
+                if tg is not None and e_sofa and not e_sofa.get("extra_time"):
+                    v = tg.get(mk)
+                    if v is not None:
+                        wartosc_t = float(v)
+            if wartosc_t is None:
                 if (
                     now - rec["kickoff_ts"] > TERMIN_BRAK_DANYCH_S
                     and rec.get("mecz") not in mecze_przyszle
@@ -1440,6 +1471,11 @@ def rozlicz(
             minuty = float(staty[pkey].get("minutes", 0)) if pkey else 0.0
         if minuty is None:
             minuty = _minuty_z_banku(rec, lib)
+        if minuty is None:
+            # FALLBACK egzotyki (Warstwa 2): minuty z cache Sofascore
+            pg, _e = _sofa_gracz(sofa, rec)
+            if pg is not None and pg.get("minutes") is not None:
+                minuty = float(pg["minutes"])
         if minuty is not None and minuty <= 0:
             rec.update(wynik="zwrot", faktyczna=0.0, rozliczono_ts=now,
                        powod="nie zagrał", zagral=False)
@@ -1481,6 +1517,14 @@ def rozlicz(
                             wartosc = float(normed[skey][mk])
                         elif minuty:
                             wartosc = 0.0  # zagrał, brak strzałów w shotmapie
+            if wartosc is None and mk in ("shots", "sot"):
+                # FALLBACK egzotyki (Warstwa 2): strzały z cache Sofascore
+                # (worker domowy) — np. liga bez shotmapy statshub.
+                pg, e_sofa = _sofa_gracz(sofa, rec)
+                if pg is not None and e_sofa and not e_sofa.get("extra_time"):
+                    v = pg.get(mk)
+                    if v is not None:
+                        wartosc = float(v)
         elif mk in MARKETY_LIB:
             # staty lineups obejmują CAŁY mecz — przy dogrywce nie nadają się
             # do rozliczenia rynku regularnego czasu (bank trendów zostaje)
@@ -1492,6 +1536,15 @@ def rozlicz(
                 wartosc = float(w) if w is not None else None
             if wartosc is None:
                 wartosc = _wartosc_z_banku(rec, lib)
+            if wartosc is None:
+                # FALLBACK egzotyki (Warstwa 2): faule/odbiory/przechwyty z
+                # cache Sofascore (worker domowy) — jedyne źródło tych rynków
+                # w egzotyce (statshub/365 ich nie mają).
+                pg, e_sofa = _sofa_gracz(sofa, rec)
+                if pg is not None and e_sofa and not e_sofa.get("extra_time"):
+                    v = pg.get(mk)
+                    if v is not None:
+                        wartosc = float(v)
         if wartosc is None:
             # źródło nie ma jeszcze meczu — spróbujemy w kolejnym cyklu;
             # po terminie zamykamy jako zwrot, żeby nic nie wisiało "w grze"

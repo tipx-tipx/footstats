@@ -1,0 +1,30 @@
+@echo off
+chcp 65001 >nul
+REM ============================================================
+REM  Rozliczanie OGONA EGZOTYKI (Warstwa 2) — Sofascore z domu.
+REM  Klikaj co 1-2 dni (gdy komp jest wlaczony). Dziala z domowego
+REM  IP, bo Sofascore blokuje chmure. Procesy w NISKIM priorytecie
+REM  (/LOW) — nie obciazaja komputera podczas pracy w tle.
+REM ============================================================
+setlocal
+set "PIPELINE_DIR=%~dp0.."
+set "PYTHON=C:\Users\Jac\AppData\Local\Programs\Python\Python312\python.exe"
+if not exist "%PYTHON%" set "PYTHON=python"
+set "PYTHONIOENCODING=utf-8"
+
+cd /d "%PIPELINE_DIR%"
+echo(
+echo === Rozliczanie egzotyki (Sofascore, domowe IP) — %date% %time% ===
+echo(
+
+echo [1/2] Pobieram staty z Sofascore do cache (sofa_results)...
+start "" /LOW /WAIT /B "%PYTHON%" -m footstats.jobs.sofa_worker
+
+echo(
+echo [2/2] Rozliczam od razu lokalnie (chmura i tak powtorzy)...
+start "" /LOW /WAIT /B "%PYTHON%" -m footstats.jobs.rozlicz_only
+
+echo(
+echo === Gotowe. Kupony egzotyki powinny sie domknac. ===
+endlocal
+pause
