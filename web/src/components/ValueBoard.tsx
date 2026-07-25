@@ -104,20 +104,17 @@ export function ValueBoard({
   );
   const [sortuj, setSortuj] = useState<SortKey>("ranking");
   const [limit, setLimit] = useState(25);
-  // Drabinki: filtr "tylko sygnały" + grupowanie kart po meczach
-  // (backend sortuje chronologicznie i najlepszym score w meczu)
-  const [tylkoSygnaly, setTylkoSygnaly] = useState(false);
+  // Drabinki: grupowanie kart po meczach (backend sortuje chronologicznie,
+  // w meczu po jakości). Filtr „tylko sygnały" USUNIĘTY 2026-07-25: odkąd
+  // każda karta musi przejść te same twarde bramy, etykieta transfer/forma
+  // mówi tylko, dlaczego zwróciliśmy uwagę na gracza — nie ile karta jest
+  // warta. Filtrowanie po niej dawało przypadkowy podzbiór.
   const radarGrupy = useMemo(() => {
-    const zrodlo = tylkoSygnaly
-      ? radarWpisy.filter(
-          (w) => w.rodzaj !== "drabinka" && w.rodzaj !== "bez_feedu",
-        )
-      : radarWpisy;
     const grupy = new Map<
       number,
       { mecz: string; kickoff_ts: number; wpisy: RadarWpis[] }
     >();
-    for (const w of zrodlo) {
+    for (const w of radarWpisy) {
       const g = grupy.get(w.mecz_id);
       if (g) g.wpisy.push(w);
       else
@@ -128,14 +125,7 @@ export function ValueBoard({
         });
     }
     return [...grupy.values()];
-  }, [radarWpisy, tylkoSygnaly]);
-  const liczbaSygnalow = useMemo(
-    () =>
-      radarWpisy.filter(
-        (w) => w.rodzaj !== "drabinka" && w.rodzaj !== "bez_feedu",
-      ).length,
-    [radarWpisy],
-  );
+  }, [radarWpisy]);
   // świeżość skanu STS liczona PO stronie klienta (po mount), żeby Date.now()
   // nie rozjechał SSR/hydracji — do mount pole zostaje puste
   const [swiezosc, setSwiezosc] = useState<ReturnType<typeof odswiezTemu>>(null);
@@ -338,33 +328,6 @@ export function ValueBoard({
                 </span>
               </div>
 
-              {/* filtr: wszystkie karty vs same sygnały */}
-              {liczbaSygnalow > 0 && (
-                <div className="mb-4 flex flex-wrap gap-1.5">
-                  <button
-                    onClick={() => setTylkoSygnaly(false)}
-                    className={`font-data rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
-                      !tylkoSygnaly
-                        ? "border-brand bg-brand-wash text-brand-deep"
-                        : "border-hairline bg-card text-muted hover:border-brand/40"
-                    }`}
-                  >
-                    Wszystkie · {radarWpisy.length}
-                  </button>
-                  <button
-                    onClick={() => setTylkoSygnaly(true)}
-                    title="Nowi w drużynie, serie formy i debiutanci — sytuacje, które rynek wycenia najsłabiej"
-                    className={`font-data rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
-                      tylkoSygnaly
-                        ? "border-brand bg-brand-wash text-brand-deep"
-                        : "border-hairline bg-card text-muted hover:border-brand/40"
-                    }`}
-                  >
-                    Tylko sygnały · {liczbaSygnalow}
-                  </button>
-                </div>
-              )}
-
               {/* karty pogrupowane po meczach, chronologicznie */}
               <div className="space-y-6">
                 {radarGrupy.map((g) => (
@@ -527,19 +490,55 @@ export function ValueBoard({
 
       {filtered.length === 0 && (
         <div className="rounded-(--radius-card) border border-hairline bg-card px-6 py-12 text-center shadow-(--shadow-card)">
-          <p className="text-sm font-medium text-ink">
-            Brak pozycji spełniających obecne filtry
-          </p>
-          <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-muted">
-            Ustaw pewność na „Każda”, wybierz inny rynek albo mecz, albo
-            zacznij od czysta.
-          </p>
-          <button
-            onClick={wyczyscFiltry}
-            className="mt-4 rounded-(--radius-control) bg-brand px-4 py-2 text-sm font-semibold text-on-brand shadow-(--shadow-card) transition-colors hover:bg-brand-strong"
-          >
-            Wyczyść filtry
-          </button>
+          {bets.length === 0 ? (
+            // cała pula pusta (nie kwestia filtrów): dziś model nie wypuścił
+            // ani jednego typu ZAWODNICZEGO — rynki drużynowe mają własną
+            // stronę, a drabinki własną zakładkę. Bez tego użytkownik widzi
+            // gołą pustkę i nie wie, że okazje w ogóle są.
+            <>
+              <p className="text-sm font-medium text-ink">
+                Brak typów zawodniczych na te mecze
+              </p>
+              <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-muted">
+                Model nie znalazł dziś okazji na propsy zawodników — zwykle
+                dlatego, że Superbet nie wystawił jeszcze kursów zawodniczych
+                (robi to ~1–2 dni przed meczem) albo historia zawodników jest
+                po przerwie zbyt stara.
+              </p>
+              <div className="mt-4 flex flex-wrap justify-center gap-2">
+                {radarWpisy.length > 0 && (
+                  <button
+                    onClick={() => wybierzRodzaj("radar")}
+                    className="rounded-(--radius-control) bg-brand px-4 py-2 text-sm font-semibold text-on-brand shadow-(--shadow-card) transition-colors hover:bg-brand-strong"
+                  >
+                    Zobacz drabinki ({radarWpisy.length})
+                  </button>
+                )}
+                <a
+                  href="/druzyny"
+                  className="rounded-(--radius-control) border border-hairline bg-paper px-4 py-2 text-sm font-semibold text-ink transition-colors hover:border-brand/40"
+                >
+                  Rynki drużynowe
+                </a>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="text-sm font-medium text-ink">
+                Brak pozycji spełniających obecne filtry
+              </p>
+              <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-muted">
+                Ustaw pewność na „Każda”, wybierz inny rynek albo mecz, albo
+                zacznij od czysta.
+              </p>
+              <button
+                onClick={wyczyscFiltry}
+                className="mt-4 rounded-(--radius-control) bg-brand px-4 py-2 text-sm font-semibold text-on-brand shadow-(--shadow-card) transition-colors hover:bg-brand-strong"
+              >
+                Wyczyść filtry
+              </button>
+            </>
+          )}
         </div>
       )}
 
