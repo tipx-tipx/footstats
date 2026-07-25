@@ -147,8 +147,20 @@ def _get(url: str, min_interval: float = 1.5, retries: int = 3) -> dict:
     raise last
 
 
-def list_events(days_ahead: int = 7) -> list[dict]:
-    start = time.strftime("%Y-%m-%d+%H:%M:%S", time.localtime())
+def list_events(days_ahead: int = 7, cofnij_h: int = 12) -> list[dict]:
+    """Oferta prematch w oknie [teraz - cofnij_h, +days_ahead].
+
+    `cofnij_h` NIE jest kosmetyką: `matchTimestamp` Superbetu bywa PRZESUNIĘTY
+    względem realnego kickoffu (zmierzone 2026-07-25: Jagiellonia–Korona gra
+    14:45, znacznik 13:04; Lech gra 20:15, znacznik 12:53). Przy starcie okna
+    ustawionym na „teraz" mecz wypadał z listy, gdy tylko jego znacznik minął —
+    czyli traciliśmy mecze TUŻ PRZED rozpoczęciem, a więc te najważniejsze
+    (oferta żyła: fetch_stat_odds po eventId zwracał komplet 41 graczy).
+    Kickoffem i tak filtrujemy dalej po stronie konsumentów.
+    """
+    start = time.strftime(
+        "%Y-%m-%d+%H:%M:%S", time.localtime(time.time() - cofnij_h * 3600)
+    )
     end = time.strftime(
         "%Y-%m-%d+23:59:00", time.localtime(time.time() + days_ahead * 86400)
     )
