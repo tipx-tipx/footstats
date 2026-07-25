@@ -403,6 +403,14 @@ export interface Meta {
   kary_korelacji?: { ta_sama: number; przeciwne: number; nieznane: number };
   /** zmierzone delty wag zaufania per kubełek pewności (kalibracja z rozliczeń) */
   wagi_zaufania?: Record<string, number>;
+  /**
+   * Rynki chwilowo wstrzymane (trafiały poniżej deklaracji modelu) —
+   * ich typy nie są publikowane, dopóki skuteczność się nie poprawi.
+   */
+  kwarantanna?: Record<
+    string,
+    { hit: number; sr_p: number; n: number; nazwa: string }
+  >;
 }
 
 /** Jeden typ (leg) na kuponie. */

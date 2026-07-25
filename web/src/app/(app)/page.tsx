@@ -109,6 +109,7 @@ export default async function OkazjePage({
         stsAlerty={stsValue.alerty}
         stsGeneratedTs={stsValue.generated_ts}
         radarWpisy={radar.wpisy}
+        kwarantanna={meta.kwarantanna}
         zawodnicy={zawodnicyLite}
         initialMatchId={mecz ? Number(mecz) : undefined}
         initialRodzaj={

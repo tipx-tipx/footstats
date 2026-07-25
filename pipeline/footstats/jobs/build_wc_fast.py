@@ -3135,6 +3135,15 @@ def _main_impl(tryb=None):
         # zmierzone delty wag zaufania per kubełek pewności — jw., frontend
         # stosuje te same co backend (kuponBuilder.wagaModelu)
         "wagi_zaufania": wagi_zauf,
+        # RYNKI WSTRZYMANE: bez tego pusta zakładka Pewniaków wygląda na
+        # awarię, a to zadziałało zabezpieczenie (model przeszacowywał —
+        # deklarował ~70%, trafiał ~50%). Front tłumaczy to użytkownikowi
+        # zamiast pokazywać gołą pustkę.
+        "kwarantanna": {
+            mk: {"hit": v["hit"], "sr_p": v["sr_p"], "n": v["n"],
+                 "nazwa": MARKET_NAMES_PL.get(mk, mk)}
+            for mk, v in (kwarantanna_rynkow or {}).items()
+        },
     })
     print(f"OK: {len(matches_out)} meczów, {len(value_bets)} okazji, "
           f"{len(players_out)} zawodników.")

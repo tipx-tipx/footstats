@@ -8,7 +8,14 @@ import { FilterDropdown } from "./FilterDropdown";
 import { RadarCard } from "./RadarCard";
 import { StsBetCard } from "./StsBetCard";
 import { fmtDataCzas } from "@/lib/format";
-import type { Pewnosc, RadarWpis, StsAlert, ValueBet, Zawodnik } from "@/lib/types";
+import type {
+  Meta,
+  Pewnosc,
+  RadarWpis,
+  StsAlert,
+  ValueBet,
+  Zawodnik,
+} from "@/lib/types";
 
 const RYNKI_FILTRY: { kod: string; label: string }[] = [
   { kod: "wszystkie", label: "Wszystkie rynki" },
@@ -78,6 +85,7 @@ export function ValueBoard({
   stsAlerty = [],
   stsGeneratedTs,
   radarWpisy = [],
+  kwarantanna,
   zawodnicy,
   initialMatchId,
   initialRodzaj,
@@ -86,6 +94,7 @@ export function ValueBoard({
   stsAlerty?: StsAlert[];
   stsGeneratedTs?: number;
   radarWpisy?: RadarWpis[];
+  kwarantanna?: Meta["kwarantanna"];
   zawodnicy: Zawodnik[];
   initialMatchId?: number;
   initialRodzaj?: "pewniaki" | "value" | "radar" | "wszystko";
@@ -234,12 +243,21 @@ export function ValueBoard({
 
   // zakładki "rodzaj": role=tab wymaga obsługi strzałek (WAI-ARIA Tabs) —
   // roving tabindex, Left/Right/Home/End przenoszą FOKUS I WYBÓR
-  const TABY_RODZAJ = [
-    ["pewniaki", "Pewniaki", liczbaPewniakow],
-    ["value", "Value Bety", liczbaValueSts],
-    ["radar", "Drabinki", radarWpisy.length],
-    ["wszystko", "Wszystko", null],
-  ] as const;
+  // Value Bety STS to skan ODPALANY RĘCZNIE (dwuklik odswiez-sts.bat), więc
+  // bywa pusty tygodniami — pusta zakładka tylko myliła. Chowamy ją, gdy nie
+  // ma czego pokazać (chyba że user właśnie na niej stoi, żeby nie zniknęła
+  // mu pod palcami po odświeżeniu danych).
+  const TABY_RODZAJ = (
+    [
+      ["pewniaki", "Pewniaki", liczbaPewniakow],
+      ["value", "Value Bety", liczbaValueSts],
+      ["radar", "Drabinki", radarWpisy.length],
+      ["wszystko", "Wszystko", null],
+    ] as const
+  ).filter(
+    ([kod, , liczba]) =>
+      kod !== "value" || (liczba ?? 0) > 0 || rodzaj === "value",
+  );
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const wybierzRodzaj = (kod: (typeof TABY_RODZAJ)[number][0]) => {
     setRodzaj(kod);
@@ -499,12 +517,30 @@ export function ValueBoard({
               <p className="text-sm font-medium text-ink">
                 Brak typów zawodniczych na te mecze
               </p>
-              <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-muted">
-                Model nie znalazł dziś okazji na propsy zawodników — zwykle
-                dlatego, że Superbet nie wystawił jeszcze kursów zawodniczych
-                (robi to ~1–2 dni przed meczem) albo historia zawodników jest
-                po przerwie zbyt stara.
-              </p>
+              {kwarantanna && Object.keys(kwarantanna).length > 0 ? (
+                <p className="mx-auto mt-1 max-w-lg text-xs leading-relaxed text-muted">
+                  Główne rynki zawodnicze są chwilowo{" "}
+                  <strong className="font-semibold text-ink-soft">
+                    wstrzymane
+                  </strong>
+                  , bo trafiały poniżej deklaracji modelu:{" "}
+                  {Object.values(kwarantanna)
+                    .map(
+                      (k) =>
+                        `${k.nazwa.toLowerCase()} — zapowiadane ${Math.round(k.sr_p * 100)}%, trafione ${Math.round(k.hit * 100)}% (${k.n} typów)`,
+                    )
+                    .join("; ")}
+                  . To zabezpieczenie: typy z tych rynków rozliczają się dalej
+                  w tle i rynek wraca sam, gdy skuteczność się poprawi.
+                </p>
+              ) : (
+                <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-muted">
+                  Model nie znalazł dziś okazji na propsy zawodników — zwykle
+                  dlatego, że Superbet nie wystawił jeszcze kursów zawodniczych
+                  (robi to ~1–2 dni przed meczem) albo historia zawodników jest
+                  po przerwie zbyt stara.
+                </p>
+              )}
               <div className="mt-4 flex flex-wrap justify-center gap-2">
                 {radarWpisy.length > 0 && (
                   <button
