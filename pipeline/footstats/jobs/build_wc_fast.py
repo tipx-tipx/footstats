@@ -2873,6 +2873,52 @@ def _main_impl(tryb=None):
     # modelu (transfery model zwykle odrzuca jako rozjazd_z_rynkiem, bo liczy
     # ze starej ligi). Warstwa informacyjna z drabinką kursów, patrz radar.py.
     # Pusty wynik NIE nadpisuje poprzedniego pliku (jak filozofia „0 okazji").
+    # DOCIĄG KURSÓW dla meczów BEZ trendów statshub (bug zmierzony 2026-07-25):
+    # sb_cache wypełnia się tylko w pętli po trendach, więc mecz z zerem
+    # trendów (cała Ekstraklasa — feed propsów UK jej nie kwotuje) nigdy nie
+    # miał kursów w systemie i ścieżka debiutantów nie mogła odpalić — mimo
+    # że Superbet kursy MA. Dociągamy dla najbliższych sparowanych meczów.
+    try:
+        DOCIAG_OKNO_S = 36 * 3600   # mecze w tym oknie przed kickoffem
+        DOCIAG_MAX = 20             # limit grzecznościowy zapytań na cykl
+        dociagniete = 0
+        teraz_d = int(time.time())
+        for e in sorted(wszystkie_ev,
+                        key=lambda e: int(e.get("timeStartTimestamp") or 0)):
+            mid_d = e["id"]
+            ts_d = int(e.get("timeStartTimestamp") or 0)
+            if mid_d in sb_cache:
+                continue
+            if not (0 <= ts_d - teraz_d <= DOCIAG_OKNO_S):
+                continue
+            if dociagniete >= DOCIAG_MAX:
+                break
+            if tryb:
+                sb_ev = tryb.sb_ev_by_mid.get(mid_d)
+            elif sb_events:
+                sb_ev = superbet.match_superbet_event(
+                    sb_events,
+                    team_name.get(e.get("homeTeamId"), ""),
+                    team_name.get(e.get("awayTeamId"), ""), ts_d,
+                )
+            else:
+                sb_ev = None
+            if not sb_ev:
+                continue
+            parts = [p.strip()
+                     for p in (sb_ev.get("matchName") or "·").split("·")]
+            try:
+                sb_cache[mid_d] = superbet.fetch_stat_odds(
+                    sb_ev["eventId"], parts[0], parts[1]
+                )
+                dociagniete += 1
+            except Exception:
+                continue
+        if dociagniete:
+            print(f"Kursy Superbet dociągnięte dla {dociagniete} meczów "
+                  f"bez trendów (ścieżka debiutantów)")
+    except Exception as ex:
+        print(f"Dociąg kursów pominięty ({ex})")
     try:
         events_meta_radar = {
             e["id"]: {

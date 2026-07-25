@@ -109,7 +109,9 @@ export function ValueBoard({
   const [tylkoSygnaly, setTylkoSygnaly] = useState(false);
   const radarGrupy = useMemo(() => {
     const zrodlo = tylkoSygnaly
-      ? radarWpisy.filter((w) => w.rodzaj !== "drabinka")
+      ? radarWpisy.filter(
+          (w) => w.rodzaj !== "drabinka" && w.rodzaj !== "bez_feedu",
+        )
       : radarWpisy;
     const grupy = new Map<
       number,
@@ -128,7 +130,10 @@ export function ValueBoard({
     return [...grupy.values()];
   }, [radarWpisy, tylkoSygnaly]);
   const liczbaSygnalow = useMemo(
-    () => radarWpisy.filter((w) => w.rodzaj !== "drabinka").length,
+    () =>
+      radarWpisy.filter(
+        (w) => w.rodzaj !== "drabinka" && w.rodzaj !== "bez_feedu",
+      ).length,
     [radarWpisy],
   );
   // świeżość skanu STS liczona PO stronie klienta (po mount), żeby Date.now()

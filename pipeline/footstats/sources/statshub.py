@@ -172,6 +172,116 @@ def fetch_event_trends(event_ids: list[int]) -> list[StatshubTrend]:
     return out
 
 
+# pole statystyk meczowych z /player/{id}/performance -> nasz kod rynku.
+# TO JEST ŚCIEŻKA DLA LIG SPOZA FEEDU PROPSÓW (Ekstraklasa, część Europy):
+# player-trends istnieje tylko tam, gdzie bukmacherzy UK wystawili linie,
+# a performance działa dla KAŻDEGO gracza (odkryte 2026-07-25).
+PERF_STATTYPE_MAP = {
+    "shots": "shots",
+    "onTargetScoringAttempt": "sot",
+    "fouls": "fouls_committed",
+    "wasFouled": "fouls_won",
+    "totalTackle": "tackles",
+    "interceptionWon": "interceptions",
+    "totalOffside": "offsides",
+    "shotOffTarget": "shots_off_target",
+    "blockedScoringAttempt": "shots_blocked",
+}
+
+
+def _pierwszy(v):
+    """Pole bywa dictem albo jednoelementową listą — bierz rekord."""
+    if isinstance(v, list):
+        return v[0] if v else {}
+    return v or {}
+
+
+def fetch_player_performance(player_id: int) -> list[dict]:
+    """Ostatnie ~10 meczów gracza ze statystykami — DZIAŁA W KAŻDEJ LIDZE.
+
+    Zwraca surowe rekordy {player_statistics_event, events, homeTeam,
+    awayTeam}. Statystyki obejmują komplet rynków propsowych: strzały,
+    celne, niecelne, zablokowane, faule popełnione i wywalczone, odbiory,
+    przechwyty, SPALONE, minuty, pozycję i rating.
+    """
+    d = _get(f"{BASE}/player/{player_id}/performance", timeout=20, retries=2)
+    rows = d.get("data", d)
+    return rows if isinstance(rows, list) else []
+
+
+def trendy_z_performance(
+    player_id: int,
+    player_name: str,
+    team_id: int | None,
+    rows: list[dict],
+) -> dict[str, StatshubTrend]:
+    """Rekordy z `fetch_player_performance` -> trendy per rynek.
+
+    Ten sam kształt co `fetch_event_trends`, więc konsumenci (radar,
+    rozliczanie) nie muszą wiedzieć, z której ścieżki przyszła historia.
+    Bez `line`/`ref_odds` (to nie feed propsów — linie bierzemy z kursów
+    Superbetu) i bez kontekstu rywala (`opponent_average` = None).
+    """
+    zebrane: dict[str, list[tuple]] = {}
+    meta: dict[str, str] = {}
+    for rec in rows:
+        ps = _pierwszy(rec.get("player_statistics_event"))
+        ev = _pierwszy(rec.get("events"))
+        if not ps or not ev:
+            continue
+        ts = int(ev.get("timeStartTimestamp") or 0)
+        minuty = float(ps.get("minutesPlayed") or 0)
+        tid = ps.get("teamId")
+        # rywal = drużyna przeciwna wobec drużyny gracza W TAMTYM meczu
+        home, away = _pierwszy(rec.get("homeTeam")), _pierwszy(rec.get("awayTeam"))
+        if tid and ev.get("homeTeamId") == tid:
+            rywal, rywal_id = away.get("name") or "", ev.get("awayTeamId") or 0
+        else:
+            rywal, rywal_id = home.get("name") or "", ev.get("homeTeamId") or 0
+        meta.setdefault("team_name", (
+            home.get("name") if tid and ev.get("homeTeamId") == tid
+            else away.get("name")
+        ) or "")
+        utid = int(ev.get("uniqueTournamentId") or 0)
+        poz = str(ps.get("position") or "")
+        for pole, mk in PERF_STATTYPE_MAP.items():
+            v = ps.get(pole)
+            if v is None:
+                continue
+            zebrane.setdefault(mk, []).append(
+                (ts, float(v), minuty, rywal, int(rywal_id or 0), utid, poz)
+            )
+    out: dict[str, StatshubTrend] = {}
+    for mk, lista in zebrane.items():
+        lista.sort(key=lambda x: -x[0])  # od najnowszego, jak w feedzie
+        out[mk] = StatshubTrend(
+            player_id=int(player_id),
+            player_name=player_name,
+            position=(lista[0][6] or "M")[:1] if lista else "M",
+            team_id=int(team_id or 0),
+            team_name=meta.get("team_name", ""),
+            opponent_id=0,
+            opponent_name="",
+            is_home=False,
+            market_code=mk,
+            line=0.5,
+            in_predicted_lineup=False,
+            league_average=None,
+            opponent_average=None,
+            opponent_rank=None,
+            total_ranks=None,
+            counts=[x[1] for x in lista],
+            minutes=[x[2] for x in lista],
+            timestamps=[x[0] for x in lista],
+            started=[x[2] >= 60 for x in lista],
+            game_positions=[x[6] for x in lista],
+            game_opponents=[x[3] for x in lista],
+            game_opponent_ids=[x[4] for x in lista],
+            game_utids=[x[5] for x in lista],
+        )
+    return out
+
+
 def fetch_predicted_lineup(event_id: int) -> dict:
     """Przewidywane XI OBU drużyn: {'home': [pid...], 'away': [...], 'confirmed': bool}.
 

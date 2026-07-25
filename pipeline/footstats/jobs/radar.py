@@ -49,9 +49,23 @@ MIN_MINUT_MECZU = 20        # krótsze występy nie liczą się do serii
 MIN_KURS_FORMY = 1.35       # linia serii musi być grywalna (nie 1.05)
 
 MIN_RYNKOW_DEBIUTANTA = 2   # Superbet kwotuje >= tyle rynków (odsiew szumu)
-MAX_WYSZUKAN_CYKL = 12      # limit zapytań /api/search na cykl (grzeczność)
-MAX_WPISOW = 120            # globalny sufit wpisów (payload i czytelność)
-MAX_WPISOW_MECZ = 6         # sufit kart per mecz (najlepszy score wygrywa)
+MAX_WYSZUKAN_CYKL = 90      # budżet zapytań /api/search na cykl (statshub to
+                            # otwarte API bez limitów — próg jest grzeczności,
+                            # nie technicznym wymogiem). Mecze iterowane od
+                            # NAJBLIŻSZEGO kickoffu, najpierw te bez trendów.
+MAX_DEBIUTANTOW_MECZU = 10  # ilu kandydatów IDENTYFIKUJEMY per mecz. Sufit
+                            # kart trzyma round-robin, więc tu chodzi o
+                            # szerokość lejka: przy 3 braliśmy pierwszych wg
+                            # liczby rynków (rotacyjnych), a dobrzy gracze —
+                            # np. Imaz z 2,8 strzału śr. — nie byli nawet
+                            # sprawdzani (pomiar 2026-07-25)
+MAX_RYNKOW_BEZ_HISTORII = 4  # karta bez historii to sama drabinka kursów —
+                             # 9 rynków × kilka szczebli to ściana, nie analiza
+# rynki pokazywane na kartach bez historii, w kolejności ważności
+RYNKI_PODSTAWOWE = ("shots", "sot", "fouls_committed", "fouls_won",
+                    "shots_outside_box", "offsides", "tackles")
+MAX_WPISOW = 45             # globalny sufit kart (round-robin po meczach)
+MAX_WPISOW_MECZ = 3         # ile rund = ile kart max na mecz
 OSTATNIE_N = 10             # ile ostatnich występów pokazuje karta rynku
 MAX_SEZONOW_WPISU = 3       # sekcja "sezony" na karcie (bieżący + poprzednie)
 # przycinanie drabinki: nikt nie gra linii 8+ @23.00 z ~0% szans — szum
@@ -283,7 +297,15 @@ def debiutanci_meczu(
     for n_rynkow, key in sorted(kandydaci, reverse=True):
         if licznik_wyszukan[0] >= MAX_WYSZUKAN_CYKL:
             break
-        surowa = names.get(key) or key
+        if len(out) >= MAX_DEBIUTANTOW_MECZU:
+            break  # komplet kart tego meczu — nie pal budżetu dalej
+        surowa = (names.get(key) or key).strip()
+        if "," in surowa:
+            # Superbet formatuje "Nazwisko, Imię" — wyszukiwarka statshub
+            # tego nie rozumie (zmierzone 2026-07-25: "Sylla, Youssuf"
+            # -> 0 trafień; "Youssuf Sylla" -> trafia)
+            czesci = [c.strip() for c in surowa.split(",") if c.strip()]
+            surowa = " ".join(reversed(czesci))
         licznik_wyszukan[0] += 1
         trafienia = statshub.search_players(surowa)
         profil = None
@@ -394,8 +416,16 @@ def _rynki_wpisu(
                     "liga": tr.league_average,
                 }
         out.append(rec)
-    # rynki z historią przed rynkami „gołej drabinki", w środku po nazwie
-    out.sort(key=lambda r: ("ostatnie" not in r, r["rynek_kod"]))
+    # rynki z historią przed rynkami „gołej drabinki"; gołe — w kolejności
+    # ważności rynku (strzały przed spalonymi), nie alfabetycznie
+    kolejnosc_rynku = {mk: i for i, mk in enumerate(RYNKI_PODSTAWOWE)}
+    out.sort(key=lambda r: (
+        "ostatnie" not in r,
+        kolejnosc_rynku.get(r["rynek_kod"], len(RYNKI_PODSTAWOWE)),
+        r["rynek_kod"],
+    ))
+    if not any("ostatnie" in r for r in out):
+        out = out[:MAX_RYNKOW_BEZ_HISTORII]  # sama drabinka = bez ściany
     return out
 
 
@@ -415,14 +445,31 @@ def _najlepsze_pokrycie(w: dict) -> float:
 
 
 def _score_wpisu(w: dict) -> float:
-    """Jakość karty do sortowania W OBRĘBIE meczu: „grywalne pokrycie"
-    plus bonusy: sygnał (transfer/forma/debiutant), miejsce w XI.
+    """Jakość karty = EDGE: pokrycie historyczne MINUS szansa implikowana
+    kursem. Linia @1.85 implikuje 54%; trafiana w 8/10 (80%) daje edge
+    +26 p.p. — to mierzy „linia tania względem historii", nie samą
+    regularność. Bonusy: sygnał (transfer/forma/debiutant), miejsce w XI.
     Debiutant nie ma historii — niesie go sam bonus sygnału."""
-    score = _najlepsze_pokrycie(w)
-    if w.get("rodzaj") != "drabinka":
-        score += 0.15
+    edge = 0.0
+    for r in w.get("rynki", []):
+        for s in r.get("drabinka", []):
+            p = s.get("pokrycie")
+            if not p or p["z"] < MIN_PROBA_SCORE:
+                continue
+            if s["kurs"] < MIN_KURS_SCORE:
+                continue
+            ratio = p["traf"] / p["z"]
+            if ratio < PROG_POKRYCIA_KARTY:
+                continue
+            edge = max(edge, ratio - 1.0 / s["kurs"])
+    score = edge
+    if w.get("rodzaj") in ("transfer", "forma", "debiutant"):
+        score += 0.08
+    elif w.get("rodzaj") == "bez_feedu":
+        # sama drabinka kursów — wartość dopiero ze średnimi sezonowymi
+        score += 0.05 if w.get("sezony") else 0.0
     if w.get("xi") is True:
-        score += 0.10
+        score += 0.04
     return score
 
 
@@ -547,9 +594,20 @@ def zbuduj(
                 wpis["sezony"] = sez
             wpisy.append(wpis)
 
-    # debiutanci: Superbet kwotuje, statshub milczy
+    # debiutanci: Superbet kwotuje, statshub milczy. Priorytet budżetu
+    # wyszukiwań: NAJPIERW mecze BEZ ŻADNYCH trendów (ligi poza feedem
+    # propsów UK — Ekstraklasa! — żyją wyłącznie tą ścieżką), potem reszta;
+    # wewnątrz po kickoffie. Bez tego budżet przepalał się na ławkach
+    # meczów, które i tak mają karty z trendów (bug zmierzony 2026-07-25:
+    # Superbet kwotował 41 graczy Lecha, kart nie było).
     budzet = [0]
-    for mid, meta in events_meta.items():
+    mids_z_trendami = {m for (m, _p) in trendy_pm}
+    for mid, meta in sorted(
+        events_meta.items(),
+        key=lambda kv: (kv[0] in mids_z_trendami, kv[1].get("ts") or 0),
+    ):
+        if (meta.get("ts") or 0) <= teraz:
+            continue  # mecz już trwa/był — szkoda budżetu
         sb = sb_cache.get(mid)
         if not sb or not (meta.get("hid") and meta.get("aid")):
             continue
@@ -559,7 +617,7 @@ def zbuduj(
         })
         for d in debiutanci_meczu(
             sb, znane, (meta["hid"], meta["aid"]), budzet
-        ):
+        )[:MAX_DEBIUTANTOW_MECZU]:
             profil = d["profil"]
             druzyna = (
                 meta.get("home") if profil.get("team_id") == meta["hid"]
@@ -573,9 +631,34 @@ def zbuduj(
             if profil.get("birth_ts"):
                 wiek = int((teraz - int(profil["birth_ts"])) // (365.25 * 86400))
             sez_deb = _sezony_wpisu(player_sezon, profil.get("id"))
+            # UCZCIWA ETYKIETA (fix 2026-07-25): gdy mecz nie ma ŻADNYCH
+            # trendów, to nie „debiutant bez historii", tylko CAŁA liga jest
+            # poza feedem propsów UK (Ekstraklasa). Nazywanie Luisa Palmy
+            # czy Nika Prelca „debiutantem, którego rynek wycenia w ciemno"
+            # byłoby po prostu nieprawdą — historia istnieje, my jej tu
+            # nie mamy. Średnie sezonowe dociąga worker (Sofascore).
+            bez_feedu = mid not in mids_z_trendami
+            # HISTORIA SPOZA FEEDU PROPSÓW (odkrycie 2026-07-25):
+            # /player/{id}/performance daje 10 ostatnich meczów ze
+            # statystykami dla KAŻDEJ ligi — Ekstraklasa dostaje pełną
+            # drabinkę z pokryciem linii zamiast gołych kursów.
+            trendy_perf: dict[str, statshub.StatshubTrend] = {}
+            if profil.get("id"):
+                try:
+                    trendy_perf = statshub.trendy_z_performance(
+                        int(profil["id"]), d["nazwa"], profil.get("team_id"),
+                        statshub.fetch_player_performance(int(profil["id"])),
+                    )
+                except Exception:
+                    trendy_perf = {}
             wpisy.append({
                 **({"sezony": sez_deb} if sez_deb else {}),
-                "rodzaj": "debiutant",
+                # z historią z performance to pełnoprawna drabinka, nie
+                # „same kursy" — etykieta idzie za realną zawartością karty
+                "rodzaj": (
+                    "drabinka" if (bez_feedu and trendy_perf)
+                    else "bez_feedu" if bez_feedu else "debiutant"
+                ),
                 "mecz_id": mid, "mecz": meta["label"],
                 "kickoff_ts": meta["ts"],
                 "podmiot_id": profil.get("id"),
@@ -584,7 +667,20 @@ def zbuduj(
                 "przeciwnik": przeciwnik or "",
                 "pozycja": (profil.get("position") or "?")[:1],
                 "xi": None,
-                "powod": "brak_historii",
+                **({"powod": "poza_feedem"} if bez_feedu and not trendy_perf
+                   else {"powod": "brak_historii"} if not bez_feedu else {}),
+                "minuty_sr6": (
+                    round(sum(
+                        m for _c, m, _t in _grane(
+                            max(trendy_perf.values(),
+                                key=lambda t: len(t.counts))
+                        )[:6]
+                    ) / max(1, len(_grane(
+                        max(trendy_perf.values(),
+                            key=lambda t: len(t.counts))
+                    )[:6])))
+                    if trendy_perf else None
+                ),
                 "profil": {
                     "wzrost": profil.get("height"),
                     "wiek": wiek,
@@ -601,7 +697,7 @@ def zbuduj(
                             (sb.get("players") or {}).get(d["klucz_sb"]) or {}
                         ).items()
                     },
-                    {}, {}, d["nazwa"], nazwy_pl,
+                    trendy_perf, {}, d["nazwa"], nazwy_pl,
                 ),
             })
 
@@ -638,19 +734,30 @@ def zbuduj(
     ]
     for w in wpisy:
         w["_score"] = _score_wpisu(w)
+    # SELEKCJA ROUND-ROBIN po meczach (decyzja usera 2026-07-25: „realnie
+    # najlepsze, nie 100" + „czemu brakuje Ekstraklasy"). Globalny ranking
+    # po edge'u ZAWSZE wypychał ligi z mniejszą liczbą kart — Ekstraklasa
+    # przegrywała z 15 meczami Ameryki Płd. i znikała w całości. Tu każdy
+    # mecz dostaje najpierw SWOJĄ najlepszą kartę (rundy po meczach,
+    # najbliższy kickoff pierwszy), dopiero potem lecą kolejne. Efekt:
+    # pokrycie wszystkich meczów dnia + w każdym meczu to, co najlepsze.
     per_mecz: dict[int, list[dict]] = {}
     for w in sorted(wpisy, key=lambda w: -w["_score"]):
         per_mecz.setdefault(w["mecz_id"], []).append(w)
-    listy = {mid: lst[:MAX_WPISOW_MECZ] for mid, lst in per_mecz.items()}
-    # globalny sufit BEZ ucinania ogona chronologicznego (bug 2026-07-25:
-    # późniejsze mecze — np. europejskie po dołączeniu kursów — wypadały
-    # w całości): zdejmujemy najsłabszą kartę z najliczniejszego meczu
-    razem = sum(len(l) for l in listy.values())
-    while razem > MAX_WPISOW:
-        mid = max(listy, key=lambda m: (len(listy[m]), m))
-        listy[mid].pop()  # listy malejąco po score → odpada najsłabsza
-        razem -= 1
-    wpisy = [w for lst in listy.values() for w in lst]
+    kolejnosc_meczow = sorted(
+        per_mecz, key=lambda mid: per_mecz[mid][0]["kickoff_ts"]
+    )
+    wybrane: list[dict] = []
+    for runda in range(MAX_WPISOW_MECZ):
+        if len(wybrane) >= MAX_WPISOW:
+            break
+        for mid in kolejnosc_meczow:
+            if len(wybrane) >= MAX_WPISOW:
+                break
+            lista = per_mecz[mid]
+            if runda < len(lista):
+                wybrane.append(lista[runda])
+    wpisy = wybrane
     wpisy.sort(key=lambda w: (w["kickoff_ts"], w["mecz_id"], -w["_score"]))
     for i, w in enumerate(wpisy, start=1):
         w.pop("_score", None)

@@ -191,8 +191,12 @@ export interface RadarSezon {
  */
 export interface RadarWpis {
   id: number;
-  /** "drabinka" = kwotowany gracz z historią, bez osobnego sygnału */
-  rodzaj: "transfer" | "forma" | "debiutant" | "drabinka";
+  /**
+   * "drabinka" = kwotowany gracz z historią, bez osobnego sygnału;
+   * "bez_feedu" = liga poza feedem statystyk (np. Ekstraklasa) — mamy same
+   * kursy + ewentualnie średnie sezonowe, historii meczowej brak
+   */
+  rodzaj: "transfer" | "forma" | "debiutant" | "drabinka" | "bez_feedu";
   mecz_id: number;
   mecz: string;
   kickoff_ts: number;
@@ -206,7 +210,12 @@ export interface RadarWpis {
   /** średnia minut z 6 ostatnich występów (pełne mecze vs ławka) */
   minuty_sr6?: number | null;
   /** brak dla rodzaju "drabinka" (nie ma osobnego powodu-sygnału) */
-  powod?: "zmiana_ligi" | "gral_przeciw" | "seria" | "brak_historii";
+  powod?:
+    | "zmiana_ligi"
+    | "gral_przeciw"
+    | "seria"
+    | "brak_historii"
+    | "poza_feedem";
   /** średnie sezonowe gracza (bieżący + poprzednie; cache workera) */
   sezony?: RadarSezon[];
   /** etykieta poprzedniej ligi (gdy powod = zmiana_ligi) */

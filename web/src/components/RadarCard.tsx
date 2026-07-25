@@ -55,6 +55,15 @@ function sygnalInfo(
         "Zawodnik regularnie przebija linię w ostatnich meczach, wyraźnie ponad swój wcześniejszy poziom. Model celowo nie dolicza formy do szansy — to sygnał dodatkowy.",
     };
   }
+  if (w.rodzaj === "bez_feedu") {
+    return {
+      label: "same kursy",
+      dioda: "bg-ink/25",
+      badge: "border border-hairline bg-paper text-muted",
+      tytul:
+        "Ta liga nie jest objęta feedem statystyk meczowych, więc nie mamy historii ostatnich występów. Pokazujemy kursy Superbetu, a tam gdzie się udało — średnie z całych sezonów.",
+    };
+  }
   return null;
 }
 
@@ -84,6 +93,11 @@ function zajawka(w: RadarWpis): string {
   }
   if (w.rodzaj === "debiutant") {
     return "Pełne kursy Superbetu bez żadnej historii w danych — rynek zgaduje.";
+  }
+  if (w.rodzaj === "bez_feedu") {
+    return w.sezony?.length
+      ? `Kursy Superbetu + średnie z ${w.sezony.length} ${w.sezony.length === 1 ? "sezonu" : "sezonów"} (bez historii meczowej — liga poza feedem).`
+      : "Kursy Superbetu. Historii meczowej brak — ta liga nie jest w feedzie statystyk.";
   }
   if (w.rodzaj === "transfer") {
     return w.stara_liga
@@ -123,6 +137,14 @@ function opisSygnalu(w: RadarWpis): string {
       "Superbet daje mu pełne linie, ale nie mamy ani jednego jego meczu w danych (świeży nabytek). " +
       (czesci.length ? `Profil: ${czesci.join(", ")}. ` : "") +
       "Sprawdź sam, skąd przyszedł i ile może zagrać, zanim postawisz."
+    );
+  }
+  if (w.rodzaj === "bez_feedu") {
+    return (
+      "Rozgrywki tego meczu nie są objęte feedem statystyk meczowych, więc nie pokazujemy ostatnich występów ani formy — to nie znaczy, że zawodnik jest nieznany. " +
+      (w.sezony?.length
+        ? "Poniżej kursy Superbetu i średnie z całych sezonów."
+        : "Poniżej same kursy Superbetu; średnie sezonowe dojdą przy najbliższym odświeżeniu danych.")
     );
   }
   if (w.rodzaj === "forma") {
