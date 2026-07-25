@@ -27,6 +27,7 @@ wpisów dziennie, nie ścianę szumu.
 
 from __future__ import annotations
 
+import math
 from collections import Counter
 
 from ..sources import statshub, superbet
@@ -64,8 +65,9 @@ MAX_RYNKOW_BEZ_HISTORII = 4  # karta bez historii to sama drabinka kursów —
 # rynki pokazywane na kartach bez historii, w kolejności ważności
 RYNKI_PODSTAWOWE = ("shots", "sot", "fouls_committed", "fouls_won",
                     "shots_outside_box", "offsides", "tackles")
-MAX_WPISOW = 45             # globalny sufit kart (round-robin po meczach)
-MAX_WPISOW_MECZ = 3         # ile rund = ile kart max na mecz
+MAX_WPISOW = 15             # dzienny TOP kart — tylko realnie najlepsze
+MAX_WPISOW_MECZ = 2         # sufit kart na mecz (bez gwarancji slotu!)
+MAX_SHOTMAP_CYKL = 160      # budżet zapytań o shotmapy historyczne na cykl
 OSTATNIE_N = 10             # ile ostatnich występów pokazuje karta rynku
 MAX_SEZONOW_WPISU = 3       # sekcja "sezony" na karcie (bieżący + poprzednie)
 # przycinanie drabinki: nikt nie gra linii 8+ @23.00 z ~0% szans — szum
@@ -75,13 +77,77 @@ MAX_KURS_SZCZEBLA = 12.0    # ...podobnie kurs powyżej tego progu
 # pierwszy szczebel drabinki od 1.65 (decyzja usera 2026-07-25): linie po
 # 1.2-1.5 to pewniaki bez value — drabinka ma zaczynać się od grywalnej ceny
 MIN_KURS_PIERWSZEGO = 1.65
-# score jakości wpisu (sortowanie w meczu): "grywalne pokrycie" linii
-MIN_KURS_SCORE = 1.65       # linia liczy się do score, gdy kurs grywalny
-MIN_PROBA_SCORE = 5         # ...i pokrycie ma sensowną próbę
-# BRAMA JAKOŚCI karty bez sygnału: zwykła drabinka musi mieć linię o kursie
-# >=1.65 trafioną w >=50% ostatnich występów — inaczej to szum, nie karta
-# (pomiar 2026-07-25: bez bramy 120 kart, z bramą ~60). Sygnały zwolnione.
-PROG_POKRYCIA_KARTY = 0.5
+# --- TWARDE BRAMY JAKOŚCI (decyzja usera 2026-07-25: „tylko najlepsze
+# drabinki, nie randomowe"). Sygnał (transfer/forma/debiutant) NIE jest już
+# przepustką — zostaje plakietką, ale karta musi obronić się liczbami. ---
+MIN_KURS_SCORE = 1.65       # linia liczy się dopiero od grywalnej ceny
+MIN_PROBA_SCORE = 8         # min. występów w próbie (było 5 — za krótkie
+                            # serie udawały pewniaki: 3/5 = "60%")
+PROG_POKRYCIA_KARTY = 0.6   # min. surowe pokrycie linii (było 0.5)
+MIN_MINUT_KARTY = 62        # zmiennik (52-55 min śr.) to ryzyko, nie typ
+MIN_EDGE_KARTY = 0.03       # przewaga po korekcie próby, w pkt proc.
+# poziom ufności korekty próby: 7/10 -> ~57% zamiast naiwnych 70%
+WILSON_K = 0.674            # ~75% jednostronnie
+
+
+def _wilson_low(traf: int, z: int, k: float = WILSON_K) -> float:
+    """Dolna granica ufności odsetka trafień — kara za krótką próbę.
+
+    Bez tego 5/5 (100%) bije 8/10 (80%), choć druga próba jest dwa razy
+    pewniejsza. Wzór Wilsona: im mniej meczów, tym mocniej ściąga w dół.
+    """
+    if z <= 0:
+        return 0.0
+    p = traf / z
+    mian = 1.0 + k * k / z
+    licz = p + k * k / (2 * z) - k * math.sqrt(
+        (p * (1.0 - p) + k * k / (4 * z)) / z
+    )
+    return max(0.0, licz / mian)
+
+
+def _mnoznik_formy(rynek: dict) -> float:
+    """Forma okno-vs-baza: rosnąca podbija, spadająca ścina (0.85–1.15)."""
+    f = rynek.get("forma") or {}
+    baza, okno = f.get("baza90"), f.get("okno90")
+    if not baza or okno is None:
+        return 1.0
+    return max(0.85, min(1.15, 0.7 + 0.3 * (okno / baza)))
+
+
+def _mnoznik_sezonu(sezony: list[dict], rynek_kod: str, linia: float) -> float:
+    """Średnia z sezonów vs linia: linia poniżej średniej = łatwiejsza.
+
+    Realizuje wytyczną „liczą się średnie z poprzedniego sezonu" — sezonowa
+    próba (30+ meczów) jest znacznie mocniejsza niż okno 10 meczów, więc
+    potwierdza albo podważa to, co widać w ostatnich występach.
+    """
+    wartosci = [
+        s["na_mecz"][rynek_kod] for s in (sezony or [])
+        if (s.get("na_mecz") or {}).get(rynek_kod) is not None
+        and (s.get("mecze") or 0) >= 8
+    ]
+    if not wartosci or linia <= 0:
+        return 1.0
+    srednia = sum(wartosci) / len(wartosci)
+    return max(0.9, min(1.1, 0.9 + 0.2 * min(srednia / linia, 1.5) / 1.5))
+
+
+def _mnoznik_minut(minuty_sr6: float | None) -> float:
+    """Rotacja to ryzyko: mniej minut = mniej okazji na przebicie linii."""
+    if not minuty_sr6:
+        return 0.9
+    return 0.75 if minuty_sr6 < 60 else 0.9 if minuty_sr6 < 75 else 1.0
+
+
+def _mnoznik_rywala(rynek: dict) -> float:
+    """Hojność rywala na tym rynku (jego miejsce w lidze) — 0.92–1.08."""
+    r = rynek.get("rywal") or {}
+    rank, z = r.get("rank"), r.get("z")
+    if not rank or not z or z < 2:
+        return 1.0
+    pct = 1.0 - (rank - 1) / (z - 1)   # 1.0 = najhojniejszy w lidze
+    return 0.92 + 0.16 * pct
 UTID_MUNDIAL = 16           # MŚ nigdy nie jest „starą ligą" (lato 2026:
                             # każdy reprezentant wracał z mundialu)
 # utid liczy się jako „rozgrywki drużyny" (nie stara liga zawodnika), gdy
@@ -429,10 +495,20 @@ def _rynki_wpisu(
     return out
 
 
-def _najlepsze_pokrycie(w: dict) -> float:
-    """Najlepszy odsetek trafień linii o grywalnym kursie (>= MIN_KURS_SCORE)
-    przy sensownej próbie — wspólny rdzeń score'u i bramy jakości."""
-    best = 0.0
+def _oceń_karte(w: dict) -> tuple[float, dict | None]:
+    """Ocena karty: (score, najlepszy_szczebel) albo (0.0, None) gdy odpada.
+
+    Rdzeń = EDGE po korekcie próby: `wilson(trafienia/próba) − 1/kurs`, czyli
+    „o ile historia jest lepsza, niż wycenia kurs". Do tego mnożniki
+    kontekstu — forma, średnie sezonowe, minuty, hojność rywala. Karta bez
+    ani jednej linii przechodzącej bramy NIE powstaje: sygnały same z siebie
+    nie wystarczają (koniec z „Lewandowski, bo transfer").
+    """
+    if (w.get("minuty_sr6") or 0) < MIN_MINUT_KARTY:
+        return 0.0, None
+    m_min = _mnoznik_minut(w.get("minuty_sr6"))
+    sezony = w.get("sezony") or []
+    best_score, best_s = 0.0, None
     for r in w.get("rynki", []):
         for s in r.get("drabinka", []):
             p = s.get("pokrycie")
@@ -440,37 +516,26 @@ def _najlepsze_pokrycie(w: dict) -> float:
                 continue
             if s["kurs"] < MIN_KURS_SCORE:
                 continue
-            best = max(best, p["traf"] / p["z"])
-    return best
-
-
-def _score_wpisu(w: dict) -> float:
-    """Jakość karty = EDGE: pokrycie historyczne MINUS szansa implikowana
-    kursem. Linia @1.85 implikuje 54%; trafiana w 8/10 (80%) daje edge
-    +26 p.p. — to mierzy „linia tania względem historii", nie samą
-    regularność. Bonusy: sygnał (transfer/forma/debiutant), miejsce w XI.
-    Debiutant nie ma historii — niesie go sam bonus sygnału."""
-    edge = 0.0
-    for r in w.get("rynki", []):
-        for s in r.get("drabinka", []):
-            p = s.get("pokrycie")
-            if not p or p["z"] < MIN_PROBA_SCORE:
+            if p["traf"] / p["z"] < PROG_POKRYCIA_KARTY:
                 continue
-            if s["kurs"] < MIN_KURS_SCORE:
+            edge = _wilson_low(p["traf"], p["z"]) - 1.0 / s["kurs"]
+            if edge < MIN_EDGE_KARTY:
                 continue
-            ratio = p["traf"] / p["z"]
-            if ratio < PROG_POKRYCIA_KARTY:
-                continue
-            edge = max(edge, ratio - 1.0 / s["kurs"])
-    score = edge
-    if w.get("rodzaj") in ("transfer", "forma", "debiutant"):
-        score += 0.08
-    elif w.get("rodzaj") == "bez_feedu":
-        # sama drabinka kursów — wartość dopiero ze średnimi sezonowymi
-        score += 0.05 if w.get("sezony") else 0.0
-    if w.get("xi") is True:
-        score += 0.04
-    return score
+            score = (
+                edge
+                * _mnoznik_formy(r)
+                * _mnoznik_sezonu(sezony, r["rynek_kod"], float(s["linia"]))
+                * m_min
+                * _mnoznik_rywala(r)
+            )
+            if score > best_score:
+                best_score, best_s = score, {
+                    "rynek_kod": r["rynek_kod"], "rynek": r.get("rynek"),
+                    "linia": s["linia"], "kurs": s["kurs"],
+                    "traf": p["traf"], "z": p["z"],
+                    "edge": round(edge, 3),
+                }
+    return best_score, best_s
 
 
 def _sezony_wpisu(player_sezon: dict | None, pid: int | None) -> list[dict]:
@@ -601,6 +666,10 @@ def zbuduj(
     # meczów, które i tak mają karty z trendów (bug zmierzony 2026-07-25:
     # Superbet kwotował 41 graczy Lecha, kart nie było).
     budzet = [0]
+    # shotmapy historycznych meczów — WSPÓLNE dla graczy tej samej drużyny
+    # (ta sama historia), więc koszt ~10 zapytań na drużynę, nie na gracza
+    sm_cache_cykl: dict[int, list] = {}
+    budzet_shotmap = [MAX_SHOTMAP_CYKL]
     mids_z_trendami = {m for (m, _p) in trendy_pm}
     for mid, meta in sorted(
         events_meta.items(),
@@ -648,6 +717,7 @@ def zbuduj(
                     trendy_perf = statshub.trendy_z_performance(
                         int(profil["id"]), d["nazwa"], profil.get("team_id"),
                         statshub.fetch_player_performance(int(profil["id"])),
+                        sm_cache=sm_cache_cykl, budzet=budzet_shotmap,
                     )
                 except Exception:
                     trendy_perf = {}
@@ -725,38 +795,30 @@ def zbuduj(
     # nie kolejność listy (stary radar sortował rodzajami, co przy wielu
     # kartach rozrzucało jeden mecz po całej liście). Sufit per mecz
     # trzyma eksplozję: każdy kwotowany gracz = kandydat na kartę.
-    # brama jakości: zwykła drabinka bez solidnie pokrytej grywalnej linii
-    # to szum — odpada; sygnały (transfer/forma/debiutant) zostają zawsze
-    wpisy = [
-        w for w in wpisy
-        if w["rodzaj"] != "drabinka"
-        or _najlepsze_pokrycie(w) >= PROG_POKRYCIA_KARTY
-    ]
+    # TWARDE BRAMY: karta bez ani jednej linii z realną przewagą odpada,
+    # niezależnie od rodzaju. Sygnał to plakietka, nie przepustka.
+    ocenione = []
     for w in wpisy:
-        w["_score"] = _score_wpisu(w)
-    # SELEKCJA ROUND-ROBIN po meczach (decyzja usera 2026-07-25: „realnie
-    # najlepsze, nie 100" + „czemu brakuje Ekstraklasy"). Globalny ranking
-    # po edge'u ZAWSZE wypychał ligi z mniejszą liczbą kart — Ekstraklasa
-    # przegrywała z 15 meczami Ameryki Płd. i znikała w całości. Tu każdy
-    # mecz dostaje najpierw SWOJĄ najlepszą kartę (rundy po meczach,
-    # najbliższy kickoff pierwszy), dopiero potem lecą kolejne. Efekt:
-    # pokrycie wszystkich meczów dnia + w każdym meczu to, co najlepsze.
-    per_mecz: dict[int, list[dict]] = {}
-    for w in sorted(wpisy, key=lambda w: -w["_score"]):
-        per_mecz.setdefault(w["mecz_id"], []).append(w)
-    kolejnosc_meczow = sorted(
-        per_mecz, key=lambda mid: per_mecz[mid][0]["kickoff_ts"]
-    )
+        score, hero = _oceń_karte(w)
+        if hero is None:
+            continue
+        w["_score"] = score
+        w["hero"] = hero    # najlepsza linia karty — front pokazuje ją w nagłówku
+        ocenione.append(w)
+
+    # SELEKCJA: globalny TOP po jakości, max MAX_WPISOW_MECZ na mecz i BEZ
+    # gwarantowanego slotu — słaby mecz nie dostaje nic (decyzja usera:
+    # „tylko najlepsze, nie randomowe"). Wcześniejszy round-robin dawał
+    # kartę każdemu meczowi, także takiemu z ujemną przewagą.
+    per_mecz_n: dict[int, int] = {}
     wybrane: list[dict] = []
-    for runda in range(MAX_WPISOW_MECZ):
+    for w in sorted(ocenione, key=lambda w: -w["_score"]):
         if len(wybrane) >= MAX_WPISOW:
             break
-        for mid in kolejnosc_meczow:
-            if len(wybrane) >= MAX_WPISOW:
-                break
-            lista = per_mecz[mid]
-            if runda < len(lista):
-                wybrane.append(lista[runda])
+        if per_mecz_n.get(w["mecz_id"], 0) >= MAX_WPISOW_MECZ:
+            continue
+        per_mecz_n[w["mecz_id"]] = per_mecz_n.get(w["mecz_id"], 0) + 1
+        wybrane.append(w)
     wpisy = wybrane
     wpisy.sort(key=lambda w: (w["kickoff_ts"], w["mecz_id"], -w["_score"]))
     for i, w in enumerate(wpisy, start=1):

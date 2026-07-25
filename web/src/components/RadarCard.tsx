@@ -67,29 +67,12 @@ function sygnalInfo(
   return null;
 }
 
-/** Najlepszy grywalny szczebel karty — nagłówkowa statystyka („hero"). */
-function heroSzczebel(
-  w: RadarWpis,
-): { rynek: RadarRynek; s: RadarSzczebel } | null {
-  let best: { rynek: RadarRynek; s: RadarSzczebel; q: number } | null = null;
-  for (const r of w.rynki) {
-    for (const s of r.drabinka) {
-      const p = s.pokrycie;
-      if (!p || p.z < 5 || s.kurs < 1.65) continue;
-      const q = p.traf / p.z + Math.min(s.kurs, 3) / 100; // tiebreak: wyższy kurs
-      if (!best || q > best.q) best = { rynek: r, s, q };
-    }
-  }
-  return best ? { rynek: best.rynek, s: best.s } : null;
-}
-
 /** Zwinięta zajawka: konkret z danych, nie szablon. */
 function zajawka(w: RadarWpis): string {
-  const hero = heroSzczebel(w);
-  if (hero) {
-    const { rynek, s } = hero;
-    const p = s.pokrycie!;
-    return `${rynek.rynek} ${linLabel(s.linia)} · trafione ${p.traf}/${p.z} ost. · kurs ${fmtKurs(s.kurs)}`;
+  // hero wylicza backend (ten sam szczebel, który zdecydował o wyborze karty)
+  if (w.hero) {
+    const h = w.hero;
+    return `${h.rynek ?? h.rynek_kod} ${linLabel(h.linia)} · trafione ${h.traf}/${h.z} ost. · kurs ${fmtKurs(h.kurs)}`;
   }
   if (w.rodzaj === "debiutant") {
     return "Pełne kursy Superbetu bez żadnej historii w danych — rynek zgaduje.";

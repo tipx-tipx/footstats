@@ -189,6 +189,23 @@ PERF_STATTYPE_MAP = {
 }
 
 
+# rynki, których performance NIE rozbija, a shotmapa TAK (flagi isOutsideBox
+# / isHeaded / isOnTarget). Bez nich gracz-specjalista od strzałów z dystansu
+# (zmierzone 2026-07-25: Hellebrand — 9/10 meczów ze strzałem zza pola, w tym
+# 100% jego strzałów) wyglądał na przeciętnego, bo jego najlepszy rynek nie
+# miał historii i nie mógł wygrać z niczym.
+SHOTMAP_DERIVED = {
+    "shots_outside_box": lambda s: bool(s.get("isOutsideBox")),
+    "sot_outside_box": (
+        lambda s: bool(s.get("isOutsideBox")) and bool(s.get("isOnTarget"))
+    ),
+    "headed_shots": lambda s: bool(s.get("isHeaded")),
+    "headed_sot": (
+        lambda s: bool(s.get("isHeaded")) and bool(s.get("isOnTarget"))
+    ),
+}
+
+
 def _pierwszy(v):
     """Pole bywa dictem albo jednoelementową listą — bierz rekord."""
     if isinstance(v, list):
@@ -214,6 +231,8 @@ def trendy_z_performance(
     player_name: str,
     team_id: int | None,
     rows: list[dict],
+    sm_cache: dict | None = None,
+    budzet: list[int] | None = None,
 ) -> dict[str, StatshubTrend]:
     """Rekordy z `fetch_player_performance` -> trendy per rynek.
 
@@ -221,6 +240,12 @@ def trendy_z_performance(
     rozliczanie) nie muszą wiedzieć, z której ścieżki przyszła historia.
     Bez `line`/`ref_odds` (to nie feed propsów — linie bierzemy z kursów
     Superbetu) i bez kontekstu rywala (`opponent_average` = None).
+
+    `sm_cache` (event_id -> shotmapa) dokłada rynki pochodne z shotmap:
+    zza pola, celne zza pola, głową, celne głową. Cache jest WSPÓLNY dla
+    graczy tej samej drużyny (mają tę samą historię meczów), więc koszt to
+    ~10 zapytań na drużynę, nie na gracza. `budzet` = jednoelementowa lista
+    z licznikiem zapytań na cykl (None = bez limitu).
     """
     zebrane: dict[str, list[tuple]] = {}
     meta: dict[str, str] = {}
@@ -251,6 +276,30 @@ def trendy_z_performance(
             zebrane.setdefault(mk, []).append(
                 (ts, float(v), minuty, rywal, int(rywal_id or 0), utid, poz)
             )
+        # rynki pochodne ze shotmapy (zza pola / głową) — tylko gdy mecz
+        # w ogóle miał shotmapę; brak = pomijamy mecz w tych rynkach,
+        # zamiast liczyć fałszywe zero
+        if sm_cache is None or not ev.get("id"):
+            continue
+        eid = int(ev["id"])
+        if eid not in sm_cache:
+            if budzet is not None and budzet[0] <= 0:
+                continue
+            try:
+                sm_cache[eid] = fetch_event_shotmap(eid)
+            except Exception:
+                sm_cache[eid] = []
+            if budzet is not None:
+                budzet[0] -= 1
+        sm = sm_cache.get(eid) or []
+        if not sm:
+            continue
+        moje = [s for s in sm if s.get("playerId") == player_id]
+        for mk, pasuje in SHOTMAP_DERIVED.items():
+            zebrane.setdefault(mk, []).append((
+                ts, float(sum(1 for s in moje if pasuje(s))),
+                minuty, rywal, int(rywal_id or 0), utid, poz,
+            ))
     out: dict[str, StatshubTrend] = {}
     for mk, lista in zebrane.items():
         lista.sort(key=lambda x: -x[0])  # od najnowszego, jak w feedzie

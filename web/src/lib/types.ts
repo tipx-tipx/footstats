@@ -209,6 +209,17 @@ export interface RadarWpis {
   xi?: boolean | null;
   /** średnia minut z 6 ostatnich występów (pełne mecze vs ławka) */
   minuty_sr6?: number | null;
+  /** najlepsza linia karty wg oceny backendu (nagłówek karty) */
+  hero?: {
+    rynek_kod: string;
+    rynek?: string;
+    linia: number;
+    kurs: number;
+    traf: number;
+    z: number;
+    /** przewaga nad kursem po korekcie na próbę */
+    edge: number;
+  } | null;
   /** brak dla rodzaju "drabinka" (nie ma osobnego powodu-sygnału) */
   powod?:
     | "zmiana_ligi"

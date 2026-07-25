@@ -301,9 +301,10 @@ def test_drabinka_przycieta_z_szumu():
     assert wpisy[0]["minuty_sr6"] == 90
 
 
-def test_sortowanie_po_meczach_potem_po_score():
-    # dwa mecze: późniejszy ma "lepszego" gracza, ale wcześniejszy mecz
-    # i tak idzie pierwszy (chronologia); w meczu decyduje score
+def test_bramy_odrzucaja_karte_bez_przewagi_nad_kursem():
+    # gracz z pokryciem 7/10, ale kurs 1.70 wycenia to na 59% — po korekcie
+    # próby (Wilson) przewagi nie ma, więc karta NIE powstaje. Mocny gracz
+    # (10/10 przy 2.10) przechodzi. Kolejność wynikowa: chronologiczna.
     def _meta(ts):
         return {"label": "A – B", "ts": ts, "hid": 100, "aid": 200,
                 "home": "A", "away": "B"}
@@ -321,7 +322,60 @@ def test_sortowanie_po_meczach_potem_po_score():
         sb_cache={}, model_pokrycie=[], players_out={}, nazwy_pl={},
         teraz=TERAZ,
     )
-    assert [w["podmiot_id"] for w in wpisy] == [2, 1, 3]
+    assert [w["podmiot_id"] for w in wpisy] == [2, 3]
+    # hero = linia, która zdecydowała o wyborze karty
+    assert wpisy[0]["hero"]["linia"] == 1.5
+    assert wpisy[0]["hero"]["traf"] == wpisy[0]["hero"]["z"] == 10
+
+
+def test_krotka_proba_nie_udaje_pewniaka():
+    # 5/5 = 100%, ale próba za krótka (MIN_PROBA_SCORE=8) -> brak karty
+    tr = _trend(utids=[LIGA_NOWA] * 5, counts=[3] * 5)
+    wpisy = radar.zbuduj(
+        trends=[tr],
+        events_meta={999: {"label": "A – B", "ts": TERAZ + DZIEN,
+                           "hid": 100, "aid": 200, "home": "A", "away": "B"}},
+        odds_grid={999: {1: {"shots": {"1.5": 2.1}}}},
+        sb_cache={}, model_pokrycie=[], players_out={}, nazwy_pl={},
+        teraz=TERAZ,
+    )
+    assert wpisy == []
+
+
+def test_zmiennik_odpada_na_bramie_minut():
+    # komplet trafień, ale ~30 min na mecz — rotacyjny to ryzyko, nie typ
+    tr = _trend(utids=[LIGA_NOWA] * 14, counts=[3] * 14,
+                minutes=[30] * 14)
+    wpisy = radar.zbuduj(
+        trends=[tr],
+        events_meta={999: {"label": "A – B", "ts": TERAZ + DZIEN,
+                           "hid": 100, "aid": 200, "home": "A", "away": "B"}},
+        odds_grid={999: {1: {"shots": {"1.5": 2.1}}}},
+        sb_cache={}, model_pokrycie=[], players_out={}, nazwy_pl={},
+        teraz=TERAZ,
+    )
+    assert wpisy == []
+
+
+def test_sygnal_bez_pokrycia_nie_dostaje_karty(monkeypatch):
+    # transfer z historią, której kursy nie pokrywają (linia 3,5 przy 1 strzale
+    # na mecz) — sam sygnał NIE jest przepustką (decyzja usera 2026-07-25)
+    monkeypatch.setattr(
+        radar.statshub, "fetch_tournament_name",
+        lambda utid: {LIGA_STARA: "Stara", LIGA_NOWA: "Nowa"}.get(utid, ""),
+    )
+    kolega = _trend(player_id=7, utids=[LIGA_NOWA] * 12, counts=[1] * 12)
+    nowy = _trend(player_id=1, utids=[LIGA_NOWA] + [LIGA_STARA] * 12,
+                  counts=[1] * 13)
+    wpisy = radar.zbuduj(
+        trends=[kolega, nowy],
+        events_meta={999: {"label": "A – B", "ts": TERAZ + DZIEN,
+                           "hid": 100, "aid": 200, "home": "A", "away": "B"}},
+        odds_grid={999: {1: {"shots": {"3.5": 4.0}}}},
+        sb_cache={}, model_pokrycie=[], players_out={}, nazwy_pl={},
+        teraz=TERAZ,
+    )
+    assert wpisy == []
 
 
 def test_brama_jakosci_tnie_slabe_drabinki_a_sygnaly_zostawia():
