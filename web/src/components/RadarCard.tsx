@@ -305,10 +305,10 @@ function RynekBlok({ r }: { r: RadarRynek }) {
   );
 }
 
-/** Wiersz jednego sezonu: liga, rok, mecze i średnie per rynek. */
-function SezonWiersz({ s }: { s: RadarSezon }) {
+/** Wiersz sezonu: liga, rok, mecze i średnia — TYLKO dla wybranego rynku. */
+function SezonWiersz({ s, rynekKod }: { s: RadarSezon; rynekKod?: string }) {
   const wpisy = Object.entries(s.na_mecz).filter(
-    ([mk]) => SEZON_RYNKI_PL[mk],
+    ([mk]) => SEZON_RYNKI_PL[mk] && (!rynekKod || mk === rynekKod),
   );
   if (!wpisy.length) return null;
   return (
@@ -459,10 +459,15 @@ export const RadarCard = memo(function RadarCard({
                 </p>
               )}
 
+              {/* TYLKO wybrany typ — karta argumentuje jedną rekomendację,
+                  nie wysypuje wszystkich 9 rynków (decyzja produktowa) */}
               <div className="space-y-2.5">
-                {w.rynki.map((r) => (
-                  <RynekBlok key={r.rynek_kod} r={r} />
-                ))}
+                {(() => {
+                  const r =
+                    w.rynki.find((x) => x.rynek_kod === w.hero?.rynek_kod) ??
+                    w.rynki[0];
+                  return r ? <RynekBlok key={r.rynek_kod} r={r} /> : null;
+                })()}
               </div>
 
               {w.sezony && w.sezony.length > 0 && (
@@ -475,7 +480,11 @@ export const RadarCard = memo(function RadarCard({
                   </p>
                   <div className="space-y-2">
                     {w.sezony.map((s, i) => (
-                      <SezonWiersz key={`${s.turniej}-${s.rok}-${i}`} s={s} />
+                      <SezonWiersz
+                        key={`${s.turniej}-${s.rok}-${i}`}
+                        s={s}
+                        rynekKod={w.hero?.rynek_kod}
+                      />
                     ))}
                   </div>
                 </div>

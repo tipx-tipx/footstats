@@ -26,6 +26,9 @@ from dataclasses import dataclass, field
 
 from curl_cffi import requests
 
+# geometria pola karnego współdzielona z Sofascore (te same współrzędne 0-100)
+from .sofascore import is_outside_box as sofa_is_outside_box
+
 BASE = "https://www.statshub.com/api"
 HEADERS = {"Accept": "application/json", "Referer": "https://www.statshub.com/"}
 
@@ -189,20 +192,39 @@ PERF_STATTYPE_MAP = {
 }
 
 
-# rynki, których performance NIE rozbija, a shotmapa TAK (flagi isOutsideBox
-# / isHeaded / isOnTarget). Bez nich gracz-specjalista od strzałów z dystansu
-# (zmierzone 2026-07-25: Hellebrand — 9/10 meczów ze strzałem zza pola, w tym
-# 100% jego strzałów) wyglądał na przeciętnego, bo jego najlepszy rynek nie
-# miał historii i nie mógł wygrać z niczym.
+# rynki, których performance NIE rozbija, a shotmapa pozwala policzyć.
+#
+# UWAGA (zmierzone 2026-07-25): flaga `isOutsideBox` ze statshuba jest
+# BEZUŻYTECZNA — w sondzie miała wartość True dla 35 z 35 strzałów meczu,
+# czyli po prostu zawsze. Branie jej wprost robiło z "zza pola" kopię
+# wszystkich strzałów, a że kursy na ten rynek są wyższe (rzadsze zdarzenie),
+# generowało to FAŁSZYWĄ przewagę i wynosiło takie karty na szczyt.
+# Dlatego liczymy z GEOMETRII (x, y w skali 0-100, jak w Sofascore).
+# Flagi `isHeaded` i `isOnTarget` są sprawdzone i wiarygodne (zgadzają się
+# odpowiednio z bodyPart='head' i z result goal/save).
+def _poza_polem(s: dict) -> bool:
+    """Strzał spoza pola karnego — z geometrii, bo flaga API kłamie.
+
+    x/y przychodzą ze statshuba jako STRINGI, stąd konwersja."""
+    try:
+        return bool(sofa_is_outside_box(float(s.get("x")), float(s.get("y"))))
+    except (TypeError, ValueError):
+        return False
+
+
+def _celny(s: dict) -> bool:
+    return bool(s.get("isOnTarget"))
+
+
+def _glowa(s: dict) -> bool:
+    return bool(s.get("isHeaded")) or str(s.get("bodyPart") or "") == "head"
+
+
 SHOTMAP_DERIVED = {
-    "shots_outside_box": lambda s: bool(s.get("isOutsideBox")),
-    "sot_outside_box": (
-        lambda s: bool(s.get("isOutsideBox")) and bool(s.get("isOnTarget"))
-    ),
-    "headed_shots": lambda s: bool(s.get("isHeaded")),
-    "headed_sot": (
-        lambda s: bool(s.get("isHeaded")) and bool(s.get("isOnTarget"))
-    ),
+    "shots_outside_box": _poza_polem,
+    "sot_outside_box": lambda s: _poza_polem(s) and _celny(s),
+    "headed_shots": _glowa,
+    "headed_sot": lambda s: _glowa(s) and _celny(s),
 }
 
 
