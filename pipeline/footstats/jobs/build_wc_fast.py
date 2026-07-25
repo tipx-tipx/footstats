@@ -121,6 +121,30 @@ def _rozlicz_i_zapisz(
     p = wyniki["podsumowanie"]
     print(f"Typy: {p['opublikowane']} w logu, {p['rozliczone']} rozliczonych, "
           f"{p['trafione']} trafionych, ROI flat {p['roi_flat']:+.2f} j.")
+def filtr_spojnosci_kierunku(legi: list[dict]) -> list[dict]:
+    """Spójność kierunku per (mecz, podmiot, rynek) — decyzja usera 2026-07-25.
+
+    Model potrafił opublikować OBIE strony tej samej linii (rożne Legii
+    24.07: powyżej 4,5 @1.64 ORAZ poniżej 4,5 @2.12 przy p=49,6% — jedna
+    z definicji przegrywa; cenowo +EV, produktowo bez sensu). Zasada:
+    „poniżej" gra dopiero od linii NAJWYŻSZE-„powyżej" + 1. Korytarz
+    (>3,5 + <5,5 = może wygrać oba) zostaje legalny, kolizja znika.
+    Rynki zawodnicze (same „powyżej") przechodzą bez zmian.
+    """
+    max_over: dict[tuple, float] = {}
+    for b in legi:
+        if b.get("strona") == "powyzej":
+            k = (b.get("mecz_id"), b.get("podmiot"), b.get("rynek_kod"))
+            max_over[k] = max(max_over.get(k, -9.0), float(b["linia"]))
+    return [
+        b for b in legi
+        if b.get("strona") != "ponizej"
+        or float(b["linia"]) >= max_over.get(
+            (b.get("mecz_id"), b.get("podmiot"), b.get("rynek_kod")), -9.0
+        ) + 1.0
+    ]
+
+
 # uniqueTournamentId 16 = Mistrzostwa Świata (jak w Sofascore)
 WC_UTID = 16
 
@@ -2622,6 +2646,14 @@ def _main_impl(tryb=None):
                      if odpadki_t else ""))
     except Exception as e:
         print(f"Rynki drużynowe pominięte ({e})")
+
+    # --- SPÓJNOŚĆ KIERUNKU (decyzja usera 2026-07-25) ---
+    # filtr na CAŁEJ puli, zanim rozejdzie się do pewniaków/kuponów/dumpów
+    n_przed_sp = len(legi_pool)
+    legi_pool = filtr_spojnosci_kierunku(legi_pool)
+    if len(legi_pool) < n_przed_sp:
+        print(f"Spójność kierunku: usunięto {n_przed_sp - len(legi_pool)} "
+              f"legów 'poniżej' kolidujących ze stroną 'powyżej'")
 
     # --- PEWNIAKI: najlepszy typ KAŻDEGO rynku dla każdego meczu ---
     # Nie top-N po samej szansie (wygrywałyby zawsze zwykłe strzały 0.5) —

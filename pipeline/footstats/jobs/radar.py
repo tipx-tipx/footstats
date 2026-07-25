@@ -64,6 +64,10 @@ MIN_KURS_PIERWSZEGO = 1.65
 # score jakości wpisu (sortowanie w meczu): "grywalne pokrycie" linii
 MIN_KURS_SCORE = 1.65       # linia liczy się do score, gdy kurs grywalny
 MIN_PROBA_SCORE = 5         # ...i pokrycie ma sensowną próbę
+# BRAMA JAKOŚCI karty bez sygnału: zwykła drabinka musi mieć linię o kursie
+# >=1.65 trafioną w >=50% ostatnich występów — inaczej to szum, nie karta
+# (pomiar 2026-07-25: bez bramy 120 kart, z bramą ~60). Sygnały zwolnione.
+PROG_POKRYCIA_KARTY = 0.5
 UTID_MUNDIAL = 16           # MŚ nigdy nie jest „starą ligą" (lato 2026:
                             # każdy reprezentant wracał z mundialu)
 # utid liczy się jako „rozgrywki drużyny" (nie stara liga zawodnika), gdy
@@ -395,12 +399,9 @@ def _rynki_wpisu(
     return out
 
 
-def _score_wpisu(w: dict) -> float:
-    """Jakość karty do sortowania W OBRĘBIE meczu: „grywalne pokrycie".
-
-    Najlepszy odsetek trafień linii o grywalnym kursie (>= MIN_KURS_SCORE)
-    przy sensownej próbie, plus bonusy: sygnał (transfer/forma/debiutant),
-    miejsce w XI. Debiutant nie ma historii — niesie go sam bonus sygnału."""
+def _najlepsze_pokrycie(w: dict) -> float:
+    """Najlepszy odsetek trafień linii o grywalnym kursie (>= MIN_KURS_SCORE)
+    przy sensownej próbie — wspólny rdzeń score'u i bramy jakości."""
     best = 0.0
     for r in w.get("rynki", []):
         for s in r.get("drabinka", []):
@@ -410,7 +411,14 @@ def _score_wpisu(w: dict) -> float:
             if s["kurs"] < MIN_KURS_SCORE:
                 continue
             best = max(best, p["traf"] / p["z"])
-    score = best
+    return best
+
+
+def _score_wpisu(w: dict) -> float:
+    """Jakość karty do sortowania W OBRĘBIE meczu: „grywalne pokrycie"
+    plus bonusy: sygnał (transfer/forma/debiutant), miejsce w XI.
+    Debiutant nie ma historii — niesie go sam bonus sygnału."""
+    score = _najlepsze_pokrycie(w)
     if w.get("rodzaj") != "drabinka":
         score += 0.15
     if w.get("xi") is True:
@@ -621,6 +629,13 @@ def zbuduj(
     # nie kolejność listy (stary radar sortował rodzajami, co przy wielu
     # kartach rozrzucało jeden mecz po całej liście). Sufit per mecz
     # trzyma eksplozję: każdy kwotowany gracz = kandydat na kartę.
+    # brama jakości: zwykła drabinka bez solidnie pokrytej grywalnej linii
+    # to szum — odpada; sygnały (transfer/forma/debiutant) zostają zawsze
+    wpisy = [
+        w for w in wpisy
+        if w["rodzaj"] != "drabinka"
+        or _najlepsze_pokrycie(w) >= PROG_POKRYCIA_KARTY
+    ]
     for w in wpisy:
         w["_score"] = _score_wpisu(w)
     per_mecz: dict[int, list[dict]] = {}

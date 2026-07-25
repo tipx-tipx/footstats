@@ -308,20 +308,52 @@ def test_sortowanie_po_meczach_potem_po_score():
         return {"label": "A – B", "ts": ts, "hid": 100, "aid": 200,
                 "home": "A", "away": "B"}
     slaby = _trend(player_id=1, utids=[LIGA_NOWA] * 14,
-                   counts=[0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0])
+                   counts=[1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1])
     mocny = _trend(player_id=2, utids=[LIGA_NOWA] * 14, counts=[3] * 14)
     pozny = _trend(player_id=3, utids=[LIGA_NOWA] * 14, counts=[3] * 14)
     pozny.event_id = 998
     wpisy = radar.zbuduj(
         trends=[slaby, mocny, pozny],
         events_meta={999: _meta(TERAZ + DZIEN), 998: _meta(TERAZ + 2 * DZIEN)},
-        odds_grid={999: {1: {"shots": {"1.5": 2.1}},
+        odds_grid={999: {1: {"shots": {"0.5": 1.7}},
                          2: {"shots": {"1.5": 2.1}}},
                    998: {3: {"shots": {"1.5": 2.1}}}},
         sb_cache={}, model_pokrycie=[], players_out={}, nazwy_pl={},
         teraz=TERAZ,
     )
     assert [w["podmiot_id"] for w in wpisy] == [2, 1, 3]
+
+
+def test_brama_jakosci_tnie_slabe_drabinki_a_sygnaly_zostawia():
+    # drabinka z pokryciem 2/10 (<50%) odpada; ta sama historia z sygnalem
+    # formy by została — tu bez sygnału, więc lista pusta
+    rzadki = _trend(utids=[LIGA_NOWA] * 14,
+                    counts=[1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    wpisy = radar.zbuduj(
+        trends=[rzadki],
+        events_meta={999: {"label": "A – B", "ts": TERAZ + DZIEN,
+                           "hid": 100, "aid": 200, "home": "A", "away": "B"}},
+        odds_grid={999: {1: {"shots": {"0.5": 1.9}}}},
+        sb_cache={}, model_pokrycie=[], players_out={}, nazwy_pl={},
+        teraz=TERAZ,
+    )
+    assert wpisy == []
+
+
+def test_pierwszy_szczebel_od_165():
+    tr = _trend(utids=[LIGA_NOWA] * 14, counts=[3] * 14)
+    wpisy = radar.zbuduj(
+        trends=[tr],
+        events_meta={999: {"label": "A – B", "ts": TERAZ + DZIEN,
+                           "hid": 100, "aid": 200, "home": "A", "away": "B"}},
+        odds_grid={999: {1: {"shots": {"0.5": 1.2, "1.5": 1.55,
+                                       "2.5": 2.4, "3.5": 4.9}}}},
+        sb_cache={}, model_pokrycie=[], players_out={}, nazwy_pl={},
+        teraz=TERAZ,
+    )
+    (rynek,) = wpisy[0]["rynki"]
+    # 0,5 @1.20 i 1,5 @1.55 odpadają — drabinka rusza od 2,5 @2.40
+    assert [s["linia"] for s in rynek["drabinka"]] == [2.5, 3.5]
 
 
 def test_klucze_dopasowane_tokenowo_w_obie_strony():
