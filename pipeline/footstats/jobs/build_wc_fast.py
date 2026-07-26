@@ -123,7 +123,34 @@ def _rozlicz_i_zapisz(
     p = wyniki["podsumowanie"]
     print(f"Typy: {p['opublikowane']} w logu, {p['rozliczone']} rozliczonych, "
           f"{p['trafione']} trafionych, ROI flat {p['roi_flat']:+.2f} j.")
-def filtr_spojnosci_kierunku(legi: list[dict]) -> list[dict]:
+def kierunki_opublikowane(log: dict) -> dict[tuple, dict]:
+    """Z ZAMROŻONEGO logu: które strony linii są już opublikowane per mecz.
+
+    Zwraca {(mecz_id, podmiot, rynek_kod): {"powyzej": max_linia,
+    "ponizej": min_linia}}. Typy odrzucone i spoza publikacji nie blokują —
+    user ich nie widział, więc nie ma z czym kolidować.
+    """
+    out: dict[tuple, dict] = {}
+    for r in (log or {}).values():
+        if r.get("odrzucony") or r.get("poza_publikacja"):
+            continue
+        linia = r.get("linia")
+        strona = r.get("strona")
+        if linia is None or strona not in ("powyzej", "ponizej"):
+            continue
+        k = (r.get("mecz_id"), rotowire._norm(str(r.get("podmiot") or "")),
+             r.get("rynek_kod"))
+        slot = out.setdefault(k, {})
+        if strona == "powyzej":
+            slot["powyzej"] = max(slot.get("powyzej", -9.0), float(linia))
+        else:
+            slot["ponizej"] = min(slot.get("ponizej", 99.0), float(linia))
+    return out
+
+
+def filtr_spojnosci_kierunku(
+    legi: list[dict], opublikowane: dict[tuple, dict] | None = None,
+) -> list[dict]:
     """Spójność kierunku per (mecz, podmiot, rynek) — decyzja usera 2026-07-25.
 
     Model potrafił opublikować OBIE strony tej samej linii (rożne Legii
@@ -132,19 +159,45 @@ def filtr_spojnosci_kierunku(legi: list[dict]) -> list[dict]:
     „poniżej" gra dopiero od linii NAJWYŻSZE-„powyżej" + 1. Korytarz
     (>3,5 + <5,5 = może wygrać oba) zostaje legalny, kolizja znika.
     Rynki zawodnicze (same „powyżej") przechodzą bez zmian.
+
+    `opublikowane` (kierunki_opublikowane) domyka DZIURĘ MIĘDZY CYKLAMI
+    zmierzoną 2026-07-26: filtr widział tylko bieżącą pulę, więc gdy „poniżej
+    0,5" zamroziło się w logu 21.07, a model zmienił zdanie i 25.07 wystawił
+    „powyżej 0,5" (strony „poniżej" nie było już w puli — nie było czego z czym
+    porównać), obie strony siedziały w Skuteczności obok siebie. Typ raz
+    opublikowany jest nieodwracalny, więc blokować musi TO, CO NOWE.
     """
     max_over: dict[tuple, float] = {}
     for b in legi:
         if b.get("strona") == "powyzej":
             k = (b.get("mecz_id"), b.get("podmiot"), b.get("rynek_kod"))
             max_over[k] = max(max_over.get(k, -9.0), float(b["linia"]))
-    return [
+    # krok 1: spójność WEWNĄTRZ puli (jak dotąd) — „poniżej" ustępuje „powyżej"
+    wynik = [
         b for b in legi
         if b.get("strona") != "ponizej"
         or float(b["linia"]) >= max_over.get(
             (b.get("mecz_id"), b.get("podmiot"), b.get("rynek_kod")), -9.0
         ) + 1.0
     ]
+    if not opublikowane:
+        return wynik
+
+    # krok 2: spójność z tym, co JUŻ zamrożone w logu — tu blokowana bywa
+    # każda ze stron, bo przeciwnej nie da się już wycofać
+    def _zgodny(b: dict) -> bool:
+        slot = opublikowane.get((
+            b.get("mecz_id"), rotowire._norm(str(b.get("podmiot") or "")),
+            b.get("rynek_kod"),
+        ))
+        if not slot:
+            return True
+        linia = float(b["linia"])
+        if b.get("strona") == "ponizej":
+            return linia >= slot.get("powyzej", -9.0) + 1.0
+        return linia <= slot.get("ponizej", 99.0) - 1.0
+
+    return [b for b in wynik if _zgodny(b)]
 
 
 # uniqueTournamentId 16 = Mistrzostwa Świata (jak w Sofascore)
@@ -2652,10 +2705,18 @@ def _main_impl(tryb=None):
     # --- SPÓJNOŚĆ KIERUNKU (decyzja usera 2026-07-25) ---
     # filtr na CAŁEJ puli, zanim rozejdzie się do pewniaków/kuponów/dumpów
     n_przed_sp = len(legi_pool)
-    legi_pool = filtr_spojnosci_kierunku(legi_pool)
+    # kierunki już zamrożone w logu — bez nich filtr widzi tylko bieżący cykl
+    # i przepuszcza kolizję rozłożoną na kilka dni (pomiar 2026-07-26)
+    try:
+        kierunki_log = kierunki_opublikowane(supa.get_key("typy_log") or {})
+    except Exception as e:
+        kierunki_log = {}
+        print(f"Spójność kierunku: log niedostępny ({e}) — tylko bieżąca pula")
+    legi_pool = filtr_spojnosci_kierunku(legi_pool, kierunki_log)
     if len(legi_pool) < n_przed_sp:
         print(f"Spójność kierunku: usunięto {n_przed_sp - len(legi_pool)} "
-              f"legów 'poniżej' kolidujących ze stroną 'powyżej'")
+              f"legów kolidujących z przeciwną stroną linii "
+              f"(pula + {len(kierunki_log)} zamrożonych kierunków z logu)")
 
     # --- PEWNIAKI: najlepszy typ KAŻDEGO rynku dla każdego meczu ---
     # Nie top-N po samej szansie (wygrywałyby zawsze zwykłe strzały 0.5) —
