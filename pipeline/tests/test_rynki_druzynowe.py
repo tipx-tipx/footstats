@@ -48,8 +48,15 @@ def _mock_supa(monkeypatch, store: dict) -> None:
         rozliczanie.supa, "get_key", lambda k: store.get(k)
     )
     monkeypatch.setattr(
+        rozliczanie.supa, "get_key_ok", lambda k: (store.get(k), True)
+    )
+    monkeypatch.setattr(
         rozliczanie.supa, "put_key",
         lambda k, v: store.__setitem__(k, v),
+    )
+    monkeypatch.setattr(
+        rozliczanie.supa, "put_key_bezpiecznie",
+        lambda k, v, **kw: store.__setitem__(k, v) or True,
     )
 
 

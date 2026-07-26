@@ -253,6 +253,27 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
         }
 
 
+KOPIA_LOGU_KLUCZ = "typy_log_kopia"
+KOPIA_LOGU_CO_S = 24 * 3600
+
+
+def _kopia_zapasowa_logu(log: dict, now: int) -> None:
+    """Raz na dobę odkładamy migawkę księgi typów pod osobny klucz.
+
+    Bezpieczniki przy zapisie bronią przed skasowaniem historii przez własny
+    kod, ale nie przed pomyłką po stronie bazy ani ręcznym błędem. Doba to
+    kompromis: kopia kosztuje jeden zapis dziennie, a najgorszy przypadek to
+    utrata jednego dnia rozliczeń zamiast wszystkiego.
+    """
+    kopia, ok = supa.get_key_ok(KOPIA_LOGU_KLUCZ)
+    if not ok:
+        return
+    if kopia and now - int((kopia or {}).get("ts") or 0) < KOPIA_LOGU_CO_S:
+        return
+    if supa.put_key(KOPIA_LOGU_KLUCZ, {"ts": now, "log": log}):
+        print(f"Kopia zapasowa księgi typów: {len(log)} wpisów")
+
+
 def _gid_365(rec: dict, cache: dict) -> int | None:
     """Znajdź id zakończonego meczu w 365Scores (cache per mecz).
 
@@ -1512,7 +1533,18 @@ def rozlicz(
     modelu (patrz `_z_modelu`). Bez tego „najlepsze typy" byłyby deklaracją
     bez pokrycia — nikt by nie wiedział, czy trafiają.
     """
-    log = _migruj_log(supa.get_key("typy_log") or {})
+    # ODCZYT KSIĘGI JEST WARUNKIEM CAŁEGO ROZLICZANIA. Gdy zapytanie padnie,
+    # `get_key` zwróciłby None nie do odróżnienia od pustej księgi — dopisalibyśmy
+    # świeże typy i nadpisali nimi całą historię (dataset kalibracji, kwarantanny
+    # i Skuteczności). Wyjątek łapie `_rozlicz_i_zapisz` i zostawia poprzednie
+    # wyniki nietknięte.
+    log_raw, odczyt_ok = supa.get_key_ok("typy_log")
+    if not odczyt_ok:
+        raise RuntimeError(
+            "nie udało się odczytać typy_log — rozliczanie pominięte, "
+            "żeby nie nadpisać historii"
+        )
+    log = _migruj_log(log_raw or {})
     _dopisz_nowe(log, value_bets)
     _dopisz_nowe(log, drabinki or [])
     # legi kuponów też muszą być w logu (pewniaki spoza publikowanych typów)
@@ -1777,10 +1809,19 @@ def rozlicz(
         k: r for k, r in log.items()
         if r.get("wynik") or now - (r.get("kickoff_ts") or now) < 30 * 86400
     }
-    supa.put_key("typy_log", log)
+    if supa.put_key_bezpiecznie("typy_log", log):
+        _kopia_zapasowa_logu(log, now)
 
     # ---- historia kuponów ----
-    log_kuponow = supa.get_key("kupony_log") or {}
+    # ten sam bezpiecznik co przy księdze typów: nieudany odczyt = pomijamy
+    # całą sekcję kuponów zamiast nadpisać historię bieżącym cyklem
+    log_kuponow_raw, kupony_odczyt_ok = supa.get_key_ok("kupony_log")
+    if not kupony_odczyt_ok:
+        raise RuntimeError(
+            "nie udało się odczytać kupony_log — rozliczanie pominięte, "
+            "żeby nie nadpisać historii kuponów"
+        )
+    log_kuponow = log_kuponow_raw or {}
     # wmerguj WŁASNE kupony (generator „ucz model") jako pominięte — rozliczą
     # się w tle i zasilą korelację/kalibrację (jak automatyczne pominięte)
     for wkey, wk in kupony_wlasne.items():
@@ -1868,7 +1909,9 @@ def rozlicz(
             k: v for k, v in r.items() if k not in _POMIN_POLA
         }
     if wygrane_log:
-        supa.put_key("kupony_wygrane", wygrane_log)
+        # log wygranych NIGDY nie maleje — nagły skurcz to znak, że odczyt
+        # wyżej zwrócił pustkę po awarii, a nie że kupony zniknęły
+        supa.put_key_bezpiecznie("kupony_wygrane", wygrane_log)
     kupony_wygrane = sorted(
         wygrane_log.values(),
         key=lambda r: -(r.get("rozliczono_ts") or r.get("opublikowano_ts") or 0),
@@ -1880,7 +1923,7 @@ def rozlicz(
         if not r.get("wynik")
         or now - (r.get("rozliczono_ts") or now) < 21 * 86400
     }
-    supa.put_key("kupony_log", log_kuponow)
+    supa.put_key_bezpiecznie("kupony_log", log_kuponow)
 
     # ---- podsumowanie do UI ----
     # strzały niecelne/zablokowane (RYNKI_OSOBNE) NIE wchodzą do skuteczności

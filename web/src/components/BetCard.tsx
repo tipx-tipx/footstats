@@ -148,7 +148,9 @@ function odznakiPrzewagi(bet: ValueBet): {
     o.push({
       znak: "⎘",
       label: "z wcześniejszego cyklu",
-      opis: "Ten typ został opublikowany wcześniej i czeka na rozliczenie, ale ostatnie przeliczenie go nie odtworzyło — zwykle dlatego, że źródło danych chwilowo zamilkło albo kurs wyszedł z widełek. Kurs obok jest ZAMROŻONY z chwili publikacji; przed zagraniem sprawdź aktualny u bukmachera",
+      opis: bet.uproszczony
+        ? "Ten typ został opublikowany wcześniej i czeka na rozliczenie, ale ostatnie przeliczenie go nie odtworzyło. Odtworzyliśmy go z księgi rozliczeń, która trzyma tylko sam typ, kurs i szansę z chwili publikacji — dlatego karta nie ma rentgenu (czynników, historii, przedziału). Kurs obok jest ZAMROŻONY; przed zagraniem sprawdź aktualny u bukmachera"
+        : "Ten typ został opublikowany wcześniej i czeka na rozliczenie, ale ostatnie przeliczenie go nie odtworzyło — zwykle dlatego, że źródło danych chwilowo zamilkło albo kurs wyszedł z widełek. Kurs obok jest ZAMROŻONY z chwili publikacji; przed zagraniem sprawdź aktualny u bukmachera",
       tone: "amber",
     });
   }

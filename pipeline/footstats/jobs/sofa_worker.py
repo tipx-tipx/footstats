@@ -273,7 +273,7 @@ def _backfill_sezony(src: SofascoreSource, now: int) -> None:
             # co przebieg gracza, którego Sofascore nie zna pod tym id)
             cache[str(pid)] = {"name": k.get("nazwa"), "fetched_ts": now,
                                "sezony": []}
-    ok = supa.put_key("player_sezon", cache)
+    ok = supa.put_key_bezpiecznie("player_sezon", cache)
     print(f"Sezony: zebrano {zebrano}/{len(do_pobrania)} graczy; "
           f"cache: {len(cache)}; push={ok}", flush=True)
 
@@ -391,7 +391,7 @@ def main() -> None:
             "last_run": now, "pobrano": dobite,
             "wiszacych": len(eventy), "w_cache": len(sofa),
         }
-        ok = supa.put_key("sofa_results", sofa)
+        ok = supa.put_key_bezpiecznie("sofa_results", sofa)
         print(f"[{stamp}] Zebrano {dobite} nowych meczów; cache: {len(sofa) - 1}; "
               f"push={ok}", flush=True)
         if not ok:

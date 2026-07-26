@@ -80,6 +80,11 @@ export interface ValueBet {
    *  wyszedł z widełek), ale został opublikowany i normalnie się rozliczy.
    *  Kurs jest ZAMROŻONY z chwili publikacji. */
   wznowiony?: boolean;
+  /** true = typ odtworzony z KSIĘGI ROZLICZEŃ (drugie źródło siatki), a nie
+   *  z rejestru publikacji: księga zna sam typ, kurs i szansę z chwili
+   *  publikacji, więc karta jedzie bez rentgenu (czynniki, przedział,
+   *  rozkład, historia). Zawsze razem z `wznowiony`. */
+  uproszczony?: boolean;
   /** znacznik pierwszej publikacji typu (z rejestru, nie z bieżącego cyklu) */
   opublikowano_ts?: number;
   /** kurs, jaki wynika z pozostałych linii buka (gdy miekka_linia) */

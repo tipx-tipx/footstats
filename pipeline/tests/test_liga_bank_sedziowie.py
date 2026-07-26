@@ -14,7 +14,14 @@ from footstats.sources import scores365
 def _mock_supa(monkeypatch, store: dict) -> None:
     monkeypatch.setattr(build_wc_fast.supa, "get_key", lambda k: store.get(k))
     monkeypatch.setattr(
+        build_wc_fast.supa, "get_key_ok", lambda k: (store.get(k), True)
+    )
+    monkeypatch.setattr(
         build_wc_fast.supa, "put_key", lambda k, v: store.__setitem__(k, v)
+    )
+    monkeypatch.setattr(
+        build_wc_fast.supa, "put_key_bezpiecznie",
+        lambda k, v, **kw: store.__setitem__(k, v) or True,
     )
 
 

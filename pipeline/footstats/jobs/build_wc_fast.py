@@ -131,8 +131,73 @@ def _klucz_publikacji(b: dict) -> str:
             f":{b.get('rynek_kod')}:{b.get('linia')}:{b.get('strona')}")
 
 
+def _typ_z_logu(rec: dict) -> dict:
+    """Karta typu odtworzona z KSIĘGI ROZLICZEŃ — uboższa, ale prawdziwa.
+
+    Rejestr publikacji trzyma pełny rekord typu, ale sam bywa młodszy niż typy,
+    które ma chronić (wpisy sprzed jego wdrożenia), i teoretycznie może się
+    zgubić. Księga rozliczeń jest drugim, niezależnym źródłem: wie o KAŻDYM
+    opublikowanym typie, z ceną i szansą zamrożonymi przy pierwszej publikacji.
+    Nie ma za to rentgenu (czynniki, uzasadnienie, przedział, rozkład), więc
+    karta jedzie oznaczona `uproszczony`, żeby front nie udawał pełnej analizy.
+    """
+    mecz = str(rec.get("mecz") or "")
+    strony = [s.strip() for s in mecz.split("–")] if "–" in mecz else []
+    podmiot = str(rec.get("podmiot") or "")
+    druzynowy = str(rec.get("rynek_kod") or "").startswith("team_")
+    przeciwnik = ""
+    if druzynowy and len(strony) == 2:
+        przeciwnik = strony[1] if strony[0] == podmiot else strony[0]
+    kurs = rec.get("kurs")
+    p = float(rec.get("p_model") or 0.0)
+    return {
+        "id": 0,   # nadawane przy scalaniu (patrz `scal_z_publikacjami`)
+        "mecz_id": rec.get("mecz_id"), "mecz": mecz,
+        "kickoff_ts": rec.get("kickoff_ts"),
+        "podmiot_typ": "druzyna" if druzynowy else "zawodnik",
+        "podmiot_id": rec.get("podmiot_id"), "podmiot": podmiot,
+        "druzyna": podmiot if druzynowy else "", "przeciwnik": przeciwnik,
+        "rynek_kod": rec.get("rynek_kod"), "rynek": rec.get("rynek"),
+        "linia": rec.get("linia"), "strona": rec.get("strona"),
+        "kurs": kurs, "bukmacher": rec.get("bukmacher") or "",
+        "kurs_ref": rec.get("kurs_ref"),
+        "p_model": p, "p_rynku": None,
+        "fair_kurs": round(1.0 / max(p, 1e-6), 2),
+        "edge_pp": None,
+        "ev_pct": round((p * float(kurs) - 1.0) * 100.0, 1) if kurs else None,
+        "pewnosc": rec.get("pewnosc") or "srednia",
+        "pewnosc_score": 55.0, "ryzyko": "srednie", "rank_score": 0.0,
+        "ci": [None, None], "oczekiwane_minuty": None,
+        "lambda": 0.0, "rozklad": None,
+        "czynniki": {}, "uzasadnienie": {"czynniki": []},
+        "pewniak": bool(rec.get("pewniak")),
+        "wyzsza_linia": bool(rec.get("wyzsza_linia")),
+        "matchup": bool(rec.get("matchup")),
+        "rotacja": bool(rec.get("rotacja")),
+        "miekka_linia": bool(rec.get("miekka_linia")),
+        "opublikowano_ts": rec.get("opublikowano_ts"),
+        "wznowiony": True, "uproszczony": True,
+    }
+
+
+def _mecz_z_logu(rec: dict) -> dict | None:
+    """Minimalny rekord meczu dla typu odtworzonego z księgi — bez niego
+    apka nie ma gdzie takiego typu pokazać."""
+    strony = [s.strip() for s in str(rec.get("mecz") or "").split("–")]
+    if len(strony) != 2 or not all(strony) or rec.get("mecz_id") is None:
+        return None
+    return {
+        "id": rec["mecz_id"], "liga": rec.get("liga") or "", "sezon": "",
+        "kolejka": None, "kickoff_ts": rec.get("kickoff_ts"),
+        "gospodarz": strony[0], "gosc": strony[1],
+        "sedzia": None, "sedzia_mnoznik_fauli": 1.0,
+        "okazje": [], "sklady_ogloszone": False,
+    }
+
+
 def scal_z_publikacjami(
     value_bets: list[dict], matches_out: dict, teraz: int | None = None,
+    typy_log: dict | None = None,
 ) -> tuple[list[dict], int]:
     """Lista typów = wszystko, co OPUBLIKOWANE i czeka na gwizdek.
 
@@ -154,7 +219,10 @@ def scal_z_publikacjami(
     Zwraca (lista do publikacji, ile wpisów wznowiono). Mutuje `matches_out`.
     """
     teraz = teraz or int(time.time())
-    rej = supa.get_key(PUBLIKACJE_KLUCZ) or {}
+    rej_raw, odczyt_ok = supa.get_key_ok(PUBLIKACJE_KLUCZ)
+    # nieudany odczyt rejestru = pracujemy bez niego, ale NIE zapisujemy go
+    # z powrotem (inaczej garstka typów z tego cyklu zastąpiłaby cały rejestr)
+    rej = rej_raw or {}
     biezace = {_klucz_publikacji(b) for b in value_bets}
 
     for b in value_bets:
@@ -169,6 +237,7 @@ def scal_z_publikacjami(
 
     out = list(value_bets)
     wznowione = 0
+    odtworzone = set(biezace)
     for k, rec in list(rej.items()):
         ts_k = int(rec.get("kickoff_ts") or 0)
         if ts_k and ts_k <= teraz:
@@ -182,17 +251,59 @@ def scal_z_publikacjami(
         bet["wznowiony"] = True
         bet["opublikowano_ts"] = rec.get("opublikowano_ts")
         out.append(bet)
+        odtworzone.add(k)
         wznowione += 1
         mid = bet.get("mecz_id")
         if mid is not None and mid not in matches_out and rec.get("mecz"):
             matches_out[mid] = rec["mecz"]
 
-    if not _dry_run():
+    # DRUGIE ŹRÓDŁO: księga rozliczeń. Rejestr wyżej chroni tylko to, co przez
+    # niego przeszło — typy opublikowane, zanim powstał (albo w cyklu, w którym
+    # zapis do bazy padł), znikały userowi mimo że normalnie się rozliczą.
+    # Zmierzone 2026-07-26 na Wiśle Kraków–GKS: pięć typów drużynowych w księdze,
+    # zero na liście, bo rejestr wdrożyliśmy cztery godziny po ich publikacji.
+    z_logu = 0
+    for rec in (typy_log or {}).values():
+        if rec.get("wynik") is not None or rec.get("sugestia"):
+            continue                      # rozliczony albo bez kursu
+        if rec.get("odrzucony") or rec.get("poza_publikacja"):
+            continue                      # nigdy nie był na liście
+        if rec.get("zrodlo"):
+            continue                      # drabinki mają własną zakładkę i siatkę
+        if int(rec.get("kickoff_ts") or 0) <= teraz:
+            continue                      # po gwizdku
+        k = _klucz_publikacji(rec)
+        if k in odtworzone:
+            continue
+        bet = _typ_z_logu(rec)
+        if bet["mecz_id"] is None or not bet["kurs"]:
+            continue
+        out.append(bet)
+        odtworzone.add(k)
+        z_logu += 1
+        mid = bet["mecz_id"]
+        if mid not in matches_out:
+            mecz = _mecz_z_logu(rec)
+            if mecz:
+                matches_out[mid] = mecz
+
+    # id typów są numerowane od zera w każdym cyklu, więc wpis wznowiony potrafi
+    # trafić na cudzy numer — front używa ich jako kluczy i kotwic (#bet-N)
+    uzyte = {b.get("id") for b in value_bets}
+    nastepne = max([i for i in uzyte if isinstance(i, int)] or [0]) + 1
+    for b in out[len(value_bets):]:
+        if b.get("id") in uzyte or not isinstance(b.get("id"), int):
+            b["id"] = nastepne
+        uzyte.add(b["id"])
+        nastepne = max(nastepne, b["id"]) + 1
+
+    if not _dry_run() and odczyt_ok:
         supa.put_key(PUBLIKACJE_KLUCZ, rej)
-    if wznowione:
-        print(f"Publikacje: wznowiono {wznowione} typów z wcześniejszych cykli "
-              f"(bieżące przeliczenie dało {len(value_bets)})")
-    return out, wznowione
+    if wznowione or z_logu:
+        print(f"Publikacje: wznowiono {wznowione} typów z rejestru"
+              + (f" + {z_logu} z księgi rozliczeń" if z_logu else "")
+              + f" (bieżące przeliczenie dało {len(value_bets)})")
+    return out, wznowione + z_logu
 
 
 PUBLIKACJE_KART_KLUCZ = "publikacje_karty"
@@ -217,7 +328,10 @@ def scal_karty_z_publikacjami(
     lepszego, bo wtedy wracamy do punktu wyjścia.
     """
     teraz = teraz or int(time.time())
-    rej = supa.get_key(PUBLIKACJE_KART_KLUCZ) or {}
+    # jak przy typach: nieudany odczyt = pracujemy bez rejestru, ale go nie
+    # nadpisujemy zawartością jednego cyklu
+    rej_raw, odczyt_ok = supa.get_key_ok(PUBLIKACJE_KART_KLUCZ)
+    rej = rej_raw or {}
     klucz = lambda w: (f"{w.get('mecz_id')}:{w.get('podmiot_id')}"
                        f":{(w.get('hero') or {}).get('rynek_kod')}"
                        f":{(w.get('hero') or {}).get('linia')}")
@@ -242,7 +356,7 @@ def scal_karty_z_publikacjami(
         w["opublikowano_ts"] = rec.get("opublikowano_ts")
         out.append(w)
         wznowione += 1
-    if not _dry_run():
+    if not _dry_run() and odczyt_ok:
         supa.put_key(PUBLIKACJE_KART_KLUCZ, rej)
     if wznowione:
         print(f"Publikacje kart: wznowiono {wznowione} "
@@ -582,7 +696,9 @@ def load_trend_lib() -> dict:
 
 
 def save_trend_lib(lib: dict) -> None:
-    supa.put_key("trend_lib", lib)
+    # biblioteka trendów tylko rośnie — nagły skurcz oznacza, że `load_trend_lib`
+    # dostało pustkę po awarii odczytu, a nie że historia zniknęła
+    supa.put_key_bezpiecznie("trend_lib", lib)
 
 
 def past_wc_events(days_back: int = 25) -> list[dict]:
@@ -687,7 +803,7 @@ def profil_sedziow(
         cache[gid] = rec
         zmieniony = True
     if zmieniony:
-        supa.put_key(cache_key, cache)
+        supa.put_key_bezpiecznie(cache_key, cache)
 
     per_sedzia: dict[str, list[tuple[float, list | None]]] = {}
     sr_druzyny: dict[str, list[float]] = {}
@@ -1012,7 +1128,7 @@ def aktualizuj_bank_stylu(
         time.sleep(0.25)
 
     if zmienione:
-        supa.put_key(klucz, bank)
+        supa.put_key_bezpiecznie(klucz, bank)
     return bank
 
 
@@ -3542,10 +3658,26 @@ def _main_impl(tryb=None):
               f"meczów sparowanych, {len(pokrycie['mecze_bez_trendow'])} bez trendów, "
               f"luka propsów Superbetu: {len(pokrycie['luka_superbet_propsy'])} meczów")
 
+    # typ raz opublikowany zostaje na liście do gwizdka — patrz scal_z_publikacjami.
+    # Księga rozliczeń jedzie jako DRUGIE źródło siatki (rejestr publikacji bywa
+    # młodszy niż typy, które ma chronić); nieudany odczyt = pracujemy bez niej.
+    # Siatka MUSI być przed bramką „0 okazji" niżej: cykl, w którym feed zamilkł
+    # na całej linii, to dokładnie ten, w którym typy sprzed gwizdka mają wrócić.
+    log_do_siatki, _ok_log = supa.get_key_ok("typy_log")
+    value_bets_pub, _wzn = scal_z_publikacjami(
+        value_bets, matches_out,
+        typy_log=rozliczanie._migruj_log(log_do_siatki or {}),
+    )
+
     # NIE degraduj aplikacji do pustej planszy: dopóki nie ma realnych okazji MŚ,
     # zostaw dotychczasowe dane (tryb pokazowy). Przełączamy na MŚ dopiero,
     # gdy propsy i kursy dają choć jedną okazję.
-    if not value_bets:
+    #
+    # Sama siatka NIE wystarczy, żeby podmienić dane: wznowione typy niosą swoje
+    # mecze, ale nie zawodników, formy ani kursów. Cykl, w którym feed padł na
+    # całej linii (zero typów I zero zawodników), zostawia więc poprzedni zrzut —
+    # inaczej ratując 20 typów wyzerowalibyśmy resztę aplikacji.
+    if not value_bets_pub or not (value_bets or players_out):
         print(
             f"Na razie 0 okazji ({len(matches_out)} meczów, "
             f"{len(players_out)} zawodników ma propsy). Nie podmieniam danych "
@@ -3569,8 +3701,6 @@ def _main_impl(tryb=None):
         return
 
     _dump_pokrycie()
-    # typ raz opublikowany zostaje na liście do gwizdka — patrz scal_z_publikacjami
-    value_bets_pub, _wzn = scal_z_publikacjami(value_bets, matches_out)
     _dump("value_bets.json", [
         {k: v for k, v in b.items() if k != "kal_tau"} for b in value_bets_pub
     ])
