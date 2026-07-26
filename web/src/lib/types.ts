@@ -479,12 +479,14 @@ export interface Meta {
   /** zmierzone delty wag zaufania per kubełek pewności (kalibracja z rozliczeń) */
   wagi_zaufania?: Record<string, number>;
   /**
-   * Rynki chwilowo wstrzymane (trafiały poniżej deklaracji modelu) —
-   * ich typy nie są publikowane, dopóki skuteczność się nie poprawi.
+   * Rynki chwilowo wstrzymane (traciły pieniądze w oknie ostatnich rozliczeń)
+   * — ich typy nie są publikowane, dopóki ROI się nie odbuduje.
+   * `roi` to zwrot na jednostkę stawki, ujemny (np. −0.18 = −18%).
    */
   kwarantanna?: Record<
     string,
-    { hit: number; sr_p: number; n: number; nazwa: string }
+    // roi opcjonalne: dane sprzed wprowadzenia bramy ROI go nie mają
+    { roi?: number; hit: number; sr_p: number; n: number; nazwa: string }
   >;
 }
 

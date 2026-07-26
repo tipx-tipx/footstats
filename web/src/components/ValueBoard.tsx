@@ -602,15 +602,18 @@ export function ValueBoard({
                   <strong className="font-semibold text-ink-soft">
                     wstrzymane
                   </strong>
-                  , bo trafiały poniżej deklaracji modelu:{" "}
+                  , bo na ostatnich typach traciły pieniądze:{" "}
                   {Object.values(kwarantanna)
-                    .map(
-                      (k) =>
-                        `${k.nazwa.toLowerCase()} — zapowiadane ${Math.round(k.sr_p * 100)}%, trafione ${Math.round(k.hit * 100)}% (${k.n} typów)`,
+                    .map((k) =>
+                      // roi bywa pusty w danych sprzed bramy ROI — wtedy
+                      // zostaje samo trafienie zamiast "NaN% straty"
+                      typeof k.roi === "number"
+                        ? `${k.nazwa.toLowerCase()} — ${Math.round(Math.abs(k.roi) * 100)}% straty na stawce, trafione ${Math.round(k.hit * 100)}% (${k.n} typów)`
+                        : `${k.nazwa.toLowerCase()} — trafione ${Math.round(k.hit * 100)}% przy zapowiadanych ${Math.round(k.sr_p * 100)}% (${k.n} typów)`,
                     )
                     .join("; ")}
                   . To zabezpieczenie: typy z tych rynków rozliczają się dalej
-                  w tle i rynek wraca sam, gdy skuteczność się poprawi.
+                  w tle i rynek wraca sam, gdy przestanie tracić.
                 </p>
               ) : (
                 <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-muted">

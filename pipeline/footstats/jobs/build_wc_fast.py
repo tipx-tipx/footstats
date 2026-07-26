@@ -1716,14 +1716,15 @@ def _main_impl(tryb=None):
                 f"{mk} {v['global']:+.2f}" for mk, v in bias_map_sug.items()))
     except Exception:
         bias_map_sug = {}
-    # BRAMA PUBLIKACJI: rynki trafiające wyraźnie poniżej deklaracji wypadają
-    # z publikacji (pewniaki, pula kuponów), ale dalej są scorowane i logowane
-    # (poza_publikacja) — kalibracja mierzy je nadal i rynek wraca sam
+    # BRAMA PUBLIKACJI: rynki tracące pieniądze w oknie ostatnich rozliczeń
+    # wypadają z publikacji (pewniaki, pula kuponów), ale dalej są scorowane
+    # i logowane (poza_publikacja) — kalibracja mierzy je nadal i rynek wraca sam
     try:
         kwarantanna_rynkow = rozliczanie.kwarantanna()
         if kwarantanna_rynkow:
             print("Kwarantanna rynków: " + ", ".join(
-                f"{mk} (hit {v['hit']:.0%} vs p {v['sr_p']:.0%}, n={v['n']})"
+                f"{mk} (ROI {v['roi']:+.0%}, hit {v['hit']:.0%} "
+                f"vs p {v['sr_p']:.0%}, n={v['n']})"
                 for mk, v in kwarantanna_rynkow.items()))
     except Exception as e:
         kwarantanna_rynkow = {}
@@ -3356,9 +3357,10 @@ def _main_impl(tryb=None):
         else:
             kw = kwarantanna_rynkow.get(t["rynek_kod"], {})
             szczegol = (
-                f"rynek chwilowo poza publikacją: ostatnie typy wchodziły w "
-                f"{kw.get('hit', 0):.0%} przy deklarowanych {kw.get('sr_p', 0):.0%} "
-                f"(próba: {kw.get('n', 0)}). Wróci, gdy kalibracja dogoni"
+                f"rynek chwilowo poza publikacją: ostatnie typy traciły "
+                f"{abs(kw.get('roi', 0)):.0%} na złotówce stawki "
+                f"(trafienia {kw.get('hit', 0):.0%}, próba: {kw.get('n', 0)}). "
+                f"Wróci, gdy przestanie tracić"
             )
         odrzucenia_out.append({
             "mecz_id": t["mecz_id"], "podmiot": t["podmiot"],
@@ -3686,12 +3688,12 @@ def _main_impl(tryb=None):
         # stosuje te same co backend (kuponBuilder.wagaModelu)
         "wagi_zaufania": wagi_zauf,
         # RYNKI WSTRZYMANE: bez tego pusta zakładka Pewniaków wygląda na
-        # awarię, a to zadziałało zabezpieczenie (model przeszacowywał —
-        # deklarował ~70%, trafiał ~50%). Front tłumaczy to użytkownikowi
+        # awarię, a to zadziałało zabezpieczenie (rynek tracił pieniądze
+        # w oknie ostatnich rozliczeń). Front tłumaczy to użytkownikowi
         # zamiast pokazywać gołą pustkę.
         "kwarantanna": {
-            mk: {"hit": v["hit"], "sr_p": v["sr_p"], "n": v["n"],
-                 "nazwa": MARKET_NAMES_PL.get(mk, mk)}
+            mk: {"roi": v["roi"], "hit": v["hit"], "sr_p": v["sr_p"],
+                 "n": v["n"], "nazwa": MARKET_NAMES_PL.get(mk, mk)}
             for mk, v in (kwarantanna_rynkow or {}).items()
         },
     })

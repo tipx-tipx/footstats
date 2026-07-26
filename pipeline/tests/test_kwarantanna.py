@@ -3,10 +3,11 @@
 from footstats.jobs import rozliczanie
 
 
-def _rec(mk: str, p: float, wynik: str, ts: int = 0, **kw) -> dict:
+def _rec(mk: str, p: float, wynik: str, ts: int = 0, kurs: float = 1.5,
+         **kw) -> dict:
     return {
         "rynek_kod": mk, "rynek": mk, "p_model": p, "wynik": wynik,
-        "kickoff_ts": ts, "sugestia": False, **kw,
+        "kickoff_ts": ts, "sugestia": False, "kurs": kurs, **kw,
     }
 
 
@@ -14,25 +15,37 @@ def _log(recs: list[dict]) -> dict:
     return {f"k{i}": r for i, r in enumerate(recs)}
 
 
-def test_kwarantanna_lapie_rynek_ponizej_deklaracji():
-    # 20 typów po 72%, weszło 8 (40%) -> bias ~0.61 < 0.80
-    recs = [
-        _rec("fouls_committed", 0.72, "wygrany" if i < 8 else "przegrany", ts=i)
-        for i in range(20)
+def _seria(mk: str, n: int, wygrane: int, kurs: float, **kw) -> list[dict]:
+    """n rozliczeń rynku, z tego `wygrane` trafionych, kurs stały."""
+    return [
+        _rec(mk, 0.72, "wygrany" if i < wygrane else "przegrany", ts=i,
+             kurs=kurs, **kw)
+        for i in range(n)
     ]
-    kw = rozliczanie.rynki_kwarantanna(_log(recs))
+
+
+def test_kwarantanna_lapie_rynek_ktory_traci():
+    # 20 typów po kursie 1,4, weszło 8 -> ROI = (8*0,4 − 12)/20 = −44%
+    kw = rozliczanie.rynki_kwarantanna(_log(_seria("fouls_committed", 20, 8, 1.4)))
     assert "fouls_committed" in kw
     assert kw["fouls_committed"]["n"] == 20
-    assert kw["fouls_committed"]["bias"] < rozliczanie.KWARANTANNA_PROG_BIAS
+    assert kw["fouls_committed"]["roi"] < rozliczanie.KWARANTANNA_ROI_WEJSCIE
 
 
 def test_zdrowy_rynek_zostaje_w_publikacji():
-    # 20 typów po 72%, weszło 15 (75%) -> bias > 1
-    recs = [
-        _rec("shots", 0.72, "wygrany" if i < 15 else "przegrany", ts=i)
-        for i in range(20)
-    ]
-    assert rozliczanie.rynki_kwarantanna(_log(recs)) == {}
+    # 20 typów po kursie 1,6, weszło 15 -> ROI = (15*0,6 − 5)/20 = +20%
+    assert rozliczanie.rynki_kwarantanna(_log(_seria("shots", 20, 15, 1.6))) == {}
+
+
+def test_rynek_zle_skalibrowany_ale_dochodowy_zostaje():
+    """Sedno bramy ROI: karą jest zdjęcie z publikacji, więc mierzymy
+    pieniądze, nie zgodność z deklaracją.
+
+    20 typów zapowiadanych na 72%, weszło 11 (55%) — dawna brama biasowa
+    (0,79 < 0,80) wstrzymałaby rynek. Przy kursie 2,2 ROI to +21%.
+    """
+    kw = rozliczanie.rynki_kwarantanna(_log(_seria("sot", 20, 11, 2.2)))
+    assert kw == {}
 
 
 def test_za_mala_proba_nie_jest_oceniana():
@@ -41,30 +54,51 @@ def test_za_mala_proba_nie_jest_oceniana():
     assert rozliczanie.rynki_kwarantanna(_log(recs)) == {}
 
 
+def test_bez_kursu_rynek_jest_niemierzalny():
+    # ROI bez kursu nie istnieje — same pudła, a mimo to brak werdyktu
+    recs = [{**_rec("shots", 0.7, "przegrany", ts=i), "kurs": None}
+            for i in range(40)]
+    assert rozliczanie.rynki_kwarantanna(_log(recs)) == {}
+
+
 def test_okno_kroczace_pozwala_wrocic():
     # stare 40 przegranych, świeże 40 wygranych — okno widzi tylko świeże
-    stare = [_rec("tackles", 0.7, "przegrany", ts=i) for i in range(40)]
-    swieze = [_rec("tackles", 0.7, "wygrany", ts=100 + i) for i in range(40)]
+    stare = _seria("tackles", 40, 0, 1.5)
+    swieze = [{**r, "kickoff_ts": 100 + i}
+              for i, r in enumerate(_seria("tackles", 40, 40, 1.5))]
     assert rozliczanie.rynki_kwarantanna(_log(stare + swieze)) == {}
     # i w drugą stronę: świeża zapaść wchodzi do kwarantanny mimo dobrej historii
+    zapasc = [{**r, "kickoff_ts": 100 + i}
+              for i, r in enumerate(_seria("tackles", 40, 0, 1.5))]
     assert "tackles" in rozliczanie.rynki_kwarantanna(
-        _log([_rec("tackles", 0.7, "wygrany", ts=i) for i in range(40)]
-             + [_rec("tackles", 0.7, "przegrany", ts=100 + i) for i in range(40)])
+        _log(_seria("tackles", 40, 40, 1.5) + zapasc)
     )
+
+
+def test_histereza_trzyma_stan_w_szarej_strefie():
+    """ROI między progami (−2,5%) nie rusza rynku w żadną stronę — decyduje
+    to, czy rynek stał w kwarantannie w poprzednim cyklu."""
+    # 20 typów po kursie 1,5, weszło 13 -> ROI = (13*0,5 − 7)/20 = −2,5%
+    wolny = _seria("shots", 20, 13, 1.5)
+    assert rozliczanie.rynki_kwarantanna(_log(wolny)) == {}
+    wstrzymany = _seria("shots", 20, 13, 1.5,
+                        poza_publikacja="kwarantanna_rynku")
+    assert "shots" in rozliczanie.rynki_kwarantanna(_log(wstrzymany))
+
+
+def test_wyjscie_dopiero_po_odbudowie_roi():
+    # ten sam rynek w kwarantannie: ROI +5% (14/20 po 1,5) przekracza próg
+    # wyjścia (−2%), więc wraca do publikacji mimo flagi z poprzedniego cyklu
+    recs = _seria("shots", 20, 14, 1.5, poza_publikacja="kwarantanna_rynku")
+    assert rozliczanie.rynki_kwarantanna(_log(recs)) == {}
 
 
 def test_typy_poza_publikacja_ucza_kwarantanne():
     # typy z flagą poza_publikacja LICZĄ SIĘ do oceny rynku (inaczej rynek
     # w kwarantannie nie miałby czym udowodnić powrotu)
-    recs = [
-        _rec("shots", 0.72, "wygrany", ts=i, poza_publikacja="kwarantanna_rynku")
-        for i in range(20)
-    ]
+    recs = _seria("shots", 20, 20, 1.5, poza_publikacja="kwarantanna_rynku")
     assert rozliczanie.rynki_kwarantanna(_log(recs)) == {}  # zdrowe wyniki
-    recs_zle = [
-        _rec("shots", 0.72, "przegrany", ts=i, poza_publikacja="limit_meczu")
-        for i in range(20)
-    ]
+    recs_zle = _seria("shots", 20, 0, 1.5, poza_publikacja="limit_meczu")
     assert "shots" in rozliczanie.rynki_kwarantanna(_log(recs_zle))
 
 

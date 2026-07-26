@@ -7,7 +7,7 @@ import type { SkutecznoscDnia } from "@/lib/types";
 
 /** Typ rozliczony w tle: dlaczego nie było go na liście typów. */
 const POZA_LABEL: Record<string, string> = {
-  kwarantanna_rynku: "Rynek był wstrzymany (trafiał poniżej deklaracji), typ rozliczył się w tle",
+  kwarantanna_rynku: "Rynek był wstrzymany (tracił pieniądze), typ rozliczył się w tle",
   limit_meczu: "Ponad limit typów z jednego meczu, typ był dostępny tylko w generatorze kuponów",
   stare_dane: "Zawodnik dawno nie grał (stare dane), typ rozliczył się w tle",
 };

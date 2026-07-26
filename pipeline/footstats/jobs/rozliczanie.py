@@ -616,18 +616,45 @@ def compute_bias_full(
     return out
 
 
-# KWARANTANNA RYNKU: rynek, który w rozliczeniach trafia wyraźnie poniżej
-# deklaracji modelu, wypada z PUBLIKACJI (pewniaki, pula kuponów), ale dalej
-# jest scorowany i logowany (poza_publikacja="kwarantanna_rynku") — kalibracja
-# mierzy go nadal i rynek wraca sam, gdy okno rozliczeń się poprawi.
-KWARANTANNA_PROG_BIAS = 0.80   # wejście do kwarantanny poniżej tego biasu
-KWARANTANNA_MIN_N = 15         # od tylu rozliczonych typów oceniamy rynek
-KWARANTANNA_OKNO = 40          # okno kroczące: tylko ostatnie N rozliczeń
+# KWARANTANNA RYNKU: rynek, który w oknie ostatnich rozliczeń TRACI PIENIĄDZE,
+# wypada z PUBLIKACJI (pewniaki, pula kuponów), ale dalej jest scorowany
+# i logowany (poza_publikacja="kwarantanna_rynku") — kalibracja mierzy go nadal
+# i rynek wraca sam, gdy okno rozliczeń się poprawi.
+#
+# KRYTERIUM TO ROI, NIE KALIBRACJA. Wcześniej bramą był bias (trafienia vs
+# deklaracja) — mierzyliśmy jedno, a karaliśmy czym innym: rynek źle
+# skalibrowany bywa dochodowy (wysokie kursy niosą pudła) i odwrotnie, rynek
+# trafiający zgodnie z deklaracją potrafi tracić przy kursach poniżej fair.
+# Skoro karą jest zdjęcie z publikacji, mierzyć trzeba to, co publikacja
+# realnie kosztuje: zwrot z jednostkowej stawki.
+KWARANTANNA_ROI_WEJSCIE = -0.10   # wejście: strata > 10 gr na złotówce stawki
+KWARANTANNA_ROI_WYJSCIE = -0.02   # wyjście: dopiero gdy strata prawie znika
+KWARANTANNA_MIN_N = 15            # od tylu rozliczonych typów oceniamy rynek
+KWARANTANNA_OKNO = 40             # okno kroczące: tylko ostatnie N rozliczeń
+# ile ostatnich rozliczeń oglądamy w poszukiwaniu flagi z poprzedniego cyklu
+# (patrz `_byl_w_kwarantannie`)
+KWARANTANNA_HISTEREZA_OKNO = 5
+
+
+def _byl_w_kwarantannie(grp: list[dict]) -> bool:
+    """Czy rynek stał w kwarantannie w poprzednim cyklu — odczytane z logu.
+
+    Rynek w kwarantannie oznacza flagą WSZYSTKIE swoje typy, więc wystarczy
+    zajrzeć w najświeższe rozliczenia. Patrzymy na kilka ostatnich, a nie na
+    jedno, bo typy wystawione po wejściu do kwarantanny rozliczą się dopiero
+    za dzień–dwa i przez ten czas najświeższy rekord jest jeszcze sprzed
+    wstrzymania.
+    """
+    return any(
+        r.get("poza_publikacja") == "kwarantanna_rynku"
+        for r in grp[-KWARANTANNA_HISTEREZA_OKNO:]
+    )
 
 
 def rynki_kwarantanna(log: dict | None = None) -> dict[str, dict]:
-    """Rynki chwilowo poza publikacją: bias (traf vs deklaracja) z okna
-    ostatnich rozliczeń poniżej progu. Zwraca {rynek: {bias, n, hit, sr_p}}."""
+    """Rynki chwilowo poza publikacją: ROI flat z okna ostatnich rozliczeń
+    poniżej progu, z histerezą (wejście −10%, wyjście −2%) żeby rynek nie
+    migotał na granicy. Zwraca {rynek: {roi, n, hit, sr_p, bias}}."""
     if log is None:
         log = _migruj_log(supa.get_key("typy_log") or {})
     settled = [
@@ -635,6 +662,8 @@ def rynki_kwarantanna(log: dict | None = None) -> dict[str, dict]:
         if r.get("wynik") in ("wygrany", "przegrany")
         and not r.get("sugestia") and not r.get("odrzucony")
         and _z_modelu(r)   # kwarantanna dotyczy DEKLARACJI MODELU, nie drabinek
+        # bez kursu nie ma ROI — typ jest wtedy niemierzalny tą bramą
+        and r.get("kurs") and float(r["kurs"]) > 1.0
     ]
     out: dict[str, dict] = {}
     for mk in {r["rynek_kod"] for r in settled}:
@@ -647,9 +676,19 @@ def rynki_kwarantanna(log: dict | None = None) -> dict[str, dict]:
         traf = sum(1 for r in grp if r["wynik"] == "wygrany")
         sr_p = sum(r["p_model"] for r in grp) / len(grp)
         bias = (traf + 2.0) / (sr_p * len(grp) + 2.0)
-        if bias < KWARANTANNA_PROG_BIAS:
+        roi = sum(
+            (float(r["kurs"]) - 1.0) if r["wynik"] == "wygrany" else -1.0
+            for r in grp
+        ) / len(grp)
+        if roi < KWARANTANNA_ROI_WEJSCIE:
+            wstrzymany = True
+        elif roi > KWARANTANNA_ROI_WYJSCIE:
+            wstrzymany = False
+        else:
+            wstrzymany = _byl_w_kwarantannie(grp)   # strefa histerezy: bez ruchu
+        if wstrzymany:
             out[mk] = {
-                "bias": round(bias, 3), "n": len(grp),
+                "roi": round(roi, 3), "bias": round(bias, 3), "n": len(grp),
                 "hit": round(traf / len(grp), 3), "sr_p": round(sr_p, 3),
             }
     return out
