@@ -339,6 +339,8 @@ export interface Odrzucenie {
     | "stare_dane"
     | string;
   szczegol: string;
+  /** "druzyna" = odrzucony rynek drużynowy; brak = kandydat zawodniczy */
+  podmiot_typ?: "druzyna";
 }
 
 /** Jeden leg z przeanalizowanej puli — fundament generatora kuponów na żądanie. */

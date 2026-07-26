@@ -23,8 +23,30 @@ from curl_cffi import requests
 URL = "https://www.rotowire.com/soccer/lineups.php?league=WOC"
 
 
+# Litery, których NFKD NIE rozkłada, bo w Unicode są OSOBNYMI znakami
+# alfabetu, a nie "literą + diakrytem": ł nie jest "l z kreską", tylko własnym
+# kodem. Rozkład na znaki łączące ich nie tyka, więc przechodziły przez
+# normalizację nietknięte — a źródła (statshub, bank stylu, Rotowire) trzymają
+# nazwy już zwinięte do ASCII. Efekt: każda drużyna z ł w nazwie nigdy nie
+# trafiała w bank. Zmierzone 2026-07-26: 0 z 287 kluczy banku ligowego
+# zawierało ł, a lookup Wisły Kraków szedł po "wisła krakow" i wracał pusty —
+# padały przez to Wisła (obie), Widzew Łódź, Zagłębie Lubin, Jagiellonia
+# Białystok, Śląsk Wrocław, czyli pół Ekstraklasy.
+# Reszta tablicy to ten sam problem w ligach, które i tak obsługujemy:
+# skandynawskie ø/æ, bałkańskie đ, islandzkie þ/ð, niemieckie ß.
+_NIEROZKLADALNE = str.maketrans({
+    "ł": "l", "Ł": "L",
+    "ø": "o", "Ø": "O",
+    "đ": "d", "Đ": "D", "ð": "d", "Ð": "D",
+    "æ": "ae", "Æ": "AE", "œ": "oe", "Œ": "OE",
+    "þ": "th", "Þ": "TH",
+    "ß": "ss", "ı": "i",
+})
+
+
 def _norm(s: str) -> str:
     """Normalizacja nazwy (zawodnik/drużyna): bez akcentów, małe litery."""
+    s = s.translate(_NIEROZKLADALNE)
     s = unicodedata.normalize("NFKD", s)
     s = "".join(c for c in s if not unicodedata.combining(c))
     return re.sub(r"\s+", " ", s).strip().lower()

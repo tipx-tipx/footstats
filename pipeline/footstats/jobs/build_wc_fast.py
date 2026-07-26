@@ -214,6 +214,9 @@ MIN_MECZE_W_OKNIE = 2               # mniej występów w oknie = historia martwa
 STARE_DANE_S = 45 * 86400           # ostatni występ dawniej -> typ tylko "w tle"
 #   (liczy się, uczy kalibrację, widoczny w Skuteczności; wraca do publikacji
 #    po 1-2 kolejkach, gdy zawodnik znów ma świeże mecze)
+# etykiety stron linii do czytelnych szczegółów w rejestrze odrzuceń
+STRONA_PL = {"powyzej": "powyżej", "ponizej": "poniżej"}
+
 MAX_PERF_CYKL = 220                 # budżet zapytań /player/{id}/performance
 #   na cykl (1 na zawodnika, nie na rynek) — ratowanie historii spoza
 #   zasięgu feedu propsów; patrz odswiez_stare_trendy(). 120 ucinało 44 ze
@@ -1635,6 +1638,25 @@ def _main_impl(tryb=None):
             "powod": powod, "szczegol": szczegol,
         }
 
+    def _odrzuc_druzyne(mid_o, tt_o, powod: str, szczegol: str = "") -> None:
+        """To samo dla rynków DRUŻYNOWYCH.
+
+        Dotąd miały wyłącznie zbiorczy licznik drukowany na stdout, więc gdy
+        mecz przestawał dawać typy, powód znikał razem z logiem przebiegu —
+        a mecz bez ani jednego typu nie trafia nawet do `matches`, więc w apce
+        nie zostawał po nim ślad. Zmierzone 2026-07-26 na Wiśle Kraków–GKS:
+        o 13:31 trzy typy, o 14:05 zero, kursy nietknięte, powód nie do
+        odtworzenia. Ujemne id odróżnia drużynę od zawodnika w kluczu.
+        """
+        odrzucenia[(mid_o, -abs(int(tt_o.team_id or 0)), tt_o.market_code)] = {
+            "mecz_id": mid_o, "podmiot": tt_o.team_name,
+            "druzyna": tt_o.team_name,
+            "rynek_kod": tt_o.market_code,
+            "rynek": MARKET_NAMES_PL.get(tt_o.market_code, tt_o.market_code),
+            "powod": powod, "szczegol": szczegol,
+            "podmiot_typ": "druzyna",
+        }
+
     # POMIAR PROGÓW: typy odrzucone TUŻ przy progu (betting.NEAR_*) — trafiają
     # do typy_log jako `odrzucony=True` (rozliczą się w tle, POZA kalibracją,
     # skutecznością i UI). Diagnostyka porówna ich hit-rate z przepuszczonymi.
@@ -2461,9 +2483,14 @@ def _main_impl(tryb=None):
             )
             if not linie_t:
                 odpadki_t["brak_kursu"] += 1
+                _odrzuc_druzyne(mid, tt, "brak_kursu",
+                                "Superbet nie kwotuje tego rynku dla drużyny")
                 continue
             if len(tt.counts) < 5:
                 odpadki_t["krotka_historia"] += 1
+                _odrzuc_druzyne(mid, tt, "krotka_historia",
+                                f"tylko {len(tt.counts)} meczów w historii "
+                                "(potrzeba 5)")
                 continue
             pole = TEAM_POLE_BANKU[tt.market_code]
             lg_mean, _lg_n = _srednia_turnieju(pole)
@@ -2587,6 +2614,9 @@ def _main_impl(tryb=None):
                 )
                 if n_sw_t < MIN_MECZE_W_OKNIE:
                     odpadki_t["za_stara_historia"] += 1
+                    _odrzuc_druzyne(mid, tt, "za_stara_historia",
+                                    f"tylko {n_sw_t} meczów w ostatnich "
+                                    "4 miesiącach")
                     continue
                 stare_t = dni_ost_t * 86400 > STARE_DANE_S
                 if stare_t:
@@ -2622,15 +2652,36 @@ def _main_impl(tryb=None):
                     )
                     if not (pewny_t or perelka_t):
                         odpadki_t["kurs_lub_szansa_poza_widelkami"] += 1
+                        _odrzuc_druzyne(
+                            mid, tt, "kurs_lub_szansa_poza_widelkami",
+                            f"{STRONA_PL.get(strona_t, strona_t)} {l_t} "
+                            f"@{odd_t}: szansa modelu {p_t:.0%} nie łączy się "
+                            "z tym kursem w typ",
+                        )
                         continue
                     if (hi_t - lo_t) > 0.35:
                         odpadki_t["chwiejna_predykcja"] += 1
+                        _odrzuc_druzyne(
+                            mid, tt, "chwiejna_predykcja",
+                            f"{STRONA_PL.get(strona_t, strona_t)} {l_t}: "
+                            f"przedział szansy {lo_t:.0%}–{hi_t:.0%} za szeroki",
+                        )
                         continue
                     if abs(p_t - implied_t) > betting.MAX_MODEL_MARKET_DIVERGENCE:
                         odpadki_t["rozjazd_z_rynkiem"] += 1
+                        _odrzuc_druzyne(
+                            mid, tt, "rozjazd_z_rynkiem",
+                            f"{STRONA_PL.get(strona_t, strona_t)} {l_t}: model "
+                            f"{p_t:.0%} vs rynek {implied_t:.0%}",
+                        )
                         continue
                     if implied_t > 0 and p_t / implied_t > betting.MAX_RELATIVE_DIVERGENCE:
                         odpadki_t["rozjazd_z_rynkiem"] += 1
+                        _odrzuc_druzyne(
+                            mid, tt, "rozjazd_z_rynkiem",
+                            f"{STRONA_PL.get(strona_t, strona_t)} {l_t}: model "
+                            f"{p_t:.0%} to {p_t / implied_t:.1f}× wycena rynku",
+                        )
                         continue
                     ev_uk_t = kurs_ref_t = None
                     if (
