@@ -876,6 +876,16 @@ def aktualizuj_bank_stylu(
         for g in rozegrane_365:
             gid = str(g["id"])
             if gid in gry:
+                # UZUPEŁNIENIE WSTECZ: gole doszły do banku 2026-07-26, a mecz
+                # raz zapisany nigdy nie był odwiedzany ponownie — historia
+                # team_goals budowałaby się po jednym meczu na cykl zamiast
+                # istnieć od razu. Wynik jedzie w tej samej odpowiedzi, więc
+                # dopełnienie starych wpisów nie kosztuje ani jednego zapytania.
+                dr_stare = gry[gid].get("druzyny") or {}
+                for nm_g, ile_g in (g.get("gole") or {}).items():
+                    if nm_g in dr_stare and dr_stare[nm_g].get("gole") is None:
+                        dr_stare[nm_g]["gole"] = float(ile_g)
+                        zmienione = True
                 continue
             if nowych >= LIMIT_NOWYCH_GIER_STYLU:
                 break
