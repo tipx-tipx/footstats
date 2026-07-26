@@ -144,6 +144,14 @@ function odznakiPrzewagi(bet: ValueBet): {
       tone: "amber",
     });
   }
+  if (bet.wznowiony) {
+    o.push({
+      znak: "⎘",
+      label: "z wcześniejszego cyklu",
+      opis: "Ten typ został opublikowany wcześniej i czeka na rozliczenie, ale ostatnie przeliczenie go nie odtworzyło — zwykle dlatego, że źródło danych chwilowo zamilkło albo kurs wyszedł z widełek. Kurs obok jest ZAMROŻONY z chwili publikacji; przed zagraniem sprawdź aktualny u bukmachera",
+      tone: "amber",
+    });
+  }
   return o;
 }
 

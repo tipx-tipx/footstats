@@ -75,6 +75,13 @@ export interface ValueBet {
   swieze_sklady?: boolean;
   /** true = linia płaci >=12% ponad kurs wynikający z RESZTY siatki Superbetu */
   miekka_linia?: boolean;
+  /** true = typ z WCZEŚNIEJSZEGO cyklu, wznowiony z rejestru publikacji:
+   *  bieżące przeliczenie go nie odtworzyło (zwykle feed zamilkł albo kurs
+   *  wyszedł z widełek), ale został opublikowany i normalnie się rozliczy.
+   *  Kurs jest ZAMROŻONY z chwili publikacji. */
+  wznowiony?: boolean;
+  /** znacznik pierwszej publikacji typu (z rejestru, nie z bieżącego cyklu) */
+  opublikowano_ts?: number;
   /** kurs, jaki wynika z pozostałych linii buka (gdy miekka_linia) */
   kurs_oczekiwany?: number | null;
 }

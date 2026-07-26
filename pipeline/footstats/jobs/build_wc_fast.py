@@ -123,6 +123,78 @@ def _rozlicz_i_zapisz(
     p = wyniki["podsumowanie"]
     print(f"Typy: {p['opublikowane']} w logu, {p['rozliczone']} rozliczonych, "
           f"{p['trafione']} trafionych, ROI flat {p['roi_flat']:+.2f} j.")
+PUBLIKACJE_KLUCZ = "publikacje_typy"
+
+
+def _klucz_publikacji(b: dict) -> str:
+    return (f"{b.get('mecz_id')}:{rotowire._norm(str(b.get('podmiot') or ''))}"
+            f":{b.get('rynek_kod')}:{b.get('linia')}:{b.get('strona')}")
+
+
+def scal_z_publikacjami(
+    value_bets: list[dict], matches_out: dict, teraz: int | None = None,
+) -> tuple[list[dict], int]:
+    """Lista typów = wszystko, co OPUBLIKOWANE i czeka na gwizdek.
+
+    Dotąd `value_bets.json` był wynikiem BIEŻĄCEGO przeliczenia, więc typ
+    znikał userowi sprzed nosa, gdy tylko cykl przestawał go odtwarzać —
+    mimo że dawno poszedł do `typy_log` i normalnie się rozliczy. Zmierzone
+    2026-07-26 na Wiśle Kraków–GKS: o 13:31 trzy typy drużynowe, o 14:05
+    zero, kursy Superbetu nietknięte. Powód nie leżał po stronie oceny —
+    feed przestał zwracać trend dla GKS, a przy zerze typów mecz wypadał
+    nawet z `matches`, więc w apce nie zostawał po nim ślad.
+
+    `kupony.json` od dawna działa właśnie tak (aktywne kupony z logu,
+    zamrożone przy publikacji) — to przeniesienie tej samej zasady na typy.
+    Wpis wraca z ZAMROŻONYM kursem z chwili publikacji i flagą `wznowiony`,
+    żeby front mógł powiedzieć wprost, że to typ z wcześniejszego cyklu.
+    Razem z typem wraca jego rekord meczu — bez tego apka nie ma gdzie go
+    pokazać.
+
+    Zwraca (lista do publikacji, ile wpisów wznowiono). Mutuje `matches_out`.
+    """
+    teraz = teraz or int(time.time())
+    rej = supa.get_key(PUBLIKACJE_KLUCZ) or {}
+    biezace = {_klucz_publikacji(b) for b in value_bets}
+
+    for b in value_bets:
+        k = _klucz_publikacji(b)
+        rej[k] = {
+            "bet": {kk: vv for kk, vv in b.items() if kk != "kal_tau"},
+            "mecz": matches_out.get(b.get("mecz_id")),
+            "kickoff_ts": b.get("kickoff_ts"),
+            # pierwsza publikacja wygrywa — to ona jest cena, ktora wzial user
+            "opublikowano_ts": (rej.get(k) or {}).get("opublikowano_ts") or teraz,
+        }
+
+    out = list(value_bets)
+    wznowione = 0
+    for k, rec in list(rej.items()):
+        ts_k = int(rec.get("kickoff_ts") or 0)
+        if ts_k and ts_k <= teraz:
+            del rej[k]           # mecz się zaczął — typ żyje dalej w typy_log
+            continue
+        if k in biezace:
+            continue
+        bet = dict(rec.get("bet") or {})
+        if not bet:
+            continue
+        bet["wznowiony"] = True
+        bet["opublikowano_ts"] = rec.get("opublikowano_ts")
+        out.append(bet)
+        wznowione += 1
+        mid = bet.get("mecz_id")
+        if mid is not None and mid not in matches_out and rec.get("mecz"):
+            matches_out[mid] = rec["mecz"]
+
+    if not _dry_run():
+        supa.put_key(PUBLIKACJE_KLUCZ, rej)
+    if wznowione:
+        print(f"Publikacje: wznowiono {wznowione} typów z wcześniejszych cykli "
+              f"(bieżące przeliczenie dało {len(value_bets)})")
+    return out, wznowione
+
+
 def kierunki_opublikowane(log: dict) -> dict[tuple, dict]:
     """Z ZAMROŻONEGO logu: które strony linii są już opublikowane per mecz.
 
@@ -3386,8 +3458,10 @@ def _main_impl(tryb=None):
         return
 
     _dump_pokrycie()
+    # typ raz opublikowany zostaje na liście do gwizdka — patrz scal_z_publikacjami
+    value_bets_pub, _wzn = scal_z_publikacjami(value_bets, matches_out)
     _dump("value_bets.json", [
-        {k: v for k, v in b.items() if k != "kal_tau"} for b in value_bets
+        {k: v for k, v in b.items() if k != "kal_tau"} for b in value_bets_pub
     ])
     _dump("matches.json", list(matches_out.values()))
     _dump("players.json", list(players_out.values()))
