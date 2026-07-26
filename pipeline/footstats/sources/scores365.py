@@ -132,12 +132,44 @@ def competitor_ids(team_names: list[str]) -> dict[str, int]:
     return out
 
 
+def competitor_ids_z_rozgrywek(comp_ids: list[int]) -> dict[str, int]:
+    """Mapa znormalizowana nazwa -> competitorId z terminarza i wyników
+    KONKRETNYCH rozgrywek.
+
+    `competitor_ids` jest reliktem trybu MŚ: skanuje `/games/current` (ok. 100
+    bieżących meczów całego świata) i rozgrywki mundialu, więc klubu, który nie
+    gra akurat teraz, nie znajdzie. Beniaminka szukamy tam, gdzie na pewno
+    jest — w terminarzu ligi, do której właśnie awansował (w wynikach może go
+    jeszcze nie być, jeśli nie rozegrał pierwszej kolejki).
+    """
+    out: dict[str, int] = {}
+    for comp in comp_ids:
+        for endpoint in ("fixtures", "results"):
+            try:
+                data = _get(f"{BASE}/games/{endpoint}/?{Q}&competitions={comp}")
+            except Exception:
+                continue
+            for g in data.get("games", []):
+                for side in ("homeCompetitor", "awayCompetitor"):
+                    c = g.get(side) or {}
+                    nm = _norm(str(c.get("name") or ""))
+                    if nm and c.get("id") and nm not in out:
+                        out[nm] = int(c["id"])
+    return out
+
+
 def finished_games_by_competition(comp_id: int = WC_COMPETITION_ID) -> list[dict]:
-    """Ostatnie zakończone mecze rozgrywek: [{id, ts, home, away}, ...].
+    """Ostatnie zakończone mecze rozgrywek: [{id, ts, home, away, gole}, ...].
 
     /games/results per rozgrywki — pewniejsze do rozliczeń niż /games/current,
     który IGNORUJE parametry startDate/endDate i zwraca tylko ~100 bieżących
     meczów (wczorajszy mecz MŚ zwykle w ogóle się w nim nie pojawia).
+
+    `gole` = {znormalizowana nazwa: gole} z TEJ SAMEJ odpowiedzi — competitor
+    niesie `score` obok nazwy, więc bank stylu dostaje historię goli bez ani
+    jednego dodatkowego zapytania (`game_scores` woła osobny endpoint i jest
+    do rozliczania pojedynczego meczu, nie do zasilania banku). Brak wyniku
+    365 sygnalizuje wartością −1, stąd ten sam filtr `>= 0` co tam.
     """
     from datetime import datetime
 
@@ -150,10 +182,18 @@ def finished_games_by_competition(comp_id: int = WC_COMPETITION_ID) -> list[dict
             ts = int(datetime.fromisoformat(str(g.get("startTime", ""))).timestamp())
         except Exception:
             continue
+        gole: dict[str, float] = {}
+        for side in ("homeCompetitor", "awayCompetitor"):
+            c = g.get(side) or {}
+            nm = _norm(str(c.get("name") or ""))
+            sc = c.get("score")
+            if nm and sc is not None and float(sc) >= 0:
+                gole[nm] = float(sc)
         out.append({
             "id": int(g["id"]), "ts": ts,
             "home": _norm(str((g.get("homeCompetitor") or {}).get("name", ""))),
             "away": _norm(str((g.get("awayCompetitor") or {}).get("name", ""))),
+            "gole": gole if len(gole) == 2 else {},
         })
     return out
 

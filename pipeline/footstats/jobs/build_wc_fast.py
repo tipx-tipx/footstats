@@ -635,11 +635,82 @@ LIMIT_NOWYCH_GIER_STYLU = 40
 LIMIT_WZROSTOW_NA_CYKL = 30
 
 
+# Beniaminek: ile gier w banku uznajemy za "zna go" — poniżej dociągamy jego
+# WŁASNĄ historię, także z niższej ligi. 4 to minimum, na którym counts.py
+# w ogóle stawia posterior (brama krotka_historia wymaga 5).
+MIN_GIER_BANKU = 4
+# ile własnych meczów dociągamy takiej drużynie i ile drużyn na cykl
+BENIAMINEK_GIER = 8
+BENIAMINEK_DRUZYN_CYKL = 6
+
+
+def dolej_historie_wlasna(
+    bank: dict, nazwy_druzyn: set[str], comp_ids: list[int] | None = None,
+    budzet: int = BENIAMINEK_DRUZYN_CYKL,
+) -> int:
+    """Dociągnij własne mecze drużynom, których bank prawie nie zna.
+
+    Bank stylu jest zasilany PER ROZGRYWKI (`comp365` z rozgrywki.PROFILE), więc
+    beniaminek nie istnieje w nim aż do kilku kolejek nowego sezonu — jego
+    poprzedni rok rozegrał w rozgrywkach spoza rejestru. Zmierzone 2026-07-26:
+    Wisła Kraków miała 0 gier w banku, bo cały sezon 25/26 grała w I lidze,
+    i przez to wypadała z typów jako `za_stara_historia`.
+
+    Historia z niższego poziomu NIE jest tym samym co z Ekstraklasy, dlatego
+    zapisujemy przy grze `comp` (rozgrywki, z których pochodzi) — korekta
+    poziomu dzieje się przy KONSUMPCJI (`_hist_z_banku`), nie tutaj: surowe
+    liczby zostają surowe, a to, jak je przeliczyć, jest decyzją modelu.
+    """
+    gry = bank.setdefault("gry", {})
+    ile_gier: dict[str, int] = {}
+    for rec in gry.values():
+        for nm in (rec.get("druzyny") or {}):
+            ile_gier[nm] = ile_gier.get(nm, 0) + 1
+    ubogie = sorted(
+        (nm for nm in {rotowire._norm(n) for n in nazwy_druzyn if n}
+         if ile_gier.get(nm, 0) < MIN_GIER_BANKU),
+        key=lambda nm: ile_gier.get(nm, 0),
+    )[:budzet]
+    if not ubogie:
+        return 0
+    id_map = scores365.competitor_ids_z_rozgrywek(comp_ids or [])
+    dodane = 0
+    for nm in ubogie:
+        try:
+            cid = id_map.get(nm) or scores365.competitor_ids([nm]).get(nm)
+            if not cid:
+                print(f"Bank stylu: nie rozwiązano id 365 dla '{nm}' "
+                      "— historia własna pominięta")
+                continue
+            for gid_i, ts_i in scores365.recent_finished_games(
+                int(cid), BENIAMINEK_GIER
+            ):
+                gid_s = str(gid_i)
+                if gid_s in gry:
+                    continue
+                druzyny = scores365.game_team_stats(gid_i)
+                if len(druzyny) != 2:
+                    continue
+                for nm_g, ile_g in (scores365.game_scores(gid_i) or {}).items():
+                    if nm_g in druzyny:
+                        druzyny[nm_g]["gole"] = float(ile_g)
+                gry[gid_s] = {"ts": ts_i, "druzyny": druzyny, "wlasna": True}
+                dodane += 1
+                time.sleep(0.3)
+        except Exception:
+            continue
+    if dodane:
+        print(f"Bank stylu: dociągnięto {dodane} własnych meczów dla "
+              f"{len(ubogie)} drużyn ubogich w historię ({', '.join(ubogie)})")
+    return dodane
+
+
 def aktualizuj_bank_stylu(
     gracze_id_sh: set[int],
     comp_ids: list[int] | None = None,
     past_events: list[dict] | None = None,
     klucz: str = "styl_bank",
+    nazwy_druzyn: set[str] | None = None,
 ) -> dict:
     """Dolej do banku stylu (Supabase `klucz`) nowe rozegrane mecze:
     statystyki drużynowe i styl zawodników (365Scores), sytuacje strzałów
@@ -685,6 +756,16 @@ def aktualizuj_bank_stylu(
                 continue
             if len(druzyny) != 2:
                 continue
+            # GOLE do banku (2026-07-26): `game_team_stats` ich nie zwraca —
+            # 365 nie traktuje wyniku jako "statystyki" — więc bank nie miał
+            # historii dla team_goals, jedynego rynku z dodatnim ROI. Wynik
+            # jedzie w tej samej odpowiedzi co lista meczów, czyli za zero
+            # dodatkowych zapytań. TEAM_POLE_BANKU już mapuje team_goals na
+            # "gole", więc to wypełnienie samo aktywuje istniejące ścieżki:
+            # _hist_z_banku, _srednia_turnieju i koncesje drużynowe.
+            for nm_g, ile_g in (g.get("gole") or {}).items():
+                if nm_g in druzyny:
+                    druzyny[nm_g]["gole"] = float(ile_g)
             gry[gid] = {"ts": g["ts"], "druzyny": druzyny}
             for pkey, rec in pelne.items():
                 if not rec.get("minutes"):
@@ -716,6 +797,15 @@ def aktualizuj_bank_stylu(
             time.sleep(0.3)
     except Exception as e:
         print(f"Bank stylu: mecze 365 pominięte ({e})")
+
+    # 1b) beniaminkowie i wracający z niższych lig: bank zasilany per rozgrywki
+    # nigdy ich nie zobaczy, dopóki nie rozegrają kilku kolejek nowego sezonu
+    if nazwy_druzyn:
+        try:
+            if dolej_historie_wlasna(bank, nazwy_druzyn, comp_ids):
+                zmienione = True
+        except Exception as e:
+            print(f"Bank stylu: własna historia pominięta ({e})")
 
     # 2) shotmapy statshub (kontry per drużyna, stałe fragmenty per zawodnik)
     try:
@@ -1388,6 +1478,7 @@ def _main_impl(tryb=None):
                 comp_ids=rozgrywki.comp365_druzynowe(),
                 past_events=tryb.past_druzynowe_events,
                 klucz="styl_bank_liga",
+                nazwy_druzyn=set(tryb.team_name.values()),
             )
         else:
             bank_stylu = aktualizuj_bank_stylu({t.player_id for t in trends})
@@ -2296,13 +2387,43 @@ def _main_impl(tryb=None):
         }
         gry_banku = list((bank_stylu.get("gry") or {}).values())
 
+        def _skala_poziomu(pole: str) -> float:
+            """Ile razy ten sam wskaźnik jest wyższy w rozgrywkach zakresu niż
+            w meczach dociągniętych własną ścieżką (niższe ligi beniaminków).
+
+            Bierzemy stosunek średnich, nie różnicę — jest bezwymiarowy, więc
+            odporny na to, czy mowa o rożnych, faulach czy strzałach. Przy
+            chudej próbce ściągamy go w stronę 1,0 wagą n/(n+8): beniaminek
+            zwykle słabnie po awansie, ale jednego meczu nie wolno brać za
+            dowód poziomu ligi.
+            """
+            zakres, wlasne = [], []
+            for rec_g in gry_banku:
+                cel = wlasne if rec_g.get("wlasna") else zakres
+                for d in (rec_g.get("druzyny") or {}).values():
+                    if d.get(pole) is not None:
+                        cel.append(float(d[pole]))
+            if len(wlasne) < 2 or not zakres:
+                return 1.0
+            sr_w = sum(wlasne) / len(wlasne)
+            if sr_w <= 0:
+                return 1.0
+            raw = (sum(zakres) / len(zakres)) / sr_w
+            waga = len(wlasne) / (len(wlasne) + 8.0)
+            return float(np.clip(1.0 + (raw - 1.0) * waga, 0.70, 1.40))
+
         def _hist_z_banku(team_nm: str, pole: str) -> tuple[list, list]:
             tn = rotowire._norm(team_nm)
+            skala = _skala_poziomu(pole)
             pary = []
             for rec_g in gry_banku:
                 dr = rec_g.get("druzyny") or {}
                 if tn in dr and dr[tn].get(pole) is not None:
-                    pary.append((int(rec_g.get("ts") or 0), float(dr[tn][pole])))
+                    # mecz z niższej ligi liczy się, ale przeliczony na poziom
+                    # rozgrywek, w których drużyna gra TERAZ
+                    mnoznik = skala if rec_g.get("wlasna") else 1.0
+                    pary.append((int(rec_g.get("ts") or 0),
+                                 float(dr[tn][pole]) * mnoznik))
             pary.sort(key=lambda x: -x[0])
             return [c for _, c in pary], [t for t, _ in pary]
 
