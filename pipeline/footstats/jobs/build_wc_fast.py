@@ -805,13 +805,15 @@ def dolej_historie_wlasna(
         return 0
     id_map = scores365.competitor_ids_z_rozgrywek(comp_ids or [])
     dodane = 0
+    udane: list[str] = []
+    nieudane: list[str] = []
     for nm in ubogie:
         try:
             cid = id_map.get(nm) or scores365.competitor_ids([nm]).get(nm)
             if not cid:
-                print(f"Bank stylu: nie rozwiązano id 365 dla '{nm}' "
-                      "— historia własna pominięta")
+                nieudane.append(nm)
                 continue
+            przed = dodane
             for gid_i, ts_i in scores365.recent_finished_games(
                 int(cid), BENIAMINEK_GIER
             ):
@@ -827,11 +829,16 @@ def dolej_historie_wlasna(
                 gry[gid_s] = {"ts": ts_i, "druzyny": druzyny, "wlasna": True}
                 dodane += 1
                 time.sleep(0.3)
+            (udane if dodane > przed else nieudane).append(nm)
         except Exception:
+            nieudane.append(nm)
             continue
-    if dodane:
+    if dodane or nieudane:
+        # komunikat mówi o UDANYCH, nie o kandydatach: poprzednia wersja
+        # raportowała "dociągnięto dla 6 drużyn", gdy udało się dla jednej
         print(f"Bank stylu: dociągnięto {dodane} własnych meczów dla "
-              f"{len(ubogie)} drużyn ubogich w historię ({', '.join(ubogie)})")
+              f"{len(udane)} drużyn ({', '.join(udane) or '—'})"
+              + (f"; bez id 365: {', '.join(nieudane)}" if nieudane else ""))
     return dodane
 
 
@@ -1618,7 +1625,18 @@ def _main_impl(tryb=None):
                 comp_ids=rozgrywki.comp365_druzynowe(),
                 past_events=tryb.past_druzynowe_events,
                 klucz="styl_bank_liga",
-                nazwy_druzyn=set(tryb.team_name.values()),
+                # tylko drużyny z meczów objętych zakresem DRUŻYNOWYM: bank
+                # stylu służy rynkom drużynowym, a id 365 potrafimy rozwiązać
+                # wyłącznie z terminarzy tych rozgrywek. Dla Cruzeiro czy
+                # Hammarby (poza zakresem) i tak nie liczymy rynków drużynowych,
+                # więc dociąganie im historii to spalone zapytania i szum
+                # w logu ("nie rozwiązano id 365" dla 5 z 6 drużyn).
+                nazwy_druzyn={
+                    tryb.team_name[t] for e in tryb.events
+                    if e.get("id") in tryb.druzynowe_mids
+                    for t in (e.get("homeTeamId"), e.get("awayTeamId"))
+                    if t in tryb.team_name
+                },
             )
         else:
             bank_stylu = aktualizuj_bank_stylu({t.player_id for t in trends})
