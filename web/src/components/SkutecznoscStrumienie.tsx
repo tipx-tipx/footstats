@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 
+import { KartyDrabinek } from "./KartyDrabinek";
 import { Segmented } from "./Segmented";
 import { SkutecznoscDzienna } from "./SkutecznoscDzienna";
 import type { SkutecznoscStrumienia, Strumien, TypyWyniki } from "@/lib/types";
@@ -174,7 +175,16 @@ export function SkutecznoscStrumienie({
         </div>
       )}
 
-      {dane!.dni.length > 0 && <SkutecznoscDzienna dni={dane!.dni} />}
+      {/* DRABINKI: kronika kart zamiast pagera po dniach. Kart jest kilka na
+          dobę, więc pytanie „która weszła, a która nie" musi mieć odpowiedź
+          bez klikania po dniach — patrz KartyDrabinek. Pozostałe strumienie
+          (dziesiątki typów dziennie) zostają przy widoku dziennym. */}
+      {dane!.dni.length > 0 &&
+        (wybrany === "drabinki" ? (
+          <KartyDrabinek dni={dane!.dni} />
+        ) : (
+          <SkutecznoscDzienna dni={dane!.dni} />
+        ))}
     </div>
   );
 }

@@ -45,6 +45,25 @@ export function fmtDataCzas(ts: number): string {
   });
 }
 
+/** "2026-07-10" -> "czw, 10 lip" (dłużej: "czwartek, 10 lipca").
+ *  Doba brana z południa lokalnego — inaczej strefa przesuwa etykietę o dzień. */
+export function fmtDzien(dzien: string, dlugo = false): string {
+  return new Intl.DateTimeFormat("pl-PL", {
+    weekday: dlugo ? "long" : "short",
+    day: "numeric",
+    month: dlugo ? "long" : "short",
+  }).format(new Date(`${dzien}T12:00:00`));
+}
+
+/** Sama godzina kickoffu ("20:15") w czasie polskim. */
+export function fmtGodzina(ts: number): string {
+  return new Date(ts * 1000).toLocaleTimeString("pl-PL", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Europe/Warsaw",
+  });
+}
+
 export const STRONA_LABEL: Record<string, string> = {
   powyzej: "powyżej",
   ponizej: "poniżej",

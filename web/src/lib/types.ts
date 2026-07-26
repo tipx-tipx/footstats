@@ -558,6 +558,8 @@ export interface TypRozliczony {
   /** typ rozliczony poza publikacją: "kwarantanna_rynku" | "limit_meczu";
    *  widoczny w Skuteczności z oznaczeniem, poza licznikami trafień/ROI */
   poza_publikacja?: string | null;
+  /** tylko karty drabinek: klasa zamrożona przy publikacji (top/mocny/solidny) */
+  klasa?: string | null;
 }
 
 /** Kupon w historii: zamrożony przy publikacji, rozliczany z legów. */

@@ -1276,6 +1276,11 @@ def _typ_dnia(r: dict) -> dict:
         "strona": r.get("strona"), "kurs": r.get("kurs"),
         "p_model": r.get("p_model"), "wynik": r.get("wynik"),
         "faktyczna": r.get("faktyczna"), "clv_pct": r.get("clv_pct"),
+        # klasa karty drabinki zamrożona przy publikacji (top/mocny/solidny) —
+        # bez niej lista rozliczonych kart nie mówi, czy przegrała karta
+        # oznaczona jako najlepsza, czy ta z końca rankingu. Typy modelu
+        # klasy nie mają, więc pole zostaje puste
+        "klasa": r.get("klasa"),
         # typ poza publikacją (kwarantanna/limit meczu) — w liście dnia
         # widoczny z oznaczeniem, ale poza licznikami skuteczności
         "poza_publikacja": r.get("poza_publikacja"),

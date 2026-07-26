@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { fmtLinia, STRONA_LABEL } from "@/lib/format";
+import { fmtDzien, fmtLinia, STRONA_LABEL } from "@/lib/format";
 import type { SkutecznoscDnia } from "@/lib/types";
 
 /** Typ rozliczony w tle: dlaczego nie było go na liście typów. */
@@ -11,16 +11,6 @@ const POZA_LABEL: Record<string, string> = {
   limit_meczu: "Ponad limit typów z jednego meczu, typ był dostępny tylko w generatorze kuponów",
   stare_dane: "Zawodnik dawno nie grał (stare dane), typ rozliczył się w tle",
 };
-
-/** "2026-07-10" -> "czw, 10 lip" (bez skoków stref: południe lokalne). */
-function etykietaDnia(dzien: string, dlugo = false): string {
-  const d = new Date(`${dzien}T12:00:00`);
-  return new Intl.DateTimeFormat("pl-PL", {
-    weekday: dlugo ? "long" : "short",
-    day: "numeric",
-    month: dlugo ? "long" : "short",
-  }).format(d);
-}
 
 /**
  * Skuteczność realnych typów DZIEŃ PO DNIU z przełącznikiem: strzałki
@@ -56,7 +46,7 @@ export function SkutecznoscDzienna({ dni }: { dni: SkutecznoscDnia[] }) {
         </button>
         <p className="text-center">
           <span className="block font-display font-semibold capitalize tracking-tight">
-            {etykietaDnia(dzien.dzien, true)}
+            {fmtDzien(dzien.dzien, true)}
           </span>
           <span className="text-xs text-faint">
             {i === 0 ? "najświeższy rozliczony dzień" : `${i} dni wstecz`}
@@ -83,7 +73,7 @@ export function SkutecznoscDzienna({ dni }: { dni: SkutecznoscDnia[] }) {
               <button
                 key={d.dzien}
                 onClick={() => setI(idx)}
-                title={`${etykietaDnia(d.dzien, true)}: ${d.trafione}/${d.rozliczone} trafionych`}
+                title={`${fmtDzien(d.dzien, true)}: ${d.trafione}/${d.rozliczone} trafionych`}
                 className={`flex shrink-0 flex-col items-center gap-1 rounded-(--radius-control) px-2 py-1.5 transition-colors ${
                   aktywny ? "bg-brand-wash" : "hover:bg-card-soft"
                 }`}
