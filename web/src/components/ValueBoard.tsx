@@ -43,6 +43,20 @@ const PEWNOSC_FILTRY: { kod: Pewnosc | "kazda"; label: string }[] = [
 
 type SortKey = "ranking" | "ev" | "pewnosc" | "kickoff" | "kurs";
 
+/**
+ * Sortowanie zakładki Drabinki — inne pytania niż przy typach modelu.
+ * "najlepsze" = ranking z backendu (ocena.miejsce): przewaga nad kursem po
+ * korekcie na rywala, sędziego i scenariusz meczu.
+ */
+type SortDrabinki = "najlepsze" | "szansa" | "kurs" | "kickoff";
+
+const SORTOWANIA_DRABINKI: { kod: SortDrabinki; label: string }[] = [
+  { kod: "najlepsze", label: "Najlepsze typy" },
+  { kod: "szansa", label: "Największa szansa" },
+  { kod: "kurs", label: "Najwyższy kurs" },
+  { kod: "kickoff", label: "Najbliższy mecz" },
+];
+
 // Kolejność wejściowa bets = ranking silnika (szansa × kurs + kontekst:
 // matchup, świeże składy, miękka linia) — to jest "Polecane".
 const SORTOWANIA: { kod: SortKey; label: string }[] = [
@@ -113,17 +127,47 @@ export function ValueBoard({
   );
   const [sortuj, setSortuj] = useState<SortKey>("ranking");
   const [limit, setLimit] = useState(25);
-  // Drabinki: grupowanie kart po meczach (backend sortuje chronologicznie,
-  // w meczu po jakości). Filtr „tylko sygnały" USUNIĘTY 2026-07-25: odkąd
-  // każda karta musi przejść te same twarde bramy, etykieta transfer/forma
-  // mówi tylko, dlaczego zwróciliśmy uwagę na gracza — nie ile karta jest
-  // warta. Filtrowanie po niej dawało przypadkowy podzbiór.
+  // Drabinki: sortowanie osobne od typów modelu (inne pola, inne pytania).
+  // Domyślnie „najlepsze" — kolejność z backendu (ocena.miejsce), bo to
+  // JEDYNA definicja jakości karty w całym systemie. Przy sortowaniu po
+  // jakości lista jest PŁASKA: grupowanie po meczach chowałoby ranking,
+  // bo najlepsza karta dnia lądowałaby w środku listy pod nazwą meczu.
+  const [sortDrabinki, setSortDrabinki] = useState<SortDrabinki>("najlepsze");
+  const radarPosortowane = useMemo(() => {
+    const w = [...radarWpisy];
+    switch (sortDrabinki) {
+      case "najlepsze":
+        w.sort(
+          (a, b) => (a.ocena?.miejsce ?? 9999) - (b.ocena?.miejsce ?? 9999),
+        );
+        break;
+      case "szansa":
+        w.sort((a, b) => (b.ocena?.p_final ?? 0) - (a.ocena?.p_final ?? 0));
+        break;
+      case "kurs":
+        w.sort((a, b) => (b.hero?.kurs ?? 0) - (a.hero?.kurs ?? 0));
+        break;
+      case "kickoff":
+        w.sort(
+          (a, b) =>
+            a.kickoff_ts - b.kickoff_ts ||
+            (a.ocena?.miejsce ?? 9999) - (b.ocena?.miejsce ?? 9999),
+        );
+        break;
+    }
+    return w;
+  }, [radarWpisy, sortDrabinki]);
+  // Grupowanie po meczach ma sens WYŁĄCZNIE przy sortowaniu chronologicznym
+  // (backend sortuje wtedy chronologicznie, w meczu po jakości). Filtr „tylko
+  // sygnały" USUNIĘTY 2026-07-25: odkąd każda karta musi przejść te same
+  // twarde bramy, etykieta transfer/forma mówi tylko, dlaczego zwróciliśmy
+  // uwagę na gracza — nie ile karta jest warta.
   const radarGrupy = useMemo(() => {
     const grupy = new Map<
       number,
       { mecz: string; kickoff_ts: number; wpisy: RadarWpis[] }
     >();
-    for (const w of radarWpisy) {
+    for (const w of radarPosortowane) {
       const g = grupy.get(w.mecz_id);
       if (g) g.wpisy.push(w);
       else
@@ -134,7 +178,7 @@ export function ValueBoard({
         });
     }
     return [...grupy.values()];
-  }, [radarWpisy]);
+  }, [radarPosortowane]);
   // świeżość skanu STS liczona PO stronie klienta (po mount), żeby Date.now()
   // nie rozjechał SSR/hydracji — do mount pole zostaje puste
   const [swiezosc, setSwiezosc] = useState<ReturnType<typeof odswiezTemu>>(null);
@@ -336,46 +380,81 @@ export function ValueBoard({
             <>
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                 <p className="max-w-prose text-xs leading-relaxed text-muted">
-                  Drabinka kursów Superbetu + pełna analiza zawodnika. Tam,
-                  gdzie widzisz procent, model policzył szansę linii; „8/10" =
-                  linia trafiona w 8 z 10 ostatnich meczów. Decyzja należy do
-                  ciebie.
+                  Drabinka kursów Superbetu + pełna analiza zawodnika. „8/10” =
+                  linia trafiona w 8 z 10 ostatnich meczów, a procent obok to
+                  szansa PO korekcie na ten mecz: kogo zawodnik ma przed sobą,
+                  kto sędziuje i jak zapowiada się spotkanie. Rozwiń kartę, żeby
+                  zobaczyć, co dokładnie ją podbiło albo ścięło.
                 </p>
                 <span className="font-data shrink-0 text-sm font-semibold text-brand-deep">
                   {odmienPozycje(radarWpisy.length)}
                 </span>
               </div>
 
-              {/* karty pogrupowane po meczach, chronologicznie */}
-              <div className="space-y-6">
-                {radarGrupy.map((g) => (
-                  <section key={`${g.mecz}-${g.kickoff_ts}`}>
-                    <div className="mb-2 flex items-baseline justify-between gap-3 border-b border-hairline pb-1.5">
-                      <h3 className="min-w-0 truncate text-sm font-semibold text-ink">
-                        {g.mecz}
-                      </h3>
-                      <span className="font-data shrink-0 text-xs text-muted">
-                        {fmtDataCzas(g.kickoff_ts)}
-                      </span>
-                    </div>
-                    <div className="space-y-3">
-                      {g.wpisy.map((w, i) => (
-                        <motion.div
-                          key={w.id}
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{
-                            delay: Math.min(i * 0.03, 0.3),
-                            duration: 0.3,
-                          }}
-                        >
-                          <RadarCard w={w} />
-                        </motion.div>
-                      ))}
-                    </div>
-                  </section>
-                ))}
+              <div className="mb-4">
+                <FilterDropdown
+                  label="Sortuj"
+                  value={sortDrabinki}
+                  options={SORTOWANIA_DRABINKI.map((s) => ({
+                    value: s.kod,
+                    label: s.label,
+                  }))}
+                  onChange={(v) => setSortDrabinki(v as SortDrabinki)}
+                />
               </div>
+
+              {sortDrabinki === "kickoff" ? (
+                /* chronologicznie — karty pogrupowane po meczach */
+                <div className="space-y-6">
+                  {radarGrupy.map((g) => (
+                    <section key={`${g.mecz}-${g.kickoff_ts}`}>
+                      <div className="mb-2 flex items-baseline justify-between gap-3 border-b border-hairline pb-1.5">
+                        <h3 className="min-w-0 truncate text-sm font-semibold text-ink">
+                          {g.mecz}
+                        </h3>
+                        <span className="font-data shrink-0 text-xs text-muted">
+                          {fmtDataCzas(g.kickoff_ts)}
+                        </span>
+                      </div>
+                      <div className="space-y-3">
+                        {g.wpisy.map((w, i) => (
+                          <motion.div
+                            key={w.id}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{
+                              delay: Math.min(i * 0.03, 0.3),
+                              duration: 0.3,
+                            }}
+                          >
+                            <RadarCard w={w} />
+                          </motion.div>
+                        ))}
+                      </div>
+                    </section>
+                  ))}
+                </div>
+              ) : (
+                /* ranking — lista płaska, bo to kolejność niesie informację */
+                <div className="space-y-3">
+                  {radarPosortowane.map((w, i) => (
+                    <motion.div
+                      key={w.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{
+                        delay: Math.min(i * 0.03, 0.3),
+                        duration: 0.3,
+                      }}
+                    >
+                      <p className="mb-1 truncate text-[11px] text-faint">
+                        {w.mecz} · {fmtDataCzas(w.kickoff_ts)}
+                      </p>
+                      <RadarCard w={w} />
+                    </motion.div>
+                  ))}
+                </div>
+              )}
             </>
           )}
         </div>

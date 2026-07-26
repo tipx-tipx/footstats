@@ -83,12 +83,43 @@ OKNO_PAROWANIA_S = 36 * 3600
 TERMIN_BRAK_DANYCH_S = 48 * 3600
 
 
+# --- STRUMIENIE TYPÓW W LOGU ---
+# Log trzyma typy o RÓŻNYM rodowodzie, z różnym znaczeniem pola p_model:
+#   * typy modelu (brak `zrodlo`) — p z silnika NB; uczą kalibrację, bias
+#     i kwarantannę rynków,
+#   * DRABINKI (`zrodlo="drabinka"`) — p z pokrycia linii skorygowanego
+#     kontekstem meczu, liczone CAŁKIEM poza silnikiem (jobs/radar.py).
+# To dwa różne estymatory tej samej rzeczy, więc muszą się rozliczać osobno:
+# wpuszczenie drabinek do kalibracji modelu zatruwałoby ją cudzymi błędami,
+# a modelu do skuteczności drabinek — odwrotnie. Rozdziela je ten predykat.
+ZRODLO_DRABINKA = "drabinka"
+
+
+def _z_modelu(r: dict) -> bool:
+    """Typ policzony przez silnik — tylko takie uczą kalibrację i kwarantannę."""
+    return not r.get("zrodlo")
+
+
+def _strumien(r: dict) -> str:
+    """Strumień skuteczności typu: pewniaki / druzyny / drabinki."""
+    if r.get("zrodlo") == ZRODLO_DRABINKA:
+        return "drabinki"
+    if str(r.get("rynek_kod") or "").startswith("team_"):
+        return "druzyny"
+    return "pewniaki"
+
+
 def _klucz(b: dict) -> str:
     # klucz po ZNORMALIZOWANYM NAZWISKU, nie player_id: syntetyczne id
     # (bank/365) może się różnić między źródłami, a w erze randomizowanego
     # hash() zmieniało się co cykl i dublowało typy w logu (do 25 kopii)
     podmiot = rotowire._norm(str(b["podmiot"]))
-    return f"{b['mecz_id']}:{podmiot}:{b['rynek_kod']}:{b['linia']}:{b['strona']}"
+    k = f"{b['mecz_id']}:{podmiot}:{b['rynek_kod']}:{b['linia']}:{b['strona']}"
+    # drabinka trafia w tę samą linię co typ modelu zaskakująco często —
+    # bez sufiksu jeden rekord obsługiwałby oba strumienie i pierwszy z brzegu
+    # decydowałby, do którego licznika trafi wynik. Stare klucze (bez `zrodlo`)
+    # zostają nietknięte, więc log nie wymaga migracji.
+    return f"{k}:{b['zrodlo']}" if b.get("zrodlo") else k
 
 
 _RANGA_WYNIKU = {"wygrany": 2, "przegrany": 2, "zwrot": 1, None: 0}
@@ -209,6 +240,14 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
             # skuteczności/kalendarza/UI — w odróżnieniu od `odrzucony`,
             # który jest też poza kalibracją.
             "poza_publikacja": b.get("poza_publikacja"),
+            # STRUMIEŃ: brak = typ modelu. "drabinka" = karta z zakładki
+            # Drabinki; `klasa` i `edge` zamrożone przy publikacji, żeby dało
+            # się potem sprawdzić, czy klasa „top" faktycznie trafia lepiej
+            # niż „solidny" (inaczej progi PROG_KLASY zostaną na zawsze
+            # nieweryfikowalnym założeniem)
+            **({"zrodlo": b["zrodlo"]} if b.get("zrodlo") else {}),
+            **({"klasa": b["klasa"]} if b.get("klasa") else {}),
+            **({"edge": b["edge"]} if b.get("edge") is not None else {}),
             "opublikowano_ts": int(time.time()),
             "wynik": None, "faktyczna": None,
         }
@@ -487,7 +526,8 @@ def compute_bias(log: dict, min_n: int = MIN_N_KALIBRACJI) -> dict[str, float]:
     """Płaski bias per rynek (stary format) — zachowany dla raportu i testów."""
     grupy: dict[str, list[dict]] = {}
     for r in log.values():
-        if r.get("wynik") in ("wygrany", "przegrany") and not r.get("odrzucony"):
+        if (r.get("wynik") in ("wygrany", "przegrany")
+                and not r.get("odrzucony") and _z_modelu(r)):
             grupy.setdefault(r["rynek_kod"], []).append(r)
     return {
         mk: _cap_bias(_bias_surowy(grp))
@@ -523,6 +563,9 @@ def compute_bias_full(
         if r.get("wynik") in ("wygrany", "przegrany")
         and bool(r.get("sugestia")) == sugestie
         and not r.get("odrzucony")
+        # drabinki mają własne p (pokrycie + kontekst), nie p silnika —
+        # kalibracja modelu musi je pomijać, inaczej uczy się cudzych błędów
+        and _z_modelu(r)
     ]
     # ważenie świeżości względem najnowszego rozliczenia w logu — świeże
     # błędy ważą więcej, stare wygasają (półokres KALIBRACJA_POLOWICZNY_DNI)
@@ -591,6 +634,7 @@ def rynki_kwarantanna(log: dict | None = None) -> dict[str, dict]:
         r for r in log.values()
         if r.get("wynik") in ("wygrany", "przegrany")
         and not r.get("sugestia") and not r.get("odrzucony")
+        and _z_modelu(r)   # kwarantanna dotyczy DEKLARACJI MODELU, nie drabinek
     ]
     out: dict[str, dict] = {}
     for mk in {r["rynek_kod"] for r in settled}:
@@ -651,6 +695,7 @@ def compute_wagi_zaufania(log: dict) -> dict[str, dict]:
             r for r in log.values()
             if r.get("wynik") in ("wygrany", "przegrany")
             and not r.get("sugestia") and not r.get("odrzucony")
+            and _z_modelu(r)   # waga zaufania dotyczy p_model, nie drabinek
             and r.get("kurs") and float(r["kurs"]) > 1.0
             and (r.get("pewnosc") or "srednia") == kubelek
         ]
@@ -687,7 +732,8 @@ def compute_diagnostyka(log: dict) -> dict:
     # typy pomiarowe (odrzucone przy progu) NIE wchodzą do kategorii jakości
     # modelu — mają własną kategorię porównawczą niżej
     wszystkie_settled = [
-        r for r in log.values() if r.get("wynik") in ("wygrany", "przegrany")
+        r for r in log.values()
+        if r.get("wynik") in ("wygrany", "przegrany") and _z_modelu(r)
     ]
     settled = [r for r in wszystkie_settled if not r.get("odrzucony")]
 
@@ -1292,6 +1338,67 @@ def skutecznosc_per_dzien(
     return out
 
 
+STRUMIENIE = ("pewniaki", "druzyny", "drabinki")
+
+
+def skutecznosc_strumieni(log: dict, dni: int = 21) -> dict[str, dict]:
+    """Skuteczność rozbita na strumienie: pewniaki / drużyny / drabinki.
+
+    Jeden wspólny licznik mówił o wszystkim naraz i o niczym konkretnie:
+    typ zawodniczy z silnika, rynek drużynowy i karta z drabinki to trzy
+    różne produkty, o różnym ryzyku i różnym pochodzeniu prawdopodobieństwa.
+    Dopiero osobne liczniki odpowiadają na pytanie „czy TO działa".
+
+    Każdy strumień dostaje ten sam kształt co `skutecznosc_dzienna`
+    (dni + lista typów) plus własne podsumowanie, a drabinki dodatkowo
+    rozbicie po KLASIE karty — to jedyny sposób sprawdzić, czy „top"
+    naprawdę trafia lepiej niż „solidny", zamiast wierzyć progom.
+    """
+    out: dict[str, dict] = {}
+    for nazwa in STRUMIENIE:
+        w_strumieniu = [
+            r for r in log.values()
+            if r.get("wynik") in ("wygrany", "przegrany")
+            and r.get("rynek_kod") not in RYNKI_OSOBNE
+            and not r.get("odrzucony")
+            and _strumien(r) == nazwa
+        ]
+        settled = [r for r in w_strumieniu if not r.get("poza_publikacja")]
+        poza = [r for r in w_strumieniu if r.get("poza_publikacja")]
+        okazje = [r for r in settled if not r.get("sugestia") and r.get("kurs")]
+        trafione = sum(1 for r in settled if r["wynik"] == "wygrany")
+        roi = sum(
+            (float(r["kurs"]) - 1.0) if r["wynik"] == "wygrany" else -1.0
+            for r in okazje
+        )
+        rec: dict = {
+            "dni": skutecznosc_per_dzien(settled, dni=dni, poza=poza),
+            "podsumowanie": {
+                "rozliczone": len(settled),
+                "trafione": trafione,
+                "skutecznosc": (
+                    round(trafione / len(settled), 3) if settled else None
+                ),
+                "okazje_rozliczone": len(okazje),
+                "roi_flat": round(roi, 2),
+            },
+        }
+        klasy: dict[str, dict] = {}
+        for r in settled:
+            if not r.get("klasa"):
+                continue
+            k = klasy.setdefault(r["klasa"], {"n": 0, "trafione": 0})
+            k["n"] += 1
+            if r["wynik"] == "wygrany":
+                k["trafione"] += 1
+        if klasy:
+            for k in klasy.values():
+                k["skutecznosc"] = round(k["trafione"] / k["n"], 3)
+            rec["klasy"] = klasy
+        out[nazwa] = rec
+    return out
+
+
 def _statshub_wynik(event_id: int, cache: dict) -> dict | None:
     """Wynik meczu z otwartego API statshub; cache per przebieg rozliczania."""
     if event_id in cache:
@@ -1344,10 +1451,19 @@ def rozlicz(
     niedostepni: set[int] | None = None,
     conf_mids: set[int] | None = None,
     legi_pool: list[dict] | None = None,
+    drabinki: list[dict] | None = None,
 ) -> dict:
-    """Dopisz nowe typy do logu, rozlicz zakończone, zwróć podsumowanie."""
+    """Dopisz nowe typy do logu, rozlicz zakończone, zwróć podsumowanie.
+
+    `drabinki` — typy „hero" z kart zakładki Drabinki (jobs/radar.py). Idą do
+    tego samego logu i rozliczają się tą samą maszynerią, ale z flagą
+    `zrodlo="drabinka"`, która trzyma je poza kalibracją, biasem i kwarantanną
+    modelu (patrz `_z_modelu`). Bez tego „najlepsze typy" byłyby deklaracją
+    bez pokrycia — nikt by nie wiedział, czy trafiają.
+    """
     log = _migruj_log(supa.get_key("typy_log") or {})
     _dopisz_nowe(log, value_bets)
+    _dopisz_nowe(log, drabinki or [])
     # legi kuponów też muszą być w logu (pewniaki spoza publikowanych typów)
     for k in kupony_list or []:
         _dopisz_nowe(log, [_kupon_leg_do_logu(l) for l in k["legi"]])
@@ -1728,6 +1844,10 @@ def rozlicz(
         # typy spoza publikacji uczą kalibrację, ale nie liczą się do
         # pokazywanej skuteczności — user ich nie widział, nie mógł zagrać
         and not r.get("poza_publikacja")
+        # drabinki mają WŁASNY strumień (skutecznosc_strumienie) — doliczenie
+        # ich tutaj zmieniłoby wstecz znaczenie liczb modelu, na których stoi
+        # kalibracja, kalendarz i wykresy
+        and _z_modelu(r)
     ]
     okazje = [r for r in settled if not r["sugestia"] and r.get("kurs")]
     roi = sum(
@@ -1741,6 +1861,7 @@ def rozlicz(
         and r.get("rynek_kod") not in RYNKI_OSOBNE
         and not r.get("odrzucony")
         and r.get("poza_publikacja")
+        and _z_modelu(r)
     ]
 
     def _po_rynku(recs: list[dict]) -> list[dict]:
@@ -1765,6 +1886,23 @@ def rozlicz(
     # skuteczność DZIEŃ PO DNIU (realne typy, bez rynków osobnych) — z listą
     # typów danego dnia (co siadło); zasila przełącznik dnia na Skuteczności
     skutecznosc_dzienna = skutecznosc_per_dzien(settled, poza=poza_pub)
+    # ...i to samo rozbite na strumienie (pewniaki / drużyny / drabinki),
+    # bo „skuteczność" bez podziału mieszała trzy różne produkty
+    strumienie = skutecznosc_strumieni(log)
+    for nazwa, s in strumienie.items():
+        p_s = s["podsumowanie"]
+        if p_s["rozliczone"]:
+            print(
+                f"Skuteczność [{nazwa}]: {p_s['trafione']}/{p_s['rozliczone']}"
+                f" ({(p_s['skutecznosc'] or 0):.0%}), ROI flat"
+                f" {p_s['roi_flat']:+.2f} j."
+                + (
+                    " | " + ", ".join(
+                        f"{k}: {v['trafione']}/{v['n']}"
+                        for k, v in sorted(s.get("klasy", {}).items())
+                    ) if s.get("klasy") else ""
+                )
+            )
 
     ostatnie = sorted(
         settled + poza_pub + [
@@ -1821,6 +1959,9 @@ def rozlicz(
         "ostatnie": ostatnie,
         # skuteczność dzień po dniu (realne typy) — do przełącznika w UI
         "skutecznosc_dzienna": skutecznosc_dzienna,
+        # ta sama skuteczność rozbita na strumienie: pewniaki / drużyny /
+        # drabinki (każdy z własnym ROI i listą dni)
+        "skutecznosc_strumienie": strumienie,
         "kupony": kupony_hist,
         "kupony_roi": kupony_roi,
         # WSZYSTKIE wygrane kupony (trwały log, nigdy nie znikają)

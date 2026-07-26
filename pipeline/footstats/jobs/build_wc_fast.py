@@ -18,6 +18,7 @@ import json
 import os
 import statistics
 import time
+import traceback
 import zlib
 from collections import Counter, defaultdict
 from dataclasses import asdict
@@ -88,6 +89,7 @@ def _rozlicz_i_zapisz(
     odrzucone_pomiar: list[dict] | None = None,
     poza_publikacja: list[dict] | None = None,
     legi_pool: list[dict] | None = None,
+    drabinki: list[dict] | None = None,
 ) -> None:
     """Rozliczanie + zapis wyników. Wywoływane w KAŻDYM cyklu — także gdy
     statshub nie ma propsów (rozliczenia nie mogą czekać na nowe typy).
@@ -108,7 +110,7 @@ def _rozlicz_i_zapisz(
         wyniki = rozliczanie.rozlicz(
             value_bets + (odrzucone_pomiar or []) + (poza_publikacja or []),
             kupony_list, niedostepni, conf_mids=conf_mids,
-            legi_pool=legi_pool,
+            legi_pool=legi_pool, drabinki=drabinki,
         )
     except Exception as ex:
         print(f"Rozliczanie pominięte ({ex}) — poprzednie wyniki bez zmian")
@@ -2935,10 +2937,20 @@ def _main_impl(tryb=None):
             trends, events_meta_radar, odds_grid, sb_cache,
             model_pokrycie, players_out, MARKET_NAMES_PL, int(time.time()),
             player_sezon=supa.get_key("player_sezon") or {},
+            # profil arbitra (365Scores) — drabinki korygują nim rynki faulowe;
+            # mecz bez obsady dostaje neutralne 1.0 i notatkę na karcie
+            sedzia_by_mid=sedzia_by_mid,
+            # tabela koncesji modelu (bank trendów + dopełnienie 365Scores) —
+            # dla lig spoza feedu propsów, gdzie statshub nie daje gotowych
+            # agregatów rywala, to JEDYNE źródło kontekstu (m.in. Ekstraklasa)
+            koncesje_tab=koncesje_tab,
         )
     except Exception as ex:
         radar_wpisy = []
-        print(f"Radar pominięty w tym cyklu ({ex})")
+        # pełny traceback, nie sam komunikat: pusty radar NIE nadpisuje
+        # poprzedniego pliku, więc bez tego awaria drabinek wygląda w logu
+        # identycznie jak „dziś nic nie przeszło bram"
+        print(f"Radar pominięty w tym cyklu ({ex})\n{traceback.format_exc()}")
     if radar_wpisy:
         _dump("radar.json", {
             "wygenerowano_ts": int(time.time()),
@@ -2962,6 +2974,35 @@ def _main_impl(tryb=None):
                                   "mecz_id": w.get("mecz_id")})
         if kandydaci:
             supa.put_key("sezon_kandydaci", kandydaci[:250])
+
+    # TYPY DRABINEK DO ROZLICZENIA: z każdej opublikowanej karty bierzemy
+    # dokładnie ten szczebel, który zdecydował o jej wyborze (`hero`) — czyli
+    # to, co user widzi w nagłówku. Rozliczają się jak typy modelu, ale
+    # w osobnym strumieniu skuteczności (rozliczanie._strumien), bo ich
+    # prawdopodobieństwo pochodzi z innego estymatora niż silnik.
+    drabinki_typy = []
+    for w in radar_wpisy:
+        h = w.get("hero") or {}
+        if not h.get("rynek_kod") or not h.get("kurs"):
+            continue
+        ocena = w.get("ocena") or {}
+        drabinki_typy.append({
+            "mecz_id": w["mecz_id"], "mecz": w["mecz"],
+            "kickoff_ts": w["kickoff_ts"],
+            "podmiot_id": w.get("podmiot_id") or 0,
+            "podmiot": w["podmiot"],
+            "rynek_kod": h["rynek_kod"],
+            "rynek": h.get("rynek") or h["rynek_kod"],
+            "linia": h["linia"], "strona": "powyzej",
+            "kurs": h["kurs"], "bukmacher": "Superbet",
+            # p_model w tym rekordzie to p_final drabinki (pokrycie + kontekst
+            # meczu), NIE wyjście silnika — stąd flaga zrodlo niżej
+            "p_model": h.get("p_final") or 0.0,
+            "pewnosc": None, "sugestia": False,
+            "zrodlo": rozliczanie.ZRODLO_DRABINKA,
+            "klasa": ocena.get("klasa"),
+            "edge": ocena.get("edge"),
+        })
 
     # RAPORT POKRYCIA (liga): parowanie z build_league + to, co dołożył
     # silnik — luka jest mierzona i zapisywana co cykl, nie ignorowana.
@@ -3014,8 +3055,11 @@ def _main_impl(tryb=None):
             ))
         _dump("odrzucenia_zero_okazji.json", list(odrzucenia.values()))
         _dump_pokrycie()
+        # drabinki żyją własnym życiem — dzień bez typów modelu (np. cały
+        # rynek w kwarantannie) nadal ma karty do rozliczenia
         _rozlicz_i_zapisz([], [], niedostepni,
-                          poza_publikacja=typy_poza_publikacja)
+                          poza_publikacja=typy_poza_publikacja,
+                          drabinki=drabinki_typy)
         return
 
     _dump_pokrycie()
@@ -3120,7 +3164,7 @@ def _main_impl(tryb=None):
     _rozlicz_i_zapisz(value_bets, kupony_list, niedostepni,
                       conf_mids=conf_mids, odrzucone_pomiar=odrzucone_pomiar,
                       poza_publikacja=typy_poza_publikacja,
-                      legi_pool=legi_pool_pub)
+                      legi_pool=legi_pool_pub, drabinki=drabinki_typy)
     _dump("meta.json", {
         "wygenerowano_ts": int(time.time()),
         "tryb": "liga" if tryb else "ms2026",

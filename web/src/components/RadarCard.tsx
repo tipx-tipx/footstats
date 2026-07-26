@@ -4,10 +4,49 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { memo, useState } from "react";
 
 import { fmtKurs, fmtProc } from "@/lib/format";
-import type { RadarRynek, RadarSezon, RadarSzczebel, RadarWpis } from "@/lib/types";
+import type {
+  RadarCzynnik,
+  RadarKontekst,
+  RadarRynek,
+  RadarSezon,
+  RadarSzczebel,
+  RadarWpis,
+} from "@/lib/types";
 
 /** Linia 0,5 to po ludzku „1 lub więcej" — tak mówi też Superbet. */
 const linLabel = (linia: number) => `${Math.ceil(linia)}+`;
+
+/** Klasa jakości karty (backend: radar._klasa_karty) — jedyne źródło oceny. */
+const KLASY: Record<
+  string,
+  { label: string; badge: string; tytul: string }
+> = {
+  top: {
+    label: "TOP",
+    badge: "bg-data-green text-white",
+    tytul:
+      "Najwyższa przewaga nad kursem w dzisiejszej stawce, po uwzględnieniu rywala, sędziego i scenariusza meczu. Nie gwarancja — po prostu najlepsze, co dziś mamy.",
+  },
+  mocny: {
+    label: "mocny",
+    badge: "bg-data-green-wash text-data-green-ink",
+    tytul:
+      "Wyraźna przewaga nad kursem po korekcie na kontekst meczu, ale poza czubem dzisiejszej stawki.",
+  },
+  solidny: {
+    label: "solidny",
+    badge: "border border-hairline bg-paper text-muted",
+    tytul:
+      "Przewaga nad kursem jest dodatnia, ale skromna — karta przeszła bramy jakości i tyle.",
+  },
+};
+
+/** Mnożnik kontekstu jako zmiana procentowa: 0.8 -> „−20%". */
+function pctZmiana(m?: number | null): string | null {
+  if (m == null || Math.abs(m - 1) < 0.005) return null;
+  const p = Math.round((m - 1) * 100);
+  return `${p > 0 ? "+" : "−"}${Math.abs(p)}%`;
+}
 
 /** Krótkie polskie etykiety rynków w wierszach sezonowych. */
 const SEZON_RYNKI_PL: Record<string, string> = {
@@ -72,7 +111,9 @@ function zajawka(w: RadarWpis): string {
   // hero wylicza backend (ten sam szczebel, który zdecydował o wyborze karty)
   if (w.hero) {
     const h = w.hero;
-    return `${h.rynek ?? h.rynek_kod} ${linLabel(h.linia)} · trafione ${h.traf}/${h.z} ost. · kurs ${fmtKurs(h.kurs)}`;
+    const szansa =
+      h.p_final != null ? ` · szansa ${fmtProc(h.p_final)}` : "";
+    return `${h.rynek ?? h.rynek_kod} ${linLabel(h.linia)} · trafione ${h.traf}/${h.z} ost. · kurs ${fmtKurs(h.kurs)}${szansa}`;
   }
   if (w.rodzaj === "debiutant") {
     return "Pełne kursy Superbetu bez żadnej historii w danych — rynek zgaduje.";
@@ -141,6 +182,197 @@ function opisSygnalu(w: RadarWpis): string {
   return "";
 }
 
+/** Jeden wiersz wodospadu: co zmieniło szansę i o ile. */
+function CzynnikWiersz({
+  etykieta,
+  opis,
+  mnoznik,
+  tytul,
+}: {
+  etykieta: string;
+  opis: string;
+  mnoznik?: number | null;
+  tytul?: string;
+}) {
+  const zmiana = pctZmiana(mnoznik);
+  return (
+    <div
+      className="flex items-baseline justify-between gap-3 py-1"
+      title={tytul}
+    >
+      <span className="min-w-0 text-[11px] text-muted">
+        <span className="text-faint">{etykieta}</span> {opis}
+      </span>
+      <span
+        className={`font-data shrink-0 text-[11px] font-semibold ${
+          zmiana == null
+            ? "text-faint"
+            : mnoznik! > 1
+              ? "text-data-green-ink"
+              : "text-data-amber-ink"
+        }`}
+      >
+        {zmiana ?? "bez zmian"}
+      </span>
+    </div>
+  );
+}
+
+/** Opis rywala per rynek: co dokładnie dopuszcza i jak to wypada w lidze. */
+function opisRywala(r: RadarCzynnik, rynek: string): string | null {
+  if (!r || r.zrodlo === "brak") return null;
+  const skala =
+    r.srednia != null && r.norma != null
+      ? `${liczba(r.srednia)} przy średniej ${liczba(r.norma)}`
+      : "";
+  const miejsce =
+    r.rank != null && r.z != null ? ` (#${r.rank} z ${r.z} w lidze)` : "";
+  const zrodlo =
+    r.zrodlo === "historia_pokrewny"
+      ? " — z rynku pokrewnego, więc z połową siły"
+      : r.zrodlo === "historia"
+        ? ` — z ${r.mecze ?? 0} meczów w naszych danych`
+        : "";
+  return `${rynek.toLowerCase()}: rywal dopuszcza ${skala}${miejsce}${zrodlo}`;
+}
+
+/**
+ * „Dlaczego" — wodospad od surowego pokrycia do szansy po kontekście.
+ * To jest odpowiedź na pytanie „gra z najlepszą obroną, czemu miałby oddać
+ * 2 strzały?": widać, czy i o ile ścięliśmy historię tym meczem.
+ */
+function Wodospad({
+  kontekst,
+  rynek,
+  pBazowe,
+  pFinal,
+  kurs,
+  traf,
+  z,
+}: {
+  kontekst: RadarKontekst;
+  rynek: string;
+  pBazowe?: number | null;
+  pFinal?: number | null;
+  kurs: number;
+  traf: number;
+  z: number;
+}) {
+  const rywal = kontekst.rywal;
+  const sedzia = kontekst.sedzia;
+  const scen = kontekst.scenariusz;
+  const dom = kontekst.dom;
+  const sezony = kontekst.sezony;
+  const opisR = rywal ? opisRywala(rywal, rynek) : null;
+  const cenaRynku = kurs > 0 ? 1 / kurs : null;
+  const przewaga =
+    pFinal != null && cenaRynku != null
+      ? Math.round((pFinal - cenaRynku) * 100)
+      : null;
+
+  return (
+    <div className="rounded-(--radius-control) border border-hairline bg-card px-3.5 py-3">
+      <p className="text-[10px] uppercase tracking-wide text-faint">
+        dlaczego ta linia
+      </p>
+      <div className="mt-1.5 divide-y divide-hairline">
+        <CzynnikWiersz
+          etykieta="historia"
+          opis={`trafione ${traf} z ${z} ostatnich meczów`}
+          tytul="Punkt wyjścia: surowe pokrycie linii, ściągnięte w dół karą za krótką próbę."
+        />
+        {opisR && (
+          <CzynnikWiersz
+            etykieta="rywal"
+            opis={opisR}
+            mnoznik={rywal?.mnoznik}
+            tytul="Ile najbliższy przeciwnik przeciętnie dopuszcza NA TYM rynku w porównaniu ze średnią ligi. Szczelna defensywa ścina szansę, hojna podbija."
+          />
+        )}
+        {sedzia?.zrodlo === "brak_obsady" ? (
+          <CzynnikWiersz
+            etykieta="sędzia"
+            opis="obsada jeszcze nieznana — bez korekty"
+            tytul="Arbitrzy różnią się liczbą odgwizdanych fauli. Obsada jest znana zwykle 1–2 dni przed meczem; dopóki jej nie ma, nie zgadujemy."
+          />
+        ) : sedzia?.sedzia ? (
+          <CzynnikWiersz
+            etykieta="sędzia"
+            opis={`${sedzia.sedzia}: ${
+              (sedzia.mnoznik ?? 1) > 1 ? "gwiżdże dużo" : "pobłażliwy"
+            }${sedzia.mecze ? ` (${sedzia.mecze} meczów)` : ""}`}
+            mnoznik={sedzia.mnoznik}
+            tytul="Profil arbitra: faule w jego meczach vs faule oczekiwane po tych drużynach. Liczy się tylko przy rynkach faulowych i kartkowych."
+          />
+        ) : null}
+        {scen?.mnoznik != null && (
+          <CzynnikWiersz
+            etykieta="mecz"
+            opis={`${scen.faworyt ? "faworyt" : "underdog"}${
+              scen.total != null ? `, oczekiwane ${liczba(scen.total)} gola` : ""
+            }`}
+            mnoznik={scen.mnoznik}
+            tytul="Scenariusz meczu odczytany z kursów 1X2 i liczby goli: otwarty mecz to więcej strzałów, wyraźny faworyt spycha rywala do głębokiej obrony."
+          />
+        )}
+        {dom?.mnoznik != null && (
+          <CzynnikWiersz
+            etykieta="boisko"
+            opis={dom.dom ? "u siebie" : "na wyjeździe"}
+            mnoznik={dom.mnoznik}
+            tytul="Gospodarze średnio częściej strzelają i rzadziej faulują niż goście."
+          />
+        )}
+        {sezony?.mnoznik != null && (
+          <CzynnikWiersz
+            etykieta="sezony"
+            opis={`średnia z całych sezonów ${liczba(
+              sezony.sezon90 ?? 0,
+            )}/90 wobec ${liczba(sezony.okno90 ?? 0)}/90 z ostatnich meczów`}
+            mnoznik={sezony.mnoznik}
+            tytul="Kilkadziesiąt meczów sezonu waży więcej niż dziesięć ostatnich: jeśli sezon mówi mniej niż bieżące okno, to okno jest najpewniej szczytem formy."
+          />
+        )}
+      </div>
+      {pFinal != null && (
+        <p className="mt-2 border-t border-hairline pt-2 text-[11px] text-ink-soft">
+          szansa po kontekście{" "}
+          <span className="font-data font-semibold text-ink">
+            {fmtProc(pFinal)}
+          </span>
+          {cenaRynku != null && (
+            <>
+              {" "}
+              wobec kursu {fmtKurs(kurs)} ={" "}
+              <span className="font-data text-faint">
+                {fmtProc(cenaRynku)}
+              </span>
+              {przewaga != null && (
+                <span
+                  className={`font-data font-semibold ${
+                    przewaga > 0 ? "text-data-green-ink" : "text-data-amber-ink"
+                  }`}
+                  title="Różnica między naszą szansą a ceną rynku. Dodatnia = kurs jest naszym zdaniem za wysoki."
+                >
+                  {" "}
+                  ({przewaga > 0 ? "+" : "−"}
+                  {Math.abs(przewaga)} pkt proc.)
+                </span>
+              )}
+            </>
+          )}
+          {pBazowe != null && (
+            <span className="block text-faint">
+              samo pokrycie dawało {fmtProc(pBazowe)} — resztę zrobił kontekst
+              tego meczu
+            </span>
+          )}
+        </p>
+      )}
+    </div>
+  );
+}
+
 /** Wiersz szczebla drabinki: linia · kurs · szansa modelu · pokrycie. */
 function SzczebelWiersz({ r, s }: { r: RadarRynek; s: RadarSzczebel }) {
   const p = s.pokrycie;
@@ -151,9 +383,17 @@ function SzczebelWiersz({ r, s }: { r: RadarRynek; s: RadarSzczebel }) {
       title={
         `${r.rynek}: ${linLabel(s.linia)} po kursie ${fmtKurs(s.kurs)}` +
         (p ? `. Linia trafiona w ${p.traf} z ${p.z} ostatnich meczów` : "") +
-        (s.p_model != null
-          ? `. Model daje tej linii ${fmtProc(s.p_model)} szans`
-          : ". Model nie liczył tej linii")
+        (s.p_final != null
+          ? `. Po korekcie na ten mecz dajemy jej ${fmtProc(s.p_final)} szans` +
+            (s.p_bazowe != null
+              ? ` (samo pokrycie: ${fmtProc(s.p_bazowe)})`
+              : "") +
+            (s.strzyzenie_modelu
+              ? ". Szansa ścięta, bo model widzi tę linię ciemniej niż historia"
+              : "")
+          : s.p_model != null
+            ? `. Model daje tej linii ${fmtProc(s.p_model)} szans`
+            : ". Za mało danych, żeby policzyć szansę")
       }
     >
       <span className="font-data text-xs font-semibold text-ink">
@@ -162,8 +402,16 @@ function SzczebelWiersz({ r, s }: { r: RadarRynek; s: RadarSzczebel }) {
       <span className="font-data text-xs font-semibold text-brand-deep">
         {fmtKurs(s.kurs)}
       </span>
-      <span className="font-data text-[11px] text-muted">
-        {s.p_model != null ? fmtProc(s.p_model) : "—"}
+      <span
+        className={`font-data text-[11px] ${
+          s.p_final != null ? "font-semibold text-ink-soft" : "text-muted"
+        }`}
+      >
+        {s.p_final != null
+          ? fmtProc(s.p_final)
+          : s.p_model != null
+            ? fmtProc(s.p_model)
+            : "—"}
       </span>
       {udzial != null ? (
         <span className="flex items-center gap-2">
@@ -239,7 +487,9 @@ function RynekBlok({ r }: { r: RadarRynek }) {
         <div className="grid grid-cols-[2.4rem_3.2rem_3rem_1fr] gap-x-3 border-b border-hairline pb-1 text-[9px] uppercase tracking-wide text-faint">
           <span>linia</span>
           <span>kurs</span>
-          <span title="Szansa modelu na przebicie tej linii">model</span>
+          <span title="Nasza szansa na przebicie tej linii W TYM meczu: pokrycie z ostatnich występów skorygowane o rywala, sędziego, scenariusz meczu i formę">
+            szansa
+          </span>
           <span title="Ile z ostatnich meczów przebiło tę linię">
             trafienia w ost. meczach
           </span>
@@ -281,7 +531,7 @@ function RynekBlok({ r }: { r: RadarRynek }) {
       {r.rywal?.srednia != null && (
         <p
           className="mt-2 text-[11px] text-muted"
-          title="Ile najbliższy rywal średnio oddaje przeciwnikom na tym rynku i które miejsce zajmuje na tle ligi (wyższa pozycja = hojniejszy rywal)"
+          title="Ile najbliższy rywal średnio dopuszcza na tym rynku i które miejsce zajmuje w lidze. UWAGA: #1 to drużyna NAJSZCZELNIEJSZA (dopuszcza najmniej), a nie najhojniejsza."
         >
           rywal puszcza śr.{" "}
           <span className="font-data font-semibold text-ink-soft">
@@ -353,6 +603,12 @@ export const RadarCard = memo(function RadarCard({
   const reduced = useReducedMotion();
   const sygnal = sygnalInfo(w);
   const opis = opisSygnalu(w);
+  // „solidny" bez plakietki: etykieta na każdej karcie przestaje cokolwiek
+  // znaczyć, a lista i tak jest posortowana po jakości
+  const klasa =
+    w.ocena?.klasa && w.ocena.klasa !== "solidny"
+      ? KLASY[w.ocena.klasa]
+      : null;
 
   return (
     <motion.article
@@ -396,6 +652,17 @@ export const RadarCard = memo(function RadarCard({
           </span>
 
           <span className="flex flex-col items-end justify-center gap-1">
+            {klasa && (
+              <span
+                title={klasa.tytul}
+                className={`font-data inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${klasa.badge}`}
+              >
+                {klasa.label}
+                {w.ocena?.miejsce != null && w.ocena.klasa === "top" && (
+                  <span className="opacity-70">#{w.ocena.miejsce}</span>
+                )}
+              </span>
+            )}
             {sygnal && (
               <span
                 title={sygnal.tytul}
@@ -466,7 +733,24 @@ export const RadarCard = memo(function RadarCard({
                   const r =
                     w.rynki.find((x) => x.rynek_kod === w.hero?.rynek_kod) ??
                     w.rynki[0];
-                  return r ? <RynekBlok key={r.rynek_kod} r={r} /> : null;
+                  if (!r) return null;
+                  const kontekst = w.ocena?.kontekst ?? r.kontekst;
+                  return (
+                    <>
+                      {kontekst && w.hero && (
+                        <Wodospad
+                          kontekst={kontekst}
+                          rynek={r.rynek}
+                          pBazowe={w.hero.p_bazowe}
+                          pFinal={w.hero.p_final}
+                          kurs={w.hero.kurs}
+                          traf={w.hero.traf}
+                          z={w.hero.z}
+                        />
+                      )}
+                      <RynekBlok key={r.rynek_kod} r={r} />
+                    </>
+                  );
                 })()}
               </div>
 

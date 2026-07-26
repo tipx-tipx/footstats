@@ -149,6 +149,45 @@ export interface RadarSzczebel {
   p_model: number | null;
   /** ile z ostatnich występów przebiło tę linię ("trafione 8/10") */
   pokrycie?: { traf: number; z: number } | null;
+  /** pokrycie po korekcie na krótką próbę (dolna granica Wilsona) */
+  p_bazowe?: number | null;
+  /** ile kontekst tego meczu zmienia szansę (1.0 = nic nie zmienia) */
+  korekta?: number | null;
+  /** szansa po kontekście — TA liczba decyduje o wyborze i kolejności kart */
+  p_final?: number | null;
+  /** p_final ścięte, bo model widział tę linię ciemniej niż pokrycie */
+  strzyzenie_modelu?: boolean;
+}
+
+/** Jeden czynnik wodospadu kontekstu (rywal, sędzia, scenariusz, ...). */
+export interface RadarCzynnik {
+  zrodlo?: string;
+  mnoznik?: number;
+  /** ile rywal średnio dopuszcza na tym rynku / profil sędziego */
+  srednia?: number;
+  norma?: number;
+  rank?: number | null;
+  z?: number | null;
+  mecze?: number;
+  sedzia?: string;
+  dom?: boolean;
+  faworyt?: boolean;
+  spread?: number;
+  total?: number | null;
+  sezon90?: number;
+  okno90?: number;
+  rynek_zrodlowy?: string;
+}
+
+/** Wodospad kontekstu meczu dla jednego rynku (jobs/radar.py). */
+export interface RadarKontekst {
+  rywal?: RadarCzynnik;
+  sedzia?: RadarCzynnik;
+  scenariusz?: RadarCzynnik;
+  dom?: RadarCzynnik;
+  sezony?: RadarCzynnik;
+  /** iloczyn czynników po capie — tyle łącznie robi kontekst z lambdą */
+  lacznie?: number;
 }
 
 /** Rynek na karcie radaru: drabinka + ostatnie występy (gdy mamy historię). */
@@ -170,6 +209,8 @@ export interface RadarRynek {
     z?: number | null;
     liga?: number | null;
   } | null;
+  /** pełny wodospad kontekstu meczu użyty do policzenia p_final */
+  kontekst?: RadarKontekst | null;
 }
 
 /** Średnie CAŁEGO sezonu gracza (cache workera Sofascore, per liga+rok). */
@@ -217,8 +258,26 @@ export interface RadarWpis {
     kurs: number;
     traf: number;
     z: number;
-    /** przewaga nad kursem po korekcie na próbę */
+    /** przewaga nad kursem: p_final − 1/kurs */
     edge: number;
+    p_final?: number | null;
+    p_bazowe?: number | null;
+    korekta?: number | null;
+  } | null;
+  /**
+   * Ocena karty — JEDYNE źródło rankingu i oznaczeń (front nie ma własnej
+   * definicji „najlepszego typu"). `miejsce` to pozycja w stawce dnia,
+   * `klasa` łączy próg przewagi z miejscem w czubie stawki.
+   */
+  ocena?: {
+    miejsce: number;
+    klasa: "top" | "mocny" | "solidny";
+    /** przewaga nad kursem w punktach prawdopodobieństwa */
+    edge: number;
+    p_final?: number | null;
+    p_bazowe?: number | null;
+    korekta?: number | null;
+    kontekst?: RadarKontekst | null;
   } | null;
   /** brak dla rodzaju "drabinka" (nie ma osobnego powodu-sygnału) */
   powod?:
@@ -549,6 +608,24 @@ export interface SkutecznoscDnia {
   typy?: TypRozliczony[];
 }
 
+/** Strumień skuteczności — patrz rozliczanie._strumien. */
+export type Strumien = "pewniaki" | "druzyny" | "drabinki";
+
+/** Skuteczność jednego strumienia: dni + własne podsumowanie. */
+export interface SkutecznoscStrumienia {
+  dni: SkutecznoscDnia[];
+  podsumowanie: {
+    rozliczone: number;
+    trafione: number;
+    /** udział trafień; null przy zerowej próbie */
+    skutecznosc: number | null;
+    okazje_rozliczone: number;
+    roi_flat: number;
+  };
+  /** tylko drabinki: rozbicie po klasie karty (czy „top" trafia lepiej) */
+  klasy?: Record<string, { n: number; trafione: number; skutecznosc: number }>;
+}
+
 /** Skuteczność realnych typów (log rozliczany automatycznie po meczach). */
 export interface TypyWyniki {
   podsumowanie: {
@@ -565,6 +642,13 @@ export interface TypyWyniki {
   ostatnie: TypRozliczony[];
   /** skuteczność dzień po dniu (do przełącznika); najnowszy dzień pierwszy */
   skutecznosc_dzienna?: SkutecznoscDnia[];
+  /**
+   * Ta sama skuteczność rozbita na strumienie. Trzy różne produkty o różnym
+   * ryzyku i różnym pochodzeniu prawdopodobieństwa nie mogą dzielić jednego
+   * licznika: `pewniaki` = typy zawodnicze z silnika, `druzyny` = rynki
+   * drużynowe, `drabinki` = karty z zakładki Drabinki (pokrycie + kontekst).
+   */
+  skutecznosc_strumienie?: Partial<Record<Strumien, SkutecznoscStrumienia>>;
   kupony?: KuponHistoria[];
   /** ROI kuponów per horyzont (stawka 1 j./kupon; bez pominiętych) */
   kupony_roi?: Record<

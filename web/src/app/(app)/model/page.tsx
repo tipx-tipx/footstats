@@ -3,7 +3,7 @@ import { KalendarzWynikow } from "@/components/KalendarzWynikow";
 import { KuponHistoriaCard } from "@/components/KuponHistoriaCard";
 import { PageHeader } from "@/components/PageHeader";
 import { Reveal } from "@/components/Reveal";
-import { SkutecznoscDzienna } from "@/components/SkutecznoscDzienna";
+import { SkutecznoscStrumienie } from "@/components/SkutecznoscStrumienie";
 import { getKalibracja, getMeta, getTypyWyniki } from "@/lib/data";
 import { fmtProc } from "@/lib/format";
 
@@ -224,15 +224,22 @@ export default async function ModelPage() {
         </Reveal>
       )}
 
-      {/* skuteczność dzień po dniu — przełącznik (realne typy, bez osobnych) */}
+      {/* skuteczność dzień po dniu, rozbita na strumienie (pewniaki /
+          drużyny / drabinki) — każdy produkt odpowiada za swoje liczby */}
       {(typy.skutecznosc_dzienna?.length ?? 0) > 0 && (
         <Reveal className="mt-12">
           <SectionHead eyebrow="dzień po dniu" title="Skuteczność" />
           <p className="mt-2 max-w-3xl text-sm text-muted">
-            Trafienia i ROI realnych typów rozliczonych danego dnia. Przełączaj
-            się strzałkami albo klikaj słupki, cofniesz się nawet o ~2 tygodnie.
+            Trafienia i ROI realnych typów rozliczonych danego dnia. Pewniaki,
+            rynki drużynowe i drabinki liczą się OSOBNO — to trzy różne
+            produkty i uśrednianie ich w jedną liczbę niczego by nie mówiło.
+            Przełączaj się strzałkami albo klikaj słupki, cofniesz się nawet
+            o ~2 tygodnie.
           </p>
-          <SkutecznoscDzienna dni={typy.skutecznosc_dzienna!} />
+          <SkutecznoscStrumienie
+            strumienie={typy.skutecznosc_strumienie}
+            fallbackDni={typy.skutecznosc_dzienna}
+          />
         </Reveal>
       )}
 
