@@ -31,7 +31,10 @@ export const metadata: Metadata = {
   title: "FootStats – okazje na statystyki piłkarskie",
   description:
     "Osobisty silnik decyzyjny: model matematyczny szacuje prawdopodobieństwa statystyk zawodników i drużyn, porównuje je z kursami bukmacherów i pokazuje, gdzie kurs jest zawyżony.",
-  icons: { icon: "/favicon.png" },
+  // BEZ pola `icons` — ikony biorą się z konwencji plikowej app/ (favicon.ico
+  // + icon.png). Ręcznie dopisany link nie NADPISYWAŁ tego, co Next generuje
+  // z plików, tylko się dokładał: w <head> lądowały dwie ikony naraz, a
+  // przeglądarka brała tę pierwszą — czyli domyślny favicon.ico Next.js.
   // narzędzie prywatne za hasłem — nie indeksować
   robots: { index: false, follow: false },
 };

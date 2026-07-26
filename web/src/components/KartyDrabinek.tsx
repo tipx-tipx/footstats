@@ -44,7 +44,6 @@ export function KartyDrabinek({ dni }: { dni: SkutecznoscDnia[] }) {
   if (!karty.length) return null;
 
   const widoczne = wszystkie ? karty : karty.slice(0, NA_START);
-  let ostatniDzien = "";
 
   return (
     <div className="mt-5 max-w-3xl rounded-(--radius-card) border border-hairline bg-card p-4 shadow-(--shadow-card) sm:p-5">
@@ -58,13 +57,15 @@ export function KartyDrabinek({ dni }: { dni: SkutecznoscDnia[] }) {
       </div>
       <p className="mt-1 text-xs leading-relaxed text-muted">
         Szczebel, który zdecydował o karcie — ten sam, który widziałeś w jej
-        nagłówku. „Było" to faktyczna wartość zawodnika w regularnym czasie gry.
+        nagłówku. „Było” to faktyczna wartość zawodnika w regularnym czasie gry.
       </p>
 
       <ul className="mt-4 space-y-1.5">
         {widoczne.map(({ typ: t, dzien }, i) => {
-          const nowyDzien = dzien !== ostatniDzien;
-          ostatniDzien = dzien;
+          // nagłówek dnia tylko przy zmianie daty — porównanie z poprzednią
+          // pozycją listy, bez zmiennej przenoszonej między iteracjami
+          // (mutowanie zmiennej w trakcie renderu psuje kolejne przebiegi)
+          const nowyDzien = i === 0 || widoczne[i - 1].dzien !== dzien;
           return (
             <li key={`${dzien}-${t.podmiot}-${t.rynek_kod}-${t.linia}-${i}`}>
               {nowyDzien && (
