@@ -76,3 +76,36 @@ def test_dry_run_nie_zapisuje_rejestru(monkeypatch):
     monkeypatch.setattr(B, "_dry_run", lambda: True)
     B.scal_z_publikacjami([_bet()], {1: {"id": 1}})
     assert B.PUBLIKACJE_KLUCZ not in magazyn
+
+
+def _karta(mecz_id=9, pid=77, linia=2.5, kurs=2.05, kickoff_ts=None):
+    return {
+        "mecz_id": mecz_id, "podmiot_id": pid, "podmiot": "Nicolas Acevedo",
+        "mecz": "Bahia – Corinthians", "rodzaj": "drabinka",
+        "kickoff_ts": kickoff_ts or (int(time.time()) + 7200),
+        "hero": {"rynek_kod": "shots", "linia": linia, "kurs": kurs,
+                 "edge": 0.05},
+    }
+
+
+def test_karta_wraca_gdy_kurs_wypchnal_ja_z_bramy(monkeypatch):
+    magazyn: dict = {}
+    _stub_supa(monkeypatch, magazyn)
+    out = B.scal_karty_z_publikacjami([_karta()])
+    assert len(out) == 1 and not out[0].get("wznowiony")
+
+    # kolejny cykl: kurs sie skrocil, edge spadl ponizej progu -> zero kart
+    out2 = B.scal_karty_z_publikacjami([])
+    assert len(out2) == 1
+    assert out2[0]["wznowiony"] is True
+    assert out2[0]["hero"]["kurs"] == 2.05     # ZAMROZONY kurs z publikacji
+    assert out2[0]["id"] == 1                  # numeracja przeliczona
+
+
+def test_karta_schodzi_po_kickoffie(monkeypatch):
+    magazyn: dict = {}
+    _stub_supa(monkeypatch, magazyn)
+    teraz = int(time.time())
+    B.scal_karty_z_publikacjami([_karta(kickoff_ts=teraz + 60)])
+    assert B.scal_karty_z_publikacjami([], teraz=teraz + 120) == []
+    assert magazyn[B.PUBLIKACJE_KART_KLUCZ] == {}

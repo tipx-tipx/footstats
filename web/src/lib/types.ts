@@ -257,6 +257,13 @@ export interface RadarWpis {
   xi?: boolean | null;
   /** średnia minut z 6 ostatnich występów (pełne mecze vs ławka) */
   minuty_sr6?: number | null;
+  /** true = karta z WCZEŚNIEJSZEGO cyklu, wznowiona z rejestru publikacji.
+   *  Bieżące przeliczenie jej nie odtworzyło (zwykle kurs się skrócił i
+   *  przewaga spadła pod próg), ale raz pokazana karta zostaje do gwizdka.
+   *  `hero` jest ZAMROŻONY z chwili publikacji — kurs sprawdź u bukmachera. */
+  wznowiony?: boolean;
+  /** znacznik pierwszej publikacji karty */
+  opublikowano_ts?: number;
   /** najlepsza linia karty wg oceny backendu (nagłówek karty) */
   hero?: {
     rynek_kod: string;

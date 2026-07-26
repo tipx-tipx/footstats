@@ -195,6 +195,64 @@ def scal_z_publikacjami(
     return out, wznowione
 
 
+PUBLIKACJE_KART_KLUCZ = "publikacje_karty"
+
+
+def scal_karty_z_publikacjami(
+    wpisy: list[dict], teraz: int | None = None,
+) -> list[dict]:
+    """To samo co `scal_z_publikacjami`, ale dla kart drabinek.
+
+    Karta nie jest nigdzie zamrażana: każdy cykl liczy ją od zera z BIEŻĄCYCH
+    kursów, a przepustką jest `edge = p_final − 1/kurs ≥ 0,03`. Wystarczy więc,
+    że kurs skróci się przez noc o dwa oczka i karta znika — także ta, którą
+    user już obstawił. Zmierzone 2026-07-26: z 15 kart z poprzedniego zrzutu
+    4 zniknęły z meczów NIEROZEGRANYCH (Bahia–Corinthians, Flamengo–São Paulo,
+    Bragantino–Coritiba, Riestra–Boca), a sonda u źródła pokazała, że Superbet
+    kwotował te mecze w komplecie (61–75 graczy) — to nasze bramy, nie oferta.
+
+    Wznowiona karta wraca z ZAMROŻONYM `hero` (linia, kurs, przewaga z chwili
+    publikacji) i flagą `wznowiony`. Sufit 30 kart obowiązuje tylko NOWE —
+    przypięta karta nie może wypaść przez to, że model znalazł dziś coś
+    lepszego, bo wtedy wracamy do punktu wyjścia.
+    """
+    teraz = teraz or int(time.time())
+    rej = supa.get_key(PUBLIKACJE_KART_KLUCZ) or {}
+    klucz = lambda w: (f"{w.get('mecz_id')}:{w.get('podmiot_id')}"
+                       f":{(w.get('hero') or {}).get('rynek_kod')}"
+                       f":{(w.get('hero') or {}).get('linia')}")
+    biezace = {klucz(w) for w in wpisy}
+    for w in wpisy:
+        k = klucz(w)
+        rej[k] = {
+            "wpis": w, "kickoff_ts": w.get("kickoff_ts"),
+            "opublikowano_ts": (rej.get(k) or {}).get("opublikowano_ts") or teraz,
+        }
+    out = list(wpisy)
+    wznowione = 0
+    for k, rec in list(rej.items()):
+        ts_k = int(rec.get("kickoff_ts") or 0)
+        if ts_k and ts_k <= teraz:
+            del rej[k]
+            continue
+        if k in biezace or not rec.get("wpis"):
+            continue
+        w = dict(rec["wpis"])
+        w["wznowiony"] = True
+        w["opublikowano_ts"] = rec.get("opublikowano_ts")
+        out.append(w)
+        wznowione += 1
+    if not _dry_run():
+        supa.put_key(PUBLIKACJE_KART_KLUCZ, rej)
+    if wznowione:
+        print(f"Publikacje kart: wznowiono {wznowione} "
+              f"(bieżące przeliczenie dało {len(wpisy)})")
+    out.sort(key=lambda w: (w.get("kickoff_ts") or 0, w.get("mecz_id") or 0))
+    for i, w in enumerate(out, start=1):
+        w["id"] = i
+    return out
+
+
 def kierunki_opublikowane(log: dict) -> dict[tuple, dict]:
     """Z ZAMROŻONEGO logu: które strony linii są już opublikowane per mecz.
 
@@ -3347,6 +3405,8 @@ def _main_impl(tryb=None):
         # identycznie jak „dziś nic nie przeszło bram"
         print(f"Radar pominięty w tym cyklu ({ex})\n{traceback.format_exc()}")
     if radar_wpisy:
+        # karta raz pokazana zostaje do gwizdka — ta sama zasada co przy typach
+        radar_wpisy = scal_karty_z_publikacjami(radar_wpisy)
         _dump("radar.json", {
             "wygenerowano_ts": int(time.time()),
             "wpisy": radar_wpisy,
