@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { fmtDzien, fmtLinia, STRONA_LABEL } from "@/lib/format";
+import { fmtDzien, fmtKurs, fmtLinia, STRONA_LABEL } from "@/lib/format";
 import type { SkutecznoscDnia } from "@/lib/types";
 
 /** Typ rozliczony w tle: dlaczego nie było go na liście typów. */
@@ -150,7 +150,7 @@ export function SkutecznoscDzienna({ dni }: { dni: SkutecznoscDnia[] }) {
           {dzien.poza_n === 1 ? "typ" : (dzien.poza_n as number) < 5 ? "typy" : "typów"}{" "}
           (weszło {dzien.poza_trafione ?? 0}). Nie było ich na liście typów,
           więc nie liczą się do skuteczności wyżej. Na liście niżej mają
-          oznaczenie „w tle".
+          oznaczenie „w tle”.
         </p>
       )}
 
@@ -178,8 +178,17 @@ export function SkutecznoscDzienna({ dni }: { dni: SkutecznoscDnia[] }) {
                 <span className="font-medium">{t.podmiot}</span>{" "}
                 <span className="text-muted">
                   {t.rynek.toLowerCase()} {STRONA_LABEL[t.strona]}{" "}
-                  {fmtLinia(t.linia)} · {t.mecz}
+                  {fmtLinia(t.linia)}
                 </span>
+                {t.kurs != null && (
+                  <span
+                    className="font-data ml-1.5 whitespace-nowrap text-xs font-semibold text-ink-soft"
+                    title="Kurs zamrożony w chwili publikacji typu — z niego liczy się ROI"
+                  >
+                    @{fmtKurs(t.kurs)}
+                  </span>
+                )}
+                <span className="text-muted"> · {t.mecz}</span>
               </span>
               {t.poza_publikacja && (
                 <span

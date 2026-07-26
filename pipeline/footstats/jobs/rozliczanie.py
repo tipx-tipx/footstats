@@ -1386,6 +1386,13 @@ def skutecznosc_strumieni(log: dict, dni: int = 21) -> dict[str, dict]:
                 ),
                 "okazje_rozliczone": len(okazje),
                 "roi_flat": round(roi, 2),
+                # typy rozliczone POZA publikacją (kwarantanna rynku / limit
+                # meczu): nie wchodzą do trafień ani ROI wyżej, bo user ich
+                # nie widział na liście — ale muszą mieć swoją liczbę.
+                # Bez tego wygrana w kwarantannie nie istnieje w UI nigdzie
+                # poza rozwinięciem konkretnego dnia i wygląda na zgubioną.
+                "poza_n": len(poza),
+                "poza_trafione": sum(1 for r in poza if r["wynik"] == "wygrany"),
             },
         }
         klasy: dict[str, dict] = {}

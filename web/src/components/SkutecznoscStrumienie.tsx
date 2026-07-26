@@ -143,6 +143,22 @@ export function SkutecznoscStrumienie({
         />
       </div>
 
+      {/* typy rozliczone W TLE (kwarantanna rynku / limit meczu). Nie wchodzą
+          do kafelków wyżej, bo nie było ich na liście typów — ale bez własnego
+          licznika wygrana w kwarantannie nie istniała nigdzie poza rozwinięciem
+          konkretnego dnia i wyglądała na zgubioną. */}
+      {(p.poza_n ?? 0) > 0 && (
+        <p className="mt-2.5 rounded-(--radius-control) border border-hairline bg-card px-3.5 py-2.5 text-xs leading-relaxed text-muted">
+          <span className="font-data font-semibold text-ink">
+            {p.poza_trafione ?? 0}/{p.poza_n}
+          </span>{" "}
+          rozliczonych <strong className="font-semibold">w tle</strong> — typy,
+          których nie było na liście, bo rynek stał w kwarantannie albo wpadły
+          ponad limit z jednego meczu. Nie liczą się do trafień ani ROI wyżej;
+          znajdziesz je na liście dnia z oznaczeniem „w tle”.
+        </p>
+      )}
+
       {/* drabinki: czy klasa karty cokolwiek znaczy — jedyny sposób sprawdzić,
           czy progi „top/mocny/solidny" są ustawione sensownie */}
       {dane!.klasy && (

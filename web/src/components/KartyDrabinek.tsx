@@ -2,7 +2,13 @@
 
 import { useMemo, useState } from "react";
 
-import { fmtDzien, fmtGodzina, fmtLinia, STRONA_LABEL } from "@/lib/format";
+import {
+  fmtDzien,
+  fmtGodzina,
+  fmtKurs,
+  fmtLinia,
+  STRONA_LABEL,
+} from "@/lib/format";
 import type { SkutecznoscDnia } from "@/lib/types";
 
 /** Ile kart pokazujemy przed rozwinięciem pełnej listy. */
@@ -97,6 +103,14 @@ export function KartyDrabinek({ dni }: { dni: SkutecznoscDnia[] }) {
                     {t.rynek.toLowerCase()} {STRONA_LABEL[t.strona]}{" "}
                     {fmtLinia(t.linia)}
                   </span>
+                  {t.kurs != null && (
+                    <span
+                      className="font-data ml-1.5 whitespace-nowrap rounded-(--radius-control) bg-card px-1.5 py-0.5 text-xs font-semibold text-ink-soft"
+                      title="Kurs Superbetu na ten szczebel, zamrożony w chwili publikacji karty"
+                    >
+                      @{fmtKurs(t.kurs)}
+                    </span>
+                  )}
                   <span className="block truncate text-xs text-faint">
                     {t.mecz}
                   </span>

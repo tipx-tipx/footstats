@@ -623,6 +623,10 @@ export interface SkutecznoscStrumienia {
     skutecznosc: number | null;
     okazje_rozliczone: number;
     roi_flat: number;
+    /** rozliczone poza publikacją (kwarantanna rynku / limit meczu) —
+     *  poza trafieniami i ROI powyżej, ale liczone i pokazywane osobno */
+    poza_n?: number;
+    poza_trafione?: number;
   };
   /** tylko drabinki: rozbicie po klasie karty (czy „top" trafia lepiej) */
   klasy?: Record<string, { n: number; trafione: number; skutecznosc: number }>;
