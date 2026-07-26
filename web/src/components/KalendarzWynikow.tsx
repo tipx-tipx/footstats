@@ -2,26 +2,21 @@
 
 import { useMemo, useState } from "react";
 
-import { Segmented } from "./Segmented";
 import { fmtU } from "@/lib/format";
-import type { SkutecznoscDnia, Strumien, TypyWyniki } from "@/lib/types";
+import type { SkutecznoscDnia } from "@/lib/types";
 import { OSTATNIA_ZMIANA, poZmianie } from "@/lib/zmiany";
 
 /**
- * Kalendarz wyników — widok miesiąca dzień po dniu (wzorzec zaufania:
- * codzienny bilans w jednostkach, nic nie znika).
+ * Kalendarz wyników — mapa miesiąca: bilans każdego dnia w jednostkach stawki.
  *
- * ROI dnia = roi_flat (stawka 1 j. na okazję), kolor: zysk/strata/zero.
- * Dni bez rozliczonych typów są puste (nie mylić z zerem).
+ * Kafelek niesie DWIE rzeczy (numer dnia + bilans), nie trzy. Trafienia,
+ * typy i CLV pokazuje panel dnia po kliknięciu — na kwadracie 40 px trzecia
+ * liczba i tak zlewała się w plamę, a na telefonie była nieczytelna.
  *
- * DWIE RZECZY, KTÓRYCH TU BRAKOWAŁO (2026-07-26):
- * 1. Jeden wspólny bilans nie mówił, GDZIE jest strata. Typy zawodnicze,
- *    rynki drużynowe i drabinki to trzy produkty o różnym ryzyku — pomiar
- *    z tego dnia: −42,9 j. na zawodnikach wobec −0,3 j. na drużynach.
- *    Przełącznik strumieni pokazuje to wprost zamiast uśredniać.
- * 2. Dni sprzed zmiany zasad selekcji opisują kod, którego już nie ma.
- *    Zostają w kalendarzu (nic nie chowamy), ale są wyszarzone i podpisane,
- *    żeby nie czytać ich jako bieżącej formy.
+ * Wybór produktu (zawodnicy / drużyny / drabinki) NIE należy do tego
+ * komponentu: filtr jest jeden na całą stronę, a kalendarz dostaje już
+ * przefiltrowane dni. Wcześniej ten sam przełącznik stał w dwóch miejscach
+ * z niezależnym stanem i mylił bardziej niż pomagał.
  */
 
 const DNI_TYGODNIA = ["pn", "wt", "śr", "cz", "pt", "so", "nd"];
@@ -30,58 +25,42 @@ const MIESIACE = [
   "lipiec", "sierpień", "wrzesień", "październik", "listopad", "grudzień",
 ];
 
-const NAZWY_STRUMIENI: Record<Strumien, string> = {
-  pewniaki: "Zawodnicy",
-  druzyny: "Drużyny",
-  drabinki: "Drabinki",
-};
-
-type Wybor = "wszystko" | Strumien;
-
 /** "YYYY-MM-DD" → [rok, miesiąc 0-11, dzień] bez pułapek stref czasowych. */
 function rozbijDate(dzien: string): [number, number, number] {
   const [r, m, d] = dzien.split("-").map(Number);
   return [r, m - 1, d];
 }
 
-function bilansDni(dni: SkutecznoscDnia[]): { roi: number; n: number } {
-  return dni.reduce(
-    (a, d) => ({ roi: a.roi + d.roi_flat, n: a.n + d.rozliczone }),
-    { roi: 0, n: 0 },
-  );
-}
-
 export function KalendarzWynikow({
   dni,
-  strumienie,
+  wszystkieDni,
+  wybrany,
+  onWybierz,
 }: {
+  /** dni PO filtrze produktu — to one rysują kafelki */
   dni: SkutecznoscDnia[];
-  strumienie?: TypyWyniki["skutecznosc_strumienie"];
+  /** pełny zbiór dni — wyznacza dostępne miesiące, żeby filtr nie zabierał
+   *  strzałek nawigacji */
+  wszystkieDni?: SkutecznoscDnia[];
+  wybrany?: string | null;
+  onWybierz?: (dzien: string) => void;
 }) {
-  const dostepne = useMemo(
-    () =>
-      (["pewniaki", "druzyny", "drabinki"] as Strumien[]).filter(
-        (k) => (strumienie?.[k]?.podsumowanie.rozliczone ?? 0) > 0,
-      ),
-    [strumienie],
-  );
-  const [wybor, setWybor] = useState<Wybor>("wszystko");
-  const widoczne = wybor === "wszystko" ? dni : (strumienie?.[wybor]?.dni ?? []);
+  const mapa = useMemo(() => {
+    const m = new Map<string, SkutecznoscDnia>();
+    for (const d of dni) if (d.rozliczone > 0) m.set(d.dzien, d);
+    return m;
+  }, [dni]);
 
-  // mapa dzień → dane + lista miesięcy (rok*12+m) obecnych w PEŁNYCH danych,
-  // żeby przełączanie strumienia nie zabierało miesięcy z paska nawigacji
-  const { mapa, miesiace } = useMemo(() => {
-    const mapa = new Map<string, SkutecznoscDnia>();
-    for (const d of widoczne) if (d.rozliczone > 0) mapa.set(d.dzien, d);
+  const miesiace = useMemo(() => {
     const zbior = new Set<number>();
-    for (const d of dni) {
+    for (const d of wszystkieDni ?? dni) {
       if (d.rozliczone > 0) {
         const [r, m] = rozbijDate(d.dzien);
         zbior.add(r * 12 + m);
       }
     }
-    return { mapa, miesiace: [...zbior].sort((a, b) => a - b) };
-  }, [widoczne, dni]);
+    return [...zbior].sort((a, b) => a - b);
+  }, [wszystkieDni, dni]);
 
   const [widok, setWidok] = useState<number | null>(
     () => miesiace[miesiace.length - 1] ?? null,
@@ -94,14 +73,13 @@ export function KalendarzWynikow({
   const dniWMiesiacu = new Date(rok, mies + 1, 0).getDate();
   // poniedziałek = 0 (getDay: niedziela = 0)
   const start = (new Date(rok, mies, 1).getDay() + 6) % 7;
-  const wMiesiacu = (d: SkutecznoscDnia) => {
+
+  const miesieczne = [...mapa.values()].filter((d) => {
     const [r, m] = rozbijDate(d.dzien);
     return r === rok && m === mies;
-  };
-
-  const miesieczne = [...mapa.values()].filter(wMiesiacu);
-  const { roi: bilans, n: rozliczonych } = bilansDni(miesieczne);
-  const poNowemu = bilansDni(miesieczne.filter((d) => poZmianie(d.dzien)));
+  });
+  const bilans = miesieczne.reduce((s, d) => s + d.roi_flat, 0);
+  const rozliczonych = miesieczne.reduce((s, d) => s + d.rozliczone, 0);
 
   const idx = miesiace.indexOf(widok);
 
@@ -115,26 +93,6 @@ export function KalendarzWynikow({
 
   return (
     <div className="rounded-(--radius-card) border border-hairline bg-card p-4 shadow-(--shadow-card) sm:p-5">
-      {dostepne.length > 1 && (
-        <div className="mb-4">
-          <Segmented
-            id="kalendarz-strumien"
-            opcje={[
-              { kod: "wszystko" as Wybor, label: "Wszystko" },
-              ...dostepne.map((k) => ({
-                kod: k as Wybor,
-                label: NAZWY_STRUMIENI[k],
-                title: `Bilans całości: ${fmtU(
-                  strumienie![k]!.podsumowanie.roi_flat,
-                )} z ${strumienie![k]!.podsumowanie.rozliczone} rozliczeń`,
-              })),
-            ]}
-            wartosc={wybor}
-            onChange={(v) => setWybor(v as Wybor)}
-          />
-        </div>
-      )}
-
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <button
@@ -174,7 +132,7 @@ export function KalendarzWynikow({
           >
             {fmtU(bilans)}
           </span>{" "}
-          · {rozliczonych} rozliczonych (stawka 1 j. na typ)
+          · {rozliczonych} rozliczonych
         </p>
       </div>
 
@@ -204,77 +162,38 @@ export function KalendarzWynikow({
           const zysk = k.roi_flat > 0.005;
           const strata = k.roi_flat < -0.005;
           const swiezy = poZmianie(k.dzien);
+          const aktywny = wybrany === k.dzien;
           return (
-            <span
+            <button
               key={i}
+              onClick={() => onWybierz?.(k.dzien)}
+              aria-pressed={aktywny}
               title={`${k.dzien}: ${k.trafione}/${k.rozliczone} trafionych · bilans ${fmtU(k.roi_flat)}${
                 swiezy ? "" : " · stare zasady selekcji"
-              }`}
-              className={`relative flex aspect-square flex-col items-center justify-center gap-0.5 rounded-(--radius-control) border text-xs ${
+              } — kliknij, żeby zobaczyć typy`}
+              className={`flex aspect-square flex-col items-center justify-center gap-1 rounded-(--radius-control) border text-xs transition-transform hover:scale-[1.06] ${
                 zysk
                   ? "border-data-green/30 bg-data-green-wash text-data-green-ink"
                   : strata
                     ? "border-data-red/25 bg-data-red-wash text-data-red-ink"
                     : "border-hairline bg-card-soft text-ink-soft"
-              } ${swiezy ? "" : "opacity-55"}`}
+              } ${swiezy ? "" : "opacity-55"} ${
+                aktywny ? "ring-2 ring-brand ring-offset-1 ring-offset-card" : ""
+              }`}
             >
               <span className="text-[10px] opacity-70">{nrDnia}</span>
               <span className="font-data text-[11px] font-semibold leading-none">
                 {fmtU(k.roi_flat)}
               </span>
-              <span className="font-data text-[9px] opacity-70">
-                {k.trafione}/{k.rozliczone}
-              </span>
-            </span>
+            </button>
           );
         })}
       </div>
 
-      {/* SKĄD STRATA: bilans każdego strumienia w tym samym miesiącu — bez
-          tego jeden czerwony kafelek nie mówi, czy zawiniły typy zawodnicze,
-          drużynowe czy drabinki */}
-      {dostepne.length > 1 && wybor === "wszystko" && (
-        <div className="mt-4 border-t border-hairline pt-3">
-          <p className="text-[10px] uppercase tracking-wide text-faint">
-            skąd wynik tego miesiąca
-          </p>
-          <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1.5">
-            {dostepne.map((k) => {
-              const { roi, n } = bilansDni(
-                (strumienie![k]!.dni ?? []).filter(wMiesiacu),
-              );
-              if (!n) return null;
-              return (
-                <button
-                  key={k}
-                  onClick={() => setWybor(k)}
-                  className="text-left text-xs transition-colors hover:text-ink"
-                  title={`Pokaż w kalendarzu tylko: ${NAZWY_STRUMIENI[k]}`}
-                >
-                  <span className="text-faint">{NAZWY_STRUMIENI[k]}</span>{" "}
-                  <span
-                    className={`font-data font-semibold ${
-                      roi > 0
-                        ? "text-data-green"
-                        : roi < 0
-                          ? "text-data-red-ink"
-                          : "text-ink-soft"
-                    }`}
-                  >
-                    {fmtU(roi)}
-                  </span>{" "}
-                  <span className="text-faint">({n})</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
       <div className="mt-3 space-y-1.5 text-[11px] leading-relaxed text-faint">
         <p>
-          Każdy dzień zostaje w kalendarzu, także stratny. Puste pola = brak
-          rozliczonych typów.
+          Kliknij dzień, żeby zobaczyć jego typy. Puste pola = brak rozliczeń;
+          każdy dzień zostaje w kalendarzu, także stratny.
         </p>
         {OSTATNIA_ZMIANA && (
           <p>
@@ -287,28 +206,8 @@ export function KalendarzWynikow({
               "pl-PL",
               { day: "numeric", month: "long" },
             )}
-            , czyli sprzed zmiany zasad selekcji ({OSTATNIA_ZMIANA.etykieta}) —
-            opisują model, którego już nie ma w produkcji.
-            {poNowemu.n > 0 ? (
-              <>
-                {" "}
-                Po zmianie:{" "}
-                <span
-                  className={`font-data font-semibold ${
-                    poNowemu.roi > 0
-                      ? "text-data-green"
-                      : poNowemu.roi < 0
-                        ? "text-data-red-ink"
-                        : "text-ink-soft"
-                  }`}
-                >
-                  {fmtU(poNowemu.roi)}
-                </span>{" "}
-                z {poNowemu.n} rozliczeń — za mało, żeby cokolwiek orzekać.
-              </>
-            ) : (
-              " Nowe zasady nie mają jeszcze ani jednego rozliczenia."
-            )}
+            , czyli sprzed zmiany zasad selekcji — opisują model, którego już
+            nie ma w produkcji.
           </p>
         )}
       </div>
