@@ -62,32 +62,60 @@ def get_key(key: str):
     return get_key_ok(key)[0]
 
 
+def waga(obj) -> int:
+    """Rozmiar payloadu w bajtach JSON.
+
+    Jedyna miara, która działa dla KAŻDEGO kształtu. Liczenie kluczy
+    najwyższego poziomu myli: bank stylu ma ich cztery (`gry`, `shotmapy`,
+    `wzrost`, `sytuacje`), więc mógłby stracić tysiąc meczów i przejść przez
+    bezpiecznik bez mrugnięcia — zmierzone 2026-07-26: `styl_bank_liga` to
+    3,06 MB w czterech kluczach.
+    """
+    try:
+        return len(json.dumps(obj, ensure_ascii=False))
+    except Exception:
+        return 0
+
+
+# poniżej tego rozmiaru bezpiecznik odpuszcza — mały klucz nie jest historią,
+# a bywa rejestrem, który z natury pustoszeje (publikacje po gwizdku)
+MIN_WAGA_BEZPIECZNIKA = 20_000
+
+
 def put_key_bezpiecznie(
-    key: str, payload, min_udzial: float = 0.5, min_n: int = 20,
+    key: str, payload, min_udzial: float = 0.5,
+    waga_poprzednia: int | None = None,
 ) -> bool:
-    """Upsert z bezpiecznikiem: nie nadpisuj dużej kolekcji drastycznie mniejszą.
+    """Upsert z bezpiecznikiem: nie nadpisuj dużego payloadu drastycznie mniejszym.
 
     Chroni przed klasą awarii „odczyt padł → kod myśli, że historia jest pusta
     → zapisuje kilka świeżych wpisów na miejsce tysiąca". Zanim zapiszemy,
-    sprawdzamy, co pod kluczem faktycznie leży: gdy nowa kolekcja ma mniej niż
-    `min_udzial` starej (a stara była sensownie duża), zapis WYPADA i wraca
-    False. Gdy stanu sprzed zapisu nie da się odczytać — też nie zapisujemy;
-    lepiej stracić jeden cykl niż historię.
+    sprawdzamy, co pod kluczem faktycznie leży: gdy nowy payload waży mniej niż
+    `min_udzial` starego, zapis WYPADA i wraca False. Gdy stanu sprzed zapisu
+    nie da się odczytać — też nie zapisujemy; lepiej stracić jeden cykl niż
+    historię.
+
+    `waga_poprzednia` pozwala pominąć kontrolny odczyt, gdy wołający zna już
+    rozmiar sprzed zmian (bank trendów to 8,6 MB i 2,3 s na odczyt — szkoda
+    ciągnąć go drugi raz w tym samym cyklu).
 
     Dla kolekcji, które kurczą się z natury (rejestr wygasający po gwizdku),
     to zły bezpiecznik — tam używaj `get_key_ok` i pomijaj zapis tylko przy
     nieudanym odczycie.
     """
-    stary, ok = get_key_ok(key)
-    if not ok:
-        print(f"Zapis '{key}' pominięty: nie udało się odczytać stanu sprzed "
-              "zapisu (baza nie odpowiada)")
-        return False
-    n_stary = len(stary) if isinstance(stary, (dict, list)) else 0
-    n_nowy = len(payload) if isinstance(payload, (dict, list)) else 0
-    if n_stary >= min_n and n_nowy < min_udzial * n_stary:
-        print(f"Zapis '{key}' WSTRZYMANY: {n_nowy} wpisów wobec {n_stary} "
-              "w bazie — to wygląda na utratę danych, nie na przycinanie")
+    if waga_poprzednia is None:
+        stary, ok = get_key_ok(key)
+        if not ok:
+            print(f"Zapis '{key}' pominięty: nie udało się odczytać stanu "
+                  "sprzed zapisu (baza nie odpowiada)")
+            return False
+        waga_poprzednia = waga(stary) if stary is not None else 0
+    waga_nowa = waga(payload)
+    if (waga_poprzednia >= MIN_WAGA_BEZPIECZNIKA
+            and waga_nowa < min_udzial * waga_poprzednia):
+        print(f"Zapis '{key}' WSTRZYMANY: {waga_nowa / 1e6:.2f} MB wobec "
+              f"{waga_poprzednia / 1e6:.2f} MB w bazie — to wygląda na utratę "
+              "danych, nie na przycinanie")
         return False
     return put_key(key, payload)
 

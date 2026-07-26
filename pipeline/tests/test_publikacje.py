@@ -75,6 +75,38 @@ def test_pierwsza_publikacja_wygrywa_cene(monkeypatch):
     assert rec["bet"]["kurs"] == 1.28      # sama cena jest odświeżana
 
 
+def test_wznowiony_typ_pokazuje_cene_z_ksiegi(monkeypatch):
+    """Rejestr odświeża `bet` w każdym cyklu, a rozliczenie idzie po cenie
+    z PIERWSZEJ publikacji — bez tego user widziałby 1,28, a ROI liczyłoby
+    się z 1,23."""
+    magazyn: dict = {}
+    _stub_supa(monkeypatch, magazyn)
+    bet = _bet(kurs=1.23)
+    bet["podmiot_id"] = 500
+    bet["p_model"] = 0.8
+    B.scal_z_publikacjami([bet], {1: {"id": 1}}, teraz=1000)
+    B.scal_z_publikacjami([{**bet, "kurs": 1.28}], {1: {"id": 1}}, teraz=2000)
+    # cykl bez tego typu — wraca z ceną, po której rozliczy go księga
+    ksiega = {"k": _wpis_logu(linia=6.5, strona="ponizej", kurs=1.23,
+                              rynek_kod="team_corners")}
+    out, wzn = B.scal_z_publikacjami([], {}, teraz=3000, typy_log=ksiega)
+    assert wzn == 1 and out[0]["kurs"] == 1.23
+    assert out[0]["ev_pct"] == round((0.8 * 1.23 - 1.0) * 100.0, 1)
+
+
+def test_wpis_bez_kickoffu_wygasa_zamiast_wracac_w_kolko(monkeypatch):
+    magazyn: dict = {
+        B.PUBLIKACJE_KLUCZ: {
+            "zepsuty": {"bet": {"mecz_id": 1, "podmiot": "X"},
+                        "kickoff_ts": None, "opublikowano_ts": 1},
+        },
+    }
+    _stub_supa(monkeypatch, magazyn)
+    out, wzn = B.scal_z_publikacjami([], {})
+    assert out == [] and wzn == 0
+    assert magazyn[B.PUBLIKACJE_KLUCZ] == {}
+
+
 def test_dry_run_nie_zapisuje_rejestru(monkeypatch):
     magazyn: dict = {}
     _stub_supa(monkeypatch, magazyn)

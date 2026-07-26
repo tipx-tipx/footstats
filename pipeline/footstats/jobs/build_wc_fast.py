@@ -235,12 +235,21 @@ def scal_z_publikacjami(
             "opublikowano_ts": (rej.get(k) or {}).get("opublikowano_ts") or teraz,
         }
 
+    # cena z księgi rozliczeń per typ — to ONA rozliczy typ i to ją musi
+    # pokazywać wznowiona karta (patrz niżej)
+    kurs_ksiegi = {
+        _klucz_publikacji(r): r.get("kurs")
+        for r in (typy_log or {}).values() if r.get("kurs")
+    }
+
     out = list(value_bets)
     wznowione = 0
     odtworzone = set(biezace)
     for k, rec in list(rej.items()):
         ts_k = int(rec.get("kickoff_ts") or 0)
-        if ts_k and ts_k <= teraz:
+        # brak kickoffu traktujemy jak po gwizdku: wpis bez daty nigdy by nie
+        # wygasł i wracałby na listę w nieskończoność
+        if ts_k <= teraz:
             del rej[k]           # mecz się zaczął — typ żyje dalej w typy_log
             continue
         if k in biezace:
@@ -250,6 +259,14 @@ def scal_z_publikacjami(
             continue
         bet["wznowiony"] = True
         bet["opublikowano_ts"] = rec.get("opublikowano_ts")
+        # CENA ZAMROŻONA, tak jak obiecuje karta. Rejestr odświeżał `bet`
+        # w każdym cyklu, więc wznowiony typ pokazywał ostatnią widzianą cenę,
+        # a księga rozliczy go po cenie z PIERWSZEJ publikacji — user widziałby
+        # 1,28 i dostał ROI liczone z 1,23.
+        if kurs_ksiegi.get(k) and bet.get("kurs") != kurs_ksiegi[k]:
+            bet["kurs"] = kurs_ksiegi[k]
+            p = float(bet.get("p_model") or 0.0)
+            bet["ev_pct"] = round((p * float(bet["kurs"]) - 1.0) * 100.0, 1)
         out.append(bet)
         odtworzone.add(k)
         wznowione += 1
@@ -345,8 +362,10 @@ def scal_karty_z_publikacjami(
     out = list(wpisy)
     wznowione = 0
     for k, rec in list(rej.items()):
+        # jak przy typach: karta bez kickoffu wygasa od razu, zamiast wracać
+        # na listę w nieskończoność
         ts_k = int(rec.get("kickoff_ts") or 0)
-        if ts_k and ts_k <= teraz:
+        if ts_k <= teraz:
             del rej[k]
             continue
         if k in biezace or not rec.get("wpis"):
@@ -686,19 +705,29 @@ def upcoming_wc_events() -> list[dict]:
     return list(out.values())
 
 
+# waga biblioteki trendów z chwili wczytania — zapis porównuje się do niej
+# zamiast ciągnąć 8,6 MB drugi raz w tym samym cyklu (patrz save_trend_lib)
+_TREND_LIB_WAGA: int | None = None
+
+
 def load_trend_lib() -> dict:
     """Trwała biblioteka trendów (Supabase app_data.trend_lib).
 
     statshub KASUJE propsy po meczu — bez tej biblioteki tracimy historię
     zawodników, zanim pojawią się kursy na ich następny mecz.
     """
-    return supa.get_key("trend_lib") or {}
+    global _TREND_LIB_WAGA
+    lib, ok = supa.get_key_ok("trend_lib")
+    # nieudany odczyt zostawia wagę pustą: zapis wykona wtedy własną kontrolę
+    # (i sam się wstrzyma, jeśli baza dalej nie odpowiada)
+    _TREND_LIB_WAGA = supa.waga(lib) if ok and lib is not None else None
+    return lib or {}
 
 
 def save_trend_lib(lib: dict) -> None:
     # biblioteka trendów tylko rośnie — nagły skurcz oznacza, że `load_trend_lib`
     # dostało pustkę po awarii odczytu, a nie że historia zniknęła
-    supa.put_key_bezpiecznie("trend_lib", lib)
+    supa.put_key_bezpiecznie("trend_lib", lib, waga_poprzednia=_TREND_LIB_WAGA)
 
 
 def past_wc_events(days_back: int = 25) -> list[dict]:
@@ -2674,6 +2703,10 @@ def _main_impl(tryb=None):
             "team_corners": "corners", "team_goals": "gole",
         }
         gry_banku = list((bank_stylu.get("gry") or {}).values())
+        # skala poziomu zależy WYŁĄCZNIE od rynku, a `_hist_z_banku` woła ją
+        # dla każdej drużyny osobno — bez pamięci przemiatałaby cały bank
+        # (kilka tysięcy meczów) raz na drużynę i rynek
+        _skala_cache: dict[str, float] = {}
 
         def _skala_poziomu(pole: str) -> float:
             """Ile razy ten sam wskaźnik jest wyższy w rozgrywkach zakresu niż
@@ -2685,20 +2718,23 @@ def _main_impl(tryb=None):
             zwykle słabnie po awansie, ale jednego meczu nie wolno brać za
             dowód poziomu ligi.
             """
+            if pole in _skala_cache:
+                return _skala_cache[pole]
             zakres, wlasne = [], []
             for rec_g in gry_banku:
                 cel = wlasne if rec_g.get("wlasna") else zakres
                 for d in (rec_g.get("druzyny") or {}).values():
                     if d.get(pole) is not None:
                         cel.append(float(d[pole]))
-            if len(wlasne) < 2 or not zakres:
-                return 1.0
-            sr_w = sum(wlasne) / len(wlasne)
-            if sr_w <= 0:
-                return 1.0
-            raw = (sum(zakres) / len(zakres)) / sr_w
-            waga = len(wlasne) / (len(wlasne) + 8.0)
-            return float(np.clip(1.0 + (raw - 1.0) * waga, 0.70, 1.40))
+            skala = 1.0
+            if len(wlasne) >= 2 and zakres:
+                sr_w = sum(wlasne) / len(wlasne)
+                if sr_w > 0:
+                    raw = (sum(zakres) / len(zakres)) / sr_w
+                    waga_w = len(wlasne) / (len(wlasne) + 8.0)
+                    skala = float(np.clip(1.0 + (raw - 1.0) * waga_w, 0.70, 1.40))
+            _skala_cache[pole] = skala
+            return skala
 
         def _hist_z_banku(team_nm: str, pole: str) -> tuple[list, list]:
             tn = rotowire._norm(team_nm)
