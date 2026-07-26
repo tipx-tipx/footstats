@@ -2216,15 +2216,28 @@ def _main_impl(tryb=None):
                 # dwa profile lega: PEWNIAK (niski kurs, wysoka szansa) oraz
                 # PEREŁKA (kurs 2.0-3.6 przy wciąż solidnej szansie i
                 # nieujemnej wartości — okazjonalne rodzynki na kupony)
+                # O PUBLIKACJI decyduje p OSTROŻNE: średnia punktowego p
+                # i dolnej granicy przedziału wiarygodności. Powód nie jest
+                # kosmetyczny — zmierzone 2026-07-26 na 324 rozliczeniach:
+                # luka deklaracja−trafienia trzyma się −7 do −22 pp NIEZALEŻNIE
+                # od okresu, mimo dużych korekt kalibracyjnych (−0,25..−0,73
+                # w logitach, tylko 1 przedział z 44 przy suficie). To nie jest
+                # błąd średniej, tylko EFEKT SELEKCJI: liczymy p dla tysięcy
+                # kandydatów i publikujemy te z najwyższym, a najwyższe
+                # oszacowania to systematycznie te, które przestrzeliły w górę.
+                # Kalibracja ściąga wszystkie p, brama wybiera nowy czub i
+                # korekta goni własny ogon. Dolna granica karze wprost to,
+                # co selekcja premiuje: szerokie, niepewne oszacowania.
+                p_dec = (p_side + sm.ci_low) / 2.0 if sm.ci_low is not None else p_side
                 pewny = (
                     betting.MIN_ODDS <= odd <= 2.80   # user: kursy od 1.19
                     and p_side >= 0.52
-                    and p_side * odd - 1.0 >= -0.12
+                    and p_dec * odd - 1.0 >= 0.0
                 )
                 perelka = (
                     1.90 <= odd <= 3.60
                     and p_side >= 0.42
-                    and p_side * odd - 1.0 >= 0.0
+                    and p_dec * odd - 1.0 >= 0.0
                 )
                 # furtka kontekstowa: rynki niszowe (spalone / głową / celne
                 # zza pola) prawie nigdy nie przechodzą zwykłych progów, a to
@@ -2237,7 +2250,7 @@ def _main_impl(tryb=None):
                     and matchup_typ
                     and 1.90 <= odd <= 3.60
                     and p_side >= 0.40
-                    and p_side * odd - 1.0 >= -0.05
+                    and p_dec * odd - 1.0 >= 0.0
                 )
                 # typ kontekstowy (matchup): profil rywala wyraźnie sprzyja —
                 # model może rozejść się z rynkiem mocniej niż zwykle, bo zna
@@ -2875,8 +2888,14 @@ def _main_impl(tryb=None):
                     if med and (now_t - med) / 86400.0 >= dni_ost_t - 14.0:
                         stare_t = False  # pauzowała cała liga, nie ta drużyna
             pred_t = counts.predict_match(posterior_t, 90.0, factor_t)
+            # KALIBRACJA rynków drużynowych: bias był dla nich LICZONY
+            # (team_corners −0,466, team_goals −0,254), ale nigdy nie
+            # docierał do p — ścieżka drużynowa jako jedyna nie przekazywała
+            # go dalej. Stosujemy go tu, na p_over, żeby strona "poniżej"
+            # pozostała jego dokładnym dopełnieniem.
+            bias_t = bias_map.get(tt.market_code, 1.0)
             for l_t, slot_t in sorted(linie_t.items()):
-                p_over_t = pred_t.p_over(l_t)
+                p_over_t = apply_bias(bias_t, pred_t.p_over(l_t))
                 lo_o, hi_o = counts.p_over_credible_interval(
                     posterior_t, 90.0, factor_t, l_t
                 )
@@ -2893,13 +2912,15 @@ def _main_impl(tryb=None):
                     else:
                         p_t, lo_t, hi_t = 1.0 - p_over_t, 1.0 - hi_o, 1.0 - lo_o
                     implied_t = betting.implied_prob_one_sided(odd_t)
+                    # jak po stronie zawodniczej: decyduje p ostrożne
+                    p_dec_t = (p_t + lo_t) / 2.0
                     pewny_t = (
                         betting.MIN_ODDS <= odd_t <= 2.80
-                        and p_t >= 0.52 and p_t * odd_t - 1.0 >= -0.12
+                        and p_t >= 0.52 and p_dec_t * odd_t - 1.0 >= 0.0
                     )
                     perelka_t = (
                         1.90 <= odd_t <= 3.60
-                        and p_t >= 0.42 and p_t * odd_t - 1.0 >= 0.0
+                        and p_t >= 0.42 and p_dec_t * odd_t - 1.0 >= 0.0
                     )
                     if not (pewny_t or perelka_t):
                         odpadki_t["kurs_lub_szansa_poza_widelkami"] += 1
