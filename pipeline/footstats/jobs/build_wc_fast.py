@@ -214,6 +214,11 @@ MIN_MECZE_W_OKNIE = 2               # mniej występów w oknie = historia martwa
 STARE_DANE_S = 45 * 86400           # ostatni występ dawniej -> typ tylko "w tle"
 #   (liczy się, uczy kalibrację, widoczny w Skuteczności; wraca do publikacji
 #    po 1-2 kolejkach, gdy zawodnik znów ma świeże mecze)
+MAX_PERF_CYKL = 220                 # budżet zapytań /player/{id}/performance
+#   na cykl (1 na zawodnika, nie na rynek) — ratowanie historii spoza
+#   zasięgu feedu propsów; patrz odswiez_stare_trendy(). 120 ucinało 44 ze
+#   164 zawodników z martwą próbą (dry-run 2026-07-26); koszt ~0,26 s na
+#   zapytanie, więc pełne pokrycie to ~45 s w cyklu chodzącym co 30 min.
 
 
 # --- PEŁNE SKŁADY (predicted/oficjalne) ---
@@ -304,6 +309,85 @@ def swiezosc_proby(
         return 0, float("inf")
     n_okno = sum(1 for ts in grane if ts >= now - OKNO_SWIEZEJ_PROBY_S)
     return n_okno, (now - max(grane)) / 86400.0
+
+
+def odswiez_stare_trendy(
+    trends: list, now: int, budzet: int = MAX_PERF_CYKL
+) -> tuple[int, int]:
+    """Dociągnij prawdziwą historię zawodnikom, których feed propsów ma martwą.
+
+    `/api/props/player-trends` daje historię TYLKO z meczów, na które
+    bukmacherzy UK wystawili linie. W Ameryce Południowej to garstka spotkań
+    w sezonie, więc „ostatnie 40 meczów" zawodnika sięga dwóch lat wstecz,
+    brama świeżości widzi zero występów w oknie i wyrzuca go jako
+    `za_stara_historia` — mimo że gra co tydzień. Zmierzone 2026-07-26 na
+    6 meczach Brasileirão/Ligi Profesional/MLS/Ligi MX: 58 z 360 trendów
+    (16%), m.in. Igor Rabello z ostatnim meczem wg feedu 2025-09-20.
+
+    `/api/player/{id}/performance` to własne dane meczowe statshuba —
+    10 ostatnich występów z kompletem statystyk, niezależnie od tego, czy
+    ktokolwiek je kwotował. Podmieniamy z nich SAMĄ HISTORIĘ; kontekst,
+    którego performance nie zna (rywal, średnie ligi, linia z feedu, sygnał
+    składu), zostaje z oryginalnego trendu nietknięty.
+
+    Zwraca (ilu zawodników odświeżono, ile trendów podmieniono).
+    """
+    per_gracz: dict[int, list] = {}
+    for t in trends:
+        if t.player_id:
+            per_gracz.setdefault(t.player_id, []).append(t)
+    # ratujemy zawodnika, którego ŻADEN rynek nie ma świeżej próby — gdy choć
+    # jeden ma, historia z feedu żyje i nie ma czego podmieniać
+    stare = {
+        pid: ich for pid, ich in per_gracz.items()
+        if all(
+            swiezosc_proby(t.timestamps, t.minutes, now)[0] < MIN_MECZE_W_OKNIE
+            for t in ich
+        )
+    }
+    if not stare:
+        return 0, 0
+    # najpierw zawodnicy z największą liczbą rynków — jedno zapytanie ratuje
+    # tam najwięcej kandydatów naraz
+    kolejka = sorted(stare.items(), key=lambda kv: -len(kv[1]))[:budzet]
+    n_graczy = n_trendow = 0
+    for pid, ich in kolejka:
+        try:
+            rows = statshub.fetch_player_performance(int(pid))
+        except Exception:
+            continue
+        if not rows:
+            continue
+        wzor = ich[0]
+        swieze = statshub.trendy_z_performance(
+            int(pid), wzor.player_name, wzor.team_id, rows
+        )
+        podmienione = 0
+        for t in ich:
+            s = swieze.get(t.market_code)
+            if s is None:
+                continue   # rynek pochodny (zza pola/głową) — potrzebuje shotmap
+            if swiezosc_proby(s.timestamps, s.minutes, now)[0] < MIN_MECZE_W_OKNIE:
+                continue   # performance też nie widzi świeżych występów: realnie nie gra
+            t.counts = s.counts
+            t.minutes = s.minutes
+            t.timestamps = s.timestamps
+            t.started = s.started
+            t.game_positions = s.game_positions
+            t.game_opponents = s.game_opponents
+            t.game_opponent_ids = s.game_opponent_ids
+            t.game_utids = s.game_utids
+            podmienione += 1
+        if podmienione:
+            n_graczy += 1
+            n_trendow += podmienione
+    pominieto = max(0, len(stare) - len(kolejka))
+    print(f"Historia spoza feedu propsów: {len(stare)} zawodników z martwą "
+          f"próbą, odratowano {n_graczy} ({n_trendow} trendów)"
+          + (f", budżet uciął {pominieto}" if pominieto else ""))
+    return n_graczy, n_trendow
+
+
 # nazwy reprezentacji EN -> PL (do dopasowania z Superbetem)
 EN_PL = {v: k for k, v in superbet.TEAM_PL_EN.items()}
 # MŚ 2026 to NIE jest w pełni neutralny turniej — USA/Meksyk/Kanada są
@@ -941,6 +1025,12 @@ def _main_impl(tryb=None):
         return
     print(f"Trendów propsów: {len(trends)} "
           f"({len(set(t.player_id for t in trends))} zawodników)")
+    # RATUNEK HISTORII (tylko liga): feed propsów pokrywa mecze wycenione
+    # przez buków UK, więc poza Europą historia zawodnika bywa dwuletnia i
+    # cały kandydat ginie na bramie świeżości. Robimy to TU, przed czymkolwiek
+    # innym, żeby świeża próba weszła też do banku, minut i średnich drużyny.
+    if tryb and trends:
+        odswiez_stare_trendy(trends, int(time.time()))
     # ostatni mecz KAŻDEJ drużyny wg feedu — do rozróżnienia "zawodnik siedzi"
     # od "cała liga pauzowała" (przerwa letnia / mundialowa): flaga stare_dane
     # nie powinna chować typów za przerwę, na którą zawodnik nie miał wpływu
