@@ -7,7 +7,6 @@ import { KalendarzWynikow } from "./KalendarzWynikow";
 import { KartyDrabinek } from "./KartyDrabinek";
 import { KrzywaWyniku } from "./skutecznosc/KrzywaWyniku";
 import { TypyDnia } from "./skutecznosc/TypyDnia";
-import { useBilans } from "./useBilans";
 import { WerdyktModelu, type WerdyktDane } from "./WerdyktModelu";
 import { fmtProc } from "@/lib/format";
 import type {
@@ -191,10 +190,6 @@ export function SkutecznoscScena({
   przelacznikWidoku?: React.ReactNode;
 }) {
   const reduced = useReducedMotion();
-  // Klient widzi złotówki w werdykcie, więc chipy, krzywa i kalendarz TEŻ
-  // muszą — „−466 zł" nad „−46,62u" to dwie różne liczby o tej samej rzeczy
-  // na jednym ekranie (patrz useBilans).
-  const { bilans } = useBilans(pelnyWglad);
   const [wybor, setWybor] = useState<Wybor>("wszystko");
   const [zakladka, setZakladka] = useState<IdZakladki>("rynki");
   const [dzien, setDzien] = useState<string | null>(null);
@@ -367,10 +362,6 @@ export function SkutecznoscScena({
           <div className="mt-2 flex flex-wrap gap-2">
             {(["wszystko", ...dostepne] as Wybor[]).map((k) => {
               const aktywny = k === wybor;
-              const roi =
-                k === "wszystko"
-                  ? (typy.podsumowanie?.roi_flat ?? 0)
-                  : strumienie[k]!.podsumowanie.roi_flat;
               const n =
                 k === "wszystko"
                   ? (typy.podsumowanie?.rozliczone ?? 0)
@@ -391,18 +382,12 @@ export function SkutecznoscScena({
                   }`}
                 >
                   <span className="font-semibold">{NAZWY[k]}</span>
-                  <span
-                    className={`font-data ml-2 text-xs font-semibold ${
-                      roi > 0
-                        ? "text-data-green"
-                        : roi < 0
-                          ? "text-data-red-ink"
-                          : "text-ink-soft"
-                    }`}
-                  >
-                    {bilans(roi)}
-                  </span>
-                  <span className="font-data ml-1 text-xs text-faint">
+                  {/* Bilans STĄD ZNIKNĄŁ (decyzja usera 2026-07-27). Chip jest
+                      przełącznikiem, a nie tablicą wyników: cztery kwoty obok
+                      siebie konkurowały z werdyktem wyżej, który mówi to samo
+                      dokładniej. Zostaje sama liczba rozliczeń — mówi, ile
+                      danych stoi za tym, co zobaczysz po kliknięciu. */}
+                  <span className="font-data ml-2 text-xs text-faint">
                     ({n})
                   </span>
                 </button>
@@ -417,67 +402,81 @@ export function SkutecznoscScena({
         </div>
       )}
 
-      {/* DOWÓD — krzywa i kalendarz OBOK SIEBIE.
-          To dwa spojrzenia na tę samą rzecz i dopiero razem robią robotę:
-          krzywa mówi „w którą stronę to idzie", kalendarz „kiedy i jak
-          równo". Rozdzielone (krzywa nad zakładkami, kalendarz w zakładce)
-          zmuszały do przełączania się tam i z powrotem, żeby zestawić trend
-          z konkretnym dniem. */}
-      {/* Obok siebie dopiero od XL. Kafelek kalendarza mieści dzień I bilans
-          („+0,19u"), więc przy połowie szerokości na laptopie tekst się łamał
-          i siatka wyglądała na rozjechaną — zgłoszone 2026-07-27. Poniżej XL
-          układamy jedno pod drugim, w szerokości reszty strony. */}
-      <div className="mt-8 grid max-w-3xl items-start gap-5 xl:max-w-6xl xl:grid-cols-2">
-        {dni.length > 1 && <KrzywaWyniku dni={dni} pelnyWglad={pelnyWglad} />}
-        <KalendarzWynikow
-          dni={dni}
-          wszystkieDni={wszystkieDni}
-          wybrany={wybranyDzien?.dzien ?? null}
-          onWybierz={setDzien}
-          pelnyWglad={pelnyWglad}
-        />
-      </div>
+      {/* DOWÓD — trzy bloki, dwa różne układy.
 
-      {/* WYBRANY DZIEŃ — bezpośrednio pod mapą, bez zakładki */}
-      <div className="mt-4 max-w-3xl space-y-3">
-        {wybranyDzien ? (
-          <TypyDnia
-            dzien={wybranyDzien}
+          Wersja z 27.07 stawiała krzywą obok kalendarza, a dzień pod spodem.
+          Karty w wierszu mają różną wysokość (krzywa ~260 px, kalendarz ~570),
+          więc pod krzywą zostawała pusta kolumna — i to samo pod dniem, bo był
+          węższy od siatki nad nim. Zgłoszone wprost: „pusta przestrzeń góra
+          dół".
+
+          Na szerokim ekranie kalendarz trzyma prawą kolumnę na całą swoją
+          wysokość (`row-span-2`), a lewa układa krzywą i wybrany dzień jedno
+          pod drugim. Dwa krótkie bloki dopełniają jeden wysoki — nie ma czego
+          wypełniać. Przy okazji wychodzi to lepiej logicznie: klikasz dzień
+          i jego typy są OBOK, na wysokości wzroku.
+
+          Na wąskim ekranie liczy się KOLEJNOŚĆ, nie wypełnienie: kalendarz
+          musi iść PRZED dniem, bo to nim się dzień wybiera. Dlatego trzy
+          osobne dzieci siatki i jawne `col/row-start` dopiero od XL —
+          w jednej kolumnie układają się w naturalnej kolejności czytania. */}
+      <div className="mt-8 grid max-w-3xl gap-5 xl:max-w-6xl xl:grid-cols-[minmax(0,1fr)_26rem]">
+        {dni.length > 1 && (
+          <div className="min-w-0 xl:col-start-1 xl:row-start-1">
+            <KrzywaWyniku dni={dni} pelnyWglad={pelnyWglad} />
+          </div>
+        )}
+
+        <div className="min-w-0 xl:col-start-2 xl:row-span-2 xl:row-start-1">
+          <KalendarzWynikow
+            dni={dni}
+            wszystkieDni={wszystkieDni}
+            wybrany={wybranyDzien?.dzien ?? null}
+            onWybierz={setDzien}
             pelnyWglad={pelnyWglad}
-            // strzałki chodzą po TEJ SAMEJ liście co kafelki, a kalendarz
-            // przewija się za wyborem (patrz KalendarzWynikow) — więc to
-            // nadal jedna oś czasu, tylko dostępna bez celowania w siatkę
-            nowszy={
-              idxDnia > 0
-                ? () => setDzien(dniZTypami[idxDnia - 1].dzien)
-                : undefined
-            }
-            starszy={
-              idxDnia >= 0 && idxDnia < dniZTypami.length - 1
-                ? () => setDzien(dniZTypami[idxDnia + 1].dzien)
-                : undefined
-            }
-            pozycja={idxDnia + 1}
-            ile={dniZTypami.length}
           />
-        ) : (
-          <p className="rounded-(--radius-card) border border-hairline bg-card px-4 py-3.5 text-sm text-muted shadow-(--shadow-card)">
-            Nic tu jeszcze nie ma — żaden typ tego rodzaju się nie rozliczył.
-          </p>
-        )}
-        {pelnyWglad && (poza?.poza_n ?? 0) > 0 && (
-          <p className="rounded-(--radius-card) border border-hairline bg-card px-4 py-3 text-xs leading-relaxed text-muted">
-            <span className="font-data font-semibold text-ink">
-              {poza!.poza_trafione ?? 0}/{poza!.poza_n}
-            </span>{" "}
-            typów policzyliśmy{" "}
-            <strong className="font-semibold">tylko na próbę</strong> — nie było
-            ich na stronie, bo albo dany rynek był chwilowo wstrzymany, albo nie
-            zmieściły się w limicie typów z jednego meczu. Nie wliczamy ich do
-            bilansu; na liście mają oznaczenie „na próbę”.
-          </p>
-        )}
-        {wybor === "drabinki" && dni.length > 0 && <KartyDrabinek dni={dni} />}
+        </div>
+
+        <div className="min-w-0 space-y-3 xl:col-start-1 xl:row-start-2">
+          {wybranyDzien ? (
+            <TypyDnia
+              dzien={wybranyDzien}
+              pelnyWglad={pelnyWglad}
+              // strzałki chodzą po TEJ SAMEJ liście co kafelki, a kalendarz
+              // przewija się za wyborem (patrz KalendarzWynikow) — więc to
+              // nadal jedna oś czasu, tylko dostępna bez celowania w siatkę
+              nowszy={
+                idxDnia > 0
+                  ? () => setDzien(dniZTypami[idxDnia - 1].dzien)
+                  : undefined
+              }
+              starszy={
+                idxDnia >= 0 && idxDnia < dniZTypami.length - 1
+                  ? () => setDzien(dniZTypami[idxDnia + 1].dzien)
+                  : undefined
+              }
+              pozycja={idxDnia + 1}
+              ile={dniZTypami.length}
+            />
+          ) : (
+            <p className="rounded-(--radius-card) border border-hairline bg-card px-4 py-3.5 text-sm text-muted shadow-(--shadow-card)">
+              Nic tu jeszcze nie ma — żaden typ tego rodzaju się nie rozliczył.
+            </p>
+          )}
+          {pelnyWglad && (poza?.poza_n ?? 0) > 0 && (
+            <p className="rounded-(--radius-card) border border-hairline bg-card px-4 py-3 text-xs leading-relaxed text-muted">
+              <span className="font-data font-semibold text-ink">
+                {poza!.poza_trafione ?? 0}/{poza!.poza_n}
+              </span>{" "}
+              typów policzyliśmy{" "}
+              <strong className="font-semibold">tylko na próbę</strong> — nie
+              było ich na stronie, bo albo dany rynek był chwilowo wstrzymany,
+              albo nie zmieściły się w limicie typów z jednego meczu. Nie
+              wliczamy ich do bilansu; na liście mają oznaczenie „na próbę”.
+            </p>
+          )}
+          {wybor === "drabinki" && dni.length > 0 && <KartyDrabinek dni={dni} />}
+        </div>
       </div>
 
       {/* ZAKŁADKI — sama kuchnia modelu, wyłącznie dla admina */}

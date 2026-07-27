@@ -236,7 +236,7 @@ export function KalendarzWynikow({
 
       <div className="mt-3 space-y-1.5 text-[11px] leading-relaxed text-faint">
         <p>
-          Kliknij dowolny dzień, żeby zobaczyć jego typy pod spodem. Puste pola
+          Kliknij dowolny dzień, żeby zobaczyć jego typy. Puste pola
           = brak rozliczeń; każdy dzień zostaje w kalendarzu, także stratny.
           {/* kafelek ma ~40 px, więc mieści samą liczbę bez „zł" — jednostkę
               trzeba dopowiedzieć tutaj, inaczej „−160" nic nie znaczy */}
