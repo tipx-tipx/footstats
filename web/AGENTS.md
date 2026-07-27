@@ -18,6 +18,19 @@ nothing renders it. Strip on the server instead — see `lib/okrojDlaKlienta.ts`
 When adding a new panel with model diagnostics, ask first: does the client's
 browser need to *receive* this?
 
+# Previews and mobile: use the scripts, don't eyeball
+
+- `npm run zrzuty` — Playwright screenshots (laptop + phone) of a production
+  build. `npm run zrzuty -- model kupony` for specific routes (leading slash
+  optional; Git Bash mangles `/model` into a Windows path).
+- `npm run audyt` — finds pages that scroll sideways on a 390 px screen and
+  names the element that causes it. Also lists containers that scroll
+  horizontally on purpose, so you can judge whether each one has to.
+
+Run `npm run audyt` after any layout change. One decorative element wider than
+the viewport makes the whole page swing left-right on a phone, and that is very
+hard to spot by looking.
+
 # NEVER run `next build` while `next dev` is running
 
 Both write to `.next`. The dev server watches that directory, so a production

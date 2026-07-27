@@ -493,7 +493,16 @@ export function Hero({
           custom={3}
           className="relative mx-auto w-full max-w-xl lg:mx-0 lg:max-w-none"
         >
-          <div aria-hidden className="glow-brand pointer-events-none absolute -inset-16" />
+          {/* Poświata jest DEKORACJĄ, więc nie wolno jej ruszać układu.
+              `-inset-16` (64 px na stronę) mieści się na desktopie w marginesach
+              kontenera, ale na telefonie karta zajmuje prawie całą szerokość —
+              i te 64 px wypychały CAŁĄ stronę w bok o 48 px (wykryte
+              `npm run audyt`, 2026-07-27). Na wąskim ekranie poświata jest
+              odpowiednio węższa. */}
+          <div
+            aria-hidden
+            className="glow-brand pointer-events-none absolute -inset-3 sm:-inset-16"
+          />
           <ZywyPodglad bets={spotlightBets} />
         </motion.div>
       </div>

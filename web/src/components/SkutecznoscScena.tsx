@@ -4,7 +4,6 @@ import { motion, useReducedMotion } from "framer-motion";
 import { useMemo, useState } from "react";
 
 import { KalendarzWynikow } from "./KalendarzWynikow";
-import { KartyDrabinek } from "./KartyDrabinek";
 import { KrzywaWyniku } from "./skutecznosc/KrzywaWyniku";
 import { TypyDnia } from "./skutecznosc/TypyDnia";
 import { WerdyktModelu, type WerdyktDane } from "./WerdyktModelu";
@@ -475,7 +474,6 @@ export function SkutecznoscScena({
               wliczamy ich do bilansu; na liście mają oznaczenie „na próbę”.
             </p>
           )}
-          {wybor === "drabinki" && dni.length > 0 && <KartyDrabinek dni={dni} />}
         </div>
       </div>
 

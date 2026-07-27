@@ -11,7 +11,8 @@
     "lint": "eslint",
     "stop": "node scripts/ubij-zombie.mjs",
     "test:role": "node --experimental-strip-types --no-warnings scripts/test-rol.mjs",
-    "zrzuty": "node scripts/zrzuty.mjs"
+    "zrzuty": "node scripts/zrzuty.mjs",
+    "audyt": "node scripts/audyt-mobile.mjs"
   },
   "dependencies": {
     "framer-motion": "^12.42.2",

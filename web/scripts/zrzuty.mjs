@@ -28,7 +28,13 @@ const SZEROKOSCI = [
 ];
 const DOMYSLNE = ["/model", "/model?widok=klient"];
 
-const adresy = process.argv.slice(2).filter((a) => a.startsWith("/"));
+// UWAGA na Git Bash: zamienia argument „/model" na ścieżkę windowsową
+// („C:/Program Files/Git/model") — dlatego przyjmujemy TAKŻE zapis bez
+// ukośnika (`npm run zrzuty -- model kupony`) i sami go dokładamy.
+const adresy = process.argv
+  .slice(2)
+  .filter((a) => a && !a.startsWith("-") && !/^[A-Za-z]:/.test(a))
+  .map((a) => (a.startsWith("/") ? a : `/${a}`));
 const strony = adresy.length > 0 ? adresy : DOMYSLNE;
 
 function uruchom(cmd, args, opts = {}) {

@@ -120,6 +120,24 @@ function WierszTypu({
         <span className="block truncate">
           {t.rynek.toLowerCase()} {STRONA_LABEL[t.strona]} {fmtLinia(t.linia)}
         </span>
+        {/* klasa karty (top/mocny/solidny) — mają ją WYŁĄCZNIE drabinki.
+            Wcześniej mieszkała w osobnej liście „Karty rozliczone" pod
+            kalendarzem, która przy kilku kartach dziennie powtarzała ten sam
+            zestaw co panel dnia (zgłoszone 2026-07-27: „dublowanie"). */}
+        {t.klasa && (
+          <span
+            className={`mt-0.5 inline-block rounded-full px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide ${
+              t.klasa === "top"
+                ? "bg-data-green-wash text-data-green-ink"
+                : t.klasa === "mocny"
+                  ? "bg-brand-wash text-brand-deep"
+                  : "bg-card-soft text-faint"
+            }`}
+            title="Ocena karty w chwili, gdy ją pokazaliśmy"
+          >
+            {t.klasa}
+          </span>
+        )}
         {pelnyWglad && t.poza_publikacja && (
           <span
             className="block text-[10px] uppercase tracking-wide text-faint"
