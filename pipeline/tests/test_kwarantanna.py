@@ -214,3 +214,61 @@ def test_typy_bez_flag_nie_wpadaja_do_zadnej_kategorii():
     """„Zwykłe" typy to te, które zarabiają — nie wolno ich objąć bramą."""
     recs = _seria("shots", 30, 5, 1.5)
     assert rozliczanie.kategorie_kwarantanna(_log(recs)) == {}
+
+
+# --- KOREKTA STRUMIENIA (2026-07-27) ---------------------------------------
+
+def _typ(i, p, wynik, strumien="pewniaki", kal=None):
+    rec = {
+        "mecz_id": i, "mecz": "A – B", "kickoff_ts": 1_700_000_000 + i,
+        "podmiot_id": i, "podmiot": f"G{i}",
+        "rynek_kod": "team_goals" if strumien == "druzyny" else "shots",
+        "rynek": "R", "linia": 1.5, "strona": "powyzej",
+        "kurs": 1.9, "p_model": p, "wynik": wynik, "zagral": True,
+    }
+    if kal is not None:
+        rec["kal_strumien"] = kal
+    return rec
+
+
+def test_korekta_strumienia_sciaga_przeszacowanie():
+    """Deklaracja 70%, trafienia 50% -> korekta ujemna, ale STŁUMIONA.
+
+    Pierwszy cykl dokłada połowę potrzebnej korekty (patrz
+    KOREKTA_STRUMIENIA_TLUMIENIE) — pełna wartość od razu wyzerowałaby listę.
+    """
+    log = {}
+    for i in range(60):
+        log[str(i)] = _typ(i, 0.70, "wygrany" if i % 2 == 0 else "przegrany")
+    k = rozliczanie.korekta_strumienia(log)
+    assert -0.6 < k["pewniaki"] < -0.25
+    # strumień drużynowy bez próby nie dostaje nic
+    assert "druzyny" not in k
+
+
+def test_korekta_strumienia_cisza_gdy_model_trafia():
+    log = {}
+    for i in range(60):
+        log[str(i)] = _typ(i, 0.60, "wygrany" if i % 10 < 6 else "przegrany")
+    assert rozliczanie.korekta_strumienia(log) == {}
+
+
+def test_korekta_strumienia_nie_oscyluje():
+    """Regulator liczy na SUROWYM p — inaczej po jednym cyklu wyzerowałby się.
+
+    Typy z drugiego cyklu mają p JUŻ ściągnięte korektą (0,70 -> 0,52) i
+    stempel `kal_strumien`. Gdyby pomiar szedł po p_model, luka wyglądałaby
+    na zamkniętą i korekta wróciłaby do zera — a przeszacowanie wróciłoby
+    razem z nią.
+    """
+    log = {}
+    for i in range(60):
+        log[str(i)] = _typ(i, 0.52, "wygrany" if i % 2 == 0 else "przegrany",
+                           kal=-0.80)
+    k = rozliczanie.korekta_strumienia(log)
+    assert k["pewniaki"] < -0.5, "korekta zniknęła — regulator oscyluje"
+
+
+def test_korekta_strumienia_wymaga_proby():
+    log = {str(i): _typ(i, 0.70, "przegrany") for i in range(20)}
+    assert rozliczanie.korekta_strumienia(log) == {}

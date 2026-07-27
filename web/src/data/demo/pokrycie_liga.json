@@ -1,245 +1,35 @@
 {
- "mecze_statshub": 287,
- "mecze_superbet": 870,
- "sparowane": 252,
+ "mecze_statshub": 172,
+ "mecze_superbet": 468,
+ "sparowane": 143,
  "per_rozgrywki": {
-  "CFA Super League": {
-   "kraj": "China",
-   "mecze": 7,
-   "sparowane": 4,
-   "druzynowe": false
-  },
-  "Ykkösliiga": {
-   "kraj": "Finland",
-   "mecze": 6,
-   "sparowane": 5,
-   "druzynowe": false
-  },
-  "Ekstraklasa": {
-   "kraj": "Polska",
-   "mecze": 7,
-   "sparowane": 7,
-   "druzynowe": true
-  },
-  "Superettan": {
-   "kraj": "Sweden",
-   "mecze": 8,
-   "sparowane": 8,
-   "druzynowe": false
-  },
-  "Allsvenskan": {
-   "kraj": "Sweden",
-   "mecze": 7,
-   "sparowane": 6,
-   "druzynowe": false
-  },
-  "ASEAN Championship": {
-   "kraj": "Asia",
-   "mecze": 5,
-   "sparowane": 0,
-   "druzynowe": false
-  },
-  "Russian Premier League": {
-   "kraj": "Russia",
-   "mecze": 6,
-   "sparowane": 0,
-   "druzynowe": false
-  },
-  "Veikkausliiga": {
-   "kraj": "Finland",
-   "mecze": 5,
-   "sparowane": 5,
-   "druzynowe": false
-  },
-  "Eliteserien": {
-   "kraj": "Norway",
-   "mecze": 7,
-   "sparowane": 7,
-   "druzynowe": false
-  },
-  "Romanian Super Liga": {
-   "kraj": "Romania",
-   "mecze": 6,
-   "sparowane": 6,
-   "druzynowe": false
-  },
-  "UEFA Women's Champions League": {
-   "kraj": "Europe",
-   "mecze": 6,
-   "sparowane": 3,
-   "druzynowe": false
-  },
-  "Czech First League": {
-   "kraj": "Czech Republic",
-   "mecze": 8,
-   "sparowane": 7,
-   "druzynowe": false
-  },
-  "Liga 1": {
-   "kraj": "Peru",
-   "mecze": 7,
-   "sparowane": 7,
-   "druzynowe": false
-  },
-  "Mozzart Bet Superliga": {
-   "kraj": "Serbia",
-   "mecze": 6,
-   "sparowane": 6,
-   "druzynowe": false
-  },
-  "Premier Division": {
-   "kraj": "Ireland",
-   "mecze": 2,
-   "sparowane": 2,
-   "druzynowe": false
-  },
-  "Norwegian 1st Division": {
-   "kraj": "Norway",
-   "mecze": 8,
-   "sparowane": 7,
-   "druzynowe": false
-  },
-  "Danish Superliga": {
-   "kraj": "Denmark",
-   "mecze": 5,
-   "sparowane": 3,
-   "druzynowe": false
-  },
-  "Parva Liga": {
-   "kraj": "Bulgaria",
-   "mecze": 6,
-   "sparowane": 6,
-   "druzynowe": false
-  },
-  "Niké Liga": {
-   "kraj": "Slovakia",
-   "mecze": 6,
-   "sparowane": 5,
-   "druzynowe": false
-  },
-  "Swiss Super League": {
-   "kraj": "Switzerland",
-   "mecze": 6,
-   "sparowane": 6,
-   "druzynowe": false
-  },
-  "PrvaLiga": {
-   "kraj": "Slovenia",
-   "mecze": 4,
-   "sparowane": 4,
-   "druzynowe": false
-  },
-  "NB I": {
-   "kraj": "Hungary",
-   "mecze": 5,
-   "sparowane": 5,
-   "druzynowe": false
-  },
-  "Liga Profesional de Fútbol": {
-   "kraj": "Argentina",
-   "mecze": 14,
-   "sparowane": 14,
-   "druzynowe": false
-  },
-  "Uruguayan Primera División": {
-   "kraj": "Uruguay",
+  "LigaPro Serie A": {
+   "kraj": "Ecuador",
    "mecze": 3,
    "sparowane": 3,
    "druzynowe": false
   },
-  "Ireland 1st Division": {
-   "kraj": "Ireland",
-   "mecze": 1,
-   "sparowane": 1,
-   "druzynowe": false
-  },
   "División Profesional": {
    "kraj": "Bolivia",
-   "mecze": 7,
-   "sparowane": 7,
-   "druzynowe": false
-  },
-  "Primera A, Apertura": {
-   "kraj": "Colombia",
-   "mecze": 8,
-   "sparowane": 8,
-   "druzynowe": false
-  },
-  "NWSL": {
-   "kraj": "USA",
-   "mecze": 5,
-   "sparowane": 2,
-   "druzynowe": false
-  },
-  "Brasileirão Série A": {
-   "kraj": "Brazil",
-   "mecze": 16,
-   "sparowane": 16,
-   "druzynowe": false
-  },
-  "Chilean Primera División": {
-   "kraj": "Chile",
-   "mecze": 6,
-   "sparowane": 6,
-   "druzynowe": false
-  },
-  "MLS": {
-   "kraj": "USA",
-   "mecze": 15,
-   "sparowane": 15,
-   "druzynowe": false
-  },
-  "USL League One": {
-   "kraj": "USA",
-   "mecze": 8,
-   "sparowane": 7,
-   "druzynowe": false
-  },
-  "USL Championship": {
-   "kraj": "USA",
-   "mecze": 14,
-   "sparowane": 11,
-   "druzynowe": false
-  },
-  "Liga MX, Apertura": {
-   "kraj": "Mexico",
-   "mecze": 5,
-   "sparowane": 5,
-   "druzynowe": false
-  },
-  "LigaPro Serie A": {
-   "kraj": "Ecuador",
-   "mecze": 8,
-   "sparowane": 8,
-   "druzynowe": false
-  },
-  "K League 1": {
-   "kraj": "South Korea",
-   "mecze": 4,
-   "sparowane": 4,
-   "druzynowe": false
-  },
-  "K League 2": {
-   "kraj": "South Korea",
-   "mecze": 2,
-   "sparowane": 2,
-   "druzynowe": false
-  },
-  "Canadian Premier League": {
-   "kraj": "Canada",
-   "mecze": 2,
+   "mecze": 3,
    "sparowane": 1,
    "druzynowe": false
   },
   "Brasileirão Série B": {
-   "kraj": "Brazil",
-   "mecze": 10,
-   "sparowane": 10,
+   "kraj": "Brazylia",
+   "mecze": 6,
+   "sparowane": 6,
+   "druzynowe": true
+  },
+  "Chilean Primera División": {
+   "kraj": "Chile",
+   "mecze": 1,
+   "sparowane": 1,
    "druzynowe": false
   },
-  "Svenska Cupen": {
-   "kraj": "Sweden",
-   "mecze": 1,
+  "ASEAN Championship": {
+   "kraj": "Asia",
+   "mecze": 4,
    "sparowane": 0,
    "druzynowe": false
   },
@@ -249,361 +39,468 @@
    "sparowane": 14,
    "druzynowe": true
   },
+  "Superettan": {
+   "kraj": "Szwecja",
+   "mecze": 3,
+   "sparowane": 3,
+   "druzynowe": true
+  },
   "Liga Konferencji": {
    "kraj": "Europa",
-   "mecze": 7,
-   "sparowane": 6,
+   "mecze": 49,
+   "sparowane": 44,
    "druzynowe": true
   },
   "CONMEBOL Sudamericana": {
-   "kraj": "South America",
+   "kraj": "Ameryka Płd.",
+   "mecze": 8,
+   "sparowane": 8,
+   "druzynowe": true
+  },
+  "Liga Profesional": {
+   "kraj": "Argentyna",
+   "mecze": 12,
+   "sparowane": 12,
+   "druzynowe": true
+  },
+  "Ykkösliiga": {
+   "kraj": "Finland",
+   "mecze": 5,
+   "sparowane": 4,
+   "druzynowe": false
+  },
+  "Brasileirão Série A": {
+   "kraj": "Brazylia",
+   "mecze": 10,
+   "sparowane": 6,
+   "druzynowe": true
+  },
+  "USL League One": {
+   "kraj": "USA",
+   "mecze": 2,
+   "sparowane": 0,
+   "druzynowe": false
+  },
+  "USL Championship": {
+   "kraj": "USA",
+   "mecze": 2,
+   "sparowane": 2,
+   "druzynowe": false
+  },
+  "NWSL": {
+   "kraj": "USA",
    "mecze": 3,
+   "sparowane": 0,
+   "druzynowe": false
+  },
+  "Liga Europy": {
+   "kraj": "Europa",
+   "mecze": 9,
+   "sparowane": 9,
+   "druzynowe": true
+  },
+  "Primera A, Apertura": {
+   "kraj": "Colombia",
+   "mecze": 1,
+   "sparowane": 1,
+   "druzynowe": false
+  },
+  "CFA Super League": {
+   "kraj": "China",
+   "mecze": 1,
+   "sparowane": 1,
+   "druzynowe": false
+  },
+  "Ukrainian Premier League": {
+   "kraj": "Ukraine",
+   "mecze": 1,
+   "sparowane": 0,
+   "druzynowe": false
+  },
+  "Romanian Super Liga": {
+   "kraj": "Romania",
+   "mecze": 2,
+   "sparowane": 2,
+   "druzynowe": false
+  },
+  "Parva Liga": {
+   "kraj": "Bulgaria",
+   "mecze": 2,
+   "sparowane": 1,
+   "druzynowe": false
+  },
+  "Ekstraklasa": {
+   "kraj": "Polska",
+   "mecze": 2,
+   "sparowane": 2,
+   "druzynowe": true
+  },
+  "2. Liga": {
+   "kraj": "Austria",
+   "mecze": 6,
+   "sparowane": 4,
+   "druzynowe": false
+  },
+  "Eliteserien": {
+   "kraj": "Norwegia",
+   "mecze": 2,
+   "sparowane": 2,
+   "druzynowe": true
+  },
+  "Russian Premier League": {
+   "kraj": "Russia",
+   "mecze": 1,
+   "sparowane": 0,
+   "druzynowe": false
+  },
+  "Czech First League": {
+   "kraj": "Czech Republic",
+   "mecze": 1,
+   "sparowane": 1,
+   "druzynowe": false
+  },
+  "Challenge League": {
+   "kraj": "Switzerland",
+   "mecze": 4,
    "sparowane": 3,
+   "druzynowe": false
+  },
+  "Austrian Bundesliga": {
+   "kraj": "Austria",
+   "mecze": 1,
+   "sparowane": 1,
+   "druzynowe": false
+  },
+  "HNL": {
+   "kraj": "Croatia",
+   "mecze": 1,
+   "sparowane": 1,
+   "druzynowe": false
+  },
+  "NB I": {
+   "kraj": "Hungary",
+   "mecze": 1,
+   "sparowane": 0,
+   "druzynowe": false
+  },
+  "Premier Division": {
+   "kraj": "Ireland",
+   "mecze": 2,
+   "sparowane": 2,
+   "druzynowe": false
+  },
+  "Ireland 1st Division": {
+   "kraj": "Ireland",
+   "mecze": 5,
+   "sparowane": 5,
+   "druzynowe": false
+  },
+  "Scottish Premiership": {
+   "kraj": "Scotland",
+   "mecze": 1,
+   "sparowane": 1,
+   "druzynowe": false
+  },
+  "Liga 1": {
+   "kraj": "Peru",
+   "mecze": 1,
+   "sparowane": 1,
+   "druzynowe": false
+  },
+  "Uruguayan Primera División": {
+   "kraj": "Uruguay",
+   "mecze": 1,
+   "sparowane": 1,
+   "druzynowe": false
+  },
+  "MLS": {
+   "kraj": "USA",
+   "mecze": 1,
+   "sparowane": 1,
    "druzynowe": false
   }
  },
  "luka_superbet_propsy": [
   {
-   "mecz": "Lechia Gdańsk - Pogoń Grodzisk Mazowiecki",
-   "rynkow": 179,
-   "kickoff_ts": 1784986200
-  },
-  {
-   "mecz": "Pogoń Siedlce - ŁKS Łódź",
-   "rynkow": 179,
-   "kickoff_ts": 1784986200
-  },
-  {
-   "mecz": "Stal Rzeszów - Chrobry Głogów",
-   "rynkow": 179,
-   "kickoff_ts": 1784986200
-  },
-  {
-   "mecz": "Unia Skierniewice - Stal Mielec",
-   "rynkow": 179,
-   "kickoff_ts": 1785078000
-  },
-  {
-   "mecz": "Puszcza Niepołomice - Polonia Warszawa",
-   "rynkow": 179,
-   "kickoff_ts": 1785087000
-  },
-  {
-   "mecz": "Termalica Nieciecza - Ruch Chorzów",
-   "rynkow": 178,
-   "kickoff_ts": 1785069000
-  },
-  {
-   "mecz": "Miedź Legnica - Podbeskidzie Bielsko-Biała",
-   "rynkow": 178,
-   "kickoff_ts": 1785171600
-  },
-  {
-   "mecz": "FC Kopenhaga - Lyngby",
-   "rynkow": 176,
-   "kickoff_ts": 1785074400
-  },
-  {
-   "mecz": "AC Horsens - Nordsjalland",
-   "rynkow": 176,
-   "kickoff_ts": 1785081600
-  },
-  {
-   "mecz": "Hacken - AIK Stockholm",
-   "rynkow": 154,
-   "kickoff_ts": 1785171600
-  },
-  {
-   "mecz": "Olympique Marsylia - Nice",
-   "rynkow": 148,
-   "kickoff_ts": 1784995200
-  },
-  {
-   "mecz": "Celtic - AC Milan",
-   "rynkow": 143,
-   "kickoff_ts": 1784988000
-  },
-  {
-   "mecz": "Donaufeld - Grazer AK",
-   "rynkow": 137,
-   "kickoff_ts": 1784991600
-  },
-  {
-   "mecz": "FC Lustenau - Kitzbuhel",
-   "rynkow": 137,
-   "kickoff_ts": 1784991600
-  },
-  {
-   "mecz": "Hohenems - WSC Hertha Wels",
-   "rynkow": 137,
-   "kickoff_ts": 1784995200
-  },
-  {
-   "mecz": "SV Oberwart - RB Salzburg",
-   "rynkow": 137,
-   "kickoff_ts": 1784995200
-  },
-  {
-   "mecz": "Wiener Viktoria - Parndorf",
-   "rynkow": 137,
-   "kickoff_ts": 1784995200
-  },
-  {
-   "mecz": "Wacker Innsbruck - Reichenau",
-   "rynkow": 137,
-   "kickoff_ts": 1784995200
-  },
-  {
-   "mecz": "SC Kalsdorf - LASK Linz",
-   "rynkow": 137,
-   "kickoff_ts": 1784995200
-  },
-  {
-   "mecz": "Su Vortuna Bad Leonfelden - SW Bregenz",
-   "rynkow": 137,
-   "kickoff_ts": 1784995200
-  },
-  {
-   "mecz": "Kremser SC - Austria Lustenau",
-   "rynkow": 137,
-   "kickoff_ts": 1784997000
-  },
-  {
-   "mecz": "Mattersburger Sportverein 2020 - First Vienna",
-   "rynkow": 137,
-   "kickoff_ts": 1784998800
-  },
-  {
-   "mecz": "SK Treibach - Kapfenberger",
-   "rynkow": 137,
-   "kickoff_ts": 1784998800
-  },
-  {
-   "mecz": "Świt Szczecin - Górnik Łęczna",
+   "mecz": "CA Atlanta - Almagro",
    "rynkow": 135,
-   "kickoff_ts": 1784995200
+   "kickoff_ts": 1785193200
   },
   {
-   "mecz": "Rennes - Club Brugge",
-   "rynkow": 135,
-   "kickoff_ts": 1784995200
+   "mecz": "Tranmere Rovers - Rochdale",
+   "rynkow": 134,
+   "kickoff_ts": 1785592800
   },
   {
-   "mecz": "Wolverhampton - Real Sociedad",
-   "rynkow": 135,
-   "kickoff_ts": 1784995200
+   "mecz": "Club Brugge - Royale Union SG",
+   "rynkow": 131,
+   "kickoff_ts": 1785522600
   },
   {
-   "mecz": "PSV Eindhoven - Villarreal",
-   "rynkow": 135,
-   "kickoff_ts": 1784995200
+   "mecz": "Piast Gliwice - Wisła Kraków",
+   "rynkow": 131,
+   "kickoff_ts": 1785588300
   },
   {
-   "mecz": "Zawisza Bydgoszcz - Sokół Kleczew",
-   "rynkow": 135,
-   "kickoff_ts": 1784998800
+   "mecz": "Wieczysta Kraków - Lech Poznań",
+   "rynkow": 131,
+   "kickoff_ts": 1785598200
   },
   {
-   "mecz": "Sandecja Nowy Sącz - Hutnik Kraków",
-   "rynkow": 135,
-   "kickoff_ts": 1784999400
+   "mecz": "Voluntari - UTA Arad",
+   "rynkow": 131,
+   "kickoff_ts": 1785598200
   },
   {
-   "mecz": "Lechia Zielona Góra - Rekord Bielsko-Biała",
-   "rynkow": 135,
-   "kickoff_ts": 1785002400
+   "mecz": "Novi Pazar - OFK Belgrad",
+   "rynkow": 131,
+   "kickoff_ts": 1785607200
+  },
+  {
+   "mecz": "Korona Kielce - Górnik Zabrze",
+   "rynkow": 131,
+   "kickoff_ts": 1785608100
+  },
+  {
+   "mecz": "Cukaricki - Radnicki 1923",
+   "rynkow": 131,
+   "kickoff_ts": 1785609000
+  },
+  {
+   "mecz": "Universitatea Craiova - Petrolul Ploiesti",
+   "rynkow": 131,
+   "kickoff_ts": 1785609000
+  },
+  {
+   "mecz": "Rubio Nu - Sportivo Ameliano",
+   "rynkow": 130,
+   "kickoff_ts": 1785265200
+  },
+  {
+   "mecz": "CS 2 de Mayo - Cerro Porteno",
+   "rynkow": 130,
+   "kickoff_ts": 1785274200
+  },
+  {
+   "mecz": "Sportivo Luqueno - Sportivo Trinidense",
+   "rynkow": 130,
+   "kickoff_ts": 1785351600
+  },
+  {
+   "mecz": "Nacional Asuncion - Olimpia Asuncion",
+   "rynkow": 130,
+   "kickoff_ts": 1785360600
+  },
+  {
+   "mecz": "ŁKS Łódź - Polonia Bytom",
+   "rynkow": 130,
+   "kickoff_ts": 1785513600
+  },
+  {
+   "mecz": "Vasco da Gama - Fluminense",
+   "rynkow": 130,
+   "kickoff_ts": 1785616200
+  },
+  {
+   "mecz": "Atletico MG - Juventude",
+   "rynkow": 130,
+   "kickoff_ts": 1785623400
+  },
+  {
+   "mecz": "Lechia Gdańsk - Warta Poznań",
+   "rynkow": 129,
+   "kickoff_ts": 1785522600
+  },
+  {
+   "mecz": "Puebla - Guadalajara",
+   "rynkow": 129,
+   "kickoff_ts": 1785546000
+  },
+  {
+   "mecz": "Juarez - UNAM Pumas",
+   "rynkow": 129,
+   "kickoff_ts": 1785553200
+  },
+  {
+   "mecz": "Atletico San Luis - Tijuana",
+   "rynkow": 129,
+   "kickoff_ts": 1785553200
+  },
+  {
+   "mecz": "Arka Gdynia - Stal Rzeszów",
+   "rynkow": 129,
+   "kickoff_ts": 1785591000
+  },
+  {
+   "mecz": "Polonia Warszawa - Unia Skierniewice",
+   "rynkow": 129,
+   "kickoff_ts": 1785591000
+  },
+  {
+   "mecz": "Pogoń Siedlce - Termalica Nieciecza",
+   "rynkow": 129,
+   "kickoff_ts": 1785591000
+  },
+  {
+   "mecz": "Queretaro - UANL Tigres",
+   "rynkow": 129,
+   "kickoff_ts": 1785625200
+  },
+  {
+   "mecz": "Sportivo San Lorenzo - Club Guarani",
+   "rynkow": 128,
+   "kickoff_ts": 1785438000
+  },
+  {
+   "mecz": "Libertad Asuncion - Deportivo Recoleta",
+   "rynkow": 128,
+   "kickoff_ts": 1785447000
+  },
+  {
+   "mecz": "Znicz Pruszków - Legia Warszawa II",
+   "rynkow": 128,
+   "kickoff_ts": 1785513600
+  },
+  {
+   "mecz": "Stal Stalowa Wola - GKS Tychy",
+   "rynkow": 128,
+   "kickoff_ts": 1785522600
+  },
+  {
+   "mecz": "Fortaleza CEIF - Deportivo Pereira",
+   "rynkow": 128,
+   "kickoff_ts": 1785546000
   }
  ],
- "wygenerowano_ts": 1784980488,
+ "wygenerowano_ts": 1785178612,
  "mecze_bez_trendow": [
-  "FC Haka - KäPa",
-  "IFK Värnamo - IK Brage",
-  "Degerfors IF - Djurgårdens IF",
-  "MP - KTP",
-  "JäPS - HJK Klubi 04",
-  "IFK Mariehamn - AC Oulu",
-  "Kristiansund BK - IK Start",
-  "KuPS - VPS",
-  "FC Farul Constanța - FC Corvinul Hunedoara",
-  "PK-35 - Jippo Joensuu",
-  "Viktoria Plzeň - FC Slovan Liberec",
-  "FK Teplice - Bohemians Praha 1905",
-  "FC Zlín - Baník Ostrava",
-  "Kalmar FF - Mjällby AIF",
-  "Sport Boys - Asociación Deportiva Tarma",
-  "FK Radnički Niš - FK Čukarički",
-  "PAOK - Neftchi Baku PFC",
-  "Galway United - Waterford FC",
-  "Strømsgodset - Lyn FK",
-  "FC CSKA 1948 Sofia - Botev Vratsa",
-  "AS Trenčín - KFC Komárno",
-  "FC Spartak Trnava - MFK Skalica",
-  "FC Lausanne-Sport - Grasshopper Club Zürich",
-  "Servette FC - Basel",
-  "NŠ Mura - NK Olimpija Ljubljana",
-  "Spartak Myjava - Mgarr United",
-  "Kisvárda FC - Budapest Honvéd FC",
-  "FC Dinamo București - Universitatea Craiova",
-  "Haugesund - Bryne FK",
-  "Sport Huancayo - Club Atlético Grau",
-  "FK IMT Beograd - FK Zemun",
-  "OFK Beograd - FK Radnik Surdulica",
-  "FC Zbrojovka Brno - AC Sparta Praha",
-  "KFF Mitrovica - PFC Ludogorets",
-  "Central Español - Cerro Largo",
-  "Lokomotiv Sofia - Levski Sofia",
-  "NK Maribor - Brinje Grosuplje",
-  "Longford Town - Wexford FC",
-  "FK Železiarne Podbrezová - MFK Zemplín Michalovce",
-  "FC Luzern - FC Thun",
-  "Sligo Rovers - Drogheda United",
-  "Club Always Ready - San Antonio Bulo-Bulo",
-  "Boyacá Chicó FC - Atlético Nacional",
-  "ADC Juan Pablo II - Cienciano",
-  "Boston Legacy FC - Kansas City Current",
-  "Defensor Sporting - Liverpool UY",
-  "Independiente Medellín - Deportivo Pasto",
-  "Guabirá - CDT Real Oruro",
-  "Huachipato - Cobresal",
-  "Charlotte Independence - Richmond Kickers",
-  "New York Cosmos - AC Boise",
-  "Chattanooga Red Wolves SC - One Knoxville SC",
-  "Forward Madison FC - FC Naples",
-  "Brooklyn FC - San Antonio FC",
-  "Detroit City FC - Las Vegas Lights",
-  "Miami FC - FC Tampa Bay Rowdies",
-  "Indy Eleven - Loudoun United FC",
-  "Pittsburgh Riverhounds - Rhode Island FC",
-  "Millonarios - Atlético Bucaramanga",
-  "Independiente Petrolero - Oriente Petrolero",
-  "North Carolina Courage - Utah Royals FC",
-  "Birmingham Legion FC - New Mexico United",
-  "Universidad Católica - Deportes La Serena",
-  "Técnico Universitario - Manta FC",
-  "Corpus Christi FC - Greenville Triumph SC",
-  "FC Tulsa - Lexington SC",
-  "Spokane Velocity FC - Fort Wayne FC",
-  "Colorado Springs Switchbacks FC - Charleston Battery",
-  "Melgar - Club Sporting Cristal",
-  "Deportes Tolima - Junior Barranquilla",
-  "Oakland Roots SC - Sacramento Republic FC",
-  "Monterey Bay FC - Orange County SC",
-  "Phoenix Rising FC - Hartford Athletic",
-  "AV Alta FC - Westchester SC",
-  "FC Anyang - Gangwon FC",
-  "FC Seoul - Ulsan HD",
-  "Gwangju FC - Jeju SK",
-  "Incheon United - Bucheon FC 1995",
-  "Paju Citizen FC - Ansan Greeners FC",
-  "Gimpo FC - Yongin City FC",
-  "GIF Sundsvall - Falkenbergs FF",
-  "Chengdu Rongcheng - Beijing Guoan",
-  "Shandong Taishan - Henan FC Jiuzu Dukang",
-  "IF Brommapojkarna - Hammarby IF",
-  "IK Sirius - IFK Göteborg",
-  "Ilves - FC Lahti",
-  "Inter Turku - IF Gnistan",
-  "Zhejiang - Dalian Yingbo FC",
-  "Young Boys - FC Sion",
-  "SK Brann - Vålerenga IF",
-  "Ljungskile SK - Sandvikens IF",
-  "SK Slavia Praha - 1. FC Slovácko",
-  "Vasas - ETO FC Győr",
-  "HJK - TPS",
-  "GAIS - Halmstads BK",
-  "Malmö FF - IF Elfsborg",
-  "FC St. Gallen 1879 - FC Zürich",
-  "FC Lugano - FC Vaduz",
-  "Sepsi OSK - FC Universitatea Cluj",
-  "KFUM Oslo - Molde FK",
-  "Sandefjord Fotball - Bodø/Glimt",
-  "Sarpsborg 08 - HamKam",
-  "Moss FK - Raufoss",
-  "Sandnes Ulf - Kongsvinger",
-  "Sogndal IL - Ranheim IL",
-  "Åsane - Egersund",
-  "Norrby IF - Östersunds FK",
-  "MŠK Žilina - FC Košice",
-  "FK Jablonec - SK Sigma Olomouc",
-  "Cherno More Varna - FK Spartak Varna",
-  "NK Bravo - NK Nafta Lendava 1903",
-  "Debreceni VSC - Puskás Akadémia",
-  "Dukla Banská Bystrica - ŠK Slovan Bratislava",
-  "FK Crvena zvezda - FK Vojvodina",
-  "Aalesunds FK - Viking FK",
-  "FK Csíkszereda Miercurea Ciuc - FCSB",
-  "Atlético Ottawa - Pacific FC",
-  "Universidad Técnica de Cajamarca - CD Moquegua",
-  "FC Hradec Králové - FK Pardubice",
-  "Cerro - Racing de Montevideo",
-  "Aucas - Macará",
-  "Delfín - Leones del Norte",
-  "Lokomotiv Plovdiv - FK Septemvri Sofia",
-  "FC Koper - Kalcer Radomlje",
-  "FK Mladost Lučani - FK Novi Pazar",
-  "FK Mačva Šabac - FK Partizan",
-  "Blooming - The Strongest",
-  "Internacional de Bogotá - América de Cali",
-  "Ñublense - Palestino",
-  "Comerciantes Unidos - Alianza Lima",
-  "Orense SC - Independiente del Valle",
-  "Rionegro Águilas Doradas - Independiente Santa Fe",
-  "Bolívar - Real Potosí",
-  "Audax Italiano - Universidad de Chile",
-  "Alianza Valledupar FC - Fortaleza CEIF",
-  "Nacional Potosí - CD Real Tomayapo",
-  "Deportivo Garcilaso - FC Cajamarca",
-  "Barcelona SC - LDU",
-  "Deportes Concepción - O'Higgins",
-  "Once Caldas - Cúcuta Deportivo",
-  "CFR 1907 Cluj - FC Voluntari",
-  "FK Dunav Ruse - Ludogorets",
-  "Rosenborg BK - Fredrikstad FK",
-  "Stabæk Fotball - Hødd IL",
-  "Örebro SK - IK Oddevold",
-  "Östers IF - Varbergs BoIS",
-  "MTK Budapest - Zalaegerszegi TE",
-  "CSKA Sofia - Botev Plovdiv",
-  "FC Botoșani - FC Rapid București",
   "Mushuc Runa - Libertad",
   "GV San José - FC Universitario de Vinto",
-  "Guayaquil City - Universidad Católica del Ecuador",
   "Unión La Calera - Everton de Viña del Mar",
-  "Deportivo Cuenca - Emelec",
   "KuPS - Sabah FK",
   "Lincoln Red Imps - Mjällby AIF",
-  "Landskrona BoIS - IFK Norrköping",
   "Helsingborgs IF - United IK Nordic",
   "Apollon Limassol - FC Dila Gori",
   "Riga FC - FK Vardar Skopje",
   "FC CSKA 1948 Sofia - FC Spartak Trnava",
   "FC Drita - Floriana FC",
   "NK Celje - KF Egnatia",
-  "Shamrock Rovers - FC Ararat-Armenia",
   "Dukagjini - FC Lugano",
   "MP - KäPa",
   "FK Kauno Žalgiris - Klaksvíkar Ítróttarfelag",
   "Universitatea Craiova - Levski Sofia",
-  "Hapoel Be'er Sheva - Víkingur Reykjavík",
-  "Atlético Mineiro - Red Bull Bragantino",
-  "Botafogo - Grêmio",
-  "São Paulo - Santos",
-  "Chapecoense - Vasco da Gama",
   "Górnik Zabrze - Fenerbahçe",
   "ŠK Slovan Bratislava - FC Iberia 1999",
-  "SK Rapid Wien - FC Santa Coloma"
+  "SK Rapid Wien - FC Santa Coloma",
+  "Pittsburgh Riverhounds - FC Tulsa",
+  "Louisville City FC - Birmingham Legion FC",
+  "FC Tobol - FK Panevėžys",
+  "Atlètic Club Escaldes - FC Vaduz",
+  "Jippo Joensuu - JäPS",
+  "Maccabi Tel Aviv - Sheriff Tiraspol",
+  "FC Noah - FC Zimbru Chişinău",
+  "FK Auda - FCSB",
+  "Inter Turku - Başakşehir FK",
+  "Pyunik Yerevan - Debreceni VSC",
+  "Nõmme Kalju - Shelbourne",
+  "Ilves - Stjarnan Garðabær",
+  "FK Jablonec - NK Varaždin",
+  "HB Tórshavn - Motherwell",
+  "FC Hradec Králové - Tromsø IL",
+  "FC Petrocub Hîncesti - FK Borac Banja Luka",
+  "ETO FC Győr - Atert Bissen",
+  "SK Brann - FC Universitatea Cluj",
+  "Beitar Jerusalem - AEK Larnaca",
+  "Derry City - HNK Rijeka",
+  "Valletta FC - Raków Częstochowa",
+  "The New Saints - Flora Tallinn",
+  "Ludogorets - Hapoel Tel Aviv",
+  "KF Ballkani - Bohemian FC",
+  "Una Strassen - FK Partizan",
+  "FC Sion - BATE Borisov",
+  "RSC Anderlecht - Hammarby IF",
+  "HŠK Zrinjski Mostar - Valur Reykjavík",
+  "KAA Gent - LNZ Cherkasy",
+  "Austria Wien - FK Liepaja",
+  "GKS Katowice - MŠK Žilina",
+  "Coleraine FC - HJK",
+  "FC Koper - NSÍ Runavík",
+  "Sporting Braga - FK Železničar Pančevo",
+  "FK Sutjeska Nikšić - ML Vitebsk",
+  "Dinamo City - NK Aluminij Kidričevo",
+  "Atlético Bucaramanga - Llaneros FC",
+  "Henan FC Jiuzu Dukang - Dalian Yingbo FC",
+  "KTP - SJK Akatemia",
+  "FC Argeș Pitești - FK Csíkszereda Miercurea Ciuc",
+  "PK-35 - FC Haka",
+  "Slavia Sofia - Lokomotiv Sofia",
+  "Wisła Płock - Widzew Łódź",
+  "Admira Wacker - Rapid Wien II",
+  "FC Wacker Innsbruck - Schwarz-Weiß Bregenz",
+  "Kapfenberger SV - FC Liefering",
+  "ASK Voitsberg - SKU Amstetten",
+  "Vålerenga IF - HamKam",
+  "AC Sparta Praha - FC Zlín",
+  "Yverdon-Sport FC - Étoile Carouge FC",
+  "FC Wil 1900 - Neuchâtel Xamax",
+  "Stade Nyonnais - FC Rapperswil-Jona",
+  "LASK - Grazer AK 1902",
+  "GNK Dinamo Zagreb - NK Slaven Belupo",
+  "Motor Lublin - Jagiellonia Białystok",
+  "SC Oțelul Galați - FC Dinamo București",
+  "Dundalk FC - Sligo Rovers",
+  "Athlone Town - University College Dublin",
+  "Bray Wanderers - Kerry FC",
+  "Cobh Ramblers FC - Wexford FC",
+  "Finn Harps - Cork City",
+  "Treaty United FC - Longford Town",
+  "Drogheda United - Shamrock Rovers",
+  "Bodø/Glimt - Lillestrøm SK",
+  "Los Chankas CYC - Comerciantes Unidos",
+  "Montevideo City Torque - Montevideo Wanderers"
  ],
  "odrzucenia_per_powod": {
-  "brak_kursu": 1193,
-  "kurs_lub_szansa_poza_widelkami": 639,
-  "za_stara_historia": 434,
-  "za_malo_zdarzen": 83,
-  "chwiejna_predykcja": 1
+  "brak_kursu": 1419,
+  "za_malo_zdarzen": 1151,
+  "kurs_lub_szansa_poza_widelkami": 343,
+  "za_stara_historia": 317,
+  "poza_skladem": 276,
+  "za_malo_minut": 143,
+  "kurs_poza_widelkami": 132,
+  "wartosc_ujemna": 32,
+  "szansa_za_niska": 21,
+  "rozjazd_z_rynkiem": 15,
+  "krotka_historia": 14,
+  "za_malo_historii": 8,
+  "chwiejna_predykcja": 2
  },
  "poza_publikacja_per_powod": {
-  "kwarantanna_rynku": 4,
-  "stare_dane": 2
+  "rozjazd_z_rynkiem": 37,
+  "kwarantanna_rynku": 1
  },
- "typy": 23,
- "mecze_z_typami": 9
+ "typy": 2,
+ "mecze_z_typami": 2,
+ "rynki": {
+  "meczow_druzynowych": 103,
+  "druzynowe": {
+   "team_goals": 103,
+   "team_corners": 55,
+   "team_cards": 38,
+   "team_sot": 27,
+   "team_shots": 21,
+   "team_fouls": 10
+  },
+  "zawodnicze": {
+   "sot": 1200,
+   "shots": 996,
+   "headed_sot": 491,
+   "sot_outside_box": 467,
+   "headed_shots": 390,
+   "shots_outside_box": 387,
+   "interceptions": 144,
+   "fouls_committed": 137,
+   "offsides": 114,
+   "fouls_won": 76
+  }
+ }
 }

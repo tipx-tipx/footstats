@@ -204,7 +204,9 @@ def test_zbuduj_transfer_z_drabinka_i_p_model(monkeypatch):
     assert (s0["linia"], s0["kurs"], s0["p_model"]) == (1.5, KURS_W_OKNIE, 0.65)
     # pokrycie: 7 z 10 ostatnich występów przebiło linię 1,5
     assert s0["pokrycie"] == {"traf": 7, "z": 10}
-    assert rynek["drabinka"][1]["p_model"] is None
+    # szczebel 2,5 ma pokrycie 0/10 (same dwójki) — od 2026-07-27 szczeble
+    # trafione mniej niż dwa razy nie trafiają na kartę (MIN_TRAF_SZCZEBLA)
+    assert [s["linia"] for s in rynek["drabinka"]] == [1.5]
     assert rynek["ostatnie"][:3] == [2, 2, 0]
     assert w["stara_liga"] == "Stara Liga"
 
@@ -289,8 +291,12 @@ def test_zbuduj_sygnaly_przed_drabinkami():
 
 
 def test_drabinka_przycieta_z_szumu():
-    # 8 linii, od 3. wzwyż kosmiczne kursy — karta ma pokazywać grywalne
-    tr = _trend(utids=[LIGA_NOWA] * 14, counts=SIEDEM_Z_DZIESIECIU)
+    # 8 linii, od 3. wzwyż kosmiczne kursy — karta ma pokazywać grywalne.
+    # Historia z trójkami (nie dwójkami), żeby szczebel 2,5 miał realne
+    # pokrycie — inaczej wycina go nowa brama pustych szczebli, a test ma
+    # sprawdzać przycinanie po KURSIE.
+    tr = _trend(utids=[LIGA_NOWA] * 14,
+                counts=[3, 3, 0, 3, 3, 0, 3, 3, 3, 0, 3, 3, 0, 3])
     wpisy = radar.zbuduj(
         trends=[tr],
         events_meta={999: {"label": "Klub – Rywal", "ts": TERAZ + DZIEN,
@@ -305,9 +311,9 @@ def test_drabinka_przycieta_z_szumu():
     )
     (rynek,) = wpisy[0]["rynki"]
     linie = [s["linia"] for s in rynek["drabinka"]]
-    # 0,5 @1.12 odpada (pierwszy szczebel od MIN_KURS_PIERWSZEGO=1.65),
-    # kurs 13.0 na linii 4,5 przekracza MAX_KURS_SZCZEBLA -> reszta ucięta
-    assert linie == [1.5, 2.5, 3.5]
+    # 0,5 @1.12 odpada (pierwszy szczebel od MIN_KURS_PIERWSZEGO=1.65);
+    # 3,5 ma pokrycie 0/10, więc od 2026-07-27 też nie wchodzi na kartę
+    assert linie == [1.5, 2.5]
     # minuty_sr6: pełne mecze w historii
     assert wpisy[0]["minuty_sr6"] == 90
     # udział startów: cała historia to pełne mecze
@@ -410,8 +416,10 @@ def test_brama_jakosci_tnie_slabe_drabinki_a_sygnaly_zostawia():
 
 
 def test_pierwszy_szczebel_od_165():
+    # piątki, żeby oba szczeble (2,5 i 3,5) miały realne pokrycie — test
+    # dotyczy progu KURSU pierwszego szczebla, nie pustych linii
     tr = _trend(utids=[LIGA_NOWA] * 14,
-                counts=[3, 3, 0, 3, 3, 0, 3, 3, 3, 0, 3, 3, 0, 3])
+                counts=[5, 5, 0, 5, 5, 0, 5, 5, 5, 0, 5, 5, 0, 5])
     wpisy = radar.zbuduj(
         trends=[tr],
         events_meta={999: {"label": "A – B", "ts": TERAZ + DZIEN,
@@ -545,3 +553,43 @@ def test_rzadki_rezerwowy_nie_dostaje_karty():
         sb_cache={}, model_pokrycie=[], players_out={}, nazwy_pl={},
         teraz=TERAZ,
     ) == []
+
+
+def test_karta_bez_smieci_trzy_najlepsze_rynki():
+    """Sprzątanie karty (zgłoszenie usera 2026-07-27: „randomowe rzeczy").
+
+    Na jednej karcie: rynek mocny, rynek z ładniejszym kursem przy tym samym
+    pokryciu, rynek-przypadek (jeden niezerowy mecz) i czwarty rynek słabszy.
+    Oczekiwanie: przypadek znika w całości, zostają trzy rynki, a na górze ten
+    z lepszym iloczynem pokrycie × kurs.
+    """
+    ile = [3, 3, 0, 3, 3, 0, 3, 3, 3, 0, 3, 3, 0, 3]        # 7 z 10 > 1,5
+    trendy = [
+        _trend(player_id=1, market_code="shots", utids=[LIGA_NOWA] * 14, counts=ile),
+        _trend(player_id=1, market_code="shots_outside_box",
+               utids=[LIGA_NOWA] * 14, counts=ile),
+        _trend(player_id=1, market_code="headed_sot", utids=[LIGA_NOWA] * 14,
+               counts=[0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0]),  # przypadek
+        _trend(player_id=1, market_code="sot", utids=[LIGA_NOWA] * 14, counts=ile),
+        _trend(player_id=1, market_code="fouls_won", utids=[LIGA_NOWA] * 14,
+               counts=ile),
+    ]
+    wpisy = radar.zbuduj(
+        trends=trendy,
+        events_meta={999: {"label": "A – B", "ts": TERAZ + DZIEN,
+                           "hid": 100, "aid": 200, "home": "A", "away": "B"}},
+        odds_grid={999: {1: {
+            "shots": {"1.5": 1.70},              # 0,7 × 1,70 = 1,19
+            "shots_outside_box": {"1.5": 1.95},  # 0,7 × 1,95 = 1,37  <- najlepszy
+            "headed_sot": {"1.5": 9.0},          # rynek-przypadek
+            "sot": {"1.5": 1.80},                # 0,7 × 1,80 = 1,26
+            "fouls_won": {"1.5": 1.66},          # 0,7 × 1,66 = 1,16  <- wypada
+        }}},
+        sb_cache={}, model_pokrycie=[], players_out={}, nazwy_pl={},
+        teraz=TERAZ,
+    )
+    kody = [r["rynek_kod"] for r in wpisy[0]["rynki"]]
+    assert "headed_sot" not in kody          # 1 niezerowy mecz na 10
+    assert len(kody) == radar.MAX_RYNKOW_KARTY == 3
+    assert kody[0] == "shots_outside_box"    # najwyższe pokrycie × kurs
+    assert "fouls_won" not in kody           # najsłabszy z czwórki wypada

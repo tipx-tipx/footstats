@@ -47,6 +47,9 @@ PLAYER_MARKET_MAP = {
 # drużynowe z total to "liczba goli", "liczba rzutów rożnych", "liczba
 # kartek"; fauli/strzałów ogółem Superbet dla klubów często nie kwotuje
 # czysto (tylko w combo), ale sufiksy zostają — łapią, gdy są.
+#
+# DWIE KONWENCJE NAZW (zmierzone 2026-07-27, patrz `_kod_rynku_druzyny`):
+# ta sama oferta zapisuje rynek drużynowy raz z drużyną z przodu, raz z tyłu.
 TEAM_MARKET_SUFFIX = {
     "liczba fauli": "team_fouls",
     "liczba strzałów": "team_shots",
@@ -204,6 +207,50 @@ def match_superbet_event(
     return None
 
 
+def _kod_rynku_druzyny(
+    mname: str, home_pl: str, away_pl: str
+) -> tuple[str, str | None]:
+    """('home'/'away', kod rynku) dla nazwy rynku drużynowego — albo (_, None).
+
+    Superbet zapisuje ten sam rodzaj rynku na DWA sposoby i do 2026-07-27
+    czytaliśmy tylko pierwszy:
+
+        'Racing Club - liczba goli'              drużyna z przodu
+        'Liczba celnych strzałów - Racing Club'  drużyna z tyłu
+        'Liczba strzałów Racing Club'            z tyłu i BEZ myślnika
+
+    Strzały, celne i faule drużynowe stoją WYŁĄCZNIE w drugiej konwencji, więc
+    cały ten kawałek oferty był dla nas niewidzialny: silnik budował trendy
+    z banku stylu i tracił je na `brak_kursu` (zmierzone 2026-07-27: 100%
+    odrzuceń dla team_shots/team_sot/team_fouls, 53 trendy na darmo).
+
+    Dopasowanie jest ŚCISŁE — reszta nazwy po odcięciu drużyny musi być całym
+    kluczem `TEAM_MARKET_SUFFIX`. Dzięki temu combo w rodzaju
+    'Santos powyżej 4.5 celnych strzałów; Santos strzeli gola' (inny zakład,
+    nie do użycia jako typ) odpada samo, bez osobnego filtra.
+
+    Gdy nazwa jednej drużyny jest końcówką drugiej ('River Plate' w 'CA River
+    Plate'), wygrywa DŁUŻSZE dopasowanie — inaczej kurs trafiłby do rywala.
+    """
+    trafienia: list[tuple[int, str, str]] = []
+    for team_pl, slot in ((home_pl, "home"), (away_pl, "away")):
+        if not team_pl:
+            continue
+        if mname.startswith(team_pl):
+            reszta = mname[len(team_pl):]
+        elif mname.endswith(team_pl):
+            reszta = mname[: -len(team_pl)]
+        else:
+            continue
+        code = TEAM_MARKET_SUFFIX.get(reszta.strip(" -").lower())
+        if code:
+            trafienia.append((len(team_pl), slot, code))
+    if not trafienia:
+        return "home", None
+    _, slot, code = max(trafienia)
+    return slot, code
+
+
 def fetch_stat_odds(event_id: int, home_pl: str, away_pl: str) -> dict:
     """Pobierz i znormalizuj kursy statystyczne meczu.
 
@@ -245,16 +292,23 @@ def fetch_stat_odds(event_id: int, home_pl: str, away_pl: str) -> dict:
             except ValueError:
                 line = None
             if line is not None:
-                if "powyżej" in oname:
+                if "powyżej" in oname.lower():
                     match["totals"][line]["over"] = float(price)
-                elif "poniżej" in oname:
+                elif "poniżej" in oname.lower():
                     match["totals"][line]["under"] = float(price)
             continue
 
+        # STRONA ZAKŁADU BEZ WZGLĘDU NA WIELKOŚĆ LITER (błąd znaleziony
+        # 2026-07-27). Superbet zapisuje wynik raz małą, raz wielką literą —
+        # 'Liczba celnych strzałów - Racing Club' ma 'poniżej 3.5', ale
+        # 'Liczba strzałów Racing Club' ma już 'Poniżej 10.5'. Dopasowanie
+        # wrażliwe na wielkość liter gubiło ten drugi wariant po cichu:
+        # rynek istniał w ofercie, a u nas kończył się jako `brak_kursu`.
+        oname_l, mname_l = oname.lower(), mname.lower()
         side = None
-        if "powyżej" in oname or "powyżej" in mname:
+        if "powyżej" in oname_l or "powyżej" in mname_l:
             side = "over"
-        elif "poniżej" in oname or "poniżej" in mname:
+        elif "poniżej" in oname_l or "poniżej" in mname_l:
             side = "under"
 
         # --- zawodnicy ---
@@ -278,22 +332,18 @@ def fetch_stat_odds(event_id: int, home_pl: str, away_pl: str) -> dict:
             players[key]["yellow_card"].setdefault(0.5, {})["over"] = float(price)
             continue
 
-        # --- drużyny: pełny mecz, nazwa rynku zaczyna się od nazwy drużyny ---
+        # --- drużyny: pełny mecz, obie konwencje nazw ---
         if "połowa" in mname:
             continue
-        for team_pl, slot in ((home_pl, "home"), (away_pl, "away")):
-            if not mname.startswith(team_pl):
-                continue
-            rest = mname[len(team_pl):].strip(" -")
-            code = TEAM_MARKET_SUFFIX.get(rest)
-            total = spec.get("total")
-            if code and total and side:
+        total = spec.get("total")
+        if total and side:
+            slot, code = _kod_rynku_druzyny(mname, home_pl, away_pl)
+            if code:
                 try:
                     line = float(total)
                 except ValueError:
-                    break
+                    continue
                 teams[slot][code].setdefault(line, {})[side] = float(price)
-            break
 
     return {"players": {k: dict(v) for k, v in players.items()},
             "player_names": player_names,

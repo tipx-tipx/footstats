@@ -167,3 +167,79 @@ def test_slowniki_rynkow_druzynowych_spojne():
     for kod in kody:
         assert kod in MARKET_NAMES_PL, f"brak nazwy PL dla {kod}"
         assert kod in rozliczanie.MARKETY_DRUZYNOWE, f"brak rozliczenia {kod}"
+
+
+def test_kod_rynku_druzyny_obie_konwencje_nazw():
+    """Superbet nazywa rynek drużynowy na dwa sposoby — czytamy oba.
+
+    Nazwy wzięte z żywej oferty 2026-07-27 (Rosario Central–Racing Club,
+    Santos–Universidad Central Venezuela). Do tego dnia parser znał wyłącznie
+    wariant „drużyna z przodu", więc strzały, celne i faule drużynowe nie
+    trafiały do oferty wcale.
+    """
+    from footstats.sources import superbet
+
+    kod = superbet._kod_rynku_druzyny
+    H, A = "Rosario Central", "Racing Club"
+
+    # drużyna z przodu (wariant znany od zawsze)
+    assert kod("Rosario Central - liczba goli", H, A) == ("home", "team_goals")
+    assert kod("Racing Club - liczba kartek", H, A) == ("away", "team_cards")
+    # drużyna z tyłu, z myślnikiem
+    assert kod("Liczba celnych strzałów - Racing Club", H, A) == (
+        "away", "team_sot")
+    assert kod("Liczba fauli - Rosario Central", H, A) == (
+        "home", "team_fouls")
+    # drużyna z tyłu, BEZ myślnika
+    assert kod("Liczba strzałów Racing Club", H, A) == ("away", "team_shots")
+
+    # nie nasze: rynek meczowy, combo, bramkarz, słupki
+    assert kod("Liczba fauli", H, A)[1] is None
+    assert kod("Rosario Central powyżej 8.5 fauli; Racing Club otrzyma kartkę",
+               H, A)[1] is None
+    assert kod("Racing Club - liczba obronionych strzałów przez bramkarza",
+               H, A)[1] is None
+    assert kod("Rosario Central - Liczba strzałów w obramowanie bramki",
+               H, A)[1] is None
+
+
+def test_kod_rynku_druzyny_wybiera_dluzsza_nazwe():
+    """Gdy nazwa jednej drużyny jest końcówką drugiej, kurs musi trafić do
+    właściwej — inaczej River Plate dostaje kursy CA River Plate."""
+    from footstats.sources import superbet
+
+    kod = superbet._kod_rynku_druzyny
+    assert kod("Liczba goli - CA River Plate", "River Plate", "CA River Plate") == (
+        "away", "team_goals")
+    assert kod("Liczba goli - River Plate", "River Plate", "CA River Plate") == (
+        "home", "team_goals")
+
+
+def test_strona_zakladu_niewrazliwa_na_wielkosc_liter(monkeypatch):
+    """Superbet pisze wynik raz 'poniżej', raz 'Poniżej' — musimy łapać oba.
+
+    Zgłoszenie usera 2026-07-27 („mylisz się, że tego nie kwotują").
+    Rynek istniał w ofercie, ale wynik zapisany z wielkiej litery nie ustawiał
+    strony zakładu i cały rynek znikał jako `brak_kursu`. Nazwy z żywej oferty
+    (Rosario Central–Racing Club, eventId 13875754).
+    """
+    from footstats.sources import superbet
+
+    fixture = {"data": [{"odds": [
+        # celne: wynik małą literą (ten wariant działał od zawsze)
+        {"marketName": "Liczba celnych strzałów - Racing Club",
+         "name": "powyżej 3.5", "price": 2.1, "status": "active",
+         "specifiers": {"total": "3.5"}},
+        # strzały: ten sam rynek, wynik WIELKĄ literą
+        {"marketName": "Liczba strzałów Racing Club",
+         "name": "Powyżej 10.5", "price": 1.8, "status": "active",
+         "specifiers": {"total": "10.5"}},
+        {"marketName": "Liczba strzałów Racing Club",
+         "name": "Poniżej 10.5", "price": 1.9, "status": "active",
+         "specifiers": {"total": "10.5"}},
+    ]}]}
+    monkeypatch.setattr(superbet, "_get", lambda url: fixture)
+    out = superbet.fetch_stat_odds(1, "Rosario Central", "Racing Club")
+    away = out["teams"]["away"]
+    assert away["team_sot"][3.5]["over"] == 2.1
+    assert away["team_shots"][10.5] == {"over": 1.8, "under": 1.9}

@@ -671,23 +671,25 @@ export const RadarCard = memo(function RadarCard({
                 {sygnal.label}
               </span>
             )}
+            {/* SKŁAD TO PRZEWIDYWANIE, NIE PEWNIK (zgłoszenie usera 2026-07-27).
+                Sygnał bierze się ze składu OGŁOSZONEGO albo PRZEWIDYWANEGO
+                (algorytm serwisu, nawet 36 h przed meczem) i karta nie umie ich
+                dziś rozróżnić. Skoro część z tego to prognoza, napis mówi
+                „raczej", a nie stawia tezy o decyzji trenera. */}
             {w.xi === true && (
               <span
                 className="text-[9px] uppercase tracking-wide text-faint"
-                title="Jest w pierwszym składzie — przewidywanym albo już ogłoszonym"
+                title="Według składu (ogłoszonego albo przewidywanego) zaczyna mecz"
               >
-                w składzie
+                raczej 1. skład
               </span>
             )}
-            {/* skład ogłoszono PO opublikowaniu karty i zawodnika w nim nie
-                ma — karta zostaje (obiecaliśmy, że nie znika), ale musi
-                uczciwie powiedzieć, że jest już nieaktualna */}
             {w.xi === false && (
               <span
                 className="rounded-full bg-data-red-wash px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-data-red-ink"
-                title="Trener ogłosił skład i tego zawodnika w nim nie ma. Ta karta powstała wcześniej — nie graj jej."
+                title="Według składu (ogłoszonego albo przewidywanego) nie zaczyna meczu. Ta karta powstała wcześniej — lepiej jej nie grać."
               >
-                poza składem
+                raczej poza 1. składem
               </span>
             )}
           </span>

@@ -218,6 +218,7 @@ export function TerminarzMeczy({
   sugestie,
   najlepsze,
   teraz,
+  ligiWZakresie = [],
 }: {
   mecze: Mecz[];
   /** liczby per mecz_id (serializowalne rekordy z serwera) */
@@ -226,15 +227,35 @@ export function TerminarzMeczy({
   najlepsze: Record<number, number>;
   /** znacznik czasu serwera — „dziś/jutro/wkrótce" liczone deterministycznie */
   teraz: number;
+  /**
+   * Rozgrywki z zakresu DRUŻYNOWEGO (rozgrywki.druzynowe=True w pipelinie) —
+   * te, dla których faktycznie liczymy statystyki drużyn. Zgłoszenie usera
+   * 2026-07-27: „mają się wyświetlać tylko te ligi, które bierzemy pod uwagę
+   * w drużynach". Domyślnie filtr WŁĄCZONY; pusta lista = brak filtra
+   * (stare dane pokrycia albo tryb bez zakresu).
+   */
+  ligiWZakresie?: string[];
 }) {
   const [tylkoOkazje, setTylkoOkazje] = useState(false);
+  const [tylkoNasze, setTylkoNasze] = useState(true);
+
+  const wZakresie = useMemo(() => new Set(ligiWZakresie), [ligiWZakresie]);
+  const poLigach = useMemo(
+    () =>
+      tylkoNasze && wZakresie.size > 0
+        ? mecze.filter((m) => wZakresie.has(m.liga))
+        : mecze,
+    [mecze, wZakresie, tylkoNasze],
+  );
 
   const widoczne = useMemo(
     () =>
       tylkoOkazje
-        ? mecze.filter((m) => (okazje[m.id] ?? 0) > 0 || (sugestie[m.id] ?? 0) > 0)
-        : mecze,
-    [mecze, okazje, sugestie, tylkoOkazje],
+        ? poLigach.filter(
+            (m) => (okazje[m.id] ?? 0) > 0 || (sugestie[m.id] ?? 0) > 0,
+          )
+        : poLigach,
+    [poLigach, okazje, sugestie, tylkoOkazje],
   );
 
   const dni = useMemo(() => {
@@ -249,9 +270,13 @@ export function TerminarzMeczy({
     return out;
   }, [widoczne]);
 
-  const zOkazjami = mecze.filter(
+  const zOkazjami = poLigach.filter(
     (m) => (okazje[m.id] ?? 0) > 0 || (sugestie[m.id] ?? 0) > 0,
   ).length;
+  const wNaszychLigach = useMemo(
+    () => (wZakresie.size > 0 ? mecze.filter((m) => wZakresie.has(m.liga)).length : 0),
+    [mecze, wZakresie],
+  );
 
   if (mecze.length === 0) {
     return (
@@ -283,6 +308,24 @@ export function TerminarzMeczy({
               </a>
             ))}
           </div>
+          {wZakresie.size > 0 && (
+            <button
+              onClick={() => setTylkoNasze((v) => !v)}
+              aria-pressed={tylkoNasze}
+              title="Pokaż tylko rozgrywki, dla których liczymy statystyki drużynowe. Reszta jest w skanie, ale nie mamy dla niej pełnej analizy."
+              className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                tylkoNasze
+                  ? "border-brand/50 bg-brand-wash font-semibold text-brand-deep"
+                  : "border-hairline bg-card text-muted shadow-(--shadow-card) hover:text-ink"
+              }`}
+            >
+              {tylkoNasze && (
+                <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-brand" />
+              )}
+              nasze ligi
+              <span className="font-data">{wNaszychLigach}</span>
+            </button>
+          )}
           <button
             onClick={() => setTylkoOkazje((v) => !v)}
             aria-pressed={tylkoOkazje}

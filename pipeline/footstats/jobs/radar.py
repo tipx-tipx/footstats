@@ -101,6 +101,20 @@ MIN_PROBA_SCORE = 8         # min. występów w próbie (było 5 — za krótkie
 # progu, a na braku przewagi tylko 4 — czyli lista była krótka nie dlatego,
 # że typy są słabe, tylko dlatego, że bramka pytała o złą rzecz.
 PROG_POKRYCIA_KARTY = 0.5
+# PRÓG ZOSTAJE NA 0.5 mimo zgłoszenia „drabinki są randomowe" (2026-07-27).
+# Podniesienie go na 0.65 wycięłoby kartę, którą user wskazał jako DOBRĄ
+# (Marcel Regula, strzały 2,5 @2,05 przy pokryciu 6/10 = 0,60). Szum, o który
+# chodziło, nie siedzi w progu głównej linii, tylko w tym, co leży OBOK niej
+# na karcie — i to tniemy trzema bramami niżej.
+
+# --- SPRZĄTANIE KARTY (zgłoszenie usera 2026-07-27: „często są randomowe
+# rzeczy"). Karta Reguły miała 9 rynków i 25 szczebli, z czego 11 to pokrycia
+# 0/10 i 1/10 przy kursach 8-33. Sama linia była sensowna, tonęła w szumie. ---
+MIN_TRAF_SZCZEBLA = 2       # szczebel trafiony 0 albo 1 raz na 10 to nie typ
+MIN_NIEZEROWYCH_RYNKU = 5   # rynek, w którym zawodnik ma <5 niezerowych
+                            # meczów (np. „celne głową" obrońcy), to przypadek
+                            # — nie pokazujemy go wcale
+MAX_RYNKOW_KARTY = 3        # tyle rynków max na karcie, wybrane po jakości
 MIN_MINUT_KARTY = 62        # zmiennik (52-55 min śr.) to ryzyko, nie typ
 MIN_EDGE_KARTY = 0.03       # przewaga po korekcie próby, w pkt proc.
 # GÓRNA granica przewagi — brama zgody z rynkiem (pomiar 2026-07-27 na 336
@@ -533,6 +547,12 @@ def _rynki_wpisu(
         tr = trendy_mk.get(mk)
         grane = _grane(tr) if tr is not None else []
         okno = grane[:OSTATNIE_N]
+        # RYNEK MUSI BYĆ JEGO RYNKIEM. Obrońca z jednym celnym strzałem głowy
+        # na dziesięć meczów nie ma „rynku celnych głową" — ma przypadek.
+        # Liczymy mecze z niezerowym wynikiem, nie sumę: 0,0,0,0,4 to jeden
+        # mecz, w którym coś się wydarzyło, a nie seria.
+        if okno and sum(1 for c, _m, _t in okno if c > 0) < MIN_NIEZEROWYCH_RYNKU:
+            continue
         # --- KONTEKST MECZU dla tego rynku (mnożniki lambdy) ---
         posty = _posteriory(grane, teraz) if grane else None
         lacznie_min = sum(m for _c, m, _t in grane)
@@ -593,6 +613,15 @@ def _rynki_wpisu(
                         float(np.clip(p_baz * kor[0], *P_FINAL_WIDELKI)), 3
                     )
             drabinka.append(szczebel)
+        # SZCZEBLE-ŚMIECI PRECZ. „Celne głową 1,5 — trafione 0/10, kurs 33,0"
+        # nie niesie żadnej informacji poza tym, że bukmacher kwotuje wszystko.
+        # Szczeble bez pokrycia (gołe drabinki, brak historii) zostają — tam
+        # nie mamy czym oceniać, a UI mówi wprost, że historii nie znamy.
+        drabinka = [
+            s for s in drabinka
+            if (s.get("pokrycie") or {}).get("traf", MIN_TRAF_SZCZEBLA)
+            >= MIN_TRAF_SZCZEBLA
+        ]
         if not drabinka:
             continue
         rec: dict = {
@@ -646,17 +675,34 @@ def _rynki_wpisu(
                     "liga": tr.league_average,
                 }
         out.append(rec)
-    # rynki z historią przed rynkami „gołej drabinki"; gołe — w kolejności
-    # ważności rynku (strzały przed spalonymi), nie alfabetycznie
+    # KOLEJNOŚĆ RYNKÓW WEDŁUG JAKOŚCI, NIE WEDŁUG LISTY (zmiana 2026-07-27).
+    # Dotąd rynki szły w stałej kolejności ważności (strzały przed spalonymi),
+    # więc na górze karty lądował rynek „ważny", a nie rynek DOBRY. Teraz każdy
+    # dostaje ocenę: najlepszy szczebel liczony jako surowe pokrycie × kurs,
+    # czyli ile złotówek wróciłoby ze złotówki, gdyby pokrycie było prawdą.
+    # Przy tym samym pokryciu wygrywa wyższy kurs — a to dokładnie oznacza
+    # rynki niszowe (strzały zza pola, głową), gdzie bukmacher kwotuje grubiej
+    # niż na zwykłych strzałach po 1,25.
+    def _jakosc(r: dict) -> float:
+        best = 0.0
+        for s in r.get("drabinka", []):
+            p = s.get("pokrycie")
+            if p and p.get("z"):
+                best = max(best, p["traf"] / p["z"] * float(s["kurs"]))
+        return best
+
     kolejnosc_rynku = {mk: i for i, mk in enumerate(RYNKI_PODSTAWOWE)}
     out.sort(key=lambda r: (
         "ostatnie" not in r,
+        -_jakosc(r),
         kolejnosc_rynku.get(r["rynek_kod"], len(RYNKI_PODSTAWOWE)),
         r["rynek_kod"],
     ))
     if not any("ostatnie" in r for r in out):
-        out = out[:MAX_RYNKOW_BEZ_HISTORII]  # sama drabinka = bez ściany
-    return out
+        return out[:MAX_RYNKOW_BEZ_HISTORII]  # sama drabinka = bez ściany
+    # SUFIT RYNKÓW NA KARCIE: dziewięć rynków to nie analiza, tylko wypis
+    # wszystkiego, co Superbet kwotuje. Zostają trzy najlepsze.
+    return out[:MAX_RYNKOW_KARTY]
 
 
 def _oceń_karte(w: dict, powody: Counter | None = None) -> tuple[float, dict | None]:

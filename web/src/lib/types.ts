@@ -768,3 +768,36 @@ export interface MojZaklad {
   wynik: "oczekuje" | "wygrany" | "przegrany" | "zwrot";
   p_model: number;
 }
+
+/**
+ * POKRYCIE SKANU — czego umiemy policzyć, a czego nie (zakładka Mecze).
+ *
+ * Liczone przez pipeline co cykl (`_dump_pokrycie`), do 2026-07-27 lądowało
+ * wyłącznie w pliku i nigdy nie docierało na stronę. `rynki` to tabela
+ * „naszych statystyk": w ilu meczach zakresu drużynowego widzimy dany rynek
+ * i ile par (zawodnik, rynek) ma kwotowanie.
+ */
+export interface PokrycieRozgrywek {
+  kraj: string;
+  mecze: number;
+  sparowane: number;
+  druzynowe: boolean;
+}
+
+export interface PokrycieRynkow {
+  meczow_druzynowych: number;
+  druzynowe: Record<string, number>;
+  zawodnicze: Record<string, number>;
+}
+
+export interface PokrycieLiga {
+  mecze_statshub?: number;
+  mecze_superbet?: number;
+  sparowane?: number;
+  per_rozgrywki?: Record<string, PokrycieRozgrywek>;
+  rynki?: PokrycieRynkow;
+  typy?: number;
+  mecze_z_typami?: number;
+  odrzucenia_per_powod?: Record<string, number>;
+  wygenerowano_ts?: number;
+}

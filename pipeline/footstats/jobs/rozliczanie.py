@@ -219,6 +219,11 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
             "sugestia": bool(b.get("sugestia")),
             # historia predykcji typów DRUŻYNOWYCH — patrz kalibracja_tau.py
             **({"kal_tau": b["kal_tau"]} if b.get("kal_tau") else {}),
+            # KOREKTA STRUMIENIA użyta przy publikacji — bez tego stempla
+            # następny pomiar liczyłby się z już skorygowanego p i regulator
+            # by oscylował (patrz `korekta_strumienia`)
+            **({"kal_strumien": _KOREKTA_CYKLU[_strumien(b)]}
+               if _KOREKTA_CYKLU.get(_strumien(b)) else {}),
             # kategorie typu — do diagnostyki per kategoria (Brier/log-loss)
             "matchup": bool(b.get("matchup")),
             "matchup_styl": bool(b.get("matchup_styl")),
@@ -803,6 +808,88 @@ def kategorie_kwarantanna(log: dict | None = None) -> dict[str, dict]:
                 "hit": round(traf / len(grp), 3), "sr_p": round(sr_p, 3),
                 "nazwa": KATEGORIE_NAZWY_PL.get(flaga, flaga),
             }
+    return out
+
+
+# --- KOREKTA STRUMIENIA: uczenie tego, czego kalibracja rynkowa NIE łapie ---
+#
+# Pomiar 2026-07-27 (patrz notatka „czy model robi postępy"): przez cały
+# miesiąc opublikowane typy DEKLAROWAŁY 68–75% i trafiały 58%, a luka ani
+# drgnęła — mimo że kalibracja rynkowa co cykl ściągała `p` mocno w dół
+# (strzały −0,71 w logitach). Powód nie jest błędem średniej, tylko EFEKTEM
+# SELEKCJI: korekta obniża szanse WSZYSTKICH kandydatów, po czym brama
+# publikacji wybiera czub nowego rozkładu — czyli znowu najbardziej
+# optymistyczne oszacowania. Kalibracja goni własny ogon.
+#
+# Ta korekta mierzy to, co ZOSTAJE PO całej kalibracji, na tym, co faktycznie
+# opublikowaliśmy, i domyka pętlę: gdy strumień przeszacowuje, wszystkie jego
+# szanse jadą w dół, więc przez bramę przechodzi mniej typów — i to tych
+# naprawdę mocnych.
+#
+# STABILNOŚĆ PĘTLI: gdyby liczyć korektę z p_model już skorygowanego, po
+# jednym cyklu luka zniknęłaby i korekta wyzerowałaby się, wracając do
+# przeszacowania (klasyczne oscylowanie regulatora). Dlatego przy publikacji
+# stemplujemy typ polem `kal_strumien` (użyta delta), a tutaj ODEJMUJEMY ją,
+# żeby zawsze mierzyć na SUROWYM p.
+KOREKTA_STRUMIENIA_OKNO = 120     # ostatnie N rozliczeń strumienia
+KOREKTA_STRUMIENIA_MIN_N = 40     # poniżej tego nie ruszamy niczego
+KOREKTA_STRUMIENIA_CAP = (-0.80, 0.20)
+# TŁUMIENIE: stosujemy POŁOWĘ zmierzonej reszty błędu, nie całość.
+# Pomiar na żywym logu 2026-07-27 dał od razu −0,80 dla pewniaków (szansa 70%
+# spada na 51%), co w jednym cyklu wyzerowałoby listę typów zawodniczych —
+# a user postawił sprawę jasno: „nie może być tak, żeby było 6 typów".
+# Ze stemplem `kal_strumien` korekta i tak dochodzi do pełnej wartości, tylko
+# przez kilka cykli: każdy dokłada połowę tego, co ZOSTAŁO. Dzięki temu widać
+# po drodze, ile typów kosztuje uczciwość, i można się zatrzymać.
+KOREKTA_STRUMIENIA_TLUMIENIE = 0.5
+
+# ustawiane raz na cykl przez build_wc_fast (patrz `ustaw_korekte_strumienia`)
+# — potrzebne, żeby zapisać przy typie deltę, z jaką został opublikowany
+_KOREKTA_CYKLU: dict[str, float] = {}
+
+
+def ustaw_korekte_strumienia(korekta: dict[str, float]) -> None:
+    """Zapamiętaj korektę użytą w TYM cyklu (stempel na publikowanych typach)."""
+    global _KOREKTA_CYKLU
+    _KOREKTA_CYKLU = dict(korekta or {})
+
+
+def _p_surowe(r: dict) -> float:
+    """p_model sprzed korekty strumienia — na tym mierzymy, żeby nie oscylować."""
+    p = float(r.get("p_model") or 0.0)
+    d = float(r.get("kal_strumien") or 0.0)
+    if not d:
+        return p
+    return 1.0 / (1.0 + math.exp(-(_logit(p) - d)))
+
+
+def korekta_strumienia(log: dict | None = None) -> dict[str, float]:
+    """Delta logitowa per strumień: o ile ściągnąć szanse, żeby deklaracja
+    zgadzała się z trafieniami. Zwraca {"pewniaki": -0.42, "druzyny": -0.11}."""
+    if log is None:
+        log = _migruj_log(supa.get_key("typy_log") or {})
+    settled = [
+        r for r in log.values()
+        if r.get("wynik") in ("wygrany", "przegrany")
+        and not r.get("sugestia") and not r.get("odrzucony")
+        and _z_modelu(r) and r.get("p_model")
+    ]
+    out: dict[str, float] = {}
+    for strumien in ("pewniaki", "druzyny"):
+        grp = sorted(
+            (r for r in settled if _strumien(r) == strumien),
+            key=lambda r: r.get("kickoff_ts") or 0,
+        )[-KOREKTA_STRUMIENIA_OKNO:]
+        if len(grp) < KOREKTA_STRUMIENIA_MIN_N:
+            continue
+        b = _bias_logit([{**r, "p_model": _p_surowe(r)} for r in grp])
+        # dochodzimy do pełnej korekty przez kilka cykli, nie w jednym skoku
+        juz = [float(r.get("kal_strumien") or 0.0) for r in grp]
+        srednia_juz = sum(juz) / len(juz)
+        b = srednia_juz + KOREKTA_STRUMIENIA_TLUMIENIE * (b - srednia_juz)
+        b = max(KOREKTA_STRUMIENIA_CAP[0], min(KOREKTA_STRUMIENIA_CAP[1], b))
+        if abs(b) >= 0.02:      # szum poniżej 2 setnych logita ignorujemy
+            out[strumien] = round(b, 3)
     return out
 
 

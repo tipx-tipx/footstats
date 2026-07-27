@@ -21,6 +21,7 @@ import odrzuceniaLocal from "@/data/demo/odrzucenia.json";
 import stsValueLocal from "@/data/demo/sts_value.json";
 import druzynyFormaLocal from "@/data/demo/druzyny_forma.json";
 import radarLocal from "@/data/demo/radar.json";
+import pokrycieLocal from "@/data/demo/pokrycie_liga.json";
 
 import type {
   DruzynaForma,
@@ -31,6 +32,7 @@ import type {
   Meta,
   OddsSuperbet,
   Odrzucenie,
+  PokrycieLiga,
   Radar,
   StsValue,
   TypyWyniki,
@@ -52,6 +54,7 @@ type Bundle = {
   sts_value: StsValue;
   druzyny_forma: DruzynaForma[];
   radar: Radar;
+  pokrycie_liga: PokrycieLiga;
 };
 
 const LOCAL: Bundle = {
@@ -68,6 +71,7 @@ const LOCAL: Bundle = {
   sts_value: stsValueLocal as unknown as StsValue,
   druzyny_forma: druzynyFormaLocal as unknown as DruzynaForma[],
   radar: radarLocal as unknown as Radar,
+  pokrycie_liga: pokrycieLocal as unknown as PokrycieLiga,
 };
 
 const SUPABASE_URL = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -84,7 +88,7 @@ const SUPABASE_ANON =
 const BUNDLE_KEYS = [
   "value_bets", "matches", "players", "calibration", "meta", "kupony",
   "typy_wyniki", "odds_superbet", "legi_pool", "odrzucenia", "sts_value",
-  "druzyny_forma", "radar",
+  "druzyny_forma", "radar", "pokrycie_liga",
 ] as const;
 
 /**
@@ -160,6 +164,7 @@ async function fetchBundle(): Promise<Bundle> {
       sts_value: (map.sts_value ?? LOCAL.sts_value) as StsValue,
       druzyny_forma: (map.druzyny_forma ?? LOCAL.druzyny_forma) as DruzynaForma[],
       radar: (map.radar ?? LOCAL.radar) as Radar,
+      pokrycie_liga: (map.pokrycie_liga ?? LOCAL.pokrycie_liga) as PokrycieLiga,
     });
   } catch {
     return tylkoNadchodzace(LOCAL);
@@ -268,4 +273,9 @@ export async function getStsValue(): Promise<StsValue> {
 /** Radar okazji kontekstowych (transfery / serie / debiutanci), po filtrze startu. */
 export async function getRadar(): Promise<Radar> {
   return (await loadBundle()).radar;
+}
+
+/** Tabela pokrycia skanu — ligi i nasze statystyki (zakładka Mecze). */
+export async function getPokrycie(): Promise<PokrycieLiga> {
+  return (await loadBundle()).pokrycie_liga;
 }

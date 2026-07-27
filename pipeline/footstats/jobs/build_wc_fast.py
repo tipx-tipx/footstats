@@ -1917,6 +1917,52 @@ def _main_impl(tryb=None):
                 f"{mk} {v['global']:+.2f}" for mk, v in bias_map_sug.items()))
     except Exception:
         bias_map_sug = {}
+    # KOREKTA STRUMIENIA — druga warstwa uczenia, nad kalibracją rynkową.
+    # Kalibracja rynkowa poprawia LICZBY, ale nie poprawia WYBORÓW: ściąga
+    # szanse wszystkich kandydatów, a brama i tak bierze czub rozkładu, więc
+    # opublikowany zbiór od miesiąca deklaruje ~71% i trafia 58%. Ta korekta
+    # mierzy resztę błędu NA OPUBLIKOWANYCH typach i dokłada ją do każdego
+    # rynku danego strumienia (patrz rozliczanie.korekta_strumienia).
+    try:
+        korekta_strumieni = rozliczanie.korekta_strumienia()
+        rozliczanie.ustaw_korekte_strumienia(korekta_strumieni)
+        if korekta_strumieni:
+            print("Korekta strumienia (Δlogit): " + ", ".join(
+                f"{s} {d:+.2f}" for s, d in korekta_strumieni.items()))
+    except Exception as e:
+        korekta_strumieni = {}
+        print(f"Korekta strumienia pominięta ({e})")
+
+    # korekta strumienia drużynowego jako gotowa delta logitowa — stosowana
+    # osobno, już PO wyborze strony zakładu (patrz pętla linii drużynowych)
+    _KOR_DRUZYNY = (
+        {"logit": True, "global": korekta_strumieni["druzyny"], "bins": []}
+        if korekta_strumieni.get("druzyny") else None
+    )
+
+    def _bias_z_korekta(mk: str, strumien: str):
+        """Kalibracja rynku + korekta strumienia, w jednej delcie logitowej.
+
+        Rynek BEZ własnej kalibracji (za mało rozliczeń) też dostaje korektę —
+        inaczej nowy rynek startowałby z pełnym przeszacowaniem strumienia.
+        Stary format mnożnikowy zostawiamy nietknięty: mieszanie mnożnika
+        z deltą logitową dałoby liczbę, której nikt później nie odtworzy.
+        """
+        v = bias_map.get(mk)
+        d = korekta_strumieni.get(strumien, 0.0)
+        if not d:
+            return v if v is not None else 1.0
+        if isinstance(v, dict) and v.get("logit"):
+            return {
+                **v,
+                "global": round(float(v.get("global", 0.0)) + d, 3),
+                "bins": [[lo, hi, round(float(b) + d, 3)]
+                         for lo, hi, b in (v.get("bins") or [])],
+            }
+        if v is None or v == 1.0:
+            return {"logit": True, "global": round(d, 3), "bins": []}
+        return v
+
     # BRAMA PUBLIKACJI: rynki tracące pieniądze w oknie ostatnich rozliczeń
     # wypadają z publikacji (pewniaki, pula kuponów), ale dalej są scorowane
     # i logowane (poza_publikacja) — kalibracja mierzy je nadal i rynek wraca sam
@@ -2348,7 +2394,7 @@ def _main_impl(tryb=None):
 
         probe = score_player_market(mk, 0.5, hist, prior, ctx, None, None,
                                     market_calibrated=True,
-                                    market_bias=bias_map.get(mk, 1.0))
+                                    market_bias=_bias_z_korekta(mk, "pewniaki"))
         if probe.lam < (0.35 if mk not in RARE_MARKETS else 0.2):
             _odrzuc(mid, tr, "za_malo_zdarzen",
                     f"model oczekuje ~{probe.lam:.2f} na mecz, za mało na typ")
@@ -2367,7 +2413,7 @@ def _main_impl(tryb=None):
         if mk in ("shots_blocked", "shots_off_target"):
             sm_r = score_player_market(mk, line, hist, prior, ctx, None, None,
                                        market_calibrated=True,
-                                       market_bias=bias_map.get(mk, 1.0))
+                                       market_bias=_bias_z_korekta(mk, "pewniaki"))
             dist_r = counts.predict_match(
                 counts.fit_posterior(
                     np.array(hist.counts), np.array(hist.minutes),
@@ -2470,7 +2516,7 @@ def _main_impl(tryb=None):
             sm = score_player_market(mk, l, hist, prior, ctx,
                                      over_odd, under_odd,
                                      market_calibrated=True,
-                                     market_bias=bias_map.get(mk, 1.0))
+                                     market_bias=_bias_z_korekta(mk, "pewniaki"))
             # POMIAR PROGÓW: odrzucenia tuż przy progu (betting.NEAR_*) —
             # rozliczą się w tle poza kalibracją/skutecznością/UI
             for od in sm.odrzucone:
@@ -3260,12 +3306,21 @@ def _main_impl(tryb=None):
             # docierał do p — ścieżka drużynowa jako jedyna nie przekazywała
             # go dalej. Stosujemy go tu, na p_over, żeby strona "poniżej"
             # pozostała jego dokładnym dopełnieniem.
+            # sama kalibracja rynku; korekta strumienia leci NIŻEJ, na stronie
+            # którą faktycznie typujemy (patrz `_korekta_strony`)
             bias_t = bias_map.get(tt.market_code, 1.0)
             for l_t, slot_t in sorted(linie_t.items()):
                 p_over_t = apply_bias(bias_t, pred_t.p_over(l_t))
                 lo_o, hi_o = counts.p_over_credible_interval(
                     posterior_t, 90.0, factor_t, l_t
                 )
+                # PRZEDZIAŁ W TEJ SAMEJ SKALI CO p (2026-07-27). Bramą
+                # publikacji jest `p_dec_t = (p + lo)/2`, więc korygowanie
+                # samego `p` przy surowym `lo` rozjeżdżało obie liczby:
+                # im mocniejsza korekta, tym bardziej brama ją rozwadniała.
+                # Ścieżka zawodnicza kalibruje CI od dawna (engine._kalibruj).
+                lo_o = apply_bias(bias_t, lo_o)
+                hi_o = apply_bias(bias_t, hi_o)
                 # obie strony linii: Superbet kwotuje over i under, a model ma
                 # pełny rozkład — "poniżej" to lustro szansy "powyżej"
                 for strona_t, klucz_odds in (
@@ -3278,6 +3333,19 @@ def _main_impl(tryb=None):
                         p_t, lo_t, hi_t = p_over_t, lo_o, hi_o
                     else:
                         p_t, lo_t, hi_t = 1.0 - p_over_t, 1.0 - hi_o, 1.0 - lo_o
+                    # KOREKTA STRUMIENIA — na stronie, KTÓRĄ TYPUJEMY.
+                    # Pierwsza wersja (2026-07-27) dokładała ją do kalibracji
+                    # rynku, czyli zawsze do „powyżej". Skutek zmierzony
+                    # dry-runem: legów drużynowych PRZYBYŁO z 51 na 92, bo
+                    # obniżona szansa na „powyżej" automatycznie podbijała
+                    # „poniżej" — a przecież przeszacowujemy to, co
+                    # publikujemy, niezależnie od strony. Zawodników to nie
+                    # dotyczy (underów nie gramy), więc tam korekta zostaje
+                    # w kalibracji rynku.
+                    if _KOR_DRUZYNY:
+                        p_t = apply_bias(_KOR_DRUZYNY, p_t)
+                        lo_t = apply_bias(_KOR_DRUZYNY, lo_t)
+                        hi_t = apply_bias(_KOR_DRUZYNY, hi_t)
                     implied_t = betting.implied_prob_one_sided(odd_t)
                     # jak po stronie zawodniczej: decyduje p ostrożne
                     p_dec_t = (p_t + lo_t) / 2.0
@@ -3930,6 +3998,44 @@ def _main_impl(tryb=None):
     # RAPORT POKRYCIA (liga): parowanie z build_league + to, co dołożył
     # silnik — luka jest mierzona i zapisywana co cykl, nie ignorowana.
     # Jeden plik odpowiada na "czego nie gramy i dlaczego".
+    def _pokrycie_rynkow() -> dict:
+        """W ilu meczach UMIEMY policzyć każdą naszą statystykę.
+
+        Zgłoszenie usera 2026-07-27: „w Meczach miały być tabele pokryć
+        wszystkich naszych statystyk, a obecnie jest nic". Do dziś wiedzieliśmy
+        tylko, ile meczów sparowaliśmy — nie, których rynków w nich brakuje.
+        A to właśnie ta tabela wyłapałaby dwa błędy parsera Superbetu
+        z tego samego dnia w pierwszym cyklu, zamiast po tygodniu.
+
+        Liczymy z tego samego `sb_cache`, z którego korzysta silnik, więc
+        tabela pokazuje ofertę TAK, JAK MY JĄ WIDZIMY — łącznie z naszymi
+        ślepotami. To jest zaleta, nie wada: rozjazd z rzeczywistością ma być
+        widoczny na stronie.
+        """
+        mids_druz = (
+            {m for m in sb_cache if not tryb or m in tryb.druzynowe_mids}
+            if tryb else set(sb_cache)
+        )
+        druzynowe: Counter = Counter()
+        for mid_p in mids_druz:
+            teams_p = (sb_cache.get(mid_p) or {}).get("teams") or {}
+            kody = set()
+            for strona in ("home", "away"):
+                kody |= set((teams_p.get(strona) or {}).keys())
+            for k in kody:
+                druzynowe[k] += 1
+        # zawodnicy: ile PAR (zawodnik, rynek) ma kwotowanie w tym cyklu
+        zawodnicze: Counter = Counter()
+        for mid_p, sb_p in sb_cache.items():
+            for _nazwa, rynki_p in (sb_p.get("players") or {}).items():
+                for k in rynki_p:
+                    zawodnicze[k] += 1
+        return {
+            "meczow_druzynowych": len(mids_druz),
+            "druzynowe": dict(druzynowe.most_common()),
+            "zawodnicze": dict(zawodnicze.most_common()),
+        }
+
     def _dump_pokrycie() -> None:
         if not (tryb and tryb.pokrycie):
             return
@@ -3953,6 +4059,7 @@ def _main_impl(tryb=None):
             )),
             "typy": len(value_bets),
             "mecze_z_typami": len({b["mecz_id"] for b in value_bets}),
+            "rynki": _pokrycie_rynkow(),
         }
         _dump("pokrycie_liga.json", pokrycie)
         print(f"Pokrycie ligi: {pokrycie['sparowane']}/{pokrycie['mecze_statshub']} "

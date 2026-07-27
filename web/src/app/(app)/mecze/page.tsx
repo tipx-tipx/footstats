@@ -1,11 +1,22 @@
 import { PageHeader } from "@/components/PageHeader";
+import { PokrycieSkanu } from "@/components/PokrycieSkanu";
 import { TerminarzMeczy } from "@/components/TerminarzMeczy";
-import { getMecze, getValueBets, terazTs } from "@/lib/data";
+import { getMecze, getPokrycie, getValueBets, terazTs } from "@/lib/data";
 
 export const metadata = { title: "Mecze – FootStats" };
 
 export default async function MeczePage() {
-  const [mecze, bets] = await Promise.all([getMecze(), getValueBets()]);
+  const [mecze, bets, pokrycie] = await Promise.all([
+    getMecze(),
+    getValueBets(),
+    getPokrycie(),
+  ]);
+
+  // rozgrywki, dla których liczymy statystyki drużynowe — terminarz domyślnie
+  // pokazuje tylko je (zgłoszenie usera 2026-07-27)
+  const ligiWZakresie = Object.entries(pokrycie.per_rozgrywki ?? {})
+    .filter(([, v]) => v.druzynowe)
+    .map(([nazwa]) => nazwa);
 
   // liczniki per mecz (rekordy — serializowalne do komponentu klienckiego)
   const okazje: Record<number, number> = {};
@@ -34,7 +45,9 @@ export default async function MeczePage() {
         sugestie={sugestie}
         najlepsze={najlepsze}
         teraz={terazTs()}
+        ligiWZakresie={ligiWZakresie}
       />
+      <PokrycieSkanu pokrycie={pokrycie} />
     </div>
   );
 }
