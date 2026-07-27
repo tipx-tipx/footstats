@@ -1,1 +1,1688 @@
-[{"ci": [0.8518, 0.9961], "id": 2, "kurs": 1.22, "mecz": "Qarabağ – CSKA Sofia", "linia": 5.5, "rynek": "Rzuty rożne drużyny", "ev_pct": 16.0, "lambda": 2.418, "ryzyko": "niskie", "strona": "ponizej", "druzyna": "CSKA Sofia", "edge_pp": null, "matchup": false, "mecz_id": 16350376, "p_model": 0.9509, "p_rynku": null, "pewniak": true, "pewnosc": "wysoka", "podmiot": "CSKA Sofia", "rotacja": false, "rozklad": null, "czynniki": {"opisy": {}, "rywal": 1.089, "sedzia": 1.0, "lacznie": 0.97, "matchup": 1.0, "dom_wyjazd": 0.94, "scenariusz_meczu": 0.947}, "bukmacher": "Superbet", "fair_kurs": 1.05, "rynek_kod": "team_corners", "xi_sygnal": null, "kickoff_ts": 1784822400, "podmiot_id": 3275, "przeciwnik": "Qarabağ", "rank_score": 1.0503, "podmiot_typ": "druzyna", "matchup_styl": false, "miekka_linia": false, "uzasadnienie": {"czynniki": [{"opis": "Średnio 2,1 na mecz (próba: 12 meczów, ostatnie 5 meczów: 2,6)", "nazwa": "Poziom bazowy", "mnoznik": null}, {"opis": "Drużyny notują przeciw Qarabağ średnio 5,0 przy normie ligi 3,7 (próba: 4 meczów)", "nazwa": "Profil rywala", "mnoznik": 1.09}, {"opis": "Gra na wyjeździe, to zwykle obniża tę statystykę", "nazwa": "Dom i wyjazd", "mnoznik": 0.94}, {"opis": "Z kursów meczowych: przewidywany przebieg nie sprzyja", "nazwa": "Scenariusz meczu", "mnoznik": 0.95}], "rynek_rzadki": false, "oczekiwana_liczba": 2.42}, "wyzsza_linia": true, "pewnosc_score": 55.0, "swieze_sklady": false, "kurs_oczekiwany": null, "oczekiwane_minuty": null}, {"ci": [0.7297, 0.9852], "id": 3, "kurs": 1.3, "mecz": "Larne FC – FK Crvena zvezda", "linia": 3.5, "rynek": "Rzuty rożne drużyny", "ev_pct": 16.2, "lambda": 1.694, "ryzyko": "niskie", "strona": "ponizej", "druzyna": "Larne FC", "edge_pp": null, "matchup": false, "mecz_id": 16350234, "p_model": 0.8941, "p_rynku": null, "pewniak": true, "pewnosc": "srednia", "podmiot": "Larne FC", "rotacja": false, "rozklad": null, "czynniki": {"opisy": {}, "rywal": 0.911, "sedzia": 1.0, "lacznie": 0.935, "matchup": 1.0, "dom_wyjazd": 1.06, "scenariusz_meczu": 0.968}, "bukmacher": "Superbet", "fair_kurs": 1.12, "rynek_kod": "team_corners", "xi_sygnal": null, "kickoff_ts": 1784660400, "podmiot_id": 5184, "przeciwnik": "FK Crvena zvezda", "rank_score": 0.9175, "podmiot_typ": "druzyna", "matchup_styl": false, "miekka_linia": false, "uzasadnienie": {"czynniki": [{"opis": "Średnio 1,5 na mecz (próba: 6 meczów, ostatnie 5 meczów: 1,6); po korekcie na siłę rywali i miejsce gry model liczy od 1,1", "nazwa": "Poziom bazowy", "mnoznik": null}, {"opis": "Drużyny notują przeciw FK Crvena zvezda średnio 1,9 przy normie ligi 2,7 (próba: 5 meczów)", "nazwa": "Profil rywala", "mnoznik": 0.91}, {"opis": "Gra u siebie, to zwykle pomaga w tej statystyce", "nazwa": "Dom i wyjazd", "mnoznik": 1.06}, {"opis": "Z kursów meczowych: przewidywany przebieg nie sprzyja", "nazwa": "Scenariusz meczu", "mnoznik": 0.97}], "rynek_rzadki": false, "oczekiwana_liczba": 1.69}, "wyzsza_linia": true, "pewnosc_score": 55.0, "swieze_sklady": false, "kurs_oczekiwany": null, "oczekiwane_minuty": null}, {"ci": [0.5925, 0.9322], "id": 4, "kurs": 1.6, "mecz": "FC Malisheva – Hibernian", "linia": 0.5, "rynek": "Gole drużyny", "ev_pct": 26.6, "lambda": 1.701, "ryzyko": "niskie", "strona": "powyzej", "druzyna": "FC Malisheva", "edge_pp": null, "matchup": false, "mecz_id": 16357256, "p_model": 0.7915, "p_rynku": null, "pewniak": true, "pewnosc": "srednia", "podmiot": "FC Malisheva", "rotacja": false, "rozklad": null, "czynniki": {"opisy": {}, "rywal": 1.054, "sedzia": 1.0, "lacznie": 1.081, "matchup": 1.0, "dom_wyjazd": 1.06, "scenariusz_meczu": 0.967}, "bukmacher": "Superbet", "fair_kurs": 1.26, "rynek_kod": "team_goals", "xi_sygnal": null, "kickoff_ts": 1784817000, "podmiot_id": 325494, "przeciwnik": "Hibernian", "rank_score": 0.9011, "podmiot_typ": "druzyna", "matchup_styl": false, "miekka_linia": false, "uzasadnienie": {"czynniki": [{"opis": "Średnio 1,2 na mecz (próba: 6 meczów, ostatnie 5 meczów: 1,2); po korekcie na siłę rywali i miejsce gry model liczy od 0,9", "nazwa": "Poziom bazowy", "mnoznik": null}, {"opis": "Drużyny notują przeciw Hibernian średnio 1,6 przy normie ligi 1,4 (próba: 6 meczów)", "nazwa": "Profil rywala", "mnoznik": 1.05}, {"opis": "Gra u siebie, to zwykle pomaga w tej statystyce", "nazwa": "Dom i wyjazd", "mnoznik": 1.06}, {"opis": "Z kursów meczowych: przewidywany przebieg nie sprzyja", "nazwa": "Scenariusz meczu", "mnoznik": 0.97}], "rynek_rzadki": false, "oczekiwana_liczba": 1.7}, "wyzsza_linia": false, "pewnosc_score": 55.0, "swieze_sklady": false, "kurs_oczekiwany": null, "oczekiwane_minuty": null}, {"ci": [0.6454, 0.9315], "id": 5, "kurs": 1.5, "mecz": "Neftçi Baku PFK – Dinamo Minsk", "linia": 0.5, "rynek": "Gole drużyny", "ev_pct": 21.8, "lambda": 1.786, "ryzyko": "niskie", "strona": "powyzej", "druzyna": "Dinamo Minsk", "edge_pp": null, "matchup": false, "mecz_id": 16351130, "p_model": 0.8122, "p_rynku": null, "pewniak": true, "pewnosc": "srednia", "podmiot": "Dinamo Minsk", "rotacja": false, "rozklad": null, "czynniki": {"opisy": {}, "rywal": 1.0, "sedzia": 1.0, "lacznie": 0.889, "matchup": 1.0, "dom_wyjazd": 0.94, "scenariusz_meczu": 0.946}, "bukmacher": "Superbet", "fair_kurs": 1.23, "rynek_kod": "team_goals", "xi_sygnal": null, "kickoff_ts": 1784736000, "podmiot_id": 3361, "przeciwnik": "Neftçi Baku PFK", "rank_score": 0.8953, "podmiot_typ": "druzyna", "matchup_styl": false, "miekka_linia": false, "uzasadnienie": {"czynniki": [{"opis": "Średnio 1,1 na mecz (próba: 16 meczów, ostatnie 5 meczów: 1,4)", "nazwa": "Poziom bazowy", "mnoznik": null}, {"opis": "Gra na wyjeździe, to zwykle obniża tę statystykę", "nazwa": "Dom i wyjazd", "mnoznik": 0.94}, {"opis": "Z kursów meczowych: przewidywany przebieg nie sprzyja", "nazwa": "Scenariusz meczu", "mnoznik": 0.95}], "rynek_rzadki": false, "oczekiwana_liczba": 1.79}, "wyzsza_linia": false, "pewnosc_score": 55.0, "swieze_sklady": false, "kurs_oczekiwany": null, "oczekiwane_minuty": null}, {"ci": [0.5684, 0.9152], "id": 6, "kurs": 1.66, "mecz": "Qarabağ – CSKA Sofia", "linia": 0.5, "rynek": "Gole drużyny", "ev_pct": 27.4, "lambda": 1.571, "ryzyko": "niskie", "strona": "powyzej", "druzyna": "CSKA Sofia", "edge_pp": null, "matchup": false, "mecz_id": 16350376, "p_model": 0.7677, "p_rynku": null, "pewniak": true, "pewnosc": "srednia", "podmiot": "CSKA Sofia", "rotacja": false, "rozklad": null, "czynniki": {"opisy": {}, "rywal": 1.032, "sedzia": 1.0, "lacznie": 0.919, "matchup": 1.0, "dom_wyjazd": 0.94, "scenariusz_meczu": 0.947}, "bukmacher": "Superbet", "fair_kurs": 1.3, "rynek_kod": "team_goals", "xi_sygnal": null, "kickoff_ts": 1784822400, "podmiot_id": 3275, "przeciwnik": "Qarabağ", "rank_score": 0.8902, "podmiot_typ": "druzyna", "matchup_styl": false, "miekka_linia": false, "uzasadnienie": {"czynniki": [{"opis": "Średnio 1,5 na mecz (próba: 12 meczów, ostatnie 5 meczów: 1,6); po korekcie na siłę rywali i miejsce gry model liczy od 1,4", "nazwa": "Poziom bazowy", "mnoznik": null}, {"opis": "Drużyny notują przeciw Qarabağ średnio 1,6 przy normie ligi 1,5 (próba: 8 meczów)", "nazwa": "Profil rywala", "mnoznik": 1.03}, {"opis": "Gra na wyjeździe, to zwykle obniża tę statystykę", "nazwa": "Dom i wyjazd", "mnoznik": 0.94}, {"opis": "Z kursów meczowych: przewidywany przebieg nie sprzyja", "nazwa": "Scenariusz meczu", "mnoznik": 0.95}], "rynek_rzadki": false, "oczekiwana_liczba": 1.57}, "wyzsza_linia": false, "pewnosc_score": 55.0, "swieze_sklady": false, "kurs_oczekiwany": null, "oczekiwane_minuty": null}, {"ci": [0.5635, 0.8787], "id": 7, "kurs": 1.62, "mecz": "Omonia Nicosia – Kairat Almaty", "linia": 0.5, "rynek": "Gole drużyny", "ev_pct": 19.7, "lambda": 1.414, "ryzyko": "niskie", "strona": "powyzej", "druzyna": "Kairat Almaty", "edge_pp": null, "matchup": false, "mecz_id": 16350224, "p_model": 0.739, "p_rynku": null, "pewniak": true, "pewnosc": "srednia", "podmiot": "Kairat Almaty", "rotacja": false, "rozklad": null, "czynniki": {"opisy": {}, "rywal": 1.092, "sedzia": 1.0, "lacznie": 0.976, "matchup": 1.0, "dom_wyjazd": 0.94, "scenariusz_meczu": 0.95}, "bukmacher": "Superbet", "fair_kurs": 1.35, "rynek_kod": "team_goals", "xi_sygnal": null, "kickoff_ts": 1784739600, "podmiot_id": 5172, "przeciwnik": "Omonia Nicosia", "rank_score": 0.8465, "podmiot_typ": "druzyna", "matchup_styl": false, "miekka_linia": false, "uzasadnienie": {"czynniki": [{"opis": "Średnio 1,4 na mecz (próba: 20 meczów, ostatnie 5 meczów: 1,4)", "nazwa": "Poziom bazowy", "mnoznik": null}, {"opis": "Drużyny notują przeciw Omonia Nicosia średnio 1,8 przy normie ligi 1,5 (próba: 9 meczów)", "nazwa": "Profil rywala", "mnoznik": 1.09}, {"opis": "Gra na wyjeździe, to zwykle obniża tę statystykę", "nazwa": "Dom i wyjazd", "mnoznik": 0.94}, {"opis": "Z kursów meczowych: przewidywany przebieg nie sprzyja", "nazwa": "Scenariusz meczu", "mnoznik": 0.95}], "rynek_rzadki": false, "oczekiwana_liczba": 1.41}, "wyzsza_linia": false, "pewnosc_score": 55.0, "swieze_sklady": false, "kurs_oczekiwany": null, "oczekiwane_minuty": null}, {"ci": [0.6017, 0.8801], "id": 8, "kurs": 1.54, "mecz": "FC Twente – Ferencváros TC", "linia": 0.5, "rynek": "Gole drużyny", "ev_pct": 16.5, "lambda": 1.475, "ryzyko": "niskie", "strona": "powyzej", "druzyna": "Ferencváros TC", "edge_pp": null, "matchup": false, "mecz_id": 16350372, "p_model": 0.7565, "p_rynku": null, "pewniak": true, "pewnosc": "srednia", "podmiot": "Ferencváros TC", "rotacja": false, "rozklad": null, "czynniki": {"opisy": {}, "rywal": 1.0, "sedzia": 1.0, "lacznie": 0.915, "matchup": 1.0, "dom_wyjazd": 0.94, "scenariusz_meczu": 0.973}, "bukmacher": "Superbet", "fair_kurs": 1.32, "rynek_kod": "team_goals", "xi_sygnal": null, "kickoff_ts": 1784829600, "podmiot_id": 1925, "przeciwnik": "FC Twente", "rank_score": 0.8449, "podmiot_typ": "druzyna", "matchup_styl": false, "miekka_linia": false, "uzasadnienie": {"czynniki": [{"opis": "Średnio 1,6 na mecz (próba: 20 meczów, ostatnie 5 meczów: 1,8)", "nazwa": "Poziom bazowy", "mnoznik": null}, {"opis": "Gra na wyjeździe, to zwykle obniża tę statystykę", "nazwa": "Dom i wyjazd", "mnoznik": 0.94}, {"opis": "Z kursów meczowych: przewidywany przebieg nie sprzyja", "nazwa": "Scenariusz meczu", "mnoznik": 0.97}], "rynek_rzadki": false, "oczekiwana_liczba": 1.48}, "wyzsza_linia": false, "pewnosc_score": 55.0, "swieze_sklady": false, "kurs_oczekiwany": null, "oczekiwane_minuty": null}, {"ci": [0.569, 0.9147], "id": 9, "kurs": 1.39, "mecz": "FC Ararat-Armenia – Shamrock Rovers", "linia": 0.5, "rynek": "Gole drużyny", "ev_pct": 6.7, "lambda": 1.569, "ryzyko": "niskie", "strona": "powyzej", "druzyna": "Shamrock Rovers", "edge_pp": null, "matchup": false, "mecz_id": 16350227, "p_model": 0.7676, "p_rynku": null, "pewniak": true, "pewnosc": "srednia", "podmiot": "Shamrock Rovers", "rotacja": false, "rozklad": null, "czynniki": {"opisy": {}, "rywal": 1.0, "sedzia": 1.0, "lacznie": 0.92, "matchup": 1.0, "dom_wyjazd": 0.94, "scenariusz_meczu": 0.979}, "bukmacher": "Superbet", "fair_kurs": 1.3, "rynek_kod": "team_goals", "xi_sygnal": null, "kickoff_ts": 1784649600, "podmiot_id": 3177, "przeciwnik": "FC Ararat-Armenia", "rank_score": 0.8145, "podmiot_typ": "druzyna", "matchup_styl": false, "miekka_linia": false, "uzasadnienie": {"czynniki": [{"opis": "Średnio 1,2 na mecz (próba: 14 meczów, ostatnie 5 meczów: 1,8); po korekcie na siłę rywali i miejsce gry model liczy od 1,2", "nazwa": "Poziom bazowy", "mnoznik": null}, {"opis": "Gra na wyjeździe, to zwykle obniża tę statystykę", "nazwa": "Dom i wyjazd", "mnoznik": 0.94}, {"opis": "Z kursów meczowych: przewidywany przebieg nie sprzyja", "nazwa": "Scenariusz meczu", "mnoznik": 0.98}], "rynek_rzadki": false, "oczekiwana_liczba": 1.57}, "wyzsza_linia": false, "pewnosc_score": 55.0, "swieze_sklady": false, "kurs_oczekiwany": null, "oczekiwane_minuty": null}, {"ci": [0.5929, 0.9317], "id": 10, "kurs": 1.3, "mecz": "Klaksvíkar Ítróttarfelag – FK Kauno Žalgiris", "linia": 0.5, "rynek": "Gole drużyny", "ev_pct": 2.9, "lambda": 1.699, "ryzyko": "niskie", "strona": "powyzej", "druzyna": "Klaksvíkar Ítróttarfelag", "edge_pp": null, "matchup": false, "mecz_id": 16350226, "p_model": 0.7913, "p_rynku": null, "pewniak": true, "pewnosc": "srednia", "podmiot": "Klaksvíkar Ítróttarfelag", "rotacja": false, "rozklad": null, "czynniki": {"opisy": {}, "rywal": 1.0, "sedzia": 1.0, "lacznie": 1.036, "matchup": 1.0, "dom_wyjazd": 1.06, "scenariusz_meczu": 0.977}, "bukmacher": "Superbet", "fair_kurs": 1.26, "rynek_kod": "team_goals", "xi_sygnal": null, "kickoff_ts": 1784659500, "podmiot_id": 5194, "przeciwnik": "FK Kauno Žalgiris", "rank_score": 0.812, "podmiot_typ": "druzyna", "matchup_styl": false, "miekka_linia": false, "uzasadnienie": {"czynniki": [{"opis": "Średnio 1,7 na mecz (próba: 15 meczów, ostatnie 5 meczów: 1,6)", "nazwa": "Poziom bazowy", "mnoznik": null}, {"opis": "Gra u siebie, to zwykle pomaga w tej statystyce", "nazwa": "Dom i wyjazd", "mnoznik": 1.06}, {"opis": "Z kursów meczowych: przewidywany przebieg nie sprzyja", "nazwa": "Scenariusz meczu", "mnoznik": 0.98}], "rynek_rzadki": false, "oczekiwana_liczba": 1.7}, "wyzsza_linia": false, "pewnosc_score": 55.0, "swieze_sklady": false, "kurs_oczekiwany": null, "oczekiwane_minuty": null}, {"ci": [0.6115, 0.9446], "id": 11, "kurs": 1.19, "mecz": "Stjarnan Garðabær – Ilves", "linia": 0.5, "rynek": "Gole drużyny", "ev_pct": -3.6, "lambda": 1.816, "ryzyko": "niskie", "strona": "powyzej", "druzyna": "Stjarnan Garðabær", "edge_pp": null, "matchup": false, "mecz_id": 16357226, "p_model": 0.81, "p_rynku": null, "pewniak": true, "pewnosc": "srednia", "podmiot": "Stjarnan Garðabær", "rotacja": false, "rozklad": null, "czynniki": {"opisy": {}, "rywal": 1.0, "sedzia": 1.0, "lacznie": 1.154, "matchup": 1.0, "dom_wyjazd": 1.06, "scenariusz_meczu": 1.089}, "bukmacher": "Superbet", "fair_kurs": 1.23, "rynek_kod": "team_goals", "xi_sygnal": null, "kickoff_ts": 1784833200, "podmiot_id": 1912, "przeciwnik": "Ilves", "rank_score": 0.7952, "podmiot_typ": "druzyna", "matchup_styl": false, "miekka_linia": false, "uzasadnienie": {"czynniki": [{"opis": "Średnio 1,5 na mecz (próba: 8 meczów, ostatnie 5 meczów: 1,8); po korekcie na siłę rywali i miejsce gry model liczy od 1,3", "nazwa": "Poziom bazowy", "mnoznik": null}, {"opis": "Gra u siebie, to zwykle pomaga w tej statystyce", "nazwa": "Dom i wyjazd", "mnoznik": 1.06}, {"opis": "Z kursów meczowych: przewidywany przebieg sprzyja", "nazwa": "Scenariusz meczu", "mnoznik": 1.09}], "rynek_rzadki": false, "oczekiwana_liczba": 1.82}, "wyzsza_linia": false, "pewnosc_score": 55.0, "swieze_sklady": false, "kurs_oczekiwany": null, "oczekiwane_minuty": null}]
+[
+ {
+  "id": 1,
+  "mecz_id": 16316943,
+  "mecz": "Jagiellonia Białystok – MKS Korona Kielce",
+  "kickoff_ts": 1784983500,
+  "podmiot_typ": "druzyna",
+  "podmiot_id": 5065,
+  "podmiot": "MKS Korona Kielce",
+  "druzyna": "MKS Korona Kielce",
+  "przeciwnik": "Jagiellonia Białystok",
+  "rynek_kod": "team_corners",
+  "rynek": "Rzuty rożne drużyny",
+  "linia": 5.5,
+  "strona": "ponizej",
+  "pewniak": true,
+  "wyzsza_linia": false,
+  "matchup": false,
+  "matchup_styl": false,
+  "rotacja": false,
+  "swieze_sklady": false,
+  "miekka_linia": false,
+  "kurs_oczekiwany": null,
+  "xi_sygnal": null,
+  "kurs": 1.36,
+  "bukmacher": "Superbet",
+  "p_model": 0.869,
+  "p_rynku": null,
+  "fair_kurs": 1.15,
+  "edge_pp": null,
+  "ev_pct": 18.2,
+  "pewnosc": "srednia",
+  "pewnosc_score": 55.0,
+  "ryzyko": "niskie",
+  "rank_score": 1.0134,
+  "ci": [
+   0.7645,
+   0.9467
+  ],
+  "oczekiwane_minuty": null,
+  "lambda": 3.368,
+  "rozklad": null,
+  "czynniki": {
+   "rywal": 0.847,
+   "sedzia": 1.0,
+   "dom_wyjazd": 0.94,
+   "scenariusz_meczu": 0.985,
+   "matchup": 1.0,
+   "lacznie": 0.784,
+   "opisy": {}
+  },
+  "uzasadnienie": {
+   "czynniki": [
+    {
+     "nazwa": "Poziom bazowy",
+     "opis": "Średnio 4,2 na mecz (próba: 20 meczów, ostatnie 5 meczów: 3,2)",
+     "mnoznik": null
+    },
+    {
+     "nazwa": "Profil rywala",
+     "opis": "Drużyny notują przeciw Jagiellonia Białystok średnio 3,5 przy normie ligi 4,7 (próba: 17 meczów)",
+     "mnoznik": 0.85
+    },
+    {
+     "nazwa": "Dom i wyjazd",
+     "opis": "Gra na wyjeździe, to zwykle obniża tę statystykę",
+     "mnoznik": 0.94
+    }
+   ],
+   "oczekiwana_liczba": 3.37,
+   "rynek_rzadki": false
+  }
+ },
+ {
+  "id": 2,
+  "mecz_id": 16316941,
+  "mecz": "Wisła Kraków – GKS Katowice",
+  "kickoff_ts": 1785089700,
+  "podmiot_typ": "druzyna",
+  "podmiot_id": 3112,
+  "podmiot": "GKS Katowice",
+  "druzyna": "GKS Katowice",
+  "przeciwnik": "Wisła Kraków",
+  "rynek_kod": "team_corners",
+  "rynek": "Rzuty rożne drużyny",
+  "linia": 6.5,
+  "strona": "ponizej",
+  "pewniak": true,
+  "wyzsza_linia": false,
+  "matchup": false,
+  "matchup_styl": false,
+  "rotacja": false,
+  "swieze_sklady": false,
+  "miekka_linia": false,
+  "kurs_oczekiwany": null,
+  "xi_sygnal": null,
+  "kurs": 1.28,
+  "bukmacher": "Superbet",
+  "p_model": 0.8868,
+  "p_rynku": null,
+  "fair_kurs": 1.13,
+  "edge_pp": null,
+  "ev_pct": 13.5,
+  "pewnosc": "wysoka",
+  "pewnosc_score": 55.0,
+  "ryzyko": "niskie",
+  "rank_score": 1.0033,
+  "ci": [
+   0.7829,
+   0.96
+  ],
+  "oczekiwane_minuty": null,
+  "lambda": 3.958,
+  "rozklad": null,
+  "czynniki": {
+   "rywal": 1.0,
+   "sedzia": 1.0,
+   "dom_wyjazd": 0.94,
+   "scenariusz_meczu": 1.0,
+   "matchup": 1.0,
+   "lacznie": 0.94,
+   "opisy": {}
+  },
+  "uzasadnienie": {
+   "czynniki": [
+    {
+     "nazwa": "Poziom bazowy",
+     "opis": "Średnio 3,9 na mecz (próba: 20 meczów, ostatnie 5 meczów: 3,2); po korekcie na siłę rywali i miejsce gry oraz zderzeniu krótkiej próby z normą ligi model startuje od 4,2",
+     "mnoznik": null
+    },
+    {
+     "nazwa": "Dom i wyjazd",
+     "opis": "Gra na wyjeździe, to zwykle obniża tę statystykę",
+     "mnoznik": 0.94
+    }
+   ],
+   "oczekiwana_liczba": 3.96,
+   "rynek_rzadki": false
+  }
+ },
+ {
+  "id": 3,
+  "mecz_id": 16316948,
+  "mecz": "Widzew Łódź – Motor Lublin",
+  "kickoff_ts": 1785079800,
+  "podmiot_typ": "druzyna",
+  "podmiot_id": 3115,
+  "podmiot": "Widzew Łódź",
+  "druzyna": "Widzew Łódź",
+  "przeciwnik": "Motor Lublin",
+  "rynek_kod": "team_goals",
+  "rynek": "Gole drużyny",
+  "linia": 2.5,
+  "strona": "ponizej",
+  "pewniak": true,
+  "wyzsza_linia": false,
+  "matchup": true,
+  "matchup_styl": false,
+  "rotacja": false,
+  "swieze_sklady": false,
+  "miekka_linia": false,
+  "kurs_oczekiwany": null,
+  "xi_sygnal": null,
+  "kurs": 1.3,
+  "bukmacher": "Superbet",
+  "p_model": 0.8432,
+  "p_rynku": null,
+  "fair_kurs": 1.19,
+  "edge_pp": null,
+  "ev_pct": 9.6,
+  "pewnosc": "srednia",
+  "pewnosc_score": 55.0,
+  "ryzyko": "niskie",
+  "rank_score": 0.995,
+  "ci": [
+   0.6854,
+   0.9537
+  ],
+  "oczekiwane_minuty": null,
+  "lambda": 1.331,
+  "rozklad": null,
+  "czynniki": {
+   "rywal": 1.136,
+   "sedzia": 1.0,
+   "dom_wyjazd": 1.06,
+   "scenariusz_meczu": 1.065,
+   "matchup": 1.0,
+   "lacznie": 1.283,
+   "opisy": {}
+  },
+  "uzasadnienie": {
+   "czynniki": [
+    {
+     "nazwa": "Poziom bazowy",
+     "opis": "Średnio 1,0 na mecz (próba: 20 meczów, ostatnie 5 meczów: 1,4); po korekcie na siłę rywali i miejsce gry oraz zderzeniu krótkiej próby z normą ligi model startuje od 1,0",
+     "mnoznik": null
+    },
+    {
+     "nazwa": "Profil rywala",
+     "opis": "Drużyny notują przeciw Motor Lublin średnio 1,5 przy normie ligi 1,2 (próba: 13 meczów)",
+     "mnoznik": 1.14
+    },
+    {
+     "nazwa": "Dom i wyjazd",
+     "opis": "Gra u siebie, to zwykle pomaga w tej statystyce",
+     "mnoznik": 1.06
+    },
+    {
+     "nazwa": "Scenariusz meczu",
+     "opis": "Z kursów meczowych: przewidywany przebieg sprzyja",
+     "mnoznik": 1.07
+    }
+   ],
+   "oczekiwana_liczba": 1.33,
+   "rynek_rzadki": false
+  }
+ },
+ {
+  "id": 4,
+  "mecz_id": 16316947,
+  "mecz": "Raków Częstochowa – Wisła Płock",
+  "kickoff_ts": 1785069900,
+  "podmiot_typ": "druzyna",
+  "podmiot_id": 3122,
+  "podmiot": "Wisła Płock",
+  "druzyna": "Wisła Płock",
+  "przeciwnik": "Raków Częstochowa",
+  "rynek_kod": "team_corners",
+  "rynek": "Rzuty rożne drużyny",
+  "linia": 1.5,
+  "strona": "powyzej",
+  "pewniak": true,
+  "wyzsza_linia": false,
+  "matchup": false,
+  "matchup_styl": false,
+  "rotacja": false,
+  "swieze_sklady": false,
+  "miekka_linia": false,
+  "kurs_oczekiwany": null,
+  "xi_sygnal": null,
+  "kurs": 1.2,
+  "bukmacher": "Superbet",
+  "p_model": 0.8987,
+  "p_rynku": null,
+  "fair_kurs": 1.11,
+  "edge_pp": null,
+  "ev_pct": 7.8,
+  "pewnosc": "wysoka",
+  "pewnosc_score": 55.0,
+  "ryzyko": "niskie",
+  "rank_score": 0.9845,
+  "ci": [
+   0.8242,
+   0.9527
+  ],
+  "oczekiwane_minuty": null,
+  "lambda": 3.962,
+  "rozklad": null,
+  "czynniki": {
+   "rywal": 0.963,
+   "sedzia": 1.0,
+   "dom_wyjazd": 0.94,
+   "scenariusz_meczu": 0.955,
+   "matchup": 0.968,
+   "lacznie": 0.836,
+   "opisy": {}
+  },
+  "uzasadnienie": {
+   "czynniki": [
+    {
+     "nazwa": "Poziom bazowy",
+     "opis": "Średnio 4,3 na mecz (próba: 20 meczów, ostatnie 5 meczów: 7,2); po korekcie na siłę rywali i miejsce gry oraz zderzeniu krótkiej próby z normą ligi model startuje od 4,7",
+     "mnoznik": null
+    },
+    {
+     "nazwa": "Profil rywala",
+     "opis": "Drużyny notują przeciw Raków Częstochowa średnio 4,2 przy normie ligi 4,7 (próba: 6 meczów)",
+     "mnoznik": 0.96
+    },
+    {
+     "nazwa": "Dom i wyjazd",
+     "opis": "Gra na wyjeździe, to zwykle obniża tę statystykę",
+     "mnoznik": 0.94
+    },
+    {
+     "nazwa": "Styl rywala",
+     "opis": "Rywal gra wysoko i trzyma piłkę, o rożne trudniej",
+     "mnoznik": 0.97
+    },
+    {
+     "nazwa": "Scenariusz meczu",
+     "opis": "Z kursów meczowych: przewidywany przebieg nie sprzyja",
+     "mnoznik": 0.95
+    }
+   ],
+   "oczekiwana_liczba": 3.96,
+   "rynek_rzadki": false
+  }
+ },
+ {
+  "id": 5,
+  "mecz_id": 16316953,
+  "mecz": "Górnik Zabrze – Śląsk Wrocław",
+  "kickoff_ts": 1784993400,
+  "podmiot_typ": "druzyna",
+  "podmiot_id": 3110,
+  "podmiot": "Górnik Zabrze",
+  "druzyna": "Górnik Zabrze",
+  "przeciwnik": "Śląsk Wrocław",
+  "rynek_kod": "team_corners",
+  "rynek": "Rzuty rożne drużyny",
+  "linia": 8.5,
+  "strona": "ponizej",
+  "pewniak": true,
+  "wyzsza_linia": false,
+  "matchup": false,
+  "matchup_styl": false,
+  "rotacja": false,
+  "swieze_sklady": false,
+  "miekka_linia": false,
+  "kurs_oczekiwany": null,
+  "xi_sygnal": null,
+  "kurs": 1.22,
+  "bukmacher": "Superbet",
+  "p_model": 0.8572,
+  "p_rynku": null,
+  "fair_kurs": 1.17,
+  "edge_pp": null,
+  "ev_pct": 4.6,
+  "pewnosc": "srednia",
+  "pewnosc_score": 55.0,
+  "ryzyko": "niskie",
+  "rank_score": 0.9468,
+  "ci": [
+   0.7278,
+   0.95
+  ],
+  "oczekiwane_minuty": null,
+  "lambda": 5.817,
+  "rozklad": null,
+  "czynniki": {
+   "rywal": 1.0,
+   "sedzia": 1.0,
+   "dom_wyjazd": 1.06,
+   "scenariusz_meczu": 1.059,
+   "matchup": 1.0,
+   "lacznie": 1.123,
+   "opisy": {}
+  },
+  "uzasadnienie": {
+   "czynniki": [
+    {
+     "nazwa": "Poziom bazowy",
+     "opis": "Średnio 5,5 na mecz (próba: 20 meczów, ostatnie 5 meczów: 7,2); po korekcie na siłę rywali i miejsce gry oraz zderzeniu krótkiej próby z normą ligi model startuje od 5,2",
+     "mnoznik": null
+    },
+    {
+     "nazwa": "Dom i wyjazd",
+     "opis": "Gra u siebie, to zwykle pomaga w tej statystyce",
+     "mnoznik": 1.06
+    },
+    {
+     "nazwa": "Scenariusz meczu",
+     "opis": "Z kursów meczowych: przewidywany przebieg sprzyja",
+     "mnoznik": 1.06
+    }
+   ],
+   "oczekiwana_liczba": 5.82,
+   "rynek_rzadki": false
+  }
+ },
+ {
+  "id": 6,
+  "mecz_id": 16316948,
+  "mecz": "Widzew Łódź – Motor Lublin",
+  "kickoff_ts": 1785079800,
+  "podmiot_typ": "druzyna",
+  "podmiot_id": 3115,
+  "podmiot": "Widzew Łódź",
+  "druzyna": "Widzew Łódź",
+  "przeciwnik": "Motor Lublin",
+  "rynek_kod": "team_corners",
+  "rynek": "Rzuty rożne drużyny",
+  "linia": 7.5,
+  "strona": "ponizej",
+  "pewniak": true,
+  "wyzsza_linia": false,
+  "matchup": false,
+  "matchup_styl": false,
+  "rotacja": false,
+  "swieze_sklady": false,
+  "miekka_linia": false,
+  "kurs_oczekiwany": null,
+  "xi_sygnal": null,
+  "kurs": 1.24,
+  "bukmacher": "Superbet",
+  "p_model": 0.8489,
+  "p_rynku": null,
+  "fair_kurs": 1.18,
+  "edge_pp": null,
+  "ev_pct": 5.3,
+  "pewnosc": "srednia",
+  "pewnosc_score": 55.0,
+  "ryzyko": "niskie",
+  "rank_score": 0.9453,
+  "ci": [
+   0.7071,
+   0.9497
+  ],
+  "oczekiwane_minuty": null,
+  "lambda": 5.083,
+  "rozklad": null,
+  "czynniki": {
+   "rywal": 1.083,
+   "sedzia": 1.0,
+   "dom_wyjazd": 1.06,
+   "scenariusz_meczu": 1.065,
+   "matchup": 1.014,
+   "lacznie": 1.24,
+   "opisy": {}
+  },
+  "uzasadnienie": {
+   "czynniki": [
+    {
+     "nazwa": "Poziom bazowy",
+     "opis": "Średnio 4,0 na mecz (próba: 20 meczów, ostatnie 5 meczów: 3,0); po korekcie na siłę rywali i miejsce gry oraz zderzeniu krótkiej próby z normą ligi model startuje od 4,1",
+     "mnoznik": null
+    },
+    {
+     "nazwa": "Profil rywala",
+     "opis": "Drużyny notują przeciw Motor Lublin średnio 6,0 przy normie ligi 4,7 (próba: 5 meczów)",
+     "mnoznik": 1.08
+    },
+    {
+     "nazwa": "Dom i wyjazd",
+     "opis": "Gra u siebie, to zwykle pomaga w tej statystyce",
+     "mnoznik": 1.06
+    },
+    {
+     "nazwa": "Scenariusz meczu",
+     "opis": "Z kursów meczowych: przewidywany przebieg sprzyja",
+     "mnoznik": 1.07
+    }
+   ],
+   "oczekiwana_liczba": 5.08,
+   "rynek_rzadki": false
+  }
+ },
+ {
+  "id": 7,
+  "mecz_id": 16316952,
+  "mecz": "Lech Poznań – Cracovia",
+  "kickoff_ts": 1785003300,
+  "podmiot_typ": "druzyna",
+  "podmiot_id": 4901,
+  "podmiot": "Cracovia",
+  "druzyna": "Cracovia",
+  "przeciwnik": "Lech Poznań",
+  "rynek_kod": "team_corners",
+  "rynek": "Rzuty rożne drużyny",
+  "linia": 2.5,
+  "strona": "powyzej",
+  "pewniak": true,
+  "wyzsza_linia": true,
+  "matchup": false,
+  "matchup_styl": false,
+  "rotacja": false,
+  "swieze_sklady": false,
+  "miekka_linia": false,
+  "kurs_oczekiwany": null,
+  "xi_sygnal": null,
+  "kurs": 1.28,
+  "bukmacher": "Superbet",
+  "p_model": 0.7983,
+  "p_rynku": null,
+  "fair_kurs": 1.25,
+  "edge_pp": null,
+  "ev_pct": 2.2,
+  "pewnosc": "srednia",
+  "pewnosc_score": 55.0,
+  "ryzyko": "niskie",
+  "rank_score": 0.9032,
+  "ci": [
+   0.6803,
+   0.8922
+  ],
+  "oczekiwane_minuty": null,
+  "lambda": 4.334,
+  "rozklad": null,
+  "czynniki": {
+   "rywal": 0.951,
+   "sedzia": 1.0,
+   "dom_wyjazd": 0.94,
+   "scenariusz_meczu": 0.99,
+   "matchup": 0.927,
+   "lacznie": 0.82,
+   "opisy": {}
+  },
+  "uzasadnienie": {
+   "czynniki": [
+    {
+     "nazwa": "Poziom bazowy",
+     "opis": "Średnio 5,5 na mecz (próba: 20 meczów, ostatnie 5 meczów: 6,6); po korekcie na siłę rywali i miejsce gry oraz zderzeniu krótkiej próby z normą ligi model startuje od 5,3",
+     "mnoznik": null
+    },
+    {
+     "nazwa": "Profil rywala",
+     "opis": "Drużyny notują przeciw Lech Poznań średnio 4,0 przy normie ligi 4,7 (próba: 6 meczów)",
+     "mnoznik": 0.95
+    },
+    {
+     "nazwa": "Dom i wyjazd",
+     "opis": "Gra na wyjeździe, to zwykle obniża tę statystykę",
+     "mnoznik": 0.94
+    },
+    {
+     "nazwa": "Styl rywala",
+     "opis": "Rywal gra wysoko i trzyma piłkę, o rożne trudniej",
+     "mnoznik": 0.93
+    }
+   ],
+   "oczekiwana_liczba": 4.33,
+   "rynek_rzadki": false
+  }
+ },
+ {
+  "id": 8,
+  "mecz_id": 16350240,
+  "mecz": "FK Crvena zvezda – Larne FC",
+  "kickoff_ts": 1785348000,
+  "podmiot_typ": "druzyna",
+  "podmiot_id": 5184,
+  "podmiot": "Larne FC",
+  "druzyna": "Larne FC",
+  "przeciwnik": "FK Crvena zvezda",
+  "rynek_kod": "team_corners",
+  "rynek": "Rzuty rożne drużyny",
+  "linia": 2.5,
+  "strona": "ponizej",
+  "pewniak": true,
+  "wyzsza_linia": false,
+  "matchup": false,
+  "matchup_styl": false,
+  "rotacja": false,
+  "swieze_sklady": false,
+  "miekka_linia": false,
+  "kurs_oczekiwany": null,
+  "xi_sygnal": null,
+  "kurs": 1.43,
+  "bukmacher": "Superbet",
+  "p_model": 0.8312,
+  "p_rynku": null,
+  "fair_kurs": 1.2,
+  "edge_pp": null,
+  "ev_pct": 18.9,
+  "pewnosc": "srednia",
+  "pewnosc_score": 55.0,
+  "ryzyko": "niskie",
+  "rank_score": 0.8946,
+  "ci": [
+   0.6336,
+   0.9619
+  ],
+  "oczekiwane_minuty": null,
+  "lambda": 1.373,
+  "rozklad": null,
+  "czynniki": {
+   "rywal": 1.0,
+   "sedzia": 1.0,
+   "dom_wyjazd": 0.94,
+   "scenariusz_meczu": 1.001,
+   "matchup": 1.0,
+   "lacznie": 0.941,
+   "opisy": {}
+  },
+  "uzasadnienie": {
+   "czynniki": [
+    {
+     "nazwa": "Poziom bazowy",
+     "opis": "Średnio 1,3 na mecz (próba: 7 meczów, ostatnie 5 meczów: 0,0); po korekcie na siłę rywali i miejsce gry oraz zderzeniu krótkiej próby z normą ligi model startuje od 1,5",
+     "mnoznik": null
+    },
+    {
+     "nazwa": "Dom i wyjazd",
+     "opis": "Gra na wyjeździe, to zwykle obniża tę statystykę",
+     "mnoznik": 0.94
+    }
+   ],
+   "oczekiwana_liczba": 1.37,
+   "rynek_rzadki": false
+  }
+ },
+ {
+  "id": 25,
+  "mecz_id": 16316943,
+  "mecz": "Jagiellonia Białystok – MKS Korona Kielce",
+  "kickoff_ts": 1784983500,
+  "podmiot_typ": "druzyna",
+  "podmiot_id": 7691,
+  "podmiot": "Jagiellonia Białystok",
+  "druzyna": "Jagiellonia Białystok",
+  "przeciwnik": "MKS Korona Kielce",
+  "rynek_kod": "team_corners",
+  "rynek": "Rzuty rożne drużyny",
+  "linia": 3.5,
+  "strona": "powyzej",
+  "pewniak": true,
+  "wyzsza_linia": true,
+  "matchup": false,
+  "matchup_styl": false,
+  "rotacja": false,
+  "swieze_sklady": false,
+  "miekka_linia": false,
+  "kurs_oczekiwany": null,
+  "xi_sygnal": null,
+  "kurs": 1.22,
+  "bukmacher": "Superbet",
+  "p_model": 0.8031,
+  "p_rynku": null,
+  "fair_kurs": 1.25,
+  "edge_pp": null,
+  "ev_pct": -2.0,
+  "pewnosc": "srednia",
+  "pewnosc_score": 55.0,
+  "ryzyko": "niskie",
+  "rank_score": 0.8871,
+  "ci": [
+   0.6731,
+   0.9037
+  ],
+  "oczekiwane_minuty": null,
+  "lambda": 5.636,
+  "rozklad": null,
+  "czynniki": {
+   "rywal": 0.917,
+   "sedzia": 1.0,
+   "dom_wyjazd": 1.06,
+   "scenariusz_meczu": 1.049,
+   "matchup": 1.0,
+   "lacznie": 1.02,
+   "opisy": {}
+  },
+  "uzasadnienie": {
+   "czynniki": [
+    {
+     "nazwa": "Poziom bazowy",
+     "opis": "Średnio 6,1 na mecz (próba: 20 meczów, ostatnie 5 meczów: 6,6); po korekcie na siłę rywali i miejsce gry oraz zderzeniu krótkiej próby z normą ligi model startuje od 5,5",
+     "mnoznik": null
+    },
+    {
+     "nazwa": "Profil rywala",
+     "opis": "Drużyny notują przeciw MKS Korona Kielce średnio 3,9 przy normie ligi 4,7 (próba: 13 meczów)",
+     "mnoznik": 0.92
+    },
+    {
+     "nazwa": "Dom i wyjazd",
+     "opis": "Gra u siebie, to zwykle pomaga w tej statystyce",
+     "mnoznik": 1.06
+    },
+    {
+     "nazwa": "Scenariusz meczu",
+     "opis": "Z kursów meczowych: przewidywany przebieg sprzyja",
+     "mnoznik": 1.05
+    }
+   ],
+   "oczekiwana_liczba": 5.64,
+   "rynek_rzadki": false
+  }
+ },
+ {
+  "id": 14,
+  "mecz_id": 16316950,
+  "mecz": "Zagłębie Lubin – Piast Gliwice",
+  "kickoff_ts": 1785171600,
+  "podmiot_typ": "druzyna",
+  "podmiot_id": 7918,
+  "podmiot": "Piast Gliwice",
+  "druzyna": "Piast Gliwice",
+  "przeciwnik": "Zagłębie Lubin",
+  "rynek_kod": "team_goals",
+  "rynek": "Gole drużyny",
+  "linia": 1.5,
+  "strona": "ponizej",
+  "pewniak": true,
+  "wyzsza_linia": false,
+  "matchup": false,
+  "matchup_styl": false,
+  "rotacja": false,
+  "swieze_sklady": false,
+  "miekka_linia": false,
+  "kurs_oczekiwany": null,
+  "xi_sygnal": null,
+  "kurs": 1.45,
+  "bukmacher": "Superbet",
+  "p_model": 0.7737,
+  "p_rynku": null,
+  "fair_kurs": 1.29,
+  "edge_pp": null,
+  "ev_pct": 12.2,
+  "pewnosc": "srednia",
+  "pewnosc_score": 55.0,
+  "ryzyko": "srednie",
+  "rank_score": 0.8385,
+  "ci": [
+   0.6354,
+   0.8895
+  ],
+  "oczekiwane_minuty": null,
+  "lambda": 0.894,
+  "rozklad": null,
+  "czynniki": {
+   "rywal": 0.78,
+   "sedzia": 1.0,
+   "dom_wyjazd": 0.94,
+   "scenariusz_meczu": 0.963,
+   "matchup": 1.0,
+   "lacznie": 0.706,
+   "opisy": {}
+  },
+  "uzasadnienie": {
+   "czynniki": [
+    {
+     "nazwa": "Poziom bazowy",
+     "opis": "Średnio 1,3 na mecz (próba: 20 meczów, ostatnie 5 meczów: 1,4)",
+     "mnoznik": null
+    },
+    {
+     "nazwa": "Profil rywala",
+     "opis": "Drużyny notują przeciw Zagłębie Lubin średnio 0,5 przy normie ligi 1,2 (próba: 15 meczów)",
+     "mnoznik": 0.78
+    },
+    {
+     "nazwa": "Dom i wyjazd",
+     "opis": "Gra na wyjeździe, to zwykle obniża tę statystykę",
+     "mnoznik": 0.94
+    },
+    {
+     "nazwa": "Scenariusz meczu",
+     "opis": "Z kursów meczowych: przewidywany przebieg nie sprzyja",
+     "mnoznik": 0.96
+    }
+   ],
+   "oczekiwana_liczba": 0.89,
+   "rynek_rzadki": false
+  }
+ },
+ {
+  "id": 16,
+  "mecz_id": 16316953,
+  "mecz": "Górnik Zabrze – Śląsk Wrocław",
+  "kickoff_ts": 1784993400,
+  "podmiot_typ": "druzyna",
+  "podmiot_id": 3110,
+  "podmiot": "Górnik Zabrze",
+  "druzyna": "Górnik Zabrze",
+  "przeciwnik": "Śląsk Wrocław",
+  "rynek_kod": "team_goals",
+  "rynek": "Gole drużyny",
+  "linia": 2.5,
+  "strona": "ponizej",
+  "pewniak": true,
+  "wyzsza_linia": false,
+  "matchup": false,
+  "matchup_styl": false,
+  "rotacja": false,
+  "swieze_sklady": false,
+  "miekka_linia": false,
+  "kurs_oczekiwany": null,
+  "xi_sygnal": null,
+  "kurs": 1.26,
+  "bukmacher": "Superbet",
+  "p_model": 0.8164,
+  "p_rynku": null,
+  "fair_kurs": 1.22,
+  "edge_pp": null,
+  "ev_pct": 2.9,
+  "pewnosc": "srednia",
+  "pewnosc_score": 55.0,
+  "ryzyko": "niskie",
+  "rank_score": 0.8248,
+  "ci": [
+   0.659,
+   0.9343
+  ],
+  "oczekiwane_minuty": null,
+  "lambda": 1.449,
+  "rozklad": null,
+  "czynniki": {
+   "rywal": 1.0,
+   "sedzia": 1.0,
+   "dom_wyjazd": 1.06,
+   "scenariusz_meczu": 1.059,
+   "matchup": 1.0,
+   "lacznie": 1.123,
+   "opisy": {}
+  },
+  "uzasadnienie": {
+   "czynniki": [
+    {
+     "nazwa": "Poziom bazowy",
+     "opis": "Średnio 1,2 na mecz (próba: 20 meczów, ostatnie 5 meczów: 1,8); po korekcie na siłę rywali i miejsce gry oraz zderzeniu krótkiej próby z normą ligi model startuje od 1,3",
+     "mnoznik": null
+    },
+    {
+     "nazwa": "Dom i wyjazd",
+     "opis": "Gra u siebie, to zwykle pomaga w tej statystyce",
+     "mnoznik": 1.06
+    },
+    {
+     "nazwa": "Scenariusz meczu",
+     "opis": "Z kursów meczowych: przewidywany przebieg sprzyja",
+     "mnoznik": 1.06
+    }
+   ],
+   "oczekiwana_liczba": 1.45,
+   "rynek_rzadki": false
+  }
+ },
+ {
+  "id": 17,
+  "mecz_id": 16316947,
+  "mecz": "Raków Częstochowa – Wisła Płock",
+  "kickoff_ts": 1785069900,
+  "podmiot_typ": "druzyna",
+  "podmiot_id": 3122,
+  "podmiot": "Wisła Płock",
+  "druzyna": "Wisła Płock",
+  "przeciwnik": "Raków Częstochowa",
+  "rynek_kod": "team_goals",
+  "rynek": "Gole drużyny",
+  "linia": 1.5,
+  "strona": "ponizej",
+  "pewniak": true,
+  "wyzsza_linia": false,
+  "matchup": false,
+  "matchup_styl": false,
+  "rotacja": false,
+  "swieze_sklady": false,
+  "miekka_linia": false,
+  "kurs_oczekiwany": null,
+  "xi_sygnal": null,
+  "kurs": 1.21,
+  "bukmacher": "Superbet",
+  "p_model": 0.8141,
+  "p_rynku": null,
+  "fair_kurs": 1.23,
+  "edge_pp": null,
+  "ev_pct": -1.5,
+  "pewnosc": "srednia",
+  "pewnosc_score": 55.0,
+  "ryzyko": "srednie",
+  "rank_score": 0.806,
+  "ci": [
+   0.6709,
+   0.9255
+  ],
+  "oczekiwane_minuty": null,
+  "lambda": 0.779,
+  "rozklad": null,
+  "czynniki": {
+   "rywal": 0.95,
+   "sedzia": 1.0,
+   "dom_wyjazd": 0.94,
+   "scenariusz_meczu": 0.955,
+   "matchup": 1.0,
+   "lacznie": 0.852,
+   "opisy": {}
+  },
+  "uzasadnienie": {
+   "czynniki": [
+    {
+     "nazwa": "Poziom bazowy",
+     "opis": "Średnio 0,8 na mecz (próba: 20 meczów, ostatnie 5 meczów: 0,4); po korekcie na siłę rywali i miejsce gry oraz zderzeniu krótkiej próby z normą ligi model startuje od 0,9",
+     "mnoznik": null
+    },
+    {
+     "nazwa": "Profil rywala",
+     "opis": "Drużyny notują przeciw Raków Częstochowa średnio 1,1 przy normie ligi 1,2 (próba: 14 meczów)",
+     "mnoznik": 0.95
+    },
+    {
+     "nazwa": "Dom i wyjazd",
+     "opis": "Gra na wyjeździe, to zwykle obniża tę statystykę",
+     "mnoznik": 0.94
+    },
+    {
+     "nazwa": "Scenariusz meczu",
+     "opis": "Z kursów meczowych: przewidywany przebieg nie sprzyja",
+     "mnoznik": 0.95
+    }
+   ],
+   "oczekiwana_liczba": 0.78,
+   "rynek_rzadki": false
+  }
+ },
+ {
+  "id": 18,
+  "mecz_id": 16316943,
+  "mecz": "Jagiellonia Białystok – MKS Korona Kielce",
+  "kickoff_ts": 1784983500,
+  "podmiot_typ": "druzyna",
+  "podmiot_id": 7691,
+  "podmiot": "Jagiellonia Białystok",
+  "druzyna": "Jagiellonia Białystok",
+  "przeciwnik": "MKS Korona Kielce",
+  "rynek_kod": "team_goals",
+  "rynek": "Gole drużyny",
+  "linia": 2.5,
+  "strona": "ponizej",
+  "pewniak": true,
+  "wyzsza_linia": false,
+  "matchup": false,
+  "matchup_styl": false,
+  "rotacja": false,
+  "swieze_sklady": false,
+  "miekka_linia": false,
+  "kurs_oczekiwany": null,
+  "xi_sygnal": null,
+  "kurs": 1.24,
+  "bukmacher": "Superbet",
+  "p_model": 0.8026,
+  "p_rynku": null,
+  "fair_kurs": 1.25,
+  "edge_pp": null,
+  "ev_pct": -0.5,
+  "pewnosc": "srednia",
+  "pewnosc_score": 55.0,
+  "ryzyko": "niskie",
+  "rank_score": 0.8044,
+  "ci": [
+   0.6505,
+   0.921
+  ],
+  "oczekiwane_minuty": null,
+  "lambda": 1.508,
+  "rozklad": null,
+  "czynniki": {
+   "rywal": 0.914,
+   "sedzia": 1.0,
+   "dom_wyjazd": 1.06,
+   "scenariusz_meczu": 1.049,
+   "matchup": 1.0,
+   "lacznie": 1.017,
+   "opisy": {}
+  },
+  "uzasadnienie": {
+   "czynniki": [
+    {
+     "nazwa": "Poziom bazowy",
+     "opis": "Średnio 1,4 na mecz (próba: 20 meczów, ostatnie 5 meczów: 1,8)",
+     "mnoznik": null
+    },
+    {
+     "nazwa": "Profil rywala",
+     "opis": "Drużyny notują przeciw MKS Korona Kielce średnio 1,0 przy normie ligi 1,2 (próba: 13 meczów)",
+     "mnoznik": 0.91
+    },
+    {
+     "nazwa": "Dom i wyjazd",
+     "opis": "Gra u siebie, to zwykle pomaga w tej statystyce",
+     "mnoznik": 1.06
+    },
+    {
+     "nazwa": "Scenariusz meczu",
+     "opis": "Z kursów meczowych: przewidywany przebieg sprzyja",
+     "mnoznik": 1.05
+    }
+   ],
+   "oczekiwana_liczba": 1.51,
+   "rynek_rzadki": false
+  }
+ },
+ {
+  "id": 27,
+  "mecz_id": 16316941,
+  "mecz": "Wisła Kraków – GKS Katowice",
+  "kickoff_ts": 1785089700,
+  "podmiot_typ": "druzyna",
+  "podmiot_id": 3112,
+  "podmiot": "GKS Katowice",
+  "druzyna": "GKS Katowice",
+  "przeciwnik": "Wisła Kraków",
+  "rynek_kod": "team_corners",
+  "rynek": "Rzuty rożne drużyny",
+  "linia": 4.5,
+  "strona": "ponizej",
+  "pewniak": true,
+  "wyzsza_linia": false,
+  "matchup": false,
+  "matchup_styl": false,
+  "rotacja": false,
+  "swieze_sklady": false,
+  "miekka_linia": false,
+  "kurs_oczekiwany": null,
+  "xi_sygnal": null,
+  "kurs": 1.95,
+  "bukmacher": "Superbet",
+  "p_model": 0.6368,
+  "p_rynku": null,
+  "fair_kurs": 1.57,
+  "edge_pp": null,
+  "ev_pct": 24.2,
+  "pewnosc": "srednia",
+  "pewnosc_score": 55.0,
+  "ryzyko": "niskie",
+  "rank_score": 0.8003,
+  "ci": [
+   0.4661,
+   0.7944
+  ],
+  "oczekiwane_minuty": null,
+  "lambda": 3.958,
+  "rozklad": null,
+  "czynniki": {
+   "rywal": 1.0,
+   "sedzia": 1.0,
+   "dom_wyjazd": 0.94,
+   "scenariusz_meczu": 1.0,
+   "matchup": 1.0,
+   "lacznie": 0.94,
+   "opisy": {}
+  },
+  "uzasadnienie": {
+   "czynniki": [
+    {
+     "nazwa": "Poziom bazowy",
+     "opis": "Średnio 3,9 na mecz (próba: 20 meczów, ostatnie 5 meczów: 3,2); po korekcie na siłę rywali i miejsce gry oraz zderzeniu krótkiej próby z normą ligi model startuje od 4,2",
+     "mnoznik": null
+    },
+    {
+     "nazwa": "Dom i wyjazd",
+     "opis": "Gra na wyjeździe, to zwykle obniża tę statystykę",
+     "mnoznik": 0.94
+    }
+   ],
+   "oczekiwana_liczba": 3.96,
+   "rynek_rzadki": false
+  }
+ },
+ {
+  "id": 26,
+  "mecz_id": 16316943,
+  "mecz": "Jagiellonia Białystok – MKS Korona Kielce",
+  "kickoff_ts": 1784983500,
+  "podmiot_typ": "druzyna",
+  "podmiot_id": 5065,
+  "podmiot": "MKS Korona Kielce",
+  "druzyna": "MKS Korona Kielce",
+  "przeciwnik": "Jagiellonia Białystok",
+  "rynek_kod": "team_corners",
+  "rynek": "Rzuty rożne drużyny",
+  "linia": 3.5,
+  "strona": "ponizej",
+  "pewniak": true,
+  "wyzsza_linia": false,
+  "matchup": false,
+  "matchup_styl": false,
+  "rotacja": false,
+  "swieze_sklady": false,
+  "miekka_linia": false,
+  "kurs_oczekiwany": null,
+  "xi_sygnal": null,
+  "kurs": 2.3,
+  "bukmacher": "Superbet",
+  "p_model": 0.5678,
+  "p_rynku": null,
+  "fair_kurs": 1.76,
+  "edge_pp": null,
+  "ev_pct": 30.6,
+  "pewnosc": "srednia",
+  "pewnosc_score": 55.0,
+  "ryzyko": "niskie",
+  "rank_score": 0.775,
+  "ci": [
+   0.4085,
+   0.7236
+  ],
+  "oczekiwane_minuty": null,
+  "lambda": 3.368,
+  "rozklad": null,
+  "czynniki": {
+   "rywal": 0.847,
+   "sedzia": 1.0,
+   "dom_wyjazd": 0.94,
+   "scenariusz_meczu": 0.985,
+   "matchup": 1.0,
+   "lacznie": 0.784,
+   "opisy": {}
+  },
+  "uzasadnienie": {
+   "czynniki": [
+    {
+     "nazwa": "Poziom bazowy",
+     "opis": "Średnio 4,2 na mecz (próba: 20 meczów, ostatnie 5 meczów: 3,2)",
+     "mnoznik": null
+    },
+    {
+     "nazwa": "Profil rywala",
+     "opis": "Drużyny notują przeciw Jagiellonia Białystok średnio 3,5 przy normie ligi 4,7 (próba: 17 meczów)",
+     "mnoznik": 0.85
+    },
+    {
+     "nazwa": "Dom i wyjazd",
+     "opis": "Gra na wyjeździe, to zwykle obniża tę statystykę",
+     "mnoznik": 0.94
+    }
+   ],
+   "oczekiwana_liczba": 3.37,
+   "rynek_rzadki": false
+  }
+ },
+ {
+  "id": 19,
+  "mecz_id": 16316941,
+  "mecz": "Wisła Kraków – GKS Katowice",
+  "kickoff_ts": 1785089700,
+  "podmiot_typ": "druzyna",
+  "podmiot_id": 3112,
+  "podmiot": "GKS Katowice",
+  "druzyna": "GKS Katowice",
+  "przeciwnik": "Wisła Kraków",
+  "rynek_kod": "team_goals",
+  "rynek": "Gole drużyny",
+  "linia": 0.5,
+  "strona": "powyzej",
+  "pewniak": true,
+  "wyzsza_linia": false,
+  "matchup": false,
+  "matchup_styl": false,
+  "rotacja": false,
+  "swieze_sklady": false,
+  "miekka_linia": false,
+  "kurs_oczekiwany": null,
+  "xi_sygnal": null,
+  "kurs": 1.34,
+  "bukmacher": "Superbet",
+  "p_model": 0.7389,
+  "p_rynku": null,
+  "fair_kurs": 1.35,
+  "edge_pp": null,
+  "ev_pct": -1.0,
+  "pewnosc": "srednia",
+  "pewnosc_score": 55.0,
+  "ryzyko": "niskie",
+  "rank_score": 0.7698,
+  "ci": [
+   0.5982,
+   0.8554
+  ],
+  "oczekiwane_minuty": null,
+  "lambda": 1.388,
+  "rozklad": null,
+  "czynniki": {
+   "rywal": 1.0,
+   "sedzia": 1.0,
+   "dom_wyjazd": 0.94,
+   "scenariusz_meczu": 1.0,
+   "matchup": 1.0,
+   "lacznie": 0.94,
+   "opisy": {}
+  },
+  "uzasadnienie": {
+   "czynniki": [
+    {
+     "nazwa": "Poziom bazowy",
+     "opis": "Średnio 1,6 na mecz (próba: 20 meczów, ostatnie 5 meczów: 1,8); po korekcie na siłę rywali i miejsce gry oraz zderzeniu krótkiej próby z normą ligi model startuje od 1,5",
+     "mnoznik": null
+    },
+    {
+     "nazwa": "Dom i wyjazd",
+     "opis": "Gra na wyjeździe, to zwykle obniża tę statystykę",
+     "mnoznik": 0.94
+    }
+   ],
+   "oczekiwana_liczba": 1.39,
+   "rynek_rzadki": false
+  }
+ },
+ {
+  "id": 20,
+  "mecz_id": 16316952,
+  "mecz": "Lech Poznań – Cracovia",
+  "kickoff_ts": 1785003300,
+  "podmiot_typ": "druzyna",
+  "podmiot_id": 4901,
+  "podmiot": "Cracovia",
+  "druzyna": "Cracovia",
+  "przeciwnik": "Lech Poznań",
+  "rynek_kod": "team_goals",
+  "rynek": "Gole drużyny",
+  "linia": 1.5,
+  "strona": "ponizej",
+  "pewniak": true,
+  "wyzsza_linia": false,
+  "matchup": false,
+  "matchup_styl": false,
+  "rotacja": false,
+  "swieze_sklady": false,
+  "miekka_linia": false,
+  "kurs_oczekiwany": null,
+  "xi_sygnal": null,
+  "kurs": 1.26,
+  "bukmacher": "Superbet",
+  "p_model": 0.7575,
+  "p_rynku": null,
+  "fair_kurs": 1.32,
+  "edge_pp": null,
+  "ev_pct": -4.6,
+  "pewnosc": "srednia",
+  "pewnosc_score": 55.0,
+  "ryzyko": "srednie",
+  "rank_score": 0.7653,
+  "ci": [
+   0.5921,
+   0.8936
+  ],
+  "oczekiwane_minuty": null,
+  "lambda": 0.939,
+  "rozklad": null,
+  "czynniki": {
+   "rywal": 1.019,
+   "sedzia": 1.0,
+   "dom_wyjazd": 0.94,
+   "scenariusz_meczu": 0.99,
+   "matchup": 1.0,
+   "lacznie": 0.948,
+   "opisy": {}
+  },
+  "uzasadnienie": {
+   "czynniki": [
+    {
+     "nazwa": "Poziom bazowy",
+     "opis": "Średnio 0,9 na mecz (próba: 20 meczów, ostatnie 5 meczów: 1,0); po korekcie na siłę rywali i miejsce gry oraz zderzeniu krótkiej próby z normą ligi model startuje od 1,0",
+     "mnoznik": null
+    },
+    {
+     "nazwa": "Dom i wyjazd",
+     "opis": "Gra na wyjeździe, to zwykle obniża tę statystykę",
+     "mnoznik": 0.94
+    }
+   ],
+   "oczekiwana_liczba": 0.94,
+   "rynek_rzadki": false
+  }
+ },
+ {
+  "id": 24,
+  "mecz_id": 16316948,
+  "mecz": "Widzew Łódź – Motor Lublin",
+  "kickoff_ts": 1785079800,
+  "podmiot_typ": "druzyna",
+  "podmiot_id": 7915,
+  "podmiot": "Motor Lublin",
+  "druzyna": "Motor Lublin",
+  "przeciwnik": "Widzew Łódź",
+  "rynek_kod": "team_corners",
+  "rynek": "Rzuty rożne drużyny",
+  "linia": 3.5,
+  "strona": "powyzej",
+  "pewniak": true,
+  "wyzsza_linia": true,
+  "matchup": false,
+  "matchup_styl": false,
+  "rotacja": false,
+  "swieze_sklady": false,
+  "miekka_linia": false,
+  "kurs_oczekiwany": null,
+  "xi_sygnal": null,
+  "kurs": 1.85,
+  "bukmacher": "Superbet",
+  "p_model": 0.6197,
+  "p_rynku": null,
+  "fair_kurs": 1.61,
+  "edge_pp": null,
+  "ev_pct": 14.6,
+  "pewnosc": "srednia",
+  "pewnosc_score": 55.0,
+  "ryzyko": "niskie",
+  "rank_score": 0.7586,
+  "ci": [
+   0.4558,
+   0.7671
+  ],
+  "oczekiwane_minuty": null,
+  "lambda": 4.324,
+  "rozklad": null,
+  "czynniki": {
+   "rywal": 0.975,
+   "sedzia": 1.0,
+   "dom_wyjazd": 0.94,
+   "scenariusz_meczu": 0.971,
+   "matchup": 1.0,
+   "lacznie": 0.89,
+   "opisy": {}
+  },
+  "uzasadnienie": {
+   "czynniki": [
+    {
+     "nazwa": "Poziom bazowy",
+     "opis": "Średnio 4,8 na mecz (próba: 20 meczów, ostatnie 5 meczów: 4,0)",
+     "mnoznik": null
+    },
+    {
+     "nazwa": "Profil rywala",
+     "opis": "Drużyny notują przeciw Widzew Łódź średnio 4,5 przy normie ligi 4,7 (próba: 13 meczów)",
+     "mnoznik": 0.97
+    },
+    {
+     "nazwa": "Dom i wyjazd",
+     "opis": "Gra na wyjeździe, to zwykle obniża tę statystykę",
+     "mnoznik": 0.94
+    },
+    {
+     "nazwa": "Scenariusz meczu",
+     "opis": "Z kursów meczowych: przewidywany przebieg nie sprzyja",
+     "mnoznik": 0.97
+    }
+   ],
+   "oczekiwana_liczba": 4.32,
+   "rynek_rzadki": false
+  }
+ },
+ {
+  "id": 21,
+  "mecz_id": 16350245,
+  "mecz": "Kairat Almaty – Omonia Nicosia",
+  "kickoff_ts": 1785337200,
+  "podmiot_typ": "druzyna",
+  "podmiot_id": 5172,
+  "podmiot": "Kairat Almaty",
+  "druzyna": "Kairat Almaty",
+  "przeciwnik": "Omonia Nicosia",
+  "rynek_kod": "team_goals",
+  "rynek": "Gole drużyny",
+  "linia": 0.5,
+  "strona": "powyzej",
+  "pewniak": true,
+  "wyzsza_linia": false,
+  "matchup": false,
+  "matchup_styl": false,
+  "rotacja": false,
+  "swieze_sklady": false,
+  "miekka_linia": false,
+  "kurs_oczekiwany": null,
+  "xi_sygnal": null,
+  "kurs": 1.27,
+  "bukmacher": "Superbet",
+  "p_model": 0.7412,
+  "p_rynku": null,
+  "fair_kurs": 1.35,
+  "edge_pp": null,
+  "ev_pct": -5.9,
+  "pewnosc": "srednia",
+  "pewnosc_score": 55.0,
+  "ryzyko": "niskie",
+  "rank_score": 0.7518,
+  "ci": [
+   0.5679,
+   0.8791
+  ],
+  "oczekiwane_minuty": null,
+  "lambda": 1.421,
+  "rozklad": null,
+  "czynniki": {
+   "rywal": 1.0,
+   "sedzia": 1.0,
+   "dom_wyjazd": 1.06,
+   "scenariusz_meczu": 0.991,
+   "matchup": 1.0,
+   "lacznie": 1.051,
+   "opisy": {}
+  },
+  "uzasadnienie": {
+   "czynniki": [
+    {
+     "nazwa": "Poziom bazowy",
+     "opis": "Średnio 1,2 na mecz (próba: 20 meczów, ostatnie 5 meczów: 1,4); po korekcie na siłę rywali i miejsce gry oraz zderzeniu krótkiej próby z normą ligi model startuje od 1,4",
+     "mnoznik": null
+    },
+    {
+     "nazwa": "Dom i wyjazd",
+     "opis": "Gra u siebie, to zwykle pomaga w tej statystyce",
+     "mnoznik": 1.06
+    }
+   ],
+   "oczekiwana_liczba": 1.42,
+   "rynek_rzadki": false
+  }
+ },
+ {
+  "id": 22,
+  "mecz_id": 16316947,
+  "mecz": "Raków Częstochowa – Wisła Płock",
+  "kickoff_ts": 1785069900,
+  "podmiot_typ": "druzyna",
+  "podmiot_id": 3122,
+  "podmiot": "Wisła Płock",
+  "druzyna": "Wisła Płock",
+  "przeciwnik": "Raków Częstochowa",
+  "rynek_kod": "team_corners",
+  "rynek": "Rzuty rożne drużyny",
+  "linia": 3.5,
+  "strona": "powyzej",
+  "pewniak": true,
+  "wyzsza_linia": true,
+  "matchup": false,
+  "matchup_styl": false,
+  "rotacja": false,
+  "swieze_sklady": false,
+  "miekka_linia": false,
+  "kurs_oczekiwany": null,
+  "xi_sygnal": null,
+  "kurs": 2.17,
+  "bukmacher": "Superbet",
+  "p_model": 0.5533,
+  "p_rynku": null,
+  "fair_kurs": 1.81,
+  "edge_pp": null,
+  "ev_pct": 20.1,
+  "pewnosc": "srednia",
+  "pewnosc_score": 55.0,
+  "ryzyko": "niskie",
+  "rank_score": 0.7336,
+  "ci": [
+   0.3897,
+   0.7076
+  ],
+  "oczekiwane_minuty": null,
+  "lambda": 3.962,
+  "rozklad": null,
+  "czynniki": {
+   "rywal": 0.963,
+   "sedzia": 1.0,
+   "dom_wyjazd": 0.94,
+   "scenariusz_meczu": 0.955,
+   "matchup": 0.968,
+   "lacznie": 0.836,
+   "opisy": {}
+  },
+  "uzasadnienie": {
+   "czynniki": [
+    {
+     "nazwa": "Poziom bazowy",
+     "opis": "Średnio 4,3 na mecz (próba: 20 meczów, ostatnie 5 meczów: 7,2); po korekcie na siłę rywali i miejsce gry oraz zderzeniu krótkiej próby z normą ligi model startuje od 4,7",
+     "mnoznik": null
+    },
+    {
+     "nazwa": "Profil rywala",
+     "opis": "Drużyny notują przeciw Raków Częstochowa średnio 4,2 przy normie ligi 4,7 (próba: 6 meczów)",
+     "mnoznik": 0.96
+    },
+    {
+     "nazwa": "Dom i wyjazd",
+     "opis": "Gra na wyjeździe, to zwykle obniża tę statystykę",
+     "mnoznik": 0.94
+    },
+    {
+     "nazwa": "Styl rywala",
+     "opis": "Rywal gra wysoko i trzyma piłkę, o rożne trudniej",
+     "mnoznik": 0.97
+    },
+    {
+     "nazwa": "Scenariusz meczu",
+     "opis": "Z kursów meczowych: przewidywany przebieg nie sprzyja",
+     "mnoznik": 0.95
+    }
+   ],
+   "oczekiwana_liczba": 3.96,
+   "rynek_rzadki": false
+  }
+ },
+ {
+  "id": 23,
+  "mecz_id": 16316953,
+  "mecz": "Górnik Zabrze – Śląsk Wrocław",
+  "kickoff_ts": 1784993400,
+  "podmiot_typ": "druzyna",
+  "podmiot_id": 3110,
+  "podmiot": "Górnik Zabrze",
+  "druzyna": "Górnik Zabrze",
+  "przeciwnik": "Śląsk Wrocław",
+  "rynek_kod": "team_corners",
+  "rynek": "Rzuty rożne drużyny",
+  "linia": 4.5,
+  "strona": "powyzej",
+  "pewniak": true,
+  "wyzsza_linia": true,
+  "matchup": false,
+  "matchup_styl": false,
+  "rotacja": false,
+  "swieze_sklady": false,
+  "miekka_linia": false,
+  "kurs_oczekiwany": null,
+  "xi_sygnal": null,
+  "kurs": 1.33,
+  "bukmacher": "Superbet",
+  "p_model": 0.6794,
+  "p_rynku": null,
+  "fair_kurs": 1.47,
+  "edge_pp": null,
+  "ev_pct": -9.6,
+  "pewnosc": "srednia",
+  "pewnosc_score": 55.0,
+  "ryzyko": "niskie",
+  "rank_score": 0.7052,
+  "ci": [
+   0.5045,
+   0.8279
+  ],
+  "oczekiwane_minuty": null,
+  "lambda": 5.817,
+  "rozklad": null,
+  "czynniki": {
+   "rywal": 1.0,
+   "sedzia": 1.0,
+   "dom_wyjazd": 1.06,
+   "scenariusz_meczu": 1.059,
+   "matchup": 1.0,
+   "lacznie": 1.123,
+   "opisy": {}
+  },
+  "uzasadnienie": {
+   "czynniki": [
+    {
+     "nazwa": "Poziom bazowy",
+     "opis": "Średnio 5,5 na mecz (próba: 20 meczów, ostatnie 5 meczów: 7,2); po korekcie na siłę rywali i miejsce gry oraz zderzeniu krótkiej próby z normą ligi model startuje od 5,2",
+     "mnoznik": null
+    },
+    {
+     "nazwa": "Dom i wyjazd",
+     "opis": "Gra u siebie, to zwykle pomaga w tej statystyce",
+     "mnoznik": 1.06
+    },
+    {
+     "nazwa": "Scenariusz meczu",
+     "opis": "Z kursów meczowych: przewidywany przebieg sprzyja",
+     "mnoznik": 1.06
+    }
+   ],
+   "oczekiwana_liczba": 5.82,
+   "rynek_rzadki": false
+  }
+ },
+ {
+  "id": 28,
+  "mecz_id": 16316941,
+  "mecz": "Wisła Kraków – GKS Katowice",
+  "kickoff_ts": 1785089700,
+  "podmiot_typ": "druzyna",
+  "podmiot_id": 3112,
+  "podmiot": "GKS Katowice",
+  "druzyna": "GKS Katowice",
+  "przeciwnik": "Wisła Kraków",
+  "rynek_kod": "team_corners",
+  "rynek": "Rzuty rożne drużyny",
+  "linia": 3.5,
+  "strona": "ponizej",
+  "pewniak": true,
+  "wyzsza_linia": false,
+  "matchup": false,
+  "matchup_styl": false,
+  "rotacja": false,
+  "swieze_sklady": false,
+  "miekka_linia": false,
+  "kurs_oczekiwany": null,
+  "xi_sygnal": null,
+  "kurs": 2.77,
+  "bukmacher": "Superbet",
+  "p_model": 0.4479,
+  "p_rynku": null,
+  "fair_kurs": 2.23,
+  "edge_pp": null,
+  "ev_pct": 24.1,
+  "pewnosc": "srednia",
+  "pewnosc_score": 55.0,
+  "ryzyko": "niskie",
+  "rank_score": 0.6709,
+  "ci": [
+   0.2859,
+   0.6199
+  ],
+  "oczekiwane_minuty": null,
+  "lambda": 3.958,
+  "rozklad": null,
+  "czynniki": {
+   "rywal": 1.0,
+   "sedzia": 1.0,
+   "dom_wyjazd": 0.94,
+   "scenariusz_meczu": 1.0,
+   "matchup": 1.0,
+   "lacznie": 0.94,
+   "opisy": {}
+  },
+  "uzasadnienie": {
+   "czynniki": [
+    {
+     "nazwa": "Poziom bazowy",
+     "opis": "Średnio 3,9 na mecz (próba: 20 meczów, ostatnie 5 meczów: 3,2); po korekcie na siłę rywali i miejsce gry oraz zderzeniu krótkiej próby z normą ligi model startuje od 4,2",
+     "mnoznik": null
+    },
+    {
+     "nazwa": "Dom i wyjazd",
+     "opis": "Gra na wyjeździe, to zwykle obniża tę statystykę",
+     "mnoznik": 0.94
+    }
+   ],
+   "oczekiwana_liczba": 3.96,
+   "rynek_rzadki": false
+  }
+ },
+ {
+  "id": 29,
+  "mecz_id": 16316948,
+  "mecz": "Widzew Łódź – Motor Lublin",
+  "kickoff_ts": 1785079800,
+  "podmiot_typ": "druzyna",
+  "podmiot_id": 7915,
+  "podmiot": "Motor Lublin",
+  "druzyna": "Motor Lublin",
+  "przeciwnik": "Widzew Łódź",
+  "rynek_kod": "team_corners",
+  "rynek": "Rzuty rożne drużyny",
+  "linia": 4.5,
+  "strona": "powyzej",
+  "pewniak": true,
+  "wyzsza_linia": false,
+  "matchup": false,
+  "matchup_styl": false,
+  "rotacja": false,
+  "swieze_sklady": false,
+  "miekka_linia": false,
+  "kurs_oczekiwany": null,
+  "xi_sygnal": null,
+  "kurs": 2.62,
+  "bukmacher": "Superbet",
+  "p_model": 0.4322,
+  "p_rynku": null,
+  "fair_kurs": 2.31,
+  "edge_pp": null,
+  "ev_pct": 13.2,
+  "pewnosc": "srednia",
+  "pewnosc_score": 55.0,
+  "ryzyko": "niskie",
+  "rank_score": 0.6296,
+  "ci": [
+   0.268,
+   0.6006
+  ],
+  "oczekiwane_minuty": null,
+  "lambda": 4.324,
+  "rozklad": null,
+  "czynniki": {
+   "rywal": 0.975,
+   "sedzia": 1.0,
+   "dom_wyjazd": 0.94,
+   "scenariusz_meczu": 0.971,
+   "matchup": 1.0,
+   "lacznie": 0.89,
+   "opisy": {}
+  },
+  "uzasadnienie": {
+   "czynniki": [
+    {
+     "nazwa": "Poziom bazowy",
+     "opis": "Średnio 4,8 na mecz (próba: 20 meczów, ostatnie 5 meczów: 4,0)",
+     "mnoznik": null
+    },
+    {
+     "nazwa": "Profil rywala",
+     "opis": "Drużyny notują przeciw Widzew Łódź średnio 4,5 przy normie ligi 4,7 (próba: 13 meczów)",
+     "mnoznik": 0.97
+    },
+    {
+     "nazwa": "Dom i wyjazd",
+     "opis": "Gra na wyjeździe, to zwykle obniża tę statystykę",
+     "mnoznik": 0.94
+    },
+    {
+     "nazwa": "Scenariusz meczu",
+     "opis": "Z kursów meczowych: przewidywany przebieg nie sprzyja",
+     "mnoznik": 0.97
+    }
+   ],
+   "oczekiwana_liczba": 4.32,
+   "rynek_rzadki": false
+  }
+ }
+]

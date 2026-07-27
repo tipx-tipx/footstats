@@ -1,1 +1,34 @@
-{"liga": "Piłka klubowa", "tryb": "liga", "sezon": "2026/27", "okazji": 10, "zrodlo": "statshub (statystyki i historia) + Superbet (kursy)", "meczow_demo": 92, "wagi_zaufania": {"wysoka": -0.214, "srednia": -0.25}, "kary_korelacji": {"ta_sama": 0.703, "nieznane": 0.974, "przeciwne": 0.795}, "meczow_w_bazie": 92, "wygenerowano_ts": 1784635723, "meczow_kalibracja": 20}
+{
+ "wygenerowano_ts": 1784980496,
+ "tryb": "liga",
+ "liga": "Piłka klubowa",
+ "sezon": "2026/27",
+ "zrodlo": "statshub (statystyki i historia) + Superbet (kursy)",
+ "meczow_w_bazie": 76,
+ "meczow_demo": 76,
+ "meczow_kalibracja": 20,
+ "okazji": 23,
+ "kary_korelacji": {
+  "ta_sama": 0.703,
+  "przeciwne": 0.804,
+  "nieznane": 1.0
+ },
+ "wagi_zaufania": {
+  "wysoka": -0.221,
+  "srednia": -0.25
+ },
+ "kwarantanna": {
+  "shots": {
+   "hit": 0.5,
+   "sr_p": 0.705,
+   "n": 40,
+   "nazwa": "Strzały"
+  },
+  "fouls_committed": {
+   "hit": 0.45,
+   "sr_p": 0.717,
+   "n": 20,
+   "nazwa": "Faule popełnione"
+  }
+ }
+}

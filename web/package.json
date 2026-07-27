@@ -10,7 +10,8 @@
     "start": "next start",
     "lint": "eslint",
     "stop": "node scripts/ubij-zombie.mjs",
-    "test:role": "node --experimental-strip-types --no-warnings scripts/test-rol.mjs"
+    "test:role": "node --experimental-strip-types --no-warnings scripts/test-rol.mjs",
+    "zrzuty": "node scripts/zrzuty.mjs"
   },
   "dependencies": {
     "framer-motion": "^12.42.2",
@@ -25,6 +26,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.10",
+    "playwright": "^1.62.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

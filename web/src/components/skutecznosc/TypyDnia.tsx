@@ -2,8 +2,9 @@
 
 import { useMemo, useState } from "react";
 
-import { NaglowekTypow, WierszTypu } from "./WierszTypu";
-import { fmtDzien, fmtU } from "@/lib/format";
+import { TabelaTypow } from "./WierszTypu";
+import { useBilans } from "../useBilans";
+import { fmtDzien } from "@/lib/format";
 import type { SkutecznoscDnia } from "@/lib/types";
 
 /**
@@ -85,6 +86,7 @@ export function TypyDnia({
   pozycja?: number;
   ile?: number;
 }) {
+  const { bilans } = useBilans(pelnyWglad);
   const [filtr, setFiltr] = useState<Filtr>("wszystko");
   // `?? []` w ciele komponentu tworzyłoby nową tablicę co render i unieważniało
   // useMemo niżej przy każdym przerysowaniu
@@ -113,7 +115,7 @@ export function TypyDnia({
     <div className="rounded-(--radius-card) border border-hairline bg-card p-4 shadow-(--shadow-card) sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
         <div className="min-w-0">
-          <h4 className="font-display text-base font-bold capitalize tracking-tight">
+          <h4 className="font-display text-base font-bold tracking-tight first-letter:uppercase">
             {fmtDzien(dzien.dzien, true)}
           </h4>
           <p className="mt-0.5 text-xs text-muted">
@@ -130,7 +132,7 @@ export function TypyDnia({
                     : "text-ink-soft"
               }`}
             >
-              {fmtU(dzien.roi_flat)}
+              {bilans(dzien.roi_flat)}
             </span>{" "}
             · {dzien.okazje} z kursem
           </p>
@@ -187,19 +189,8 @@ export function TypyDnia({
       )}
 
       {widoczne.length > 0 ? (
-        <div className="-mx-1 mt-3 overflow-x-auto">
-          <table className="w-full text-sm">
-            <NaglowekTypow pelnyWglad={pelnyWglad} />
-            <tbody>
-              {widoczne.map((t, ti) => (
-                <WierszTypu
-                  key={`${t.podmiot}-${t.rynek_kod}-${t.linia}-${ti}`}
-                  t={t}
-                  pelnyWglad={pelnyWglad}
-                />
-              ))}
-            </tbody>
-          </table>
+        <div className="mt-3">
+          <TabelaTypow typy={widoczne} pelnyWglad={pelnyWglad} />
         </div>
       ) : (
         <p className="mt-3 rounded-(--radius-control) border border-hairline bg-card-soft px-3.5 py-3 text-sm text-muted">

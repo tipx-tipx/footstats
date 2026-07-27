@@ -1,4 +1,2815 @@
 {
- "wygenerowano_ts": 0,
- "wpisy": []
+ "wygenerowano_ts": 1784980488,
+ "wpisy": [
+  {
+   "rodzaj": "drabinka",
+   "mecz_id": 16316943,
+   "mecz": "Jagiellonia Białystok – MKS Korona Kielce",
+   "kickoff_ts": 1784983500,
+   "podmiot_id": 865794,
+   "podmiot": "Patrik Hellebrand",
+   "druzyna": "MKS Korona Kielce",
+   "przeciwnik": "Jagiellonia Białystok",
+   "pozycja": "M",
+   "xi": null,
+   "minuty_sr6": 81,
+   "profil": {
+    "wzrost": 180,
+    "wiek": 27,
+    "kraj": "czechia",
+    "noga": "Left"
+   },
+   "rynki": [
+    {
+     "rynek_kod": "shots",
+     "rynek": "Strzały",
+     "drabinka": [
+      {
+       "linia": 1.5,
+       "kurs": 2.02,
+       "p_model": null,
+       "pokrycie": {
+        "traf": 6,
+        "z": 10
+       }
+      },
+      {
+       "linia": 2.5,
+       "kurs": 3.65,
+       "p_model": null,
+       "pokrycie": {
+        "traf": 4,
+        "z": 10
+       }
+      },
+      {
+       "linia": 3.5,
+       "kurs": 6.7,
+       "p_model": null,
+       "pokrycie": {
+        "traf": 1,
+        "z": 10
+       }
+      }
+     ],
+     "ostatnie": [
+      3,
+      2,
+      3,
+      3,
+      1,
+      4,
+      1,
+      1,
+      0,
+      2
+     ],
+     "minuty": [
+      57,
+      70,
+      90,
+      90,
+      90,
+      90,
+      90,
+      83,
+      90,
+      89
+     ],
+     "rywale": [
+      "Radomiak ",
+      "Wisła Płock",
+      "Arka",
+      "Zagłębie L.",
+      "Jagiellonia",
+      "Korona",
+      "Legia",
+      "Cracovia",
+      "Widzew Łódź",
+      "Raków"
+     ],
+     "srednia90": 2.15,
+     "forma": {
+      "okno90": 2.96,
+      "baza90": 1.02
+     }
+    },
+    {
+     "rynek_kod": "sot",
+     "rynek": "Strzały celne",
+     "drabinka": [
+      {
+       "linia": 0.5,
+       "kurs": 2.82,
+       "p_model": null,
+       "pokrycie": {
+        "traf": 5,
+        "z": 10
+       }
+      },
+      {
+       "linia": 1.5,
+       "kurs": 9.7,
+       "p_model": null,
+       "pokrycie": {
+        "traf": 0,
+        "z": 10
+       }
+      }
+     ],
+     "ostatnie": [
+      1,
+      1,
+      1,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      1
+     ],
+     "minuty": [
+      57,
+      70,
+      90,
+      90,
+      90,
+      90,
+      90,
+      83,
+      90,
+      89
+     ],
+     "rywale": [
+      "Radomiak ",
+      "Wisła Płock",
+      "Arka",
+      "Zagłębie L.",
+      "Jagiellonia",
+      "Korona",
+      "Legia",
+      "Cracovia",
+      "Widzew Łódź",
+      "Raków"
+     ],
+     "srednia90": 0.54,
+     "forma": {
+      "okno90": 0.74,
+      "baza90": 0.26
+     }
+    },
+    {
+     "rynek_kod": "fouls_committed",
+     "rynek": "Faule popełnione",
+     "drabinka": [
+      {
+       "linia": 1.5,
+       "kurs": 2.5,
+       "p_model": null,
+       "pokrycie": {
+        "traf": 1,
+        "z": 10
+       }
+      },
+      {
+       "linia": 2.5,
+       "kurs": 5.3,
+       "p_model": null,
+       "pokrycie": {
+        "traf": 0,
+        "z": 10
+       }
+      },
+      {
+       "linia": 3.5,
+       "kurs": 12.0,
+       "p_model": null,
+       "pokrycie": {
+        "traf": 0,
+        "z": 10
+       }
+      }
+     ],
+     "ostatnie": [
+      1,
+      1,
+      0,
+      1,
+      2,
+      1,
+      1,
+      1,
+      0,
+      0
+     ],
+     "minuty": [
+      57,
+      70,
+      90,
+      90,
+      90,
+      90,
+      90,
+      83,
+      90,
+      89
+     ],
+     "rywale": [
+      "Radomiak ",
+      "Wisła Płock",
+      "Arka",
+      "Zagłębie L.",
+      "Jagiellonia",
+      "Korona",
+      "Legia",
+      "Cracovia",
+      "Widzew Łódź",
+      "Raków"
+     ],
+     "srednia90": 0.86,
+     "forma": {
+      "okno90": 1.11,
+      "baza90": 0.51
+     }
+    },
+    {
+     "rynek_kod": "fouls_won",
+     "rynek": "Faule wywalczone",
+     "drabinka": [
+      {
+       "linia": 1.5,
+       "kurs": 2.07,
+       "p_model": null,
+       "pokrycie": {
+        "traf": 4,
+        "z": 10
+       }
+      },
+      {
+       "linia": 2.5,
+       "kurs": 4.1,
+       "p_model": null,
+       "pokrycie": {
+        "traf": 2,
+        "z": 10
+       }
+      },
+      {
+       "linia": 3.5,
+       "kurs": 8.3,
+       "p_model": null,
+       "pokrycie": {
+        "traf": 1,
+        "z": 10
+       }
+      }
+     ],
+     "ostatnie": [
+      0,
+      1,
+      2,
+      4,
+      1,
+      1,
+      2,
+      1,
+      3,
+      1
+     ],
+     "minuty": [
+      57,
+      70,
+      90,
+      90,
+      90,
+      90,
+      90,
+      83,
+      90,
+      89
+     ],
+     "rywale": [
+      "Radomiak ",
+      "Wisła Płock",
+      "Arka",
+      "Zagłębie L.",
+      "Jagiellonia",
+      "Korona",
+      "Legia",
+      "Cracovia",
+      "Widzew Łódź",
+      "Raków"
+     ],
+     "srednia90": 1.72,
+     "forma": {
+      "okno90": 1.66,
+      "baza90": 1.79
+     }
+    },
+    {
+     "rynek_kod": "shots_outside_box",
+     "rynek": "Strzały zza pola karnego",
+     "drabinka": [
+      {
+       "linia": 1.5,
+       "kurs": 2.52,
+       "p_model": null,
+       "pokrycie": {
+        "traf": 6,
+        "z": 10
+       }
+      },
+      {
+       "linia": 2.5,
+       "kurs": 4.7,
+       "p_model": null,
+       "pokrycie": {
+        "traf": 4,
+        "z": 10
+       }
+      }
+     ],
+     "ostatnie": [
+      3,
+      2,
+      3,
+      3,
+      1,
+      4,
+      1,
+      1,
+      0,
+      2
+     ],
+     "minuty": [
+      57,
+      70,
+      90,
+      90,
+      90,
+      90,
+      90,
+      83,
+      90,
+      89
+     ],
+     "rywale": [
+      "Radomiak ",
+      "Wisła Płock",
+      "Arka",
+      "Zagłębie L.",
+      "Jagiellonia",
+      "Korona",
+      "Legia",
+      "Cracovia",
+      "Widzew Łódź",
+      "Raków"
+     ],
+     "srednia90": 2.15,
+     "forma": {
+      "okno90": 2.96,
+      "baza90": 1.02
+     }
+    },
+    {
+     "rynek_kod": "headed_shots",
+     "rynek": "Strzały głową",
+     "drabinka": [
+      {
+       "linia": 0.5,
+       "kurs": 5.2,
+       "p_model": null,
+       "pokrycie": {
+        "traf": 0,
+        "z": 10
+       }
+      }
+     ],
+     "ostatnie": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "minuty": [
+      57,
+      70,
+      90,
+      90,
+      90,
+      90,
+      90,
+      83,
+      90,
+      89
+     ],
+     "rywale": [
+      "Radomiak ",
+      "Wisła Płock",
+      "Arka",
+      "Zagłębie L.",
+      "Jagiellonia",
+      "Korona",
+      "Legia",
+      "Cracovia",
+      "Widzew Łódź",
+      "Raków"
+     ],
+     "srednia90": 0.0,
+     "forma": {
+      "okno90": 0.0,
+      "baza90": 0.0
+     }
+    },
+    {
+     "rynek_kod": "headed_sot",
+     "rynek": "Celne strzały głową",
+     "drabinka": [
+      {
+       "linia": 0.5,
+       "kurs": 16.0,
+       "p_model": null,
+       "pokrycie": {
+        "traf": 0,
+        "z": 10
+       }
+      }
+     ],
+     "ostatnie": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "minuty": [
+      57,
+      70,
+      90,
+      90,
+      90,
+      90,
+      90,
+      83,
+      90,
+      89
+     ],
+     "rywale": [
+      "Radomiak ",
+      "Wisła Płock",
+      "Arka",
+      "Zagłębie L.",
+      "Jagiellonia",
+      "Korona",
+      "Legia",
+      "Cracovia",
+      "Widzew Łódź",
+      "Raków"
+     ],
+     "srednia90": 0.0,
+     "forma": {
+      "okno90": 0.0,
+      "baza90": 0.0
+     }
+    },
+    {
+     "rynek_kod": "sot_outside_box",
+     "rynek": "Celne zza pola karnego",
+     "drabinka": [
+      {
+       "linia": 0.5,
+       "kurs": 3.6,
+       "p_model": null,
+       "pokrycie": {
+        "traf": 5,
+        "z": 10
+       }
+      },
+      {
+       "linia": 1.5,
+       "kurs": 10.0,
+       "p_model": null,
+       "pokrycie": {
+        "traf": 0,
+        "z": 10
+       }
+      }
+     ],
+     "ostatnie": [
+      1,
+      1,
+      1,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      1
+     ],
+     "minuty": [
+      57,
+      70,
+      90,
+      90,
+      90,
+      90,
+      90,
+      83,
+      90,
+      89
+     ],
+     "rywale": [
+      "Radomiak ",
+      "Wisła Płock",
+      "Arka",
+      "Zagłębie L.",
+      "Jagiellonia",
+      "Korona",
+      "Legia",
+      "Cracovia",
+      "Widzew Łódź",
+      "Raków"
+     ],
+     "srednia90": 0.54,
+     "forma": {
+      "okno90": 0.74,
+      "baza90": 0.26
+     }
+    }
+   ],
+   "hero": {
+    "rynek_kod": "shots_outside_box",
+    "rynek": "Strzały zza pola karnego",
+    "linia": 1.5,
+    "kurs": 2.52,
+    "traf": 6,
+    "z": 10,
+    "edge": 0.097
+   },
+   "id": 1
+  },
+  {
+   "rodzaj": "drabinka",
+   "mecz_id": 16316943,
+   "mecz": "Jagiellonia Białystok – MKS Korona Kielce",
+   "kickoff_ts": 1784983500,
+   "podmiot_id": 827574,
+   "podmiot": "Martin Remacle",
+   "druzyna": "MKS Korona Kielce",
+   "przeciwnik": "Jagiellonia Białystok",
+   "pozycja": "M",
+   "xi": null,
+   "minuty_sr6": 79,
+   "profil": {
+    "wzrost": 176,
+    "wiek": 29,
+    "kraj": "belgium",
+    "noga": "Right"
+   },
+   "rynki": [
+    {
+     "rynek_kod": "shots",
+     "rynek": "Strzały",
+     "drabinka": [
+      {
+       "linia": 2.5,
+       "kurs": 2.52,
+       "p_model": null,
+       "pokrycie": {
+        "traf": 4,
+        "z": 10
+       }
+      },
+      {
+       "linia": 3.5,
+       "kurs": 4.15,
+       "p_model": null,
+       "pokrycie": {
+        "traf": 2,
+        "z": 10
+       }
+      },
+      {
+       "linia": 4.5,
+       "kurs": 7.2,
+       "p_model": null,
+       "pokrycie": {
+        "traf": 0,
+        "z": 10
+       }
+      }
+     ],
+     "ostatnie": [
+      2,
+      1,
+      4,
+      2,
+      2,
+      3,
+      4,
+      0,
+      3,
+      0
+     ],
+     "minuty": [
+      90,
+      90,
+      63,
+      78,
+      90,
+      64,
+      77,
+      67,
+      76,
+      58
+     ],
+     "rywale": [
+      "Cracovia",
+      "Widzew Łódź",
+      "Raków",
+      "Piast",
+      "GKS Katowice",
+      "Górnik",
+      "Jagiellonia",
+      "Lechia",
+      "Arka",
+      "Pogoń"
+     ],
+     "srednia90": 2.51,
+     "forma": {
+      "okno90": 2.65,
+      "baza90": 2.27
+     }
+    },
+    {
+     "rynek_kod": "sot",
+     "rynek": "Strzały celne",
+     "drabinka": [
+      {
+       "linia": 0.5,
+       "kurs": 2.45,
+       "p_model": null,
+       "pokrycie": {
+        "traf": 3,
+        "z": 10
+       }
+      },
+      {
+       "linia": 1.5,
+       "kurs": 7.4,
+       "p_model": null,
+       "pokrycie": {
+        "traf": 1,
+        "z": 10
+       }
+      }
+     ],
+     "ostatnie": [
+      0,
+      0,
+      2,
+      1,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0
+     ],
+     "minuty": [
+      90,
+      90,
+      63,
+      78,
+      90,
+      64,
+      77,
+      67,
+      76,
+      58
+     ],
+     "rywale": [
+      "Cracovia",
+      "Widzew Łódź",
+      "Raków",
+      "Piast",
+      "GKS Katowice",
+      "Górnik",
+      "Jagiellonia",
+      "Lechia",
+      "Arka",
+      "Pogoń"
+     ],
+     "srednia90": 0.48,
+     "forma": {
+      "okno90": 0.57,
+      "baza90": 0.32
+     }
+    },
+    {
+     "rynek_kod": "fouls_committed",
+     "rynek": "Faule popełnione",
+     "drabinka": [
+      {
+       "linia": 1.5,
+       "kurs": 1.7,
+       "p_model": null,
+       "pokrycie": {
+        "traf": 3,
+        "z": 10
+       }
+      },
+      {
+       "linia": 2.5,
+       "kurs": 3.05,
+       "p_model": null,
+       "pokrycie": {
+        "traf": 3,
+        "z": 10
+       }
+      },
+      {
+       "linia": 3.5,
+       "kurs": 5.7,
+       "p_model": null,
+       "pokrycie": {
+        "traf": 1,
+        "z": 10
+       }
+      },
+      {
+       "linia": 4.5,
+       "kurs": 12.0,
+       "p_model": null,
+       "pokrycie": {
+        "traf": 0,
+        "z": 10
+       }
+      }
+     ],
+     "ostatnie": [
+      1,
+      3,
+      1,
+      0,
+      4,
+      0,
+      3,
+      0,
+      0,
+      0
+     ],
+     "minuty": [
+      90,
+      90,
+      63,
+      78,
+      90,
+      64,
+      77,
+      67,
+      76,
+      58
+     ],
+     "rywale": [
+      "Cracovia",
+      "Widzew Łódź",
+      "Raków",
+      "Piast",
+      "GKS Katowice",
+      "Górnik",
+      "Jagiellonia",
+      "Lechia",
+      "Arka",
+      "Pogoń"
+     ],
+     "srednia90": 1.43,
+     "forma": {
+      "okno90": 1.71,
+      "baza90": 0.97
+     }
+    },
+    {
+     "rynek_kod": "fouls_won",
+     "rynek": "Faule wywalczone",
+     "drabinka": [
+      {
+       "linia": 1.5,
+       "kurs": 1.73,
+       "p_model": null,
+       "pokrycie": {
+        "traf": 2,
+        "z": 10
+       }
+      },
+      {
+       "linia": 2.5,
+       "kurs": 3.15,
+       "p_model": null,
+       "pokrycie": {
+        "traf": 1,
+        "z": 10
+       }
+      },
+      {
+       "linia": 3.5,
+       "kurs": 5.9,
+       "p_model": null,
+       "pokrycie": {
+        "traf": 1,
+        "z": 10
+       }
+      },
+      {
+       "linia": 4.5,
+       "kurs": 12.0,
+       "p_model": null,
+       "pokrycie": {
+        "traf": 1,
+        "z": 10
+       }
+      }
+     ],
+     "ostatnie": [
+      1,
+      5,
+      1,
+      1,
+      2,
+      0,
+      1,
+      1,
+      1,
+      1
+     ],
+     "minuty": [
+      90,
+      90,
+      63,
+      78,
+      90,
+      64,
+      77,
+      67,
+      76,
+      58
+     ],
+     "rywale": [
+      "Cracovia",
+      "Widzew Łódź",
+      "Raków",
+      "Piast",
+      "GKS Katowice",
+      "Górnik",
+      "Jagiellonia",
+      "Lechia",
+      "Arka",
+      "Pogoń"
+     ],
+     "srednia90": 1.67,
+     "forma": {
+      "okno90": 1.89,
+      "baza90": 1.29
+     }
+    },
+    {
+     "rynek_kod": "shots_outside_box",
+     "rynek": "Strzały zza pola karnego",
+     "drabinka": [
+      {
+       "linia": 1.5,
+       "kurs": 2.17,
+       "p_model": null,
+       "pokrycie": {
+        "traf": 6,
+        "z": 10
+       }
+      },
+      {
+       "linia": 2.5,
+       "kurs": 4.0,
+       "p_model": null,
+       "pokrycie": {
+        "traf": 2,
+        "z": 10
+       }
+      }
+     ],
+     "ostatnie": [
+      1,
+      2,
+      3,
+      1,
+      2,
+      2,
+      2,
+      0,
+      3,
+      0
+     ],
+     "minuty": [
+      90,
+      90,
+      63,
+      78,
+      90,
+      64,
+      77,
+      67,
+      76,
+      58
+     ],
+     "rywale": [
+      "Cracovia",
+      "Widzew Łódź",
+      "Raków",
+      "Piast",
+      "GKS Katowice",
+      "Górnik",
+      "Jagiellonia",
+      "Lechia",
+      "Arka",
+      "Pogoń"
+     ],
+     "srednia90": 1.91,
+     "forma": {
+      "okno90": 2.08,
+      "baza90": 1.62
+     }
+    },
+    {
+     "rynek_kod": "headed_shots",
+     "rynek": "Strzały głową",
+     "drabinka": [
+      {
+       "linia": 0.5,
+       "kurs": 4.35,
+       "p_model": null,
+       "pokrycie": {
+        "traf": 1,
+        "z": 10
+       }
+      },
+      {
+       "linia": 1.5,
+       "kurs": 21.0,
+       "p_model": null,
+       "pokrycie": {
+        "traf": 0,
+        "z": 10
+       }
+      }
+     ],
+     "ostatnie": [
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "minuty": [
+      90,
+      90,
+      63,
+      78,
+      90,
+      64,
+      77,
+      67,
+      76,
+      58
+     ],
+     "rywale": [
+      "Cracovia",
+      "Widzew Łódź",
+      "Raków",
+      "Piast",
+      "GKS Katowice",
+      "Górnik",
+      "Jagiellonia",
+      "Lechia",
+      "Arka",
+      "Pogoń"
+     ],
+     "srednia90": 0.12,
+     "forma": {
+      "okno90": 0.19,
+      "baza90": 0.0
+     }
+    },
+    {
+     "rynek_kod": "headed_sot",
+     "rynek": "Celne strzały głową",
+     "drabinka": [
+      {
+       "linia": 0.5,
+       "kurs": 13.0,
+       "p_model": null,
+       "pokrycie": {
+        "traf": 1,
+        "z": 10
+       }
+      }
+     ],
+     "ostatnie": [
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "minuty": [
+      90,
+      90,
+      63,
+      78,
+      90,
+      64,
+      77,
+      67,
+      76,
+      58
+     ],
+     "rywale": [
+      "Cracovia",
+      "Widzew Łódź",
+      "Raków",
+      "Piast",
+      "GKS Katowice",
+      "Górnik",
+      "Jagiellonia",
+      "Lechia",
+      "Arka",
+      "Pogoń"
+     ],
+     "srednia90": 0.12,
+     "forma": {
+      "okno90": 0.19,
+      "baza90": 0.0
+     }
+    },
+    {
+     "rynek_kod": "sot_outside_box",
+     "rynek": "Celne zza pola karnego",
+     "drabinka": [
+      {
+       "linia": 0.5,
+       "kurs": 3.65,
+       "p_model": null,
+       "pokrycie": {
+        "traf": 2,
+        "z": 10
+       }
+      },
+      {
+       "linia": 1.5,
+       "kurs": 10.0,
+       "p_model": null,
+       "pokrycie": {
+        "traf": 0,
+        "z": 10
+       }
+      }
+     ],
+     "ostatnie": [
+      0,
+      0,
+      1,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "minuty": [
+      90,
+      90,
+      63,
+      78,
+      90,
+      64,
+      77,
+      67,
+      76,
+      58
+     ],
+     "rywale": [
+      "Cracovia",
+      "Widzew Łódź",
+      "Raków",
+      "Piast",
+      "GKS Katowice",
+      "Górnik",
+      "Jagiellonia",
+      "Lechia",
+      "Arka",
+      "Pogoń"
+     ],
+     "srednia90": 0.24,
+     "forma": {
+      "okno90": 0.38,
+      "baza90": 0.0
+     }
+    }
+   ],
+   "hero": {
+    "rynek_kod": "shots_outside_box",
+    "rynek": "Strzały zza pola karnego",
+    "linia": 1.5,
+    "kurs": 2.17,
+    "traf": 6,
+    "z": 10,
+    "edge": 0.033
+   },
+   "id": 2
+  },
+  {
+   "minuty_sr6": 88,
+   "rodzaj": "drabinka",
+   "mecz_id": 15171610,
+   "mecz": "New York Red Bulls – Charlotte FC",
+   "kickoff_ts": 1785018600,
+   "podmiot_id": 1491651,
+   "podmiot": "Ronald Donkor",
+   "druzyna": "New York Red Bulls",
+   "przeciwnik": "Charlotte FC",
+   "pozycja": "M",
+   "xi": true,
+   "rynki": [
+    {
+     "rynek_kod": "fouls_committed",
+     "rynek": "Faule popełnione",
+     "drabinka": [
+      {
+       "linia": 1.5,
+       "kurs": 1.85,
+       "p_model": 0.298,
+       "pokrycie": {
+        "traf": 7,
+        "z": 10
+       }
+      },
+      {
+       "linia": 2.5,
+       "kurs": 3.45,
+       "p_model": 0.123,
+       "pokrycie": {
+        "traf": 4,
+        "z": 10
+       }
+      },
+      {
+       "linia": 3.5,
+       "kurs": 6.3,
+       "p_model": 0.046,
+       "pokrycie": {
+        "traf": 0,
+        "z": 10
+       }
+      }
+     ],
+     "ostatnie": [
+      2,
+      3,
+      1,
+      0,
+      3,
+      0,
+      3,
+      2,
+      3,
+      2
+     ],
+     "minuty": [
+      90,
+      90,
+      90,
+      90,
+      90,
+      76,
+      90,
+      85,
+      90,
+      90
+     ],
+     "rywale": [
+      "Philadelphia Union",
+      "Sporting Kansas City",
+      "New York City FC",
+      "Columbus Crew",
+      "Chicago Fire",
+      "FC Dallas",
+      "New York City FC",
+      "FC Cincinnati",
+      "DC United",
+      "CF Montréal"
+     ],
+     "srednia90": 1.68,
+     "forma": {
+      "okno90": 1.54,
+      "baza90": 1.71
+     },
+     "rywal": {
+      "srednia": 2.94,
+      "rank": 28,
+      "z": 30,
+      "liga": 2.18
+     }
+    }
+   ],
+   "hero": {
+    "rynek_kod": "fouls_committed",
+    "rynek": "Faule popełnione",
+    "linia": 1.5,
+    "kurs": 1.85,
+    "traf": 7,
+    "z": 10,
+    "edge": 0.055
+   },
+   "id": 3
+  },
+  {
+   "minuty_sr6": 79,
+   "rodzaj": "drabinka",
+   "mecz_id": 15171613,
+   "mecz": "Philadelphia Union – Seattle Sounders FC",
+   "kickoff_ts": 1785022200,
+   "podmiot_id": 1645789,
+   "podmiot": "Frankie Westfield",
+   "druzyna": "Philadelphia Union",
+   "przeciwnik": "Seattle Sounders FC",
+   "pozycja": "D",
+   "xi": true,
+   "rynki": [
+    {
+     "rynek_kod": "shots",
+     "rynek": "Strzały",
+     "drabinka": [
+      {
+       "linia": 1.5,
+       "kurs": 2.35,
+       "p_model": null,
+       "pokrycie": {
+        "traf": 6,
+        "z": 10
+       }
+      },
+      {
+       "linia": 2.5,
+       "kurs": 4.55,
+       "p_model": null,
+       "pokrycie": {
+        "traf": 1,
+        "z": 10
+       }
+      },
+      {
+       "linia": 3.5,
+       "kurs": 9.4,
+       "p_model": null,
+       "pokrycie": {
+        "traf": 0,
+        "z": 10
+       }
+      }
+     ],
+     "ostatnie": [
+      2,
+      2,
+      0,
+      0,
+      3,
+      2,
+      1,
+      2,
+      0,
+      2
+     ],
+     "minuty": [
+      90,
+      83,
+      31,
+      90,
+      90,
+      90,
+      90,
+      90,
+      90,
+      90
+     ],
+     "rywale": [
+      "New York Red Bulls",
+      "Inter Miami CF",
+      "New England Revolution",
+      "Nashville SC",
+      "Toronto FC",
+      "DC United",
+      "CF Montréal",
+      "Charlotte FC",
+      "Chicago Fire",
+      "Atlanta United"
+     ],
+     "srednia90": 0.85,
+     "forma": {
+      "okno90": 1.71,
+      "baza90": 0.67
+     },
+     "rywal": {
+      "srednia": 13.2,
+      "rank": 20,
+      "z": 30,
+      "liga": 12.89
+     }
+    }
+   ],
+   "hero": {
+    "rynek_kod": "shots",
+    "rynek": "Strzały",
+    "linia": 1.5,
+    "kurs": 2.35,
+    "traf": 6,
+    "z": 10,
+    "edge": 0.068
+   },
+   "id": 4
+  },
+  {
+   "minuty_sr6": 90,
+   "rodzaj": "forma",
+   "mecz_id": 15171615,
+   "mecz": "Minnesota United – Vancouver Whitecaps",
+   "kickoff_ts": 1785025800,
+   "podmiot_id": 1194565,
+   "podmiot": "Morris Duggan",
+   "druzyna": "Minnesota United",
+   "przeciwnik": "Vancouver Whitecaps",
+   "pozycja": "D",
+   "xi": true,
+   "rynki": [
+    {
+     "rynek_kod": "shots",
+     "rynek": "Strzały",
+     "drabinka": [
+      {
+       "linia": 0.5,
+       "kurs": 1.8,
+       "p_model": 0.297,
+       "pokrycie": {
+        "traf": 7,
+        "z": 10
+       }
+      },
+      {
+       "linia": 1.5,
+       "kurs": 4.35,
+       "p_model": 0.076,
+       "pokrycie": {
+        "traf": 3,
+        "z": 10
+       }
+      }
+     ],
+     "ostatnie": [
+      2,
+      1,
+      1,
+      0,
+      1,
+      2,
+      2,
+      1,
+      0,
+      0
+     ],
+     "minuty": [
+      90,
+      90,
+      90,
+      90,
+      90,
+      90,
+      90,
+      90,
+      90,
+      90
+     ],
+     "rywale": [
+      "Sporting Kansas City",
+      "Real Salt Lake",
+      "New England Revolution",
+      "Colorado Rapids",
+      "Austin FC",
+      "Columbus Crew",
+      "San Jose Earthquakes",
+      "Los Angeles FC",
+      "FC Dallas",
+      "Portland Timbers"
+     ],
+     "srednia90": 0.6,
+     "forma": {
+      "okno90": 1.17,
+      "baza90": 0.49
+     },
+     "rywal": {
+      "srednia": 8.47,
+      "rank": 1,
+      "z": 30,
+      "liga": 12.89
+     }
+    },
+    {
+     "rynek_kod": "fouls_committed",
+     "rynek": "Faule popełnione",
+     "drabinka": [
+      {
+       "linia": 1.5,
+       "kurs": 3.0,
+       "p_model": 0.098,
+       "pokrycie": {
+        "traf": 2,
+        "z": 10
+       }
+      },
+      {
+       "linia": 2.5,
+       "kurs": 6.4,
+       "p_model": 0.025,
+       "pokrycie": {
+        "traf": 1,
+        "z": 10
+       }
+      }
+     ],
+     "ostatnie": [
+      0,
+      0,
+      1,
+      3,
+      0,
+      2,
+      0,
+      1,
+      1,
+      1
+     ],
+     "minuty": [
+      90,
+      90,
+      90,
+      90,
+      90,
+      90,
+      90,
+      90,
+      90,
+      90
+     ],
+     "rywale": [
+      "Sporting Kansas City",
+      "Real Salt Lake",
+      "New England Revolution",
+      "Colorado Rapids",
+      "Austin FC",
+      "Columbus Crew",
+      "San Jose Earthquakes",
+      "Los Angeles FC",
+      "FC Dallas",
+      "Portland Timbers"
+     ],
+     "srednia90": 0.75,
+     "forma": {
+      "okno90": 1.0,
+      "baza90": 0.71
+     }
+    }
+   ],
+   "powod": "seria",
+   "forma_rynek": "shots",
+   "forma": {
+    "linia": 0.5,
+    "kurs": 1.8,
+    "trafienia": 5,
+    "okno": 6,
+    "srednia90_okno": 1.17,
+    "srednia90_baza": 0.49
+   },
+   "hero": {
+    "rynek_kod": "shots",
+    "rynek": "Strzały",
+    "linia": 0.5,
+    "kurs": 1.8,
+    "traf": 7,
+    "z": 10,
+    "edge": 0.04
+   },
+   "id": 5
+  },
+  {
+   "minuty_sr6": 86,
+   "rodzaj": "forma",
+   "mecz_id": 16431097,
+   "mecz": "Lanús – San Lorenzo",
+   "kickoff_ts": 1785025800,
+   "podmiot_id": 965768,
+   "podmiot": "Alexis Cuello",
+   "druzyna": "San Lorenzo",
+   "przeciwnik": "Lanús",
+   "pozycja": "F",
+   "xi": false,
+   "rynki": [
+    {
+     "rynek_kod": "shots",
+     "rynek": "Strzały",
+     "drabinka": [
+      {
+       "linia": 2.5,
+       "kurs": 2.27,
+       "p_model": 0.118,
+       "pokrycie": {
+        "traf": 7,
+        "z": 10
+       }
+      },
+      {
+       "linia": 3.5,
+       "kurs": 3.65,
+       "p_model": 0.042,
+       "pokrycie": {
+        "traf": 4,
+        "z": 10
+       }
+      }
+     ],
+     "ostatnie": [
+      3,
+      6,
+      3,
+      5,
+      6,
+      2,
+      1,
+      0,
+      5,
+      3
+     ],
+     "minuty": [
+      90,
+      80,
+      90,
+      80,
+      90,
+      89,
+      45,
+      64,
+      86,
+      90
+     ],
+     "rywale": [
+      "Deportivo Riestra",
+      "Recoleta FC",
+      "Santos",
+      "Deportivo Cuenca",
+      "CA Independiente",
+      "Santos",
+      "Platense",
+      "Vélez Sarsfield",
+      "Deportivo Cuenca",
+      "Newell's Old Boys"
+     ],
+     "srednia90": 2.33,
+     "forma": {
+      "okno90": 4.34,
+      "baza90": 1.97
+     },
+     "rywal": {
+      "srednia": 13,
+      "rank": 45,
+      "z": 60,
+      "liga": 25.07
+     }
+    }
+   ],
+   "powod": "seria",
+   "forma_rynek": "shots",
+   "forma": {
+    "linia": 2.5,
+    "kurs": 2.27,
+    "trafienia": 5,
+    "okno": 6,
+    "srednia90_okno": 4.34,
+    "srednia90_baza": 1.97
+   },
+   "sezony": [
+    {
+     "rok": "2026",
+     "na90": {
+      "sot": 0.66,
+      "shots": 1.84,
+      "tackles": 1.05,
+      "offsides": 0.46,
+      "fouls_won": 2.1,
+      "interceptions": 0.39,
+      "shots_blocked": 0.33,
+      "fouls_committed": 1.64,
+      "shots_outside_box": 0.53
+     },
+     "mecze": 16,
+     "minuty": 1369,
+     "na_mecz": {
+      "sot": 0.62,
+      "shots": 1.75,
+      "tackles": 1.0,
+      "offsides": 0.44,
+      "fouls_won": 2.0,
+      "interceptions": 0.38,
+      "shots_blocked": 0.31,
+      "fouls_committed": 1.56,
+      "shots_outside_box": 0.5
+     },
+     "turniej": "Liga Profesional de Fútbol"
+    },
+    {
+     "rok": "2025",
+     "na90": {
+      "sot": 0.86,
+      "shots": 2.32,
+      "tackles": 1.19,
+      "offsides": 0.46,
+      "fouls_won": 2.59,
+      "interceptions": 0.13,
+      "shots_blocked": 0.27,
+      "fouls_committed": 1.46,
+      "shots_outside_box": 0.2
+     },
+     "mecze": 16,
+     "minuty": 1357,
+     "na_mecz": {
+      "sot": 0.81,
+      "shots": 2.19,
+      "tackles": 1.12,
+      "offsides": 0.44,
+      "fouls_won": 2.44,
+      "interceptions": 0.12,
+      "shots_blocked": 0.25,
+      "fouls_committed": 1.38,
+      "shots_outside_box": 0.19
+     },
+     "turniej": "Liga Profesional de Fútbol"
+    },
+    {
+     "rok": "2026",
+     "na90": {
+      "sot": 1.47,
+      "shots": 4.4,
+      "tackles": 0.92,
+      "offsides": 0.73,
+      "fouls_won": 3.3,
+      "interceptions": 0.0,
+      "shots_blocked": 1.1,
+      "fouls_committed": 0.92,
+      "shots_outside_box": 1.47
+     },
+     "mecze": 6,
+     "minuty": 491,
+     "na_mecz": {
+      "sot": 1.33,
+      "shots": 4.0,
+      "tackles": 0.83,
+      "offsides": 0.67,
+      "fouls_won": 3.0,
+      "interceptions": 0.0,
+      "shots_blocked": 1.0,
+      "fouls_committed": 0.83,
+      "shots_outside_box": 1.33
+     },
+     "turniej": "CONMEBOL Sudamericana"
+    }
+   ],
+   "hero": {
+    "rynek_kod": "shots",
+    "rynek": "Strzały",
+    "linia": 2.5,
+    "kurs": 2.27,
+    "traf": 7,
+    "z": 10,
+    "edge": 0.155
+   },
+   "id": 6
+  },
+  {
+   "minuty_sr6": 89,
+   "rodzaj": "forma",
+   "mecz_id": 16431097,
+   "mecz": "Lanús – San Lorenzo",
+   "kickoff_ts": 1785025800,
+   "podmiot_id": 1019621,
+   "podmiot": "Rodrigo Auzmendi",
+   "druzyna": "San Lorenzo",
+   "przeciwnik": "Lanús",
+   "pozycja": "F",
+   "xi": false,
+   "rynki": [
+    {
+     "rynek_kod": "shots",
+     "rynek": "Strzały",
+     "drabinka": [
+      {
+       "linia": 2.5,
+       "kurs": 2.05,
+       "p_model": 0.178,
+       "pokrycie": {
+        "traf": 7,
+        "z": 10
+       }
+      },
+      {
+       "linia": 3.5,
+       "kurs": 3.25,
+       "p_model": 0.074,
+       "pokrycie": {
+        "traf": 3,
+        "z": 10
+       }
+      }
+     ],
+     "ostatnie": [
+      5,
+      7,
+      3,
+      3,
+      3,
+      3,
+      2,
+      4,
+      1,
+      0
+     ],
+     "minuty": [
+      90,
+      90,
+      90,
+      86,
+      90,
+      90,
+      89,
+      90,
+      85,
+      45
+     ],
+     "rywale": [
+      "Deportivo Riestra",
+      "Recoleta FC",
+      "Santos",
+      "River Plate",
+      "Deportivo Cuenca",
+      "CA Independiente",
+      "Santos",
+      "Platense",
+      "Vélez Sarsfield",
+      "Newell's Old Boys"
+     ],
+     "srednia90": 2.9,
+     "forma": {
+      "okno90": 4.03,
+      "baza90": 2.54
+     },
+     "rywal": {
+      "srednia": 13,
+      "rank": 45,
+      "z": 60,
+      "liga": 25.07
+     }
+    }
+   ],
+   "powod": "seria",
+   "forma_rynek": "shots",
+   "forma": {
+    "linia": 2.5,
+    "kurs": 2.05,
+    "trafienia": 6,
+    "okno": 6,
+    "srednia90_okno": 4.03,
+    "srednia90_baza": 2.54
+   },
+   "sezony": [
+    {
+     "rok": "2026",
+     "na90": {
+      "sot": 2.03,
+      "shots": 3.52,
+      "tackles": 0.41,
+      "offsides": 0.68,
+      "fouls_won": 0.81,
+      "interceptions": 0.27,
+      "shots_blocked": 0.81,
+      "fouls_committed": 2.17,
+      "shots_outside_box": 1.22
+     },
+     "mecze": 15,
+     "minuty": 665,
+     "na_mecz": {
+      "sot": 1.0,
+      "shots": 1.73,
+      "tackles": 0.2,
+      "offsides": 0.33,
+      "fouls_won": 0.4,
+      "interceptions": 0.13,
+      "shots_blocked": 0.4,
+      "fouls_committed": 1.07,
+      "shots_outside_box": 0.6
+     },
+     "turniej": "Liga Profesional de Fútbol"
+    },
+    {
+     "rok": "2025",
+     "na90": {
+      "sot": 1.1,
+      "shots": 3.31,
+      "tackles": 0.93,
+      "offsides": 0.17,
+      "fouls_won": 1.78,
+      "interceptions": 0.17,
+      "shots_blocked": 1.02,
+      "fouls_committed": 0.85,
+      "shots_outside_box": 1.27
+     },
+     "mecze": 15,
+     "minuty": 1060,
+     "na_mecz": {
+      "sot": 0.87,
+      "shots": 2.6,
+      "tackles": 0.73,
+      "offsides": 0.13,
+      "fouls_won": 1.4,
+      "interceptions": 0.13,
+      "shots_blocked": 0.8,
+      "fouls_committed": 0.67,
+      "shots_outside_box": 1.0
+     },
+     "turniej": "Liga Profesional de Fútbol"
+    },
+    {
+     "rok": "2026",
+     "na90": {
+      "sot": 1.82,
+      "shots": 3.46,
+      "tackles": 0.73,
+      "offsides": 0.0,
+      "fouls_won": 0.91,
+      "interceptions": 0.36,
+      "shots_blocked": 0.73,
+      "fouls_committed": 0.91,
+      "shots_outside_box": 0.73
+     },
+     "mecze": 6,
+     "minuty": 494,
+     "na_mecz": {
+      "sot": 1.67,
+      "shots": 3.17,
+      "tackles": 0.67,
+      "offsides": 0.0,
+      "fouls_won": 0.83,
+      "interceptions": 0.33,
+      "shots_blocked": 0.67,
+      "fouls_committed": 0.83,
+      "shots_outside_box": 0.67
+     },
+     "turniej": "CONMEBOL Sudamericana"
+    }
+   ],
+   "hero": {
+    "rynek_kod": "shots",
+    "rynek": "Strzały",
+    "linia": 2.5,
+    "kurs": 2.05,
+    "traf": 7,
+    "z": 10,
+    "edge": 0.108
+   },
+   "id": 7
+  },
+  {
+   "minuty_sr6": 80,
+   "rodzaj": "drabinka",
+   "mecz_id": 15171618,
+   "mecz": "Los Angeles FC – Sporting Kansas City",
+   "kickoff_ts": 1785033000,
+   "podmiot_id": 1823642,
+   "podmiot": "Taylor Calheira",
+   "druzyna": "Sporting Kansas City",
+   "przeciwnik": "Los Angeles FC",
+   "pozycja": "F",
+   "xi": false,
+   "rynki": [
+    {
+     "rynek_kod": "shots",
+     "rynek": "Strzały",
+     "drabinka": [
+      {
+       "linia": 1.5,
+       "kurs": 1.82,
+       "p_model": 0.647,
+       "pokrycie": {
+        "traf": 7,
+        "z": 10
+       }
+      },
+      {
+       "linia": 2.5,
+       "kurs": 3.25,
+       "p_model": 0.334,
+       "pokrycie": {
+        "traf": 4,
+        "z": 10
+       }
+      },
+      {
+       "linia": 3.5,
+       "kurs": 5.45,
+       "p_model": 0.177,
+       "pokrycie": {
+        "traf": 2,
+        "z": 10
+       }
+      },
+      {
+       "linia": 4.5,
+       "kurs": 11.0,
+       "p_model": 0.088,
+       "pokrycie": {
+        "traf": 2,
+        "z": 10
+       }
+      }
+     ],
+     "ostatnie": [
+      2,
+      2,
+      0,
+      5,
+      3,
+      2,
+      1,
+      1,
+      6,
+      3
+     ],
+     "minuty": [
+      76,
+      75,
+      62,
+      90,
+      90,
+      90,
+      90,
+      90,
+      120,
+      90
+     ],
+     "rywale": [
+      "New York Red Bulls",
+      "Austin FC",
+      "LA Galaxy",
+      "Sacramento Republic FC",
+      "North Carolina FC",
+      "FC Tampa Bay Rowdies",
+      "New Mexico United",
+      "Colorado Springs Switchbacks FC",
+      "Hartford Athletic",
+      "New York Red Bulls II"
+     ],
+     "srednia90": 3.08,
+     "forma": {
+      "okno90": 2.61,
+      "baza90": 3.56
+     }
+    }
+   ],
+   "hero": {
+    "rynek_kod": "shots",
+    "rynek": "Strzały",
+    "linia": 1.5,
+    "kurs": 1.82,
+    "traf": 7,
+    "z": 10,
+    "edge": 0.046
+   },
+   "id": 8
+  },
+  {
+   "minuty_sr6": 86,
+   "rodzaj": "drabinka",
+   "mecz_id": 15171620,
+   "mecz": "San Jose Earthquakes – LA Galaxy",
+   "kickoff_ts": 1785033000,
+   "podmiot_id": 1086321,
+   "podmiot": "Justin Haak",
+   "druzyna": "LA Galaxy",
+   "przeciwnik": "San Jose Earthquakes",
+   "pozycja": "D",
+   "xi": true,
+   "rynki": [
+    {
+     "rynek_kod": "fouls_committed",
+     "rynek": "Faule popełnione",
+     "drabinka": [
+      {
+       "linia": 1.5,
+       "kurs": 2.72,
+       "p_model": 0.2,
+       "pokrycie": {
+        "traf": 7,
+        "z": 10
+       }
+      },
+      {
+       "linia": 2.5,
+       "kurs": 5.7,
+       "p_model": 0.068,
+       "pokrycie": {
+        "traf": 1,
+        "z": 10
+       }
+      }
+     ],
+     "ostatnie": [
+      2,
+      3,
+      0,
+      2,
+      0,
+      2,
+      2,
+      1,
+      2,
+      2
+     ],
+     "minuty": [
+      90,
+      90,
+      90,
+      90,
+      65,
+      89,
+      90,
+      90,
+      90,
+      90
+     ],
+     "rywale": [
+      "St.Louis City",
+      "Los Angeles FC",
+      "Houston Dynamo",
+      "Seattle Sounders FC",
+      "Atlanta United",
+      "Vancouver Whitecaps",
+      "Real Salt Lake",
+      "Columbus Crew",
+      "FC Dallas",
+      "CD Toluca"
+     ],
+     "srednia90": 1.22,
+     "forma": {
+      "okno90": 1.58,
+      "baza90": 1.16
+     },
+     "rywal": {
+      "srednia": 1.94,
+      "rank": 8,
+      "z": 30,
+      "liga": 2.18
+     }
+    }
+   ],
+   "hero": {
+    "rynek_kod": "fouls_committed",
+    "rynek": "Faule popełnione",
+    "linia": 1.5,
+    "kurs": 2.72,
+    "traf": 7,
+    "z": 10,
+    "edge": 0.228
+   },
+   "id": 9
+  },
+  {
+   "minuty_sr6": 90,
+   "rodzaj": "drabinka",
+   "mecz_id": 16317924,
+   "mecz": "Tigres UANL – Atlético San Luis",
+   "kickoff_ts": 1785034800,
+   "podmiot_id": 828610,
+   "podmiot": "Sebastien Lamonge",
+   "druzyna": "Atlético San Luis",
+   "przeciwnik": "Tigres UANL",
+   "pozycja": "M",
+   "xi": false,
+   "rynki": [
+    {
+     "rynek_kod": "shots",
+     "rynek": "Strzały",
+     "drabinka": [
+      {
+       "linia": 1.5,
+       "kurs": 2.2,
+       "p_model": 0.234,
+       "pokrycie": {
+        "traf": 7,
+        "z": 10
+       }
+      },
+      {
+       "linia": 2.5,
+       "kurs": 4.0,
+       "p_model": 0.085,
+       "pokrycie": {
+        "traf": 2,
+        "z": 10
+       }
+      }
+     ],
+     "ostatnie": [
+      3,
+      2,
+      0,
+      3,
+      2,
+      0,
+      2,
+      0,
+      2,
+      2
+     ],
+     "minuty": [
+      90,
+      90,
+      90,
+      90,
+      90,
+      90,
+      90,
+      90,
+      90,
+      90
+     ],
+     "rywale": [
+      "Cruz Azul",
+      "FC Juárez",
+      "Santos Laguna",
+      "Pumas UNAM",
+      "CD Toluca",
+      "CF Monterrey",
+      "Club León",
+      "CF Pachuca",
+      "Cruz Azul",
+      "Mazatlán FC"
+     ],
+     "srednia90": 1.41,
+     "forma": {
+      "okno90": 1.67,
+      "baza90": 1.36
+     },
+     "rywal": {
+      "srednia": 15,
+      "rank": 11,
+      "z": 18,
+      "liga": 13.19
+     }
+    }
+   ],
+   "hero": {
+    "rynek_kod": "shots",
+    "rynek": "Strzały",
+    "linia": 1.5,
+    "kurs": 2.2,
+    "traf": 7,
+    "z": 10,
+    "edge": 0.141
+   },
+   "id": 10
+  },
+  {
+   "minuty_sr6": 90,
+   "rodzaj": "drabinka",
+   "mecz_id": 15235408,
+   "mecz": "Bahia – Corinthians",
+   "kickoff_ts": 1785092400,
+   "podmiot_id": 959620,
+   "podmiot": "Nicolas Acevedo",
+   "druzyna": "Bahia",
+   "przeciwnik": "Corinthians",
+   "pozycja": "M",
+   "xi": true,
+   "rynki": [
+    {
+     "rynek_kod": "shots",
+     "rynek": "Strzały",
+     "drabinka": [
+      {
+       "linia": 1.5,
+       "kurs": 2.25,
+       "p_model": null,
+       "pokrycie": {
+        "traf": 6,
+        "z": 10
+       }
+      },
+      {
+       "linia": 2.5,
+       "kurs": 4.5,
+       "p_model": null,
+       "pokrycie": {
+        "traf": 4,
+        "z": 10
+       }
+      },
+      {
+       "linia": 3.5,
+       "kurs": 9.4,
+       "p_model": null,
+       "pokrycie": {
+        "traf": 2,
+        "z": 10
+       }
+      }
+     ],
+     "ostatnie": [
+      3,
+      2,
+      0,
+      3,
+      0,
+      0,
+      5,
+      4,
+      1,
+      2
+     ],
+     "minuty": [
+      90,
+      90,
+      90,
+      90,
+      90,
+      90,
+      90,
+      90,
+      90,
+      90
+     ],
+     "rywale": [
+      "Atlético Mineiro",
+      "Chapecoense",
+      "Coritiba",
+      "Grêmio",
+      "Remo",
+      "Cruzeiro",
+      "São Paulo",
+      "Santos",
+      "Remo",
+      "Flamengo"
+     ],
+     "srednia90": 1.29,
+     "forma": {
+      "okno90": 1.33,
+      "baza90": 1.28
+     },
+     "rywal": {
+      "srednia": 11.47,
+      "rank": 4,
+      "z": 20,
+      "liga": 13.33
+     }
+    }
+   ],
+   "hero": {
+    "rynek_kod": "shots",
+    "rynek": "Strzały",
+    "linia": 1.5,
+    "kurs": 2.25,
+    "traf": 6,
+    "z": 10,
+    "edge": 0.049
+   },
+   "id": 11
+  },
+  {
+   "minuty_sr6": 90,
+   "rodzaj": "drabinka",
+   "mecz_id": 15235416,
+   "mecz": "Cruzeiro – Botafogo",
+   "kickoff_ts": 1785092400,
+   "podmiot_id": 1064039,
+   "podmiot": "Danilo Santos",
+   "druzyna": "Botafogo",
+   "przeciwnik": "Cruzeiro",
+   "pozycja": "M",
+   "xi": false,
+   "rynki": [
+    {
+     "rynek_kod": "shots",
+     "rynek": "Strzały",
+     "drabinka": [
+      {
+       "linia": 1.5,
+       "kurs": 1.92,
+       "p_model": 0.098,
+       "pokrycie": {
+        "traf": 7,
+        "z": 10
+       }
+      },
+      {
+       "linia": 2.5,
+       "kurs": 3.6,
+       "p_model": 0.031,
+       "pokrycie": {
+        "traf": 4,
+        "z": 10
+       }
+      }
+     ],
+     "ostatnie": [
+      2,
+      4,
+      4,
+      2,
+      4,
+      1,
+      2,
+      4,
+      1,
+      1
+     ],
+     "minuty": [
+      90,
+      90,
+      90,
+      90,
+      90,
+      90,
+      90,
+      90,
+      90,
+      90
+     ],
+     "rywale": [
+      "Chapecoense",
+      "Atlético Mineiro",
+      "Racing Club",
+      "Remo",
+      "Internacional",
+      "Chapecoense",
+      "Chapecoense",
+      "Coritiba",
+      "Caracas F.C.",
+      "Vasco da Gama"
+     ],
+     "srednia90": 1.72,
+     "forma": {
+      "okno90": 2.83,
+      "baza90": 1.49
+     },
+     "rywal": {
+      "srednia": 11.05,
+      "rank": 3,
+      "z": 20,
+      "liga": 13.33
+     }
+    }
+   ],
+   "sezony": [
+    {
+     "rok": "2026",
+     "na90": {
+      "sot": 0.99,
+      "shots": 2.3,
+      "tackles": 1.32,
+      "offsides": 0.0,
+      "fouls_won": 0.49,
+      "interceptions": 0.41,
+      "shots_blocked": 0.58,
+      "fouls_committed": 0.66,
+      "shots_outside_box": 1.15
+     },
+     "mecze": 13,
+     "minuty": 1095,
+     "na_mecz": {
+      "sot": 0.92,
+      "shots": 2.15,
+      "tackles": 1.23,
+      "offsides": 0.0,
+      "fouls_won": 0.46,
+      "interceptions": 0.38,
+      "shots_blocked": 0.54,
+      "fouls_committed": 0.62,
+      "shots_outside_box": 1.08
+     },
+     "turniej": "Brasileirão Betano"
+    },
+    {
+     "rok": "2025",
+     "na90": {
+      "sot": 0.43,
+      "shots": 1.52,
+      "tackles": 1.95,
+      "offsides": 0.22,
+      "fouls_won": 0.54,
+      "interceptions": 0.98,
+      "shots_blocked": 0.43,
+      "fouls_committed": 0.65,
+      "shots_outside_box": 1.09
+     },
+     "mecze": 13,
+     "minuty": 829,
+     "na_mecz": {
+      "sot": 0.31,
+      "shots": 1.08,
+      "tackles": 1.38,
+      "offsides": 0.15,
+      "fouls_won": 0.38,
+      "interceptions": 0.69,
+      "shots_blocked": 0.31,
+      "fouls_committed": 0.46,
+      "shots_outside_box": 0.77
+     },
+     "turniej": "Brasileirão Betano"
+    },
+    {
+     "rok": "2026",
+     "na90": {
+      "sot": 2.09,
+      "shots": 4.19,
+      "tackles": 10.47,
+      "offsides": 0.0,
+      "fouls_won": 0.0,
+      "interceptions": 2.09,
+      "shots_blocked": 0.0,
+      "fouls_committed": 0.0,
+      "shots_outside_box": 0.0
+     },
+     "mecze": 4,
+     "minuty": 43,
+     "na_mecz": {
+      "sot": 0.25,
+      "shots": 0.5,
+      "tackles": 1.25,
+      "offsides": 0.0,
+      "fouls_won": 0.0,
+      "interceptions": 0.25,
+      "shots_blocked": 0.0,
+      "fouls_committed": 0.0,
+      "shots_outside_box": 0.0
+     },
+     "turniej": "FIFA World Cup"
+    }
+   ],
+   "hero": {
+    "rynek_kod": "shots",
+    "rynek": "Strzały",
+    "linia": 1.5,
+    "kurs": 1.92,
+    "traf": 7,
+    "z": 10,
+    "edge": 0.075
+   },
+   "id": 12
+  },
+  {
+   "minuty_sr6": 81,
+   "rodzaj": "drabinka",
+   "mecz_id": 15235410,
+   "mecz": "Red Bull Bragantino – Coritiba",
+   "kickoff_ts": 1785101400,
+   "podmiot_id": 1067641,
+   "podmiot": "Lucas Barbosa",
+   "druzyna": "Red Bull Bragantino",
+   "przeciwnik": "Coritiba",
+   "pozycja": "M",
+   "xi": true,
+   "rynki": [
+    {
+     "rynek_kod": "shots",
+     "rynek": "Strzały",
+     "drabinka": [
+      {
+       "linia": 2.5,
+       "kurs": 2.3,
+       "p_model": 0.299,
+       "pokrycie": {
+        "traf": 6,
+        "z": 10
+       }
+      },
+      {
+       "linia": 3.5,
+       "kurs": 4.0,
+       "p_model": 0.149,
+       "pokrycie": {
+        "traf": 3,
+        "z": 10
+       }
+      },
+      {
+       "linia": 4.5,
+       "kurs": 6.8,
+       "p_model": 0.069,
+       "pokrycie": {
+        "traf": 1,
+        "z": 10
+       }
+      }
+     ],
+     "ostatnie": [
+      1,
+      3,
+      0,
+      4,
+      1,
+      0,
+      3,
+      4,
+      5,
+      3
+     ],
+     "minuty": [
+      90,
+      90,
+      45,
+      90,
+      81,
+      90,
+      90,
+      90,
+      90,
+      87
+     ],
+     "rywale": [
+      "Fluminense",
+      "Internacional",
+      "River Plate",
+      "Vitória",
+      "Mirassol",
+      "Santos",
+      "Chapecoense",
+      "River Plate",
+      "Palmeiras",
+      "Mirassol"
+     ],
+     "srednia90": 2.19,
+     "forma": {
+      "okno90": 1.67,
+      "baza90": 2.29
+     },
+     "rywal": {
+      "srednia": 16.74,
+      "rank": 20,
+      "z": 20,
+      "liga": 13.33
+     }
+    }
+   ],
+   "hero": {
+    "rynek_kod": "shots",
+    "rynek": "Strzały",
+    "linia": 2.5,
+    "kurs": 2.3,
+    "traf": 6,
+    "z": 10,
+    "edge": 0.059
+   },
+   "id": 13
+  },
+  {
+   "minuty_sr6": 69,
+   "rodzaj": "drabinka",
+   "mecz_id": 15237985,
+   "mecz": "Flamengo – São Paulo",
+   "kickoff_ts": 1785101400,
+   "podmiot_id": 998499,
+   "podmiot": "Ferreirinha",
+   "druzyna": "São Paulo",
+   "przeciwnik": "Flamengo",
+   "pozycja": "M",
+   "xi": false,
+   "rynki": [
+    {
+     "rynek_kod": "shots",
+     "rynek": "Strzały",
+     "drabinka": [
+      {
+       "linia": 1.5,
+       "kurs": 2.02,
+       "p_model": 0.135,
+       "pokrycie": {
+        "traf": 7,
+        "z": 10
+       }
+      },
+      {
+       "linia": 2.5,
+       "kurs": 3.8,
+       "p_model": 0.044,
+       "pokrycie": {
+        "traf": 4,
+        "z": 10
+       }
+      }
+     ],
+     "ostatnie": [
+      1,
+      3,
+      2,
+      2,
+      1,
+      3,
+      3,
+      2,
+      5,
+      1
+     ],
+     "minuty": [
+      72,
+      70,
+      75,
+      63,
+      69,
+      65,
+      57,
+      74,
+      90,
+      64
+     ],
+     "rywale": [
+      "Remo",
+      "Boston River",
+      "Botafogo",
+      "Millonarios",
+      "Corinthians",
+      "O'Higgins",
+      "Vitória",
+      "Boston River",
+      "Cruzeiro",
+      "Coritiba"
+     ],
+     "srednia90": 2.34,
+     "forma": {
+      "okno90": 2.61,
+      "baza90": 2.29
+     },
+     "rywal": {
+      "srednia": 12.94,
+      "rank": 9,
+      "z": 20,
+      "liga": 13.33
+     }
+    }
+   ],
+   "hero": {
+    "rynek_kod": "shots",
+    "rynek": "Strzały",
+    "linia": 1.5,
+    "kurs": 2.02,
+    "traf": 7,
+    "z": 10,
+    "edge": 0.1
+   },
+   "id": 14
+  },
+  {
+   "minuty_sr6": 74,
+   "rodzaj": "transfer",
+   "mecz_id": 16431100,
+   "mecz": "Deportivo Riestra – Boca Juniors",
+   "kickoff_ts": 1785105000,
+   "podmiot_id": 275789,
+   "podmiot": "Milton Celiz",
+   "druzyna": "Deportivo Riestra",
+   "przeciwnik": "Boca Juniors",
+   "pozycja": "M",
+   "xi": false,
+   "rynki": [
+    {
+     "rynek_kod": "shots",
+     "rynek": "Strzały",
+     "drabinka": [
+      {
+       "linia": 1.5,
+       "kurs": 2.2,
+       "p_model": 0.28,
+       "pokrycie": {
+        "traf": 6,
+        "z": 10
+       }
+      },
+      {
+       "linia": 2.5,
+       "kurs": 4.0,
+       "p_model": 0.115,
+       "pokrycie": {
+        "traf": 3,
+        "z": 10
+       }
+      },
+      {
+       "linia": 3.5,
+       "kurs": 7.8,
+       "p_model": 0.044,
+       "pokrycie": {
+        "traf": 1,
+        "z": 10
+       }
+      }
+     ],
+     "ostatnie": [
+      2,
+      1,
+      6,
+      3,
+      0,
+      2,
+      3,
+      0,
+      0,
+      2
+     ],
+     "minuty": [
+      45,
+      79,
+      90,
+      90,
+      88,
+      51,
+      90,
+      84,
+      90,
+      71
+     ],
+     "rywale": [
+      "Técnico Universitario",
+      "Cruzeiro",
+      "Delfín",
+      "Aucas",
+      "Independiente del Valle",
+      "Boca Juniors",
+      "Universidad Católica",
+      "Orense SC",
+      "Macará",
+      "Cruzeiro"
+     ],
+     "srednia90": 1.35,
+     "forma": {
+      "okno90": 2.84,
+      "baza90": 1.12
+     },
+     "rywal": {
+      "srednia": 172,
+      "rank": 33,
+      "z": 60,
+      "liga": 25.07
+     }
+    }
+   ],
+   "powod": "zmiana_ligi",
+   "stara_liga_utid": 240,
+   "mecze_stara": 9,
+   "mecze_nowa": 0,
+   "stara_liga": "LigaPro Serie A (Ecuador)",
+   "hero": {
+    "rynek_kod": "shots",
+    "rynek": "Strzały",
+    "linia": 1.5,
+    "kurs": 2.2,
+    "traf": 6,
+    "z": 10,
+    "edge": 0.039
+   },
+   "id": 15
+  }
+ ]
 }

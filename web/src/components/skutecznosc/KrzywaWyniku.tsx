@@ -1,6 +1,6 @@
 "use client";
 
-import { fmtU } from "@/lib/format";
+import { useBilans } from "../useBilans";
 import type { SkutecznoscDnia } from "@/lib/types";
 import { OSTATNIA_ZMIANA } from "@/lib/zmiany";
 
@@ -18,10 +18,21 @@ import { OSTATNIA_ZMIANA } from "@/lib/zmiany";
  */
 
 const W = 640;
-const H = 150;
+// Wyższy wykres od 2026-07-27: krzywa stoi w siatce obok kalendarza, który
+// jest dwa razy wyższy — przy 150 px zostawała pod nią pusta kolumna. Przy
+// okazji łagodne spadki są w ogóle widoczne, a nie zlane w płaską kreskę.
+const H = 260;
 const M = { gora: 12, dol: 20, lewo: 4, prawo: 4 };
 
-export function KrzywaWyniku({ dni }: { dni: SkutecznoscDnia[] }) {
+export function KrzywaWyniku({
+  dni,
+  pelnyWglad = true,
+}: {
+  dni: SkutecznoscDnia[];
+  /** false = widok klienta: bilans w złotówkach zamiast jednostek stawki */
+  pelnyWglad?: boolean;
+}) {
+  const { bilans } = useBilans(pelnyWglad);
   // dni przychodzą najnowszy pierwszy — krzywa idzie od najstarszego
   const rosnaco = [...dni]
     .filter((d) => d.rozliczone > 0)
@@ -74,7 +85,7 @@ export function KrzywaWyniku({ dni }: { dni: SkutecznoscDnia[] }) {
               dodatni ? "text-data-green" : "text-data-red"
             }`}
           >
-            {fmtU(koncowy)}
+            {bilans(koncowy)}
           </span>
         </p>
       </div>
@@ -84,7 +95,7 @@ export function KrzywaWyniku({ dni }: { dni: SkutecznoscDnia[] }) {
         className="mt-3 w-full"
         style={{ height: "auto" }}
         role="img"
-        aria-label={`Narastający bilans: ${fmtU(koncowy)} po ${punkty.length} dniach z rozliczeniami`}
+        aria-label={`Narastający bilans: ${bilans(koncowy)} po ${punkty.length} dniach z rozliczeniami`}
       >
         <defs>
           <linearGradient id="krzywa-wypelnienie" x1="0" y1="0" x2="0" y2="1">

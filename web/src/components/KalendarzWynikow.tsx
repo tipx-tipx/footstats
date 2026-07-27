@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 
-import { fmtU } from "@/lib/format";
+import { useBilans } from "./useBilans";
 import type { SkutecznoscDnia } from "@/lib/types";
 import { OSTATNIA_ZMIANA, poZmianie } from "@/lib/zmiany";
 
@@ -36,6 +36,7 @@ export function KalendarzWynikow({
   wszystkieDni,
   wybrany,
   onWybierz,
+  pelnyWglad = true,
 }: {
   /** dni PO filtrze produktu — to one rysują kafelki */
   dni: SkutecznoscDnia[];
@@ -44,7 +45,11 @@ export function KalendarzWynikow({
   wszystkieDni?: SkutecznoscDnia[];
   wybrany?: string | null;
   onWybierz?: (dzien: string) => void;
+  /** false = widok klienta: bilans w złotówkach zamiast jednostek stawki */
+  pelnyWglad?: boolean;
 }) {
+  // `pisz`, nie `bilans` — zmienna `bilans` niżej trzyma sumę miesiąca
+  const { bilans: pisz, stawka } = useBilans(pelnyWglad);
   const mapa = useMemo(() => {
     const m = new Map<string, SkutecznoscDnia>();
     for (const d of dni) if (d.rozliczone > 0) m.set(d.dzien, d);
@@ -165,7 +170,7 @@ export function KalendarzWynikow({
                   : "text-ink-soft"
             }`}
           >
-            {fmtU(bilans)}
+            {pisz(bilans)}
           </span>{" "}
           · {rozliczonych} rozliczonych
         </p>
@@ -203,7 +208,7 @@ export function KalendarzWynikow({
               key={i}
               onClick={() => onWybierz?.(k.dzien)}
               aria-pressed={aktywny}
-              title={`${k.dzien}: weszło ${k.trafione} z ${k.rozliczone} · bilans ${fmtU(k.roi_flat)}${
+              title={`${k.dzien}: weszło ${k.trafione} z ${k.rozliczone} · bilans ${pisz(k.roi_flat)}${
                 swiezy ? "" : " · typy sprzed zmiany zasad"
               } — kliknij, żeby zobaczyć ten dzień`}
               className={`flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-(--radius-control) border text-xs transition-transform hover:scale-[1.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
@@ -222,7 +227,7 @@ export function KalendarzWynikow({
             >
               <span className="text-[10px] opacity-70">{nrDnia}</span>
               <span className="font-data text-[11px] font-semibold leading-none">
-                {fmtU(k.roi_flat)}
+                {pisz(k.roi_flat, true)}
               </span>
             </button>
           );
@@ -233,6 +238,11 @@ export function KalendarzWynikow({
         <p>
           Kliknij dowolny dzień, żeby zobaczyć jego typy pod spodem. Puste pola
           = brak rozliczeń; każdy dzień zostaje w kalendarzu, także stratny.
+          {/* kafelek ma ~40 px, więc mieści samą liczbę bez „zł" — jednostkę
+              trzeba dopowiedzieć tutaj, inaczej „−160" nic nie znaczy */}
+          {!pelnyWglad && (
+            <> Liczba na kafelku to złotówki przy {stawka} zł na typ.</>
+          )}
         </p>
         {OSTATNIA_ZMIANA && (
           <p>

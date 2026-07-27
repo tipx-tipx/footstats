@@ -725,11 +725,10 @@ export interface TypyWyniki {
    */
   skutecznosc_strumienie?: Partial<Record<Strumien, SkutecznoscStrumienia>>;
   /**
-   * Mundial vs sezon ligowy, per rynek. Kwarantanna rynków patrzy na okno 40
-   * ostatnich rozliczeń, a nie na kalendarz — dla rynków o dużym wolumenie
-   * połowa tego okna to wciąż mecze reprezentacji. To rozbicie pokazuje, czy
-   * start lig faktycznie zmienił obraz (na 27.07: tylko w rynkach drużynowych).
-   * `null` w którejś epoce = brak rozliczeń tego rynku w tamtym okresie.
+   * Mundial vs sezon ligowy, per rynek. NIE JEST JUŻ POKAZYWANE (decyzja usera
+   * 2026-07-27: „nie interesuje nas ten mundial"). Pipeline liczy to dalej, bo
+   * kwarantanna rynków patrzy na okno 40 ostatnich rozliczeń, a nie na
+   * kalendarz — gdyby pytanie wróciło, dane są. Front tego nie czyta.
    */
   epoki_per_rynek?: Record<string, EpokiRynku>;
   kupony?: KuponHistoria[];
