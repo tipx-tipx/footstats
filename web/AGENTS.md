@@ -3,6 +3,21 @@
 
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
 
+# Two access levels — check before you show anything
+
+`APP_PASSWORD` = admin (full view). `KLIENT_PASSWORD` = external client
+(product only, no model internals). The second is **optional** — unset, the app
+behaves exactly as before, one password, everyone is admin.
+
+Role lives in the session cookie and is covered by the signature, so editing it
+does not escalate — `npm run test:role` proves it (9 checks, no framework).
+
+**Hiding something in the UI is not hiding it.** `SkutecznoscScena` is a client
+component, so anything passed in props ends up in the page source even when
+nothing renders it. Strip on the server instead — see `lib/okrojDlaKlienta.ts`.
+When adding a new panel with model diagnostics, ask first: does the client's
+browser need to *receive* this?
+
 # NEVER run `next build` while `next dev` is running
 
 Both write to `.next`. The dev server watches that directory, so a production

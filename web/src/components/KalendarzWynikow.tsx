@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 
 import { fmtU } from "@/lib/format";
 import type { SkutecznoscDnia } from "@/lib/types";
@@ -62,9 +62,35 @@ export function KalendarzWynikow({
     return [...zbior].sort((a, b) => a - b);
   }, [wszystkieDni, dni]);
 
-  const [widok, setWidok] = useState<number | null>(
-    () => miesiace[miesiace.length - 1] ?? null,
-  );
+  /**
+   * Pokazywany miesiąc NIE JEST osobnym stanem — wynika z otwartego dnia.
+   *
+   * Pod kalendarzem zawsze stoi panel jakiegoś dnia, a do jego zmiany prowadzą
+   * dwie drogi (kafelek i strzałki panelu). Gdyby siatka miała własny stan
+   * miesiąca, te drogi potrafiłyby się rozjechać: panel pokazywałby czerwiec,
+   * a kalendarz lipiec z niepodświetlonym niczym. Wyliczenie zamiast stanu
+   * czyni ten rozjazd niemożliwym — a strzałki miesiąca po prostu przestawiają
+   * WYBÓR na sąsiedni miesiąc, zamiast przewijać widok obok wyboru.
+   */
+  const widok = useMemo(() => {
+    if (wybrany) {
+      const [r, m] = rozbijDate(wybrany);
+      const cel = r * 12 + m;
+      if (miesiace.includes(cel)) return cel;
+    }
+    return miesiace[miesiace.length - 1] ?? null;
+  }, [wybrany, miesiace]);
+
+  /** Najnowszy dzień z rozliczeniami w danym miesiącu — cel strzałek miesiąca. */
+  const dzienWMiesiacu = (klucz: number): string | null => {
+    const kandydaci = [...mapa.values()]
+      .filter((d) => {
+        const [r, m] = rozbijDate(d.dzien);
+        return r * 12 + m === klucz;
+      })
+      .sort((a, b) => (a.dzien < b.dzien ? 1 : -1));
+    return kandydaci[0]?.dzien ?? null;
+  };
 
   if (widok == null || miesiace.length === 0) return null;
 
@@ -96,7 +122,10 @@ export function KalendarzWynikow({
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <button
-            onClick={() => idx > 0 && setWidok(miesiace[idx - 1])}
+            onClick={() => {
+              const d = idx > 0 ? dzienWMiesiacu(miesiace[idx - 1]) : null;
+              if (d) onWybierz?.(d);
+            }}
             disabled={idx <= 0}
             aria-label="Poprzedni miesiąc"
             className="flex h-8 w-8 items-center justify-center rounded-(--radius-control) border border-hairline text-ink-soft transition-colors hover:border-brand hover:text-brand disabled:cursor-default disabled:opacity-35 disabled:hover:border-hairline disabled:hover:text-ink-soft"
@@ -109,7 +138,13 @@ export function KalendarzWynikow({
             {MIESIACE[mies]} {rok}
           </h3>
           <button
-            onClick={() => idx < miesiace.length - 1 && setWidok(miesiace[idx + 1])}
+            onClick={() => {
+              const d =
+                idx < miesiace.length - 1
+                  ? dzienWMiesiacu(miesiace[idx + 1])
+                  : null;
+              if (d) onWybierz?.(d);
+            }}
             disabled={idx >= miesiace.length - 1}
             aria-label="Następny miesiąc"
             className="flex h-8 w-8 items-center justify-center rounded-(--radius-control) border border-hairline text-ink-soft transition-colors hover:border-brand hover:text-brand disabled:cursor-default disabled:opacity-35 disabled:hover:border-hairline disabled:hover:text-ink-soft"
@@ -153,7 +188,7 @@ export function KalendarzWynikow({
               <span
                 key={i}
                 className="flex aspect-square flex-col items-center justify-center rounded-(--radius-control) border border-hairline/60 text-xs text-faint/60"
-                title="Brak rozliczonych typów tego dnia"
+                title="Tego dnia nic się nie rozliczyło"
               >
                 {nrDnia}
               </span>
@@ -168,17 +203,21 @@ export function KalendarzWynikow({
               key={i}
               onClick={() => onWybierz?.(k.dzien)}
               aria-pressed={aktywny}
-              title={`${k.dzien}: ${k.trafione}/${k.rozliczone} trafionych · bilans ${fmtU(k.roi_flat)}${
-                swiezy ? "" : " · stare zasady selekcji"
-              } — kliknij, żeby zobaczyć typy`}
-              className={`flex aspect-square flex-col items-center justify-center gap-1 rounded-(--radius-control) border text-xs transition-transform hover:scale-[1.06] ${
+              title={`${k.dzien}: weszło ${k.trafione} z ${k.rozliczone} · bilans ${fmtU(k.roi_flat)}${
+                swiezy ? "" : " · typy sprzed zmiany zasad"
+              } — kliknij, żeby zobaczyć ten dzień`}
+              className={`flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-(--radius-control) border text-xs transition-transform hover:scale-[1.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
                 zysk
                   ? "border-data-green/30 bg-data-green-wash text-data-green-ink"
                   : strata
                     ? "border-data-red/25 bg-data-red-wash text-data-red-ink"
                     : "border-hairline bg-card-soft text-ink-soft"
               } ${swiezy ? "" : "opacity-55"} ${
-                aktywny ? "ring-2 ring-brand ring-offset-1 ring-offset-card" : ""
+                // wybrany dzień jest OTWARTY pod spodem, więc kafelek musi go
+                // wskazywać jednoznacznie — sam ring ginął na kolorowym tle
+                aktywny
+                  ? "scale-[1.06] ring-2 ring-brand ring-offset-1 ring-offset-card"
+                  : ""
               }`}
             >
               <span className="text-[10px] opacity-70">{nrDnia}</span>
@@ -192,8 +231,8 @@ export function KalendarzWynikow({
 
       <div className="mt-3 space-y-1.5 text-[11px] leading-relaxed text-faint">
         <p>
-          Kliknij dzień, żeby zobaczyć jego typy. Puste pola = brak rozliczeń;
-          każdy dzień zostaje w kalendarzu, także stratny.
+          Kliknij dowolny dzień, żeby zobaczyć jego typy pod spodem. Puste pola
+          = brak rozliczeń; każdy dzień zostaje w kalendarzu, także stratny.
         </p>
         {OSTATNIA_ZMIANA && (
           <p>

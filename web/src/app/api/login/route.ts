@@ -59,11 +59,20 @@ export async function POST(request: Request) {
     /* puste body -> złe hasło */
   }
 
-  // porównanie stałoczasowe
-  const a = new TextEncoder().encode(given);
-  const b = new TextEncoder().encode(password);
-  let diff = a.length === b.length ? 0 : 1;
-  for (let i = 0; i < Math.min(a.length, b.length); i++) diff |= a[i] ^ b[i];
+  // porównanie stałoczasowe — sprawdzamy OBA hasła, zawsze oba, żeby czas
+  // odpowiedzi nie zdradzał, które trafiło (KLIENT_PASSWORD jest opcjonalne)
+  const pasuje = (wzorzec: string | undefined): boolean => {
+    if (!wzorzec) return false;
+    const a = new TextEncoder().encode(given);
+    const b = new TextEncoder().encode(wzorzec);
+    let d = a.length === b.length ? 0 : 1;
+    for (let i = 0; i < Math.min(a.length, b.length); i++) d |= a[i] ^ b[i];
+    return d === 0;
+  };
+  const jestAdmin = pasuje(password);
+  const jestKlient = pasuje(process.env.KLIENT_PASSWORD);
+  const rola = jestAdmin ? "admin" : "klient";
+  const diff = jestAdmin || jestKlient ? 0 : 1;
 
   if (diff !== 0) {
     if (rateLimitOn) {
@@ -87,8 +96,8 @@ export async function POST(request: Request) {
     }
   }
 
-  const res = NextResponse.json({ ok: true });
-  res.cookies.set(SESSION_COOKIE, await createSessionToken(secret), {
+  const res = NextResponse.json({ ok: true, rola });
+  res.cookies.set(SESSION_COOKIE, await createSessionToken(secret, rola), {
     httpOnly: true,
     secure: true,
     sameSite: "lax",

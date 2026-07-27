@@ -1,10 +1,13 @@
 import { CalibrationChart } from "@/components/CalibrationChart";
 import { KuponHistoriaCard } from "@/components/KuponHistoriaCard";
 import { PageHeader } from "@/components/PageHeader";
+import { PrzelacznikWidoku } from "@/components/PrzelacznikWidoku";
 import { Reveal } from "@/components/Reveal";
 import { SkutecznoscScena } from "@/components/SkutecznoscScena";
 import { getKalibracja, getMeta, getTypyWyniki } from "@/lib/data";
+import { okrojDlaKlienta } from "@/lib/okrojDlaKlienta";
 import { fmtU } from "@/lib/format";
+import { czyPelnyWglad, czytajRole } from "@/lib/rola";
 
 export const metadata = { title: "Skuteczność modelu – FootStats" };
 
@@ -38,16 +41,31 @@ function Sekcja({
   );
 }
 
-export default async function ModelPage() {
-  const [kal, meta, typy] = await Promise.all([
+export default async function ModelPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ widok?: string }>;
+}) {
+  const [kal, meta, typySurowe, rola, params] = await Promise.all([
     getKalibracja(),
     getMeta(),
     getTypyWyniki(),
+    czytajRole(),
+    searchParams,
   ]);
+  // admin może podejrzeć własny produkt oczami klienta (?widok=klient)
+  const podglad = params.widok === "klient";
+  const pelnyWglad = czyPelnyWglad(rola, podglad);
+  // UKRYCIE W INTERFEJSIE TO ZA MAŁO: scena jest komponentem klienckim, więc
+  // wszystko, co dostanie w propsach, ląduje w źródle strony — nawet jeśli
+  // nic tego nie renderuje. Kuchnię modelu wycinamy z DANYCH, nie z widoku.
+  const typy = pelnyWglad ? typySurowe : okrojDlaKlienta(typySurowe);
   const pods = typy.podsumowanie;
 
   // --- KUPONY: bilans per horyzont + historia + kronika wygranych ---
-  const kuponyPanel =
+  // (zakładka wyłącznie dla admina — klientowi nie budujemy jej wcale, bo
+  //  React i tak wysłałby ją do przeglądarki jako props sceny)
+  const kuponyPanel = !pelnyWglad ? null :
     (typy.kupony?.length ?? 0) > 0 || (typy.kupony_wygrane?.length ?? 0) > 0 ? (
       <div className="space-y-8">
         <Sekcja
@@ -148,7 +166,7 @@ export default async function ModelPage() {
   // --- TEST NA MECZACH SPOZA NAUKI ---
   // To INNE dane niż wszystko powyżej (tysiące prognoz ze sprawdzianu, a nie
   // realne zakłady), a licznik obok „331 typów" sugerował tę samą próbę.
-  const testPanel = (
+  const testPanel = !pelnyWglad ? null : (
     <div className="max-w-4xl space-y-6">
       <Sekcja
         tytul="Test na meczach spoza nauki"
@@ -231,14 +249,17 @@ export default async function ModelPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="kontrola jakości"
-        title="Czy model mówi prawdę?"
+        eyebrow={pelnyWglad ? "kontrola jakości" : "wyniki"}
+        title={pelnyWglad ? "Czy model mówi prawdę?" : "Co z tego wyszło"}
         lead={
           <>
-            Wszystkie liczby tutaj biorą się same, z typów, które naprawdę
-            pokazaliśmy na stronie — nikt ich ręcznie nie wybiera i żaden
-            nietrafiony typ stąd nie znika. Zacznij od werdyktu na górze, a
-            jeśli chcesz sprawdzić, skąd się wziął, schodź niżej.
+            <strong className="font-semibold text-ink">
+              Każdy typ, który kiedykolwiek pokazaliśmy, trafia tu sam — razem
+              z tymi, które nie weszły.
+            </strong>{" "}
+            Nic nie da się stąd usunąć ani dopisać ręcznie: liczby liczą się
+            z rozliczeń meczów. Zacznij od werdyktu na górze, a jeśli chcesz
+            sprawdzić, skąd się wziął, schodź niżej.
           </>
         }
       />
@@ -255,6 +276,12 @@ export default async function ModelPage() {
             meta={meta}
             kuponyPanel={kuponyPanel}
             testPanel={testPanel}
+            pelnyWglad={pelnyWglad}
+            przelacznikWidoku={
+              rola === "admin" ? (
+                <PrzelacznikWidoku podglad={podglad} />
+              ) : undefined
+            }
           />
         </Reveal>
       )}

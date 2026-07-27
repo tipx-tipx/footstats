@@ -1,5 +1,6 @@
 "use client";
 
+import { useStawka } from "./useStawka";
 import { fmtProc, fmtU } from "@/lib/format";
 import { OSTATNIA_ZMIANA } from "@/lib/zmiany";
 
@@ -10,14 +11,20 @@ import { OSTATNIA_ZMIANA } from "@/lib/zmiany";
  * pytanie, po które się tu wchodzi: „czy to zarabia?". Odpowiadamy pierwszym
  * zdaniem, liczbami obok, a dopiero potem wpuszczamy w szczegóły.
  *
- * PRÓG OPŁACALNOŚCI (2026-07-26) to najważniejsza liczba, której tu brakowało.
- * „Trafia 60%" nic nie znaczy bez odniesienia — dopiero „a musi 69%, żeby
- * wyjść na zero" tłumaczy stratę jednym zdaniem. Liczymy go z realnych
- * kursów rozliczonych typów (1 / średni kurs), nie z założenia.
+ * DWA WIDOKI TYCH SAMYCH LICZB (2026-07-27, przygotowanie pod klienta):
+ *
+ *   klient — trzy liczby i złotówki. „−46,8u" nie znaczy nic, „−936 zł przy
+ *            20 zł na typ" znaczy wszystko. „Ile trzeba trafiać" i „tyle sam
+ *            obiecywał" to pytania, na które klient nie umie odpowiedzieć,
+ *            więc tylko dokładają szumu.
+ *   admin  — komplet, bo to są liczby DIAGNOSTYCZNE: różnica „obiecywał vs
+ *            trafia" mówi, czy model kłamie o własnej pewności, a próg
+ *            opłacalności — ile realnie brakuje do zysku. Mylenie tych dwóch
+ *            to najczęstszy błąd w rozmowie o wyniku.
+ *
+ * PRÓG OPŁACALNOŚCI liczymy z realnych kursów rozliczonych typów
+ * (1 / średni kurs), nie z założenia.
  */
-
-/** Ile złotówek pokazać w przykładzie „gdybyś stawiał po X". */
-const PRZYKLAD_STAWKA = 20;
 
 /** "2026-07-26" → "26 lipca" (południe lokalne, żeby strefa nie cofała daty). */
 function dataPl(dzien: string): string {
@@ -25,6 +32,12 @@ function dataPl(dzien: string): string {
     day: "numeric",
     month: "long",
   });
+}
+
+/** Bilans w jednostkach → złotówki przy stawce usera ("+124 zł", "−936 zł"). */
+function zlote(jednostki: number, stawka: number): string {
+  const v = Math.round(jednostki * stawka);
+  return `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v)} zł`;
 }
 
 function Liczba({
@@ -56,6 +69,15 @@ function Liczba({
   );
 }
 
+/** Kolumna z pionową kreską oddzielającą (na desktopie). */
+function Kolumna({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="min-w-0 sm:ml-6 sm:border-l sm:border-hairline-strong/60 sm:pl-6">
+      {children}
+    </div>
+  );
+}
+
 export interface WerdyktDane {
   /** nazwa filtra w zdaniu: "typach", "typach drużynowych", "kartach drabinek" */
   coLiczymy: string;
@@ -72,13 +94,21 @@ export interface WerdyktDane {
   naMinusie: number;
   /** zdanie „prawie cała strata siedzi w…" — tylko gdy jeden produkt dominuje */
   winowajca?: { nazwa: string; roi: number } | null;
-  /** rynki wstrzymane przez kwarantannę (nazwy po polsku) */
+  /** rynki i powody wstrzymane przez kwarantannę (nazwy po polsku) */
   wstrzymane: string[];
   /** ile dni z rozliczeniami mamy JUŻ po zmianie zasad */
   dniPoZmianie: number;
 }
 
-export function WerdyktModelu({ d }: { d: WerdyktDane }) {
+export function WerdyktModelu({
+  d,
+  pelnyWglad = true,
+}: {
+  d: WerdyktDane;
+  /** false = widok klienta: trzy liczby, złotówki, bez kuchni */
+  pelnyWglad?: boolean;
+}) {
+  const [stawka, setStawka] = useStawka();
   if (d.rozliczone === 0) return null;
 
   const hit = d.trafione / d.rozliczone;
@@ -103,88 +133,108 @@ export function WerdyktModelu({ d }: { d: WerdyktDane }) {
             </>
           ) : (
             <>
-              Model <span className="text-data-red">jeszcze nie zarabia</span>
+              Na razie <span className="text-data-red">jesteśmy pod kreską</span>
             </>
           )}
         </h2>
-        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">
-          Na {d.rozliczone} rozliczonych {d.coLiczymy} bilans to{" "}
-          <strong className="font-semibold text-ink">{fmtU(d.roi)}</strong>.
-          {brakuje != null && d.prog != null && (
-            <>
-              {" "}
-              Trafia <strong className="font-semibold text-ink">
-                {fmtProc(hit)}
-              </strong>
-              , a przy tych kursach musi{" "}
-              <strong className="font-semibold text-ink">
-                {fmtProc(d.prog)}
-              </strong>
-              , żeby wyjść na zero —{" "}
-              {brakuje > 0
-                ? `brakuje ${brakuje} ${brakuje === 1 ? "punktu procentowego" : "punktów procentowych"}`
-                : brakuje < 0
-                  ? `ma ${Math.abs(brakuje)} pp zapasu`
-                  : "jest dokładnie na progu"}
-              .
-            </>
-          )}
-          {d.deklaracja != null && (
-            <> Sam zapowiadał {fmtProc(d.deklaracja)}.</>
-          )}
-          {d.winowajca && (
-            <>
-              {" "}
-              Prawie cała strata siedzi w jednym miejscu:{" "}
-              <strong className="font-semibold text-ink">
-                {d.winowajca.nazwa}
-              </strong>{" "}
-              ({fmtU(d.winowajca.roi)} z {fmtU(d.roi)}).
-            </>
-          )}
-        </p>
+
+        {pelnyWglad ? (
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">
+            Na {d.rozliczone} rozliczonych {d.coLiczymy} bilans to{" "}
+            <strong className="font-semibold text-ink">{fmtU(d.roi)}</strong>.
+            {brakuje != null && d.prog != null && (
+              <>
+                {" "}
+                Trafia{" "}
+                <strong className="font-semibold text-ink">{fmtProc(hit)}</strong>
+                , a przy tych kursach musi{" "}
+                <strong className="font-semibold text-ink">
+                  {fmtProc(d.prog)}
+                </strong>
+                , żeby wyjść na zero —{" "}
+                {brakuje > 0
+                  ? `brakuje ${brakuje} ${brakuje === 1 ? "punktu procentowego" : "punktów procentowych"}`
+                  : brakuje < 0
+                    ? `ma ${Math.abs(brakuje)} pp zapasu`
+                    : "jest dokładnie na progu"}
+                .
+              </>
+            )}
+            {d.deklaracja != null && <> Sam obiecywał {fmtProc(d.deklaracja)}.</>}
+            {d.winowajca && (
+              <>
+                {" "}
+                Prawie cała strata siedzi w jednym miejscu:{" "}
+                <strong className="font-semibold text-ink">
+                  {d.winowajca.nazwa}
+                </strong>{" "}
+                ({fmtU(d.winowajca.roi)} z {fmtU(d.roi)}).
+              </>
+            )}
+          </p>
+        ) : (
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">
+            Grając po {stawka} zł na każdy z {d.rozliczone} rozliczonych typów,
+            miałbyś dziś{" "}
+            <strong
+              className={`font-semibold ${zarabia ? "text-data-green" : "text-data-red"}`}
+            >
+              {zlote(d.roi, stawka)}
+            </strong>
+            . Weszło {d.trafione} z {d.rozliczone}.
+          </p>
+        )}
       </div>
 
       <dl className="grid grid-cols-2 gap-y-5 px-5 py-5 sm:flex sm:items-stretch sm:px-6">
         <Liczba
-          etykieta="bilans"
-          wartosc={fmtU(d.roi)}
+          etykieta={pelnyWglad ? "bilans" : `bilans przy ${stawka} zł na typ`}
+          wartosc={pelnyWglad ? fmtU(d.roi) : zlote(d.roi, stawka)}
           ton={d.roi > 0 ? "dodatni" : d.roi < 0 ? "ujemny" : undefined}
           tytul="Ile zostałoby w kieszeni, gdybyś zagrał każdy z tych typów tą samą stawką: wypłaty minus to, co postawione"
         />
-        <div className="min-w-0 sm:ml-6 sm:border-l sm:border-hairline-strong/60 sm:pl-6">
+        <Kolumna>
           <Liczba
-            etykieta={`trafia (${d.trafione}/${d.rozliczone})`}
+            etykieta={`weszło (${d.trafione}/${d.rozliczone})`}
             wartosc={fmtProc(hit)}
           />
-        </div>
-        {d.prog != null && (
-          <div className="min-w-0 sm:ml-6 sm:border-l sm:border-hairline-strong/60 sm:pl-6">
+        </Kolumna>
+        {!pelnyWglad && (
+          <Kolumna>
+            <Liczba
+              etykieta="rozliczonych typów"
+              wartosc={String(d.rozliczone)}
+              tytul="Wszystko, co kiedykolwiek pokazaliśmy i co już się zakończyło — razem z tym, co nie weszło"
+            />
+          </Kolumna>
+        )}
+        {pelnyWglad && d.prog != null && (
+          <Kolumna>
             <Liczba
               etykieta="ile trzeba trafiać"
               wartosc={fmtProc(d.prog)}
               tytul="Przy takich kursach dopiero od tylu trafień wychodzi się na zero. Niżej — dokładasz, wyżej — zarabiasz."
             />
-          </div>
+          </Kolumna>
         )}
-        {d.deklaracja != null && (
-          <div className="min-w-0 sm:ml-6 sm:border-l sm:border-hairline-strong/60 sm:pl-6">
+        {pelnyWglad && d.deklaracja != null && (
+          <Kolumna>
             <Liczba
               etykieta="tyle sam obiecywał"
               wartosc={fmtProc(d.deklaracja)}
-              tytul="Średnia szansa, jaką model dawał tym typom. Jeśli jest wyraźnie wyżej niż „trafia”, znaczy, że model jest zbyt pewny siebie."
+              tytul="Średnia szansa, jaką model dawał tym typom. Jeśli jest wyraźnie wyżej niż „weszło”, znaczy, że model jest zbyt pewny siebie."
             />
-          </div>
+          </Kolumna>
         )}
-        {d.clv != null && (d.clvN ?? 0) > 0 && (
-          <div className="min-w-0 sm:ml-6 sm:border-l sm:border-hairline-strong/60 sm:pl-6">
+        {pelnyWglad && d.clv != null && (d.clvN ?? 0) > 0 && (
+          <Kolumna>
             <Liczba
               etykieta={`lepszy kurs niż przed meczem (${d.clvN})`}
               wartosc={`${d.clv >= 0 ? "+" : "−"}${Math.abs(d.clv).toFixed(1).replace(".", ",")}%`}
               ton={d.clv > 0 ? "dodatni" : d.clv < 0 ? "ujemny" : undefined}
-              tytul="O ile procent kurs, który pokazaliśmy, był lepszy od kursu tuż przed pierwszym gwizdkiem. Na plusie znaczy, że łapiemy cenę, zanim bukmacher ją poprawi — to dobry znak niezależnie od tego, czy typ wszedł."
+              tytul="O ile procent kurs, który pokazaliśmy, był lepszy od kursu tuż przed pierwszym gwizdkiem. Na plusie znaczy, że łapiemy cenę, zanim bukmacher ją poprawi."
             />
-          </div>
+          </Kolumna>
         )}
       </dl>
 
@@ -214,38 +264,58 @@ export function WerdyktModelu({ d }: { d: WerdyktDane }) {
         </div>
       )}
 
-      {/* JEDNOSTKA I KOLORY wyjaśnione RAZ, zamiast w pięciu tooltipach */}
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-hairline px-5 py-3.5 text-[11px] text-faint sm:px-6">
-        <span>
-          <strong className="font-semibold text-ink-soft">1u</strong> = jedna
-          stawka. {fmtU(d.roi)} to{" "}
-          <strong className="font-semibold text-ink-soft">
-            {Math.round(d.roi * PRZYKLAD_STAWKA)} zł
-          </strong>{" "}
-          przy {PRZYKLAD_STAWKA} zł na typ.
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span aria-hidden className="h-2.5 w-2.5 rounded-[3px] bg-data-green" />
-          zysk
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span aria-hidden className="h-2.5 w-2.5 rounded-[3px] bg-data-red" />
-          strata
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span aria-hidden className="h-2.5 w-2.5 rounded-[3px] bg-data-amber" />
-          za mała próba
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span
-            aria-hidden
-            className="h-2.5 w-2.5 rounded-[3px] border border-hairline bg-card-soft opacity-55"
+      {/* STAWKA — dla klienta to jedyny sposób, żeby liczby znaczyły cokolwiek
+          osobistego; dla admina jednostki wystarczą, więc nie zabieramy miejsca */}
+      {!pelnyWglad && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-hairline px-5 py-3.5 text-xs text-muted sm:px-6">
+          <label htmlFor="stawka-werdykt">Przelicz na moją stawkę:</label>
+          <input
+            id="stawka-werdykt"
+            type="number"
+            min={1}
+            step={1}
+            value={stawka}
+            onChange={(e) => setStawka(Number(e.target.value))}
+            className="font-data w-20 rounded-(--radius-control) border border-hairline bg-card-soft px-2 py-1 text-sm text-ink"
           />
-          stare zasady
-        </span>
-      </div>
+          <span>zł na każdy typ</span>
+        </div>
+      )}
 
-      {OSTATNIA_ZMIANA && d.wstrzymane.length > 0 && (
+      {/* JEDNOSTKA I KOLORY wyjaśnione RAZ, zamiast w pięciu tooltipach */}
+      {pelnyWglad && (
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-hairline px-5 py-3.5 text-[11px] text-faint sm:px-6">
+          <span>
+            <strong className="font-semibold text-ink-soft">1u</strong> = jedna
+            stawka. {fmtU(d.roi)} to{" "}
+            <strong className="font-semibold text-ink-soft">
+              {zlote(d.roi, stawka)}
+            </strong>{" "}
+            przy {stawka} zł na typ.
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span aria-hidden className="h-2.5 w-2.5 rounded-[3px] bg-data-green" />
+            zysk
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span aria-hidden className="h-2.5 w-2.5 rounded-[3px] bg-data-red" />
+            strata
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span aria-hidden className="h-2.5 w-2.5 rounded-[3px] bg-data-amber" />
+            za mała próba
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span
+              aria-hidden
+              className="h-2.5 w-2.5 rounded-[3px] border border-hairline bg-card-soft opacity-55"
+            />
+            stare zasady
+          </span>
+        </div>
+      )}
+
+      {pelnyWglad && OSTATNIA_ZMIANA && d.wstrzymane.length > 0 && (
         <p className="border-t border-hairline px-5 py-4 text-xs leading-relaxed text-muted sm:px-6">
           <strong className="font-semibold text-ink">Co z tym robimy:</strong>{" "}
           od {dataPl(OSTATNIA_ZMIANA.od)} {OSTATNIA_ZMIANA.opis} Wstrzymane

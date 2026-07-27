@@ -6,7 +6,6 @@ import { useMemo, useState } from "react";
 import { KalendarzWynikow } from "./KalendarzWynikow";
 import { KartyDrabinek } from "./KartyDrabinek";
 import { KrzywaWyniku } from "./skutecznosc/KrzywaWyniku";
-import { ListaTypow } from "./skutecznosc/ListaTypow";
 import { TypyDnia } from "./skutecznosc/TypyDnia";
 import { WerdyktModelu, type WerdyktDane } from "./WerdyktModelu";
 import { fmtProc, fmtU } from "@/lib/format";
@@ -30,7 +29,21 @@ import { poZmianie } from "@/lib/zmiany";
  * spodem: werdykt, krzywą, kalendarz i tabelę rynków.
  *
  * Hierarchia jest twarda i czytelnik schodzi nią w dół, nigdy w bok:
- *   CO (produkt) → KIEDY (krzywa, kalendarz, dzień) → DLACZEGO (rynki, typy).
+ *   CO (produkt) → KIEDY (krzywa + kalendarz + dzień) → DLACZEGO (rynki).
+ *
+ * DWA WIDOKI (2026-07-27, przygotowanie strony pod klienta zewnętrznego):
+ *
+ *   klient — strona liniowa, ZERO zakładek. Werdykt w złotówkach, krzywa
+ *            i kalendarz obok siebie, pod nimi wybrany dzień. Koniec.
+ *   admin  — to samo plus zakładki z kuchnią: tabela rynków (obiecywał vs
+ *            weszło), bilans kuponów, sprawdzian na meczach spoza nauki.
+ *
+ * Podział nie jest kosmetyczny. Tabela rynków dosłownie mówi „nasz model
+ * przeszacowuje o 12 pp" — dla nas to najważniejsza diagnostyka, dla klienta
+ * argument przeciwko produktowi. Sprawdzian modelu i typy liczone „na próbę"
+ * to z kolei narzędzia inżynierskie: nikt z zewnątrz nie wie, co znaczy punkt
+ * na przekątnej. Admin ma przełącznik „pokaż jak widzi klient", bo inaczej
+ * przygotowanie tej strony pod sprzedaż byłoby zgadywanką.
  */
 
 type Wybor = "wszystko" | Strumien;
@@ -59,9 +72,16 @@ const OPISY: Record<Strumien, string> = {
     "Najlepszy typ z każdej karty w zakładce Drabinki. Szansę liczymy tu inaczej niż w modelu: od tego, jak często zawodnik przebijał daną linię, poprawionego o rywala, sędziego i przewidywany przebieg meczu.",
 };
 
+// Zakładka „Co weszło" (pełna lista wszystkich rozliczonych typów) ZNIKNĘŁA
+// 2026-07-27 na prośbę usera: przy kilkuset rozliczeniach była ścianą tekstu,
+// przez którą nie dało się przejść. Wróciliśmy do modelu „kalendarz + dzień",
+// ale bez wady, która tamtą listę zrodziła — patrz komentarz przy `wybranyDzien`.
+//
+// Kalendarz i dzień wyszły PONAD zakładki (2026-07-27): to nie jest „jeden
+// z dowodów", tylko główna treść strony, a chowanie jej za zakładką obok
+// diagnostyki modelu zrównywało rzeczy o zupełnie różnej wadze. W zakładkach
+// została sama kuchnia — i dlatego widzi je wyłącznie admin.
 const ZAKLADKI = [
-  { id: "typy", label: "Co weszło" },
-  { id: "kalendarz", label: "Kalendarz" },
   { id: "rynki", label: "Rynki" },
   { id: "kupony", label: "Kupony" },
   { id: "test", label: "Test na danych z przeszłości" },
@@ -156,16 +176,22 @@ export function SkutecznoscScena({
   meta,
   kuponyPanel,
   testPanel,
+  pelnyWglad = true,
+  przelacznikWidoku,
 }: {
   typy: TypyWyniki;
   meta: Meta;
   /** panele niezależne od filtru produktu — renderowane na serwerze */
   kuponyPanel: React.ReactNode;
   testPanel: React.ReactNode;
+  /** false = widok klienta: bez kuchni modelu (patrz komentarz na górze) */
+  pelnyWglad?: boolean;
+  /** przełącznik „pokaż jak widzi klient" — tylko dla admina */
+  przelacznikWidoku?: React.ReactNode;
 }) {
   const reduced = useReducedMotion();
   const [wybor, setWybor] = useState<Wybor>("wszystko");
-  const [zakladka, setZakladka] = useState<IdZakladki>("typy");
+  const [zakladka, setZakladka] = useState<IdZakladki>("rynki");
   const [dzien, setDzien] = useState<string | null>(null);
 
   const wszystkieDni = useMemo(
@@ -191,8 +217,42 @@ export function SkutecznoscScena({
     [strumienie],
   );
 
-  const dni = wybor === "wszystko" ? wszystkieDni : (strumienie[wybor]?.dni ?? []);
-  const wybranyDzien = dni.find((d) => d.dzien === dzien) ?? null;
+  // useMemo, a nie zwykłe wyrażenie: `?? []` dawałoby nową tablicę co render
+  // i unieważniało wszystkie useMemo, które biorą `dni` w zależnościach
+  const dni = useMemo(
+    () => (wybor === "wszystko" ? wszystkieDni : (strumienie[wybor]?.dni ?? [])),
+    [wybor, wszystkieDni, strumienie],
+  );
+
+  /**
+   * Dni, które mają co pokazać — od najnowszego (tak przychodzą z backendu).
+   * Kalendarz rysuje kafelki wyłącznie z nich, więc panel i siatka operują na
+   * dokładnie tym samym zbiorze i nawigacja strzałkami nie trafia w pustkę.
+   */
+  const dniZTypami = useMemo(
+    () => dni.filter((d) => d.rozliczone > 0),
+    [dni],
+  );
+
+  /**
+   * ZAWSZE któryś dzień jest otwarty — i to jest sedno tej przebudowy.
+   *
+   * Pełna lista typów („Co weszło") powstała dlatego, że kafelki kalendarza
+   * nie wyglądały na klikalne: kto o tym nie wiedział, nie zobaczył ani jednego
+   * typu. Odpowiedzią było wysypanie wszystkiego na jedną stronę, co zamieniło
+   * problem odkrywalności w ścianę tekstu.
+   *
+   * Domyślne otwarcie najnowszego dnia rozwiązuje jedno i drugie: interakcja
+   * pokazuje się sama (widać otwarty panel i podświetlony kafelek nad nim),
+   * a treści jest tyle, ile człowiek przeczyta. Gdy filtr produktu zmieni się
+   * tak, że zapamiętany dzień w nim nie istnieje, wracamy do najnowszego —
+   * dlatego to wyliczenie, a nie efekt synchronizujący stan.
+   */
+  const wybranyDzien =
+    dniZTypami.find((d) => d.dzien === dzien) ?? dniZTypami[0] ?? null;
+  const idxDnia = wybranyDzien
+    ? dniZTypami.findIndex((d) => d.dzien === wybranyDzien.dzien)
+    : -1;
 
   // --- WERDYKT dla aktualnego filtru ---
   const werdykt: WerdyktDane | null = useMemo(() => {
@@ -305,9 +365,11 @@ export function SkutecznoscScena({
 
   return (
     <div>
+      {przelacznikWidoku}
+
       {werdykt && (
         <div className="max-w-3xl">
-          <WerdyktModelu d={werdykt} />
+          <WerdyktModelu d={werdykt} pelnyWglad={pelnyWglad} />
         </div>
       )}
 
@@ -371,15 +433,67 @@ export function SkutecznoscScena({
         </div>
       )}
 
-      {/* KRZYWA — główny obraz: czy to idzie w dobrą stronę */}
-      {dni.length > 1 && (
-        <div className="mt-6 max-w-3xl">
-          <KrzywaWyniku dni={dni} />
-        </div>
-      )}
+      {/* DOWÓD — krzywa i kalendarz OBOK SIEBIE.
+          To dwa spojrzenia na tę samą rzecz i dopiero razem robią robotę:
+          krzywa mówi „w którą stronę to idzie", kalendarz „kiedy i jak
+          równo". Rozdzielone (krzywa nad zakładkami, kalendarz w zakładce)
+          zmuszały do przełączania się tam i z powrotem, żeby zestawić trend
+          z konkretnym dniem. */}
+      <div className="mt-8 grid max-w-6xl items-start gap-5 lg:grid-cols-2">
+        {dni.length > 1 && <KrzywaWyniku dni={dni} />}
+        <KalendarzWynikow
+          dni={dni}
+          wszystkieDni={wszystkieDni}
+          wybrany={wybranyDzien?.dzien ?? null}
+          onWybierz={setDzien}
+        />
+      </div>
 
-      {/* ZAKŁADKI dowodów */}
-      <div className="mt-8">
+      {/* WYBRANY DZIEŃ — bezpośrednio pod mapą, bez zakładki */}
+      <div className="mt-4 max-w-3xl space-y-3">
+        {wybranyDzien ? (
+          <TypyDnia
+            dzien={wybranyDzien}
+            pelnyWglad={pelnyWglad}
+            // strzałki chodzą po TEJ SAMEJ liście co kafelki, a kalendarz
+            // przewija się za wyborem (patrz KalendarzWynikow) — więc to
+            // nadal jedna oś czasu, tylko dostępna bez celowania w siatkę
+            nowszy={
+              idxDnia > 0
+                ? () => setDzien(dniZTypami[idxDnia - 1].dzien)
+                : undefined
+            }
+            starszy={
+              idxDnia >= 0 && idxDnia < dniZTypami.length - 1
+                ? () => setDzien(dniZTypami[idxDnia + 1].dzien)
+                : undefined
+            }
+            pozycja={idxDnia + 1}
+            ile={dniZTypami.length}
+          />
+        ) : (
+          <p className="rounded-(--radius-card) border border-hairline bg-card px-4 py-3.5 text-sm text-muted shadow-(--shadow-card)">
+            Nic tu jeszcze nie ma — żaden typ tego rodzaju się nie rozliczył.
+          </p>
+        )}
+        {pelnyWglad && (poza?.poza_n ?? 0) > 0 && (
+          <p className="rounded-(--radius-card) border border-hairline bg-card px-4 py-3 text-xs leading-relaxed text-muted">
+            <span className="font-data font-semibold text-ink">
+              {poza!.poza_trafione ?? 0}/{poza!.poza_n}
+            </span>{" "}
+            typów policzyliśmy{" "}
+            <strong className="font-semibold">tylko na próbę</strong> — nie było
+            ich na stronie, bo albo dany rynek był chwilowo wstrzymany, albo nie
+            zmieściły się w limicie typów z jednego meczu. Nie wliczamy ich do
+            bilansu; na liście mają oznaczenie „na próbę”.
+          </p>
+        )}
+        {wybor === "drabinki" && dni.length > 0 && <KartyDrabinek dni={dni} />}
+      </div>
+
+      {/* ZAKŁADKI — sama kuchnia modelu, wyłącznie dla admina */}
+      {pelnyWglad && (
+      <div className="mt-10">
         <div
           role="tablist"
           aria-label="Dowody skuteczności"
@@ -425,49 +539,6 @@ export function SkutecznoscScena({
           aria-labelledby={`zakladka-${zakladka}`}
           className="mt-5"
         >
-          {zakladka === "typy" && (
-            <div className="max-w-3xl space-y-3">
-              <p className="max-w-prose text-sm leading-relaxed text-muted">
-                Wszystko, co pokazaliśmy i co już się zakończyło —{" "}
-                {wybor === "wszystko"
-                  ? "ze wszystkich rodzajów typów"
-                  : `tylko ${NAZWY[wybor].toLowerCase()}`}
-                . Zielona kropka znaczy, że typ wszedł.
-              </p>
-              <ListaTypow dni={dni} />
-            </div>
-          )}
-
-          {zakladka === "kalendarz" && (
-            <div className="max-w-3xl space-y-3">
-              <KalendarzWynikow
-                dni={dni}
-                wszystkieDni={wszystkieDni}
-                wybrany={dzien}
-                onWybierz={(d) => setDzien((v) => (v === d ? null : d))}
-              />
-              {wybranyDzien && (
-                <TypyDnia dzien={wybranyDzien} onZamknij={() => setDzien(null)} />
-              )}
-              {(poza?.poza_n ?? 0) > 0 && (
-                <p className="rounded-(--radius-card) border border-hairline bg-card px-4 py-3 text-xs leading-relaxed text-muted">
-                  <span className="font-data font-semibold text-ink">
-                    {poza!.poza_trafione ?? 0}/{poza!.poza_n}
-                  </span>{" "}
-                  typów policzyliśmy{" "}
-                  <strong className="font-semibold">tylko na próbę</strong> —
-                  nie było ich na stronie, bo albo dany rynek był chwilowo
-                  wstrzymany, albo nie zmieściły się w limicie typów z jednego
-                  meczu. Nie wliczamy ich do bilansu; na liście mają
-                  oznaczenie „na próbę”.
-                </p>
-              )}
-              {wybor === "drabinki" && dni.length > 0 && (
-                <KartyDrabinek dni={dni} />
-              )}
-            </div>
-          )}
-
           {zakladka === "rynki" && (
             <div className="max-w-3xl">
               {klasy && (
@@ -680,6 +751,7 @@ export function SkutecznoscScena({
           {zakladka === "test" && testPanel}
         </div>
       </div>
+      )}
     </div>
   );
 }
