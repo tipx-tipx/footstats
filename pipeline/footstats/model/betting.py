@@ -310,6 +310,83 @@ NEAR_DIV = 0.06         # rozjazd model-rynek do 6 pp ponad limit
 NEAR_REL = 0.3          # rozjazd względny do 0.3x ponad limit
 
 
+# --- WIDEŁKI KURS×SZANSA DLA RYNKÓW DRUŻYNOWYCH ---
+# Typ drużynowy wchodzi do puli, jeśli mieści się w którymkolwiek przedziale:
+# kurs w widełkach ORAZ szansa nad progiem ORAZ dodatnia wartość na p ostrożnym.
+#
+# TO SĄ ZAŁOŻENIA, NIE POMIAR — i to NAJWIĘKSZE sito w całym systemie.
+# Dry-run 2026-07-27: 1372 odrzucenia tą bramą wobec 66 oknem zgody z rynkiem
+# i 12 krótką historią. Każdy inny próg w projekcie przeszedł już weryfikację
+# rozliczeniami (rozjazd z rynkiem, kwarantanna rynków, kwarantanna kategorii);
+# ten stoi nietknięty od czasu, gdy go wpisano „na oko".
+#
+# Co już wiadomo BEZ czekania na rozliczenia (rachunek, nie przeczucie):
+#  * progi szansy 0,52 i 0,42 to niemal dokładnie PRÓG OPŁACALNOŚCI na górnych
+#    granicach swoich przedziałów: 1/1,92 = 0,52 i 1/2,38 = 0,42. Czyli nie są
+#    niezależnym sitem — w większości zakresu wiąże ten sam warunek, co żądanie
+#    dodatniej wartości. Ruszanie ich osobno niewiele da.
+#  * PRAWDZIWYM sitem jest wymóg dodatniej wartości na p OSTROŻNYM, czyli na
+#    średniej z p i dolnej granicy przedziału ufności. Przy szerokim przedziale
+#    (a rynki drużynowe świeżo z banku mają szerokie) to schodzi kilka-kilkanaście
+#    pp poniżej p i zabiera typ, który na samym p wychodziłby na plus.
+#  * sufit kursów wychodzi na 3,60 (suma obu przedziałów to 1,19–3,60), podczas
+#    gdy typy zawodnicze mają MAX_ODDS=6,0. Nikt nie uzasadnił tej różnicy.
+# ŻADNEGO z nich nie ruszamy bez rozliczeń — po to są typy pomiarowe niżej.
+#
+# Dlatego zamiast ruszać liczby: rozdzielamy DIAGNOSTYKĘ na trzy powody
+# (widziemy wreszcie, który warunek tnie) i logujemy odrzucenia TUŻ pod progiem
+# jako typy pomiarowe — dokładnie tak, jak zmierzyliśmy próg rozjazdu.
+WIDELKI_DRUZYNOWE = (
+    # (kurs_min, kurs_max, minimalna szansa)
+    (MIN_ODDS, 2.80, 0.52),   # „pewniak": niski kurs, wysoka szansa
+    (1.90, 3.60, 0.42),       # „perełka": wyższy kurs, niższa szansa
+)
+# tolerancje pomiaru: o ile typ może minąć się z progiem, żeby trafić do logu
+# jako `odrzucony` (rozlicza się w tle, poza kalibracją, skutecznością i UI)
+NEAR_WIDELKI_KURS = 1.4     # kurs do 1,4x ponad sufit widełek
+NEAR_WIDELKI_P = 0.08       # szansa do 8 pp poniżej progu
+NEAR_WIDELKI_EV = 0.04      # wartość na p ostrożnym do 4 pp pod zerem
+
+
+def widelki_druzynowe_ok(odd: float, p: float, p_ostrozne: float) -> bool:
+    """Czy typ drużynowy przechodzi bramę kurs×szansa (patrz WIDELKI_DRUZYNOWE)."""
+    return any(
+        lo <= odd <= hi and p >= p_min and p_ostrozne * odd - 1.0 >= 0.0
+        for lo, hi, p_min in WIDELKI_DRUZYNOWE
+    )
+
+
+def powod_widelek(odd: float, p: float, p_ostrozne: float) -> str:
+    """KTÓRY z trzech warunków wyciął typ — wyłącznie do diagnostyki.
+
+    Jeden licznik na trzy różne przyczyny nie mówił nic: nie dało się odróżnić
+    „bukmacher daje za wysoki kurs" od „model daje za niską szansę" od „to po
+    prostu nie ma wartości". Kolejność od najbardziej zewnętrznego warunku.
+    """
+    w_kursie = [b for b in WIDELKI_DRUZYNOWE if b[0] <= odd <= b[1]]
+    if not w_kursie:
+        return "kurs_poza_widelkami"
+    if not any(p >= p_min for _, _, p_min in w_kursie):
+        return "szansa_za_niska"
+    return "wartosc_ujemna"
+
+
+def widelki_druzynowe_blisko(odd: float, p: float, p_ostrozne: float) -> bool:
+    """Czy typ minął się z bramą NIEWIELE — kandydat na typ pomiarowy.
+
+    Sens: za miesiąc porównamy hit-rate i ROI tych typów z przepuszczonymi
+    i dopiero wtedy będzie wiadomo, czy brama zarabia, czy tylko chudzi listę.
+    """
+    if widelki_druzynowe_ok(odd, p, p_ostrozne):
+        return False
+    return any(
+        lo <= odd <= hi * NEAR_WIDELKI_KURS
+        and p >= p_min - NEAR_WIDELKI_P
+        and p_ostrozne * odd - 1.0 >= -NEAR_WIDELKI_EV
+        for lo, hi, p_min in WIDELKI_DRUZYNOWE
+    )
+
+
 def assess(
     p_model_over: float,
     over_odds: float | None,

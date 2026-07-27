@@ -297,6 +297,12 @@ const POWOD_LABEL: Record<string, string> = {
   chwiejna_predykcja: "Model sam nie jest pewny swojej liczby",
   rozjazd_z_rynkiem: "Model za daleko od kursu bukmachera",
   kurs_lub_szansa_poza_widelkami: "Kurs i szansa nie składają się w grywalny typ",
+  // ten sam warunek rozbity na trzy (2026-07-27) — dla rynków drużynowych to
+  // najczęstszy powód braku typu, a jedna etykieta nie mówiła, co konkretnie
+  // zawiodło: cena bukmachera, nasza szansa czy sam rachunek opłacalności
+  kurs_poza_widelkami: "Kurs poza widełkami, w jakich gramy",
+  szansa_za_niska: "Szansa za niska jak na ten kurs",
+  wartosc_ujemna: "Przy ostrożnym liczeniu to nie wychodzi na plus",
 };
 
 /** Grupuj wpisy po powodzie, w kolejności z POWOD_LABEL (reszta na końcu). */

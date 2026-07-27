@@ -348,7 +348,13 @@ export interface Odrzucenie {
     | "za_malo_historii"
     | "za_malo_zdarzen"
     | "brak_kursu"
+    // rynki drużynowe: dawne "kurs_lub_szansa_poza_widelkami" rozbite na trzy
+    // powody (2026-07-27) — jeden licznik na trzy warunki nie mówił, co tnie.
+    // Stary kod zostaje: log i dumpy sprzed zmiany nadal go niosą.
     | "kurs_lub_szansa_poza_widelkami"
+    | "kurs_poza_widelkami"
+    | "szansa_za_niska"
+    | "wartosc_ujemna"
     | "krotka_historia"
     | "chwiejna_predykcja"
     | "rozjazd_z_rynkiem"

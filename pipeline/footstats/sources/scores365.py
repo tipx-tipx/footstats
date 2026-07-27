@@ -19,6 +19,7 @@ Wyniki cache'owane w pamięci procesu (jeden cykl = jedno pobranie).
 
 from __future__ import annotations
 
+import re
 import time as _time
 
 from curl_cffi import requests
@@ -156,6 +157,79 @@ def competitor_ids_z_rozgrywek(comp_ids: list[int]) -> dict[str, int]:
                     if nm and c.get("id") and nm not in out:
                         out[nm] = int(c["id"])
     return out
+
+
+# Skróty typu klubu — w nazwie są ozdobą, nie tożsamością. Lista celowo krótka:
+# im więcej wyrzucimy, tym łatwiej o fałszywą zgodność (np. „cd leganes" i „ud
+# leganes" po wycięciu obu skrótów to ta sama drużyna, a nie jest). Wszystko,
+# co niesie znaczenie (atletico, real, sporting, dynamo, cska), ZOSTAJE.
+_TOKENY_TYPU_KLUBU = frozenset({
+    "fc", "fk", "fci", "afc", "cfr", "nk", "hnk", "gnk", "msk", "ofk",
+    "sc", "rsc", "ssc", "ac", "sk", "bk", "if", "kf", "cf", "sv", "fs",
+})
+
+
+def _tokeny_druzyny(nazwa: str) -> frozenset[str]:
+    """Słowa niosące TOŻSAMOŚĆ klubu: bez skrótów typu, roku i pojedynczych liter.
+
+    Rok założenia w nazwie („KF Shkëndija 79", „FC Hradec Králové 1905") jest
+    u jednego źródła, a u drugiego nie — dlatego liczby lecą. Pojedyncze litery
+    lecą z tego samego powodu: „Caracas F.C." rozpada się na `f` i `c`.
+    """
+    surowe = re.split(r"[^0-9a-z]+", _norm(nazwa))
+    return frozenset(
+        t for t in surowe
+        if len(t) > 1 and not t.isdigit() and t not in _TOKENY_TYPU_KLUBU
+    )
+
+
+def dopasuj_druzyne(mapa: dict[str, int], nazwa: str) -> int | None:
+    """competitorId dla nazwy drużyny z innego źródła — albo None.
+
+    POWÓD (zmierzone 2026-07-27): doganianie banku stylu prosiło o id dla 12
+    drużyn i dostawało je dla JEDNEJ. Wszystkie pozostałe siedziały w mapie,
+    tylko inaczej zapisane: „Caracas F.C." vs „Caracas FC", „Bodo/Glimt" vs
+    „Bodo Glimt", „RSC Anderlecht" vs „Anderlecht", „KF Shkëndija" vs
+    „KF Shkëndija 79", „FCI Levadia Tallinn" vs „Levadia Tallinn".
+
+    DLACZEGO NIE PODOBIEŃSTWO TEKSTU. Wydaje się oczywiste i jest groźne.
+    Dla „Deportivo Riestra" najbardziej podobne w mapie jest „Deportivo
+    Recoleta" (0,80) — INNY KLUB. Dla „Riga FC" najbardziej podobne to
+    „Rigas FS" (0,80) — też inny klub, drugi zespół z tej samej Rygi. Próg
+    podobieństwa wpuściłby oba i zasilił bank historią cudzej drużyny: cicho,
+    bez błędu i bez śladu w logu. Brak dopasowania widać, podmianę — nie.
+
+    Dlatego ta sama reguła co przy zawodnikach (superbet.znajdz_zawodnika):
+    porównujemy ZBIORY SŁÓW i przyjmujemy WYŁĄCZNIE dopasowanie jednoznaczne.
+    Dwa stopnie, od ostrzejszego:
+
+      1. identyczny zbiór słów (Riga FC -> riga, nie rigas fs),
+      2. zawieranie się w którąkolwiek stronę (Deportivo Riestra -> riestra).
+
+    Remis na którymkolwiek stopniu = brak dopasowania. Nie zgadujemy.
+    """
+    klucz = _norm(nazwa)
+    if klucz in mapa:
+        return mapa[klucz]
+    tok = _tokeny_druzyny(nazwa)
+    if not tok:
+        return None
+    # rozstrzygamy po ID, nie po kluczu: ta sama drużyna bywa w mapie pod
+    # dwoma zapisami i dwa wpisy na jedno id to nadal jednoznaczność
+    rowne: set[int] = set()
+    zawarte: set[int] = set()
+    for k, cid in mapa.items():
+        kt = _tokeny_druzyny(k)
+        if not kt:
+            continue
+        if kt == tok:
+            rowne.add(int(cid))
+        elif tok <= kt or kt <= tok:
+            zawarte.add(int(cid))
+    for kandydaci in (rowne, zawarte):
+        if len(kandydaci) == 1:
+            return next(iter(kandydaci))
+    return None
 
 
 def finished_games_by_competition(comp_id: int = WC_COMPETITION_ID) -> list[dict]:

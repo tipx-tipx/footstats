@@ -480,6 +480,14 @@ STARE_DANE_S = 45 * 86400           # ostatni występ dawniej -> typ tylko "w tl
 # etykiety stron linii do czytelnych szczegółów w rejestrze odrzuceń
 STRONA_PL = {"powyzej": "powyżej", "ponizej": "poniżej"}
 
+# dokończenie zdania „szansa modelu X% ..." w rejestrze odrzuceń drużynowych.
+# Trzy powody zamiast jednego — patrz betting.WIDELKI_DRUZYNOWE
+POWODY_WIDELEK_PL = {
+    "kurs_poza_widelkami": "przy kursie spoza widełek, w jakich gramy",
+    "szansa_za_niska": "jest za niska jak na ten przedział kursów",
+    "wartosc_ujemna": "nie daje dodatniej wartości przy ostrożnym liczeniu",
+}
+
 # --- BRAMA EKSPOZYCJI: ile minut model spodziewa się po zawodniku ---
 # Typ na zawodnika, który przeciętnie gra pół meczu, jest zakładem o skład,
 # nie o statystykę. Rozliczenia 2026-07-27: przy NIEZNANYM składzie zawodnik
@@ -976,7 +984,18 @@ def dolej_historie_wlasna(
     nieudane: list[str] = []
     for nm in ubogie:
         try:
-            cid = id_map.get(nm) or scores365.competitor_ids([nm]).get(nm)
+            # dopasowanie po ZBIORACH SŁÓW, nie po dokładnym kluczu — 365Scores
+            # i statshub zapisują te same kluby inaczej („RSC Anderlecht" vs
+            # „Anderlecht", „Caracas F.C." vs „Caracas FC"). Zmierzone
+            # 2026-07-27: na dokładnym kluczu z 12 drużyn cyklu id dostawała
+            # JEDNA, przez co podniesiony budżet doganiania nie miał czego
+            # doganiać. Reguła jednoznaczności siedzi w `dopasuj_druzyne` —
+            # patrz tam, czemu NIE jest to próg podobieństwa tekstu.
+            cid = scores365.dopasuj_druzyne(id_map, nm)
+            if not cid:
+                cid = scores365.dopasuj_druzyne(
+                    scores365.competitor_ids([nm]), nm
+                )
             if not cid:
                 nieudane.append(nm)
                 continue
@@ -2151,6 +2170,11 @@ def _main_impl(tryb=None):
     # skutecznością i UI). Diagnostyka porówna ich hit-rate z przepuszczonymi.
     odrzucone_pomiar: list[dict] = []
     ODRZUCONE_POMIAR_MAX = 80   # bezpiecznik objętości logu per cykl
+    # OSOBNY budżet dla rynków DRUŻYNOWYCH (2026-07-27). Pętla zawodnicza idzie
+    # pierwsza i przy ruchliwym dniu wypełniłaby wspólny limit do zera, a wtedy
+    # pomiar bramy kurs×szansa — ten, po który go w ogóle dokładamy — nie
+    # zebrałby ani jednej próbki. Dwa liczniki, żeby jedno nie głodziło drugiego.
+    ODRZUCONE_POMIAR_DRUZYN_MAX = 60
 
     # PEŁNE POKRYCIE p_model per (zawodnik, rynek, linia) — dla scannera value
     # betów STS. Model „widzi" KAŻDĄ kwotowaną linię, nie tylko te, które weszły
@@ -3042,6 +3066,7 @@ def _main_impl(tryb=None):
         }
 
         n_team = 0
+        pomiar_druzyn = 0   # własny budżet typów pomiarowych, patrz wyżej
         seen_team = set()
         odpadki_t: Counter = Counter()  # diagnostyka: czemu legi drużynowe nie powstają
         for tt in team_trends:
@@ -3256,22 +3281,46 @@ def _main_impl(tryb=None):
                     implied_t = betting.implied_prob_one_sided(odd_t)
                     # jak po stronie zawodniczej: decyduje p ostrożne
                     p_dec_t = (p_t + lo_t) / 2.0
-                    pewny_t = (
-                        betting.MIN_ODDS <= odd_t <= 2.80
-                        and p_t >= 0.52 and p_dec_t * odd_t - 1.0 >= 0.0
-                    )
-                    perelka_t = (
-                        1.90 <= odd_t <= 3.60
-                        and p_t >= 0.42 and p_dec_t * odd_t - 1.0 >= 0.0
-                    )
-                    if not (pewny_t or perelka_t):
-                        odpadki_t["kurs_lub_szansa_poza_widelkami"] += 1
+                    if not betting.widelki_druzynowe_ok(odd_t, p_t, p_dec_t):
+                        # ROZDZIELONA DIAGNOSTYKA (2026-07-27): trzy warunki
+                        # miały dotąd jeden licznik, więc te 1372 odrzucenia
+                        # nie mówiły, CO właściwie tnie. Patrz betting.
+                        # WIDELKI_DRUZYNOWE — to najbardziej kosztowna brama
+                        # w systemie i jedyna nigdy niezweryfikowana.
+                        powod_w = betting.powod_widelek(odd_t, p_t, p_dec_t)
+                        odpadki_t[powod_w] += 1
                         _odrzuc_druzyne(
-                            mid, tt, "kurs_lub_szansa_poza_widelkami",
+                            mid, tt, powod_w,
                             f"{STRONA_PL.get(strona_t, strona_t)} {l_t} "
-                            f"@{odd_t}: szansa modelu {p_t:.0%} nie łączy się "
-                            "z tym kursem w typ",
+                            f"@{odd_t}: szansa modelu {p_t:.0%} "
+                            + POWODY_WIDELEK_PL[powod_w],
                         )
+                        # POMIAR PROGU: typ, który minął się z bramą niewiele,
+                        # rozlicza się w tle jako `odrzucony` — poza kalibracją,
+                        # skutecznością i UI. Za miesiąc porównamy jego wynik
+                        # z przepuszczonymi i dopiero wtedy ruszymy liczby.
+                        if (
+                            betting.widelki_druzynowe_blisko(odd_t, p_t, p_dec_t)
+                            and pomiar_druzyn < ODRZUCONE_POMIAR_DRUZYN_MAX
+                        ):
+                            pomiar_druzyn += 1
+                            odrzucone_pomiar.append({
+                                "id": 0, "mecz_id": mid, "mecz": match_label,
+                                "kickoff_ts": ts, "podmiot_typ": "druzyna",
+                                "podmiot_id": -abs(int(tt.team_id or 0)),
+                                "podmiot": tt.team_name,
+                                "rynek_kod": tt.market_code,
+                                "rynek": MARKET_NAMES_PL.get(
+                                    tt.market_code, tt.market_code
+                                ),
+                                "linia": l_t, "strona": strona_t,
+                                "kurs": odd_t, "bukmacher": "Superbet",
+                                "p_model": round(p_t, 4),
+                                "pewnosc": "srednia",
+                                "sugestia": False,
+                                "odrzucony": True,
+                                "odrzucenie_powod": powod_w,
+                            })
                         continue
                     if (hi_t - lo_t) > 0.35:
                         odpadki_t["chwiejna_predykcja"] += 1
@@ -3946,8 +3995,12 @@ def _main_impl(tryb=None):
         _dump("odrzucenia_zero_okazji.json", list(odrzucenia.values()))
         _dump_pokrycie()
         # drabinki żyją własnym życiem — dzień bez typów modelu (np. cały
-        # rynek w kwarantannie) nadal ma karty do rozliczenia
+        # rynek w kwarantannie) nadal ma karty do rozliczenia.
+        # Typy POMIAROWE też muszą tędy przejść: cykl bez ani jednej okazji to
+        # dokładnie ten, w którym progi wycięły wszystko — czyli najciekawszy
+        # dla pomiaru, a dotąd jedyny, który go gubił.
         _rozlicz_i_zapisz([], [], niedostepni,
+                          odrzucone_pomiar=odrzucone_pomiar,
                           poza_publikacja=typy_poza_publikacja,
                           drabinki=drabinki_typy)
         return
