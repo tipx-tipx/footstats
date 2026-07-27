@@ -1558,6 +1558,67 @@ def skutecznosc_strumieni(log: dict, dni: int = 21) -> dict[str, dict]:
     return out
 
 
+# --- MUNDIAL vs LIGI: rozbicie epok per rynek ---
+# Powód (pomiar 2026-07-27, 408 rozliczonych typów): sezon ligowy wystartował,
+# ale kwarantanna rynków patrzy na OKNO 40 OSTATNICH ROZLICZEŃ, a nie na
+# kalendarz — dla rynków o dużym wolumenie połowa tego okna to wciąż mecze
+# reprezentacji. Naturalne pytanie „może w ligach jest już lepiej?" sprawdziliśmy
+# i odpowiedź brzmi NIE:
+#
+#   mundial (mecz < 21.07)         292 typy   57,4% trafień   ROI −13,5%
+#   ligi    (mecz >= 21.07)        116 typów  65,7% trafień   ROI  −4,8%
+#     z tego drużynowe              84        66,2%           ROI  −2,4%
+#     z tego ZAWODNICZE             32        64,0%           ROI −11,2%
+#
+# Cała poprawa siedzi w rynkach drużynowych, których na mundialu w ogóle nie
+# było; typy zawodnicze w ligach tracą praktycznie tyle samo co na turnieju.
+# Sprawdzone też ważenie świeżością (półzanik 14 i 7 dni): ŻADEN wstrzymany
+# rynek się nie odblokowuje, a strzały wychodzą wtedy nawet gorzej
+# (−10,7% -> −12,6%). Wycięcie mundialu zwolniłoby odbiory (0 rozliczeń z lig),
+# faule popełnione (1) i wywalczone (4) — czyli na BRAKU DANYCH, nie na dowodzie
+# poprawy. Dlatego kwarantanny nie ruszamy; zamiast tego pokazujemy rozbicie,
+# żeby moment przełomu dało się zobaczyć, a nie zgadywać.
+KONIEC_MUNDIALU_TS = 1784592000   # 2026-07-21 00:00 UTC
+
+
+def epoki_per_rynek(log: dict) -> dict:
+    """Trafienia i ROI per rynek w rozbiciu mundial / ligi.
+
+    Liczone na tej samej próbie co kwarantanna (typy modelu z kursem), żeby
+    liczby dało się zestawić z jej progiem wprost.
+    """
+    settled = [
+        r for r in log.values()
+        if r.get("wynik") in ("wygrany", "przegrany")
+        and not r.get("sugestia") and not r.get("odrzucony")
+        and _z_modelu(r) and r.get("kurs") and float(r["kurs"]) > 1.0
+    ]
+
+    def _blok(grp: list[dict]) -> dict | None:
+        if not grp:
+            return None
+        traf = sum(1 for r in grp if r["wynik"] == "wygrany")
+        roi = sum(
+            (float(r["kurs"]) - 1.0) if r["wynik"] == "wygrany" else -1.0
+            for r in grp
+        ) / len(grp)
+        return {"n": len(grp), "trafione": traf,
+                "skutecznosc": round(traf / len(grp), 3), "roi": round(roi, 3)}
+
+    out: dict = {}
+    for mk in sorted({r["rynek_kod"] for r in settled}):
+        grp = [r for r in settled if r["rynek_kod"] == mk]
+        mundial = [r for r in grp
+                   if int(r.get("kickoff_ts") or 0) < KONIEC_MUNDIALU_TS]
+        ligi = [r for r in grp
+                if int(r.get("kickoff_ts") or 0) >= KONIEC_MUNDIALU_TS]
+        # etykieta z samego rekordu — rozliczanie nie zna map z build_demo,
+        # a każdy typ i tak nosi swoją polską nazwę rynku
+        out[mk] = {"mundial": _blok(mundial), "ligi": _blok(ligi),
+                   "nazwa": next((r.get("rynek") for r in grp if r.get("rynek")), mk)}
+    return out
+
+
 def _statshub_wynik(event_id: int, cache: dict) -> dict | None:
     """Wynik meczu z otwartego API statshub; cache per przebieg rozliczania."""
     if event_id in cache:
@@ -2143,6 +2204,9 @@ def rozlicz(
         # ta sama skuteczność rozbita na strumienie: pewniaki / drużyny /
         # drabinki (każdy z własnym ROI i listą dni)
         "skutecznosc_strumienie": strumienie,
+        # mundial vs ligi per rynek — czy sezon klubowy zmienił obraz
+        # (patrz `epoki_per_rynek`: na 27.07 NIE zmienił, poza drużynowymi)
+        "epoki_per_rynek": epoki_per_rynek(log),
         "kupony": kupony_hist,
         "kupony_roi": kupony_roi,
         # WSZYSTKIE wygrane kupony (trwały log, nigdy nie znikają)

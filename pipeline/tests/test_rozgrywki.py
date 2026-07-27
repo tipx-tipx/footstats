@@ -3,15 +3,47 @@
 from footstats import rozgrywki
 
 
-def test_zakres_druzynowy_dokladnie_9_rozgrywek():
-    """Top 5 + Ekstraklasa + LM/LE/LK — dokładnie tyle i nic więcej."""
+def test_zakres_druzynowy_dokladnie_17_rozgrywek():
+    """Europa (top 5 + Ekstraklasa + puchary) + Ameryka Płd. + Skandynawia.
+
+    Rozszerzone 2026-07-27: rynki drużynowe to jedyny dochodowy produkt, więc
+    zakres poszedł tam, gdzie sonda statshub pokazała komplet danych. Lista
+    jest zamknięta celowo — każda dołożona rozgrywka kosztuje czas cyklu
+    (bank stylu + terminarze 365Scores), więc nie rośnie sama z siebie.
+    """
     druzynowe = [p for p in rozgrywki.PROFILE.values() if p.druzynowe]
-    assert len(druzynowe) == 9
+    assert len(druzynowe) == 17
     nazwy = {p.nazwa for p in druzynowe}
     assert nazwy == {
+        # Europa (zakres pierwotny 2026-07-20)
         "Premier League", "LaLiga", "Serie A", "Bundesliga", "Ligue 1",
         "Ekstraklasa", "Liga Mistrzów", "Liga Europy", "Liga Konferencji",
+        # Ameryka Płd. — grają cały rok
+        "Liga Profesional", "Brasileirão Série A", "Brasileirão Série B",
+        "CONMEBOL Sudamericana",
+        # Skandynawia — sezon letni, luka przed startem top 5
+        "Allsvenskan", "Superettan", "Eliteserien", "Superliga",
     }
+
+
+def test_nowe_ligi_maja_obie_polowki_pary_id():
+    """utid BEZ comp365 = rynki drużynowe, które nigdy się nie rozliczą.
+
+    Rozliczanie szuka wyniku meczu po `comp365` (games/results per rozgrywki).
+    Brak tego id nie daje błędu — typ po prostu wisi i po 48h zamyka się jako
+    zwrot. Pary poniżej zweryfikowane 2026-07-27 porównaniem nazw drużyn
+    między statshub (utid) a 365Scores (comp365).
+    """
+    PARY = {155: 72, 325: 113, 390: 116, 480: 389,
+            40: 122, 46: 123, 20: 131, 39: 119}
+    for utid, comp in PARY.items():
+        p = rozgrywki.profil(utid)
+        assert p is not None and p.druzynowe, f"utid {utid} poza zakresem"
+        assert p.comp365 == (comp,), f"utid {utid}: comp365 {p.comp365}"
+    # każda rozgrywka w zakresie MUSI mieć comp365 — inaczej cicha strata
+    for p in rozgrywki.PROFILE.values():
+        if p.druzynowe:
+            assert p.comp365, f"{p.nazwa} bez comp365"
 
 
 def test_ms_poza_zakresem_druzynowym():

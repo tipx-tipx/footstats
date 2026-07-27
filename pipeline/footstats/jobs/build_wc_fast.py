@@ -919,12 +919,26 @@ LIMIT_WZROSTOW_NA_CYKL = 30
 
 
 # Beniaminek: ile gier w banku uznajemy za "zna go" — poniżej dociągamy jego
-# WŁASNĄ historię, także z niższej ligi. 4 to minimum, na którym counts.py
-# w ogóle stawia posterior (brama krotka_historia wymaga 5).
-MIN_GIER_BANKU = 4
+# WŁASNĄ historię, także z niższej ligi.
+#
+# PODNIESIONE Z 4 NA 6 (2026-07-27). Cztery gry były progiem posteriora
+# counts.py, ale brama `krotka_historia` w sekcji drużynowej wymaga PIĘCIU —
+# więc drużyna doprowadzona dokładnie do czterech przestawała być "uboga",
+# a typu i tak nie dawała. Sześć zostawia zapas na mecze, których 365 nie
+# odda (brak statystyk, mecz przerwany).
+MIN_GIER_BANKU = 6
 # ile własnych meczów dociągamy takiej drużynie i ile drużyn na cykl
 BENIAMINEK_GIER = 8
-BENIAMINEK_DRUZYN_CYKL = 6
+# PODNIESIONE Z 6 NA 12 (2026-07-27) — powód jest arytmetyczny. Po dołożeniu
+# ośmiu lig do zakresu drużynowego bank stylu nie zna 141 z 214 drużyn
+# najbliższych meczów (zmierzone: tylko 3% ma wymagane 5 gier). Zasilanie
+# per rozgrywki tego nie nadrobi, bo `/games/results?competitions=` oddaje
+# WYŁĄCZNIE ostatnią kolejkę — medianę jednego meczu na drużynę. Ta ścieżka,
+# per drużyna, jest jedyną, która sięga w głąb sezonu. Przy 6 drużynach na
+# cykl doganianie trwałoby ~24 cykle, przy 12 — połowę tego, czyli mniej
+# więcej dobę. Koszt to ~minuta cyklu i tylko na czas doganiania: gdy bank
+# już zna drużyny, lista "ubogich" jest pusta i pętla nie robi nic.
+BENIAMINEK_DRUZYN_CYKL = 12
 
 
 def dolej_historie_wlasna(
@@ -967,8 +981,10 @@ def dolej_historie_wlasna(
                 nieudane.append(nm)
                 continue
             przed = dodane
-            for gid_i, ts_i in scores365.recent_finished_games(
-                int(cid), BENIAMINEK_GIER
+            for gid_i, ts_i, comp_i in (
+                scores365.recent_finished_games_z_rozgrywkami(
+                    int(cid), BENIAMINEK_GIER
+                )
             ):
                 gid_s = str(gid_i)
                 if gid_s in gry:
@@ -979,7 +995,17 @@ def dolej_historie_wlasna(
                 for nm_g, ile_g in (scores365.game_scores(gid_i) or {}).items():
                     if nm_g in druzyny:
                         druzyny[nm_g]["gole"] = float(ile_g)
-                gry[gid_s] = {"ts": ts_i, "druzyny": druzyny, "wlasna": True}
+                # `wlasna` = historia Z INNEGO POZIOMU, wymagająca skalowania
+                # przy konsumpcji. Mecz rozegrany w rozgrywkach NASZEGO zakresu
+                # jest zwykłą historią, choćby przyszedł tą samą ścieżką —
+                # inaczej dołożenie ligi (2026-07-27: osiem naraz) oznaczałoby,
+                # że cała jej historia udaje "niższy poziom" i psuje skalę
+                # wszystkim pozostałym.
+                w_zakresie = comp_i in set(comp_ids or [])
+                gry[gid_s] = {
+                    "ts": ts_i, "druzyny": druzyny,
+                    **({} if w_zakresie else {"wlasna": True}),
+                }
                 dodane += 1
                 time.sleep(0.3)
             (udane if dodane > przed else nieudane).append(nm)
@@ -1164,7 +1190,10 @@ def aktualizuj_bank_stylu(
         zmienione = True
         time.sleep(0.25)
 
-    if zmienione:
+    # dry-run ma CZYTAĆ produkcję (inaczej liczby są nieporównywalne), ale nie
+    # zapisywać — docstring build_league.main obiecuje „Supabase nietknięte"
+    # i to jedyne miejsce, które tej obietnicy nie dotrzymywało
+    if zmienione and not _dry_run():
         supa.put_key_bezpiecznie(klucz, bank)
     return bank
 
@@ -2862,28 +2891,71 @@ def _main_impl(tryb=None):
                         vals.append(float(v))
             return (sum(vals) / len(vals), len(vals)) if vals else (None, 0)
 
-        # faule drużyn: team-trends ich nie wystawia — syntetyczny trend z banku
+        # --- RYNKI DRUŻYNOWE Z WŁASNEGO BANKU (rozszerzone 2026-07-27) ---
+        # Sonda statshub na 129 meczach (1590 rekordów team-trends): feed niesie
+        # WYŁĄCZNIE `goals` i `cornerKicks`. Kartek, strzałów, celnych i fauli
+        # drużynowych nie ma tam wcale — czyli tą drogą nowy rynek nie przyjdzie.
+        #
+        # Ale obie brakujące połówki mamy u siebie:
+        #   * LINIA I KURS — Superbet kwotuje je CZYSTO (sonda 8 meczów klubowych
+        #     2026-07-27: kartki 8/8 meczów po ~6,6 linii, celne 8/8 po ~4,4,
+        #     strzały 6/8 po ~4, faule 4/8 po jednej linii),
+        #   * HISTORIA — bank stylu ligowego (475 meczów, 950 rekordów
+        #     drużyna-mecz): kartki 86,7% pokrycia, strzały 97,6%, celne 94,3%,
+        #     faule 71,4%.
+        # Reszta ścieżki (kalibracja, czynnik rywala, sędzia, matchup, mostki,
+        # rozliczanie z game_team_stats) już te kody rynków zna — brakowało
+        # jedynie samego trendu. Budujemy go tu, dokładnie tak jak dotąd dla
+        # fauli, i dalej wszystko płynie istniejącą ścieżką.
+        #
+        # UWAGA: nowy rynek startuje BEZ historii rozliczeń, więc przez pierwsze
+        # ~2 tygodnie nie chroni go ani kwarantanna rynku (KWARANTANNA_MIN_N=15),
+        # ani kalibracja (bias=1.0). Leci na surowym modelu — dlatego dokładamy
+        # je świadomie i patrzymy na pierwsze rozliczenia.
+        RYNKI_Z_BANKU = (
+            ("team_cards", "kartki"),
+            ("team_sot", "sot"),
+            ("team_shots", "shots"),
+            ("team_fouls", "fouls"),
+        )
+        # próg zgodny z bramą głównej pętli (`len(tt.counts) < 5`) — budowanie
+        # trendu z 3 meczów tylko po to, żeby odpaść oczko dalej, zaciemniało
+        # diagnostykę licznikiem `krotka_historia`
+        MIN_HIST_BANKU = 5
         widziane_tt = {(t.event_id, t.team_id, t.market_code) for t in team_trends}
+        syntetyczne_tt: Counter = Counter()
         for e in wszystkie_ev:
             if tryb and e["id"] not in tryb.druzynowe_mids:
                 continue  # zakres drużynowy (jw.), gdy bank ligowy powstanie
+            lid_e = int(e.get("uniqueTournamentId") or 0)
             for tid_e, opp_e, is_home_e in (
                 (e["homeTeamId"], e["awayTeamId"], True),
                 (e["awayTeamId"], e["homeTeamId"], False),
             ):
                 nm_e = team_name.get(tid_e, "")
-                if not nm_e or (e["id"], tid_e, "team_fouls") in widziane_tt:
+                if not nm_e:
                     continue
-                c_f, t_f = _hist_z_banku(nm_e, "fouls")
-                if len(c_f) < 3:
-                    continue
-                team_trends.append(statshub.TeamTrend(
-                    team_id=tid_e, team_name=nm_e,
-                    opponent_name=team_name.get(opp_e, ""),
-                    event_id=e["id"], is_home=is_home_e,
-                    market_code="team_fouls", line=0.0,
-                    counts=c_f, timestamps=t_f,
-                ))
+                for mk_e, pole_e in RYNKI_Z_BANKU:
+                    # feed ma pierwszeństwo: jego historia niesie id rywali
+                    # i miejsce gry, więc jest bogatsza niż nasza z banku
+                    if (e["id"], tid_e, mk_e) in widziane_tt:
+                        continue
+                    c_f, t_f = _hist_z_banku(nm_e, pole_e)
+                    if len(c_f) < MIN_HIST_BANKU:
+                        continue
+                    team_trends.append(statshub.TeamTrend(
+                        team_id=tid_e, team_name=nm_e,
+                        opponent_name=team_name.get(opp_e, ""),
+                        opponent_id=int(opp_e or 0),
+                        event_id=e["id"], is_home=is_home_e,
+                        league_id=lid_e,
+                        market_code=mk_e, line=0.0,
+                        counts=c_f, timestamps=t_f,
+                    ))
+                    syntetyczne_tt[mk_e] += 1
+        if syntetyczne_tt:
+            print("Trendy drużynowe z własnego banku: "
+                  + ", ".join(f"{k}={v}" for k, v in sorted(syntetyczne_tt.items())))
 
         # KONTEKST Z FEEDU — w lidze bank stylu bywa młody/pusty, a recentGames
         # CAŁEGO feedu team-trends to duża próbka: liczymy z niej średnią ligi

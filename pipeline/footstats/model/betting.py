@@ -265,8 +265,28 @@ MAX_RELATIVE_DIVERGENCE = 1.9       # p_model / p_rynku > 1.9x = podejrzane (lon
 # To brama PUBLIKACJI, nie scoringu: typ poza oknem dalej się liczy, rozlicza
 # i uczy kalibrację (poza_publikacja="rozjazd_z_rynkiem"), więc za miesiąc da
 # się ten pomiar powtórzyć i próg poprawić.
+#
+# --- POPRAWKA GRANIC (powtórzony pomiar 2026-07-27, 408 rozliczonych typów) ---
+# Ten sam pomiar na cieńszych plasterkach pokazał, że +10 pp cięło 2 pp ZA
+# WCZEŚNIE — pole straty zaczyna się dopiero przy +14 pp, i to skokiem:
+#
+#   dół:  −4..−3 pp  n=13  69,2%  −11,6%     góra:  +8..+10 pp  n=34  67,6%   −6,1%
+#         −3..−2 pp  n= 8  62,5%  −13,0%            +10..+12 pp n=23  56,5%   +4,5%
+#         −2..−1 pp  n=11  54,5%  −29,8%            +12..+14 pp n=26  61,5%   +0,1%
+#         −1..0  pp  n=16  56,2%  −25,4%            +14..+18 pp n=58  37,9%  −39,2%
+#         +0..+1 pp  n=12  66,7%   −7,1%            ponad +18   n=44  45,5%  −29,3%
+#         +1..+2 pp  n=15  86,7%  +11,1%
+#
+# DOLNA granica potwierdzona po raz drugi: pod zerem nie ma nic do odzyskania,
+# każdy plasterek traci. Hipoteza "dopuśćmy −2..0 pp przy wysokiej szansie"
+# jest OBALONA (to najgorsze plasterki w całym zestawieniu), nie wracamy do niej.
+#
+# GÓRNA idzie z +10 na +12: 157 -> 180 typów, bilans −0,6u -> +0,5u, a do klifu
+# przy +14 zostaje 2 pp zapasu. Wariant +14 (206 typów, +0,5u, drużynowe +8,4u)
+# jest kuszący, ale stoi dokładnie na krawędzi — decyzja użytkownika 2026-07-27:
+# bierzemy +12 i wracamy do tego po kolejnej setce rozliczeń.
 OKNO_ZGODY_MIN = 0.00   # p_model musi być co najmniej na poziomie ceny rynku
-OKNO_ZGODY_MAX = 0.10   # ...i najwyżej 10 pp nad nią
+OKNO_ZGODY_MAX = 0.12   # ...i najwyżej 12 pp nad nią
 
 
 def w_oknie_zgody(p_model: float, kurs: float) -> bool:

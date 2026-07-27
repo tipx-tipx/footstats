@@ -279,6 +279,27 @@ export function SkutecznoscScena({
       });
   }, [typy.po_rynku, wybor]);
 
+  // --- MUNDIAL vs SEZON LIGOWY ---
+  // Kwarantanna rynku patrzy na 40 OSTATNICH rozliczeń, nie na kalendarz, więc
+  // przy rynkach o dużym wolumenie mecze reprezentacji wciąż zajmują pół okna.
+  // Naturalne pytanie brzmi „skoro ruszyły ligi, to może już jest lepiej?" —
+  // i zamiast zgadywać, pokazujemy odpowiedź. Sortujemy po wielkości próby
+  // ligowej, bo to ona rozstrzyga; rynki bez rozliczeń ligowych są na końcu.
+  const epokiWidoku = useMemo(() => {
+    const zrodlo = typy.epoki_per_rynek;
+    if (!zrodlo || wybor === "drabinki") return [];
+    return Object.entries(zrodlo)
+      .filter(([kod]) =>
+        wybor === "druzyny"
+          ? kod.startsWith("team_")
+          : wybor === "pewniaki"
+            ? !kod.startsWith("team_")
+            : true,
+      )
+      .filter(([, e]) => e.mundial || e.ligi)
+      .sort(([, a], [, b]) => (b.ligi?.n ?? 0) - (a.ligi?.n ?? 0));
+  }, [typy.epoki_per_rynek, wybor]);
+
   const poza = wybor === "wszystko" ? null : strumienie[wybor]?.podsumowanie;
   const klasy = wybor === "drabinki" ? strumienie.drabinki?.klasy : undefined;
 
@@ -553,6 +574,97 @@ export function SkutecznoscScena({
                       </tbody>
                     </table>
                   </div>
+
+                  {epokiWidoku.length > 0 && (
+                    <div className="mt-8">
+                      <h3 className="text-sm font-semibold text-ink">
+                        Mundial a sezon ligowy
+                      </h3>
+                      <p className="mb-3 mt-1 max-w-prose text-sm leading-relaxed text-muted">
+                        Wstrzymanie rynku liczymy z 40 ostatnich rozliczeń, a nie
+                        z kalendarza — więc przy rynkach granych najczęściej
+                        połowa tego okna to wciąż mecze reprezentacji. Tu widać,
+                        czy start lig cokolwiek zmienił. Ostatnia kolumna to
+                        zwrot z jednej złotówki stawki.
+                      </p>
+                      <div className="overflow-x-auto rounded-(--radius-card) border border-hairline bg-card shadow-(--shadow-card)">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-hairline bg-card-soft text-left text-[11px] uppercase tracking-wide text-faint">
+                              <th className="px-4 py-2.5 font-medium">rynek</th>
+                              <th className="px-4 py-2.5 font-medium">
+                                mundial
+                              </th>
+                              <th className="px-4 py-2.5 font-medium">
+                                sezon ligowy
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-hairline">
+                            {epokiWidoku.map(([kod, e]) => {
+                              const kom = (
+                                b: typeof e.mundial,
+                                epoka: string,
+                              ) => {
+                                if (!b)
+                                  return (
+                                    <span className="text-faint">
+                                      brak typów
+                                    </span>
+                                  );
+                                const chudy = b.n < N_ISTOTNE;
+                                return (
+                                  <span
+                                    className={chudy ? "text-faint" : undefined}
+                                    title={
+                                      chudy
+                                        ? `Tylko ${b.n} rozliczeń ${epoka} — za mało, żeby cokolwiek z tego wnioskować`
+                                        : undefined
+                                    }
+                                  >
+                                    <span className="font-data">
+                                      {b.trafione}/{b.n}
+                                    </span>
+                                    <span className="font-data ml-1 text-muted">
+                                      ({fmtProc(b.skutecznosc)})
+                                    </span>
+                                    <span
+                                      className={`font-data ml-2 font-semibold ${
+                                        chudy
+                                          ? ""
+                                          : b.roi > 0
+                                            ? "text-data-green"
+                                            : "text-data-red-ink"
+                                      }`}
+                                    >
+                                      {b.roi >= 0 ? "+" : "−"}
+                                      {Math.abs(b.roi * 100).toFixed(1)}%
+                                    </span>
+                                  </span>
+                                );
+                              };
+                              return (
+                                <tr
+                                  key={kod}
+                                  className="even:bg-card-soft transition-colors hover:bg-brand-wash/40"
+                                >
+                                  <td className="px-4 py-2.5 font-medium">
+                                    {e.nazwa}
+                                  </td>
+                                  <td className="px-4 py-2.5">
+                                    {kom(e.mundial, "z mundialu")}
+                                  </td>
+                                  <td className="px-4 py-2.5">
+                                    {kom(e.ligi, "z lig")}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
                 </>
               ) : (
                 <p className="rounded-(--radius-card) border border-hairline bg-card px-4 py-3.5 text-sm text-muted shadow-(--shadow-card)">

@@ -243,8 +243,27 @@ def game_referee(game_id: int) -> str | None:
     return _ref_cache[game_id]
 
 
-def recent_finished_games(competitor_id: int, n: int = 6) -> list[tuple[int, int]]:
-    """Ostatnie n zakończonych meczów drużyny: [(gameId, timestamp_unix), ...] od najnowszych."""
+def recent_finished_games_z_rozgrywkami(
+    competitor_id: int, n: int = 6
+) -> list[tuple[int, int, int]]:
+    """Jak `recent_finished_games`, ale z ID ROZGRYWEK: [(gameId, ts, compId)].
+
+    Rozgrywki są potrzebne, żeby odróżnić dwie zupełnie różne sytuacje, które
+    ta sama ścieżka obsługuje (patrz build_wc_fast.dolej_historie_wlasna):
+
+      * beniaminek — poprzedni sezon grał NIŻEJ, jego historia wymaga korekty
+        poziomu przed użyciem,
+      * drużyna z ligi świeżo dołożonej do zakresu — jej historia jest z tego
+        samego poziomu, na którym gra teraz, i korekty NIE wymaga.
+
+    Bez tego rozróżnienia dołożenie ośmiu lig naraz (2026-07-27) wrzuciłoby
+    całą ich historię do worka „mecze z niższego poziomu" i skala poziomu
+    liczyłaby stosunek Brazylii do Europy zamiast I ligi do Ekstraklasy.
+
+    Ten endpoint (`/games/results?competitors=`) jako JEDYNY sięga w głąb
+    sezonu: dla Remo oddał 36 meczów od 28.01, podczas gdy ten sam endpoint
+    filtrowany po rozgrywkach zwraca wyłącznie ostatnią kolejkę.
+    """
     data = _get(f"{BASE}/games/results/?{Q}&competitors={competitor_id}")
     rows = []
     for g in data.get("games", []):
@@ -257,9 +276,15 @@ def recent_finished_games(competitor_id: int, n: int = 6) -> list[tuple[int, int
             ts = int(datetime.fromisoformat(st).timestamp())
         except Exception:
             continue
-        rows.append((int(g["id"]), ts))
+        rows.append((int(g["id"]), ts, int(g.get("competitionId") or 0)))
     rows.sort(key=lambda x: x[1], reverse=True)
     return rows[:n]
+
+
+def recent_finished_games(competitor_id: int, n: int = 6) -> list[tuple[int, int]]:
+    """Ostatnie n zakończonych meczów drużyny: [(gameId, timestamp_unix), ...] od najnowszych."""
+    return [(gid, ts) for gid, ts, _ in
+            recent_finished_games_z_rozgrywkami(competitor_id, n)]
 
 
 def classify_event(e: dict) -> dict[str, int] | None:

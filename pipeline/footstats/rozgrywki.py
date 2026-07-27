@@ -1,13 +1,28 @@
 """Profile rozgrywek — jedna konfiguracja trybu ligowego.
 
-Zakres zatwierdzony 2026-07-20 (koniec MŚ):
+Zakres zatwierdzony 2026-07-20 (koniec MŚ), rozszerzony 2026-07-27:
 
 * statystyki indywidualne (propsy zawodników): CAŁY ŚWIAT — każdy mecz,
   na który Superbet lub STS kwotuje propsy. Odkrywanie meczów idzie OD OFERTY
   bukmachera, więc lista profili NIE ogranicza propsów; profil precyzuje
   tylko dodatkowe źródła i zakres drużynowy.
 * statystyki drużynowe: wyłącznie rozgrywki z flagą druzynowe=True
-  (top 5 lig + Ekstraklasa + puchary europejskie razem z kwalifikacjami).
+  (top 5 lig + Ekstraklasa + puchary europejskie razem z kwalifikacjami
+  + Ameryka Płd. + Skandynawia — patrz niżej).
+
+ROZSZERZENIE 2026-07-27 — dlaczego akurat te ligi. Rynki drużynowe to jedyna
+część systemu z dodatnim wynikiem (w oknie zgody: 42 typy, 83,3% trafień,
++7,2u; zawodnicze w tym samym oknie −7,8u), a zakres ograniczał je do garstki
+meczów. Sonda statshub na 129 meczach z kursami pokazała, KTÓRE rozgrywki
+spoza rejestru mają komplet danych drużynowych — dołożone zostały te z realną
+podażą: Ameryka Płd. (gra cały rok, ~30 meczów w oknie 4 dni) i Skandynawia
+(trwający sezon letni, zapełnia lukę do startu top 5 w sierpniu).
+
+Pary utid/comp365 dla nowych lig zweryfikowane 2026-07-27 przez porównanie
+NAZW DRUŻYN z obu źródeł (statshub event/by-date vs 365Scores games/results):
+każda para pokazuje te same kluby. Ta weryfikacja jest istotna, bo błędny
+comp365 nie daje błędu — po prostu rynki drużynowe tej ligi nigdy się nie
+rozliczą i po 48h zamkną jako zwrot.
 
 Identyfikatory (zweryfikowane na żywo 2026-07-20):
 
@@ -66,6 +81,26 @@ PROFILE: dict[int, ProfilRozgrywek] = {
                         comp365=(573, 596)),
         ProfilRozgrywek(17015, "Liga Konferencji", "Europa", druzynowe=True,
                         comp365=(7685,)),
+        # --- Ameryka Południowa (dodane 2026-07-27) — grają cały rok, więc
+        # niosą podaż także wtedy, gdy Europa ma przerwę
+        ProfilRozgrywek(155, "Liga Profesional", "Argentyna", druzynowe=True,
+                        comp365=(72,)),
+        ProfilRozgrywek(325, "Brasileirão Série A", "Brazylia", druzynowe=True,
+                        comp365=(113,)),
+        ProfilRozgrywek(390, "Brasileirão Série B", "Brazylia", druzynowe=True,
+                        comp365=(116,)),
+        ProfilRozgrywek(480, "CONMEBOL Sudamericana", "Ameryka Płd.",
+                        druzynowe=True, comp365=(389,)),
+        # --- Skandynawia (dodane 2026-07-27) — sezon letni, czyli dokładnie
+        # ten okres, w którym top 5 lig jeszcze nie gra
+        ProfilRozgrywek(40, "Allsvenskan", "Szwecja", druzynowe=True,
+                        comp365=(122,)),
+        ProfilRozgrywek(46, "Superettan", "Szwecja", druzynowe=True,
+                        comp365=(123,)),
+        ProfilRozgrywek(20, "Eliteserien", "Norwegia", druzynowe=True,
+                        comp365=(131,)),
+        ProfilRozgrywek(39, "Superliga", "Dania", druzynowe=True,
+                        comp365=(119,)),
     )
 }
 

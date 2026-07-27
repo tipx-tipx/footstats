@@ -678,6 +678,23 @@ export interface SkutecznoscStrumienia {
   klasy?: Record<string, { n: number; trafione: number; skutecznosc: number }>;
 }
 
+/** Wynik jednego rynku w jednej epoce (mundial / sezon ligowy). */
+export interface EpokaBlok {
+  n: number;
+  trafione: number;
+  /** udział trafień, 0–1 */
+  skutecznosc: number;
+  /** zwrot z jednostkowej stawki, np. −0.107 = tracimy 10,7 gr na złotówce */
+  roi: number;
+}
+
+/** Ten sam rynek w dwóch epokach — do porównania „czy w ligach jest lepiej". */
+export interface EpokiRynku {
+  nazwa: string;
+  mundial: EpokaBlok | null;
+  ligi: EpokaBlok | null;
+}
+
 /** Skuteczność realnych typów (log rozliczany automatycznie po meczach). */
 export interface TypyWyniki {
   podsumowanie: {
@@ -701,6 +718,14 @@ export interface TypyWyniki {
    * drużynowe, `drabinki` = karty z zakładki Drabinki (pokrycie + kontekst).
    */
   skutecznosc_strumienie?: Partial<Record<Strumien, SkutecznoscStrumienia>>;
+  /**
+   * Mundial vs sezon ligowy, per rynek. Kwarantanna rynków patrzy na okno 40
+   * ostatnich rozliczeń, a nie na kalendarz — dla rynków o dużym wolumenie
+   * połowa tego okna to wciąż mecze reprezentacji. To rozbicie pokazuje, czy
+   * start lig faktycznie zmienił obraz (na 27.07: tylko w rynkach drużynowych).
+   * `null` w którejś epoce = brak rozliczeń tego rynku w tamtym okresie.
+   */
+  epoki_per_rynek?: Record<string, EpokiRynku>;
   kupony?: KuponHistoria[];
   /** ROI kuponów per horyzont (stawka 1 j./kupon; bez pominiętych) */
   kupony_roi?: Record<

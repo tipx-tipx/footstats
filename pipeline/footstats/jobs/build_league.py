@@ -24,11 +24,27 @@ import re
 import time
 import unicodedata
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from curl_cffi import requests
 
 from .. import rozgrywki
 from ..sources import superbet
+
+# .env jak w cycle.py — DRY-RUN BEZ TEGO KŁAMIE (zmierzone 2026-07-27).
+# Ten moduł uruchamia się też wprost (`python -m footstats.jobs.build_league`)
+# i wtedy nie przechodził przez cycle.py, czyli szedł bez SUPABASE_*. Tryb
+# lokalny nie jest jednak „trochę uboższy": `get_key_ok` oddaje wtedy
+# `(None, True)` = „klucz pusty, odczyt się udał", więc cykl odbudowywał bank
+# stylu OD ZERA, gubił kwarantannę rynków, kalibrację i rejestr publikacji —
+# i wypisywał liczbę typów, która wyglądała jak wynik produkcji, a nią nie była.
+# Zmienne już obecne w środowisku mają pierwszeństwo (GitHub Actions).
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
+except Exception:
+    pass
 
 SH_BASE = "https://www.statshub.com/api"
 SH_HEADERS = {"Accept": "application/json", "Referer": "https://www.statshub.com/"}
