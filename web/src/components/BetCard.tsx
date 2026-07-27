@@ -95,8 +95,8 @@ function odznakiPrzewagi(bet: ValueBet): {
   if (!bet.sugestia && bet.ev_uk != null && bet.ev_uk >= 4) {
     o.push({
       znak: "↑",
-      label: `+${Math.round(bet.ev_uk)}% vs UK`,
-      opis: `Uczciwa cena wg bukmacherów UK (po zdjęciu marży) to ~${fmtKurs(bet.kurs_novig ?? 0)}, a Superbet płaci +${bet.ev_uk.toFixed(1).replace(".", ",")}% ponad ten poziom`,
+      label: `+${Math.round(bet.ev_uk)}% ponad cenę z Anglii`,
+      opis: `Angielscy bukmacherzy wyceniają to na ~${fmtKurs(bet.kurs_novig ?? 0)} (już bez ich prowizji), a Superbet płaci o ${bet.ev_uk.toFixed(1).replace(".", ",")}% więcej. Innymi słowy: ten sam zakład jest u nas tańszy.`,
       tone: "brand",
     });
   } else if (
@@ -107,24 +107,24 @@ function odznakiPrzewagi(bet: ValueBet): {
   ) {
     o.push({
       znak: "↑",
-      label: "odstaje od rynku",
-      opis: `Bukmacherzy w UK płacą za to średnio ${fmtKurs(bet.kurs_ref)}, a kurs Superbetu wyraźnie odstaje w górę`,
+      label: "kurs wyższy niż gdzie indziej",
+      opis: `W Anglii za to samo płacą średnio ${fmtKurs(bet.kurs_ref)}, a Superbet wyraźnie więcej`,
       tone: "brand",
     });
   }
   if (bet.matchup) {
     o.push({
       znak: "◎",
-      label: "matchup",
-      opis: "Profil rywala wyraźnie sprzyja temu rynkowi (co ta drużyna dopuszcza zawodnikom z tej formacji). Liczby w czynniku „Profil rywala”",
+      label: "rywal sprzyja",
+      opis: "Przeciwko tej drużynie zawodnicy grający na tej pozycji regularnie notują dużo więcej niż przeciętnie. Liczby znajdziesz niżej, przy „Profil rywala”.",
       tone: "brand",
     });
   }
   if (bet.miekka_linia) {
     o.push({
       znak: "↗",
-      label: "miękka linia",
-      opis: `Z pozostałych linii Superbetu na ten rynek wynika kurs ~${(bet.kurs_oczekiwany ?? 0).toFixed(2).replace(".", ",")}, a ta linia płaci wyraźnie więcej (niespójność siatki bukmachera)`,
+      label: "zaniżony kurs",
+      opis: `Z pozostałych linii Superbetu na ten rynek wychodzi kurs ~${(bet.kurs_oczekiwany ?? 0).toFixed(2).replace(".", ",")}, a akurat ta płaci wyraźnie więcej. Wygląda na przeoczenie bukmachera.`,
       tone: "brand",
     });
   }
@@ -132,7 +132,7 @@ function odznakiPrzewagi(bet: ValueBet): {
     o.push({
       znak: "↥",
       label: "wchodzi do składu",
-      opis: "Wraca do XI po dłuższej przerwie, rynek często nie zdążył dograć jego linii",
+      opis: "Wraca do pierwszego składu po przerwie — bukmacher często nie zdążył jeszcze poprawić kursu",
       tone: "amber",
     });
   }
@@ -140,7 +140,7 @@ function odznakiPrzewagi(bet: ValueBet): {
     o.push({
       znak: "◷",
       label: "świeże składy",
-      opis: "Składy potwierdzono w ostatnich ~45 minutach, więc kursy bywają jeszcze sprzed ogłoszenia XI",
+      opis: "Składy ogłoszono w ostatnich ~45 minutach, więc część kursów jest jeszcze sprzed tej wiadomości",
       tone: "amber",
     });
   }
@@ -188,7 +188,7 @@ function sygnalyTypu(
         znak: "XI",
         label: "w wyjściowym składzie",
         ton: "brand",
-        opis: "Trener ogłosił skład i zawodnik wychodzi w pierwszej jedenastce. Typ nie wisi na decyzji o rotacji.",
+        opis: "Trener ogłosił skład i zawodnik wychodzi od pierwszej minuty. Nie ma ryzyka, że przesiedzi mecz na ławce.",
       });
     } else if (pSklad >= 85) {
       s.push({
@@ -196,11 +196,11 @@ function sygnalyTypu(
         znak: "XI",
         label: "pewny występ",
         ton: "brand",
-        opis: `Szansa na pierwszy skład: ${pSklad}%${
+        opis: `Szansa, że wyjdzie w pierwszym składzie: ${pSklad}%${
           bet.oczekiwane_minuty != null
-            ? `, przewidywane ${Math.round(bet.oczekiwane_minuty)} minut gry`
+            ? `, spodziewamy się ${Math.round(bet.oczekiwane_minuty)} minut na boisku`
             : ""
-        }. Typ nie wisi na decyzji trenera.`,
+        }. Ryzyko, że nie zagra, jest tu małe.`,
       });
     }
     // duży zapas nad linią: średnia z formy wyraźnie ponad linię zakładu
@@ -252,12 +252,12 @@ function sygnalyTypu(
     s.push({
       id: "tlo-uk",
       znak: "·",
-      label: `rynek UK płaci ${fmtKurs(bet.kurs_ref)}`,
+      label: `w Anglii płacą ${fmtKurs(bet.kurs_ref)}`,
       ton: "cichy",
       opis:
         bet.kurs_novig != null
-          ? `Bukmacherzy w UK płacą za to średnio ${fmtKurs(bet.kurs_ref)}, a uczciwa cena po zdjęciu ich marży to ${fmtKurs(bet.kurs_novig)}. To niezależny punkt odniesienia dla kursu wyżej.`
-          : `Bukmacherzy w UK płacą za to średnio ${fmtKurs(bet.kurs_ref)}. To niezależny punkt odniesienia dla kursu wyżej.`,
+          ? `W Anglii za to samo płacą średnio ${fmtKurs(bet.kurs_ref)}, a po odjęciu ich prowizji uczciwa cena wychodzi ${fmtKurs(bet.kurs_novig)}. To punkt odniesienia niezależny od nas.`
+          : `W Anglii za to samo płacą średnio ${fmtKurs(bet.kurs_ref)}. To punkt odniesienia niezależny od nas.`,
     });
   }
   // pewniak z kursem sporo poniżej wartości: uczciwa uwaga o cenie zamiast
@@ -273,9 +273,9 @@ function sygnalyTypu(
       znak: "·",
       label: "kurs poniżej wartości",
       ton: "cichy",
-      opis: `${bet.bukmacher} płaci ${fmtKurs(bet.kurs)}, a uczciwa cena to ${fmtKurs(
+      opis: `${bet.bukmacher} płaci ${fmtKurs(bet.kurs)}, a przy takiej szansie sprawiedliwy kurs to ${fmtKurs(
         bet.fair_kurs,
-      )}. Różnica to marża bukmachera. Ten typ bierzesz dla wysokiej szansy trafienia, nie dla kursu.`,
+      )}. Różnicę zabiera bukmacher. Ten typ bierzesz dlatego, że często wchodzi — nie dlatego, że dobrze płaci.`,
     });
   }
   return s;
@@ -531,7 +531,7 @@ function SekcjaFormy({ bet, forma }: { bet: ValueBet; forma: FormaRynku }) {
         {bet.oczekiwane_minuty != null && (
           <span
             className="font-data text-[11px] font-semibold text-ink-soft"
-            title="Ile minut zawodnik zagra dziś wg przewidywań modelu"
+            title="Ile minut spodziewamy się po nim w tym meczu"
           >
             <span className="mr-1 text-[9px] font-medium uppercase opacity-70">
               przewidywane minuty
@@ -597,15 +597,15 @@ export function swiatloTypu(
 export const SWIATLO_STYL = {
   green: {
     pasek: "bg-data-green",
-    opis: "Zielone światło: linia przebijana w ≥65% ostatnich 10 meczów, a model daje wysoką szansę",
+    opis: "Zielone światło: w ostatnich 10 meczach ta linia padła co najmniej 6-7 razy, a model też daje wysoką szansę",
   },
   amber: {
     pasek: "bg-data-amber",
-    opis: "Żółte światło: historia i model nie mówią jednym głosem. Przeczytaj szczegóły",
+    opis: "Żółte światło: historia zawodnika i model nie zgadzają się ze sobą. Zajrzyj w szczegóły przed zagraniem.",
   },
   red: {
     pasek: "bg-data-red",
-    opis: "Czerwone światło: linia przebita w mniej niż 45% ostatnich 10 meczów. Historia przeczy typowi",
+    opis: "Czerwone światło: w ostatnich 10 meczach ta linia padła mniej niż 5 razy. Historia przeczy temu typowi.",
   },
 } as const;
 
@@ -625,13 +625,13 @@ function tierPewniaka(bet: ValueBet): {
       return {
         label: "✦ opcja ryzykowna",
         cls: "bg-data-amber-wash text-data-amber-ink",
-        opis: "Wyższa linia przy szansie 40–52% i kursie 1,9+: świadomie ryzykowny wariant typu bazowego, nie pewniak",
+        opis: "Wyżej postawiona poprzeczka za wyraźnie lepszy kurs. Wchodzi rzadziej niż co drugi raz — to świadome ryzyko, nie pewniak.",
       };
     }
     return {
       label: "✦ wyższa linia",
       cls: "bg-data-amber-wash text-data-amber-ink",
-      opis: "Perełka: wyższa linia (1,5+) przy wciąż solidnej szansie i wyraźnie lepszym kursie niż na linii 0,5",
+      opis: "Wyżej postawiona poprzeczka niż zwykle, ale szansa wciąż solidna, a kurs dużo lepszy",
     };
   }
   if (bet.p_model < 0.52) {
@@ -639,33 +639,33 @@ function tierPewniaka(bet: ValueBet): {
       return {
         label: "◆ perełka",
         cls: "bg-data-amber-wash text-data-amber-ink",
-        opis: "Wyższy kurs (1,9+) przy wciąż sensownej szansie: okazjonalny rodzynek na kupon, nie pewniak",
+        opis: "Wysoki kurs przy wciąż sensownej szansie — rodzynek na kupon, nie pewniak",
       };
     }
     return {
       label: "ryzykowny",
       cls: "bg-paper text-muted",
-      opis: "Szansa modelu poniżej 52% bez wysokiego kursu to najsłabsza kategoria, traktuj ostrożnie",
+      opis: "Szansa poniżej 52% i bez wysokiego kursu w zamian — najsłabszy rodzaj typu, uważaj",
     };
   }
   if (bet.p_model >= 0.75) {
     return {
       label: "★ pewniak",
       cls: "bg-brand-wash text-brand-deep",
-      opis: "Szansa modelu 75%+ to najmocniejsza kategoria typów",
+      opis: "Szansa 75% i więcej — najmocniejszy rodzaj typu",
     };
   }
   if (bet.p_model >= 0.62) {
     return {
       label: "mocny typ",
       cls: "bg-data-green-wash text-data-green-ink",
-      opis: "Szansa modelu 62–74% to solidny typ, ale jeszcze nie pewniak",
+      opis: "Szansa 62-74% — solidny typ, ale jeszcze nie pewniak",
     };
   }
   return {
     label: "umiarkowany",
     cls: "bg-paper text-muted",
-    opis: "Szansa modelu 52–61% to niewiele ponad 50/50, traktuj ostrożnie",
+    opis: "Szansa 52-61% — niewiele ponad rzut monetą, uważaj",
   };
 }
 
@@ -1362,7 +1362,7 @@ export const BetCard = memo(function BetCard({
           ) : bet.sugestia || bet.ev_pct == null ? (
             <span
               className="inline-flex items-center rounded-full bg-data-amber-wash px-2.5 py-0.5 text-xs font-semibold text-data-amber-ink"
-              title="Rynek dostępny w STS, sprawdź kurs ręcznie"
+              title="Ten rynek jest w ofercie STS — kurs sprawdź sam"
             >
               sprawdź w STS
             </span>
@@ -1385,7 +1385,7 @@ export const BetCard = memo(function BetCard({
           <span className="ml-auto flex items-center gap-3">
             <span
               className="flex items-center gap-1 text-[10px] text-faint"
-              title="Pewność modelu: ile danych i jak stabilnych stoi za tą predykcją"
+              title="Na ilu meczach i jak spójnych opiera się ta prognoza. Wysoka = dużo powtarzalnych danych."
             >
               <PewnoscDots level={bet.pewnosc} />
               {PEWNOSC_LABEL[bet.pewnosc]} pewność

@@ -267,3 +267,48 @@ def test_dzienne_do_czterech_przedzialow():
     dzienne = [k for k in out if k.get("horyzont") == "dzienny"]
     assert 2 <= len(dzienne) <= 4
     assert len({k["cel_label"] for k in dzienne}) == len(dzienne)
+
+
+# --- UCZCIWA SZANSA KUPONU (pomiar 2026-07-27) ---
+
+
+def test_kalibracja_kuponow_sciaga_deklaracje_do_rozliczen():
+    """Styl „z przewagą": 0 wygranych na 18 przy deklarowanych 33,8%."""
+    wsp = kupony.kalibracja_kuponow_z_pomiaru(
+        {"value": {"n": 18, "hit": 0.0, "sr_p": 0.338}}
+    )
+    assert 0 < wsp["value"] < 1.0
+    # shrinkage: przy 18 rozliczeniach nie schodzimy od razu do zera
+    assert wsp["value"] > kupony.KUPON_KAL_MIN
+
+
+def test_kalibracja_kuponow_nigdy_nie_podbija_szansy():
+    """Gdyby kupony trafiały PONAD deklarację, to zapas, nie obietnica."""
+    wsp = kupony.kalibracja_kuponow_z_pomiaru(
+        {"dzienny": {"n": 100, "hit": 0.30, "sr_p": 0.15}}
+    )
+    assert wsp["dzienny"] == 1.0
+
+
+def test_kalibracja_kuponow_milczy_bez_proby():
+    assert kupony.kalibracja_kuponow_z_pomiaru({}) == {}
+    assert kupony.kalibracja_kuponow_z_pomiaru(
+        {"dzienny": {"n": 0, "hit": None, "sr_p": 0.2}}
+    ) == {}
+
+
+def test_urealnienie_rusza_tylko_liczbami_dla_usera():
+    kupon = {
+        "kurs_laczny": 10.0, "p_model": 0.20, "fair_kurs": 5.0, "ev_pct": 100.0,
+        "legi": [{"p_model": 0.5}, {"p_model": 0.4}],
+        "alternatywa": {"p_po": 0.25}, "dolozenie": {"p_po": 0.18},
+    }
+    kupony._urealnij_szanse(kupon, 0.6)
+    assert kupon["p_model"] == 0.12
+    assert kupon["fair_kurs"] == 8.33          # 1 / 0,12
+    assert kupon["ev_pct"] == 20.0             # 0,12 x 10 - 1
+    assert kupon["kurs_laczny"] == 10.0        # kurs i legi nietknięte
+    assert [l["p_model"] for l in kupon["legi"]] == [0.5, 0.4]
+    # warianty podglądowe idą tą samą korektą, inaczej kłóciłyby się z kartą
+    assert kupon["alternatywa"]["p_po"] == 0.15
+    assert kupon["dolozenie"]["p_po"] == 0.108

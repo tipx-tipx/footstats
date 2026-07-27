@@ -354,8 +354,12 @@ export interface Odrzucenie {
     | "rozjazd_z_rynkiem"
     | "tylko_w_puli"
     | "kwarantanna_rynku"
+    | "kwarantanna_kategorii"
     | "za_stara_historia"
     | "stare_dane"
+    | "poza_skladem"
+    | "za_malo_minut"
+    | "za_pozno"
     | string;
   szczegol: string;
   /** "druzyna" = odrzucony rynek drużynowy; brak = kandydat zawodniczy */
@@ -493,6 +497,25 @@ export interface Meta {
     // roi opcjonalne: dane sprzed wprowadzenia bramy ROI go nie mają
     { roi?: number; hit: number; sr_p: number; n: number; nazwa: string }
   >;
+  /**
+   * To samo, ale po POWODZIE, dla którego typ wchodził na listę
+   * („ambitniejsza linia", „słaby rywal na tym rynku"...). Rozliczenia
+   * pokazały, że model zarabia, gdy typuje nudno, i traci na każdej ścieżce
+   * „znaleźliśmy coś więcej niż rynek" — te powody są chwilowo wstrzymane.
+   */
+  kwarantanna_powodow?: Record<
+    string,
+    { roi: number; hit: number; sr_p: number; n: number; nazwa: string }
+  >;
+  /** zapas na obstawienie w minutach — nic nowego nie wchodzi później */
+  margines_startu_min?: number;
+  /**
+   * Zmierzone urealnienie szansy kuponu per horyzont (dzienny /
+   * dlugoterminowy / value). Szansa kuponu to iloczyn szans typów, więc błąd
+   * pojedynczego typu podnosi się do potęgi — bez tej korekty kupon obiecywał
+   * 17%, a wchodził w 10%. Wartość < 1 = tyle z deklaracji naprawdę wchodzi.
+   */
+  kalibracja_kuponow?: Record<string, number>;
 }
 
 /** Jeden typ (leg) na kuponie. */

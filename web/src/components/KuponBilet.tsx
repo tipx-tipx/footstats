@@ -8,14 +8,14 @@ import {
 } from "@/lib/format";
 import type { Kupon, KuponLeg } from "@/lib/types";
 
-/** mini-znaczniki kontekstu typu (matchup / debiut w XI / miękka linia) */
+/** mini-znaczniki: sprzyjający rywal / powrót do składu / zaniżony kurs */
 function LegBadges({ l }: { l: KuponLeg }) {
   return (
     <>
       {l.matchup && (
         <span
           className="shrink-0 text-[11px] font-semibold text-brand"
-          title="Profil rywala wyraźnie sprzyja temu rynkowi (matchup)"
+          title="Rywal dużo dopuszcza na tym rynku — zawodnicy z tej pozycji regularnie mu to robią"
         >
           ◎
         </span>
@@ -23,7 +23,7 @@ function LegBadges({ l }: { l: KuponLeg }) {
       {l.rotacja && (
         <span
           className="shrink-0 text-[11px] font-semibold text-data-amber-ink"
-          title="Wraca do XI po dłuższej przerwie, linia rynku bywa niedograna"
+          title="Wraca do pierwszego składu po przerwie — bukmacher często nie zdążył jeszcze poprawić kursu"
         >
           ↥
         </span>
@@ -31,7 +31,7 @@ function LegBadges({ l }: { l: KuponLeg }) {
       {l.miekka_linia && (
         <span
           className="shrink-0 text-[11px] font-semibold text-brand"
-          title="Linia płaci więcej, niż wynika z reszty siatki Superbetu"
+          title="Ten kurs jest wyższy, niż wynikałoby z pozostałych linii Superbetu na ten sam rynek"
         >
           ↑
         </span>
@@ -87,7 +87,7 @@ export function KuponBilet({
           </span>
         </div>
         <div className="mt-3.5 flex flex-wrap items-end gap-x-7 gap-y-2.5">
-          <div title="Kursy wszystkich typów pomnożone przez siebie: tyle razy rośnie stawka, gdy wejdzie całość">
+          <div title="Kursy wszystkich typów przemnożone przez siebie — tyle razy rośnie stawka, jeśli wejdzie cały kupon">
             <p className="text-[10px] uppercase tracking-wide text-faint">
               kurs łączny
             </p>
@@ -97,7 +97,7 @@ export function KuponBilet({
               className="font-data mt-0.5 block text-[1.7rem] font-bold leading-none"
             />
           </div>
-          <div title="Prawdopodobieństwo, że wejdą wszystkie typy naraz (wg modelu, z karą za typy z jednego meczu)">
+          <div title="Szansa, że wejdą wszystkie typy naraz. Typy z jednego meczu potrafią paść razem, więc za nie obcinamy tę szansę.">
             <p className="text-[10px] uppercase tracking-wide text-faint">
               szansa modelu
             </p>
@@ -179,7 +179,7 @@ export function KuponBilet({
                   {li === weakIdx && k.legi.length > 1 && (
                     <span
                       className="shrink-0 rounded-full bg-data-amber-wash px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-data-amber-ink"
-                      title="Typ o najniższej szansie. To on najmocniej ciągnie szansę kuponu w dół"
+                      title="Typ o najmniejszej szansie — to on najmocniej ciągnie cały kupon w dół"
                     >
                       najsłabszy
                     </span>

@@ -132,6 +132,21 @@ def game_script_factor(
       * duży total -> otwarty mecz -> więcej strzałów, mniej fauli taktycznych,
       * wyraźny faworyt -> underdog broni się głęboko -> jego obrońcy mają
         więcej odbiorów/przechwytów, faworyt więcej strzałów (też z dystansu).
+
+    UWAGA na total (błąd zmierzony 2026-07-27, Dinamo Zagreb–FC Thun):
+    total to gole OBU drużyn razem, więc przy jednostronnym meczu rośnie
+    dlatego, że strzeli FAWORYT — a nie dlatego, że mecz będzie otwarty dla
+    obu stron. Stary kod dawał wtedy bonus ofensywny także zawodnikom
+    underdoga: przy totalu 3,05 i spreadzie −1,41 obrońca Thun dostawał
+    +6,1% za „otwarty mecz" i −7,1% za bycie słabszym, czyli w sumie −1,4%.
+    W efekcie wyjazd do Dinama wyglądał w liczbach jak przeciętny mecz
+    Super League, a karta trafiła na szczyt rankingu dnia.
+
+    Dlatego total ROZBIJAMY spreadem na gole obu drużyn i patrzymy na to, ile
+    goli rynek daje DRUŻYNIE ZAWODNIKA względem połowy przeciętnego meczu:
+        gole_drużyny = (total + spread_gracza) / 2
+    Dla Thun: (3,05 − 1,41)/2 = 0,82 wobec normy 1,30 -> ×0,87, nie ×1,06.
+    Bez spreadu (brak kursów 1X2) zostaje stare zachowanie: pół totalu.
     """
     f = 1.0
     offensive = market_code.startswith(
@@ -142,12 +157,20 @@ def game_script_factor(
     disciplinary = "foul" in market_code or "card" in market_code or market_code == "yellow_card"
 
     if implied_total is not None:
-        # Odchylenie totalu od 2.6 gola: +-0.1 mnożnika na gol dla rynków ofensywnych.
-        dev = (implied_total - 2.6) / 2.6
+        # gole DRUŻYNY ZAWODNIKA (nie całego meczu) wobec połowy przeciętnego
+        # meczu; przy nieznanym spreadzie zakładamy podział po równo
+        gole_druzyny = (
+            (implied_total + implied_spread) / 2.0
+            if implied_spread is not None
+            else implied_total / 2.0
+        )
+        dev = (gole_druzyny - 1.3) / 1.3
         if offensive:
             f *= 1.0 + 0.35 * dev
         if disciplinary:
-            f *= 1.0 - 0.15 * dev  # otwarte mecze = mniej cynicznych fauli
+            # faule liczą się z tempa CAŁEGO meczu, nie z jednej strony —
+            # przy otwartym meczu mniej cynicznych przerywań po obu stronach
+            f *= 1.0 - 0.15 * (implied_total - 2.6) / 2.6
 
     if implied_spread is not None:
         edge = abs(implied_spread)

@@ -123,7 +123,7 @@ export function BetTracker() {
                     : "",
             },
             {
-              label: "średni CLV",
+              label: "kurs vs tuż przed meczem",
               value:
                 podsumowanie.sredniCLV === null
                   ? "–"
@@ -216,8 +216,11 @@ export function BetTracker() {
                   />
                 </label>
 
-                <label className="flex items-center gap-1.5 text-xs text-muted">
-                  kurs zamkn.
+                <label
+                  className="flex items-center gap-1.5 text-xs text-muted"
+                  title="Kurs, jaki bukmacher miał tuż przed pierwszym gwizdkiem"
+                >
+                  kurs przed meczem
                   <input
                     type="number"
                     min={1}
@@ -242,9 +245,9 @@ export function BetTracker() {
                         ? "bg-data-green-wash text-data-green-ink"
                         : "bg-data-red-wash text-data-red-ink"
                     }`}
-                    title="Closing Line Value"
+                    title="O tyle procent Twój kurs był lepszy od kursu tuż przed pierwszym gwizdkiem"
                   >
-                    CLV {clv > 0 ? "+" : ""}
+                    {clv > 0 ? "+" : ""}
                     {clv.toFixed(1).replace(".", ",")}%
                   </span>
                 )}

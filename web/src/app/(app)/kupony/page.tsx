@@ -112,6 +112,7 @@ export default async function KuponyPage() {
                 pool={legiPool}
                 kary={meta.kary_korelacji}
                 wagi={meta.wagi_zaufania}
+                kalibracja={meta.kalibracja_kuponow}
               />
             </div>
           </section>

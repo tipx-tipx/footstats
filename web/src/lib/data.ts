@@ -92,9 +92,11 @@ const BUNDLE_KEYS = [
  * wisieć na tablicy (pewniaki/STS/okazje), nawet gdy pipeline chwilowo
  * nie podmienił snapshotu. Kupony zostają — ich status pokazuje historia.
  */
-// zapas na obstawienie — jak pipeline (kupony.MARGINES_STARTU_S): kupon na
-// mecz startujący za 3 minuty jest praktycznie nieobstawialny
-const MARGINES_STARTU_S = 15 * 60;
+// zapas na obstawienie — MUSI się zgadzać z pipeline (kupony.MARGINES_STARTU_S).
+// Kupon na mecz startujący za kwadrans jest praktycznie nieobstawialny, a przy
+// cyklu chodzącym co ~godzinę user widział takie pozycje 10 minut przed
+// gwizdkiem (zgłoszenie 2026-07-27, Club Necaxa).
+const MARGINES_STARTU_S = 90 * 60;
 
 function tylkoNadchodzace(bundle: Bundle): Bundle {
   const now = Math.floor(Date.now() / 1000);

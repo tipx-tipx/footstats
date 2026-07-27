@@ -150,9 +150,15 @@ def test_pobłazliwy_sedzia_scina_faule():
 # --- CAŁA ŚCIEŻKA: p_final i ranking kart ---
 
 def _zbuduj(opponent_average, league_average, sedzia_by_mid=None):
-    """Jedna karta: 8/10 pokrycia linii 1,5 strzału, kurs 2,00."""
+    """Jedna karta: 7/10 pokrycia linii 1,5 strzału, kurs 1,75.
+
+    Dawna fikstura (8/10 przy kursie 2,00) opisywała sytuację, w której nasza
+    szansa stoi 50% nad ceną rynku — po wprowadzeniu bramy zgody z rynkiem
+    (radar.MAX_ROZJAZD_KARTY) taka karta słusznie nie powstaje. Tu chodzi
+    o sprawdzenie KONTEKSTU, więc dane muszą być realistyczne.
+    """
     tr = _trend(
-        counts=[2, 3, 2, 2, 0, 2, 3, 2, 2, 1], league_average=league_average,
+        counts=[2, 3, 2, 2, 0, 2, 3, 2, 1, 1], league_average=league_average,
         opponent_average=opponent_average, opponent_rank=5, total_ranks=30,
     )
     trends = [tr]
@@ -160,7 +166,7 @@ def _zbuduj(opponent_average, league_average, sedzia_by_mid=None):
         999: {"label": "Klub – Rywal", "ts": TERAZ + 3 * 3600,
               "hid": 100, "aid": 200, "home": "Klub", "away": "Rywal"},
     }
-    odds_grid = {999: {1: {"shots": {"1.5": 2.0, "2.5": 4.0}}}}
+    odds_grid = {999: {1: {"shots": {"1.5": 1.75, "2.5": 4.0}}}}
     return radar.zbuduj(
         trends, events_meta, odds_grid, {}, [], {},
         {"shots": "Strzały"}, TERAZ, sedzia_by_mid=sedzia_by_mid,
@@ -181,8 +187,8 @@ def test_karta_dostaje_ocene_klase_i_p_final():
 
 def test_ten_sam_zawodnik_ma_mniejsza_przewage_z_trudnym_rywalem():
     """Rdzeń pytania usera: identyczna historia, inny rywal, inna ocena."""
-    latwy = _zbuduj(opponent_average=16.0, league_average=13.0)[0]
-    trudny = _zbuduj(opponent_average=9.0, league_average=13.0)[0]
+    latwy = _zbuduj(opponent_average=13.0, league_average=13.0)[0]
+    trudny = _zbuduj(opponent_average=12.0, league_average=13.0)[0]
     assert trudny["ocena"]["p_final"] < latwy["ocena"]["p_final"]
     assert trudny["ocena"]["edge"] < latwy["ocena"]["edge"]
     # pokrycie w obu przypadkach IDENTYCZNE — różnicę robi wyłącznie kontekst

@@ -721,6 +721,91 @@ def kwarantanna() -> dict[str, dict]:
     return rynki_kwarantanna(log)
 
 
+# KWARANTANNA KATEGORII — ta sama mechanika co przy rynkach, ale bramą jest
+# POWÓD, dla którego typ w ogóle wszedł na listę, a nie rynek, na którym stoi.
+#
+# Pomiar 2026-07-27 na 296 rozliczonych typach (próg opłacalności 62,9%):
+#   zwykłe        65,6%  (n=183)  -> nad kreską
+#   matchup       54,3%  (n=35)
+#   matchup_styl  45,7%  (n=46)
+#   wyższa linia  47,0%  (n=66)
+#   miękka linia  41,2%  (n=17)
+# Czyli: model zarabia dokładnie wtedy, gdy typuje "nudno". Każda ścieżka
+# dołożona po to, żeby znaleźć COŚ WIĘCEJ niż rynek (profil rywala, analogia
+# stylu, ambitniejsza linia, rzekomy błąd tradera), oddaje pieniądze. Skoro
+# rynki mają za to karę, kategorie muszą mieć taką samą — inaczej wystarczy
+# przekleić stratny typ na inny rynek i brama go przepuszcza.
+#
+# Typ z kategorii w kwarantannie NIE znika: liczy się, uczy kalibrację
+# i widać go w Skuteczności "w tle" (poza_publikacja="kwarantanna_kategorii").
+KATEGORIE_KWARANTANNY = (
+    "wyzsza_linia", "matchup_styl", "matchup", "miekka_linia", "rotacja",
+)
+KATEGORIE_NAZWY_PL = {
+    "wyzsza_linia": "Ambitniejsza linia",
+    "matchup_styl": "Podobny rywal w przeszłości",
+    "matchup": "Słaby rywal na tym rynku",
+    "miekka_linia": "Zaniżony kurs bukmachera",
+    "rotacja": "Wraca do składu",
+}
+# progi jak przy rynkach, tylko próba mniejsza: kategoria zbiera typy ze
+# WSZYSTKICH rynków naraz, więc 12 rozliczeń mówi tu tyle, co 15 na rynku
+KATEGORIA_MIN_N = 12
+KATEGORIA_OKNO = 60
+
+
+def _byla_w_kwarantannie(grp: list[dict]) -> bool:
+    """Czy kategoria stała w kwarantannie w poprzednim cyklu (histereza)."""
+    return any(
+        r.get("poza_publikacja") == "kwarantanna_kategorii"
+        for r in grp[-KWARANTANNA_HISTEREZA_OKNO:]
+    )
+
+
+def kategorie_kwarantanna(log: dict | None = None) -> dict[str, dict]:
+    """Kategorie typów chwilowo poza publikacją (ROI okna poniżej progu).
+
+    Zwraca {flaga: {roi, n, hit, sr_p, nazwa}} — dokładnie jak
+    `rynki_kwarantanna`, z tą samą histerezą wejścia/wyjścia.
+    """
+    if log is None:
+        log = _migruj_log(supa.get_key("typy_log") or {})
+    settled = [
+        r for r in log.values()
+        if r.get("wynik") in ("wygrany", "przegrany")
+        and not r.get("sugestia") and not r.get("odrzucony")
+        and _z_modelu(r)
+        and r.get("kurs") and float(r["kurs"]) > 1.0
+    ]
+    out: dict[str, dict] = {}
+    for flaga in KATEGORIE_KWARANTANNY:
+        grp = sorted(
+            (r for r in settled if r.get(flaga)),
+            key=lambda r: r.get("kickoff_ts") or 0,
+        )[-KATEGORIA_OKNO:]
+        if len(grp) < KATEGORIA_MIN_N:
+            continue
+        traf = sum(1 for r in grp if r["wynik"] == "wygrany")
+        sr_p = sum(float(r["p_model"]) for r in grp) / len(grp)
+        roi = sum(
+            (float(r["kurs"]) - 1.0) if r["wynik"] == "wygrany" else -1.0
+            for r in grp
+        ) / len(grp)
+        if roi < KWARANTANNA_ROI_WEJSCIE:
+            wstrzymana = True
+        elif roi > KWARANTANNA_ROI_WYJSCIE:
+            wstrzymana = False
+        else:
+            wstrzymana = _byla_w_kwarantannie(grp)
+        if wstrzymana:
+            out[flaga] = {
+                "roi": round(roi, 3), "n": len(grp),
+                "hit": round(traf / len(grp), 3), "sr_p": round(sr_p, 3),
+                "nazwa": KATEGORIE_NAZWY_PL.get(flaga, flaga),
+            }
+    return out
+
+
 def market_bias() -> dict[str, dict]:
     """Korekty kalibracyjne z logu w Supabase (puste, gdy brak danych/env)."""
     log = _migruj_log(supa.get_key("typy_log") or {})
@@ -1038,6 +1123,8 @@ def _sygnatura_legow(legi: list[dict]) -> frozenset:
 # capy wariantów kluczy per slot/dzień — bez nich seryjne pomijanie/wymiany
 # rozdymały log (#2/#3/... bez końca) i koszt skanów Jaccard przy publikacji
 MAX_WARIANTOW_DNIA = 10
+# zapas na obstawienie — jedno źródło prawdy (model/kupony.py)
+MARGINES_STARTU_S = kupony_model.MARGINES_STARTU_S
 MAX_WYMIAN_DNIA = 5
 
 
@@ -1181,7 +1268,7 @@ def _kupon_do_logu(
         legi = [dict(l) for i, l in enumerate(rec["legi"]) if i != idx]
         legi.append(alt_leg)
         legi.sort(key=lambda l: (l["kickoff_ts"], l["mecz_id"], -l["p_model"]))
-        if min(l["kickoff_ts"] for l in legi) <= now + 15 * 60:
+        if min(l["kickoff_ts"] for l in legi) <= now + MARGINES_STARTU_S:
             continue  # pierwszy mecz za chwilę — za późno na wymianę
         if not kurs_po or not p_po:
             continue  # bez wyceny nie publikujemy — kupon zostaje bez zmian
@@ -1254,8 +1341,8 @@ def _kupon_do_logu(
         slot = f"{k.get('horyzont', '?')}:{k.get('cel_label', k.get('cel'))}"
         if slot in zajete:
             continue  # poprzedni kupon wciąż w grze — nie podmieniamy go
-        if min(l["kickoff_ts"] for l in k["legi"]) <= now + 15 * 60:
-            continue  # pierwszy mecz trwa lub startuje za chwilę — za późno
+        if min(l["kickoff_ts"] for l in k["legi"]) <= now + MARGINES_STARTU_S:
+            continue  # pierwszy mecz startuje za mało czasu na obstawienie
         if any(l.get("podmiot_id") in niedostepni for l in k["legi"]):
             continue  # leg z zawodnikiem poza składem — czekaj na kolejny cykl
         sygn = _sygnatura_legow(k["legi"])

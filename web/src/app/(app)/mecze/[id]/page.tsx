@@ -194,6 +194,7 @@ export default async function MeczPage({
             pool={legiPool}
             kary={meta.kary_korelacji}
             wagi={meta.wagi_zaufania}
+            kalibracja={meta.kalibracja_kuponow}
             meczId={meczId}
           />
         </Reveal>

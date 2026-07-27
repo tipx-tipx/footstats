@@ -27,14 +27,14 @@ function potwierdzenia(a: StsAlert): { label: string; opis: string; on: boolean 
     },
     {
       label: "ponad tło meczu",
-      opis: `STS bywa globalnie luźniejszy, ale ta selekcja odstaje ×${a.nadwyzka_vs_baseline
+      opis: `STS bywa po prostu tańszy w całym meczu, ale ten typ odstaje mocniej niż reszta: ×${a.nadwyzka_vs_baseline
         .toFixed(2)
         .replace(".", ",")} ponad typową różnicę STS/Superbet w tym meczu. To nie sama ogólna luźność.`,
     },
     {
       label: "pełna drabinka linii",
       opis:
-        "STS ma komplet linii tego rynku (kurs świeży, nie osierocona/zawieszona pozycja), więc wartość jest wiarygodna.",
+        "STS ma tu komplet linii, więc kurs jest świeży, a nie zapomnianą pozycją, o której trader zapomniał",
     },
   ];
   // sygnaly = ile z 3 zaszło; zapalamy pierwsze `sygnaly` (kolejność jak backend)
@@ -61,7 +61,7 @@ function sygnalyAlertu(a: StsAlert): Sygnal[] {
       znak: "⚠",
       label: "model ostrzega",
       ton: "czerwony",
-      opis: `Własne sito modelu odrzuciło tę parę zawodnik+rynek: ${a.odrzucenie_powod}. Nie traktuj jej jak potwierdzoną, to sama różnica kursowa STS vs Superbet. Graj ostrożnie albo odpuść.`,
+      opis: `Nasz model sam odrzucił ten typ: ${a.odrzucenie_powod}. Zostaje więc tylko różnica w kursach STS i Superbetu, bez naszego potwierdzenia. Graj ostrożnie albo odpuść.`,
     });
   } else if (a.ma_model && a.p_model != null) {
     s.push({
@@ -86,7 +86,7 @@ function sygnalyAlertu(a: StsAlert): Sygnal[] {
       znak: "·",
       label: "bez oceny modelu",
       ton: "cichy",
-      opis: "Model nie ocenił tej selekcji (za mało danych albo poza jego rynkami), więc to sama różnica kursowa STS vs Superbet. Sygnał słabszy niż przy typach z potwierdzeniem modelu.",
+      opis: "Model nie policzył tego typu (za mało danych albo to nie jego rynek), więc zostaje sama różnica w kursach. Słabszy sygnał niż tam, gdzie model potwierdza.",
     });
   }
 
@@ -284,7 +284,7 @@ export const StsBetCard = memo(function StsBetCard({
           {a.model_odrzucil && a.odrzucenie_powod && (
             <span
               className="inline-flex items-center gap-1 px-1 text-[11px] font-medium text-data-red-ink"
-              title={`Własne sito modelu odrzuciło tę parę zawodnik+rynek: ${a.odrzucenie_powod}`}
+              title={`Nasz model sam odrzucił ten typ: ${a.odrzucenie_powod}`}
             >
               <span aria-hidden className="font-data">⚠</span> {a.odrzucenie_powod}
             </span>
@@ -302,7 +302,7 @@ export const StsBetCard = memo(function StsBetCard({
           <span className="ml-auto flex items-center gap-3">
             <span
               className="flex items-center gap-1 text-[10px] text-faint"
-              title="Ile z 3 niezależnych potwierdzeń cross-book zaszło (siatka Superbetu, ponad tło meczu, pełna drabinka linii)"
+              title="Ile z trzech niezależnych sprawdzianów ta okazja przeszła: kurs odstaje od reszty linii Superbetu, odstaje bardziej niż zwykle w tym meczu, i STS ma komplet linii na ten rynek"
             >
               <PewnoscDots level={a.pewnosc} />
               {a.sygnaly}/3 potwierdzenia

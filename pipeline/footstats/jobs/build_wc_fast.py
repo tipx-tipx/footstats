@@ -480,6 +480,14 @@ STARE_DANE_S = 45 * 86400           # ostatni występ dawniej -> typ tylko "w tl
 # etykiety stron linii do czytelnych szczegółów w rejestrze odrzuceń
 STRONA_PL = {"powyzej": "powyżej", "ponizej": "poniżej"}
 
+# --- BRAMA EKSPOZYCJI: ile minut model spodziewa się po zawodniku ---
+# Typ na zawodnika, który przeciętnie gra pół meczu, jest zakładem o skład,
+# nie o statystykę. Rozliczenia 2026-07-27: przy NIEZNANYM składzie zawodnik
+# w ogóle zagrał w 85% typów (przy ogłoszonym — 95%), a te 15% to pudła bez
+# szansy na trafienie. Drabinki mają taki próg od dawna (radar.MIN_MINUT_KARTY
+# = 62) i to jedyny produkt, który nie tonie — model dostaje ten sam.
+MIN_OCZEK_MINUT = 60.0
+
 MAX_PERF_CYKL = 220                 # budżet zapytań /player/{id}/performance
 #   na cykl (1 na zawodnika, nie na rynek) — ratowanie historii spoza
 #   zasięgu feedu propsów; patrz odswiez_stare_trendy(). 120 ucinało 44 ze
@@ -1874,6 +1882,21 @@ def _main_impl(tryb=None):
     except Exception as e:
         kwarantanna_rynkow = {}
         print(f"Kwarantanna rynków pominięta ({e})")
+    # TA SAMA BRAMA, ale po POWODZIE wejścia typu na listę, nie po rynku.
+    # Rozliczenia pokazują, że model zarabia, gdy typuje nudno, a traci na
+    # każdej ścieżce "znaleźliśmy coś więcej niż rynek" (ambitniejsza linia,
+    # profil rywala, analogia stylu, rzekomy błąd tradera). Bez tej bramy
+    # wystarczyło przekleić stratny typ na inny rynek, żeby przeszedł.
+    try:
+        kwarantanna_kategorii = rozliczanie.kategorie_kwarantanna()
+        if kwarantanna_kategorii:
+            print("Kwarantanna kategorii: " + ", ".join(
+                f"{v['nazwa']} (ROI {v['roi']:+.0%}, hit {v['hit']:.0%} "
+                f"vs p {v['sr_p']:.0%}, n={v['n']})"
+                for v in kwarantanna_kategorii.values()))
+    except Exception as e:
+        kwarantanna_kategorii = {}
+        print(f"Kwarantanna kategorii pominięta ({e})")
 
     ev_by_id = {e["id"]: e for e in events}
     sb_cache: dict[int, dict] = {}
@@ -1959,6 +1982,48 @@ def _main_impl(tryb=None):
             niedostepni.add(t.player_id)
     if niedostepni:
         print(f"Poza ogłoszonymi składami: {len(niedostepni)} zawodników")
+
+    # --- POZA SKŁADEM: twarda brama publikacji (zgłoszenie 2026-07-27) ---
+    # `niedostepni` wyżej unieważnia ZAMROŻONE kupony, ale nigdy nie blokował
+    # tworzenia NOWYCH typów i kart. Efekt: zawodnik, o którym sami wiemy, że
+    # nie ma go w jedenastce, i tak wchodził do Pewniaków i do Drabinek —
+    # wystarczyło, że jego HISTORIA wyglądała dobrze (Fabio Fehr, FC Thun).
+    #
+    # Dlaczego to nie to samo co `players.json.xi`: tam False znaczy dwie
+    # zupełnie różne rzeczy — „wiemy, że go nie ma" i „nie znamy jeszcze
+    # składu". Karać wolno tylko za pierwsze, więc liczymy je osobno:
+    # skład drużyny musi być ZNANY (pełne XI z statshub/Sofascore albo
+    # potwierdzenie Rotowire), a zawodnika w nim nie ma.
+    poza_skladem: set[tuple[int, int]] = set()
+    for mid_x, v in xi_pelne.items():
+        for tid_x, xi_set in v["xi_by_team"].items():
+            for t in trends:
+                if (
+                    t.event_id == mid_x and t.team_id == tid_x
+                    and t.player_id and t.player_id not in xi_set
+                ):
+                    poza_skladem.add((mid_x, t.player_id))
+    for t in trends:
+        if not (t.player_id and t.event_id):
+            continue
+        if (
+            rotowire.is_confirmed(roto, t.team_name)
+            and rotowire.predicted_status(roto, t.team_name, t.player_name)
+            is False
+        ):
+            poza_skladem.add((t.event_id, t.player_id))
+    # tri-state dla UI: True = w składzie, False = poza składem, None = nie
+    # wiemy. Bez tego karta nie umie odróżnić „ławka" od „skład nieznany".
+    xi_znany: dict[tuple[int, int], bool] = {}
+    for mid_x, v in xi_pelne.items():
+        for tid_x, xi_set in v["xi_by_team"].items():
+            for pid_x in xi_set:
+                xi_znany[(mid_x, pid_x)] = True
+    for k_ps in poza_skladem:
+        xi_znany.setdefault(k_ps, False)
+    if poza_skladem:
+        print(f"Poza znanym składem: {len(poza_skladem)} par (mecz, zawodnik) "
+              "— typy i karty tych zawodników nie powstają")
 
     # matchup-lite: profil per90 zawodników każdej drużyny (pod strony boiska)
     opp_players_by_team: dict[tuple[int, int], list[matchup_lite.OppPlayer]] = {}
@@ -2079,6 +2144,16 @@ def _main_impl(tryb=None):
         home_name = team_name.get(ev.get("homeTeamId"), "")
         away_name = team_name.get(ev.get("awayTeamId"), "")
         match_label = f"{home_name} – {away_name}"
+
+        # POZA SKŁADEM — koniec pętli dla tego zawodnika. Znamy jedenastkę
+        # jego drużyny i jego w niej nie ma, więc typ na niego jest zakładem
+        # o to, że wejdzie z ławki i zdąży. Rozliczenia mówią, ile to kosztuje:
+        # przy nieznanym składzie zawodnik zagrał w 85% przypadków, przy
+        # ogłoszonym — w 95%. Te 10 pp to czyste pudła bez żadnej szansy.
+        if (mid, tr.player_id) in poza_skladem:
+            _odrzuc(mid, tr, "poza_skladem",
+                    "nie ma go w składzie na ten mecz")
+            continue
 
         if mid not in matches_out:
             sed = sedzia_by_mid.get(mid) or {}
@@ -2224,6 +2299,13 @@ def _main_impl(tryb=None):
         if probe.lam < (0.35 if mk not in RARE_MARKETS else 0.2):
             _odrzuc(mid, tr, "za_malo_zdarzen",
                     f"model oczekuje ~{probe.lam:.2f} na mecz, za mało na typ")
+            continue
+        # ile minut spodziewamy się po zawodniku (patrz MIN_OCZEK_MINUT):
+        # rezerwowy z 25 minutami to loteria składu, nie typ statystyczny
+        if (probe.expected_minutes or 0.0) < MIN_OCZEK_MINUT:
+            _odrzuc(mid, tr, "za_malo_minut",
+                    f"spodziewamy się ~{probe.expected_minutes:.0f} minut, "
+                    "za mało jak na typ")
             continue
         line = line_for_lambda(probe.lam)
 
@@ -2599,9 +2681,16 @@ def _main_impl(tryb=None):
                 "rozklad": dist, "czynniki": sm.factors, "uzasadnienie": sm.reasoning,
             }
             # brama jakości (liga): okazja na starych danych nie wchodzi do
-            # publikacji, rozlicza się i uczy kalibrację w tle
-            if stare_dane:
+            # publikacji, rozlicza się i uczy kalibrację w tle. To samo dotyczy
+            # okazji, która powstałaby tuż przed gwizdkiem (zapas na obstawienie)
+            if not betting.w_oknie_zgody(a.model_prob, kurs_wziety):
+                rec_okazji["poza_publikacja"] = "rozjazd_z_rynkiem"
+                typy_poza_publikacja.append(rec_okazji)
+            elif stare_dane:
                 rec_okazji["poza_publikacja"] = "stare_dane"
+                typy_poza_publikacja.append(rec_okazji)
+            elif ts <= int(time.time()) + kupony.MARGINES_STARTU_S:
+                rec_okazji["poza_publikacja"] = "za_pozno"
                 typy_poza_publikacja.append(rec_okazji)
             else:
                 value_bets.append(rec_okazji)
@@ -3335,17 +3424,27 @@ def _main_impl(tryb=None):
         ci = b.get("ci") or [None, None]
         ci_w = (ci[1] - ci[0]) if ci[0] is not None else 0.30
         r = b["p_model"] * (b["kurs"] ** 0.5)
-        if b.get("matchup"):
+        # premie tylko za kategorie, które NIE stoją w kwarantannie — inaczej
+        # windujemy w rankingu dokładnie te typy, które udowodniły, że tracą
+        if b.get("matchup") and "matchup" not in kwarantanna_kategorii:
             r *= 1.15
-        if b.get("rotacja"):
+        if b.get("rotacja") and "rotacja" not in kwarantanna_kategorii:
             r *= 1.10
         if b.get("swieze_sklady"):
             r *= 1.12  # składy ogłoszone <45 min temu — kurs mógł nie zdążyć
-        if b.get("miekka_linia"):
+        if b.get("miekka_linia") and "miekka_linia" not in kwarantanna_kategorii:
             r *= 1.10  # linia odstaje od własnej siatki buka (błąd tradera)
         if ci_w > 0.25:
             r *= 0.90
         return r
+
+    def _kategoria_wstrzymana(b: dict) -> str | None:
+        """Pierwsza flaga typu, która stoi w kwarantannie (albo None)."""
+        return next(
+            (f for f in rozliczanie.KATEGORIE_KWARANTANNY
+             if b.get(f) and f in kwarantanna_kategorii),
+            None,
+        )
 
     # perełki: do 2 wpisów z wyższym kursem (>=2.0) per mecz, po wartości
     perelki_kandydaci = sorted(
@@ -3363,8 +3462,11 @@ def _main_impl(tryb=None):
     # — a w puli bywają perełki typu "strzały 1,5+" albo "odbiory 2,5+"
     # (kurs wyraźnie wyższy przy wciąż solidnej szansie). Per (mecz, rynek)
     # dokładamy najlepszego kandydata z linią >= 1,5 po jakości p×kurs.
+    # Kategoria w kwarantannie nie dokłada NOWYCH kandydatów: gdy „ambitniejsza
+    # linia" traci pieniądze, samo oznaczenie jej flagą po wyemitowaniu to za
+    # mało — trzeba przestać ją w ogóle produkować.
     wyzsze: dict[tuple[int, str], dict] = {}
-    for b in legi_pool:
+    for b in ([] if "wyzsza_linia" in kwarantanna_kategorii else legi_pool):
         # przy kursie 1,9+ dopuszczamy "opcję ryzykowną" już od p>=40%
         # (format tipsterski: linia wyżej, kurs wyraźnie wyższy)
         prog_p = 0.40 if b["kurs"] >= 1.9 else 0.52
@@ -3393,6 +3495,9 @@ def _main_impl(tryb=None):
     # (typy_poza_publikacja zainicjalizowane przed pętlą trendów — zbiera
     # też okazje z kursem i sugestie zdjęte przez bramę jakości)
     pewniaki_per_mecz: dict[int, int] = {}
+    # zapas na obstawienie — NOWY typ nie pojawia się kwadrans przed gwizdkiem
+    # (typ już opublikowany wraca z rejestru publikacji i zostaje do końca)
+    teraz_pub = int(time.time())
     for b in do_emisji:
         klucz = (b["podmiot_id"], b["rynek_kod"], b["linia"], b["strona"])
         if klucz in juz_opublikowane:
@@ -3404,8 +3509,16 @@ def _main_impl(tryb=None):
         powod_poza = None
         if b["rynek_kod"] in kwarantanna_rynkow:
             powod_poza = "kwarantanna_rynku"
+        elif not betting.w_oknie_zgody(b["p_model"], b["kurs"]):
+            # najostrzejsza brama, zmierzona na 336 rozliczeniach — patrz
+            # betting.OKNO_ZGODY_*. Typ dalej się liczy i uczy w tle.
+            powod_poza = "rozjazd_z_rynkiem"
+        elif _kategoria_wstrzymana(b):
+            powod_poza = "kwarantanna_kategorii"
         elif b.get("stare_dane"):
             powod_poza = "stare_dane"
+        elif b["kickoff_ts"] <= teraz_pub + kupony.MARGINES_STARTU_S:
+            powod_poza = "za_pozno"
         elif pewniaki_per_mecz.get(b["mecz_id"], 0) >= MAX_PEWNIAKOW_MECZ:
             powod_poza = "limit_meczu"
         rec_pewniaka = {
@@ -3449,14 +3562,10 @@ def _main_impl(tryb=None):
         value_bets.append(rec_pewniaka)
         _zapewnij_mecz(b["mecz_id"])["okazje"].append(vb_id)
     if typy_poza_publikacja:
-        n_kw = sum(1 for t in typy_poza_publikacja
-                   if t["poza_publikacja"] == "kwarantanna_rynku")
-        n_st = sum(1 for t in typy_poza_publikacja
-                   if t["poza_publikacja"] == "stare_dane")
-        print(f"Poza publikacją: {n_kw} typów (kwarantanna rynku), "
-              f"{n_st} (stare dane), "
-              f"{len(typy_poza_publikacja) - n_kw - n_st} (limit na mecz) — "
-              "rozliczą się i uczą kalibrację w tle")
+        licz_poza = Counter(t["poza_publikacja"] for t in typy_poza_publikacja)
+        print("Poza publikacją: " + ", ".join(
+            f"{v} ({k})" for k, v in licz_poza.most_common()
+        ) + " — rozliczą się i uczą kalibrację w tle")
 
     value_bets.sort(key=lambda b: -b["rank_score"])
 
@@ -3466,6 +3575,11 @@ def _main_impl(tryb=None):
     legi_pool_pub = [
         b for b in legi_pool
         if b["rynek_kod"] not in kwarantanna_rynkow and not b.get("stare_dane")
+        and not _kategoria_wstrzymana(b)
+        # ta sama brama co przy typach: leg poza oknem zgody z rynkiem nie
+        # wchodzi do kuponów. Błąd pojedynczego lega MNOŻY się przez kupon,
+        # więc to tu boli najbardziej (patrz kupony 0/18 w stylu „z przewagą")
+        and betting.w_oknie_zgody(b["p_model"], b["kurs"])
     ]
 
     # REJESTR ODRZUCEŃ — domknięcie: para (zawodnik, rynek) opublikowana
@@ -3505,6 +3619,30 @@ def _main_impl(tryb=None):
             szczegol = (
                 "ostatni mecz zawodnika był dawno temu, czekamy aż "
                 "wróci do gry i da świeże dane"
+            )
+        elif t["poza_publikacja"] == "za_pozno":
+            szczegol = (
+                "za mało czasu do pierwszego gwizdka — nowych typów nie "
+                "dodajemy na ostatnią chwilę, żebyś zdążył je obstawić"
+            )
+        elif t["poza_publikacja"] == "rozjazd_z_rynkiem":
+            szczegol = (
+                "nasza szansa za mocno rozjeżdża się z kursem. Rozliczenia "
+                "mówią jasno: im dalej jesteśmy od bukmachera, tym rzadziej "
+                "mamy rację — zwykle on wie coś, czego my nie wiemy"
+            )
+        elif t["poza_publikacja"] == "kwarantanna_kategorii":
+            flaga = next(
+                (f for f in rozliczanie.KATEGORIE_KWARANTANNY
+                 if t.get(f) and f in kwarantanna_kategorii),
+                None,
+            )
+            kk = kwarantanna_kategorii.get(flaga or "", {})
+            szczegol = (
+                f"typy z powodu „{kk.get('nazwa', flaga)}” ostatnio traciły "
+                f"{abs(kk.get('roi', 0)):.0%} na złotówce stawki "
+                f"(trafienia {kk.get('hit', 0):.0%}, próba: {kk.get('n', 0)}). "
+                f"Wstrzymane, aż przestaną tracić"
             )
         else:
             kw = kwarantanna_rynkow.get(t["rynek_kod"], {})
@@ -3600,6 +3738,12 @@ def _main_impl(tryb=None):
             # dla lig spoza feedu propsów, gdzie statshub nie daje gotowych
             # agregatów rywala, to JEDYNE źródło kontekstu (m.in. Ekstraklasa)
             koncesje_tab=koncesje_tab,
+            # brama składu: karta nie powstaje dla zawodnika, o którym WIEMY,
+            # że go w jedenastce nie ma (zgłoszenie 2026-07-27: Fabio Fehr)
+            poza_skladem=poza_skladem,
+            xi_znany=xi_znany,
+            # zapas na obstawienie — nowa karta nie wskakuje tuż przed meczem
+            margines_startu_s=kupony.MARGINES_STARTU_S,
         )
     except Exception as ex:
         radar_wpisy = []
@@ -3796,11 +3940,21 @@ def _main_impl(tryb=None):
     # ZMIERZONE kary korelacji legów z rozliczonych kuponów (zastępują zgadywane
     # 0.92/0.95/0.97; shrinkage do domyślnych przy małej próbie) — kupony dostają
     # uczciwsze szanse, bo legi z jednego meczu realnie nie padają niezależnie
-    kary_kor = kupony.kary_korelacji_z_diagnostyki(
-        rozliczanie.compute_kupony_diagnostyka(supa.get_key("kupony_log") or {})["korelacja"]
+    diag_kuponow = rozliczanie.compute_kupony_diagnostyka(
+        supa.get_key("kupony_log") or {}
     )
+    kary_kor = kupony.kary_korelacji_z_diagnostyki(diag_kuponow["korelacja"])
     if kary_kor != kupony.KARY_DEFAULT:
         print(f"Kary korelacji (zmierzone): {kary_kor}")
+    # UCZCIWA SZANSA KUPONU: zmierzone „ile z deklarowanej szansy naprawdę
+    # wchodzi" per horyzont. Bez tego kupon obiecywał 17%, a wchodził w 10%
+    # (a styl „z przewagą" — 34% deklaracji przy zerze na osiemnaście).
+    kal_kuponow = kupony.kalibracja_kuponow_z_pomiaru(
+        diag_kuponow.get("kalibracja") or {}
+    )
+    if kal_kuponow:
+        print("Urealnienie szansy kuponów (zmierzone): " + ", ".join(
+            f"{h} x{w}" for h, w in sorted(kal_kuponow.items())))
     # ZMIERZONE wagi zaufania do p_model per kubełek pewności (z rozliczonych
     # typów) — składanie ufa modelowi dokładnie tyle, ile pokazały rozliczenia
     wagi_zauf: dict = {}
@@ -3819,7 +3973,7 @@ def _main_impl(tryb=None):
         print(f"Wagi zaufania pominięte ({e})")
     kupony_list = kupony.build_kupony(
         value_bets, legi_pool_pub, profil=profil_kuponow, kary=kary_kor,
-        wagi=wagi_zauf or None,
+        wagi=wagi_zauf or None, kal_szansy=kal_kuponow or None,
     )
     # znacznik: na ilu meczach kuponu składy były już POTWIERDZONE przy
     # budowie (mniejsze ryzyko anulowań/zwrotów niż na prognozach XI)
@@ -3862,6 +4016,16 @@ def _main_impl(tryb=None):
                  "n": v["n"], "nazwa": MARKET_NAMES_PL.get(mk, mk)}
             for mk, v in (kwarantanna_rynkow or {}).items()
         },
+        # POWODY WSTRZYMANE: to samo co wyżej, tylko po powodzie wejścia typu
+        # na listę („ambitniejsza linia", „słaby rywal"...). Front tłumaczy
+        # nimi, czemu typów jest mniej niż wczoraj.
+        "kwarantanna_powodow": kwarantanna_kategorii or {},
+        # zapas na obstawienie w minutach — front pisze go wprost, zamiast
+        # trzymać własną kopię liczby (rozjazd byłby nie do wytłumaczenia)
+        "margines_startu_min": kupony.MARGINES_STARTU_S // 60,
+        # zmierzone urealnienie szansy kuponu per horyzont — generator na
+        # żądanie pokazuje te same liczby co kupony automatyczne
+        "kalibracja_kuponow": kal_kuponow or {},
     })
     print(f"OK: {len(matches_out)} meczów, {len(value_bets)} okazji, "
           f"{len(players_out)} zawodników.")

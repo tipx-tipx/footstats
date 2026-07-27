@@ -153,7 +153,7 @@ export function TopPokrycia({
           className={`font-display pb-1.5 text-[11px] font-semibold uppercase tracking-wide transition-colors ${
             bezKursu ? "text-brand-deep" : "text-faint hover:text-ink"
           }`}
-          title="Rynki, których Superbet nie kwotuje (niecelne, zablokowane), zawsze bez kursu"
+          title="Rynki, których Superbet w ogóle nie wystawia (strzały niecelne, zablokowane) — kursu tu nie będzie"
         >
           {bezKursu ? "✓ z rynkami bez kursu" : "+ rynki bez kursu"}
         </button>
@@ -161,7 +161,7 @@ export function TopPokrycia({
         <div
           aria-live="polite"
           className="ml-auto flex flex-col items-end gap-1"
-          title="Wiersze spełniające obecne filtry: regularni w kadrze najpierw"
+          title="Ile pozycji pasuje do ustawionych filtrów. Na górze regularni gracze kadry."
         >
           <span className="text-[10px] font-semibold uppercase tracking-wide text-faint">
             w tabeli
@@ -189,7 +189,7 @@ export function TopPokrycia({
           </span>{" "}
           = rezerwa kadry, liczone z klubu
         </span>
-        <span title="Zgrubny sygnał wartości: pokrycie × kurs − 1. To NIE jest przewaga silnika (próba to 5 startów, bez kalibracji i kontekstu), tylko sito na kursy typu „5/5 @1,01”.">
+        <span title="Zgrubna podpowiedź, nie wyliczenie modelu: bierzemy sam odsetek trafień z ostatnich 5 startów i mnożymy przez kurs. Służy tylko do odsiewania kursów typu „5/5 za 1,01”.">
           <span className="font-data font-semibold text-data-green-ink">+%</span> = ile
           płaci kurs względem pokrycia (zgrubnie, próba 5)
         </span>
@@ -231,7 +231,7 @@ export function TopPokrycia({
                     {!w.kadraRegularny && (
                       <span
                         className="inline-flex rounded-full bg-data-amber-wash px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-data-amber-ink"
-                        title="Zawodnik nie ma 5 startów w reprezentacji w dostępnej historii. Rezerwa kadry, statystyki liczone z klubu. Na mecz reprezentacji traktuj ostrożnie."
+                        title="Nie ma nawet 5 występów w reprezentacji, więc liczymy mu statystyki z klubu. Na mecz kadry traktuj to ostrożnie."
                       >
                         forma klubowa
                       </span>

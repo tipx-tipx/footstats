@@ -32,6 +32,7 @@ from collections import Counter
 
 import numpy as np
 
+from ..model import betting
 from ..model import context as context_mod
 from ..model import counts as counts_mod
 from ..model import kontekst_drabinki as kd
@@ -102,6 +103,26 @@ MIN_PROBA_SCORE = 8         # min. występów w próbie (było 5 — za krótkie
 PROG_POKRYCIA_KARTY = 0.5
 MIN_MINUT_KARTY = 62        # zmiennik (52-55 min śr.) to ryzyko, nie typ
 MIN_EDGE_KARTY = 0.03       # przewaga po korekcie próby, w pkt proc.
+# GÓRNA granica przewagi — brama zgody z rynkiem (pomiar 2026-07-27 na 336
+# rozliczonych typach modelu, patrz betting.OKNO_ZGODY_*): im mocniej nasza
+# szansa rozjeżdża się z ceną bukmachera, tym RZADZIEJ mamy rację.
+#
+# Drabinki nie miały tej bramy w ogóle, a ich ranking to dosłownie „kto
+# najbardziej rozjeżdża się z kursem" — więc na szczyt trafiało to, co
+# najpewniej jest błędem. Karta Fabio Fehra (FC Thun, 2026-07-28) stała
+# 16 pp nad ceną rynku i była kartą numer 1 dnia.
+#
+# Tu liczymy ILORAZEM (nasza szansa / cena rynku), a nie różnicą w punktach
+# jak przy typach modelu, bo drabinki żyją na zupełnie innych kursach: model
+# typuje średnio po 1,50, a karta zaczyna się od 1,65 i sięga 4,0. Te same
+# „10 punktów procentowych" to przy kursie 1,7 błąd o 18%, a przy 3,5 —
+# o 38%. Pomiar w formie ilorazu (ROI +2,3% do 1,15x, −17,8% w 1,15–1,30x,
+# −37,3% w 1,30–1,50x) skaluje się przez cały ten zakres.
+MAX_ROZJAZD_KARTY = 1.25
+# Udział meczów rozpoczętych w pierwszym składzie (z ostatnich rozegranych).
+# Karta liczy wszystko z minut, których zmiennik po prostu nie dostanie.
+MIN_UDZIAL_STARTOW = 0.6
+OKNO_STARTOW = 10
 # poziom ufności korekty próby: 7/10 -> ~57% zamiast naiwnych 70%
 WILSON_K = 0.674            # ~75% jednostronnie
 
@@ -219,6 +240,19 @@ def _grane(tr: statshub.StatshubTrend) -> list[tuple[float, float, int]]:
         for c, m, ts in zip(tr.counts, tr.minutes, tr.timestamps)
         if m and m >= MIN_MINUT_MECZU
     ]
+
+
+def udzial_startow(tr: statshub.StatshubTrend, okno: int = OKNO_STARTOW) -> float | None:
+    """Jaka część ostatnich meczów DRUŻYNY zaczynał w pierwszym składzie.
+
+    Liczymy z pełnej historii (nie tylko z meczów, w których zagrał), bo
+    dopiero ona odróżnia „gra co tydzień od pierwszej minuty" od „raz na
+    trzy kolejki wchodzi i robi 90 minut". None = za krótka historia.
+    """
+    n = min(len(tr.started), len(tr.minutes), okno)
+    if n < 5:
+        return None
+    return sum(1 for i in range(n) if tr.started[i]) / n
 
 
 def liga_konsensus(
@@ -646,6 +680,14 @@ def _oceń_karte(w: dict, powody: Counter | None = None) -> tuple[float, dict | 
         if powody is not None:
             powody["za_malo_minut"] += 1
         return 0.0, None
+    # czy on w ogóle regularnie WYCHODZI w pierwszym składzie: średnia minut
+    # potrafi wyglądać dobrze u kogoś, kto raz zagrał 90 minut, a poza tym
+    # siedzi. Cała analiza karty stoi na minutach, których rezerwowy nie dostanie.
+    udzial = w.get("udzial_startow")
+    if udzial is not None and udzial < MIN_UDZIAL_STARTOW:
+        if powody is not None:
+            powody["rzadko_w_pierwszym_skladzie"] += 1
+        return 0.0, None
     best_score, best_s = 0.0, None
     lokalne: Counter = Counter()
     for r in w.get("rynki", []):
@@ -672,6 +714,13 @@ def _oceń_karte(w: dict, powody: Counter | None = None) -> tuple[float, dict | 
             edge = p_final - 1.0 / s["kurs"]
             if edge < MIN_EDGE_KARTY:
                 lokalne["brak_przewagi"] += 1
+                continue
+            # ...ale przewaga ZA DUŻA to nie okazja, tylko sygnał, że to my się
+            # mylimy (patrz MAX_ROZJAZD_KARTY). Cena rynku po zdjęciu marży,
+            # tak jak w modelu — porównujemy jabłka z jabłkami.
+            cena = betting.implied_prob_one_sided(s["kurs"])
+            if cena > 0 and p_final / cena > MAX_ROZJAZD_KARTY:
+                lokalne["rozjazd_z_rynkiem"] += 1
                 continue
             if edge > best_score:
                 best_score, best_s = edge, {
@@ -735,6 +784,9 @@ def zbuduj(
     player_sezon: dict | None = None,
     sedzia_by_mid: dict[int, dict] | None = None,
     koncesje_tab=None,
+    poza_skladem: set[tuple[int, int]] | None = None,
+    xi_znany: dict[tuple[int, int], bool] | None = None,
+    margines_startu_s: int = 0,
 ) -> list[dict]:
     """Złóż wpisy radaru/drabinek ze zbiorów, które cykl i tak ma w pamięci.
 
@@ -785,16 +837,40 @@ def zbuduj(
                 float(r["p_model"])
             )
 
+    poza_skladem = poza_skladem or set()
+    xi_znany = xi_znany or {}
+
     wpisy: list[dict] = []
     for mid, gracze in odds_grid.items():
         meta = events_meta.get(mid)
         if not meta:
             continue
+        # ZAPAS NA OBSTAWIENIE: nowa karta nie powstaje tuż przed gwizdkiem.
+        # Karta już opublikowana wraca z rejestru (scal_karty_z_publikacjami)
+        # i zostaje do końca — chodzi wyłącznie o to, żeby nic NOWEGO nie
+        # wskakiwało na listę w ostatniej chwili (zgłoszenie: Club Necaxa).
+        if margines_startu_s and (meta.get("ts") or 0) <= teraz + margines_startu_s:
+            continue
         for pid, drabinki in gracze.items():
+            # POZA SKŁADEM: znamy jedenastkę i jego w niej nie ma. Karta na
+            # takiego zawodnika to zakład o to, że wejdzie z ławki — a cała
+            # analiza pod spodem liczy z minut, których nie zagra.
+            if (mid, pid) in poza_skladem:
+                continue
             trendy_mk = trendy_pm.get((mid, pid))
             if not trendy_mk:
                 continue
             tr_ref = max(trendy_mk.values(), key=lambda t: len(t.counts))
+            # ŚWIEŻOŚĆ PRÓBY: dotąd pilnowały jej tylko detektory transferu
+            # i formy, czyli plakietki. Zwykła drabinka mogła stać na historii
+            # sprzed pół roku — dla zawodnika po kontuzji albo poza rotacją
+            # „trafił 8/10" opisuje kogoś, kto już tak nie gra.
+            grane_ref = _grane(tr_ref)
+            if (
+                not grane_ref
+                or teraz - grane_ref[0][2] > MAX_DNI_SWIEZOSC * 86400
+            ):
+                continue
             liga_dr, utidy_dr = konsensus.get(
                 tr_ref.team_id or -1, (None, set())
             )
@@ -819,7 +895,7 @@ def zbuduj(
             # średnia minut z ostatnich 6 występów — "gra pełne mecze"
             # vs "wchodzi z ławki" to pierwsze pytanie każdej analizy.
             # Liczona PRZED drabinką, bo jest prognozą ekspozycji w p_final.
-            gr_ref = _grane(tr_ref)[:6]
+            gr_ref = grane_ref[:6]
             minuty_sr6 = (
                 round(sum(m for _, m, _ in gr_ref) / len(gr_ref))
                 if gr_ref else None
@@ -856,6 +932,10 @@ def zbuduj(
                 continue  # same puste drabinki (kursy-szum) = nie ma karty
             wpis = {
                 "minuty_sr6": minuty_sr6,
+                # ile z ostatnich meczów zaczynał w pierwszym składzie —
+                # brama karty i konkret na karcie („gra od pierwszej minuty
+                # w 9 z 10 ostatnich"), zamiast samej średniej minut
+                "udzial_startow": udzial_startow(tr_ref),
                 "rodzaj": (
                     "transfer" if transfer else
                     "forma" if forma else "drabinka"
@@ -867,7 +947,18 @@ def zbuduj(
                 "druzyna": tr_ref.team_name,
                 "przeciwnik": tr_ref.opponent_name,
                 "pozycja": info.get("pozycja") or tr_ref.position or "?",
-                "xi": info.get("xi"),
+                # tri-state: True = jest w składzie, False = poza składem,
+                # None = składu jeszcze nie ogłoszono. Dawne `info["xi"]`
+                # zwracało False w obu ostatnich przypadkach naraz, więc karta
+                # nie umiała odróżnić „ławka" od „nie wiemy". `info["xi"]`
+                # zostaje jako źródło pozytywnego sygnału (True znaczy tam
+                # dokładnie „jest w przewidywanym XI"); jego False odrzucamy,
+                # bo nie niesie informacji.
+                "xi": (
+                    xi_znany.get((mid, pid))
+                    if (mid, pid) in xi_znany
+                    else (True if info.get("xi") else None)
+                ),
                 "rynki": rynki,
             }
             if transfer:
@@ -897,8 +988,8 @@ def zbuduj(
         events_meta.items(),
         key=lambda kv: (kv[0] in mids_z_trendami, kv[1].get("ts") or 0),
     ):
-        if (meta.get("ts") or 0) <= teraz:
-            continue  # mecz już trwa/był — szkoda budżetu
+        if (meta.get("ts") or 0) <= teraz + margines_startu_s:
+            continue  # mecz trwa albo startuje za chwilę — szkoda budżetu
         sb = sb_cache.get(mid)
         if not sb or not (meta.get("hid") and meta.get("aid")):
             continue
@@ -910,6 +1001,8 @@ def zbuduj(
             sb, znane, (meta["hid"], meta["aid"]), budzet
         )[:MAX_DEBIUTANTOW_MECZU]:
             profil = d["profil"]
+            if (mid, profil.get("id")) in poza_skladem:
+                continue  # poza ogłoszonym składem — patrz komentarz wyżej
             druzyna = (
                 meta.get("home") if profil.get("team_id") == meta["hid"]
                 else meta.get("away")
@@ -976,10 +1069,15 @@ def zbuduj(
                 "druzyna": druzyna or "",
                 "przeciwnik": przeciwnik or "",
                 "pozycja": (profil.get("position") or "?")[:1],
-                "xi": None,
+                "xi": xi_znany.get((mid, profil.get("id"))),
                 **({"powod": "poza_feedem"} if bez_feedu and not trendy_perf
                    else {"powod": "brak_historii"} if not bez_feedu else {}),
                 "minuty_sr6": minuty_sr6_deb,
+                "udzial_startow": (
+                    udzial_startow(max(trendy_perf.values(),
+                                       key=lambda t: len(t.counts)))
+                    if trendy_perf else None
+                ),
                 "profil": {
                     "wzrost": profil.get("height"),
                     "wiek": wiek,

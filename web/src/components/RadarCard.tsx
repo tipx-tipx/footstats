@@ -116,19 +116,19 @@ function zajawka(w: RadarWpis): string {
     return `${h.rynek ?? h.rynek_kod} ${linLabel(h.linia)} · trafione ${h.traf}/${h.z} ost. · kurs ${fmtKurs(h.kurs)}${szansa}`;
   }
   if (w.rodzaj === "debiutant") {
-    return "Pełne kursy Superbetu bez żadnej historii w danych — rynek zgaduje.";
+    return "Superbet wystawił mu komplet kursów, choć my nie mamy o nim żadnych statystyk — bukmacher też strzela.";
   }
   if (w.rodzaj === "bez_feedu") {
     return w.sezony?.length
-      ? `Kursy Superbetu + średnie z ${w.sezony.length} ${w.sezony.length === 1 ? "sezonu" : "sezonów"} (bez historii meczowej — liga poza feedem).`
-      : "Kursy Superbetu. Historii meczowej brak — ta liga nie jest w feedzie statystyk.";
+      ? `Kursy Superbetu i średnie z ${w.sezony.length} ${w.sezony.length === 1 ? "sezonu" : "sezonów"}. Meczu po meczu tu nie pokażemy — z tej ligi nie mamy takich danych.`
+      : "Same kursy Superbetu. Z tej ligi nie mamy statystyk mecz po meczu.";
   }
   if (w.rodzaj === "transfer") {
     return w.stara_liga
       ? `Historia z poprzedniej ligi: ${w.stara_liga}. Kurs może tego nie uwzględniać.`
       : "Świeży transfer — historia z poprzedniego klubu.";
   }
-  return "Drabinka kursów z pełną historią występów.";
+  return "Drabinka kursów z pełną historią jego występów.";
 }
 
 /** Akapit „dlaczego ta karta" w rozwinięciu — tylko wpisy z sygnałem. */
@@ -292,7 +292,7 @@ function Wodospad({
         {sedzia?.zrodlo === "brak_obsady" ? (
           <CzynnikWiersz
             etykieta="sędzia"
-            opis="obsada jeszcze nieznana — bez korekty"
+            opis="nie wiadomo jeszcze, kto sędziuje — nic z tego tytułu nie zmieniamy"
             tytul="Arbitrzy różnią się liczbą odgwizdanych fauli. Obsada jest znana zwykle 1–2 dni przed meczem; dopóki jej nie ma, nie zgadujemy."
           />
         ) : sedzia?.sedzia ? (
@@ -352,7 +352,7 @@ function Wodospad({
                   className={`font-data font-semibold ${
                     przewaga > 0 ? "text-data-green-ink" : "text-data-amber-ink"
                   }`}
-                  title="Różnica między naszą szansą a ceną rynku. Dodatnia = kurs jest naszym zdaniem za wysoki."
+                  title="O ile nasza szansa jest wyższa od tej, którą wycenia kurs. Na plusie znaczy, że naszym zdaniem bukmacher płaci za dużo."
                 >
                   {" "}
                   ({przewaga > 0 ? "+" : "−"}
@@ -363,8 +363,8 @@ function Wodospad({
           )}
           {pBazowe != null && (
             <span className="block text-faint">
-              samo pokrycie dawało {fmtProc(pBazowe)} — resztę zrobił kontekst
-              tego meczu
+              z samej historii wychodziło {fmtProc(pBazowe)} — resztę zmieniło to,
+              co czeka go w tym meczu
             </span>
           )}
         </p>
@@ -448,7 +448,7 @@ function RynekBlok({ r }: { r: RadarRynek }) {
           {r.forma && (
             <span
               className="font-data text-[11px]"
-              title="Średnia na 90 minut z 6 ostatnich meczów vs wcześniejsza baza"
+              title="Ile notował na 90 minut w 6 ostatnich meczach w porównaniu z wcześniejszym okresem"
             >
               <span
                 className={
@@ -474,7 +474,7 @@ function RynekBlok({ r }: { r: RadarRynek }) {
           {r.srednia90 != null && (
             <span
               className="font-data text-[11px] text-muted"
-              title="Średnia liczba zdarzeń na 90 minut z całej dostępnej historii"
+              title="Ile notował średnio na 90 minut przez całą historię, jaką mamy"
             >
               śr. {liczba(r.srednia90)}/90
             </span>
@@ -487,10 +487,10 @@ function RynekBlok({ r }: { r: RadarRynek }) {
         <div className="grid grid-cols-[2.4rem_3.2rem_3rem_1fr] gap-x-3 border-b border-hairline pb-1 text-[9px] uppercase tracking-wide text-faint">
           <span>linia</span>
           <span>kurs</span>
-          <span title="Nasza szansa na przebicie tej linii W TYM meczu: pokrycie z ostatnich występów skorygowane o rywala, sędziego, scenariusz meczu i formę">
+          <span title="Nasza szansa, że przebije tę linię akurat w tym meczu. Zaczynamy od tego, jak często robił to ostatnio, a potem poprawiamy o rywala, sędziego, przewidywany przebieg meczu i formę.">
             szansa
           </span>
-          <span title="Ile z ostatnich meczów przebiło tę linię">
+          <span title="W ilu z ostatnich meczów przebił tę linię">
             trafienia w ost. meczach
           </span>
         </div>
@@ -531,7 +531,7 @@ function RynekBlok({ r }: { r: RadarRynek }) {
       {r.rywal?.srednia != null && (
         <p
           className="mt-2 text-[11px] text-muted"
-          title="Ile najbliższy rywal średnio dopuszcza na tym rynku i które miejsce zajmuje w lidze. UWAGA: #1 to drużyna NAJSZCZELNIEJSZA (dopuszcza najmniej), a nie najhojniejsza."
+          title="Ile najbliższy rywal średnio pozwala rywalom na tym rynku i które to miejsce w lidze. Uwaga: miejsce 1 ma drużyna, która pozwala NAJMNIEJ, a nie najwięcej."
         >
           rywal puszcza śr.{" "}
           <span className="font-data font-semibold text-ink-soft">
@@ -674,9 +674,20 @@ export const RadarCard = memo(function RadarCard({
             {w.xi === true && (
               <span
                 className="text-[9px] uppercase tracking-wide text-faint"
-                title="Zawodnik jest w przewidywanym lub potwierdzonym pierwszym składzie"
+                title="Jest w pierwszym składzie — przewidywanym albo już ogłoszonym"
               >
                 w składzie
+              </span>
+            )}
+            {/* skład ogłoszono PO opublikowaniu karty i zawodnika w nim nie
+                ma — karta zostaje (obiecaliśmy, że nie znika), ale musi
+                uczciwie powiedzieć, że jest już nieaktualna */}
+            {w.xi === false && (
+              <span
+                className="rounded-full bg-data-red-wash px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-data-red-ink"
+                title="Trener ogłosił skład i tego zawodnika w nim nie ma. Ta karta powstała wcześniej — nie graj jej."
+              >
+                poza składem
               </span>
             )}
           </span>
@@ -758,7 +769,7 @@ export const RadarCard = memo(function RadarCard({
                 <div className="mt-4">
                   <p
                     className="mb-2 text-[10px] uppercase tracking-wide text-faint"
-                    title="Średnie z całych sezonów (bieżący i poprzednie) — także z poprzedniego klubu i ligi, jeśli zawodnik zmienił barwy"
+                    title="Średnie z całych sezonów, także z poprzedniego klubu i ligi, jeśli zmienił barwy"
                   >
                     średnie sezonowe
                   </p>

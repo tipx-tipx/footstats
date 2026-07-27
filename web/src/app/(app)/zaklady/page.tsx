@@ -21,11 +21,11 @@ export default async function ZakladyPage() {
         title="Moje zakłady"
         lead={
           <>
-            Wszystko, co postawiłeś, w jednym miejscu. Po meczu uzupełnij wynik
-            i kurs zamknięcia, a zobaczysz swój <strong>CLV</strong>, czyli czy
-            bierzesz kursy lepsze niż rynek tuż przed meczem. Dodatni CLV w
-            dłuższej serii to najlepszy dowód, że system znajduje prawdziwą
-            wartość.
+            Wszystko, co postawiłeś, w jednym miejscu. Po meczu wpisz wynik i
+            kurs, jaki był tuż przed pierwszym gwizdkiem — pokażemy Ci, czy
+            łapiesz lepsze kursy niż reszta rynku. Jeśli w dłuższej serii są
+            lepsze, to najmocniejszy dowód, że ten system naprawdę coś
+            znajduje.
           </>
         }
       />

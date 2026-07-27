@@ -33,8 +33,16 @@ const KROKI = [
     opis: "Pewność mówi, ile danych i jak stabilnych stoi za predykcją (mała próba, niepewne minuty = niska pewność). Ryzyko mówi, jak kapryśne jest samo zdarzenie: rzadkie zdarzenia (np. strzały głową) to loteria nawet przy dobrym modelu. Wysokiej wartości bez pewności nie traktujemy poważnie.",
   },
   {
+    tytul: "Odrzucamy to, czego nie da się obstawić",
+    opis: "Typ nie powstaje, jeśli wiemy, że zawodnika nie ma w składzie, albo jeśli spodziewamy się po nim mniej niż godziny gry. Nic nowego nie pojawia się też później niż półtorej godziny przed pierwszym gwizdkiem — żebyś zdążył spokojnie obstawić, a nie gonił kurs na dziesięć minut przed meczem.",
+  },
+  {
+    tytul: "Wstrzymujemy to, co traci pieniądze",
+    opis: "Co jakiś czas przeliczamy, ile zarobił albo stracił każdy rynek i każdy powód, dla którego typ trafia na listę. Jeśli coś w ostatnich kilkudziesięciu rozliczeniach oddaje pieniądze, znika ze strony — ale liczymy je dalej po cichu, więc wraca samo, gdy przestanie tracić. Nikt nie decyduje o tym ręcznie.",
+  },
+  {
     tytul: "Sprawdzamy sami siebie",
-    opis: "Zakładka „Skuteczność” to test na meczach, których model nie widział podczas nauki. Jeśli mówi „60%”, a zdarzenia zachodzą w 60% przypadków, możesz mu ufać. A Twój dziennik zakładów z CLV pokazuje, czy realnie wyprzedzasz rynek.",
+    opis: "Zakładka „Skuteczność” pokazuje wszystko, co pokazaliśmy i co się już zakończyło — także nietrafione. Jest tam też egzamin na meczach, których model nie widział, gdy się uczył: jeśli mówi „60%”, a takie zdarzenia zachodzą w 60% przypadków, możesz mu wierzyć. Sprawdzamy też, czy kursy, które łapiemy, są lepsze od tych tuż przed meczem — to znak, że wyprzedzamy bukmachera.",
   },
 ];
 
@@ -47,8 +55,8 @@ export default function JakToDzialaPage() {
         lead={
           <>
             Bez żargonu: co się dzieje między „mecz w sobotę” a „ten kurs jest
-            zawyżony”. Osiem kroków, dokładnie w tej kolejności system
-            wykonuje je dla każdego zawodnika i każdego rynku.
+            zawyżony”. Poniżej wszystkie kroki, dokładnie w tej kolejności, w
+            jakiej system wykonuje je dla każdego zawodnika i każdego rynku.
           </>
         }
       />

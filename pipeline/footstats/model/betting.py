@@ -237,6 +237,44 @@ MIN_CONFIDENCE_SCORE = 25.0
 # realny hit-rate z przepuszczonymi, zanim ruszy się same liczby.
 MAX_MODEL_MARKET_DIVERGENCE = 0.22  # różnica p_model vs p_rynku > 22 pp = podejrzana
 MAX_RELATIVE_DIVERGENCE = 1.9       # p_model / p_rynku > 1.9x = podejrzane (longshoty!)
+
+# --- OKNO ZGODY Z RYNKIEM: brama PUBLIKACJI (pomiar 2026-07-27) ---
+# Grunt pomiaru zapowiadany wyżej wreszcie jest. 336 rozliczonych typów
+# z kursem, pogrupowanych po tym, o ile p_model przebija cenę rynku po devigu:
+#
+#   poniżej ceny   n= 36   trafia 58,3%   ROI −22,4%
+#   +0 do +2 pp    n= 26   trafia 80,8%   ROI  +7,0%
+#   +2 do +5 pp    n= 44   trafia 72,7%   ROI  +4,0%
+#   +5 do +8 pp    n= 48   trafia 68,8%   ROI  −6,6%
+#   +8 do +12 pp   n= 55   trafia 61,8%   ROI  −5,9%
+#   +12 do +18 pp  n= 83   trafia 44,6%   ROI −27,7%
+#   ponad +18 pp   n= 44   trafia 45,5%   ROI −29,3%
+#
+# Zależność jest MONOTONICZNA na całej rozpiętości: im mocniej rozchodzimy się
+# z bukmacherem, tym gorzej trafiamy. To nie jest dopasowanie do szumu, tylko
+# klasyczna selekcja negatywna — bukmacher rozjeżdża się z nami najbardziej
+# tam, gdzie wie coś, czego my nie wiemy (kontuzja, rotacja, waga meczu).
+# Stary limit 22 pp przepuszczał CAŁE pole straty.
+#
+# Odcięcie samym tym oknem: 336 -> 151 typów, ROI −13,9% -> −1,3%.
+# Razem z kwarantanną rynków (już działa): 69 typów, ROI +11,6%, bilans +8u.
+#
+# Dolna granica nie jest kosmetyczna: typy WYCENIONE PONIŻEJ ceny rynku
+# (bierzemy je dla samej wysokiej szansy) tracą 22% — nie ma powodu ich grać.
+#
+# To brama PUBLIKACJI, nie scoringu: typ poza oknem dalej się liczy, rozlicza
+# i uczy kalibrację (poza_publikacja="rozjazd_z_rynkiem"), więc za miesiąc da
+# się ten pomiar powtórzyć i próg poprawić.
+OKNO_ZGODY_MIN = 0.00   # p_model musi być co najmniej na poziomie ceny rynku
+OKNO_ZGODY_MAX = 0.10   # ...i najwyżej 10 pp nad nią
+
+
+def w_oknie_zgody(p_model: float, kurs: float) -> bool:
+    """Czy typ mieści się w oknie zgody z rynkiem (patrz OKNO_ZGODY_*)."""
+    if not kurs or kurs <= 1.0:
+        return False
+    roznica = float(p_model) - implied_prob_one_sided(float(kurs))
+    return OKNO_ZGODY_MIN <= roznica < OKNO_ZGODY_MAX
 MAX_ODDS = 6.0                      # kursy wyżej to loteria, nie systematyczny betting
 MIN_ODDS = 1.19                     # poniżej 1.19 gra się nie opłaca (decyzja użytkownika)
 MAX_CI_WIDTH = 0.30                 # zbyt szerokie widełki szansy = nie stawiamy

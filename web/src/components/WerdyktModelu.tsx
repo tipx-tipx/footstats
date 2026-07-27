@@ -150,7 +150,7 @@ export function WerdyktModelu({ d }: { d: WerdyktDane }) {
           etykieta="bilans"
           wartosc={fmtU(d.roi)}
           ton={d.roi > 0 ? "dodatni" : d.roi < 0 ? "ujemny" : undefined}
-          tytul="Suma wypłat minus suma stawek, przy jednej jednostce na każdy typ z kursem"
+          tytul="Ile zostałoby w kieszeni, gdybyś zagrał każdy z tych typów tą samą stawką: wypłaty minus to, co postawione"
         />
         <div className="min-w-0 sm:ml-6 sm:border-l sm:border-hairline-strong/60 sm:pl-6">
           <Liczba
@@ -161,28 +161,28 @@ export function WerdyktModelu({ d }: { d: WerdyktDane }) {
         {d.prog != null && (
           <div className="min-w-0 sm:ml-6 sm:border-l sm:border-hairline-strong/60 sm:pl-6">
             <Liczba
-              etykieta="próg opłacalności"
+              etykieta="ile trzeba trafiać"
               wartosc={fmtProc(d.prog)}
-              tytul="Ile trzeba trafiać przy średnim kursie tych typów, żeby wyjść na zero (1 / średni kurs)"
+              tytul="Przy takich kursach dopiero od tylu trafień wychodzi się na zero. Niżej — dokładasz, wyżej — zarabiasz."
             />
           </div>
         )}
         {d.deklaracja != null && (
           <div className="min-w-0 sm:ml-6 sm:border-l sm:border-hairline-strong/60 sm:pl-6">
             <Liczba
-              etykieta="tyle zapowiadał"
+              etykieta="tyle sam obiecywał"
               wartosc={fmtProc(d.deklaracja)}
-              tytul="Średnia szansa, jaką model dawał tym typom, ważona liczbą rozliczeń"
+              tytul="Średnia szansa, jaką model dawał tym typom. Jeśli jest wyraźnie wyżej niż „trafia”, znaczy, że model jest zbyt pewny siebie."
             />
           </div>
         )}
         {d.clv != null && (d.clvN ?? 0) > 0 && (
           <div className="min-w-0 sm:ml-6 sm:border-l sm:border-hairline-strong/60 sm:pl-6">
             <Liczba
-              etykieta={`kurs vs zamknięcie (${d.clvN})`}
+              etykieta={`lepszy kurs niż przed meczem (${d.clvN})`}
               wartosc={`${d.clv >= 0 ? "+" : "−"}${Math.abs(d.clv).toFixed(1).replace(".", ",")}%`}
               ton={d.clv > 0 ? "dodatni" : d.clv < 0 ? "ujemny" : undefined}
-              tytul="CLV: o ile procent kurs wzięty przy publikacji był lepszy od kursu tuż przed meczem. Dodatni = bierzemy lepszą cenę niż rynek na koniec."
+              tytul="O ile procent kurs, który pokazaliśmy, był lepszy od kursu tuż przed pierwszym gwizdkiem. Na plusie znaczy, że łapiemy cenę, zanim bukmacher ją poprawi — to dobry znak niezależnie od tego, czy typ wszedł."
             />
           </div>
         )}

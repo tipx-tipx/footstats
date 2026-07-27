@@ -294,7 +294,7 @@ export function ValueBoard({
   const TABY_RODZAJ = (
     [
       ["pewniaki", "Pewniaki", liczbaPewniakow],
-      ["value", "Value Bety", liczbaValueSts],
+      ["value", "Lepszy kurs w STS", liczbaValueSts],
       ["radar", "Drabinki", radarWpisy.length],
       ["wszystko", "Wszystko", null],
     ] as const
@@ -463,20 +463,22 @@ export function ValueBoard({
           {stsAlerty.length === 0 ? (
             <div className="rounded-(--radius-card) border border-hairline bg-card px-6 py-12 text-center shadow-(--shadow-card)">
               <p className="text-sm font-medium text-ink">
-                Brak value betów STS w tej chwili
+                W tej chwili nic tu nie ma
               </p>
               <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-muted">
-                Value bet STS to selekcja, na którą STS płaci wyraźnie więcej niż
-                Superbet, a model potwierdza szansę. Takie różnice pojawiają się
-                nieregularnie i szybko znikają, gdy STS je koryguje.
+                Szukamy tu typów, za które STS płaci wyraźnie więcej niż
+                Superbet — a my dodatkowo uważamy, że mają szansę wejść. Takie
+                różnice w kursach zdarzają się nieregularnie i znikają, gdy STS
+                je zauważy.
               </p>
             </div>
           ) : (
             <>
               <div className="mb-2 flex items-baseline justify-between gap-3">
                 <p className="max-w-prose text-xs leading-relaxed text-muted">
-                  STS przepłaca te selekcje względem Superbetu, a model potwierdza
-                  szansę na ich trafienie. Kursy bywają ulotne, bierz póki są.
+                  Za te typy STS płaci więcej niż Superbet, a my uważamy, że
+                  mają szansę wejść. Takie kursy szybko się zmieniają — jeśli
+                  chcesz je zagrać, lepiej nie zwlekać.
                 </p>
                 <span className="font-data shrink-0 text-sm font-semibold text-brand-deep">
                   {odmienPozycje(stsAlerty.length)}
@@ -490,14 +492,14 @@ export function ValueBoard({
                       swiezosc.minuty >= STS_STALE_MIN ? "bg-data-amber" : "bg-data-green"
                     }`}
                   />
-                  ostatni skan STS:{" "}
+                  kursy STS sprawdzone:{" "}
                   <span className="font-data text-muted">{swiezosc.label}</span>
                 </p>
               )}
               {swiezosc && swiezosc.minuty >= STS_STALE_MIN && (
                 <div className="mb-4 rounded-(--radius-control) border border-data-amber/30 bg-data-amber-wash px-3 py-2 text-xs leading-relaxed text-data-amber-ink">
-                  Ten skan ma już {swiezosc.label}. Kursy STS bywają ulotne i mogły się
-                  ruszyć. Odśwież skan STS (klik na PC), żeby złapać aktualne linie.
+                  Te kursy sprawdzaliśmy {swiezosc.label} — mogły się już
+                  zmienić. Odśwież je na komputerze, żeby zobaczyć aktualne.
                 </div>
               )}
               <div className="space-y-3">
@@ -616,11 +618,13 @@ export function ValueBoard({
                   w tle i rynek wraca sam, gdy przestanie tracić.
                 </p>
               ) : (
-                <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-muted">
-                  Model nie znalazł dziś okazji na propsy zawodników — zwykle
-                  dlatego, że Superbet nie wystawił jeszcze kursów zawodniczych
-                  (robi to ~1–2 dni przed meczem) albo historia zawodników jest
-                  po przerwie zbyt stara.
+                <p className="mx-auto mt-1 max-w-lg text-xs leading-relaxed text-muted">
+                  Dziś nic nie przeszło naszych progów. Najczęstsze powody:
+                  Superbet nie wystawił jeszcze kursów na zawodników (robi to
+                  zwykle 1–2 dni przed meczem), zawodników nie ma w ogłoszonych
+                  składach, albo nasza szansa za mocno rozjeżdżała się z kursem
+                  — a wtedy z rozliczeń wychodzi, że to zwykle my się mylimy.
+                  Pusta lista to działające zabezpieczenie, nie awaria.
                 </p>
               )}
               <div className="mt-4 flex flex-wrap justify-center gap-2">

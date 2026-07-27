@@ -11,6 +11,15 @@ LIGA_STARA = 202    # np. Ekstraklasa
 KADRA = 16
 
 
+# Historia 7/10 nad linia 1,5 — realny material na karte PO wprowadzeniu okna
+# zgody z rynkiem (radar.MAX_ROZJAZD_KARTY). Dawne fikstury „14 z 14 trafien
+# przy kursie 2,05" opisywaly sytuacje, ktora w praktyce nie zdarza sie inaczej
+# niz przez nasz blad: bukmacher nie placi 2,05 za pewniaka. Kurs 1,80 wycenia
+# to na 55%, a my po korekcie kontekstu na 64% — rozjazd ok. +10 pp, w oknie.
+SIEDEM_Z_DZIESIECIU = [2, 2, 0, 2, 2, 0, 2, 2, 2, 0, 2, 2, 0, 2]
+KURS_W_OKNIE = 1.7
+
+
 def _trend(
     *,
     player_id=1,
@@ -44,6 +53,7 @@ def _trend(
         counts=[float(c) for c in (counts or [])],
         minutes=[float(m) for m in (minutes or [90] * n)],
         timestamps=[TERAZ - (dni_wstecz_start + 7 * i) * DZIEN for i in range(n)],
+        started=[float(m) >= 60 for m in (minutes or [90] * n)],
         game_utids=list(utids or [LIGA_NOWA] * n),
         game_opponent_ids=list(opponent_ids or [0] * n),
     )
@@ -168,17 +178,17 @@ def test_zbuduj_transfer_z_drabinka_i_p_model(monkeypatch):
     # kolega z drużyny osadza konsensus ligi na LIGA_NOWA
     kolega = _trend(player_id=7, utids=[LIGA_NOWA] * 12, counts=[1] * 12)
     nowy = _trend(player_id=1, utids=[LIGA_NOWA] + [LIGA_STARA] * 12,
-                  counts=[2] * 13)
+                  counts=SIEDEM_Z_DZIESIECIU)
     wpisy = radar.zbuduj(
         trends=[kolega, nowy],
         events_meta={999: {"label": "Klub – Rywal", "ts": TERAZ + DZIEN,
                            "hid": 100, "aid": 200,
                            "home": "Klub", "away": "Rywal"}},
-        odds_grid={999: {1: {"shots": {"1.5": 2.05, "2.5": 3.2}}}},
+        odds_grid={999: {1: {"shots": {"1.5": KURS_W_OKNIE, "2.5": 3.2}}}},
         sb_cache={},
         model_pokrycie=[{"podmiot": "Gracz 1", "rynek_kod": "shots",
                          "linia": 1.5, "strona": "powyzej",
-                         "p_model": 0.44}],
+                         "p_model": 0.65}],
         players_out={1: {"pozycja": "M", "xi": True}},
         nazwy_pl={"shots": "Strzały"},
         teraz=TERAZ,
@@ -191,18 +201,18 @@ def test_zbuduj_transfer_z_drabinka_i_p_model(monkeypatch):
     (rynek,) = w["rynki"]
     assert rynek["rynek"] == "Strzały"
     s0 = rynek["drabinka"][0]
-    assert (s0["linia"], s0["kurs"], s0["p_model"]) == (1.5, 2.05, 0.44)
-    # pokrycie: wszystkie ostatnie występy (2 zdarzenia) przebiły linię 1,5
-    assert s0["pokrycie"] == {"traf": 10, "z": 10}
+    assert (s0["linia"], s0["kurs"], s0["p_model"]) == (1.5, KURS_W_OKNIE, 0.65)
+    # pokrycie: 7 z 10 ostatnich występów przebiło linię 1,5
+    assert s0["pokrycie"] == {"traf": 7, "z": 10}
     assert rynek["drabinka"][1]["p_model"] is None
-    assert rynek["ostatnie"][:3] == [2, 2, 2]
+    assert rynek["ostatnie"][:3] == [2, 2, 0]
     assert w["stara_liga"] == "Stara Liga"
 
 
 def test_zbuduj_drabinka_bez_sygnalu_z_forma_i_rywalem():
     # gracz zadomowiony w lidze, bez serii — kiedyś radar go pomijał,
     # teraz dostaje wpis rodzaju "drabinka" z pełną analizą
-    tr = _trend(utids=[LIGA_NOWA] * 14, counts=[2] * 14)
+    tr = _trend(utids=[LIGA_NOWA] * 14, counts=SIEDEM_Z_DZIESIECIU)
     tr.opponent_average = 11.4
     tr.opponent_rank = 3
     tr.total_ranks = 18
@@ -211,7 +221,7 @@ def test_zbuduj_drabinka_bez_sygnalu_z_forma_i_rywalem():
         events_meta={999: {"label": "Klub – Rywal", "ts": TERAZ + DZIEN,
                            "hid": 100, "aid": 200,
                            "home": "Klub", "away": "Rywal"}},
-        odds_grid={999: {1: {"shots": {"1.5": 2.05, "2.5": 3.2}}}},
+        odds_grid={999: {1: {"shots": {"1.5": KURS_W_OKNIE, "2.5": 3.2}}}},
         sb_cache={},
         model_pokrycie=[],
         players_out={1: {"pozycja": "M", "xi": True}},
@@ -224,22 +234,22 @@ def test_zbuduj_drabinka_bez_sygnalu_z_forma_i_rywalem():
     assert "powod" not in w
     (rynek,) = w["rynki"]
     # forma okno-vs-baza liczona informacyjnie na każdym rynku z historią
-    assert rynek["forma"]["okno90"] == rynek["forma"]["baza90"] == 2.0
+    assert rynek["forma"]["okno90"] > 0 and rynek["forma"]["baza90"] > 0
     assert rynek["rywal"] == {"srednia": 11.4, "rank": 3, "z": 18,
                               "liga": None}
     assert len(rynek["ostatnie"]) == 10  # OSTATNIE_N występów na karcie
 
 
 def test_zbuduj_dolacza_srednie_sezonowe_z_cache():
-    tr = _trend(utids=[LIGA_NOWA] * 14, counts=[2] * 14)
+    tr = _trend(utids=[LIGA_NOWA] * 14, counts=SIEDEM_Z_DZIESIECIU)
     sezon = {"turniej": "Serie B", "rok": "2025", "mecze": 32,
-             "minuty": 1738, "na_mecz": {"shots": 2.0}, "na90": {"shots": 3.31}}
+             "minuty": 1738, "na_mecz": {"shots": 1.4}, "na90": {"shots": 1.4}}
     wpisy = radar.zbuduj(
         trends=[tr],
         events_meta={999: {"label": "Klub – Rywal", "ts": TERAZ + DZIEN,
                            "hid": 100, "aid": 200,
                            "home": "Klub", "away": "Rywal"}},
-        odds_grid={999: {1: {"shots": {"1.5": 2.05}}}},
+        odds_grid={999: {1: {"shots": {"1.5": KURS_W_OKNIE}}}},
         sb_cache={},
         model_pokrycie=[],
         players_out={},
@@ -255,8 +265,9 @@ def test_zbuduj_sygnaly_przed_drabinkami():
     # sortowanie: transfer przodem, zwykla drabinka na koncu
     kolega = _trend(player_id=7, utids=[LIGA_NOWA] * 12, counts=[1] * 12)
     nowy = _trend(player_id=1, utids=[LIGA_NOWA] + [LIGA_STARA] * 12,
-                  counts=[2] * 13)
-    zwykly = _trend(player_id=7, utids=[LIGA_NOWA] * 12, counts=[1] * 12)
+                  counts=SIEDEM_Z_DZIESIECIU)
+    zwykly = _trend(player_id=7, utids=[LIGA_NOWA] * 14,
+                    counts=[1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1])
     import unittest.mock as _m
     with _m.patch.object(radar.statshub, "fetch_tournament_name",
                          lambda utid: {LIGA_STARA: "Stara",
@@ -266,8 +277,8 @@ def test_zbuduj_sygnaly_przed_drabinkami():
             events_meta={999: {"label": "Klub – Rywal", "ts": TERAZ + DZIEN,
                                "hid": 100, "aid": 200,
                                "home": "Klub", "away": "Rywal"}},
-            odds_grid={999: {1: {"shots": {"1.5": 2.05}},
-                             7: {"shots": {"0.5": 1.7}}}},
+            odds_grid={999: {1: {"shots": {"1.5": KURS_W_OKNIE}},
+                             7: {"shots": {"0.5": 1.75}}}},
             sb_cache={},
             model_pokrycie=[],
             players_out={},
@@ -279,14 +290,14 @@ def test_zbuduj_sygnaly_przed_drabinkami():
 
 def test_drabinka_przycieta_z_szumu():
     # 8 linii, od 3. wzwyż kosmiczne kursy — karta ma pokazywać grywalne
-    tr = _trend(utids=[LIGA_NOWA] * 14, counts=[2] * 14)
+    tr = _trend(utids=[LIGA_NOWA] * 14, counts=SIEDEM_Z_DZIESIECIU)
     wpisy = radar.zbuduj(
         trends=[tr],
         events_meta={999: {"label": "Klub – Rywal", "ts": TERAZ + DZIEN,
                            "hid": 100, "aid": 200,
                            "home": "Klub", "away": "Rywal"}},
         odds_grid={999: {1: {"shots": {
-            "0.5": 1.12, "1.5": 1.85, "2.5": 3.4, "3.5": 6.1,
+            "0.5": 1.12, "1.5": KURS_W_OKNIE, "2.5": 3.4, "3.5": 6.1,
             "4.5": 13.0, "5.5": 23.0, "6.5": 41.0, "7.5": 67.0,
         }}}},
         sb_cache={}, model_pokrycie=[], players_out={}, nazwy_pl={},
@@ -299,6 +310,8 @@ def test_drabinka_przycieta_z_szumu():
     assert linie == [1.5, 2.5, 3.5]
     # minuty_sr6: pełne mecze w historii
     assert wpisy[0]["minuty_sr6"] == 90
+    # udział startów: cała historia to pełne mecze
+    assert wpisy[0]["udzial_startow"] == 1.0
 
 
 def test_bramy_odrzucaja_karte_bez_przewagi_nad_kursem():
@@ -310,22 +323,24 @@ def test_bramy_odrzucaja_karte_bez_przewagi_nad_kursem():
                 "home": "A", "away": "B"}
     slaby = _trend(player_id=1, utids=[LIGA_NOWA] * 14,
                    counts=[1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1])
-    mocny = _trend(player_id=2, utids=[LIGA_NOWA] * 14, counts=[3] * 14)
-    pozny = _trend(player_id=3, utids=[LIGA_NOWA] * 14, counts=[3] * 14)
+    mocny = _trend(player_id=2, utids=[LIGA_NOWA] * 14,
+                   counts=SIEDEM_Z_DZIESIECIU)
+    pozny = _trend(player_id=3, utids=[LIGA_NOWA] * 14,
+                   counts=SIEDEM_Z_DZIESIECIU)
     pozny.event_id = 998
     wpisy = radar.zbuduj(
         trends=[slaby, mocny, pozny],
         events_meta={999: _meta(TERAZ + DZIEN), 998: _meta(TERAZ + 2 * DZIEN)},
         odds_grid={999: {1: {"shots": {"0.5": 1.7}},
-                         2: {"shots": {"1.5": 2.1}}},
-                   998: {3: {"shots": {"1.5": 2.1}}}},
+                         2: {"shots": {"1.5": KURS_W_OKNIE}}},
+                   998: {3: {"shots": {"1.5": KURS_W_OKNIE}}}},
         sb_cache={}, model_pokrycie=[], players_out={}, nazwy_pl={},
         teraz=TERAZ,
     )
     assert [w["podmiot_id"] for w in wpisy] == [2, 3]
     # hero = linia, która zdecydowała o wyborze karty
     assert wpisy[0]["hero"]["linia"] == 1.5
-    assert wpisy[0]["hero"]["traf"] == wpisy[0]["hero"]["z"] == 10
+    assert (wpisy[0]["hero"]["traf"], wpisy[0]["hero"]["z"]) == (7, 10)
 
 
 def test_krotka_proba_nie_udaje_pewniaka():
@@ -395,13 +410,14 @@ def test_brama_jakosci_tnie_slabe_drabinki_a_sygnaly_zostawia():
 
 
 def test_pierwszy_szczebel_od_165():
-    tr = _trend(utids=[LIGA_NOWA] * 14, counts=[3] * 14)
+    tr = _trend(utids=[LIGA_NOWA] * 14,
+                counts=[3, 3, 0, 3, 3, 0, 3, 3, 3, 0, 3, 3, 0, 3])
     wpisy = radar.zbuduj(
         trends=[tr],
         events_meta={999: {"label": "A – B", "ts": TERAZ + DZIEN,
                            "hid": 100, "aid": 200, "home": "A", "away": "B"}},
         odds_grid={999: {1: {"shots": {"0.5": 1.2, "1.5": 1.55,
-                                       "2.5": 2.4, "3.5": 4.9}}}},
+                                       "2.5": KURS_W_OKNIE, "3.5": 4.9}}}},
         sb_cache={}, model_pokrycie=[], players_out={}, nazwy_pl={},
         teraz=TERAZ,
     )
@@ -418,3 +434,114 @@ def test_klucze_dopasowane_tokenowo_w_obie_strony():
     }
     assert radar._klucze_dopasowane(klucze, "Amadou Ba-Sy") == {"ba sy"}
     assert radar._klucze_dopasowane(klucze, "Nowak") == set()
+
+
+# --- BRAMY KARTY: skład, świeżość, zapas na obstawienie (2026-07-27) ---
+
+
+def _pod_karte(**nadpisz):
+    """Zestaw argumentów radar.zbuduj dający DOKŁADNIE jedną kartę.
+
+    Jeden gracz z długą, świeżą historią i kwotowaną drabinką — punkt
+    odniesienia dla testów bram niżej (każdy zmienia jedną rzecz).
+    """
+    gracz = _trend(player_id=1, counts=SIEDEM_Z_DZIESIECIU)
+    kolega = _trend(player_id=7, counts=[1] * 12)
+    baza = dict(
+        trends=[gracz, kolega],
+        events_meta={999: {"label": "Klub – Rywal", "ts": TERAZ + DZIEN,
+                           "hid": 100, "aid": 200,
+                           "home": "Klub", "away": "Rywal"}},
+        odds_grid={999: {1: {"shots": {"1.5": KURS_W_OKNIE, "2.5": 3.2}}}},
+        sb_cache={},
+        model_pokrycie=[],
+        players_out={1: {"pozycja": "M", "xi": True}},
+        nazwy_pl={"shots": "Strzały"},
+        teraz=TERAZ,
+    )
+    baza.update(nadpisz)
+    return baza
+
+
+def test_karta_powstaje_gdy_wszystko_gra():
+    assert len(radar.zbuduj(**_pod_karte())) == 1
+
+
+def test_karta_nie_powstaje_dla_zawodnika_poza_skladem():
+    """Zgłoszenie 2026-07-27 (Fabio Fehr): wiemy, że go nie ma w jedenastce,
+    a karta i tak wisiała, bo historia wyglądała dobrze."""
+    wpisy = radar.zbuduj(**_pod_karte(poza_skladem={(999, 1)}))
+    assert wpisy == []
+
+
+def test_karta_nie_powstaje_na_nieswiezej_historii():
+    """Ostatni występ sprzed pół roku: „trafił 8/10" opisuje kogoś, kto już
+    tak nie gra (kontuzja, transfer, wypadł z rotacji)."""
+    stary = _trend(player_id=1, counts=SIEDEM_Z_DZIESIECIU,
+                   dni_wstecz_start=radar.MAX_DNI_SWIEZOSC + 10)
+    kolega = _trend(player_id=7, counts=[1] * 12)
+    assert radar.zbuduj(**_pod_karte(trends=[stary, kolega])) == []
+
+
+def test_karta_nie_powstaje_tuz_przed_gwizdkiem():
+    """Zapas na obstawienie: nic NOWEGO na 20 minut przed meczem."""
+    meta = {999: {"label": "Klub – Rywal", "ts": TERAZ + 20 * 60,
+                  "hid": 100, "aid": 200, "home": "Klub", "away": "Rywal"}}
+    assert radar.zbuduj(
+        **_pod_karte(events_meta=meta, margines_startu_s=90 * 60)
+    ) == []
+    # bez marginesu (stare zachowanie) karta by powstała
+    assert len(radar.zbuduj(**_pod_karte(events_meta=meta))) == 1
+
+
+def test_xi_karty_odroznia_lawke_od_nieznanego_skladu():
+    """False znaczy „poza składem", None — „składu jeszcze nie znamy"."""
+    (w,) = radar.zbuduj(**_pod_karte(xi_znany={(999, 1): False}))
+    assert w["xi"] is False
+    (w2,) = radar.zbuduj(**_pod_karte(players_out={1: {"pozycja": "M"}}))
+    assert w2["xi"] is None
+
+
+def test_karta_nie_powstaje_gdy_za_mocno_rozjezdzamy_sie_z_kursem():
+    """Sprawa Fabio Fehra (FC Thun, 2026-07-28).
+
+    Zawodnik grał regularnie po 90 minut i przebijał linię w 7 na 10 meczów,
+    więc żadna brama „czy on w ogóle gra" go nie zatrzymała. Zatrzymać go
+    miała cena: Superbet płacił 2,17 za strzał, czyli wyceniał to na 43%,
+    a my liczyliśmy 59%. Rozliczenia mówią, że przy takim rozjeździe to
+    zwykle MY się mylimy — a karta była numerem 1 rankingu dnia.
+    """
+    tr = _trend(utids=[LIGA_NOWA] * 14, counts=SIEDEM_Z_DZIESIECIU)
+    wspolne = dict(
+        trends=[tr],
+        events_meta={999: {"label": "A – B", "ts": TERAZ + DZIEN,
+                           "hid": 100, "aid": 200, "home": "A", "away": "B"}},
+        sb_cache={}, model_pokrycie=[], players_out={}, nazwy_pl={},
+        teraz=TERAZ,
+    )
+    # kurs zgodny z naszą szansą — karta powstaje
+    assert len(radar.zbuduj(
+        odds_grid={999: {1: {"shots": {"1.5": KURS_W_OKNIE}}}}, **wspolne
+    )) == 1
+    # ten sam zawodnik, kurs jak u Fehra — nasza szansa 1,4x ponad cenę rynku
+    assert radar.zbuduj(
+        odds_grid={999: {1: {"shots": {"1.5": 2.17}}}}, **wspolne
+    ) == []
+
+
+def test_rzadki_rezerwowy_nie_dostaje_karty():
+    """Średnia minut potrafi wyglądać dobrze u kogoś, kto raz zagrał pełne
+    90 minut, a poza tym siedzi na ławce. Karta liczy z minut, których
+    rezerwowy nie dostanie."""
+    minuty = [90, 90, 90, 0, 0, 0, 0, 0, 0, 0, 90, 90, 0, 90]
+    tr = _trend(utids=[LIGA_NOWA] * 14, counts=SIEDEM_Z_DZIESIECIU,
+                minutes=minuty)
+    assert radar.udzial_startow(tr) == 0.3
+    assert radar.zbuduj(
+        trends=[tr],
+        events_meta={999: {"label": "A – B", "ts": TERAZ + DZIEN,
+                           "hid": 100, "aid": 200, "home": "A", "away": "B"}},
+        odds_grid={999: {1: {"shots": {"1.5": KURS_W_OKNIE}}}},
+        sb_cache={}, model_pokrycie=[], players_out={}, nazwy_pl={},
+        teraz=TERAZ,
+    ) == []

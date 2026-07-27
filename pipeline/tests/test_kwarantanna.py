@@ -181,3 +181,36 @@ def test_kalibracja_wazy_swieze_rozliczenia_mocniej():
         log_plaski, cap=bez_capa,
     )["shots"]["global"]
     assert wazona < plaska
+
+
+# --- KWARANTANNA KATEGORII: brama po POWODZIE wejścia typu, nie po rynku ---
+
+
+def test_kategoria_ktora_traci_wypada_z_publikacji():
+    """Pomiar 2026-07-27: „ambitniejsza linia" trafiała 47% przy progu
+    opłacalności 63%. Bez tej bramy wystarczyło przekleić stratny typ na
+    inny rynek, żeby przeszedł."""
+    # 20 typów po kursie 1,7 na dwóch RÓŻNYCH rynkach, weszło 7
+    recs = (_seria("shots", 10, 3, 1.7, wyzsza_linia=True)
+            + _seria("sot", 10, 4, 1.7, wyzsza_linia=True))
+    kw = rozliczanie.kategorie_kwarantanna(_log(recs))
+    assert "wyzsza_linia" in kw
+    assert kw["wyzsza_linia"]["n"] == 20
+    assert kw["wyzsza_linia"]["nazwa"] == "Ambitniejsza linia"
+
+
+def test_kategoria_dochodowa_zostaje():
+    recs = _seria("shots", 20, 15, 1.6, matchup=True)
+    assert rozliczanie.kategorie_kwarantanna(_log(recs)) == {}
+
+
+def test_kategoria_na_krotkiej_probie_nie_jest_oceniana():
+    recs = _seria("shots", rozliczanie.KATEGORIA_MIN_N - 1, 0, 1.7,
+                  miekka_linia=True)
+    assert rozliczanie.kategorie_kwarantanna(_log(recs)) == {}
+
+
+def test_typy_bez_flag_nie_wpadaja_do_zadnej_kategorii():
+    """„Zwykłe" typy to te, które zarabiają — nie wolno ich objąć bramą."""
+    recs = _seria("shots", 30, 5, 1.5)
+    assert rozliczanie.kategorie_kwarantanna(_log(recs)) == {}

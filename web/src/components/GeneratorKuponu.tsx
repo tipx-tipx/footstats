@@ -27,24 +27,50 @@ import {
 import type { LegPool } from "@/lib/types";
 
 const PROFILE: { kod: Profil; label: string; opis: string }[] = [
-  { kod: "bezpieczny", label: "Bezpieczny", opis: "same kotwice o najwyższej szansie" },
+  { kod: "bezpieczny", label: "Bezpieczny", opis: "tylko typy o najwyższej szansie, bez kombinowania" },
   {
     kod: "zbalansowany",
     label: "Zbalansowany",
-    opis: "pewne typy; ryzykowny dołoży tylko, gdy kurs jest wyraźnie zawyżony",
+    opis: "pewne typy, a ryzykowny dołoży tylko wtedy, gdy kurs jest wyraźnie zawyżony",
   },
   {
     kod: "agresywny",
     label: "Agresywny",
-    opis: "dopuszcza ryzykowne typy, mocno ku przewadze i matchupom",
+    opis: "wpuszcza typy ryzykowne i te, gdzie rywal wyraźnie sprzyja",
   },
 ];
 
-// zapas na obstawienie — jak pipeline (kupony.py: MARGINES_STARTU_S)
-const MARGINES_STARTU_S = 15 * 60;
+// zapas na obstawienie — MUSI się zgadzać z pipeline (kupony.MARGINES_STARTU_S)
+const MARGINES_STARTU_S = 90 * 60;
 
 function odmienTyp(n: number): string {
   return n === 1 ? "typ" : n < 5 ? "typy" : "typów";
+}
+
+/**
+ * UCZCIWA SZANSA — to samo, co robi silnik z kuponami automatycznymi
+ * (kupony.py:_urealnij_szanse). Szansa kuponu to iloczyn szans typów, więc
+ * błąd pojedynczego typu podnosi się do potęgi: rozliczenia pokazały kupony
+ * obiecujące 17%, a wchodzące w 10%. Współczynnik jest ZMIERZONY na
+ * rozliczonych kuponach (meta.kalibracja_kuponow) — tutaj bierzemy ten
+ * ostrożniejszy z dostępnych, bo kupon z generatora miesza horyzonty.
+ *
+ * Zostaje poza kuponBuilder.ts celowo: tamten plik jest portem 1:1
+ * beam-searcha z Pythona i pilnuje go test parytetu.
+ */
+function urealnij(
+  k: KuponWynik | null,
+  kalibracja?: Record<string, number>,
+): KuponWynik | null {
+  const wsp = Math.min(1, ...Object.values(kalibracja ?? {}));
+  if (!k || !Number.isFinite(wsp) || wsp >= 1) return k;
+  const p = k.p_model * wsp;
+  return {
+    ...k,
+    p_model: p,
+    fair_kurs: Math.round((1 / Math.max(p, 1e-9)) * 100) / 100,
+    ev_pct: Math.round((p * k.kurs_laczny - 1) * 1000) / 10,
+  };
 }
 
 /** pinezka „na pewno w kuponie" — glif zamiast emoji, dziedziczy kolor */
@@ -72,12 +98,15 @@ export function GeneratorKuponu({
   pool,
   kary = KARY_DEFAULT,
   wagi,
+  kalibracja,
   meczId,
 }: {
   pool: LegPool[];
   kary?: Kary;
   /** zmierzone delty wag zaufania (meta.wagi_zaufania) — te same co backend */
   wagi?: Record<string, number>;
+  /** zmierzone urealnienie szansy kuponu (meta.kalibracja_kuponow) */
+  kalibracja?: Record<string, number>;
   /** gdy podany — generator ograniczony do jednego meczu (wersja na stronie meczu) */
   meczId?: number;
 }) {
@@ -272,8 +301,8 @@ export function GeneratorKuponu({
   const podglad = useMemo(() => {
     const cmin = kursCel * 0.85;
     const cmax = kursCel * 1.18;
-    return zlozKupon(pulaFiltrowana, cmin, cmax, opcje);
-  }, [pulaFiltrowana, kursCel, opcje]);
+    return urealnij(zlozKupon(pulaFiltrowana, cmin, cmax, opcje), kalibracja);
+  }, [pulaFiltrowana, kursCel, opcje, kalibracja]);
 
   const podpowiedzBrak = useMemo(() => {
     if (podglad) return null;
@@ -642,7 +671,7 @@ export function GeneratorKuponu({
           role="switch"
           aria-checked={tylkoValue}
           onClick={() => { setTylkoValue(!tylkoValue); setPokazany(false); }}
-          title={`Techniczne kryterium: typ z przewagą liczoną na ≥${MIN_LEG_EV}% i maks. 1 typ z meczu`}
+          title={`Bierze tylko typy, w których kurs jest o co najmniej ${MIN_LEG_EV}% wyższy, niż wynika z naszej szansy — i najwyżej jeden typ z meczu`}
           className="group flex w-full items-start gap-3 text-left"
         >
           <span
@@ -1093,7 +1122,7 @@ function KuponKarta({
                         )}
                         {l.ev_uk != null && l.ev_uk >= 4 && (
                           <span
-                            title={`Wartość vs no-vig UK: ${fmtEV(l.ev_uk)}`}
+                            title={`O tyle Superbet płaci więcej niż uczciwa cena u bukmacherów w Anglii: ${fmtEV(l.ev_uk)}`}
                             className="text-[10px] font-semibold text-data-green"
                           >
                             {fmtEV(l.ev_uk)}

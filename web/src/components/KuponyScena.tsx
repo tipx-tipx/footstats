@@ -33,12 +33,12 @@ const ZAKRESY: { kod: Zakres; label: string; opis: string }[] = [
   {
     kod: "dlugoterminowy",
     label: "Na kilka dni",
-    opis: "Typy rozłożone na 1–4 dni: model wybiera z pełnej puli, więc jakość typów jest najwyższa.",
+    opis: "Typy rozłożone na najbliższe 1–4 dni. Model ma wtedy z czego wybierać, więc same typy są najlepsze.",
   },
   {
     kod: "value",
-    label: "Value",
-    opis: "Tylko typy, za które bukmacher płaci ponad ich uczciwy kurs. Trafia rzadziej, ale przy serii matematyka gra dla Ciebie.",
+    label: "Z przewagą",
+    opis: "Tylko typy, za które bukmacher płaci więcej, niż powinien. Wchodzą rzadziej, ale przy dłuższej serii to one dają zarobek.",
   },
 ];
 
@@ -81,16 +81,16 @@ function Werdykt({ kupon: k }: { kupon: Kupon }) {
         <dd className="text-sm leading-relaxed text-muted">
           {k.styl === "value" ? (
             <>
-              <strong className="font-semibold text-ink">Value</strong>: każdy
-              typ płaci więcej, niż wynosi jego uczciwa cena.
+              <strong className="font-semibold text-ink">Z przewagą</strong>:
+              za każdy typ bukmacher płaci więcej, niż powinien.
               {jedenMecz ? "" : ` Typy z ${meczeIds.length} różnych meczów.`}
             </>
           ) : (
             <>
               <strong className="font-semibold text-ink">Pewniaki</strong>:
-              najpewniejsze typy, które razem domykają kurs ×{celKuponu(k)}.{" "}
+              najpewniejsze typy, które razem dają kurs ×{celKuponu(k)}.{" "}
               {jedenMecz
-                ? "Wszystkie z jednego meczu, szansa liczona z karą za wspólny mecz."
+                ? "Wszystkie z jednego meczu — a że jeden nudny mecz potrafi położyć je naraz, obcinamy za to szansę kuponu."
                 : `Rozłożone na ${meczeIds.length} mecze.`}
             </>
           )}
@@ -120,7 +120,7 @@ function Werdykt({ kupon: k }: { kupon: Kupon }) {
             przewaga
           </dt>
           <dd className="text-sm leading-relaxed text-muted">
-            Uczciwa cena tego kompletu to{" "}
+            Przy takiej szansie sprawiedliwy kurs za ten komplet to{" "}
             <strong className="font-data font-semibold text-ink">
               ×{fmtKurs(k.fair_kurs)}
             </strong>
@@ -128,7 +128,7 @@ function Werdykt({ kupon: k }: { kupon: Kupon }) {
             <strong className="font-data font-semibold text-data-green">
               ×{fmtKurs(k.kurs_laczny)}
             </strong>
-            . To jest cała przewaga tego kuponu.
+            . Ta różnica to cała przewaga tego kuponu.
           </dd>
         </div>
       )}
@@ -146,12 +146,12 @@ function Werdykt({ kupon: k }: { kupon: Kupon }) {
             >
               {k.mecze_ze_skladami}/{k.mecze_lacznie}
             </strong>{" "}
-            meczów z potwierdzonymi XI przy budowie.
+            meczów miało już ogłoszone składy, gdy składaliśmy ten kupon.
             {!skladyPelne && (
               <span className="text-data-amber-ink">
                 {" "}
-                Typy z niepotwierdzonych składów mogą wylecieć po ogłoszeniu
-                XI.
+                Jeśli okaże się, że któryś zawodnik siedzi na ławce, jego typ
+                wypadnie i kupon się unieważni.
               </span>
             )}
           </dd>
@@ -486,7 +486,7 @@ export function KuponyScena({
               title={
                 k
                   ? `Kupon ×${p}: szansa ${fmtProc(k.p_model)}`
-                  : "Kupon w tych widełkach powstanie, gdy pula typów pozwoli domknąć kurs (zwykle bliżej meczów)"
+                  : "Ten kupon pojawi się, gdy z dostępnych typów da się ułożyć taki kurs (zwykle bliżej meczów)"
               }
               className={`group flex flex-col items-start pb-0.5 pt-0.5 text-left disabled:cursor-default ${
                 ostatni ? "w-auto" : "w-[86px] sm:w-28"
@@ -576,17 +576,17 @@ export function KuponyScena({
                     : "Ten przedział czeka na kupon"}
                 </p>
                 <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-muted">
-                  Kupon powstanie, gdy pula typów pozwoli domknąć kurs w tych
-                  widełkach. Zwykle dzieje się to bliżej meczów.
+                  Kupon pojawi się, gdy z dostępnych typów da się ułożyć taki
+                  kurs. Zwykle dzieje się to bliżej meczów.
                 </p>
               </div>
             ) : stan === "pominiety" ? (
               <div className="rounded-(--radius-card) border border-dashed border-hairline bg-card-soft/60 px-6 py-10 text-center">
                 <p className="text-sm font-medium text-ink">Kupon pominięty</p>
                 <p className="mx-auto mt-1 max-w-sm text-xs leading-relaxed text-muted">
-                  Model i tak rozliczy go w tle (do nauki). Nowy kupon w tym
-                  przedziale pojawi się w kilka minut, o ile pula ma inny
-                  sensowny zestaw.
+                  I tak sprawdzimy, jak by poszedł — model się na tym uczy.
+                  Nowy kupon w tym miejscu pojawi się w kilka minut, o ile da
+                  się ułożyć inny sensowny zestaw.
                 </p>
                 <button
                   onClick={przywroc}

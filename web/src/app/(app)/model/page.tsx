@@ -54,9 +54,10 @@ export default async function ModelPage() {
           tytul="Bilans kuponów"
           opis={
             <>
-              Kupon zamraża się w chwili publikacji. Zmienia się tylko wtedy,
-              gdy ogłoszone składy wywrócą któryś typ. Jedno pudło = kupon
-              przegrany, a zwrot typu (zawodnik nie zagrał) wyłącza go z kursu,
+              Kupon zapisujemy w chwili, gdy pojawia się na stronie, i już go nie
+              zmieniamy — chyba że ogłoszone składy wywrócą któryś typ. Jeden
+              nietrafiony typ przekreśla cały kupon, a typ, który poszedł na
+              zwrot (bo zawodnik nie zagrał), wypada z kursu — dokładnie tak,
               jak u bukmachera.
             </>
           }
@@ -76,7 +77,7 @@ export default async function ModelPage() {
                   return (
                     <div key={h} className="px-5 py-4">
                       <p className="text-[10px] uppercase tracking-wide text-faint">
-                        kupony {label} · zagrane {d.n}
+                        kupony {label} · rozliczone {d.n}
                       </p>
                       <p className="font-data mt-1.5 text-xl font-semibold leading-none">
                         <span
@@ -92,8 +93,8 @@ export default async function ModelPage() {
                         </span>
                       </p>
                       <p className="mt-1.5 text-xs text-muted">
-                        wygrane {d.wygrane}/{d.n} · z {d.n}u wróciło{" "}
-                        {d.zwrot_j.toFixed(2).replace(".", ",")}u
+                        weszły {d.wygrane} z {d.n} · z {d.n} stawek wróciło{" "}
+                        {d.zwrot_j.toFixed(2).replace(".", ",")}
                       </p>
                     </div>
                   );
@@ -106,7 +107,7 @@ export default async function ModelPage() {
         {(typy.kupony?.length ?? 0) > 0 && (
           <Sekcja
             tytul="Ostatnie kupony"
-            opis="Dwanaście najświeższych, razem z tymi, które nie weszły."
+            opis="Dwanaście ostatnich, razem z tymi, które nie weszły."
           >
             {/* items-start: rozwinięcie jednego kuponu nie rozciąga sąsiada */}
             <div className="grid max-w-4xl items-start gap-3 sm:grid-cols-2">
@@ -124,7 +125,7 @@ export default async function ModelPage() {
         {(typy.kupony_wygrane?.length ?? 0) > 0 && (
           <Sekcja
             tytul={`Kronika trafień (${typy.kupony_wygrane!.length})`}
-            opis="Każdy kupon, który się kiedykolwiek trafił, zostaje tu na stałe — niezależnie od tego, jak dawno temu i czy był grany."
+            opis="Każdy kupon, który kiedykolwiek wszedł, zostaje tu na stałe — niezależnie od tego, jak dawno temu i czy akurat go zagrałeś."
           >
             <div className="grid max-w-4xl items-start gap-3 sm:grid-cols-2">
               {typy.kupony_wygrane!.map((k) => (
@@ -140,27 +141,28 @@ export default async function ModelPage() {
       </div>
     ) : (
       <p className="max-w-3xl rounded-(--radius-card) border border-hairline bg-card px-4 py-3.5 text-sm text-muted shadow-(--shadow-card)">
-        Żaden kupon nie doczekał się jeszcze rozliczenia.
+        Żaden kupon się jeszcze nie zakończył.
       </p>
     );
 
-  // --- TEST LABORATORYJNY: backtest na meczach spoza nauki ---
-  // Nazwa nie jest ozdobna: to INNE dane niż wszystko powyżej (tysiące
-  // predykcji z backtestu, nie realne zakłady), a licznik obok „331 typów"
-  // sugerował, że mowa o tej samej próbie.
+  // --- TEST NA MECZACH SPOZA NAUKI ---
+  // To INNE dane niż wszystko powyżej (tysiące prognoz ze sprawdzianu, a nie
+  // realne zakłady), a licznik obok „331 typów" sugerował tę samą próbę.
   const testPanel = (
     <div className="max-w-4xl space-y-6">
       <Sekcja
         tytul="Test na meczach spoza nauki"
         opis={
           <>
-            To NIE są realne zakłady, tylko sprawdzian silnika: model
-            przewidywał zdarzenia w {meta.meczow_kalibracja} meczach, których{" "}
-            <strong>nie widział podczas nauki</strong>. Punkt na przekątnej =
-            idealna kalibracja (gdy mówi „60%”, zdarzenie zachodzi w 60%
-            przypadków). Wielkość punktu = liczba predykcji w kubełku.
+            To nie są realne zakłady, tylko egzamin dla modelu: kazaliśmy mu
+            typować {meta.meczow_kalibracja} meczów, których{" "}
+            <strong>nie widział, gdy się uczył</strong>. Chodzi o jedno — czy
+            model mówi prawdę o własnej pewności. Jeśli obiecuje „60%”, to
+            takie zdarzenia powinny zachodzić mniej więcej w 6 przypadkach na
+            10. Na wykresie idealnie uczciwy model układa się wzdłuż przekątnej;
+            im większa kropka, tym więcej prognoz się na nią złożyło.
             {meta.tryb === "ms2026" &&
-              " Test przeprowadzono na Premier League — to ten sam rdzeń modelu, który liczy predykcje MŚ."}
+              " Egzamin zdawał na Premier League — to ten sam silnik, który liczy typy na MŚ."}
           </>
         }
       >
@@ -173,24 +175,24 @@ export default async function ModelPage() {
                     {kal.razem.n}
                   </dd>
                   <dt className="mt-1.5 text-[11px] leading-tight text-faint">
-                    sprawdzonych predykcji
+                    sprawdzonych prognoz
                   </dt>
                 </div>
                 <div
                   className="ml-6 min-w-0 border-l border-hairline-strong/60 pl-6"
-                  title="Średni kwadrat błędu prognozy: 0 = ideał, 0,25 = rzut monetą. Im niżej, tym lepiej."
+                  title="Standardowa miara celności prognoz (wynik Briera): średni kwadrat pomyłki. 0 to ideał, 0,25 to rzut monetą."
                 >
                   <dd className="font-data text-3xl font-semibold leading-none text-data-green">
                     {kal.razem.brier.toFixed(3).replace(".", ",")}
                   </dd>
                   <dt className="mt-1.5 text-[11px] leading-tight text-faint">
-                    wynik Briera ⓘ
+                    celność prognoz ⓘ
                   </dt>
                 </div>
               </dl>
               <p className="text-xs leading-relaxed text-muted sm:ml-6 sm:max-w-56 sm:border-l sm:border-hairline-strong/60 sm:pl-6">
-                0 = jasnowidz, 0,25 = rzut monetą. Poniżej 0,20 model realnie
-                rozróżnia, co jest prawdopodobne.
+                0 znaczy „jasnowidz”, 0,25 znaczy „rzut monetą”. Poniżej 0,20
+                model naprawdę odróżnia to, co prawdopodobne, od reszty.
               </p>
             </div>
           </div>
@@ -206,8 +208,11 @@ export default async function ModelPage() {
             >
               <div className="mb-1 flex items-baseline justify-between gap-3">
                 <h4 className="font-semibold">{r.nazwa}</h4>
-                <span className="font-data text-xs text-muted">
-                  Brier {r.brier.toFixed(3).replace(".", ",")} · n={r.n}
+                <span
+                  className="font-data text-xs text-muted"
+                  title="Celność prognoz na tym rynku (0 = ideał, 0,25 = rzut monetą) i liczba sprawdzonych prognoz"
+                >
+                  celność {r.brier.toFixed(3).replace(".", ",")} · {r.n} prognoz
                 </span>
               </div>
               <CalibrationChart bins={r.kubelki} size={240} />
@@ -216,7 +221,8 @@ export default async function ModelPage() {
         </div>
       ) : (
         <p className="rounded-(--radius-card) border border-hairline bg-card p-4 text-sm text-muted shadow-(--shadow-card)">
-          Za mało danych do kalibracji. Uruchom dłuższy backfill w pipeline.
+          Za mało danych, żeby zrobić ten sprawdzian. Potrzeba więcej
+          rozegranych meczów.
         </p>
       )}
     </div>
@@ -229,18 +235,18 @@ export default async function ModelPage() {
         title="Czy model mówi prawdę?"
         lead={
           <>
-            Wszystkie liczby na tej stronie liczą się same, z rozliczeń realnych
-            typów — nikt ich nie wybiera ręcznie i nic z nich nie znika. Zacznij
-            od werdyktu, a jeśli chcesz sprawdzić, skąd się wziął, schodź niżej.
+            Wszystkie liczby tutaj biorą się same, z typów, które naprawdę
+            pokazaliśmy na stronie — nikt ich ręcznie nie wybiera i żaden
+            nietrafiony typ stąd nie znika. Zacznij od werdyktu na górze, a
+            jeśli chcesz sprawdzić, skąd się wziął, schodź niżej.
           </>
         }
       />
 
       {pods && pods.rozliczone === 0 ? (
         <p className="mt-7 max-w-3xl rounded-(--radius-card) border border-hairline bg-card px-4 py-3.5 text-sm text-muted shadow-(--shadow-card)">
-          Log już zbiera publikowane typy ({pods.opublikowane}). Pierwsze
-          rozliczenia pojawią się automatycznie po zakończeniu najbliższych
-          meczów.
+          Mamy już zapisane {pods.opublikowane} pokazanych typów. Pierwsze
+          wyniki pojawią się tu same, gdy skończą się najbliższe mecze.
         </p>
       ) : (
         <Reveal className="mt-7">

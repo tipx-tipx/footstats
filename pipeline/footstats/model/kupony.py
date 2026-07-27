@@ -36,11 +36,19 @@ PRZEDZIALY_VALUE = ((4.0, 8.0), (8.0, 16.0))
 OKNO_DZIS_S = 20 * 3600       # "dziś" = mecze w ciągu ~20 h
 OKNO_JUTRO_S = 44 * 3600      # rozszerzenie na jutro, gdy dziś < 2 mecze
 OKNO_DLUGO_S = 4 * 86400      # długoterminowy: mecze z najbliższych 4 dni
-# nowy kupon bierze WYŁĄCZNIE mecze jeszcze nierozpoczęte, z zapasem na
-# obstawienie — leg z meczu, który już się odbył/trwa, nie może wejść do
-# świeżo składanego kuponu (spójnie z regułą publikacji: kupon z pierwszym
-# meczem startującym za <15 min i tak nie jest publikowany)
-MARGINES_STARTU_S = 15 * 60
+# ZAPAS NA OBSTAWIENIE — jedno źródło prawdy dla całego systemu (typy, karty
+# drabinek, kupony, generator na żądanie).
+#
+# Było 15 minut i to była realna wada produktu: kupon albo karta potrafiły
+# pojawić się na stronie kwadrans przed pierwszym gwizdkiem, a przy cyklu
+# chodzącym co ~godzinę user widział je dosłownie 10 minut przed meczem
+# (zgłoszenie 2026-07-27, Club Necaxa). Zapas ma odpowiadać na pytanie
+# „czy zdążę to spokojnie obstawić", a nie „czy mecz już się zaczął".
+#
+# UWAGA: to margines PIERWSZEJ PUBLIKACJI, nie znikania. Typ raz pokazany
+# zostaje na liście do gwizdka (rejestr publikacji) — chodzi o to, żeby nic
+# NOWEGO nie wskakiwało w ostatniej chwili.
+MARGINES_STARTU_S = 90 * 60
 MIN_LEG_EV = 2.0          # leg value: wyraźna przewaga w %, nie kosmetyczne 0,1
 MAX_LEGI_PEWNIAKI = 12
 MAX_NA_MECZ = 4           # do 4 wydarzeń z jednego meczu (jak w bet builderze)
@@ -230,6 +238,71 @@ def kary_korelacji_z_diagnostyki(korelacja: dict, prior: float = KARA_PRIOR) -> 
         eff = KARY_DEFAULT[rel] + w * (float(wsp) - KARY_DEFAULT[rel])
         out[rel] = round(max(KARA_MIN, min(1.0, eff)), 3)
     return out
+
+
+# --- UCZCIWA SZANSA KUPONU: kalibracja z rozliczonych kuponów ---
+# Szansa kuponu to iloczyn szans legów, więc błąd pojedynczego typu podnosi
+# się do potęgi. Zmierzone 2026-07-27 na produkcji:
+#
+#   dzienny          deklarowane 17,3%  ->  weszło  9,8%  (n=41)
+#   długoterminowy   deklarowane 15,2%  ->  weszło  4,9%  (n=41)
+#   „z przewagą"     deklarowane 33,8%  ->  weszło  0,0%  (n=18)
+#
+# Zero na osiemnaście przy deklarowanych 33,8% to nie pech: prawdopodobieństwo
+# takiej serii przy uczciwej deklaracji wynosi jeden do tysiąca. Kupon
+# obiecywał liczby, których nie miał jak dowieźć, a user podejmował decyzje
+# właśnie na nich.
+#
+# Nie zgadujemy współczynnika — bierzemy go z rozliczeń (hit / deklaracja),
+# ściągamy do 1.0 wagą n/(n+prior) przy małej próbie i NIGDY nie podbijamy
+# szansy w górę (cap 1.0): gdyby kupony zaczęły trafiać ponad deklarację,
+# lepiej mieć to jako zapas niż jako obietnicę.
+KUPON_KAL_PRIOR = 25.0
+KUPON_KAL_MIN, KUPON_KAL_MAX = 0.35, 1.0
+
+
+def kalibracja_kuponow_z_pomiaru(
+    kalibracja: dict, prior: float = KUPON_KAL_PRIOR
+) -> dict:
+    """Współczynnik urealnienia szansy kuponu per horyzont — ZMIERZONY.
+
+    `kalibracja` = rozliczanie.compute_kupony_diagnostyka(...)["kalibracja"]
+    (per horyzont: n, hit, sr_p). Zwraca {horyzont: współczynnik}; brak
+    danych = brak wpisu = zachowanie bez korekty.
+    """
+    out: dict[str, float] = {}
+    for horyzont, d in (kalibracja or {}).items():
+        n, hit, sr_p = d.get("n", 0), d.get("hit"), d.get("sr_p")
+        if not n or hit is None or not sr_p:
+            continue
+        k = n / (n + prior)
+        wsp = 1.0 + k * (float(hit) / float(sr_p) - 1.0)
+        out[horyzont] = round(min(max(wsp, KUPON_KAL_MIN), KUPON_KAL_MAX), 3)
+    return out
+
+
+def _urealnij_szanse(kupon: dict, wsp: float) -> None:
+    """Nałóż zmierzony współczynnik na WYŚWIETLANE liczby kuponu (w miejscu).
+
+    Rusza wyłącznie tym, co widzi user (szansa, uczciwy kurs, przewaga) —
+    dobór legów i kurs łączny zostają nietknięte. Ta sama korekta leci na
+    warianty podglądowe, inaczej „po wymianie 21%" kłóciłoby się z „12%"
+    na kuponie głównym.
+    """
+    if wsp >= 1.0:
+        return
+    for cel in (kupon, kupon.get("wariant_b")):
+        if not cel:
+            continue
+        p = _zaokr(float(cel["p_model"]) * wsp, 4)
+        cel["p_model"] = p
+        cel["fair_kurs"] = _zaokr(1.0 / max(p, 1e-9), 2)
+        cel["ev_pct"] = _zaokr((p * float(cel["kurs_laczny"]) - 1.0) * 100.0, 1)
+        cel["kalibracja_szansy"] = wsp
+    for propozycja in ("alternatywa", "dolozenie"):
+        rec = kupon.get(propozycja)
+        if rec and rec.get("p_po") is not None:
+            rec["p_po"] = _zaokr(float(rec["p_po"]) * wsp, 4)
 
 
 def _kara_koszyka(legi, kary: dict | None = None) -> float:
@@ -618,6 +691,7 @@ def build_kupony(
     profil: str = "zbalansowany",
     kary: dict | None = None,
     wagi: dict | None = None,
+    kal_szansy: dict | None = None,
 ) -> list[dict]:
     """Kupony pewniaków w dwóch horyzontach + kupony value.
 
@@ -677,4 +751,13 @@ def build_kupony(
         _dolozenie(k, cands, cmin, cmax, max_na_mecz=1, kary=kary)
         out.append(k)
         sygnatury.add(_sygnatura(k))
+
+    # UCZCIWA SZANSA na końcu: dobór legów i kurs łączny są już ustalone,
+    # zmieniamy wyłącznie liczby, które user czyta (patrz _urealnij_szanse).
+    # Robimy to POZA _zloz_pewniaki, żeby nie ruszyć parytetu z generatorem
+    # na żądanie (kuponBuilder.ts porównuje się właśnie z tamtą funkcją).
+    for k in out:
+        wsp = (kal_szansy or {}).get(k.get("horyzont") or "")
+        if wsp:
+            _urealnij_szanse(k, float(wsp))
     return out

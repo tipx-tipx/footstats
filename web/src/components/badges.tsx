@@ -1,7 +1,7 @@
 import type { Pewnosc, Ryzyko } from "@/lib/types";
 import { fmtEV, RYZYKO_LABEL } from "@/lib/format";
 
-/** Badge wartości zakładu (EV%) — im wyższa wartość, tym mocniejszy sygnał. */
+/** Plakietka przewagi nad kursem — im wyżej, tym mocniejszy sygnał. */
 export function EdgeBadge({ ev }: { ev: number }) {
   const strong = ev >= 10;
   return (
@@ -11,7 +11,7 @@ export function EdgeBadge({ ev }: { ev: number }) {
           ? "bg-data-green text-on-brand"
           : "bg-data-green-wash text-data-green-ink"
       }`}
-      title="Wartość oczekiwana zakładu: o ile procent kurs jest lepszy, niż być powinien według modelu"
+      title="O ile procent kurs jest wyższy, niż wynikałoby z naszej szansy. Przy +8% z każdych postawionych 100 zł średnio 8 zł to zysk — o ile mamy rację."
     >
       {fmtEV(ev)}
     </span>
@@ -47,7 +47,7 @@ export function RiskBadge({ level }: { level: Ryzyko }) {
   return (
     <span
       className={`inline-flex items-center gap-1.5 text-xs font-medium ${RYZYKO_STYLE[level]}`}
-      title="Ryzyko: jak kapryśne jest samo zdarzenie (rzadkie zdarzenia = duża loteria nawet przy dobrym modelu)"
+      title="Jak kapryśne jest samo zdarzenie. Rzadkie rzeczy (kartka, gol obrońcy) potrafią nie wejść nawet wtedy, gdy liczby były po naszej stronie."
     >
       <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden>
         <path
