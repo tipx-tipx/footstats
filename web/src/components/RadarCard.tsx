@@ -41,6 +41,46 @@ const KLASY: Record<
   },
 };
 
+/**
+ * NA CZYM STOI KARTA (backend: radar._kategoria_karty). Osobna oś od klasy
+ * jakości: klasa mówi „jak dobry jest typ", kategoria — „na jakim dowodzie
+ * stoi". Dlatego kategoria dostaje PASEK przy krawędzi karty, a nie kolejną
+ * plakietkę obok klasy — inaczej nagłówek robi się jarmarkiem.
+ */
+const KATEGORIE: Record<
+  string,
+  { label: string; pasek: string; badge: string; tytul: string }
+> = {
+  analiza: {
+    label: "analiza",
+    pasek: "bg-hairline-strong",
+    badge: "border border-hairline bg-paper text-muted",
+    tytul:
+      "Karta stoi wyłącznie na naszej analizie: pokrycie linii, forma, minuty, rywal i scenariusz meczu. Drugiego cennika na tę linię nie mamy — albo Betclic nie prowadzi tego meczu, albo nie wystawił tego rynku.",
+  },
+  rynek_zgodny: {
+    label: "rynek zgodny",
+    pasek: "bg-brand-bright",
+    badge: "bg-brand-wash text-brand-deep",
+    tytul:
+      "Drugi bukmacher wycenia to niemal identycznie. Nie ma tu okazji cenowej, ale jest potwierdzenie: obie księgi widzą to tak samo, więc nasza linia nie jest wzięta z sufitu.",
+  },
+  rozjazd: {
+    label: "lepsza cena",
+    pasek: "bg-data-amber",
+    badge: "bg-data-amber-wash text-data-amber-ink",
+    tytul:
+      "Za to samo zdarzenie jeden bukmacher płaci zauważalnie więcej niż drugi. Gra się tam, gdzie płacą więcej — przy tej samej analizie dostajesz lepszą cenę. Sama różnica kursów NIE jest powodem, dla którego ta karta tu jest: najpierw musiała przejść całą analizę.",
+  },
+  pewniak_taniej: {
+    label: "cena mówi: pewne",
+    pasek: "bg-data-amber",
+    badge: "bg-data-amber text-white",
+    tytul:
+      "Jeden bukmacher wycenia to jako niemal pewne (kurs poniżej 1,45), a drugi płaci za to samo 1,75 lub więcej. UWAGA: to opinia RYNKU o pewności, nie nasza gwarancja — i nie ona zdecydowała o tej karcie. Karta i tak musiała przejść pokrycie linii, formę, minuty, rywala i scenariusz meczu; różnica cen jest dodatkowym dowodem, nie przepustką.",
+  },
+};
+
 /** Mnożnik kontekstu jako zmiana procentowa: 0.8 -> „−20%". */
 function pctZmiana(m?: number | null): string | null {
   if (m == null || Math.abs(m - 1) < 0.005) return null;
@@ -401,6 +441,28 @@ function SzczebelWiersz({ r, s }: { r: RadarRynek; s: RadarSzczebel }) {
       </span>
       <span className="font-data text-xs font-semibold text-brand-deep">
         {fmtKurs(s.kurs)}
+        {/* druga cena POD pierwszą, a nie w nowej kolumnie — na telefonie
+            piąta kolumna rozpychała wiersz w bok */}
+        {s.rozjazd && (
+          <span
+            title={
+              `Betclic płaci za to samo ${fmtKurs(s.rozjazd.betclic)}, ` +
+              `Superbet ${fmtKurs(s.rozjazd.superbet)} — różnica ` +
+              `${Math.round(s.rozjazd.przewaga_pct)}%. Gra się tam, gdzie ` +
+              `płacą więcej` +
+              (s.rozjazd.typ === "pewniak_taniej"
+                ? ". Tańsza cena mówi: to niemal pewne — najcenniejszy układ."
+                : ".")
+            }
+            className={`block text-[10px] font-medium ${
+              s.rozjazd.gdzie === "betclic"
+                ? "text-data-amber-ink"
+                : "text-faint"
+            }`}
+          >
+            BC {fmtKurs(s.rozjazd.betclic)}
+          </span>
+        )}
       </span>
       <span
         className={`font-data text-[11px] ${
@@ -609,12 +671,23 @@ export const RadarCard = memo(function RadarCard({
     w.ocena?.klasa && w.ocena.klasa !== "solidny"
       ? KLASY[w.ocena.klasa]
       : null;
+  // „analiza" bez paska i plakietki — to stan domyślny, a etykieta na każdej
+  // karcie przestaje cokolwiek znaczyć (ta sama zasada co przy „solidny")
+  const kat =
+    w.kategoria && w.kategoria !== "analiza" ? KATEGORIE[w.kategoria] : null;
 
   return (
     <motion.article
       layout={!reduced}
       className="relative overflow-hidden rounded-(--radius-card) border border-hairline bg-card shadow-(--shadow-card) transition-[border-color,box-shadow] duration-200 hover:border-brand/30 hover:shadow-(--shadow-card-hover)"
     >
+      {/* pasek kategorii przy krawędzi — skanuje się wzrokiem, bez czytania */}
+      {kat && (
+        <span
+          aria-hidden
+          className={`absolute inset-y-0 left-0 w-1 ${kat.pasek}`}
+        />
+      )}
       <button
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
@@ -652,6 +725,23 @@ export const RadarCard = memo(function RadarCard({
           </span>
 
           <span className="flex flex-col items-end justify-center gap-1">
+            {kat && (
+              <span
+                title={kat.tytul}
+                className={`font-data inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${kat.badge}`}
+              >
+                {kat.label}
+                {w.rozjazd_pewniak || w.rozjazd_hero ? (
+                  <span className="ml-1 opacity-80">
+                    +
+                    {Math.round(
+                      (w.rozjazd_pewniak ?? w.rozjazd_hero)!.przewaga_pct,
+                    )}
+                    %
+                  </span>
+                ) : null}
+              </span>
+            )}
             {klasa && (
               <span
                 title={klasa.tytul}
@@ -694,6 +784,34 @@ export const RadarCard = memo(function RadarCard({
             )}
           </span>
         </span>
+
+        {/* UKŁAD „PEWNIAK TANIEJ" — najcenniejszy rodzaj rozjazdu, więc mówimy
+            go zdaniem, a nie samym procentem. Cena tańsza jest DOWODEM, że
+            zdarzenie jest pewne; stawia się tam, gdzie płacą więcej. */}
+        {w.rozjazd_pewniak && (
+          <span className="mx-4 mb-2 block rounded-(--radius-control) bg-data-amber-wash px-3 py-1.5 text-[11px] text-data-amber-ink sm:mx-5">
+            {w.rozjazd_pewniak.gdzie === "betclic" ? "Superbet" : "Betclic"}{" "}
+            wycenia {linLabel(w.rozjazd_pewniak.linia)} na zaledwie{" "}
+            <span className="font-data font-semibold">
+              {fmtKurs(
+                w.rozjazd_pewniak.gdzie === "betclic"
+                  ? w.rozjazd_pewniak.superbet
+                  : w.rozjazd_pewniak.betclic,
+              )}
+            </span>
+            , a{" "}
+            {w.rozjazd_pewniak.gdzie === "betclic" ? "Betclic" : "Superbet"}{" "}
+            płaci{" "}
+            <span className="font-data font-semibold">
+              {fmtKurs(w.rozjazd_pewniak.lepszy)}
+            </span>{" "}
+            — o {Math.round(w.rozjazd_pewniak.przewaga_pct)}% więcej za to samo.
+            <span className="mt-0.5 block text-[10px] opacity-80">
+              To ocena rynku, nie gwarancja — karta stoi na analizie, a różnica
+              cen jest do niej dodatkiem.
+            </span>
+          </span>
+        )}
 
         {/* zajawka z konkretem + rozwinięcie */}
         <span className="flex items-center gap-x-2.5 px-4 pb-3.5 sm:px-5">

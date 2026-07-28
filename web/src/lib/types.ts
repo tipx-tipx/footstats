@@ -169,6 +169,24 @@ export interface RadarSzczebel {
   p_final?: number | null;
   /** p_final ścięte, bo model widział tę linię ciemniej niż pokrycie */
   strzyzenie_modelu?: boolean;
+  /** cena tej samej linii u drugiego bukmachera (Betclic), gdy ją mamy */
+  kurs_betclic?: number | null;
+  rozjazd?: RadarRozjazd | null;
+}
+
+/** Rozjazd dwóch cenników na jednej linii (backend: betclic.rozjazd). */
+export interface RadarRozjazd {
+  superbet: number;
+  betclic: number;
+  /** wyższa z dwóch cen — tam się gra */
+  lepszy: number;
+  gdzie: "superbet" | "betclic";
+  /** o ile procent lepsza cena bije gorszą */
+  przewaga_pct: number;
+  /** szansa wynikająca z TAŃSZEJ ceny (ostrożniejsza ocena rynku) */
+  p_rynku: number;
+  /** „pewniak_taniej" = jeden mówi „to niemal pewne", drugi płaci sensownie */
+  typ: "pewniak_taniej" | "zwykly";
 }
 
 /** Jeden czynnik wodospadu kontekstu (rywal, sędzia, scenariusz, ...). */
@@ -269,6 +287,19 @@ export interface RadarWpis {
   wznowiony?: boolean;
   /** znacznik pierwszej publikacji karty */
   opublikowano_ts?: number;
+  /**
+   * Na czym stoi karta (backend: radar._kategoria_karty) — front dobiera po
+   * tym kolor i etykietę:
+   *   "analiza"        — sama nasza analiza, drugiej ceny nie mamy
+   *   "rynek_zgodny"   — drugi bukmacher wycenia to prawie tak samo
+   *   "rozjazd"        — drugi bukmacher płaci zauważalnie więcej
+   *   "pewniak_taniej" — jeden mówi „to niemal pewne", drugi płaci sensownie
+   */
+  kategoria?: "analiza" | "rynek_zgodny" | "rozjazd" | "pewniak_taniej";
+  /** najmocniejszy układ „pewniak taniej" na karcie (do wyróżnienia) */
+  rozjazd_pewniak?: (RadarRozjazd & { linia: number }) | null;
+  /** rozjazd na linii, która wygrała kartę */
+  rozjazd_hero?: RadarRozjazd | null;
   /** najlepsza linia karty wg oceny backendu (nagłówek karty) */
   hero?: {
     rynek_kod: string;

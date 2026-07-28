@@ -28,7 +28,9 @@ wpisów dziennie, nie ścianę szumu.
 from __future__ import annotations
 
 import math
+import re
 import time
+import unicodedata
 from collections import Counter, defaultdict
 
 import numpy as np
@@ -819,6 +821,47 @@ def _sezony_wpisu(player_sezon: dict | None, pid: int | None) -> list[dict]:
     return sez[:MAX_SEZONOW_WPISU]
 
 
+# Do ilu procent różnicy uznajemy, że dwa cenniki MÓWIĄ TO SAMO. Poniżej tego
+# druga księga jest potwierdzeniem naszej wyceny, powyżej — okazją.
+PROG_ZGODNEGO_RYNKU_PCT = 8.0
+
+
+def _klucz_zawodnika(nazwa: str) -> str:
+    """Klucz tożsamości zawodnika do scalania dubli.
+
+    NIE `superbet.norm_name` — tamten wycina tokeny krótsze niż dwa znaki,
+    więc gubi cyfry i skróty; dwie różne osoby potrafią zejść się do jednego
+    klucza (wyłapane testem: „Gracz 1" i „Gracz 7" dawały ten sam klucz).
+    Tu zostawiamy liczby, a kolejność słów dalej nie ma znaczenia, żeby
+    „Semedo, Lisandro" i „Lisandro Semedo" były tą samą osobą.
+    """
+    s = unicodedata.normalize("NFKD", str(nazwa or ""))
+    s = "".join(c for c in s if not unicodedata.combining(c)).lower()
+    tokeny = [t for t in re.split(r"[^a-z0-9]+", s) if len(t) > 1 or t.isdigit()]
+    return " ".join(sorted(tokeny))
+
+
+def _kategoria_karty(w: dict) -> str:
+    """Rodzaj karty — po czym front dobiera kolor i etykietę.
+
+    Cztery rodzaje, od najsłabszego dowodu do najmocniejszego:
+      * `analiza`        — druga cena niedostępna, karta stoi na naszej analizie
+      * `rynek_zgodny`   — obie księgi wyceniają to prawie tak samo
+      * `rozjazd`        — druga księga płaci zauważalnie więcej
+      * `pewniak_taniej` — jedna mówi „to niemal pewne", druga płaci sensownie
+    Kolejność jest istotna: karta dostaje NAJMOCNIEJSZY rodzaj, jaki ma.
+    """
+    if w.get("rozjazd_pewniak"):
+        return "pewniak_taniej"
+    rozjazdy = [s["rozjazd"] for r in w.get("rynki") or []
+                for s in r.get("drabinka") or [] if s.get("rozjazd")]
+    if not rozjazdy:
+        return "analiza"
+    if max(r["przewaga_pct"] for r in rozjazdy) >= PROG_ZGODNEGO_RYNKU_PCT:
+        return "rozjazd"
+    return "rynek_zgodny"
+
+
 # DRUGI CENNIK (Betclic) — ile sekund wolno na to zużyć w jednym przebiegu.
 # Dociągamy PO selekcji, tylko dla kart, które przeszły: kart jest do 30,
 # meczów kilkanaście, a każde zapytanie do Betclica to kilka sekund.
@@ -922,12 +965,18 @@ def _dopnij_betclic(wpisy: list[dict], events_meta: dict[int, dict]) -> None:
                             "linia": najlepszy["linia"], **najlepszy["rozjazd"]
                         }
                         n_pewniakow += 1
+        for w in wpisy:
+            w["kategoria"] = _kategoria_karty(w)
         print(f"Drabinki — drugi cennik (Betclic): mecze {len(pary)}/{len(nasze)}, "
               f"karty z drugą ceną {n_kart}/{len(wpisy)}, szczebli {n_szczebli}, "
               f"układów „pewniak taniej” {n_pewniakow}"
               + (f", pominięte mecze (budżet czasu): {pominiete}" if pominiete else ""))
     except Exception as e:  # źródło pomocnicze — nigdy nie wywala przebiegu
         print(f"Drabinki — drugi cennik pominięty ({type(e).__name__}: {e})")
+    finally:
+        # każda karta MUSI mieć rodzaj, także gdy Betclic w ogóle nie odpowiedział
+        for w in wpisy:
+            w.setdefault("kategoria", _kategoria_karty(w))
 
 
 def zbuduj(
@@ -1311,6 +1360,23 @@ def zbuduj(
         print("Drabinki — kandydaci odrzuceni: " + ", ".join(
             f"{k}={v}" for k, v in powody_odpadniecia.most_common()
         ) + f" (przeszło: {len(ocenione)})")
+    # JEDEN ZAWODNIK = JEDNA KARTA W MECZU. Zgłoszenie usera 2026-07-28:
+    # „w drabinkach są 4 typy, a 2 są na tego samego zawodnika". Powód:
+    # kartę buduje DWIE ścieżki — po historii z trendów i po profilu
+    # (debiutanci/transfery) — a id zawodnika w feedzie propsów bywa inne niż
+    # kanoniczne ([[drabinki-analiza-zawodnika]], pułapka 3), więc ten sam
+    # człowiek wchodził dwoma wejściami. Rozstrzygamy po NAZWISKU, nie po id,
+    # i zostawiamy lepszą kartę.
+    najlepsza: dict[tuple, dict] = {}
+    for w in sorted(ocenione, key=lambda w: -w["_score"]):
+        najlepsza.setdefault(
+            (w["mecz_id"], _klucz_zawodnika(w.get("podmiot") or "")), w
+        )
+    if len(najlepsza) < len(ocenione):
+        print(f"Drabinki — dublety tego samego zawodnika: "
+              f"{len(ocenione) - len(najlepsza)} kart scalonych")
+    ocenione = list(najlepsza.values())
+
     per_mecz_n: dict[int, int] = {}
     wybrane: list[dict] = []
     for w in sorted(ocenione, key=lambda w: -w["_score"]):

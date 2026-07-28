@@ -833,7 +833,16 @@ MIN_WSPOLNYCH_LINII = 2
 
 # 2) BEZPIECZNIK OSTATECZNY na absurdy (28,00 vs 1,95 = +1336%). Wysoko,
 #    żeby nie ruszać realnych okazji: 1,20 vs 2,60 (+117%) ma przechodzić.
+#    UWAGA: układu „pewniak taniej" ten limit NIE dotyczy w ogóle — decyzja
+#    usera 2026-07-28: „1,20 → 2,60, dokładnie tutaj nie powinno być limitu".
+#    Rozsądku pilnuje wtedy zgoda całej drabinki (niżej), a nie procent.
 MAX_ROZJAZD_PCT = 200.0
+
+# Ile może wynosić TYPOWY rozjazd na drabince, żebyśmy uznali, że oba cenniki
+# liczą to samo. Jedna linia potrafi się rozjechać mocno i to jest właśnie
+# okazja; ale gdy rozjeżdża się CAŁA drabinka, to znak, że Betclic mierzy inną
+# statystykę — wtedy nie pokazujemy nic. To jest ten „rozsądek" zamiast limitu.
+PROG_ZGODY_DRABINKI_PCT = 60.0
 
 # „Pewniak taniej": rynek u jednego bukmachera mówi „to niemal pewne"
 # (kurs <= 1,45), a drugi płaci za to sensowne pieniądze (>= 1,75).
@@ -843,10 +852,13 @@ PEWNIAK_MAX_KURS = 1.45
 PEWNIAK_MIN_LEPSZY = 1.75
 
 # ile porównań odrzuciły bramy — do logu, żeby obcinka nie była cicha
-ODRZUCONE_ROZJAZDY: dict[str, int] = {"za_duzy": 0, "za_malo_wspolnych": 0}
+ODRZUCONE_ROZJAZDY: dict[str, int] = {
+    "za_duzy": 0, "za_malo_wspolnych": 0, "drabinka_niezgodna": 0,
+}
 
 
-def rozjazd(kurs_sb: float | None, kurs_bc: float | None) -> dict | None:
+def rozjazd(kurs_sb: float | None, kurs_bc: float | None,
+            limit_pct: float | None = MAX_ROZJAZD_PCT) -> dict | None:
     """Porównanie dwóch cen tego samego zdarzenia.
 
     Wzorzec z wpisów typera ([[drabinki-wzorzec-typera]]): gra się tam, gdzie
@@ -862,7 +874,12 @@ def rozjazd(kurs_sb: float | None, kurs_bc: float | None) -> dict | None:
         return None
     if a <= 1.0 or b <= 1.0:
         return None
-    if max(a, b) / min(a, b) - 1 > MAX_ROZJAZD_PCT / 100:
+    lepszy_, gorszy_ = max(a, b), min(a, b)
+    pewniak = (gorszy_ <= PEWNIAK_MAX_KURS and lepszy_ >= PEWNIAK_MIN_LEPSZY)
+    # układ „pewniak taniej" nie ma limitu procentowego (decyzja usera):
+    # 1,20 -> 2,60 to najcenniejsza okazja, nie błąd danych
+    if (limit_pct is not None and not pewniak
+            and lepszy_ / gorszy_ - 1 > limit_pct / 100):
         ODRZUCONE_ROZJAZDY["za_duzy"] += 1
         return None
     lepszy, gorszy = (a, b) if a >= b else (b, a)
@@ -894,13 +911,24 @@ def porownaj_drabinke(linie_sb: dict, linie_bc: dict) -> dict:
         if wspolne:
             ODRZUCONE_ROZJAZDY["za_malo_wspolnych"] += len(wspolne)
         return {}
-    out = {}
-    for linia in wspolne:
-        r = rozjazd((linie_sb[linia] or {}).get("over"),
-                    (linie_bc[linia] or {}).get("over"))
-        if r:
-            out[linia] = r
-    return out
+    # NAJPIERW bez limitu: patrzymy, czy drabinki jako całość się zgadzają.
+    # Jedna linia może się mocno rozjechać — to jest właśnie okazja. Ale gdy
+    # rozjeżdża się CAŁA drabinka, oba cenniki liczą co innego.
+    surowe = {
+        linia: rozjazd((linie_sb[linia] or {}).get("over"),
+                       (linie_bc[linia] or {}).get("over"), limit_pct=None)
+        for linia in wspolne
+    }
+    gapy = sorted(r["przewaga_pct"] for r in surowe.values() if r)
+    if not gapy:
+        return {}
+    mediana = gapy[len(gapy) // 2] if len(gapy) % 2 else (
+        (gapy[len(gapy) // 2 - 1] + gapy[len(gapy) // 2]) / 2)
+    if mediana > PROG_ZGODY_DRABINKI_PCT:
+        ODRZUCONE_ROZJAZDY["drabinka_niezgodna"] += len(gapy)
+        return {}
+    # drabinka spójna -> ufamy jej także tam, gdzie jedna linia odjeżdża
+    return {linia: r for linia, r in surowe.items() if r}
 
 
 def porownaj_kursy(sb_players: dict, bc_players: dict) -> list[dict]:
