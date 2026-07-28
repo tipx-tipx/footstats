@@ -101,15 +101,43 @@ def test_rozjazd_wskazuje_lepsza_cene_i_ostrozniejsza_szanse():
 
 
 def test_rozjazd_odrzuca_nieprawdopodobna_roznice():
-    """13-krotna różnica ceny to nie okazja, tylko dwie różne statystyki.
-
-    Zmierzone na żywej ofercie: Betclic kwotował „powyżej 9,5 strzału" gracza
-    za 1,60, Superbet tego samego w okolicy 1,5 strzału. Bez tej bramy karta
-    pokazałaby +1300% przewagi, czyli zmyśloną okazję.
-    """
+    """13-krotna różnica ceny to nie okazja, tylko dwie różne statystyki."""
     assert betclic.rozjazd(28.0, 1.95) is None
     # wzorcowy wpis typera (1,37 vs 1,90 = +39%) MUSI przejść
     assert betclic.rozjazd(1.37, 1.90) is not None
+
+
+def test_pewniak_u_jednego_a_pieniadze_u_drugiego():
+    """NAJCENNIEJSZY układ: 1,25 „bo pewne" u jednego, 2,00 u drugiego.
+
+    Na tym stoją wszystkie cztery wpisy typera, które user pokazał. Musi
+    przechodzić bramy i być NAZWANY, żeby front mógł go wyróżnić.
+    """
+    r = betclic.rozjazd(1.25, 2.00)
+    assert r["typ"] == "pewniak_taniej"
+    assert r["gdzie"] == "betclic"
+    assert r["p_rynku"] == 0.8         # szansa z TAŃSZEJ ceny: 1/1,25
+    # zwykła różnica dwóch podobnych cen to nie ten układ
+    assert betclic.rozjazd(2.10, 2.35)["typ"] == "zwykly"
+    # i szeroki rozjazd na taniej stronie też przechodzi (1,20 vs 2,60)
+    assert betclic.rozjazd(1.20, 2.60)["typ"] == "pewniak_taniej"
+
+
+def test_jedna_wspolna_linia_to_za_malo():
+    """Rynek liczący CO INNEGO ma z naszym najwyżej jedną wspólną linię.
+
+    Zmierzone: Betclic kwotował Reichmutha na 4,5–6,5 strzału, Superbet na
+    0,5–2,5. Jedyna część wspólna dała +1336% „przewagi" — czyli bzdurę.
+    """
+    sb = {5.5: {"over": 28.0}}
+    bc = {5.5: {"over": 1.95}, 6.5: {"over": 2.8}}
+    assert betclic.porownaj_drabinke(sb, bc) == {}
+    # dwie wspólne linie = cenniki mówią o tym samym, porównujemy
+    sb2 = {0.5: {"over": 1.25}, 1.5: {"over": 2.5}}
+    bc2 = {0.5: {"over": 2.00}, 1.5: {"over": 2.7}}
+    wynik = betclic.porownaj_drabinke(sb2, bc2)
+    assert set(wynik) == {0.5, 1.5}
+    assert wynik[0.5]["typ"] == "pewniak_taniej"
 
 
 def test_kod_rynku_odsiewa_nie_nasze_rynki():
@@ -136,13 +164,19 @@ def test_rozjazd_odrzuca_smieci():
 
 
 def test_porownaj_kursy_tylko_wspolne_linie():
+    """Porównujemy wyłącznie linie, które mają OBAJ bukmacherzy — i dopiero
+    gdy jest ich co najmniej dwie (brama `MIN_WSPOLNYCH_LINII`)."""
     sb = {"semedo lisandro": {"shots_outside_box": {
-        0.5: {"over": 1.37}, 1.5: {"over": 4.0}}}}
-    bc = {"semedo lisandro": {"shots_outside_box": {0.5: {"over": 1.90}}}}
+        0.5: {"over": 1.37}, 1.5: {"over": 4.0}, 2.5: {"over": 9.0}}}}
+    bc = {"semedo lisandro": {"shots_outside_box": {
+        0.5: {"over": 1.90}, 1.5: {"over": 4.4}}}}
     out = betclic.porownaj_kursy(sb, bc)
-    assert len(out) == 1
-    assert out[0]["linia"] == 0.5
+    assert {x["linia"] for x in out} == {0.5, 1.5}
     assert out[0]["gdzie"] == "betclic"
+
+    # jedna wspólna linia = za mało, żeby uwierzyć, że to ta sama statystyka
+    bc_jedna = {"semedo lisandro": {"shots_outside_box": {0.5: {"over": 1.90}}}}
+    assert betclic.porownaj_kursy(sb, bc_jedna) == []
 
 
 # ---------------------------------------------------------------------------
@@ -156,6 +190,7 @@ def _karta():
         "rynki": [{"rynek_kod": "shots_outside_box", "drabinka": [
             {"linia": 0.5, "kurs": 1.37},
             {"linia": 1.5, "kurs": 4.00},
+            {"linia": 2.5, "kurs": 9.00},
         ]}],
     }
 
@@ -166,16 +201,18 @@ def test_dopina_druga_cene_do_szczebla(monkeypatch):
     monkeypatch.setattr(betclic, "paruj_mecze",
                         lambda nasze, *a, **k: ({7: {"id": 123, "nazwa": "x"}}, []))
     monkeypatch.setattr(betclic, "kursy_zawodnikow", lambda *a, **k: {
-        "players": {"lisandro semedo": {
-            "shots_outside_box": {0.5: {"over": 1.90}}}}})
+        "players": {"lisandro semedo": {"shots_outside_box": {
+            0.5: {"over": 1.90}, 1.5: {"over": 4.40}}}}})
     radar._dopnij_betclic(karty, meta)
     szczeble = karty[0]["rynki"][0]["drabinka"]
     assert szczeble[0]["kurs_betclic"] == 1.90
     assert szczeble[0]["rozjazd"]["gdzie"] == "betclic"
     # linia bez ceny u Betclica zostaje nietknięta
-    assert "kurs_betclic" not in szczeble[1]
+    assert "kurs_betclic" not in szczeble[2]
     # rozjazd rynku, który wygrał kartę, ląduje też na wierzchu
     assert karty[0]["rozjazd_hero"]["betclic"] == 1.90
+    # i układ „pewniak taniej" (1,37 vs 1,90) wyciągnięty osobno
+    assert karty[0]["rozjazd_pewniak"]["linia"] == 0.5
 
 
 def test_awaria_betclica_nie_wywala_przebiegu(monkeypatch):

@@ -856,7 +856,7 @@ def _dopnij_betclic(wpisy: list[dict], events_meta: dict[int, dict]) -> None:
         for w in wpisy:
             wpisy_mid[w["mecz_id"]].append(w)
 
-        n_szczebli = n_kart = 0
+        n_szczebli = n_kart = n_pewniakow = 0
         pominiete = 0
         for mid, bc in pary.items():
             if time.time() - start > BUDZET_BETCLIC_S:
@@ -876,10 +876,19 @@ def _dopnij_betclic(wpisy: list[dict], events_meta: dict[int, dict]) -> None:
                     continue
                 trafil = False
                 for r in w.get("rynki") or []:
-                    linie_bc = rynki_bc.get(r.get("rynek_kod")) or {}
+                    # nasza drabinka w kształcie porównywalnym z Betclikiem —
+                    # rozjazdy liczy JEDNA funkcja (razem z bramą wspólnych
+                    # linii), żeby karta i porównywarka nie miały dwóch
+                    # różnych definicji tego samego
+                    nasze_linie = {
+                        float(s["linia"]): {"over": s.get("kurs")}
+                        for s in r.get("drabinka") or [] if s.get("kurs")
+                    }
+                    rozjazdy = betclic.porownaj_drabinke(
+                        nasze_linie, rynki_bc.get(r.get("rynek_kod")) or {}
+                    )
                     for s in r.get("drabinka") or []:
-                        ceny = linie_bc.get(float(s["linia"])) or {}
-                        r_oc = betclic.rozjazd(s.get("kurs"), ceny.get("over"))
+                        r_oc = rozjazdy.get(float(s["linia"]))
                         if not r_oc:
                             continue
                         s["kurs_betclic"] = r_oc["betclic"]
@@ -889,6 +898,8 @@ def _dopnij_betclic(wpisy: list[dict], events_meta: dict[int, dict]) -> None:
                 if trafil:
                     n_kart += 1
                     hero = w.get("hero") or {}
+                    wszystkie = [s for r in w.get("rynki") or []
+                                 for s in r.get("drabinka") or [] if s.get("rozjazd")]
                     for r in w.get("rynki") or []:
                         if r.get("rynek_kod") != hero.get("rynek_kod"):
                             continue
@@ -896,8 +907,24 @@ def _dopnij_betclic(wpisy: list[dict], events_meta: dict[int, dict]) -> None:
                             if (s.get("rozjazd")
                                     and float(s["linia"]) == float(hero.get("linia", -1))):
                                 w["rozjazd_hero"] = s["rozjazd"]
+                    # UKŁAD „PEWNIAK TANIEJ": jeden bukmacher mówi „to niemal
+                    # pewne" (kurs <= 1,45), drugi płaci za to 1,75+. To jest
+                    # ten rodzaj rozjazdu, na którym stoją wpisy typerów —
+                    # wyciągamy go na wierzch karty, żeby front mógł go
+                    # wyróżnić, a nie topić w liście szczebli.
+                    pewniaki = [s for s in wszystkie
+                                if s["rozjazd"].get("typ") == "pewniak_taniej"]
+                    if pewniaki:
+                        najlepszy = max(
+                            pewniaki, key=lambda s: s["rozjazd"]["przewaga_pct"]
+                        )
+                        w["rozjazd_pewniak"] = {
+                            "linia": najlepszy["linia"], **najlepszy["rozjazd"]
+                        }
+                        n_pewniakow += 1
         print(f"Drabinki — drugi cennik (Betclic): mecze {len(pary)}/{len(nasze)}, "
-              f"karty z drugą ceną {n_kart}/{len(wpisy)}, szczebli {n_szczebli}"
+              f"karty z drugą ceną {n_kart}/{len(wpisy)}, szczebli {n_szczebli}, "
+              f"układów „pewniak taniej” {n_pewniakow}"
               + (f", pominięte mecze (budżet czasu): {pominiete}" if pominiete else ""))
     except Exception as e:  # źródło pomocnicze — nigdy nie wywala przebiegu
         print(f"Drabinki — drugi cennik pominięty ({type(e).__name__}: {e})")

@@ -817,19 +817,33 @@ def znajdz_zawodnika(gracze_bc: dict, nazwa: str) -> dict:
 # Rozjazd cenników: Superbet vs Betclic
 # ---------------------------------------------------------------------------
 
-# Powyżej tylu procent różnicy uznajemy, że to NIE JEST ta sama rzecz.
-# Zmierzone 2026-07-28 (Dinamo Zagrzeb–FC Thun): Betclic wystawia „Valmir
-# Matoshi powyżej 9,5 strzału za 1,60", a Superbet tego samego zawodnika
-# kwotuje w okolicy 1,5 strzału. Sprawdzone na ICH stronie — tak to u nich
-# realnie wygląda, więc to nie błąd naszego odczytu, tylko inna definicja
-# statystyki (albo pomyłka Betclica). Prawdziwy rozjazd cenników w propsach
-# to kilkanaście–kilkadziesiąt procent (wzorcowy wpis typera: 1,37 vs 1,90 =
-# +39%). Trzynastokrotna różnica to nie okazja, tylko sygnał, że porównujemy
-# dwie różne rzeczy — i lepiej nie pokazać nic, niż pokazać zmyśloną okazję.
-MAX_ROZJAZD_PCT = 80.0
+# DWIE BRAMY, bo dwa różne zagrożenia — i uwaga: NIE WOLNO ich zacieśnić tak,
+# żeby zabiły przypadek „u Superbetu 1,25 bo pewne, u Betclica 2,00". To jest
+# NAJCENNIEJSZY rodzaj rozjazdu i sedno wszystkich czterech wpisów typera,
+# które user pokazał (Superbet 1,20–1,37, gra po 1,90–1,95).
+#
+# 1) WSPÓLNE LINIE. Prawdziwym śmieciem nie była wielkość różnicy, tylko to,
+#    że Betclic liczył CO INNEGO: „Valmir Matoshi powyżej 9,5 strzału za 1,60"
+#    (sprawdzone wzrokiem na ich stronie — tak to u nich naprawdę wygląda).
+#    Taki rynek ma z naszym najwyżej JEDNĄ wspólną linię, bo drabinki leżą
+#    w zupełnie innych miejscach. Gdy oba cenniki dzielą co najmniej dwie
+#    linie tego samego zawodnika i rynku, mówią o tej samej rzeczy — i wtedy
+#    duża różnica na jednej z nich to okazja, nie błąd.
+MIN_WSPOLNYCH_LINII = 2
 
-# ile porównań odrzuciła brama — do logu, żeby obcinka nie była cicha
-ODRZUCONE_ROZJAZDY: dict[str, int] = {"za_duzy": 0}
+# 2) BEZPIECZNIK OSTATECZNY na absurdy (28,00 vs 1,95 = +1336%). Wysoko,
+#    żeby nie ruszać realnych okazji: 1,20 vs 2,60 (+117%) ma przechodzić.
+MAX_ROZJAZD_PCT = 200.0
+
+# „Pewniak taniej": rynek u jednego bukmachera mówi „to niemal pewne"
+# (kurs <= 1,45), a drugi płaci za to sensowne pieniądze (>= 1,75).
+# Dokładnie ten układ typer opisuje zdaniem „Superbet wycenia to na zaledwie
+# 1,20" — niska cena jest DOWODEM, a gra się tam, gdzie płacą więcej.
+PEWNIAK_MAX_KURS = 1.45
+PEWNIAK_MIN_LEPSZY = 1.75
+
+# ile porównań odrzuciły bramy — do logu, żeby obcinka nie była cicha
+ODRZUCONE_ROZJAZDY: dict[str, int] = {"za_duzy": 0, "za_malo_wspolnych": 0}
 
 
 def rozjazd(kurs_sb: float | None, kurs_bc: float | None) -> dict | None:
@@ -859,7 +873,34 @@ def rozjazd(kurs_sb: float | None, kurs_bc: float | None) -> dict | None:
         "gdzie": "superbet" if a >= b else "betclic",
         "przewaga_pct": round((lepszy / gorszy - 1) * 100, 1),
         "p_rynku": round(1.0 / gorszy, 4),
+        # nazwany układ, a nie sam procent — front ma to wyróżniać
+        "typ": ("pewniak_taniej"
+                if gorszy <= PEWNIAK_MAX_KURS and lepszy >= PEWNIAK_MIN_LEPSZY
+                else "zwykly"),
     }
+
+
+def porownaj_drabinke(linie_sb: dict, linie_bc: dict) -> dict:
+    """Rozjazdy dla JEDNEGO zawodnika i rynku: {linia: rozjazd}.
+
+    Tu mieszka brama wspólnych linii (patrz `MIN_WSPOLNYCH_LINII`): dopóki
+    oba cenniki nie zejdą się na co najmniej dwóch liniach, nie wierzymy, że
+    liczą to samo, i nie pokazujemy nic. Dzięki temu układ „1,25 u jednego,
+    2,00 u drugiego" przechodzi (bo reszta drabinki się zgadza), a rynek
+    liczący inną statystykę odpada w całości.
+    """
+    wspolne = sorted(set(linie_sb or {}) & set(linie_bc or {}))
+    if len(wspolne) < MIN_WSPOLNYCH_LINII:
+        if wspolne:
+            ODRZUCONE_ROZJAZDY["za_malo_wspolnych"] += len(wspolne)
+        return {}
+    out = {}
+    for linia in wspolne:
+        r = rozjazd((linie_sb[linia] or {}).get("over"),
+                    (linie_bc[linia] or {}).get("over"))
+        if r:
+            out[linia] = r
+    return out
 
 
 def porownaj_kursy(sb_players: dict, bc_players: dict) -> list[dict]:
@@ -875,13 +916,10 @@ def porownaj_kursy(sb_players: dict, bc_players: dict) -> list[dict]:
         if not rynki_bc:
             continue
         for kod, linie_sb in rynki_sb.items():
-            linie_bc = rynki_bc.get(kod) or {}
-            for linia, ceny_sb in linie_sb.items():
-                ceny_bc = linie_bc.get(linia) or {}
-                r = rozjazd(ceny_sb.get("over"), ceny_bc.get("over"))
-                if r:
-                    out.append({"gracz": klucz, "rynek": kod,
-                                "linia": linia, **r})
+            for linia, r in porownaj_drabinke(
+                linie_sb, rynki_bc.get(kod) or {}
+            ).items():
+                out.append({"gracz": klucz, "rynek": kod, "linia": linia, **r})
     out.sort(key=lambda x: -x["przewaga_pct"])
     return out
 
