@@ -28,7 +28,8 @@ wpisów dziennie, nie ścianę szumu.
 from __future__ import annotations
 
 import math
-from collections import Counter
+import time
+from collections import Counter, defaultdict
 
 import numpy as np
 
@@ -37,7 +38,7 @@ from ..model import context as context_mod
 from ..model import counts as counts_mod
 from ..model import kontekst_drabinki as kd
 from ..model import tempo as tempo_mod
-from ..sources import statshub, superbet
+from ..sources import betclic, statshub, superbet
 
 # --- progi detektorów ---
 OKNO_TRANSFER = 15          # ile ostatnich meczów historii patrzymy na ligi
@@ -818,6 +819,90 @@ def _sezony_wpisu(player_sezon: dict | None, pid: int | None) -> list[dict]:
     return sez[:MAX_SEZONOW_WPISU]
 
 
+# DRUGI CENNIK (Betclic) — ile sekund wolno na to zużyć w jednym przebiegu.
+# Dociągamy PO selekcji, tylko dla kart, które przeszły: kart jest do 30,
+# meczów kilkanaście, a każde zapytanie do Betclica to kilka sekund.
+BUDZET_BETCLIC_S = 150.0
+
+
+def _dopnij_betclic(wpisy: list[dict], events_meta: dict[int, dict]) -> None:
+    """Dopnij do szczebli drugą cenę (Betclic) i rozjazd wobec Superbetu.
+
+    PO CO: wzorzec z wpisów typerów — gra się tam, gdzie płacą więcej, a niski
+    kurs drugiego bukmachera jest dowodem, że zdarzenie jest pewne. To DODATEK
+    do analizy, nie kryterium selekcji: karty są już wybrane, tu tylko
+    dokładamy informację.
+
+    Wszystko w bezpiecznej klamrze — Betclic jest źródłem pomocniczym i jego
+    awaria (albo zmiana protokołu) nie ma prawa wywalić całego przebiegu.
+    Budżet czasu pilnuje, żeby cron nie urósł: co pominięte, ląduje w logu,
+    bo cicha obcinka wygląda jak „sprawdzone wszystko".
+    """
+    if not wpisy:
+        return
+    start = time.time()
+    try:
+        mids = sorted({w["mecz_id"] for w in wpisy})
+        nasze = []
+        for mid in mids:
+            meta = events_meta.get(mid) or {}
+            if meta.get("home") and meta.get("away"):
+                nasze.append({"klucz": mid, "home": meta["home"],
+                              "away": meta["away"], "kickoff_ts": meta.get("ts")})
+        if not nasze:
+            return
+        pary, _luka = betclic.paruj_mecze(nasze)
+        wpisy_mid: dict[int, list[dict]] = defaultdict(list)
+        for w in wpisy:
+            wpisy_mid[w["mecz_id"]].append(w)
+
+        n_szczebli = n_kart = 0
+        pominiete = 0
+        for mid, bc in pary.items():
+            if time.time() - start > BUDZET_BETCLIC_S:
+                pominiete += 1
+                continue
+            try:
+                paczka = betclic.kursy_zawodnikow(int(bc["id"]))
+            except (RuntimeError, OSError, ValueError) as e:
+                print(f"Drabinki/Betclic: mecz {bc.get('nazwa')} — {e}")
+                continue
+            gracze = paczka.get("players") or {}
+            if not gracze:
+                continue
+            for w in wpisy_mid.get(mid, []):
+                rynki_bc = betclic.znajdz_zawodnika(gracze, w.get("podmiot") or "")
+                if not rynki_bc:
+                    continue
+                trafil = False
+                for r in w.get("rynki") or []:
+                    linie_bc = rynki_bc.get(r.get("rynek_kod")) or {}
+                    for s in r.get("drabinka") or []:
+                        ceny = linie_bc.get(float(s["linia"])) or {}
+                        r_oc = betclic.rozjazd(s.get("kurs"), ceny.get("over"))
+                        if not r_oc:
+                            continue
+                        s["kurs_betclic"] = r_oc["betclic"]
+                        s["rozjazd"] = r_oc
+                        n_szczebli += 1
+                        trafil = True
+                if trafil:
+                    n_kart += 1
+                    hero = w.get("hero") or {}
+                    for r in w.get("rynki") or []:
+                        if r.get("rynek_kod") != hero.get("rynek_kod"):
+                            continue
+                        for s in r.get("drabinka") or []:
+                            if (s.get("rozjazd")
+                                    and float(s["linia"]) == float(hero.get("linia", -1))):
+                                w["rozjazd_hero"] = s["rozjazd"]
+        print(f"Drabinki — drugi cennik (Betclic): mecze {len(pary)}/{len(nasze)}, "
+              f"karty z drugą ceną {n_kart}/{len(wpisy)}, szczebli {n_szczebli}"
+              + (f", pominięte mecze (budżet czasu): {pominiete}" if pominiete else ""))
+    except Exception as e:  # źródło pomocnicze — nigdy nie wywala przebiegu
+        print(f"Drabinki — drugi cennik pominięty ({type(e).__name__}: {e})")
+
+
 def zbuduj(
     trends: list[statshub.StatshubTrend],
     events_meta: dict[int, dict],
@@ -1231,6 +1316,7 @@ def zbuduj(
                 None,
             ),
         }
+    _dopnij_betclic(wpisy, events_meta)
     wpisy.sort(key=lambda w: (w["kickoff_ts"], w["mecz_id"], -w["_score"]))
     for i, w in enumerate(wpisy, start=1):
         w.pop("_score", None)
