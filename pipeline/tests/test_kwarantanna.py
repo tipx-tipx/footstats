@@ -400,3 +400,22 @@ def test_urealnij_p_zachowuje_kolejnosc_i_zakres():
     assert 0 < rozliczanie.urealnij_p(0.01, d) < rozliczanie.urealnij_p(0.5, d)
     assert rozliczanie.urealnij_p(0.5, d) < rozliczanie.urealnij_p(0.99, d) < 1
     assert rozliczanie.urealnij_p(0.7, 0.0) == 0.7
+
+
+def test_flaga_pewniak_jest_objeta_kwarantanna_kategorii():
+    """Dziura załatana 2026-07-29: `pewniak` to ponad połowa typów
+    zawodniczych (136 z 259 rozliczonych, ROI −22% na opublikowanych),
+    a stała POZA bramą, która pilnuje dokładnie takich ścieżek — wpuszcza
+    typ na listę bez wymogu wartości, na samej wysokiej szansie."""
+    assert "pewniak" in rozliczanie.KATEGORIE_KWARANTANNY
+    recs = _seria("shots", 30, 5, 1.7, pewniak=True)
+    kw = rozliczanie.kategorie_kwarantanna(_log(recs))
+    assert "pewniak" in kw
+    assert kw["pewniak"]["nazwa"] == "Najwyższa szansa w meczu"
+
+
+def test_pewniak_ktory_zarabia_nie_jest_wstrzymywany():
+    """Brama patrzy na ROI z okna, nie na samą flagę — dochodowa kategoria
+    zostaje (na 29.07 `pewniak` miał w oknie +10% i przechodził)."""
+    recs = _seria("shots", 30, 25, 1.7, pewniak=True)
+    assert "pewniak" not in rozliczanie.kategorie_kwarantanna(_log(recs))

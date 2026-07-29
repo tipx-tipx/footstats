@@ -743,8 +743,23 @@ def kwarantanna() -> dict[str, dict]:
 #
 # Typ z kategorii w kwarantannie NIE znika: liczy się, uczy kalibrację
 # i widać go w Skuteczności "w tle" (poza_publikacja="kwarantanna_kategorii").
+#
+# DZIURA ZAŁATANA 2026-07-29: brakowało tu `pewniak` — a to NAJWIĘKSZA
+# kategoria ze wszystkich. Pomiar na 259 rozliczonych typach zawodniczych:
+#   pewniak        n=136  weszło 51%  deklarował 71%  ROI −22%
+#   z tego bez żadnej innej flagi  n=46  weszło 57%   ROI −21%
+# Czyli ponad połowa typów stała poza bramą, która miała pilnować dokładnie
+# tego: „każda ścieżka dołożona po to, żeby znaleźć COŚ WIĘCEJ niż rynek,
+# oddaje pieniądze". `pewniak` jest taką ścieżką — wpuszcza typ na listę BEZ
+# wymogu wartości, na samej wysokiej szansie.
+#
+# Powód, dla którego to widać dopiero teraz: raport uczenia pokazał, że model
+# przestał typować „nudno". Udział typów bez żadnej flagi spadł ze 100%
+# w pierwszej paczce do 5% w ostatniej, a liczba flag na typ urosła z 0,00
+# do 1,89 — i dokładnie tym torem szła luka (−6 pp -> −20 pp).
 KATEGORIE_KWARANTANNY = (
     "wyzsza_linia", "matchup_styl", "matchup", "miekka_linia", "rotacja",
+    "pewniak",
 )
 KATEGORIE_NAZWY_PL = {
     "wyzsza_linia": "Ambitniejsza linia",
@@ -752,6 +767,7 @@ KATEGORIE_NAZWY_PL = {
     "matchup": "Słaby rywal na tym rynku",
     "miekka_linia": "Zaniżony kurs bukmachera",
     "rotacja": "Wraca do składu",
+    "pewniak": "Najwyższa szansa w meczu",
 }
 # progi jak przy rynkach, tylko próba mniejsza: kategoria zbiera typy ze
 # WSZYSTKICH rynków naraz, więc 12 rozliczeń mówi tu tyle, co 15 na rynku
