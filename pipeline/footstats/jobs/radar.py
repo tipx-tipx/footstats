@@ -109,6 +109,45 @@ PROG_POKRYCIA_KARTY = 0.5
 # (Marcel Regula, strzały 2,5 @2,05 przy pokryciu 6/10 = 0,60). Szum, o który
 # chodziło, nie siedzi w progu głównej linii, tylko w tym, co leży OBOK niej
 # na karcie — i to tniemy trzema bramami niżej.
+#
+# PIERWSZY WYNIK POMIARU (dry-run 2026-07-29, 160 kandydatów):
+#   daleko pod progiem (<0,40)        152 szczeble
+#   w paśmie pomiarowym (0,40–0,50)    42
+#     z tego poniżej ceny fair         40
+#     z tego rozjazd z rynkiem          2
+#     do zmierzenia                     0
+# Czyli PRÓG 0,5 NIE ODCINA NICZEGO, czego nie odciąłby kurs: każdy szczebel
+# tuż pod progiem bukmacher wycenia wyżej, niż my go liczymy. Powód jest
+# mechaniczny — Wilson ścina 4/10 do 0,30, a rynek płaci tam jak za ~0,33+.
+# Wniosek praktyczny: ruszanie tego progu (w górę czy w dół) nie zmieni ani
+# podaży kart, ani wyniku. Wąskim gardłem jest korekta próby zderzona z ceną.
+# Pomiar zostaje włączony — kosztuje tyle co nic, a w dniu, w którym rynek
+# wystawi taką linię hojnie, karta pomiarowa się zapisze i rozliczy.
+#
+# POMIAR PROGU (2026-07-29). Dotąd 0,5 było WIARĄ: nikt nie wiedział, czy
+# szczeble tuż pod progiem trafiają gorzej, tak samo, czy lepiej — bo nigdzie
+# się nie rozliczały. Ta sama sztuczka, co przy typach modelu (betting.NEAR_*):
+# szczebel odrzucony WYŁĄCZNIE pokryciem i mieszczący się w tolerancji poniżej
+# trafia do księgi z flagą `odrzucony`, rozlicza się w tle i NIE pokazuje się
+# nigdzie — ani w Drabinkach, ani w Skuteczności, ani w kalibracji. Po kilku
+# tygodniach porównanie jego trafień z opublikowanymi (rozliczanie.
+# pomiar_progu_drabinek) powie, czy 0,5 to dobra liczba — zamiast zgadywania.
+NEAR_POKRYCIA = 0.10        # mierzymy pokrycia 0,40–0,50
+# NIŻSZY PRÓG PRZEWAGI DLA POMIARU — konieczny, nie wygodny. Pierwsza wersja
+# wymagała od szczebla pomiarowego pełnego MIN_EDGE_KARTY i dała ZERO
+# kandydatów w dry-runie 2026-07-29 (na 99 odrzuconych pokryciem). Powód jest
+# mechaniczny: p_final rośnie razem z pokryciem, więc szczebel spod progu ma
+# z definicji niższą szansę, a przy niższej szansie wymagane +3 pp przewagi
+# zostawia okno kursów szerokie na kilka setnych (dla 4/10 dokładnie
+# 3,67–3,85). Bukmacher tam nie kwotuje i pomiar nigdy by nie ruszył.
+# Zostaje więc uczciwe minimum: „warte swojej ceny" (przewaga >= 0).
+MIN_EDGE_POMIARU = 0.0
+# Sufit pomiaru trzymamy PONIŻEJ dziennego sufitu kart (MAX_WPISOW=30): grupa
+# porównawcza ma być tej samej wielkości co publikacja, a nie ją zdominować —
+# rozliczone wpisy nigdy nie wypadają z księgi (to dataset kalibracji).
+# Bierzemy szczeble o największej przewadze, czyli tą samą regułą, którą
+# wybieramy karty — inaczej porównywalibyśmy TOP z losem.
+MAX_POMIAROW_CYKLU = 25
 
 # --- SPRZĄTANIE KARTY (zgłoszenie usera 2026-07-27: „często są randomowe
 # rzeczy"). Karta Reguły miała 9 rynków i 25 szczebli, z czego 11 to pokrycia
@@ -166,6 +205,19 @@ CAP_SEZONU = (0.85, 1.15)   # ile może ruszyć średnia z całych sezonów
 # skalibrowania z rozliczeń drabinek — dopiero własny strumień skuteczności
 # powie, czy „top" faktycznie trafia lepiej niż „solidny".
 PROG_KLASY = ((0.10, "top"), (0.06, "mocny"))
+
+
+def _z_korekta_strumienia(p: float, delta: float) -> float:
+    """Szansa po korekcie strumienia drabinek (delta w skali logitowej).
+
+    Ta sama jednostka, co kalibracja modelu — dodanie delty do logitu ściąga
+    (albo podnosi) całą skalę równomiernie, w odróżnieniu od mnożnika, który
+    przy p bliskim 1 potrafi wyjechać poza zakres.
+    """
+    if not delta:
+        return p
+    p = min(max(float(p), 1e-6), 1.0 - 1e-6)
+    return 1.0 / (1.0 + math.exp(-(math.log(p / (1.0 - p)) + delta)))
 
 
 def _wilson_low(traf: int, z: int, k: float = WILSON_K) -> float:
@@ -535,6 +587,7 @@ def _rynki_wpisu(
     minuty_proj: float | None = None,
     sezony: list[dict] | None = None,
     teraz: int = 0,
+    korekta_logit: float = 0.0,
 ) -> list[dict]:
     """Sekcja `rynki` wpisu: przycięta drabinka kursów + pokrycie linii
     w ostatnich występach + forma i PEŁNY kontekst meczu per rynek.
@@ -542,7 +595,11 @@ def _rynki_wpisu(
     Każdy szczebel dostaje `p_final` — pokrycie Wilsona przemnożone przez
     korektę kontekstową (rywal na tym rynku, sędzia przy faulach, scenariusz
     meczu, dom/wyjazd, średnie sezonowe, forma i prognoza minut). To ta liczba,
-    nie surowe „8/10", decyduje o wyborze i kolejności kart."""
+    nie surowe „8/10", decyduje o wyborze i kolejności kart.
+
+    `korekta_logit` — nauka z WŁASNYCH rozliczeń drabinek (patrz `zbuduj`).
+    Wchodzi na samym końcu, po korekcie kontekstowej, więc karta pokazuje
+    szansę już poprawioną o to, jak strumień radził sobie naprawdę."""
     out = []
     for mk, linie in drabinki.items():
         if not linie:
@@ -613,7 +670,12 @@ def _rynki_wpisu(
                     szczebel["p_bazowe"] = round(p_baz, 3)
                     szczebel["korekta"] = round(kor[0], 3)
                     szczebel["p_final"] = round(
-                        float(np.clip(p_baz * kor[0], *P_FINAL_WIDELKI)), 3
+                        float(np.clip(
+                            _z_korekta_strumienia(
+                                p_baz * kor[0], korekta_logit
+                            ),
+                            *P_FINAL_WIDELKI,
+                        )), 3
                     )
             drabinka.append(szczebel)
         # SZCZEBLE-ŚMIECI PRECZ. „Celne głową 1,5 — trafione 0/10, kurs 33,0"
@@ -708,7 +770,12 @@ def _rynki_wpisu(
     return out[:MAX_RYNKOW_KARTY]
 
 
-def _oceń_karte(w: dict, powody: Counter | None = None) -> tuple[float, dict | None]:
+def _oceń_karte(
+    w: dict,
+    powody: Counter | None = None,
+    pomiar_out: list | None = None,
+    powody_pomiaru: Counter | None = None,
+) -> tuple[float, dict | None]:
     """Ocena karty: (score, najlepszy_szczebel) albo (0.0, None) gdy odpada.
 
     Score = REALNA PRZEWAGA nad kursem: `p_final − 1/kurs`, gdzie p_final to
@@ -724,6 +791,16 @@ def _oceń_karte(w: dict, powody: Counter | None = None) -> tuple[float, dict | 
 
     Karta bez ani jednej linii przechodzącej bramy NIE powstaje: sygnały same
     z siebie nie wystarczają (koniec z „Lewandowski, bo transfer").
+
+    pomiar_out — kolektor SZCZEBLI POMIAROWYCH: linie odrzucone wyłącznie
+    progiem pokrycia i mieszczące się w tolerancji NEAR_POKRYCIA (patrz tam).
+    Zbieramy je, żeby rozliczyły się w tle i dały odpowiedź, czy 0,5 to dobry
+    próg. Bramy karty (minuty, udział startów) obowiązują tak samo — pomiar ma
+    porównywać rzeczy porównywalne, a nie zawodników, których i tak nie gramy.
+
+    powody_pomiaru — licznik diagnostyczny: gdzie giną szczeble z przedziału
+    pomiarowego. Bez niego pusty pomiar wygląda identycznie jak brak takich
+    szczebli w ofercie, a to dwie zupełnie różne sytuacje.
     """
     if (w.get("minuty_sr6") or 0) < MIN_MINUT_KARTY:
         if powody is not None:
@@ -738,6 +815,7 @@ def _oceń_karte(w: dict, powody: Counter | None = None) -> tuple[float, dict | 
             powody["rzadko_w_pierwszym_skladzie"] += 1
         return 0.0, None
     best_score, best_s = 0.0, None
+    pomiar_score, pomiar_s = 0.0, None
     lokalne: Counter = Counter()
     for r in w.get("rynki", []):
         for s in r.get("drabinka", []):
@@ -748,39 +826,72 @@ def _oceń_karte(w: dict, powody: Counter | None = None) -> tuple[float, dict | 
             if s["kurs"] < MIN_KURS_SCORE:
                 lokalne["kurs_ponizej_progu"] += 1
                 continue
-            if p["traf"] / p["z"] < PROG_POKRYCIA_KARTY:
+            # SZCZEBEL POMIAROWY: pokrycie pod progiem, ale w tolerancji.
+            # Nie przerywamy od razu — przepuszczamy go przez WSZYSTKIE
+            # pozostałe bramy, żeby zmierzyć wyłącznie efekt progu pokrycia,
+            # a nie „reszty świata". Na koniec i tak nie wraca jako hero.
+            pokrycie = p["traf"] / p["z"]
+            pomiarowy = pokrycie < PROG_POKRYCIA_KARTY
+            if pomiarowy:
                 lokalne["slabe_pokrycie"] += 1
-                continue
+                if pokrycie < PROG_POKRYCIA_KARTY - NEAR_POKRYCIA:
+                    if powody_pomiaru is not None:
+                        powody_pomiaru["daleko_pod_progiem"] += 1
+                    continue
+                if powody_pomiaru is not None:
+                    powody_pomiaru["w_przedziale"] += 1
+                if pomiar_out is None:
+                    continue
             p_final = s.get("p_final")
             if p_final is None:
-                lokalne["brak_korekty"] += 1
+                # szczebel pomiarowy jest już policzony jako `slabe_pokrycie` —
+                # drugi powód dla tej samej linii przekłamałby diagnostykę
+                if not pomiarowy:
+                    lokalne["brak_korekty"] += 1
+                elif powody_pomiaru is not None:
+                    powody_pomiaru["brak_korekty"] += 1
                 continue  # bez korekty kontekstowej nie oceniamy karty
             p_mod = s.get("p_model")
             if p_mod is not None and p_mod < p_final:
                 p_final = round((p_final + float(p_mod)) / 2.0, 3)
-                s["p_final"] = p_final
-                s["strzyzenie_modelu"] = True
+                # szczebla pomiarowego NIE dotykamy: nie wchodzi na kartę,
+                # więc nie ma prawa zmieniać tego, co user widzi
+                if not pomiarowy:
+                    s["p_final"] = p_final
+                    s["strzyzenie_modelu"] = True
             edge = p_final - 1.0 / s["kurs"]
-            if edge < MIN_EDGE_KARTY:
-                lokalne["brak_przewagi"] += 1
+            if edge < (MIN_EDGE_POMIARU if pomiarowy else MIN_EDGE_KARTY):
+                if not pomiarowy:
+                    lokalne["brak_przewagi"] += 1
+                elif powody_pomiaru is not None:
+                    powody_pomiaru["ponizej_ceny_fair"] += 1
                 continue
             # ...ale przewaga ZA DUŻA to nie okazja, tylko sygnał, że to my się
             # mylimy (patrz MAX_ROZJAZD_KARTY). Cena rynku po zdjęciu marży,
             # tak jak w modelu — porównujemy jabłka z jabłkami.
             cena = betting.implied_prob_one_sided(s["kurs"])
             if cena > 0 and p_final / cena > MAX_ROZJAZD_KARTY:
-                lokalne["rozjazd_z_rynkiem"] += 1
+                if not pomiarowy:
+                    lokalne["rozjazd_z_rynkiem"] += 1
+                elif powody_pomiaru is not None:
+                    powody_pomiaru["rozjazd_z_rynkiem"] += 1
                 continue
-            if edge > best_score:
-                best_score, best_s = edge, {
-                    "rynek_kod": r["rynek_kod"], "rynek": r.get("rynek"),
-                    "linia": s["linia"], "kurs": s["kurs"],
-                    "traf": p["traf"], "z": p["z"],
-                    "edge": round(edge, 3),
-                    "p_final": p_final,
-                    "p_bazowe": s.get("p_bazowe"),
-                    "korekta": s.get("korekta"),
-                }
+            trafiony = {
+                "rynek_kod": r["rynek_kod"], "rynek": r.get("rynek"),
+                "linia": s["linia"], "kurs": s["kurs"],
+                "traf": p["traf"], "z": p["z"],
+                "edge": round(edge, 3),
+                "p_final": p_final,
+                "p_bazowe": s.get("p_bazowe"),
+                "korekta": s.get("korekta"),
+            }
+            if pomiarowy:
+                if edge > pomiar_score:
+                    pomiar_score, pomiar_s = edge, trafiony
+            elif edge > best_score:
+                best_score, best_s = edge, trafiony
+    if pomiar_out is not None and pomiar_s is not None:
+        pomiar_out.append(pomiar_s)
     if powody is not None and best_s is None:
         # najczęstszy powód odpadnięcia tej karty — bez tego nie wiadomo,
         # czy pusta lista to słaby dzień, czy zbyt ostry próg
@@ -994,6 +1105,8 @@ def zbuduj(
     poza_skladem: set[tuple[int, int]] | None = None,
     xi_znany: dict[tuple[int, int], bool] | None = None,
     margines_startu_s: int = 0,
+    korekta_logit: float = 0.0,
+    pomiar_out: list | None = None,
 ) -> list[dict]:
     """Złóż wpisy radaru/drabinek ze zbiorów, które cykl i tak ma w pamięci.
 
@@ -1008,6 +1121,13 @@ def zbuduj(
     na tym konkretnym rynku, sędzia przy faulach, scenariusz meczu z kursów
     1X2, forma, prognoza minut, średnie sezonowe). Selekcja i kolejność kart
     idą po realnej przewadze nad kursem, nie po surowym „trafione 8/10".
+
+    WŁASNE UCZENIE (2026-07-29): `korekta_logit` to delta ze strumienia
+    drabinek (rozliczanie.korekta_strumienia) — o ile ich szanse okazały się
+    przeszacowane na rozliczeniach. Wchodzi w `p_final`, czyli i w liczbę na
+    karcie, i w bramę przewagi: gdy strumień przeszacowuje, przez bramę
+    przechodzi mniej kart. `pomiar_out` zbiera szczeble tuż pod progiem
+    pokrycia do rozliczenia w tle (patrz NEAR_POKRYCIA).
 
     Zwraca listę do radar.json — posortowaną: transfery, debiutanci, serie
     formy, reszta drabinek; wewnątrz rodzaju po godzinie meczu. Kickoffem,
@@ -1134,6 +1254,7 @@ def zbuduj(
                 minuty_proj=minuty_sr6,
                 sezony=sez,
                 teraz=teraz,
+                korekta_logit=korekta_logit,
             )
             if not rynki:
                 continue  # same puste drabinki (kursy-szum) = nie ma karty
@@ -1313,6 +1434,7 @@ def zbuduj(
                     minuty_proj=minuty_sr6_deb,
                     sezony=sez_deb,
                     teraz=teraz,
+                    korekta_logit=korekta_logit,
                 ),
             })
 
@@ -1344,13 +1466,41 @@ def zbuduj(
     # niezależnie od rodzaju. Sygnał to plakietka, nie przepustka.
     ocenione = []
     powody_odpadniecia: Counter = Counter()
+    pomiar_kandydaci: list[dict] = []
+    powody_pomiaru: Counter = Counter()
     for w in wpisy:
-        score, hero = _oceń_karte(w, powody_odpadniecia)
+        pom: list[dict] | None = [] if pomiar_out is not None else None
+        score, hero = _oceń_karte(
+            w, powody_odpadniecia, pomiar_out=pom,
+            powody_pomiaru=powody_pomiaru,
+        )
+        if pom:
+            # jeden pomiar na zawodnika w meczu — najlepszy szczebel spod progu
+            pomiar_kandydaci.append({
+                "mecz_id": w["mecz_id"], "mecz": w["mecz"],
+                "kickoff_ts": w["kickoff_ts"],
+                "podmiot_id": w.get("podmiot_id") or 0,
+                "podmiot": w["podmiot"],
+                **max(pom, key=lambda s: s["edge"]),
+            })
         if hero is None:
             continue
         w["_score"] = score
         w["hero"] = hero    # najlepsza linia karty — front pokazuje ją w nagłówku
         ocenione.append(w)
+    if pomiar_kandydaci:
+        # sufit na pomiarze: bierzemy te z największą przewagą, bo to one
+        # najbardziej wyglądają na karty, których nie wystawiliśmy
+        pomiar_kandydaci.sort(key=lambda s: -s["edge"])
+        if pomiar_out is not None:
+            pomiar_out.extend(pomiar_kandydaci[:MAX_POMIAROW_CYKLU])
+    if powody_pomiaru:
+        # PUSTY POMIAR TO TEŻ WYNIK: bez tej linijki „zero typów pomiarowych"
+        # wygląda tak samo jak „bukmacher nie kwotuje takich linii", a to
+        # zupełnie inna diagnoza (patrz MIN_EDGE_POMIARU).
+        print("Drabinki — pomiar progu: " + ", ".join(
+            f"{k}={v}" for k, v in powody_pomiaru.most_common()
+        ) + f" (do księgi: {min(len(pomiar_kandydaci), MAX_POMIAROW_CYKLU)})")
 
     # SELEKCJA: globalny TOP po jakości, max MAX_WPISOW_MECZ na mecz i BEZ
     # gwarantowanego slotu — słaby mecz nie dostaje nic (decyzja usera:

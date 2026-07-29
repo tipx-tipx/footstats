@@ -35,7 +35,14 @@ function bezProbnych(dni: SkutecznoscDnia[]): SkutecznoscDnia[] {
  * wkłada do JSON-a (diagnostyka modelu). Nie widać ich w kodzie, więc tym
  * łatwiej byłoby je przeoczyć — kasujemy po nazwie.
  */
-const NIEZADEKLAROWANA_KUCHNIA = ["diagnostyka", "kupony_diag"] as const;
+const NIEZADEKLAROWANA_KUCHNIA = [
+  "diagnostyka",
+  "kupony_diag",
+  // pomiar progu pokrycia drabinek: typy, których NIGDY nie wystawiliśmy,
+  // rozliczane w tle po to, żeby sprawdzić własny próg. Klientowi zewnętrznemu
+  // pokazywałoby to skuteczność czegoś, czego nie mógł zagrać.
+  "prog_drabinek",
+] as const;
 
 export function okrojDlaKlienta(typy: TypyWyniki): TypyWyniki {
   const strumienie = typy.skutecznosc_strumienie;

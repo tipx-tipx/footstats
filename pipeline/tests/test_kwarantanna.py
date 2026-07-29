@@ -272,3 +272,69 @@ def test_korekta_strumienia_nie_oscyluje():
 def test_korekta_strumienia_wymaga_proby():
     log = {str(i): _typ(i, 0.70, "przegrany") for i in range(20)}
     assert rozliczanie.korekta_strumienia(log) == {}
+
+# --- WŁASNE UCZENIE DRABINEK (2026-07-29) ----------------------------------
+
+
+def _drabinka(i, p, wynik, odrzucony=False, kurs=2.2):
+    """Rekord księgi ze strumienia drabinek (p z pokrycia, nie z silnika)."""
+    rec = {
+        "mecz_id": i, "mecz": "A – B", "kickoff_ts": 1_700_000_000 + i,
+        "podmiot_id": i, "podmiot": f"G{i}",
+        "rynek_kod": "shots", "rynek": "Strzały", "linia": 1.5,
+        "strona": "powyzej", "kurs": kurs, "p_model": p, "wynik": wynik,
+        "zrodlo": rozliczanie.ZRODLO_DRABINKA,
+    }
+    if odrzucony:
+        rec["odrzucony"] = True
+        rec["odrzucenie_powod"] = rozliczanie.POWOD_POMIARU_POKRYCIA
+    return rec
+
+
+def test_drabinki_dostaja_wlasna_korekte():
+    """Do 2026-07-29 strumień z ROI −68% nie miał ŻADNEGO sprzężenia
+    zwrotnego: kalibracja i kwarantanna pomijają wszystko, co ma `zrodlo`."""
+    log = {
+        str(i): _drabinka(i, 0.55, "wygrany" if i % 5 == 0 else "przegrany")
+        for i in range(rozliczanie.KOREKTA_DRABINEK_MIN_N + 5)
+    }
+    k = rozliczanie.korekta_strumienia(log)
+    assert k["drabinki"] < -0.1
+    # ...ale nie głębiej niż pozwala ich węższy cap (przy n=30 zerowanie
+    # zakładki byłoby wnioskiem mocniejszym niż dane)
+    assert k["drabinki"] >= rozliczanie.KOREKTA_DRABINEK_CAP[0]
+    # i nie wolno im zatruć strumienia typów modelu
+    assert "pewniaki" not in k
+
+
+def test_drabinki_na_krotkiej_probie_bez_korekty():
+    log = {
+        str(i): _drabinka(i, 0.55, "przegrany")
+        for i in range(rozliczanie.KOREKTA_DRABINEK_MIN_N - 1)
+    }
+    assert rozliczanie.korekta_strumienia(log) == {}
+
+
+def test_typy_pomiarowe_drabinek_nie_ucza_korekty():
+    """Szczebel spod progu nigdy nie był opublikowany — nie ma prawa
+    przesuwać szans kart, które publikujemy."""
+    log = {
+        str(i): _drabinka(i, 0.55, "przegrany", odrzucony=True)
+        for i in range(rozliczanie.KOREKTA_DRABINEK_MIN_N + 5)
+    }
+    assert rozliczanie.korekta_strumienia(log) == {}
+
+
+def test_pomiar_progu_drabinek_zestawia_obie_grupy():
+    log = {}
+    for i in range(10):
+        log[f"pub{i}"] = _drabinka(i, 0.55, "wygrany" if i < 6 else "przegrany")
+    for i in range(8):
+        log[f"pom{i}"] = _drabinka(
+            100 + i, 0.45, "wygrany" if i < 2 else "przegrany", odrzucony=True
+        )
+    p = rozliczanie.pomiar_progu_drabinek(log)
+    assert p["opublikowane"]["n"] == 10 and p["opublikowane"]["hit"] == 0.6
+    assert p["pod_progiem"]["n"] == 8 and p["pod_progiem"]["hit"] == 0.25
+    # ROI liczone z kursu, nie z samych trafień
+    assert p["opublikowane"]["roi"] > p["pod_progiem"]["roi"]

@@ -3904,6 +3904,7 @@ def _main_impl(tryb=None):
                   f"bez trendów (ścieżka debiutantów)")
     except Exception as ex:
         print(f"Dociąg kursów pominięty ({ex})")
+    pomiar_drabinek: list[dict] = []
     try:
         events_meta_radar = {
             e["id"]: {
@@ -3933,6 +3934,12 @@ def _main_impl(tryb=None):
             xi_znany=xi_znany,
             # zapas na obstawienie — nowa karta nie wskakuje tuż przed meczem
             margines_startu_s=kupony.MARGINES_STARTU_S,
+            # WŁASNE UCZENIE DRABINEK: delta z ICH rozliczeń (nie modelu) —
+            # ściąga szanse kart o tyle, o ile strumień przeszacowywał
+            korekta_logit=korekta_strumieni.get("drabinki", 0.0),
+            # ...i pomiar progu pokrycia: szczeble tuż pod nim, do rozliczenia
+            # w tle (patrz radar.NEAR_POKRYCIA)
+            pomiar_out=pomiar_drabinek,
         )
     except Exception as ex:
         radar_wpisy = []
@@ -3993,6 +4000,29 @@ def _main_impl(tryb=None):
             "zrodlo": rozliczanie.ZRODLO_DRABINKA,
             "klasa": ocena.get("klasa"),
             "edge": ocena.get("edge"),
+        })
+
+    # TYPY POMIAROWE DRABINEK: szczeble odrzucone WYŁĄCZNIE progiem pokrycia
+    # (0,40–0,50). Idą do tej samej księgi z flagą `odrzucony`, więc rozliczą
+    # się w tle, ale nie zobaczy ich ani user, ani skuteczność, ani korekta
+    # strumienia. Po kilku tygodniach `rozliczanie.pomiar_progu_drabinek`
+    # powie, czy próg 0,5 zarabia, czy tylko obcina kandydatów.
+    for p in pomiar_drabinek:
+        drabinki_typy.append({
+            "mecz_id": p["mecz_id"], "mecz": p["mecz"],
+            "kickoff_ts": p["kickoff_ts"],
+            "podmiot_id": p.get("podmiot_id") or 0,
+            "podmiot": p["podmiot"],
+            "rynek_kod": p["rynek_kod"],
+            "rynek": p.get("rynek") or p["rynek_kod"],
+            "linia": p["linia"], "strona": "powyzej",
+            "kurs": p["kurs"], "bukmacher": "Superbet",
+            "p_model": p.get("p_final") or 0.0,
+            "pewnosc": None, "sugestia": False,
+            "zrodlo": rozliczanie.ZRODLO_DRABINKA,
+            "edge": p.get("edge"),
+            "odrzucony": True,
+            "odrzucenie_powod": rozliczanie.POWOD_POMIARU_POKRYCIA,
         })
 
     # RAPORT POKRYCIA (liga): parowanie z build_league + to, co dołożył

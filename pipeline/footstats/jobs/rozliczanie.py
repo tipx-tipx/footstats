@@ -843,6 +843,26 @@ KOREKTA_STRUMIENIA_CAP = (-0.80, 0.20)
 # po drodze, ile typów kosztuje uczciwość, i można się zatrzymać.
 KOREKTA_STRUMIENIA_TLUMIENIE = 0.5
 
+# DRABINKI mają własne, ostrzejsze warunki — z dwóch powodów:
+#
+# 1. PRÓBA. Strumień wystawia kilka kart dziennie, nie kilkadziesiąt typów:
+#    na 29.07 miał 12 rozliczeń wobec 276 pewniaków. Przy wspólnym progu 40
+#    „drabinki nie uczą się w ogóle" ([[czy-model-robi-postepy]]) byłoby
+#    prawdą jeszcze przez wiele tygodni.
+# 2. SKUTEK. Korekta wchodzi do `p_final`, a `p_final` jest jedyną bramą
+#    karty (MIN_EDGE_KARTY). Pomiar z 29.07 (deklaracja 50%, trafienia 17%)
+#    dałby po stłumieniu −0,80 logita, czyli szansę 50% -> 31% — przy takich
+#    liczbach NIC nie przeszłoby przez bramę i zakładka Drabinki zgasłaby na
+#    dobre. Przy n=12 przedział ufności trafień sięga jednak 48%, więc
+#    zerowanie strumienia byłoby wnioskiem mocniejszym niż dane.
+#
+# Dlatego: niższy próg wejścia i węższy cap. Korekta i tak dochodzi do niego
+# przez kilka cykli (tłumienie), więc widać po drodze, ile kart kosztuje.
+# DO REWIZJI, gdy strumień uzbiera ~60 rozliczeń: wtedy cap ma iść w stronę
+# tego, co mają typy modelu (−0,80).
+KOREKTA_DRABINEK_MIN_N = 25
+KOREKTA_DRABINEK_CAP = (-0.40, 0.20)
+
 # ustawiane raz na cykl przez build_wc_fast (patrz `ustaw_korekte_strumienia`)
 # — potrzebne, żeby zapisać przy typie deltę, z jaką został opublikowany
 _KOREKTA_CYKLU: dict[str, float] = {}
@@ -865,29 +885,44 @@ def _p_surowe(r: dict) -> float:
 
 def korekta_strumienia(log: dict | None = None) -> dict[str, float]:
     """Delta logitowa per strumień: o ile ściągnąć szanse, żeby deklaracja
-    zgadzała się z trafieniami. Zwraca {"pewniaki": -0.42, "druzyny": -0.11}."""
+    zgadzała się z trafieniami. Zwraca {"pewniaki": -0.42, "druzyny": -0.11}.
+
+    DRABINKI liczą się tą samą maszynerią, ale z własnym progiem i capem
+    (patrz KOREKTA_DRABINEK_*) — mimo że stoją poza kalibracją modelu
+    (`_z_modelu`). To jedyne sprzężenie zwrotne, jakie ten strumień ma:
+    ich `p` pochodzi z pokrycia linii, a nie z silnika, więc kalibracja
+    rynkowa nie ma czego w nich poprawiać.
+    """
     if log is None:
         log = _migruj_log(supa.get_key("typy_log") or {})
     settled = [
         r for r in log.values()
         if r.get("wynik") in ("wygrany", "przegrany")
         and not r.get("sugestia") and not r.get("odrzucony")
-        and _z_modelu(r) and r.get("p_model")
+        and r.get("p_model")
+        # typy modelu ORAZ drabinki — każdy mierzony na SWOICH rozliczeniach,
+        # nigdy wymieszany (pętla niżej rozdziela je po strumieniu)
+        and (_z_modelu(r) or r.get("zrodlo") == ZRODLO_DRABINKA)
     ]
     out: dict[str, float] = {}
-    for strumien in ("pewniaki", "druzyny"):
+    for strumien in STRUMIENIE:
+        drabinki = strumien == "drabinki"
+        min_n = (
+            KOREKTA_DRABINEK_MIN_N if drabinki else KOREKTA_STRUMIENIA_MIN_N
+        )
+        cap = KOREKTA_DRABINEK_CAP if drabinki else KOREKTA_STRUMIENIA_CAP
         grp = sorted(
             (r for r in settled if _strumien(r) == strumien),
             key=lambda r: r.get("kickoff_ts") or 0,
         )[-KOREKTA_STRUMIENIA_OKNO:]
-        if len(grp) < KOREKTA_STRUMIENIA_MIN_N:
+        if len(grp) < min_n:
             continue
         b = _bias_logit([{**r, "p_model": _p_surowe(r)} for r in grp])
         # dochodzimy do pełnej korekty przez kilka cykli, nie w jednym skoku
         juz = [float(r.get("kal_strumien") or 0.0) for r in grp]
         srednia_juz = sum(juz) / len(juz)
         b = srednia_juz + KOREKTA_STRUMIENIA_TLUMIENIE * (b - srednia_juz)
-        b = max(KOREKTA_STRUMIENIA_CAP[0], min(KOREKTA_STRUMIENIA_CAP[1], b))
+        b = max(cap[0], min(cap[1], b))
         if abs(b) >= 0.02:      # szum poniżej 2 setnych logita ignorujemy
             out[strumien] = round(b, 3)
     return out
@@ -1645,6 +1680,68 @@ def skutecznosc_strumieni(log: dict, dni: int = 21) -> dict[str, dict]:
     return out
 
 
+# POMIAR PROGU POKRYCIA DRABINEK (2026-07-29). Próg 0,5 (radar.
+# PROG_POKRYCIA_KARTY) był od początku ZAŁOŻENIEM: raz zszedł z 0,6, raz go
+# nie podnieśliśmy, ale nigdy nie zmierzyliśmy, czy szczeble tuż pod nim
+# faktycznie trafiają gorzej. Od tej wersji radar dopisuje najlepszy szczebel
+# z pokryciem 0,40–0,50 do księgi jako typ POMIAROWY (`odrzucony`), czyli poza
+# publikacją, poza Skutecznością i poza korektą strumienia. Ta funkcja
+# zestawia obie grupy — dopiero ona odpowiada, czy próg jest w dobrym miejscu.
+POWOD_POMIARU_POKRYCIA = "pokrycie_pod_progiem"
+
+
+def pomiar_progu_drabinek(log: dict) -> dict:
+    """Opublikowane drabinki vs szczeble tuż pod progiem pokrycia.
+
+    Zwraca {"opublikowane": {...}, "pod_progiem": {...}} z n / trafione /
+    hit / sr_p / roi.
+
+    JAK TO CZYTAĆ — i czego to NIE mówi. Grupy nie są bliźniacze: szczebel
+    spod progu ma z definicji niższe `p_final` (bo p rośnie z pokryciem),
+    więc wpuszczamy go do pomiaru już przy przewadze >= 0, a nie +3 pp
+    (radar.MIN_EDGE_POMIARU — inaczej grupa byłaby pusta). Dlatego:
+      * porównujemy przede wszystkim ROI, nie sam hit-rate — ROI uwzględnia
+        cenę, a to właśnie ceną te grupy się różnią;
+      * gdy „pod progiem" wychodzi PODOBNIE albo LEPIEJ, wniosek jest mocny:
+        próg 0,5 nie zarabia, mimo że gra słabszą ręką;
+      * gdy wychodzi gorzej, wniosek jest słabszy — część różnicy może
+        pochodzić z luźniejszej bramy przewagi, nie z samego pokrycia.
+    """
+    def _stat(grp: list[dict]) -> dict:
+        n = len(grp)
+        z_kursem = [r for r in grp if r.get("kurs") and float(r["kurs"]) > 1.0]
+        traf = sum(1 for r in grp if r["wynik"] == "wygrany")
+        return {
+            "n": n,
+            "trafione": traf,
+            "hit": round(traf / n, 3) if n else None,
+            "sr_p": (
+                round(sum(float(r["p_model"] or 0) for r in grp) / n, 3)
+                if n else None
+            ),
+            "roi": (
+                round(sum(
+                    (float(r["kurs"]) - 1.0) if r["wynik"] == "wygrany"
+                    else -1.0 for r in z_kursem
+                ) / len(z_kursem), 3) if z_kursem else None
+            ),
+        }
+
+    dr = [
+        r for r in log.values()
+        if r.get("wynik") in ("wygrany", "przegrany")
+        and r.get("zrodlo") == ZRODLO_DRABINKA
+    ]
+    return {
+        "opublikowane": _stat([r for r in dr if not r.get("odrzucony")]),
+        "pod_progiem": _stat([
+            r for r in dr
+            if r.get("odrzucony")
+            and r.get("odrzucenie_powod") == POWOD_POMIARU_POKRYCIA
+        ]),
+    }
+
+
 # --- MUNDIAL vs LIGI: rozbicie epok per rynek ---
 # Powód (pomiar 2026-07-27, 408 rozliczonych typów): sezon ligowy wystartował,
 # ale kwarantanna rynków patrzy na OKNO 40 OSTATNICH ROZLICZEŃ, a nie na
@@ -2233,6 +2330,16 @@ def rozlicz(
                 )
             )
 
+    # czy próg pokrycia drabinek (0,5) stoi w dobrym miejscu — pomiar w tle
+    prog_drabinek = pomiar_progu_drabinek(log)
+    if prog_drabinek["pod_progiem"]["n"]:
+        o, pp = prog_drabinek["opublikowane"], prog_drabinek["pod_progiem"]
+        print(
+            f"Drabinki — próg pokrycia: opublikowane {o['trafione']}/{o['n']}"
+            f" (ROI {o['roi']}), pod progiem {pp['trafione']}/{pp['n']}"
+            f" (ROI {pp['roi']})"
+        )
+
     ostatnie = sorted(
         settled + poza_pub + [
             r for r in log.values()
@@ -2291,6 +2398,9 @@ def rozlicz(
         # ta sama skuteczność rozbita na strumienie: pewniaki / drużyny /
         # drabinki (każdy z własnym ROI i listą dni)
         "skutecznosc_strumienie": strumienie,
+        # pomiar progu pokrycia drabinek (opublikowane vs tuż pod progiem) —
+        # jedyna droga do odpowiedzi, czy 0,5 to dobra liczba
+        "prog_drabinek": prog_drabinek,
         # mundial vs ligi per rynek — czy sezon klubowy zmienił obraz
         # (patrz `epoki_per_rynek`: na 27.07 NIE zmienił, poza drużynowymi)
         "epoki_per_rynek": epoki_per_rynek(log),

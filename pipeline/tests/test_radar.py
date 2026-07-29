@@ -593,3 +593,98 @@ def test_karta_bez_smieci_trzy_najlepsze_rynki():
     assert len(kody) == radar.MAX_RYNKOW_KARTY == 3
     assert kody[0] == "shots_outside_box"    # najwyższe pokrycie × kurs
     assert "fouls_won" not in kody           # najsłabszy z czwórki wypada
+
+
+# --- UCZENIE DRABINEK (2026-07-29): pomiar progu pokrycia + własna korekta ---
+
+
+def _karta_do_oceny(traf, kurs=2.5, p_final=0.45, z=10):
+    """Kandydat na kartę z JEDNYM szczeblem — wszystko poza pokryciem gra.
+
+    Bramy karty (minuty, udział startów) przechodzą, kurs jest grywalny,
+    przewaga nad ceną mieści się w oknie zgody z rynkiem. Jedyną zmienną
+    jest `traf`, czyli pokrycie linii — dokładnie to, o co pytamy.
+    """
+    return {
+        "minuty_sr6": 85,
+        "udzial_startow": 0.9,
+        "rynki": [{
+            "rynek_kod": "shots", "rynek": "Strzały",
+            "drabinka": [{
+                "linia": 1.5, "kurs": kurs,
+                "pokrycie": {"traf": traf, "z": z},
+                "p_bazowe": p_final, "korekta": 1.0, "p_final": p_final,
+            }],
+        }],
+    }
+
+
+def test_szczebel_tuz_pod_progiem_idzie_do_pomiaru_a_nie_na_karte():
+    """4/10 to 0,40 — pod progiem 0,5, ale w tolerancji NEAR_POKRYCIA.
+
+    Ma się rozliczyć w tle, żeby dało się kiedyś sprawdzić, czy próg 0,5
+    faktycznie broni pieniędzy. Na karcie nie ma prawa się pojawić.
+    """
+    pomiar = []
+    score, hero = radar._oceń_karte(_karta_do_oceny(4), pomiar_out=pomiar)
+    assert hero is None and score == 0.0
+    assert len(pomiar) == 1
+    assert pomiar[0]["rynek_kod"] == "shots" and pomiar[0]["traf"] == 4
+
+
+def test_pomiar_nie_bierze_szczebli_daleko_pod_progiem():
+    """3/10 to już nie „tuż pod progiem", tylko inna liga jakości —
+    mierzenie tego nie odpowiada na pytanie o próg."""
+    pomiar = []
+    radar._oceń_karte(_karta_do_oceny(3), pomiar_out=pomiar)
+    assert pomiar == []
+
+
+def test_szczebel_nad_progiem_zostaje_typem_a_nie_pomiarem():
+    pomiar = []
+    _score, hero = radar._oceń_karte(_karta_do_oceny(6), pomiar_out=pomiar)
+    assert hero is not None and hero["traf"] == 6
+    assert pomiar == []
+
+
+def test_pomiar_odrzuca_szczebel_ponizej_ceny_fair():
+    """Pomiar bierze szczeble „warte swojej ceny" (przewaga >= 0). Kurs 1,9
+    przy szansie 0,45 to strata już na papierze — takiego typu nie
+    postawilibyśmy przy ŻADNYM progu pokrycia, więc nic o progu nie mówi."""
+    pomiar = []
+    radar._oceń_karte(_karta_do_oceny(4, kurs=1.9), pomiar_out=pomiar)
+    assert pomiar == []
+
+
+def test_pomiar_bierze_szczebel_spod_progu_bez_pelnej_przewagi():
+    """Kluczowe dla działania pomiaru: od szczebla spod progu NIE wymagamy
+    pełnego MIN_EDGE_KARTY. Pierwsza wersja tego wymagała i dała zero
+    kandydatów na 99 odrzuconych pokryciem (dry-run 2026-07-29)."""
+    pomiar = []
+    # szansa 0,45 przy kursie 2,25 = przewaga +0,006, czyli poniżej progu
+    # karty (0,03), ale powyżej ceny fair
+    radar._oceń_karte(_karta_do_oceny(4, kurs=2.25), pomiar_out=pomiar)
+    assert len(pomiar) == 1
+    assert 0 <= pomiar[0]["edge"] < radar.MIN_EDGE_KARTY
+
+
+def test_bez_kolektora_pomiar_nic_nie_zmienia():
+    """Stara ścieżka (bez pomiar_out) ma działać identycznie jak wcześniej."""
+    score, hero = radar._oceń_karte(_karta_do_oceny(4))
+    assert hero is None and score == 0.0
+
+
+def test_korekta_strumienia_sciaga_szanse_kart():
+    """Własne uczenie drabinek: gdy strumień przeszacowywał, karta z granicy
+    przestaje przechodzić bramę przewagi (a nie tylko ładniej wygląda)."""
+    assert len(radar.zbuduj(**_pod_karte())) == 1
+    assert radar.zbuduj(**_pod_karte(korekta_logit=-0.5)) == []
+
+
+def test_korekta_strumienia_widac_w_p_final_karty():
+    """Karta pokazuje szansę JUŻ poprawioną — nie osobno „nasze 64%"
+    i osobno prawdę w logu. Delta musi być mała, bo fikstura stoi
+    kilka punktów nad bramą przewagi (przy -0,15 karta znika całkiem)."""
+    (bez,) = radar.zbuduj(**_pod_karte())
+    (z_korekta,) = radar.zbuduj(**_pod_karte(korekta_logit=-0.05))
+    assert z_korekta["ocena"]["p_final"] < bez["ocena"]["p_final"]
