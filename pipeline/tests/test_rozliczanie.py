@@ -440,3 +440,106 @@ def test_skutecznosc_per_dzien_limit_dni():
         for i in range(1, 40)
     ]
     assert len(rozliczanie.skutecznosc_per_dzien(settled, dni=7)) == 7
+
+
+# --- RAPORT UCZENIA: czy model robi postępy (2026-07-29) -------------------
+
+DZIEN = 86_400
+
+
+def _typ_uczenia(i, p, wynik, kurs=1.9, rynek="shots"):
+    """Rozliczony typ w księdze; kolejne i = kolejne dni meczów."""
+    return {
+        "mecz_id": i, "mecz": "A – B",
+        "kickoff_ts": 1_700_000_000 + i * DZIEN,
+        "podmiot": f"G{i}", "rynek_kod": rynek, "rynek": "R",
+        "linia": 1.5, "strona": "powyzej", "kurs": kurs,
+        "p_model": p, "wynik": wynik,
+    }
+
+
+def test_raport_uczenia_tnie_na_paczki_stalej_wielkosci():
+    log = {
+        str(i): _typ_uczenia(i, 0.70, "wygrany" if i % 2 == 0 else "przegrany")
+        for i in range(90)
+    }
+    p = rozliczanie.raport_uczenia(log, rozmiar=40)["pewniaki"]["paczki"]
+    assert [x["n"] for x in p] == [40, 40, 10]
+    assert [x["pelna"] for x in p] == [True, True, False]
+    # deklaracja vs trafienia: model mówił 70%, wchodzi 50% -> luka -20 pp
+    assert p[0]["deklaracja"] == 0.7
+    assert p[0]["hit"] == 0.5
+    assert p[0]["luka"] == -0.2
+
+
+def test_raport_uczenia_doklada_krotki_ogon_do_poprzedniej_paczki():
+    """Paczka „3 typy, 33%" jako osobny wiersz sugerowałaby załamanie,
+    a jest szumem — dlatego ogon poniżej minimum wsiąka w poprzedni wiersz."""
+    log = {str(i): _typ_uczenia(i, 0.6, "wygrany") for i in range(43)}
+    p = rozliczanie.raport_uczenia(log, rozmiar=40)["pewniaki"]["paczki"]
+    assert len(p) == 1 and p[0]["n"] == 43
+
+
+def test_raport_uczenia_granice_nie_ruszaja_sie_po_nowych_rozliczeniach():
+    """Wiersz raz pokazany ma zostać taki sam — inaczej tabela wyglądałaby
+    co dzień inaczej, mimo że historia jest ta sama."""
+    log = {str(i): _typ_uczenia(i, 0.6, "wygrany") for i in range(80)}
+    przed = rozliczanie.raport_uczenia(log, rozmiar=40)["pewniaki"]["paczki"]
+    for i in range(80, 95):
+        log[str(i)] = _typ_uczenia(i, 0.6, "przegrany")
+    po = rozliczanie.raport_uczenia(log, rozmiar=40)["pewniaki"]["paczki"]
+    assert po[:2] == przed[:2]
+
+
+def test_raport_uczenia_widzi_postep_i_regres():
+    """Trend liczy trzy pierwsze paczki wobec trzech ostatnich."""
+    log = {}
+    for i in range(120):        # start: mówi 70%, trafia 50% (luka -20 pp)
+        log[f"a{i}"] = _typ_uczenia(i, 0.70, "wygrany" if i % 2 == 0 else "przegrany")
+    for i in range(120, 240):   # teraz: mówi 55%, trafia 50% (luka -5 pp)
+        log[f"b{i}"] = _typ_uczenia(i, 0.55, "wygrany" if i % 2 == 0 else "przegrany")
+    t = rozliczanie.raport_uczenia(log, rozmiar=40)["pewniaki"]["trend"]
+    assert t["luka_start"] < t["luka_teraz"]
+    assert t["zmiana"] > 0.1          # dodatnia zmiana = luka się zamyka
+    assert t["paczek"] == 6
+
+
+def test_raport_uczenia_trend_pomija_niedokonczona_paczke():
+    """Ostatni wiersz potrafi mieć 12 typów i skakać o 30 pp — w trendzie
+    robiłby fałszywy alarm."""
+    log = {
+        f"a{i}": _typ_uczenia(i, 0.55, "wygrany" if i % 2 == 0 else "przegrany")
+        for i in range(240)
+    }
+    for i in range(240, 252):   # ogon: 12 typów, same pudła
+        log[f"b{i}"] = _typ_uczenia(i, 0.55, "przegrany")
+    r = rozliczanie.raport_uczenia(log, rozmiar=40)["pewniaki"]
+    assert r["paczki"][-1]["pelna"] is False
+    assert r["trend"]["paczek"] == 6     # 240/40, ogon poza trendem
+
+
+def test_raport_uczenia_rozdziela_strumienie():
+    log = {}
+    for i in range(50):
+        log[f"p{i}"] = _typ_uczenia(i, 0.7, "wygrany")
+    for i in range(50):
+        log[f"d{i}"] = _typ_uczenia(i, 0.7, "przegrany", rynek="team_goals")
+    r = rozliczanie.raport_uczenia(log, rozmiar=40)
+    assert r["pewniaki"]["paczki"][0]["hit"] == 1.0
+    assert r["druzyny"]["paczki"][0]["hit"] == 0.0
+
+
+def test_raport_uczenia_pomija_typy_pomiarowe_i_spoza_publikacji():
+    """Raport ma pokazywać to, co user MÓGŁ zagrać — nic więcej."""
+    log = {}
+    for i in range(40):
+        log[f"ok{i}"] = _typ_uczenia(i, 0.6, "wygrany")
+    for i in range(40, 60):
+        log[f"x{i}"] = {**_typ_uczenia(i, 0.6, "przegrany"), "odrzucony": True}
+    for i in range(60, 80):
+        log[f"y{i}"] = {
+            **_typ_uczenia(i, 0.6, "przegrany"),
+            "poza_publikacja": "kwarantanna_rynku",
+        }
+    p = rozliczanie.raport_uczenia(log, rozmiar=40)["pewniaki"]["paczki"]
+    assert len(p) == 1 and p[0]["n"] == 40 and p[0]["hit"] == 1.0

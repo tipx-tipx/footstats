@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 
 import { KalendarzWynikow } from "./KalendarzWynikow";
 import { KrzywaWyniku } from "./skutecznosc/KrzywaWyniku";
+import { RaportUczenia } from "./skutecznosc/RaportUczenia";
 import { TypyDnia } from "./skutecznosc/TypyDnia";
 import { WerdyktModelu, type WerdyktDane } from "./WerdyktModelu";
 import { fmtProc } from "@/lib/format";
@@ -81,6 +82,7 @@ const OPISY: Record<Strumien, string> = {
 // diagnostyki modelu zrównywało rzeczy o zupełnie różnej wadze. W zakładkach
 // została sama kuchnia — i dlatego widzi je wyłącznie admin.
 const ZAKLADKI = [
+  { id: "postep", label: "Czy się uczymy" },
   { id: "rynki", label: "Rynki" },
   { id: "kupony", label: "Kupony" },
   { id: "test", label: "Test na danych z przeszłości" },
@@ -190,7 +192,9 @@ export function SkutecznoscScena({
 }) {
   const reduced = useReducedMotion();
   const [wybor, setWybor] = useState<Wybor>("wszystko");
-  const [zakladka, setZakladka] = useState<IdZakladki>("rynki");
+  // domyślnie „Czy się uczymy": to jest pytanie, po które tu wchodzimy
+  // najczęściej, a tabela rynków odpowiada na nie tylko pośrednio
+  const [zakladka, setZakladka] = useState<IdZakladki>("postep");
   const [dzien, setDzien] = useState<string | null>(null);
 
   const wszystkieDni = useMemo(
@@ -525,6 +529,17 @@ export function SkutecznoscScena({
           aria-labelledby={`zakladka-${zakladka}`}
           className="mt-5"
         >
+          {zakladka === "postep" && (
+            <RaportUczenia
+              raport={typy.raport_uczenia ?? {}}
+              // filtr produktu ze szczytu strony obowiązuje też tutaj:
+              // „Wszystko" pokazuje trzy tabele pod sobą, wybrany produkt jedną
+              strumienie={
+                wybor === "wszystko" ? dostepne : [wybor as Strumien]
+              }
+            />
+          )}
+
           {zakladka === "rynki" && (
             <div className="max-w-3xl">
               {klasy && (

@@ -50,6 +50,10 @@ export function okrojDlaKlienta(typy: TypyWyniki): TypyWyniki {
     ...typy,
     po_rynku: [],
     epoki_per_rynek: undefined,
+    // raport uczenia mówi to samo co tabela rynków, tylko w czasie:
+    // „obiecywaliśmy 71%, weszło 58%". Dla nas najważniejsza diagnostyka,
+    // dla klienta zewnętrznego argument przeciwko produktowi.
+    raport_uczenia: undefined,
     ostatnie: (typy.ostatnie ?? []).filter((t) => !t.poza_publikacja),
     skutecznosc_dzienna: bezProbnych(typy.skutecznosc_dzienna ?? []),
     skutecznosc_strumienie: strumienie

@@ -732,6 +732,42 @@ export interface EpokiRynku {
   ligi: EpokaBlok | null;
 }
 
+/**
+ * Jeden wiersz raportu uczenia: paczka kolejnych rozliczeń stałej wielkości.
+ *
+ * Paczka, a nie tydzień, bo tydzień to raz 3, raz 90 typów — porównanie
+ * wiersz do wiersza mówiłoby wtedy głównie o kalendarzu rozgrywek.
+ */
+export interface PaczkaUczenia {
+  /** data pierwszego i ostatniego meczu w paczce (YYYY-MM-DD) */
+  od: string;
+  do: string;
+  n: number;
+  trafione: number;
+  /** udział trafień, 0–1 */
+  hit: number;
+  /** średnia szansa, jaką model DEKLAROWAŁ przy publikacji */
+  deklaracja: number;
+  /** hit − deklaracja; ujemne = model był zbyt pewny siebie */
+  luka: number;
+  /** zwrot z jednostkowej stawki; null gdy żaden typ nie miał kursu */
+  roi: number | null;
+  /** false = wiersz jeszcze rośnie (ostatnia, niedokończona paczka) */
+  pelna: boolean;
+}
+
+/** Postęp jednego strumienia: wiersze + kierunek liczony z pełnych paczek. */
+export interface UczenieStrumienia {
+  paczki: PaczkaUczenia[];
+  trend?: {
+    luka_start: number;
+    luka_teraz: number;
+    /** ujemne = luka się POWIĘKSZA, czyli model NIE robi postępów */
+    zmiana: number;
+    paczek: number;
+  };
+}
+
 /** Skuteczność realnych typów (log rozliczany automatycznie po meczach). */
 export interface TypyWyniki {
   podsumowanie: {
@@ -755,6 +791,12 @@ export interface TypyWyniki {
    * drużynowe, `drabinki` = karty z zakładki Drabinki (pokrycie + kontekst).
    */
   skutecznosc_strumienie?: Partial<Record<Strumien, SkutecznoscStrumienia>>;
+  /**
+   * Czy model robi postępy: paczki po 40 rozliczeń, per strumień.
+   * KUCHNIA — `okrojDlaKlienta` to wycina (mówi wprost, o ile model
+   * przeszacowuje, tak samo jak `po_rynku`).
+   */
+  raport_uczenia?: Partial<Record<Strumien, UczenieStrumienia>>;
   /**
    * Mundial vs sezon ligowy, per rynek. NIE JEST JUŻ POKAZYWANE (decyzja usera
    * 2026-07-27: „nie interesuje nas ten mundial"). Pipeline liczy to dalej, bo

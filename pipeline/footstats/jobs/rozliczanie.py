@@ -1680,6 +1680,110 @@ def skutecznosc_strumieni(log: dict, dni: int = 21) -> dict[str, dict]:
     return out
 
 
+# --- RAPORT UCZENIA: czy model robi postępy (2026-07-29) ---
+#
+# Zamówienie usera z 27.07: „user ma widzieć postęp sam, bez pytania mnie".
+# Do dziś odpowiedź na „czy to się poprawia" wymagała ode mnie ręcznej sondy
+# po księdze — a odpowiedź brzmiała NIE ([[czy-model-robi-postepy]]:
+# deklaracja stała na 68–75% przez siedem paczek z rzędu, trafienia na 58%).
+#
+# CZEMU PACZKI PO N ROZLICZEŃ, A NIE TYGODNIE. Tydzień to od 3 do 90 typów
+# zależnie od kalendarza, więc „ostatni tydzień gorszy" mówiłoby głównie
+# o tym, ile było meczów. Paczka stałej wielkości ma ten sam ciężar
+# statystyczny w każdym wierszu — i dopiero wtedy porównanie wiersz do
+# wiersza cokolwiek znaczy.
+#
+# GRANICE PACZEK LICZYMY OD NAJSTARSZEJ. Dzięki temu raz pokazany wiersz już
+# się nie zmienia, a rośnie tylko ostatni (oznaczony `pelna: False`). Gdyby
+# ciąć od końca, każde nowe rozliczenie przesuwałoby wszystkie granice i
+# tabela wyglądałaby co dzień inaczej, mimo że historia jest ta sama.
+PACZKA_UCZENIA = 40         # rozliczeń na wiersz raportu
+PACZKA_UCZENIA_MIN = 10     # krótszy ogon nie jest osobnym wierszem
+PACZEK_W_RAPORCIE = 10      # ile ostatnich wierszy trzymamy w payloadzie
+TREND_PACZEK = 3            # po tylu pierwszych/ostatnich liczymy kierunek
+
+
+def raport_uczenia(
+    log: dict, rozmiar: int = PACZKA_UCZENIA,
+) -> dict[str, dict]:
+    """Postęp modelu w paczkach po `rozmiar` rozliczeń, per strumień.
+
+    Każdy wiersz: od–do (daty meczów), ile weszło, ile model DEKLAROWAŁ,
+    luka między jednym a drugim i ROI. Plus `trend`: średnia luka z trzech
+    pierwszych paczek wobec trzech ostatnich — czyli jednozdaniowa odpowiedź
+    na „czy się uczymy".
+
+    Liczone na tych samych typach, co pokazywana skuteczność: bez sugestii,
+    bez typów pomiarowych, bez typów spoza publikacji i bez rynków osobnych.
+    """
+    out: dict[str, dict] = {}
+    for nazwa in STRUMIENIE:
+        settled = sorted(
+            (
+                r for r in log.values()
+                if r.get("wynik") in ("wygrany", "przegrany")
+                and r.get("rynek_kod") not in RYNKI_OSOBNE
+                and not r.get("odrzucony") and not r.get("poza_publikacja")
+                and not r.get("sugestia") and r.get("p_model")
+                and _strumien(r) == nazwa
+            ),
+            key=lambda r: r.get("kickoff_ts") or 0,
+        )
+        if not settled:
+            continue
+        paczki: list[dict] = []
+        for i in range(0, len(settled), rozmiar):
+            grp = settled[i:i + rozmiar]
+            if len(grp) < PACZKA_UCZENIA_MIN and paczki:
+                # ogon krótszy niż minimum doklejamy do poprzedniego wiersza,
+                # zamiast pokazywać paczkę „3 typy, 33%" jako pełnoprawną
+                paczki.pop()
+                grp = settled[max(0, i - rozmiar):i + rozmiar]
+            z_kursem = [r for r in grp if r.get("kurs") and float(r["kurs"]) > 1.0]
+            traf = sum(1 for r in grp if r["wynik"] == "wygrany")
+            hit = traf / len(grp)
+            sr_p = sum(float(r["p_model"]) for r in grp) / len(grp)
+            paczki.append({
+                "od": time.strftime(
+                    "%Y-%m-%d", time.localtime(grp[0].get("kickoff_ts") or 0)
+                ),
+                "do": time.strftime(
+                    "%Y-%m-%d", time.localtime(grp[-1].get("kickoff_ts") or 0)
+                ),
+                "n": len(grp), "trafione": traf,
+                "hit": round(hit, 3),
+                "deklaracja": round(sr_p, 3),
+                "luka": round(hit - sr_p, 3),
+                "roi": (
+                    round(sum(
+                        (float(r["kurs"]) - 1.0) if r["wynik"] == "wygrany"
+                        else -1.0 for r in z_kursem
+                    ) / len(z_kursem), 3) if z_kursem else None
+                ),
+                "pelna": len(grp) >= rozmiar,
+            })
+        rec: dict = {"paczki": paczki[-PACZEK_W_RAPORCIE:]}
+        # KIERUNEK liczymy z PEŁNEJ historii, nie z przyciętej listy — inaczej
+        # „od początku" znaczyłoby „od dziesiątej paczki wstecz" i trend
+        # zmieniałby sens w miarę, jak rośnie księga. I tylko z paczek PEŁNYCH:
+        # ostatni, niedokończony wiersz potrafi mieć 12 typów i skakać o 30 pp
+        # z dnia na dzień — wpuszczony do trendu robiłby z niego alarm.
+        pelne = [p for p in paczki if p["pelna"]]
+        if len(pelne) >= 2 * TREND_PACZEK:
+            start = pelne[:TREND_PACZEK]
+            teraz = pelne[-TREND_PACZEK:]
+            l_start = sum(p["luka"] for p in start) / len(start)
+            l_teraz = sum(p["luka"] for p in teraz) / len(teraz)
+            rec["trend"] = {
+                "luka_start": round(l_start, 3),
+                "luka_teraz": round(l_teraz, 3),
+                "zmiana": round(l_teraz - l_start, 3),
+                "paczek": len(pelne),
+            }
+        out[nazwa] = rec
+    return out
+
+
 # POMIAR PROGU POKRYCIA DRABINEK (2026-07-29). Próg 0,5 (radar.
 # PROG_POKRYCIA_KARTY) był od początku ZAŁOŻENIEM: raz zszedł z 0,6, raz go
 # nie podnieśliśmy, ale nigdy nie zmierzyliśmy, czy szczeble tuż pod nim
@@ -2330,6 +2434,17 @@ def rozlicz(
                 )
             )
 
+    # CZY MODEL ROBI POSTĘPY — paczki po 40 rozliczeń, automatycznie
+    uczenie = raport_uczenia(log)
+    for nazwa, rec in uczenie.items():
+        t = rec.get("trend")
+        if t:
+            print(
+                f"Uczenie [{nazwa}]: luka na starcie {t['luka_start']:+.3f}"
+                f" -> teraz {t['luka_teraz']:+.3f}"
+                f" (zmiana {t['zmiana']:+.3f}, paczek {t['paczek']})"
+            )
+
     # czy próg pokrycia drabinek (0,5) stoi w dobrym miejscu — pomiar w tle
     prog_drabinek = pomiar_progu_drabinek(log)
     if prog_drabinek["pod_progiem"]["n"]:
@@ -2401,6 +2516,9 @@ def rozlicz(
         # pomiar progu pokrycia drabinek (opublikowane vs tuż pod progiem) —
         # jedyna droga do odpowiedzi, czy 0,5 to dobra liczba
         "prog_drabinek": prog_drabinek,
+        # postęp modelu w paczkach po 40 rozliczeń (deklaracja vs trafienia
+        # vs ROI) — user ma to widzieć sam, bez pytania mnie
+        "raport_uczenia": uczenie,
         # mundial vs ligi per rynek — czy sezon klubowy zmienił obraz
         # (patrz `epoki_per_rynek`: na 27.07 NIE zmienił, poza drużynowymi)
         "epoki_per_rynek": epoki_per_rynek(log),
