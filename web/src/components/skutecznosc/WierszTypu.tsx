@@ -26,6 +26,8 @@ export const POZA_LABEL: Record<string, string> = {
     "Nasza szansa za mocno rozjeżdżała się z kursem — typ policzył się tylko na próbę",
   limit_meczu:
     "Z jednego meczu pokazujemy ograniczoną liczbę typów; ten się nie zmieścił",
+  ujemna_po_korekcie:
+    "Po urealnieniu szansy na rozliczeniach ten zakład wychodził na minus — typ policzył się tylko na próbę",
   stare_dane: "Zawodnik dawno nie grał, więc typ policzył się tylko na próbę",
   za_pozno: "Powstał za blisko pierwszego gwizdka — nie zdążyłbyś go obstawić",
 };

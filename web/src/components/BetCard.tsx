@@ -730,11 +730,17 @@ function skadTaLiczba(bet: ValueBet): string | null {
         ? "Do wejścia typu wystarczy 1"
         : `Do wejścia typu potrzeba co najmniej ${Math.floor(bet.linia) + 1}`;
   // "ryzyko krótszej gry" dotyczy zawodnika (rotacja, zmiana); drużyna
-  // gra zawsze pełny mecz — jej szansa wynika z rozkładu możliwych wyników
-  const domkniecie =
-    bet.podmiot_typ === "druzyna"
-      ? `${prog}, a rozkład możliwych wyników daje ${fmtProc(bet.p_model)}.`
-      : `${prog}, ale model dolicza jeszcze ryzyko krótszej gry i ostatecznie daje ${fmtProc(bet.p_model)}.`;
+  // gra zawsze pełny mecz — jej szansa wynika z rozkładu możliwych wyników.
+  //
+  // OD 2026-07-29 pokazywana liczba jest jeszcze ściągnięta o zmierzony
+  // rozjazd deklaracji z wynikami, więc zdanie „rozkład daje X%" przestałoby
+  // być prawdziwe — X nie pochodzi już z samego rozkładu.
+  const skad = bet.p_urealnione
+    ? "a po odjęciu tego, o ile takie typy rozmijały się z rzeczywistością, zostaje"
+    : bet.podmiot_typ === "druzyna"
+      ? "a rozkład możliwych wyników daje"
+      : "ale model dolicza jeszcze ryzyko krótszej gry i ostatecznie daje";
+  const domkniecie = `${prog}, ${skad} ${fmtProc(bet.p_model)}.`;
   return `${fmtOpisLiczby(baza.opis)}. ${korekta} – zostaje ok. ${ocz}. ${domkniecie}`;
 }
 
@@ -889,7 +895,14 @@ export function SzczegolyTypu({
               : "wszystkie"
           } minut, szansa mieściłaby się w ${fmtProc(ci[0])}–${fmtProc(
             ci[1],
-          )}. Model podaje ostrożniejszą liczbę, bo wlicza też ryzyko, że zagra krócej`
+          )}. Model podaje ostrożniejszą liczbę, bo wlicza też ryzyko, że zagra krócej${
+            // przedział ufności liczy się przy przewidywanych minutach, a
+            // pokazywana szansa jest jeszcze ściągnięta o zmierzony rozjazd —
+            // bez tej wzmianki wygląda, jakby model wypadał poza własny przedział
+            bet.p_urealnione
+              ? ", oraz to, o ile takie typy rozmijały się z rzeczywistością w rozliczeniach"
+              : ""
+          }`
         : `Model daje ${fmtProc(bet.p_model)}`,
     },
     ...(implied != null
@@ -1178,7 +1191,15 @@ export function SzczegolyTypu({
                               {fmtProc(bet.p_model)}
                             </span>
                             , czyli mniej, bo wlicza też ryzyko, że zawodnik
-                            zagra krócej albo w ogóle nie wyjdzie.
+                            zagra krócej albo w ogóle nie wyjdzie
+                            {/* od 2026-07-29 to już nie jedyny powód różnicy:
+                                pokazywana szansa jest dodatkowo ściągnięta
+                                o zmierzony rozjazd deklaracji z wynikami.
+                                Bez tego zdania karta zwalałaby całą różnicę
+                                na minuty — czyli mówiłaby nieprawdę. */}
+                            {bet.p_urealnione
+                              ? " — a na końcu jeszcze o tyle, o ile takie typy rozmijały się z rzeczywistością w rozliczeniach."
+                              : "."}
                           </p>
                         )}
                         <h4 className="mb-2.5 mt-5 text-xs font-semibold uppercase tracking-wide text-faint">

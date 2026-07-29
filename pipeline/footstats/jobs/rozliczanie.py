@@ -928,6 +928,95 @@ def korekta_strumienia(log: dict | None = None) -> dict[str, float]:
     return out
 
 
+# --- SZANSA POKAZYWANA: co piszemy userowi na stronie (2026-07-29) ---
+#
+# Zgłoszenie usera: „skoro przy deklarowanych 71% trafiamy 58%, pokazywanie
+# 71% jest nieuczciwe". Racja — i żadna z warstw uczenia tego nie naprawia,
+# bo wszystkie działają PRZED bramą publikacji: obniżamy szanse wszystkich
+# kandydatów, a brama i tak wybiera czub nowego rozkładu, więc opublikowany
+# zbiór wraca do ~71% (efekt selekcji, patrz `korekta_strumienia`).
+#
+# Ta korekta jest inna w jednym kluczowym punkcie: działa PO selekcji i NIE
+# WRACA do modelu. Mierzy dokładnie to, co user widzi — deklarację przy
+# opublikowanych typach — i porównuje z tym, co weszło. Ponieważ nie zamyka
+# pętli, nie ma czym oscylować: żadnego tłumienia i żadnego stempla nie
+# potrzebuje (w odróżnieniu od korekty strumienia, gdzie jedno i drugie jest
+# konieczne).
+#
+# Czego NIE dotyka:
+#   * księgi typów — `p_model` w logu zostaje surowe, inaczej następny pomiar
+#     liczyłby się z już poprawionej liczby i korekta zjadłaby własny ogon,
+#   * puli legów kuponów — to WEJŚCIE do beam-searcha z progami bezwzględnymi
+#     (kupony.py), więc przesunięcie szans zmieniłoby SKŁAD kuponów, a nie
+#     tylko wyświetlaną liczbę; kupony mają zresztą własne urealnienie,
+#     zmierzone na rozliczonych kuponach,
+#   * kart Drabinek — te uczą się u źródła (radar `korekta_logit`), a karta
+#     pokazuje jawnie rachunek „pokrycie × kontekst = szansa"; przesunięcie
+#     samego wyniku rozjechałoby go z jego własnym uzasadnieniem.
+SZANSA_POKAZ_MIN_N = 40      # poniżej tego nie ruszamy pokazywanej liczby
+SZANSA_POKAZ_OKNO = 200      # okno kroczące rozliczeń
+SZANSA_POKAZ_CAP = (-1.0, 0.30)
+
+
+def szansa_pokazywana(
+    log: dict | None = None,
+    korekta_przed_brama: dict[str, float] | None = None,
+) -> dict[str, float]:
+    """Delta logitowa: o ile jeszcze ściągnąć liczbę pokazywaną na stronie.
+
+    Liczona na OPUBLIKOWANYCH, rozliczonych typach — ale na `p` SUROWYM
+    (sprzed korekty strumienia, patrz `_p_surowe`), a od wyniku odejmujemy to,
+    co korekta strumienia robi JUŻ TERAZ, przed bramą publikacji.
+    Bez tego odjęcia liczylibyśmy jedną rzecz dwa razy.
+
+    Pomiar 2026-07-29 pokazuje, dlaczego to nie jest teoretyczna ostrożność:
+    w księdze nie ma ANI JEDNEGO rozliczonego pewniaka ze stemplem
+    `kal_strumien` (korekta ruszyła 27.07, a rynki zawodnicze stoją od tego
+    czasu w kwarantannie). Surowy pomiar dawał −0,80, korekta przed bramą
+    stoi na −0,48 — złożone naiwnie zrobiłyby −1,28 i z typu na 70% zostałoby
+    39%. Po odjęciu wychodzi −0,33, czyli 70% -> 62%.
+
+    Zwraca {"pewniaki": -0.33, "druzyny": -0.20}.
+    """
+    if log is None:
+        log = _migruj_log(supa.get_key("typy_log") or {})
+    if korekta_przed_brama is None:
+        korekta_przed_brama = korekta_strumienia(log)
+    settled = [
+        r for r in log.values()
+        if r.get("wynik") in ("wygrany", "przegrany")
+        and not r.get("sugestia") and not r.get("odrzucony")
+        and not r.get("poza_publikacja")     # user ich nie widział
+        and r.get("rynek_kod") not in RYNKI_OSOBNE
+        and r.get("p_model")
+    ]
+    out: dict[str, float] = {}
+    for strumien in STRUMIENIE:
+        grp = sorted(
+            (r for r in settled if _strumien(r) == strumien),
+            key=lambda r: r.get("kickoff_ts") or 0,
+        )[-SZANSA_POKAZ_OKNO:]
+        if len(grp) < SZANSA_POKAZ_MIN_N:
+            continue
+        # cały rozjazd względem SUROWEGO wyjścia modelu...
+        b = _bias_logit([{**r, "p_model": _p_surowe(r)} for r in grp])
+        # ...minus ta jego część, którą przed bramą załatwia już korekta
+        # strumienia (dla typów w oknie bywała inna — stąd pomiar na surowym)
+        b -= float(korekta_przed_brama.get(strumien, 0.0))
+        b = max(SZANSA_POKAZ_CAP[0], min(SZANSA_POKAZ_CAP[1], b))
+        if abs(b) >= 0.02:
+            out[strumien] = round(b, 3)
+    return out
+
+
+def urealnij_p(p: float, delta: float) -> float:
+    """Szansa po korekcie pokazywanej (delta w skali logitowej)."""
+    if not delta:
+        return float(p)
+    p = min(max(float(p), 1e-6), 1.0 - 1e-6)
+    return 1.0 / (1.0 + math.exp(-(_logit(p) + delta)))
+
+
 def market_bias() -> dict[str, dict]:
     """Korekty kalibracyjne z logu w Supabase (puste, gdy brak danych/env)."""
     log = _migruj_log(supa.get_key("typy_log") or {})

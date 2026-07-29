@@ -47,7 +47,16 @@ export interface ValueBet {
   kurs_novig?: number | null;
   /** wartość kursu Superbetu względem no-vig UK, w % (dodatnia = miękka linia) */
   ev_uk?: number | null;
+  /**
+   * Szansa POKAZYWANA — po urealnieniu na rozliczeniach, gdy jest z czego
+   * (patrz `p_urealnione`). Liczby pochodne niżej są przeliczone z tej samej
+   * wartości, więc karta nie może sama sobie zaprzeczyć. W księdze typów
+   * pipeline trzyma wersję surową; ta jest wyłącznie do czytania.
+   */
   p_model: number;
+  /** true = powyższa szansa jest już ściągnięta o to, o ile taki strumień
+   *  typów rozmijał się z rzeczywistością w ostatnich rozliczeniach */
+  p_urealnione?: boolean;
   p_rynku: number | null;
   fair_kurs: number;
   edge_pp: number | null;

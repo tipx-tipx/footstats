@@ -1,5 +1,7 @@
 """Brama publikacji: kwarantanna rynków + flaga poza_publikacja w logu."""
 
+import pytest
+
 from footstats.jobs import rozliczanie
 
 
@@ -338,3 +340,63 @@ def test_pomiar_progu_drabinek_zestawia_obie_grupy():
     assert p["pod_progiem"]["n"] == 8 and p["pod_progiem"]["hit"] == 0.25
     # ROI liczone z kursu, nie z samych trafień
     assert p["opublikowane"]["roi"] > p["pod_progiem"]["roi"]
+
+
+# --- SZANSA POKAZYWANA NA STRONIE (2026-07-29) -----------------------------
+
+
+def test_szansa_pokazywana_odejmuje_korekte_sprzed_bramy():
+    """Najważniejszy warunek: nie liczyć jednej rzeczy dwa razy.
+
+    Typy w oknie deklarowały 70% i trafiały 50% (rozjazd ~-0,8 logita).
+    Skoro korekta strumienia ściąga już -0,5 PRZED bramą, do pokazania
+    zostaje reszta, a nie całość.
+    """
+    log = {
+        str(i): _typ(i, 0.70, "wygrany" if i % 2 == 0 else "przegrany")
+        for i in range(60)
+    }
+    calosc = rozliczanie.szansa_pokazywana(log, {})["pewniaki"]
+    reszta = rozliczanie.szansa_pokazywana(log, {"pewniaki": -0.5})["pewniaki"]
+    assert calosc < -0.5
+    assert reszta == pytest.approx(calosc + 0.5, abs=1e-3)
+
+
+def test_szansa_pokazywana_mierzy_na_surowym_p():
+    """Typy wystawione z korektą mają p JUŻ ściągnięte i stempel — pomiar
+    idzie po surowym, inaczej korekta zjadałaby własny ogon."""
+    log = {
+        str(i): _typ(i, 0.52, "wygrany" if i % 2 == 0 else "przegrany",
+                     kal=-0.80)
+        for i in range(60)
+    }
+    d = rozliczanie.szansa_pokazywana(log, {"pewniaki": -0.80})["pewniaki"]
+    # surowe p to ~0,70, trafienia 50% -> rozjazd ~-0,8; korekta przed bramą
+    # zdejmuje dokładnie tyle, więc do pokazania zostaje prawie nic
+    assert abs(d) < 0.15
+
+
+def test_szansa_pokazywana_cisza_gdy_deklaracja_sie_broni():
+    log = {
+        str(i): _typ(i, 0.60, "wygrany" if i % 10 < 6 else "przegrany")
+        for i in range(60)
+    }
+    assert rozliczanie.szansa_pokazywana(log, {}) == {}
+
+
+def test_szansa_pokazywana_pomija_typy_spoza_publikacji():
+    """Mierzymy to, co user WIDZIAŁ — typy z kwarantanny nie były na stronie."""
+    log = {}
+    for i in range(50):
+        log[f"ok{i}"] = _typ(i, 0.60, "wygrany" if i % 10 < 6 else "przegrany")
+    for i in range(50, 110):
+        log[f"x{i}"] = {**_typ(i, 0.60, "przegrany"),
+                        "poza_publikacja": "kwarantanna_rynku"}
+    assert rozliczanie.szansa_pokazywana(log, {}) == {}
+
+
+def test_urealnij_p_zachowuje_kolejnosc_i_zakres():
+    d = -0.33
+    assert 0 < rozliczanie.urealnij_p(0.01, d) < rozliczanie.urealnij_p(0.5, d)
+    assert rozliczanie.urealnij_p(0.5, d) < rozliczanie.urealnij_p(0.99, d) < 1
+    assert rozliczanie.urealnij_p(0.7, 0.0) == 0.7

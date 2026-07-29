@@ -90,6 +90,7 @@ def _rozlicz_i_zapisz(
     poza_publikacja: list[dict] | None = None,
     legi_pool: list[dict] | None = None,
     drabinki: list[dict] | None = None,
+    urealnienie: dict[str, float] | None = None,
 ) -> None:
     """Rozliczanie + zapis wyników. Wywoływane w KAŻDYM cyklu — także gdy
     statshub nie ma propsów (rozliczenia nie mogą czekać na nowe typy).
@@ -116,8 +117,28 @@ def _rozlicz_i_zapisz(
         print(f"Rozliczanie pominięte ({ex}) — poprzednie wyniki bez zmian")
         return
     _dump("typy_wyniki.json", wyniki)
+
+    def _kupon_do_pokazania(k: dict) -> dict:
+        """Kupon z legami pokazującymi tę samą szansę, co lista typów.
+
+        Sam kupon ma WŁASNE urealnienie (zmierzone na rozliczonych kuponach,
+        `kupony._urealnij_szanse`), więc jego `p_model` zostaje nietknięte —
+        poprawiamy tylko liczby przy pojedynczych legach, żeby ten sam typ
+        nie pokazywał dwóch różnych szans dwa kliknięcia od siebie.
+        Dotyczy WYŁĄCZNIE dumpu; log kuponów zostaje surowy.
+        """
+        if not urealnienie:
+            return k
+        return {**k, "legi": [
+            {**l, "p_model": round(rozliczanie.urealnij_p(
+                float(l["p_model"]),
+                urealnienie.get(rozliczanie._strumien(l), 0.0),
+            ), 4)} if l.get("p_model") else l
+            for l in k.get("legi", [])
+        ]}
+
     _dump("kupony.json", [
-        k for k in wyniki["kupony"]
+        _kupon_do_pokazania(k) for k in wyniki["kupony"]
         if k.get("wynik") is None and not k.get("pominiety")
     ])
     p = wyniki["podsumowanie"]
@@ -1932,6 +1953,44 @@ def _main_impl(tryb=None):
     except Exception as e:
         korekta_strumieni = {}
         print(f"Korekta strumienia pominięta ({e})")
+
+    # SZANSA POKAZYWANA — ostatnia warstwa, wyłącznie na wyjściu.
+    # Kalibracja i korekta strumienia działają PRZED bramą publikacji, więc
+    # zjada je efekt selekcji: opublikowany zbiór i tak deklaruje ~71%, a
+    # trafia 58%. Ta delta nie wraca do modelu — poprawia liczbę, którą user
+    # czyta na stronie, i nic poza nią (patrz rozliczanie.szansa_pokazywana).
+    try:
+        # korektę przed bramą PODAJEMY jawnie — inaczej funkcja policzyłaby ją
+        # sobie drugi raz z księgi i mogłaby odjąć inną liczbę niż ta, z którą
+        # typy faktycznie wychodzą w tym cyklu
+        korekta_pokazywana = rozliczanie.szansa_pokazywana(
+            korekta_przed_brama=korekta_strumieni
+        )
+        if korekta_pokazywana:
+            print("Szansa pokazywana (Δlogit): " + ", ".join(
+                f"{s} {d:+.2f}" for s, d in korekta_pokazywana.items()))
+    except Exception as e:
+        korekta_pokazywana = {}
+        print(f"Urealnienie pokazywanej szansy pominięte ({e})")
+
+    def _urealnij_do_pokazania(b: dict) -> dict:
+        """Kopia typu z szansą taką, jaka wychodzi z rozliczeń — do payloadu.
+
+        Przeliczamy TAKŻE liczby pochodne (uczciwy kurs, przewaga, wartość),
+        bo inaczej karta mówiłaby „szansa 58%, kurs 1,70, wartość +21%",
+        czyli trzy liczby, z których dwie zaprzeczają trzeciej.
+        """
+        d = korekta_pokazywana.get(rozliczanie._strumien(b), 0.0)
+        if not d or b.get("sugestia") or not b.get("p_model"):
+            return b
+        p = rozliczanie.urealnij_p(float(b["p_model"]), d)
+        out = {**b, "p_model": round(p, 4), "p_urealnione": True,
+               "fair_kurs": round(1.0 / max(p, 1e-6), 3)}
+        if b.get("p_rynku") is not None:
+            out["edge_pp"] = round((p - float(b["p_rynku"])) * 100.0, 2)
+        if b.get("kurs"):
+            out["ev_pct"] = round((p * float(b["kurs"]) - 1.0) * 100.0, 2)
+        return out
 
     # korekta strumienia drużynowego jako gotowa delta logitowa — stosowana
     # osobno, już PO wyborze strony zakładu (patrz pętla linii drużynowych)
@@ -3750,6 +3809,33 @@ def _main_impl(tryb=None):
         pewniaki_per_mecz[b["mecz_id"]] = pewniaki_per_mecz.get(b["mecz_id"], 0) + 1
         value_bets.append(rec_pewniaka)
         _zapewnij_mecz(b["mecz_id"])["okazje"].append(vb_id)
+    # OSTATNIA BRAMA: typ, który po UREALNIENIU szansy przestaje mieć wartość.
+    #
+    # Decyzja usera 2026-07-29. Skoro strona pokazuje szansę ściągniętą
+    # o zmierzony rozjazd deklaracji z wynikami, to ta sama liczba musi
+    # decydować, czy typ w ogóle jest okazją. Inaczej karta mówiłaby wprost
+    # „szansa 70%, kurs 1,27, wartość −11%" — czyli polecalibyśmy zakład,
+    # który sami wyceniamy na minus.
+    #
+    # Brama stoi PO wszystkich innych i NIE jest kolejną warstwą uczenia:
+    # to samo przeliczenie, które trafia na stronę (`_urealnij_do_pokazania`).
+    # Typ nie znika bez śladu — idzie do księgi jako `poza_publikacja`, więc
+    # rozlicza się i uczy kalibrację, tak jak typy z kwarantanny.
+    if korekta_pokazywana:
+        odpadle = []
+        for b in value_bets:
+            if b.get("sugestia") or not b.get("kurs"):
+                continue
+            if (_urealnij_do_pokazania(b).get("ev_pct") or 0.0) < 0.0:
+                odpadle.append(b)
+        if odpadle:
+            odrzucone_id = {id(b) for b in odpadle}
+            value_bets[:] = [b for b in value_bets if id(b) not in odrzucone_id]
+            for b in odpadle:
+                typy_poza_publikacja.append(
+                    {**b, "poza_publikacja": "ujemna_po_korekcie"}
+                )
+
     if typy_poza_publikacja:
         licz_poza = Counter(t["poza_publikacja"] for t in typy_poza_publikacja)
         print("Poza publikacją: " + ", ".join(
@@ -4139,13 +4225,34 @@ def _main_impl(tryb=None):
         _rozlicz_i_zapisz([], [], niedostepni,
                           odrzucone_pomiar=odrzucone_pomiar,
                           poza_publikacja=typy_poza_publikacja,
-                          drabinki=drabinki_typy)
+                          drabinki=drabinki_typy,
+                          urealnienie=korekta_pokazywana)
         return
 
     _dump_pokrycie()
-    _dump("value_bets.json", [
-        {k: v for k, v in b.items() if k != "kal_tau"} for b in value_bets_pub
-    ])
+    # UWAGA NA KOLEJNOŚĆ: urealnienie dotyczy WYŁĄCZNIE tego dumpu.
+    # `value_bets` (surowe) idą niżej do `_rozlicz_i_zapisz`, czyli do księgi —
+    # gdyby trafiła tam liczba już poprawiona, następny pomiar liczyłby się
+    # z niej i korekta zjadałaby własny ogon.
+    #
+    # Brama „ujemna po korekcie" MUSI stać także tutaj, nie tylko przy świeżych
+    # typach. Prawie cała lista to typy WZNOWIONE z rejestru publikacji
+    # (dry-run 2026-07-29: 49 pozycji na liście, z czego świeżych 1) — brama
+    # przy narodzinach typu przepuszczałaby więc praktycznie wszystko, a user
+    # dalej widziałby karty z ujemną wartością. Wyjątek robimy dla sugestii
+    # (nie mają kursu, więc nie ma czego liczyć).
+    do_pokazania = []
+    zdjete = 0
+    for b in value_bets_pub:
+        u = _urealnij_do_pokazania(b)
+        if not u.get("sugestia") and u.get("kurs") and (u.get("ev_pct") or 0.0) < 0.0:
+            zdjete += 1
+            continue
+        do_pokazania.append({k: v for k, v in u.items() if k != "kal_tau"})
+    if zdjete:
+        print(f"Zdjęte po urealnieniu szansy: {zdjete} typów miało ujemną "
+              f"wartość przy pokazywanej liczbie (zostaje {len(do_pokazania)})")
+    _dump("value_bets.json", do_pokazania)
     _dump("matches.json", list(matches_out.values()))
     _dump("players.json", list(players_out.values()))
     _dump("druzyny_forma.json", list(druzyny_forma.values()))
@@ -4254,7 +4361,8 @@ def _main_impl(tryb=None):
     _rozlicz_i_zapisz(value_bets, kupony_list, niedostepni,
                       conf_mids=conf_mids, odrzucone_pomiar=odrzucone_pomiar,
                       poza_publikacja=typy_poza_publikacja,
-                      legi_pool=legi_pool_pub, drabinki=drabinki_typy)
+                      legi_pool=legi_pool_pub, drabinki=drabinki_typy,
+                      urealnienie=korekta_pokazywana)
     _dump("meta.json", {
         "wygenerowano_ts": int(time.time()),
         "tryb": "liga" if tryb else "ms2026",
