@@ -225,3 +225,59 @@ def test_awaria_betclica_nie_wywala_przebiegu(monkeypatch):
     monkeypatch.setattr(betclic, "paruj_mecze", bum)
     radar._dopnij_betclic(karty, meta)          # nie rzuca
     assert "rozjazd_hero" not in karty[0]
+
+
+# --- TEST PRZESUNIĘCIA DRABINEK (2026-07-29) -------------------------------
+
+
+def test_drabinka_przesunieta_o_szczebel_odpada():
+    """Sprawa Claudia Spinellego (żywa karta 29.07).
+
+    Karta obiecywała „Betclic wycenia 4+ na 1,40, a Superbet płaci 1,97 —
+    o 41% więcej za to samo". Wyglądało na okazję, a drabinki zachodzą na
+    siebie idealnie po przesunięciu o jeden szczebel: to samo zdarzenie
+    nazywa się u nich inaczej. Pomiar na 200 drabinkach: 18 takich par.
+    """
+    sb = {1.5: {"over": 1.10}, 2.5: {"over": 1.39}, 3.5: {"over": 1.97},
+          4.5: {"over": 3.00}, 5.5: {"over": 4.70}}
+    bc = {3.5: {"over": 1.40}, 4.5: {"over": 1.90}, 5.5: {"over": 2.80}}
+    assert betclic.porownaj_drabinke(sb, bc) == {}
+
+
+def test_uklad_pewniak_taniej_dalej_przechodzi():
+    """Bramy NIE WOLNO zacieśnić tak, żeby zabiła układ, o który chodzi
+    userowi: „1,20 u jednego, 2,60 u drugiego" (decyzja 2026-07-28)."""
+    sb = {0.5: {"over": 1.20}, 1.5: {"over": 2.40}, 2.5: {"over": 4.60}}
+    bc = {0.5: {"over": 2.60}, 1.5: {"over": 2.50}, 2.5: {"over": 4.50}}
+    r = betclic.porownaj_drabinke(sb, bc)
+    assert r[0.5]["typ"] == "pewniak_taniej"
+    # ...i mówi, gdzie grać — rozjazd działa w OBIE strony
+    assert r[0.5]["gdzie"] == "betclic"
+    assert r[0.5]["lepszy"] == 2.60
+
+
+def test_rozjazd_wskazuje_takze_superbet():
+    """Druga strona tej samej monety: gdy to Superbet płaci więcej."""
+    sb = {0.5: {"over": 2.60}, 1.5: {"over": 2.50}, 2.5: {"over": 4.50}}
+    bc = {0.5: {"over": 1.20}, 1.5: {"over": 2.40}, 2.5: {"over": 4.60}}
+    r = betclic.porownaj_drabinke(sb, bc)
+    assert r[0.5]["gdzie"] == "superbet" and r[0.5]["lepszy"] == 2.60
+
+
+def test_zgodna_drabinka_nie_jest_uznana_za_przesunieta():
+    """Drabinka, która i tak się zgadza, nie ma prawa wpaść w test
+    przesunięcia — inaczej wycięlibyśmy zdrowe porównania."""
+    sb = {0.5: {"over": 1.50}, 1.5: {"over": 2.50}, 2.5: {"over": 4.00}}
+    bc = {0.5: {"over": 1.55}, 1.5: {"over": 2.45}, 2.5: {"over": 4.10}}
+    assert betclic._drabinka_przesunieta(sb, bc, 4.0) is False
+    assert len(betclic.porownaj_drabinke(sb, bc)) == 3
+
+
+def test_obie_wersje_zle_to_nie_dowod_przesuniecia():
+    """Gdy po przesunięciu też jest źle, to nie przesunięcie — takie
+    drabinki odrzuca zwykły próg zgody, z własnym powodem w liczniku."""
+    sb = {0.5: {"over": 1.50}, 1.5: {"over": 2.50}, 2.5: {"over": 4.00}}
+    bc = {0.5: {"over": 5.00}, 1.5: {"over": 9.00}, 2.5: {"over": 14.0}}
+    mediana, _ = betclic._mediana_rozjazdu(sb, bc)
+    assert betclic._drabinka_przesunieta(sb, bc, mediana) is False
+    assert betclic.porownaj_drabinke(sb, bc) == {}

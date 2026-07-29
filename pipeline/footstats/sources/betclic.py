@@ -844,6 +844,34 @@ MAX_ROZJAZD_PCT = 200.0
 # statystykę — wtedy nie pokazujemy nic. To jest ten „rozsądek" zamiast limitu.
 PROG_ZGODY_DRABINKI_PCT = 60.0
 
+# 3) TEST PRZESUNIĘCIA (2026-07-29) — brama, której brakowało, i najostrzejsza
+#    z trzech, bo nie mierzy WIELKOŚCI różnicy, tylko sprawdza wprost
+#    założenie, na którym stoi całe porównanie: że etykieta „powyżej 3,5"
+#    znaczy u obu to samo.
+#
+#    ZNALEZIONE NA ŻYWEJ KARCIE (Claudio Spinelli, 29.07). Karta obiecywała
+#    „Betclic wycenia 4+ na 1,40, a Superbet płaci 1,97 — o 41% więcej za to
+#    samo". Wyglądało na okazję, było błędem:
+#        linia w linię:      3,5: 1,97 vs 1,40 (+41%)   4,5: 3,00 vs 1,90 (+58%)
+#        Betclic o szczebel: 2,5: 1,39 vs 1,40  (+1%)   3,5: 1,97 vs 1,90  (+4%)
+#    Drabinki zachodzą na siebie idealnie, tylko przesunięte — czyli oba
+#    cenniki mówią to samo, a my porównywaliśmy strzał 4+ ze strzałem 3+.
+#
+#    POMIAR NA 200 DRABINKACH (24 mecze, 68 zawodników, 29.07): 42 z nich
+#    (21%) pasują DUŻO lepiej po przesunięciu o jeden szczebel, i to
+#    w OBIE strony — więc nie ma jednego globalnego offsetu do wpisania
+#    na sztywno, jest rozjazd definicji per zawodnik (najczęściej „strzały":
+#    z zablokowanymi albo bez). Stary próg 60% łapał tylko 31 z 200 i akurat
+#    kartę Spinellego przepuszczał (jego mediana wynosiła 49%).
+#
+#    Warunki są celowo koniunkcją: różnica linia-w-linię musi być zauważalna,
+#    dopasowanie po przesunięciu wyraźnie lepsze ORAZ samo w sobie dobre.
+#    Ostatni warunek pilnuje, żeby „obie wersje są złe" nie liczyło się jako
+#    dowód przesunięcia — tam odrzuca zwykły próg zgody wyżej.
+PROG_PRZESUNIECIA_MIN_PCT = 15.0    # poniżej tego drabinka i tak się zgadza
+PROG_PRZESUNIECIA_KROTNOSC = 2.5    # ile razy lepiej ma pasować po przesunięciu
+PROG_PRZESUNIECIA_MAKS_PCT = 25.0   # ...i jak dobrze pasować bezwzględnie
+
 # „Pewniak taniej": rynek u jednego bukmachera mówi „to niemal pewne"
 # (kurs <= 1,45), a drugi płaci za to sensowne pieniądze (>= 1,75).
 # Dokładnie ten układ typer opisuje zdaniem „Superbet wycenia to na zaledwie
@@ -854,6 +882,7 @@ PEWNIAK_MIN_LEPSZY = 1.75
 # ile porównań odrzuciły bramy — do logu, żeby obcinka nie była cicha
 ODRZUCONE_ROZJAZDY: dict[str, int] = {
     "za_duzy": 0, "za_malo_wspolnych": 0, "drabinka_niezgodna": 0,
+    "drabinka_przesunieta": 0,
 }
 
 
@@ -897,14 +926,73 @@ def rozjazd(kurs_sb: float | None, kurs_bc: float | None,
     }
 
 
+def _kurs(linie: dict, linia: float) -> float | None:
+    """Kurs 'powyżej' dla linii — None, gdy tej linii nie ma."""
+    w = (linie or {}).get(linia)
+    if isinstance(w, dict):
+        return w.get("over")
+    return w
+
+
+def _mediana_rozjazdu(
+    linie_sb: dict, linie_bc: dict, przesun: float = 0.0,
+) -> tuple[float | None, int]:
+    """Typowy rozjazd cen, gdy drabinkę Betclica przesunąć o `przesun` linii."""
+    gapy = []
+    for linia in linie_sb or {}:
+        a, b = _kurs(linie_sb, linia), _kurs(linie_bc, linia + przesun)
+        try:
+            a, b = float(a or 0), float(b or 0)
+        except (TypeError, ValueError):
+            continue
+        if a <= 1.0 or b <= 1.0:
+            continue
+        gapy.append((max(a, b) / min(a, b) - 1) * 100.0)
+    if len(gapy) < MIN_WSPOLNYCH_LINII:
+        return None, len(gapy)
+    gapy.sort()
+    srodek = len(gapy) // 2
+    med = (gapy[srodek] if len(gapy) % 2
+           else (gapy[srodek - 1] + gapy[srodek]) / 2)
+    return med, len(gapy)
+
+
+def _drabinka_przesunieta(linie_sb: dict, linie_bc: dict, mediana: float) -> bool:
+    """Czy te drabinki pasują do siebie DUŻO lepiej przesunięte o szczebel.
+
+    Jeśli tak, to nie mamy okazji tylko rozjazd definicji: etykieta „powyżej
+    3,5" znaczy u obu bukmacherów co innego (patrz PROG_PRZESUNIECIA_*).
+    """
+    if mediana <= PROG_PRZESUNIECIA_MIN_PCT:
+        return False        # drabinka i tak się zgadza — nie ma czego badać
+    przesuniete = [
+        m for m, _n in (
+            _mediana_rozjazdu(linie_sb, linie_bc, 1.0),
+            _mediana_rozjazdu(linie_sb, linie_bc, -1.0),
+        ) if m is not None
+    ]
+    if not przesuniete:
+        return False
+    naj = min(przesuniete)
+    return (naj <= PROG_PRZESUNIECIA_MAKS_PCT
+            and naj * PROG_PRZESUNIECIA_KROTNOSC < mediana)
+
+
 def porownaj_drabinke(linie_sb: dict, linie_bc: dict) -> dict:
     """Rozjazdy dla JEDNEGO zawodnika i rynku: {linia: rozjazd}.
 
-    Tu mieszka brama wspólnych linii (patrz `MIN_WSPOLNYCH_LINII`): dopóki
-    oba cenniki nie zejdą się na co najmniej dwóch liniach, nie wierzymy, że
-    liczą to samo, i nie pokazujemy nic. Dzięki temu układ „1,25 u jednego,
-    2,00 u drugiego" przechodzi (bo reszta drabinki się zgadza), a rynek
-    liczący inną statystykę odpada w całości.
+    Tu mieszkają trzy bramy — każda pyta o co innego:
+      * WSPÓLNE LINIE (`MIN_WSPOLNYCH_LINII`): dopóki oba cenniki nie zejdą
+        się na co najmniej dwóch liniach, nie wierzymy, że liczą to samo;
+      * ZGODA DRABINKI (`PROG_ZGODY_DRABINKI_PCT`): jedna linia może mocno
+        odjechać i to jest właśnie okazja — ale gdy rozjeżdża się CAŁA
+        drabinka, oba cenniki liczą co innego;
+      * PRZESUNIĘCIE (`_drabinka_przesunieta`): czy drabinki nie zachodzą na
+        siebie idealnie po przesunięciu o jeden szczebel. To najostrzejszy
+        test, bo sprawdza samo założenie porównania, a nie wielkość różnicy.
+
+    Dzięki nim układ „1,25 u jednego, 2,00 u drugiego" przechodzi (reszta
+    drabinki się zgadza), a rynek liczący inną statystykę odpada w całości.
     """
     wspolne = sorted(set(linie_sb or {}) & set(linie_bc or {}))
     if len(wspolne) < MIN_WSPOLNYCH_LINII:
@@ -912,8 +1000,6 @@ def porownaj_drabinke(linie_sb: dict, linie_bc: dict) -> dict:
             ODRZUCONE_ROZJAZDY["za_malo_wspolnych"] += len(wspolne)
         return {}
     # NAJPIERW bez limitu: patrzymy, czy drabinki jako całość się zgadzają.
-    # Jedna linia może się mocno rozjechać — to jest właśnie okazja. Ale gdy
-    # rozjeżdża się CAŁA drabinka, oba cenniki liczą co innego.
     surowe = {
         linia: rozjazd((linie_sb[linia] or {}).get("over"),
                        (linie_bc[linia] or {}).get("over"), limit_pct=None)
@@ -926,6 +1012,9 @@ def porownaj_drabinke(linie_sb: dict, linie_bc: dict) -> dict:
         (gapy[len(gapy) // 2 - 1] + gapy[len(gapy) // 2]) / 2)
     if mediana > PROG_ZGODY_DRABINKI_PCT:
         ODRZUCONE_ROZJAZDY["drabinka_niezgodna"] += len(gapy)
+        return {}
+    if _drabinka_przesunieta(linie_sb, linie_bc, mediana):
+        ODRZUCONE_ROZJAZDY["drabinka_przesunieta"] += len(gapy)
         return {}
     # drabinka spójna -> ufamy jej także tam, gdzie jedna linia odjeżdża
     return {linia: r for linia, r in surowe.items() if r}

@@ -1082,6 +1082,15 @@ def _dopnij_betclic(wpisy: list[dict], events_meta: dict[int, dict]) -> None:
               f"karty z drugą ceną {n_kart}/{len(wpisy)}, szczebli {n_szczebli}, "
               f"układów „pewniak taniej” {n_pewniakow}"
               + (f", pominięte mecze (budżet czasu): {pominiete}" if pominiete else ""))
+        # CO ODRZUCIŁY BRAMY — bez tego obcinka jest cicha i „karty z drugą
+        # ceną 1/3" wygląda tak samo, gdy Betclic nie ma oferty, jak wtedy,
+        # gdy ma, ale liczy co innego (patrz betclic.ODRZUCONE_ROZJAZDY)
+        odrzucone = {k: v for k, v in betclic.ODRZUCONE_ROZJAZDY.items() if v}
+        if odrzucone:
+            print("Drabinki — porównania cen odrzucone: " + ", ".join(
+                f"{k}={v}" for k, v in sorted(
+                    odrzucone.items(), key=lambda kv: -kv[1])
+            ))
     except Exception as e:  # źródło pomocnicze — nigdy nie wywala przebiegu
         print(f"Drabinki — drugi cennik pominięty ({type(e).__name__}: {e})")
     finally:
