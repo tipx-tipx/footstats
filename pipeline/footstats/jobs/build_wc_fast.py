@@ -3194,6 +3194,9 @@ def _main_impl(tryb=None):
         pomiar_druzyn = 0   # własny budżet typów pomiarowych, patrz wyżej
         seen_team = set()
         odpadki_t: Counter = Counter()  # diagnostyka: czemu legi drużynowe nie powstają
+        # (mecz, rynek) -> {"home": {...}, "away": {...}} pod „kto więcej"
+        # i sumy meczowe; wypełniane w pętli niżej
+        predykcje_druzyn: dict[tuple[int, str], dict] = {}
         for tt in team_trends:
             klucz_t = (tt.event_id, tt.team_id, tt.market_code)
             if klucz_t in seen_team or tt.event_id not in ev_by_id:
@@ -3380,6 +3383,16 @@ def _main_impl(tryb=None):
                     if med and (now_t - med) / 86400.0 >= dni_ost_t - 14.0:
                         stare_t = False  # pauzowała cała liga, nie ta drużyna
             pred_t = counts.predict_match(posterior_t, 90.0, factor_t)
+            # PREDYKCJE OBU DRUŻYN POD NOWE RYNKI (2026-07-30). „Kto więcej"
+            # i suma meczowa potrzebują rozkładów OBU drużyn naraz, a ta pętla
+            # widzi je osobno (jeden obrót = jedna drużyna). Odkładamy więc
+            # rozkłady i przetwarzamy je PO pętli, gdy komplet jest pewny.
+            _slot_t = "home" if tt.team_id == ev.get("homeTeamId") else "away"
+            predykcje_druzyn.setdefault((mid, tt.market_code), {})[_slot_t] = {
+                "pred": pred_t, "nazwa": tt.team_name, "team_id": tt.team_id,
+                "mecz": match_label, "ts": ts, "stare": stare_t,
+                "home_name": home_name, "away_name": away_name,
+            }
             # KALIBRACJA rynków drużynowych: bias był dla nich LICZONY
             # (team_corners −0,466, team_goals −0,254), ale nigdy nie
             # docierał do p — ścieżka drużynowa jako jedyna nie przekazywała
@@ -3656,6 +3669,154 @@ def _main_impl(tryb=None):
                                 float(np.mean(tt.counts[:N_T])), 2
                             ) if n_f else 0.0,
                         }
+        # === NOWE RYNKI: „KTO WIĘCEJ" I SUMA MECZOWA (2026-07-30) ===
+        # Wchodzą PO pętli, bo potrzebują rozkładów OBU drużyn naraz, a pętla
+        # widzi je osobno. Rozliczanie tych rynków powstało WCZEŚNIEJ niż
+        # publikacja (rozliczanie.MARKETY_SUMY / MARKETY_WIECEJ) — nie
+        # wystawiamy niczego, czego nie umiemy zamknąć.
+        n_wiecej = n_sumy = 0
+        odpadki_nowe: Counter = Counter()
+        for (mid_n, mk_n), strony_n in predykcje_druzyn.items():
+            if "home" not in strony_n or "away" not in strony_n:
+                odpadki_nowe["tylko jedna druzyna"] += 1
+                continue
+            h_n, a_n = strony_n["home"], strony_n["away"]
+            if h_n["stare"] or a_n["stare"]:
+                odpadki_nowe["stare dane"] += 1
+                continue
+            oferta_n = sb_cache.get(mid_n) or {}
+            ts_n = h_n["ts"]
+            if ts_n <= int(time.time()) + kupony.MARGINES_STARTU_S:
+                odpadki_nowe["za pozno"] += 1
+                continue
+            baza_n = mk_n.replace("team_", "")
+            # „Rzuty rożne drużyny" -> „Rzuty rożne": przy sumie meczowej
+            # i przy „kto więcej" słowo „drużyny" jest zbędne i czyta się źle
+            # („Rzuty rożne drużyny w meczu")
+            nazwa_bazy = MARKET_NAMES_PL.get(mk_n, mk_n)
+            for _ogon in (" drużyny", " drużyn"):
+                if nazwa_bazy.endswith(_ogon):
+                    nazwa_bazy = nazwa_bazy[: -len(_ogon)]
+                    break
+
+            # --- „KTO WIĘCEJ": trzy wyniki, gramy TYLKO strony drużynowe ---
+            # Remisu nie publikujemy (decyzja usera), ale jest policzony i
+            # odjęty — bez tego szansa drużyny wyszłaby zawyżona nawet o 19 pp
+            # (kartki). Patrz rozliczanie.STRONY_WIECEJ.
+            kursy_w = (oferta_n.get("porownania") or {}).get(mk_n) or {}
+            kod_w = "wiecej_" + baza_n
+            if kursy_w and kod_w in rozliczanie.MARKETY_WIECEJ:
+                p_h, p_remis, p_a = counts.porownanie_druzyn(
+                    h_n["pred"], a_n["pred"]
+                )
+                for strona_w, p_w, kurs_w, kto_w, rywal_w in (
+                    ("gospodarz", p_h, kursy_w.get("home"),
+                     h_n["nazwa"], a_n["nazwa"]),
+                    ("gosc", p_a, kursy_w.get("away"),
+                     a_n["nazwa"], h_n["nazwa"]),
+                ):
+                    if not kurs_w or float(kurs_w) <= 1.0:
+                        continue
+                    ev_w = (p_w * float(kurs_w) - 1.0) * 100.0
+                    if ev_w < betting.MIN_EV_PCT:
+                        odpadki_nowe["kto wiecej: brak wartosci"] += 1
+                        continue
+                    vb_id += 1
+                    n_wiecej += 1
+                    value_bets.append({
+                        "id": vb_id, "mecz_id": mid_n, "mecz": h_n["mecz"],
+                        "kickoff_ts": ts_n,
+                        # podmiot ZAWSZE gospodarz — tak to rozlicza
+                        # rozliczanie.MARKETY_WIECEJ
+                        "podmiot_id": h_n["team_id"],
+                        "podmiot": h_n["home_name"],
+                        "podmiot_typ": "druzyna",
+                        "druzyna": kto_w, "przeciwnik": rywal_w,
+                        "rynek_kod": kod_w,
+                        "rynek": "Więcej: " + nazwa_bazy.lower(),
+                        "linia": 0, "strona": strona_w,
+                        "kurs": float(kurs_w), "bukmacher": "Superbet",
+                        "p_model": round(p_w, 4),
+                        "p_rynku": betting.implied_prob_one_sided(
+                            float(kurs_w)),
+                        "fair_kurs": round(1.0 / max(p_w, 1e-6), 3),
+                        "edge_pp": None,
+                        "ev_pct": round(ev_w, 2),
+                        "pewnosc": "srednia", "pewnosc_score": 50.0,
+                        "ryzyko": "sredni", "rank_score": round(ev_w, 3),
+                        "ci": [None, None], "oczekiwane_minuty": None,
+                        "lambda": round(h_n["pred"].lam, 3),
+                        "rozklad": None, "czynniki": {}, "sugestia": False,
+                        # ile zabiera remis — user ma to widzieć, bo przy
+                        # kartkach to co piąty zakład
+                        "p_remis": round(p_remis, 4),
+                        "uzasadnienie": {
+                            "czynniki": [],
+                            "oczekiwana_liczba": round(h_n["pred"].lam, 2),
+                        },
+                    })
+
+            # --- SUMA MECZOWA: linia i strony jak przy jednej drużynie ---
+            kod_s = "match_" + baza_n
+            linie_s = (oferta_n.get("sumy") or {}).get(kod_s) or {}
+            if linie_s and kod_s in rozliczanie.MARKETY_SUMY:
+                for linia_s, slot_s in sorted(linie_s.items()):
+                    p_over_s = counts.p_over_sumy(
+                        h_n["pred"], a_n["pred"], float(linia_s)
+                    )
+                    for strona_s, p_s, kurs_s in (
+                        ("powyzej", p_over_s, slot_s.get("over")),
+                        ("ponizej", 1.0 - p_over_s, slot_s.get("under")),
+                    ):
+                        if not kurs_s or float(kurs_s) <= 1.0:
+                            continue
+                        ev_s = (p_s * float(kurs_s) - 1.0) * 100.0
+                        if ev_s < betting.MIN_EV_PCT:
+                            continue
+                        # ta sama brama co przy typach: poza oknem zgody
+                        # z rynkiem nie publikujemy
+                        if not betting.w_oknie_zgody(p_s, float(kurs_s)):
+                            odpadki_nowe["suma: rozjazd z rynkiem"] += 1
+                            continue
+                        vb_id += 1
+                        n_sumy += 1
+                        value_bets.append({
+                            "id": vb_id, "mecz_id": mid_n, "mecz": h_n["mecz"],
+                            "kickoff_ts": ts_n,
+                            "podmiot_id": h_n["team_id"],
+                            "podmiot": h_n["home_name"],
+                            "podmiot_typ": "druzyna",
+                            "druzyna": h_n["mecz"], "przeciwnik": "",
+                            "rynek_kod": kod_s,
+                            "rynek": nazwa_bazy + " w meczu",
+                            "linia": float(linia_s), "strona": strona_s,
+                            "kurs": float(kurs_s), "bukmacher": "Superbet",
+                            "p_model": round(p_s, 4),
+                            "p_rynku": betting.implied_prob_one_sided(
+                                float(kurs_s)),
+                            "fair_kurs": round(1.0 / max(p_s, 1e-6), 3),
+                            "edge_pp": None,
+                            "ev_pct": round(ev_s, 2),
+                            "pewnosc": "srednia", "pewnosc_score": 50.0,
+                            "ryzyko": "sredni", "rank_score": round(ev_s, 3),
+                            "ci": [None, None], "oczekiwane_minuty": None,
+                            "lambda": round(
+                                h_n["pred"].lam + a_n["pred"].lam, 3),
+                            "rozklad": None, "czynniki": {}, "sugestia": False,
+                            "uzasadnienie": {
+                                "czynniki": [],
+                                "oczekiwana_liczba": round(
+                                    h_n["pred"].lam + a_n["pred"].lam, 2),
+                            },
+                        })
+        if n_wiecej or n_sumy or odpadki_nowe:
+            szczegoly = ", ".join(
+                str(k) + "=" + str(v) for k, v in odpadki_nowe.most_common()
+            )
+            print("Nowe rynki: kto wiecej " + str(n_wiecej)
+                  + ", sumy meczowe " + str(n_sumy)
+                  + ("; odpadlo: " + szczegoly if odpadki_nowe else ""))
+
         if n_team or team_trends:
             print(f"Rynki drużynowe: +{n_team} legów w puli "
                   f"({len(team_trends)} trendów drużynowych)"

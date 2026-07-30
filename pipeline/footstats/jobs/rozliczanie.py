@@ -809,7 +809,12 @@ def strony_kwarantanna(log: dict | None = None) -> dict[str, dict]:
         and not r.get("sugestia") and not r.get("odrzucony")
         and _z_modelu(r)
         and r.get("kurs") and float(r["kurs"]) > 1.0
-        and r.get("strona") in ("powyzej", "ponizej")
+        # STRONY, KTORE ZNAMY: linia ma dwie („powyzej"/„ponizej"), a rynek
+        # „kto wiecej" — dwie druzynowe („gospodarz"/„gosc"). Bez dopisania
+        # tych drugich nowy rynek wchodzilby BEZ zabezpieczenia, ktore
+        # 2026-07-30 okazalo sie najskuteczniejsze: to ono pokazalo, ze
+        # wszystkie tracace strony to „powyzej".
+        and r.get("strona") in ("powyzej", "ponizej", *STRONY_WIECEJ)
     ]
     out: dict[str, dict] = {}
     pary = {(r["rynek_kod"], r["strona"]) for r in settled}

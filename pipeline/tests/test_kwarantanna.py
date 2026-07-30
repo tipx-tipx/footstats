@@ -471,3 +471,13 @@ def test_korekta_dochodzi_do_zmierzonej_wartosci_przez_cykle():
                             "wygrany" if i % 10 < 4 else "przegrany", kal=d1)
     d2 = rozliczanie.korekta_strumienia(log2)["pewniaki"]
     assert d2 < d1, "korekta musi pogłębiać się między cyklami, nie cofać"
+
+
+def test_kwarantanna_zna_strony_rynku_kto_wiecej():
+    """Nowy rynek ma kierunki „gospodarz"/„gosc", nie „powyzej"/„ponizej".
+    Bez tego wchodziłby BEZ zabezpieczenia, które 30.07 okazało się
+    najskuteczniejsze — to ono pokazało, że wszystkie tracące strony to
+    „powyżej"."""
+    recs = _seria("wiecej_shots", 30, 5, 1.9, strona="gospodarz")
+    kw = rozliczanie.strony_kwarantanna(_log(recs))
+    assert "wiecej_shots:gospodarz" in kw
