@@ -60,6 +60,41 @@ TEAM_MARKET_SUFFIX = {
     "liczba rzutów rożnych": "team_corners",
 }
 
+# „KTO WIĘCEJ" — porównanie dwóch drużyn zamiast linii z dwiema stronami.
+# Rynek ma TRZY wyniki (gospodarz / remis / gość), a nazwa wyniku bywa raz
+# nazwą drużyny, raz „1"/„X"/„2" — obsługujemy oba zapisy.
+#
+# PO CO TO JEST WAŻNE: nasz zmierzony błąd to zawyżanie przewidywanej liczby
+# zdarzeń. W zakładzie „kto więcej" ten błąd SIĘ SKRACA, bo zawyżamy obie
+# drużyny naraz — to jedyny znany nam rynek odporny na naszą główną wadę.
+POROWNANIA_DRUZYN = {
+    "najwięcej strzałów": "team_shots",
+    "najwięcej celnych strzałów": "team_sot",
+    "najwięcej kartek": "team_cards",
+    "najwięcej rzutów rożnych": "team_corners",
+    "najwięcej fauli": "team_fouls",
+}
+
+# SUMA MECZOWA obu drużyn (dziś czytamy tylko gole — reszta leżała odłogiem:
+# „Liczba rzutów rożnych" to 42 kwotowania na mecz, ignorowane w całości).
+SUMY_MECZOWE = {
+    "liczba rzutów rożnych": "match_corners",
+    "liczba strzałów": "match_shots",
+    "liczba celnych strzałów": "match_sot",
+    "liczba kartek": "match_cards",
+    "liczba żółtych kartek": "match_cards",
+    "liczba fauli": "match_fouls",
+}
+
+# Rynki połówkowe i minutowe NIE są naszym zakładem — model liczy pełny mecz.
+_FRAGMENTY_MECZU = ("połowa", "polowa", "minuty", "od 0:00", "przedział",
+                    "przedzial", "h2h", "kto pierwszy", "ostatni")
+
+
+def _fragment_meczu(mname_l: str) -> bool:
+    """Czy nazwa dotyczy wycinka meczu (połowa, okno minutowe, przedział)."""
+    return any(f in mname_l for f in _FRAGMENTY_MECZU)
+
 # nazwy reprezentacji: Superbet (PL) -> Sofascore/statshub (EN)
 TEAM_PL_EN = {
     "Hiszpania": "Spain", "Austria": "Austria", "USA": "USA",
@@ -271,6 +306,10 @@ def fetch_stat_odds(event_id: int, home_pl: str, away_pl: str) -> dict:
     teams: dict = {"home": defaultdict(dict), "away": defaultdict(dict)}
     # kursy meczowe pod tempo/scenariusz meczu (model/tempo.py)
     match: dict = {"h": None, "x": None, "a": None, "totals": defaultdict(dict)}
+    # „kto więcej": kod rynku -> {"home"/"remis"/"away": kurs}
+    porownania: dict = defaultdict(dict)
+    # sumy meczowe obu drużyn: kod rynku -> linia -> {"over"/"under": kurs}
+    sumy: dict = defaultdict(lambda: defaultdict(dict))
 
     for o in odds:
         if o.get("status") == "block":
@@ -281,6 +320,41 @@ def fetch_stat_odds(event_id: int, home_pl: str, away_pl: str) -> dict:
         mname = (o.get("marketName") or "").strip()
         oname = (o.get("name") or "").strip()
         spec = o.get("specifiers") or {}
+
+        mname_l_pelna = mname.lower()
+
+        # --- „KTO WIĘCEJ": trzy wyniki, bez linii ---
+        if (mname_l_pelna in POROWNANIA_DRUZYN
+                and not _fragment_meczu(mname_l_pelna)):
+            kod = POROWNANIA_DRUZYN[mname_l_pelna]
+            on_l = oname.lower()
+            # nazwa wyniku: raz nazwa drużyny, raz „1"/„X"/„2"
+            if on_l in ("x", "remis"):
+                strona = "remis"
+            elif oname == "1" or (home_pl and oname == home_pl):
+                strona = "home"
+            elif oname == "2" or (away_pl and oname == away_pl):
+                strona = "away"
+            else:
+                strona = None
+            if strona:
+                porownania[kod][strona] = float(price)
+            continue
+
+        # --- SUMA MECZOWA obu drużyn (bez nazwy drużyny w nazwie rynku) ---
+        if (mname_l_pelna in SUMY_MECZOWE and spec.get("total")
+                and not _fragment_meczu(mname_l_pelna)):
+            kod_s = SUMY_MECZOWE[mname_l_pelna]
+            try:
+                linia_s = float(spec["total"])
+            except (TypeError, ValueError):
+                linia_s = None
+            on_l = oname.lower()
+            strona_s = ("over" if "powyżej" in on_l
+                        else "under" if "poniżej" in on_l else None)
+            if linia_s is not None and strona_s:
+                sumy[kod_s][linia_s][strona_s] = float(price)
+            continue
 
         # --- 1X2 (rynek "Mecz") i total goli ("Liczba goli") ---
         if mname == "Mecz" and oname in ("1", "X", "2"):
@@ -348,4 +422,8 @@ def fetch_stat_odds(event_id: int, home_pl: str, away_pl: str) -> dict:
     return {"players": {k: dict(v) for k, v in players.items()},
             "player_names": player_names,
             "teams": {k: dict(v) for k, v in teams.items()},
+            # „kto więcej" i sumy meczowe — nowe rodzaje zakładu (2026-07-30)
+            "porownania": {k: dict(v) for k, v in porownania.items()},
+            "sumy": {k: {l: dict(v) for l, v in lin.items()}
+                     for k, lin in sumy.items()},
             "match": {**match, "totals": {k: dict(v) for k, v in match["totals"].items()}}}
