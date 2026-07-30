@@ -333,6 +333,14 @@ export interface RadarWpis {
     klasa: "top" | "mocny" | "solidny";
     /** przewaga nad kursem w punktach prawdopodobieństwa */
     edge: number;
+    /**
+     * Na czym stoi karta:
+     *   "przewaga" — nasza szansa bije cenę bukmachera,
+     *   "seria"    — mocne pokrycie przy grywalnej cenie, BEZ przewagi.
+     * Karta bez przewagi nie ma prawa wyglądać jak karta z przewagą,
+     * dlatego front pisze to wprost (decyzja usera 2026-07-30).
+     */
+    powod_wejscia?: "przewaga" | "seria";
     p_final?: number | null;
     p_bazowe?: number | null;
     korekta?: number | null;

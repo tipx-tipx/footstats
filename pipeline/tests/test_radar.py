@@ -321,14 +321,16 @@ def test_drabinka_przycieta_z_szumu():
 
 
 def test_bramy_odrzucaja_karte_bez_przewagi_nad_kursem():
-    # gracz z pokryciem 7/10, ale kurs 1.70 wycenia to na 59% — po korekcie
-    # próby (Wilson) przewagi nie ma, więc karta NIE powstaje. Mocny gracz
-    # (10/10 przy 2.10) przechodzi. Kolejność wynikowa: chronologiczna.
+    # Gracz bez przewagi I bez mocnej serii (5/10 przy 1,70) NIE tworzy karty.
+    # UWAGA na fiksturę: od 2026-07-30 karta ma DWIE ścieżki wejścia, więc
+    # pokrycie 7/10 przy tym kursie weszłoby jako „mocna seria" — i dlatego
+    # ten test ma teraz gracza faktycznie słabego. Ścieżkę serii sprawdzają
+    # testy niżej (test_mocna_seria_wchodzi_bez_przewagi_nad_kursem).
     def _meta(ts):
         return {"label": "A – B", "ts": ts, "hid": 100, "aid": 200,
                 "home": "A", "away": "B"}
     slaby = _trend(player_id=1, utids=[LIGA_NOWA] * 14,
-                   counts=[1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1])
+                   counts=[1, 0, 0, 1, 1, 0, 1, 0, 1, 0, 1, 1, 0, 1])
     mocny = _trend(player_id=2, utids=[LIGA_NOWA] * 14,
                    counts=SIEDEM_Z_DZIESIECIU)
     pozny = _trend(player_id=3, utids=[LIGA_NOWA] * 14,
@@ -714,3 +716,40 @@ def test_korekta_strumienia_widac_w_p_final_karty():
     (bez,) = radar.zbuduj(**_pod_karte())
     (z_korekta,) = radar.zbuduj(**_pod_karte(korekta_logit=-0.05))
     assert z_korekta["ocena"]["p_final"] < bez["ocena"]["p_final"]
+
+
+# --- DRUGA ŚCIEŻKA WEJŚCIA: MOCNA SERIA (2026-07-30) -----------------------
+
+
+def test_mocna_seria_wchodzi_bez_przewagi_nad_kursem():
+    """Decyzja usera: „drabinka to nie tylko przewaga nad kursem".
+    7/10 przy kursie 2,0 to wartościowa karta, nawet gdy nasza szansa nie
+    bije ceny — pokazuje realny wzorzec, a nie naszą opinię o cenie."""
+    karta = _karta_do_oceny(7, kurs=2.0, p_final=0.47)
+    _score, hero = radar._oceń_karte(karta)
+    assert hero is not None
+    assert hero["powod_wejscia"] == "seria"
+    assert hero["edge"] < radar.MIN_EDGE_KARTY   # przewagi NIE ma
+
+
+def test_seria_z_przewaga_stoi_na_przewadze():
+    """Gdy linia ma i serię, i przewagę — karta stoi na przewadze."""
+    # kurs 2,3 przy szansie 0,47 to przewaga +3,5 pp i wciąż w oknie zgody
+    # z rynkiem (przy 2,5 karta odpadłaby na zbyt dużym rozjeździe)
+    _score, hero = radar._oceń_karte(_karta_do_oceny(7, kurs=2.3, p_final=0.47))
+    assert hero is not None and hero["powod_wejscia"] == "przewaga"
+
+
+def test_slaba_seria_przy_taniej_cenie_dalej_odpada():
+    """68 z 87 odrzuceń to tanie linie — ich wpuszczenie zamieniłoby
+    „za mało kart" na „dużo słabych kart" (pomiar 30.07)."""
+    _score, hero = radar._oceń_karte(_karta_do_oceny(5, kurs=1.6, p_final=0.40))
+    assert hero is None
+
+
+def test_seria_jawnie_gorsza_od_ceny_odpada():
+    """Przewaga nie jest wymagana, ale karta nie może być jawnie gorsza:
+    przy −6 pp nasze własne liczby mówią, że rację ma bukmacher."""
+    karta = _karta_do_oceny(7, kurs=2.0, p_final=0.40)   # edge = −0,10
+    _score, hero = radar._oceń_karte(karta)
+    assert hero is None

@@ -174,6 +174,28 @@ MIN_NIEZEROWYCH_RYNKU = 5   # rynek, w którym zawodnik ma <5 niezerowych
 MAX_RYNKOW_KARTY = 3        # tyle rynków max na karcie, wybrane po jakości
 MIN_MINUT_KARTY = 62        # zmiennik (52-55 min śr.) to ryzyko, nie typ
 MIN_EDGE_KARTY = 0.03       # przewaga po korekcie próby, w pkt proc.
+
+# --- DRUGA ŚCIEŻKA WEJŚCIA: MOCNA SERIA (decyzja usera 2026-07-30) ---
+# „Drabinka to nie tylko przewaga nad kursem" — karta „7 na 10 meczów po 2+
+# faule, kurs 2,50" jest wartościowa niezależnie od tego, czy nasza szansa
+# bije cenę, bo pokazuje realny wzorzec, a nie naszą opinię o cenie.
+#
+# PROGI Z POMIARU, nie z wyczucia. Dry-run 30.07 rozbił 87 kandydatów
+# odrzuconych na przewadze wg pokrycia i ceny:
+#     mocne 7+/10, kurs 1,7-2,0   =  8      <- wpuszczamy
+#     mocne 7+/10, kurs 2,0+      =  1      <- wpuszczamy
+#     srednie 6/10, kurs 2,0+     =  3      <- wpuszczamy
+#     slabe 5/10, kurs do 1,7     = 34      <- odrzucamy dalej
+# 68 z 87 odrzuceń to tanie linie poniżej 1,7 — wpuszczenie ich zamieniłoby
+# „za mało kart" na „dużo słabych kart", czyli nie rozwiązałoby problemu.
+PROG_POKRYCIA_SERII = 0.70   # mocna seria...
+MIN_KURS_SERII = 1.70        # ...przy cenie, która jest coś warta
+# ...albo seria trochę słabsza, ale przy wyraźnie wyższej stawce
+PROG_POKRYCIA_SERII_DROGIEJ = 0.60
+MIN_KURS_SERII_DROGIEJ = 2.00
+# Przewaga NIE jest wymagana, ale karta nie może być jawnie gorsza od ceny:
+# przy −6 pp nasze własne liczby mówią, że bukmacher ma rację, a my nie.
+MIN_EDGE_SERII = -0.06
 # GÓRNA granica przewagi — brama zgody z rynkiem (pomiar 2026-07-27 na 336
 # rozliczonych typach modelu, patrz betting.OKNO_ZGODY_*): im mocniej nasza
 # szansa rozjeżdża się z ceną bukmachera, tym RZADZIEJ mamy rację.
@@ -793,6 +815,7 @@ def _oceń_karte(
     powody: Counter | None = None,
     pomiar_out: list | None = None,
     powody_pomiaru: Counter | None = None,
+    statystyki: Counter | None = None,
 ) -> tuple[float, dict | None]:
     """Ocena karty: (score, najlepszy_szczebel) albo (0.0, None) gdy odpada.
 
@@ -832,8 +855,11 @@ def _oceń_karte(
         if powody is not None:
             powody["rzadko_w_pierwszym_skladzie"] += 1
         return 0.0, None
-    best_score, best_s = 0.0, None
-    pomiar_score, pomiar_s = 0.0, None
+    # -inf, nie 0: linia wpuszczona jako MOCNA SERIA ma prawo mieć ujemną
+    # przewagę (patrz MIN_EDGE_SERII), więc próg 0,0 wycinałby dokładnie te
+    # karty, dla których druga ścieżka powstała
+    best_score, best_s = float("-inf"), None
+    pomiar_score, pomiar_s = float("-inf"), None
     lokalne: Counter = Counter()
     for r in w.get("rynki", []):
         for s in r.get("drabinka", []):
@@ -878,9 +904,39 @@ def _oceń_karte(
                     s["p_final"] = p_final
                     s["strzyzenie_modelu"] = True
             edge = p_final - 1.0 / s["kurs"]
-            if edge < (MIN_EDGE_POMIARU if pomiarowy else MIN_EDGE_KARTY):
+            # DWA POWODY, DLA KTÓRYCH LINIA MOŻE WEJŚĆ NA KARTĘ (patrz
+            # PROG_POKRYCIA_SERII): przewaga nad kursem ALBO mocna seria przy
+            # grywalnej cenie. Kolejność ma znaczenie — gdy linia ma przewagę,
+            # karta stoi na przewadze; seria jest wtedy tylko dodatkiem.
+            seria = (
+                not pomiarowy
+                and edge >= MIN_EDGE_SERII
+                and (
+                    (pokrycie >= PROG_POKRYCIA_SERII
+                     and s["kurs"] >= MIN_KURS_SERII)
+                    or (pokrycie >= PROG_POKRYCIA_SERII_DROGIEJ
+                        and s["kurs"] >= MIN_KURS_SERII_DROGIEJ)
+                )
+            )
+            if edge < (MIN_EDGE_POMIARU if pomiarowy else MIN_EDGE_KARTY) \
+                    and not seria:
                 if not pomiarowy:
                     lokalne["brak_przewagi"] += 1
+                    # CO DOKŁADNIE ODPADA NA PRZEWADZE (2026-07-30). User:
+                    # „drabinka to nie tylko przewaga nad kursem" — karta
+                    # z mocną serią przy grywalnej cenie też jest wartościowa.
+                    # Zanim wpuścimy drugą ścieżkę wejścia, trzeba wiedzieć,
+                    # ile z tych odrzuceń to naprawdę mocne serie, a ile
+                    # 5/10 przy kursie 1,5. Bez tego zamienimy „za mało kart"
+                    # na „dużo słabych kart".
+                    if statystyki is not None:
+                        pas_p = ("mocne 7+/10" if pokrycie >= 0.7 else
+                                 "srednie 6/10" if pokrycie >= 0.6 else
+                                 "slabe 5/10")
+                        pas_k = ("kurs 2,0+" if s["kurs"] >= 2.0 else
+                                 "kurs 1,7-2,0" if s["kurs"] >= 1.7 else
+                                 "kurs do 1,7")
+                        statystyki[f"{pas_p} / {pas_k}"] += 1
                 elif powody_pomiaru is not None:
                     powody_pomiaru["ponizej_ceny_fair"] += 1
                 continue
@@ -902,6 +958,10 @@ def _oceń_karte(
                 "p_final": p_final,
                 "p_bazowe": s.get("p_bazowe"),
                 "korekta": s.get("korekta"),
+                # na czym stoi ta linia — front ma to napisać wprost, żeby
+                # karta bez przewagi nie udawała karty z przewagą
+                "powod_wejscia": ("przewaga" if edge >= MIN_EDGE_KARTY
+                                  else "seria"),
             }
             if pomiarowy:
                 if edge > pomiar_score:
@@ -916,7 +976,7 @@ def _oceń_karte(
         powody[
             lokalne.most_common(1)[0][0] if lokalne else "brak_drabinki"
         ] += 1
-    return best_score, best_s
+    return (best_score if best_s is not None else 0.0), best_s
 
 
 def _klasa_karty(edge: float, miejsce: int = 1, ile: int = 1) -> str:
@@ -1495,11 +1555,12 @@ def zbuduj(
     powody_odpadniecia: Counter = Counter()
     pomiar_kandydaci: list[dict] = []
     powody_pomiaru: Counter = Counter()
+    statystyki_przewagi: Counter = Counter()
     for w in wpisy:
         pom: list[dict] | None = [] if pomiar_out is not None else None
         score, hero = _oceń_karte(
             w, powody_odpadniecia, pomiar_out=pom,
-            powody_pomiaru=powody_pomiaru,
+            powody_pomiaru=powody_pomiaru, statystyki=statystyki_przewagi,
         )
         if pom:
             # jeden pomiar na zawodnika w meczu — najlepszy szczebel spod progu
@@ -1521,6 +1582,12 @@ def zbuduj(
         pomiar_kandydaci.sort(key=lambda s: -s["edge"])
         if pomiar_out is not None:
             pomiar_out.extend(pomiar_kandydaci[:MAX_POMIAROW_CYKLU])
+    if statystyki_przewagi:
+        # rozkład tego, co odpada na braku przewagi — materiał pod decyzję
+        # o drugiej ścieżce wejścia (mocna seria zamiast przewagi)
+        print("Drabinki — odrzucone na przewadze wg jakości: " + ", ".join(
+            f"{k}={v}" for k, v in statystyki_przewagi.most_common()
+        ))
     if powody_pomiaru:
         # PUSTY POMIAR TO TEŻ WYNIK: bez tej linijki „zero typów pomiarowych"
         # wygląda tak samo jak „bukmacher nie kwotuje takich linii", a to
@@ -1575,6 +1642,11 @@ def zbuduj(
             "miejsce": miejsce,
             "klasa": _klasa_karty(w["_score"], miejsce, len(wpisy)),
             "edge": round(w["_score"], 3),
+            # NA CZYM STOI KARTA: „przewaga" (nasza szansa bije cenę) albo
+            # „seria" (mocne pokrycie przy grywalnej cenie, bez przewagi).
+            # Front pisze to wprost — karta bez przewagi nie ma prawa
+            # wyglądać jak karta z przewagą.
+            "powod_wejscia": hero.get("powod_wejscia") or "przewaga",
             "p_final": hero.get("p_final"),
             "p_bazowe": hero.get("p_bazowe"),
             "korekta": hero.get("korekta"),

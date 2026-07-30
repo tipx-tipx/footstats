@@ -842,6 +842,19 @@ export const RadarCard = memo(function RadarCard({
                 )}
               </span>
             )}
+            {/* NA CZYM STOI KARTA. Od 2026-07-30 karta może wejść z dwóch
+                powodów: przewagi nad kursem albo mocnej serii przy grywalnej
+                cenie. Druga ścieżka nie ma prawa udawać pierwszej, więc
+                mówimy o niej wprost — to jest ta sama zasada, co przy
+                „różnica kursów to dowód, nie przepustka". */}
+            {w.ocena?.powod_wejscia === "seria" && (
+              <span
+                title="Karta stoi na serii, nie na przewadze: zawodnik regularnie przebija tę linię, a cena jest grywalna. Nasza szansa NIE bije tu kursu bukmachera — to wzorzec z ostatnich meczów, nie wycena."
+                className="font-data inline-flex items-center rounded-full bg-paper px-2.5 py-0.5 text-xs font-semibold text-ink-soft"
+              >
+                mocna seria
+              </span>
+            )}
             {sygnal && (
               <span
                 title={sygnal.tytul}
