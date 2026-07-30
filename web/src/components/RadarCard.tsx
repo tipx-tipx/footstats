@@ -500,6 +500,93 @@ function SzczebelWiersz({ r, s }: { r: RadarRynek; s: RadarSzczebel }) {
   );
 }
 
+/** Odmiana rzeczownika rynku po liczbie: 1 strzał / 2 strzały / 5 strzałów. */
+const ODMIANY: Record<string, [string, string, string]> = {
+  shots: ["strzał", "strzały", "strzałów"],
+  sot: ["celny strzał", "celne strzały", "celnych strzałów"],
+  shots_outside_box: [
+    "strzał zza pola", "strzały zza pola", "strzałów zza pola",
+  ],
+  headed_sot: [
+    "celny strzał głową", "celne strzały głową", "celnych strzałów głową",
+  ],
+  fouls_committed: ["faul", "faule", "fauli"],
+  fouls_won: [
+    "faul na nim", "faule na nim", "fauli na nim",
+  ],
+  tackles: ["odbiór", "odbiory", "odbiorów"],
+  offsides: ["spalony", "spalone", "spalonych"],
+  interceptions: ["przechwyt", "przechwyty", "przechwytów"],
+};
+
+function odmien(n: number, kod: string): string {
+  const f = ODMIANY[kod];
+  if (!f) return "";
+  if (n === 1) return f[0];
+  const d = n % 10;
+  const s = n % 100;
+  return d >= 2 && d <= 4 && !(s >= 12 && s <= 14) ? f[1] : f[2];
+}
+
+/** Poniżej tylu minut występ jest zbyt krótki, żeby liczba coś znaczyła. */
+const KROTKI_WYSTEP_MIN = 60;
+
+/**
+ * Mecz po meczu, zdaniami — nie samym ciągiem liczb.
+ *
+ * Wzorzec, który user przysłał jako docelowy dla Drabinek, opisuje KAŻDY mecz
+ * osobno („3 strzały zza pola vs Radomiak", „1 strzał vs Miedź, 40 minut gry").
+ * Dopiero taki zapis pozwala odróżnić zero po pełnym meczu od zera po wejściu
+ * z ławki — a to zupełnie inna informacja o zawodniku.
+ */
+function RywaleMeczPoMeczu({ r }: { r: RadarRynek }) {
+  const n = r.ostatnie?.length ?? 0;
+  if (!n || !r.rywale?.length) return null;
+  return (
+    <ul className="mt-2 space-y-0.5">
+      {r.ostatnie!.slice(0, n).map((c, i) => {
+        const rywal = r.rywale?.[i];
+        const min = r.minuty?.[i];
+        const krotki = min != null && min < KROTKI_WYSTEP_MIN;
+        return (
+          <li
+            key={i}
+            className="flex items-baseline gap-1.5 text-[11px] leading-relaxed"
+          >
+            <span
+              className={`font-data font-semibold ${
+                c > 0 ? "text-ink-soft" : "text-faint"
+              }`}
+            >
+              {c}
+            </span>
+            <span className={c > 0 ? "text-muted" : "text-faint"}>
+              {odmien(c, r.rynek_kod)}
+            </span>
+            {rywal && (
+              <span className="truncate text-muted">vs {rywal}</span>
+            )}
+            {min != null && (
+              <span
+                className={`font-data ml-auto shrink-0 ${
+                  krotki ? "text-data-amber-ink" : "text-faint"
+                }`}
+                title={
+                  krotki
+                    ? "Krótki występ — z tej liczby niewiele wynika"
+                    : undefined
+                }
+              >
+                {min} min
+              </span>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 /** Blok jednego rynku: nagłówek, drabinka-tabela, ostatnie mecze, kontekst. */
 function RynekBlok({ r }: { r: RadarRynek }) {
   return (
@@ -581,12 +668,14 @@ function RynekBlok({ r }: { r: RadarRynek }) {
               </span>
             ))}
           </div>
-          {r.rywale && r.rywale.length > 0 && (
-            <p className="mt-1 truncate text-[10px] text-faint">
-              od najnowszego: vs {r.rywale.slice(0, 4).join(", vs ")}
-              {r.rywale.length > 4 ? "…" : ""}
-            </p>
-          )}
+          {/* MECZ PO MECZU, NIE SAM CIĄG LICZB (wzorzec typera, którego user
+              przysłał jako docelowy: „3 strzały vs Radomiak", „1 strzał vs
+              Miedź (40 min gry)"). Kafelki wyżej zostają na szybki rzut oka,
+              ale nazwa rywala i minuty nie mogą siedzieć w dymku — to jest
+              treść, po którą czyta się rozwinięcie. Krótkie występy
+              wyróżniamy, bo „0 strzałów" po 20 minutach znaczy co innego niż
+              po pełnym meczu. */}
+          <RywaleMeczPoMeczu r={r} />
         </div>
       )}
 
