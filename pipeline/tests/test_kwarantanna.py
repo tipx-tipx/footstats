@@ -419,3 +419,29 @@ def test_pewniak_ktory_zarabia_nie_jest_wstrzymywany():
     zostaje (na 29.07 `pewniak` miał w oknie +10% i przechodził)."""
     recs = _seria("shots", 30, 25, 1.7, pewniak=True)
     assert "pewniak" not in rozliczanie.kategorie_kwarantanna(_log(recs))
+
+
+# --- KWARANTANNA STRONY LINII (2026-07-30) ---------------------------------
+
+
+def test_strona_linii_ma_wlasna_kwarantanne():
+    """Pomiar 30.07 na 108 typach drużynowych: „powyżej" ROI −15%,
+    „poniżej" +8% na tych samych rynkach. Kwarantanna rynkowa widziała
+    tylko średnią, więc rynek wypadał cały albo zostawał cały."""
+    recs = (_seria("team_goals", 30, 5, 1.7, strona="powyzej")   # tonie
+            + _seria("team_goals", 30, 25, 1.5, strona="ponizej"))
+    kw = rozliczanie.strony_kwarantanna(_log(recs))
+    assert "team_goals:powyzej" in kw
+    assert "team_goals:ponizej" not in kw
+    assert kw["team_goals:powyzej"]["strona"] == "powyzej"
+
+
+def test_strona_na_krotkiej_probie_nie_jest_oceniana():
+    recs = _seria("shots", rozliczanie.STRONA_MIN_N - 1, 0, 1.7,
+                  strona="powyzej")
+    assert rozliczanie.strony_kwarantanna(_log(recs)) == {}
+
+
+def test_dochodowa_strona_zostaje():
+    recs = _seria("team_corners", 30, 24, 1.5, strona="ponizej")
+    assert rozliczanie.strony_kwarantanna(_log(recs)) == {}

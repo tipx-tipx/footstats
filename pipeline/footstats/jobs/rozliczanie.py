@@ -727,6 +727,81 @@ def rynki_kwarantanna(log: dict | None = None) -> dict[str, dict]:
     return out
 
 
+# KWARANTANNA STRONY LINII (2026-07-30). Ta sama mechanika co przy rynkach,
+# ale bramą jest STRONA zakładu na danym rynku: „gole drużyny powyżej" osobno
+# od „gole drużyny poniżej".
+#
+# POWÓD — pomiar na 108 rozliczonych typach drużynowych:
+#     „powyżej"  mówiliśmy 74%, weszło 59%  ROI −15%
+#     „poniżej"  mówiliśmy 72%, weszło 69%  ROI  +8%
+# Różnica 23 punktów ROI na tym samym rynku. Kwarantanna rynkowa tego nie
+# widziała, bo miesza obie strony w jeden licznik i wychodzi jej średnia —
+# rynek albo wypada cały (razem z dobrą stroną), albo zostaje cały (razem
+# ze złą). Żadna z tych dwóch odpowiedzi nie jest prawdziwa.
+#
+# Świadomie NIE wpisujemy na sztywno „gramy tylko poniżej": 108 rozliczeń to
+# za mało na taką decyzję, a mechanizm z histerezą sam to wybierze z danych
+# i sam odkręci, gdy strona się poprawi.
+STRONA_MIN_N = 15
+STRONA_OKNO = 50
+
+
+def _byla_wstrzymana_strona(grp: list[dict]) -> bool:
+    return any(
+        r.get("poza_publikacja") == "kwarantanna_strony"
+        for r in grp[-KWARANTANNA_HISTEREZA_OKNO:]
+    )
+
+
+def strony_kwarantanna(log: dict | None = None) -> dict[str, dict]:
+    """Strony linii chwilowo poza publikacją: {"team_goals:powyzej": {...}}.
+
+    ROI z okna ostatnich rozliczeń danej pary (rynek, strona), z tą samą
+    histerezą wejścia/wyjścia co kwarantanna rynków.
+    """
+    if log is None:
+        log = _migruj_log(supa.get_key("typy_log") or {})
+    settled = [
+        r for r in log.values()
+        if r.get("wynik") in ("wygrany", "przegrany")
+        and not r.get("sugestia") and not r.get("odrzucony")
+        and _z_modelu(r)
+        and r.get("kurs") and float(r["kurs"]) > 1.0
+        and r.get("strona") in ("powyzej", "ponizej")
+    ]
+    out: dict[str, dict] = {}
+    pary = {(r["rynek_kod"], r["strona"]) for r in settled}
+    for mk, strona in pary:
+        grp = sorted(
+            (r for r in settled
+             if r["rynek_kod"] == mk and r["strona"] == strona),
+            key=lambda r: r.get("kickoff_ts") or 0,
+        )[-STRONA_OKNO:]
+        if len(grp) < STRONA_MIN_N:
+            continue
+        traf = sum(1 for r in grp if r["wynik"] == "wygrany")
+        roi = sum(
+            (float(r["kurs"]) - 1.0) if r["wynik"] == "wygrany" else -1.0
+            for r in grp
+        ) / len(grp)
+        if roi < KWARANTANNA_ROI_WEJSCIE:
+            wstrzymana = True
+        elif roi > KWARANTANNA_ROI_WYJSCIE:
+            wstrzymana = False
+        else:
+            wstrzymana = _byla_wstrzymana_strona(grp)
+        if wstrzymana:
+            out[f"{mk}:{strona}"] = {
+                "roi": round(roi, 3), "n": len(grp),
+                "hit": round(traf / len(grp), 3),
+                "sr_p": round(
+                    sum(float(r["p_model"]) for r in grp) / len(grp), 3),
+                "rynek": grp[0].get("rynek") or mk,
+                "strona": strona,
+            }
+    return out
+
+
 def kwarantanna() -> dict[str, dict]:
     """Kwarantanna rynków z logu w Supabase (pusta, gdy brak danych/env)."""
     log = _migruj_log(supa.get_key("typy_log") or {})

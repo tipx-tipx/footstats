@@ -95,11 +95,19 @@ MIN_P_SZCZEBLA = 0.03       # od 3. szczebla w górę: p_model < 3% ucina reszt�
 MAX_KURS_SZCZEBLA = 12.0    # ...podobnie kurs powyżej tego progu
 # pierwszy szczebel drabinki od 1.65 (decyzja usera 2026-07-25): linie po
 # 1.2-1.5 to pewniaki bez value — drabinka ma zaczynać się od grywalnej ceny
-MIN_KURS_PIERWSZEGO = 1.65
+# ZEJŚCIE 1,65 -> 1,45 (2026-07-30) — wymuszone sufitem linii wyżej.
+# Sufit „3+" zostawia na karcie tylko niskie linie, a te są tanie: linia 2+
+# kosztuje zwykle 1,45–1,80. Przy progu 1,65 dry-run z sufitem dał ZERO kart
+# (wcześniej 1–3), bo cała drabinka wypadała na cenie. Dwa życzenia usera —
+# „max 3+" i „za mało kart" — da się spełnić naraz tylko wtedy, gdy próg ceny
+# zejdzie razem z sufitem linii.
+MIN_KURS_PIERWSZEGO = 1.45
 # --- TWARDE BRAMY JAKOŚCI (decyzja usera 2026-07-25: „tylko najlepsze
 # drabinki, nie randomowe"). Sygnał (transfer/forma/debiutant) NIE jest już
 # przepustką — zostaje plakietką, ale karta musi obronić się liczbami. ---
-MIN_KURS_SCORE = 1.65       # linia liczy się dopiero od grywalnej ceny
+MIN_KURS_SCORE = 1.45       # linia liczy się dopiero od grywalnej ceny
+                            # (zeszło z 1,65 razem z MIN_KURS_PIERWSZEGO —
+                            # patrz tam, sufit linii „3+" wymusza tańsze linie)
 MIN_PROBA_SCORE = 8         # min. występów w próbie (było 5 — za krótkie
                             # serie udawały pewniaki: 3/5 = "60%")
 # Surowe pokrycie linii. ZEJŚCIE 0.6 -> 0.5 (decyzja usera 2026-07-26):

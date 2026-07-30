@@ -415,9 +415,9 @@ def test_brama_jakosci_tnie_slabe_drabinki_a_sygnaly_zostawia():
     assert wpisy == []
 
 
-def test_pierwszy_szczebel_od_165():
-    # piątki, żeby oba szczeble (2,5 i 3,5) miały realne pokrycie — test
-    # dotyczy progu KURSU pierwszego szczebla, nie pustych linii
+def test_pierwszy_szczebel_od_progu_ceny():
+    # piątki, żeby szczeble miały realne pokrycie — test dotyczy progu KURSU
+    # pierwszego szczebla, nie pustych linii
     tr = _trend(utids=[LIGA_NOWA] * 14,
                 counts=[5, 5, 0, 5, 5, 0, 5, 5, 5, 0, 5, 5, 0, 5])
     wpisy = radar.zbuduj(
@@ -430,10 +430,11 @@ def test_pierwszy_szczebel_od_165():
         teraz=TERAZ,
     )
     (rynek,) = wpisy[0]["rynki"]
-    # 0,5 @1.20 i 1,5 @1.55 odpadają na progu kursu — drabinka rusza od 2,5.
-    # 3,5 nie wchodzi od 2026-07-30: sufit linii dla strzałów to „3+" (2,5),
-    # decyzja usera. Test dalej pilnuje tego, o co był: progu KURSU.
-    assert [s["linia"] for s in rynek["drabinka"]] == [2.5]
+    # 0,5 @1.20 odpada na progu ceny (MIN_KURS_PIERWSZEGO = 1,45), 1,5 @1.55
+    # już wchodzi. 3,5 nie wchodzi od 2026-07-30: sufit linii dla strzałów to
+    # „3+" (2,5). Próg ceny zszedł razem z sufitem — inaczej przy samych
+    # niskich liniach karta nie powstawałaby wcale (dry-run: zero kart).
+    assert [s["linia"] for s in rynek["drabinka"]] == [1.5, 2.5]
 
 
 def test_sufit_linii_na_karcie():

@@ -1992,23 +1992,18 @@ def _main_impl(tryb=None):
             out["ev_pct"] = round((p * float(b["kurs"]) - 1.0) * 100.0, 2)
         return out
 
-    # korekta strumienia drużynowego jako gotowa delta logitowa — stosowana
-    # osobno, już PO wyborze strony zakładu (patrz pętla linii drużynowych)
-    _KOR_DRUZYNY = (
-        {"logit": True, "global": korekta_strumieni["druzyny"], "bins": []}
-        if korekta_strumieni.get("druzyny") else None
-    )
+    # Korekta strumienia drużynowego NIE jest już stosowana po wyborze strony
+    # zakładu — wchodzi do kalibracji „powyżej" razem z biasem rynku
+    # (patrz pętla linii drużynowych i pomiar z 2026-07-30).
 
-    def _bias_z_korekta(mk: str, strumien: str):
-        """Kalibracja rynku + korekta strumienia, w jednej delcie logitowej.
+    def _dodaj_delte(v, d: float):
+        """Kalibracja rynku + delta logitowa, w jednej korekcie.
 
-        Rynek BEZ własnej kalibracji (za mało rozliczeń) też dostaje korektę —
+        Rynek BEZ własnej kalibracji (za mało rozliczeń) też dostaje deltę —
         inaczej nowy rynek startowałby z pełnym przeszacowaniem strumienia.
         Stary format mnożnikowy zostawiamy nietknięty: mieszanie mnożnika
         z deltą logitową dałoby liczbę, której nikt później nie odtworzy.
         """
-        v = bias_map.get(mk)
-        d = korekta_strumieni.get(strumien, 0.0)
         if not d:
             return v if v is not None else 1.0
         if isinstance(v, dict) and v.get("logit"):
@@ -2021,6 +2016,11 @@ def _main_impl(tryb=None):
         if v is None or v == 1.0:
             return {"logit": True, "global": round(d, 3), "bins": []}
         return v
+
+    def _bias_z_korekta(mk: str, strumien: str):
+        """Kalibracja rynku danego kodu + korekta jego strumienia."""
+        return _dodaj_delte(bias_map.get(mk),
+                            korekta_strumieni.get(strumien, 0.0))
 
     # BRAMA PUBLIKACJI: rynki tracące pieniądze w oknie ostatnich rozliczeń
     # wypadają z publikacji (pewniaki, pula kuponów), ale dalej są scorowane
@@ -2050,6 +2050,21 @@ def _main_impl(tryb=None):
     except Exception as e:
         kwarantanna_kategorii = {}
         print(f"Kwarantanna kategorii pominięta ({e})")
+    # TA SAMA BRAMA, ale po STRONIE LINII. Kwarantanna rynkowa miesza „powyżej"
+    # z „poniżej" w jeden licznik i wychodzi jej średnia, a pomiar 30.07 mówi,
+    # że to dwa różne światy: na tych samych rynkach „powyżej" ma ROI od −12%
+    # do −32%, a „poniżej" nie wypada nigdzie. Bez tego wymiaru rynek albo
+    # wypadał cały (razem z dobrą stroną), albo zostawał cały (razem ze złą).
+    try:
+        kwarantanna_stron = rozliczanie.strony_kwarantanna()
+        if kwarantanna_stron:
+            print("Kwarantanna strony linii: " + ", ".join(
+                f"{v['rynek']} {v['strona']} (ROI {v['roi']:+.0%}, "
+                f"hit {v['hit']:.0%} vs p {v['sr_p']:.0%}, n={v['n']})"
+                for v in kwarantanna_stron.values()))
+    except Exception as e:
+        kwarantanna_stron = {}
+        print(f"Kwarantanna strony pominięta ({e})")
 
     ev_by_id = {e["id"]: e for e in events}
     sb_cache: dict[int, dict] = {}
@@ -2841,7 +2856,12 @@ def _main_impl(tryb=None):
             # brama jakości (liga): okazja na starych danych nie wchodzi do
             # publikacji, rozlicza się i uczy kalibrację w tle. To samo dotyczy
             # okazji, która powstałaby tuż przed gwizdkiem (zapas na obstawienie)
-            if not betting.w_oknie_zgody(a.model_prob, kurs_wziety):
+            if f"{mk}:{a.side}" in kwarantanna_stron:
+                # ta STRONA tego rynku traci pieniądze w oknie rozliczeń —
+                # rynek jako całość może być w porządku (pomiar 30.07)
+                rec_okazji["poza_publikacja"] = "kwarantanna_strony"
+                typy_poza_publikacja.append(rec_okazji)
+            elif not betting.w_oknie_zgody(a.model_prob, kurs_wziety):
                 rec_okazji["poza_publikacja"] = "rozjazd_z_rynkiem"
                 typy_poza_publikacja.append(rec_okazji)
             elif stare_dane:
@@ -3369,7 +3389,28 @@ def _main_impl(tryb=None):
             # którą faktycznie typujemy (patrz `_korekta_strony`)
             bias_t = bias_map.get(tt.market_code, 1.0)
             for l_t, slot_t in sorted(linie_t.items()):
-                p_over_t = apply_bias(bias_t, pred_t.p_over(l_t))
+                # KOREKTA ZAWSZE NA „POWYŻEJ", NIGDY NA WYBRANEJ STRONIE
+                # (poprawka 2026-07-30). Model ma pełny rozkład, więc szansa
+                # „poniżej" jest z definicji lustrem: p_under = 1 − p_over.
+                # Dokładanie korekty do strony, którą typujemy, łamało tę
+                # tożsamość — obie strony tej samej linii dostawały liczby,
+                # które się nie sumują do jedynki.
+                #
+                # POMIAR, KTÓRY TO ROZSTRZYGNĄŁ (30.07, 108 rozliczonych
+                # typów drużynowych):
+                #     „powyżej"  mówiliśmy 74%, weszło 59%  ROI −15%
+                #     „poniżej"  mówiliśmy 72%, weszło 69%  ROI  +8%
+                # Błąd NIE jest symetryczny: strona „poniżej" jest prawie
+                # dokładna. Poprzednie założenie („przeszacowujemy to, co
+                # publikujemy, niezależnie od strony") jest tym obalone —
+                # symetryczna korekta psuła dobrą stronę i za słabo ruszała
+                # złą. Źródłem jest zawyżona przewidywana liczba zdarzeń,
+                # a ona podbija „powyżej" i zaniża „poniżej" jednym ruchem,
+                # więc jedna korekta na „powyżej" naprawia obie strony.
+                _bias_t_pelny = _dodaj_delte(
+                    bias_t, korekta_strumieni.get("druzyny", 0.0)
+                )
+                p_over_t = apply_bias(_bias_t_pelny, pred_t.p_over(l_t))
                 lo_o, hi_o = counts.p_over_credible_interval(
                     posterior_t, 90.0, factor_t, l_t
                 )
@@ -3378,8 +3419,8 @@ def _main_impl(tryb=None):
                 # samego `p` przy surowym `lo` rozjeżdżało obie liczby:
                 # im mocniejsza korekta, tym bardziej brama ją rozwadniała.
                 # Ścieżka zawodnicza kalibruje CI od dawna (engine._kalibruj).
-                lo_o = apply_bias(bias_t, lo_o)
-                hi_o = apply_bias(bias_t, hi_o)
+                lo_o = apply_bias(_bias_t_pelny, lo_o)
+                hi_o = apply_bias(_bias_t_pelny, hi_o)
                 # obie strony linii: Superbet kwotuje over i under, a model ma
                 # pełny rozkład — "poniżej" to lustro szansy "powyżej"
                 for strona_t, klucz_odds in (
@@ -3392,19 +3433,10 @@ def _main_impl(tryb=None):
                         p_t, lo_t, hi_t = p_over_t, lo_o, hi_o
                     else:
                         p_t, lo_t, hi_t = 1.0 - p_over_t, 1.0 - hi_o, 1.0 - lo_o
-                    # KOREKTA STRUMIENIA — na stronie, KTÓRĄ TYPUJEMY.
-                    # Pierwsza wersja (2026-07-27) dokładała ją do kalibracji
-                    # rynku, czyli zawsze do „powyżej". Skutek zmierzony
-                    # dry-runem: legów drużynowych PRZYBYŁO z 51 na 92, bo
-                    # obniżona szansa na „powyżej" automatycznie podbijała
-                    # „poniżej" — a przecież przeszacowujemy to, co
-                    # publikujemy, niezależnie od strony. Zawodników to nie
-                    # dotyczy (underów nie gramy), więc tam korekta zostaje
-                    # w kalibracji rynku.
-                    if _KOR_DRUZYNY:
-                        p_t = apply_bias(_KOR_DRUZYNY, p_t)
-                        lo_t = apply_bias(_KOR_DRUZYNY, lo_t)
-                        hi_t = apply_bias(_KOR_DRUZYNY, hi_t)
+                    # KOREKTA STRUMIENIA — patrz `_p_over_t_kor` wyżej.
+                    # Od 2026-07-30 stosowana do „powyżej", a „poniżej" jest
+                    # jej LUSTREM; nie dokładamy jej drugi raz do wybranej
+                    # strony, bo to łamało tożsamość p_under = 1 − p_over.
                     implied_t = betting.implied_prob_one_sided(odd_t)
                     # jak po stronie zawodniczej: decyduje p ostrożne
                     p_dec_t = (p_t + lo_t) / 2.0
@@ -3694,6 +3726,10 @@ def _main_impl(tryb=None):
             None,
         )
 
+    def _strona_wstrzymana(b: dict) -> bool:
+        """Czy ta STRONA tego rynku stoi w kwarantannie (patrz 30.07)."""
+        return f"{b.get('rynek_kod')}:{b.get('strona')}" in kwarantanna_stron
+
     # perełki: do 2 wpisów z wyższym kursem (>=2.0) per mecz, po wartości
     perelki_kandydaci = sorted(
         (b for b in legi_pool if b["kurs"] >= 1.90),
@@ -3757,6 +3793,8 @@ def _main_impl(tryb=None):
         powod_poza = None
         if b["rynek_kod"] in kwarantanna_rynkow:
             powod_poza = "kwarantanna_rynku"
+        elif _strona_wstrzymana(b):
+            powod_poza = "kwarantanna_strony"
         elif not betting.w_oknie_zgody(b["p_model"], b["kurs"]):
             # najostrzejsza brama, zmierzona na 336 rozliczeniach — patrz
             # betting.OKNO_ZGODY_*. Typ dalej się liczy i uczy w tle.
@@ -3847,15 +3885,20 @@ def _main_impl(tryb=None):
     # rynki w kwarantannie wypadają też z puli kuponów (generator i kupony
     # automatyczne nie budują na rynku, który trafia poniżej deklaracji);
     # to samo legi na starych danych (brama jakości ligi)
-    legi_pool_pub = [
-        b for b in legi_pool
-        if b["rynek_kod"] not in kwarantanna_rynkow and not b.get("stare_dane")
-        and not _kategoria_wstrzymana(b)
-        # ta sama brama co przy typach: leg poza oknem zgody z rynkiem nie
-        # wchodzi do kuponów. Błąd pojedynczego lega MNOŻY się przez kupon,
-        # więc to tu boli najbardziej (patrz kupony 0/18 w stylu „z przewagą")
-        and betting.w_oknie_zgody(b["p_model"], b["kurs"])
-    ]
+    def _leg_dopuszczalny(b: dict) -> bool:
+        return bool(
+            b.get("kurs")
+            and b["rynek_kod"] not in kwarantanna_rynkow
+            and not b.get("stare_dane")
+            and not _kategoria_wstrzymana(b)
+            # ta sama brama co przy typach: leg poza oknem zgody z rynkiem nie
+            # wchodzi do kuponów. Błąd pojedynczego lega MNOŻY się przez kupon,
+            # więc to tu boli najbardziej (patrz kupony 0/18 w stylu
+            # „z przewagą")
+            and betting.w_oknie_zgody(b["p_model"], b["kurs"])
+        )
+
+    legi_pool_pub = [b for b in legi_pool if _leg_dopuszczalny(b)]
 
     # REJESTR ODRZUCEŃ — domknięcie: para (zawodnik, rynek) opublikowana
     # (typ/sugestia) wypada z rejestru; obecna w puli kuponów, ale nie na
@@ -4192,6 +4235,38 @@ def _main_impl(tryb=None):
         value_bets, matches_out,
         typy_log=rozliczanie._migruj_log(log_do_siatki or {}),
     )
+
+    # TYP WZNOWIONY TEŻ JEST LEGIEM (naprawa 2026-07-30, zgłoszenie usera:
+    # „jak to możliwe, że pula ma jednego lega, jak jest dużo więcej").
+    #
+    # Pula kuponów budowała się WYŁĄCZNIE z bieżącego przeliczenia, a lista
+    # typów w 86% składa się z typów WZNOWIONYCH z rejestru publikacji
+    # (pomiar 30.07: 63 typy drużynowe na liście, z tego 54 wznowione — pula
+    # widziała 9). Strona pokazywała więc 63 pozycje, a generator kuponów
+    # dziewięć: kupon dzienny nie miał z czego powstać, mimo że typy były.
+    #
+    # Wznowiony typ ma wszystko, czego leg potrzebuje: zamrożony kurs, szansę
+    # i przedział z chwili publikacji — a przy publikacji przeszedł te same
+    # bramy. Brakowało tylko podpięcia.
+    _klucze_puli = {
+        (b.get("mecz_id"), str(b.get("podmiot")), b.get("rynek_kod"),
+         b.get("linia"), b.get("strona"))
+        for b in legi_pool_pub
+    }
+    _dolozone_legi = 0
+    for b in value_bets_pub:
+        if b.get("sugestia") or not b.get("wznowiony"):
+            continue
+        k = (b.get("mecz_id"), str(b.get("podmiot")), b.get("rynek_kod"),
+             b.get("linia"), b.get("strona"))
+        if k in _klucze_puli or not _leg_dopuszczalny(b):
+            continue
+        _klucze_puli.add(k)
+        legi_pool_pub.append(b)
+        _dolozone_legi += 1
+    if _dolozone_legi:
+        print(f"Pula kuponów: dołożono {_dolozone_legi} legów z typów "
+              f"wznowionych (wcześniej pula widziała tylko bieżące przeliczenie)")
 
     # NIE degraduj aplikacji do pustej planszy: dopóki nie ma realnych okazji MŚ,
     # zostaw dotychczasowe dane (tryb pokazowy). Przełączamy na MŚ dopiero,
