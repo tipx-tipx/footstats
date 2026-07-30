@@ -2229,20 +2229,32 @@ def rozlicz(
             gid_t = _gid_365(rec, cache_365)
             wartosc_t = None
             if gid_t is not None and not scores365.after_extra_time(gid_t):
-                tk = rotowire._norm(str(rec["podmiot"]))
+                # DOPASOWANIE NAZWY DRUŻYNY PO ZBIORACH SŁÓW, nie po
+                # identycznym napisie (poprawka 2026-07-30). 365Scores nazywa
+                # kluby inaczej niż my („qarabag" / „qarabag agdam",
+                # „sarmiento" / „sarmiento junin"), przez co 26 z 46 wiszących
+                # typów drużynowych nie rozliczało się nigdy — patrz
+                # `scores365.resolve_team_key`.
                 if mk == "team_goals":
                     # goli nie ma w game/stats — bierzemy wynik meczu
                     try:
-                        wartosc_t = scores365.game_scores(gid_t).get(tk)
+                        wyniki_t = scores365.game_scores(gid_t)
                     except Exception:
-                        wartosc_t = None
+                        wyniki_t = None
+                    if wyniki_t:
+                        kt = scores365.resolve_team_key(
+                            set(wyniki_t), str(rec["podmiot"])
+                        )
+                        wartosc_t = wyniki_t.get(kt) if kt else None
                 else:
                     try:
                         st_t = scores365.game_team_stats(gid_t)
                     except Exception:
                         st_t = None
-                    if st_t and tk in st_t:
-                        w_t = st_t[tk].get(MARKETY_DRUZYNOWE[mk])
+                    kt = (scores365.resolve_team_key(
+                        set(st_t), str(rec["podmiot"])) if st_t else None)
+                    if kt:
+                        w_t = st_t[kt].get(MARKETY_DRUZYNOWE[mk])
                         wartosc_t = float(w_t) if w_t is not None else None
             if wartosc_t is None and mk == "team_goals":
                 # FALLBACK egzotyki: wynik z otwartego API statshub (dowolna

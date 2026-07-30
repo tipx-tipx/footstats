@@ -405,6 +405,57 @@ def classify_event(e: dict) -> dict[str, int] | None:
     }
 
 
+# Słowa, które w nazwach klubów nic nie rozróżniają — bez ich odsiania
+# „FC" albo „de" potrafi być jedynym wspólnym tokenem dwóch różnych klubów.
+_SZUM_NAZWY_KLUBU = frozenset({
+    "fc", "cf", "ac", "sc", "kf", "fk", "sk", "cd", "ca", "afc", "cfc",
+    "club", "de", "del", "da", "do", "y", "e", "i", "the", "if", "ik",
+    "sv", "vf", "vfb", "us", "as", "ss", "ssc", "cs", "rc", "sd",
+})
+
+
+def resolve_team_key(all_keys: set[str], team_name: str) -> str | None:
+    """Klucz drużyny w statystykach meczu — po ZBIORACH SŁÓW, nie podobieństwie.
+
+    PO CO (znalezione 2026-07-30): statystyki drużynowe rozliczały się tylko
+    przy IDENTYCZNYM napisie, a 365Scores nazywa kluby inaczej niż my:
+
+        qarabag              -> qarabag agdam
+        sarmiento            -> sarmiento junin
+        fci levadia tallinn  -> levadia tallinn
+        deportivo riestra    -> riestra
+        instituto de cordoba -> instituto ac cordoba
+
+    Na 46 wiszących typów drużynowych 26 ginęło wyłącznie na tym. Typ znikał
+    po meczu i nie pojawiał się w Skuteczności.
+
+    ŚWIADOMIE BEZ PODOBIEŃSTWA TEKSTU ([[parowanie-nazw-druzyn]]): dla
+    „Deportivo Riestra" najbliższe tekstowo jest „Deportivo Recoleta", czyli
+    INNY klub, a taka podmiana nie zostawia śladu. Tu liczymy wspólne słowa
+    (po odsianiu szumu typu „FC") i wymagamy JEDNOZNACZNEGO maksimum — remis
+    oznacza brak dopasowania, nie strzał. To bezpieczne także dlatego, że
+    kandydaci są tylko dwaj: obie drużyny tego meczu.
+    """
+    p = _norm(team_name)
+    if p in all_keys:
+        return p
+    tokeny = {t for t in p.split() if t not in _SZUM_NAZWY_KLUBU}
+    if not tokeny:
+        return None
+    wyniki: list[tuple[int, str]] = []
+    for k in all_keys:
+        wspolne = tokeny & {
+            t for t in k.split() if t not in _SZUM_NAZWY_KLUBU
+        }
+        if wspolne:
+            wyniki.append((len(wspolne), k))
+    if not wyniki:
+        return None
+    naj = max(w[0] for w in wyniki)
+    najlepsze = [k for n, k in wyniki if n == naj]
+    return najlepsze[0] if len(najlepsze) == 1 else None
+
+
 def resolve_player_key(all_keys: set[str], player_name: str) -> str | None:
     """Znajdź klucz zawodnika w historii 365 (dokładnie albo nazwisko+inicjał)."""
     p = _norm(player_name)

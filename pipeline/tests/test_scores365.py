@@ -97,3 +97,52 @@ def test_prawdziwa_dogrywka_dalej_wykrywana():
 def test_status_ended_nie_wpada_na_slowie_et():
     """„Ended" nie może przypadkiem wyglądać jak „ET"."""
     assert _et(7, gameTime=95.0, shortStatusText="Ended", statusText="Ended") is False
+
+
+# --- DOPASOWANIE NAZWY DRUŻYNY (2026-07-30) --------------------------------
+
+
+def test_resolve_team_key_lapie_inne_warianty_nazwy():
+    """365Scores nazywa kluby inaczej niż my. Statystyki drużynowe
+    rozliczały się tylko przy IDENTYCZNYM napisie — 26 z 46 wiszących typów
+    ginęło wyłącznie na tym."""
+    assert s365.resolve_team_key(
+        {"cska sofia", "qarabag agdam"}, "Qarabağ") == "qarabag agdam"
+    assert s365.resolve_team_key(
+        {"banfield", "sarmiento junin"}, "Sarmiento") == "sarmiento junin"
+    assert s365.resolve_team_key(
+        {"levadia tallinn", "ifk goteborg"},
+        "FCI Levadia Tallinn") == "levadia tallinn"
+    assert s365.resolve_team_key(
+        {"defensa y justicia", "riestra"}, "Deportivo Riestra") == "riestra"
+    assert s365.resolve_team_key(
+        {"instituto ac cordoba", "platense"},
+        "Instituto De Córdoba") == "instituto ac cordoba"
+
+
+def test_resolve_team_key_nie_zgaduje_po_podobienstwie():
+    """PUŁAPKA Z PAMIĘCI PROJEKTU: dla „Deportivo Riestra" najbliższe
+    tekstowo jest „Deportivo Recoleta" — INNY klub. Wspólne jest tylko słowo
+    szumowe, więc dopasowania nie ma i nie wolno go zgadywać."""
+    assert s365.resolve_team_key(
+        {"deportivo recoleta", "argentinos juniors"}, "Riestra") is None
+
+
+def test_resolve_team_key_remis_to_brak_dopasowania():
+    """Dwa kluby o tej samej sile dopasowania = nie wiemy, który to."""
+    assert s365.resolve_team_key(
+        {"gimnasia la plata", "gimnasia mendoza"}, "Gimnasia") is None
+    # ...ale gdy nasza nazwa rozstrzyga, wybieramy jednoznacznie
+    assert s365.resolve_team_key(
+        {"gimnasia la plata", "gimnasia mendoza"},
+        "Gimnasia y Esgrima Mendoza") == "gimnasia mendoza"
+
+
+def test_resolve_team_key_samo_fc_to_za_malo():
+    """„FC" wspólne dwóm klubom nie jest dopasowaniem."""
+    assert s365.resolve_team_key({"fc porto", "fc basel"}, "FC Kopenhaga") is None
+
+
+def test_resolve_team_key_dokladny_napis_ma_pierwszenstwo():
+    assert s365.resolve_team_key(
+        {"bohemians", "bohemian fc"}, "Bohemian FC") == "bohemian fc"
