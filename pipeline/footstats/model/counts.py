@@ -208,3 +208,107 @@ def p_over_credible_interval(
     p_overs = stats.poisson.sf(threshold, lam_samples * e)
     lo = (1.0 - level) / 2.0
     return float(np.quantile(p_overs, lo)), float(np.quantile(p_overs, 1.0 - lo))
+
+
+# --- DWA NOWE RODZAJE ZAKŁADU (2026-07-30) ---------------------------------
+#
+# Dotąd model umiał tylko „ile zdarzeń zrobi JEDNA drużyna" i porównywał to
+# z linią. Superbet kwotuje jeszcze dwa rodzaje, których nie czytaliśmy:
+#   * „kto więcej" — porównanie dwóch drużyn, trzy wyniki z remisem,
+#   * suma meczowa — obie drużyny razem, linia jak przy pojedynczej drużynie.
+#
+# CZEMU „KTO WIĘCEJ" JEST DLA NAS SZCZEGÓLNIE WARTOŚCIOWY: zmierzony błąd
+# modelu to ZAWYŻANIE przewidywanej liczby zdarzeń (pomiar 2026-07-30: typy
+# „powyżej" deklarują 74%, wchodzą 59%). W porównaniu dwóch drużyn ten błąd
+# w dużej mierze SIĘ SKRACA, bo zawyżamy obie strony naraz. W sumie meczowej
+# przeciwnie — dodaje się, więc tam ostrożność musi być większa.
+#
+# ZAŁOŻENIE NIEZALEŻNOŚCI I JEGO GRANICE. Oba rachunki traktują liczby obu
+# drużyn jako niezależne. To NIE jest prawda: przebieg meczu wiąże je ze sobą
+# (drużyna dominująca oddaje więcej strzałów, rywal mniej), więc realnie
+# korelacja jest ujemna. Skutki są przeciwne dla obu rynków i trzeba je znać:
+#   * przy „kto więcej" ujemna korelacja ZANIŻA nasze P(remis) — remisy są
+#     rzadsze niż przy niezależności, więc jesteśmy tu ostrożni w dobrą stronę
+#     (nie przepłacamy za remis),
+#   * przy sumie meczowej ujemna korelacja ZWĘŻA prawdziwy rozkład sumy,
+#     czyli nasze ogony są za grube i P(over) na wysokich liniach wychodzi
+#     zawyżone.
+# Dlatego sumy meczowe wchodzą z tą samą ostrożnością co reszta (kwarantanna
+# strony linii), a docelowo korelację trzeba ZMIERZYĆ na rozliczeniach —
+# tak samo jak zmierzyliśmy korelację legów kuponu.
+
+# Dokąd sumujemy rozkład. Powyżej tego liczby zdarzeń w meczu nie występują,
+# a reszta masy i tak trafia do normalizacji.
+MAX_ZDARZEN = 40
+
+
+def _pmf_wektor(pred: "MatchPrediction", max_k: int = MAX_ZDARZEN) -> list[float]:
+    """P(X=0..max_k) dla jednej drużyny."""
+    return [pred.pmf(k) for k in range(max_k + 1)]
+
+
+def porownanie_druzyn(
+    pred_a: "MatchPrediction",
+    pred_b: "MatchPrediction",
+    max_k: int = MAX_ZDARZEN,
+) -> tuple[float, float, float]:
+    """(P(A>B), P(remis), P(B>A)) — trzy wyniki rynku „kto więcej".
+
+    Trzy liczby MUSZĄ sumować się do jedynki: to jest cały rynek, a nie linia
+    z dwiema stronami. Gdyby się nie sumowały, przewaga policzona wobec kursu
+    byłaby zmyślona, a błąd niewidoczny na stronie — dlatego na końcu jest
+    jawna normalizacja resztą obciętego ogona.
+    """
+    pa = _pmf_wektor(pred_a, max_k)
+    pb = _pmf_wektor(pred_b, max_k)
+    # skumulowane P(B < k) — liczone narastająco, bez podwójnej pętli
+    p_a_wiecej = 0.0
+    p_remis = 0.0
+    cum_b = 0.0                      # P(B <= k-1)
+    for k in range(max_k + 1):
+        p_a_wiecej += pa[k] * cum_b
+        p_remis += pa[k] * pb[k]
+        cum_b += pb[k]
+    p_b_wiecej = 0.0
+    cum_a = 0.0
+    for k in range(max_k + 1):
+        p_b_wiecej += pb[k] * cum_a
+        cum_a += pa[k]
+    suma = p_a_wiecej + p_remis + p_b_wiecej
+    if suma <= 0:
+        return 0.0, 1.0, 0.0
+    return p_a_wiecej / suma, p_remis / suma, p_b_wiecej / suma
+
+
+def rozklad_sumy(
+    pred_a: "MatchPrediction",
+    pred_b: "MatchPrediction",
+    max_k: int = MAX_ZDARZEN,
+) -> list[float]:
+    """P(A+B = 0..2*max_k) — splot dwóch rozkładów.
+
+    Suma dwóch rozkładów ujemnych dwumianowych o RÓŻNYM p nie jest ujemnym
+    dwumianowym, więc nie ma tu wzoru zamkniętego — liczymy splotem.
+    """
+    pa = _pmf_wektor(pred_a, max_k)
+    pb = _pmf_wektor(pred_b, max_k)
+    out = [0.0] * (2 * max_k + 1)
+    for i, wa in enumerate(pa):
+        if wa <= 0.0:
+            continue
+        for j, wb in enumerate(pb):
+            out[i + j] += wa * wb
+    suma = sum(out)
+    return [x / suma for x in out] if suma > 0 else out
+
+
+def p_over_sumy(
+    pred_a: "MatchPrediction",
+    pred_b: "MatchPrediction",
+    line: float,
+    max_k: int = MAX_ZDARZEN,
+) -> float:
+    """P(A+B > linia) — ta sama konwencja co `MatchPrediction.p_over`."""
+    rozklad = rozklad_sumy(pred_a, pred_b, max_k)
+    prog = int(np.floor(line))
+    return float(sum(rozklad[prog + 1:])) if prog + 1 < len(rozklad) else 0.0

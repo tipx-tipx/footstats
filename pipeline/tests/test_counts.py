@@ -122,3 +122,56 @@ def test_credible_interval_narrows_with_data():
     lo_s, hi_s = counts.p_over_credible_interval(small, 90.0, 1.0, 1.5)
     lo_b, hi_b = counts.p_over_credible_interval(big, 90.0, 1.0, 1.5)
     assert (hi_b - lo_b) < (hi_s - lo_s)
+
+
+# --- „KTO WIĘCEJ" I SUMA MECZOWA (2026-07-30) ------------------------------
+
+
+def _pred(mean90: float, alpha: float = 8.0):
+    """Rozkład drużyny o zadanej średniej — im wyższa alfa, tym węższy."""
+    post = counts.GammaPosterior(alpha=alpha, beta=alpha / mean90,
+                                 effective_matches=alpha)
+    return counts.predict_match(post, 90.0, 1.0)
+
+
+def test_kto_wiecej_sumuje_sie_do_jedynki():
+    """Trzy wyniki to CAŁY rynek. Gdyby się nie sumowały, przewaga liczona
+    wobec kursu byłaby zmyślona, a błąd niewidoczny na stronie."""
+    a, remis, b = counts.porownanie_druzyn(_pred(5.0), _pred(3.0))
+    assert abs(a + remis + b - 1.0) < 1e-9
+    assert a > b        # mocniejsza drużyna czesciej ma więcej
+
+
+def test_kto_wiecej_symetryczne_druzyny_daja_symetryczny_wynik():
+    a, remis, b = counts.porownanie_druzyn(_pred(4.0), _pred(4.0))
+    assert abs(a - b) < 1e-9
+    assert 0.0 < remis < 1.0
+    assert abs(a + remis + b - 1.0) < 1e-9
+
+
+def test_remis_jest_czestszy_przy_malych_liczbach():
+    """Przy 0,5 zdarzenia na mecz remis (np. 0-0) jest częsty; przy 12 —
+    rzadki. To sanity check na sam rachunek, nie na model."""
+    _a1, remis_male, _b1 = counts.porownanie_druzyn(_pred(0.5), _pred(0.5))
+    _a2, remis_duze, _b2 = counts.porownanie_druzyn(_pred(12.0), _pred(12.0))
+    assert remis_male > remis_duze
+
+
+def test_suma_meczowa_ma_srednia_rowna_sumie_srednich():
+    """Splot musi zachować wartość oczekiwaną — najprostszy test na to,
+    że rozkład sumy nie jest przesunięty."""
+    pa, pb = _pred(5.0), _pred(3.0)
+    rozklad = counts.rozklad_sumy(pa, pb)
+    srednia = sum(k * p for k, p in enumerate(rozklad))
+    assert abs(srednia - (pa.lam + pb.lam)) < 0.05
+    assert abs(sum(rozklad) - 1.0) < 1e-9
+
+
+def test_p_over_sumy_zgodne_z_rozkladem():
+    pa, pb = _pred(5.0), _pred(4.0)
+    # P(suma > 8) musi się zgadzać z ogonem rozkładu
+    rozklad = counts.rozklad_sumy(pa, pb)
+    recznie = sum(rozklad[9:])
+    assert abs(counts.p_over_sumy(pa, pb, 8.5) - recznie) < 1e-9
+    # ...i maleć wraz z linią
+    assert counts.p_over_sumy(pa, pb, 12.5) < counts.p_over_sumy(pa, pb, 8.5)
