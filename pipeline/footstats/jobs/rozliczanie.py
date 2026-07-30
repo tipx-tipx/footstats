@@ -57,6 +57,48 @@ MARKETY_DRUZYNOWE = {
     # (scores365.game_scores), pole tu tylko znacznikiem przynależności
     "team_goals": "gole",
 }
+
+# --- DWA NOWE RODZAJE ZAKŁADU (2026-07-30): NAJPIERW ROZLICZANIE ---
+#
+# Kolejność jest celowa. Cała ta sesja to były błędy rozliczeń — typy, których
+# nie umieliśmy zamknąć, znikały userowi ze strony i nie trafiały do
+# Skuteczności. Wystawienie rynku, którego nie potrafimy rozliczyć, dołożyłoby
+# czwarty rodzaj tego samego problemu. Zasada: NIE PUBLIKUJEMY RYNKU, KTÓREGO
+# NIE POTRAFIMY ZAMKNĄĆ.
+#
+# SUMA MECZOWA: obie drużyny razem, linia i strony jak przy pojedynczej
+# drużynie (powyżej/poniżej).
+MARKETY_SUMY = {
+    "match_shots": "shots", "match_sot": "sot",
+    "match_fouls": "fouls", "match_cards": "kartki",
+    "match_corners": "corners",
+}
+# „KTO WIĘCEJ": trzy wyniki zamiast dwóch stron linii. `podmiot` trzyma ZAWSZE
+# gospodarza (żeby dało się odtworzyć, która drużyna jest która), a `strona`
+# mówi, na co postawiliśmy.
+MARKETY_WIECEJ = {
+    "wiecej_shots": "shots", "wiecej_sot": "sot",
+    "wiecej_fouls": "fouls", "wiecej_cards": "kartki",
+    "wiecej_corners": "corners",
+}
+# REMISU NIE GRAMY — decyzja usera 2026-07-30. Publikujemy wyłącznie „ta
+# drużyna więcej", nigdy remisu.
+#
+# ALE MUSIMY GO LICZYĆ, i to nie jest sprzeczność. Remis zabiera część
+# prawdopodobieństwa naszej stronie: przy kartkach aż 18,8% meczów kończy się
+# tym samym wynikiem obu drużyn, przy strzałach 5,3%. Gdyby pominąć remis
+# w rachunku, szansa gospodarza wyszłaby zawyżona nawet o 19 punktów, a kurs
+# fair z 2,28 zrobiłby się 1,85 — i cała „przewaga" byłaby zmyślona.
+#
+# I DRUGA KONSEKWENCJA: remis to dla naszego typu PRZEGRANA, nie zwrot.
+# Obstawiamy „gospodarz więcej", mecz kończy się 11:11 — zakład przepada.
+# Dlatego rozliczanie niżej porównuje `strona` ze zwycięzcą, a nie sprawdza
+# samej różnicy.
+#
+# GDZIE TEN RYNEK MA SENS: strzały (remis 5%) i faule (5%) są czyste,
+# kartki (19%) to inna gra — tam remis zabiera co piąty zakład.
+STRONY_WIECEJ = ("gospodarz", "gosc")
+STRONA_REMIS = "remis"          # tylko jako wynik rozliczenia, nie do gry
 # strzały NIECELNE i ZABLOKOWANE liczymy CAŁKOWICIE OSOBNO — nie wchodzą do
 # zbiorczej skuteczności modelu (podsumowanie trafień/ROI ani tabela per rynek).
 # Rynek "shots" (strzały ogółem) zostaje bez zmian = wszystkie strzały, zgodnie
@@ -2223,6 +2265,55 @@ def rozlicz(
         if rec.get("wynik") or now - rec["kickoff_ts"] < MECZ_KONIEC_PO_S:
             continue
         mk = rec["rynek_kod"]
+
+        # SUMA MECZOWA i „KTO WIĘCEJ" — obie potrzebują statystyk OBU drużyn
+        if mk in MARKETY_SUMY or mk in MARKETY_WIECEJ:
+            gid_n = _gid_365(rec, cache_365)
+            wartosci = None
+            if gid_n is not None and not scores365.after_extra_time(gid_n):
+                try:
+                    st_n = scores365.game_team_stats(gid_n)
+                except Exception:
+                    st_n = None
+                klucz_staty = MARKETY_SUMY.get(mk) or MARKETY_WIECEJ[mk]
+                if st_n and len(st_n) == 2:
+                    # gospodarz z `podmiot`, gość = ta druga drużyna meczu.
+                    # Nazwy dopasowujemy tolerancyjnie (patrz resolve_team_key)
+                    kh = scores365.resolve_team_key(
+                        set(st_n), str(rec["podmiot"])
+                    )
+                    if kh:
+                        ka = next(k for k in st_n if k != kh)
+                        wh = (st_n[kh] or {}).get(klucz_staty)
+                        wa = (st_n[ka] or {}).get(klucz_staty)
+                        if wh is not None and wa is not None:
+                            wartosci = (float(wh), float(wa))
+            if wartosci is None:
+                if (
+                    now - rec["kickoff_ts"] > TERMIN_BRAK_DANYCH_S
+                    and rec.get("mecz") not in mecze_przyszle
+                ):
+                    rec.update(wynik="zwrot", faktyczna=None,
+                               rozliczono_ts=now, powod="brak danych źródła")
+                continue
+            wh, wa = wartosci
+            if mk in MARKETY_SUMY:
+                suma = wh + wa
+                traf_n = (suma > rec["linia"] if rec["strona"] == "powyzej"
+                          else suma < rec["linia"])
+                faktyczna_n = suma
+            else:
+                zwyciezca = ("gospodarz" if wh > wa
+                             else "gosc" if wa > wh else "remis")
+                traf_n = rec["strona"] == zwyciezca
+                # zapisujemy OBIE liczby — bez nich nie da się później
+                # sprawdzić, czy rozliczenie było słuszne
+                faktyczna_n = f"{wh:g}:{wa:g}"
+            rec.update(
+                wynik="wygrany" if traf_n else "przegrany",
+                faktyczna=faktyczna_n, rozliczono_ts=now, zagral=True,
+            )
+            continue
 
         # RYNKI DRUŻYNOWE — osobna, prosta ścieżka (statystyki drużynowe 365)
         if mk in MARKETY_DRUZYNOWE:

@@ -243,3 +243,108 @@ def test_strona_zakladu_niewrazliwa_na_wielkosc_liter(monkeypatch):
     away = out["teams"]["away"]
     assert away["team_sot"][3.5]["over"] == 2.1
     assert away["team_shots"][10.5] == {"over": 1.8, "under": 1.9}
+
+
+# --- ROZLICZANIE SUM MECZOWYCH I „KTO WIĘCEJ" (2026-07-30) -----------------
+
+
+def _log_nowy(rec):
+    return {rozliczanie._klucz(rec): rec}
+
+
+def _rec_nowy(**kw):
+    r = {
+        "mecz_id": 4242, "mecz": "Gospodarze – Goscie",
+        "kickoff_ts": int(time.time()) - 5 * 3600,
+        "podmiot_id": 11, "podmiot": "Gospodarze", "podmiot_typ": "druzyna",
+        "rynek_kod": "match_corners", "rynek": "Rzuty rożne w meczu",
+        "linia": 9.5, "strona": "powyzej", "kurs": 1.9, "p_model": 0.55,
+        "sugestia": False, "wynik": None, "opublikowano_ts": 1,
+    }
+    r.update(kw)
+    return r
+
+
+def _przygotuj_nowy(monkeypatch, rec, staty):
+    store = {"typy_log": _log_nowy(rec)}
+    monkeypatch.setattr(rozliczanie.supa, "get_key", lambda k: store.get(k))
+    monkeypatch.setattr(rozliczanie.supa, "get_key_ok",
+                        lambda k: (store.get(k), True))
+    monkeypatch.setattr(rozliczanie.supa, "put_key",
+                        lambda k, v: store.__setitem__(k, v))
+    monkeypatch.setattr(rozliczanie.supa, "put_key_bezpiecznie",
+                        lambda k, v, **kw: store.__setitem__(k, v) or True)
+    monkeypatch.setattr(rozliczanie, "_snapshot_zamkniecia", lambda *a, **k: None)
+    monkeypatch.setattr(
+        scores365, "finished_games_by_competition",
+        lambda comp_id=None: [{"id": 900, "home": "gospodarze",
+                               "away": "goscie", "ts": rec["kickoff_ts"]}],
+    )
+    monkeypatch.setattr(scores365, "after_extra_time", lambda gid: False)
+    monkeypatch.setattr(scores365, "game_team_stats", lambda gid: staty)
+    return store
+
+
+STATY = {"gospodarze": {"corners": 6.0, "shots": 14.0},
+         "goscie": {"corners": 5.0, "shots": 9.0}}
+
+
+def test_suma_meczowa_rozlicza_sie_z_obu_druzyn(monkeypatch):
+    """11 rożnych łącznie > 9,5 — typ wchodzi."""
+    rec = _rec_nowy()
+    store = _przygotuj_nowy(monkeypatch, rec, STATY)
+    rozliczanie.rozlicz([], [])
+    w = list(store["typy_log"].values())[0]
+    assert w["faktyczna"] == 11.0 and w["wynik"] == "wygrany"
+
+
+def test_suma_meczowa_ponizej(monkeypatch):
+    rec = _rec_nowy(linia=12.5, strona="ponizej")
+    store = _przygotuj_nowy(monkeypatch, rec, STATY)
+    rozliczanie.rozlicz([], [])
+    assert list(store["typy_log"].values())[0]["wynik"] == "wygrany"
+
+
+def test_kto_wiecej_wskazuje_zwyciezce(monkeypatch):
+    """14 do 9 strzałów — wygrywa gospodarz."""
+    rec = _rec_nowy(rynek_kod="wiecej_shots", linia=0, strona="gospodarz")
+    store = _przygotuj_nowy(monkeypatch, rec, STATY)
+    rozliczanie.rozlicz([], [])
+    w = list(store["typy_log"].values())[0]
+    assert w["wynik"] == "wygrany"
+    # obie liczby w zapisie — bez nich nie da się sprawdzić rozliczenia
+    assert w["faktyczna"] == "14:9"
+
+
+def test_kto_wiecej_gosc_przegrywa(monkeypatch):
+    rec = _rec_nowy(rynek_kod="wiecej_shots", linia=0, strona="gosc")
+    store = _przygotuj_nowy(monkeypatch, rec, STATY)
+    rozliczanie.rozlicz([], [])
+    assert list(store["typy_log"].values())[0]["wynik"] == "przegrany"
+
+
+def test_remis_to_przegrana_naszego_typu(monkeypatch):
+    """REMISU NIE GRAMY (decyzja usera 2026-07-30), ale musi być rozliczony
+    jako PRZEGRANA naszej strony — nie jako zwrot. Obstawiamy „gospodarz
+    więcej", mecz kończy się 11:11 i zakład przepada. Przy kartkach taki
+    remis wypada w 19% meczów, więc to nie jest przypadek brzegowy."""
+    staty = {"gospodarze": {"shots": 11.0}, "goscie": {"shots": 11.0}}
+    rec = _rec_nowy(rynek_kod="wiecej_shots", linia=0, strona="gospodarz")
+    store = _przygotuj_nowy(monkeypatch, rec, staty)
+    rozliczanie.rozlicz([], [])
+    w = list(store["typy_log"].values())[0]
+    assert w["wynik"] == "przegrany" and w["faktyczna"] == "11:11"
+
+
+def test_remis_nie_jest_strona_do_gry():
+    """Publikujemy wyłącznie „ta drużyna więcej"."""
+    assert rozliczanie.STRONY_WIECEJ == ("gospodarz", "gosc")
+    assert rozliczanie.STRONA_REMIS not in rozliczanie.STRONY_WIECEJ
+
+
+def test_nowe_rynki_czekaja_gdy_brak_statystyk(monkeypatch):
+    """Bez danych typ NIE zamyka się na oślep — czeka jak reszta."""
+    rec = _rec_nowy()
+    store = _przygotuj_nowy(monkeypatch, rec, None)
+    rozliczanie.rozlicz([], [])
+    assert list(store["typy_log"].values())[0]["wynik"] is None
