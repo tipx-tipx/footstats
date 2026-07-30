@@ -56,14 +56,30 @@ def _minuta(t) -> float | None:
         return None
 
 
+# DOLICZONY CZAS TO NIE DOGRYWKA. Próg był `> 90,5` — a 365Scores podaje
+# `gameTime` z doliczonym: Fluminense–Bahia (liga brazylijska, 30.07) miało
+# 98,0 i przez to uchodziło za mecz po dogrywce. Skutek był drogi: rynki
+# drużynowe takich meczów NIGDY się nie rozliczały (30.07: 89 typów wisiało
+# po gwizdku), więc typ znikał ze strony po meczu i nie pojawiał się
+# w Skuteczności — dokładnie to zgłosił user.
+#
+# Dogrywka to 2 × 15 minut PO 90, czyli realnie 120+; zawodnicy z doliczonym
+# dobijają do ~100. Próg 110 minut rozdziela te dwa światy z zapasem, a
+# słowa ze statusu łapią przypadki, w których 365 nie poda minut.
+PROG_DOGRYWKI_MIN = 110.0
+_SLOWA_DOGRYWKI = ("aet", "a.e.t", "after extra", "extra time",
+                   "after penalties", "penalties", " et", "et ")
+
+
 def _zapamietaj_et(game_id: int, game: dict) -> None:
     try:
         gt = float(game.get("gameTime") or 0)
     except (TypeError, ValueError):
         gt = 0.0
+    status = f" {game.get('shortStatusText') or ''} {game.get('statusText') or ''} ".lower()
     _et_cache[game_id] = (
-        gt > REGULARNY_CZAS_MIN + 0.5
-        or "ET" in str(game.get("shortStatusText") or "")
+        gt > PROG_DOGRYWKI_MIN
+        or any(s in status for s in _SLOWA_DOGRYWKI)
     )
 
 

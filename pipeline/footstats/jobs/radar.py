@@ -84,6 +84,13 @@ OSTATNIE_N = 10             # ile ostatnich występów pokazuje karta rynku
 MAX_SEZONOW_WPISU = 3       # sekcja "sezony" na karcie (bieżący + poprzednie)
 # przycinanie drabinki: nikt nie gra linii 8+ @23.00 z ~0% szans — szum
 MAX_SZCZEBLI = 5            # tyle linii max na rynek
+# SUFIT LINII NA KARCIE (decyzja usera 2026-07-30): „wszystkie typy — faule
+# popełnione/wywalczone, strzały — max 3+, tylko odbiory max 4+".
+# Linia 2,5 to zakład „3 lub więcej", linia 3,5 to „4 lub więcej" — stąd te
+# liczby. Wyżej drabinka i tak schodziła w kursy, które nikogo nie interesują,
+# a psuła wrażenie „karta pokazuje sensowne typy".
+MAX_LINIA_DOMYSLNA = 2.5    # czyli „3+"
+MAX_LINIA_RYNKU = {"tackles": 3.5}   # odbiory: „4+"
 MIN_P_SZCZEBLA = 0.03       # od 3. szczebla w górę: p_model < 3% ucina resztę
 MAX_KURS_SZCZEBLA = 12.0    # ...podobnie kurs powyżej tego progu
 # pierwszy szczebel drabinki od 1.65 (decyzja usera 2026-07-25): linie po
@@ -635,8 +642,11 @@ def _rynki_wpisu(
             f_rywal * f_sedzia * f_scen * f_dom * f_sezon,
             context_mod.CAP_COMBINED,
         )
+        sufit_linii = MAX_LINIA_RYNKU.get(mk, MAX_LINIA_DOMYSLNA)
         drabinka = []
         for linia_s, kurs in sorted(linie.items(), key=lambda kv: float(kv[0])):
+            if float(linia_s) > sufit_linii:
+                break   # linie posortowane rosnąco — wyżej już nic nie weźmiemy
             if not drabinka and kurs < MIN_KURS_PIERWSZEGO:
                 continue  # drabinka startuje od pierwszej grywalnej ceny
             if len(drabinka) >= MAX_SZCZEBLI:

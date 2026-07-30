@@ -103,3 +103,65 @@ def test_dolewka_nie_pyta_o_stare_i_druzynowe(monkeypatch):
     monkeypatch.setattr(statshub, "fetch_event_trends", _fet)
     rozliczanie._dolej_swieze_trendy(log, {}, now)
     assert pytane == [[1]]
+
+
+# --- PUSTA MAPA TO NIE ZERO ZDARZEŃ (2026-07-30) ----------------------------
+
+
+def test_pusta_mapa_365_nie_znaczy_zero_strzalow(monkeypatch):
+    """Sprawa Marcela Reguły (27.07): 365Scores oddało dla meczu PUSTĄ mapę
+    strzałów, a statystyki meczu mówiły, że zagrał 90 minut. Stary kod czytał
+    to jako „zagrał, nie ma go w mapie, czyli 0 strzałów", zapisywał zero i nie
+    pytał już żadnego innego źródła. Statshub miał wtedy 6 strzałów.
+    """
+    rec = _rec_zawodniczy(linia=2.5, kurs=2.05)
+    store = _przygotuj(monkeypatch, rec, trendy=[])
+    # 365: zna mecz i minuty, ale mapa strzałów PUSTA
+    monkeypatch.setattr(
+        scores365, "finished_games_by_competition",
+        lambda comp_id=None: [{"id": 4200, "home": "egzotic fc",
+                               "away": "nieznani fc",
+                               "ts": rec["kickoff_ts"]}],
+    )
+    monkeypatch.setattr(scores365, "game_player_match_stats",
+                        lambda gid: {"jan testowy": {"minutes": 90.0}})
+    monkeypatch.setattr(scores365, "game_player_shots", lambda gid: {})
+    monkeypatch.setattr(scores365, "after_extra_time", lambda gid: False)
+    # statshub ma komplet
+    monkeypatch.setattr(
+        statshub, "fetch_event_result",
+        lambda eid: {"home_id": 1, "away_id": 2, "home_name": "Egzotic FC",
+                     "away_name": "Nieznani FC", "home_goals": 1.0,
+                     "away_goals": 0.0, "extra_time": False},
+    )
+    monkeypatch.setattr(
+        statshub, "player_shots_from_shotmap",
+        lambda eid: {"Jan Testowy": {"shots": 6, "sot": 1}},
+    )
+    rozliczanie.rozlicz([], [])
+    wynik = list(store["typy_log"].values())[0]
+    assert wynik["faktyczna"] == 6.0
+    assert wynik["wynik"] == "wygrany"
+
+
+def test_zero_zostaje_gdy_zrodla_mecz_znaja(monkeypatch):
+    """Odwrotny warunek: gdy mapa KOGOŚ zawiera, a jego nie ma — to naprawdę
+    zero zdarzeń i typ ma się rozliczyć, a nie wisieć bez końca."""
+    rec = _rec_zawodniczy(linia=0.5)
+    store = _przygotuj(monkeypatch, rec, trendy=[])
+    monkeypatch.setattr(
+        scores365, "finished_games_by_competition",
+        lambda comp_id=None: [{"id": 4200, "home": "egzotic fc",
+                               "away": "nieznani fc",
+                               "ts": rec["kickoff_ts"]}],
+    )
+    monkeypatch.setattr(scores365, "game_player_match_stats",
+                        lambda gid: {"jan testowy": {"minutes": 90.0}})
+    monkeypatch.setattr(scores365, "game_player_shots",
+                        lambda gid: {"ktos inny": {"shots": 2}})
+    monkeypatch.setattr(scores365, "after_extra_time", lambda gid: False)
+    monkeypatch.setattr(statshub, "fetch_event_result", lambda eid: None)
+    monkeypatch.setattr(statshub, "player_shots_from_shotmap", lambda eid: None)
+    rozliczanie.rozlicz([], [])
+    wynik = list(store["typy_log"].values())[0]
+    assert wynik["faktyczna"] == 0.0 and wynik["wynik"] == "przegrany"

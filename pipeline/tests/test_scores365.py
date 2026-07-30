@@ -63,3 +63,37 @@ def test_poz_z_formacji_mapuje_kubelki():
     assert s365._poz_z_formacji(m("Striker")) == "F"
     assert s365._poz_z_formacji(m("")) == ""
     assert s365._poz_z_formacji({}) == ""
+
+
+# --- DOLICZONY CZAS TO NIE DOGRYWKA (2026-07-30) ----------------------------
+
+
+def _et(gid, **game):
+    s365._et_cache.pop(gid, None)
+    s365._zapamietaj_et(gid, game)
+    return s365._et_cache[gid]
+
+
+def test_doliczony_czas_nie_jest_dogrywka():
+    """Sprawa Fluminense – Bahia (liga brazylijska, 30.07): 365Scores podało
+    `gameTime = 98` (90 + 8 doliczonych), a my uznaliśmy to za mecz po
+    dogrywce i NIE ROZLICZYLIŚMY rynków drużynowych. Tego dnia wisiało tak
+    89 typów — typ znikał ze strony po meczu i nie trafiał do Skuteczności.
+    """
+    assert _et(1, gameTime=98.0, shortStatusText="Ended", statusText="Ended") is False
+    assert _et(2, gameTime=100.0, shortStatusText="Ended") is False
+    assert _et(3, gameTime=90.0, shortStatusText="Ended") is False
+
+
+def test_prawdziwa_dogrywka_dalej_wykrywana():
+    # Kairat – Omonia 29.07: 130 minut, „After Penalties"
+    assert _et(4, gameTime=130.0, shortStatusText="After Penalties",
+               statusText="After Penalties") is True
+    # ...także wtedy, gdy minut nie ma, a status mówi wprost
+    assert _et(5, gameTime=0.0, shortStatusText="AET") is True
+    assert _et(6, gameTime=0.0, statusText="After Extra Time") is True
+
+
+def test_status_ended_nie_wpada_na_slowie_et():
+    """„Ended" nie może przypadkiem wyglądać jak „ET"."""
+    assert _et(7, gameTime=95.0, shortStatusText="Ended", statusText="Ended") is False

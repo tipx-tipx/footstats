@@ -529,6 +529,13 @@ def fetch_event_result(event_id: int) -> dict | None:
     ev = (ev[0] if isinstance(ev, list) and ev else ev) or {}
     if not isinstance(ev, dict):
         return None
+    # MECZ MUSI BYĆ SKOŃCZONY. Docstring obiecywał to od początku, ale kod
+    # tego nie sprawdzał: dla trwającego meczu `homeScoreCurrent` to wynik
+    # BIEŻĄCY, więc rozliczenie w 80. minucie brało stan z tej minuty jako
+    # ostateczny. Zgłoszenia usera 2026-07-30 (Górnik Zabrze, Remo) to
+    # dokładnie ten przypadek — gole zapisane jako 0.
+    if str(ev.get("status") or "").lower() != "finished":
+        return None
     hn, an = ev.get("homeScoreNormaltime"), ev.get("awayScoreNormaltime")
     hc, ac = ev.get("homeScoreCurrent"), ev.get("awayScoreCurrent")
     hg = hn if hn is not None else hc

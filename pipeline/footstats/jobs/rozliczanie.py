@@ -76,7 +76,14 @@ SUPERZMIANA_RYNKI = {
 
 # próbuj rozliczać już ~105 min po kickoffie (źródła i tak wymagają statusu
 # "zakończony") — status kuponu odświeża się tuż po końcowym gwizdku
-MECZ_KONIEC_PO_S = 105 * 60
+# Kiedy NAJWCZEŚNIEJ wolno próbować rozliczyć mecz. Było 105 minut — a mecz
+# trwa 90 minut gry, 15 minut przerwy i doliczony czas obu połów, czyli kończy
+# się zwykle po 115–125 minutach od pierwszego gwizdka (Górnik–Fenerbahçe
+# 29.07: doliczone 10 + 4, koniec po ~119 minutach). Przy 105 minutach cykl
+# pytał źródła w trakcie gry. Pierwszą linią obrony jest status meczu
+# u źródła (`statshub.fetch_event_result`), to jest druga: nie zawracamy
+# głowy API, dopóki mecz na pewno się nie skończył.
+MECZ_KONIEC_PO_S = 130 * 60
 OKNO_PAROWANIA_S = 36 * 3600
 # po tym czasie bez danych źródłowych typ zamyka się jako "zwrot" (brak
 # rozstrzygnięcia) — kupony nie mogą wisieć "w grze" w nieskończoność
@@ -2223,40 +2230,53 @@ def rozlicz(
 
         wartosc = None
         if mk in MARKETY_365:
+            # PUSTA MAPA TO NIE ZERO ZDARZEŃ — najdroższy błąd rozliczania,
+            # znaleziony 2026-07-30 na zgłoszeniu usera („Marcel Reguła
+            # niezaliczony, a miał 6 strzałów").
+            #
+            # 365Scores dla części meczów oddaje mapę strzałów PUSTĄ ({}), a
+            # jednocześnie w statystykach meczu pokazuje, że zawodnik zagrał
+            # 90 minut. Stary kod czytał to jako „zagrał, nie ma go w mapie,
+            # czyli oddał 0 strzałów", zapisywał `faktyczna=0` i NIE PYTAŁ już
+            # żadnego innego źródła — bo `wartosc` przestawała być pusta.
+            # Statshub miał wtedy komplet (Reguła: 6 strzałów, 1 celny).
+            # Skutek: typ „powyżej" przegrywał z automatu, a księga uczyła
+            # kalibrację na zmyślonych zerach.
+            #
+            # Teraz „zagrał, a nie ma go w mapie" jest OSTATNIM wnioskiem, po
+            # przepytaniu wszystkich źródeł — i tylko wtedy, gdy mapa w ogóle
+            # kogoś zawiera (patrz `mapa_pusta` niżej).
             gra = None
             if gid is not None:
                 try:
                     gra = scores365.game_player_shots(gid)
                 except Exception:
                     gra = None
-            if gra is not None:
+            mapy_puste = True       # czy ŻADNE źródło nie miało danych o meczu
+            if gra:                 # pusty słownik = brak danych, nie zero
+                mapy_puste = False
                 skey = scores365.resolve_player_key(set(gra), rec["podmiot"])
                 if skey:
                     wartosc = float(gra[skey].get(MARKETY_365[mk], 0))
-                elif minuty:
-                    # zagrał (minuty > 0), a nie ma go w mapie = 0 zdarzeń
-                    wartosc = 0.0
             if wartosc is None and mk in ("shots", "sot"):
                 # multi-liga: mecz spoza rozgrywek z comp365 nie ma gid —
                 # strzały/celne rozliczamy z banku trendów statshub
                 # (te same dane Opta, na których stoi scoring)
                 wartosc = _wartosc_z_banku(rec, lib)
             if wartosc is None and mk in ("shots", "sot"):
-                # FALLBACK egzotyki: shotmapa z otwartego API statshub, gdy
-                # bank propsów pusty (liga bez linii UK). Tylko mecze bez
-                # dogrywki — shotmapa nie oddziela regularnego czasu.
+                # shotmapa z otwartego API statshub. Tylko mecze bez dogrywki —
+                # shotmapa nie oddziela regularnego czasu.
                 sr = _statshub_wynik(rec["mecz_id"], cache_sh)
                 if sr is not None and not sr["extra_time"]:
                     counts = _statshub_strzaly(rec["mecz_id"], cache_sh_sm)
-                    if counts is not None:
+                    if counts:
+                        mapy_puste = False
                         # id zawodników bywają w innej przestrzeni niż shotmapa
                         # — dopasowujemy po nazwisku, jak ścieżka 365
                         normed = {scores365._norm(n): v for n, v in counts.items()}
                         skey = scores365.resolve_player_key(set(normed), rec["podmiot"])
                         if skey is not None:
                             wartosc = float(normed[skey][mk])
-                        elif minuty:
-                            wartosc = 0.0  # zagrał, brak strzałów w shotmapie
             if wartosc is None and mk in ("shots", "sot"):
                 # FALLBACK egzotyki (Warstwa 2): strzały z cache Sofascore
                 # (worker domowy) — np. liga bez shotmapy statshub.
@@ -2265,6 +2285,10 @@ def rozlicz(
                     v = pg.get(mk)
                     if v is not None:
                         wartosc = float(v)
+            if wartosc is None and minuty and not mapy_puste:
+                # dopiero TERAZ: zagrał, źródła mecz znają i w żadnym go nie ma
+                # przy tym rynku — czyli faktycznie zero zdarzeń
+                wartosc = 0.0
         elif mk in MARKETY_LIB:
             # staty lineups obejmują CAŁY mecz — przy dogrywce nie nadają się
             # do rozliczenia rynku regularnego czasu (bank trendów zostaje)

@@ -543,3 +543,35 @@ def test_raport_uczenia_pomija_typy_pomiarowe_i_spoza_publikacji():
         }
     p = rozliczanie.raport_uczenia(log, rozmiar=40)["pewniaki"]["paczki"]
     assert len(p) == 1 and p[0]["n"] == 40 and p[0]["hit"] == 1.0
+
+
+# --- WYNIK MECZU TYLKO Z MECZU ZAKOŃCZONEGO (2026-07-30) --------------------
+
+
+def test_wynik_meczu_tylko_gdy_status_finished(monkeypatch):
+    """Sprawy Górnika Zabrze i Remo (29–30.07): rozliczaliśmy w trakcie gry.
+
+    `fetch_event_result` obiecywało w docstringu „None, gdy mecz niezakończony",
+    ale statusu nie sprawdzało — a `homeScoreCurrent` to wynik BIEŻĄCY, więc
+    odczyt w 80. minucie zapisywał stan z tej minuty jako ostateczny.
+    """
+    from footstats.sources import statshub
+
+    def payload(status):
+        return {"data": {"events": [{
+            "status": status, "homeTeamId": 1, "awayTeamId": 2,
+            "homeScoreCurrent": 1, "awayScoreCurrent": 1,
+        }], "homeTeam": {"name": "A"}, "awayTeam": {"name": "B"}}}
+
+    monkeypatch.setattr(statshub, "_get", lambda url: payload("inprogress"))
+    assert statshub.fetch_event_result(1) is None
+
+    monkeypatch.setattr(statshub, "_get", lambda url: payload("finished"))
+    r = statshub.fetch_event_result(2)
+    assert r is not None and r["home_goals"] == 1.0
+
+
+def test_rozliczamy_dopiero_po_realnym_koncu_meczu():
+    """105 minut od gwizdka to dla wielu meczów jeszcze druga połowa:
+    90 gry + 15 przerwy + doliczony to 115–125 minut."""
+    assert rozliczanie.MECZ_KONIEC_PO_S >= 125 * 60

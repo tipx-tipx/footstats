@@ -430,8 +430,33 @@ def test_pierwszy_szczebel_od_165():
         teraz=TERAZ,
     )
     (rynek,) = wpisy[0]["rynki"]
-    # 0,5 @1.20 i 1,5 @1.55 odpadają — drabinka rusza od 2,5 @2.40
-    assert [s["linia"] for s in rynek["drabinka"]] == [2.5, 3.5]
+    # 0,5 @1.20 i 1,5 @1.55 odpadają na progu kursu — drabinka rusza od 2,5.
+    # 3,5 nie wchodzi od 2026-07-30: sufit linii dla strzałów to „3+" (2,5),
+    # decyzja usera. Test dalej pilnuje tego, o co był: progu KURSU.
+    assert [s["linia"] for s in rynek["drabinka"]] == [2.5]
+
+
+def test_sufit_linii_na_karcie():
+    """Decyzja usera 2026-07-30: strzały i faule max „3+" (linia 2,5),
+    odbiory max „4+" (linia 3,5)."""
+    assert radar.MAX_LINIA_DOMYSLNA == 2.5
+    assert radar.MAX_LINIA_RYNKU["tackles"] == 3.5
+    # sufit tniemy przy budowie drabinki, więc badamy ją wprost — bez bram
+    # selekcji karty, które są tu nie na temat
+    counts = [5, 5, 0, 5, 5, 0, 5, 5, 5, 0, 5, 5, 0, 5]
+    trendy = {
+        "shots": _trend(counts=counts),
+        "tackles": _trend(market_code="tackles", counts=counts),
+    }
+    kursy = {"1.5": 1.7, "2.5": 2.2, "3.5": 3.4, "4.5": 5.0}
+    rynki = radar._rynki_wpisu(
+        {"shots": dict(kursy), "tackles": dict(kursy)},
+        trendy, {}, "Gracz 1", {}, teraz=TERAZ, minuty_proj=85.0,
+    )
+    per_rynek = {r["rynek_kod"]: [s["linia"] for s in r["drabinka"]]
+                 for r in rynki}
+    assert max(per_rynek["shots"]) == 2.5
+    assert max(per_rynek["tackles"]) == 3.5
 
 
 def test_klucze_dopasowane_tokenowo_w_obie_strony():

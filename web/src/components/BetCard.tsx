@@ -144,16 +144,11 @@ function odznakiPrzewagi(bet: ValueBet): {
       tone: "amber",
     });
   }
-  if (bet.wznowiony) {
-    o.push({
-      znak: "⎘",
-      label: "z wcześniejszego cyklu",
-      opis: bet.uproszczony
-        ? "Ten typ został opublikowany wcześniej i czeka na rozliczenie, ale ostatnie przeliczenie go nie odtworzyło. Odtworzyliśmy go z księgi rozliczeń, która trzyma tylko sam typ, kurs i szansę z chwili publikacji — dlatego karta nie ma rentgenu (czynników, historii, przedziału). Kurs obok jest ZAMROŻONY; przed zagraniem sprawdź aktualny u bukmachera"
-        : "Ten typ został opublikowany wcześniej i czeka na rozliczenie, ale ostatnie przeliczenie go nie odtworzyło — zwykle dlatego, że źródło danych chwilowo zamilkło albo kurs wyszedł z widełek. Kurs obok jest ZAMROŻONY z chwili publikacji; przed zagraniem sprawdź aktualny u bukmachera",
-      tone: "amber",
-    });
-  }
+  // PLAKIETKA „z wcześniejszego cyklu" USUNIĘTA (decyzja usera 2026-07-30).
+  // Mówiła o kuchni pipeline'u — o tym, że ostatnie przeliczenie nie odtworzyło
+  // typu — a nie o samym zakładzie. Flaga `wznowiony` zostaje w danych, bo
+  // pilnuje jej siatka bezpieczeństwa (typ raz pokazany zostaje do gwizdka);
+  // po prostu nie zawracamy nią głowy na karcie.
   return o;
 }
 
