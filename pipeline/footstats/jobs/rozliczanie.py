@@ -931,7 +931,23 @@ def kategorie_kwarantanna(log: dict | None = None) -> dict[str, dict]:
 # żeby zawsze mierzyć na SUROWYM p.
 KOREKTA_STRUMIENIA_OKNO = 120     # ostatnie N rozliczeń strumienia
 KOREKTA_STRUMIENIA_MIN_N = 40     # poniżej tego nie ruszamy niczego
-KOREKTA_STRUMIENIA_CAP = (-0.80, 0.20)
+# CAP PODNIESIONY -0,80 -> -1,05 (2026-07-30). Pomiar na 120 ostatnich
+# rozliczeniach: pełna potrzebna korekta pewniaków to −0,955, czyli STARY CAP
+# BYŁ WIĄŻĄCY — świadomie publikowaliśmy typy zawyżone o kilka punktów, bo
+# bezpiecznik nie pozwalał korekcie dojść tam, gdzie wskazują dane.
+#
+# Cap miał chronić przed wyzerowaniem listy i to była słuszna obawa w chwili,
+# gdy powstawał. Dziś tę rolę pełnią dwie inne rzeczy, których wtedy nie było:
+# osobna szansa pokazywana (`szansa_pokazywana`, liczona PO selekcji) oraz
+# brama „ujemna po korekcie", która zdejmuje typ, gdy przestaje mieć wartość.
+# Cap nie musi już udawać obu naraz — zostaje tylko bezpiecznikiem na absurdy.
+#
+# CO TO ZMIENIA W PRAKTYCE: typ, któremu model daje 70%, po pełnej korekcie
+# pokazuje 47%. Przy kursie 1,50 to nie jest zakład i wypadnie; przy 2,30 —
+# jest. Typy zawodnicze przesuwają się więc z niskich kursów na wyższe.
+# To nie jest zawężenie produktu, tylko przeniesienie go tam, gdzie liczby
+# się bronią.
+KOREKTA_STRUMIENIA_CAP = (-1.05, 0.20)
 # TŁUMIENIE: stosujemy POŁOWĘ zmierzonej reszty błędu, nie całość.
 # Pomiar na żywym logu 2026-07-27 dał od razu −0,80 dla pewniaków (szansa 70%
 # spada na 51%), co w jednym cyklu wyzerowałoby listę typów zawodniczych —

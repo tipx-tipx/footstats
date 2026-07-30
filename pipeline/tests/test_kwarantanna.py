@@ -445,3 +445,29 @@ def test_strona_na_krotkiej_probie_nie_jest_oceniana():
 def test_dochodowa_strona_zostaje():
     recs = _seria("team_corners", 30, 24, 1.5, strona="ponizej")
     assert rozliczanie.strony_kwarantanna(_log(recs)) == {}
+
+
+def test_cap_korekty_siega_zmierzonej_potrzeby():
+    """Pomiar 2026-07-30: pełna potrzebna korekta pewniaków to −0,955, więc
+    stary cap −0,80 BYŁ WIĄŻĄCY — bezpiecznik nie pozwalał korekcie dojść
+    tam, gdzie wskazują dane. Rolę „nie wyzeruj listy" przejęły osobna
+    szansa pokazywana i brama „ujemna po korekcie"."""
+    lo, _hi = rozliczanie.KOREKTA_STRUMIENIA_CAP
+    assert lo <= -0.95
+
+
+def test_korekta_dochodzi_do_zmierzonej_wartosci_przez_cykle():
+    """Tłumienie ma spowalniać, nie zatrzymywać: po kilku cyklach korekta
+    ma sięgnąć poziomu, który mówi pomiar."""
+    log = {}
+    for i in range(60):
+        log[str(i)] = _typ(i, 0.70, "wygrany" if i % 10 < 4 else "przegrany")
+    d1 = rozliczanie.korekta_strumienia(log)["pewniaki"]
+    # drugi cykl: te same wyniki, ale typy wystawione JUŻ z korektą d1
+    log2 = {}
+    for i in range(60):
+        p2 = rozliczanie.urealnij_p(0.70, d1)
+        log2[str(i)] = _typ(i, round(p2, 4),
+                            "wygrany" if i % 10 < 4 else "przegrany", kal=d1)
+    d2 = rozliczanie.korekta_strumienia(log2)["pewniaki"]
+    assert d2 < d1, "korekta musi pogłębiać się między cyklami, nie cofać"
