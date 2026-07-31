@@ -13,6 +13,11 @@ __pycache__/
 # dane pipeline (duże, odtwarzalne przez backfill/statshub)
 pipeline/data/http_cache/
 pipeline/data/store/
+# ...i to samo piętro niżej. Nie jest to literówka: `sts_value.py` liczył
+# sobie ścieżkę sam i pomylił się o jeden katalog, więc zrzuty lądowały tutaj
+# i wisiały jako nieśledzone (naprawione 2026-07-31). Wpis zostaje jako
+# bezpiecznik na wypadek, gdyby ktoś powtórzył ten sam błąd.
+pipeline/footstats/data/
 pipeline/logs/
 
 # obieg kursów (lokalny, może zawierać wpisane linie)
@@ -34,3 +39,10 @@ web/src/data/demo/_manifest.json
 
 # zrzuty dry-run trybu ligowego (odtwarzalne kazdym przebiegiem build_league)
 web/src/data/demo/liga_dryrun/
+
+# lokalne narzędzia i szkice, których NIE chcemy w repo:
+# skrót Windows z bezwzględną ścieżką (dwuklik do odświeżenia Sofascore)
+*.lnk
+# podgląd fontów — leży w `public/`, więc zacommitowany byłby PUBLICZNIE
+# dostępny pod /fonty.html; to szkic z wyboru kroju, nie część produktu
+web/public/fonty.html

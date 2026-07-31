@@ -42,7 +42,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-from .. import supa
+from .. import store, supa
 from ..model import betting
 from ..sources import sts, superbet
 from ..sources.superbet import norm_name
@@ -56,7 +56,15 @@ MARKET_NAMES_PL = {
     "yellow_card": "Żółta kartka",
 }
 
-OUT_PATH = Path(__file__).resolve().parent.parent / "data" / "store" / "sts_value.json"
+# JEDNO ŹRÓDŁO ŚCIEŻKI, nie własne liczenie katalogów (poprawka 2026-07-31).
+# Było: `Path(__file__).parent.parent / "data" / "store"` — wyrażenie skopiowane
+# z `store.py`, który leży PIĘTRO WYŻEJ (`footstats/`, nie `footstats/jobs/`).
+# Przez ten jeden brakujący `.parent` zrzut lądował w `pipeline/footstats/data/`
+# zamiast w `pipeline/data/` — czyli poza katalogiem, który `.gitignore`
+# pilnuje, i wisiał w `git status` jako nieśledzony plik gotowy do
+# przypadkowego zacommitowania. Nikt tego pliku nie czyta (to zrzut
+# diagnostyczny), więc nie było awarii — tylko cicha rozbieżność.
+OUT_PATH = store.STORE_DIR / "sts_value.json"
 
 
 def _pair_key(home: str, away: str) -> frozenset:
