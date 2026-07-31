@@ -40,9 +40,6 @@ web/src/data/demo/_manifest.json
 # zrzuty dry-run trybu ligowego (odtwarzalne kazdym przebiegiem build_league)
 web/src/data/demo/liga_dryrun/
 
-# lokalne narzędzia i szkice, których NIE chcemy w repo:
-# skrót Windows z bezwzględną ścieżką (dwuklik do odświeżenia Sofascore)
+# skrót Windows z bezwzględną ścieżką (dwuklik do odświeżenia Sofascore) —
+# bezużyteczny u kogokolwiek poza autorem, więc nie ma czego wersjonować
 *.lnk
-# podgląd fontów — leży w `public/`, więc zacommitowany byłby PUBLICZNIE
-# dostępny pod /fonty.html; to szkic z wyboru kroju, nie część produktu
-web/public/fonty.html
