@@ -49,6 +49,32 @@ function uruchom(cmd, args, opts = {}) {
   });
 }
 
+/**
+ * Przewiń stronę od góry do dołu i wróć — żeby odpalić wszystkie animacje
+ * wejścia, a potem zrobić zrzut całej (już widocznej) strony. Krok co 70%
+ * wysokości okna, z chwilą na animację; na końcu powrót na górę, bo
+ * `fullPage` renderuje od bieżącej pozycji przewijania.
+ */
+async function przewinCalosc(page) {
+  const wysokoscOkna = page.viewportSize()?.height ?? 900;
+  const krok = Math.round(wysokoscOkna * 0.7);
+  let y = 0;
+  for (let i = 0; i < 60; i++) {
+    const koniec = await page.evaluate(
+      ([y, krok]) => {
+        window.scrollTo(0, y + krok);
+        return window.scrollY + window.innerHeight >= document.body.scrollHeight - 2;
+      },
+      [y, krok],
+    );
+    y += krok;
+    await page.waitForTimeout(220);
+    if (koniec) break;
+  }
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForTimeout(500);
+}
+
 async function czekajNaSerwer(url, sekundy = 60) {
   for (let i = 0; i < sekundy * 2; i++) {
     try {
@@ -114,6 +140,15 @@ try {
       });
       // animacje wejścia (framer-motion) — bez tego łapiemy je w połowie
       await page.waitForTimeout(900);
+      // PRZEWIŃ CAŁĄ STRONĘ przed zrzutem. `Reveal` startuje z opacity 0
+      // i pojawia się dopiero `whileInView` (IntersectionObserver), a
+      // `fullPage: true` NIE przewija — renderuje wysoką klatkę z pozycji 0.
+      // Efekt: wszystko poniżej pierwszego ekranu wychodziło NIEWIDOCZNE, a
+      // zrzut wyglądał jak strona z brakującą treścią (zmierzone 2026-07-31
+      // na „Jak to działa": widać 4 kroki z 10 i pół ekranu pustki).
+      // To była wada NARZĘDZIA, nie strony — ale narzędzie jest jedynym
+      // sposobem, w jaki oglądamy własne UI, więc kłamało nam do oczu.
+      await przewinCalosc(page);
       const plik = path.join(
         KATALOG,
         `${adres.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "") || "start"}--${nazwa}.png`,
