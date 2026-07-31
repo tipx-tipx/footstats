@@ -6,9 +6,22 @@ zmierzony 2026-07-26 (rank 1 = najszczelniejszy rywal był czytany jako
 najhojniejszy, więc typy przeciw najlepszym defensywom dostawały bonus).
 """
 
+import pytest
+
 from footstats.jobs import radar
 from footstats.model import kontekst_drabinki as kd
 from footstats.sources.statshub import StatshubTrend
+
+
+@pytest.fixture(autouse=True)
+def _bez_betclica(monkeypatch):
+    """ODETNIJ SIEĆ — patrz bliźniacza zaślepka w `test_radar.py`.
+
+    `radar.zbuduj` woła `betclic.paruj_mecze` po drugi cennik, czyli wchodzi
+    w sieć. Połączenie do Betclica jest strumieniowe i potrafi wisieć, przez
+    co ten plik nigdy się nie kończył — a razem z nim cały zestaw.
+    """
+    monkeypatch.setattr(radar.betclic, "paruj_mecze", lambda nasze: ({}, []))
 
 TERAZ = 1_800_000_000
 DZIEN = 86_400

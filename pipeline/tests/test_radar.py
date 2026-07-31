@@ -1,7 +1,30 @@
 """Testy detektorów radaru (jobs/radar.py) na syntetycznych trendach."""
 
+import pytest
+
 from footstats.jobs import radar
 from footstats.sources.statshub import StatshubTrend
+
+
+@pytest.fixture(autouse=True)
+def _bez_betclica(monkeypatch):
+    """ODETNIJ SIEĆ (naprawa 2026-07-31).
+
+    `radar.zbuduj` dokłada do kart drugi cennik i woła w tym celu
+    `betclic.paruj_mecze` — czyli robi PRAWDZIWE zapytanie gRPC-Web. Testy,
+    które podają `events_meta` z nazwami drużyn, wchodziły więc w sieć, a
+    połączenie do Betclica jest strumieniowe („pierwsza ramka, potem wisi") —
+    i zestaw stawał na amen.
+
+    Skutek był gorszy niż wolne testy: PEŁNY zestaw nie kończył się NIGDY,
+    więc nikt go nie uruchamiał, więc 466 testów nie broniło niczego. To jest
+    dokładnie ta dziura, którą zamyka CI — ale CI też by na tym zawisło.
+
+    Zaślepka zwraca „żadnego meczu nie sparowano", czyli ścieżkę, którą kod
+    i tak obsługuje (Betclic bywa niedostępny w produkcji). Test drugiego
+    cennika, który tego POTRZEBUJE, podmienia zaślepkę u siebie.
+    """
+    monkeypatch.setattr(radar.betclic, "paruj_mecze", lambda nasze: ({}, []))
 
 TERAZ = 1_800_000_000
 DZIEN = 86_400
