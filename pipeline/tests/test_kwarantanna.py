@@ -310,7 +310,9 @@ def test_korekta_strumienia_nie_oscyluje():
         log[str(i)] = _typ(i, 0.52, "wygrany" if i % 2 == 0 else "przegrany",
                            kal=-0.80)
     k = rozliczanie.korekta_strumienia(log)
-    assert betting.delta_globalna(k["pewniaki"]) < -0.5,         "korekta zniknęła — regulator oscyluje"
+    assert betting.delta_globalna(k["pewniaki"]) < -0.5, (
+        "korekta zniknęła — regulator oscyluje"
+    )
 
 
 def test_korekta_strumienia_wymaga_proby():
