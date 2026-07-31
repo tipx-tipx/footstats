@@ -118,6 +118,44 @@ def ev_brutto_pct(p: float, kurs: float) -> float:
     return (float(p) * float(kurs) - 1.0) * 100.0
 
 
+def delta_dla_p(korekta, p: float) -> float:
+    """Rozwiąż korektę logitową dla konkretnej szansy `p`.
+
+    Korekta bywa w dwóch postaciach i to jest celowe:
+      * `float` — jedna delta na cały strumień (tak było do 2026-07-31),
+      * `dict` — `{"global": g, "bins": [[lo, hi, b], ...]}`, czyli delta
+        zależna od tego, JAK PEWNY jest model.
+
+    PO CO PRZEDZIAŁY (pomiar 2026-07-31): błąd modelu nie jest jednym
+    przesunięciem — on ZMIENIA ZNAK. Na stronie „powyżej" model przeszacowuje
+    o 5-11 pp, a na „poniżej" przy kursach 1,9+ NIEDOSZACOWUJE o 16,7 pp
+    (mówi 45,8%, wchodzi 62,5%). Jedna liczba na strumień uśrednia dwa błędy
+    o przeciwnych znakach i psuje oba naraz. Kalibracja rynkowa ma przedziały
+    od dawna; korekta strumienia jako jedyna warstwa uczenia ich nie miała.
+
+    Nieznana postać albo brak korekty = 0.0, czyli „nie ruszaj".
+    """
+    if isinstance(korekta, dict):
+        for lo, hi, b in korekta.get("bins") or []:
+            if lo <= p < hi:
+                return float(b)
+        return float(korekta.get("global", 0.0))
+    try:
+        return float(korekta or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def delta_globalna(korekta) -> float:
+    """Sama część globalna korekty — dla miejsc, które nie znają `p`."""
+    if isinstance(korekta, dict):
+        return float(korekta.get("global", 0.0))
+    try:
+        return float(korekta or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def prog_oplacalnosci(kurs: float, tryb: str | None = None) -> float:
     """Jaka szansa jest potrzebna, żeby wyjść na zero przy tym kursie."""
     netto = kurs_netto(kurs, tryb)

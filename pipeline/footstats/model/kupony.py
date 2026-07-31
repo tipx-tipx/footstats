@@ -381,8 +381,11 @@ def szansa_z_legow(kupon: dict, korekty: dict | None) -> float:
         return float(kupon.get("p_model") or 0.0)
     p = 1.0
     for leg in kupon.get("legi") or []:
-        d = korekty.get(_strumien_lega(leg), 0.0)
-        p *= urealnij_leg(float(leg.get("p_model") or 0.0), d)
+        # delta dobierana pod SZANSĘ TEGO LEGA — korekta bywa binowana
+        # (rozliczanie.korekta_strumienia), bo błąd modelu zmienia znak
+        p_leg = float(leg.get("p_model") or 0.0)
+        d = betting.delta_dla_p(korekty.get(_strumien_lega(leg)), p_leg)
+        p *= urealnij_leg(p_leg, d)
     return p
 
 
@@ -456,8 +459,9 @@ def legi_z_wartoscia(
         kurs = float(l.get("kurs") or 0.0)
         if kurs <= 1.0:
             continue
-        d = (korekty or {}).get(_strumien_lega(l), 0.0)
-        p = urealnij_leg(float(l.get("p_model") or 0.0), d)
+        p_leg = float(l.get("p_model") or 0.0)
+        d = betting.delta_dla_p((korekty or {}).get(_strumien_lega(l)), p_leg)
+        p = urealnij_leg(p_leg, d)
         if (p * kurs - 1.0) * 100.0 >= min_ev:
             out.append(l)
     return out

@@ -2004,7 +2004,7 @@ def _main_impl(tryb=None):
     # zakładu — wchodzi do kalibracji „powyżej" razem z biasem rynku
     # (patrz pętla linii drużynowych i pomiar z 2026-07-30).
 
-    def _dodaj_delte(v, d: float):
+    def _dodaj_delte(v, d):
         """Kalibracja rynku + delta logitowa, w jednej korekcie.
 
         Rynek BEZ własnej kalibracji (za mało rozliczeń) też dostaje deltę —
@@ -2014,15 +2014,32 @@ def _main_impl(tryb=None):
         """
         if not d:
             return v if v is not None else 1.0
+        # KOREKTA STRUMIENIA BYWA BINOWANA (2026-07-31). Oba zestawy binów
+        # chodzą po TYCH SAMYCH przedziałach `p_over` (rozliczanie.
+        # BIAS_PRZEDZIALY), więc sumują się bin po binie. Gdyby kiedyś
+        # przestały być te same, `_delta_dla` niżej i tak dobierze wartość
+        # po zakresie, a nie po pozycji na liście.
+        d_glob = rozliczanie.betting.delta_globalna(d)
+
+        def _delta_dla(lo, hi):
+            return rozliczanie.betting.delta_dla_p(d, (lo + hi) / 2.0)
+
         if isinstance(v, dict) and v.get("logit"):
+            biny = [[lo, hi, round(float(b) + _delta_dla(lo, hi), 3)]
+                    for lo, hi, b in (v.get("bins") or [])]
             return {
                 **v,
-                "global": round(float(v.get("global", 0.0)) + d, 3),
-                "bins": [[lo, hi, round(float(b) + d, 3)]
-                         for lo, hi, b in (v.get("bins") or [])],
+                "global": round(float(v.get("global", 0.0)) + d_glob, 3),
+                "bins": biny,
             }
         if v is None or v == 1.0:
-            return {"logit": True, "global": round(d, 3), "bins": []}
+            # rynek bez własnej kalibracji dostaje samą korektę strumienia —
+            # razem z jej przedziałami, jeśli je ma
+            if isinstance(d, dict):
+                return {"logit": True, "global": round(d_glob, 3),
+                        "bins": [[lo, hi, round(float(b), 3)]
+                                 for lo, hi, b in (d.get("bins") or [])]}
+            return {"logit": True, "global": round(d_glob, 3), "bins": []}
         return v
 
     def _bias_z_korekta(mk: str, strumien: str):
@@ -4353,7 +4370,13 @@ def _main_impl(tryb=None):
             margines_startu_s=kupony.MARGINES_STARTU_S,
             # WŁASNE UCZENIE DRABINEK: delta z ICH rozliczeń (nie modelu) —
             # ściąga szanse kart o tyle, o ile strumień przeszacowywał
-            korekta_logit=korekta_strumieni.get("drabinki", 0.0),
+            # SKALAR, nie biny: `p` drabinek pochodzi z pokrycia linii,
+            # a nie z p_over silnika, więc przedziały modelu nic tam nie
+            # znaczą (patrz rozliczanie._biny_korekty — drabinki celowo
+            # zostają jedną liczbą; `delta_globalna` jest bezpiecznikiem)
+            korekta_logit=rozliczanie.betting.delta_globalna(
+                korekta_strumieni.get("drabinki")
+            ),
             # ...i pomiar progu pokrycia: szczeble tuż pod nim, do rozliczenia
             # w tle (patrz radar.NEAR_POKRYCIA)
             pomiar_out=pomiar_drabinek,
