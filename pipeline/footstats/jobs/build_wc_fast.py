@@ -293,6 +293,20 @@ def scal_z_publikacjami(
             bet["ev_netto"] = round(
                 betting.ev_pct(p, bet["kurs"], bet.get("tryb_podatku")), 1
             )
+        # STEMPEL TRYBU PODATKOWEGO na typach WZNOWIONYCH (2026-07-31).
+        # Typ raz pokazany zostaje na liście do gwizdka, więc wraca tu
+        # z rejestru publikacji albo z księgi rozliczeń — a te struktury
+        # powstały PRZED podatkiem i pola nie niosą. Zmierzone na produkcji
+        # zaraz po wdrożeniu: 59 ze 153 typów na stronie było bez stempla.
+        #
+        # Dziś to nieszkodliwe, bo brak trybu = „standard" wszędzie, gdzie
+        # się go czyta. Ale cały sens zapisywania trybu PRZY TYPIE polega na
+        # tym, że historia pamięta, w czym była liczona — a rekord bez pola
+        # dostanie tryb dopiero przy rozliczeniu, czyli już wg konfiguracji
+        # z TAMTEJ chwili, nie z chwili publikacji.
+        bet.setdefault(
+            "tryb_podatku", betting.tryb_podatku(bet.get("bukmacher"))
+        )
         out.append(bet)
         odtworzone.add(k)
         wznowione += 1
