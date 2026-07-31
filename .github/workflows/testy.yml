@@ -1,0 +1,96 @@
+name: FootStats — testy
+
+# BRAMKA JAKOŚCI PRZED WDROŻENIEM (dodana 2026-07-31).
+#
+# Do dziś projekt miał 426 testów i ZERO ich uruchomień przed deployem —
+# każdy push do `master` szedł prosto na Vercel. Przy produkcie, którego
+# jedyną przewagą jest „niczego nie poprawiamy po fakcie", niezawodność
+# rozliczania jest fundamentem wiarygodności: raz zapisany wynik zostaje
+# w statystyce na zawsze, więc błąd w rozliczaniu jest nieodwracalny.
+#
+# Ten workflow NIE wdraża niczego — Vercel dalej buduje z `master` po swojemu.
+# Żeby bramka realnie broniła produkcji, trzeba jeszcze (osobno, w ustawieniach
+# GitHuba): włączyć ochronę gałęzi `master` i wymagać zielonego statusu tego
+# workflow przed scaleniem. Do tego czasu jest to sygnał, nie blokada.
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+# nowy push na tę samą gałąź anuluje poprzedni przebieg — po co liczyć
+# wynik dla kodu, którego już nie ma
+concurrency:
+  group: testy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pipeline:
+    name: Model i pipeline (pytest)
+    runs-on: ubuntu-latest
+    # Cały zestaw (470 testów) idzie ~45 s. Limit jest tu jako BEZPIECZNIK,
+    # nie jako budżet: do 2026-07-31 dwa pliki testowe wchodziły w sieć
+    # (`radar` i `drabinki_kontekst` wołały Betclica przez `radar.zbuduj`),
+    # a połączenie do Betclica jest strumieniowe i potrafi wisieć bez końca.
+    # Zestaw nie kończył się NIGDY, więc nikt go nie uruchamiał — i 470 testów
+    # nie broniło niczego. Zaślepki są w tych plikach; limit pilnuje, żeby
+    # kolejny taki przypadek ubił przebieg zamiast wisieć.
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pipeline/requirements.txt
+
+      - name: Instalacja zależności
+        working-directory: pipeline
+        run: pip install -r requirements.txt
+
+      - name: Testy
+        working-directory: pipeline
+        env:
+          # Windows lokalnie wymaga tego dla polskich znaków w testach;
+          # w Linuksie nieszkodliwe, a trzyma jedno zachowanie w obu miejscach
+          PYTHONUTF8: "1"
+          PYTHONIOENCODING: utf-8
+        run: python -m pytest tests/ -q
+
+  web:
+    name: Aplikacja (lint, typy, build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Instalacja zależności
+        working-directory: web
+        run: npm ci
+
+      - name: Lint
+        working-directory: web
+        run: npm run lint
+
+      - name: Typy
+        working-directory: web
+        run: npm run typecheck
+
+      - name: Build produkcyjny
+        working-directory: web
+        # Build sprawdza też PARYTET generatora kuponów: `kuponBuilder.ts` jest
+        # ręcznym portem `kupony.py` i już raz złamał się przez jeden import
+        # (most parytetu odpala ten plik gołym Node'em). Sam pytest tego nie
+        # łapie, jeśli most nie wstanie.
+        run: npm run build
