@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { wyplata } from "@/lib/podatek";
 
 import { CountUpKurs, PasekSzansy } from "./KuponAnim";
 import { fmtDataCzas, fmtKurs, fmtLinia, fmtProc } from "@/lib/format";
@@ -51,7 +52,7 @@ export function KuponDniaTeaser({ kupon }: { kupon: Kupon }) {
               z 10 zł robi się
             </p>
             <p className="font-data mt-0.5 text-lg font-semibold leading-tight">
-              {Math.round(kupon.kurs_laczny * 10)} zł
+              {Math.round(wyplata(kupon.kurs_laczny, 10, kupon.tryb_podatku))} zł
             </p>
           </div>
         </div>

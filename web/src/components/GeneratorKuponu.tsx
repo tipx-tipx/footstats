@@ -1,6 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
+import { kursNetto, wyplata } from "@/lib/podatek";
 import { useEffect, useMemo, useState } from "react";
 
 import {
@@ -70,6 +71,7 @@ function urealnij(
     p_model: p,
     fair_kurs: Math.round((1 / Math.max(p, 1e-9)) * 100) / 100,
     ev_pct: Math.round((p * k.kurs_laczny - 1) * 1000) / 10,
+    ev_netto: Math.round((p * kursNetto(k.kurs_laczny) - 1) * 1000) / 10,
   };
 }
 
@@ -953,7 +955,7 @@ export function GeneratorKuponu({
                   zł robi się
                 </dt>
                 <dd className="font-data font-semibold text-ink">
-                  {Math.round(podglad.kurs_laczny * stawka)} zł
+                  {Math.round(wyplata(podglad.kurs_laczny, stawka))} zł
                 </dd>
               </div>
             </dl>
@@ -1044,7 +1046,7 @@ function KuponKarta({
   onPrzypnij: (l: LegPool) => void;
   onUsun: (l: LegPool) => void;
 }) {
-  const zwrot = (stawka * k.kurs_laczny).toFixed(0);
+  const zwrot = wyplata(k.kurs_laczny, stawka).toFixed(0);
   // legi grupowane po meczu (jak bet builder)
   const grupy = useMemo(() => {
     const m = new Map<number, { mecz: string; legi: typeof k.legi }>();

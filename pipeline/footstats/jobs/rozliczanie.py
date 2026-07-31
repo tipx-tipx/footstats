@@ -144,6 +144,23 @@ TERMIN_BRAK_DANYCH_S = 48 * 3600
 ZRODLO_DRABINKA = "drabinka"
 
 
+def _zwrot_typu(r: dict) -> float:
+    """Ile realnie wraca z 1 j. postawionej na ten typ — PO PODATKU.
+
+    Jedno miejsce dla wszystkich rachunków bilansu (dzień, strumień,
+    podsumowanie), żeby nie dało się policzyć raz tak, a raz inaczej.
+
+    TRYB PODATKOWY z rekordu; brak pola = „standard". Rekordy sprzed
+    2026-07-31 nie mają go wcale, a wszystkie szły z Superbetu i STS, więc
+    domyślny standard odtwarza ich prawdziwy wynik — historia liczy się od
+    teraz NETTO (decyzja usera 2026-07-31). To nie jest poprawianie
+    przeszłości: zamrożone są `p_model` i kurs, a nie sposób liczenia zysku.
+    """
+    if r.get("wynik") != "wygrany":
+        return 0.0
+    return betting.kurs_netto(float(r.get("kurs") or 0.0), r.get("tryb_podatku"))
+
+
 def _z_modelu(r: dict) -> bool:
     """Typ policzony przez silnik — tylko takie uczą kalibrację i kwarantannę."""
     return not r.get("zrodlo")
@@ -303,6 +320,14 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
             **({"klasa": b["klasa"]} if b.get("klasa") else {}),
             **({"edge": b["edge"]} if b.get("edge") is not None else {}),
             "opublikowano_ts": int(time.time()),
+            # TRYB PODATKOWY ZAMROŻONY PRZY TYPIE (2026-07-31). Bez tego pola
+            # `_zwrot_typu` zawsze czytałby None i rozliczał wszystko jako
+            # „standard" — czyli zamrożenie trybu byłoby pozorne, a przyszły
+            # typ z oferty „bez podatku" policzyłby się źle. Kurs i p_model są
+            # zamrażane z tego samego powodu: rekord ma pamiętać, w czym był
+            # liczony, a nie zależeć od dzisiejszej konfiguracji.
+            "tryb_podatku": b.get("tryb_podatku")
+                            or betting.tryb_podatku(b.get("bukmacher")),
             "wynik": None, "faktyczna": None,
         }
 
@@ -751,6 +776,11 @@ def rynki_kwarantanna(log: dict | None = None) -> dict[str, dict]:
         traf = sum(1 for r in grp if r["wynik"] == "wygrany")
         sr_p = sum(r["p_model"] for r in grp) / len(grp)
         bias = (traf + 2.0) / (sr_p * len(grp) + 2.0)
+        # ROI BRUTTO, ŚWIADOMIE (2026-07-31): kwarantanna to BRAMA, a bramy
+        # zostają na brutto do czasu pomiaru — inaczej podatek przestawiłby
+        # naraz i rachunek, i selekcję, i w rozliczeniach nie dałoby się
+        # rozdzielić jednego od drugiego. Progi KWARANTANNA_ROI_* były
+        # kalibrowane na brutto; ich przeliczenie to osobna decyzja.
         roi = sum(
             (float(r["kurs"]) - 1.0) if r["wynik"] == "wygrany" else -1.0
             for r in grp
@@ -827,6 +857,11 @@ def strony_kwarantanna(log: dict | None = None) -> dict[str, dict]:
         if len(grp) < STRONA_MIN_N:
             continue
         traf = sum(1 for r in grp if r["wynik"] == "wygrany")
+        # ROI BRUTTO, ŚWIADOMIE (2026-07-31): kwarantanna to BRAMA, a bramy
+        # zostają na brutto do czasu pomiaru — inaczej podatek przestawiłby
+        # naraz i rachunek, i selekcję, i w rozliczeniach nie dałoby się
+        # rozdzielić jednego od drugiego. Progi KWARANTANNA_ROI_* były
+        # kalibrowane na brutto; ich przeliczenie to osobna decyzja.
         roi = sum(
             (float(r["kurs"]) - 1.0) if r["wynik"] == "wygrany" else -1.0
             for r in grp
@@ -937,6 +972,11 @@ def kategorie_kwarantanna(log: dict | None = None) -> dict[str, dict]:
             continue
         traf = sum(1 for r in grp if r["wynik"] == "wygrany")
         sr_p = sum(float(r["p_model"]) for r in grp) / len(grp)
+        # ROI BRUTTO, ŚWIADOMIE (2026-07-31): kwarantanna to BRAMA, a bramy
+        # zostają na brutto do czasu pomiaru — inaczej podatek przestawiłby
+        # naraz i rachunek, i selekcję, i w rozliczeniach nie dałoby się
+        # rozdzielić jednego od drugiego. Progi KWARANTANNA_ROI_* były
+        # kalibrowane na brutto; ich przeliczenie to osobna decyzja.
         roi = sum(
             (float(r["kurs"]) - 1.0) if r["wynik"] == "wygrany" else -1.0
             for r in grp
@@ -1475,13 +1515,12 @@ def _sloty_aktualne() -> set[str]:
     """Sloty wynikające z AKTUALNEJ konfiguracji przedziałów kursowych —
     na stronie wisi maks. jeden kupon na przedział (user: razem max 4
     dzienne i max 4 długoterminowe)."""
+    et = kupony_model.etykieta_celu
     return (
-        {f"dzienny:{int(a)}–{int(b)}"
-         for a, b in kupony_model.PRZEDZIALY_DZIENNE}
-        | {f"dlugoterminowy:{int(a)}–{int(b)}"
+        {f"dzienny:{et(a, b)}" for a, b in kupony_model.PRZEDZIALY_DZIENNE}
+        | {f"dlugoterminowy:{et(a, b)}"
            for a, b in kupony_model.PRZEDZIALY_DLUGOTERMINOWE}
-        | {f"value:{int(a)}–{int(b)}"
-           for a, b in kupony_model.PRZEDZIALY_VALUE}
+        | {f"value:{et(a, b)}" for a, b in kupony_model.PRZEDZIALY_VALUE}
     )
 
 
@@ -1657,6 +1696,11 @@ def _kupon_do_logu(
             "kurs_laczny": round(kurs_po, 2), "p_model": round(p_po, 4),
             "fair_kurs": round(1.0 / max(p_po, 1e-9), 2),
             "ev_pct": round((p_po * kurs_po - 1.0) * 100.0, 1),
+            # wariant po wymianie lega musi nieść to samo, co kupon oryginalny
+            # — inaczej jedyny kupon w logu bez trybu rozliczyłby się inaczej
+            "ev_netto": round(betting.ev_pct(p_po, kurs_po), 1),
+            "tryb_podatku": rec.get("tryb_podatku")
+                            or betting.TRYB_PODATKU_DOMYSLNY,
             "legi": legi, "slot": rec["slot"], "klucz": klucz_n,
             "dzien": dzien, "opublikowano_ts": now, "wynik": None,
             "z_wymiany": True,
@@ -1837,7 +1881,7 @@ def skutecznosc_per_dzien(
             agg["trafione"] += 1
         if not r.get("sugestia") and r.get("kurs"):
             agg["okazje"] += 1
-            agg["_zwrot_j"] += r["kurs"] if r.get("wynik") == "wygrany" else 0.0
+            agg["_zwrot_j"] += _zwrot_typu(r)
         agg["typy"].append(_typ_dnia(r))
     for r in poza or []:
         agg = _agg(r)
@@ -1891,10 +1935,7 @@ def skutecznosc_strumieni(log: dict, dni: int = 21) -> dict[str, dict]:
         poza = [r for r in w_strumieniu if r.get("poza_publikacja")]
         okazje = [r for r in settled if not r.get("sugestia") and r.get("kurs")]
         trafione = sum(1 for r in settled if r["wynik"] == "wygrany")
-        roi = sum(
-            (float(r["kurs"]) - 1.0) if r["wynik"] == "wygrany" else -1.0
-            for r in okazje
-        )
+        roi = sum(_zwrot_typu(r) - 1.0 for r in okazje)
         rec: dict = {
             "dni": skutecznosc_per_dzien(settled, dni=dni, poza=poza),
             "podsumowanie": {
@@ -2136,10 +2177,7 @@ def epoki_per_rynek(log: dict) -> dict:
         if not grp:
             return None
         traf = sum(1 for r in grp if r["wynik"] == "wygrany")
-        roi = sum(
-            (float(r["kurs"]) - 1.0) if r["wynik"] == "wygrany" else -1.0
-            for r in grp
-        ) / len(grp)
+        roi = sum(_zwrot_typu(r) - 1.0 for r in grp) / len(grp)
         return {"n": len(grp), "trafione": traf,
                 "skutecznosc": round(traf / len(grp), 3), "roi": round(roi, 3)}
 
@@ -2651,10 +2689,14 @@ def rozlicz(
         d["n"] += 1
         if r["wynik"] == "wygrany":
             d["wygrane"] += 1
-            d["zwrot_j"] += float(
-                r.get("kurs_rozliczony") or r.get("kurs_laczny") or 0
+            # PODATEK OD STAWKI liczy się RAZ na kupon, nie od każdego typu —
+            # kupon to jeden zakład o kursie łącznym (2026-07-31)
+            d["zwrot_j"] += betting.kurs_netto(
+                float(r.get("kurs_rozliczony") or r.get("kurs_laczny") or 0),
+                r.get("tryb_podatku"),
             )
         elif r["wynik"] == "zwrot":
+            # zakład anulowany: stawka wraca W CAŁOŚCI, razem z podatkiem
             d["zwrot_j"] += 1.0
     for d in kupony_roi.values():
         d["zwrot_j"] = round(d["zwrot_j"], 2)
@@ -2708,9 +2750,7 @@ def rozlicz(
         and _z_modelu(r)
     ]
     okazje = [r for r in settled if not r["sugestia"] and r.get("kurs")]
-    roi = sum(
-        (r["kurs"] - 1.0) if r["wynik"] == "wygrany" else -1.0 for r in okazje
-    )
+    roi = sum(_zwrot_typu(r) - 1.0 for r in okazje)
     # typy poza publikacją (kwarantanna/limit meczu): w Skuteczności widoczne
     # z oznaczeniem (pełna transparentność), ale poza licznikami trafień/ROI
     poza_pub = [

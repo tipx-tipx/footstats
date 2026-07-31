@@ -312,3 +312,84 @@ def p_over_sumy(
     rozklad = rozklad_sumy(pred_a, pred_b, max_k)
     prog = int(np.floor(line))
     return float(sum(rozklad[prog + 1:])) if prog + 1 < len(rozklad) else 0.0
+
+
+# --- PRZEDZIAŁY WIARYGODNOŚCI DLA NOWYCH RYNKÓW (2026-07-31) -----------------
+#
+# PO CO: brama publikacji rynków drużynowych decyduje o „p OSTROŻNYM"
+# (średnia p i dolnej granicy przedziału), a nie o samym p — i to jest
+# najmocniejsza część tej bramy. Nowe rynki („kto więcej", sumy meczowe)
+# wchodziły na stronę BEZ przedziału, więc nie dało się ich przez tę bramę
+# przepuścić: wystawialiśmy je na samym EV. Bez tych dwóch funkcji „dopięcie
+# nowych rynków do bram" byłoby udawaniem kontroli, której nie ma.
+#
+# METODA jest ta sama, co w `p_over_credible_interval` dla jednej drużyny:
+# losujemy intensywność z posteriora Gamma i liczymy prawdopodobieństwo
+# WARUNKOWO na wylosowanej intensywności (wtedy licznik jest Poissona).
+# Rozrzut wyników po losowaniach = niepewność samej estymaty p.
+#
+# Dwa fakty rachunkowe, dzięki którym jest to tanie i dokładne:
+#   * suma niezależnych Poissonów to Poisson o sumie intensywności —
+#     przedział dla sumy meczowej nie wymaga splotu,
+#   * różnica dwóch Poissonów ma rozkład Skellama — P(A>B) = P(różnica > 0)
+#     liczy się wprost, bez podwójnej pętli po wynikach.
+#
+# UWAGA: te przedziały dziedziczą ZAŁOŻENIE NIEZALEŻNOŚCI obu drużyn
+# (patrz komentarz przy `porownanie_druzyn`). Realna korelacja jest ujemna,
+# więc przedział sumy jest tu ZA SZEROKI, a przedział porównania — za wąski.
+# Kierunek błędu jest po bezpiecznej stronie dokładnie tam, gdzie brama tnie
+# (sumy), więc do czasu zmierzenia korelacji to jest ostrożne, nie naiwne.
+
+
+def _losuj_lambdy(
+    posterior: GammaPosterior, exposure: float, rng, n: int
+) -> np.ndarray:
+    """Wylosowane oczekiwane liczby zdarzeń (intensywność × ekspozycja)."""
+    return rng.gamma(
+        shape=posterior.alpha, scale=1.0 / posterior.beta, size=n
+    ) * max(exposure, 1e-9)
+
+
+def przedzial_sumy(
+    post_a: GammaPosterior,
+    exposure_a: float,
+    post_b: GammaPosterior,
+    exposure_b: float,
+    line: float,
+    level: float = 0.90,
+    n_samples: int = 4000,
+    seed: int = 7,
+) -> tuple[float, float]:
+    """Przedział wiarygodności na P(A+B > linia) — suma meczowa."""
+    rng = np.random.default_rng(seed)
+    mu = (
+        _losuj_lambdy(post_a, exposure_a, rng, n_samples)
+        + _losuj_lambdy(post_b, exposure_b, rng, n_samples)
+    )
+    p_overs = stats.poisson.sf(int(np.floor(line)), mu)
+    lo = (1.0 - level) / 2.0
+    return float(np.quantile(p_overs, lo)), float(np.quantile(p_overs, 1.0 - lo))
+
+
+def przedzial_porownania(
+    post_a: GammaPosterior,
+    exposure_a: float,
+    post_b: GammaPosterior,
+    exposure_b: float,
+    level: float = 0.90,
+    n_samples: int = 4000,
+    seed: int = 7,
+) -> tuple[float, float]:
+    """Przedział wiarygodności na P(A > B) — rynek „kto więcej".
+
+    Dla drugiej strony rynku wywołać z zamienionymi argumentami; remis
+    zjada część masy po obu stronach, więc P(B>A) NIE jest dopełnieniem
+    P(A>B) i nie wolno go liczyć jako 1 − lo/hi.
+    """
+    rng = np.random.default_rng(seed)
+    mu_a = _losuj_lambdy(post_a, exposure_a, rng, n_samples)
+    mu_b = _losuj_lambdy(post_b, exposure_b, rng, n_samples)
+    # Skellam(mu_a, mu_b) = rozkład różnicy A−B; P(A>B) = P(różnica > 0)
+    p_wiecej = stats.skellam.sf(0, mu_a, mu_b)
+    lo = (1.0 - level) / 2.0
+    return float(np.quantile(p_wiecej, lo)), float(np.quantile(p_wiecej, 1.0 - lo))

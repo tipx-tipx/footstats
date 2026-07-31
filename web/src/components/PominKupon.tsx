@@ -67,6 +67,12 @@ export function PominKupon({
     setStan("wysylam");
     try {
       await akcjaKuponu({ klucz, powod });
+      // To NIE jest render: funkcja jest procedurą obsługi kliknięcia (async,
+      // wołana z onClick), a reguła czystości nie odróżnia jej od ciała
+      // komponentu. Znacznik czasu pominięcia musi być realnym „teraz", więc
+      // `Date.now()` jest tu poprawne — inaczej niż w renderze, gdzie od tego
+      // jest `terazTs()`. Dyrektywa MUSI stać bezpośrednio nad kodem.
+      // eslint-disable-next-line react-hooks/purity
       localStorage.setItem(`kupon-pominiety:${klucz}`, String(Date.now()));
       setStan("pominiety");
     } catch {

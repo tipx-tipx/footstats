@@ -1,4 +1,5 @@
 import { CountUpKurs, PasekSzansy } from "./KuponAnim";
+import { wyplata } from "@/lib/podatek";
 import {
   fmtDataCzas,
   fmtKurs,
@@ -110,7 +111,7 @@ export function KuponBilet({
               z {stawka} zł robi się
             </p>
             <p className="font-data mt-0.5 text-lg font-semibold leading-tight">
-              {Math.round(k.kurs_laczny * stawka)} zł
+              {Math.round(wyplata(k.kurs_laczny, stawka, k.tryb_podatku))} zł
             </p>
           </div>
         </div>

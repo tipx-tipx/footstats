@@ -114,7 +114,7 @@ function Werdykt({ kupon: k }: { kupon: Kupon }) {
         </dd>
       </div>
 
-      {k.styl === "value" && k.ev_pct > 0 && (
+      {k.styl === "value" && (k.ev_netto ?? k.ev_pct) > 0 && (
         <div className="grid grid-cols-[68px_1fr] gap-3 py-3">
           <dt className="pt-0.5 text-[10px] font-semibold uppercase tracking-wide text-faint">
             przewaga
@@ -339,6 +339,12 @@ export function KuponyScena({
     setStan("wysylam");
     try {
       await akcjaKuponu({ klucz: kupon.klucz, powod });
+      // To NIE jest render: funkcja jest procedurą obsługi kliknięcia (async,
+      // wołana z onClick), a reguła czystości nie odróżnia jej od ciała
+      // komponentu. Znacznik czasu pominięcia musi być realnym „teraz", więc
+      // `Date.now()` jest tu poprawne — inaczej niż w renderze, gdzie od tego
+      // jest `terazTs()`. Dyrektywa MUSI stać bezpośrednio nad kodem.
+      // eslint-disable-next-line react-hooks/purity
       localStorage.setItem(`kupon-pominiety:${kupon.klucz}`, String(Date.now()));
       setStan("pominiety");
     } catch {

@@ -14,19 +14,23 @@ def _bet(id_, mecz_id, podmiot_id, kurs, p, ev=5.0, pewnosc="wysoka", rank=1.0):
     }
 
 
-def test_kupon_value_sklada_sie_w_przedziale_4_8():
+def test_kupony_value_sa_wylaczone():
+    """Styl „z przewagą" WYŁĄCZONY 2026-07-30: 0 wygranych na 13 przy
+    deklarowanych 38,1%. Kupon złożony z legów bez realnej przewagi nie może
+    jej wytworzyć — mnożenie podnosi stratę do potęgi, nie uśrednia jej.
+
+    Ten test pilnuje, żeby value nie wróciło przypadkiem (np. przy sklejaniu
+    gałęzi). Ma wrócić dopiero, gdy pojedyncze typy udowodnią przewagę —
+    i wtedy razem z pomiarem, nie z samym wpisem w PRZEDZIALY_VALUE.
+    """
+    assert kupony.PRZEDZIALY_VALUE == ()
     bets = [
         _bet(1, 1, 11, 1.8, 0.62, rank=3.0),
         _bet(2, 2, 22, 1.7, 0.65, rank=2.5),
         _bet(3, 3, 33, 1.75, 0.63, rank=2.0),
     ]
     out = kupony.build_kupony(bets, now_ts=0)
-    v = next((k for k in out if k.get("styl") == "value" and k["cel"] == 4), None)
-    assert v is not None
-    assert 4.0 <= v["kurs_laczny"] <= 8.0
-    assert v["cel_label"] == "4–8"
-    assert len(v["legi"]) == 3
-    assert abs(v["p_model"] - 0.62 * 0.65 * 0.63) < 1e-4  # zaokrąglenie do 4 miejsc
+    assert [k for k in out if k.get("styl") == "value"] == []
 
 
 def test_kupon_pomija_mecze_juz_rozpoczete():
@@ -40,11 +44,12 @@ def test_kupon_pomija_mecze_juz_rozpoczete():
     ]
     for b in bets:
         b["kickoff_ts"] = teraz - 60  # mecze zaczęły się minutę temu
-    assert kupony.build_kupony(bets, now_ts=teraz) == []
+    assert kupony.build_kupony(bets, bets, now_ts=teraz) == []
     # ten sam zestaw, ale mecze w przyszłości — kupon powstaje
+    # (pula pewniaków, bo styl „value" jest wyłączony)
     for b in bets:
         b["kickoff_ts"] = teraz + 3 * 3600
-    assert kupony.build_kupony(bets, now_ts=teraz) != []
+    assert kupony.build_kupony(bets, bets, now_ts=teraz) != []
 
 
 def test_max_one_leg_per_match_and_player():
@@ -102,7 +107,11 @@ def test_pewniaki_two_horizons_and_max_4_per_match():
             licznik[l["mecz_id"]] = licznik.get(l["mecz_id"], 0) + 1
         assert max(licznik.values()) <= 4
         # kurs w zadeklarowanym przedziale
-        cmin, cmax = (float(x) for x in k["cel_label"].split("–"))
+        # etykieta jest PO POLSKU (przecinek dziesiętny) — patrz
+        # kupony.etykieta_celu; test ma czytać ją tak, jak czyta user
+        cmin, cmax = (
+            float(x.replace(",", ".")) for x in k["cel_label"].split("–")
+        )
         assert cmin <= k["kurs_laczny"] <= cmax
         # kara korelacyjna: p kuponu <= iloczyn szans legów
         iloczyn = 1.0
@@ -257,7 +266,7 @@ def test_profil_bezpieczny_odrzuca_ryzykowne_legi():
         assert all(l["p_model"] >= 0.58 for l in k["legi"])
 
 
-def test_dzienne_do_czterech_przedzialow():
+def test_dzienne_maja_dwa_przedzialy():
     pool = [
         _leg(mecz, mecz * 10 + i, 1.45, 0.72, kickoff=10_000)
         for mecz in range(1, 4)
@@ -265,8 +274,13 @@ def test_dzienne_do_czterech_przedzialow():
     ]
     out = kupony.build_kupony([], pool, now_ts=0)
     dzienne = [k for k in out if k.get("horyzont") == "dzienny"]
-    assert 2 <= len(dzienne) <= 4
+    # przebudowa 2026-07-30: cztery przedziały -> dwa (2-3 i 4,5-5,5).
+    # Przy tej puli (kursy 1,45) składa się tylko pierwszy: dwójka daje 2,10,
+    # a do 4,5-5,5 brakuje kombinacji (czwórka to 4,42, piątka 6,41).
+    assert 1 <= len(dzienne) <= len(kupony.PRZEDZIALY_DZIENNE)
     assert len({k["cel_label"] for k in dzienne}) == len(dzienne)
+    # kupon dnia ma być KRÓTKI — o to chodziło w przebudowie
+    assert all(len(k["legi"]) <= 4 for k in dzienne)
 
 
 # --- UCZCIWA SZANSA KUPONU (pomiar 2026-07-27) ---

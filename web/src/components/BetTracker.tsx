@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { kursNetto } from "@/lib/podatek";
 import { useEffect, useMemo, useState } from "react";
 
 import {
@@ -54,8 +55,11 @@ export function BetTracker() {
     const zysk = zeStawka.reduce(
       (a, z) =>
         a +
+        // PO PODATKU (2026-07-31): z 1 zł stawki pracuje 0,88 zł, więc zysk
+        // z wygranej to stawka × (kurs × 0,88 − 1). Bez tego własny dziennik
+        // usera pokazywałby inny wynik niż ta sama historia w Skuteczności.
         (z.wynik === "wygrany"
-          ? (z.stawka ?? 0) * (z.kurs - 1)
+          ? (z.stawka ?? 0) * (kursNetto(z.kurs) - 1)
           : -(z.stawka ?? 0)),
       0,
     );

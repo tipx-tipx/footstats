@@ -38,10 +38,11 @@ def test_epoki_dziela_po_dacie_meczu_i_licza_roi():
     ep = rozliczanie.epoki_per_rynek(log)["shots"]
     assert ep["mundial"]["n"] == 2 and ep["ligi"]["n"] == 1
     assert ep["mundial"]["skutecznosc"] == 0.5
-    # mundial: (+1.0) + (−1.0) = 0 na dwóch typach
-    assert ep["mundial"]["roi"] == 0.0
-    # ligi: kurs 3.0 wygrany = +2 j. na jednym typie
-    assert ep["ligi"]["roi"] == 2.0
+    # ROI PO PODATKU od stawki (od 2026-07-31): z 1 j. pracuje 0,88 j.
+    # mundial: (2,0×0,88 − 1) + (−1) = −0,24 na dwóch typach = −0,12
+    assert ep["mundial"]["roi"] == -0.12
+    # ligi: kurs 3,0 wygrany = 3,0×0,88 − 1 = +1,64 na jednym typie
+    assert ep["ligi"]["roi"] == 1.64
     assert ep["nazwa"] == "Strzały"
 
 

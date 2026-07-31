@@ -3,6 +3,7 @@
 import time
 
 from footstats.jobs import rozliczanie
+from footstats.model import kupony as kupony_model
 from footstats.sources import scores365
 
 
@@ -72,7 +73,16 @@ def _leg(mecz_id, podmiot_id, kickoff=10_000, kurs=2.0):
     }
 
 
-def _kupon(cel_label="5–10", horyzont="dzienny", legi=None):
+# przedział z AKTUALNEJ konfiguracji — testy zamrażania kuponu sprawdzają
+# zachowanie slotu, a slot istnieje tylko dla przedziałów, które naprawdę
+# są w `PRZEDZIALY_DZIENNE`. Po przebudowie 2026-07-30 (4 przedziały -> 2)
+# stara etykieta „5–10" przestała być slotem i testy mierzyły co innego,
+# niż deklarowały. Bierzemy pierwszy dzienny przedział z konfiguracji,
+# żeby ta pułapka nie wróciła przy kolejnej zmianie progów.
+_CEL_DZIENNY = kupony_model.etykieta_celu(*kupony_model.PRZEDZIALY_DZIENNE[0])
+
+
+def _kupon(cel_label=_CEL_DZIENNY, horyzont="dzienny", legi=None):
     legi = legi or [
         _leg(1, 11, kickoff=10_000),
         _leg(2, 22, kickoff=12_000),
@@ -423,9 +433,11 @@ def test_skutecznosc_per_dzien_grupuje_i_liczy_roi():
     da = time.strftime("%Y-%m-%d", time.localtime(A))
     db = time.strftime("%Y-%m-%d", time.localtime(B))
     assert by[da]["rozliczone"] == 2 and by[da]["trafione"] == 1
-    assert by[da]["okazje"] == 2 and by[da]["roi_flat"] == 0.0   # 2.0 - 2 j.
+    # BILANS PO PODATKU (od 2026-07-31): z 1 j. pracuje 0,88 j., więc wygrana
+    # po 2,0 oddaje 1,76, a nie 2,0. Dzień A: 1,76 − 2 j. = −0,24.
+    assert by[da]["okazje"] == 2 and by[da]["roi_flat"] == -0.24
     assert by[db]["rozliczone"] == 2 and by[db]["trafione"] == 2
-    assert by[db]["okazje"] == 1 and by[db]["roi_flat"] == 2.0   # 3.0 - 1 j.
+    assert by[db]["okazje"] == 1 and by[db]["roi_flat"] == 1.64  # 3,0×0,88 − 1 j.
     assert "_zwrot_j" not in by[da]           # pole robocze usunięte
     # lista typów dnia (co siadło): trafiony na górze, komplet wpisów
     assert len(by[da]["typy"]) == 2

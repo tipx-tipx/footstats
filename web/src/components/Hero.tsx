@@ -1,6 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { wartoscNetto } from "@/lib/podatek";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -175,7 +176,7 @@ function ZywyPodglad({ bets }: { bets: ValueBet[] }) {
                   {idx === 0
                     ? bet.sugestia
                       ? "najmocniejszy typ dnia · kurs w STS"
-                      : bet.ev_pct != null && bet.ev_pct > 0
+                      : (wartoscNetto(bet) ?? 0) > 0
                         ? "najlepsza okazja teraz"
                         : "najpewniejszy typ teraz"
                     : `namierzone przez skan · ${idx + 1} z ${bets.length}`}
@@ -222,13 +223,13 @@ function ZywyPodglad({ bets }: { bets: ValueBet[] }) {
                       </div>
                     </>
                   )}
-                  {bet.kurs != null && bet.ev_pct != null && bet.ev_pct > 0 && (
+                  {bet.kurs != null && (wartoscNetto(bet) ?? 0) > 0 && (
                     <div title="O tyle wypłata z kursu przebija realną szansę zdarzenia. To nadwyżka, którą bukmacher płaci ponad uczciwą wycenę">
                       <p className="text-[10px] uppercase tracking-wide text-faint">
                         bukmacher przepłaca
                       </p>
                       <p className="font-data mt-0.5 text-2xl font-semibold text-data-green">
-                        +{bet.ev_pct.toFixed(1).replace(".", ",")}%
+                        +{(wartoscNetto(bet) as number).toFixed(1).replace(".", ",")}%
                       </p>
                     </div>
                   )}

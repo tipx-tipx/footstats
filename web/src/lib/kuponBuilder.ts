@@ -202,7 +202,10 @@ export interface KuponWynik {
   kurs_laczny: number;
   p_model: number;
   fair_kurs: number;
+  /** BRUTTO — parytet z kupony.py, tym filtrowane są legi */
   ev_pct: number;
+  /** PO PODATKU od stawki — to widzi użytkownik */
+  ev_netto?: number;
   cel_label: string;
   legi: LegPool[];
   /** indeks (w `legi`, po sortowaniu do wyświetlenia) lega o najniższej szansie */
@@ -494,6 +497,10 @@ export function zlozKupon(
       // ev_pct dalej liczone z NIEzaokrąglonego pF, jak w Pythonie
       p_model: Math.round(pF * 10000) / 10000,
       fair_kurs: Math.round((1 / Math.max(pF, 1e-9)) * 100) / 100,
+      // BRUTTO — parytet z kupony.py (tym filtrujemy legi). Wartość PO
+      // PODATKU dokłada warstwa widoku (`wyplata`/`wartoscNetto` z lib/
+      // podatek.ts): ten plik jest uruchamiany gołym Node'em przez most
+      // parytetu, więc nie może mieć importów runtime bez rozszerzenia.
       ev_pct: Math.round((pF * st.kurs - 1) * 1000) / 10,
       cel_label: `${Math.round(cmin)}–${Math.round(cmax)}`,
       legi: legiSort,

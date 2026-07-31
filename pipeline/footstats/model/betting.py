@@ -23,6 +23,106 @@ from scipy import stats as _stats
 # Typowa marża polskich bukmacherów na player props (do jednostronnych kwotowań).
 DEFAULT_ONE_SIDED_MARGIN = 0.07
 
+
+# ---------------------------------------------------------------------------
+# PODATEK OD STAWKI — jedno miejsce dla całego systemu (2026-07-31)
+# ---------------------------------------------------------------------------
+#
+# CZEGO BRAKOWAŁO: do 31.07 podatku nie było NIGDZIE — ani w EV, ani w bramach,
+# ani w rozliczeniach, ani w kwocie wypłaty na stronie. Wszystkie liczby
+# produktu były o kilkanaście punktów procentowych za dobre.
+#
+# JAK TO DZIAŁA W PL: 12% pobierane od STAWKI przy zawieraniu zakładu. Przy
+# stawce 1 j. do gry idzie 0,88 j., więc zwrot z wygranej to 0,88 × kurs.
+# Konsekwencja, która nie jest oczywista: przy kursie poniżej 1/0,88 = 1,136
+# zakład traci NAWET przy stuprocentowej pewności. Zmierzone 31.07: 28 typów
+# na stronie było poniżej tej granicy.
+#
+# CZEMU TRYB, A NIE STAŁA 0,88: Betclic reklamuje ofertę „bez podatku", część
+# operatorów robi zwrot podatku jako bonus, a promocje bywają warunkowe.
+# Wpisanie 0,88 na sztywno oznaczałoby, że przy pierwszej takiej ofercie
+# trzeba przerabiać rachunek I rozstrzygać, co ze starymi rekordami. Dlatego
+# tryb jest ZAPISYWANY PRZY TYPIE (pole `tryb_podatku` w typy_log): historia
+# wie, w czym była liczona, a zmiana domyślnego trybu nie tyka przeszłości.
+#
+# ZWROTY: przy zakładzie anulowanym stawka wraca w całości razem z podatkiem,
+# więc `kurs_netto` NIE dotyczy zwrotów — tam zwrot to zawsze dokładnie 1 j.
+
+TRYB_PODATKU_DOMYSLNY = "standard"
+
+WSPOLCZYNNIK_PODATKU = {
+    "standard": 0.88,      # 12% od stawki (Superbet, STS — stan na 2026-07)
+    "bez_podatku": 1.0,    # promocja „bez podatku" — potwierdzać per oferta
+    "zwrot": 1.0,          # podatek oddawany bonusem; rachunek jak bez podatku
+}
+
+# Domyślny tryb per bukmacher. Zmiana TUTAJ dotyczy tylko NOWYCH typów —
+# stare mają tryb zapisany przy sobie.
+TRYB_PODATKU_BUKMACHERA: dict[str, str] = {
+    "Superbet": "standard",
+    "STS": "standard",
+    "Betclic": "standard",
+}
+
+# Kurs, poniżej którego zakład jest stratny nawet przy pewności 100%.
+# Przy trybie „standard" to 1/0,88 = 1,136.
+KURS_GRANICZNY_PODATKU = 1.0 / WSPOLCZYNNIK_PODATKU["standard"]
+
+
+def tryb_podatku(bukmacher: str | None = None, tryb: str | None = None) -> str:
+    """Tryb podatkowy: jawnie podany, po bukmacherze, albo domyślny."""
+    if tryb in WSPOLCZYNNIK_PODATKU:
+        return tryb
+    if bukmacher:
+        return TRYB_PODATKU_BUKMACHERA.get(bukmacher, TRYB_PODATKU_DOMYSLNY)
+    return TRYB_PODATKU_DOMYSLNY
+
+
+def wspolczynnik_podatku(tryb: str | None = None) -> float:
+    """Ile ze stawki realnie pracuje (0,88 przy standardowym podatku).
+
+    Nieznany tryb (np. rekord z przyszłej wersji) traktujemy jak standardowy —
+    bezpieczniej zaniżyć wynik niż go zawyżyć.
+    """
+    return WSPOLCZYNNIK_PODATKU.get(
+        tryb or TRYB_PODATKU_DOMYSLNY,
+        WSPOLCZYNNIK_PODATKU[TRYB_PODATKU_DOMYSLNY],
+    )
+
+
+def kurs_netto(kurs: float, tryb: str | None = None) -> float:
+    """Kurs po podatku — tyle realnie wraca z 1 j. stawki przy wygranej."""
+    return float(kurs) * wspolczynnik_podatku(tryb)
+
+
+def ev_pct(p: float, kurs: float, tryb: str | None = None) -> float:
+    """Wartość oczekiwana zakładu w %, PO PODATKU — liczba dla użytkownika.
+
+    ROZDZIAŁ DWÓCH LICZB (decyzja usera 2026-07-31): `ev_netto` (ta funkcja)
+    jest tym, co POKAZUJEMY i czym ROZLICZAMY, a `ev_brutto` niżej zostaje
+    tym, czym BRAMY DECYDUJĄ. Powód jest pomiarowy, nie kosmetyczny: gdyby
+    podatek wszedł od razu do bram, selekcja zmieniłaby się w tym samym
+    momencie co rachunek i w rozliczeniach nie dałoby się rozdzielić skutku
+    jednego od drugiego.
+    """
+    return (float(p) * kurs_netto(kurs, tryb) - 1.0) * 100.0
+
+
+def ev_brutto_pct(p: float, kurs: float) -> float:
+    """Wartość oczekiwana bez podatku — TYLKO do bram publikacji.
+
+    Istnieje po to, żeby miejsca decydujące o publikacji były jawnie
+    oznaczone jako liczące brutto, zamiast mieć rozsiane `p * kurs - 1`,
+    o których po miesiącu nikt nie wie, czy są celowe.
+    """
+    return (float(p) * float(kurs) - 1.0) * 100.0
+
+
+def prog_oplacalnosci(kurs: float, tryb: str | None = None) -> float:
+    """Jaka szansa jest potrzebna, żeby wyjść na zero przy tym kursie."""
+    netto = kurs_netto(kurs, tryb)
+    return 1.0 / netto if netto > 0 else 1.0
+
 # pokrewne rynki dzielą błąd modelu i korelują przez tempo meczu — wspólna
 # mapa dla kalibracji (rozliczanie) i dywersyfikacji kuponów (kupony)
 RODZINY_RYNKOW = {
@@ -218,7 +318,9 @@ class ValueAssessment:
     implied_prob: float
     fair_odds: float
     edge_pp: float
-    ev_pct: float
+    ev_pct: float          # BRUTTO — tym decydują bramy
+    ev_netto: float        # PO PODATKU — to widzi użytkownik
+    tryb_podatku: str
     confidence: str
     confidence_score: float
     risk: str
@@ -349,7 +451,21 @@ NEAR_WIDELKI_EV = 0.04      # wartość na p ostrożnym do 4 pp pod zerem
 
 
 def widelki_druzynowe_ok(odd: float, p: float, p_ostrozne: float) -> bool:
-    """Czy typ drużynowy przechodzi bramę kurs×szansa (patrz WIDELKI_DRUZYNOWE)."""
+    """Czy typ drużynowy przechodzi bramę kurs×szansa (patrz WIDELKI_DRUZYNOWE).
+
+    LICZONE BRUTTO, ŚWIADOMIE (decyzja usera 2026-07-31). Policzone zostało,
+    co się stanie po wpięciu podatku TU: lista 138 -> 6 typów, bo model gra
+    medianą kursu 1,25, a po podatku sens mają dopiero kursy od ~1,96.
+    Podatek wchodzi więc najpierw do TEGO, CO POKAZUJEMY I ROZLICZAMY
+    (`ev_netto`, bilans, próg opłacalności), a bramy zostają nietknięte, żeby
+    zmiana nie ruszyła selekcji ani o jeden typ — inaczej nie dałoby się
+    odróżnić skutku podatku od skutku nowej selekcji w rozliczeniach.
+
+    Do ruszenia progów wracamy z pomiarem, tak jak przy oknie zgody z rynkiem.
+    Uwaga na przyszłość: progi 0,52 i 0,42 były wprost definiowane jako próg
+    opłacalności (1/1,92 i 1/2,38) — po podatku te same definicje dają
+    0,59 i 0,48, więc przeliczenie ich ZAOSTRZA bramę, a nie luzuje.
+    """
     return any(
         lo <= odd <= hi and p >= p_min and p_ostrozne * odd - 1.0 >= 0.0
         for lo, hi, p_min in WIDELKI_DRUZYNOWE
@@ -395,6 +511,7 @@ def assess(
     lam: float,
     is_prob_market: bool = False,
     odrzucone_out: list | None = None,
+    tryb: str | None = None,
 ) -> list[ValueAssessment]:
     """Oceń obie strony rynku. Zwraca tylko strony przechodzące progi.
 
@@ -432,12 +549,17 @@ def assess(
         if implied is None or odds is None:
             continue
         edge_pp = (p_model - implied) * 100.0
-        ev_pct = (p_model * odds - 1.0) * 100.0
+        # EV PO PODATKU (2026-07-31). `edge_pp` zostaje bez podatku celowo:
+        # to porównanie dwóch szans (modelu i rynku), a nie zysk — podatek
+        # skracałby się po obu stronach i tylko zaciemniał sygnał.
+        # BRAMA liczy brutto (patrz `ev_brutto_pct`), UŻYTKOWNIK widzi netto
+        ev = ev_brutto_pct(p_model, odds)
+        ev_netto = ev_pct(p_model, odds, tryb)
         # bramki publikacji — każda z parą (odrzuca?, czy TUŻ przy progu?);
         # komentarze przy stałych MAX_* wyżej tłumaczą intuicje
         powody: list[tuple[str, bool]] = []
-        if ev_pct < min_ev:
-            powody.append(("ev_ponizej_progu", ev_pct >= min_ev - NEAR_EV_PP))
+        if ev < min_ev:
+            powody.append(("ev_ponizej_progu", ev >= min_ev - NEAR_EV_PP))
         if score < MIN_CONFIDENCE_SCORE:
             powody.append(
                 ("niska_pewnosc", score >= MIN_CONFIDENCE_SCORE - NEAR_CONF)
@@ -462,7 +584,8 @@ def assess(
                     "side": side, "powod": powody[0][0],
                     "p_model": round(p_model, 4),
                     "implied": round(implied, 4), "odds": odds,
-                    "ev_pct": round(ev_pct, 2),
+                    "ev_pct": round(ev, 2),
+                    "ev_netto": round(ev_netto, 2),
                     "confidence_score": round(score, 1),
                 })
             continue
@@ -476,7 +599,9 @@ def assess(
                 implied_prob=round(implied, 4),
                 fair_odds=round(1.0 / max(p_model, 1e-6), 3),
                 edge_pp=round(edge_pp, 2),
-                ev_pct=round(ev_pct, 2),
+                ev_pct=round(ev, 2),
+                ev_netto=round(ev_netto, 2),
+                tryb_podatku=tryb_podatku(tryb=tryb),
                 confidence=confidence_level(score),
                 confidence_score=round(score, 1),
                 risk=risk,

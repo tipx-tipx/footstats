@@ -175,3 +175,64 @@ def test_p_over_sumy_zgodne_z_rozkladem():
     assert abs(counts.p_over_sumy(pa, pb, 8.5) - recznie) < 1e-9
     # ...i maleć wraz z linią
     assert counts.p_over_sumy(pa, pb, 12.5) < counts.p_over_sumy(pa, pb, 8.5)
+
+
+# --- PRZEDZIAŁY DLA NOWYCH RYNKÓW (2026-07-31) ----------------------------
+# Powód istnienia: bez przedziału nowe rynki nie mogły przejść przez bramę
+# drużynową (decyduje „p ostrożne" = średnia p i dolnej granicy), więc szły
+# na stronę na samym EV — 28 typów o kursie poniżej granicy opłacalności.
+
+
+def _post(mean90: float, alpha: float = 8.0) -> counts.GammaPosterior:
+    return counts.GammaPosterior(alpha=alpha, beta=alpha / mean90,
+                                 effective_matches=alpha)
+
+
+def test_przedzial_sumy_obejmuje_wlasne_p():
+    """Punktowe p MUSI leżeć w swoim przedziale — inaczej brama publikacji
+    odrzucałaby (albo wpuszczała) typy na podstawie sprzecznych liczb."""
+    pa, pb = _post(5.0), _post(4.0)
+    prd_a = counts.predict_match(pa, 90.0, 1.0)
+    prd_b = counts.predict_match(pb, 90.0, 1.0)
+    for linia in (4.5, 8.5, 12.5):
+        p = counts.p_over_sumy(prd_a, prd_b, linia)
+        lo, hi = counts.przedzial_sumy(
+            pa, prd_a.exposure, pb, prd_b.exposure, linia
+        )
+        assert 0.0 <= lo <= p <= hi <= 1.0, (linia, lo, p, hi)
+
+
+def test_przedzial_sumy_wezszy_przy_wiekszej_probie():
+    """Sens przedziału: ma mierzyć, ile model WIE. Większa próba (wyższa
+    alfa przy tej samej średniej) musi dawać węższe widełki."""
+    def szerokosc(alpha: float) -> float:
+        pa, pb = _post(5.0, alpha), _post(4.0, alpha)
+        prd_a = counts.predict_match(pa, 90.0, 1.0)
+        prd_b = counts.predict_match(pb, 90.0, 1.0)
+        lo, hi = counts.przedzial_sumy(
+            pa, prd_a.exposure, pb, prd_b.exposure, 8.5
+        )
+        return hi - lo
+
+    assert szerokosc(60.0) < szerokosc(8.0)
+
+
+def test_przedzial_porownania_obejmuje_wlasne_p_obu_stron():
+    """Remis zjada masę po obu stronach, więc P(B>A) NIE jest dopełnieniem
+    P(A>B) — każda strona potrzebuje własnego przedziału."""
+    pa, pb = _post(5.0), _post(3.0)
+    prd_a = counts.predict_match(pa, 90.0, 1.0)
+    prd_b = counts.predict_match(pb, 90.0, 1.0)
+    p_a, _remis, p_b = counts.porownanie_druzyn(prd_a, prd_b)
+
+    lo_a, hi_a = counts.przedzial_porownania(
+        pa, prd_a.exposure, pb, prd_b.exposure
+    )
+    lo_b, hi_b = counts.przedzial_porownania(
+        pb, prd_b.exposure, pa, prd_a.exposure
+    )
+    assert lo_a <= p_a <= hi_a
+    assert lo_b <= p_b <= hi_b
+    # gdyby ktoś liczył stronę gościa jako 1 − przedział gospodarza,
+    # dostałby widełki przesunięte dokładnie o masę remisu
+    assert lo_b < 1.0 - hi_a

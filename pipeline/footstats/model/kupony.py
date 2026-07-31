@@ -26,13 +26,71 @@ import time
 from . import betting
 
 # przedziały kursowe — do 4 aktywnych kuponów w każdym horyzoncie (user)
+# PROGI KURSU — przebudowa 2026-07-30/31, zatwierdzone przez usera.
+#
+# POWOD: 81 rozliczonych kuponow, 4 wygrane, ROI -56%.
+#     kilkudniowy  34 kupony,  0 wygranych,  sr. 5,9 lega,  kurs 18,5
+#     value        13 kuponow, 0 wygranych,  sr. 3,6 lega,  kurs  6,2
+#     dzienny      34 kupony,  4 wygrane,    sr. 4,9 lega,  kurs 12,5
+# Zero na 34 przy deklarowanych 15,8% zdarza sie z prawdopodobienstwem 0,3%,
+# a zero na 13 przy 38,1% — 0,2%. To nie byl pech, tylko zla konstrukcja.
+#
+# ARYTMETYKA, KTORA ZA TYM STOI: wartosc kuponu to ILOCZYN wartosci legow.
+# Kupon nie rozklada ryzyka, tylko podnosi je do potegi. Przy legu wartym
+# -10% szesciolatka jest warta -47%. Dlatego kupony maja byc KROTKIE.
+#
+# Cztery pozycje zamiast osmiu przedzialow: dwie dzienne i dwie kilkudniowe,
+# kazda z jasna rola. Uzytkownik chce miec mozliwosc podniesienia kursu do
+# ~25 — stad gorna pozycja, ale ze swiadomoscia, ze szansa spada tam do ~7%.
 PRZEDZIALY_DZIENNE = (
-    (5.0, 10.0), (10.0, 15.0), (15.0, 20.0), (20.0, 25.0),
+    (2.0, 3.0),      # dwojka/trojka dnia — szansa ~45%
+    (4.5, 5.5),      # trojka mocniejsza — szansa ~26%
 )
 PRZEDZIALY_DLUGOTERMINOWE = (
-    (10.0, 15.0), (15.0, 20.0), (20.0, 25.0), (25.0, 35.0),
+    (9.0, 11.0),     # czworka z kilku dni — szansa ~18%
+    (18.0, 25.0),    # dla chcacych wyzszego kursu — szansa ~7%
 )
-PRZEDZIALY_VALUE = ((4.0, 8.0), (8.0, 16.0))
+# DWA LEGI TO JUŻ KUPON (2026-07-31). Domyślne `min_legi=3` w `_zloz_pewniaki`
+# czyniło przedział 2,0-3,0 niemożliwym do złożenia: przy typowym kursie 1,45
+# dwójka daje 2,10 (mieści się), a trójka 3,05 (już nie). Czyli pierwsza
+# pozycja dnia — ta, o którą w tej przebudowie chodziło najbardziej — nigdy
+# by nie powstała. Domyślnej wartości w `_zloz_pewniaki` NIE ruszamy, bo ta
+# funkcja jest lustrzanie portowana do kuponBuilder.ts i pilnowana testem
+# parytetu; podajemy próg jawnie tylko dla kuponów automatycznych.
+MIN_LEGI_PEWNIAKI = 2
+
+# VALUE wylaczone: 0 wygranych na 13 przy deklarowanych 38,1%. Wracaja
+# dopiero, gdy pojedyncze typy udowodnia przewage — kupon z legow bez
+# przewagi nie moze jej wytworzyc.
+PRZEDZIALY_VALUE = ()
+
+# Leg wchodzi do kuponu tylko wtedy, gdy PO KOREKCIE ma dodatnia wartosc.
+# Bez tego mnozymy przez siebie zaklady, o ktorych sami wiemy, ze traca —
+# i dokladnie to robily kupony z zerowa skutecznoscia.
+MIN_WARTOSC_LEGA = 1.0
+
+# CZY ODSIEWAĆ LEGI BEZ WARTOŚCI — zmierzone 2026-07-31, decyzja: NA RAZIE NIE.
+#
+# Zamysł przebudowy był taki: skoro wartość kuponu to iloczyn wartości legów,
+# to leg bez przewagi nie ma czego wnieść i nie powinien wchodzić. Rachunek
+# jest poprawny. Problem w tym, co mówi POMIAR na żywej puli:
+#
+#   zmierzone korekty strumieni:  pewniaki −0,441, drużyny −0,428 (logit)
+#   pula 29 legów -> po korekcie DODATNIĄ wartość ma 3 z nich
+#   mediana wartości lega po korekcie: −4,2%
+#   przy progu +1% zostają 2 legi -> ZERO kuponów
+#
+# Czyli włączenie filtru dziś nie „poprawia kupony", tylko je KASUJE. To nie
+# jest wada filtru — to ta sama prawda, co wszędzie indziej: typy modelu nie
+# mają dziś przewagi. Ale różnica między „nie pokazujemy kuponów" a „kupony
+# są, tylko uczciwie opisane" to decyzja produktowa, nie matematyczna.
+#
+# Wybrane rozwiązanie jest LUSTREM decyzji o podatku (2026-07-31): korygujemy
+# to, co POKAZUJEMY, a nie to, co WYBIERAMY. Szansa kuponu liczy się więc
+# z już skorygowanych legów (spada np. 55% -> 42,5%, 11,4% -> 4,7%), a dobór
+# legów zostaje nietknięty. Filtr jest gotowy i czeka na jeden przełącznik —
+# włączamy go, gdy pojedyncze typy zaczną mieć realną przewagę.
+FILTRUJ_WARTOSC_LEGA = False
 OKNO_DZIS_S = 20 * 3600       # "dziś" = mecze w ciągu ~20 h
 OKNO_JUTRO_S = 44 * 3600      # rozszerzenie na jutro, gdy dziś < 2 mecze
 OKNO_DLUGO_S = 4 * 86400      # długoterminowy: mecze z najbliższych 4 dni
@@ -113,6 +171,23 @@ BONUS_SWIEZE = {"bezpieczny": 1.0, "zbalansowany": 0.96, "agresywny": 0.93}
 # premia za średnią wartość legów w FUNKCJI CELU wyboru kompletu (nie tylko w
 # kolejności kandydatów) — bez tego value wpływałoby marginalnie
 WAGA_VALUE_SELEKCJA = {"bezpieczny": 0.0, "zbalansowany": 0.15, "agresywny": 0.30}
+
+
+def etykieta_celu(cmin: float, cmax: float) -> str:
+    """Etykieta przedziału kursowego („2–3", „4,5–5,5").
+
+    Powód istnienia: po przebudowie 2026-07-30 przedziały przestały być
+    całkowite, a etykieta szła przez `int()` — kupon z przedziału 4,5–5,5
+    podpisywał się jako „×4–5". Użytkownik czytał więc na bilecie kurs,
+    którego ten kupon nigdy nie mógł mieć.
+
+    Ta sama funkcja liczy KLUCZ SLOTU w rozliczaniu (`_sloty_aktualne`),
+    więc etykieta i slot nie mogą się rozjechać.
+    """
+    def _f(x: float) -> str:
+        return (f"{x:g}").replace(".", ",")
+
+    return f"{_f(cmin)}–{_f(cmax)}"
 
 
 def _zaokr(x: float, dp: int) -> float:
@@ -281,6 +356,55 @@ def kalibracja_kuponow_z_pomiaru(
     return out
 
 
+def urealnij_leg(p: float, delta: float) -> float:
+    """Szansa lega po korekcie zmierzonej na rozliczeniach (skala logitowa)."""
+    if not delta:
+        return float(p)
+    p = min(max(float(p), 1e-6), 1.0 - 1e-6)
+    return 1.0 / (1.0 + math.exp(-(math.log(p / (1.0 - p)) + delta)))
+
+
+def _strumien_lega(leg: dict) -> str:
+    return ("druzyny" if str(leg.get("rynek_kod") or "").startswith(
+        ("team_", "match_", "wiecej_")) else "pewniaki")
+
+
+def szansa_z_legow(kupon: dict, korekty: dict | None) -> float:
+    """Szansa kuponu liczona z JUZ SKORYGOWANYCH szans legow.
+
+    Dotad kupon mnozyl surowe `p_model` legow, a przeszacowanie pojedynczego
+    typu podnosilo sie do potegi: przy szesciu legach blad rzedu 15% robi
+    z deklarowanych 17% realne 7%. Zmierzone: kupony deklarowaly 15,8-38,1%
+    i wygraly 4 razy na 81.
+    """
+    if not korekty:
+        return float(kupon.get("p_model") or 0.0)
+    p = 1.0
+    for leg in kupon.get("legi") or []:
+        d = korekty.get(_strumien_lega(leg), 0.0)
+        p *= urealnij_leg(float(leg.get("p_model") or 0.0), d)
+    return p
+
+
+def _ustaw_szanse(cel: dict, p: float) -> None:
+    """Wpisz WYŚWIETLANĄ szansę kuponu i liczby, które z niej wynikają.
+
+    Odpowiednik `_urealnij_szanse`, ale bierze gotową szansę zamiast
+    współczynnika — bo przy korektach per leg nie ma jednego mnożnika:
+    każdy leg jest korygowany osobno, wg swojego strumienia.
+
+    Dobór legów i kurs łączny zostają nietknięte — zmieniają się wyłącznie
+    liczby, które user czyta.
+    """
+    p = _zaokr(max(min(float(p), 1.0), 0.0), 4)
+    kurs = float(cel["kurs_laczny"])
+    cel["p_model"] = p
+    cel["fair_kurs"] = _zaokr(1.0 / max(p, 1e-9), 2)
+    cel["ev_pct"] = _zaokr((p * kurs - 1.0) * 100.0, 1)
+    cel["ev_netto"] = _zaokr(betting.ev_pct(p, kurs), 1)
+    cel["szansa_z_legow"] = True
+
+
 def _urealnij_szanse(kupon: dict, wsp: float) -> None:
     """Nałóż zmierzony współczynnik na WYŚWIETLANE liczby kuponu (w miejscu).
 
@@ -303,6 +427,40 @@ def _urealnij_szanse(kupon: dict, wsp: float) -> None:
         rec = kupon.get(propozycja)
         if rec and rec.get("p_po") is not None:
             rec["p_po"] = _zaokr(float(rec["p_po"]) * wsp, 4)
+
+
+def legi_z_wartoscia(
+    legi: list[dict], korekty: dict | None, min_ev: float = MIN_WARTOSC_LEGA
+) -> list[dict]:
+    """Zostaw tylko legi, które PO KOREKCIE mają dodatnią wartość.
+
+    Sedno przebudowy z 2026-07-30: wartość kuponu to ILOCZYN wartości legów,
+    więc kupon nie rozkłada ryzyka, tylko podnosi je do potęgi. Przy legu
+    wartym −10% szóstka jest warta −47%. Dopóki do kuponu wchodziły typy,
+    o których sami wiedzieliśmy, że tracą, żaden dobór przedziałów kursowych
+    nie mógł tego naprawić — i nie naprawił (81 kuponów, 4 wygrane, ROI −56%).
+
+    UWAGA GDZIE TO DZIAŁA: filtr siedzi w `build_kupony`, a NIE w
+    `_zloz_pewniaki`. To celowe — `_zloz_pewniaki` jest lustrzanie
+    portowane do `web/src/lib/kuponBuilder.ts` i pilnowane testem parytetu,
+    więc każda zmiana w środku wymagałaby bliźniaczej zmiany na froncie.
+    Filtrowanie puli PRZED wejściem do beam searchu daje ten sam efekt
+    i zostawia parytet nietknięty.
+
+    WARTOŚĆ LICZONA BRUTTO — jak wszystkie bramy (decyzja usera 2026-07-31,
+    patrz betting.ev_brutto_pct). Podatek wchodzi do liczb pokazywanych
+    i rozliczanych, nie do selekcji.
+    """
+    out = []
+    for l in legi:
+        kurs = float(l.get("kurs") or 0.0)
+        if kurs <= 1.0:
+            continue
+        d = (korekty or {}).get(_strumien_lega(l), 0.0)
+        p = urealnij_leg(float(l.get("p_model") or 0.0), d)
+        if (p * kurs - 1.0) * 100.0 >= min_ev:
+            out.append(l)
+    return out
 
 
 def _kara_koszyka(legi, kary: dict | None = None) -> float:
@@ -553,12 +711,15 @@ def _zloz_pewniaki(
         )
         return {
             "cel": int(cmin),
-            "cel_label": f"{int(cmin)}–{int(cmax)}",
+            "cel_label": etykieta_celu(cmin, cmax),
             "styl": "pewniaki",
             "kurs_laczny": _zaokr(kurs, 2),
             "p_model": _zaokr(p, 4),
             "fair_kurs": _zaokr(1.0 / max(p, 1e-9), 2),
+            # brutto (spójne z bramami) + netto (to widzi user)
             "ev_pct": _zaokr((p * kurs - 1.0) * 100.0, 1),
+            "ev_netto": _zaokr(betting.ev_pct(p, kurs), 1),
+            "tryb_podatku": betting.TRYB_PODATKU_DOMYSLNY,
             "legi": [_leg_dict(b) for b in legi],
         }
 
@@ -692,16 +853,39 @@ def build_kupony(
     kary: dict | None = None,
     wagi: dict | None = None,
     kal_szansy: dict | None = None,
+    korekty_legow: dict | None = None,
+    filtruj_wartosc: bool = FILTRUJ_WARTOSC_LEGA,
 ) -> list[dict]:
-    """Kupony pewniaków w dwóch horyzontach + kupony value.
+    """Kupony pewniaków w dwóch horyzontach (value wyłączone).
 
     DZIENNY: mecze z dziś (gdy dziś < 2 mecze — również jutro); przedziały
-    kursowe 5-10 / 10-15 / 15-20 / 20-25 (do 4 aktywnych kuponów).
-    DŁUGOTERMINOWY: mecze z najbliższych 4 dni; 10-15 / 15-20 / 20-25 / 25-35.
-    VALUE: przedziały 4-8 / 8-16, tylko legi z EV >= 2%, max 1 leg na mecz.
+    kursowe 2-3 i 4,5-5,5 — czyli dwójka/trójka, nie szóstka.
+    DŁUGOTERMINOWY: mecze z najbliższych 4 dni; 9-11 i 18-25.
+    VALUE: WYŁĄCZONE (`PRZEDZIALY_VALUE` puste) — 0 wygranych na 13 przy
+    deklarowanych 38,1%. Wracają, gdy pojedyncze typy udowodnią przewagę;
+    kupon z legów bez przewagi nie może jej wytworzyć.
+
+    `korekty_legow` — zmierzone korekty per strumień (rozliczanie.
+    korekta_strumienia). Mogą robić DWIE rzeczy; domyślnie robią JEDNĄ:
+      * ZAWSZE: dają UCZCIWĄ szansę kuponu, liczoną z już skorygowanych
+        legów (`szansa_z_legow`) zamiast iloczynu surowych `p_model`,
+      * OPCJONALNIE (`filtruj_wartosc`): odsiewają legi, które po korekcie
+        tracą (`legi_z_wartoscia`). Domyślnie WYŁĄCZONE — patrz
+        `FILTRUJ_WARTOSC_LEGA`.
+
+    PODWÓJNA KOREKTA — pułapka, o którą łatwo tu zahaczyć: `kal_szansy` to
+    STARY mechanizm (współczynnik na gotową szansę kuponu, zmierzony na
+    kuponach sprzed przebudowy: dzienny ×0,808, długoterminowy ×0,431).
+    Nałożony razem z `korekty_legow` korygowałby to samo dwa razy. Dlatego
+    gdy podane są korekty legów, stary współczynnik jest POMIJANY — wróci,
+    gdy zostanie zmierzony na nowej podstawie.
     """
     now = now_ts if now_ts is not None else int(time.time())
     pool = [b for b in (pool or []) if b["kickoff_ts"] > now + MARGINES_STARTU_S]
+    # legi bez wartości po korekcie nie mają czego wnieść do iloczynu —
+    # ale tylko gdy filtr jest włączony (patrz FILTRUJ_WARTOSC_LEGA)
+    if filtruj_wartosc:
+        pool = legi_z_wartoscia(pool, korekty_legow)
     out: list[dict] = []
 
     # dzienny: każdy przedział NAJPIERW z samego "dziś"; dopiero gdy się nie
@@ -711,12 +895,14 @@ def build_kupony(
     tylko_dzis_ok = len({b["mecz_id"] for b in dzis20}) >= 2
     for cmin, cmax in PRZEDZIALY_DZIENNE:
         k = (
-            _zloz_pewniaki(dzis20, cmin, cmax, profil=profil, kary=kary, wagi=wagi)
+            _zloz_pewniaki(dzis20, cmin, cmax, profil=profil, kary=kary,
+                           wagi=wagi, min_legi=MIN_LEGI_PEWNIAKI)
             if tylko_dzis_ok else None
         )
         pula_k = dzis20
         if k is None:
-            k = _zloz_pewniaki(dzis44, cmin, cmax, profil=profil, kary=kary, wagi=wagi)
+            k = _zloz_pewniaki(dzis44, cmin, cmax, profil=profil, kary=kary,
+                               wagi=wagi, min_legi=MIN_LEGI_PEWNIAKI)
             pula_k = dzis44
         if k is not None:
             k["horyzont"] = "dzienny"
@@ -726,7 +912,8 @@ def build_kupony(
 
     dlugo = [b for b in pool if b["kickoff_ts"] <= now + OKNO_DLUGO_S]
     for cmin, cmax in PRZEDZIALY_DLUGOTERMINOWE:
-        k = _zloz_pewniaki(dlugo, cmin, cmax, profil=profil, kary=kary, wagi=wagi)
+        k = _zloz_pewniaki(dlugo, cmin, cmax, profil=profil, kary=kary,
+                           wagi=wagi, min_legi=MIN_LEGI_PEWNIAKI)
         if k is not None:
             k["horyzont"] = "dlugoterminowy"
             _rentgen(k, dlugo, cmin, cmax, kary=kary)
@@ -736,7 +923,10 @@ def build_kupony(
     # VALUE: ten sam builder co pewniaki (max iloczyn szans przy zadanym
     # kursie = max EV), ale pula tylko z wyraźną przewagą i 1 leg na mecz;
     # kupon identyczny z którymś kuponem pewniaków nie wchodzi drugi raz
-    cands = [b for b in _kandydaci(bets) if b["kickoff_ts"] > now + MARGINES_STARTU_S]
+    cands = [b for b in _kandydaci(bets)
+             if b["kickoff_ts"] > now + MARGINES_STARTU_S]
+    if filtruj_wartosc:
+        cands = legi_z_wartoscia(cands, korekty_legow)
     sygnatury = {_sygnatura(k) for k in out}
     for cmin, cmax in PRZEDZIALY_VALUE:
         k = _zloz_pewniaki(
@@ -757,7 +947,21 @@ def build_kupony(
     # Robimy to POZA _zloz_pewniaki, żeby nie ruszyć parytetu z generatorem
     # na żądanie (kuponBuilder.ts porównuje się właśnie z tamtą funkcją).
     for k in out:
-        wsp = (kal_szansy or {}).get(k.get("horyzont") or "")
-        if wsp:
-            _urealnij_szanse(k, float(wsp))
+        if korekty_legow:
+            # szansa z JUŻ SKORYGOWANYCH legów — stary współczynnik pomijamy,
+            # żeby nie skorygować dwa razy (patrz docstring)
+            for cel in (k, k.get("wariant_b")):
+                if not cel:
+                    continue
+                # kara korelacji zostaje — dotyczy zależności między legami,
+                # a nie tego, o ile mylimy się co do pojedynczego typu
+                _ustaw_szanse(
+                    cel,
+                    szansa_z_legow(cel, korekty_legow)
+                    * _kara_koszyka(cel.get("legi") or [], kary),
+                )
+        else:
+            wsp = (kal_szansy or {}).get(k.get("horyzont") or "")
+            if wsp:
+                _urealnij_szanse(k, float(wsp))
     return out

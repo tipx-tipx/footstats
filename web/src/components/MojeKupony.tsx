@@ -216,7 +216,7 @@ export function MojeKupony({ historia }: { historia: KuponHistoria[] }) {
         <Link href="/kupony" className="text-brand hover:underline">
           Kupony
         </Link>{" "}
-        przyciskiem „gram ten kupon".
+        przyciskiem „gram ten kupon”.
       </p>
     </section>
   );

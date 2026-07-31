@@ -8,6 +8,7 @@ import { ChanceBar, OutcomeColumns } from "./DistributionStrip";
 import { FormBars } from "./FormBars";
 import { OsSzans, type OsZnacznik } from "./OsSzans";
 import { Sygnaly, type Sygnal } from "./Sygnaly";
+import { wartoscNetto } from "@/lib/podatek";
 import { addZakladFromBet, isTracked, onZakladyChange } from "@/lib/tracker";
 import {
   fmtDataCzas,
@@ -260,8 +261,7 @@ function sygnalyTypu(
   if (
     bet.pewniak &&
     bet.kurs != null &&
-    bet.ev_pct != null &&
-    bet.ev_pct <= -8
+    (wartoscNetto(bet) ?? 0) <= -8
   ) {
     s.push({
       id: "cena",
@@ -292,7 +292,7 @@ function WerdyktPewniaka({ bet }: { bet: ValueBet }) {
   const p = fmtProc(bet.p_model);
   const fair = fmtKurs(bet.fair_kurs);
   const kurs = fmtKurs(bet.kurs as number);
-  const ev = bet.ev_pct;
+  const ev = wartoscNetto(bet);
 
   let glowne: React.ReactNode;
   if (bet.wyzsza_linia) {
@@ -395,7 +395,7 @@ function WerdyktZdanie({ bet }: { bet: ValueBet }) {
   }
   const kurs = fmtKurs(bet.kurs);
   const wycena = fmtProc(1 / bet.kurs);
-  const ev = bet.ev_pct;
+  const ev = wartoscNetto(bet);
   if (ev != null && ev >= 1) {
     return (
       <>
@@ -1026,8 +1026,8 @@ export function SzczegolyTypu({
                   znaczniki={znaczniki}
                   przewaga={przewaga}
                   przewagaWartosc={
-                    przewaga && bet.ev_pct != null && bet.ev_pct >= 1
-                      ? fmtEV(bet.ev_pct)
+                    przewaga && (wartoscNetto(bet) ?? -99) >= 1
+                      ? fmtEV(wartoscNetto(bet) as number)
                       : undefined
                   }
                   przewagaPodpis="twoja przewaga"
@@ -1383,7 +1383,7 @@ export const BetCard = memo(function BetCard({
               sprawdź w STS
             </span>
           ) : (
-            <EdgeBadge ev={bet.ev_pct} />
+            <EdgeBadge ev={wartoscNetto(bet) as number} />
           )}
           {/* odznaki przewagi — tekstowe odczyty HUD zamiast kolejnych
               chipów; jedno źródło prawdy (odznakiPrzewagi) */}

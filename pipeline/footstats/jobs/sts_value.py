@@ -213,7 +213,10 @@ def scan_match(m: dict, ws_seconds: float, min_ev: float, min_ratio: float) -> l
                 # referencja fair = devig Superbetu na tej linii. Dla rynków z
                 # dogrywką to DOLNE oszacowanie EV (dogrywka podnosi P("over"))
                 p_fair = betting.implied_prob_one_sided(sb_over)
-                ev_pct = (p_fair * sts_over - 1.0) * 100.0
+                # BRUTTO — to brama selekcji alertów (jak reszta bram,
+                # patrz betting.ev_brutto_pct); wartość pokazywana userowi
+                # liczy `ev_model_pct` niżej, już po podatku
+                ev_pct = betting.ev_brutto_pct(p_fair, sts_over)
                 ratio = sts_over / sb_over
                 if ev_pct < min_ev or ratio < min_ratio:
                     continue
@@ -342,7 +345,9 @@ def _enrich_with_model(alerts: list[dict], model_index: dict, rejections: dict) 
                      value_potwierdzony=False)
             continue
         p = float(e.get("p_model") or 0) or None
-        ev_model = round((p * a["kurs_sts"] - 1.0) * 100.0, 1) if p else None
+        # PO PODATKU (2026-07-31) — karta STS mówi wprost „model potwierdza
+        # +X% przewagi", więc musi to być liczba, którą user realnie dostanie
+        ev_model = round(betting.ev_pct(p, a["kurs_sts"]), 1) if p else None
         a.update(
             zawodnik_nazwa=e.get("podmiot"),
             p_model=round(p, 4) if p else None,

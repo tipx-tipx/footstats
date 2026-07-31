@@ -147,7 +147,7 @@ export function PokrycieSkanu({ pokrycie }: { pokrycie: PokrycieLiga }) {
             Rozgrywki w skanie
           </h3>
           <p className="mt-1 text-xs text-muted">
-            „sparowane" = mecz, który udało się połączyć z ofertą bukmachera.
+            „sparowane” = mecz, który udało się połączyć z ofertą bukmachera.
             Bez pary nie ma kursów, więc nie ma czego analizować.
           </p>
 

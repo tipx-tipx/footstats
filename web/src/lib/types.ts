@@ -60,7 +60,14 @@ export interface ValueBet {
   p_rynku: number | null;
   fair_kurs: number;
   edge_pp: number | null;
+  /** BRUTTO — tą liczbą decydują bramy publikacji (patrz betting.ev_brutto_pct) */
   ev_pct: number | null;
+  /** PO PODATKU od stawki — TO pokazujemy użytkownikowi (betting.ev_pct).
+   *  Brak pola = rekord sprzed 2026-07-31; wtedy front liczy netto sam. */
+  ev_netto?: number | null;
+  /** „standard" (12% od stawki) | „bez_podatku" | „zwrot" — zapisany przy
+   *  typie, żeby zmiana domyślnego trybu nie unieważniła historii */
+  tryb_podatku?: string;
   pewnosc: Pewnosc;
   pewnosc_score: number;
   ryzyko: Ryzyko;
@@ -445,7 +452,14 @@ export interface LegPool {
   rotacja?: boolean;
   miekka_linia?: boolean;
   swieze_sklady?: boolean;
+  /** BRUTTO — tą liczbą decydują bramy publikacji (patrz betting.ev_brutto_pct) */
   ev_pct?: number | null;
+  /** PO PODATKU od stawki — TO pokazujemy użytkownikowi (betting.ev_pct).
+   *  Brak pola = rekord sprzed 2026-07-31; wtedy front liczy netto sam. */
+  ev_netto?: number | null;
+  /** „standard" (12% od stawki) | „bez_podatku" | „zwrot" — zapisany przy
+   *  typie, żeby zmiana domyślnego trybu nie unieważniła historii */
+  tryb_podatku?: string;
   ev_uk?: number | null;
   kurs_oczekiwany?: number | null;
   ryzyko?: Ryzyko;
@@ -620,7 +634,14 @@ export interface Kupon {
   kurs_laczny: number;
   p_model: number;
   fair_kurs: number;
+  /** BRUTTO — tą liczbą decydują bramy publikacji (patrz betting.ev_brutto_pct) */
   ev_pct: number;
+  /** PO PODATKU od stawki — TO pokazujemy użytkownikowi (betting.ev_pct).
+   *  Brak pola = rekord sprzed 2026-07-31; wtedy front liczy netto sam. */
+  ev_netto?: number | null;
+  /** „standard" (12% od stawki) | „bez_podatku" | „zwrot" — zapisany przy
+   *  typie, żeby zmiana domyślnego trybu nie unieważniła historii */
+  tryb_podatku?: string;
   legi: KuponLeg[];
   /** indeks lega o najniższej szansie (najsłabsze ogniwo) */
   najslabszy_idx?: number;
@@ -647,6 +668,9 @@ export interface TypRozliczony {
   linia: number;
   strona: Strona;
   kurs: number | null;
+  /** tryb podatkowy zamrożony przy typie; brak = rekord sprzed 2026-07-31,
+   *  liczony jak „standard" (12% od stawki) */
+  tryb_podatku?: string;
   p_model: number;
   sugestia: boolean;
   wynik: "wygrany" | "przegrany" | "zwrot" | null;

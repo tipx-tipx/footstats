@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { wartoscNetto } from "@/lib/podatek";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { BetCard } from "./BetCard";
@@ -252,7 +253,9 @@ export function ValueBoard({
     // "najbliższym meczu" typy w obrębie meczu idą od najlepiej ocenianych
     switch (sortuj) {
       case "ev":
-        wynik.sort((a, b) => (b.ev_pct ?? -999) - (a.ev_pct ?? -999));
+        wynik.sort(
+          (a, b) => (wartoscNetto(b) ?? -999) - (wartoscNetto(a) ?? -999),
+        );
         break;
       case "pewnosc":
         // "największa szansa" = liczba, którą user widzi na karcie

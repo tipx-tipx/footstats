@@ -100,11 +100,26 @@ def test_strumien_drabinek_rozbija_sie_po_klasie_karty():
 
 
 def test_roi_liczony_osobno_per_strumien():
+    """Bilans PO PODATKU od stawki (od 2026-07-31), osobno per strumień.
+
+    Liczby: przy 12% od stawki z 1 j. pracuje 0,88 j., więc wygrana po
+    kursie 2,0 oddaje 1,76 (zysk +0,76), a po 3,0 — 2,64 (zysk +1,64).
+    """
     log = _log([
-        _rec(kurs=2.0, wynik="wygrany"),                       # +1.0
-        _rec(zrodlo="drabinka", kurs=3.0, wynik="wygrany"),    # +2.0
-        _rec(zrodlo="drabinka", kurs=2.0, wynik="przegrany"),  # -1.0
+        _rec(kurs=2.0, wynik="wygrany"),                       # 2,0×0,88−1 = +0,76
+        _rec(zrodlo="drabinka", kurs=3.0, wynik="wygrany"),    # 3,0×0,88−1 = +1,64
+        _rec(zrodlo="drabinka", kurs=2.0, wynik="przegrany"),  # −1,00
     ])
     s = rozliczanie.skutecznosc_strumieni(log)
+    assert s["pewniaki"]["podsumowanie"]["roi_flat"] == 0.76
+    assert s["drabinki"]["podsumowanie"]["roi_flat"] == 0.64
+
+
+def test_tryb_bez_podatku_liczy_sie_jak_dawniej():
+    """Rekord z trybem `bez_podatku` (np. promocja) rozlicza się bez potrącenia
+    — dowód, że tryb jedzie z rekordem, a nie jest wpisany na sztywno."""
+    log = _log([_rec(kurs=2.0, wynik="wygrany")])
+    for r in log.values():
+        r["tryb_podatku"] = "bez_podatku"
+    s = rozliczanie.skutecznosc_strumieni(log)
     assert s["pewniaki"]["podsumowanie"]["roi_flat"] == 1.0
-    assert s["drabinki"]["podsumowanie"]["roi_flat"] == 1.0

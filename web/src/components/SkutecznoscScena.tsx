@@ -1,6 +1,7 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
+import { kursNetto } from "@/lib/podatek";
 import { useMemo, useState } from "react";
 
 import { KalendarzWynikow } from "./KalendarzWynikow";
@@ -157,7 +158,14 @@ function strumienieZDni(
   return out;
 }
 
-/** Średni kurs rozliczonych typów z dni — podstawa progu opłacalności. */
+/**
+ * Ile trzeba trafiać, żeby wyjść na zero — PO PODATKU od stawki.
+ *
+ * Liczone ze średniego kursu rozliczonych typów, ale przez `kursNetto`:
+ * przy 12% od stawki z 1 j. pracuje 0,88 j., więc próg przy średnim kursie
+ * 1,67 to nie 60%, tylko 68%. Bez tego strona pokazywała próg, którego
+ * przekroczenie i tak nie dawało zysku (poprawka 2026-07-31).
+ */
 function progOplacalnosci(dni: SkutecznoscDnia[]): number | null {
   let suma = 0;
   let n = 0;
@@ -165,7 +173,7 @@ function progOplacalnosci(dni: SkutecznoscDnia[]): number | null {
     for (const t of d.typy ?? []) {
       if (t.poza_publikacja || t.kurs == null || t.kurs <= 1) continue;
       if (t.wynik !== "wygrany" && t.wynik !== "przegrany") continue;
-      suma += t.kurs;
+      suma += kursNetto(t.kurs, t.tryb_podatku);
       n += 1;
     }
   }

@@ -185,7 +185,9 @@ def _typ_z_logu(rec: dict) -> dict:
         "p_model": p, "p_rynku": None,
         "fair_kurs": round(1.0 / max(p, 1e-6), 2),
         "edge_pp": None,
-        "ev_pct": round((p * float(kurs) - 1.0) * 100.0, 1) if kurs else None,
+        "ev_pct": round(betting.ev_brutto_pct(p, kurs), 1) if kurs else None,
+        "ev_netto": round(betting.ev_pct(p, kurs), 1) if kurs else None,
+        "tryb_podatku": betting.tryb_podatku(rec.get("bukmacher")),
         "pewnosc": rec.get("pewnosc") or "srednia",
         "pewnosc_score": 55.0, "ryzyko": "srednie", "rank_score": 0.0,
         "ci": [None, None], "oczekiwane_minuty": None,
@@ -287,7 +289,10 @@ def scal_z_publikacjami(
         if kurs_ksiegi.get(k) and bet.get("kurs") != kurs_ksiegi[k]:
             bet["kurs"] = kurs_ksiegi[k]
             p = float(bet.get("p_model") or 0.0)
-            bet["ev_pct"] = round((p * float(bet["kurs"]) - 1.0) * 100.0, 1)
+            bet["ev_pct"] = round(betting.ev_brutto_pct(p, bet["kurs"]), 1)
+            bet["ev_netto"] = round(
+                betting.ev_pct(p, bet["kurs"], bet.get("tryb_podatku")), 1
+            )
         out.append(bet)
         odtworzone.add(k)
         wznowione += 1
@@ -1989,7 +1994,10 @@ def _main_impl(tryb=None):
         if b.get("p_rynku") is not None:
             out["edge_pp"] = round((p - float(b["p_rynku"])) * 100.0, 2)
         if b.get("kurs"):
-            out["ev_pct"] = round((p * float(b["kurs"]) - 1.0) * 100.0, 2)
+            out["ev_pct"] = round(betting.ev_brutto_pct(p, b["kurs"]), 2)
+            out["ev_netto"] = round(
+                betting.ev_pct(p, b["kurs"], b.get("tryb_podatku")), 2
+            )
         return out
 
     # Korekta strumienia drużynowego NIE jest już stosowana po wyborze strony
@@ -2703,7 +2711,8 @@ def _main_impl(tryb=None):
                 ):
                     # wartość lega (do selekcji kuponów „ku przewadze”):
                     # EV vs Superbet zawsze; no-vig UK gdy jest konsensus na tej linii
-                    ev_pct_leg = round((p_side * odd - 1.0) * 100.0, 1)
+                    ev_pct_leg = round(betting.ev_brutto_pct(p_side, odd), 1)
+                    ev_netto_leg = round(betting.ev_pct(p_side, odd), 1)
                     ev_uk_leg = None
                     kurs_ref_leg = None
                     if (
@@ -2725,7 +2734,8 @@ def _main_impl(tryb=None):
                         "rynek_kod": mk, "rynek": MARKET_NAMES_PL[mk], "linia": l,
                         "strona": side_pl, "kurs": odd,
                         "bukmacher": sv[1], "p_model": round(p_side, 4),
-                        "ev_pct": ev_pct_leg, "ev_uk": ev_uk_leg, "kurs_ref": kurs_ref_leg,
+                        "ev_pct": ev_pct_leg, "ev_netto": ev_netto_leg,
+                        "ev_uk": ev_uk_leg, "kurs_ref": kurs_ref_leg,
                         # ta sama formuła co w value_bets (spójne z pewnosc_score
                         # backendu) — generator na żądanie (GeneratorKuponu) tego
                         # dotąd nie miał, więc nie mógł filtrować jak styl "value"
@@ -2837,6 +2847,7 @@ def _main_impl(tryb=None):
                 "kurs_novig": kurs_novig, "ev_uk": ev_uk,
                 "p_model": a.model_prob, "p_rynku": a.implied_prob,
                 "fair_kurs": a.fair_odds, "edge_pp": a.edge_pp, "ev_pct": a.ev_pct,
+                "ev_netto": a.ev_netto, "tryb_podatku": a.tryb_podatku,
                 "matchup": float(sm.factors.get("rywal", 1.0) or 1.0) >= 1.12,
                 "matchup_styl": bool(
                     pstyle is not None and ostyle is not None
@@ -3392,6 +3403,10 @@ def _main_impl(tryb=None):
                 "pred": pred_t, "nazwa": tt.team_name, "team_id": tt.team_id,
                 "mecz": match_label, "ts": ts, "stare": stare_t,
                 "home_name": home_name, "away_name": away_name,
+                # posterior potrzebny do PRZEDZIAŁU nowych rynków (2026-07-31):
+                # brama drużynowa decyduje o „p ostrożnym", a bez posteriora
+                # nie było czym go policzyć — patrz counts.przedzial_sumy
+                "posterior": posterior_t,
             }
             # KALIBRACJA rynków drużynowych: bias był dla nich LICZONY
             # (team_corners −0,466, team_goals −0,254), ale nigdy nie
@@ -3611,7 +3626,9 @@ def _main_impl(tryb=None):
                         "rynek": MARKET_NAMES_PL[tt.market_code],
                         "linia": l_t, "strona": strona_t, "kurs": odd_t,
                         "bukmacher": "Superbet", "p_model": round(p_t, 4),
-                        "ev_pct": round((p_t * odd_t - 1.0) * 100.0, 1),
+                        "ev_pct": round(betting.ev_brutto_pct(p_t, odd_t), 1),
+                        "ev_netto": round(betting.ev_pct(p_t, odd_t), 1),
+                        "tryb_podatku": betting.tryb_podatku("Superbet"),
                         "ev_uk": ev_uk_t, "kurs_ref": kurs_ref_t,
                         "pewnosc": "wysoka" if (hi_t - lo_t) <= 0.18 else "srednia",
                         "matchup": bool(f_opp >= 1.12),
@@ -3709,6 +3726,21 @@ def _main_impl(tryb=None):
                 p_h, p_remis, p_a = counts.porownanie_druzyn(
                     h_n["pred"], a_n["pred"]
                 )
+                # PRZEDZIAŁ na P(kto więcej) — liczony RAZ na mecz+rynek,
+                # osobno dla każdej strony (remis zjada masę po obu stronach,
+                # więc strona gościa NIE jest dopełnieniem strony gospodarza)
+                ci_w = {}
+                try:
+                    ci_w["gospodarz"] = counts.przedzial_porownania(
+                        h_n["posterior"], h_n["pred"].exposure,
+                        a_n["posterior"], a_n["pred"].exposure,
+                    )
+                    ci_w["gosc"] = counts.przedzial_porownania(
+                        a_n["posterior"], a_n["pred"].exposure,
+                        h_n["posterior"], h_n["pred"].exposure,
+                    )
+                except Exception:
+                    ci_w = {}
                 for strona_w, p_w, kurs_w, kto_w, rywal_w in (
                     ("gospodarz", p_h, kursy_w.get("home"),
                      h_n["nazwa"], a_n["nazwa"]),
@@ -3717,9 +3749,33 @@ def _main_impl(tryb=None):
                 ):
                     if not kurs_w or float(kurs_w) <= 1.0:
                         continue
-                    ev_w = (p_w * float(kurs_w) - 1.0) * 100.0
+                    kurs_w = float(kurs_w)
+                    ev_w = betting.ev_brutto_pct(p_w, kurs_w)
                     if ev_w < betting.MIN_EV_PCT:
                         odpadki_nowe["kto wiecej: brak wartosci"] += 1
+                        continue
+                    # === BRAMY JAKOŚCI (dopięte 2026-07-31) ===
+                    # Do tej pory ten rynek przechodził WYŁĄCZNIE przez EV
+                    # powyżej — bez widełek kursu, bez progu szansy, bez
+                    # przedziału i bez okna zgody z rynkiem. Reszta systemu
+                    # przechodzi przez komplet tych bram, a rozjazd był
+                    # niezamierzony: rynek dopisano 30.07 osobną ścieżką.
+                    lo_w, hi_w = ci_w.get(strona_w, (None, None))
+                    if lo_w is None:
+                        odpadki_nowe["kto wiecej: brak przedzialu"] += 1
+                        continue
+                    if hi_w - lo_w > betting.MAX_CI_WIDTH:
+                        odpadki_nowe["kto wiecej: szeroki przedzial"] += 1
+                        continue
+                    p_dec_w = (p_w + lo_w) / 2.0
+                    if not betting.widelki_druzynowe_ok(kurs_w, p_w, p_dec_w):
+                        odpadki_nowe[
+                            "kto wiecej: " + betting.powod_widelek(
+                                kurs_w, p_w, p_dec_w)
+                        ] += 1
+                        continue
+                    if not betting.w_oknie_zgody(p_w, kurs_w):
+                        odpadki_nowe["kto wiecej: rozjazd z rynkiem"] += 1
                         continue
                     vb_id += 1
                     n_wiecej += 1
@@ -3742,9 +3798,24 @@ def _main_impl(tryb=None):
                         "fair_kurs": round(1.0 / max(p_w, 1e-6), 3),
                         "edge_pp": None,
                         "ev_pct": round(ev_w, 2),
-                        "pewnosc": "srednia", "pewnosc_score": 50.0,
-                        "ryzyko": "sredni", "rank_score": round(ev_w, 3),
-                        "ci": [None, None], "oczekiwane_minuty": None,
+                        "ev_netto": round(betting.ev_pct(p_w, kurs_w), 2),
+                        "tryb_podatku": betting.tryb_podatku("Superbet"),
+                        # PEWNOŚĆ Z PRZEDZIAŁU, nie z sufitu (2026-07-31).
+                        # Wcześniej stało tu na sztywno „średnia / 50 pkt" —
+                        # rynek podawał liczbę, której nie policzył, i to
+                        # dokładnie w polu, po którym user filtruje listę.
+                        # Próg 0,18 jak w rynkach drużynowych (linia 3616).
+                        "pewnosc": "wysoka" if (hi_w - lo_w) <= 0.18
+                                   else "srednia",
+                        "pewnosc_score": round(
+                            100.0 * max(0.0, 1.0 - (hi_w - lo_w) / 0.30), 1
+                        ),
+                        "ryzyko": betting.risk_level(
+                            p_w, False, 1.0, is_prob_market=True
+                        ),
+                        "rank_score": round(ev_w, 3),
+                        "ci": [round(lo_w, 4), round(hi_w, 4)],
+                        "oczekiwane_minuty": None,
                         "lambda": round(h_n["pred"].lam, 3),
                         "rozklad": None, "czynniki": {}, "sugestia": False,
                         # ile zabiera remis — user ma to widzieć, bo przy
@@ -3764,18 +3835,57 @@ def _main_impl(tryb=None):
                     p_over_s = counts.p_over_sumy(
                         h_n["pred"], a_n["pred"], float(linia_s)
                     )
+                    # PRZEDZIAŁ liczony RAZ na linię, dla strony „powyżej";
+                    # „poniżej" jest jego lustrem — tak samo jak w rynkach
+                    # drużynowych (p_under = 1 − p_over, więc granice się
+                    # zamieniają miejscami)
+                    try:
+                        lo_o_s, hi_o_s = counts.przedzial_sumy(
+                            h_n["posterior"], h_n["pred"].exposure,
+                            a_n["posterior"], a_n["pred"].exposure,
+                            float(linia_s),
+                        )
+                    except Exception:
+                        lo_o_s = hi_o_s = None
                     for strona_s, p_s, kurs_s in (
                         ("powyzej", p_over_s, slot_s.get("over")),
                         ("ponizej", 1.0 - p_over_s, slot_s.get("under")),
                     ):
                         if not kurs_s or float(kurs_s) <= 1.0:
                             continue
-                        ev_s = (p_s * float(kurs_s) - 1.0) * 100.0
+                        kurs_s = float(kurs_s)
+                        ev_s = betting.ev_brutto_pct(p_s, kurs_s)
                         if ev_s < betting.MIN_EV_PCT:
+                            continue
+                        # === BRAMY JAKOŚCI (dopięte 2026-07-31) ===
+                        # Ten rynek szedł na stronę na samym EV. Skutek
+                        # zmierzony 31.07 na produkcji: 39 typów, kursy od
+                        # 1,04, z czego 28 poniżej 1,136 — czyli poniżej
+                        # granicy, za którą zakład traci NAWET przy pewności
+                        # stuprocentowej (po podatku od stawki). Widełki
+                        # kurs×szansa odcinają to jednym warunkiem.
+                        if lo_o_s is None:
+                            odpadki_nowe["suma: brak przedzialu"] += 1
+                            continue
+                        if strona_s == "powyzej":
+                            lo_s, hi_s = lo_o_s, hi_o_s
+                        else:
+                            lo_s, hi_s = 1.0 - hi_o_s, 1.0 - lo_o_s
+                        if hi_s - lo_s > betting.MAX_CI_WIDTH:
+                            odpadki_nowe["suma: szeroki przedzial"] += 1
+                            continue
+                        p_dec_s = (p_s + lo_s) / 2.0
+                        if not betting.widelki_druzynowe_ok(
+                            kurs_s, p_s, p_dec_s
+                        ):
+                            odpadki_nowe[
+                                "suma: " + betting.powod_widelek(
+                                    kurs_s, p_s, p_dec_s)
+                            ] += 1
                             continue
                         # ta sama brama co przy typach: poza oknem zgody
                         # z rynkiem nie publikujemy
-                        if not betting.w_oknie_zgody(p_s, float(kurs_s)):
+                        if not betting.w_oknie_zgody(p_s, kurs_s):
                             odpadki_nowe["suma: rozjazd z rynkiem"] += 1
                             continue
                         vb_id += 1
@@ -3797,9 +3907,21 @@ def _main_impl(tryb=None):
                             "fair_kurs": round(1.0 / max(p_s, 1e-6), 3),
                             "edge_pp": None,
                             "ev_pct": round(ev_s, 2),
-                            "pewnosc": "srednia", "pewnosc_score": 50.0,
-                            "ryzyko": "sredni", "rank_score": round(ev_s, 3),
-                            "ci": [None, None], "oczekiwane_minuty": None,
+                            "ev_netto": round(betting.ev_pct(p_s, kurs_s), 2),
+                            "tryb_podatku": betting.tryb_podatku("Superbet"),
+                            # pewność z przedziału, nie z sufitu — patrz
+                            # bliźniaczy komentarz przy „kto więcej"
+                            "pewnosc": "wysoka" if (hi_s - lo_s) <= 0.18
+                                       else "srednia",
+                            "pewnosc_score": round(
+                                100.0 * max(0.0, 1.0 - (hi_s - lo_s) / 0.30), 1
+                            ),
+                            "ryzyko": betting.risk_level(
+                                h_n["pred"].lam + a_n["pred"].lam, False, 1.0
+                            ),
+                            "rank_score": round(ev_s, 3),
+                            "ci": [round(lo_s, 4), round(hi_s, 4)],
+                            "oczekiwane_minuty": None,
                             "lambda": round(
                                 h_n["pred"].lam + a_n["pred"].lam, 3),
                             "rozklad": None, "czynniki": {}, "sugestia": False,
@@ -3989,7 +4111,12 @@ def _main_impl(tryb=None):
             "p_model": b["p_model"], "p_rynku": None,
             "fair_kurs": round(1.0 / max(b["p_model"], 1e-6), 2),
             "edge_pp": None,
-            "ev_pct": round((b["p_model"] * b["kurs"] - 1.0) * 100.0, 1),
+            "ev_pct": round(betting.ev_brutto_pct(b["p_model"], b["kurs"]), 1),
+            "ev_netto": round(
+                betting.ev_pct(b["p_model"], b["kurs"], b.get("tryb_podatku")), 1
+            ),
+            "tryb_podatku": b.get("tryb_podatku")
+                            or betting.tryb_podatku(b.get("bukmacher")),
             "pewnosc": "wysoka" if ci_w <= 0.18 else "srednia",
             "pewnosc_score": 55.0,
             "ryzyko": b.get("ryzyko", "srednie"),
@@ -4504,6 +4631,11 @@ def _main_impl(tryb=None):
         "przeciwnik", "rynek_kod", "rynek", "linia", "strona", "kurs", "bukmacher",
         "p_model", "matchup", "rotacja", "miekka_linia", "swieze_sklady",
         "ev_pct", "ev_uk", "kurs_oczekiwany", "ryzyko", "oczekiwane_minuty",
+        # PODATEK (2026-07-31): `ev_pct` jest brutto i tym decydują bramy,
+        # `ev_netto` to liczba pokazywana userowi. Oba muszą jechać aż do
+        # typy_log, bo inaczej kupony z generatora na żądanie byłyby jedynym
+        # miejscem w systemie bez informacji, w jakim trybie je liczono.
+        "ev_netto", "tryb_podatku",
         # wyzsza_linia/xi_sygnal/kurs_ref — muszą jechać aż do typy_log przez
         # kupony własne (generator na żądanie), inaczej te legi są ślepą
         # plamą w diagnostyce miękkich linii/sygnałów XI/marży UK (patrz
@@ -4579,6 +4711,12 @@ def _main_impl(tryb=None):
     kupony_list = kupony.build_kupony(
         value_bets, legi_pool_pub, profil=profil_kuponow, kary=kary_kor,
         wagi=wagi_zauf or None, kal_szansy=kal_kuponow or None,
+        # ZMIERZONE KOREKTY PER STRUMIEŃ (2026-07-31, domknięcie przebudowy
+        # kuponów): odsiewają legi, które po korekcie tracą, i dają szansę
+        # kuponu liczoną z już skorygowanych legów. Gdy są podane, stary
+        # `kal_szansy` jest w build_kupony pomijany — inaczej ta sama
+        # pomyłka byłaby korygowana dwa razy.
+        korekty_legow=korekta_strumieni or None,
     )
     # znacznik: na ilu meczach kuponu składy były już POTWIERDZONE przy
     # budowie (mniejsze ryzyko anulowań/zwrotów niż na prognozach XI)

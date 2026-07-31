@@ -7,6 +7,7 @@
  */
 
 import type { Kupon, KuponHistoria } from "./types";
+import { kursNetto } from "./podatek";
 
 export interface MojKupon {
   id: string;
@@ -17,6 +18,9 @@ export interface MojKupon {
   kurs_laczny: number;
   p_model: number;
   stawka: number;
+  /** tryb podatkowy zapisany w chwili zagrania — bez tego zmiana domyślnego
+   *  trybu przeliczyłaby wstecz kupony, które user zagrał na innych zasadach */
+  tryb_podatku?: string;
   dodano_ts: number;
   legi: {
     podmiot: string;
@@ -53,6 +57,7 @@ export function addKuponZagrany(k: Kupon, stawka: number): MojKupon {
     kurs_laczny: k.kurs_laczny,
     p_model: k.p_model,
     stawka,
+    tryb_podatku: k.tryb_podatku,
     dodano_ts: Math.floor(Date.now() / 1000),
     legi: k.legi.map((l) => ({
       podmiot: l.podmiot,
@@ -113,7 +118,12 @@ export function zyskKuponu(
   kursRozliczony: number | null,
 ): number | null {
   if (wynik === "wygrany") {
-    return wpis.stawka * ((kursRozliczony ?? wpis.kurs_laczny) - 1);
+    // PO PODATKU (2026-07-31): z 1 zł stawki pracuje 0,88 zł, więc zysk to
+    // stawka × (kurs × 0,88 − 1), a nie stawka × (kurs − 1)
+    return (
+      wpis.stawka *
+      (kursNetto(kursRozliczony ?? wpis.kurs_laczny, wpis.tryb_podatku) - 1)
+    );
   }
   if (wynik === "przegrany") return -wpis.stawka;
   if (wynik === "zwrot" || wynik === "anulowany") return 0;
