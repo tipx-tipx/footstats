@@ -705,7 +705,8 @@ def compute_bias_full(
             continue  # za mało danych i brak rozliczonej rodziny
         bins = []
         for lo, hi in BIAS_PRZEDZIALY:
-            bgrp = [r for r in grp if lo <= r["p_model"] < hi]
+            # po `p_over`, nie po `p` typu — patrz `_p_over_rekordu`
+            bgrp = [r for r in grp if lo <= _p_over_rekordu(r) < hi]
             bb = g
             if len(bgrp) >= MIN_N_PRZEDZIAL:
                 b_eff = sum(_w(r) for r in bgrp)
@@ -1044,6 +1045,28 @@ KOREKTA_STRUMIENIA_CAP = (-1.05, 0.20)
 # po drodze, ile typów kosztuje uczciwość, i można się zatrzymać.
 KOREKTA_STRUMIENIA_TLUMIENIE = 0.5
 
+# PRZEDZIAŁY SZANSY W KOREKCIE STRUMIENIA (2026-07-31).
+#
+# Do dziś korekta była JEDNĄ liczbą na strumień. Pomiar na 536 rozliczeniach
+# pokazał, że to za mało, bo błąd modelu ZMIENIA ZNAK:
+#
+#   segment (w oknie zgody)        n    weszło  obiecywał     luka
+#   powyżej zawodnicze  <1,9     118    68,6%    74,3%      −5,6 pp
+#   powyżej drużynowe   <1,9      30    63,3%    74,3%     −11,0 pp
+#   poniżej drużynowe   <1,9      43    81,4%    80,4%      +1,0 pp
+#   poniżej drużynowe   >=1,9     24    62,5%    45,8%     +16,7 pp  <- w drugą stronę
+#
+# Jedna delta na strumień uśrednia przeszacowanie z niedoszacowaniem i psuje
+# oba naraz. Przedziały liczone są po `p` modelu — tych samych, których używa
+# kalibracja rynkowa (BIAS_PRZEDZIALY), żeby dało się je zsumować bin po binie
+# (patrz build_wc_fast._dodaj_delte).
+#
+# Próg jest WYŻSZY niż przy kalibracji rynkowej (MIN_N_PRZEDZIAL=15), bo
+# przedział strumienia dzieli i tak niewielką próbę na cztery. Poniżej progu
+# przedział dostaje wartość globalną — czyli zachowuje się dokładnie jak
+# dotąd. Dzięki temu zmiana rusza WYŁĄCZNIE tam, gdzie naprawdę zmierzyliśmy.
+KOREKTA_PRZEDZIAL_MIN_N = 20
+
 # DRABINKI mają własne, ostrzejsze warunki — z dwóch powodów:
 #
 # 1. PRÓBA. Strumień wystawia kilka kart dziennie, nie kilkadziesiąt typów:
@@ -1075,13 +1098,44 @@ def ustaw_korekte_strumienia(korekta: dict[str, float]) -> None:
     _KOREKTA_CYKLU = dict(korekta or {})
 
 
+def _p_over_rekordu(r: dict) -> float:
+    """`p_over` linii, na której stał ten typ — a NIE `p` samego typu.
+
+    PO CO TO ISTNIEJE (błąd znaleziony 2026-07-31): przedziały kalibracji są
+    WYSZUKIWANE po `p_over` (engine._select_bias dostaje `p_over`, ścieżka
+    drużynowa woła `apply_bias(..., pred.p_over(linia))`), a MIERZONE były po
+    `p` typu. Dla typu „poniżej" te dwie liczby są swoimi lustrami, więc
+    rekord lądował w binie po przeciwnej stronie skali niż ten, do którego
+    zostanie potem przyłożony.
+
+    Czemu nikt tego nie zauważył: typy zawodnicze to w 100% strona „powyżej",
+    gdzie `p` typu JEST `p_over` — więc na propsach błąd nie istnieje. Wychodzi
+    dopiero na rynkach drużynowych, gdzie 76% typów to „poniżej" — czyli
+    dokładnie tam, gdzie siedzi jedyny zyskowny segment.
+    """
+    p = _p_surowe(r)
+    return 1.0 - p if r.get("strona") == "ponizej" else p
+
+
 def _p_surowe(r: dict) -> float:
-    """p_model sprzed korekty strumienia — na tym mierzymy, żeby nie oscylować."""
+    """p_model sprzed korekty strumienia — na tym mierzymy, żeby nie oscylować.
+
+    ODWRACAMY TAM, GDZIE NAŁOŻONO (poprawka 2026-07-31). Korekta idzie na
+    `p_over` i dopiero stamtąd lustrzy się na „poniżej" (p_under = 1 − p_over).
+    Odejmowanie delty wprost od `p` typu „poniżej" NIE jest odwrotnością tej
+    operacji — przesunięcie w logicie nie zachowuje się symetrycznie przy
+    odbiciu. Skutek: dla rynków drużynowych, gdzie 76% typów to „poniżej",
+    surowe `p` wychodziło błędne, a że to na nim mierzymy kolejną korektę,
+    błąd wracał do modelu przy każdym cyklu.
+    """
     p = float(r.get("p_model") or 0.0)
     d = float(r.get("kal_strumien") or 0.0)
     if not d:
         return p
-    return 1.0 / (1.0 + math.exp(-(_logit(p) - d)))
+    over = r.get("strona") != "ponizej"
+    p_over = p if over else 1.0 - p
+    p_over_sur = 1.0 / (1.0 + math.exp(-(_logit(p_over) - d)))
+    return p_over_sur if over else 1.0 - p_over_sur
 
 
 def korekta_strumienia(log: dict | None = None) -> dict[str, float]:
@@ -1124,9 +1178,46 @@ def korekta_strumienia(log: dict | None = None) -> dict[str, float]:
         srednia_juz = sum(juz) / len(juz)
         b = srednia_juz + KOREKTA_STRUMIENIA_TLUMIENIE * (b - srednia_juz)
         b = max(cap[0], min(cap[1], b))
-        if abs(b) >= 0.02:      # szum poniżej 2 setnych logita ignorujemy
+        # DRABINKI zostają skalarem: ich `p` pochodzi z pokrycia linii, a nie
+        # z silnika, więc przedziały `p` modelu nic tam nie znaczą — a próba
+        # jest najmniejsza ze wszystkich strumieni.
+        biny = [] if drabinki else _biny_korekty(grp, b, cap)
+        # PRÓG SZUMU OBEJMUJE CAŁĄ STRUKTURĘ: strumień idealnie skalibrowany
+        # ma MILCZEĆ, a nie zwracać słownik zer. Delty 0,0 byłyby nieszkodliwe
+        # w rachunku, ale znaczą co innego niż brak wpisu — a na braku wpisu
+        # opiera się „cisza, gdy model trafia".
+        istotna = abs(b) >= 0.02 or any(abs(x) >= 0.02 for _, _, x in biny)
+        if not istotna:
+            continue
+        if biny:
+            out[strumien] = {"logit": True, "global": round(b, 3), "bins": biny}
+        else:
             out[strumien] = round(b, 3)
     return out
+
+
+def _biny_korekty(grp: list[dict], globalna: float, cap: tuple) -> list:
+    """Delty per przedział szansy, ściągane do globalnej przy małej próbie.
+
+    Zwraca [] gdy ŻADEN przedział nie ma własnego pomiaru — wtedy wołający
+    zostaje przy jednej liczbie i nic się nie zmienia względem poprzedniej
+    wersji. To jest celowe: przedziały mają włączać się same, gdy danych
+    przybędzie, a nie od razu udawać wiedzę.
+    """
+    biny = []
+    wlasne = 0
+    for lo, hi in BIAS_PRZEDZIALY:
+        bgrp = [r for r in grp if lo <= _p_over_rekordu(r) < hi]
+        bb = globalna
+        if len(bgrp) >= KOREKTA_PRZEDZIAL_MIN_N:
+            k = len(bgrp) / (len(bgrp) + KOREKTA_PRZEDZIAL_MIN_N)
+            surowy = _bias_logit(
+                [{**r, "p_model": _p_surowe(r)} for r in bgrp]
+            )
+            bb = globalna + k * (surowy - globalna)
+            wlasne += 1
+        biny.append([lo, hi, round(max(cap[0], min(cap[1], bb)), 3)])
+    return biny if wlasne else []
 
 
 # --- SZANSA POKAZYWANA: co piszemy userowi na stronie (2026-07-29) ---
@@ -1203,7 +1294,10 @@ def szansa_pokazywana(
         b = _bias_logit([{**r, "p_model": _p_surowe(r)} for r in grp])
         # ...minus ta jego część, którą przed bramą załatwia już korekta
         # strumienia (dla typów w oknie bywała inna — stąd pomiar na surowym)
-        b -= float(korekta_przed_brama.get(strumien, 0.0))
+        # korekta bywa binowana (2026-07-31); tu nie znamy `p` konkretnego
+        # typu, bo liczymy jedną liczbę na cały strumień — bierzemy część
+        # globalną, czyli dokładnie to, czym była ta korekta wcześniej
+        b -= betting.delta_globalna(korekta_przed_brama.get(strumien))
         b = max(SZANSA_POKAZ_CAP[0], min(SZANSA_POKAZ_CAP[1], b))
         if abs(b) >= 0.02:
             out[strumien] = round(b, 3)

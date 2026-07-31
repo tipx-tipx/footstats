@@ -3,6 +3,7 @@
 import pytest
 
 from footstats.jobs import rozliczanie
+from footstats.model import betting
 
 
 def _rec(mk: str, p: float, wynik: str, ts: int = 0, kurs: float = 1.5,
@@ -243,9 +244,50 @@ def test_korekta_strumienia_sciaga_przeszacowanie():
     for i in range(60):
         log[str(i)] = _typ(i, 0.70, "wygrany" if i % 2 == 0 else "przegrany")
     k = rozliczanie.korekta_strumienia(log)
-    assert -0.6 < k["pewniaki"] < -0.25
+    # od 2026-07-31 korekta bywa binowana po `p_over`; `delta_globalna`
+    # czyta jej część wspólną, czyli dokładnie to, czym była wcześniej
+    assert -0.6 < betting.delta_globalna(k["pewniaki"]) < -0.25
     # strumień drużynowy bez próby nie dostaje nic
     assert "druzyny" not in k
+
+
+def test_korekta_ma_osobne_delty_per_przedzial_szansy():
+    """Błąd modelu ZMIENIA ZNAK, więc jedna liczba na strumień go nie opisze.
+
+    Pomiar 2026-07-31: na „powyżej" model przeszacowuje, a na „poniżej" przy
+    wysokich kursach niedoszacowuje o 16,7 pp. Uśrednienie psuje oba naraz.
+
+    Tu: typy o p_over ~0,80 mocno przeszacowane (weszło 40%), a typy
+    o p_over ~0,45 trafiające zgodnie z deklaracją. Delta dla wysokiego
+    przedziału musi być WYRAŹNIE ostrzejsza niż dla niskiego.
+    """
+    log = {}
+    for i in range(40):                        # p_over 0,80 -> weszło 40%
+        log[f"a{i}"] = _typ(i, 0.80, "wygrany" if i % 10 < 4 else "przegrany")
+    for i in range(40):                        # p_over 0,45 -> weszło 45%
+        log[f"b{i}"] = _typ(100 + i, 0.45,
+                            "wygrany" if i % 20 < 9 else "przegrany")
+    k = rozliczanie.korekta_strumienia(log)["pewniaki"]
+    assert isinstance(k, dict), "przy takiej próbie muszą powstać przedziały"
+    d_niski = betting.delta_dla_p(k, 0.45)
+    d_wysoki = betting.delta_dla_p(k, 0.80)
+    assert d_wysoki < d_niski - 0.15, (
+        f"przedziały się nie rozjechały: {d_niski:+.3f} vs {d_wysoki:+.3f}"
+    )
+
+
+def test_korekta_binowana_po_p_over_a_nie_po_p_typu():
+    """Typ „poniżej" ma `p` będące LUSTREM `p_over`, a przedziały są
+    wyszukiwane po `p_over` (engine._select_bias). Mierzone muszą być tak samo,
+    inaczej rekord ląduje w binie po przeciwnej stronie skali.
+
+    Błąd realny do 2026-07-31 — niewidoczny na propsach (100% „powyżej"),
+    wychodził na rynkach drużynowych, gdzie 76% typów to „poniżej".
+    """
+    r = {"p_model": 0.30, "strona": "ponizej"}
+    assert abs(rozliczanie._p_over_rekordu(r) - 0.70) < 1e-9
+    r2 = {"p_model": 0.30, "strona": "powyzej"}
+    assert abs(rozliczanie._p_over_rekordu(r2) - 0.30) < 1e-9
 
 
 def test_korekta_strumienia_cisza_gdy_model_trafia():
@@ -268,7 +310,7 @@ def test_korekta_strumienia_nie_oscyluje():
         log[str(i)] = _typ(i, 0.52, "wygrany" if i % 2 == 0 else "przegrany",
                            kal=-0.80)
     k = rozliczanie.korekta_strumienia(log)
-    assert k["pewniaki"] < -0.5, "korekta zniknęła — regulator oscyluje"
+    assert betting.delta_globalna(k["pewniaki"]) < -0.5,         "korekta zniknęła — regulator oscyluje"
 
 
 def test_korekta_strumienia_wymaga_proby():
@@ -462,14 +504,14 @@ def test_korekta_dochodzi_do_zmierzonej_wartosci_przez_cykle():
     log = {}
     for i in range(60):
         log[str(i)] = _typ(i, 0.70, "wygrany" if i % 10 < 4 else "przegrany")
-    d1 = rozliczanie.korekta_strumienia(log)["pewniaki"]
+    d1 = betting.delta_globalna(rozliczanie.korekta_strumienia(log)["pewniaki"])
     # drugi cykl: te same wyniki, ale typy wystawione JUŻ z korektą d1
     log2 = {}
     for i in range(60):
         p2 = rozliczanie.urealnij_p(0.70, d1)
         log2[str(i)] = _typ(i, round(p2, 4),
                             "wygrany" if i % 10 < 4 else "przegrany", kal=d1)
-    d2 = rozliczanie.korekta_strumienia(log2)["pewniaki"]
+    d2 = betting.delta_globalna(rozliczanie.korekta_strumienia(log2)["pewniaki"])
     assert d2 < d1, "korekta musi pogłębiać się między cyklami, nie cofać"
 
 
