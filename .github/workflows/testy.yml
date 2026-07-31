@@ -14,8 +14,16 @@ name: FootStats — testy
 # workflow przed scaleniem. Do tego czasu jest to sygnał, nie blokada.
 
 on:
+  # PUSH tylko na `master` — czyli scalenia PR-ow i (gdyby regula kiedys
+  # zniknela) bezposrednie pushe. Galezie robocze obsluguje `pull_request`.
+  #
+  # Bylo `branches: ["**"]` razem z `pull_request` i to znaczylo, ze KAZDA
+  # zmiana w PR-ze liczy sie DWA RAZY: raz ze zdarzenia push, raz z PR.
+  # Kosztowalo podwojne minuty Actions, a w interfejsie dawalo cztery checki
+  # zamiast dwoch — z czego polowa byla zielona kopia drugiej polowy. Przy
+  # pierwszym PR-ze wygladalo to jak zablokowany merge, choc wszystko dzialalo.
   push:
-    branches: ["**"]
+    branches: [master]
   pull_request:
   workflow_dispatch: {}
 
