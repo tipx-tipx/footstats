@@ -5005,6 +5005,35 @@ def _main_impl(tryb=None):
             typy_poza_publikacja.extend(_zdjete_swieze)
             print(f"Do księgi jako 'poza publikacją': {len(_zdjete_swieze)} "
                   f"świeżych typów zdjętych bramą wyświetlania")
+    # CIEŃ WYCENY — ile naprawdę dają potwierdzone składy (patrz
+    # rozliczanie.ustaw_cienie_skladow). Bierzemy ŚWIEŻO policzone `p` dla
+    # typów z meczów, gdzie skład jest już potwierdzony, a gwizdek jest blisko.
+    # Typ na liście się NIE zmienia — cena i szansa zostają zamrożone z chwili
+    # publikacji. To wyłącznie druga liczba obok, do porównania po rozliczeniu.
+    #
+    # Okno dwóch godzin, bo tyle mniej więcej przed meczem składy są pewne,
+    # a jednocześnie to garstka typów na cykl — nie chcemy dokładać roboty
+    # cyklowi, który i tak ledwo mieści się w limicie czasu.
+    _CIEN_OKNO_S = 2 * 3600
+    try:
+        _teraz_cien = int(time.time())
+        _cienie: dict[str, float] = {}
+        for b in (list(value_bets) + list(odrzucone_pomiar or [])
+                  + list(typy_poza_publikacja or [])):
+            if b.get("mecz_id") not in (conf_mids or set()):
+                continue
+            do_gwizdka = int(b.get("kickoff_ts") or 0) - _teraz_cien
+            if not 0 < do_gwizdka <= _CIEN_OKNO_S or not b.get("p_model"):
+                continue
+            _cienie[rozliczanie._klucz(b)] = float(b["p_model"])
+        rozliczanie.ustaw_cienie_skladow(_cienie)
+        if _cienie:
+            print(f"Cień wyceny: {len(_cienie)} typów przeliczonych przy "
+                  "potwierdzonym składzie (pomiar, nie publikacja)")
+    except Exception as e:
+        rozliczanie.ustaw_cienie_skladow({})
+        print(f"Cień wyceny pominięty ({e})")
+
     # publikacja kuponów idzie przez log (zamrożenie/anulowanie/rozliczenie)
     # wewnątrz _rozlicz_i_zapisz — kupony.json to aktywne kupony z logu
     _rozlicz_i_zapisz(value_bets, kupony_list, niedostepni,

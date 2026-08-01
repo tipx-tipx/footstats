@@ -118,6 +118,21 @@ def main() -> None:
                   f"{_strzalka(v['zmiana'])}")
 
     print()
+    print("=" * 78)
+    print("CZY POTWIERDZONE SKŁADY POPRAWIAJĄ PROGNOZĘ (cień wyceny)")
+    print("=" * 78)
+    c = rozliczanie.raport_cieni(log)
+    if not c["n"]:
+        print("  (brak par — pierwsze powstaną, gdy mecz ze znanym składem "
+              "zacznie się w ciągu 2 h od cyklu)")
+    else:
+        print(f"  par: {c['n']} {'(wystarczy na wniosek)' if c['gotowy'] else '(za mało na wniosek, cel 100)'}")
+        print(f"  nasza zamrożona liczba: {c['brier_zamrozone']:.4f}")
+        print(f"  liczba ze znanym składem: {c['brier_ze_skladem']:.4f}")
+        print(f"  zysk ze składu: {c['lepszy_cien']:+.4f}"
+              f"  {'-> składy POMAGAJĄ' if c['lepszy_cien'] > 0 else '-> składy nic nie dają'}")
+
+    print()
     print("Przypomnienie: to jest mapa, nie brama. Nic nie blokujemy —")
     print("rynek o ujemnej przewadze zostaje w grze i czeka, aż model się go nauczy.")
 

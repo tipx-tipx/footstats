@@ -279,6 +279,14 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
             # kurs/p_model zostają z pierwszej publikacji (dataset kalibracji).
             rec = log[k]
             if rec.get("wynik") is None:
+                # CIEŃ WYCENY — świeże `p` policzone, gdy skład jest już
+                # potwierdzony. Leży OBOK zamrożonego `p_model`, nie zamiast:
+                # karta i rozliczenie dalej jadą po cenie i szansie z chwili
+                # publikacji. To jest wyłącznie pomiar (patrz `raport_cieni`).
+                cien = _CIENIE_CYKLU.get(k)
+                if cien is not None:
+                    rec["p_cien"] = round(float(cien), 4)
+                    rec["p_cien_ts"] = int(time.time())
                 for f in ("matchup", "matchup_styl", "rotacja", "wyzsza_linia",
                           "pewniak", "miekka_linia"):
                     if b.get(f):
@@ -1147,6 +1155,64 @@ def ustaw_korekte_strumienia(korekta: dict[str, float]) -> None:
     """Zapamiętaj korektę użytą w TYM cyklu (stempel na publikowanych typach)."""
     global _KOREKTA_CYKLU
     _KOREKTA_CYKLU = dict(korekta or {})
+
+
+# --- CIEŃ WYCENY: ile naprawdę dają potwierdzone składy (2026-08-01) --------
+#
+# CZEGO NIE DA SIĘ ODPOWIEDZIEĆ DZIŚ. Chcemy wiedzieć, czy warto budować model
+# na potwierdzonych składach — to najgrubsza pozycja z listy rzeczy, które
+# bukmacher wycenia, a my nie. Pole `xi_sygnal` tego NIE mierzy: stempluje się
+# przy pierwszej publikacji, a ta wypada medianowo 60 h przed meczem, czyli
+# grubo przed ogłoszeniem składów (zmierzone 2026-08-01, n=153).
+#
+# JAK TO MIERZYMY, NIE RUSZAJĄC PRODUKTU. Typ zostaje zamrożony: cena i szansa
+# z chwili publikacji, tak jak obiecuje karta. Ale gdy mecz startuje niedługo
+# i skład jest już potwierdzony, silnik i tak przelicza tego zawodnika — więc
+# tę świeżą liczbę zapisujemy OBOK, jako `p_cien`. Nic jej nie publikuje i nic
+# po niej nie rozlicza.
+#
+# Po rozliczeniu mamy na TYM SAMYM zdarzeniu dwie prognozy: naszą sprzed dwóch
+# dni i tę ze znanym składem. Porównanie Brierem odpowiada wprost, czy
+# potwierdzony skład czyni nas lepszymi i o ile — patrz `raport_cieni`.
+_CIENIE_CYKLU: dict[str, float] = {}
+
+
+def ustaw_cienie_skladow(cienie: dict[str, float]) -> None:
+    """Świeże `p` dla typów z meczów, gdzie skład jest już potwierdzony."""
+    global _CIENIE_CYKLU
+    _CIENIE_CYKLU = dict(cienie or {})
+
+
+def raport_cieni(log: dict | None = None) -> dict:
+    """Czy prognoza ze znanym składem bije naszą zamrożoną?
+
+    Liczy na rozliczonych rekordach, które mają OBIE liczby. `lepszy_cien`
+    dodatni = potwierdzone składy poprawiają prognozę, czyli etap 3 warto
+    zacząć właśnie od nich.
+    """
+    if log is None:
+        log = _migruj_log(supa.get_key("typy_log") or {})
+    pary = [
+        r for r in log.values()
+        if r.get("wynik") in ("wygrany", "przegrany")
+        and r.get("p_model") and r.get("p_cien")
+        and not r.get("sugestia") and not r.get("odrzucony")
+    ]
+    if not pary:
+        return {"n": 0, "gotowy": False}
+    b_zamrozone = b_cien = 0.0
+    for r in pary:
+        trafil = 1.0 if r["wynik"] == "wygrany" else 0.0
+        b_zamrozone += (float(r["p_model"]) - trafil) ** 2
+        b_cien += (float(r["p_cien"]) - trafil) ** 2
+    n = len(pary)
+    return {
+        "n": n,
+        "gotowy": n >= 100,          # niżej to jeszcze nie jest odpowiedź
+        "brier_zamrozone": round(b_zamrozone / n, 4),
+        "brier_ze_skladem": round(b_cien / n, 4),
+        "lepszy_cien": round((b_zamrozone - b_cien) / n, 4),
+    }
 
 
 def _p_over_rekordu(r: dict) -> float:

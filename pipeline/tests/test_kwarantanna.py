@@ -803,3 +803,53 @@ def test_kwarantanna_zna_strony_rynku_kto_wiecej():
     recs = _seria("wiecej_shots", 30, 5, 1.9, strona="gospodarz")
     kw = rozliczanie.strony_kwarantanna(_log(recs))
     assert "wiecej_shots:gospodarz" in kw
+
+
+# --- CIEN WYCENY: ile daja potwierdzone skalady (2026-08-01) ---------------
+
+def test_cien_zapisuje_sie_obok_zamrozonej_liczby():
+    """Karta i rozliczenie jada po cenie z chwili publikacji — cien tylko obok."""
+    b = _typ_z_kursem(1, 0.70, 2.0, None)
+    log = {}
+    rozliczanie._dopisz_nowe(log, [b])
+    klucz = next(iter(log))
+    rozliczanie.ustaw_cienie_skladow({klucz: 0.55})
+    try:
+        rozliczanie._dopisz_nowe(log, [b])          # kolejny cykl, skladzy znane
+    finally:
+        rozliczanie.ustaw_cienie_skladow({})
+    rec = log[klucz]
+    assert rec["p_model"] == 0.70, "zamrozona szansa nie moze sie ruszyc"
+    assert rec["p_cien"] == 0.55
+    assert rec["p_cien_ts"] > 0
+
+
+def test_cien_nie_dotyka_rozliczonych():
+    b = _typ_z_kursem(1, 0.70, 2.0, "wygrany")
+    log = {}
+    rozliczanie._dopisz_nowe(log, [b])
+    klucz = next(iter(log))
+    log[klucz]["wynik"] = "wygrany"
+    rozliczanie.ustaw_cienie_skladow({klucz: 0.55})
+    try:
+        rozliczanie._dopisz_nowe(log, [b])
+    finally:
+        rozliczanie.ustaw_cienie_skladow({})
+    assert "p_cien" not in log[klucz], "rozliczony rekord jest zamrozony"
+
+
+def test_raport_cieni_wykrywa_poprawe():
+    """Typy weszly; cien mowil 0,8, zamrozone 0,5 -> sklad poprawia prognoze."""
+    log = {}
+    for i in range(120):
+        log[str(i)] = {**_typ_z_kursem(i, 0.50, 2.0, "wygrany"),
+                       "p_cien": 0.80}
+    r = rozliczanie.raport_cieni(log)
+    assert r["n"] == 120 and r["gotowy"] is True
+    assert r["lepszy_cien"] > 0
+    assert r["brier_ze_skladem"] < r["brier_zamrozone"]
+
+
+def test_raport_cieni_milczy_bez_par():
+    assert rozliczanie.raport_cieni({})["n"] == 0
+    assert rozliczanie.raport_cieni({})["gotowy"] is False
