@@ -118,46 +118,14 @@ def _rozlicz_i_zapisz(
         return
     _dump("typy_wyniki.json", wyniki)
 
-    def _kupon_do_pokazania(k: dict) -> dict:
-        """Kupon z legami pokazującymi tę samą szansę, co lista typów.
-
-        Sam kupon ma WŁASNE urealnienie (zmierzone na rozliczonych kuponach,
-        `kupony._urealnij_szanse`), więc jego `p_model` zostaje nietknięte —
-        poprawiamy tylko liczby przy pojedynczych legach, żeby ten sam typ
-        nie pokazywał dwóch różnych szans dwa kliknięcia od siebie.
-        Dotyczy WYŁĄCZNIE dumpu; log kuponów zostaje surowy.
-
-        WARTOŚĆ LICZONA OD NOWA Z ZAMROŻONYCH LICZB (2026-08-01). Kupony żyją
-        w logu tygodniami, więc na stronie leżą obok siebie rekordy zamrożone
-        przez różne wersje kodu. Jedna z nich (`_urealnij_szanse` sprzed
-        naprawy) korygowała `ev_pct`, ale zostawiała `ev_netto` policzone ze
-        surowej szansy — kupon 18–25 pokazywał netto **+72,8%** przy wartości
-        brutto −10,6%. Przeliczenie tutaj gwarantuje, że trzy liczby na
-        karcie (szansa, kurs, wartość) zawsze się zgadzają, niezależnie od
-        tego, która wersja kodu zamroziła rekord. Sama SZANSA i SKŁAD kuponu
-        zostają nietknięte — to nadal ten kupon, który user widział.
-        """
-        p_k = k.get("p_model")
-        kurs_k = k.get("kurs_laczny")
-        if p_k and kurs_k:
-            k = {
-                **k,
-                "ev_pct": round((float(p_k) * float(kurs_k) - 1.0) * 100.0, 1),
-                "ev_netto": round(betting.ev_pct(
-                    float(p_k), float(kurs_k), k.get("tryb_podatku")), 1),
-            }
-        if not urealnienie:
-            return k
-        return {**k, "legi": [
-            {**l, "p_model": round(rozliczanie.urealnij_p(
-                float(l["p_model"]),
-                urealnienie.get(rozliczanie._strumien(l), 0.0),
-            ), 4)} if l.get("p_model") else l
-            for l in k.get("legi", [])
-        ]}
-
+    # NORMALIZACJA KUPONU DO POKAZANIA MIESZKA W `rozliczanie` (2026-08-01).
+    # Była tutaj jako funkcja zagnieżdżona i przez to obowiązywała tylko duży
+    # cykl — a klucz `kupony` zapisuje też `rozlicz_only`, co 20 minut. Efekt
+    # był taki, że naprawa wartości netto wracała do stanu sprzed naprawy przy
+    # pierwszym lekkim rozliczeniu (patrz rozliczanie.kupon_do_pokazania).
     _dump("kupony.json", [
-        _kupon_do_pokazania(k) for k in wyniki["kupony"]
+        rozliczanie.kupon_do_pokazania(k, urealnienie)
+        for k in wyniki["kupony"]
         if k.get("wynik") is None and not k.get("pominiety")
     ])
     p = wyniki["podsumowanie"]

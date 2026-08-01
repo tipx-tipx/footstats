@@ -27,7 +27,17 @@ concurrency:
 jobs:
   cycle:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # 20 -> 35 (2026-08-01). Cykl trwa 16-20 min i ROŚNIE z zakresem lig, więc
+    # regularnie ginął na limicie: z 19 kolejnych przebiegów SZEŚĆ skończyło się
+    # statusem `cancelled` na 20,2-20,3 min. Zabity przebieg nie wypycha NICZEGO
+    # (push_supabase idzie na końcu cycle.py), więc strona zostawała z danymi
+    # sprzed 1-2 h przy sprawnym cronie — to jest prawdziwa przyczyna „cron się
+    # dławi" z wcześniejszych diagnoz.
+    #
+    # Limit ZOSTAJE (a nie rośnie do maksimum), bo przebieg zawieszony na
+    # padniętym źródle blokowałby kolejkę: concurrency nie przepuszcza drugiego
+    # cyklu. Gdzie idą minuty — patrz stopery w cycle.py/build_league.py.
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
 

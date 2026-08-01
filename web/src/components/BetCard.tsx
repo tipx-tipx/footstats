@@ -764,7 +764,7 @@ function OcenaTypu({ bet }: { bet: ValueBet }) {
       {/* „pewność" była tylko trzema kropkami z dymkiem — a to zupełnie inna
           rzecz niż szansa i mylenie ich jest łatwe */}
       <p className="mt-1 max-w-prose text-xs leading-relaxed text-faint">
-        Obok kropki z napisem „{PEWNOSC_LABEL[bet.pewnosc]} pewność" — to nie
+        Obok kropki z napisem „{PEWNOSC_LABEL[bet.pewnosc]} pewność” — to nie
         to samo co szansa. Mówią, na ilu meczach i jak powtarzalnych opiera się
         ta prognoza.
       </p>

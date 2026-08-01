@@ -33,6 +33,12 @@ MODE = "liga"
 def main():
     stamp = time.strftime("%Y-%m-%d %H:%M:%S")
     print(f"[{stamp}] START cyklu (tryb: {MODE})", flush=True)
+    # STOPER CAŁEGO CYKLU (2026-08-01). Cykl regularnie ginął na limicie 20 min
+    # w GitHub Actions, a z logów nie dało się powiedzieć, co go zjada — job
+    # kończył się w połowie i nie zostawiał ani jednej liczby o czasie.
+    # Zabity przebieg nie wypycha nic, więc każda taka śmierć to godzina
+    # nieświeżej strony; bez pomiaru podnoszenie limitu jest zgadywaniem.
+    t0 = time.monotonic()
     try:
         if MODE == "ms2026":
             from . import build_wc_fast
@@ -43,9 +49,13 @@ def main():
         else:
             from . import build_demo
             build_demo.main()
+        t_model = time.monotonic() - t0
+        print(f"[stoper] model policzony po {t_model / 60:.1f} min", flush=True)
         # wypchnij wyniki do Supabase (jeśli skonfigurowane) — aplikacja na Vercel je czyta
         from . import push_supabase
         wypchniete = push_supabase.push()
+        print(f"[stoper] wysyłka do Supabase: {(time.monotonic() - t0 - t_model) / 60:.1f} min "
+              f"| CAŁY CYKL {(time.monotonic() - t0) / 60:.1f} min", flush=True)
         # push() zwraca False też gdy Supabase NIE jest skonfigurowany (lokalny
         # run bez sekretów) — to nie błąd. Ale gdy sekrety SĄ ustawione (GitHub
         # Actions), False = realny błąd (HTTP/brak danych) i dane NIE trafiły do

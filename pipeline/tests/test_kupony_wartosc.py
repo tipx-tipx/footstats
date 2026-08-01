@@ -165,3 +165,72 @@ def test_kara_koszyka_uzywa_zmierzonych():
         legi, {"ta_sama": 0.6, "przeciwne": 0.97, "nieznane": 0.95}
     )
     assert abs(zmierz - 0.6) < 1e-9
+
+
+# --- KUPON DO POKAZANIA: jedna normalizacja dla WSZYSTKICH pisarzy klucza ----
+#
+# Regresja z produkcji 2026-08-01. Naprawa wartości netto siedziała w funkcji
+# zagnieżdżonej w `build_wc_fast`, więc stosował ją tylko duży cykl — a klucz
+# `kupony` zapisuje też lekki job rozliczeniowy, co 20 minut. Zmierzone na
+# żywym Supabase: kupon 18-25 wrócił do netto +72,8% przy wartości brutto
+# −10,6%, czyli naprawa przeżyła na stronie około półtorej godziny.
+
+def _kupon_klamiacy():
+    """Dokładnie ten rekord, który leżał na produkcji: `ev_netto` policzone
+    ze SUROWEJ szansy (iloczyn legów 0,1076), `p_model` już urealnione."""
+    return {
+        "p_model": 0.049, "kurs_laczny": 18.25,
+        "ev_pct": -10.6, "ev_netto": 72.8,
+        "wynik": None, "pominiety": False,
+        "legi": [{"p_model": 0.6791, "rynek_kod": "team_goals"}],
+    }
+
+
+def test_kupon_do_pokazania_netto_nie_moze_bic_brutto():
+    k = rozliczanie.kupon_do_pokazania(_kupon_klamiacy())
+    # brutto bez zmian, netto policzone od nowa: 0,049 × 18,25 × 0,88 − 1
+    assert k["ev_pct"] == -10.6
+    assert abs(k["ev_netto"] - (-21.3)) < 0.15
+    # podatek tylko zabiera — netto nigdy nie jest wyższe od brutto
+    assert k["ev_netto"] <= k["ev_pct"]
+    # szansa i skład kuponu nietknięte: to nadal ten kupon, który user widział
+    assert k["p_model"] == 0.049 and len(k["legi"]) == 1
+
+
+def test_kupon_do_pokazania_urealnia_szanse_legow():
+    k = rozliczanie.kupon_do_pokazania(_kupon_klamiacy(), {"druzyny": -0.3})
+    assert k["legi"][0]["p_model"] < 0.6791     # leg ściągnięty
+    assert k["p_model"] == 0.049                 # kupon ma własne urealnienie
+
+
+def test_lekki_job_rozliczeniowy_normalizuje_kupony(monkeypatch):
+    """Sedno regresji: to NIE jest test funkcji, tylko test drugiego pisarza.
+
+    Gdyby ktoś kiedyś dodał trzeci job zapisujący `kupony`, ten test go nie
+    złapie — ale złapie powrót do zapisu surowych rekordów tutaj, a to jest
+    dokładnie to, co się wydarzyło.
+    """
+    from footstats.jobs import rozlicz_only
+
+    monkeypatch.setenv("SUPABASE_URL", "https://test.invalid")
+    monkeypatch.setenv("SUPABASE_SERVICE_KEY", "test")
+    monkeypatch.setattr(rozliczanie, "rozlicz", lambda *a, **kw: {
+        "kupony": [_kupon_klamiacy()],
+        "podsumowanie": {"rozliczone": 0, "opublikowane": 0, "trafione": 0,
+                         "roi_flat": 0.0},
+    })
+    monkeypatch.setattr(rozliczanie, "szansa_pokazywana", lambda *a, **kw: {})
+    zapisane: dict[str, object] = {}
+
+    def _put(key, payload):
+        zapisane[key] = payload
+        return True
+
+    monkeypatch.setattr(rozlicz_only.supa, "put_key", _put)
+    rozlicz_only.main()
+
+    kupon = zapisane["kupony"][0]
+    assert abs(kupon["ev_netto"] - (-21.3)) < 0.15, (
+        "lekki job zapisał kupon bez normalizacji — wartość netto znów kłamie"
+    )
+    assert kupon["ev_netto"] <= kupon["ev_pct"]

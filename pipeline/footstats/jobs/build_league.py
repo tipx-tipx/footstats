@@ -495,11 +495,22 @@ def main(publikuj: bool = False) -> None:
     są nietknięte (patrz build_wc_fast._dry_run)."""
     from . import build_wc_fast
 
+    # STOPER ODKRYWANIA (2026-08-01) — patrz komentarz w cycle.py. Rozdziela
+    # dwie zupełnie różne rzeczy: pobranie kalendarza i oferty bukmachera
+    # (czyste czekanie na sieć, rośnie z liczbą dni i rozgrywek) od liczenia
+    # modelu. Bez tego rozdziału nie wiadomo, czy limit czasu zjada zakres lig,
+    # czy sam silnik.
+    t0 = time.monotonic()
     tryb = zbuduj_tryb(publikuj=publikuj)
+    print(f"[stoper] odkrywanie meczów + parowanie z Superbetem: "
+          f"{(time.monotonic() - t0) / 60:.1f} min", flush=True)
     if tryb is None:
         print("Brak sparowanych meczów — cykl ligowy pominięty.")
         return
+    t1 = time.monotonic()
     build_wc_fast.main(tryb)
+    print(f"[stoper] silnik (typy, kupony, rozliczenia): "
+          f"{(time.monotonic() - t1) / 60:.1f} min", flush=True)
 
 
 if __name__ == "__main__":

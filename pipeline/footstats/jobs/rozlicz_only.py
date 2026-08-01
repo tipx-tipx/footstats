@@ -47,8 +47,20 @@ def main() -> None:
         return
     try:
         wyniki = rozliczanie.rozlicz([], [])
+        # TEN SAM KLUCZ PISZE TEŻ DUŻY CYKL — i musi go pisać tak samo.
+        # Do 2026-08-01 lekki job wrzucał kupony SUROWO z logu, więc co 20 minut
+        # cofał normalizację robioną przez `build_wc_fast`: na produkcji kupon
+        # 18–25 wracał do netto +72,8% przy wartości brutto −10,6%. Naprawa
+        # w dużym cyklu żyła około półtorej godziny, do najbliższego przebiegu
+        # tego joba. Szczegóły: rozliczanie.kupon_do_pokazania.
+        try:
+            urealnienie = rozliczanie.szansa_pokazywana()
+        except Exception as e:
+            urealnienie = {}
+            print(f"[{stamp}] Urealnienie szans legów pominięte ({e})", flush=True)
         aktywne = [
-            k for k in wyniki["kupony"]
+            rozliczanie.kupon_do_pokazania(k, urealnienie)
+            for k in wyniki["kupony"]
             if k.get("wynik") is None and not k.get("pominiety")
         ]
         ok_k = supa.put_key("kupony", aktywne)

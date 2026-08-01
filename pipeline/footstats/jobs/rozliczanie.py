@@ -1477,6 +1477,51 @@ def urealnij_p(p: float, delta: float) -> float:
     return 1.0 / (1.0 + math.exp(-(_logit(p) + delta)))
 
 
+def kupon_do_pokazania(k: dict, urealnienie: dict[str, float] | None = None) -> dict:
+    """Kupon z logu przygotowany do POKAZANIA — wartość przeliczona od nowa.
+
+    JEDNA FUNKCJA DLA WSZYSTKICH PISARZY KLUCZA `kupony` (2026-08-01).
+    Wcześniej mieszkała jako funkcja zagnieżdżona w `build_wc_fast`, więc
+    stosował ją WYŁĄCZNIE duży cykl — a klucz `kupony` zapisuje też lekki job
+    rozliczeniowy (`rozlicz_only`), co 20 minut, prosto z logu. Skutek zmierzony
+    na produkcji: naprawa wartości netto z `d6df2d8` żyła na stronie około
+    półtorej godziny, po czym lekki job przywracał kłamiące liczby (kupon 18–25
+    znów pokazywał netto **+72,8%** przy wartości brutto −10,6%).
+
+    Reguła, która z tego wynika: klucz widoku ma jedną funkcję normalizującą,
+    nie jedną na job. Kto zapisuje `kupony`, woła to.
+
+    Co robi:
+    * WARTOŚĆ OD NOWA Z ZAMROŻONYCH LICZB. Kupony żyją w logu tygodniami, więc
+      obok siebie leżą rekordy zamrożone przez różne wersje kodu. Jedna z nich
+      korygowała `ev_pct`, ale zostawiała `ev_netto` policzone ze surowej
+      szansy. Przeliczenie z `p_model` i `kurs_laczny` gwarantuje, że trzy
+      liczby na karcie (szansa, kurs, wartość) zawsze się zgadzają.
+    * SZANSA LEGÓW jak na liście typów — żeby ten sam typ nie pokazywał dwóch
+      różnych szans dwa kliknięcia od siebie. Sam kupon ma WŁASNE urealnienie
+      (`kupony._urealnij_szanse`), więc jego `p_model` zostaje nietknięte.
+
+    Dotyczy WYŁĄCZNIE tego, co pokazujemy — log kuponów zostaje surowy.
+    """
+    p_k = k.get("p_model")
+    kurs_k = k.get("kurs_laczny")
+    if p_k and kurs_k:
+        k = {
+            **k,
+            "ev_pct": round((float(p_k) * float(kurs_k) - 1.0) * 100.0, 1),
+            "ev_netto": round(betting.ev_pct(
+                float(p_k), float(kurs_k), k.get("tryb_podatku")), 1),
+        }
+    if not urealnienie:
+        return k
+    return {**k, "legi": [
+        {**l, "p_model": round(urealnij_p(
+            float(l["p_model"]), urealnienie.get(_strumien(l), 0.0),
+        ), 4)} if l.get("p_model") else l
+        for l in k.get("legi", [])
+    ]}
+
+
 def market_bias() -> dict[str, dict]:
     """Korekty kalibracyjne z logu w Supabase (puste, gdy brak danych/env)."""
     log = _migruj_log(supa.get_key("typy_log") or {})
