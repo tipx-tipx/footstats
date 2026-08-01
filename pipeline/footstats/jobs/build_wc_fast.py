@@ -4842,6 +4842,15 @@ def _main_impl(tryb=None):
         print("Przewaga wg pasma ceny: " + ", ".join(
             f"{k} {v['przewaga']:+.4f} (weszło {100*v['hit']:.0f}%, n={v['n']})"
             for k, v in _pasma.items()))
+    # DZIENNY STEMPEL POMIARU — bez historii etap 3 jest zgadywanką: po
+    # dołożeniu potwierdzonych składów nie dałoby się powiedzieć, czy rynek
+    # drgnął, bo nie byłoby z czym porównać (patrz rozliczanie.zapisz_przewage).
+    if not _dry_run() and (_przewaga or _pasma):
+        try:
+            if rozliczanie.zapisz_przewage(_przewaga, _pasma):
+                print("Historia przewagi: stempel dnia zapisany")
+        except Exception as e:
+            print(f"Historia przewagi pominięta ({e})")
     _dump("value_bets.json", lista_pub)
     _dump("matches.json", list(matches_out.values()))
     _dump("players.json", list(players_out.values()))

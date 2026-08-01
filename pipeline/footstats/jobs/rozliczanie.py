@@ -1676,6 +1676,101 @@ def przewaga_pasm(log: dict | None = None) -> dict[str, dict]:
     return out
 
 
+# --- HISTORIA POMIARU: bez niej etap 3 jest zgadywanką ------------------
+#
+# Sam pomiar „czy bijemy cenę" mówi, gdzie jesteśmy DZIŚ. Do roboty na
+# najbliższy miesiąc potrzebny jest KIERUNEK: dołożyliśmy potwierdzone składy —
+# czy `shots|powyzej` drgnęło? Bez zapisanej historii pytanie jest bez
+# odpowiedzi, bo nie ma z czym porównać, a pamięć ludzka po tygodniu
+# podpowiada to, w co chcemy wierzyć.
+#
+# Stempel jest DZIENNY, nie na cykl: cykl chodzi kilkanaście razy dziennie,
+# a pomiar rusza się o ułamki promila między przebiegami — szesnaście prawie
+# identycznych wpisów dziennie tylko zaśmieciłoby klucz.
+PRZEWAGA_HISTORIA_KLUCZ = "przewaga_historia"
+PRZEWAGA_HISTORIA_DNI = 180
+
+
+def zapisz_przewage(
+    rynki: dict[str, dict], pasma: dict[str, dict], dzien: str | None = None,
+) -> bool:
+    """Dopisz dzienny stempel pomiaru przewagi. True = zapisano.
+
+    Odczyt-modyfikacja-zapis przez `get_key_ok`: przy nieudanym odczycie NIE
+    zapisujemy, żeby jeden timeout nie skasował historii (patrz supa).
+    """
+    if not rynki and not pasma:
+        return False
+    dzien = dzien or time.strftime("%Y-%m-%d")
+    stary, ok = get_key_ok_przewagi()
+    if not ok:
+        print("Historia przewagi: odczyt padł, nie zapisuję")
+        return False
+    hist = dict(stary or {})
+    hist[dzien] = {
+        "ts": int(time.time()),
+        "rynki": {k: {"n": v["n"], "przewaga": v["przewaga"],
+                      "brier_model": v["brier_model"],
+                      "brier_kurs": v["brier_kurs"]}
+                  for k, v in (rynki or {}).items()},
+        "pasma": {k: {"n": v["n"], "hit": v["hit"], "przewaga": v["przewaga"],
+                      "brier_model": v["brier_model"],
+                      "brier_kurs": v["brier_kurs"]}
+                  for k, v in (pasma or {}).items()},
+    }
+    # przytnij do ostatnich N dni — klucz ma rosnąć liniowo i wolno
+    for stary_dzien in sorted(hist)[:-PRZEWAGA_HISTORIA_DNI]:
+        del hist[stary_dzien]
+    return supa.put_key(PRZEWAGA_HISTORIA_KLUCZ, hist)
+
+
+def get_key_ok_przewagi():
+    """Wydzielone, żeby test mógł podmienić samo źródło historii."""
+    return supa.get_key_ok(PRZEWAGA_HISTORIA_KLUCZ)
+
+
+def trend_przewagi(dni: int = 7, hist: dict | None = None) -> dict[str, dict]:
+    """Porównanie dzisiejszego pomiaru z pomiarem sprzed `dni` dni.
+
+    Zwraca `{"team_goals|ponizej": {"teraz":.., "bylo":.., "zmiana":..,
+    "n_teraz":.., "n_bylo":..}}` — dla rynków i pasm razem, bo w tym pytaniu
+    („czy idzie w dobrą stronę") jedno i drugie czyta się tak samo.
+    """
+    if hist is None:
+        hist = get_key_ok_przewagi()[0] or {}
+    if not hist:
+        return {}
+    dni_lista = sorted(hist)
+    teraz_klucz = dni_lista[-1]
+    # najbliższy wpis NIE NOWSZY niż `dni` wstecz; gdy historia jest krótsza,
+    # bierzemy najstarszy, jaki mamy — lepiej porównać z czymkolwiek niż milczeć
+    prog = time.strftime(
+        "%Y-%m-%d", time.localtime(time.time() - dni * 86400)
+    )
+    starsze = [d for d in dni_lista if d <= prog]
+    bylo_klucz = starsze[-1] if starsze else dni_lista[0]
+    if bylo_klucz == teraz_klucz:
+        return {}
+    out: dict[str, dict] = {}
+    for sekcja in ("rynki", "pasma"):
+        teraz = (hist[teraz_klucz] or {}).get(sekcja) or {}
+        bylo = (hist[bylo_klucz] or {}).get(sekcja) or {}
+        for k, v in teraz.items():
+            b = bylo.get(k)
+            out[k] = {
+                "sekcja": sekcja,
+                "teraz": v.get("przewaga"),
+                "n_teraz": v.get("n"),
+                "bylo": (b or {}).get("przewaga"),
+                "n_bylo": (b or {}).get("n"),
+                "zmiana": (round(v["przewaga"] - b["przewaga"], 4)
+                           if b and v.get("przewaga") is not None
+                           and b.get("przewaga") is not None else None),
+                "od": bylo_klucz, "do": teraz_klucz,
+            }
+    return out
+
+
 def przewaga_pasma_dla(kurs, pasma: dict[str, dict] | None) -> float:
     """Przewaga pasma, w którym leży ten kurs (0.0 = nie wiemy)."""
     if not pasma or not kurs:

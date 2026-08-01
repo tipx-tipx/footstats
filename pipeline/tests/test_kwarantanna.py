@@ -457,6 +457,72 @@ def test_przewaga_pasma_dla_wybiera_wlasciwy_przedzial():
     assert rozliczanie.przewaga_pasma_dla(2.0, None) == 0.0
 
 
+# --- HISTORIA POMIARU (2026-08-01): bez niej etap 3 jest zgadywanka ---------
+
+def _pomiar(przewaga, n=40):
+    return {"team_goals|ponizej": {"n": n, "przewaga": przewaga,
+                                   "brier_model": 0.20, "brier_kurs": 0.22}}
+
+
+def test_stempel_jest_dzienny_a_nie_na_cykl(monkeypatch):
+    """Cykl chodzi kilkanaście razy dziennie — historia ma rosnąć raz na dobę."""
+    zapisane = {}
+    monkeypatch.setattr(rozliczanie, "get_key_ok_przewagi",
+                        lambda: (zapisane.get("h"), True))
+    monkeypatch.setattr(rozliczanie.supa, "put_key",
+                        lambda k, v: zapisane.__setitem__("h", v) or True)
+    rozliczanie.zapisz_przewage(_pomiar(0.01), {}, dzien="2026-08-01")
+    rozliczanie.zapisz_przewage(_pomiar(0.02), {}, dzien="2026-08-01")
+    assert list(zapisane["h"]) == ["2026-08-01"]
+    # ostatni pomiar dnia wygrywa
+    assert zapisane["h"]["2026-08-01"]["rynki"]["team_goals|ponizej"]["przewaga"] == 0.02
+    rozliczanie.zapisz_przewage(_pomiar(0.03), {}, dzien="2026-08-02")
+    assert sorted(zapisane["h"]) == ["2026-08-01", "2026-08-02"]
+
+
+def test_nieudany_odczyt_nie_kasuje_historii(monkeypatch):
+    """Jeden timeout nie może zastąpić miesiąca pomiarów jednym wpisem."""
+    monkeypatch.setattr(rozliczanie, "get_key_ok_przewagi", lambda: (None, False))
+    monkeypatch.setattr(rozliczanie.supa, "put_key",
+                        lambda k, v: pytest.fail("zapis mimo padnietego odczytu"))
+    assert rozliczanie.zapisz_przewage(_pomiar(0.01), {}) is False
+
+
+def test_trend_pokazuje_kierunek():
+    hist = {
+        "2026-07-20": {"rynki": {"team_goals|ponizej":
+                                 {"n": 30, "przewaga": -0.010}}, "pasma": {}},
+        "2026-08-01": {"rynki": {"team_goals|ponizej":
+                                 {"n": 90, "przewaga": +0.015}}, "pasma": {}},
+    }
+    t = rozliczanie.trend_przewagi(7, hist)["team_goals|ponizej"]
+    assert t["bylo"] == -0.010 and t["teraz"] == 0.015
+    assert t["zmiana"] == 0.025          # model sie nauczyl
+    assert t["n_bylo"] == 30 and t["n_teraz"] == 90
+
+
+def test_trend_milczy_gdy_jest_jeden_pomiar():
+    hist = {"2026-08-01": {"rynki": _pomiar(0.01), "pasma": {}}}
+    assert rozliczanie.trend_przewagi(7, hist) == {}
+
+
+def test_historia_przycinana_do_okna():
+    dni = {f"2026-{m:02d}-{d:02d}": {"rynki": {}, "pasma": {}}
+           for m in (1, 2, 3, 4, 5, 6, 7) for d in range(1, 29)}
+    assert len(dni) > rozliczanie.PRZEWAGA_HISTORIA_DNI
+    zapisane = {}
+    import footstats.jobs.rozliczanie as R
+    stary_get, stary_put = R.get_key_ok_przewagi, R.supa.put_key
+    R.get_key_ok_przewagi = lambda: (dni, True)
+    R.supa.put_key = lambda k, v: zapisane.__setitem__("h", v) or True
+    try:
+        R.zapisz_przewage(_pomiar(0.01), {}, dzien="2026-08-01")
+    finally:
+        R.get_key_ok_przewagi, R.supa.put_key = stary_get, stary_put
+    assert len(zapisane["h"]) == rozliczanie.PRZEWAGA_HISTORIA_DNI
+    assert "2026-08-01" in zapisane["h"]     # najnowszy zawsze zostaje
+
+
 def test_delta_zapisana_toleruje_smieci():
     assert rozliczanie._delta_zapisana({}) == 0.0
     assert rozliczanie._delta_zapisana({"kal_strumien": -0.4}) == -0.4
