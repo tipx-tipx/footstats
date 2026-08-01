@@ -13,6 +13,13 @@
  * Użycie:
  *   npm run zrzuty                    — domyślny zestaw ekranów
  *   npm run zrzuty -- /model /kupony  — wybrane adresy
+ *   npm run zrzuty -- --rozwin        — z ROZWINIĘTYMI kartami (domyślnie 3)
+ *   npm run zrzuty -- --rozwin=6      — tyle pierwszych kart otwartych
+ *
+ * DLACZEGO `--rozwin`: skrypt fotografował wyłącznie listę zwiniętą, więc
+ * rozwinięcia kart — czyli miejsce, w którym siedzi całe wyjaśnienie typu —
+ * przechodziły do produkcji nieobejrzane (2026-08-01). Jeden przełącznik
+ * zamiast obietnicy „następnym razem sprawdzę ręcznie".
  */
 
 import { spawn } from "node:child_process";
@@ -36,6 +43,11 @@ const adresy = process.argv
   .filter((a) => a && !a.startsWith("-") && !/^[A-Za-z]:/.test(a))
   .map((a) => (a.startsWith("/") ? a : `/${a}`));
 const strony = adresy.length > 0 ? adresy : DOMYSLNE;
+
+const flagaRozwin = process.argv.slice(2).find((a) => a.startsWith("--rozwin"));
+const ILE_ROZWINAC = flagaRozwin
+  ? Number(flagaRozwin.split("=")[1] ?? 3) || 3
+  : 0;
 
 function uruchom(cmd, args, opts = {}) {
   return new Promise((resolve, reject) => {
@@ -73,6 +85,31 @@ async function przewinCalosc(page) {
   }
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.waitForTimeout(500);
+}
+
+/**
+ * Rozwiń pierwsze `ile` kart na stronie. Karty rozwijają się przyciskiem
+ * z `aria-expanded` — to samo w BetCard, RadarCard, BetRow i StsBetCard,
+ * więc jeden selektor łapie wszystkie rodzaje list.
+ */
+async function rozwinKarty(page, ile) {
+  // TYLKO karty (`article`), nie każdy `aria-expanded` na stronie: filtry
+  // i przełączniki widoku też je mają i zjadały wszystkie kliknięcia
+  const SEL = 'article button[aria-expanded="false"]';
+  const n = Math.min(await page.locator(SEL).count(), ile);
+  for (let i = 0; i < n; i++) {
+    // lista przelicza się po każdym kliknięciu (layout framer-motion),
+    // więc za każdym razem bierzemy PIERWSZY zwinięty przycisk
+    const p = page.locator(SEL).first();
+    try {
+      await p.scrollIntoViewIfNeeded({ timeout: 2000 });
+      await p.click({ timeout: 2000 });
+      await page.waitForTimeout(350);
+    } catch {
+      break; // przycisk zniknął albo zasłonięty — nie blokujemy zrzutu
+    }
+  }
+  return n;
 }
 
 async function czekajNaSerwer(url, sekundy = 60) {
@@ -149,9 +186,17 @@ try {
       // To była wada NARZĘDZIA, nie strony — ale narzędzie jest jedynym
       // sposobem, w jaki oglądamy własne UI, więc kłamało nam do oczu.
       await przewinCalosc(page);
+      if (ILE_ROZWINAC > 0) {
+        const otwarte = await rozwinKarty(page, ILE_ROZWINAC);
+        console.log(`  (rozwinięte karty: ${otwarte})`);
+        await page.evaluate(() => window.scrollTo(0, 0));
+        await page.waitForTimeout(400);
+      }
       const plik = path.join(
         KATALOG,
-        `${adres.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "") || "start"}--${nazwa}.png`,
+        `${adres.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "") || "start"}${
+          ILE_ROZWINAC > 0 ? "-rozwiniete" : ""
+        }--${nazwa}.png`,
       );
       await page.screenshot({ path: plik, fullPage: true });
       console.log(`  ${plik}`);

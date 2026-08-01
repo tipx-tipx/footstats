@@ -109,6 +109,22 @@ export function profilTypu(bet: {
   return null;
 }
 
+/**
+ * CHARAKTER SZCZEBLA drabinki – opis JEDNEJ linii, nie ocena całego typu.
+ *
+ * Dzięki temu widać istotę drabinki: idąc w górę linii kupujesz wyższy kurs
+ * za niższą pewność. Żaden szczebel nie jest przy tym reklamowany („nasz typ"
+ * nad wybraną kolumną nic nie tłumaczyło, tylko się chwaliło – decyzja usera
+ * 2026-08-01). Progi celowo grubsze niż w `SILA_TYPU`: w komórce 84 px mieści
+ * się jedno słowo, a nie „bardzo wysoka szansa".
+ */
+export function charakterSzczebla(p: number | null | undefined): string | null {
+  if (p == null) return null;
+  if (p >= 0.8) return "wysoka szansa";
+  if (p >= 0.5) return "realne";
+  return "ryzykowne";
+}
+
 /* ------------------------------------------------------------------ *
  * MNOŻNIKI – kierunek słowem, liczba jako przypis
  * ------------------------------------------------------------------ */

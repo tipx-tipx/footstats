@@ -5,7 +5,9 @@ import { memo, useEffect, useRef, useState } from "react";
 
 import { EdgeBadge, PewnoscDots, RiskBadge } from "./badges";
 import { ChanceBar, OutcomeColumns } from "./DistributionStrip";
+import { DrabinkaLinii } from "./DrabinkaLinii";
 import { FormBars } from "./FormBars";
+import { Krok, Kroki, SzczegolyTechniczne } from "./KrokiRozwiniecia";
 import { OsSzans, type OsZnacznik } from "./OsSzans";
 import { Sygnaly, type Sygnal } from "./Sygnaly";
 import { wartoscNetto } from "@/lib/podatek";
@@ -480,10 +482,49 @@ function OdczytOkna({
 }
 
 /**
- * Historia zawodnika na tym rynku: słupki, okna hit-rate i splity. Bez karty
- * (de-boxing) – nagłówek, wykres i odczyty niosą się same.
+ * KROK „JAK BYŁO OSTATNIO" – surowa historia i jedno zdanie, co z niej wynika.
+ *
+ * To jest część historii, nie materiał diagnostyczny, więc od 2026-08-01
+ * (część 2) stoi na wierzchu rozwinięcia, a nie w zakładce. Rozbiór na okna
+ * L5/L10/razem i splity kadra-klub został – ale zszedł do „Szczegółów
+ * technicznych", bo odpowiada na pytanie o próbę, a nie o ten mecz.
  */
-function SekcjaFormy({ bet, forma }: { bet: ValueBet; forma: FormaRynku }) {
+function HistoriaKrotko({ bet, forma }: { bet: ValueBet; forma: FormaRynku }) {
+  const okna = oknaFormy(forma, bet.linia, bet.strona);
+  const w = okna.l10.n >= 5 ? okna.l10 : okna.all;
+  return (
+    <div>
+      <FormBars
+        counts={forma.ostatnie}
+        minutes={forma.minuty}
+        opponents={forma.rywale}
+        kadra={forma.kadra}
+        line={bet.linia}
+        side={bet.strona}
+        height={64}
+        rynek={bet.rynek.toLowerCase()}
+      />
+      {okna.zagrane > 0 && (
+        <p className="mt-2 text-sm leading-relaxed text-ink-soft">
+          W {w.n} ostatnich {w.n === 1 ? "meczu" : "meczach"} ten typ wszedłby{" "}
+          <span className="font-data font-semibold text-ink">{w.traf}</span>{" "}
+          {w.traf === 1 ? "raz" : "razy"}, średnio wychodziło{" "}
+          <span className="font-data font-semibold text-ink">
+            {forma.srednia90.toFixed(2).replace(".", ",")}
+          </span>{" "}
+          na mecz.
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Rozbiór historii na okna i podpróbki – materiał diagnostyczny, więc jedzie
+ * pod „Szczegóły techniczne". Odpowiada na pytanie „na czym stoi ta próba",
+ * którego prawie nikt nie zadaje przed postawieniem zakładu.
+ */
+function HistoriaWLiczbach({ bet, forma }: { bet: ValueBet; forma: FormaRynku }) {
   const okna = oknaFormy(forma, bet.linia, bet.strona);
   const zagrane = okna.zagrane;
   // okna jak w Props.cash/StatsHub: forma TERAZ vs średnia – L5 wykrywa
@@ -496,38 +537,19 @@ function SekcjaFormy({ bet, forma }: { bet: ValueBet; forma: FormaRynku }) {
   const splity = splityFormy(forma, bet.linia, bet.strona);
   return (
     <div>
-      <div className="mb-2.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
-        <h4 className="text-xs font-semibold uppercase tracking-wide text-faint">
-          Ostatnie mecze: {bet.rynek.toLowerCase()}
-        </h4>
-        {zagrane > 0 && (
-          <span className="flex items-center gap-2">
-            {odczyty.map((c) => (
-              <OdczytOkna key={c.label} {...c} />
-            ))}
-          </span>
-        )}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+        {zagrane > 0 &&
+          odczyty.map((c) => <OdczytOkna key={c.label} {...c} />)}
       </div>
       {zagrane > 0 && (
-        <p className="-mt-1.5 mb-2.5 text-[11px] leading-relaxed text-faint">
-          Liczby po prawej mówią, jak często ten typ by wszedł – w ostatnich 5,
-          10 i we wszystkich meczach, w których zawodnik grał.
+        <p className="mt-1.5 text-[11px] leading-relaxed text-faint">
+          Ile razy ten typ by wszedł – w ostatnich 5, 10 i we wszystkich
+          meczach, w których {bet.podmiot_typ === "druzyna" ? "drużyna grała" : "zawodnik grał"}.
         </p>
       )}
-      <FormBars
-        counts={forma.ostatnie}
-        minutes={forma.minuty}
-        opponents={forma.rywale}
-        kadra={forma.kadra}
-        line={bet.linia}
-        side={bet.strona}
-        height={64}
-        rynek={bet.rynek.toLowerCase()}
-      />
-      {/* jedna banda odczytów pod wykresem: średnia, minuty i splity razem */}
+      {/* etykiety mówią same za siebie – bez dymków, które i tak nie
+          działają na telefonie (przegląd kart 2026-08-01) */}
       <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-hairline pt-2.5">
-        {/* etykiety mówią same za siebie – bez dymków, które i tak nie
-            działają na telefonie (przegląd kart 2026-08-01) */}
         <span className="font-data text-[11px] font-semibold text-ink-soft">
           <span className="mr-1 text-[9px] font-medium uppercase opacity-70">
             średnio na mecz z ostatnich {zagrane}
@@ -641,6 +663,11 @@ const CZYNNIK_PO_LUDZKU: Record<string, string> = {
   "Scenariusz meczu": "przewidywany przebieg meczu",
   "Matchup (kto na kogo)": "zestawienie z rywalem",
   "Dom / wyjazd": "miejsce meczu",
+  // rynki drużynowe nazywają czynniki inaczej niż zawodnicze; bez tych
+  // dwóch wpisów proza mówiła „w górę ciągną dom i wyjazd i przewidywany
+  // przebieg meczu" – dwa „i" pod rząd i nazwa wprost z kodu backendu
+  "Dom i wyjazd": "miejsce meczu",
+  "Styl rywala": "styl gry rywala",
 };
 
 const listaPoPolsku = (xs: string[]) =>
@@ -652,8 +679,16 @@ const listaPoPolsku = (xs: string[]) =>
  * której nikt nie rozumiał – po prostu opowiadamy, jak model doszedł do
  * swojego procentu. Ostatnie zdanie domyka rozjazd „oczekiwane 2,3 vs 76%"
  * (model dolicza ryzyko krótszej gry, patrz pułapka p_model vs rozkład).
+ *
+ * OD 2026-08-01 (część 2) zwraca DWA KAWAŁKI, nie jedno zdanie: pierwszy jest
+ * krokiem „skąd ta liczba", drugi krokiem „co zmienia ten mecz". Wcześniej
+ * cała proza leciała jednym ciągiem – i, co gorsza, wisiała wyłącznie przy
+ * typach o wysokiej szansie (`OcenaTypu`), więc karta drużynowa, czyli jedyny
+ * zarabiający strumień, nie tłumaczyła się w ogóle.
  */
-function skadTaLiczba(bet: ValueBet): string | null {
+function skadTaLiczba(
+  bet: ValueBet,
+): { baza: string; zmiana: string } | null {
   const cz = bet.uzasadnienie.czynniki;
   const baza = cz.find((c) => c.nazwa === "Poziom bazowy");
   if (!baza) return null;
@@ -704,7 +739,10 @@ function skadTaLiczba(bet: ValueBet): string | null {
       ? "a rozkład możliwych wyników daje"
       : "ale model dolicza jeszcze ryzyko krótszej gry i ostatecznie daje";
   const domkniecie = `${prog}, ${skad} ${fmtProc(bet.p_model)}.`;
-  return `${fmtOpisLiczby(baza.opis)}. ${korekta} – zostaje ok. ${ocz}. ${domkniecie}`;
+  return {
+    baza: `${fmtOpisLiczby(baza.opis)}.`,
+    zmiana: `${korekta} – zostaje ok. ${ocz}. ${domkniecie}`,
+  };
 }
 
 /** Skala ocen = ta sama tabela co plakietka (patrz lib/slownik.ts). */
@@ -716,7 +754,6 @@ const SKALA_OCEN = SILA_TYPU;
  * liczba". Czyta się jak skala ocen, nie jak wykres do interpretacji.
  */
 function OcenaTypu({ bet }: { bet: ValueBet }) {
-  const proza = skadTaLiczba(bet);
   const s = silaTypu(bet.p_model);
   const wobecKursu =
     bet.kurs != null && bet.kurs > 1
@@ -724,9 +761,6 @@ function OcenaTypu({ bet }: { bet: ValueBet }) {
       : null;
   return (
     <div>
-      <h4 className="mb-2.5 text-xs font-semibold uppercase tracking-wide text-faint">
-        Nasza ocena
-      </h4>
       <div className="grid max-w-xl grid-cols-4 gap-x-2.5">
         {SKALA_OCEN.map((k) => {
           const aktywna = k.kod === s.kod;
@@ -779,11 +813,6 @@ function OcenaTypu({ bet }: { bet: ValueBet }) {
             : "."}
         </p>
       )}
-      {proza && (
-        <p className="mt-3 max-w-prose text-sm leading-relaxed text-muted">
-          <span className="font-medium text-ink">Skąd ta liczba:</span> {proza}
-        </p>
-      )}
     </div>
   );
 }
@@ -825,40 +854,23 @@ function RozjazdZHistoria({
     .filter((c) => (wGore ? (c.mnoznik as number) < 1 : (c.mnoznik as number) > 1))
     .map((c) => (CZYNNIK_PO_LUDZKU[c.nazwa] ?? c.nazwa.toLowerCase()));
   return (
-    <div className="mt-5 max-w-prose rounded-(--radius-control) border border-hairline bg-card-soft/60 px-3.5 py-3">
-      <h4 className="text-xs font-semibold uppercase tracking-wide text-faint">
-        Czemu nie tyle, ile mówi ostatnie 10 meczów
-      </h4>
-      <p className="mt-1.5 text-sm leading-relaxed text-ink-soft">
-        W ostatnich {w.n} meczach ten typ wszedłby{" "}
-        <span className="font-data font-semibold text-ink">{w.traf}</span> razy
-        (<span className="font-data">{fmtProc(hr)}</span>), a my dajemy mu{" "}
-        <span className="font-data font-semibold text-ink">
-          {fmtProc(bet.p_model)}
-        </span>
-        . To nie pomyłka – te dwie liczby liczą co innego.
-      </p>
-      <p className="mt-1.5 text-sm leading-relaxed text-muted">
-        Licznik wyżej patrzy tylko na {w.n} ostatnich meczów. Model bierze
-        około dwudziestu, świeższe waży mocniej, ściąga wynik do średniej
-        rozgrywek – bo krótka seria nie ma prawa decydować sama – i dopiero
-        potem poprawia go o rywala i miejsce gry.
-        {ruszaja.length > 0 && (
-          <>
-            {" "}
-            Tutaj w {wGore ? "górę" : "dół"} ciągnie{" "}
-            {ruszaja.length > 1 ? "je" : "ją"} {listaPoPolsku(ruszaja)}.
-          </>
-        )}
-      </p>
-      {bet.uproszczony && (
-        <p className="mt-1.5 text-xs leading-relaxed text-faint">
-          Przy tej karcie nie pokażemy pełnego rachunku: wróciła z wcześniejszej
-          publikacji, więc mamy zamrożony kurs i szansę z chwili, gdy typ
-          powstał, ale rozpisane czynniki zostały tamtego dnia.
-        </p>
+    <p className="mt-2 max-w-prose text-sm leading-relaxed text-muted">
+      Ta liczba i nasza szansa (
+      <span className="font-data font-semibold text-ink">
+        {fmtProc(bet.p_model)}
+      </span>
+      ) to nie pomyłka – liczą co innego. Licznik wyżej patrzy tylko na {w.n}{" "}
+      ostatnich meczów. Model bierze około dwudziestu, świeższe waży mocniej,
+      ściąga wynik do średniej rozgrywek – bo krótka seria nie ma prawa
+      decydować sama – i dopiero potem poprawia go o rywala i miejsce gry.
+      {ruszaja.length > 0 && (
+        <>
+          {" "}
+          Tutaj w {wGore ? "górę" : "dół"} ciągnie{" "}
+          {ruszaja.length > 1 ? "je" : "ją"} {listaPoPolsku(ruszaja)}.
+        </>
       )}
-    </div>
+    </p>
   );
 }
 
@@ -891,22 +903,20 @@ export function SzczegolyTypu({
     okna == null ? null : okna.l10.n >= 5 ? okna.l10 : okna.all;
   const sygnaly = sygnalyTypu(bet, okna, forma);
 
-  // głębia na żądanie: jedna sekcja naraz zamiast siatki wszystkiego
+  // SZCZEGÓŁY TECHNICZNE ZWINIĘTE (2026-08-01, zasada uzgodniona z userem).
+  // Rozwinięcie karty odpowiadało na pytania, których nikt nie zadał: tabela
+  // mnożników, przedział ufności, rozkład możliwych wyników. To materiał
+  // diagnostyczny – potrzebny, ale dla jednego użytkownika na stu. Na wierzchu
+  // zostaje historia w czterech krokach, która odpowiada na to jedno pytanie,
+  // które zadaje każdy: dlaczego ten typ i czemu mam w to wierzyć.
   const taby: { kod: TabSzczegolow; label: string }[] = [
-    ...(forma ? [{ kod: "forma" as const, label: "Forma" }] : []),
+    ...(forma ? [{ kod: "forma" as const, label: "Historia w liczbach" }] : []),
     ...(bet.uzasadnienie.czynniki.length > 0
       ? [{ kod: "czynniki" as const, label: "Czynniki modelu" }]
       : []),
     ...(bet.rozklad ? [{ kod: "wyniki" as const, label: "Możliwe wyniki" }] : []),
   ];
   const [tab, setTab] = useState<TabSzczegolow>(taby[0]?.kod ?? "czynniki");
-  // SZCZEGÓŁY TECHNICZNE ZWINIĘTE (2026-08-01, zasada uzgodniona z userem).
-  // Rozwinięcie karty odpowiadało na pytania, których nikt nie zadał: tabela
-  // mnożników, przedział ufności, rozkład możliwych wyników. To materiał
-  // diagnostyczny – potrzebny, ale dla jednego użytkownika na stu. Na wierzchu
-  // zostaje proza „skąd ta liczba", która odpowiada na to jedno pytanie, które
-  // zadaje każdy: dlaczego ten typ i czemu mam w to wierzyć.
-  const [szczegoly, setSzczegoly] = useState(false);
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const onTabKeyDown = (
     e: React.KeyboardEvent<HTMLButtonElement>,
@@ -1014,7 +1024,24 @@ export function SzczegolyTypu({
 
   const reduced = useReducedMotion();
 
-  // werdykt z akcją → oś wyceny → sygnały → głębia w zakładkach
+  // JEDNA HISTORIA ZAMIAST CZTERECH SEKCJI (2026-08-01, część 2 przeglądu).
+  //
+  // Rozwinięcie otwierał WERDYKT – czyli wniosek, postawiony przed rachunkiem,
+  // więc do wzięcia wyłącznie na wiarę. Teraz karta prowadzi tak, jak człowiek
+  // tłumaczy typ na głos: skąd bierzemy tę liczbę → co zmienia ten mecz → jak
+  // było ostatnio → i dopiero na końcu, gdzie jest w tym przewaga.
+  //
+  // Proza „skąd ta liczba" wisiała dotąd wyłącznie przy typach o wysokiej
+  // szansie (wewnątrz `OcenaTypu`). Karta drużynowa – jedyny strumień, na
+  // którym zarabiamy – nie tłumaczyła się w ogóle. Teraz jedzie na każdej.
+  const proza = skadTaLiczba(bet);
+  const pokazHistorie = forma != null && (okna?.zagrane ?? 0) > 0;
+  // krok „jak było ostatnio" niesie już tę samą liczbę co sygnały o formie –
+  // bez tego filtra to samo „weszło w 7 z 10" pada dwa razy w jednym akapicie
+  const sygnalyDoPokazania = pokazHistorie
+    ? sygnaly.filter((s) => s.id !== "forma-za" && s.id !== "forma-przeciw")
+    : sygnaly;
+
   return (
     <AnimatePresence initial={false}>
       {open && (
@@ -1026,155 +1053,143 @@ export function SzczegolyTypu({
           transition={{ duration: 0.28, ease: [0.25, 0.9, 0.3, 1] }}
         >
           <div className="border-t border-hairline bg-paper/50 px-4 py-5 sm:px-6">
-            {/* moment 1: werdykt jednym zdaniem, akcja od razu obok */}
             <motion.div
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: 0.04 }}
-              className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-8"
             >
-              <div className="min-w-0 max-w-xl flex-1">
-                <div className="mb-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-faint">
-                    werdykt
-                  </span>
+              <Kroki>
+                {(proza || bet.uproszczony) && (
+                  <Krok kod="skad">
+                    {proza && (
+                      <p className="max-w-prose text-sm leading-relaxed text-ink-soft">
+                        {proza.baza}
+                      </p>
+                    )}
+                    {bet.uproszczony && (
+                      <p className="mt-1.5 max-w-prose text-[13px] leading-relaxed text-faint">
+                        Tej karcie nie rozpiszemy pełnego rachunku: wróciła
+                        z wcześniejszej publikacji, więc kurs i szansa są
+                        zamrożone z chwili, gdy typ powstał, a rozpisane
+                        czynniki zostały tamtego dnia.
+                      </p>
+                    )}
+                  </Krok>
+                )}
+
+                {proza && (
+                  <Krok kod="zmiana">
+                    <p className="max-w-prose text-sm leading-relaxed text-ink-soft">
+                      {proza.zmiana}
+                    </p>
+                  </Krok>
+                )}
+
+                {pokazHistorie && forma && (
+                  <Krok kod="ostatnio">
+                    <HistoriaKrotko bet={bet} forma={forma} />
+                    {/* DLACZEGO NIE TYLE, ILE MÓWI OSTATNIE 10 MECZÓW.
+                        Odpowiedź na najczęstsze „czy to na pewno nie błąd" –
+                        i jedyne miejsce, gdzie ma sens: tuż pod liczbą,
+                        która to pytanie wywołuje. */}
+                    <RozjazdZHistoria bet={bet} okna={okna} />
+                  </Krok>
+                )}
+
+                <Krok kod="przewaga">
                   {/* niskie ryzyko to norma, nie informacja – badge tylko
                       gdy zdarzenie jest realnie kapryśne */}
-                  {bet.ryzyko !== "niskie" && <RiskBadge level={bet.ryzyko} />}
-                </div>
-                <WerdyktZdanie bet={bet} />
-              </div>
-              {bet.sugestia || bet.kurs == null ? (
-                <span className="font-data shrink-0 text-[10px] uppercase tracking-wide text-faint sm:pt-6">
-                  kurs sprawdzasz ręcznie
-                </span>
-              ) : (
-                <div className="w-full shrink-0 sm:w-auto sm:pt-5 sm:text-right">
-                  <button
-                    onClick={() => addZakladFromBet(bet, null)}
-                    disabled={tracked}
-                    className={`w-full rounded-(--radius-control) px-5 py-2.5 text-sm font-semibold transition-colors sm:w-auto ${
-                      tracked
-                        ? "cursor-default bg-brand-wash text-brand"
-                        : "bg-brand text-on-brand shadow-(--shadow-card) hover:bg-brand-strong"
-                    }`}
-                  >
-                    {tracked ? "✓ W moich zakładach" : "Dodaj do moich zakładów"}
-                  </button>
-                  <p className="mt-1.5 text-[10px] text-faint">
-                    rozliczymy go automatycznie po meczu
-                  </p>
-                </div>
-              )}
+                  {bet.ryzyko !== "niskie" && (
+                    <div className="mb-1.5">
+                      <RiskBadge level={bet.ryzyko} />
+                    </div>
+                  )}
+                  <WerdyktZdanie bet={bet} />
+
+                  {/* przy wysokiej szansie oś z wyceną bukmachera nie mówi nic
+                      potrzebnego – zamiast niej nasza skala ocen */}
+                  {bet.pewniak && (
+                    <div className="mt-4">
+                      <OcenaTypu bet={bet} />
+                    </div>
+                  )}
+
+                  {/* jedna oś wyceny (liczby przy znacznikach, bez legendy);
+                      zwężona, żeby znaczniki nie tonęły w torze */}
+                  {!bet.pewniak && (implied != null || hist != null) && (
+                    <div className="mt-4 max-w-xl">
+                      <OsSzans
+                        znaczniki={znaczniki}
+                        przewaga={przewaga}
+                        przewagaWartosc={
+                          przewaga && (wartoscNetto(bet) ?? -99) >= 1
+                            ? fmtEV(wartoscNetto(bet) as number)
+                            : undefined
+                        }
+                        przewagaPodpis="twoja przewaga"
+                        przeplata={przeplata}
+                        przeplataPodpis="marża bukmachera"
+                        przeplataTytul={
+                          przeplata && bet.kurs != null && implied != null
+                            ? `Kurs ${fmtKurs(bet.kurs)} odpowiada szansie ${fmtProc(
+                                implied,
+                              )}, a model daje ${fmtProc(
+                                bet.p_model,
+                              )}. Różnica to w większości marża bukmachera, dlatego kurs płaci mniej, niż typ jest wart`
+                            : undefined
+                        }
+                        ariaLabel={`Oś szans: ${znaczniki
+                          .map((z) => `${z.podpis} ${z.wartosc}`)
+                          .join(", ")}`}
+                      />
+                    </div>
+                  )}
+
+                  {/* sygnały w jednej linii, opis na klik */}
+                  {sygnalyDoPokazania.length > 0 && (
+                    <div className="mt-4">
+                      <Sygnaly
+                        naglowek={
+                          sygnalyDoPokazania.some((s) => s.ton === "czerwony")
+                            ? "Za i przeciw"
+                            : "Za tym typem"
+                        }
+                        sygnaly={sygnalyDoPokazania}
+                      />
+                    </div>
+                  )}
+
+                  {bet.sugestia || bet.kurs == null ? (
+                    <p className="font-data mt-4 text-[10px] uppercase tracking-wide text-faint">
+                      kurs sprawdzasz ręcznie
+                    </p>
+                  ) : (
+                    <div className="mt-4">
+                      <button
+                        onClick={() => addZakladFromBet(bet, null)}
+                        disabled={tracked}
+                        className={`w-full rounded-(--radius-control) px-5 py-2.5 text-sm font-semibold transition-colors sm:w-auto ${
+                          tracked
+                            ? "cursor-default bg-brand-wash text-brand"
+                            : "bg-brand text-on-brand shadow-(--shadow-card) hover:bg-brand-strong"
+                        }`}
+                      >
+                        {tracked
+                          ? "✓ W moich zakładach"
+                          : "Dodaj do moich zakładów"}
+                      </button>
+                      <p className="mt-1.5 text-[10px] text-faint">
+                        rozliczymy go automatycznie po meczu
+                      </p>
+                    </div>
+                  )}
+                </Krok>
+              </Kroki>
             </motion.div>
-
-            {/* DLACZEGO NIE TYLE, ILE MÓWI OSTATNIE 10 MECZÓW – patrz
-                komponent niżej. To jest odpowiedź na najczęstsze „czy to na
-                pewno nie błąd", a do 2026-08-01 nie było jej nigdzie. */}
-            <RozjazdZHistoria bet={bet} okna={okna} />
-
-            {/* moment 2 (pewniak): nasza skala ocen + „skąd ta liczba" –
-                oś z wyceną bukmachera nie mówiła tu nic potrzebnego */}
-            {bet.pewniak && (
-              <motion.div
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: 0.1 }}
-                className="mt-5"
-              >
-                <OcenaTypu bet={bet} />
-              </motion.div>
-            )}
-
-            {/* moment 2 (value): jedna oś wyceny (liczby przy znacznikach,
-                bez legendy); zwężona, żeby znaczniki nie tonęły w torze */}
-            {!bet.pewniak && (implied != null || hist != null) && (
-              <motion.div
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: 0.1 }}
-                className="mt-5 max-w-xl"
-              >
-                <OsSzans
-                  znaczniki={znaczniki}
-                  przewaga={przewaga}
-                  przewagaWartosc={
-                    przewaga && (wartoscNetto(bet) ?? -99) >= 1
-                      ? fmtEV(wartoscNetto(bet) as number)
-                      : undefined
-                  }
-                  przewagaPodpis="twoja przewaga"
-                  przeplata={przeplata}
-                  przeplataPodpis="marża bukmachera"
-                  przeplataTytul={
-                    przeplata && bet.kurs != null && implied != null
-                      ? `Kurs ${fmtKurs(bet.kurs)} odpowiada szansie ${fmtProc(
-                          implied,
-                        )}, a model daje ${fmtProc(
-                          bet.p_model,
-                        )}. Różnica to w większości marża bukmachera, dlatego kurs płaci mniej, niż typ jest wart`
-                      : undefined
-                  }
-                  ariaLabel={`Oś szans: ${znaczniki
-                    .map((z) => `${z.podpis} ${z.wartosc}`)
-                    .join(", ")}`}
-                />
-              </motion.div>
-            )}
-
-            {/* moment 3: sygnały w jednej linii, opis na klik */}
-            {sygnaly.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: 0.16 }}
-                className="mt-5 border-t border-hairline pt-4"
-              >
-                <Sygnaly
-                  naglowek={
-                    sygnaly.some((s) => s.ton === "czerwony")
-                      ? "Za i przeciw"
-                      : "Za tym typem"
-                  }
-                  sygnaly={sygnaly}
-                />
-              </motion.div>
-            )}
 
             {/* głębia na żądaniu: jedna sekcja naraz = jeden wykres naraz */}
             {taby.length > 0 && (
-              <div className="mt-6">
-                <button
-                  type="button"
-                  onClick={() => setSzczegoly((v) => !v)}
-                  aria-expanded={szczegoly}
-                  className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint transition-colors hover:text-ink"
-                >
-                  Szczegóły techniczne
-                  <svg
-                    aria-hidden
-                    width="12"
-                    height="12"
-                    viewBox="0 0 14 14"
-                    className={`transition-transform ${szczegoly ? "rotate-180" : ""}`}
-                  >
-                    <path
-                      d="M3 5.5 L7 9.5 L11 5.5"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.6"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </button>
-                {szczegoly && (
-              <motion.div
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.25 }}
-                className="mt-3"
-              >
+              <SzczegolyTechniczne>
                 <div
                   role="tablist"
                   aria-label="Szczegóły typu"
@@ -1212,7 +1227,7 @@ export function SzczegolyTypu({
                     className="pt-4"
                   >
                     {tab === "forma" && forma && (
-                      <SekcjaFormy bet={bet} forma={forma} />
+                      <HistoriaWLiczbach bet={bet} forma={forma} />
                     )}
 
                     {tab === "czynniki" && (
@@ -1345,9 +1360,7 @@ export function SzczegolyTypu({
                     )}
                   </motion.div>
                 </AnimatePresence>
-              </motion.div>
-                )}
-              </div>
+              </SzczegolyTechniczne>
             )}
           </div>
         </motion.div>
@@ -1358,16 +1371,25 @@ export function SzczegolyTypu({
 
 /** memo: przy zmianie filtrów listy nie przerenderowują się wszystkie karty */
 export const BetCard = memo(function BetCard({
-  bet,
+  bet: glowny,
   rank,
   zawodnik,
+  warianty,
 }: {
   bet: ValueBet;
   rank: number;
   zawodnik?: Zawodnik;
+  /** wszystkie linie tego samego typu (mecz, podmiot, rynek, strona).
+   *  Więcej niż jedna = karta dostaje drabinkę wyboru zamiast dublować się
+   *  w liście – patrz lib/warianty.ts */
+  warianty?: ValueBet[];
 }) {
   const [open, setOpen] = useState(false);
+  const [wybranyId, setWybranyId] = useState(glowny.id);
   const reduced = useReducedMotion();
+
+  // karta tłumaczy JEDEN szczebel naraz – ten, który user kliknął
+  const bet = warianty?.find((b) => b.id === wybranyId) ?? glowny;
 
   const forma = zawodnik?.forma[bet.rynek_kod];
   const swiatlo = swiatloTypu(forma, bet.linia, bet.p_model, bet.strona);
@@ -1520,6 +1542,15 @@ export const BetCard = memo(function BetCard({
         </span>
       </button>
 
+      {/* JEDNA KARTA ZAMIAST TRZECH: gdy ten sam typ ma kilka poprzeczek,
+          wybór szczebla stoi tu, a rozwinięcie tłumaczy wybrany */}
+      {warianty && warianty.length > 1 && (
+        <DrabinkaLinii
+          warianty={warianty}
+          wybrany={bet.id}
+          onWybor={setWybranyId}
+        />
+      )}
 
       <SzczegolyTypu bet={bet} forma={forma} open={open} />
     </motion.article>

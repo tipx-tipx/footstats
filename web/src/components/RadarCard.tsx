@@ -3,8 +3,11 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { memo, useState } from "react";
 
+import { FormBars } from "./FormBars";
+import { Krok, Kroki, SzczegolyTechniczne } from "./KrokiRozwiniecia";
 import { fmtKurs, fmtProc } from "@/lib/format";
 import {
+  charakterSzczebla,
   kierunekMnoznika,
   klasaKierunku,
   miejsceWLidze,
@@ -107,7 +110,9 @@ const SEZON_RYNKI_PL: Record<string, string> = {
   shots_blocked: "zablokowane",
 };
 
-const liczba = (v: number) => String(v).replace(".", ",");
+/** Liczba po polsku, bez ogona z zaokrągleń: 13.02 -> „13,0", 2 -> „2". */
+const liczba = (v: number) =>
+  (Number.isInteger(v) ? String(v) : v.toFixed(1)).replace(".", ",");
 
 /** Plakietka sygnału – tylko dla wpisów Z SYGNAŁEM (zwykła drabinka bez). */
 function sygnalInfo(
@@ -170,26 +175,57 @@ function sygnalInfo(
  * Wybrany szczebel (ten, który zdecydował o karcie) jest podświetlony – reszta
  * jest tłem, żeby dało się porównać cenę, a nie tylko przeczytać jedną liczbę.
  */
-/**
- * CHARAKTER SZCZEBLA, nie reklama (2026-08-01, decyzja usera).
- *
- * Etykieta „nasz typ" nad wybraną kolumną nic nie tłumaczyła, tylko się
- * chwaliła – a user i tak wie, że wszystko na tej stronie jest nasze.
- * Każdy szczebel dostaje więc opis SWOJEGO charakteru, wyliczony z naszej
- * szansy. Dzięki temu widać istotę drabinki: idąc w prawo kupujesz wyższy
- * kurs za niższą pewność. Żaden szczebel nie jest przy tym reklamowany.
- */
-function charakterSzczebla(p: number | null | undefined): string | null {
-  if (p == null) return null;
-  if (p >= 0.8) return "wysoka szansa";
-  if (p >= 0.5) return "realne";
-  return "ryzykowne";
-}
-
 /** Czy karta pokaże pasek drabinki (a więc zajawka byłaby jego powtórzeniem). */
 function maDrabinke(w: RadarWpis): boolean {
   const r = w.rynki?.find((x) => x.rynek_kod === w.hero?.rynek_kod) ?? w.rynki?.[0];
   return Boolean(w.hero) && (r?.drabinka?.length ?? 0) > 0;
+}
+
+/**
+ * HISTORIA JAKO WYKRES, NIE DZIESIĘĆ RÓWNYCH KRESEK (2026-08-01, część 2).
+ *
+ * Zgłoszenie usera: „wykres ten x z 10 weszło jest słaby, nierówny". I był:
+ * dziesięć identycznych kresek 6 × 14 px, pomalowanych na dwa kolory. Taki
+ * pasek mówi wyłącznie „tak / nie", więc mecz z pięcioma strzałami wyglądał
+ * dokładnie tak samo jak mecz z jednym. Do tego przy krótszej historii kresek
+ * bywało siedem zamiast dziesięciu i pasek kończył się w przypadkowym miejscu.
+ *
+ * Teraz to prawdziwy wykres: wysokość słupka niesie LICZBĘ zdarzeń, przerywana
+ * linia pokazuje poprzeczkę zakładu, a słupki dzielą szerokość równo, więc
+ * pasek zawsze dochodzi do prawej krawędzi. Wszystko na `span`-ach, bo ten
+ * blok siedzi w środku przycisku rozwijającego kartę.
+ */
+function HistoriaSparkline({
+  ostatnie,
+  linia,
+}: {
+  ostatnie: number[];
+  linia: number;
+}) {
+  // dane mają najnowszy mecz pierwszy – odwracamy, żeby czas płynął w prawo
+  const wartosci = [...ostatnie].reverse();
+  const max = Math.max(...wartosci, Math.ceil(linia + 0.5), 2);
+  const liniaOdGory = (1 - linia / max) * 100;
+  return (
+    <span aria-hidden className="relative block h-11 w-full">
+      <span
+        className="absolute inset-x-0 border-t border-dashed border-ink/40"
+        style={{ top: `${liniaOdGory}%` }}
+      />
+      <span className="absolute inset-0 flex items-end gap-[3px]">
+        {wartosci.map((v, i) => (
+          <span
+            key={i}
+            className={`min-w-[3px] flex-1 rounded-t-[3px] ${
+              v > linia ? "bg-brand" : "bg-hairline-strong"
+            }`}
+            style={{ height: `${v > 0 ? Math.max((v / max) * 100, 7) : 3}%` }}
+          />
+        ))}
+      </span>
+      <span className="absolute inset-x-0 bottom-0 h-px bg-hairline" />
+    </span>
+  );
 }
 
 function DrabinkaPasek({ w }: { w: RadarWpis }) {
@@ -213,86 +249,114 @@ function DrabinkaPasek({ w }: { w: RadarWpis }) {
 
   return (
     <span className="block px-4 pb-3 sm:px-5">
-      <span className="block rounded-lg border border-hairline bg-card-soft/70 p-2.5">
-        <span className="mb-1.5 flex items-baseline justify-between gap-2">
-          <span className="text-[11px] font-semibold text-ink-soft">
-            {hero.rynek ?? rynek?.rynek ?? rynek?.rynek_kod}
-          </span>
-          <span className="text-[10px] uppercase tracking-wide text-faint">
+      <span className="block rounded-(--radius-control) border border-hairline bg-card-soft/70 p-3">
+        {/* legenda PRZY drabince, nie przy prawej krawędzi karty – opisuje
+            szczeble, a nie zdanie, które od 2026-08-01 stoi po prawej */}
+        <span className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-ink-soft">
+          {hero.rynek ?? rynek?.rynek ?? rynek?.rynek_kod}
+          <span className="ml-2 font-normal text-faint">
             kurs / nasza szansa
           </span>
         </span>
 
-        {/* KOMÓRKI STAŁEJ SZEROKOŚCI, nie rozciągane na całą kartę: przy
-            dwóch szczeblach `1fr` robił dwa ogromne pudła i pół karty pustki.
-            Drabinka ma się czytać jak cennik – wąskie kolumny obok siebie. */}
-        <span className="flex flex-wrap items-start gap-x-6 gap-y-2 sm:flex-nowrap">
-        <span className="flex flex-wrap gap-1">
-          {widoczne.map((s) => {
-            const wybrany = s.linia === hero.linia;
-            const p = s.p_final ?? s.p_model;
-            return (
-              <span
-                key={s.linia}
-                className={[
-                  "flex w-[84px] flex-col items-center rounded-md px-1 py-1.5 text-center",
-                  wybrany
-                    ? "bg-brand-wash ring-1 ring-brand/40"
-                    : "bg-card",
-                ].join(" ")}
-              >
+        {/* TRZY STREFY ZAMIAST DWÓCH I PUSTKI (2026-08-01, zgłoszenie usera).
+            Przy `1fr` na szczeblach dwa poziomy robiły dwa ogromne pudła;
+            przy samej stałej szerokości zostawała martwa pustka po prawej.
+            Rozciąganie wykresu na całą resztę też było złe – dziesięć
+            słupków na 700 px wygląda jak płot, nie jak wykres.
+            Teraz: drabinka (cennik) · wykres (stała, sensowna szerokość) ·
+            TEZA KARTY zdaniem – to ona wypełnia resztę wiersza i mówi
+            wprost, po co ta karta w ogóle jest. */}
+        <span className="flex flex-col gap-3 sm:flex-row sm:items-stretch sm:gap-5">
+          <span className="flex flex-wrap gap-1.5">
+            {widoczne.map((s) => {
+              const wybrany = s.linia === hero.linia;
+              const p = s.p_final ?? s.p_model;
+              return (
                 <span
-                  className={`font-data text-[12px] font-semibold ${
-                    wybrany ? "text-brand" : "text-ink-soft"
-                  }`}
+                  key={s.linia}
+                  className={[
+                    "flex w-[84px] flex-col items-center rounded-md px-1 py-2 text-center transition-colors sm:w-[92px]",
+                    wybrany
+                      ? "bg-card shadow-(--shadow-card) ring-1 ring-brand"
+                      : "bg-card/60",
+                  ].join(" ")}
                 >
-                  {linLabel(s.linia)}
+                  <span
+                    className={`font-data text-[12px] font-semibold ${
+                      wybrany ? "text-brand" : "text-ink-soft"
+                    }`}
+                  >
+                    {linLabel(s.linia)}
+                  </span>
+                  <span
+                    className={`font-data tabular-nums ${
+                      wybrany
+                        ? "text-[17px] font-bold leading-tight text-ink"
+                        : "text-[13px] font-semibold text-ink-soft"
+                    }`}
+                  >
+                    {fmtKurs(s.kurs)}
+                  </span>
+                  <span
+                    className={`font-data text-[11px] tabular-nums ${
+                      wybrany ? "text-brand-deep" : "text-faint"
+                    }`}
+                  >
+                    {p != null ? fmtProc(p) : "–"}
+                  </span>
+                  <span className="mt-0.5 text-[9px] uppercase leading-tight tracking-tight text-faint">
+                    {charakterSzczebla(p) ?? ""}
+                  </span>
                 </span>
-                <span
-                  className={`font-data text-[13px] font-bold tabular-nums ${
-                    wybrany ? "text-ink" : "text-ink-soft"
-                  }`}
-                >
-                  {fmtKurs(s.kurs)}
-                </span>
-                <span className="font-data text-[11px] tabular-nums text-faint">
-                  {p != null ? fmtProc(p) : "–"}
-                </span>
-                <span className="mt-0.5 text-[9px] uppercase leading-tight tracking-tight text-faint">
-                  {charakterSzczebla(p) ?? ""}
-                </span>
-              </span>
-            );
-          })}
-        </span>
+              );
+            })}
+          </span>
 
-        {ostatnie.length > 0 && (
-          <span className="flex min-w-0 flex-col gap-0.5">
-            {/* SKALA CZASU (2026-08-01): dziesięć kresek bez podpisu nie
-                mówiło, czy pierwszy słupek to mecz sprzed tygodnia, czy sprzed
-                trzech miesięcy. Dane mają najnowszy mecz pierwszy, więc
-                odwracamy: czas płynie od lewej do prawej, jak na wykresie. */}
-            <span className="flex gap-[3px]" aria-hidden>
-              {[...ostatnie].reverse().map((x, i) => (
-                <span
-                  key={i}
-                  className={`h-3.5 w-1.5 rounded-[2px] ${
-                    x > hero.linia ? "bg-brand" : "bg-faint/30"
-                  }`}
-                />
-              ))}
-            </span>
-            {/* JEDNA LINIJKA ZAMIAST DWÓCH PODPISÓW: pasek ma ~90 px, więc
-                „10 meczów temu" i „ostatni" na obu końcach sklejały się
-                w jedno słowo. Kierunek czasu mówimy słowem, nie układem. */}
-            <span className="mt-0.5 text-[11px] leading-tight text-faint">
-              {przebite} z {ostatnie.length} przebiło {linLabel(hero.linia)}
-              <span className="block text-[9px] uppercase tracking-wide">
-                najnowszy mecz z prawej
+          {ostatnie.length > 0 && (
+            <span className="flex w-full min-w-0 flex-col justify-end sm:w-[13rem] sm:shrink-0">
+              <HistoriaSparkline ostatnie={ostatnie} linia={hero.linia} />
+              {/* KIERUNEK CZASU SŁOWEM, NIE UKŁADEM: podpisy na obu końcach
+                  paska sklejały się w jedno, bo pasek bywa wąski. */}
+              <span className="mt-1.5 flex items-baseline justify-between gap-2 text-[10px] uppercase tracking-wide text-faint">
+                <span>ostatnie {ostatnie.length} meczów</span>
+                <span className="shrink-0">najnowszy z prawej</span>
               </span>
+            </span>
+          )}
+
+          {/* TEZA KARTY: historia i cena w jednym zdaniu. Wcześniej w tym
+              miejscu była pustka, a karta – mimo drabinki – wyglądała jak
+              każdy inny wiersz typu. */}
+          <span className="flex min-w-0 flex-1 items-center">
+            <span className="text-[13px] leading-relaxed text-muted">
+              {ostatnie.length > 0 && (
+                <>
+                  <span className="font-data font-semibold text-ink">
+                    {przebite}
+                  </span>{" "}
+                  z {ostatnie.length} ostatnich meczów przebiło{" "}
+                  {linLabel(hero.linia)}.{" "}
+                </>
+              )}
+              {hero.p_final != null ? (
+                <>
+                  Kurs {fmtKurs(hero.kurs)} wycenia to na{" "}
+                  <span className="font-data">{fmtProc(1 / hero.kurs)}</span>, my
+                  dajemy{" "}
+                  <span className="font-data font-semibold text-ink">
+                    {fmtProc(hero.p_final)}
+                  </span>
+                  {hero.p_final - 1 / hero.kurs > 0.01 && (
+                    <span className="text-data-green-ink"> – tu jest przewaga</span>
+                  )}
+                  .
+                </>
+              ) : (
+                <>Kurs {fmtKurs(hero.kurs)} u Superbetu.</>
+              )}
             </span>
           </span>
-        )}
         </span>
       </span>
     </span>
@@ -415,12 +479,18 @@ function CzynnikWiersz({
   );
 }
 
-/** Opis rywala per rynek: co dokładnie dopuszcza i jak to wypada w lidze. */
-function opisRywala(r: RadarCzynnik, rynek: string): string | null {
+/**
+ * Opis rywala: co dokładnie dopuszcza i jak to wypada w lidze.
+ *
+ * BEZ POWTÓRZENIA NAZWY (2026-08-01): wiersz ma już etykietę „rywal", a cała
+ * karta jest o jednym rynku – więc „rywal | strzały: rywal dopuszcza 13,5"
+ * mówiło to samo trzy razy w jednej linijce.
+ */
+function opisRywala(r: RadarCzynnik): string | null {
   if (!r || r.zrodlo === "brak") return null;
   const skala =
     r.srednia != null && r.norma != null
-      ? `${liczba(r.srednia)} przy średniej ${liczba(r.norma)}`
+      ? `dopuszcza ${liczba(r.srednia)} przy średniej ${liczba(r.norma)}`
       : "";
   // „#3 z 18 w lidze" było pułapką: miejsce 1 ma drużyna, która pozwala
   // NAJMNIEJ, więc sama liczba porządkowa czytała się odwrotnie, niż znaczy.
@@ -433,57 +503,78 @@ function opisRywala(r: RadarCzynnik, rynek: string): string | null {
       : r.zrodlo === "historia"
         ? ` – z ${r.mecze ?? 0} meczów w naszych danych`
         : "";
-  return `${rynek.toLowerCase()}: rywal dopuszcza ${skala}${miejsce}${zrodlo}`;
+  return `${skala}${miejsce}${zrodlo}`;
 }
 
 /**
- * „Dlaczego" – wodospad od surowego pokrycia do szansy po kontekście.
- * To jest odpowiedź na pytanie „gra z najlepszą obroną, czemu miałby oddać
- * 2 strzały?": widać, czy i o ile ścięliśmy historię tym meczem.
+ * KROK „SKĄD TA LICZBA" – punkt wyjścia, zanim mecz cokolwiek zmieni.
+ *
+ * Do 2026-08-01 była to pierwsza linijka wodospadu („punkt wyjścia: przebił
+ * tę linię w 7 z 10 – od tego zaczynamy"), zgubiona w tabeli sześciu wierszy
+ * z mnożnikami. A to jest fundament całej karty, więc dostaje własny krok
+ * i pełne zdanie – tak samo jak na karcie drużynowej.
  */
-function Wodospad({
-  kontekst,
-  rynek,
-  pBazowe,
-  pFinal,
-  kurs,
+function PunktWyjscia({
   traf,
   z,
+  pBazowe,
+  srednia90,
 }: {
-  kontekst: RadarKontekst;
-  rynek: string;
-  pBazowe?: number | null;
-  pFinal?: number | null;
-  kurs: number;
   traf: number;
   z: number;
+  pBazowe?: number | null;
+  srednia90?: number | null;
 }) {
+  return (
+    <p className="max-w-prose text-sm leading-relaxed text-ink-soft">
+      Liczymy od jego własnej historii:{" "}
+      <span className="text-ink">{trafioneZ(traf, z)}</span>
+      {srednia90 != null && <>, {naMecz(srednia90)}</>}.
+      {pBazowe != null && (
+        <>
+          {" "}
+          Z samej historii wychodzi{" "}
+          <span className="font-data font-semibold text-ink">
+            {fmtProc(pBazowe)}
+          </span>{" "}
+          szans – i to jest liczba, którą dopiero ten mecz koryguje.
+        </>
+      )}
+    </p>
+  );
+}
+
+/**
+ * KROK „CO ZMIENIA TEN MECZ" – wodospad korekt: rywal, sędzia, przebieg,
+ * miejsce gry, dłuższa historia. To odpowiedź na „gra z najlepszą obroną,
+ * czemu miałby oddać 2 strzały?": widać, czy i o ile ścięliśmy historię.
+ *
+ * Zwraca null, gdy ten mecz nie zmienia nic – pusty nagłówek „brak korekt"
+ * byłby gorszy niż brak kroku.
+ */
+function CzynnikiMeczu({ kontekst }: { kontekst: RadarKontekst }) {
   const rywal = kontekst.rywal;
   const sedzia = kontekst.sedzia;
   const scen = kontekst.scenariusz;
   const dom = kontekst.dom;
   const sezony = kontekst.sezony;
-  const opisR = rywal ? opisRywala(rywal, rynek) : null;
-  const cenaRynku = kurs > 0 ? 1 / kurs : null;
-  const przewaga =
-    pFinal != null && cenaRynku != null
-      ? Math.round((pFinal - cenaRynku) * 100)
-      : null;
+  const opisR = rywal ? opisRywala(rywal) : null;
+  const cokolwiek =
+    opisR != null ||
+    sedzia?.sedzia != null ||
+    sedzia?.zrodlo === "brak_obsady" ||
+    scen?.mnoznik != null ||
+    dom?.mnoznik != null ||
+    sezony?.mnoznik != null;
+  if (!cokolwiek) return null;
 
   return (
-    <div className="rounded-(--radius-control) border border-hairline bg-card px-3.5 py-3">
-      <p className="text-[10px] uppercase tracking-wide text-faint">
-        skąd ta liczba
-      </p>
+    <div className="max-w-prose">
       {/* WYJAŚNIENIA NA STRONIE, NIE W DYMKACH (2026-08-01). Sześć wierszy
           niżej miało sześć dymków z pełnymi zdaniami – czyli na telefonie
           była to lista skrótów bez znaczenia. Zdania, które naprawdę coś
           wnosiły, wsiąkły w opis wiersza; reszta zniknęła. */}
-      <div className="mt-1.5 divide-y divide-hairline">
-        <CzynnikWiersz
-          etykieta="punkt wyjścia"
-          opis={`${trafioneZ(traf, z)} – od tego zaczynamy`}
-        />
+      <div className="divide-y divide-hairline">
         {opisR && (
           <CzynnikWiersz
             etykieta="rywal"
@@ -533,43 +624,61 @@ function Wodospad({
           />
         )}
       </div>
-      {/* „+13 pkt proc." zastąpione dwiema liczbami obok siebie i zdaniem,
-          co z nich wynika – punkt procentowy to jednostka, której prawie
-          nikt nie odróżnia od procenta, a tu akurat na niej wszystko stoi. */}
-      {pFinal != null && (
-        <p className="mt-2 border-t border-hairline pt-2 text-[11px] leading-relaxed text-ink-soft">
-          Po tych poprawkach dajemy temu{" "}
+    </div>
+  );
+}
+
+/**
+ * KROK „GDZIE JEST PRZEWAGA" – nasza szansa kontra cena bukmachera.
+ *
+ * „+13 pkt proc." zastąpione dwiema liczbami obok siebie i zdaniem, co z nich
+ * wynika – punkt procentowy to jednostka, której prawie nikt nie odróżnia od
+ * procenta, a tu akurat na niej wszystko stoi.
+ */
+function PrzewagaZdanie({
+  pFinal,
+  kurs,
+  linia,
+}: {
+  pFinal?: number | null;
+  kurs: number;
+  linia: number;
+}) {
+  if (pFinal == null) return null;
+  const cenaRynku = kurs > 0 ? 1 / kurs : null;
+  const przewaga =
+    cenaRynku != null ? Math.round((pFinal - cenaRynku) * 100) : null;
+  return (
+    <p className="max-w-prose text-sm leading-relaxed text-ink-soft">
+      Po tych poprawkach dajemy {linLabel(linia)}{" "}
+      <span className="font-data font-semibold text-ink">
+        {fmtProc(pFinal)}
+      </span>{" "}
+      szans
+      {cenaRynku != null && (
+        <>
+          , a kurs{" "}
           <span className="font-data font-semibold text-ink">
-            {fmtProc(pFinal)}
-          </span>
-          {cenaRynku != null && (
-            <>
-              , a kurs {fmtKurs(kurs)} jest wyceniony jak na{" "}
-              <span className="font-data text-faint">{fmtProc(cenaRynku)}</span>
-              {przewaga != null && przewaga > 0 && (
-                <span className="font-semibold text-data-green-ink">
-                  {" "}
-                  – czyli naszym zdaniem bukmacher płaci tu za dużo
-                </span>
-              )}
-              {przewaga != null && przewaga <= 0 && (
-                <span className="font-semibold text-data-amber-ink">
-                  {" "}
-                  – czyli cena jest uczciwa albo lekko za niska
-                </span>
-              )}
-            </>
-          )}
-          .
-          {pBazowe != null && (
-            <span className="mt-0.5 block text-faint">
-              Z samej historii wychodziło {fmtProc(pBazowe)}. Resztę zmieniło to,
-              co czeka go akurat w tym meczu.
+            {fmtKurs(kurs)}
+          </span>{" "}
+          jest wyceniony jak na{" "}
+          <span className="font-data text-muted">{fmtProc(cenaRynku)}</span>
+          {przewaga != null && przewaga > 0 && (
+            <span className="font-semibold text-data-green-ink">
+              {" "}
+              – czyli naszym zdaniem bukmacher płaci tu za dużo
             </span>
           )}
-        </p>
+          {przewaga != null && przewaga <= 0 && (
+            <span className="font-semibold text-data-amber-ink">
+              {" "}
+              – czyli cena jest uczciwa albo lekko za niska
+            </span>
+          )}
+        </>
       )}
-    </div>
+      .
+    </p>
   );
 }
 
@@ -685,7 +794,7 @@ function RywaleMeczPoMeczu({ r }: { r: RadarRynek }) {
   const n = r.ostatnie?.length ?? 0;
   if (!n || !r.rywale?.length) return null;
   return (
-    <ul className="mt-2 space-y-0.5">
+    <ul className="mt-2 max-w-md space-y-0.5">
       {r.ostatnie!.slice(0, n).map((c, i) => {
         const rywal = r.rywale?.[i];
         const min = r.minuty?.[i];
@@ -724,43 +833,70 @@ function RywaleMeczPoMeczu({ r }: { r: RadarRynek }) {
   );
 }
 
-/** Blok jednego rynku: nagłówek, drabinka-tabela, ostatnie mecze, kontekst. */
-function RynekBlok({ r }: { r: RadarRynek }) {
+/**
+ * KROK „JAK BYŁO OSTATNIO" – ten sam wykres, co na karcie drużynowej, plus
+ * rozpiska mecz po meczu. Wykres niesie liczbę i poprzeczkę zakładu, lista
+ * pod nim – rywala i minuty, czyli to, czego z samego słupka nie widać.
+ */
+function HistoriaRynku({ r, linia }: { r: RadarRynek; linia: number }) {
+  const ostatnie = r.ostatnie ?? [];
+  if (ostatnie.length === 0) return null;
+  const przebite = ostatnie.filter((x) => x > linia).length;
   return (
-    <div className="rounded-(--radius-control) border border-hairline bg-card px-3.5 py-3">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <span className="text-xs font-semibold text-ink">{r.rynek}</span>
-        <span className="flex items-baseline gap-3">
-          {/* „forma ↑ 2,1/90 (baza 1,7)" -> zdanie. Zapis „/90" znaczy
-              „na 90 minut gry", czyli po prostu na mecz – ale tego trzeba
-              było się domyślić albo najechać myszą. */}
-          {r.forma && (
-            <span className="text-[11px]">
-              <span
-                className={
-                  r.forma.okno90 > r.forma.baza90
-                    ? "font-semibold text-data-green-ink"
-                    : r.forma.okno90 < r.forma.baza90
-                      ? "font-semibold text-data-amber-ink"
-                      : "text-muted"
-                }
-              >
-                ostatnio {naMecz(r.forma.okno90, "")}
-              </span>{" "}
-              <span className="text-faint">
-                , wcześniej {naMecz(r.forma.baza90, "")}
-              </span>
+    <div>
+      <FormBars
+        counts={ostatnie}
+        minutes={r.minuty}
+        opponents={r.rywale}
+        line={linia}
+        side="powyzej"
+        height={64}
+        rynek={r.rynek.toLowerCase()}
+      />
+      <p className="mt-2 max-w-prose text-sm leading-relaxed text-ink-soft">
+        W {ostatnie.length} ostatnich meczach przebił {linLabel(linia)}{" "}
+        <span className="font-data font-semibold text-ink">{przebite}</span>{" "}
+        {przebite === 1 ? "raz" : "razy"}
+        {r.srednia90 != null && <>, {naMecz(r.srednia90)}</>}.
+        {/* „forma ↑ 2,1/90 (baza 1,7)" -> zdanie. Zapis „/90" znaczy „na 90
+            minut gry", czyli po prostu na mecz – ale tego trzeba było się
+            domyślić albo najechać myszą. */}
+        {r.forma && (
+          <>
+            {" "}
+            Ostatnio{" "}
+            <span
+              className={
+                r.forma.okno90 > r.forma.baza90
+                  ? "font-semibold text-data-green-ink"
+                  : r.forma.okno90 < r.forma.baza90
+                    ? "font-semibold text-data-amber-ink"
+                    : "text-muted"
+              }
+            >
+              {naMecz(r.forma.okno90, "")}
             </span>
-          )}
-          {r.srednia90 != null && (
-            <span className="text-[11px] text-muted">
-              {naMecz(r.srednia90)} przez całą historię
-            </span>
-          )}
-        </span>
-      </div>
+            , wcześniej {naMecz(r.forma.baza90, "")}.
+          </>
+        )}
+      </p>
+      {/* MECZ PO MECZU, NIE SAM CIĄG LICZB (wzorzec typera, którego user
+          przysłał jako docelowy). Krótkie występy wyróżniamy, bo „0 strzałów"
+          po 20 minutach znaczy co innego niż po pełnym meczu. */}
+      <RywaleMeczPoMeczu r={r} />
+    </div>
+  );
+}
 
-      {/* drabinka: linia · kurs · model · pokrycie ostatnich */}
+/**
+ * SZCZEGÓŁY TECHNICZNE: pełna drabinka wszystkich szczebli z pokryciem.
+ * Do decyzji wystarczą trzy szczeble z paska na zwiniętej karcie – tabela
+ * z ośmioma liniami, drugą ceną i znacznikami ścięcia to materiał dla kogoś,
+ * kto chce sprawdzić nasz rachunek, a nie postawić zakład.
+ */
+function TabelaDrabinki({ r }: { r: RadarRynek }) {
+  return (
+    <div>
       <div className="mt-2">
         <div className="grid grid-cols-[2.4rem_3.2rem_3rem_1fr] gap-x-3 border-b border-hairline pb-1 text-[9px] uppercase tracking-wide text-faint">
           <span>linia</span>
@@ -794,35 +930,6 @@ function RynekBlok({ r }: { r: RadarRynek }) {
           </p>
         )}
       </div>
-
-      {r.ostatnie && r.ostatnie.length > 0 && (
-        <div className="mt-2.5">
-          <div className="flex flex-wrap items-center gap-1">
-            <span className="mr-1 text-[9px] uppercase tracking-wide text-faint">
-              ostatnie
-            </span>
-            {/* bez dymka: rywal i minuty są wypisane niżej, mecz po meczu */}
-            {r.ostatnie.map((c, i) => (
-              <span
-                key={i}
-                className={`font-data inline-flex h-5 min-w-5 items-center justify-center rounded px-1 text-[11px] font-semibold ${
-                  c > 0 ? "bg-brand-wash text-brand-deep" : "bg-paper text-faint"
-                }`}
-              >
-                {c}
-              </span>
-            ))}
-          </div>
-          {/* MECZ PO MECZU, NIE SAM CIĄG LICZB (wzorzec typera, którego user
-              przysłał jako docelowy: „3 strzały vs Radomiak", „1 strzał vs
-              Miedź (40 min gry)"). Kafelki wyżej zostają na szybki rzut oka,
-              ale nazwa rywala i minuty nie mogą siedzieć w dymku – to jest
-              treść, po którą czyta się rozwinięcie. Krótkie występy
-              wyróżniamy, bo „0 strzałów" po 20 minutach znaczy co innego niż
-              po pełnym meczu. */}
-          <RywaleMeczPoMeczu r={r} />
-        </div>
-      )}
 
       {r.rywal?.srednia != null && (
         <p className="mt-2 text-[11px] leading-relaxed text-muted">
@@ -1065,114 +1172,183 @@ export const RadarCard = memo(function RadarCard({
             transition={{ duration: 0.28, ease: [0.25, 0.9, 0.3, 1] }}
           >
             <div className="border-t border-hairline bg-paper/50 px-4 py-4 sm:px-6">
-              {/* CO TA KARTA MA NA SOBIE – zdania, które do 2026-08-01 były
-                  dymkami przy plakietkach. Dymek nie działa na telefonie,
-                  a bez tych zdań etykiety typu „lepsza cena" albo „debiutant"
-                  są dla postronnej osoby zgadywanką. */}
-              {(klasa || kat || sygnal || w.ocena?.powod_wejscia === "seria") && (
-                <ul className="mb-4 max-w-prose space-y-2 text-sm leading-relaxed text-ink-soft">
-                  {klasa && (
-                    <li>
-                      <span className="font-medium text-ink">
-                        {klasa.label}:
-                      </span>{" "}
-                      {klasa.opis}
-                    </li>
-                  )}
-                  {kat && (
-                    <li>
-                      <span className="font-medium text-ink">{kat.label}:</span>{" "}
-                      {kat.opis}
-                    </li>
-                  )}
-                  {w.ocena?.powod_wejscia === "seria" && (
-                    <li>
-                      <span className="font-medium text-ink">mocna seria:</span>{" "}
-                      ta karta stoi na serii, nie na przewadze. Zawodnik
-                      regularnie przebija tę linię, a cena jest grywalna – ale
-                      nasza szansa NIE bije tu kursu bukmachera.
-                    </li>
-                  )}
-                  {sygnal && (
-                    <li>
-                      <span className="font-medium text-ink">
-                        {sygnal.label}:
-                      </span>{" "}
-                      {sygnal.tytul}
-                    </li>
-                  )}
-                  {w.xi === false && (
-                    <li className="text-data-red-ink">
-                      <span className="font-medium">raczej poza składem:</span>{" "}
-                      według składu (ogłoszonego albo przewidywanego) nie
-                      zaczyna meczu. Ta karta powstała wcześniej – lepiej jej
-                      nie grać.
-                    </li>
-                  )}
-                  {w.xi === true && (
-                    <li className="text-faint">
-                      <span className="font-medium">raczej w pierwszym składzie:</span>{" "}
-                      tak wynika ze składu – ale bywa on przewidywany przez
-                      serwis nawet 36 godzin przed meczem, a nie ogłoszony
-                      przez trenera.
-                    </li>
-                  )}
-                </ul>
-              )}
-              {opis && (
-                <p className="mb-4 max-w-prose text-sm leading-relaxed text-ink-soft">
-                  {opis}
+              {/* TEN SAM UKŁAD, CO NA KARCIE DRUŻYNOWEJ (2026-08-01, część 2):
+                  skąd ta liczba → co zmienia ten mecz → jak było ostatnio →
+                  gdzie jest przewaga. Wcześniej drabinka tłumaczyła się
+                  wodospadem i tabelą, drużyna werdyktem i osią – nauka jednej
+                  karty nie pomagała przy drugiej.
+
+                  OSTRZEŻENIE O SKŁADZIE STOI PRZED HISTORIĄ: jeśli zawodnik
+                  raczej nie zagra, reszta rachunku jest bez znaczenia. */}
+              {w.xi === false && (
+                <p className="mb-4 max-w-prose rounded-(--radius-control) bg-data-red-wash px-3.5 py-2.5 text-sm leading-relaxed text-data-red-ink">
+                  <span className="font-medium">Raczej poza pierwszym składem:</span>{" "}
+                  według składu (ogłoszonego albo przewidywanego) nie zaczyna
+                  meczu. Ta karta powstała wcześniej – lepiej jej nie grać.
                 </p>
               )}
 
-              {/* TYLKO wybrany typ – karta argumentuje jedną rekomendację,
-                  nie wysypuje wszystkich 9 rynków (decyzja produktowa) */}
-              <div className="space-y-2.5">
-                {(() => {
-                  const r =
-                    w.rynki.find((x) => x.rynek_kod === w.hero?.rynek_kod) ??
-                    w.rynki[0];
-                  if (!r) return null;
-                  const kontekst = w.ocena?.kontekst ?? r.kontekst;
-                  return (
-                    <>
-                      {kontekst && w.hero && (
-                        <Wodospad
-                          kontekst={kontekst}
-                          rynek={r.rynek}
-                          pBazowe={w.hero.p_bazowe}
-                          pFinal={w.hero.p_final}
-                          kurs={w.hero.kurs}
-                          traf={w.hero.traf}
-                          z={w.hero.z}
+              {(() => {
+                // TYLKO wybrany typ – karta argumentuje jedną rekomendację,
+                // nie wysypuje wszystkich 9 rynków (decyzja produktowa)
+                const r =
+                  w.rynki.find((x) => x.rynek_kod === w.hero?.rynek_kod) ??
+                  w.rynki[0];
+                const kontekst = w.ocena?.kontekst ?? r?.kontekst;
+                const hero = w.hero;
+                return (
+                  <Kroki>
+                    {(hero || opis) && (
+                      <Krok kod="skad">
+                        {hero && (
+                          <PunktWyjscia
+                            traf={hero.traf}
+                            z={hero.z}
+                            pBazowe={hero.p_bazowe}
+                            srednia90={r?.srednia90}
+                          />
+                        )}
+                        {/* skąd BIORĄ SIĘ te dane: transfer z innej ligi,
+                            debiutant bez historii, liga poza feedem */}
+                        {opis && (
+                          <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-muted">
+                            {opis}
+                          </p>
+                        )}
+                        {sygnal && w.rodzaj !== "forma" && (
+                          <p className="mt-1.5 max-w-prose text-[13px] leading-relaxed text-faint">
+                            <span className="font-medium text-ink-soft">
+                              {sygnal.label}:
+                            </span>{" "}
+                            {sygnal.tytul}
+                          </p>
+                        )}
+                        {/* karta wznowiona z rejestru publikacji: hero jest
+                            ZAMROŻONY z chwili, gdy karta powstała – kurs
+                            u bukmachera mógł się od tego czasu skrócić */}
+                        {w.wznowiony && (
+                          <p className="mt-1.5 max-w-prose text-[13px] leading-relaxed text-faint">
+                            Ta karta powstała we wcześniejszym przeliczeniu,
+                            więc kurs i szansa są zamrożone z tamtej chwili.
+                            Cenę sprawdź u bukmachera przed postawieniem.
+                          </p>
+                        )}
+                      </Krok>
+                    )}
+
+                    {kontekst && r && (
+                      <Krok kod="zmiana">
+                        <CzynnikiMeczu kontekst={kontekst} />
+                      </Krok>
+                    )}
+
+                    {r && hero && (r.ostatnie?.length ?? 0) > 0 && (
+                      <Krok kod="ostatnio">
+                        <HistoriaRynku r={r} linia={hero.linia} />
+                        {sygnal && w.rodzaj === "forma" && (
+                          <p className="mt-2 max-w-prose text-[13px] leading-relaxed text-faint">
+                            <span className="font-medium text-ink-soft">
+                              {sygnal.label}:
+                            </span>{" "}
+                            {sygnal.tytul}
+                          </p>
+                        )}
+                      </Krok>
+                    )}
+
+                    <Krok kod="przewaga">
+                      {hero && (
+                        <PrzewagaZdanie
+                          pFinal={hero.p_final}
+                          kurs={hero.kurs}
+                          linia={hero.linia}
                         />
                       )}
-                      <RynekBlok key={r.rynek_kod} r={r} />
-                    </>
-                  );
-                })()}
-              </div>
+                      {/* CO TA KARTA MA NA SOBIE – zdania, które do 2026-08-01
+                          były dymkami przy plakietkach. Dymek nie działa na
+                          telefonie, a bez tych zdań etykiety typu „lepsza
+                          cena" są dla postronnej osoby zgadywanką. */}
+                      {(klasa ||
+                        kat ||
+                        w.ocena?.powod_wejscia === "seria" ||
+                        w.xi === true) && (
+                        <ul className="mt-2.5 max-w-prose space-y-2 text-[13px] leading-relaxed text-muted">
+                          {klasa && (
+                            <li>
+                              <span className="font-medium text-ink-soft">
+                                {klasa.label}:
+                              </span>{" "}
+                              {klasa.opis}
+                            </li>
+                          )}
+                          {kat && (
+                            <li>
+                              <span className="font-medium text-ink-soft">
+                                {kat.label}:
+                              </span>{" "}
+                              {kat.opis}
+                            </li>
+                          )}
+                          {w.ocena?.powod_wejscia === "seria" && (
+                            <li>
+                              <span className="font-medium text-ink-soft">
+                                mocna seria:
+                              </span>{" "}
+                              ta karta stoi na serii, nie na przewadze.
+                              Zawodnik regularnie przebija tę linię, a cena
+                              jest grywalna – ale nasza szansa NIE bije tu
+                              kursu bukmachera.
+                            </li>
+                          )}
+                          {w.xi === true && (
+                            <li className="text-faint">
+                              <span className="font-medium">
+                                raczej w pierwszym składzie:
+                              </span>{" "}
+                              tak wynika ze składu – ale bywa on przewidywany
+                              przez serwis nawet 36 godzin przed meczem, a nie
+                              ogłoszony przez trenera.
+                            </li>
+                          )}
+                        </ul>
+                      )}
+                    </Krok>
+                  </Kroki>
+                );
+              })()}
 
-              {w.sezony && w.sezony.length > 0 && (
-                <div className="mt-4">
-                  <p className="mb-0.5 text-[10px] uppercase tracking-wide text-faint">
-                    średnie sezonowe
-                  </p>
-                  <p className="mb-2 text-[10px] leading-relaxed text-faint">
-                    Średnie z całych sezonów – także z poprzedniego klubu
-                    i ligi, jeśli zmienił barwy.
-                  </p>
-                  <div className="space-y-2">
-                    {w.sezony.map((s, i) => (
-                      <SezonWiersz
-                        key={`${s.turniej}-${s.rok}-${i}`}
-                        s={s}
-                        rynekKod={w.hero?.rynek_kod}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
+              {(() => {
+                const r =
+                  w.rynki.find((x) => x.rynek_kod === w.hero?.rynek_kod) ??
+                  w.rynki[0];
+                const maSezony = (w.sezony?.length ?? 0) > 0;
+                if (!r && !maSezony) return null;
+                return (
+                  <SzczegolyTechniczne>
+                    {r && <TabelaDrabinki r={r} />}
+                    {maSezony && (
+                      <div className="mt-4">
+                        <p className="mb-0.5 text-[10px] uppercase tracking-wide text-faint">
+                          średnie sezonowe
+                        </p>
+                        <p className="mb-2 text-[10px] leading-relaxed text-faint">
+                          Średnie z całych sezonów – także z poprzedniego klubu
+                          i ligi, jeśli zmienił barwy.
+                        </p>
+                        <div className="space-y-2">
+                          {w.sezony!.map((s, i) => (
+                            <SezonWiersz
+                              key={`${s.turniej}-${s.rok}-${i}`}
+                              s={s}
+                              rynekKod={w.hero?.rynek_kod}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </SzczegolyTechniczne>
+                );
+              })()}
             </div>
           </motion.div>
         )}
