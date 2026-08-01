@@ -1524,6 +1524,172 @@ def szansa_pokazywana(
     return out
 
 
+# --- CZY BIJEMY CENĘ BUKMACHERA (2026-08-01) -------------------------------
+#
+# JEDYNE PYTANIE, KTÓRE NAPRAWDĘ DECYDUJE o tym, czy rynek ma dla nas sens:
+# czy nasza liczba jest lepszą prognozą niż liczba wyciągnięta z samego kursu.
+# Zysk bierze się z przewagi informacyjnej, nie z ustawienia progów — pomiar
+# 2026-08-01 na 576 rozliczeniach pokazał, że oba fakty idą w parze:
+#
+#   team_goals/poniżej   nasz Brier 0,2169  vs  z kursu 0,2308   -> ROI  +8,5%
+#   shots/powyżej        nasz Brier 0,2498  vs  z kursu 0,2149   -> ROI −26,3%
+#   ŁĄCZNIE (n=576)      nasz 0,2441        vs  z kursu 0,2237
+#
+# Bijemy cenę w 2 rynkach na 9 — i zarabiamy dokładnie w tym, w którym bijemy
+# ją wyraźnie. Wszystkie inne objawy (odwrócona pewność, anty-predykcyjna
+# przewaga, brama zgody odrzucająca wszystko) to skutki tego jednego faktu.
+#
+# CZEMU BRIER, A NIE ROI: ROI ma ogromną wariancję (jeden kurs 3,5 przewraca
+# bilans dziesiątek zakładów), więc kwarantanna po ROI miota się po dwóch
+# pechowych weekendach. Brier mierzy jakość prognozy, nie szczęście, i
+# rozstrzyga na kilkukrotnie mniejszej próbie.
+#
+# TO NIE JEST BRAMA. Wynik służy do UKŁADANIA KOLEJNOŚCI listy — rynek nie
+# znika, tylko czeka niżej, aż model się go nauczy, i wraca sam.
+PRZEWAGA_MIN_N = 25      # poniżej tego nie orzekamy nic (przewaga = 0)
+
+
+def przewaga_rynkow(log: dict | None = None) -> dict[str, dict]:
+    """Per (rynek, strona): o ile nasza prognoza bije prognozę z kursu.
+
+    Zwraca `{"team_goals|ponizej": {"n":.., "brier_model":.., "brier_kurs":..,
+    "przewaga":..}}`. `przewaga` dodatnia = wiemy więcej niż bukmacher.
+
+    Wynik jest TŁUMIONY wielkością próby (`n/(n+MIN_N)`), żeby rynek z 26
+    rozliczeniami nie przeskakiwał rynku ze 130 na jednym dobrym tygodniu.
+    Rynki poniżej progu nie trafiają do wyniku wcale — czyli w sortowaniu
+    dostają zero i lądują MIĘDZY tymi, które biją cenę, a tymi, które
+    przegrywają. Brak danych nie jest winą.
+    """
+    if log is None:
+        log = _migruj_log(supa.get_key("typy_log") or {})
+    grupy: dict[tuple, list] = {}
+    for r in log.values():
+        if r.get("wynik") not in ("wygrany", "przegrany"):
+            continue
+        if r.get("sugestia") or r.get("odrzucony") or r.get("zrodlo"):
+            continue
+        if not r.get("kurs") or not r.get("p_model"):
+            continue
+        if _z_martwej_epoki(r):
+            continue
+        try:
+            kurs = float(r["kurs"])
+        except (TypeError, ValueError):
+            continue
+        if kurs <= 1.0:
+            continue
+        grupy.setdefault((r.get("rynek_kod"), r.get("strona")), []).append(r)
+
+    out: dict[str, dict] = {}
+    for (rynek, strona), v in grupy.items():
+        if len(v) < PRZEWAGA_MIN_N:
+            continue
+        b_model = b_kurs = 0.0
+        for r in v:
+            trafil = 1.0 if r["wynik"] == "wygrany" else 0.0
+            b_model += (float(r["p_model"]) - trafil) ** 2
+            b_kurs += (
+                betting.implied_prob_one_sided(float(r["kurs"])) - trafil
+            ) ** 2
+        n = len(v)
+        b_model /= n
+        b_kurs /= n
+        out[f"{rynek}|{strona}"] = {
+            "rynek_kod": rynek, "strona": strona, "n": n,
+            "brier_model": round(b_model, 4),
+            "brier_kurs": round(b_kurs, 4),
+            # dodatnia = nasza prognoza lepsza; tłumiona próbą
+            "przewaga": round((b_kurs - b_model) * (n / (n + PRZEWAGA_MIN_N)), 4),
+        }
+    return out
+
+
+# PASMA CENY — drugi wymiar tego samego pytania (2026-08-01, zgłoszenie usera:
+# „model ma znajdować pewne typy przy kursach 1,3 / 1,5 / 1,9 / 2,5 / 3").
+#
+# Zmierzone na 570 rozliczeniach: przewaga NIE rozkłada się równo po cenie.
+#     1,19-1,35   cena mówi 74,1%, wchodzi 73,5%  -> bukmacher trafia CO DO
+#                 PUNKTU; my mówimy 82,4% i tylko dokładamy szum
+#     3,00-6,00   cena mówi 28,7%, wchodzi 44,8%  -> TU bijemy cenę (+25,6% ROI)
+# Na drużynowych w paśmie 3,0+ cena mówi 29%, a wchodzi 52,6%.
+#
+# Stąd zasada: pasmo ceny wchodzi na listę wtedy, gdy UDOWODNI, że jesteśmy
+# w nim lepsi od bukmachera — dokładnie tak samo jak rynek. Dziś to 3,0+;
+# gdy model się poprawi, dojdą niższe. Nic nie jest zamknięte na stałe.
+#
+# CZEMU OSOBNO, A NIE JAKO TRZECI WYMIAR OBOK RYNKU I STRONY: rynek × strona
+# × pasmo to ~54 komórki na 570 rozliczeń, czyli prawie wszystkie poniżej progu
+# istotności. Mierzymy więc dwa sygnały niezależnie i sumujemy je przy
+# układaniu listy.
+PASMA_CENY = ((1.19, 1.35), (1.35, 1.60), (1.60, 1.90),
+              (1.90, 2.30), (2.30, 3.00), (3.00, 6.01))
+
+
+def przewaga_pasm(log: dict | None = None) -> dict[str, dict]:
+    """To samo co `przewaga_rynkow`, ale w przekroju PASM CENY.
+
+    Klucz to `"1.9-2.3"`. Dodatnia `przewaga` = w tym przedziale kursowym
+    nasza liczba jest lepsza od ceny bukmachera.
+    """
+    if log is None:
+        log = _migruj_log(supa.get_key("typy_log") or {})
+    rek = []
+    for r in log.values():
+        if r.get("wynik") not in ("wygrany", "przegrany"):
+            continue
+        if r.get("sugestia") or r.get("odrzucony") or r.get("zrodlo"):
+            continue
+        if not r.get("kurs") or not r.get("p_model") or _z_martwej_epoki(r):
+            continue
+        try:
+            kurs = float(r["kurs"])
+        except (TypeError, ValueError):
+            continue
+        if kurs > 1.0:
+            rek.append((r, kurs))
+
+    out: dict[str, dict] = {}
+    for lo, hi in PASMA_CENY:
+        v = [r for r, k in rek if lo <= k < hi]
+        if len(v) < PRZEWAGA_MIN_N:
+            continue
+        b_model = b_kurs = 0.0
+        trafione = 0
+        for r in v:
+            trafil = 1.0 if r["wynik"] == "wygrany" else 0.0
+            trafione += int(trafil)
+            b_model += (float(r["p_model"]) - trafil) ** 2
+            b_kurs += (
+                betting.implied_prob_one_sided(float(r["kurs"])) - trafil
+            ) ** 2
+        n = len(v)
+        b_model /= n
+        b_kurs /= n
+        out[f"{lo}-{hi}"] = {
+            "od": lo, "do": hi, "n": n,
+            "hit": round(trafione / n, 4),
+            "brier_model": round(b_model, 4),
+            "brier_kurs": round(b_kurs, 4),
+            "przewaga": round((b_kurs - b_model) * (n / (n + PRZEWAGA_MIN_N)), 4),
+        }
+    return out
+
+
+def przewaga_pasma_dla(kurs, pasma: dict[str, dict] | None) -> float:
+    """Przewaga pasma, w którym leży ten kurs (0.0 = nie wiemy)."""
+    if not pasma or not kurs:
+        return 0.0
+    try:
+        k = float(kurs)
+    except (TypeError, ValueError):
+        return 0.0
+    for v in pasma.values():
+        if float(v["od"]) <= k < float(v["do"]):
+            return float(v.get("przewaga") or 0.0)
+    return 0.0
+
+
 def urealnij_p(p: float, delta: float) -> float:
     """Szansa po korekcie pokazywanej (delta w skali logitowej)."""
     if not delta:

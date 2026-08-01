@@ -362,6 +362,101 @@ def test_uczenie_przezywa_stary_stempel_slownikowy():
     assert isinstance(rozliczanie.szansa_pokazywana(log), dict)
 
 
+# --- CZY BIJEMY CENĘ BUKMACHERA (2026-08-01) -------------------------------
+
+def _typ_z_kursem(i, p, kurs, wynik, rynek="team_goals", strona="ponizej"):
+    return {
+        "mecz_id": i, "mecz": "A – B", "kickoff_ts": 1_700_000_000 + i,
+        "podmiot_id": i, "podmiot": f"G{i}", "rynek_kod": rynek, "rynek": "R",
+        "linia": 1.5, "strona": strona, "kurs": kurs, "p_model": p,
+        "wynik": wynik,
+    }
+
+
+def test_przewaga_dodatnia_gdy_model_bije_cene():
+    """Kurs 2,0 mówi ~53%, my mówimy 80% i trafiamy 80% — bijemy cenę."""
+    log = {}
+    for i in range(40):
+        log[str(i)] = _typ_z_kursem(
+            i, 0.80, 2.0, "wygrany" if i % 10 < 8 else "przegrany")
+    w = rozliczanie.przewaga_rynkow(log)["team_goals|ponizej"]
+    assert w["n"] == 40
+    assert w["przewaga"] > 0, "model trafia zgodnie z deklaracją, cena nie"
+    assert w["brier_model"] < w["brier_kurs"]
+
+
+def test_przewaga_ujemna_gdy_model_gada():
+    """Deklarujemy 85%, trafiamy 40%, a kurs 2,0 był bliżej prawdy."""
+    log = {}
+    for i in range(40):
+        log[str(i)] = _typ_z_kursem(
+            i, 0.85, 2.0, "wygrany" if i % 10 < 4 else "przegrany")
+    w = rozliczanie.przewaga_rynkow(log)["team_goals|ponizej"]
+    assert w["przewaga"] < 0
+
+
+def test_przewaga_milczy_na_malej_probie():
+    """Brak danych to nie wina rynku — po prostu go nie oceniamy."""
+    log = {str(i): _typ_z_kursem(i, 0.80, 2.0, "wygrany") for i in range(10)}
+    assert rozliczanie.przewaga_rynkow(log) == {}
+
+
+def test_przewaga_tlumiona_wielkoscia_proby():
+    """Ten sam wynik na większej próbie znaczy więcej — inaczej rynek z 26
+    rozliczeniami przeskakiwałby rynek ze 130 po jednym dobrym tygodniu."""
+    def zbuduj(ile):
+        return {str(i): _typ_z_kursem(
+            i, 0.80, 2.0, "wygrany" if i % 10 < 8 else "przegrany")
+            for i in range(ile)}
+    mala = rozliczanie.przewaga_rynkow(zbuduj(30))["team_goals|ponizej"]
+    duza = rozliczanie.przewaga_rynkow(zbuduj(200))["team_goals|ponizej"]
+    assert duza["przewaga"] > mala["przewaga"]
+
+
+def test_przewaga_rozdziela_strony_tego_samego_rynku():
+    """„Powyżej" i „poniżej" to osobne byty — pomiar 01.08 pokazał, że jeden
+    potrafi bić cenę, gdy drugi ją przegrywa."""
+    log = {}
+    for i in range(30):
+        log[f"p{i}"] = _typ_z_kursem(
+            i, 0.80, 2.0, "wygrany" if i % 10 < 8 else "przegrany")
+        log[f"n{i}"] = _typ_z_kursem(
+            100 + i, 0.85, 2.0, "wygrany" if i % 10 < 4 else "przegrany",
+            strona="powyzej")
+    w = rozliczanie.przewaga_rynkow(log)
+    assert w["team_goals|ponizej"]["przewaga"] > 0
+    assert w["team_goals|powyzej"]["przewaga"] < 0
+
+
+def test_przewaga_pasm_znajduje_przedzial_z_przewaga():
+    """Zgłoszenie usera: „model ma znajdować pewne typy przy różnych kursach".
+
+    Odpowiedź jest pomiarowa: pasmo wchodzi, gdy w NIM bijemy cenę. Tu tanie
+    kursy są wycenione idealnie przez bukmachera, a przy 3,0+ trafiamy dużo
+    częściej, niż cena sugeruje — dokładnie jak na produkcji.
+    """
+    log = {}
+    for i in range(40):          # tanio: cena mowi ~83%, wchodzi ~83%
+        log[f"t{i}"] = _typ_z_kursem(
+            i, 0.95, 1.2, "wygrany" if i % 6 < 5 else "przegrany")
+    for i in range(40):          # drogo: cena mowi ~28%, wchodzi 50%
+        log[f"d{i}"] = _typ_z_kursem(
+            100 + i, 0.50, 3.2, "wygrany" if i % 2 == 0 else "przegrany")
+    p = rozliczanie.przewaga_pasm(log)
+    assert p["3.0-6.01"]["przewaga"] > 0, "przy 3,0+ bijemy cene"
+    assert p["1.19-1.35"]["przewaga"] < p["3.0-6.01"]["przewaga"]
+
+
+def test_przewaga_pasma_dla_wybiera_wlasciwy_przedzial():
+    pasma = {"1.9-2.3": {"od": 1.9, "do": 2.3, "przewaga": 0.05},
+             "3.0-6.01": {"od": 3.0, "do": 6.01, "przewaga": 0.02}}
+    assert rozliczanie.przewaga_pasma_dla(2.0, pasma) == 0.05
+    assert rozliczanie.przewaga_pasma_dla(3.5, pasma) == 0.02
+    assert rozliczanie.przewaga_pasma_dla(1.5, pasma) == 0.0   # brak pomiaru
+    assert rozliczanie.przewaga_pasma_dla(None, pasma) == 0.0
+    assert rozliczanie.przewaga_pasma_dla(2.0, None) == 0.0
+
+
 def test_delta_zapisana_toleruje_smieci():
     assert rozliczanie._delta_zapisana({}) == 0.0
     assert rozliczanie._delta_zapisana({"kal_strumien": -0.4}) == -0.4

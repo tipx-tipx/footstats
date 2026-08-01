@@ -91,6 +91,8 @@ def _rozlicz_i_zapisz(
     legi_pool: list[dict] | None = None,
     drabinki: list[dict] | None = None,
     urealnienie: dict[str, float] | None = None,
+    przewaga: dict[str, dict] | None = None,
+    pasma: dict[str, dict] | None = None,
 ) -> None:
     """Rozliczanie + zapis wyników. Wywoływane w KAŻDYM cyklu — także gdy
     statshub nie ma propsów (rozliczenia nie mogą czekać na nowe typy).
@@ -116,6 +118,14 @@ def _rozlicz_i_zapisz(
     except Exception as ex:
         print(f"Rozliczanie pominięte ({ex}) — poprzednie wyniki bez zmian")
         return
+    # CZY BIJEMY CENĘ — per rynek i strona. To jest odpowiedź na jedyne
+    # pytanie, które decyduje, czy rynek ma dla nas sens (patrz
+    # rozliczanie.przewaga_rynkow). Idzie do widoku diagnostycznego, żeby dało
+    # się śledzić, który rynek zbliża się do wejścia na listę, a który odjeżdża.
+    if przewaga:
+        wyniki["przewaga_rynkow"] = przewaga
+    if pasma:
+        wyniki["przewaga_pasm"] = pasma
     _dump("typy_wyniki.json", wyniki)
 
     # NORMALIZACJA KUPONU DO POKAZANIA MIESZKA W `rozliczanie` (2026-08-01).
@@ -4728,7 +4738,111 @@ def _main_impl(tryb=None):
     if zdjete:
         print(f"Zdjęte po urealnieniu szansy: {zdjete} typów miało ujemną "
               f"wartość przy pokazywanej liczbie (zostaje {len(do_pokazania)})")
-    _dump("value_bets.json", do_pokazania)
+    # --- CO TRAFIA NA LISTĘ I W JAKIEJ KOLEJNOŚCI (decyzja usera 2026-08-01) ---
+    #
+    # Zgłoszenie: „nie może być tak, że będziemy wrzucać milion typów; w
+    # zakładkach mają być najlepsze". Zmierzone tego dnia: 102 typy na 29
+    # meczach, po 3-5 linii z jednego spotkania, kolejność przypadkowa.
+    #
+    # CZYM SORTUJEMY — i czym NIE. Wszystkie sygnały, które model produkuje
+    # sam o sobie, okazały się ODWRÓCONE (pomiar na 114 rozliczeniach profilu
+    # „poniżej, kurs 1,6+", podział na tercyle):
+    #     wg deklarowanej pewności   górna 1/3 −4,2%   dolna 1/3 +26,6%
+    #     wg deklarowanej przewagi   górna 1/3 −41,2%  dolna 1/3 +32,5%
+    #     wg wysokości kursu         górna 1/3 +18,9%  dolna 1/3 −10,2%
+    # Dlatego NIE sortujemy po pewności ani po przewadze — to przepis na
+    # wybranie najgorszych. Zostają sygnały strukturalne: udowodniona przewaga
+    # RYNKU nad ceną (rozliczanie.przewaga_rynkow) i wysokość kursu.
+    #
+    # LIMIT RÓŻNORODNOŚCI JEST KONIECZNY, nie kosmetyczny: bez `PER_RYNEK`
+    # jedyny rynek z dodatnią przewagą zajmował 20 miejsc na 20 (zmierzone),
+    # czyli sortowanie po cichu robiło się amputacją pozostałych rynków —
+    # dokładnie tego, czego user nie chce. Rynek ma czekać niżej, aż model się
+    # go nauczy, a nie znikać.
+    # NIC NIE BLOKUJEMY (zasada stała, user 2026-08-01: „my nie mamy blokować
+    # nic; mamy miesiąc, żeby nauczyć model na wszystkie typy i kursy").
+    # Limity poniżej NIE są bramami — żaden rynek, strona ani pasmo ceny nie
+    # jest wykluczone. To są GWARANCJE RÓŻNORODNOŚCI: pilnują, żeby lista nie
+    # zwyrodniała w 20 pozycji z jednego rynku albo z jednego przedziału
+    # kursowego. Pomiar przewagi układa kolejność, ale nikogo nie usuwa —
+    # wszystko, co się nie zmieści, żyje dalej w puli kuponów.
+    LISTA_CAP = 20
+    LISTA_PER_MECZ = 2
+    LISTA_PER_RYNEK = 6
+    # ...i tyle samo na przedział kursowy, żeby na liście były i tanie, i
+    # drogie typy. Bez tego sortowanie po zmierzonej przewadze wypełniłoby
+    # listę samym pasmem 3,0+ (dziś jedynym, które bije cenę) — czyli tanie
+    # kursy zniknęłyby po cichu, a tego user nie chce.
+    LISTA_PER_PASMO = 6
+    try:
+        _log_przewagi = rozliczanie._migruj_log(
+            supa.get_key("typy_log") or {}
+        )
+        _przewaga = rozliczanie.przewaga_rynkow(_log_przewagi)
+        _pasma = rozliczanie.przewaga_pasm(_log_przewagi)
+    except Exception as e:
+        _przewaga, _pasma = {}, {}
+        print(f"Przewaga rynków pominięta ({e})")
+
+    def _klucz_listy(b: dict):
+        # DWA NIEZALEŻNE SYGNAŁY, oba mierzone tym samym testem „czy bijemy
+        # cenę": jeden dla rynku i strony, drugi dla przedziału kursowego.
+        # Sumujemy, bo typ z dobrego rynku W DOBRYM PAŚMIE ma dwa powody, żeby
+        # być wyżej, a typ z dobrego rynku po cenie, w której nic nie wiemy
+        # (1,19-1,35 — tam bukmacher trafia co do punktu), traci połowę atutu.
+        p_rynek = (_przewaga.get(f'{b.get("rynek_kod")}|{b.get("strona")}')
+                   or {}).get("przewaga", 0.0)
+        p_pasmo = rozliczanie.przewaga_pasma_dla(b.get("kurs"), _pasma)
+        ma_rachunek = bool(b.get("czynniki")) and (b.get("ci") or [None])[0] is not None
+        return (round(float(p_rynek) + float(p_pasmo), 4),
+                float(b.get("kurs") or 0.0), ma_rachunek)
+
+    def _pasmo_kursu(kurs) -> str:
+        try:
+            k = float(kurs or 0)
+        except (TypeError, ValueError):
+            return "?"
+        for lo, hi in rozliczanie.PASMA_CENY:
+            if lo <= k < hi:
+                return f"{lo}-{hi}"
+        return "?"
+
+    _z_meczu: dict = {}
+    _z_rynku: dict = {}
+    _z_pasma: dict = {}
+    lista_pub = []
+    for b in sorted(do_pokazania, key=_klucz_listy, reverse=True):
+        if b.get("sugestia"):
+            lista_pub.append(b)          # sugestie nie są zakładem, nie liczą się do limitu
+            continue
+        mid = b.get("mecz_id")
+        kl = (b.get("rynek_kod"), b.get("strona"))
+        pas = _pasmo_kursu(b.get("kurs"))
+        if _z_meczu.get(mid, 0) >= LISTA_PER_MECZ:
+            continue
+        if _z_rynku.get(kl, 0) >= LISTA_PER_RYNEK:
+            continue
+        if _z_pasma.get(pas, 0) >= LISTA_PER_PASMO:
+            continue
+        _z_meczu[mid] = _z_meczu.get(mid, 0) + 1
+        _z_rynku[kl] = _z_rynku.get(kl, 0) + 1
+        _z_pasma[pas] = _z_pasma.get(pas, 0) + 1
+        lista_pub.append(b)
+        if len(lista_pub) >= LISTA_CAP:
+            break
+    if len(do_pokazania) > len(lista_pub):
+        print(f"Lista publikowana: {len(lista_pub)} z {len(do_pokazania)} "
+              f"kandydatów (max {LISTA_PER_MECZ}/mecz, {LISTA_PER_RYNEK}/rynek); "
+              f"reszta zostaje w puli kuponów")
+    if _przewaga:
+        _bija = [k for k, v in _przewaga.items() if v["przewaga"] > 0]
+        print(f"Przewaga nad ceną: {len(_bija)} z {len(_przewaga)} rynków "
+              f"bije kurs" + (f" ({', '.join(_bija)})" if _bija else ""))
+    if _pasma:
+        print("Przewaga wg pasma ceny: " + ", ".join(
+            f"{k} {v['przewaga']:+.4f} (weszło {100*v['hit']:.0f}%, n={v['n']})"
+            for k, v in _pasma.items()))
+    _dump("value_bets.json", lista_pub)
     _dump("matches.json", list(matches_out.values()))
     _dump("players.json", list(players_out.values()))
     _dump("druzyny_forma.json", list(druzyny_forma.values()))
@@ -4868,7 +4982,10 @@ def _main_impl(tryb=None):
                       conf_mids=conf_mids, odrzucone_pomiar=odrzucone_pomiar,
                       poza_publikacja=typy_poza_publikacja,
                       legi_pool=legi_pool_pub, drabinki=drabinki_typy,
-                      urealnienie=korekta_pokazywana)
+                      urealnienie=korekta_pokazywana,
+                      # policzone wyżej przy układaniu listy — nie liczymy
+                      # drugi raz, bo to kolejny odczyt księgi z Supabase
+                      przewaga=_przewaga, pasma=_pasma)
     _dump("meta.json", {
         "wygenerowano_ts": int(time.time()),
         "tryb": "liga" if tryb else "ms2026",
