@@ -4774,12 +4774,25 @@ def _main_impl(tryb=None):
     # listę samym pasmem 3,0+ (dziś jedynym, które bije cenę) — czyli tanie
     # kursy zniknęłyby po cichu, a tego user nie chce.
     LISTA_PER_PASMO = 6
+    _ukryte: set[str] = set()
     try:
         _log_przewagi = rozliczanie._migruj_log(
             supa.get_key("typy_log") or {}
         )
         _przewaga = rozliczanie.przewaga_rynkow(_log_przewagi)
         _pasma = rozliczanie.przewaga_pasm(_log_przewagi)
+        # RYNEK, KTÓRY „TRAGICZNIE NIE WCHODZI", schodzi ze strony do czasu
+        # dopracowania (decyzja usera 2026-08-01). Kryterium jest statystyczne,
+        # nie uznaniowe — patrz rozliczanie.rynki_do_ukrycia. Zła seria NIE
+        # wystarcza: rynek musi być istotnie gorszy od ceny bukmachera, na
+        # próbie co najmniej 60 rozliczeń, przez trzy dni z rzędu.
+        _hist_przewagi = rozliczanie.get_key_ok_przewagi()[0] or {}
+        _wczoraj = sorted(_hist_przewagi)[-1] if _hist_przewagi else None
+        _ukryte = rozliczanie.rynki_do_ukrycia(
+            _przewaga, _hist_przewagi,
+            set((_hist_przewagi.get(_wczoraj) or {}).get("ukryte") or ())
+            if _wczoraj else set(),
+        )
     except Exception as e:
         _przewaga, _pasma = {}, {}
         print(f"Przewaga rynków pominięta ({e})")
@@ -4817,6 +4830,10 @@ def _main_impl(tryb=None):
             continue
         mid = b.get("mecz_id")
         kl = (b.get("rynek_kod"), b.get("strona"))
+        # rynek ukryty do czasu dopracowania — zostaje w puli kuponów i dalej
+        # rozlicza sie w ksiedze, wiec ma jak udowodnic poprawe
+        if f'{b.get("rynek_kod")}|{b.get("strona")}' in _ukryte:
+            continue
         pas = _pasmo_kursu(b.get("kurs"))
         if _z_meczu.get(mid, 0) >= LISTA_PER_MECZ:
             continue
@@ -4845,9 +4862,12 @@ def _main_impl(tryb=None):
     # DZIENNY STEMPEL POMIARU — bez historii etap 3 jest zgadywanką: po
     # dołożeniu potwierdzonych składów nie dałoby się powiedzieć, czy rynek
     # drgnął, bo nie byłoby z czym porównać (patrz rozliczanie.zapisz_przewage).
+    if _ukryte:
+        print("Ukryte do czasu dopracowania (istotnie gorsze od ceny, "
+              f"{rozliczanie.UKRYCIE_DNI} dni z rzedu): {', '.join(sorted(_ukryte))}")
     if not _dry_run() and (_przewaga or _pasma):
         try:
-            if rozliczanie.zapisz_przewage(_przewaga, _pasma):
+            if rozliczanie.zapisz_przewage(_przewaga, _pasma, ukryte=_ukryte):
                 print("Historia przewagi: stempel dnia zapisany")
         except Exception as e:
             print(f"Historia przewagi pominięta ({e})")

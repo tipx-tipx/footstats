@@ -58,13 +58,33 @@ def main() -> None:
     print("=" * 78)
     if not rynki:
         print(f"  (żaden rynek nie ma jeszcze {rozliczanie.PRZEWAGA_MIN_N} rozliczeń)")
+    hist = rozliczanie.get_key_ok_przewagi()[0] or {}
+    ostatni = sorted(hist)[-1] if hist else None
+    ukryte = rozliczanie.rynki_do_ukrycia(
+        rynki, hist,
+        set((hist.get(ostatni) or {}).get("ukryte") or ()) if ostatni else set(),
+    )
     print(f"  {'rynek':18} {'strona':9} {'n':>5} {'nasz':>8} {'cena':>8} "
-          f"{'przewaga':>10}")
+          f"{'przewaga':>10} {'ile SE':>7}  stan")
     for k, v in sorted(rynki.items(), key=lambda kv: -kv[1]["przewaga"]):
-        kto = "BIJEMY" if v["przewaga"] > 0 else ""
+        se = float(v.get("se") or 0.0)
+        if k in ukryte:
+            stan = "UKRYTY (do dopracowania)"
+        elif v["przewaga"] > 0:
+            stan = ("BIJEMY CENĘ" if se >= 2
+                    else "lepsi, ale jeszcze nie dowód")
+        elif se > rozliczanie.UKRYCIE_SE:
+            stan = "w granicach szumu"
+        elif v["n"] < rozliczanie.UKRYCIE_MIN_N:
+            stan = "istotnie gorsi, za mała próba"
+        else:
+            stan = f"istotnie gorsi — czeka na {rozliczanie.UKRYCIE_DNI} dni"
         print(f"  {str(v['rynek_kod']):18} {str(v['strona']):9} {v['n']:>5} "
               f"{v['brier_model']:>8.4f} {v['brier_kurs']:>8.4f} "
-              f"{v['przewaga']:>+10.4f}  {kto}")
+              f"{v['przewaga']:>+10.4f} {v.get('se', 0):>+7.2f}  {stan}")
+    print(f"\n  Próg ukrycia: {rozliczanie.UKRYCIE_SE} błędu std, min "
+          f"{rozliczanie.UKRYCIE_MIN_N} rozliczeń, {rozliczanie.UKRYCIE_DNI} dni "
+          f"z rzędu. Powrót przy {rozliczanie.POWROT_SE}.")
 
     print()
     print("=" * 78)

@@ -523,6 +523,72 @@ def test_historia_przycinana_do_okna():
     assert "2026-08-01" in zapisane["h"]     # najnowszy zawsze zostaje
 
 
+# --- KIEDY RYNEK ZNIKA ZE STRONY (2026-08-01) ------------------------------
+#
+# User: „jak coś tragicznie nie wchodzi to ma być ukryte do czasu dopracowania,
+# ale jak coś raz na jakiś czas nie wejdzie to ma się pokazywać".
+
+def _dzien(se, n=120, klucz="shots|powyzej"):
+    return {"rynki": {klucz: {"n": n, "se": se, "przewaga": -0.03,
+                              "brier_model": 0.25, "brier_kurs": 0.22}},
+            "pasma": {}, "ukryte": []}
+
+
+def _teraz(se, n=120, klucz="shots|powyzej"):
+    return {klucz: {"rynek_kod": "shots", "strona": "powyzej", "n": n,
+                    "se": se, "przewaga": -0.03,
+                    "brier_model": 0.25, "brier_kurs": 0.22}}
+
+
+HIST_ZLA = {"2026-07-30": _dzien(-3.0), "2026-07-31": _dzien(-2.9),
+            "2026-08-01": _dzien(-3.2)}
+
+
+def test_rynek_tragiczny_znika():
+    assert rozliczanie.rynki_do_ukrycia(_teraz(-3.2), HIST_ZLA) == {"shots|powyzej"}
+
+
+def test_zla_seria_to_za_malo():
+    """„Raz na jakiś czas nie wejdzie" ma zostać na stronie."""
+    assert rozliczanie.rynki_do_ukrycia(_teraz(-2.0), HIST_ZLA) == set()
+
+
+def test_jeden_zly_dzien_nie_wystarcza():
+    hist = {"2026-07-30": _dzien(-0.5), "2026-07-31": _dzien(-0.4),
+            "2026-08-01": _dzien(-3.2)}
+    assert rozliczanie.rynki_do_ukrycia(_teraz(-3.2), hist) == set()
+
+
+def test_mala_proba_nie_moze_ukryc_rynku():
+    """Przy 30 rozliczeniach sam błąd standardowy jest niestabilny."""
+    assert rozliczanie.rynki_do_ukrycia(_teraz(-3.2, n=30), HIST_ZLA) == set()
+
+
+def test_bez_historii_nie_ukrywamy_w_ciemno():
+    assert rozliczanie.rynki_do_ukrycia(_teraz(-3.2), {}) == set()
+
+
+def test_histereza_wyjscie_trudniejsze_niz_powrot():
+    ukryty = {"shots|powyzej"}
+    # lekka poprawa nie wystarcza, zeby wrocic
+    assert rozliczanie.rynki_do_ukrycia(
+        _teraz(-1.5), HIST_ZLA, ukryty) == {"shots|powyzej"}
+    # ...ale realna juz tak, i to BEZ udowadniania przewagi
+    assert rozliczanie.rynki_do_ukrycia(_teraz(-0.5), HIST_ZLA, ukryty) == set()
+
+
+def test_przewaga_rynkow_liczy_istotnosc():
+    """Ta sama różnica na małej i dużej próbie znaczy co innego."""
+    def log(ile):
+        return {str(i): _typ_z_kursem(
+            i, 0.85, 2.0, "wygrany" if i % 10 < 4 else "przegrany")
+            for i in range(ile)}
+    mala = rozliczanie.przewaga_rynkow(log(30))["team_goals|ponizej"]
+    duza = rozliczanie.przewaga_rynkow(log(300))["team_goals|ponizej"]
+    assert duza["blad_std"] < mala["blad_std"]
+    assert duza["se"] < mala["se"]          # bardziej ujemne = pewniejsze
+
+
 def test_delta_zapisana_toleruje_smieci():
     assert rozliczanie._delta_zapisana({}) == 0.0
     assert rozliczanie._delta_zapisana({"kal_strumien": -0.4}) == -0.4

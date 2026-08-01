@@ -1595,13 +1595,95 @@ def przewaga_rynkow(log: dict | None = None) -> dict[str, dict]:
         n = len(v)
         b_model /= n
         b_kurs /= n
+        # RÓŻNICA PER ZAKŁAD I JEJ BŁĄD STANDARDOWY. Bez tego nie da się
+        # odróżnić „rynek jest gorszy" od „mieliśmy pechowy tydzień": ta sama
+        # różnica 0,03 przy 20 rozliczeniach to szum, a przy 150 to wyrok.
+        roznice = []
+        for r in v:
+            trafil = 1.0 if r["wynik"] == "wygrany" else 0.0
+            roznice.append(
+                (betting.implied_prob_one_sided(float(r["kurs"])) - trafil) ** 2
+                - (float(r["p_model"]) - trafil) ** 2
+            )
+        srednia = sum(roznice) / n
+        war = (sum((x - srednia) ** 2 for x in roznice) / (n - 1)) if n > 1 else 0.0
+        se = math.sqrt(war / n) if war > 0 else 0.0
         out[f"{rynek}|{strona}"] = {
             "rynek_kod": rynek, "strona": strona, "n": n,
             "brier_model": round(b_model, 4),
             "brier_kurs": round(b_kurs, 4),
             # dodatnia = nasza prognoza lepsza; tłumiona próbą
             "przewaga": round((b_kurs - b_model) * (n / (n + PRZEWAGA_MIN_N)), 4),
+            "roznica": round(srednia, 4),
+            "blad_std": round(se, 4),
+            # ile błędów standardowych od zera — to jest liczba, na której
+            # opiera się decyzja o ukryciu (patrz `rynki_do_ukrycia`)
+            "se": round(srednia / se, 2) if se else 0.0,
         }
+    return out
+
+
+# --- KIEDY RYNEK ZNIKA ZE STRONY (decyzja usera 2026-08-01) ----------------
+#
+# User: „jak coś tragicznie nie wchodzi to ma być ukryte do czasu dopracowania,
+# ale jak coś raz na jakiś czas nie wejdzie to ma się pokazywać".
+#
+# To są DWA RÓŻNE PYTANIA i do 01.08 mierzyliśmy oba jednym, złym narzędziem —
+# ROI, który skacze po dwóch pechowych weekendach. Tutaj decyduje ISTOTNOŚĆ
+# STATYSTYCZNA różnicy wobec ceny bukmachera, więc próg sam się dostosowuje,
+# gdy próba rośnie: przy 20 rozliczeniach nie ukryje nic, przy 150 wystarczy
+# umiarkowana różnica.
+#
+# CZEMU 2,5 A NIE 2,0 BŁĘDU: testujemy kilkanaście rynków naraz, więc przy
+# progu 2,0 mniej więcej co drugi miesiąc ukrywalibyśmy coś przez przypadek.
+# Ukrycie jest kierunkiem szkodliwym (zabiera produkt), więc kosztuje więcej
+# niż zostawienie słabego rynku na liście.
+#
+# WYJŚCIE TRUDNIEJSZE NIŻ POWRÓT — histereza. Rynek wraca, gdy tylko podniesie
+# się do −1 błędu; nie musi udowadniać przewagi. Dzięki temu nie miota się.
+#
+# UKRYTY RYNEK DALEJ SIĘ UCZY: typy z niego lecą do księgi jako
+# `poza_publikacja`, rozliczają się i zasilają ten sam pomiar — więc ma jak
+# udowodnić poprawę. To była największa wada starej kwarantanny po ROI.
+UKRYCIE_SE = -2.5           # poniżej tylu błędów standardowych -> ukryj
+POWROT_SE = -1.0            # powyżej tylu -> wróć na stronę
+UKRYCIE_MIN_N = 60          # przy mniejszej próbie sam błąd std jest niestabilny
+UKRYCIE_DNI = 3             # tyle dni z rzędu musi się utrzymać
+
+
+def rynki_do_ukrycia(
+    teraz: dict[str, dict] | None = None, hist: dict | None = None,
+    juz_ukryte: set[str] | None = None,
+) -> set[str]:
+    """Klucze `rynek|strona`, które schodzą ze strony. Patrz komentarz wyżej.
+
+    `juz_ukryte` włącza histerezę: rynek raz ukryty zostaje, dopóki nie
+    poprawi się do `POWROT_SE`.
+    """
+    if teraz is None:
+        teraz = przewaga_rynkow()
+    juz_ukryte = set(juz_ukryte or ())
+    out: set[str] = set()
+    for klucz, v in (teraz or {}).items():
+        se = float(v.get("se") or 0.0)
+        if klucz in juz_ukryte:
+            # histereza: wychodzi dopiero po realnej poprawie
+            if se < POWROT_SE:
+                out.add(klucz)
+            continue
+        if v.get("n", 0) < UKRYCIE_MIN_N or se > UKRYCIE_SE:
+            continue
+        # ...i musi się utrzymać: jeden dzień to za mało na wyrok
+        dni_zle = 1
+        for dzien in sorted(hist or {}, reverse=True)[1:UKRYCIE_DNI]:
+            wpis = ((hist[dzien] or {}).get("rynki") or {}).get(klucz)
+            if wpis and float(wpis.get("se") or 0.0) <= UKRYCIE_SE:
+                dni_zle += 1
+        if hist and dni_zle >= UKRYCIE_DNI:
+            out.add(klucz)
+        elif not hist:
+            # brak historii (pierwsze dni po wdrożeniu) — nie ukrywamy w ciemno
+            continue
     return out
 
 
@@ -1693,6 +1775,7 @@ PRZEWAGA_HISTORIA_DNI = 180
 
 def zapisz_przewage(
     rynki: dict[str, dict], pasma: dict[str, dict], dzien: str | None = None,
+    ukryte: set[str] | None = None,
 ) -> bool:
     """Dopisz dzienny stempel pomiaru przewagi. True = zapisano.
 
@@ -1711,12 +1794,18 @@ def zapisz_przewage(
         "ts": int(time.time()),
         "rynki": {k: {"n": v["n"], "przewaga": v["przewaga"],
                       "brier_model": v["brier_model"],
-                      "brier_kurs": v["brier_kurs"]}
+                      "brier_kurs": v["brier_kurs"],
+                      # `se` jest tu OBOWIAZKOWE: na nim opiera sie warunek
+                      # „utrzymuje sie od 3 dni" w `rynki_do_ukrycia`
+                      "se": v.get("se", 0.0)}
                   for k, v in (rynki or {}).items()},
         "pasma": {k: {"n": v["n"], "hit": v["hit"], "przewaga": v["przewaga"],
                       "brier_model": v["brier_model"],
                       "brier_kurs": v["brier_kurs"]}
                   for k, v in (pasma or {}).items()},
+        # ktore rynki byly ukryte tego dnia — stad histereza bierze stan
+        # poprzedni, zeby rynek nie wracal i nie znikal co cykl
+        "ukryte": sorted(ukryte or ()),
     }
     # przytnij do ostatnich N dni — klucz ma rosnąć liniowo i wolno
     for stary_dzien in sorted(hist)[:-PRZEWAGA_HISTORIA_DNI]:
