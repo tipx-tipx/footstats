@@ -51,6 +51,9 @@ type SortKey = "ranking" | "ev" | "pewnosc" | "kickoff" | "kurs";
  */
 type SortDrabinki = "najlepsze" | "szansa" | "kurs" | "kickoff";
 
+/** Ile kart drabinek pokazujemy dziennie (decyzja usera 2026-08-01). */
+const DRABINKI_MAX = 10;
+
 const SORTOWANIA_DRABINKI: { kod: SortDrabinki; label: string }[] = [
   { kod: "najlepsze", label: "Najlepsze typy" },
   { kod: "szansa", label: "Największa szansa" },
@@ -134,8 +137,22 @@ export function ValueBoard({
   // jakości lista jest PŁASKA: grupowanie po meczach chowałoby ranking,
   // bo najlepsza karta dnia lądowałaby w środku listy pod nazwą meczu.
   const [sortDrabinki, setSortDrabinki] = useState<SortDrabinki>("najlepsze");
+  // MAX 10 KART DZIENNIE (decyzja usera 2026-08-01). Wybieramy je ZAWSZE po
+  // `ocena.miejsce` — to backendowy ranking przewagi nad kursem po korekcie na
+  // rywala, sędziego i scenariusz meczu, czyli jedyna definicja „najbardziej
+  // value" w systemie. Sortowanie z rozwijanej listy działa DOPIERO na tej
+  // dziesiątce: user zmienia kolejność patrzenia, a nie to, które karty
+  // w ogóle wchodzą. Inaczej „najwyższy kurs" wciągałby karty z gorszą
+  // analizą tylko dlatego, że mają grubszą cenę.
+  const radarNajlepsze = useMemo(
+    () =>
+      [...radarWpisy]
+        .sort((a, b) => (a.ocena?.miejsce ?? 9999) - (b.ocena?.miejsce ?? 9999))
+        .slice(0, DRABINKI_MAX),
+    [radarWpisy],
+  );
   const radarPosortowane = useMemo(() => {
-    const w = [...radarWpisy];
+    const w = [...radarNajlepsze];
     switch (sortDrabinki) {
       case "najlepsze":
         w.sort(
@@ -157,7 +174,7 @@ export function ValueBoard({
         break;
     }
     return w;
-  }, [radarWpisy, sortDrabinki]);
+  }, [radarNajlepsze, sortDrabinki]);
   // Grupowanie po meczach ma sens WYŁĄCZNIE przy sortowaniu chronologicznym
   // (backend sortuje wtedy chronologicznie, w meczu po jakości). Filtr „tylko
   // sygnały" USUNIĘTY 2026-07-25: odkąd każda karta musi przejść te same
@@ -302,12 +319,20 @@ export function ValueBoard({
       // („pewniaki" jedzie w adresie i w backendzie), zmienia się etykieta.
       ["pewniaki", "Wysokie szanse", liczbaPewniakow],
       ["value", "Lepszy kurs w STS", liczbaValueSts],
-      ["radar", "Drabinki", radarWpisy.length],
+      ["radar", "Drabinki", radarNajlepsze.length],
       ["wszystko", "Wszystko", null],
     ] as const
   ).filter(
+    // Pusta zakładka tylko myli — chowamy ją, dopóki nie ma czego pokazać.
+    // Dotyczy „Lepszy kurs w STS" (skan odpalany ręcznie, bywa pusty
+    // tygodniami) ORAZ „Wysokie szanse" (decyzja usera 2026-08-01: rynki
+    // zawodnicze potrafią stać puste, a pusta zakładka wygląda jak awaria).
+    // Wyjątek: gdy user właśnie na niej stoi — inaczej zniknęłaby mu spod
+    // palców przy odświeżeniu danych.
     ([kod, , liczba]) =>
-      kod !== "value" || (liczba ?? 0) > 0 || rodzaj === "value",
+      (kod !== "value" && kod !== "pewniaki") ||
+      (liczba ?? 0) > 0 ||
+      rodzaj === kod,
   );
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const wybierzRodzaj = (kod: (typeof TABY_RODZAJ)[number][0]) => {
@@ -333,7 +358,7 @@ export function ValueBoard({
     <section aria-label="Lista okazji">
       {/* przełącznik rodzaju — tablica wyników: czysty tekst, aktywna
           zakładka z podkreśleniem marki (żadnych kolejnych "przycisków") */}
-      {(liczbaValueSts > 0 || liczbaPewniakow > 0 || radarWpisy.length > 0) && (
+      {(liczbaValueSts > 0 || liczbaPewniakow > 0 || radarNajlepsze.length > 0) && (
         <div
           className="flex flex-wrap items-end gap-x-6 gap-y-1 border-b border-hairline"
           role="tablist"
@@ -640,7 +665,7 @@ export function ValueBoard({
                     onClick={() => wybierzRodzaj("radar")}
                     className="rounded-(--radius-control) bg-brand px-4 py-2 text-sm font-semibold text-on-brand shadow-(--shadow-card) transition-colors hover:bg-brand-strong"
                   >
-                    Zobacz drabinki ({radarWpisy.length})
+                    Zobacz drabinki ({radarNajlepsze.length})
                   </button>
                 )}
                 <a
