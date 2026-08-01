@@ -3770,11 +3770,16 @@ def _main_impl(tryb=None):
             # Remisu nie publikujemy (decyzja usera), ale jest policzony i
             # odjęty — bez tego szansa drużyny wyszłaby zawyżona nawet o 19 pp
             # (kartki). Patrz rozliczanie.STRONY_WIECEJ.
+            # ZMIERZONA KORELACJA MIĘDZY DRUŻYNAMI (2026-08-01) — jedna liczba
+            # na rynek, ta sama dla porównania i dla sumy, bo to ta sama para
+            # liczb w tym samym meczu. Rynek bez pomiaru dostaje 0, czyli
+            # liczy się dokładnie jak dotąd. Patrz counts.KORELACJA_DRUZYN.
+            rho_n = counts.korelacja_rynku(mk_n)
             kursy_w = (oferta_n.get("porownania") or {}).get(mk_n) or {}
             kod_w = "wiecej_" + baza_n
             if kursy_w and kod_w in rozliczanie.MARKETY_WIECEJ:
                 p_h, p_remis, p_a = counts.porownanie_druzyn(
-                    h_n["pred"], a_n["pred"]
+                    h_n["pred"], a_n["pred"], rho=rho_n
                 )
                 # PRZEDZIAŁ na P(kto więcej) — liczony RAZ na mecz+rynek,
                 # osobno dla każdej strony (remis zjada masę po obu stronach,
@@ -3784,10 +3789,12 @@ def _main_impl(tryb=None):
                     ci_w["gospodarz"] = counts.przedzial_porownania(
                         h_n["posterior"], h_n["pred"].exposure,
                         a_n["posterior"], a_n["pred"].exposure,
+                        rho=rho_n,
                     )
                     ci_w["gosc"] = counts.przedzial_porownania(
                         a_n["posterior"], a_n["pred"].exposure,
                         h_n["posterior"], h_n["pred"].exposure,
+                        rho=rho_n,
                     )
                 except Exception:
                     ci_w = {}
@@ -3883,7 +3890,7 @@ def _main_impl(tryb=None):
             if linie_s and kod_s in rozliczanie.MARKETY_SUMY:
                 for linia_s, slot_s in sorted(linie_s.items()):
                     p_over_s = counts.p_over_sumy(
-                        h_n["pred"], a_n["pred"], float(linia_s)
+                        h_n["pred"], a_n["pred"], float(linia_s), rho=rho_n
                     )
                     # PRZEDZIAŁ liczony RAZ na linię, dla strony „powyżej";
                     # „poniżej" jest jego lustrem — tak samo jak w rynkach
@@ -3893,7 +3900,7 @@ def _main_impl(tryb=None):
                         lo_o_s, hi_o_s = counts.przedzial_sumy(
                             h_n["posterior"], h_n["pred"].exposure,
                             a_n["posterior"], a_n["pred"].exposure,
-                            float(linia_s),
+                            float(linia_s), rho=rho_n,
                         )
                     except Exception:
                         lo_o_s = hi_o_s = None

@@ -236,3 +236,76 @@ def test_przedzial_porownania_obejmuje_wlasne_p_obu_stron():
     # gdyby ktoś liczył stronę gościa jako 1 − przedział gospodarza,
     # dostałby widełki przesunięte dokładnie o masę remisu
     assert lo_b < 1.0 - hi_a
+
+
+# --- KORELACJA MIĘDZY DRUŻYNAMI (2026-08-01) ---------------------------------
+
+
+def _pred(lam, r=10.0):
+    """Predykcja o zadanej średniej i naddyspersji NB (r = alpha posteriora)."""
+    p = r / (r + lam)
+    return counts.MatchPrediction(lam=lam, nb_r=r, nb_p=p, exposure=1.0)
+
+
+def test_wariancja_predykcji_zgadza_sie_z_nb():
+    pred = _pred(4.34, r=10.0)
+    # NB o średniej lam i parametrze r: Var = lam + lam^2/r
+    assert abs(pred.wariancja - (4.34 + 4.34 ** 2 / 10.0)) < 1e-6
+
+
+def test_korelacja_rynku_czyta_wszystkie_konwencje_kodu():
+    for kod in ("corners", "team_corners", "match_corners", "wiecej_corners"):
+        assert counts.korelacja_rynku(kod) == counts.KORELACJA_DRUZYN["corners"]
+    # rynek bez pomiaru = zero, czyli zachowanie sprzed zmiany
+    assert counts.korelacja_rynku("match_fouls") == 0.0
+    assert counts.korelacja_rynku(None) == 0.0
+
+
+def test_pmf_z_momentow_odtwarza_srednia_i_wariancje():
+    for mu, war in ((8.68, 11.0), (8.68, 7.0), (8.68, 8.68), (2.0, 5.0)):
+        pmf = counts._pmf_z_momentow(mu, war, 80)
+        ks = list(range(len(pmf)))
+        m = sum(k * p for k, p in zip(ks, pmf))
+        v = sum((k - m) ** 2 * p for k, p in zip(ks, pmf))
+        assert abs(m - mu) < 0.25, (mu, war, m)
+        assert abs(v - war) < 0.6, (mu, war, v)
+
+
+def test_ujemna_korelacja_zwEza_sume_i_poszerza_roznice():
+    """Zmierzony kierunek: suma robi się węższa, porównanie mniej zdecydowane."""
+    a, b = _pred(4.5), _pred(4.2)
+    rho = counts.KORELACJA_DRUZYN["corners"]      # −0,127
+
+    # SUMA: cieńsze ogony, więc P(dużo rożnych) spada...
+    p_hi_bez = counts.p_over_sumy(a, b, 12.5)
+    p_hi_z = counts.p_over_sumy(a, b, 12.5, rho=rho)
+    assert p_hi_z < p_hi_bez
+    # ...a P(mało rożnych) też, bo to drugi ogon tego samego rozkładu
+    p_lo_bez = 1.0 - counts.p_over_sumy(a, b, 4.5)
+    p_lo_z = 1.0 - counts.p_over_sumy(a, b, 4.5, rho=rho)
+    assert p_lo_z < p_lo_bez
+    # średnia zostaje nietknięta — zmienia się grubość ogonów, nie środek
+    r_bez = counts.rozklad_sumy(a, b)
+    r_z = counts.rozklad_sumy(a, b, rho=rho)
+    sr = lambda d: sum(k * p for k, p in enumerate(d))
+    assert abs(sr(r_bez) - sr(r_z)) < 0.35
+
+    # PORÓWNANIE: szersza różnica = mniej masy dokładnie na zerze, czyli
+    # REMIS RZADSZY — a skoro remis zjadał masę obu stronom, obie rosną.
+    # (Pierwsza wersja tego testu zakładała odwrotnie i dlatego padła.)
+    ph_bez, prem_bez, pa_bez = counts.porownanie_druzyn(a, b)
+    ph_z, prem_z, pa_z = counts.porownanie_druzyn(a, b, rho=rho)
+    assert prem_z < prem_bez
+    assert ph_z > ph_bez and pa_z > pa_bez
+    assert abs(ph_z + prem_z + pa_z - 1.0) < 1e-9
+    # faworyt zostaje faworytem — korekta rusza rozrzutem, nie kolejnością
+    assert ph_z > pa_z and ph_bez > pa_bez
+
+
+def test_zerowa_korelacja_nie_rusza_niczego():
+    """Rynek bez pomiaru ma liczyć się DOKŁADNIE jak przed zmianą."""
+    a, b = _pred(4.5), _pred(4.2)
+    assert counts.p_over_sumy(a, b, 9.5, rho=0.0) == counts.p_over_sumy(a, b, 9.5)
+    assert counts.porownanie_druzyn(a, b, rho=0.0) == counts.porownanie_druzyn(a, b)
+    # próg szumu: 0,01 to jeszcze nie jest pomiar
+    assert counts.p_over_sumy(a, b, 9.5, rho=0.01) == counts.p_over_sumy(a, b, 9.5)
