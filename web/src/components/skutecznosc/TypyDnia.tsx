@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 
 import { TabelaTypow } from "./WierszTypu";
 import { useBilans } from "../useBilans";
-import { fmtDzien } from "@/lib/format";
+import { fmtDzien, odmien } from "@/lib/format";
 import type { SkutecznoscDnia } from "@/lib/types";
 
 /**
@@ -31,6 +31,26 @@ const FILTRY: { kod: Filtr; label: string }[] = [
 
 /** Od tylu typów w dniu filtr zaczyna się opłacać. */
 const PROG_FILTRA = 8;
+
+/**
+ * ZAKŁAD, a nie wiersz. Ten sam mecz + rynek + drużyna + strona to jedna
+ * rzecz, choćby stała w kilku liniach:
+ *
+ *   Wisła Płock  rożne w meczu poniżej  6,5 / 7,5 / 13,5 / 14,5 / 15,5
+ *
+ * Padło 11 rożnych — trzy ostatnie wchodzą RAZEM. Zgłoszenie usera
+ * 2026-08-01 („czemu tu jest miliard typów?") dotyczyło dokładnie tego.
+ * Publikacja wystawia od tej pory jedną linię na stronę, ale w księdze
+ * zostają dni sprzed zmiany — i one nadal mają się czytać uczciwie.
+ */
+function kluczZakladu(t: {
+  mecz: string;
+  rynek_kod: string;
+  podmiot: string;
+  strona: string;
+}) {
+  return `${t.mecz}|${t.rynek_kod}|${t.podmiot}|${t.strona}`;
+}
 
 function Strzalka({
   kierunek,
@@ -88,11 +108,18 @@ export function TypyDnia({
 }) {
   const { bilans } = useBilans(pelnyWglad);
   const [filtr, setFiltr] = useState<Filtr>("wszystko");
+  // Typy „na próbę" nie były na stronie i mają własne podsumowanie zdaniem
+  // niżej — ZWINIĘTE domyślnie, bo potrafią zająć połowę listy (zmierzone
+  // 2026-08-01: 27 z 60 ostatnich rozliczeń).
+  const [pokazNaProbe, setPokazNaProbe] = useState(false);
   // `?? []` w ciele komponentu tworzyłoby nową tablicę co render i unieważniało
   // useMemo niżej przy każdym przerysowaniu
   const typy = useMemo(
-    () => (dzien.typy ?? []).filter((t) => pelnyWglad || !t.poza_publikacja),
-    [dzien.typy, pelnyWglad],
+    () =>
+      (dzien.typy ?? []).filter(
+        (t) => !t.poza_publikacja || (pelnyWglad && pokazNaProbe),
+      ),
+    [dzien.typy, pelnyWglad, pokazNaProbe],
   );
 
   const widoczne = useMemo(
@@ -105,6 +132,12 @@ export function TypyDnia({
             : true,
       ),
     [typy, filtr],
+  );
+
+  // ile z tych wierszy to naprawdę osobne zakłady (patrz `kluczZakladu`)
+  const zakladow = useMemo(
+    () => new Set(widoczne.map(kluczZakladu)).size,
+    [widoczne],
   );
 
   const proc = dzien.rozliczone
@@ -161,8 +194,29 @@ export function TypyDnia({
           Poza tym {dzien.poza_n}{" "}
           {dzien.poza_n === 1 ? "typ policzył się" : "typów policzyło się"}{" "}
           tylko na próbę (weszło {dzien.poza_trafione ?? 0}). Nie było ich na
-          stronie, więc nie liczymy ich do bilansu wyżej — na liście mają
-          oznaczenie „na próbę”.
+          stronie, więc nie liczymy ich do bilansu wyżej.{" "}
+          <button
+            onClick={() => setPokazNaProbe((v) => !v)}
+            aria-expanded={pokazNaProbe}
+            className="font-semibold text-brand underline underline-offset-2 hover:text-brand-deep"
+          >
+            {pokazNaProbe ? "Ukryj je" : "Pokaż je na liście"}
+          </button>
+        </p>
+      )}
+
+      {widoczne.length > zakladow && (
+        <p className="mt-3 rounded-(--radius-control) border border-hairline bg-card-soft px-3.5 py-2.5 text-xs leading-relaxed text-muted">
+          <span className="font-data font-semibold text-ink">
+            {widoczne.length}{" "}
+            {odmien(widoczne.length, "wiersz", "wiersze", "wierszy")} ={" "}
+            {zakladow} {odmien(zakladow, "zakład", "zakłady", "zakładów")}
+          </span>{" "}
+          — ta sama drużyna i ten sam rynek stoją tu w kilku liniach naraz
+          (np. „poniżej 13,5", „poniżej 14,5", „poniżej 15,5”). Takie linie
+          wchodzą albo przepadają <strong>razem</strong>, więc to jeden wynik
+          meczu, nie kilka trafień. Od 1 sierpnia wystawiamy już tylko jedną
+          linię na stronę.
         </p>
       )}
 

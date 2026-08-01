@@ -1306,6 +1306,60 @@ def forward_test(log: dict | None = None) -> dict:
     }
 
 
+# --- SKUTECZNOŚĆ PER ZDARZENIE, NIE PER WIERSZ (2026-08-01) ---
+#
+# Zgłoszenie usera: „czemu tu jest miliard typów?". Odpowiedź: bo ta sama
+# rzecz siedziała w kilku liniach naraz.
+#
+#   Wisła Płock  rożne w meczu poniżej   6,5 / 7,5 / 13,5 / 14,5 / 15,5
+#
+# Padło 11 rożnych — „poniżej 13,5", „poniżej 14,5" i „poniżej 15,5" wchodzą
+# RAZEM. To jeden wynik meczu, nie trzy zakłady. Publikacja została naprawiona
+# (build_wc_fast: jedna linia na stronę), ale KSIĘGA ma już takie skupiska
+# i będzie je miała zawsze — więc statystyka musi umieć je policzyć uczciwie.
+#
+# Zmierzone na 471 opublikowanych rozliczeniach:
+#   per wiersz     n=471   trafia 57,1%   bilans −106,79u
+#   per zdarzenie  n=349   trafia 53,0%   bilans  −86,07u
+# Czyli zakładka pokazywała skuteczność ZAWYŻONĄ o 4 pp (zagnieżdżone
+# „poniżej" dokładają tanie pewniaki) i jednocześnie bilans zaniżony, bo
+# liczyła stawkę kilka razy tam, gdzie ryzyko było jedno.
+#
+# METODA: nie wybieramy „reprezentanta" (każdy wybór byłby arbitralny), tylko
+# dzielimy JEDNĄ STAWKĘ na wszystkie linie zdarzenia — rekord ze skupiska
+# o k liniach waży 1/k. Zdarzenie zawsze waży dokładnie jedną jednostkę,
+# a informacja ze wszystkich linii zostaje wykorzystana.
+def _zdarzenie(r: dict) -> tuple:
+    """Ta sama rzecz: mecz + rynek + podmiot + strona. Różne tylko linie."""
+    return (r.get("mecz_id"), r.get("rynek_kod"),
+            rotowire._norm(str(r.get("podmiot") or "")), r.get("strona"))
+
+
+def skutecznosc_zdarzen(recs: list[dict]) -> dict:
+    """Trafienia i bilans liczone RAZ NA ZDARZENIE (patrz komentarz wyżej)."""
+    grupy: dict[tuple, list[dict]] = {}
+    for r in recs:
+        grupy.setdefault(_zdarzenie(r), []).append(r)
+    if not grupy:
+        return {"n": 0, "wierszy": len(recs), "trafione": 0.0, "hit": None,
+                "bilans_j": 0.0, "roi": None, "skupisk": 0}
+    trafione = zwrot = 0.0
+    for czlony in grupy.values():
+        w = 1.0 / len(czlony)
+        trafione += w * sum(1 for r in czlony if r.get("wynik") == "wygrany")
+        zwrot += w * sum(_zwrot_typu(r) for r in czlony)
+    n = len(grupy)
+    return {
+        "n": n,
+        "wierszy": len(recs),
+        "trafione": round(trafione, 2),
+        "hit": round(trafione / n, 4),
+        "bilans_j": round(zwrot - n, 2),
+        "roi": round(zwrot / n - 1.0, 4),
+        "skupisk": sum(1 for v in grupy.values() if len(v) > 1),
+    }
+
+
 def _biny_korekty(grp: list[dict], globalna: float, cap: tuple) -> list:
     """Delty per przedział szansy, ściągane do globalnej przy małej próbie.
 
@@ -3078,6 +3132,10 @@ def rozlicz(
                 if z_clv else None
             ),
             "clv_n": len(z_clv),
+            # TO SAMO POLICZONE RAZ NA ZDARZENIE — bo zagnieżdżone linie tego
+            # samego zakładu („poniżej 13,5 / 14,5 / 15,5") wchodzą razem
+            # i liczone osobno zawyżają trafienia. Patrz `skutecznosc_zdarzen`.
+            "zdarzenia": skutecznosc_zdarzen(settled),
         },
         "po_rynku": po_rynku,
         "ostatnie": ostatnie,

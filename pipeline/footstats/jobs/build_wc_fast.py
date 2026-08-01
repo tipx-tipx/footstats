@@ -3888,6 +3888,13 @@ def _main_impl(tryb=None):
             kod_s = "match_" + baza_n
             linie_s = (oferta_n.get("sumy") or {}).get(kod_s) or {}
             if linie_s and kod_s in rozliczanie.MARKETY_SUMY:
+                # JEDNA LINIA NA STRONĘ (2026-08-01). Ten rynek wystawiał
+                # KAŻDĄ kwotowaną linię, więc jeden mecz potrafił dać pięć
+                # wierszy „rożne w meczu poniżej" (6,5 / 7,5 / 13,5 / 14,5 /
+                # 15,5) — a to jeden wynik meczu w pięciu przebraniach.
+                # Zbieramy kandydatów i wystawiamy najlepszego po wartości;
+                # patrz bliźniacza brama przy pewniakach niżej.
+                kandydaci_s: dict[str, dict] = {}
                 for linia_s, slot_s in sorted(linie_s.items()):
                     p_over_s = counts.p_over_sumy(
                         h_n["pred"], a_n["pred"], float(linia_s), rho=rho_n
@@ -3945,10 +3952,11 @@ def _main_impl(tryb=None):
                         if not betting.w_oknie_zgody(p_s, kurs_s):
                             odpadki_nowe["suma: rozjazd z rynkiem"] += 1
                             continue
-                        vb_id += 1
-                        n_sumy += 1
-                        value_bets.append({
-                            "id": vb_id, "mecz_id": mid_n, "mecz": h_n["mecz"],
+                        poprzedni = kandydaci_s.get(strona_s)
+                        if poprzedni is not None and poprzedni["ev_pct"] >= ev_s:
+                            continue
+                        kandydaci_s[strona_s] = ({
+                            "id": 0, "mecz_id": mid_n, "mecz": h_n["mecz"],
                             "kickoff_ts": ts_n,
                             "podmiot_id": h_n["team_id"],
                             "podmiot": h_n["home_name"],
@@ -3988,6 +3996,12 @@ def _main_impl(tryb=None):
                                     h_n["pred"].lam + a_n["pred"].lam, 2),
                             },
                         })
+                # …i dopiero teraz wystawiamy po jednym na stronę
+                for rec_s in kandydaci_s.values():
+                    vb_id += 1
+                    n_sumy += 1
+                    rec_s["id"] = vb_id
+                    value_bets.append(rec_s)
         if n_wiecej or n_sumy or odpadki_nowe:
             szczegoly = ", ".join(
                 str(k) + "=" + str(v) for k, v in odpadki_nowe.most_common()
@@ -4111,6 +4125,35 @@ def _main_impl(tryb=None):
             continue
         perelki_per_mecz[b["mecz_id"]] = perelki_per_mecz.get(b["mecz_id"], 0) + 1
         do_emisji.append(b)
+    # === JEDNA LINIA NA (mecz, rynek, podmiot, stronę) — 2026-08-01 ===
+    #
+    # Zgłoszenie usera: „czemu tu jest miliard typów?". Trzy kanały wyżej
+    # (najlepszy per rynek, „wyższa linia", perełki) potrafiły wystawić tę samą
+    # drużynę na tym samym rynku i tej samej stronie w kilku liniach naraz:
+    #
+    #   Motor Lublin  rożne drużyny poniżej  3,5 / 4,5 / 6,5
+    #   Wisła Płock   rożne w meczu poniżej  6,5 / 7,5 / 13,5 / 14,5 / 15,5
+    #
+    # To NIE są osobne zakłady. Padło 6 rożnych — „poniżej 14,5", „poniżej 15,5"
+    # i „poniżej 16,5" wchodzą razem, zawsze. Zmierzone na całej księdze:
+    # 65% takich skupisk kończy się jednolitym wynikiem, a Skuteczność liczona
+    # per wiersz pokazuje 57,1% trafień tam, gdzie per zdarzenie jest 53,0%
+    # (zagnieżdżone „poniżej" dokładają tanie pewniaki).
+    #
+    # Rynki zawodnicze mają tę bramę od zawsze (`best_by_side`). Tu jej nie było.
+    # Zostaje NAJATRAKCYJNIEJSZA linia — czyli „wyższa linia" i perełka nadal
+    # wygrywają, gdy naprawdę są lepsze, ale nie DOKŁADAJĄ się do bazowej.
+    najlepsza_na_strone: dict[tuple, dict] = {}
+    for b in do_emisji:
+        k_str = (b["mecz_id"], b["rynek_kod"], b.get("podmiot_id"), b["strona"])
+        w = najlepsza_na_strone.get(k_str)
+        if w is None or _atrakcyjnosc(b) > _atrakcyjnosc(w):
+            najlepsza_na_strone[k_str] = b
+    if len(najlepsza_na_strone) < len(do_emisji):
+        print(f"Jedna linia na stronę: {len(do_emisji)} kandydatów -> "
+              f"{len(najlepsza_na_strone)} (zdjęte zagnieżdżone linie tego "
+              f"samego zakładu)")
+    do_emisji = list(najlepsza_na_strone.values())
     # LIMIT EKSPOZYCJI DZIENNEJ: do publikacji wchodzi maks. MAX_PEWNIAKOW_MECZ
     # pewniaków z jednego meczu (w kolejności atrakcyjności) — czerwone dni
     # kalendarza brały się z 5+ skorelowanych typów z jednego zamulonego
@@ -4681,13 +4724,21 @@ def _main_impl(tryb=None):
     do_pokazania = []
     zdjete = 0
     poza_kursem = 0
+    # POWÓD ZDJĘCIA PER TYP — księga musi wiedzieć, że tego typu user NIE
+    # widział (2026-08-01). Do dziś `_rozlicz_i_zapisz` dostawał surowe
+    # `value_bets`, czyli listę SPRZED bram wyświetlania, więc typ zdjęty tutaj
+    # liczył się w Skuteczności jako opublikowany. Przy podłodze kursu ta luka
+    # od razu urosła: typ po 1,05 nie trafia na stronę, a wpadał do statystyki.
+    zdjete_klucze: dict[str, str] = {}
     for b in value_bets_pub:
         if not b.get("sugestia") and not betting.kurs_w_widelkach(b.get("kurs")):
             poza_kursem += 1
+            zdjete_klucze[_klucz_publikacji(b)] = "kurs_poza_widelkami"
             continue
         u = _urealnij_do_pokazania(b)
         if not u.get("sugestia") and u.get("kurs") and (u.get("ev_pct") or 0.0) < 0.0:
             zdjete += 1
+            zdjete_klucze[_klucz_publikacji(b)] = "ujemna_po_korekcie"
             continue
         do_pokazania.append({k: v for k, v in u.items() if k != "kal_tau"})
     if poza_kursem:
@@ -4812,6 +4863,25 @@ def _main_impl(tryb=None):
             f"(kurs {k['kurs_laczny']}, szansa {k['p_model']*100:.0f}%)"
             for k in kupony_list
         ))
+    # KSIĘGA DOSTAJE TO, CO NAPRAWDĘ POSZŁO NA STRONĘ (2026-08-01).
+    # Typ ŚWIEŻY, zdjęty przez bramę wyświetlania (podłoga kursu albo ujemna
+    # wartość po korekcie), idzie do logu z `poza_publikacja` — rozlicza się
+    # i uczy kalibrację, ale nie liczy się do Skuteczności. Typów WZNOWIONYCH
+    # to nie dotyczy: one były pokazane wcześniej i ich rekord w księdze jest
+    # uczciwy taki, jaki jest — historii nie przepisujemy.
+    if zdjete_klucze:
+        _zostaja, _zdjete_swieze = [], []
+        for b in value_bets:
+            powod_zdjecia = zdjete_klucze.get(_klucz_publikacji(b))
+            if powod_zdjecia and not b.get("wznowiony"):
+                _zdjete_swieze.append({**b, "poza_publikacja": powod_zdjecia})
+            else:
+                _zostaja.append(b)
+        if _zdjete_swieze:
+            value_bets = _zostaja
+            typy_poza_publikacja.extend(_zdjete_swieze)
+            print(f"Do księgi jako 'poza publikacją': {len(_zdjete_swieze)} "
+                  f"świeżych typów zdjętych bramą wyświetlania")
     # publikacja kuponów idzie przez log (zamrożenie/anulowanie/rozliczenie)
     # wewnątrz _rozlicz_i_zapisz — kupony.json to aktywne kupony z logu
     _rozlicz_i_zapisz(value_bets, kupony_list, niedostepni,

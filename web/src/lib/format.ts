@@ -28,6 +28,27 @@ export function fmtU(v: number): string {
 }
 
 /**
+ * Odmiana rzeczownika przez liczbę — po polsku formy są TRZY, nie dwie:
+ * 1 zakład, 2–4 zakłady, 5+ zakładów. Warunek „nie 12–14" jest konieczny,
+ * bo 22 idzie jak 2, ale 12 jak 5.
+ *
+ *     odmien(26, "zakład", "zakłady", "zakładów")  ->  "zakładów"
+ */
+export function odmien(
+  n: number,
+  jeden: string,
+  dwaCztery: string,
+  wiele: string,
+): string {
+  const a = Math.abs(Math.round(n));
+  if (a === 1) return jeden;
+  const r10 = a % 10;
+  const r100 = a % 100;
+  if (r10 >= 2 && r10 <= 4 && !(r100 >= 12 && r100 <= 14)) return dwaCztery;
+  return wiele;
+}
+
+/**
  * Teksty z pipeline miewają kropkę dziesiętną ("Średnio 2.80") — na widoku
  * zamieniamy ją na przecinek. Tylko między cyframi, reszta tekstu nietknięta.
  */

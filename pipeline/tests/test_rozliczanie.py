@@ -669,3 +669,46 @@ def test_forward_test_milczy_gdy_pusto():
     out = rozliczanie.forward_test({})
     assert out["n"] == 0 and out["gotowy"] is False
     assert out["dokument"].startswith("docs/")
+
+
+def test_skutecznosc_per_zdarzenie_nie_liczy_tej_samej_rzeczy_kilka_razy():
+    """Zagnieżdżone linie tego samego zakładu to JEDNO zdarzenie.
+
+    Wisła Płock, rożne w meczu: padło 11, więc „poniżej 13,5", „poniżej 14,5"
+    i „poniżej 15,5" wchodzą razem. Liczone osobno zawyżają trafienia.
+    """
+    def _l(linia, wynik, kurs=1.10):
+        return {"mecz_id": 7, "rynek_kod": "match_corners", "podmiot": "Wisła",
+                "strona": "ponizej", "linia": linia, "kurs": kurs,
+                "wynik": wynik, "tryb_podatku": "standard"}
+
+    recs = [
+        _l(13.5, "wygrany"), _l(14.5, "wygrany"), _l(15.5, "wygrany"),
+        # osobne zdarzenie: inna drużyna, ten sam mecz
+        {"mecz_id": 7, "rynek_kod": "team_goals", "podmiot": "Widzew",
+         "strona": "ponizej", "linia": 1.5, "kurs": 2.0,
+         "wynik": "przegrany", "tryb_podatku": "standard"},
+    ]
+    out = rozliczanie.skutecznosc_zdarzen(recs)
+    assert out["wierszy"] == 4 and out["n"] == 2
+    assert out["skupisk"] == 1
+    # per wiersz byłoby 75% trafień; per zdarzenie jest 50%
+    assert out["hit"] == 0.5
+    assert out["trafione"] == 1.0
+    # bilans: zdarzenie wygrane po 1,10 x 0,88 = 0,968 z jednej jednostki,
+    # drugie przegrane -> 0,968 - 2 = -1,032
+    assert abs(out["bilans_j"] - (0.968 - 2)) < 0.01
+
+
+def test_skutecznosc_per_zdarzenie_bez_skupisk_zgadza_sie_z_wierszami():
+    recs = [
+        {"mecz_id": i, "rynek_kod": "shots", "podmiot": f"P{i}",
+         "strona": "powyzej", "linia": 1.5, "kurs": 2.0,
+         "wynik": "wygrany" if i < 3 else "przegrany",
+         "tryb_podatku": "standard"}
+        for i in range(5)
+    ]
+    out = rozliczanie.skutecznosc_zdarzen(recs)
+    assert out["n"] == out["wierszy"] == 5
+    assert out["skupisk"] == 0
+    assert out["hit"] == 0.6
