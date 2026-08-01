@@ -170,6 +170,22 @@ function sygnalInfo(
  * Wybrany szczebel (ten, który zdecydował o karcie) jest podświetlony – reszta
  * jest tłem, żeby dało się porównać cenę, a nie tylko przeczytać jedną liczbę.
  */
+/**
+ * CHARAKTER SZCZEBLA, nie reklama (2026-08-01, decyzja usera).
+ *
+ * Etykieta „nasz typ" nad wybraną kolumną nic nie tłumaczyła, tylko się
+ * chwaliła – a user i tak wie, że wszystko na tej stronie jest nasze.
+ * Każdy szczebel dostaje więc opis SWOJEGO charakteru, wyliczony z naszej
+ * szansy. Dzięki temu widać istotę drabinki: idąc w prawo kupujesz wyższy
+ * kurs za niższą pewność. Żaden szczebel nie jest przy tym reklamowany.
+ */
+function charakterSzczebla(p: number | null | undefined): string | null {
+  if (p == null) return null;
+  if (p >= 0.8) return "wysoka szansa";
+  if (p >= 0.5) return "realne";
+  return "ryzykowne";
+}
+
 /** Czy karta pokaże pasek drabinki (a więc zajawka byłaby jego powtórzeniem). */
 function maDrabinke(w: RadarWpis): boolean {
   const r = w.rynki?.find((x) => x.rynek_kod === w.hero?.rynek_kod) ?? w.rynki?.[0];
@@ -219,7 +235,7 @@ function DrabinkaPasek({ w }: { w: RadarWpis }) {
               <span
                 key={s.linia}
                 className={[
-                  "flex w-[72px] flex-col items-center rounded-md px-1 py-1.5 text-center",
+                  "flex w-[84px] flex-col items-center rounded-md px-1 py-1.5 text-center",
                   wybrany
                     ? "bg-brand-wash ring-1 ring-brand/40"
                     : "bg-card",
@@ -241,6 +257,9 @@ function DrabinkaPasek({ w }: { w: RadarWpis }) {
                 </span>
                 <span className="font-data text-[11px] tabular-nums text-faint">
                   {p != null ? fmtProc(p) : "–"}
+                </span>
+                <span className="mt-0.5 text-[9px] uppercase leading-tight tracking-tight text-faint">
+                  {charakterSzczebla(p) ?? ""}
                 </span>
               </span>
             );
