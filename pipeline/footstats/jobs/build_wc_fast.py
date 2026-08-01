@@ -4922,6 +4922,11 @@ def _main_impl(tryb=None):
         # zmierzone urealnienie szansy kuponu per horyzont — generator na
         # żądanie pokazuje te same liczby co kupony automatyczne
         "kalibracja_kuponow": kal_kuponow or {},
+        # PRZEDZIAŁY KURSOWE KUPONÓW — jedno źródło prawdy (kupony.py).
+        # Strona miała je wpisane na sztywno i po przebudowie z 30.07 nie
+        # zgadzała się ani jedna etykieta: zakładka Kupony pokazywała pustkę
+        # przez dwa dni, choć kupony istniały. Patrz kupony.przedzialy_publiczne.
+        "przedzialy_kuponow": kupony.przedzialy_publiczne(),
     })
     print(f"OK: {len(matches_out)} meczów, {len(value_bets)} okazji, "
           f"{len(players_out)} zawodników.")

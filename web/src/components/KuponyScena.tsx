@@ -42,11 +42,35 @@ const ZAKRESY: { kod: Zakres; label: string; opis: string }[] = [
   },
 ];
 
-const PRZEDZIALY: Record<Zakres, string[]> = {
-  dzienny: ["5–10", "10–15", "15–20", "20–25"],
-  dlugoterminowy: ["10–15", "15–20", "20–25", "25–35"],
-  value: ["4–8", "8–16"],
-};
+/**
+ * PRZEDZIAŁY KURSOWE NIE MOGĄ BYĆ WPISANE TUTAJ (awaria z 2026-08-01).
+ *
+ * Do dziś stała tu lista „5–10, 10–15, 15–20, 20–25". Przebudowa kuponów
+ * z 30.07 zmieniła przedziały w `kupony.py` na „2–3 / 4,5–5,5" i „9–11 /
+ * 18–25" — i od tamtej chwili NIE ZGADZAŁA SIĘ ANI JEDNA etykieta. Skutek:
+ * licznik przy zakładce liczył kupony poprawnie („2"), ale pozycje rysowały
+ * się z martwej listy, więc żaden kupon nie pasował do żadnej pozycji i pod
+ * spodem stało „Ten przedział czeka na kupon". Zakładka Kupony nie pokazała
+ * ani jednego kuponu przez dwa dni.
+ *
+ * Teraz lista przychodzi z backendu (`meta.przedzialy_kuponow`), a gdyby
+ * meta była starsza niż kupony — schodzimy na etykiety WYCIĄGNIĘTE Z SAMYCH
+ * KUPONÓW. Dzięki temu ten widok nie ma już fizycznej możliwości pokazać
+ * pustki, mając kupony w ręku.
+ */
+function przedzialyZakresu(
+  zakres: Zakres,
+  grupa: Kupon[],
+  zMeta?: Record<string, string[]>,
+): string[] {
+  const zBackendu = zMeta?.[zakres];
+  const zKuponow = Array.from(new Set(grupa.map(celKuponu)));
+  if (!zBackendu || zBackendu.length === 0) return zKuponow;
+  // etykiety, które przyszły z kuponami, a których meta nie zna (meta bywa
+  // z innego cyklu niż zamrożony kupon) — dokładamy, zamiast je gubić
+  const brakujace = zKuponow.filter((c) => !zBackendu.includes(c));
+  return [...zBackendu, ...brakujace];
+}
 
 const POWODY = ["nie zagrałem", "słaby zestaw", "za niski kurs"] as const;
 
@@ -284,10 +308,13 @@ function Dopracuj({ kupon: k }: { kupon: Kupon }) {
 export function KuponyScena({
   kupony,
   jestGenerator = false,
+  przedzialyMeta,
 }: {
   kupony: Kupon[];
   /** czy na stronie jest sekcja generatora (#generator) — cel mostu „zmień" */
   jestGenerator?: boolean;
+  /** etykiety przedziałów z backendu (meta.przedzialy_kuponow) */
+  przedzialyMeta?: Record<string, string[]>;
 }) {
   const reduced = useReducedMotion();
   const [stawka, setStawka] = useStawka();
@@ -300,7 +327,10 @@ export function KuponyScena({
     () => kupony.filter((k) => (k.horyzont ?? "value") === zakres),
     [kupony, zakres],
   );
-  const przedzialy = PRZEDZIALY[zakres];
+  const przedzialy = useMemo(
+    () => przedzialyZakresu(zakres, grupa, przedzialyMeta),
+    [zakres, grupa, przedzialyMeta],
+  );
   const pierwszyZajety = przedzialy.find((p) =>
     grupa.some((k) => celKuponu(k) === p),
   );

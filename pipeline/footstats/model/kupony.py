@@ -173,6 +173,30 @@ BONUS_SWIEZE = {"bezpieczny": 1.0, "zbalansowany": 0.96, "agresywny": 0.93}
 WAGA_VALUE_SELEKCJA = {"bezpieczny": 0.0, "zbalansowany": 0.15, "agresywny": 0.30}
 
 
+def przedzialy_publiczne() -> dict[str, list[str]]:
+    """Etykiety przedziałów kursowych per horyzont — DLA STRONY.
+
+    PO CO TO ISTNIEJE (awaria zgłoszona 2026-08-01). `KuponyScena.tsx` miała
+    własną, wpisaną na sztywno listę przedziałów: „5–10, 10–15, 15–20, 20–25".
+    Przebudowa kuponów z 30.07 zmieniła je tutaj na „2–3, 4,5–5,5" i „9–11,
+    18–25" — i od tej chwili NIE ZGADZAŁA SIĘ ANI JEDNA etykieta. Strona
+    liczyła kupony poprawnie (zakładka pokazywała „2"), ale rysowała pozycje
+    z martwej listy, więc pod spodem stało „Ten przedział czeka na kupon".
+    Zakładka Kupony nie pokazała ani jednego kuponu przez dwa dni, a wyglądało
+    to jak zwykły dzień bez okazji.
+
+    Dlatego lista jedzie teraz w `meta` i strona nie ma prawa jej znać. Zmiana
+    progów wyżej wystarczy — front dostosuje się sam.
+    """
+    return {
+        "dzienny": [etykieta_celu(a, b) for a, b in PRZEDZIALY_DZIENNE],
+        "dlugoterminowy": [
+            etykieta_celu(a, b) for a, b in PRZEDZIALY_DLUGOTERMINOWE
+        ],
+        "value": [etykieta_celu(a, b) for a, b in PRZEDZIALY_VALUE],
+    }
+
+
 def etykieta_celu(cmin: float, cmax: float) -> str:
     """Etykieta przedziału kursowego („2–3", „4,5–5,5").
 

@@ -788,6 +788,80 @@ function OcenaTypu({ bet }: { bet: ValueBet }) {
   );
 }
 
+/**
+ * „W ostatnich 10 meczach weszłoby 2 razy, a wy dajecie 48%" — zgłoszenie
+ * usera 2026-08-01 (Viking FK, rożne poniżej 5,5).
+ *
+ * OBIE LICZBY BYŁY POPRAWNE, tylko liczyły co innego, a karta nigdzie tego
+ * nie mówiła. Licznik trafień patrzy na 10 ostatnich meczów i nic poza tym.
+ * Model bierze ~20 meczów, waży świeższe mocniej, ściąga wynik do średniej
+ * rozgrywek (krótka próba nie ma prawa decydować sama) i dopiero potem
+ * poprawia go o rywala i miejsce gry. Przy Vikingu ostatnie 10 dawało 20%,
+ * pełne 20 meczów 45%, a po korekcie na wyjazd wyszło 48%.
+ *
+ * Zestawione bez słowa komentarza wyglądało to jak pomyłka — i to jest
+ * najgorszy możliwy efekt, bo akurat TU liczby były w porządku.
+ *
+ * Blok pokazuje się tylko przy realnym rozjeździe (12 pp), żeby nie tłumaczyć
+ * rzeczy, które same się zgadzają.
+ */
+const PROG_ROZJAZDU = 0.12;
+
+function RozjazdZHistoria({
+  bet,
+  okna,
+}: {
+  bet: ValueBet;
+  okna: ReturnType<typeof oknaFormy> | null;
+}) {
+  const w = okna?.l10;
+  if (!w || w.n < 5) return null;
+  const hr = w.traf / w.n;
+  const roznica = bet.p_model - hr;
+  if (Math.abs(roznica) < PROG_ROZJAZDU) return null;
+  const wGore = roznica > 0;
+  const ruszaja = bet.uzasadnienie.czynniki
+    .filter((c) => c.mnoznik != null && Math.abs(c.mnoznik - 1) > 0.04)
+    .filter((c) => (wGore ? (c.mnoznik as number) < 1 : (c.mnoznik as number) > 1))
+    .map((c) => (CZYNNIK_PO_LUDZKU[c.nazwa] ?? c.nazwa.toLowerCase()));
+  return (
+    <div className="mt-5 max-w-prose rounded-(--radius-control) border border-hairline bg-card-soft/60 px-3.5 py-3">
+      <h4 className="text-xs font-semibold uppercase tracking-wide text-faint">
+        Czemu nie tyle, ile mówi ostatnie 10 meczów
+      </h4>
+      <p className="mt-1.5 text-sm leading-relaxed text-ink-soft">
+        W ostatnich {w.n} meczach ten typ wszedłby{" "}
+        <span className="font-data font-semibold text-ink">{w.traf}</span> razy
+        (<span className="font-data">{fmtProc(hr)}</span>), a my dajemy mu{" "}
+        <span className="font-data font-semibold text-ink">
+          {fmtProc(bet.p_model)}
+        </span>
+        . To nie pomyłka — te dwie liczby liczą co innego.
+      </p>
+      <p className="mt-1.5 text-sm leading-relaxed text-muted">
+        Licznik wyżej patrzy tylko na {w.n} ostatnich meczów. Model bierze
+        około dwudziestu, świeższe waży mocniej, ściąga wynik do średniej
+        rozgrywek — bo krótka seria nie ma prawa decydować sama — i dopiero
+        potem poprawia go o rywala i miejsce gry.
+        {ruszaja.length > 0 && (
+          <>
+            {" "}
+            Tutaj w {wGore ? "górę" : "dół"} ciągnie{" "}
+            {ruszaja.length > 1 ? "je" : "ją"} {listaPoPolsku(ruszaja)}.
+          </>
+        )}
+      </p>
+      {bet.uproszczony && (
+        <p className="mt-1.5 text-xs leading-relaxed text-faint">
+          Przy tej karcie nie pokażemy pełnego rachunku: wróciła z wcześniejszej
+          publikacji, więc mamy zamrożony kurs i szansę z chwili, gdy typ
+          powstał, ale rozpisane czynniki zostały tamtego dnia.
+        </p>
+      )}
+    </div>
+  );
+}
+
 type TabSzczegolow = "forma" | "czynniki" | "wyniki";
 
 /**
@@ -986,6 +1060,11 @@ export function SzczegolyTypu({
                 </div>
               )}
             </motion.div>
+
+            {/* DLACZEGO NIE TYLE, ILE MÓWI OSTATNIE 10 MECZÓW — patrz
+                komponent niżej. To jest odpowiedź na najczęstsze „czy to na
+                pewno nie błąd", a do 2026-08-01 nie było jej nigdzie. */}
+            <RozjazdZHistoria bet={bet} okna={okna} />
 
             {/* moment 2 (pewniak): nasza skala ocen + „skąd ta liczba" —
                 oś z wyceną bukmachera nie mówiła tu nic potrzebnego */}

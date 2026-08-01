@@ -45,7 +45,11 @@ export default async function KuponyPage() {
         </Reveal>
       ) : (
         <div className="mt-7">
-          <KuponyScena kupony={kupony} jestGenerator={legiPool.length > 0} />
+          <KuponyScena
+            kupony={kupony}
+            jestGenerator={legiPool.length > 0}
+            przedzialyMeta={meta.przedzialy_kuponow}
+          />
         </div>
       )}
 

@@ -372,3 +372,35 @@ def test_nowe_rynki_licza_sie_jako_druzynowe():
         assert rozliczanie._strumien({"rynek_kod": kod}) == "druzyny"
     assert kupony._strumien_lega({"rynek_kod": "shots"}) == "pewniaki"
     assert rozliczanie._strumien({"rynek_kod": "shots"}) == "pewniaki"
+
+
+def test_przedzialy_publiczne_pokrywaja_wszystkie_etykiety_kuponow():
+    """Strona rysuje pozycje z tej listy — musi znać KAŻDĄ etykietę.
+
+    Awaria 2026-08-01: KuponyScena.tsx miała listę wpisaną na sztywno
+    („5–10, 10–15…"), a przebudowa z 30.07 zmieniła progi na „2–3, 4,5–5,5".
+    Nie zgadzała się ani jedna etykieta, więc zakładka Kupony przez dwa dni
+    pokazywała „Ten przedział czeka na kupon", mając kupony w ręku.
+    """
+    pub = kupony.przedzialy_publiczne()
+    assert set(pub) == {"dzienny", "dlugoterminowy", "value"}
+    for nazwa, zakresy in (
+        ("dzienny", kupony.PRZEDZIALY_DZIENNE),
+        ("dlugoterminowy", kupony.PRZEDZIALY_DLUGOTERMINOWE),
+        ("value", kupony.PRZEDZIALY_VALUE),
+    ):
+        oczekiwane = [kupony.etykieta_celu(a, b) for a, b in zakresy]
+        assert pub[nazwa] == oczekiwane, nazwa
+    # etykiety realnie budowanych slotów muszą być w liście publicznej
+    assert "2–3" in pub["dzienny"] and "4,5–5,5" in pub["dzienny"]
+    assert "9–11" in pub["dlugoterminowy"]
+
+
+def test_przedzialy_publiczne_ida_w_meta():
+    """Bez tego pola front znowu musiałby zgadywać (patrz test wyżej)."""
+    import inspect
+
+    from footstats.jobs import build_wc_fast
+
+    zrodlo = inspect.getsource(build_wc_fast)
+    assert '"przedzialy_kuponow": kupony.przedzialy_publiczne()' in zrodlo

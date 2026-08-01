@@ -584,6 +584,13 @@ export interface Meta {
    * 17%, a wchodził w 10%. Wartość < 1 = tyle z deklaracji naprawdę wchodzi.
    */
   kalibracja_kuponow?: Record<string, number>;
+  /**
+   * Etykiety przedziałów kursowych per horyzont („dzienny", „dlugoterminowy",
+   * „value") — JEDNO ŹRÓDŁO PRAWDY po stronie `kupony.py`. Widok kuponów miał
+   * je wpisane na sztywno i po przebudowie progów z 30.07 nie zgadzała się
+   * ani jedna, więc zakładka świeciła pustką mimo istniejących kuponów.
+   */
+  przedzialy_kuponow?: Record<string, string[]>;
 }
 
 /** Jeden typ (leg) na kuponie. */
