@@ -126,7 +126,26 @@ def _rozlicz_i_zapisz(
         poprawiamy tylko liczby przy pojedynczych legach, żeby ten sam typ
         nie pokazywał dwóch różnych szans dwa kliknięcia od siebie.
         Dotyczy WYŁĄCZNIE dumpu; log kuponów zostaje surowy.
+
+        WARTOŚĆ LICZONA OD NOWA Z ZAMROŻONYCH LICZB (2026-08-01). Kupony żyją
+        w logu tygodniami, więc na stronie leżą obok siebie rekordy zamrożone
+        przez różne wersje kodu. Jedna z nich (`_urealnij_szanse` sprzed
+        naprawy) korygowała `ev_pct`, ale zostawiała `ev_netto` policzone ze
+        surowej szansy — kupon 18–25 pokazywał netto **+72,8%** przy wartości
+        brutto −10,6%. Przeliczenie tutaj gwarantuje, że trzy liczby na
+        karcie (szansa, kurs, wartość) zawsze się zgadzają, niezależnie od
+        tego, która wersja kodu zamroziła rekord. Sama SZANSA i SKŁAD kuponu
+        zostają nietknięte — to nadal ten kupon, który user widział.
         """
+        p_k = k.get("p_model")
+        kurs_k = k.get("kurs_laczny")
+        if p_k and kurs_k:
+            k = {
+                **k,
+                "ev_pct": round((float(p_k) * float(kurs_k) - 1.0) * 100.0, 1),
+                "ev_netto": round(betting.ev_pct(
+                    float(p_k), float(kurs_k), k.get("tryb_podatku")), 1),
+            }
         if not urealnienie:
             return k
         return {**k, "legi": [
@@ -4207,6 +4226,10 @@ def _main_impl(tryb=None):
     def _leg_dopuszczalny(b: dict) -> bool:
         return bool(
             b.get("kurs")
+            # ta sama podłoga co na stronie — bez niej pula kuponów brała
+            # tanie legi wznowione sprzed zmian bram (2026-08-01: 28 legów
+            # „rożne w meczu" po 1,05–1,17, przy MIN_ODDS 1,19)
+            and betting.kurs_w_widelkach(b["kurs"])
             and b["rynek_kod"] not in kwarantanna_rynkow
             and not b.get("stare_dane")
             and not _kategoria_wstrzymana(b)
@@ -4641,14 +4664,29 @@ def _main_impl(tryb=None):
     # przy narodzinach typu przepuszczałaby więc praktycznie wszystko, a user
     # dalej widziałby karty z ujemną wartością. Wyjątek robimy dla sugestii
     # (nie mają kursu, więc nie ma czego liczyć).
+    #
+    # PODŁOGA KURSU stoi w tym samym miejscu i z tego samego powodu (zgłoszenie
+    # usera 2026-08-01: „zaczęły się pojawiać kursy 1,03, a miało być minimum
+    # 1,19"). Typ raz opublikowany wracał tu z księgi BEZ ŻADNEJ bramy, więc
+    # kursy sprzed naprawy nowych rynków (1,05–1,09) trzymały się listy do
+    # gwizdka. Decyzja usera: typ, który nie przechodzi DZISIEJSZYCH progów,
+    # schodzi z listy — w księdze zostaje i normalnie się rozliczy.
     do_pokazania = []
     zdjete = 0
+    poza_kursem = 0
     for b in value_bets_pub:
+        if not b.get("sugestia") and not betting.kurs_w_widelkach(b.get("kurs")):
+            poza_kursem += 1
+            continue
         u = _urealnij_do_pokazania(b)
         if not u.get("sugestia") and u.get("kurs") and (u.get("ev_pct") or 0.0) < 0.0:
             zdjete += 1
             continue
         do_pokazania.append({k: v for k, v in u.items() if k != "kal_tau"})
+    if poza_kursem:
+        print(f"Zdjęte przez podłogę kursu: {poza_kursem} typów poza "
+              f"{betting.MIN_ODDS}–{betting.MAX_ODDS} (głównie wznowione "
+              f"sprzed zmian bram)")
     if zdjete:
         print(f"Zdjęte po urealnieniu szansy: {zdjete} typów miało ujemną "
               f"wartość przy pokazywanej liczbie (zostaje {len(do_pokazania)})")

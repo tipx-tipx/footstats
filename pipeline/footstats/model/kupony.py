@@ -365,8 +365,10 @@ def urealnij_leg(p: float, delta: float) -> float:
 
 
 def _strumien_lega(leg: dict) -> str:
+    # ta sama stała co w rozliczaniu (rozliczanie._strumien) — do 2026-08-01
+    # obie listy przedrostków żyły osobno i rozjechały się przy nowych rynkach
     return ("druzyny" if str(leg.get("rynek_kod") or "").startswith(
-        ("team_", "match_", "wiecej_")) else "pewniaki")
+        betting.PRZEDROSTKI_DRUZYNOWE) else "pewniaki")
 
 
 def szansa_z_legow(kupon: dict, korekty: dict | None) -> float:
@@ -404,7 +406,7 @@ def _ustaw_szanse(cel: dict, p: float) -> None:
     cel["p_model"] = p
     cel["fair_kurs"] = _zaokr(1.0 / max(p, 1e-9), 2)
     cel["ev_pct"] = _zaokr((p * kurs - 1.0) * 100.0, 1)
-    cel["ev_netto"] = _zaokr(betting.ev_pct(p, kurs), 1)
+    cel["ev_netto"] = _zaokr(betting.ev_pct(p, kurs, cel.get("tryb_podatku")), 1)
     cel["szansa_z_legow"] = True
 
 
@@ -415,6 +417,13 @@ def _urealnij_szanse(kupon: dict, wsp: float) -> None:
     dobór legów i kurs łączny zostają nietknięte. Ta sama korekta leci na
     warianty podglądowe, inaczej „po wymianie 21%" kłóciłoby się z „12%"
     na kuponie głównym.
+
+    WARTOŚĆ NETTO TEŻ (naprawa 2026-08-01). Funkcja przeliczała `ev_pct`, ale
+    zostawiała `ev_netto` policzone ze SUROWEJ szansy — a to właśnie `ev_netto`
+    czyta strona. Zmierzone na produkcji: kupon 18–25 miał wartość brutto
+    −10,6% i pokazywał netto **+72,8%**; kupon 9–11 odpowiednio −26,0% i
+    +43,2%. Przy współczynniku 0,455 to nie jest zaokrąglenie, tylko dwie
+    różne liczby o przeciwnym znaku pod tym samym kuponem.
     """
     if wsp >= 1.0:
         return
@@ -422,9 +431,13 @@ def _urealnij_szanse(kupon: dict, wsp: float) -> None:
         if not cel:
             continue
         p = _zaokr(float(cel["p_model"]) * wsp, 4)
+        kurs = float(cel["kurs_laczny"])
         cel["p_model"] = p
         cel["fair_kurs"] = _zaokr(1.0 / max(p, 1e-9), 2)
-        cel["ev_pct"] = _zaokr((p * float(cel["kurs_laczny"]) - 1.0) * 100.0, 1)
+        cel["ev_pct"] = _zaokr((p * kurs - 1.0) * 100.0, 1)
+        cel["ev_netto"] = _zaokr(
+            betting.ev_pct(p, kurs, cel.get("tryb_podatku")), 1
+        )
         cel["kalibracja_szansy"] = wsp
     for propozycja in ("alternatywa", "dolozenie"):
         rec = kupon.get(propozycja)

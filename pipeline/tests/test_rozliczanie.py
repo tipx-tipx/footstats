@@ -587,3 +587,40 @@ def test_rozliczamy_dopiero_po_realnym_koncu_meczu():
     """105 minut od gwizdka to dla wielu meczów jeszcze druga połowa:
     90 gry + 15 przerwy + doliczony to 115–125 minut."""
     assert rozliczanie.MECZ_KONIEC_PO_S >= 125 * 60
+
+
+def test_wersje_i_kurs_ts_zamrozone_przy_typie():
+    """Nowy typ w księdze niesie stempel epoki (2026-08-01).
+
+    Bez tego pomiar na logu miesza polityki — zdarzyło się dwa razy w jednym
+    tygodniu i za każdym razem trzeba było odwołać wniosek.
+    """
+    log = {}
+    rozliczanie._dopisz_nowe(log, [{
+        "mecz_id": 1, "mecz": "A – B", "kickoff_ts": 1_800_000_000,
+        "podmiot_id": 7, "podmiot": "A", "rynek_kod": "team_corners",
+        "rynek": "Rożne", "linia": 4.5, "strona": "ponizej", "kurs": 1.90,
+        "p_model": 0.60, "kurs_ts": 1_799_999_000,
+    }])
+    from footstats.model import betting
+
+    rec = next(iter(log.values()))
+    assert rec["wersje"] == betting.wersje_publikacji()
+    assert set(rec["wersje"]) == {"model", "kalibracja", "polityka", "dane"}
+    assert rec["kurs_ts"] == 1_799_999_000
+
+
+def test_martwa_epoka_nowych_rynkow_nie_uczy_korekty():
+    """Nowy rynek sprzed dopięcia bram nie steruje liczbą pokazywaną userowi.
+
+    18 takich rozliczeń (trafiły 83% przy deklarowanych 58%) przesuwało
+    korektę strumienia drużynowego z −0,324 na −0,179.
+    """
+    from footstats.model import betting
+
+    stary = {"rynek_kod": "match_corners", "wynik": "wygrany", "p_model": 0.9}
+    nowy = {**stary, "wersje": betting.wersje_publikacji()}
+    zwykly = {"rynek_kod": "team_corners", "wynik": "wygrany", "p_model": 0.9}
+    assert rozliczanie._z_martwej_epoki(stary)
+    assert not rozliczanie._z_martwej_epoki(nowy)
+    assert not rozliczanie._z_martwej_epoki(zwykly)

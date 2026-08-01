@@ -167,10 +167,15 @@ def _z_modelu(r: dict) -> bool:
 
 
 def _strumien(r: dict) -> str:
-    """Strumień skuteczności typu: pewniaki / druzyny / drabinki."""
+    """Strumień skuteczności typu: pewniaki / druzyny / drabinki.
+
+    Lista przedrostków drużynowych siedzi w `betting` — patrz komentarz przy
+    `betting.PRZEDROSTKI_DRUZYNOWE`; do 2026-08-01 to miejsce znało tylko
+    `team_`, a kupony znały wszystkie trzy.
+    """
     if r.get("zrodlo") == ZRODLO_DRABINKA:
         return "drabinki"
-    if str(r.get("rynek_kod") or "").startswith("team_"):
+    if str(r.get("rynek_kod") or "").startswith(betting.PRZEDROSTKI_DRUZYNOWE):
         return "druzyny"
     return "pewniaki"
 
@@ -320,6 +325,19 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
             **({"klasa": b["klasa"]} if b.get("klasa") else {}),
             **({"edge": b["edge"]} if b.get("edge") is not None else {}),
             "opublikowano_ts": int(time.time()),
+            # WERSJE ZAMROŻONE PRZY TYPIE (2026-08-01) — model / kalibracja /
+            # polityka selekcji / dane. Bez tego każdy pomiar na tym logu
+            # miesza epoki i wychodzą z niego wnioski, które trzeba odwoływać
+            # (zdarzyło się dwa razy w tygodniu — patrz betting.WERSJA_*).
+            # Historia typów NIE jest przepisywana wstecz: rekord bez pola
+            # znaczy „sprzed wersjonowania" i tak ma zostać.
+            "wersje": betting.wersje_publikacji(),
+            # CZAS ODCZYTU KURSU — osobno od czasu publikacji. Kurs bywa
+            # czytany raz na cykl i użyty do kilku typów, a typ wznowiony
+            # niesie cenę sprzed godzin; bez tego pola nie da się zmierzyć,
+            # jak stara była cena, którą pokazaliśmy (punkt 10 z listy usera:
+            # wskaźnik świeżości).
+            "kurs_ts": b.get("kurs_ts") or int(time.time()),
             # TRYB PODATKOWY ZAMROŻONY PRZY TYPIE (2026-07-31). Bez tego pola
             # `_zwrot_typu` zawsze czytałby None i rozliczał wszystko jako
             # „standard" — czyli zamrożenie trybu byłoby pozorne, a przyszły
@@ -1138,6 +1156,36 @@ def _p_surowe(r: dict) -> float:
     return p_over_sur if over else 1.0 - p_over_sur
 
 
+# --- ODCIĘCIE MARTWEJ EPOKI (2026-08-01) ---
+#
+# Nowe rynki (`match_`, `wiecej_`) były publikowane od 30.07 przez JEDNĄ bramę
+# (EV ≥ 1%) — bez widełek kursu, bez progu pewności, bez przedziału i bez okna
+# zgody z rynkiem. Bramy dopięto 31.07 o 15:37. Rekordy sprzed tej chwili
+# opisują więc politykę, której już nie ma.
+#
+# Czemu to nie jest kosmetyka: te 18 rozliczeń trafiło 83,3% przy deklarowanych
+# 57,6% (mediana kursu 1,87). Wpuszczone do korekty strumienia drużynowego
+# przesuwają ją z −0,324 na −0,179 — czyli podnoszą szansę POKAZYWANĄ userowi
+# przy każdym typie drużynowym, na podstawie osiemnastu rekordów z martwej
+# reguły. Dokładnie ten błąd (mieszanie epok) kazał odwołać wniosek z 31.07.
+#
+# ROZPOZNANIE PO STEMPLU, nie po dacie: od 2026-08-01 każdy publikowany typ
+# niesie `wersje` (patrz betting.wersje_publikacji). Nowy rynek BEZ stempla
+# jest z martwej epoki. Reguła wygasa sama — gdy nowe rynki uzbierają własne
+# rozliczenia pod dzisiejszymi bramami, wszystkie będą ostemplowane i warunek
+# przestanie cokolwiek odrzucać.
+#
+# ZAKRES: wyłącznie warstwy UCZENIA, które sterują liczbą pokazywaną userowi
+# (korekta strumienia i szansa pokazywana). Rozliczenie, ROI i skuteczność
+# ZOSTAJĄ nietknięte — user te typy widział i wynik jest jego wynikiem.
+def _z_martwej_epoki(r: dict) -> bool:
+    """Nowy rynek opublikowany, zanim dopięto mu bramy jakości."""
+    return (
+        str(r.get("rynek_kod") or "").startswith(("match_", "wiecej_"))
+        and not r.get("wersje")
+    )
+
+
 def korekta_strumienia(log: dict | None = None) -> dict[str, float]:
     """Delta logitowa per strumień: o ile ściągnąć szanse, żeby deklaracja
     zgadzała się z trafieniami. Zwraca {"pewniaki": -0.42, "druzyny": -0.11}.
@@ -1155,6 +1203,7 @@ def korekta_strumienia(log: dict | None = None) -> dict[str, float]:
         if r.get("wynik") in ("wygrany", "przegrany")
         and not r.get("sugestia") and not r.get("odrzucony")
         and r.get("p_model")
+        and not _z_martwej_epoki(r)   # patrz komentarz przy `_z_martwej_epoki`
         # typy modelu ORAZ drabinki — każdy mierzony na SWOICH rozliczeniach,
         # nigdy wymieszany (pętla niżej rozdziela je po strumieniu)
         and (_z_modelu(r) or r.get("zrodlo") == ZRODLO_DRABINKA)
@@ -1281,6 +1330,7 @@ def szansa_pokazywana(
         and not r.get("poza_publikacja")     # user ich nie widział
         and r.get("rynek_kod") not in RYNKI_OSOBNE
         and r.get("p_model")
+        and not _z_martwej_epoki(r)   # patrz komentarz przy `_z_martwej_epoki`
     ]
     out: dict[str, float] = {}
     for strumien in STRUMIENIE:

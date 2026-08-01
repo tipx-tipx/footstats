@@ -91,6 +91,12 @@ def _przygotuj(monkeypatch, rec, aet=False, staty=None):
     monkeypatch.setattr(
         rozliczanie.scores365, "finished_games_by_competition", lambda *a: []
     )
+    # DOLEWKA TRENDÓW i fallbacki statshub — bez tych trzech zaślepek test
+    # naprawdę wychodził do internetu (wykryte 2026-08-01 przez zaporę
+    # sieciową w conftest.py; przedtem po prostu cicho odpytywał źródło)
+    monkeypatch.setattr(statshub, "fetch_event_trends", lambda mids: [])
+    monkeypatch.setattr(statshub, "fetch_event_result", lambda eid: None)
+    monkeypatch.setattr(statshub, "player_shots_from_shotmap", lambda eid: None)
     return store
 
 
@@ -282,6 +288,12 @@ def _przygotuj_nowy(monkeypatch, rec, staty):
     )
     monkeypatch.setattr(scores365, "after_extra_time", lambda gid: False)
     monkeypatch.setattr(scores365, "game_team_stats", lambda gid: staty)
+    # DOLEWKA TRENDÓW i fallbacki statshub — bez tych trzech zaślepek test
+    # naprawdę wychodził do internetu (wykryte 2026-08-01 przez zaporę
+    # sieciową w conftest.py; przedtem po prostu cicho odpytywał źródło)
+    monkeypatch.setattr(statshub, "fetch_event_trends", lambda mids: [])
+    monkeypatch.setattr(statshub, "fetch_event_result", lambda eid: None)
+    monkeypatch.setattr(statshub, "player_shots_from_shotmap", lambda eid: None)
     return store
 
 

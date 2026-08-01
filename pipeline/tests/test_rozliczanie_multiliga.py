@@ -44,6 +44,11 @@ def _przygotuj(monkeypatch, rec, trendy=None):
     monkeypatch.setattr(
         statshub, "fetch_event_trends", lambda mids: trendy or []
     )
+    # fallbacki statshub (wynik meczu + shotmapa) — bez tych dwóch zaślepek
+    # test naprawdę wychodził do internetu; wykryte 2026-08-01 przez zaporę
+    # sieciową w conftest.py
+    monkeypatch.setattr(statshub, "fetch_event_result", lambda eid: None)
+    monkeypatch.setattr(statshub, "player_shots_from_shotmap", lambda eid: None)
     monkeypatch.setattr(
         rozliczanie, "_snapshot_zamkniecia", lambda *a, **k: None
     )

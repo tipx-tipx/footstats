@@ -133,3 +133,21 @@ def test_card_conversion_shrinks_small_sample():
     q_small = cards.player_card_conversion(career_yellows=3, career_fouls=5)
     # surowo 0.6, ale shrink do ~0.18 powinien mocno ściągnąć
     assert q_small < 0.30
+
+
+def test_kurs_w_widelkach_jest_podloga_na_wyjsciu():
+    """Podłoga kursu obowiązuje TAKŻE typy wznowione (zgłoszenie 2026-08-01).
+
+    Kursy 1,05–1,09 na rynku „rożne w meczu" wracały na stronę z księgi
+    rozliczeń, bo ścieżka wznowienia nie sprawdzała żadnej bramy.
+    """
+    assert betting.kurs_w_widelkach(betting.MIN_ODDS)
+    assert betting.kurs_w_widelkach(betting.MAX_ODDS)
+    assert betting.kurs_w_widelkach(2.10)
+    for tani in (1.03, 1.05, 1.09, 1.17, 1.189):
+        assert not betting.kurs_w_widelkach(tani), tani
+    assert not betting.kurs_w_widelkach(6.5)
+    # sugestia nie ma kursu i nie jest zakładem — nie odrzucamy jej tu
+    assert betting.kurs_w_widelkach(None)
+    # śmieć w polu to NIE jest zgoda na publikację
+    assert not betting.kurs_w_widelkach("brak")

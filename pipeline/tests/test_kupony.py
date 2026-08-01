@@ -326,3 +326,49 @@ def test_urealnienie_rusza_tylko_liczbami_dla_usera():
     # warianty podglądowe idą tą samą korektą, inaczej kłóciłyby się z kartą
     assert kupon["alternatywa"]["p_po"] == 0.15
     assert kupon["dolozenie"]["p_po"] == 0.108
+
+
+def test_urealnienie_poprawia_takze_wartosc_netto():
+    """Wartość PO PODATKU też musi zejść razem z szansą.
+
+    Zmierzone na produkcji 2026-08-01: kupon 18–25 miał wartość brutto −10,6%
+    i pokazywał netto +72,8%, bo `ev_netto` zostawało policzone ze SUROWEJ
+    szansy. To liczba, którą czyta strona — czyli jedyna, która musiała być
+    prawdziwa.
+    """
+    kupon = {
+        "kurs_laczny": 10.0, "p_model": 0.20, "fair_kurs": 5.0,
+        "ev_pct": 100.0, "ev_netto": 76.0, "tryb_podatku": "standard",
+        "legi": [{"p_model": 0.5}, {"p_model": 0.4}],
+    }
+    kupony._urealnij_szanse(kupon, 0.6)
+    # 0,12 x 10 x 0,88 - 1 = +5,6%  (a NIE +76%)
+    assert kupon["ev_netto"] == 5.6
+    assert kupon["ev_netto"] < kupon["ev_pct"]
+
+
+def test_urealnienie_potrafi_zmienic_znak_wartosci_netto():
+    """Przypadek z produkcji: brutto ujemne, netto pokazywane dodatnie."""
+    kupon = {
+        "kurs_laczny": 9.08, "p_model": 0.1791, "ev_pct": 62.6,
+        "ev_netto": 43.2, "tryb_podatku": "standard", "legi": [],
+    }
+    kupony._urealnij_szanse(kupon, 0.455)
+    assert kupon["ev_pct"] < 0 and kupon["ev_netto"] < 0
+    assert kupon["ev_netto"] < kupon["ev_pct"]
+
+
+def test_nowe_rynki_licza_sie_jako_druzynowe():
+    """`match_` i `wiecej_` to rynki DRUŻYNOWE — nie zawodnicze.
+
+    Do 2026-08-01 rozliczanie znało tylko `team_`, więc suma meczowa dostawała
+    korektę strumienia zawodniczego, a kupony (które znały wszystkie trzy
+    przedrostki) korygowały ten sam typ inaczej.
+    """
+    from footstats.jobs import rozliczanie
+
+    for kod in ("team_corners", "match_corners", "wiecej_cards"):
+        assert kupony._strumien_lega({"rynek_kod": kod}) == "druzyny"
+        assert rozliczanie._strumien({"rynek_kod": kod}) == "druzyny"
+    assert kupony._strumien_lega({"rynek_kod": "shots"}) == "pewniaki"
+    assert rozliczanie._strumien({"rynek_kod": "shots"}) == "pewniaki"

@@ -172,6 +172,64 @@ RODZINY_RYNKOW = {
     "tackles": "defensywa", "interceptions": "defensywa",
 }
 
+# Przedrostki rynków DRUŻYNOWYCH — jedno źródło prawdy dla klasyfikacji
+# strumienia (rozliczanie._strumien) i doboru korekty legów
+# (kupony._strumien_lega).
+#
+# PO CO OSOBNA STAŁA: `match_` (suma meczowa) i `wiecej_` („kto więcej")
+# doszły 2026-07-30. Rozliczanie rozpoznawało strumień drużynowy po samym
+# `team_`, więc oba nowe rynki liczyły się jako typy ZAWODNICZE, a kupony
+# miały już wtedy własną, pełną listę przedrostków. Ten sam typ dostawał
+# więc na stronie i w kuponie dwie różne korekty. Skutki po stronie
+# rozliczania były ciche, ale realne:
+#   * korekta zawodnicza zamiast drużynowej (2026-08-01 przy szansie
+#     pokazywanej: −0,482 zamiast −0,197),
+#   * 18 rozliczonych nowych rynków zatruwało pomiar strumienia zawodniczego.
+PRZEDROSTKI_DRUZYNOWE = ("team_", "match_", "wiecej_")
+
+
+# --- WERSJONOWANIE POLITYKI (2026-08-01) ---
+#
+# Problem, który to rozwiązuje, nazywa się „selection-induced miscalibration",
+# ale objawia się bardzo konkretnie: kalibracja ściąga `p` CAŁEGO strumienia,
+# a brama publikacji natychmiast wybiera nowy czub rozkładu — więc opublikowany
+# zbiór ZAWSZE deklaruje ~71%, choćby korekta była dowolnie duża. Bez zapisu,
+# WEDŁUG JAKIEJ REGUŁY typ został wybrany, nie da się rozdzielić „model się
+# poprawił" od „zmieniliśmy selekcję".
+#
+# To nie jest teoria. Dwa razy w ciągu tygodnia pomiar na tym logu dał zły
+# wynik, bo mieszał epoki:
+#   * 2026-07-31: okno zgody weszło 27.07, a w logu leżały starsze rekordy
+#     publikowane regułą ±22 pp — wniosek „wstrzymane typy zarabiają +13,2%"
+#     trzeba było odwołać,
+#   * 2026-08-01: nowe rynki sprzed dopięcia bram (18 rozliczeń, trafiły 83%
+#     przy deklarowanych 58%) przesunęły korektę strumienia drużynowego
+#     z −0,324 na −0,179 — czyli liczbę POKAZYWANĄ userowi ruszyło 18 rekordów
+#     z polityki, której już nie ma.
+#
+# ZASADA: każda zmiana, która rusza SELEKCJĄ (progi, bramy, okna), podbija
+# `WERSJA_POLITYKI`. Zmiana w rachunku `p` podbija `WERSJA_MODELU`. Zmiana
+# w warstwach uczenia (kalibracja rynkowa, korekta strumienia) podbija
+# `WERSJA_KALIBRACJI`. Zmiana źródeł/zakresu danych — `WERSJA_DANYCH`.
+# Wersja jedzie ZAMROŻONA przy typie, więc historia zawsze wie, czym była.
+#
+# Format: data wdrożenia + krótki slug. Data pierwsza, żeby sortowanie
+# leksykalne dawało chronologię.
+WERSJA_MODELU = "2026-07-31-korekta-znaku"
+WERSJA_KALIBRACJI = "2026-07-31-przedzialy-korekty"
+WERSJA_POLITYKI = "2026-08-01-podloga-kursu"
+WERSJA_DANYCH = "2026-07-27-liga-klubowa"
+
+
+def wersje_publikacji() -> dict[str, str]:
+    """Stempel wersji do zamrożenia przy publikowanym typie."""
+    return {
+        "model": WERSJA_MODELU,
+        "kalibracja": WERSJA_KALIBRACJI,
+        "polityka": WERSJA_POLITYKI,
+        "dane": WERSJA_DANYCH,
+    }
+
 
 def implied_probs_two_way(over_odds: float, under_odds: float) -> tuple[float, float]:
     """Devig dwustronny metodą potęgową.
@@ -438,6 +496,30 @@ def w_oknie_zgody(p_model: float, kurs: float) -> bool:
 MAX_ODDS = 6.0                      # kursy wyżej to loteria, nie systematyczny betting
 MIN_ODDS = 1.19                     # poniżej 1.19 gra się nie opłaca (decyzja użytkownika)
 MAX_CI_WIDTH = 0.30                 # zbyt szerokie widełki szansy = nie stawiamy
+
+
+def kurs_w_widelkach(kurs) -> bool:
+    """Czy kurs mieści się w widełkach produktu (MIN_ODDS..MAX_ODDS).
+
+    PODŁOGA NA WYJŚCIU, nie tylko przy narodzinach typu (2026-08-01).
+    `MIN_ODDS` był sprawdzany wyłącznie tam, gdzie typ POWSTAJE (`assess`,
+    widełki drużynowe). Tymczasem lista na stronie w większości składa się
+    z typów WZNOWIONYCH — a ścieżka wznowienia (`scal_z_publikacjami`, drugie
+    źródło: księga rozliczeń) nie sprawdzała niczego. Skutek zgłoszony przez
+    usera i zmierzony na produkcji 2026-08-01: pięć typów „rożne w meczu —
+    poniżej" po kursie 1,05–1,09, opublikowanych 31.07 PRZED naprawą bram
+    nowych rynków, wracało na stronę i do puli kuponów (28 takich legów)
+    aż do gwizdka, czyli jeszcze przez dwa dni.
+
+    Brak kursu (sugestia) NIE jest odrzuceniem — sugestia nie jest zakładem.
+    """
+    if kurs is None:
+        return True
+    try:
+        k = float(kurs)
+    except (TypeError, ValueError):
+        return False
+    return MIN_ODDS <= k <= MAX_ODDS
 
 # GRUNT POMIARU progów (zapowiadany w komentarzu wyżej): typ odrzucony
 # DOKŁADNIE JEDNYM kryterium o mniej niż poniższe tolerancje trafia do
