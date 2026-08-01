@@ -152,6 +152,126 @@ function sygnalInfo(
   return null;
 }
 
+/**
+ * DRABINKA JAKO TREŚĆ KARTY, NIE UKRYTY DODATEK (przebudowa 2026-08-01).
+ *
+ * Zgłoszenie usera: karta drabinki wyglądała dokładnie jak każdy inny wiersz
+ * typu — nazwisko, jedna linijka tekstu, strzałka „skąd ta liczba". To, co ją
+ * wyróżnia, czyli KILKA POZIOMÓW TEJ SAMEJ RZECZY po różnych cenach, było
+ * widoczne dopiero po rozwinięciu. Czyli sedno produktu chowało się za
+ * kliknięciem.
+ *
+ * Teraz zwinięta karta pokazuje wprost to, po co się na nią patrzy:
+ *   1+     2+     3+      <- szczeble drabinki
+ *  1,18   1,56   2,90     <- ile płaci bukmacher za każdy
+ *   92%    73%    38%     <- ile dajemy my
+ * a pod spodem pasek ostatnich meczów: które przebiły wybraną linię.
+ *
+ * Wybrany szczebel (ten, który zdecydował o karcie) jest podświetlony — reszta
+ * jest tłem, żeby dało się porównać cenę, a nie tylko przeczytać jedną liczbę.
+ */
+/** Czy karta pokaże pasek drabinki (a więc zajawka byłaby jego powtórzeniem). */
+function maDrabinke(w: RadarWpis): boolean {
+  const r = w.rynki?.find((x) => x.rynek_kod === w.hero?.rynek_kod) ?? w.rynki?.[0];
+  return Boolean(w.hero) && (r?.drabinka?.length ?? 0) > 0;
+}
+
+function DrabinkaPasek({ w }: { w: RadarWpis }) {
+  const hero = w.hero;
+  const rynek =
+    w.rynki?.find((r) => r.rynek_kod === hero?.rynek_kod) ?? w.rynki?.[0];
+  const szczeble = rynek?.drabinka ?? [];
+  if (!hero || szczeble.length === 0) return null;
+
+  // maksymalnie pięć szczebli wokół wybranego — pełna drabinka bywa długa,
+  // a karta ma dać się ogarnąć jednym spojrzeniem
+  const idxHero = Math.max(
+    0,
+    szczeble.findIndex((s) => s.linia === hero.linia),
+  );
+  const od = Math.max(0, Math.min(idxHero - 2, szczeble.length - 5));
+  const widoczne = szczeble.slice(od, od + 5);
+
+  const ostatnie = (rynek?.ostatnie ?? []).slice(0, 10);
+  const przebite = ostatnie.filter((x) => x > hero.linia).length;
+
+  return (
+    <span className="block px-4 pb-3 sm:px-5">
+      <span className="block rounded-lg border border-hairline bg-card-soft/70 p-2.5">
+        <span className="mb-1.5 flex items-baseline justify-between gap-2">
+          <span className="text-[11px] font-semibold text-ink-soft">
+            {hero.rynek ?? rynek?.rynek ?? rynek?.rynek_kod}
+          </span>
+          <span className="text-[10px] uppercase tracking-wide text-faint">
+            kurs / nasza szansa
+          </span>
+        </span>
+
+        {/* KOMÓRKI STAŁEJ SZEROKOŚCI, nie rozciągane na całą kartę: przy
+            dwóch szczeblach `1fr` robił dwa ogromne pudła i pół karty pustki.
+            Drabinka ma się czytać jak cennik — wąskie kolumny obok siebie. */}
+        <span className="flex flex-wrap gap-1">
+          {widoczne.map((s) => {
+            const wybrany = s.linia === hero.linia;
+            const p = s.p_final ?? s.p_model;
+            return (
+              <span
+                key={s.linia}
+                className={[
+                  "flex w-[72px] flex-col items-center rounded-md px-1 py-1.5 text-center",
+                  wybrany
+                    ? "bg-brand-wash ring-1 ring-brand/40"
+                    : "bg-card",
+                ].join(" ")}
+              >
+                <span
+                  className={`font-data text-[12px] font-semibold ${
+                    wybrany ? "text-brand" : "text-ink-soft"
+                  }`}
+                >
+                  {linLabel(s.linia)}
+                </span>
+                <span
+                  className={`font-data text-[13px] font-bold tabular-nums ${
+                    wybrany ? "text-ink" : "text-ink-soft"
+                  }`}
+                >
+                  {fmtKurs(s.kurs)}
+                </span>
+                <span className="font-data text-[11px] tabular-nums text-faint">
+                  {p != null ? fmtProc(p) : "—"}
+                </span>
+              </span>
+            );
+          })}
+        </span>
+
+        {ostatnie.length > 0 && (
+          <span className="mt-2 flex items-center gap-2">
+            {/* najnowszy mecz jest pierwszy w danych — odwracamy, żeby czas
+                płynął od lewej do prawej, jak każdy wykres */}
+            <span className="flex gap-[3px]" aria-hidden>
+              {[...ostatnie].reverse().map((x, i) => (
+                <span
+                  key={i}
+                  title={`${x} w tym meczu`}
+                  className={`h-3.5 w-1.5 rounded-[2px] ${
+                    x > hero.linia ? "bg-brand" : "bg-faint/30"
+                  }`}
+                />
+              ))}
+            </span>
+            <span className="text-[11px] text-faint">
+              {przebite} z {ostatnie.length} ostatnich meczów przebiło{" "}
+              {linLabel(hero.linia)}
+            </span>
+          </span>
+        )}
+      </span>
+    </span>
+  );
+}
+
 /** Zwinięta zajawka: konkret z danych, nie szablon. */
 function zajawka(w: RadarWpis): string {
   // hero wylicza backend (ten sam szczebel, który zdecydował o wyborze karty)
@@ -870,11 +990,21 @@ export const RadarCard = memo(function RadarCard({
           </span>
         )}
 
+        {/* DRABINKA — to jest treść karty, patrz DrabinkaPasek */}
+        <DrabinkaPasek w={w} />
+
         {/* zajawka z konkretem + rozwinięcie */}
         <span className="flex items-center gap-x-2.5 px-4 pb-3.5 sm:px-5">
-          <span className="min-w-0 truncate text-[11px] font-medium text-ink-soft">
-            {zajawka(w)}
-          </span>
+          {/* Gdy pasek drabinki jest na karcie, zajawka mówiłaby DOKŁADNIE to
+              samo („Strzały 2+ · kurs 1,56 · szansa 73%") tylko prozą — dwa
+              razy ta sama rzecz, jedna pod drugą. Zostaje wtedy sam przycisk
+              rozwinięcia; opisowe zajawki (debiutant, transfer, brak feedu)
+              niosą treść, której w pasku nie ma, więc te zostają. */}
+          {!maDrabinke(w) && (
+            <span className="min-w-0 truncate text-[11px] font-medium text-ink-soft">
+              {zajawka(w)}
+            </span>
+          )}
           <span className="ml-auto flex shrink-0 items-center gap-1 text-[10px] uppercase tracking-wide text-faint">
             {open ? "zwiń" : "skąd ta liczba"}
             <svg

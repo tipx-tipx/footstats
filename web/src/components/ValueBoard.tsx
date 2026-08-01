@@ -419,7 +419,7 @@ export function ValueBoard({
                   zobaczyć, co dokładnie ją podbiło albo ścięło.
                 </p>
                 <span className="font-data shrink-0 text-sm font-semibold text-brand-deep">
-                  {odmienPozycje(radarWpisy.length)}
+                  {odmienPozycje(radarNajlepsze.length)}
                 </span>
               </div>
 
