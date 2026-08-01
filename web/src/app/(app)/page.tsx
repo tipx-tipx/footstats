@@ -38,7 +38,7 @@ export default async function OkazjePage({
   ]);
   const pods = typyWyniki.podsumowanie;
 
-  // ta strona to STATYSTYKI ZAWODNIKÓW — typy drużynowe mają własną
+  // ta strona to STATYSTYKI ZAWODNIKÓW – typy drużynowe mają własną
   // podstronę /druzyny (osobna funkcja produktu, nie ta sama lista)
   const bets = wszystkieBets.filter((b) => b.podmiot_typ !== "druzyna");
   const druzynoweN = wszystkieBets.filter(
@@ -46,7 +46,7 @@ export default async function OkazjePage({
   ).length;
 
   // ODCHUDZENIE payloadu: ValueBoard/BetCard czytają z zawodnika wyłącznie
-  // forma[rynek_kod] typu — a pełna baza (każdy zawodnik × wszystkie rynki
+  // forma[rynek_kod] typu – a pełna baza (każdy zawodnik × wszystkie rynki
   // × 20 meczów historii) pompowała megabajty do HTML i strumienia RSC
   // i to była główna waga tej strony. Na klienta idzie tylko forma rynków,
   // na które faktycznie są typy.
@@ -149,7 +149,7 @@ export default async function OkazjePage({
         </Reveal>
       )}
 
-      {/* pod listą: obietnice hero z pokryciem — bilet kuponu dnia i bliźniacza
+      {/* pod listą: obietnice hero z pokryciem – bilet kuponu dnia i bliźniacza
           karta trafień (ta sama anatomia); oba znikają same, gdy brak danych */}
       {(kuponDnia || (pods && pods.rozliczone > 0)) && (
         <section

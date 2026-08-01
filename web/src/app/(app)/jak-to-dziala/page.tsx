@@ -34,15 +34,15 @@ const KROKI = [
   },
   {
     tytul: "Odrzucamy to, czego nie da się obstawić",
-    opis: "Typ nie powstaje, jeśli wiemy, że zawodnika nie ma w składzie, albo jeśli spodziewamy się po nim mniej niż godziny gry. Nic nowego nie pojawia się też później niż półtorej godziny przed pierwszym gwizdkiem — żebyś zdążył spokojnie obstawić, a nie gonił kurs na dziesięć minut przed meczem.",
+    opis: "Typ nie powstaje, jeśli wiemy, że zawodnika nie ma w składzie, albo jeśli spodziewamy się po nim mniej niż godziny gry. Nic nowego nie pojawia się też później niż półtorej godziny przed pierwszym gwizdkiem – żebyś zdążył spokojnie obstawić, a nie gonił kurs na dziesięć minut przed meczem.",
   },
   {
     tytul: "Wstrzymujemy to, co traci pieniądze",
-    opis: "Co jakiś czas przeliczamy, ile zarobił albo stracił każdy rynek i każdy powód, dla którego typ trafia na listę. Jeśli coś w ostatnich kilkudziesięciu rozliczeniach oddaje pieniądze, znika ze strony — ale liczymy je dalej po cichu, więc wraca samo, gdy przestanie tracić. Nikt nie decyduje o tym ręcznie.",
+    opis: "Co jakiś czas przeliczamy, ile zarobił albo stracił każdy rynek i każdy powód, dla którego typ trafia na listę. Jeśli coś w ostatnich kilkudziesięciu rozliczeniach oddaje pieniądze, znika ze strony – ale liczymy je dalej po cichu, więc wraca samo, gdy przestanie tracić. Nikt nie decyduje o tym ręcznie.",
   },
   {
     tytul: "Sprawdzamy sami siebie",
-    opis: "Zakładka „Skuteczność” pokazuje wszystko, co pokazaliśmy i co się już zakończyło — także nietrafione. Jest tam też egzamin na meczach, których model nie widział, gdy się uczył: jeśli mówi „60%”, a takie zdarzenia zachodzą w 60% przypadków, możesz mu wierzyć. Sprawdzamy też, czy kursy, które łapiemy, są lepsze od tych tuż przed meczem — to znak, że wyprzedzamy bukmachera.",
+    opis: "Zakładka „Skuteczność” pokazuje wszystko, co pokazaliśmy i co się już zakończyło – także nietrafione. Jest tam też egzamin na meczach, których model nie widział, gdy się uczył: jeśli mówi „60%”, a takie zdarzenia zachodzą w 60% przypadków, możesz mu wierzyć. Sprawdzamy też, czy kursy, które łapiemy, są lepsze od tych tuż przed meczem – to znak, że wyprzedzamy bukmachera.",
   },
 ];
 
@@ -62,7 +62,7 @@ export default function JakToDzialaPage() {
       />
 
       <ol className="relative mt-9 max-w-3xl space-y-5">
-        {/* linia łącząca kroki — u góry w kolorze marki, niżej wygasa */}
+        {/* linia łącząca kroki – u góry w kolorze marki, niżej wygasa */}
         <span
           aria-hidden
           className="absolute bottom-8 left-[19px] top-8 w-px bg-gradient-to-b from-brand-bright/50 via-hairline-strong to-transparent"

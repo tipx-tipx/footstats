@@ -20,14 +20,14 @@ import type {
   RadarWpis,
 } from "@/lib/types";
 
-/** Linia 0,5 to po ludzku „1 lub więcej" — tak mówi też Superbet. */
+/** Linia 0,5 to po ludzku „1 lub więcej" – tak mówi też Superbet. */
 const linLabel = (linia: number) => `${Math.ceil(linia)}+`;
 
 /**
  * Klasa karty (backend: radar._klasa_karty). NAZWY ZMIENIONE 2026-08-01:
  * „TOP / mocny / solidny" brzmiało jak ocena szkolna i zderzało się z drugą
  * skalą produktu (siła typu wg szansy, `lib/slownik.ts`). Klasa mierzy coś
- * innego — o ile nasza szansa bije cenę bukmachera — więc mówi to wprost.
+ * innego – o ile nasza szansa bije cenę bukmachera – więc mówi to wprost.
  * `opis` jedzie NA STRONĘ, do rozwinięcia, a nie do dymka.
  */
 const KLASY: Record<
@@ -37,7 +37,7 @@ const KLASY: Record<
   top: {
     label: "największa przewaga dziś",
     badge: "bg-data-green text-white",
-    opis: "Ze wszystkich dzisiejszych kart ta ma najwyższą przewagę nad kursem — po uwzględnieniu rywala, sędziego i przewidywanego przebiegu meczu. To nie jest gwarancja, tylko najlepsze, co dziś mamy.",
+    opis: "Ze wszystkich dzisiejszych kart ta ma najwyższą przewagę nad kursem – po uwzględnieniu rywala, sędziego i przewidywanego przebiegu meczu. To nie jest gwarancja, tylko najlepsze, co dziś mamy.",
   },
   mocny: {
     label: "wyraźna przewaga",
@@ -47,15 +47,15 @@ const KLASY: Record<
   solidny: {
     label: "niewielka przewaga",
     badge: "border border-hairline bg-paper text-muted",
-    opis: "Przewaga nad kursem jest dodatnia, ale skromna. Karta przeszła nasze progi jakości i na tym koniec — nie obiecujemy tu nic więcej.",
+    opis: "Przewaga nad kursem jest dodatnia, ale skromna. Karta przeszła nasze progi jakości i na tym koniec – nie obiecujemy tu nic więcej.",
   },
 };
 
 /**
  * NA CZYM STOI KARTA (backend: radar._kategoria_karty). Osobna oś od klasy
- * jakości: klasa mówi „jak dobry jest typ", kategoria — „na jakim dowodzie
+ * jakości: klasa mówi „jak dobry jest typ", kategoria – „na jakim dowodzie
  * stoi". Dlatego kategoria dostaje PASEK przy krawędzi karty, a nie kolejną
- * plakietkę obok klasy — inaczej nagłówek robi się jarmarkiem.
+ * plakietkę obok klasy – inaczej nagłówek robi się jarmarkiem.
  */
 const KATEGORIE: Record<
   string,
@@ -65,7 +65,7 @@ const KATEGORIE: Record<
     label: "tylko nasza analiza",
     pasek: "bg-hairline-strong",
     badge: "border border-hairline bg-paper text-muted",
-    opis: "Ta karta stoi wyłącznie na naszej analizie: jak często przebijał tę linię, forma, minuty, rywal i przewidywany przebieg meczu. Drugiego cennika na tę linię nie mamy — albo Betclic nie prowadzi tego meczu, albo nie wystawił tego rynku.",
+    opis: "Ta karta stoi wyłącznie na naszej analizie: jak często przebijał tę linię, forma, minuty, rywal i przewidywany przebieg meczu. Drugiego cennika na tę linię nie mamy – albo Betclic nie prowadzi tego meczu, albo nie wystawił tego rynku.",
   },
   rynek_zgodny: {
     label: "obaj bukmacherzy zgodni",
@@ -77,13 +77,13 @@ const KATEGORIE: Record<
     label: "jeden płaci więcej",
     pasek: "bg-data-amber",
     badge: "bg-data-amber-wash text-data-amber-ink",
-    opis: "Za to samo zdarzenie jeden bukmacher płaci zauważalnie więcej niż drugi. Stawia się tam, gdzie płacą więcej — przy tej samej analizie dostajesz lepszą cenę. Sama różnica kursów nie jest powodem, dla którego ta karta tu jest: najpierw musiała przejść całą analizę.",
+    opis: "Za to samo zdarzenie jeden bukmacher płaci zauważalnie więcej niż drugi. Stawia się tam, gdzie płacą więcej – przy tej samej analizie dostajesz lepszą cenę. Sama różnica kursów nie jest powodem, dla którego ta karta tu jest: najpierw musiała przejść całą analizę.",
   },
   pewniak_taniej: {
     label: "drugi bukmacher: to niemal pewne",
     pasek: "bg-data-amber",
     badge: "bg-data-amber text-white",
-    opis: "Jeden bukmacher wycenia to jako niemal pewne (kurs poniżej 1,45), a drugi płaci za to samo 1,75 lub więcej. To opinia rynku o pewności, nie nasza gwarancja — i nie ona zdecydowała o tej karcie. Karta i tak musiała przejść wszystkie nasze progi; różnica cen jest dodatkowym dowodem, nie przepustką.",
+    opis: "Jeden bukmacher wycenia to jako niemal pewne (kurs poniżej 1,45), a drugi płaci za to samo 1,75 lub więcej. To opinia rynku o pewności, nie nasza gwarancja – i nie ona zdecydowała o tej karcie. Karta i tak musiała przejść wszystkie nasze progi; różnica cen jest dodatkowym dowodem, nie przepustką.",
   },
 };
 
@@ -109,7 +109,7 @@ const SEZON_RYNKI_PL: Record<string, string> = {
 
 const liczba = (v: number) => String(v).replace(".", ",");
 
-/** Plakietka sygnału — tylko dla wpisów Z SYGNAŁEM (zwykła drabinka bez). */
+/** Plakietka sygnału – tylko dla wpisów Z SYGNAŁEM (zwykła drabinka bez). */
 function sygnalInfo(
   w: RadarWpis,
 ): { label: string; dioda: string; badge: string; tytul: string } | null {
@@ -128,7 +128,7 @@ function sygnalInfo(
       dioda: "bg-data-amber",
       badge: "bg-data-amber-wash text-data-amber-ink",
       tytul:
-        "Superbet daje mu pełne kursy, ale w danych nie ma ani jednego jego meczu — rynek wycenia go w ciemno. Sprawdź sam, skąd przyszedł, zanim postawisz.",
+        "Superbet daje mu pełne kursy, ale w danych nie ma ani jednego jego meczu – rynek wycenia go w ciemno. Sprawdź sam, skąd przyszedł, zanim postawisz.",
     };
   }
   if (w.rodzaj === "forma") {
@@ -137,7 +137,7 @@ function sygnalInfo(
       dioda: "bg-data-green",
       badge: "bg-data-green-wash text-data-green-ink",
       tytul:
-        "Zawodnik regularnie przebija linię w ostatnich meczach, wyraźnie ponad swój wcześniejszy poziom. Model celowo nie dolicza formy do szansy — to sygnał dodatkowy.",
+        "Zawodnik regularnie przebija linię w ostatnich meczach, wyraźnie ponad swój wcześniejszy poziom. Model celowo nie dolicza formy do szansy – to sygnał dodatkowy.",
     };
   }
   if (w.rodzaj === "bez_feedu") {
@@ -146,7 +146,7 @@ function sygnalInfo(
       dioda: "bg-ink/25",
       badge: "border border-hairline bg-paper text-muted",
       tytul:
-        "Ta liga nie jest objęta feedem statystyk meczowych, więc nie mamy historii ostatnich występów. Pokazujemy kursy Superbetu, a tam gdzie się udało — średnie z całych sezonów.",
+        "Ta liga nie jest objęta feedem statystyk meczowych, więc nie mamy historii ostatnich występów. Pokazujemy kursy Superbetu, a tam gdzie się udało – średnie z całych sezonów.",
     };
   }
   return null;
@@ -156,7 +156,7 @@ function sygnalInfo(
  * DRABINKA JAKO TREŚĆ KARTY, NIE UKRYTY DODATEK (przebudowa 2026-08-01).
  *
  * Zgłoszenie usera: karta drabinki wyglądała dokładnie jak każdy inny wiersz
- * typu — nazwisko, jedna linijka tekstu, strzałka „skąd ta liczba". To, co ją
+ * typu – nazwisko, jedna linijka tekstu, strzałka „skąd ta liczba". To, co ją
  * wyróżnia, czyli KILKA POZIOMÓW TEJ SAMEJ RZECZY po różnych cenach, było
  * widoczne dopiero po rozwinięciu. Czyli sedno produktu chowało się za
  * kliknięciem.
@@ -167,7 +167,7 @@ function sygnalInfo(
  *   92%    73%    38%     <- ile dajemy my
  * a pod spodem pasek ostatnich meczów: które przebiły wybraną linię.
  *
- * Wybrany szczebel (ten, który zdecydował o karcie) jest podświetlony — reszta
+ * Wybrany szczebel (ten, który zdecydował o karcie) jest podświetlony – reszta
  * jest tłem, żeby dało się porównać cenę, a nie tylko przeczytać jedną liczbę.
  */
 /** Czy karta pokaże pasek drabinki (a więc zajawka byłaby jego powtórzeniem). */
@@ -183,7 +183,7 @@ function DrabinkaPasek({ w }: { w: RadarWpis }) {
   const szczeble = rynek?.drabinka ?? [];
   if (!hero || szczeble.length === 0) return null;
 
-  // maksymalnie pięć szczebli wokół wybranego — pełna drabinka bywa długa,
+  // maksymalnie pięć szczebli wokół wybranego – pełna drabinka bywa długa,
   // a karta ma dać się ogarnąć jednym spojrzeniem
   const idxHero = Math.max(
     0,
@@ -209,7 +209,7 @@ function DrabinkaPasek({ w }: { w: RadarWpis }) {
 
         {/* KOMÓRKI STAŁEJ SZEROKOŚCI, nie rozciągane na całą kartę: przy
             dwóch szczeblach `1fr` robił dwa ogromne pudła i pół karty pustki.
-            Drabinka ma się czytać jak cennik — wąskie kolumny obok siebie. */}
+            Drabinka ma się czytać jak cennik – wąskie kolumny obok siebie. */}
         <span className="flex flex-wrap gap-1">
           {widoczne.map((s) => {
             const wybrany = s.linia === hero.linia;
@@ -239,7 +239,7 @@ function DrabinkaPasek({ w }: { w: RadarWpis }) {
                   {fmtKurs(s.kurs)}
                 </span>
                 <span className="font-data text-[11px] tabular-nums text-faint">
-                  {p != null ? fmtProc(p) : "—"}
+                  {p != null ? fmtProc(p) : "–"}
                 </span>
               </span>
             );
@@ -248,7 +248,7 @@ function DrabinkaPasek({ w }: { w: RadarWpis }) {
 
         {ostatnie.length > 0 && (
           <span className="mt-2 flex items-center gap-2">
-            {/* najnowszy mecz jest pierwszy w danych — odwracamy, żeby czas
+            {/* najnowszy mecz jest pierwszy w danych – odwracamy, żeby czas
                 płynął od lewej do prawej, jak każdy wykres */}
             <span className="flex gap-[3px]" aria-hidden>
               {[...ostatnie].reverse().map((x, i) => (
@@ -282,22 +282,22 @@ function zajawka(w: RadarWpis): string {
     return `${h.rynek ?? h.rynek_kod} ${linLabel(h.linia)} · trafione ${h.traf}/${h.z} ost. · kurs ${fmtKurs(h.kurs)}${szansa}`;
   }
   if (w.rodzaj === "debiutant") {
-    return "Superbet wystawił mu komplet kursów, choć my nie mamy o nim żadnych statystyk — bukmacher też strzela.";
+    return "Superbet wystawił mu komplet kursów, choć my nie mamy o nim żadnych statystyk – bukmacher też strzela.";
   }
   if (w.rodzaj === "bez_feedu") {
     return w.sezony?.length
-      ? `Kursy Superbetu i średnie z ${w.sezony.length} ${w.sezony.length === 1 ? "sezonu" : "sezonów"}. Meczu po meczu tu nie pokażemy — z tej ligi nie mamy takich danych.`
+      ? `Kursy Superbetu i średnie z ${w.sezony.length} ${w.sezony.length === 1 ? "sezonu" : "sezonów"}. Meczu po meczu tu nie pokażemy – z tej ligi nie mamy takich danych.`
       : "Same kursy Superbetu. Z tej ligi nie mamy statystyk mecz po meczu.";
   }
   if (w.rodzaj === "transfer") {
     return w.stara_liga
       ? `Historia z poprzedniej ligi: ${w.stara_liga}. Kurs może tego nie uwzględniać.`
-      : "Świeży transfer — historia z poprzedniego klubu.";
+      : "Świeży transfer – historia z poprzedniego klubu.";
   }
   return "Drabinka kursów z pełną historią jego występów.";
 }
 
-/** Akapit „dlaczego ta karta" w rozwinięciu — tylko wpisy z sygnałem. */
+/** Akapit „dlaczego ta karta" w rozwinięciu – tylko wpisy z sygnałem. */
 function opisSygnalu(w: RadarWpis): string {
   if (w.rodzaj === "transfer") {
     if (w.powod === "zmiana_ligi") {
@@ -308,7 +308,7 @@ function opisSygnalu(w: RadarWpis): string {
           : `W nowej lidze zagrał dopiero ${w.mecze_nowa} ${w.mecze_nowa === 1 ? "mecz" : w.mecze_nowa < 5 ? "mecze" : "meczów"}`;
       return (
         `Ostatnie ${w.mecze_stara ?? ""} występów zaliczył w poprzedniej lidze${liga}. ` +
-        `${nowa}. Liczby niżej pochodzą głównie ze starego adresu — kurs może tego nie uwzględniać.`
+        `${nowa}. Liczby niżej pochodzą głównie ze starego adresu – kurs może tego nie uwzględniać.`
       );
     }
     return (
@@ -331,7 +331,7 @@ function opisSygnalu(w: RadarWpis): string {
   }
   if (w.rodzaj === "bez_feedu") {
     return (
-      "Rozgrywki tego meczu nie są objęte feedem statystyk meczowych, więc nie pokazujemy ostatnich występów ani formy — to nie znaczy, że zawodnik jest nieznany. " +
+      "Rozgrywki tego meczu nie są objęte feedem statystyk meczowych, więc nie pokazujemy ostatnich występów ani formy – to nie znaczy, że zawodnik jest nieznany. " +
       (w.sezony?.length
         ? "Poniżej kursy Superbetu i średnie z całych sezonów."
         : "Poniżej same kursy Superbetu; średnie sezonowe dojdą przy najbliższym odświeżeniu danych.")
@@ -353,7 +353,7 @@ function opisSygnalu(w: RadarWpis): string {
  *
  * KIERUNEK SŁOWEM, PROCENT JAKO PRZYPIS (2026-08-01). Wcześniej kolumna
  * pokazywała samo „−20%" i nie było wiadomo, czy to o tyle spadła szansa,
- * czy oczekiwana liczba zdarzeń — a wyjaśnienie siedziało w dymku, którego
+ * czy oczekiwana liczba zdarzeń – a wyjaśnienie siedziało w dymku, którego
  * na telefonie nie ma. Teraz wiersz mówi „obniża", a liczba jest obok,
  * mniejsza, dla tych, którzy jej szukają.
  */
@@ -402,15 +402,15 @@ function opisRywala(r: RadarCzynnik, rynek: string): string | null {
     r.rank != null && r.z != null ? `, ${miejsceWLidze(r.rank, r.z)}` : "";
   const zrodlo =
     r.zrodlo === "historia_pokrewny"
-      ? " — z rynku pokrewnego, więc z połową siły"
+      ? " – z rynku pokrewnego, więc z połową siły"
       : r.zrodlo === "historia"
-        ? ` — z ${r.mecze ?? 0} meczów w naszych danych`
+        ? ` – z ${r.mecze ?? 0} meczów w naszych danych`
         : "";
   return `${rynek.toLowerCase()}: rywal dopuszcza ${skala}${miejsce}${zrodlo}`;
 }
 
 /**
- * „Dlaczego" — wodospad od surowego pokrycia do szansy po kontekście.
+ * „Dlaczego" – wodospad od surowego pokrycia do szansy po kontekście.
  * To jest odpowiedź na pytanie „gra z najlepszą obroną, czemu miałby oddać
  * 2 strzały?": widać, czy i o ile ścięliśmy historię tym meczem.
  */
@@ -449,13 +449,13 @@ function Wodospad({
         skąd ta liczba
       </p>
       {/* WYJAŚNIENIA NA STRONIE, NIE W DYMKACH (2026-08-01). Sześć wierszy
-          niżej miało sześć dymków z pełnymi zdaniami — czyli na telefonie
+          niżej miało sześć dymków z pełnymi zdaniami – czyli na telefonie
           była to lista skrótów bez znaczenia. Zdania, które naprawdę coś
           wnosiły, wsiąkły w opis wiersza; reszta zniknęła. */}
       <div className="mt-1.5 divide-y divide-hairline">
         <CzynnikWiersz
           etykieta="punkt wyjścia"
-          opis={`${trafioneZ(traf, z)} — od tego zaczynamy`}
+          opis={`${trafioneZ(traf, z)} – od tego zaczynamy`}
         />
         {opisR && (
           <CzynnikWiersz
@@ -467,7 +467,7 @@ function Wodospad({
         {sedzia?.zrodlo === "brak_obsady" ? (
           <CzynnikWiersz
             etykieta="sędzia"
-            opis="jeszcze nie wiadomo, kto sędziuje — nie zgadujemy, więc nic tu nie zmieniamy"
+            opis="jeszcze nie wiadomo, kto sędziuje – nie zgadujemy, więc nic tu nie zmieniamy"
           />
         ) : sedzia?.sedzia ? (
           <CzynnikWiersz
@@ -501,13 +501,13 @@ function Wodospad({
         {sezony?.mnoznik != null && (
           <CzynnikWiersz
             etykieta="cały sezon"
-            opis={`przez cały sezon ${naMecz(sezony.sezon90 ?? 0, "")}, w ostatnich meczach ${naMecz(sezony.okno90 ?? 0, "")} — dłuższa historia waży więcej`}
+            opis={`przez cały sezon ${naMecz(sezony.sezon90 ?? 0, "")}, w ostatnich meczach ${naMecz(sezony.okno90 ?? 0, "")} – dłuższa historia waży więcej`}
             mnoznik={sezony.mnoznik}
           />
         )}
       </div>
       {/* „+13 pkt proc." zastąpione dwiema liczbami obok siebie i zdaniem,
-          co z nich wynika — punkt procentowy to jednostka, której prawie
+          co z nich wynika – punkt procentowy to jednostka, której prawie
           nikt nie odróżnia od procenta, a tu akurat na niej wszystko stoi. */}
       {pFinal != null && (
         <p className="mt-2 border-t border-hairline pt-2 text-[11px] leading-relaxed text-ink-soft">
@@ -522,13 +522,13 @@ function Wodospad({
               {przewaga != null && przewaga > 0 && (
                 <span className="font-semibold text-data-green-ink">
                   {" "}
-                  — czyli naszym zdaniem bukmacher płaci tu za dużo
+                  – czyli naszym zdaniem bukmacher płaci tu za dużo
                 </span>
               )}
               {przewaga != null && przewaga <= 0 && (
                 <span className="font-semibold text-data-amber-ink">
                   {" "}
-                  — czyli cena jest uczciwa albo lekko za niska
+                  – czyli cena jest uczciwa albo lekko za niska
                 </span>
               )}
             </>
@@ -552,15 +552,15 @@ function SzczebelWiersz({ s }: { s: RadarSzczebel }) {
   const udzial = p && p.z > 0 ? p.traf / p.z : null;
   return (
     /* BEZ DYMKA (2026-08-01): powtarzał liczby, które i tak są w wierszu.
-       Jedyna rzecz, której w wierszu nie było — „szansa ścięta, bo model
-       widzi tę linię ciemniej niż historia" — dostała widoczny znacznik. */
+       Jedyna rzecz, której w wierszu nie było – „szansa ścięta, bo model
+       widzi tę linię ciemniej niż historia" – dostała widoczny znacznik. */
     <div className="grid grid-cols-[2.4rem_3.2rem_3rem_1fr] items-center gap-x-3 py-1">
       <span className="font-data text-xs font-semibold text-ink">
         {linLabel(s.linia)}
       </span>
       <span className="font-data text-xs font-semibold text-brand-deep">
         {fmtKurs(s.kurs)}
-        {/* druga cena POD pierwszą, a nie w nowej kolumnie — na telefonie
+        {/* druga cena POD pierwszą, a nie w nowej kolumnie – na telefonie
             piąta kolumna rozpychała wiersz w bok */}
         {s.rozjazd && (
           <span
@@ -583,7 +583,7 @@ function SzczebelWiersz({ s }: { s: RadarSzczebel }) {
           ? fmtProc(s.p_final)
           : s.p_model != null
             ? fmtProc(s.p_model)
-            : "—"}
+            : "–"}
         {s.strzyzenie_modelu && (
           <span className="block text-[9px] font-normal text-data-amber-ink">
             ścięta
@@ -647,12 +647,12 @@ function odmien(n: number, kod: string): string {
 const KROTKI_WYSTEP_MIN = 60;
 
 /**
- * Mecz po meczu, zdaniami — nie samym ciągiem liczb.
+ * Mecz po meczu, zdaniami – nie samym ciągiem liczb.
  *
  * Wzorzec, który user przysłał jako docelowy dla Drabinek, opisuje KAŻDY mecz
  * osobno („3 strzały zza pola vs Radomiak", „1 strzał vs Miedź, 40 minut gry").
  * Dopiero taki zapis pozwala odróżnić zero po pełnym meczu od zera po wejściu
- * z ławki — a to zupełnie inna informacja o zawodniku.
+ * z ławki – a to zupełnie inna informacja o zawodniku.
  */
 function RywaleMeczPoMeczu({ r }: { r: RadarRynek }) {
   const n = r.ostatnie?.length ?? 0;
@@ -687,7 +687,7 @@ function RywaleMeczPoMeczu({ r }: { r: RadarRynek }) {
                   krotki ? "text-data-amber-ink" : "text-faint"
                 }`}
               >
-                {min} min{krotki && " — krótko, więc mało z tego wynika"}
+                {min} min{krotki && " – krótko, więc mało z tego wynika"}
               </span>
             )}
           </li>
@@ -705,7 +705,7 @@ function RynekBlok({ r }: { r: RadarRynek }) {
         <span className="text-xs font-semibold text-ink">{r.rynek}</span>
         <span className="flex items-baseline gap-3">
           {/* „forma ↑ 2,1/90 (baza 1,7)" -> zdanie. Zapis „/90" znaczy
-              „na 90 minut gry", czyli po prostu na mecz — ale tego trzeba
+              „na 90 minut gry", czyli po prostu na mecz – ale tego trzeba
               było się domyślić albo najechać myszą. */}
           {r.forma && (
             <span className="text-[11px]">
@@ -742,7 +742,7 @@ function RynekBlok({ r }: { r: RadarRynek }) {
           <span>trafienia w ost. meczach</span>
         </div>
         {/* NAGŁÓWKI TŁUMACZĄ SIĘ POD TABELĄ, NIE W DYMKU. Dwa z czterech
-            miały wcześniej `title` z pełnym zdaniem — na telefonie nie do
+            miały wcześniej `title` z pełnym zdaniem – na telefonie nie do
             odczytania, a bez nich kolumna „szansa" nie mówi, czyja to szansa
             i skąd się bierze. */}
         <p className="mt-1 text-[10px] leading-relaxed text-faint">
@@ -763,7 +763,7 @@ function RynekBlok({ r }: { r: RadarRynek }) {
         {r.drabinka.some((s) => s.strzyzenie_modelu) && (
           <p className="mt-1 text-[10px] leading-relaxed text-faint">
             „ścięta” znaczy, że model widzi tę linię ciemniej niż sama historia
-            — i zostawiamy tę niższą liczbę, nie wyższą.
+            – i zostawiamy tę niższą liczbę, nie wyższą.
           </p>
         )}
       </div>
@@ -789,7 +789,7 @@ function RynekBlok({ r }: { r: RadarRynek }) {
           {/* MECZ PO MECZU, NIE SAM CIĄG LICZB (wzorzec typera, którego user
               przysłał jako docelowy: „3 strzały vs Radomiak", „1 strzał vs
               Miedź (40 min gry)"). Kafelki wyżej zostają na szybki rzut oka,
-              ale nazwa rywala i minuty nie mogą siedzieć w dymku — to jest
+              ale nazwa rywala i minuty nie mogą siedzieć w dymku – to jest
               treść, po którą czyta się rozwinięcie. Krótkie występy
               wyróżniamy, bo „0 strzałów" po 20 minutach znaczy co innego niż
               po pełnym meczu. */}
@@ -812,7 +812,7 @@ function RynekBlok({ r }: { r: RadarRynek }) {
           )}
           {r.rywal.rank != null && r.rywal.z != null && (
             <span className="text-faint">
-              {" — "}
+              {" – "}
               {miejsceWLidze(r.rywal.rank, r.rywal.z)}
             </span>
           )}
@@ -823,7 +823,7 @@ function RynekBlok({ r }: { r: RadarRynek }) {
   );
 }
 
-/** Wiersz sezonu: liga, rok, mecze i średnia — TYLKO dla wybranego rynku. */
+/** Wiersz sezonu: liga, rok, mecze i średnia – TYLKO dla wybranego rynku. */
 function SezonWiersz({ s, rynekKod }: { s: RadarSezon; rynekKod?: string }) {
   const wpisy = Object.entries(s.na_mecz).filter(
     ([mk]) => SEZON_RYNKI_PL[mk] && (!rynekKod || mk === rynekKod),
@@ -869,20 +869,20 @@ export const RadarCard = memo(function RadarCard({
     w.ocena?.klasa && w.ocena.klasa !== "solidny"
       ? KLASY[w.ocena.klasa]
       : null;
-  // „analiza" bez paska i plakietki — to stan domyślny, a etykieta na każdej
+  // „analiza" bez paska i plakietki – to stan domyślny, a etykieta na każdej
   // karcie przestaje cokolwiek znaczyć (ta sama zasada co przy „solidny")
   const kat =
     // od 2026-08-01 kategoria nie jest plakietką, tylko zdaniem w rozwinięciu
-    // — więc „tylko nasza analiza" też warto powiedzieć, zamiast przemilczeć
+    // – więc „tylko nasza analiza" też warto powiedzieć, zamiast przemilczeć
     w.kategoria ? KATEGORIE[w.kategoria] : null;
 
   // NAJWYŻEJ DWIE PLAKIETKI (2026-08-01). Wcześniej mogło ich być pięć naraz
-  // — kategoria, klasa, „mocna seria", sygnał i skład — i nagłówek robił się
+  // – kategoria, klasa, „mocna seria", sygnał i skład – i nagłówek robił się
   // jarmarkiem, w którym nic nie było ważne. Kolejność niżej to kolejność
   // WAŻNOŚCI DLA DECYZJI: ostrzeżenie o składzie bije wszystko, potem ocena
   // przewagi, potem uczciwe zastrzeżenie „to stoi na serii, nie na przewadze",
   // na końcu sygnał. Wszystko, co się nie zmieści, ma swoje zdanie
-  // w rozwinięciu — nie znika, tylko przestaje krzyczeć.
+  // w rozwinięciu – nie znika, tylko przestaje krzyczeć.
   const plakietki = [
     w.xi === false
       ? {
@@ -904,7 +904,7 @@ export const RadarCard = memo(function RadarCard({
       layout={!reduced}
       className="relative overflow-hidden rounded-(--radius-card) border border-hairline bg-card shadow-(--shadow-card) transition-[border-color,box-shadow] duration-200 hover:border-brand/30 hover:shadow-(--shadow-card-hover)"
     >
-      {/* pasek kategorii przy krawędzi — skanuje się wzrokiem, bez czytania */}
+      {/* pasek kategorii przy krawędzi – skanuje się wzrokiem, bez czytania */}
       {kat && (
         <span
           aria-hidden
@@ -945,7 +945,7 @@ export const RadarCard = memo(function RadarCard({
           </span>
 
           {/* NAJWYŻEJ DWIE PLAKIETKI (2026-08-01). Wcześniej mogło ich być
-              pięć naraz — kategoria, klasa, „mocna seria", sygnał i skład —
+              pięć naraz – kategoria, klasa, „mocna seria", sygnał i skład –
               a nagłówek robił się jarmarkiem, w którym nic nie było ważne.
               Zostają: OCENA (jak duża przewaga) i OSTRZEŻENIE (poza składem),
               bo tylko te dwie zmieniają decyzję. Cała reszta ma teraz swoje
@@ -962,7 +962,7 @@ export const RadarCard = memo(function RadarCard({
           </span>
         </span>
 
-        {/* UKŁAD „PEWNIAK TANIEJ" — najcenniejszy rodzaj rozjazdu, więc mówimy
+        {/* UKŁAD „PEWNIAK TANIEJ" – najcenniejszy rodzaj rozjazdu, więc mówimy
             go zdaniem, a nie samym procentem. Cena tańsza jest DOWODEM, że
             zdarzenie jest pewne; stawia się tam, gdzie płacą więcej. */}
         {w.rozjazd_pewniak && (
@@ -982,21 +982,21 @@ export const RadarCard = memo(function RadarCard({
             <span className="font-data font-semibold">
               {fmtKurs(w.rozjazd_pewniak.lepszy)}
             </span>{" "}
-            — o {Math.round(w.rozjazd_pewniak.przewaga_pct)}% więcej za to samo.
+            – o {Math.round(w.rozjazd_pewniak.przewaga_pct)}% więcej za to samo.
             <span className="mt-0.5 block text-[10px] opacity-80">
-              To ocena rynku, nie gwarancja — karta stoi na analizie, a różnica
+              To ocena rynku, nie gwarancja – karta stoi na analizie, a różnica
               cen jest do niej dodatkiem.
             </span>
           </span>
         )}
 
-        {/* DRABINKA — to jest treść karty, patrz DrabinkaPasek */}
+        {/* DRABINKA – to jest treść karty, patrz DrabinkaPasek */}
         <DrabinkaPasek w={w} />
 
         {/* zajawka z konkretem + rozwinięcie */}
         <span className="flex items-center gap-x-2.5 px-4 pb-3.5 sm:px-5">
           {/* Gdy pasek drabinki jest na karcie, zajawka mówiłaby DOKŁADNIE to
-              samo („Strzały 2+ · kurs 1,56 · szansa 73%") tylko prozą — dwa
+              samo („Strzały 2+ · kurs 1,56 · szansa 73%") tylko prozą – dwa
               razy ta sama rzecz, jedna pod drugą. Zostaje wtedy sam przycisk
               rozwinięcia; opisowe zajawki (debiutant, transfer, brak feedu)
               niosą treść, której w pasku nie ma, więc te zostają. */}
@@ -1038,7 +1038,7 @@ export const RadarCard = memo(function RadarCard({
             transition={{ duration: 0.28, ease: [0.25, 0.9, 0.3, 1] }}
           >
             <div className="border-t border-hairline bg-paper/50 px-4 py-4 sm:px-6">
-              {/* CO TA KARTA MA NA SOBIE — zdania, które do 2026-08-01 były
+              {/* CO TA KARTA MA NA SOBIE – zdania, które do 2026-08-01 były
                   dymkami przy plakietkach. Dymek nie działa na telefonie,
                   a bez tych zdań etykiety typu „lepsza cena" albo „debiutant"
                   są dla postronnej osoby zgadywanką. */}
@@ -1062,7 +1062,7 @@ export const RadarCard = memo(function RadarCard({
                     <li>
                       <span className="font-medium text-ink">mocna seria:</span>{" "}
                       ta karta stoi na serii, nie na przewadze. Zawodnik
-                      regularnie przebija tę linię, a cena jest grywalna — ale
+                      regularnie przebija tę linię, a cena jest grywalna – ale
                       nasza szansa NIE bije tu kursu bukmachera.
                     </li>
                   )}
@@ -1078,14 +1078,14 @@ export const RadarCard = memo(function RadarCard({
                     <li className="text-data-red-ink">
                       <span className="font-medium">raczej poza składem:</span>{" "}
                       według składu (ogłoszonego albo przewidywanego) nie
-                      zaczyna meczu. Ta karta powstała wcześniej — lepiej jej
+                      zaczyna meczu. Ta karta powstała wcześniej – lepiej jej
                       nie grać.
                     </li>
                   )}
                   {w.xi === true && (
                     <li className="text-faint">
                       <span className="font-medium">raczej w pierwszym składzie:</span>{" "}
-                      tak wynika ze składu — ale bywa on przewidywany przez
+                      tak wynika ze składu – ale bywa on przewidywany przez
                       serwis nawet 36 godzin przed meczem, a nie ogłoszony
                       przez trenera.
                     </li>
@@ -1098,7 +1098,7 @@ export const RadarCard = memo(function RadarCard({
                 </p>
               )}
 
-              {/* TYLKO wybrany typ — karta argumentuje jedną rekomendację,
+              {/* TYLKO wybrany typ – karta argumentuje jedną rekomendację,
                   nie wysypuje wszystkich 9 rynków (decyzja produktowa) */}
               <div className="space-y-2.5">
                 {(() => {
@@ -1132,7 +1132,7 @@ export const RadarCard = memo(function RadarCard({
                     średnie sezonowe
                   </p>
                   <p className="mb-2 text-[10px] leading-relaxed text-faint">
-                    Średnie z całych sezonów — także z poprzedniego klubu
+                    Średnie z całych sezonów – także z poprzedniego klubu
                     i ligi, jeśli zmienił barwy.
                   </p>
                   <div className="space-y-2">

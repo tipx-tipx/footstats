@@ -1,7 +1,7 @@
 import { Logo } from "./Logo";
 
 /**
- * Stopka produktu. Renderowana WYŁĄCZNIE w app/(app)/layout.tsx — /login żyje
+ * Stopka produktu. Renderowana WYŁĄCZNIE w app/(app)/layout.tsx – /login żyje
  * poza tą grupą tras (server component, bez "use client").
  */
 export function SiteFooter({

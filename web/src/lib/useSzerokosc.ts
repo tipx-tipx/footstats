@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-/** Zmierzona szerokość elementu (ResizeObserver) — 0 przed pierwszym pomiarem. */
+/** Zmierzona szerokość elementu (ResizeObserver) – 0 przed pierwszym pomiarem. */
 export function useSzerokosc() {
   const ref = useRef<HTMLDivElement | null>(null);
   const [w, setW] = useState(0);

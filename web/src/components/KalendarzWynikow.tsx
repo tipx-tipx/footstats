@@ -7,10 +7,10 @@ import type { SkutecznoscDnia } from "@/lib/types";
 import { OSTATNIA_ZMIANA, poZmianie } from "@/lib/zmiany";
 
 /**
- * Kalendarz wyników — mapa miesiąca: bilans każdego dnia w jednostkach stawki.
+ * Kalendarz wyników – mapa miesiąca: bilans każdego dnia w jednostkach stawki.
  *
  * Kafelek niesie DWIE rzeczy (numer dnia + bilans), nie trzy. Trafienia,
- * typy i CLV pokazuje panel dnia po kliknięciu — na kwadracie 40 px trzecia
+ * typy i CLV pokazuje panel dnia po kliknięciu – na kwadracie 40 px trzecia
  * liczba i tak zlewała się w plamę, a na telefonie była nieczytelna.
  *
  * Wybór produktu (zawodnicy / drużyny / drabinki) NIE należy do tego
@@ -38,9 +38,9 @@ export function KalendarzWynikow({
   onWybierz,
   pelnyWglad = true,
 }: {
-  /** dni PO filtrze produktu — to one rysują kafelki */
+  /** dni PO filtrze produktu – to one rysują kafelki */
   dni: SkutecznoscDnia[];
-  /** pełny zbiór dni — wyznacza dostępne miesiące, żeby filtr nie zabierał
+  /** pełny zbiór dni – wyznacza dostępne miesiące, żeby filtr nie zabierał
    *  strzałek nawigacji */
   wszystkieDni?: SkutecznoscDnia[];
   wybrany?: string | null;
@@ -48,7 +48,7 @@ export function KalendarzWynikow({
   /** false = widok klienta: bilans w złotówkach zamiast jednostek stawki */
   pelnyWglad?: boolean;
 }) {
-  // `pisz`, nie `bilans` — zmienna `bilans` niżej trzyma sumę miesiąca
+  // `pisz`, nie `bilans` – zmienna `bilans` niżej trzyma sumę miesiąca
   const { bilans: pisz, stawka } = useBilans(pelnyWglad);
   const mapa = useMemo(() => {
     const m = new Map<string, SkutecznoscDnia>();
@@ -68,13 +68,13 @@ export function KalendarzWynikow({
   }, [wszystkieDni, dni]);
 
   /**
-   * Pokazywany miesiąc NIE JEST osobnym stanem — wynika z otwartego dnia.
+   * Pokazywany miesiąc NIE JEST osobnym stanem – wynika z otwartego dnia.
    *
    * Pod kalendarzem zawsze stoi panel jakiegoś dnia, a do jego zmiany prowadzą
    * dwie drogi (kafelek i strzałki panelu). Gdyby siatka miała własny stan
    * miesiąca, te drogi potrafiłyby się rozjechać: panel pokazywałby czerwiec,
    * a kalendarz lipiec z niepodświetlonym niczym. Wyliczenie zamiast stanu
-   * czyni ten rozjazd niemożliwym — a strzałki miesiąca po prostu przestawiają
+   * czyni ten rozjazd niemożliwym – a strzałki miesiąca po prostu przestawiają
    * WYBÓR na sąsiedni miesiąc, zamiast przewijać widok obok wyboru.
    */
   const widok = useMemo(() => {
@@ -86,7 +86,7 @@ export function KalendarzWynikow({
     return miesiace[miesiace.length - 1] ?? null;
   }, [wybrany, miesiace]);
 
-  /** Najnowszy dzień z rozliczeniami w danym miesiącu — cel strzałek miesiąca. */
+  /** Najnowszy dzień z rozliczeniami w danym miesiącu – cel strzałek miesiąca. */
   const dzienWMiesiacu = (klucz: number): string | null => {
     const kandydaci = [...mapa.values()]
       .filter((d) => {
@@ -210,7 +210,7 @@ export function KalendarzWynikow({
               aria-pressed={aktywny}
               title={`${k.dzien}: weszło ${k.trafione} z ${k.rozliczone} · bilans ${pisz(k.roi_flat)}${
                 swiezy ? "" : " · typy sprzed zmiany zasad"
-              } — kliknij, żeby zobaczyć ten dzień`}
+              } – kliknij, żeby zobaczyć ten dzień`}
               className={`flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-(--radius-control) border text-xs transition-transform hover:scale-[1.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
                 zysk
                   ? "border-data-green/30 bg-data-green-wash text-data-green-ink"
@@ -219,7 +219,7 @@ export function KalendarzWynikow({
                     : "border-hairline bg-card-soft text-ink-soft"
               } ${swiezy ? "" : "opacity-55"} ${
                 // wybrany dzień jest OTWARTY pod spodem, więc kafelek musi go
-                // wskazywać jednoznacznie — sam ring ginął na kolorowym tle
+                // wskazywać jednoznacznie – sam ring ginął na kolorowym tle
                 aktywny
                   ? "scale-[1.06] ring-2 ring-brand ring-offset-1 ring-offset-card"
                   : ""
@@ -238,7 +238,7 @@ export function KalendarzWynikow({
         <p>
           Kliknij dowolny dzień, żeby zobaczyć jego typy. Puste pola
           = brak rozliczeń; każdy dzień zostaje w kalendarzu, także stratny.
-          {/* kafelek ma ~40 px, więc mieści samą liczbę bez „zł" — jednostkę
+          {/* kafelek ma ~40 px, więc mieści samą liczbę bez „zł" – jednostkę
               trzeba dopowiedzieć tutaj, inaczej „−160" nic nie znaczy */}
           {!pelnyWglad && (
             <> Liczba na kafelku to złotówki przy {stawka} zł na typ.</>
@@ -255,7 +255,7 @@ export function KalendarzWynikow({
               "pl-PL",
               { day: "numeric", month: "long" },
             )}
-            , czyli sprzed zmiany zasad selekcji — opisują model, którego już
+            , czyli sprzed zmiany zasad selekcji – opisują model, którego już
             nie ma w produkcji.
           </p>
         )}

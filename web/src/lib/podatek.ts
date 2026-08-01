@@ -1,5 +1,5 @@
 /**
- * Podatek od stawki — lustro `pipeline/footstats/model/betting.py`.
+ * Podatek od stawki – lustro `pipeline/footstats/model/betting.py`.
  *
  * W Polsce bukmacher pobiera 12% od STAWKI przy zawieraniu zakładu: z 10 zł
  * do gry idzie 8,80 zł, więc z wygranej wraca `stawka × 0,88 × kurs`.
@@ -8,10 +8,10 @@
  * jest stratny NAWET przy stuprocentowej pewności.
  *
  * ROZDZIAŁ DWÓCH LICZB (decyzja usera 2026-07-31). W całym systemie:
- *   * `ev_pct`   — BRUTTO, tym decydują bramy publikacji po stronie Pythona,
- *   * `ev_netto` — PO PODATKU, i TO jest liczba dla użytkownika.
+ *   * `ev_pct`   – BRUTTO, tym decydują bramy publikacji po stronie Pythona,
+ *   * `ev_netto` – PO PODATKU, i TO jest liczba dla użytkownika.
  * Front pokazuje wyłącznie netto. Bramy zostały na brutto celowo, żeby
- * wprowadzenie podatku nie zmieniło przy okazji selekcji typów — inaczej
+ * wprowadzenie podatku nie zmieniło przy okazji selekcji typów – inaczej
  * w rozliczeniach nie dałoby się rozdzielić skutku jednego od drugiego.
  */
 
@@ -35,7 +35,7 @@ export function kursNetto(kurs: number, tryb?: string | null): number {
   return kurs * wspolczynnik(tryb);
 }
 
-/** Ile realnie wraca ze stawki `stawka` — kwota do pokazania userowi. */
+/** Ile realnie wraca ze stawki `stawka` – kwota do pokazania userowi. */
 export function wyplata(kurs: number, stawka: number, tryb?: string | null): number {
   return kursNetto(kurs, tryb) * stawka;
 }
@@ -49,7 +49,7 @@ export function progOplacalnosciKursu(kurs: number, tryb?: string | null): numbe
 /**
  * Wartość zakładu w %, po podatku.
  *
- * Rekordy sprzed 2026-07-31 nie mają `ev_netto` — dla nich liczymy je tutaj
+ * Rekordy sprzed 2026-07-31 nie mają `ev_netto` – dla nich liczymy je tutaj
  * z szansy i kursu, zamiast pokazywać brutto (byłoby o kilkanaście punktów
  * procentowych za dobre).
  */

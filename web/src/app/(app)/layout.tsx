@@ -12,10 +12,10 @@ import { getMeta } from "@/lib/data";
 export const revalidate = 60;
 
 /**
- * Chrome aplikacji (Nav + kolumna treści + stopka) — WYŁĄCZNIE dla stron
+ * Chrome aplikacji (Nav + kolumna treści + stopka) – WYŁĄCZNIE dla stron
  * "wewnątrz" produktu. /login żyje poza tą grupą tras (parenteza w nazwie
  * folderu nie wchodzi do URL-a) i dostaje sam root layout, bez tego chrome'u
- * — dzięki temu Nav/MainShell/SiteFooter nie muszą już sprawdzać pathname
+ * – dzięki temu Nav/MainShell/SiteFooter nie muszą już sprawdzać pathname
  * w czasie działania, żeby schować się na ekranie logowania.
  */
 export default async function AppLayout({

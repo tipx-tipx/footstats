@@ -2,10 +2,10 @@
  * Warstwa danych.
  *
  * Dwa źródła, jeden interfejs:
- *  1. Supabase (produkcja na Vercel) — gdy ustawione SUPABASE_URL + SUPABASE_ANON_KEY.
+ *  1. Supabase (produkcja na Vercel) – gdy ustawione SUPABASE_URL + SUPABASE_ANON_KEY.
  *     Pipeline (GitHub Actions / lokalnie) wypycha snapshoty do tabeli app_data,
  *     aplikacja czyta je tutaj. Odświeżane co godzinę (revalidate).
- *  2. Pliki lokalne (dev / brak Supabase) — bundlowane JSON-y z data/demo.
+ *  2. Pliki lokalne (dev / brak Supabase) – bundlowane JSON-y z data/demo.
  */
 
 import valueBetsLocal from "@/data/demo/value_bets.json";
@@ -81,7 +81,7 @@ const SUPABASE_ANON =
 /**
  * Klucze app_data, które web faktycznie czyta (pola Bundle). MUSI być filtrem
  * w zapytaniu: tabela trzyma też wewnętrzne dane pipeline'u (trend_lib 5,3 MB,
- * styl_bank_liga 2,6 MB, logi rozliczeń...), które rosną z czasem — bez filtra
+ * styl_bank_liga 2,6 MB, logi rozliczeń...), które rosną z czasem – bez filtra
  * każdy zimny render pobierał i parsował ~12 MB, z czego używał ~2,5 MB
  * (pomiar 2026-07-22, głównego winowajcę wolnych Zawodników).
  */
@@ -94,9 +94,9 @@ const BUNDLE_KEYS = [
 /**
  * Odetnij mecze, które już się zaczęły: typ nie do obstawienia nie może
  * wisieć na tablicy (pewniaki/STS/okazje), nawet gdy pipeline chwilowo
- * nie podmienił snapshotu. Kupony zostają — ich status pokazuje historia.
+ * nie podmienił snapshotu. Kupony zostają – ich status pokazuje historia.
  */
-// zapas na obstawienie — MUSI się zgadzać z pipeline (kupony.MARGINES_STARTU_S).
+// zapas na obstawienie – MUSI się zgadzać z pipeline (kupony.MARGINES_STARTU_S).
 // Kupon na mecz startujący za kwadrans jest praktycznie nieobstawialny, a przy
 // cyklu chodzącym co ~godzinę user widział takie pozycje 10 minut przed
 // gwizdkiem (zgłoszenie 2026-07-27, Club Necaxa).
@@ -139,10 +139,10 @@ async function fetchBundle(): Promise<Bundle> {
         // UWAGA: to MUSI być revalidate, nie no-store. Strony są ISR
         // (prerender statyczny + odświeżanie), a no-store podczas
         // prerenderu rzuca kontrolny DynamicServerError, który łapał
-        // nasz try/catch — na produkcję zapiekał się LOKALNY fallback
+        // nasz try/catch – na produkcję zapiekał się LOKALNY fallback
         // demo zamiast danych z Supabase (incydent 2026-07-21). Zapis
         // do data cache Next i tak się nie udaje (payload ~14 MB > limit
-        // 2 MB, ostrzeżenie w logach jest kosmetyczne) — realny cache
+        // 2 MB, ostrzeżenie w logach jest kosmetyczne) – realny cache
         // robi loadBundle niżej, w pamięci instancji.
         next: { revalidate: 60 },
       },
@@ -174,10 +174,10 @@ async function fetchBundle(): Promise<Bundle> {
 /**
  * Cache bundla w pamięci instancji. Bez niego KAŻDY getter KAŻDEGO żądania
  * pobierał całe ~14 MB app_data od nowa (strona zawodników woła 6 getterów
- * w Promise.all = ~87 MB i sześć JSON.parse na jedno wejście — stąd
+ * w Promise.all = ~87 MB i sześć JSON.parse na jedno wejście – stąd
  * kilkusekundowe ładowanie). Jedna współdzielona obietnica deduplikuje
  * gettery w ramach renderu i równoległe żądania, a TTL 60 s (intencja
- * dawnego revalidate) niesie dane między żądaniami — instancja Fluid
+ * dawnego revalidate) niesie dane między żądaniami – instancja Fluid
  * Compute żyje dłużej niż pojedynczy request, więc kolejne wejścia mają
  * bundle od ręki. Świeży kupon po pominięciu nadal pojawia się w ~2-3 min
  * (pipeline odpalany od razu, patrz /api/kupon-pomin).
@@ -222,7 +222,7 @@ export async function getKalibracja(): Promise<Kalibracja> {
   return (await loadBundle()).calibration;
 }
 
-/** Znacznik czasu serwera (sekundy) — pomocnik poza komponentem, bo reguła
+/** Znacznik czasu serwera (sekundy) – pomocnik poza komponentem, bo reguła
  *  czystości renderu nie pozwala wołać Date.now() w komponencie. */
 export function terazTs(): number {
   return Math.floor(Date.now() / 1000);
@@ -275,7 +275,7 @@ export async function getRadar(): Promise<Radar> {
   return (await loadBundle()).radar;
 }
 
-/** Tabela pokrycia skanu — ligi i nasze statystyki (zakładka Mecze). */
+/** Tabela pokrycia skanu – ligi i nasze statystyki (zakładka Mecze). */
 export async function getPokrycie(): Promise<PokrycieLiga> {
   return (await loadBundle()).pokrycie_liga;
 }

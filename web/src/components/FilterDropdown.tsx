@@ -27,7 +27,7 @@ export function FilterDropdown({
 }) {
   const [open, setOpen] = useState(false);
   // panel jest szerszy od przycisku (w-max); przy prawej kolumnie na wąskim
-  // ekranie wyjeżdżałby poza viewport — wtedy dosuwamy go do prawej
+  // ekranie wyjeżdżałby poza viewport – wtedy dosuwamy go do prawej
   const [odPrawej, setOdPrawej] = useState(false);
   const kontener = useRef<HTMLDivElement | null>(null);
   const panel = useRef<HTMLUListElement | null>(null);

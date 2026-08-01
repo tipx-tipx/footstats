@@ -104,7 +104,7 @@ export function BetTracker() {
 
   return (
     <>
-      {/* podsumowanie — pasek statystyk z separatorami (wzór: hero) */}
+      {/* podsumowanie – pasek statystyk z separatorami (wzór: hero) */}
       <div className="mt-7 max-w-3xl rounded-(--radius-card) border border-hairline bg-card px-5 py-4 shadow-(--shadow-card) sm:px-6 sm:py-5">
         <dl className="grid grid-cols-2 gap-y-5 sm:flex sm:items-stretch sm:gap-0">
           {[
@@ -166,7 +166,7 @@ export function BetTracker() {
         </dl>
       </div>
 
-      {/* lista — dziennik wpisów */}
+      {/* lista – dziennik wpisów */}
       <div className="mt-6 space-y-2.5">
         {zaklady.map((z) => {
           const clv = clvPct(z);
@@ -175,7 +175,7 @@ export function BetTracker() {
               key={z.id}
               className="relative overflow-hidden rounded-(--radius-card) border border-hairline bg-card px-4 py-3 shadow-(--shadow-card) transition-shadow hover:shadow-(--shadow-card-hover)"
             >
-              {/* akcent statusu przy krawędzi — czytelny przy przewijaniu */}
+              {/* akcent statusu przy krawędzi – czytelny przy przewijaniu */}
               {WYNIK_PASEK[z.wynik] && (
                 <span
                   aria-hidden

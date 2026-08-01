@@ -9,10 +9,10 @@ import { Segmented } from "./Segmented";
  * przebuduj po składach.
  *
  * Pominięcie zapisuje klucz kuponu w Supabase (API route), który OD RAZU
- * odpala przeliczenie pipeline'u (workflow_dispatch) — slot się zwalnia i
+ * odpala przeliczenie pipeline'u (workflow_dispatch) – slot się zwalnia i
  * powstaje nowy kupon, a pominięty dalej rozlicza się w tle (model uczy się
  * też z niezagranych). Kartę chowamy od razu (localStorage), bo snapshot
- * danych odświeża się co ~60 s. Przywrócenie usuwa klucz — pipeline cofa
+ * danych odświeża się co ~60 s. Przywrócenie usuwa klucz – pipeline cofa
  * pominięcie, o ile slot nie został już zajęty nowszym kuponem.
  */
 
@@ -33,7 +33,7 @@ export function PominKupon({
   children,
 }: {
   klucz?: string;
-  /** true dla kuponów dziennych — opcja "przebuduj po składach" */
+  /** true dla kuponów dziennych – opcja "przebuduj po składach" */
   pokazPrzebuduj?: boolean;
   children: ReactNode;
 }) {
@@ -70,7 +70,7 @@ export function PominKupon({
       // To NIE jest render: funkcja jest procedurą obsługi kliknięcia (async,
       // wołana z onClick), a reguła czystości nie odróżnia jej od ciała
       // komponentu. Znacznik czasu pominięcia musi być realnym „teraz", więc
-      // `Date.now()` jest tu poprawne — inaczej niż w renderze, gdzie od tego
+      // `Date.now()` jest tu poprawne – inaczej niż w renderze, gdzie od tego
       // jest `terazTs()`. Dyrektywa MUSI stać bezpośrednio nad kodem.
       // eslint-disable-next-line react-hooks/purity
       localStorage.setItem(`kupon-pominiety:${klucz}`, String(Date.now()));
@@ -97,7 +97,7 @@ export function PominKupon({
       localStorage.setItem(`kupon-przebudowa:${klucz}`, String(Date.now()));
       setPrzebudowa(true);
     } catch {
-      /* przycisk zostaje — można spróbować ponownie */
+      /* przycisk zostaje – można spróbować ponownie */
     }
   };
 
@@ -219,7 +219,7 @@ const PROFILE_OPIS: Record<string, string> = {
   agresywny: "więcej matchupów i wyższych linii, kupon z rodzynkami",
 };
 
-/** Charakter buildera kuponów — ustawienie globalne (nowe kupony). */
+/** Charakter buildera kuponów – ustawienie globalne (nowe kupony). */
 export function ProfilKuponow() {
   const [profil, setProfil] = useState<string | null>(null);
   const [zapis, setZapis] = useState(false);

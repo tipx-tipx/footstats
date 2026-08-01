@@ -7,9 +7,9 @@ import { fmtKurs, fmtLinia, fmtProc, STRONA_LABEL } from "@/lib/format";
 import type { FormaRynku, ValueBet } from "@/lib/types";
 
 /**
- * Gęsty wiersz ceduły typów — jednostka tablicy /druzyny przy skali sezonu
+ * Gęsty wiersz ceduły typów – jednostka tablicy /druzyny przy skali sezonu
  * (setki typów dziennie): jedna linia z diodą, drużyną, rynkiem, szansą
- * i kursem. Klik otwiera pełne rozwinięcie karty (SzczegolyTypu) — wiersz
+ * i kursem. Klik otwiera pełne rozwinięcie karty (SzczegolyTypu) – wiersz
  * dosłownie "staje się" kartą, lista wraca do gęstej ceduły po zwinięciu.
  */
 
@@ -35,7 +35,7 @@ export const BetRow = memo(function BetRow({
   forma?: FormaRynku;
   /** tryb "wg godziny": godzina jako wyrównana kolumna z przodu wiersza */
   pokazGodzine?: boolean;
-  /** nazwa rozgrywek w metadanych — dla list płaskich, bez sekcji lig */
+  /** nazwa rozgrywek w metadanych – dla list płaskich, bez sekcji lig */
   liga?: string;
 }) {
   const [open, setOpen] = useState(false);

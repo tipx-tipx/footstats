@@ -4,7 +4,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useState, type ReactNode } from "react";
 
 /**
- * Sygnaly — argumenty za typem jako rząd kafelków, opis pod spodem.
+ * Sygnaly – argumenty za typem jako rząd kafelków, opis pod spodem.
  *
  * Pierwszy sygnał startuje otwarty: sekcja od razu coś mówi, zamiast czekać
  * na klik. Kafelki mają ramkę (czytelne „to się klika"), aktywny dostaje
@@ -54,7 +54,7 @@ export function Sygnaly({
   naglowek: ReactNode;
   sygnaly: Sygnal[];
 }) {
-  // pierwszy sygnał otwarty od wejścia — sekcja mówi bez klikania
+  // pierwszy sygnał otwarty od wejścia – sekcja mówi bez klikania
   const [otwarty, setOtwarty] = useState<string | null>(
     sygnaly[0]?.id ?? null,
   );

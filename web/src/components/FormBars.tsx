@@ -13,11 +13,11 @@ import type { Strona } from "@/lib/types";
  * jako słupki z kreskowaną linią zakładu.
  *   zielony słupek  = typ by wszedł (nad linią przy "powyżej", pod przy "poniżej")
  *   szary słupek    = typ by nie wszedł
- *   półprzezroczysty = zawodnik grał krótko (<30 min) — wynik mało mówi
+ *   półprzezroczysty = zawodnik grał krótko (<30 min) – wynik mało mówi
  *
  * Zamiast systemowego tooltipa: własna karta nad słupkiem (rywal, wynik,
  * minuty, klub/kadra, werdykt), hover na desktopie, tap na dotyku. Etykieta
- * linii siedzi na samej linii w prawej rynience — bez osobnej legendy.
+ * linii siedzi na samej linii w prawej rynience – bez osobnej legendy.
  */
 export function FormBars({
   counts,
@@ -59,7 +59,7 @@ export function FormBars({
     const x = ((i + 0.5) / values.length) * obszar;
     return Math.min(Math.max(x, 84), Math.max(w - 84, 84));
   };
-  // etykieta linii pod linią, chyba że linia leży nisko — wtedy nad nią
+  // etykieta linii pod linią, chyba że linia leży nisko – wtedy nad nią
   const liniaNisko = lineY > height * 0.55;
 
   return (
@@ -73,7 +73,7 @@ export function FormBars({
           ", ",
         )}. Linia zakładu: ${fmtLinia(line)}.`}
       >
-        {/* karta hover — jedna naraz, nad wykresem */}
+        {/* karta hover – jedna naraz, nad wykresem */}
         <AnimatePresence>
           {tip != null && (
             <motion.div

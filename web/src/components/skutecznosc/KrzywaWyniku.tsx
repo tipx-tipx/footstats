@@ -5,21 +5,21 @@ import type { SkutecznoscDnia } from "@/lib/types";
 import { OSTATNIA_ZMIANA } from "@/lib/zmiany";
 
 /**
- * KRZYWA WYNIKU — narastający bilans dzień po dniu.
+ * KRZYWA WYNIKU – narastający bilans dzień po dniu.
  *
  * Kalendarz odpowiada „jak było w piątek". Nie odpowiada na pytanie, po które
  * się tu wchodzi: czy to w ogóle idzie w dobrą stronę. Siedem zielonych
  * kafelków rozsypanych między dwunastoma czerwonymi nie układa się w głowie
- * w żaden trend — krzywa układa się w jeden rzut oka.
+ * w żaden trend – krzywa układa się w jeden rzut oka.
  *
  * Pionowa kreska w dniu zmiany zasad selekcji dzieli wykres na „to był inny
  * model" i „to jest ten, który dziś gra". Za dwa tygodnie ta kreska odpowie,
- * czy zaostrzenie bram cokolwiek dało — kalendarz tego nie pokaże nigdy.
+ * czy zaostrzenie bram cokolwiek dało – kalendarz tego nie pokaże nigdy.
  */
 
 const W = 640;
 // Wyższy wykres od 2026-07-27: krzywa stoi w siatce obok kalendarza, który
-// jest dwa razy wyższy — przy 150 px zostawała pod nią pusta kolumna. Przy
+// jest dwa razy wyższy – przy 150 px zostawała pod nią pusta kolumna. Przy
 // okazji łagodne spadki są w ogóle widoczne, a nie zlane w płaską kreskę.
 const H = 260;
 const M = { gora: 12, dol: 20, lewo: 4, prawo: 4 };
@@ -33,7 +33,7 @@ export function KrzywaWyniku({
   pelnyWglad?: boolean;
 }) {
   const { bilans } = useBilans(pelnyWglad);
-  // dni przychodzą najnowszy pierwszy — krzywa idzie od najstarszego
+  // dni przychodzą najnowszy pierwszy – krzywa idzie od najstarszego
   const rosnaco = [...dni]
     .filter((d) => d.rozliczone > 0)
     .sort((a, b) => a.dzien.localeCompare(b.dzien));
@@ -62,7 +62,7 @@ export function KrzywaWyniku({
   const dodatni = koncowy >= 0;
   const kolor = dodatni ? "var(--color-data-green)" : "var(--color-data-red)";
 
-  // kreska zmiany zasad — między ostatnim dniem starych i pierwszym nowych
+  // kreska zmiany zasad – między ostatnim dniem starych i pierwszym nowych
   const odKiedy = OSTATNIA_ZMIANA?.od;
   const iZmiany = odKiedy
     ? punkty.findIndex((p) => p.dzien >= odKiedy)
@@ -104,7 +104,7 @@ export function KrzywaWyniku({
           </linearGradient>
         </defs>
 
-        {/* linia zera — punkt odniesienia „ani zysku, ani straty" */}
+        {/* linia zera – punkt odniesienia „ani zysku, ani straty" */}
         <line
           x1={M.lewo}
           x2={W - M.prawo}
@@ -155,7 +155,7 @@ export function KrzywaWyniku({
           </>
         )}
 
-        {/* punkt końcowy — gdzie jesteśmy dzisiaj */}
+        {/* punkt końcowy – gdzie jesteśmy dzisiaj */}
         <circle
           cx={x(punkty.length - 1)}
           cy={y(koncowy)}
@@ -185,7 +185,7 @@ export function KrzywaWyniku({
       {xZmiany != null && (
         <p className="mt-1 text-[11px] leading-relaxed text-faint">
           Kreska to zmiana zasad selekcji. Wszystko na lewo opisuje model,
-          którego już nie ma w produkcji — porównuj nachylenie po prawej,
+          którego już nie ma w produkcji – porównuj nachylenie po prawej,
           nie sam poziom.
         </p>
       )}

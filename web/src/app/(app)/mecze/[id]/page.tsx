@@ -90,7 +90,7 @@ export default async function MeczPage({
         {/* nagłówek meczu = tablica przed transmisją: typografia i linie,
             bez karty w karcie (siatka boiska leży w tle samej sekcji) */}
         <div className="relative mt-5">
-          {/* siatka boiska wyśrodkowana POD nazwami (własna maska — domyślna
+          {/* siatka boiska wyśrodkowana POD nazwami (własna maska – domyślna
               z .pitch-grid wygasa od lewego górnego rogu i zostawiała plamę
               kratki w rogu, wyglądającą przypadkowo) */}
           <div
@@ -221,7 +221,7 @@ export default async function MeczPage({
 
       {odrzucenia.length > 0 && (
         <Reveal className="mt-10">
-          {/* sito modelu: banda z odczytem, nie karta — to przypis, nie sekcja */}
+          {/* sito modelu: banda z odczytem, nie karta – to przypis, nie sekcja */}
           <details className="group border-y border-hairline">
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3 py-3.5 text-sm font-semibold [&::-webkit-details-marker]:hidden">
               <span>
@@ -297,7 +297,7 @@ const POWOD_LABEL: Record<string, string> = {
   chwiejna_predykcja: "Model sam nie jest pewny swojej liczby",
   rozjazd_z_rynkiem: "Model za daleko od kursu bukmachera",
   kurs_lub_szansa_poza_widelkami: "Kurs i szansa nie składają się w grywalny typ",
-  // ten sam warunek rozbity na trzy (2026-07-27) — dla rynków drużynowych to
+  // ten sam warunek rozbity na trzy (2026-07-27) – dla rynków drużynowych to
   // najczęstszy powód braku typu, a jedna etykieta nie mówiła, co konkretnie
   // zawiodło: cena bukmachera, nasza szansa czy sam rachunek opłacalności
   kurs_poza_widelkami: "Kurs poza widełkami, w jakich gramy",

@@ -3,10 +3,10 @@ import { NextResponse } from "next/server";
 import { createSessionToken, SESSION_COOKIE, SESSION_DAYS } from "@/lib/auth";
 import { mergeAppData, readAppData } from "@/lib/appDataWrite";
 
-// Rate-limit prób logowania per IP — bez tego jedyna obrona było 400ms
+// Rate-limit prób logowania per IP – bez tego jedyna obrona było 400ms
 // sekwencyjnego opóźnienia, które równoległe żądania całkowicie omijają
 // (jedno hasło na cały produkt = tania powierzchnia na brute-force). Zapis
-// idzie przez mergeAppData (migracja 0003, atomowy merge/remove) — dwie
+// idzie przez mergeAppData (migracja 0003, atomowy merge/remove) – dwie
 // równoległe próby logowania z TEGO SAMEGO IP już się nie nadpisują.
 const RATE_LIMIT_WINDOW_S = 15 * 60;
 const RATE_LIMIT_MAX_PROB = 8;
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
   const ip = clientIp(request);
   const now = Math.floor(Date.now() / 1000);
 
-  // stare wpisy (poza oknem) do wywalenia przy najbliższym zapisie — best
+  // stare wpisy (poza oknem) do wywalenia przy najbliższym zapisie – best
   // effort, nie musi być idealnie świeże (rzadka operacja porządkowa)
   const proby: LoginProby = rateLimitOn
     ? (await readAppData(supaUrl!, supaKey!, RATE_LIMIT_KEY)) as LoginProby
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
     /* puste body -> złe hasło */
   }
 
-  // porównanie stałoczasowe — sprawdzamy OBA hasła, zawsze oba, żeby czas
+  // porównanie stałoczasowe – sprawdzamy OBA hasła, zawsze oba, żeby czas
   // odpowiedzi nie zdradzał, które trafiło (KLIENT_PASSWORD jest opcjonalne)
   const pasuje = (wzorzec: string | undefined): boolean => {
     if (!wzorzec) return false;

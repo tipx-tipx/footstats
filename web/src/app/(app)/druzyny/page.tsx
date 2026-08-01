@@ -6,10 +6,10 @@ import { getDruzynyForma, getMecze, getMeta, getValueBets, terazTs } from "@/lib
 export const metadata = { title: "Drużyny – FootStats" };
 
 /**
- * STATYSTYKI DRUŻYNOWE — osobna funkcja produktu (nie ta sama lista co
+ * STATYSTYKI DRUŻYNOWE – osobna funkcja produktu (nie ta sama lista co
  * propsy zawodników): typy na gole, rzuty rożne i kartki CAŁYCH drużyn.
  * Zakres celowo wąski: top 5 lig, Ekstraklasa i puchary europejskie
- * z kwalifikacjami — tylko rozgrywki, dla których model ma głębokie dane.
+ * z kwalifikacjami – tylko rozgrywki, dla których model ma głębokie dane.
  * Tablica jest projektowana pod pełny sezon (dziesiątki meczów dziennie):
  * najmocniejsze typy doby na górze, reszta dniami, filtry rynku i rozgrywek.
  */

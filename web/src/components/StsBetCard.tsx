@@ -14,7 +14,7 @@ const przeplaca = (a: StsAlert) => Math.round((a.ratio - 1) * 100);
 
 /**
  * Trzy niezależne potwierdzenia cross-book (backend: pole `sygnaly`). Kolejność
- * i treść lustrzane do sts_value.py — karta tłumaczy je po ludzku i pokazuje,
+ * i treść lustrzane do sts_value.py – karta tłumaczy je po ludzku i pokazuje,
  * ile z nich realnie zaszło (sygnaly = ich liczba).
  */
 function potwierdzenia(a: StsAlert): { label: string; opis: string; on: boolean }[] {
@@ -43,7 +43,7 @@ function potwierdzenia(a: StsAlert): { label: string; opis: string; on: boolean 
 
 /**
  * Sygnały rozwinięcia: potwierdzenia cross-book + głos modelu + SuperZmiana.
- * Jedna linia etykiet, opisy na klik (komponent Sygnaly) — zamiast dwóch
+ * Jedna linia etykiet, opisy na klik (komponent Sygnaly) – zamiast dwóch
  * kolumn pełnych akapitów.
  */
 function sygnalyAlertu(a: StsAlert): Sygnal[] {
@@ -133,7 +133,7 @@ export const StsBetCard = memo(function StsBetCard({
       wartosc: fmtProc(pSb),
       podpis: "superbet",
       ton: "duch-brand",
-      // bez modelu Superbet jest drugim głosem osi — wtedy dostaje etykietę
+      // bez modelu Superbet jest drugim głosem osi – wtedy dostaje etykietę
       etykieta: model != null ? "gora" : "dol",
       tytul: `Kurs Superbetu ${fmtKurs(a.kurs_superbet)} odpowiada szansie ${fmtProc(
         pSb,
@@ -198,7 +198,7 @@ export const StsBetCard = memo(function StsBetCard({
                   stan === "potw"
                     ? "Pełny value bet STS: model potwierdza i STS przepłaca"
                     : stan === "ostrzega"
-                      ? "Model odrzucił tę selekcję — sama różnica kursowa, ostrożnie"
+                      ? "Model odrzucił tę selekcję – sama różnica kursowa, ostrożnie"
                       : "Różnica kursowa STS vs Superbet (model nie ocenił tej selekcji)"
                 }
                 className="relative inline-flex h-2 w-2 shrink-0 translate-y-px items-center justify-center"
@@ -220,7 +220,7 @@ export const StsBetCard = memo(function StsBetCard({
             </span>
           </span>
 
-          {/* ile STS przepłaca — sygnał gapu na pierwszy rzut oka */}
+          {/* ile STS przepłaca – sygnał gapu na pierwszy rzut oka */}
           <span className="hidden flex-col items-end justify-center sm:flex">
             <span className="font-data text-lg font-semibold leading-none text-data-green-ink">
               +{przeplaca(a)}%
@@ -259,8 +259,8 @@ export const StsBetCard = memo(function StsBetCard({
               stan === "potw"
                 ? "Model potwierdza tę selekcję i STS płaci ponad wartość"
                 : stan === "ostrzega"
-                  ? `Model odrzucił tę selekcję: ${a.odrzucenie_powod}. To sama różnica kursowa — ostrożnie.`
-                  : "Sama różnica kursowa STS vs Superbet — bez potwierdzenia modelu"
+                  ? `Model odrzucił tę selekcję: ${a.odrzucenie_powod}. To sama różnica kursowa – ostrożnie.`
+                  : "Sama różnica kursowa STS vs Superbet – bez potwierdzenia modelu"
             }
           >
             {stan === "potw"

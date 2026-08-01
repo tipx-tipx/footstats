@@ -24,7 +24,7 @@ import { poZmianie } from "@/lib/zmiany";
  * Cała interaktywna część zakładki Skuteczność w JEDNYM stanie.
  *
  * Dotąd wybór produktu (zawodnicy / drużyny / drabinki) stał w dwóch
- * miejscach — w sekcji strumieni i w kalendarzu — z osobnym stanem każdy.
+ * miejscach – w sekcji strumieni i w kalendarzu – z osobnym stanem każdy.
  * Ustawiałeś „Drużyny" w kalendarzu, przechodziłeś wyżej, a tam znowu
  * „Pewniaki". Teraz filtr jest jeden, na górze, i obowiązuje wszystko pod
  * spodem: werdykt, krzywą, kalendarz i tabelę rynków.
@@ -34,13 +34,13 @@ import { poZmianie } from "@/lib/zmiany";
  *
  * DWA WIDOKI (2026-07-27, przygotowanie strony pod klienta zewnętrznego):
  *
- *   klient — strona liniowa, ZERO zakładek. Werdykt w złotówkach, krzywa
+ *   klient – strona liniowa, ZERO zakładek. Werdykt w złotówkach, krzywa
  *            i kalendarz obok siebie, pod nimi wybrany dzień. Koniec.
- *   admin  — to samo plus zakładki z kuchnią: tabela rynków (obiecywał vs
+ *   admin  – to samo plus zakładki z kuchnią: tabela rynków (obiecywał vs
  *            weszło), bilans kuponów, sprawdzian na meczach spoza nauki.
  *
  * Podział nie jest kosmetyczny. Tabela rynków dosłownie mówi „nasz model
- * przeszacowuje o 12 pp" — dla nas to najważniejsza diagnostyka, dla klienta
+ * przeszacowuje o 12 pp" – dla nas to najważniejsza diagnostyka, dla klienta
  * argument przeciwko produktowi. Sprawdzian modelu i typy liczone „na próbę"
  * to z kolei narzędzia inżynierskie: nikt z zewnątrz nie wie, co znaczy punkt
  * na przekątnej. Admin ma przełącznik „pokaż jak widzi klient", bo inaczej
@@ -76,12 +76,12 @@ const OPISY: Record<Strumien, string> = {
 // Zakładka „Co weszło" (pełna lista wszystkich rozliczonych typów) ZNIKNĘŁA
 // 2026-07-27 na prośbę usera: przy kilkuset rozliczeniach była ścianą tekstu,
 // przez którą nie dało się przejść. Wróciliśmy do modelu „kalendarz + dzień",
-// ale bez wady, która tamtą listę zrodziła — patrz komentarz przy `wybranyDzien`.
+// ale bez wady, która tamtą listę zrodziła – patrz komentarz przy `wybranyDzien`.
 //
 // Kalendarz i dzień wyszły PONAD zakładki (2026-07-27): to nie jest „jeden
 // z dowodów", tylko główna treść strony, a chowanie jej za zakładką obok
 // diagnostyki modelu zrównywało rzeczy o zupełnie różnej wadze. W zakładkach
-// została sama kuchnia — i dlatego widzi je wyłącznie admin.
+// została sama kuchnia – i dlatego widzi je wyłącznie admin.
 const ZAKLADKI = [
   { id: "postep", label: "Czy się uczymy" },
   { id: "rynki", label: "Rynki" },
@@ -95,11 +95,11 @@ type IdZakladki = (typeof ZAKLADKI)[number]["id"];
 const N_ISTOTNE = 10;
 
 /**
- * Do którego produktu należy typ — awaryjnie, po samym rekordzie.
+ * Do którego produktu należy typ – awaryjnie, po samym rekordzie.
  *
  * Backend liczy ten podział sam (`skutecznosc_strumienie`), ale dane sprzed
  * jego wdrożenia go nie mają i wtedy filtr produktu w ogóle nie pojawiał się
- * na stronie — user nie miał jak zobaczyć, co weszło z drużyn, a co
+ * na stronie – user nie miał jak zobaczyć, co weszło z drużyn, a co
  * z drabinek. `klasa` (top/mocny/solidny) występuje wyłącznie na kartach
  * Drabinek, a rynki drużynowe mają kod z przedrostkiem `team_`.
  */
@@ -159,7 +159,7 @@ function strumienieZDni(
 }
 
 /**
- * Ile trzeba trafiać, żeby wyjść na zero — PO PODATKU od stawki.
+ * Ile trzeba trafiać, żeby wyjść na zero – PO PODATKU od stawki.
  *
  * Liczone ze średniego kursu rozliczonych typów, ale przez `kursNetto`:
  * przy 12% od stawki z 1 j. pracuje 0,88 j., więc próg przy średnim kursie
@@ -190,12 +190,12 @@ export function SkutecznoscScena({
 }: {
   typy: TypyWyniki;
   meta: Meta;
-  /** panele niezależne od filtru produktu — renderowane na serwerze */
+  /** panele niezależne od filtru produktu – renderowane na serwerze */
   kuponyPanel: React.ReactNode;
   testPanel: React.ReactNode;
   /** false = widok klienta: bez kuchni modelu (patrz komentarz na górze) */
   pelnyWglad?: boolean;
-  /** przełącznik „pokaż jak widzi klient" — tylko dla admina */
+  /** przełącznik „pokaż jak widzi klient" – tylko dla admina */
   przelacznikWidoku?: React.ReactNode;
 }) {
   const reduced = useReducedMotion();
@@ -209,7 +209,7 @@ export function SkutecznoscScena({
     () => typy.skutecznosc_dzienna ?? [],
     [typy.skutecznosc_dzienna],
   );
-  // podział na produkty: z backendu, a gdy go tam jeszcze nie ma — policzony
+  // podział na produkty: z backendu, a gdy go tam jeszcze nie ma – policzony
   // z listy dni (patrz strumienieZDni). Bez tego filtr znikał i user nie miał
   // jak zobaczyć, co weszło z drużyn i z drabinek.
   const strumienie = useMemo(
@@ -236,7 +236,7 @@ export function SkutecznoscScena({
   );
 
   /**
-   * Dni, które mają co pokazać — od najnowszego (tak przychodzą z backendu).
+   * Dni, które mają co pokazać – od najnowszego (tak przychodzą z backendu).
    * Kalendarz rysuje kafelki wyłącznie z nich, więc panel i siatka operują na
    * dokładnie tym samym zbiorze i nawigacja strzałkami nie trafia w pustkę.
    */
@@ -246,7 +246,7 @@ export function SkutecznoscScena({
   );
 
   /**
-   * ZAWSZE któryś dzień jest otwarty — i to jest sedno tej przebudowy.
+   * ZAWSZE któryś dzień jest otwarty – i to jest sedno tej przebudowy.
    *
    * Pełna lista typów („Co weszło") powstała dlatego, że kafelki kalendarza
    * nie wyglądały na klikalne: kto o tym nie wiedział, nie zobaczył ani jednego
@@ -256,7 +256,7 @@ export function SkutecznoscScena({
    * Domyślne otwarcie najnowszego dnia rozwiązuje jedno i drugie: interakcja
    * pokazuje się sama (widać otwarty panel i podświetlony kafelek nad nim),
    * a treści jest tyle, ile człowiek przeczyta. Gdy filtr produktu zmieni się
-   * tak, że zapamiętany dzień w nim nie istnieje, wracamy do najnowszego —
+   * tak, że zapamiętany dzień w nim nie istnieje, wracamy do najnowszego –
    * dlatego to wyliczenie, a nie efekt synchronizujący stan.
    */
   const wybranyDzien =
@@ -320,7 +320,7 @@ export function SkutecznoscScena({
       naPlusie: dni.filter((d) => d.roi_flat > 0.005).length,
       naMinusie: dni.filter((d) => d.roi_flat < -0.005).length,
       winowajca,
-      // wstrzymane RYNKI i wstrzymane POWODY typowania — dla czytelnika to
+      // wstrzymane RYNKI i wstrzymane POWODY typowania – dla czytelnika to
       // jedna lista („czego teraz nie pokazujemy i dlaczego”)
       wstrzymane: [
         ...Object.values(meta.kwarantanna ?? {}),
@@ -363,7 +363,7 @@ export function SkutecznoscScena({
         </div>
       )}
 
-      {/* FILTR PRODUKTU — jeden na całą stronę. Każdy chip niesie własny
+      {/* FILTR PRODUKTU – jeden na całą stronę. Każdy chip niesie własny
           bilans, więc „gdzie tracimy" widać bez wchodzenia w cokolwiek. */}
       {dostepne.length > 1 && (
         <div className="mt-6 max-w-3xl">
@@ -396,7 +396,7 @@ export function SkutecznoscScena({
                   {/* Bilans STĄD ZNIKNĄŁ (decyzja usera 2026-07-27). Chip jest
                       przełącznikiem, a nie tablicą wyników: cztery kwoty obok
                       siebie konkurowały z werdyktem wyżej, który mówi to samo
-                      dokładniej. Zostaje sama liczba rozliczeń — mówi, ile
+                      dokładniej. Zostaje sama liczba rozliczeń – mówi, ile
                       danych stoi za tym, co zobaczysz po kliknięciu. */}
                   <span className="font-data ml-2 text-xs text-faint">
                     ({n})
@@ -413,23 +413,23 @@ export function SkutecznoscScena({
         </div>
       )}
 
-      {/* DOWÓD — trzy bloki, dwa różne układy.
+      {/* DOWÓD – trzy bloki, dwa różne układy.
 
           Wersja z 27.07 stawiała krzywą obok kalendarza, a dzień pod spodem.
           Karty w wierszu mają różną wysokość (krzywa ~260 px, kalendarz ~570),
-          więc pod krzywą zostawała pusta kolumna — i to samo pod dniem, bo był
+          więc pod krzywą zostawała pusta kolumna – i to samo pod dniem, bo był
           węższy od siatki nad nim. Zgłoszone wprost: „pusta przestrzeń góra
           dół".
 
           Na szerokim ekranie kalendarz trzyma prawą kolumnę na całą swoją
           wysokość (`row-span-2`), a lewa układa krzywą i wybrany dzień jedno
-          pod drugim. Dwa krótkie bloki dopełniają jeden wysoki — nie ma czego
+          pod drugim. Dwa krótkie bloki dopełniają jeden wysoki – nie ma czego
           wypełniać. Przy okazji wychodzi to lepiej logicznie: klikasz dzień
           i jego typy są OBOK, na wysokości wzroku.
 
           Na wąskim ekranie liczy się KOLEJNOŚĆ, nie wypełnienie: kalendarz
           musi iść PRZED dniem, bo to nim się dzień wybiera. Dlatego trzy
-          osobne dzieci siatki i jawne `col/row-start` dopiero od XL —
+          osobne dzieci siatki i jawne `col/row-start` dopiero od XL –
           w jednej kolumnie układają się w naturalnej kolejności czytania. */}
       <div className="mt-8 grid max-w-3xl gap-5 xl:max-w-6xl xl:grid-cols-[minmax(0,1fr)_26rem]">
         {dni.length > 1 && (
@@ -454,7 +454,7 @@ export function SkutecznoscScena({
               dzien={wybranyDzien}
               pelnyWglad={pelnyWglad}
               // strzałki chodzą po TEJ SAMEJ liście co kafelki, a kalendarz
-              // przewija się za wyborem (patrz KalendarzWynikow) — więc to
+              // przewija się za wyborem (patrz KalendarzWynikow) – więc to
               // nadal jedna oś czasu, tylko dostępna bez celowania w siatkę
               nowszy={
                 idxDnia > 0
@@ -471,7 +471,7 @@ export function SkutecznoscScena({
             />
           ) : (
             <p className="rounded-(--radius-card) border border-hairline bg-card px-4 py-3.5 text-sm text-muted shadow-(--shadow-card)">
-              Nic tu jeszcze nie ma — żaden typ tego rodzaju się nie rozliczył.
+              Nic tu jeszcze nie ma – żaden typ tego rodzaju się nie rozliczył.
             </p>
           )}
           {pelnyWglad && (poza?.poza_n ?? 0) > 0 && (
@@ -480,7 +480,7 @@ export function SkutecznoscScena({
                 {poza!.poza_trafione ?? 0}/{poza!.poza_n}
               </span>{" "}
               typów policzyliśmy{" "}
-              <strong className="font-semibold">tylko na próbę</strong> — nie
+              <strong className="font-semibold">tylko na próbę</strong> – nie
               było ich na stronie, bo albo dany rynek był chwilowo wstrzymany,
               albo nie zmieściły się w limicie typów z jednego meczu. Nie
               wliczamy ich do bilansu; na liście mają oznaczenie „na próbę”.
@@ -489,7 +489,7 @@ export function SkutecznoscScena({
         </div>
       </div>
 
-      {/* ZAKŁADKI — sama kuchnia modelu, wyłącznie dla admina */}
+      {/* ZAKŁADKI – sama kuchnia modelu, wyłącznie dla admina */}
       {pelnyWglad && (
       <div className="mt-10">
         <div
@@ -586,7 +586,7 @@ export function SkutecznoscScena({
                     Dla każdego rynku porównujemy dwie rzeczy: ile model{" "}
                     <strong className="font-semibold">obiecywał</strong>, a ile
                     faktycznie <strong className="font-semibold">weszło</strong>
-                    . Ostatnia kolumna to różnica między nimi — na minusie
+                    . Ostatnia kolumna to różnica między nimi – na minusie
                     znaczy, że model był zbyt pewny siebie. Rynki, na których
                     rozliczyło się mniej niż {N_ISTOTNE} typów, są wyszarzone:
                     to jeszcze o niczym nie świadczy.
@@ -618,7 +618,7 @@ export function SkutecznoscScena({
                               }`}
                               title={
                                 chudy
-                                  ? `Za mało rozliczeń (${r.n}) — te liczby jeszcze nic nie znaczą`
+                                  ? `Za mało rozliczeń (${r.n}) – te liczby jeszcze nic nie znaczą`
                                   : undefined
                               }
                             >
@@ -659,7 +659,7 @@ export function SkutecznoscScena({
               ) : (
                 <p className="rounded-(--radius-card) border border-hairline bg-card px-4 py-3.5 text-sm text-muted shadow-(--shadow-card)">
                   Drabinki liczą szansę zupełnie inaczej niż model, więc nie ma
-                  sensu wrzucać ich do jednej tabeli — mieszalibyśmy dwie różne
+                  sensu wrzucać ich do jednej tabeli – mieszalibyśmy dwie różne
                   rzeczy. Ich jakość widać wyżej, w rozbiciu na klasy kart.
                 </p>
               )}

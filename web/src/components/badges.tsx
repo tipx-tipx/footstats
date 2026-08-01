@@ -1,7 +1,7 @@
 import type { Pewnosc, Ryzyko } from "@/lib/types";
 import { fmtEV, RYZYKO_LABEL } from "@/lib/format";
 
-/** Plakietka przewagi nad kursem — im wyżej, tym mocniejszy sygnał. */
+/** Plakietka przewagi nad kursem – im wyżej, tym mocniejszy sygnał. */
 export function EdgeBadge({ ev }: { ev: number }) {
   const strong = ev >= 10;
   return (
@@ -11,7 +11,7 @@ export function EdgeBadge({ ev }: { ev: number }) {
           ? "bg-data-green text-on-brand"
           : "bg-data-green-wash text-data-green-ink"
       }`}
-      title="O ile procent kurs jest wyższy, niż wynikałoby z naszej szansy. Przy +8% z każdych postawionych 100 zł średnio 8 zł to zysk — o ile mamy rację."
+      title="O ile procent kurs jest wyższy, niż wynikałoby z naszej szansy. Przy +8% z każdych postawionych 100 zł średnio 8 zł to zysk – o ile mamy rację."
     >
       {fmtEV(ev)}
     </span>
@@ -20,7 +20,7 @@ export function EdgeBadge({ ev }: { ev: number }) {
 
 export function PewnoscDots({ level }: { level: Pewnosc }) {
   const filled = level === "wysoka" ? 3 : level === "srednia" ? 2 : 1;
-  // rosnące kreski jak wskaźnik zasięgu — czytelniejsze "ile" niż kropki
+  // rosnące kreski jak wskaźnik zasięgu – czytelniejsze "ile" niż kropki
   const wysokosci = ["h-1.5", "h-2.5", "h-3"];
   return (
     <span aria-hidden className="flex items-end gap-[3px]">
@@ -42,7 +42,7 @@ const RYZYKO_STYLE: Record<Ryzyko, string> = {
   wysokie: "text-data-red-ink",
 };
 
-/** Zmienność samego zdarzenia — niezależna od pewności modelu. */
+/** Zmienność samego zdarzenia – niezależna od pewności modelu. */
 export function RiskBadge({ level }: { level: Ryzyko }) {
   return (
     <span
@@ -64,7 +64,7 @@ export function RiskBadge({ level }: { level: Ryzyko }) {
 }
 
 /**
- * Chip kontekstowy karty (matchup, świeże składy, miękka linia…) —
+ * Chip kontekstowy karty (matchup, świeże składy, miękka linia…) –
  * jeden wygląd dla wszystkich sygnałów, ton dobiera wariant.
  */
 export function SignalChip({

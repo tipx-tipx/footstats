@@ -8,16 +8,16 @@ import { fmtDzien, odmien } from "@/lib/format";
 import type { SkutecznoscDnia } from "@/lib/types";
 
 /**
- * Panel JEDNEGO DNIA — pod kalendarzem, zawsze otwarty na którymś dniu.
+ * Panel JEDNEGO DNIA – pod kalendarzem, zawsze otwarty na którymś dniu.
  *
  * Jedna oś czasu, dwa sposoby ruszania się po niej: kliknięcie w kafelek
  * (skok w konkretną datę) i strzałki tutaj (krok po kolejnych dniach
- * z rozliczeniami). To NIE jest dawny osobny pager z własnej zakładki —
+ * z rozliczeniami). To NIE jest dawny osobny pager z własnej zakładki –
  * obie drogi ustawiają ten sam wybór, a kalendarz przewija się za nim, więc
  * podświetlony kafelek zawsze odpowiada temu, co widać niżej.
  *
  * Filtr wyniku pojawia się dopiero przy dłuższej liście: przy trzech typach
- * jest szumem, przy trzydziestu — jedynym sposobem, żeby szybko zobaczyć,
+ * jest szumem, przy trzydziestu – jedynym sposobem, żeby szybko zobaczyć,
  * co konkretnie nie weszło.
  */
 
@@ -38,10 +38,10 @@ const PROG_FILTRA = 8;
  *
  *   Wisła Płock  rożne w meczu poniżej  6,5 / 7,5 / 13,5 / 14,5 / 15,5
  *
- * Padło 11 rożnych — trzy ostatnie wchodzą RAZEM. Zgłoszenie usera
+ * Padło 11 rożnych – trzy ostatnie wchodzą RAZEM. Zgłoszenie usera
  * 2026-08-01 („czemu tu jest miliard typów?") dotyczyło dokładnie tego.
  * Publikacja wystawia od tej pory jedną linię na stronę, ale w księdze
- * zostają dni sprzed zmiany — i one nadal mają się czytać uczciwie.
+ * zostają dni sprzed zmiany – i one nadal mają się czytać uczciwie.
  */
 function kluczZakladu(t: {
   mecz: string;
@@ -109,7 +109,7 @@ export function TypyDnia({
   const { bilans } = useBilans(pelnyWglad);
   const [filtr, setFiltr] = useState<Filtr>("wszystko");
   // Typy „na próbę" nie były na stronie i mają własne podsumowanie zdaniem
-  // niżej — ZWINIĘTE domyślnie, bo potrafią zająć połowę listy (zmierzone
+  // niżej – ZWINIĘTE domyślnie, bo potrafią zająć połowę listy (zmierzone
   // 2026-08-01: 27 z 60 ostatnich rozliczeń).
   const [pokazNaProbe, setPokazNaProbe] = useState(false);
   // `?? []` w ciele komponentu tworzyłoby nową tablicę co render i unieważniało
@@ -212,7 +212,7 @@ export function TypyDnia({
             {odmien(widoczne.length, "wiersz", "wiersze", "wierszy")} ={" "}
             {zakladow} {odmien(zakladow, "zakład", "zakłady", "zakładów")}
           </span>{" "}
-          — ta sama drużyna i ten sam rynek stoją tu w kilku liniach naraz
+          – ta sama drużyna i ten sam rynek stoją tu w kilku liniach naraz
           (np. „poniżej 13,5”, „poniżej 14,5”, „poniżej 15,5”). Takie linie
           wchodzą albo przepadają <strong>razem</strong>, więc to jeden wynik
           meczu, nie kilka trafień. Od 1 sierpnia wystawiamy już tylko jedną

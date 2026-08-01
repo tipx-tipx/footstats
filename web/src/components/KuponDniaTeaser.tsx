@@ -66,7 +66,7 @@ export function KuponDniaTeaser({ kupon }: { kupon: Kupon }) {
         <span className="mx-4 block border-t border-dashed border-hairline-strong sm:mx-5" />
       </div>
 
-      {/* typy zgrupowane po meczu — jak na pełnym bilecie */}
+      {/* typy zgrupowane po meczu – jak na pełnym bilecie */}
       <div className="flex-1 pb-1">
         {kupon.legi.map((l, li) => {
           const nowyMecz = li === 0 || kupon.legi[li - 1].mecz_id !== l.mecz_id;

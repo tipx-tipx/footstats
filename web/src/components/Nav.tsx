@@ -10,9 +10,9 @@ import { ThemeToggle } from "./ThemeToggle";
 
 /**
  * Nawigacja w trzech logicznych grupach:
- *   1. codzienna praca — Okazje, Kupony, Mecze
- *   2. Twoje rzeczy   — Moje zakłady
- *   3. zaufanie       — Skuteczność, Jak to działa
+ *   1. codzienna praca – Okazje, Kupony, Mecze
+ *   2. Twoje rzeczy   – Moje zakłady
+ *   3. zaufanie       – Skuteczność, Jak to działa
  * Desktop (md+): pasek z pastylką aktywnej strony, która PŁYNIE między
  * pozycjami (framer-motion layoutId). Mobile: hamburger + panel na scrimie.
  */
@@ -60,7 +60,7 @@ export function Nav() {
     };
   }, [open]);
 
-  // zmiana trasy zamyka panel (np. wstecz w przeglądarce) — korekta stanu
+  // zmiana trasy zamyka panel (np. wstecz w przeglądarce) – korekta stanu
   // w trakcie renderu zamiast effectu (bez kaskadowego renderu)
   const [prevPathname, setPrevPathname] = useState(pathname);
   if (prevPathname !== pathname) {
@@ -70,7 +70,7 @@ export function Nav() {
 
   return (
     <header className="sticky top-0 z-40 px-3 pt-3 sm:px-6">
-      {/* scrim pod panelem mobilnym — poza szklanym kontenerem (backdrop-filter
+      {/* scrim pod panelem mobilnym – poza szklanym kontenerem (backdrop-filter
           robi z niego containing block dla position:fixed) */}
       <AnimatePresence>
         {open && (
@@ -150,7 +150,7 @@ export function Nav() {
             <IkonaWyloguj />
           </button>
 
-          {/* hamburger — tylko mobile */}
+          {/* hamburger – tylko mobile */}
           <button
             onClick={() => setOpen((v) => !v)}
             className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-(--radius-control) text-ink transition-colors hover:bg-paper lg:hidden"
@@ -179,7 +179,7 @@ export function Nav() {
         </div>
       </div>
 
-      {/* panel mobilny — płynne rozwijanie (grid 0fr -> 1fr) */}
+      {/* panel mobilny – płynne rozwijanie (grid 0fr -> 1fr) */}
       <div
         id="menu-mobilne"
         aria-hidden={!open}

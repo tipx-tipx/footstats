@@ -12,13 +12,13 @@ export default async function MeczePage() {
     getPokrycie(),
   ]);
 
-  // rozgrywki, dla których liczymy statystyki drużynowe — terminarz domyślnie
+  // rozgrywki, dla których liczymy statystyki drużynowe – terminarz domyślnie
   // pokazuje tylko je (zgłoszenie usera 2026-07-27)
   const ligiWZakresie = Object.entries(pokrycie.per_rozgrywki ?? {})
     .filter(([, v]) => v.druzynowe)
     .map(([nazwa]) => nazwa);
 
-  // liczniki per mecz (rekordy — serializowalne do komponentu klienckiego)
+  // liczniki per mecz (rekordy – serializowalne do komponentu klienckiego)
   const okazje: Record<number, number> = {};
   const sugestie: Record<number, number> = {};
   const najlepsze: Record<number, number> = {};

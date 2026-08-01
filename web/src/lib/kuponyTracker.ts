@@ -2,7 +2,7 @@
 
 /** Magazyn zagranych kuponów w localStorage (narzędzie osobiste, jak
  *  lib/tracker.ts dla pojedynczych typów). Kupony modelu mają `klucz`,
- *  a pipeline i tak rozlicza każdy z nich — więc wynik zagranego kuponu
+ *  a pipeline i tak rozlicza każdy z nich – więc wynik zagranego kuponu
  *  bierzemy ZA DARMO z historii (typy_wyniki.kupony), po kluczu.
  */
 
@@ -11,14 +11,14 @@ import { kursNetto } from "./podatek";
 
 export interface MojKupon {
   id: string;
-  /** klucz kuponu modelu — po nim dojeżdża wynik z historii */
+  /** klucz kuponu modelu – po nim dojeżdża wynik z historii */
   klucz: string | null;
   cel_label: string | null;
   horyzont: string | null;
   kurs_laczny: number;
   p_model: number;
   stawka: number;
-  /** tryb podatkowy zapisany w chwili zagrania — bez tego zmiana domyślnego
+  /** tryb podatkowy zapisany w chwili zagrania – bez tego zmiana domyślnego
    *  trybu przeliczyłaby wstecz kupony, które user zagrał na innych zasadach */
   tryb_podatku?: string;
   dodano_ts: number;

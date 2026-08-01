@@ -55,7 +55,7 @@ function OsTrafien({ typy }: { typy: TypRozliczony[] }) {
 /**
  * Mini-wykres skuteczności dziennej: kolumna = dzień, zielone wypełnienie
  * = odsetek trafień. Wypełnia treścią przestrzeń, którą karta dostaje od
- * siatki (bliźniak wyższego biletu kuponu) — bez niego środek karty wisiał
+ * siatki (bliźniak wyższego biletu kuponu) – bez niego środek karty wisiał
  * z pustymi pasami nad i pod osią trafień.
  */
 function DniSlupki({ dni }: { dni: SkutecznoscDnia[] }) {
@@ -67,7 +67,7 @@ function DniSlupki({ dni }: { dni: SkutecznoscDnia[] }) {
       <p className="text-[10px] uppercase tracking-wide text-faint">
         skuteczność dzień po dniu
       </p>
-      {/* słupki rosną z kartą (bliźniak wyższego biletu kuponu), z sufitem —
+      {/* słupki rosną z kartą (bliźniak wyższego biletu kuponu), z sufitem –
           bez tego środek karty wisiał z pustymi pasami */}
       <div className="mt-2 flex min-h-14 flex-1 items-end gap-1.5 [max-height:7.5rem]">
         {okno.map((d) => {

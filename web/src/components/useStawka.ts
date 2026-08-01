@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 const KEY = "footstats.stawka";
 
 /**
- * Globalna stawka użytkownika (zł) — jedno źródło dla „z X zł robi się",
+ * Globalna stawka użytkownika (zł) – jedno źródło dla „z X zł robi się",
  * zapisu zagranych kuponów i podglądu generatora. Trzymana lokalnie,
  * domyślnie 10 zł.
  */

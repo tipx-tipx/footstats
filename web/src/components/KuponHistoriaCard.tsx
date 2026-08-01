@@ -2,7 +2,7 @@ import { fmtDataCzas, fmtKurs, fmtLinia, fmtProc, STRONA_LABEL } from "@/lib/for
 import type { KuponHistoria } from "@/lib/types";
 
 /** Techniczne powody z pipeline'u mówią „leg" (magiczne stringi logiki +
- *  historyczne dane w Supabase — nie wolno ich zmieniać u źródła);
+ *  historyczne dane w Supabase – nie wolno ich zmieniać u źródła);
  *  tu tłumaczymy je na język UI („typ") wyłącznie do wyświetlenia. */
 function powodPoLudzku(powod: string): string {
   return powod
@@ -11,8 +11,8 @@ function powodPoLudzku(powod: string): string {
 }
 
 /**
- * Karta kuponu w historii — zamrożona przy publikacji, rozwijana do pełnego
- * składu legów (zgrupowanych po meczu). Używana i w „Kupony — historia",
+ * Karta kuponu w historii – zamrożona przy publikacji, rozwijana do pełnego
+ * składu legów (zgrupowanych po meczu). Używana i w „Kupony – historia",
  * i w sekcji wszystkich wygranych kuponów.
  */
 export function KuponHistoriaCard({
@@ -20,7 +20,7 @@ export function KuponHistoriaCard({
   name,
 }: {
   k: KuponHistoria;
-  /** grupa <details name> — rozwinięcie jednego zamyka sąsiada */
+  /** grupa <details name> – rozwinięcie jednego zamyka sąsiada */
   name?: string;
 }) {
   const rozliczone = k.legi_rozliczone ?? 0;
@@ -97,7 +97,7 @@ export function KuponHistoriaCard({
           </span>
         </p>
       </summary>
-      {/* rozwinięcie: pełny kupon — legi zgrupowane po meczu */}
+      {/* rozwinięcie: pełny kupon – legi zgrupowane po meczu */}
       <div className="border-t border-hairline pb-2">
         {k.legi.map((l, li) => {
           const nowyMecz = li === 0 || k.legi[li - 1].mecz_id !== l.mecz_id;

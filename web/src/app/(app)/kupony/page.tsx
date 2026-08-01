@@ -53,7 +53,7 @@ export default async function KuponyPage() {
         </div>
       )}
 
-      {/* zasady gry — cała dawna ściana tekstu, ale na żądanie */}
+      {/* zasady gry – cała dawna ściana tekstu, ale na żądanie */}
       <Reveal className="mt-8">
         <details className="group max-w-3xl">
           <summary className="flex cursor-pointer list-none items-center gap-2 text-xs font-semibold uppercase tracking-widest text-muted transition-colors hover:text-ink [&::-webkit-details-marker]:hidden">

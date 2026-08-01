@@ -38,7 +38,7 @@ const WYNIK_LABEL: Record<string, string> = {
 /**
  * Zagrane kupony w Moich zakładach. W przeciwieństwie do pojedynczych
  * typów NIE wymagają ręcznego rozliczania: kupony modelu mają klucz,
- * a pipeline rozlicza każdy z nich — wynik dojeżdża sam z historii.
+ * a pipeline rozlicza każdy z nich – wynik dojeżdża sam z historii.
  */
 export function MojeKupony({ historia }: { historia: KuponHistoria[] }) {
   const [kupony, setKupony] = useState<MojKupon[]>([]);

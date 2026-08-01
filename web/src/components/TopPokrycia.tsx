@@ -38,7 +38,7 @@ export function TopPokrycia({
   ligowy = false,
 }: {
   wiersze: WierszPokrycia[];
-  /** [gospodarz, gość] — do filtra drużyn */
+  /** [gospodarz, gość] – do filtra drużyn */
   druzyny: [string, string];
   /** tryb ligowy: bez podziału klub/kadra w opisach próbki */
   ligowy?: boolean;
@@ -49,7 +49,7 @@ export function TopPokrycia({
   const [rozwin, setRozwin] = useState(false);
   const [tip, setTip] = useState<Tip>(null);
 
-  // domyślnie chowamy rynki bez kursu Superbet (niecelne/zablokowane = „—")
+  // domyślnie chowamy rynki bez kursu Superbet (niecelne/zablokowane = „–")
   const zKursem = useMemo(
     () => (bezKursu ? wiersze : wiersze.filter((w) => w.maKurs)),
     [wiersze, bezKursu],
@@ -97,7 +97,7 @@ export function TopPokrycia({
         onMouseLeave={() => setTip(null)}
         onFocus={pokaz}
         onBlur={() => setTip(null)}
-        // dotyk: tap pokazuje tooltip (mobile nie ma hover) — zostaje widoczny
+        // dotyk: tap pokazuje tooltip (mobile nie ma hover) – zostaje widoczny
         // do kolejnego tapnięcia gdzie indziej (proste, bez wyścigu ze
         // zdarzeniami mouseenter, które przeglądarki syntetyzują po dotyku)
         onClick={pokaz}
@@ -114,7 +114,7 @@ export function TopPokrycia({
 
   return (
     <div className="mt-5">
-      {/* zakładki drużyn — tablica wyników, jak na liście okazji */}
+      {/* zakładki drużyn – tablica wyników, jak na liście okazji */}
       <div className="flex flex-wrap items-end gap-x-6 gap-y-1 border-b border-hairline">
         {([[null, "Wszyscy"], ...druzyny.map((d) => [d, d] as const)] as const).map(
           ([kod, label]) => (
@@ -153,7 +153,7 @@ export function TopPokrycia({
           className={`font-display pb-1.5 text-[11px] font-semibold uppercase tracking-wide transition-colors ${
             bezKursu ? "text-brand-deep" : "text-faint hover:text-ink"
           }`}
-          title="Rynki, których Superbet w ogóle nie wystawia (strzały niecelne, zablokowane) — kursu tu nie będzie"
+          title="Rynki, których Superbet w ogóle nie wystawia (strzały niecelne, zablokowane) – kursu tu nie będzie"
         >
           {bezKursu ? "✓ z rynkami bez kursu" : "+ rynki bez kursu"}
         </button>
@@ -178,7 +178,7 @@ export function TopPokrycia({
         </div>
       </div>
 
-      {/* legenda — jedna linia mikro-odczytów zamiast ściany tekstu */}
+      {/* legenda – jedna linia mikro-odczytów zamiast ściany tekstu */}
       <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-faint">
         <span>
           Pokrycie z ostatnich 5 startów, regularni w kadrze na górze.
@@ -195,7 +195,7 @@ export function TopPokrycia({
         </span>
       </div>
 
-      {/* tabela — przewija się w kontenerze (poziomo na mobile),
+      {/* tabela – przewija się w kontenerze (poziomo na mobile),
           nagłówek kolumn przyklejony u góry */}
       <div className="mt-3.5 max-h-[75vh] overflow-auto rounded-(--radius-card) border border-hairline bg-card shadow-(--shadow-card)">
         <table className="w-full min-w-[720px] text-sm">
@@ -320,7 +320,7 @@ export function TopPokrycia({
         )}
       </div>
 
-      {/* płynny tooltip kafelka (fixed — nigdy nieprzycięty przez tabelę) */}
+      {/* płynny tooltip kafelka (fixed – nigdy nieprzycięty przez tabelę) */}
       <div
         aria-hidden
         className={`pointer-events-none fixed z-50 -translate-x-1/2 -translate-y-full rounded-lg bg-ink px-2.5 py-1.5 text-paper shadow-(--shadow-pop) transition-all duration-150 ease-out ${

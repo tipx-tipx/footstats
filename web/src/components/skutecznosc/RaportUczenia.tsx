@@ -4,19 +4,19 @@ import { fmtProc } from "@/lib/format";
 import type { Strumien, UczenieStrumienia } from "@/lib/types";
 
 /**
- * CZY MODEL ROBI POSTĘPY — paczki po 40 rozliczeń, jedna pod drugą.
+ * CZY MODEL ROBI POSTĘPY – paczki po 40 rozliczeń, jedna pod drugą.
  *
  * Pytanie „czy to się w ogóle poprawia" padało co kilka dni i za każdym razem
  * odpowiedź wymagała ręcznego przeliczenia księgi. Teraz liczy to pipeline
  * (rozliczanie.raport_uczenia), a tu jest tylko widok.
  *
  * Wiersz to STAŁA LICZBA ROZLICZEŃ, nie tydzień. Tydzień bywa raz na 3 typy,
- * raz na 90 — porównanie wiersz do wiersza mówiłoby wtedy o kalendarzu
+ * raz na 90 – porównanie wiersz do wiersza mówiłoby wtedy o kalendarzu
  * rozgrywek, nie o modelu.
  *
  * Kolumna, o którą w tym wszystkim chodzi, to RÓŻNICA: ile model obiecywał
  * minus ile weszło. Jeśli model się uczy, ta liczba pełznie do zera.
- * Jeśli stoi w miejscu przez kilka paczek — deklaracja jest ozdobą.
+ * Jeśli stoi w miejscu przez kilka paczek – deklaracja jest ozdobą.
  */
 
 const NAZWY: Record<Strumien, string> = {
@@ -25,7 +25,7 @@ const NAZWY: Record<Strumien, string> = {
   drabinki: "Drabinki",
 };
 
-/** "2026-07-03" → "3 lip" (bez roku — wszystkie paczki są z tego sezonu). */
+/** "2026-07-03" → "3 lip" (bez roku – wszystkie paczki są z tego sezonu). */
 function krotkaData(d: string): string {
   return new Intl.DateTimeFormat("pl-PL", {
     day: "numeric",
@@ -41,7 +41,7 @@ function zDziesieciu(roi: number): string {
 
 /**
  * Luka to RÓŻNICA dwóch procentów, więc jednostką są punkty procentowe.
- * „Model myli się o 20%" i „o 20 pp" to dwie różne rzeczy — pierwsze brzmi
+ * „Model myli się o 20%" i „o 20 pp" to dwie różne rzeczy – pierwsze brzmi
  * jak jedna piąta deklaracji, drugie mówi, ile realnie brakuje trafień.
  */
 function pp(luka: number): string {
@@ -49,7 +49,7 @@ function pp(luka: number): string {
 }
 
 function Werdykt({ t }: { t: NonNullable<UczenieStrumienia["trend"]> }) {
-  // zmiana > 0 znaczy, że luka zbliżyła się do zera — czyli postęp
+  // zmiana > 0 znaczy, że luka zbliżyła się do zera – czyli postęp
   const lepiej = t.zmiana > 0.02;
   const gorzej = t.zmiana < -0.02;
   return (
@@ -71,7 +71,7 @@ function Werdykt({ t }: { t: NonNullable<UczenieStrumienia["trend"]> }) {
       ) : gorzej ? (
         <>
           <strong className="font-semibold">
-            Model NIE robi postępów — jest gorzej.
+            Model NIE robi postępów – jest gorzej.
           </strong>{" "}
           Na starcie na sto typów brakowało {pp(t.luka_start)} trafień do tego,
           co obiecywał; w ostatnich paczkach {pp(t.luka_teraz)}.
@@ -103,7 +103,7 @@ function Tabela({ u }: { u: UczenieStrumienia }) {
               obiecywał
             </th>
             <th className="px-3 py-2.5 font-medium sm:px-4">różnica</th>
-            {/* na telefonie sam „z 10 zł" — pełny nagłówek rozpychał tabelę
+            {/* na telefonie sam „z 10 zł" – pełny nagłówek rozpychał tabelę
                 poza szerokość ekranu (audyt: 416 px w kontenerze 356 px) */}
             <th
               className="px-3 py-2.5 font-medium sm:px-4"
@@ -121,7 +121,7 @@ function Tabela({ u }: { u: UczenieStrumienia }) {
               title={
                 p.pelna
                   ? undefined
-                  : `Paczka jeszcze rośnie (${p.n} rozliczeń) — te liczby będą się zmieniać`
+                  : `Paczka jeszcze rośnie (${p.n} rozliczeń) – te liczby będą się zmieniać`
               }
             >
               <td className="px-3 py-2.5 whitespace-nowrap sm:px-4">
@@ -136,7 +136,7 @@ function Tabela({ u }: { u: UczenieStrumienia }) {
               </td>
               <td className="font-data px-3 py-2.5 whitespace-nowrap sm:px-4">
                 {p.trafione}/{p.n}
-                {/* procent to ta sama informacja co ułamek obok — na wąskim
+                {/* procent to ta sama informacja co ułamek obok – na wąskim
                     ekranie oddaje miejsce kolumnie, której nie da się policzyć
                     w głowie */}
                 <span className="ml-2 hidden text-muted sm:inline">
@@ -169,7 +169,7 @@ function Tabela({ u }: { u: UczenieStrumienia }) {
                       : "text-data-red"
                 }`}
               >
-                {p.roi == null ? "—" : zDziesieciu(p.roi)}
+                {p.roi == null ? "–" : zDziesieciu(p.roi)}
               </td>
             </tr>
           ))}
@@ -184,7 +184,7 @@ export function RaportUczenia({
   strumienie,
 }: {
   raport: Partial<Record<Strumien, UczenieStrumienia>>;
-  /** które produkty pokazać — filtr ze strony obowiązuje i tutaj */
+  /** które produkty pokazać – filtr ze strony obowiązuje i tutaj */
   strumienie: Strumien[];
 }) {
   const widoczne = strumienie.filter((k) => (raport[k]?.paczki.length ?? 0) > 0);
@@ -202,7 +202,7 @@ export function RaportUczenia({
         <strong className="font-semibold">
           kolejne 40 rozliczonych typów
         </strong>{" "}
-        — nie tydzień, bo tydzień bywa raz na trzy typy, a raz na dziewięćdziesiąt.
+        – nie tydzień, bo tydzień bywa raz na trzy typy, a raz na dziewięćdziesiąt.
         Kolumna <strong className="font-semibold">różnica</strong> mówi, o ile
         model się pomylił: na minusie był zbyt pewny siebie. Jeśli się uczy, ta
         liczba z wiersza na wiersz zbliża się do zera.
@@ -218,7 +218,7 @@ export function RaportUczenia({
               <Werdykt t={u.trend} />
             ) : (
               <p className="rounded-(--radius-card) border border-hairline bg-card px-4 py-3 text-sm text-muted">
-                Za mało pełnych paczek na wniosek o kierunku — potrzeba sześciu,
+                Za mało pełnych paczek na wniosek o kierunku – potrzeba sześciu,
                 żeby porównać początek z końcem.
               </p>
             )}

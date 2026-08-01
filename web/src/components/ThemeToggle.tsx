@@ -7,7 +7,7 @@ import { useSyncExternalStore } from "react";
  * (ustawiany bez mignięcia przez skrypt inline w layout.tsx); komponent
  * subskrybuje ten atrybut przez MutationObserver, więc każda instancja
  * przełącznika jest zawsze zsynchronizowana. Wybór usera trafia do
- * localStorage — brak zapisu = podążaj za motywem systemu.
+ * localStorage – brak zapisu = podążaj za motywem systemu.
  */
 const KLUCZ_MOTYWU = "footstats-motyw";
 
@@ -25,7 +25,7 @@ function czyCiemny(): boolean {
 }
 
 export function ThemeToggle({ className = "" }: { className?: string }) {
-  // na serwerze zakładamy jasny — po hydracji dociąga się prawdziwa wartość
+  // na serwerze zakładamy jasny – po hydracji dociąga się prawdziwa wartość
   const ciemny = useSyncExternalStore(subskrybujMotyw, czyCiemny, () => false);
 
   const przelacz = () => {
@@ -34,7 +34,7 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
     try {
       localStorage.setItem(KLUCZ_MOTYWU, naCiemny ? "dark" : "light");
     } catch {
-      // tryb prywatny / zablokowany storage — motyw i tak działa do końca sesji
+      // tryb prywatny / zablokowany storage – motyw i tak działa do końca sesji
     }
   };
 
@@ -47,7 +47,7 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
       className={`shrink-0 rounded-(--radius-control) p-2.5 text-faint transition-colors hover:bg-paper hover:text-ink ${className}`}
     >
       {ciemny ? (
-        // słońce — wracamy do jasnego
+        // słońce – wracamy do jasnego
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
           <circle cx="12" cy="12" r="4" />
           <path
@@ -56,7 +56,7 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
           />
         </svg>
       ) : (
-        // księżyc — przejście na ciemny
+        // księżyc – przejście na ciemny
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
           <path
             d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"

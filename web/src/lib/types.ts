@@ -1,4 +1,4 @@
-/** Typy danych FootStats — odpowiadają JSON-om generowanym przez pipeline. */
+/** Typy danych FootStats – odpowiadają JSON-om generowanym przez pipeline. */
 
 export type Pewnosc = "wysoka" | "srednia" | "niska";
 export type Ryzyko = "niskie" | "srednie" | "wysokie";
@@ -39,16 +39,16 @@ export interface ValueBet {
   rynek: string;
   linia: number;
   strona: Strona;
-  kurs: number | null;          // null dla sugestii (rynek STS — sprawdź ręcznie)
+  kurs: number | null;          // null dla sugestii (rynek STS – sprawdź ręcznie)
   bukmacher: string;
-  /** mediana kursów bukmacherów UK (Bet365, WH...) dla tej linii — konsensus rynku */
+  /** mediana kursów bukmacherów UK (Bet365, WH...) dla tej linii – konsensus rynku */
   kurs_ref?: number | null;
-  /** uczciwy kurs UK po zdjęciu marży (no-vig) — benchmark „prawdziwej" ceny */
+  /** uczciwy kurs UK po zdjęciu marży (no-vig) – benchmark „prawdziwej" ceny */
   kurs_novig?: number | null;
   /** wartość kursu Superbetu względem no-vig UK, w % (dodatnia = miękka linia) */
   ev_uk?: number | null;
   /**
-   * Szansa POKAZYWANA — po urealnieniu na rozliczeniach, gdy jest z czego
+   * Szansa POKAZYWANA – po urealnieniu na rozliczeniach, gdy jest z czego
    * (patrz `p_urealnione`). Liczby pochodne niżej są przeliczone z tej samej
    * wartości, więc karta nie może sama sobie zaprzeczyć. W księdze typów
    * pipeline trzyma wersję surową; ta jest wyłącznie do czytania.
@@ -60,12 +60,12 @@ export interface ValueBet {
   p_rynku: number | null;
   fair_kurs: number;
   edge_pp: number | null;
-  /** BRUTTO — tą liczbą decydują bramy publikacji (patrz betting.ev_brutto_pct) */
+  /** BRUTTO – tą liczbą decydują bramy publikacji (patrz betting.ev_brutto_pct) */
   ev_pct: number | null;
-  /** PO PODATKU od stawki — TO pokazujemy użytkownikowi (betting.ev_pct).
+  /** PO PODATKU od stawki – TO pokazujemy użytkownikowi (betting.ev_pct).
    *  Brak pola = rekord sprzed 2026-07-31; wtedy front liczy netto sam. */
   ev_netto?: number | null;
-  /** „standard" (12% od stawki) | „bez_podatku" | „zwrot" — zapisany przy
+  /** „standard" (12% od stawki) | „bez_podatku" | „zwrot" – zapisany przy
    *  typie, żeby zmiana domyślnego trybu nie unieważniła historii */
   tryb_podatku?: string;
   pewnosc: Pewnosc;
@@ -85,9 +85,9 @@ export interface ValueBet {
   wyzsza_linia?: boolean;
   /** true = profil rywala wyraźnie sprzyja (koncesje per rynek × pozycja) */
   matchup?: boolean;
-  /** true = wraca do XI po dłuższej przerwie — linie rynku bywają niedograne */
+  /** true = wraca do XI po dłuższej przerwie – linie rynku bywają niedograne */
   rotacja?: boolean;
-  /** true = składy potwierdzono <45 min temu — kurs mógł nie zdążyć zareagować */
+  /** true = składy potwierdzono <45 min temu – kurs mógł nie zdążyć zareagować */
   swieze_sklady?: boolean;
   /** true = linia płaci >=12% ponad kurs wynikający z RESZTY siatki Superbetu */
   miekka_linia?: boolean;
@@ -110,7 +110,7 @@ export interface ValueBet {
 /**
  * Value bet STS: selekcja „powyżej", gdzie STS przepłaca vs Superbet, a model
  * potwierdza. Generowane on-demand (jobs/sts_value.py) z domowego IP i wpychane
- * do Supabase (klucz sts_value). Osobny kształt niż ValueBet — STS to porównanie
+ * do Supabase (klucz sts_value). Osobny kształt niż ValueBet – STS to porównanie
  * dwóch kursów + strona modelu, nie pełny rentgen predykcji.
  */
 export interface StsAlert {
@@ -152,7 +152,7 @@ export interface StsAlert {
   ma_model?: boolean;
   /** true = pełny value bet STS: model + cross-book (EV modelu > 0, bez weta) */
   value_potwierdzony?: boolean;
-  /** true = model odrzucił tę parę (zawodnik, rynek) — weto „potwierdzenia" */
+  /** true = model odrzucił tę parę (zawodnik, rynek) – weto „potwierdzenia" */
   model_odrzucil?: boolean;
   /** powód odrzucenia po ludzku (gdy model_odrzucil) */
   odrzucenie_powod?: string | null;
@@ -181,7 +181,7 @@ export interface RadarSzczebel {
   p_bazowe?: number | null;
   /** ile kontekst tego meczu zmienia szansę (1.0 = nic nie zmienia) */
   korekta?: number | null;
-  /** szansa po kontekście — TA liczba decyduje o wyborze i kolejności kart */
+  /** szansa po kontekście – TA liczba decyduje o wyborze i kolejności kart */
   p_final?: number | null;
   /** p_final ścięte, bo model widział tę linię ciemniej niż pokrycie */
   strzyzenie_modelu?: boolean;
@@ -194,7 +194,7 @@ export interface RadarSzczebel {
 export interface RadarRozjazd {
   superbet: number;
   betclic: number;
-  /** wyższa z dwóch cen — tam się gra */
+  /** wyższa z dwóch cen – tam się gra */
   lepszy: number;
   gdzie: "superbet" | "betclic";
   /** o ile procent lepsza cena bije gorszą */
@@ -232,7 +232,7 @@ export interface RadarKontekst {
   scenariusz?: RadarCzynnik;
   dom?: RadarCzynnik;
   sezony?: RadarCzynnik;
-  /** iloczyn czynników po capie — tyle łącznie robi kontekst z lambdą */
+  /** iloczyn czynników po capie – tyle łącznie robi kontekst z lambdą */
   lacznie?: number;
 }
 
@@ -272,7 +272,7 @@ export interface RadarSezon {
 }
 
 /**
- * Wpis radaru okazji kontekstowych (jobs/radar.py) — sygnały, których model
+ * Wpis radaru okazji kontekstowych (jobs/radar.py) – sygnały, których model
  * celowo nie gra: nowy w drużynie, seria formy, debiutant bez historii.
  * To warstwa informacyjna POZA bramami publikacji modelu, nie typ modelu.
  */
@@ -280,7 +280,7 @@ export interface RadarWpis {
   id: number;
   /**
    * "drabinka" = kwotowany gracz z historią, bez osobnego sygnału;
-   * "bez_feedu" = liga poza feedem statystyk (np. Ekstraklasa) — mamy same
+   * "bez_feedu" = liga poza feedem statystyk (np. Ekstraklasa) – mamy same
    * kursy + ewentualnie średnie sezonowe, historii meczowej brak
    */
   rodzaj: "transfer" | "forma" | "debiutant" | "drabinka" | "bez_feedu";
@@ -299,17 +299,17 @@ export interface RadarWpis {
   /** true = karta z WCZEŚNIEJSZEGO cyklu, wznowiona z rejestru publikacji.
    *  Bieżące przeliczenie jej nie odtworzyło (zwykle kurs się skrócił i
    *  przewaga spadła pod próg), ale raz pokazana karta zostaje do gwizdka.
-   *  `hero` jest ZAMROŻONY z chwili publikacji — kurs sprawdź u bukmachera. */
+   *  `hero` jest ZAMROŻONY z chwili publikacji – kurs sprawdź u bukmachera. */
   wznowiony?: boolean;
   /** znacznik pierwszej publikacji karty */
   opublikowano_ts?: number;
   /**
-   * Na czym stoi karta (backend: radar._kategoria_karty) — front dobiera po
+   * Na czym stoi karta (backend: radar._kategoria_karty) – front dobiera po
    * tym kolor i etykietę:
-   *   "analiza"        — sama nasza analiza, drugiej ceny nie mamy
-   *   "rynek_zgodny"   — drugi bukmacher wycenia to prawie tak samo
-   *   "rozjazd"        — drugi bukmacher płaci zauważalnie więcej
-   *   "pewniak_taniej" — jeden mówi „to niemal pewne", drugi płaci sensownie
+   *   "analiza"        – sama nasza analiza, drugiej ceny nie mamy
+   *   "rynek_zgodny"   – drugi bukmacher wycenia to prawie tak samo
+   *   "rozjazd"        – drugi bukmacher płaci zauważalnie więcej
+   *   "pewniak_taniej" – jeden mówi „to niemal pewne", drugi płaci sensownie
    */
   kategoria?: "analiza" | "rynek_zgodny" | "rozjazd" | "pewniak_taniej";
   /** najmocniejszy układ „pewniak taniej" na karcie (do wyróżnienia) */
@@ -331,7 +331,7 @@ export interface RadarWpis {
     korekta?: number | null;
   } | null;
   /**
-   * Ocena karty — JEDYNE źródło rankingu i oznaczeń (front nie ma własnej
+   * Ocena karty – JEDYNE źródło rankingu i oznaczeń (front nie ma własnej
    * definicji „najlepszego typu"). `miejsce` to pozycja w stawce dnia,
    * `klasa` łączy próg przewagi z miejscem w czubie stawki.
    */
@@ -342,8 +342,8 @@ export interface RadarWpis {
     edge: number;
     /**
      * Na czym stoi karta:
-     *   "przewaga" — nasza szansa bije cenę bukmachera,
-     *   "seria"    — mocne pokrycie przy grywalnej cenie, BEZ przewagi.
+     *   "przewaga" – nasza szansa bije cenę bukmachera,
+     *   "seria"    – mocne pokrycie przy grywalnej cenie, BEZ przewagi.
      * Karta bez przewagi nie ma prawa wyglądać jak karta z przewagą,
      * dlatego front pisze to wprost (decyzja usera 2026-07-30).
      */
@@ -367,7 +367,7 @@ export interface RadarWpis {
   stara_liga_utid?: number | null;
   mecze_stara?: number | null;
   mecze_nowa?: number | null;
-  /** profil debiutanta (statshub) — gdy rodzaj = debiutant */
+  /** profil debiutanta (statshub) – gdy rodzaj = debiutant */
   profil?: {
     wzrost?: number | null;
     wiek?: number | null;
@@ -404,7 +404,7 @@ export interface Odrzucenie {
     | "za_malo_zdarzen"
     | "brak_kursu"
     // rynki drużynowe: dawne "kurs_lub_szansa_poza_widelkami" rozbite na trzy
-    // powody (2026-07-27) — jeden licznik na trzy warunki nie mówił, co tnie.
+    // powody (2026-07-27) – jeden licznik na trzy warunki nie mówił, co tnie.
     // Stary kod zostaje: log i dumpy sprzed zmiany nadal go niosą.
     | "kurs_lub_szansa_poza_widelkami"
     | "kurs_poza_widelkami"
@@ -427,7 +427,7 @@ export interface Odrzucenie {
   podmiot_typ?: "druzyna";
 }
 
-/** Jeden leg z przeanalizowanej puli — fundament generatora kuponów na żądanie. */
+/** Jeden leg z przeanalizowanej puli – fundament generatora kuponów na żądanie. */
 export interface LegPool {
   id: number;
   mecz_id: number;
@@ -435,7 +435,7 @@ export interface LegPool {
   kickoff_ts: number;
   podmiot_id: number;
   podmiot: string;
-  /** "zawodnik" (domyślnie) albo "druzyna" — leg na statystykę całej drużyny */
+  /** "zawodnik" (domyślnie) albo "druzyna" – leg na statystykę całej drużyny */
   podmiot_typ?: string;
   druzyna: string;
   przeciwnik: string;
@@ -452,12 +452,12 @@ export interface LegPool {
   rotacja?: boolean;
   miekka_linia?: boolean;
   swieze_sklady?: boolean;
-  /** BRUTTO — tą liczbą decydują bramy publikacji (patrz betting.ev_brutto_pct) */
+  /** BRUTTO – tą liczbą decydują bramy publikacji (patrz betting.ev_brutto_pct) */
   ev_pct?: number | null;
-  /** PO PODATKU od stawki — TO pokazujemy użytkownikowi (betting.ev_pct).
+  /** PO PODATKU od stawki – TO pokazujemy użytkownikowi (betting.ev_pct).
    *  Brak pola = rekord sprzed 2026-07-31; wtedy front liczy netto sam. */
   ev_netto?: number | null;
-  /** „standard" (12% od stawki) | „bez_podatku" | „zwrot" — zapisany przy
+  /** „standard" (12% od stawki) | „bez_podatku" | „zwrot" – zapisany przy
    *  typie, żeby zmiana domyślnego trybu nie unieważniła historii */
   tryb_podatku?: string;
   ev_uk?: number | null;
@@ -468,7 +468,7 @@ export interface LegPool {
   xi_sygnal?: string | null;
   kurs_ref?: number | null;
   pewnosc?: "wysoka" | "srednia";
-  /** przedział wiarygodności szansy [dół, góra] — szerokość steruje
+  /** przedział wiarygodności szansy [dół, góra] – szerokość steruje
    * zaufaniem do p_model przy składaniu kuponu (kuponBuilder.wagaModelu) */
   ci?: number[];
 }
@@ -497,12 +497,12 @@ export interface FormaRynku {
   kadra?: boolean[];
   /** true = mecz u siebie (forma drużynowa) */
   dom?: boolean[];
-  /** timestamp (s) każdego meczu — do daty ostatniego meczu (świeżość) */
+  /** timestamp (s) każdego meczu – do daty ostatniego meczu (świeżość) */
   ts?: number[];
   srednia90: number;
 }
 
-/** Forma DRUŻYNY per rynek drużynowy — karta typu na /druzyny. */
+/** Forma DRUŻYNY per rynek drużynowy – karta typu na /druzyny. */
 export interface DruzynaForma {
   id: number;
   nazwa: string;
@@ -551,13 +551,13 @@ export interface Meta {
   meczow_demo: number;
   meczow_kalibracja: number;
   okazji: number;
-  /** zmierzone kary korelacji legów — generator na żądanie używa tych samych co backend */
+  /** zmierzone kary korelacji legów – generator na żądanie używa tych samych co backend */
   kary_korelacji?: { ta_sama: number; przeciwne: number; nieznane: number };
   /** zmierzone delty wag zaufania per kubełek pewności (kalibracja z rozliczeń) */
   wagi_zaufania?: Record<string, number>;
   /**
    * Rynki chwilowo wstrzymane (traciły pieniądze w oknie ostatnich rozliczeń)
-   * — ich typy nie są publikowane, dopóki ROI się nie odbuduje.
+   * – ich typy nie są publikowane, dopóki ROI się nie odbuduje.
    * `roi` to zwrot na jednostkę stawki, ujemny (np. −0.18 = −18%).
    */
   kwarantanna?: Record<
@@ -569,24 +569,24 @@ export interface Meta {
    * To samo, ale po POWODZIE, dla którego typ wchodził na listę
    * („ambitniejsza linia", „słaby rywal na tym rynku"...). Rozliczenia
    * pokazały, że model zarabia, gdy typuje nudno, i traci na każdej ścieżce
-   * „znaleźliśmy coś więcej niż rynek" — te powody są chwilowo wstrzymane.
+   * „znaleźliśmy coś więcej niż rynek" – te powody są chwilowo wstrzymane.
    */
   kwarantanna_powodow?: Record<
     string,
     { roi: number; hit: number; sr_p: number; n: number; nazwa: string }
   >;
-  /** zapas na obstawienie w minutach — nic nowego nie wchodzi później */
+  /** zapas na obstawienie w minutach – nic nowego nie wchodzi później */
   margines_startu_min?: number;
   /**
    * Zmierzone urealnienie szansy kuponu per horyzont (dzienny /
    * dlugoterminowy / value). Szansa kuponu to iloczyn szans typów, więc błąd
-   * pojedynczego typu podnosi się do potęgi — bez tej korekty kupon obiecywał
+   * pojedynczego typu podnosi się do potęgi – bez tej korekty kupon obiecywał
    * 17%, a wchodził w 10%. Wartość < 1 = tyle z deklaracji naprawdę wchodzi.
    */
   kalibracja_kuponow?: Record<string, number>;
   /**
    * Etykiety przedziałów kursowych per horyzont („dzienny", „dlugoterminowy",
-   * „value") — JEDNO ŹRÓDŁO PRAWDY po stronie `kupony.py`. Widok kuponów miał
+   * „value") – JEDNO ŹRÓDŁO PRAWDY po stronie `kupony.py`. Widok kuponów miał
    * je wpisane na sztywno i po przebudowie progów z 30.07 nie zgadzała się
    * ani jedna, więc zakładka świeciła pustką mimo istniejących kuponów.
    */
@@ -616,7 +616,7 @@ export interface KuponLeg {
   miekka_linia?: boolean;
 }
 
-/** Propozycja wymiany najsłabszego lega (rentgen kuponu — doradcza). */
+/** Propozycja wymiany najsłabszego lega (rentgen kuponu – doradcza). */
 export interface KuponAlternatywa extends KuponLeg {
   zamiast_idx: number;
   kurs_po: number;
@@ -632,7 +632,7 @@ export interface KuponDolozenie extends KuponLeg {
 /** Kupon (AKO) budowany przez model pod docelowy kurs (x5/x10/x15/x20/x25). */
 export interface Kupon {
   cel: number;
-  /** np. "10–15" — przedział kursowy kuponu */
+  /** np. "10–15" – przedział kursowy kuponu */
   cel_label?: string;
   /** dzienny = mecze z dziś/jutra; dlugoterminowy = najbliższe 4 dni */
   horyzont?: "dzienny" | "dlugoterminowy" | "value";
@@ -641,12 +641,12 @@ export interface Kupon {
   kurs_laczny: number;
   p_model: number;
   fair_kurs: number;
-  /** BRUTTO — tą liczbą decydują bramy publikacji (patrz betting.ev_brutto_pct) */
+  /** BRUTTO – tą liczbą decydują bramy publikacji (patrz betting.ev_brutto_pct) */
   ev_pct: number;
-  /** PO PODATKU od stawki — TO pokazujemy użytkownikowi (betting.ev_pct).
+  /** PO PODATKU od stawki – TO pokazujemy użytkownikowi (betting.ev_pct).
    *  Brak pola = rekord sprzed 2026-07-31; wtedy front liczy netto sam. */
   ev_netto?: number | null;
-  /** „standard" (12% od stawki) | „bez_podatku" | „zwrot" — zapisany przy
+  /** „standard" (12% od stawki) | „bez_podatku" | „zwrot" – zapisany przy
    *  typie, żeby zmiana domyślnego trybu nie unieważniła historii */
   tryb_podatku?: string;
   legi: KuponLeg[];
@@ -661,7 +661,7 @@ export interface Kupon {
   wariant_b?: Kupon;
   /** true = kupon powstał z wymiany lega (zastosowana alternatywa rentgena) */
   z_wymiany?: boolean;
-  /** klucz rekordu w logu kuponów — identyfikator do pomijania */
+  /** klucz rekordu w logu kuponów – identyfikator do pomijania */
   klucz?: string;
 }
 
@@ -706,7 +706,7 @@ export interface KuponHistoria extends Kupon {
   kurs_rozliczony?: number;
   legi_trafione?: number;
   legi_rozliczone?: number;
-  /** true = user pominął kupon (nie zagrał) — rozliczony tylko do nauki */
+  /** true = user pominął kupon (nie zagrał) – rozliczony tylko do nauki */
   pominiety?: boolean;
   /** powód pominięcia (user) albo techniczny: wymiana lega / przebudowa */
   pomin_powod?: string | null;
@@ -725,23 +725,23 @@ export interface RynekSkutecznosc {
 
 /** Skuteczność realnych typów jednego dnia (grupowane po dniu meczu). */
 export interface SkutecznoscDnia {
-  /** "YYYY-MM-DD" — dzień meczu */
+  /** "YYYY-MM-DD" – dzień meczu */
   dzien: string;
   rozliczone: number;
   trafione: number;
-  /** typy z realnym kursem (bez sugestii) — podstawa ROI */
+  /** typy z realnym kursem (bez sugestii) – podstawa ROI */
   okazje: number;
   /** ROI flat: stawka 1 j. na okazję (zwrot − postawione) */
   roi_flat: number;
   /** typy rozliczone poza publikacją tego dnia (kwarantanna/limit meczu) */
   poza_n?: number;
   poza_trafione?: number;
-  /** realne typy tego dnia (co siadło / nie siadło) — trafione na górze,
+  /** realne typy tego dnia (co siadło / nie siadło) – trafione na górze,
    *  typy poza publikacją na końcu z oznaczeniem */
   typy?: TypRozliczony[];
 }
 
-/** Strumień skuteczności — patrz rozliczanie._strumien. */
+/** Strumień skuteczności – patrz rozliczanie._strumien. */
 export type Strumien = "pewniaki" | "druzyny" | "drabinki";
 
 /** Skuteczność jednego strumienia: dni + własne podsumowanie. */
@@ -754,7 +754,7 @@ export interface SkutecznoscStrumienia {
     skutecznosc: number | null;
     okazje_rozliczone: number;
     roi_flat: number;
-    /** rozliczone poza publikacją (kwarantanna rynku / limit meczu) —
+    /** rozliczone poza publikacją (kwarantanna rynku / limit meczu) –
      *  poza trafieniami i ROI powyżej, ale liczone i pokazywane osobno */
     poza_n?: number;
     poza_trafione?: number;
@@ -773,7 +773,7 @@ export interface EpokaBlok {
   roi: number;
 }
 
-/** Ten sam rynek w dwóch epokach — do porównania „czy w ligach jest lepiej". */
+/** Ten sam rynek w dwóch epokach – do porównania „czy w ligach jest lepiej". */
 export interface EpokiRynku {
   nazwa: string;
   mundial: EpokaBlok | null;
@@ -783,7 +783,7 @@ export interface EpokiRynku {
 /**
  * Jeden wiersz raportu uczenia: paczka kolejnych rozliczeń stałej wielkości.
  *
- * Paczka, a nie tydzień, bo tydzień to raz 3, raz 90 typów — porównanie
+ * Paczka, a nie tydzień, bo tydzień to raz 3, raz 90 typów – porównanie
  * wiersz do wiersza mówiłoby wtedy głównie o kalendarzu rozgrywek.
  */
 export interface PaczkaUczenia {
@@ -841,7 +841,7 @@ export interface TypyWyniki {
   skutecznosc_strumienie?: Partial<Record<Strumien, SkutecznoscStrumienia>>;
   /**
    * Czy model robi postępy: paczki po 40 rozliczeń, per strumień.
-   * KUCHNIA — `okrojDlaKlienta` to wycina (mówi wprost, o ile model
+   * KUCHNIA – `okrojDlaKlienta` to wycina (mówi wprost, o ile model
    * przeszacowuje, tak samo jak `po_rynku`).
    */
   raport_uczenia?: Partial<Record<Strumien, UczenieStrumienia>>;
@@ -849,7 +849,7 @@ export interface TypyWyniki {
    * Mundial vs sezon ligowy, per rynek. NIE JEST JUŻ POKAZYWANE (decyzja usera
    * 2026-07-27: „nie interesuje nas ten mundial"). Pipeline liczy to dalej, bo
    * kwarantanna rynków patrzy na okno 40 ostatnich rozliczeń, a nie na
-   * kalendarz — gdyby pytanie wróciło, dane są. Front tego nie czyta.
+   * kalendarz – gdyby pytanie wróciło, dane są. Front tego nie czyta.
    */
   epoki_per_rynek?: Record<string, EpokiRynku>;
   kupony?: KuponHistoria[];
@@ -858,7 +858,7 @@ export interface TypyWyniki {
     string,
     { n: number; wygrane: number; zwrot_j: number; roi_j: number }
   >;
-  /** WSZYSTKIE wygrane kupony (trwały log — nigdy nie znikają) */
+  /** WSZYSTKIE wygrane kupony (trwały log – nigdy nie znikają) */
   kupony_wygrane?: KuponHistoria[];
 }
 
@@ -891,7 +891,7 @@ export interface MojZaklad {
 }
 
 /**
- * POKRYCIE SKANU — czego umiemy policzyć, a czego nie (zakładka Mecze).
+ * POKRYCIE SKANU – czego umiemy policzyć, a czego nie (zakładka Mecze).
  *
  * Liczone przez pipeline co cykl (`_dump_pokrycie`), do 2026-07-27 lądowało
  * wyłącznie w pliku i nigdy nie docierało na stronę. `rynki` to tabela

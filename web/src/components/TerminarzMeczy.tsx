@@ -164,7 +164,7 @@ function WierszMeczu({
             )}
           </p>
 
-          {/* wynik skanu na telefonie — pod drużynami */}
+          {/* wynik skanu na telefonie – pod drużynami */}
           <p className="mt-2 flex items-baseline gap-x-3 text-xs sm:hidden">
             <span
               className={`font-data font-semibold ${
@@ -225,10 +225,10 @@ export function TerminarzMeczy({
   okazje: Record<number, number>;
   sugestie: Record<number, number>;
   najlepsze: Record<number, number>;
-  /** znacznik czasu serwera — „dziś/jutro/wkrótce" liczone deterministycznie */
+  /** znacznik czasu serwera – „dziś/jutro/wkrótce" liczone deterministycznie */
   teraz: number;
   /**
-   * Rozgrywki z zakresu DRUŻYNOWEGO (rozgrywki.druzynowe=True w pipelinie) —
+   * Rozgrywki z zakresu DRUŻYNOWEGO (rozgrywki.druzynowe=True w pipelinie) –
    * te, dla których faktycznie liczymy statystyki drużyn. Zgłoszenie usera
    * 2026-07-27: „mają się wyświetlać tylko te ligi, które bierzemy pod uwagę
    * w drużynach". Domyślnie filtr WŁĄCZONY; pusta lista = brak filtra

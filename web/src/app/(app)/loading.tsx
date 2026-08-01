@@ -1,7 +1,7 @@
 /**
  * Szkielet ładowania dla stron grupy (app). Strona główna jest dynamiczna
  * (searchParams), więc bez tego pliku klik w nawigację wisiał na starej
- * stronie bez ŻADNEJ reakcji, aż serwer skończył render — z nim przejście
+ * stronie bez ŻADNEJ reakcji, aż serwer skończył render – z nim przejście
  * jest natychmiastowe, a treść wjeżdża w miejsce szkieletu.
  */
 export default function Loading() {

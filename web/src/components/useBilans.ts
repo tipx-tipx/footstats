@@ -4,14 +4,14 @@ import { useStawka } from "./useStawka";
 import { fmtU } from "@/lib/format";
 
 /**
- * Jak pisać bilans — jedna decyzja na całą Skuteczność.
+ * Jak pisać bilans – jedna decyzja na całą Skuteczność.
  *
  * Admin czyta w jednostkach stawki („−46,62u"), bo porównuje produkty
  * i okresy, a jednostka jest niezależna od tego, ile kto stawia. Klient czyta
  * w złotówkach, bo „u" nie znaczy dla niego nic.
  *
  * Powód istnienia tego pliku: przez chwilę werdykt i chipy pokazywały
- * złotówki, a krzywa i kalendarz obok — jednostki. Dwie różne liczby o tej
+ * złotówki, a krzywa i kalendarz obok – jednostki. Dwie różne liczby o tej
  * samej rzeczy na jednym ekranie to najprostszy sposób, żeby ktoś przestał
  * ufać stronie. Wszystko, co pokazuje bilans, bierze formatowanie stąd.
  *

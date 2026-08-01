@@ -4,11 +4,11 @@
  * Bez nich kalendarz i liczniki mieszają dwa różne modele w jedną średnią:
  * dzień sprzed zaostrzenia bram opowiada o kodzie, który już nie działa,
  * a użytkownik czyta to jako „bieżącą formę". Znacznik nie chowa starych
- * dni (nic nie znika) — tylko mówi wprost, od kiedy liczby dotyczą tego,
+ * dni (nic nie znika) – tylko mówi wprost, od kiedy liczby dotyczą tego,
  * co jest w produkcji dzisiaj.
  */
 export interface ZmianaZasad {
-  /** "YYYY-MM-DD" — pierwszy dzień, którego mecze objęły nowe zasady */
+  /** "YYYY-MM-DD" – pierwszy dzień, którego mecze objęły nowe zasady */
   od: string;
   etykieta: string;
   opis: string;

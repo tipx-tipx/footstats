@@ -31,7 +31,7 @@ export function addZakladFromBet(bet: ValueBet, stawka: number | null): MojZakla
     rynek: bet.rynek,
     linia: bet.linia,
     strona: bet.strona,
-    kurs: bet.kurs ?? 0, // sugestie (kurs null) nie są dodawane — przycisk ukryty
+    kurs: bet.kurs ?? 0, // sugestie (kurs null) nie są dodawane – przycisk ukryty
     bukmacher: bet.bukmacher,
     stawka,
     dodano_ts: Math.floor(Date.now() / 1000),
@@ -64,9 +64,9 @@ export function onZakladyChange(cb: () => void): () => void {
   };
 }
 
-/** CLV — o ile lepszy kurs wzięliśmy niż kurs zamknięcia. */
+/** CLV – o ile lepszy kurs wzięliśmy niż kurs zamknięcia. */
 export function clvPct(z: MojZaklad): number | null {
-  // kurs < 1 nie istnieje — literówka w polu dawałaby absurdalne CLV
+  // kurs < 1 nie istnieje – literówka w polu dawałaby absurdalne CLV
   if (!z.kurs_zamkniecia || z.kurs_zamkniecia < 1) return null;
   return (z.kurs / z.kurs_zamkniecia - 1) * 100;
 }

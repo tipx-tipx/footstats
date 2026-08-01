@@ -1,7 +1,7 @@
 import type { PokrycieLiga } from "@/lib/types";
 
 /**
- * POKRYCIE SKANU — „czego umiemy policzyć, a czego nie".
+ * POKRYCIE SKANU – „czego umiemy policzyć, a czego nie".
  *
  * Zgłoszenie usera 2026-07-27: „w Meczach miały być tabele pokryć wszystkich
  * naszych statystyk, a obecnie jest nic". Pipeline liczy te dane co cykl
@@ -10,7 +10,7 @@ import type { PokrycieLiga } from "@/lib/types";
  *
  * Tabela pokazuje ofertę TAK, JAK MY JĄ WIDZIMY. To celowe: jeśli parser
  * przestanie rozumieć nazwę rynku u bukmachera, słupek spadnie do zera i widać
- * to od razu — dwa takie błędy naraz kosztowały nas tydzień zgadywania.
+ * to od razu – dwa takie błędy naraz kosztowały nas tydzień zgadywania.
  */
 
 const NAZWY_RYNKOW: Record<string, string> = {
@@ -91,7 +91,7 @@ export function PokrycieSkanu({ pokrycie }: { pokrycie: PokrycieLiga }) {
         <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted">
           Statystyka trafia do analizy dopiero wtedy, gdy mamy jedno i drugie:
           historię drużyny albo zawodnika i kurs u bukmachera. Poniżej widać, ile
-          z tego faktycznie mamy — a puste miejsca mówią, czego dziś nie
+          z tego faktycznie mamy – a puste miejsca mówią, czego dziś nie
           policzymy, nawet gdyby mecz był idealny.
         </p>
       </div>
@@ -186,7 +186,7 @@ export function PokrycieSkanu({ pokrycie }: { pokrycie: PokrycieLiga }) {
               </summary>
               <p className="mt-2 text-xs leading-relaxed text-muted">
                 Te mecze są w skanie, ale nie liczymy dla nich statystyk
-                drużynowych — nie mamy stamtąd historii, więc każda liczba
+                drużynowych – nie mamy stamtąd historii, więc każda liczba
                 byłaby zgadywaniem.
               </p>
               <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted">

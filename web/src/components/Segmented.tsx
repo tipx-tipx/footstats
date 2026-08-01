@@ -14,7 +14,7 @@ export function Segmented<T extends string>({
   onChange,
   disabled,
 }: {
-  /** unikalny w obrębie strony — spina layoutId pastylki */
+  /** unikalny w obrębie strony – spina layoutId pastylki */
   id: string;
   opcje: { kod: T; label: string; title?: string }[];
   wartosc: T;

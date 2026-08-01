@@ -5,7 +5,7 @@ import { fmtProc, fmtU } from "@/lib/format";
 import { OSTATNIA_ZMIANA } from "@/lib/zmiany";
 
 /**
- * WERDYKT — jedyna rzecz, którą widać bez przewijania.
+ * WERDYKT – jedyna rzecz, którą widać bez przewijania.
  *
  * Zakładka miała siedem sekcji jedna pod drugą i żadna nie odpowiadała na
  * pytanie, po które się tu wchodzi: „czy to zarabia?". Odpowiadamy pierwszym
@@ -13,13 +13,13 @@ import { OSTATNIA_ZMIANA } from "@/lib/zmiany";
  *
  * DWA WIDOKI TYCH SAMYCH LICZB (2026-07-27, przygotowanie pod klienta):
  *
- *   klient — trzy liczby i złotówki. „−46,8u" nie znaczy nic, „−936 zł przy
+ *   klient – trzy liczby i złotówki. „−46,8u" nie znaczy nic, „−936 zł przy
  *            20 zł na typ" znaczy wszystko. „Ile trzeba trafiać" i „tyle sam
  *            obiecywał" to pytania, na które klient nie umie odpowiedzieć,
  *            więc tylko dokładają szumu.
- *   admin  — komplet, bo to są liczby DIAGNOSTYCZNE: różnica „obiecywał vs
+ *   admin  – komplet, bo to są liczby DIAGNOSTYCZNE: różnica „obiecywał vs
  *            trafia" mówi, czy model kłamie o własnej pewności, a próg
- *            opłacalności — ile realnie brakuje do zysku. Mylenie tych dwóch
+ *            opłacalności – ile realnie brakuje do zysku. Mylenie tych dwóch
  *            to najczęstszy błąd w rozmowie o wyniku.
  *
  * PRÓG OPŁACALNOŚCI liczymy z realnych kursów rozliczonych typów
@@ -92,7 +92,7 @@ export interface WerdyktDane {
   clvN?: number;
   naPlusie: number;
   naMinusie: number;
-  /** zdanie „prawie cała strata siedzi w…" — tylko gdy jeden produkt dominuje */
+  /** zdanie „prawie cała strata siedzi w…" – tylko gdy jeden produkt dominuje */
   winowajca?: { nazwa: string; roi: number } | null;
   /** rynki i powody wstrzymane przez kwarantannę (nazwy po polsku) */
   wstrzymane: string[];
@@ -114,7 +114,7 @@ export function WerdyktModelu({
   const hit = d.trafione / d.rozliczone;
   const zarabia = d.roi > 0;
   const zRozliczeniami = d.naPlusie + d.naMinusie;
-  // różnicę liczymy z liczb, KTÓRE POKAZUJEMY (po zaokrągleniu) — inaczej
+  // różnicę liczymy z liczb, KTÓRE POKAZUJEMY (po zaokrągleniu) – inaczej
   // czytelnik widzi „60% wobec 63%" i obok „brakuje 4 pp"
   const brakuje =
     d.prog != null ? Math.round(d.prog * 100) - Math.round(hit * 100) : null;
@@ -151,7 +151,7 @@ export function WerdyktModelu({
                 <strong className="font-semibold text-ink">
                   {fmtProc(d.prog)}
                 </strong>
-                , żeby wyjść na zero —{" "}
+                , żeby wyjść na zero –{" "}
                 {brakuje > 0
                   ? `brakuje ${brakuje} ${brakuje === 1 ? "punktu procentowego" : "punktów procentowych"}`
                   : brakuje < 0
@@ -204,7 +204,7 @@ export function WerdyktModelu({
             <Liczba
               etykieta="rozliczonych typów"
               wartosc={String(d.rozliczone)}
-              tytul="Wszystko, co kiedykolwiek pokazaliśmy i co już się zakończyło — razem z tym, co nie weszło"
+              tytul="Wszystko, co kiedykolwiek pokazaliśmy i co już się zakończyło – razem z tym, co nie weszło"
             />
           </Kolumna>
         )}
@@ -213,7 +213,7 @@ export function WerdyktModelu({
             <Liczba
               etykieta="ile trzeba trafiać"
               wartosc={fmtProc(d.prog)}
-              tytul="Przy takich kursach dopiero od tylu trafień wychodzi się na zero. Niżej — dokładasz, wyżej — zarabiasz."
+              tytul="Przy takich kursach dopiero od tylu trafień wychodzi się na zero. Niżej – dokładasz, wyżej – zarabiasz."
             />
           </Kolumna>
         )}
@@ -264,7 +264,7 @@ export function WerdyktModelu({
         </div>
       )}
 
-      {/* STAWKA — dla klienta to jedyny sposób, żeby liczby znaczyły cokolwiek
+      {/* STAWKA – dla klienta to jedyny sposób, żeby liczby znaczyły cokolwiek
           osobistego; dla admina jednostki wystarczą, więc nie zabieramy miejsca */}
       {!pelnyWglad && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-hairline px-5 py-3.5 text-xs text-muted sm:px-6">
@@ -320,10 +320,10 @@ export function WerdyktModelu({
           <strong className="font-semibold text-ink">Co z tym robimy:</strong>{" "}
           od {dataPl(OSTATNIA_ZMIANA.od)} {OSTATNIA_ZMIANA.opis} Wstrzymane
           właśnie {d.wstrzymane.length === 1 ? "jest" : "są"}:{" "}
-          {d.wstrzymane.join(", ")} — nie publikujemy stamtąd typów, dopóki nie
+          {d.wstrzymane.join(", ")} – nie publikujemy stamtąd typów, dopóki nie
           przestaną tracić.{" "}
           {d.dniPoZmianie > 0
-            ? `Dni po zmianie: ${d.dniPoZmianie} — na ocenę wciąż za mało.`
+            ? `Dni po zmianie: ${d.dniPoZmianie} – na ocenę wciąż za mało.`
             : "Nowe zasady nie mają jeszcze ani jednego rozliczenia."}
         </p>
       )}

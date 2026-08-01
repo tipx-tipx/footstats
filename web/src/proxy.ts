@@ -1,5 +1,5 @@
 /**
- * Bramka dostępu — cała aplikacja za hasłem (narzędzie osobiste).
+ * Bramka dostępu – cała aplikacja za hasłem (narzędzie osobiste).
  *
  * Przepuszcza: /login, /api/login, zasoby statyczne (pliki z kropką, _next).
  * Reszta wymaga ważnego ciasteczka sesji (lib/auth.ts), inaczej -> /login.

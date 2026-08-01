@@ -3,12 +3,12 @@ import { NextResponse } from "next/server";
 import { mergeAppData, readAppData, writeAppData } from "@/lib/appDataWrite";
 
 /**
- * Akcje na kuponach (za bramką logowania — proxy.ts):
- *  - {klucz, powod?}                — pomiń kupon (opcjonalny powód),
- *  - {klucz, akcja: "przywroc"}     — cofnij pominięcie (usuń klucz),
- *  - {klucz, akcja: "wymien"}       — zastosuj alternatywę rentgena,
- *  - {klucz, akcja: "przebuduj"}    — przebuduj po potwierdzeniu składów,
- *  - {akcja: "profil", profil}      — charakter buildera kuponów.
+ * Akcje na kuponach (za bramką logowania – proxy.ts):
+ *  - {klucz, powod?}                – pomiń kupon (opcjonalny powód),
+ *  - {klucz, akcja: "przywroc"}     – cofnij pominięcie (usuń klucz),
+ *  - {klucz, akcja: "wymien"}       – zastosuj alternatywę rentgena,
+ *  - {klucz, akcja: "przebuduj"}    – przebuduj po potwierdzeniu składów,
+ *  - {akcja: "profil", profil}      – charakter buildera kuponów.
  * Pipeline czyta te klucze w każdym cyklu (kupony_pominiete / kupony_wymiana
  * / kupony_przebudowa / kupony_profil). Wymaga SUPABASE_SERVICE_KEY.
  */
@@ -19,7 +19,7 @@ const PROFILE = new Set(["bezpieczny", "zbalansowany", "agresywny"]);
 // Odpalenie pipeline'u od razu po akcji usera. Bez tego nowy kupon w
 // zwolnionym slocie czeka na kolejny cron GitHub Actions, który na prywatnym
 // repo bywa dławiony do kilku godzin. GH_DISPATCH_TOKEN = fine-grained PAT z
-// uprawnieniem Actions: write na tym repo (jeśli brak — zostajemy przy cronie).
+// uprawnieniem Actions: write na tym repo (jeśli brak – zostajemy przy cronie).
 const GH_REPO = process.env.GH_REPO ?? "tipx-tipx/footstats";
 const GH_TOKEN = process.env.GH_DISPATCH_TOKEN;
 const GH_WORKFLOW = "cycle.yml";
@@ -58,7 +58,7 @@ export async function POST(req: Request) {
   const now = Math.floor(Date.now() / 1000);
 
   // odpal cykl pipeline'u, chyba że któryś odpalił się w ostatnich ~90 s;
-  // dispatch jest bonusem — akcja usera jest już zapisana, więc błąd tu nie
+  // dispatch jest bonusem – akcja usera jest już zapisana, więc błąd tu nie
   // wywraca odpowiedzi (cron i tak w końcu dogoni)
   async function odpalCykl(): Promise<void> {
     if (!GH_TOKEN) return;
@@ -82,7 +82,7 @@ export async function POST(req: Request) {
       );
       if (res.ok) await writeKey("cykl_dispatch", { ts: now });
     } catch {
-      /* dispatch nieudany — zostaje cron */
+      /* dispatch nieudany – zostaje cron */
     }
   }
 
@@ -97,7 +97,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, profil: body.profil });
   }
 
-  // własny kupon z generatora — zapisz do nauki (rozliczy się w tle jak
+  // własny kupon z generatora – zapisz do nauki (rozliczy się w tle jak
   // pominięty, zasila korelację/kalibrację i kalibrację legów)
   if (akcja === "wlasny_nauka") {
     const kk = body.kupon as
@@ -124,7 +124,7 @@ export async function POST(req: Request) {
           bukmacher: String(x.bukmacher ?? "Superbet").slice(0, 20),
           p_model: Number(x.p_model) || 0,
           pewnosc: x.pewnosc === "wysoka" || x.pewnosc === "srednia" ? x.pewnosc : undefined,
-          // te same flagi co kupony.py:_leg_dict — bez nich legi trafiające do
+          // te same flagi co kupony.py:_leg_dict – bez nich legi trafiające do
           // nauki WYŁĄCZNIE przez własny kupon są ślepą plamą dla diagnostyki
           // miękkich linii/sygnałów XI/marży UK (dokładnie ten sam P0 fix z tej
           // sesji, ale dla ścieżki "wlasny_nauka", którą wtedy pominięto)
@@ -149,7 +149,7 @@ export async function POST(req: Request) {
       .sort()
       .join("|")
       .slice(0, 130);
-    // bufor ograniczony (~40 ostatnich) — nie puchnie w nieskończoność. Lista
+    // bufor ograniczony (~40 ostatnich) – nie puchnie w nieskończoność. Lista
     // do przycięcia to best-effort odczyt (rzadka operacja porządkowa); zapis
     // nowego wpisu + przycięcie lecą razem w JEDNYM atomowym merge, więc nowy
     // wpis nigdy nie ginie nawet gdy przycięcie akurat "spóźni się" o jeden.

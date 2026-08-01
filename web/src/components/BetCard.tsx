@@ -55,7 +55,7 @@ function oknaFormy(forma: FormaRynku, linia: number, strona: Strona) {
 /**
  * Splity kontekstowe z formy: hit-rate linii w podpróbkach, które dane
  * uczciwie wspierają (kadra vs klub, pełne występy 60+ min). Pokazujemy
- * split dopiero od 3 meczów — mniejsza próba myli bardziej, niż pomaga.
+ * split dopiero od 3 meczów – mniejsza próba myli bardziej, niż pomaga.
  */
 function splityFormy(forma: FormaRynku, linia: number, strona: Strona) {
   const gry = forma.ostatnie.map((v, i) => ({
@@ -71,7 +71,7 @@ function splityFormy(forma: FormaRynku, linia: number, strona: Strona) {
   const wynik: { label: string; opis: string; traf: number; n: number }[] = [];
   const kadra = licz(zagrane.filter((g) => g.kadra));
   const klub = licz(zagrane.filter((g) => !g.kadra));
-  // splity kadra/klub tylko gdy OBA mają próbę — inaczej to zwykłe "razem"
+  // splity kadra/klub tylko gdy OBA mają próbę – inaczej to zwykłe "razem"
   if (kadra.n >= 3 && klub.n >= 3) {
     wynik.push(
       { label: "kadra", opis: "mecze reprezentacji w próbce", ...kadra },
@@ -90,7 +90,7 @@ function splityFormy(forma: FormaRynku, linia: number, strona: Strona) {
 }
 
 /**
- * Odznaki przewagi — policzalny system sygnałów typu (wzorzec Linemate:
+ * Odznaki przewagi – policzalny system sygnałów typu (wzorzec Linemate:
  * każdy typ nosi 0–4 odznaki). Jedno źródło prawdy dla wiersza karty
  * (chipy) i rozwinięcia (sygnały na klik).
  */
@@ -141,7 +141,7 @@ function odznakiPrzewagi(bet: ValueBet): {
     o.push({
       znak: "↥",
       label: "wchodzi do składu",
-      opis: "Wraca do pierwszego składu po przerwie — bukmacher często nie zdążył jeszcze poprawić kursu",
+      opis: "Wraca do pierwszego składu po przerwie – bukmacher często nie zdążył jeszcze poprawić kursu",
       tone: "amber",
     });
   }
@@ -154,8 +154,8 @@ function odznakiPrzewagi(bet: ValueBet): {
     });
   }
   // PLAKIETKA „z wcześniejszego cyklu" USUNIĘTA (decyzja usera 2026-07-30).
-  // Mówiła o kuchni pipeline'u — o tym, że ostatnie przeliczenie nie odtworzyło
-  // typu — a nie o samym zakładzie. Flaga `wznowiony` zostaje w danych, bo
+  // Mówiła o kuchni pipeline'u – o tym, że ostatnie przeliczenie nie odtworzyło
+  // typu – a nie o samym zakładzie. Flaga `wznowiony` zostaje w danych, bo
   // pilnuje jej siatka bezpieczeństwa (typ raz pokazany zostaje do gwizdka);
   // po prostu nie zawracamy nią głowy na karcie.
   return o;
@@ -179,7 +179,7 @@ function sygnalyTypu(
     ton: o.tone,
   }));
   if (bet.pewniak) {
-    // pewny występ — dane siedzą w czynniku „Minuty" (pipeline pisze tam
+    // pewny występ – dane siedzą w czynniku „Minuty" (pipeline pisze tam
     // szansę na pierwszy skład), tu wychodzą na światło jako argument
     const minuty = bet.uzasadnienie.czynniki.find((c) => c.nazwa === "Minuty");
     const skladOgloszony = minuty?.opis.includes("pewny występ") ?? false;
@@ -278,13 +278,13 @@ function sygnalyTypu(
       ton: "cichy",
       opis: `${bet.bukmacher} płaci ${fmtKurs(bet.kurs)}, a przy takiej szansie sprawiedliwy kurs to ${fmtKurs(
         bet.fair_kurs,
-      )}. Różnicę zabiera bukmacher. Ten typ bierzesz dlatego, że często wchodzi — nie dlatego, że dobrze płaci.`,
+      )}. Różnicę zabiera bukmacher. Ten typ bierzesz dlatego, że często wchodzi – nie dlatego, że dobrze płaci.`,
     });
   }
   return s;
 }
 
-/** Liczba w zdaniu werdyktu — mono, żeby czytała się jak odczyt, nie proza. */
+/** Liczba w zdaniu werdyktu – mono, żeby czytała się jak odczyt, nie proza. */
 function Num({ children }: { children: React.ReactNode }) {
   return <span className="font-data font-semibold">{children}</span>;
 }
@@ -312,7 +312,7 @@ function WerdyktPewniaka({ bet }: { bet: ValueBet }) {
   } else if (bet.p_model >= 0.75) {
     glowne = (
       <>
-        Model daje temu typowi <Num>{p}</Num> szans — najwyższy przedział na
+        Model daje temu typowi <Num>{p}</Num> szans – najwyższy przedział na
         liście. Uwaga: przy takich szansach kurs jest niski, więc częste
         trafienia same z siebie nie oznaczają zysku.
       </>
@@ -334,7 +334,7 @@ function WerdyktPewniaka({ bet }: { bet: ValueBet }) {
   } else if ((bet.kurs ?? 0) >= 1.9) {
     glowne = (
       <>
-        Niska szansa — <Num>{p}</Num> — za to kurs <Num>{kurs}</Num> płaci
+        Niska szansa – <Num>{p}</Num> – za to kurs <Num>{kurs}</Num> płaci
         wyraźnie więcej. Świadome ryzyko, nie wpadka.
       </>
     );
@@ -451,7 +451,7 @@ function WerdyktZdanie({ bet }: { bet: ValueBet }) {
 
 /**
  * Odczyt okna formy (L5 · L10 · razem, splity): kolor niesie ton, tekst
- * niesie treść. Bez washa i pastylki — chipów zostaje na karcie tylko status.
+ * niesie treść. Bez washa i pastylki – chipów zostaje na karcie tylko status.
  */
 function OdczytOkna({
   label,
@@ -481,12 +481,12 @@ function OdczytOkna({
 
 /**
  * Historia zawodnika na tym rynku: słupki, okna hit-rate i splity. Bez karty
- * (de-boxing) — nagłówek, wykres i odczyty niosą się same.
+ * (de-boxing) – nagłówek, wykres i odczyty niosą się same.
  */
 function SekcjaFormy({ bet, forma }: { bet: ValueBet; forma: FormaRynku }) {
   const okna = oknaFormy(forma, bet.linia, bet.strona);
   const zagrane = okna.zagrane;
-  // okna jak w Props.cash/StatsHub: forma TERAZ vs średnia — L5 wykrywa
+  // okna jak w Props.cash/StatsHub: forma TERAZ vs średnia – L5 wykrywa
   // trend, którego jedna suma nie pokaże
   const odczyty = [
     ...(zagrane >= 3 ? [{ label: "L5", ...okna.l5 }] : []),
@@ -510,7 +510,7 @@ function SekcjaFormy({ bet, forma }: { bet: ValueBet; forma: FormaRynku }) {
       </div>
       {zagrane > 0 && (
         <p className="-mt-1.5 mb-2.5 text-[11px] leading-relaxed text-faint">
-          Liczby po prawej mówią, jak często ten typ by wszedł — w ostatnich 5,
+          Liczby po prawej mówią, jak często ten typ by wszedł – w ostatnich 5,
           10 i we wszystkich meczach, w których zawodnik grał.
         </p>
       )}
@@ -526,7 +526,7 @@ function SekcjaFormy({ bet, forma }: { bet: ValueBet; forma: FormaRynku }) {
       />
       {/* jedna banda odczytów pod wykresem: średnia, minuty i splity razem */}
       <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-hairline pt-2.5">
-        {/* etykiety mówią same za siebie — bez dymków, które i tak nie
+        {/* etykiety mówią same za siebie – bez dymków, które i tak nie
             działają na telefonie (przegląd kart 2026-08-01) */}
         <span className="font-data text-[11px] font-semibold text-ink-soft">
           <span className="mr-1 text-[9px] font-medium uppercase opacity-70">
@@ -556,7 +556,7 @@ function SekcjaFormy({ bet, forma }: { bet: ValueBet; forma: FormaRynku }) {
 
 /**
  * Odchylenie czynnika od neutralnego 1,00 jako kreska w lewo/prawo od osi.
- * Pełne wychylenie = ±15% — realne czynniki mieszczą się w ~0,85–1,15,
+ * Pełne wychylenie = ±15% – realne czynniki mieszczą się w ~0,85–1,15,
  * więc szersza skala robiła z każdego z nich niewidoczną drobinkę.
  */
 function MnoznikBar({ m }: { m: number }) {
@@ -613,12 +613,12 @@ export const SWIATLO_STYL = {
 } as const;
 
 /**
- * Oznaczenie typu — JEDNA skala z `lib/slownik.ts`, ta sama w całym
+ * Oznaczenie typu – JEDNA skala z `lib/slownik.ts`, ta sama w całym
  * produkcie (2026-08-01). Wcześniej były tu trzy równoległe słowniki:
  * „★ pewniak / mocny typ / umiarkowany / ryzykowny" tutaj, „TOP / mocny /
  * solidny" na kartach Drabinek i jeszcze raz czterostopniowa skala niżej
  * w rozwinięciu. Do tego „perełka" i „wyższa linia" mówiły to samo dwiema
- * nazwami, choć opisują nie SIŁĘ typu, tylko sposób jego postawienia —
+ * nazwami, choć opisują nie SIŁĘ typu, tylko sposób jego postawienia –
  * dlatego dziś to osobna, druga plakietka (`profilTypu`).
  */
 function tierTypu(bet: ValueBet): {
@@ -649,7 +649,7 @@ const listaPoPolsku = (xs: string[]) =>
 /**
  * Proza „skąd ta liczba": baza z ostatnich meczów → korekty na ten mecz →
  * oczekiwany wynik → próg linii → szansa. Zamiast osi z kursem bukmachera,
- * której nikt nie rozumiał — po prostu opowiadamy, jak model doszedł do
+ * której nikt nie rozumiał – po prostu opowiadamy, jak model doszedł do
  * swojego procentu. Ostatnie zdanie domyka rozjazd „oczekiwane 2,3 vs 76%"
  * (model dolicza ryzyko krótszej gry, patrz pułapka p_model vs rozkład).
  */
@@ -693,11 +693,11 @@ function skadTaLiczba(bet: ValueBet): string | null {
         ? "Do wejścia typu wystarczy 1"
         : `Do wejścia typu potrzeba co najmniej ${Math.floor(bet.linia) + 1}`;
   // "ryzyko krótszej gry" dotyczy zawodnika (rotacja, zmiana); drużyna
-  // gra zawsze pełny mecz — jej szansa wynika z rozkładu możliwych wyników.
+  // gra zawsze pełny mecz – jej szansa wynika z rozkładu możliwych wyników.
   //
   // OD 2026-07-29 pokazywana liczba jest jeszcze ściągnięta o zmierzony
   // rozjazd deklaracji z wynikami, więc zdanie „rozkład daje X%" przestałoby
-  // być prawdziwe — X nie pochodzi już z samego rozkładu.
+  // być prawdziwe – X nie pochodzi już z samego rozkładu.
   const skad = bet.p_urealnione
     ? "a po odjęciu tego, o ile takie typy rozmijały się z rzeczywistością, zostaje"
     : bet.podmiot_typ === "druzyna"
@@ -756,15 +756,15 @@ function OcenaTypu({ bet }: { bet: ValueBet }) {
         })}
       </div>
       {/* OPIS SKALI NA STRONIE, NIE W DYMKU (2026-08-01). Wcześniej każda
-          z czterech kratek miała `title` z wyjaśnieniem — czyli na telefonie
+          z czterech kratek miała `title` z wyjaśnieniem – czyli na telefonie
           skala była czterema słowami bez znaczenia. */}
       <p className="mt-2 max-w-prose text-xs leading-relaxed text-faint">
         {s.opis}
       </p>
-      {/* „pewność" była tylko trzema kropkami z dymkiem — a to zupełnie inna
+      {/* „pewność" była tylko trzema kropkami z dymkiem – a to zupełnie inna
           rzecz niż szansa i mylenie ich jest łatwe */}
       <p className="mt-1 max-w-prose text-xs leading-relaxed text-faint">
-        Obok kropki z napisem „{PEWNOSC_LABEL[bet.pewnosc]} pewność” — to nie
+        Obok kropki z napisem „{PEWNOSC_LABEL[bet.pewnosc]} pewność” – to nie
         to samo co szansa. Mówią, na ilu meczach i jak powtarzalnych opiera się
         ta prognoza.
       </p>
@@ -775,7 +775,7 @@ function OcenaTypu({ bet }: { bet: ValueBet }) {
         <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-ink-soft">
           Przy tym typie {wobecKursu.zdanie}
           {wobecKursu.przewaga != null && wobecKursu.przewaga > 0
-            ? " — czyli naszym zdaniem bukmacher płaci za dużo."
+            ? " – czyli naszym zdaniem bukmacher płaci za dużo."
             : "."}
         </p>
       )}
@@ -789,7 +789,7 @@ function OcenaTypu({ bet }: { bet: ValueBet }) {
 }
 
 /**
- * „W ostatnich 10 meczach weszłoby 2 razy, a wy dajecie 48%" — zgłoszenie
+ * „W ostatnich 10 meczach weszłoby 2 razy, a wy dajecie 48%" – zgłoszenie
  * usera 2026-08-01 (Viking FK, rożne poniżej 5,5).
  *
  * OBIE LICZBY BYŁY POPRAWNE, tylko liczyły co innego, a karta nigdzie tego
@@ -799,7 +799,7 @@ function OcenaTypu({ bet }: { bet: ValueBet }) {
  * poprawia go o rywala i miejsce gry. Przy Vikingu ostatnie 10 dawało 20%,
  * pełne 20 meczów 45%, a po korekcie na wyjazd wyszło 48%.
  *
- * Zestawione bez słowa komentarza wyglądało to jak pomyłka — i to jest
+ * Zestawione bez słowa komentarza wyglądało to jak pomyłka – i to jest
  * najgorszy możliwy efekt, bo akurat TU liczby były w porządku.
  *
  * Blok pokazuje się tylko przy realnym rozjeździe (12 pp), żeby nie tłumaczyć
@@ -836,12 +836,12 @@ function RozjazdZHistoria({
         <span className="font-data font-semibold text-ink">
           {fmtProc(bet.p_model)}
         </span>
-        . To nie pomyłka — te dwie liczby liczą co innego.
+        . To nie pomyłka – te dwie liczby liczą co innego.
       </p>
       <p className="mt-1.5 text-sm leading-relaxed text-muted">
         Licznik wyżej patrzy tylko na {w.n} ostatnich meczów. Model bierze
         około dwudziestu, świeższe waży mocniej, ściąga wynik do średniej
-        rozgrywek — bo krótka seria nie ma prawa decydować sama — i dopiero
+        rozgrywek – bo krótka seria nie ma prawa decydować sama – i dopiero
         potem poprawia go o rywala i miejsce gry.
         {ruszaja.length > 0 && (
           <>
@@ -867,7 +867,7 @@ type TabSzczegolow = "forma" | "czynniki" | "wyniki";
 /**
  * Rozwinięcie typu: werdykt z akcją, oś wyceny, sygnały i głębia w
  * zakładkach. Współdzielone przez kartę (BetCard) i gęsty wiersz tablicy
- * (BetRow) — jedna prawda o szczegółach niezależnie od gęstości listy.
+ * (BetRow) – jedna prawda o szczegółach niezależnie od gęstości listy.
  */
 export function SzczegolyTypu({
   bet,
@@ -953,7 +953,7 @@ export function SzczegolyTypu({
             ci[1],
           )}. Model podaje ostrożniejszą liczbę, bo wlicza też ryzyko, że zagra krócej${
             // przedział ufności liczy się przy przewidywanych minutach, a
-            // pokazywana szansa jest jeszcze ściągnięta o zmierzony rozjazd —
+            // pokazywana szansa jest jeszcze ściągnięta o zmierzony rozjazd –
             // bez tej wzmianki wygląda, jakby model wypadał poza własny przedział
             bet.p_urealnione
               ? ", oraz to, o ile takie typy rozmijały się z rzeczywistością w rozliczeniach"
@@ -982,7 +982,7 @@ export function SzczegolyTypu({
       ? { od: implied, do: bet.p_model }
       : null;
   // odwrotność przewagi: kurs wycenia szansę wyżej niż model (głównie marża)
-  // — bez tego oś pewniaka to dwa znaczniki i pusta luka; odcinek dopiero od
+  // – bez tego oś pewniaka to dwa znaczniki i pusta luka; odcinek dopiero od
   // 1 pp na zaokrąglonych liczbach, żeby nie znaczyć szumu
   const przeplata =
     implied != null &&
@@ -991,7 +991,7 @@ export function SzczegolyTypu({
       : null;
 
   // rozkład (i „inne linie”) liczą się przy przewidywanych minutach, p_model
-  // dokłada do tego scenariusze rotacji — te dwie liczby potrafią się rozjechać
+  // dokłada do tego scenariusze rotacji – te dwie liczby potrafią się rozjechać
   // o kilkanaście pp, więc karta musi powiedzieć wprost, skąd różnica
   const przyMinutach =
     bet.oczekiwane_minuty != null ? Math.round(bet.oczekiwane_minuty) : null;
@@ -1031,7 +1031,7 @@ export function SzczegolyTypu({
                   <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-faint">
                     werdykt
                   </span>
-                  {/* niskie ryzyko to norma, nie informacja — badge tylko
+                  {/* niskie ryzyko to norma, nie informacja – badge tylko
                       gdy zdarzenie jest realnie kapryśne */}
                   {bet.ryzyko !== "niskie" && <RiskBadge level={bet.ryzyko} />}
                 </div>
@@ -1061,12 +1061,12 @@ export function SzczegolyTypu({
               )}
             </motion.div>
 
-            {/* DLACZEGO NIE TYLE, ILE MÓWI OSTATNIE 10 MECZÓW — patrz
+            {/* DLACZEGO NIE TYLE, ILE MÓWI OSTATNIE 10 MECZÓW – patrz
                 komponent niżej. To jest odpowiedź na najczęstsze „czy to na
                 pewno nie błąd", a do 2026-08-01 nie było jej nigdzie. */}
             <RozjazdZHistoria bet={bet} okna={okna} />
 
-            {/* moment 2 (pewniak): nasza skala ocen + „skąd ta liczba" —
+            {/* moment 2 (pewniak): nasza skala ocen + „skąd ta liczba" –
                 oś z wyceną bukmachera nie mówiła tu nic potrzebnego */}
             {bet.pewniak && (
               <motion.div
@@ -1186,7 +1186,7 @@ export function SzczegolyTypu({
                       /* KIERUNEK SŁOWEM, MNOŻNIK JAKO PRZYPIS (2026-08-01).
                          Kolumna liczb „×1,12" nie ma jednostki ani kierunku:
                          żeby cokolwiek z niej wyczytać, trzeba wiedzieć, że
-                         1,00 znaczy „bez wpływu" — a to wiedza wewnętrzna.
+                         1,00 znaczy „bez wpływu" – a to wiedza wewnętrzna.
                          Teraz każdy wiersz mówi wprost „podnosi" / „obniża",
                          a sama liczba została dla tych, którzy jej szukają. */
                       <ul className="max-w-2xl space-y-2">
@@ -1239,7 +1239,7 @@ export function SzczegolyTypu({
                           side={bet.strona}
                         />
                         {/* rozkład liczy się przy przewidywanych minutach, a p_model
-                            wlicza jeszcze ryzyko rotacji — bez tego zdania user widzi
+                            wlicza jeszcze ryzyko rotacji – bez tego zdania user widzi
                             dwie różne liczby na tej samej karcie i traci zaufanie */}
                         {rozjazdMinut && (
                           <p className="mt-2 text-xs leading-relaxed text-faint">
@@ -1253,16 +1253,16 @@ export function SzczegolyTypu({
                                 pokazywana szansa jest dodatkowo ściągnięta
                                 o zmierzony rozjazd deklaracji z wynikami.
                                 Bez tego zdania karta zwalałaby całą różnicę
-                                na minuty — czyli mówiłaby nieprawdę. */}
+                                na minuty – czyli mówiłaby nieprawdę. */}
                             {bet.p_urealnione
-                              ? " — a na końcu jeszcze o tyle, o ile takie typy rozmijały się z rzeczywistością w rozliczeniach."
+                              ? " – a na końcu jeszcze o tyle, o ile takie typy rozmijały się z rzeczywistością w rozliczeniach."
                               : "."}
                           </p>
                         )}
                         <h4 className="mb-2.5 mt-5 text-xs font-semibold uppercase tracking-wide text-faint">
                           Szanse na inne linie
                         </h4>
-                        {/* podkreślenie zamiast kafelka — linia tego typu czyta się
+                        {/* podkreślenie zamiast kafelka – linia tego typu czyta się
                             jak aktywna zakładka */}
                         <div className="flex items-end gap-3">
                           {[0.5, 1.5, 2.5, 3.5].map((l) => {
@@ -1350,7 +1350,7 @@ export const BetCard = memo(function BetCard({
       >
         {/* wiersz główny: numer z koszulki · kto i co · szansa · kurs */}
         <span className="grid grid-cols-[1fr_auto] items-center gap-x-4 px-4 pb-3 pt-3.5 sm:grid-cols-[auto_1.4fr_1fr_auto] sm:px-5">
-          {/* ghost-numer jak nadruk na koszulce — orientacja w rankingu bez
+          {/* ghost-numer jak nadruk na koszulce – orientacja w rankingu bez
               kolejnego "pudełka"; przy hoverze nabiera koloru marki */}
           <span
             aria-hidden
@@ -1386,7 +1386,7 @@ export const BetCard = memo(function BetCard({
             <span className="mt-1 block truncate text-xs text-faint">
               {bet.mecz} · {fmtDataCzas(bet.kickoff_ts)}
             </span>
-            {/* pasek szansy na mobile — pod nazwą, żeby triage działał też kciukiem */}
+            {/* pasek szansy na mobile – pod nazwą, żeby triage działał też kciukiem */}
             <span className="mt-2 block max-w-56 sm:hidden">
               <ChanceBar p={bet.p_model} line={bet.linia} side={bet.strona} />
             </span>
@@ -1398,7 +1398,7 @@ export const BetCard = memo(function BetCard({
             </span>
           </span>
 
-          {/* rubryka kursu za gradientową linią — liczba, nie przycisk;
+          {/* rubryka kursu za gradientową linią – liczba, nie przycisk;
               bez kursu: od jakiego kursu w STS typ jest wart zagrania */}
           <span
             className="relative flex flex-col items-end justify-center gap-1 self-stretch justify-self-end pl-5 sm:pl-6"
@@ -1421,7 +1421,7 @@ export const BetCard = memo(function BetCard({
           </span>
         </span>
 
-        {/* linia meta: ocena typu + odznaki przewagi + pewność + detale —
+        {/* linia meta: ocena typu + odznaki przewagi + pewność + detale –
             bez własnego pudełka, wcięta do kolumny nazwiska */}
         <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1.5 px-4 pb-3.5 sm:pl-[4.75rem] sm:pr-5">
           {bet.pewniak ? (
@@ -1442,7 +1442,7 @@ export const BetCard = memo(function BetCard({
           ) : (
             <EdgeBadge ev={wartoscNetto(bet) as number} />
           )}
-          {/* odznaki przewagi — tekstowe odczyty HUD zamiast kolejnych
+          {/* odznaki przewagi – tekstowe odczyty HUD zamiast kolejnych
               chipów; jedno źródło prawdy (odznakiPrzewagi) */}
           {/* BEZ DYMKA: pełne wyjaśnienie każdej odznaki jest w rozwinięciu
               (komponent Sygnaly, opis na stronie i na klik). Dymek dublował

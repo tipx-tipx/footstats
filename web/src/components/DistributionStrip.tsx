@@ -7,9 +7,9 @@ import { fmtLinia, fmtProc } from "@/lib/format";
 /**
  * Wizualizacje szans FootStats.
  *
- * ChanceBar — kompaktowy pasek w wierszu okazji: zielone wypełnienie =
+ * ChanceBar – kompaktowy pasek w wierszu okazji: zielone wypełnienie =
  *   szansa modelu na "powyżej linii", z procentem i podpisem.
- * OutcomeColumns — rozwinięcie: kolumnowy mini-wykres możliwych wyników
+ * OutcomeColumns – rozwinięcie: kolumnowy mini-wykres możliwych wyników
  *   (0, 1, 2, 3+ zdarzeń), zielone kolumny = scenariusze "powyżej linii",
  *   kreskowana linia bukmachera między kolumnami, procenty nad słupkami.
  */
@@ -42,7 +42,7 @@ export function ChanceBar({
             aria-hidden
             className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-hairline"
           />
-          {/* delikatne wypełnienie do szansy modelu — czytanie wielkości */}
+          {/* delikatne wypełnienie do szansy modelu – czytanie wielkości */}
           <motion.span
             aria-hidden
             initial={{ width: 0 }}
@@ -50,12 +50,12 @@ export function ChanceBar({
             transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
             className="absolute left-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-brand/20"
           />
-          {/* znacznik 50% — punkt odniesienia rzutu monetą */}
+          {/* znacznik 50% – punkt odniesienia rzutu monetą */}
           <span
             aria-hidden
             className="absolute left-1/2 top-1/2 h-3 w-px -translate-y-1/2 bg-hairline-strong"
           />
-          {/* znacznik modelu — dojeżdża na miejsce razem z wypełnieniem */}
+          {/* znacznik modelu – dojeżdża na miejsce razem z wypełnieniem */}
           <motion.span
             aria-hidden
             initial={{ left: "2%", opacity: 0 }}

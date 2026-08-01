@@ -28,7 +28,7 @@ export function fmtU(v: number): string {
 }
 
 /**
- * Odmiana rzeczownika przez liczbę — po polsku formy są TRZY, nie dwie:
+ * Odmiana rzeczownika przez liczbę – po polsku formy są TRZY, nie dwie:
  * 1 zakład, 2–4 zakłady, 5+ zakładów. Warunek „nie 12–14" jest konieczny,
  * bo 22 idzie jak 2, ale 12 jak 5.
  *
@@ -49,7 +49,7 @@ export function odmien(
 }
 
 /**
- * Teksty z pipeline miewają kropkę dziesiętną ("Średnio 2.80") — na widoku
+ * Teksty z pipeline miewają kropkę dziesiętną ("Średnio 2.80") – na widoku
  * zamieniamy ją na przecinek. Tylko między cyframi, reszta tekstu nietknięta.
  */
 export function fmtOpisLiczby(s: string): string {
@@ -67,7 +67,7 @@ export function fmtDataCzas(ts: number): string {
 }
 
 /** "2026-07-10" -> "czw, 10 lip" (dłużej: "czwartek, 10 lipca").
- *  Doba brana z południa lokalnego — inaczej strefa przesuwa etykietę o dzień. */
+ *  Doba brana z południa lokalnego – inaczej strefa przesuwa etykietę o dzień. */
 export function fmtDzien(dzien: string, dlugo = false): string {
   return new Intl.DateTimeFormat("pl-PL", {
     weekday: dlugo ? "long" : "short",

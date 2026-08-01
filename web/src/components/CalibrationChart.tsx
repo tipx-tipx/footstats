@@ -81,7 +81,7 @@ export function CalibrationChart({
         >
           ideał
         </text>
-        {/* punkty kubełków — tabIndex/focus dla klawiatury, onClick dla
+        {/* punkty kubełków – tabIndex/focus dla klawiatury, onClick dla
             dotyku (mobile nie ma hover, title= tam nigdy się nie pokazuje) */}
         {bins.map((b, i) => (
           <circle
@@ -92,7 +92,7 @@ export function CalibrationChart({
             cy={y(b.p_real)}
             r={5 + 5 * Math.sqrt(b.n / maxN)}
             // kolor MARKI, nie statusowy: punkt nie mówi "dobrze/źle",
-            // tylko "tu leży kubełek" — zieleń statusowa byłaby myląca
+            // tylko "tu leży kubełek" – zieleń statusowa byłaby myląca
             fill="var(--color-brand)"
             fillOpacity={hover === i ? 0.95 : 0.72}
             stroke="var(--color-card)"
@@ -102,7 +102,7 @@ export function CalibrationChart({
             onMouseLeave={() => setHover(null)}
             onFocus={() => setHover(i)}
             onBlur={() => setHover(null)}
-            // dotyk: tap pokazuje tooltip (mobile nie ma hover) — zostaje
+            // dotyk: tap pokazuje tooltip (mobile nie ma hover) – zostaje
             // widoczny do kolejnego tapnięcia gdzie indziej, bez wyścigu ze
             // zdarzeniami mouseenter syntetyzowanymi po dotyku
             onClick={() => setHover(i)}

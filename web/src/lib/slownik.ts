@@ -1,5 +1,5 @@
 /**
- * SŁOWNIK PRODUKTU — jedno miejsce, w którym liczby modelu zamieniają się
+ * SŁOWNIK PRODUKTU – jedno miejsce, w którym liczby modelu zamieniają się
  * w polskie zdania.
  *
  * Powstał 2026-08-01 z przeglądu kart (Drabinki + Drużyny). Trzy rzeczy,
@@ -8,11 +8,11 @@
  *  1. TA SAMA RZECZ NAZYWANA RÓŻNIE. Karta Drabinek oceniała typ jako
  *     „TOP / mocny / solidny", lista drużyn jako „pewniak / perełka",
  *     a rozwinięcie jeszcze raz, własną czterostopniową skalą. Trzy słowniki
- *     na jedną rzecz — nikt z zewnątrz nie zgadnie, czy „mocny" to więcej
+ *     na jedną rzecz – nikt z zewnątrz nie zgadnie, czy „mocny" to więcej
  *     czy mniej niż „pewniak".
  *
  *  2. SŁOWO „PEWNIAK" (decyzja usera 2026-08-01: znika z całej strony).
- *     Obiecywało pewność, której nie mamy — a produkt stoi na tym, że mówimy
+ *     Obiecywało pewność, której nie mamy – a produkt stoi na tym, że mówimy
  *     prawdę o szansach. Zastąpione opisem tego, co liczba naprawdę znaczy.
  *
  *  3. MNOŻNIK ×1,12. Kolumna liczb bez jednostki i bez kierunku; żeby
@@ -23,16 +23,16 @@
 import { fmtKurs, fmtProc } from "./format";
 
 /* ------------------------------------------------------------------ *
- * SIŁA TYPU — JEDYNA skala w całym produkcie
+ * SIŁA TYPU – JEDYNA skala w całym produkcie
  * ------------------------------------------------------------------ */
 
 /**
  * Cztery stopnie po samej szansie. Progi zostały te, co były (75 / 62 / 52),
- * bo są zestrojone z widełkami publikacji — zmieniają się TYLKO nazwy.
+ * bo są zestrojone z widełkami publikacji – zmieniają się TYLKO nazwy.
  *
  * Etykieta mówi wprost, o czym jest liczba: o szansie. Poprzednie nazwy
  * („pewniak", „mocny typ") oceniały typ, choć liczba opisywała wyłącznie
- * prawdopodobieństwo — i to właśnie brało się za obietnicę.
+ * prawdopodobieństwo – i to właśnie brało się za obietnicę.
  */
 export const SILA_TYPU = [
   {
@@ -69,7 +69,7 @@ export const SILA_TYPU = [
     od: 0.75,
     do: 1.01,
     cls: "bg-brand-wash text-brand-deep",
-    opis: "Szansa 75% i więcej — najczęściej wchodzący rodzaj typu. Uwaga: przy takich szansach kursy są niskie, więc sama częstotliwość trafień nie oznacza zysku.",
+    opis: "Szansa 75% i więcej – najczęściej wchodzący rodzaj typu. Uwaga: przy takich szansach kursy są niskie, więc sama częstotliwość trafień nie oznacza zysku.",
   },
 ] as const;
 
@@ -80,11 +80,11 @@ export function silaTypu(p: number): SilaTypu {
 }
 
 /**
- * PROFIL TYPU — druga, NIEZALEŻNA oś: nie „jak mocny", tylko „jak
+ * PROFIL TYPU – druga, NIEZALEŻNA oś: nie „jak mocny", tylko „jak
  * postawiony". Dawne „perełka" i „wyższa linia" mówiły dokładnie to samo
  * (poprzeczka wyżej, kurs lepszy, szansa niższa) dwiema różnymi nazwami.
  *
- * Zwraca null, gdy typ jest zwykły — plakietka pojawia się tylko wtedy,
+ * Zwraca null, gdy typ jest zwykły – plakietka pojawia się tylko wtedy,
  * gdy naprawdę coś zmienia.
  */
 export function profilTypu(bet: {
@@ -110,7 +110,7 @@ export function profilTypu(bet: {
 }
 
 /* ------------------------------------------------------------------ *
- * MNOŻNIKI — kierunek słowem, liczba jako przypis
+ * MNOŻNIKI – kierunek słowem, liczba jako przypis
  * ------------------------------------------------------------------ */
 
 /**
@@ -127,7 +127,7 @@ export function kierunekMnoznika(m?: number | null): string {
   return "lekko obniża";
 }
 
-/** Kolor kierunku — zielony w górę, bursztyn w dół, szary bez zmian. */
+/** Kolor kierunku – zielony w górę, bursztyn w dół, szary bez zmian. */
 export function klasaKierunku(m?: number | null): string {
   if (m == null || Math.abs(m - 1) < 0.02) return "text-faint";
   return m > 1 ? "text-data-green-ink" : "text-data-amber-ink";
@@ -154,7 +154,7 @@ export function trafioneZ(traf: number, z: number, co = "przebił tę linię"): 
  * „+6 pkt proc." -> „kurs wyceniony jak na 51%, my dajemy 57%".
  *
  * Punkt procentowy to pojęcie, którego większość ludzi nie odróżnia od
- * procenta — a tu akurat różnica jest sednem. Więc zamiast nazwy jednostki
+ * procenta – a tu akurat różnica jest sednem. Więc zamiast nazwy jednostki
  * pokazujemy obie liczby obok siebie i zostawiamy porównanie oczom.
  */
 export function szansaWobecKursu(
@@ -173,7 +173,7 @@ export function szansaWobecKursu(
  * „#3 z 18 w lidze" -> „3. najszczelniejsza drużyna w lidze (z 18)".
  *
  * Sama liczba porządkowa była pułapką: miejsce 1 ma drużyna, która pozwala
- * NAJMNIEJ — i to zdanie siedziało w dymku, którego na telefonie nie ma.
+ * NAJMNIEJ – i to zdanie siedziało w dymku, którego na telefonie nie ma.
  */
 export function miejsceWLidze(rank: number, z: number): string {
   return `${rank}. najszczelniejsza w lidze na tym rynku (z ${z} drużyn)`;

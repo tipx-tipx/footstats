@@ -1,9 +1,9 @@
 "use client";
 
 /**
- * Wspólne animacje kuponów — te same w generatorze („Zbuduj własny kupon")
+ * Wspólne animacje kuponów – te same w generatorze („Zbuduj własny kupon")
  * i w automatycznych na /kupony, żeby całość czytała się jako jeden system.
- * Motyw: kupon się „składa" — kurs dobija do wartości, pasek szansy narasta,
+ * Motyw: kupon się „składa" – kurs dobija do wartości, pasek szansy narasta,
  * legi wpadają jeden po drugim. Wszystko respektuje prefers-reduced-motion.
  */
 
@@ -12,7 +12,7 @@ import { useEffect, useRef } from "react";
 
 /** Kurs łączny „dobijający" do wartości (rośnie jak przy składaniu kuponu).
 
- * Płynność: licznik pisze PROSTO do textContent w pętli rAF — bez setState.
+ * Płynność: licznik pisze PROSTO do textContent w pętli rAF – bez setState.
  * Wersja ze stanem renderowała React 60×/s na każdą kartę naraz (na /kupony
  * ~9 kart podczas wejścia), co dławiło główny wątek dokładnie w trakcie
  * animacji wejściowych; na ciemnym motywie zacięcia są najbardziej widoczne
@@ -64,11 +64,11 @@ export function CountUpKurs({
 
 /** Pasek szansy narastający od 0 do p (0..1) gdy karta wejdzie w kadr.
 
- * Płynność: animujemy transform (scaleX), NIE width — zmiana szerokości to
+ * Płynność: animujemy transform (scaleX), NIE width – zmiana szerokości to
  * właściwość LAYOUTU (przeliczenie układu + malowanie w każdej klatce, dla
  * wszystkich kart naraz, w środku układu kolumnowego /kupony), a transform
  * idzie w całości na kompozytorze. Pasek ma stałą szerokość = pct i rośnie
- * skalą od lewej — wygląda identycznie, kosztuje ułamek. */
+ * skalą od lewej – wygląda identycznie, kosztuje ułamek. */
 export function PasekSzansy({
   p,
   className,
@@ -100,7 +100,7 @@ export function PasekSzansy({
   );
 }
 
-/** Kontener + element do staggera legów — legi wpadają jeden po drugim. */
+/** Kontener + element do staggera legów – legi wpadają jeden po drugim. */
 export const legiKontener: Variants = {
   hidden: {},
   show: { transition: { staggerChildren: 0.06, delayChildren: 0.08 } },

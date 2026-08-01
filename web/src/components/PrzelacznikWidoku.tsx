@@ -3,7 +3,7 @@
 import Link from "next/link";
 
 /**
- * „Pokaż jak widzi klient" — tylko dla admina.
+ * „Pokaż jak widzi klient" – tylko dla admina.
  *
  * Bez tego przygotowanie strony pod sprzedaż jest zgadywanką: trzeba by się
  * wylogować, żeby zobaczyć własny produkt. Przełącznik chodzi po adresie

@@ -12,7 +12,7 @@ import { czyPelnyWglad, czytajRole } from "@/lib/rola";
 export const metadata = { title: "Skuteczność modelu – FootStats" };
 
 /**
- * KONTROLA JAKOŚCI — przebudowa 2026-07-26.
+ * KONTROLA JAKOŚCI – przebudowa 2026-07-26.
  *
  * Strona miała siedem sekcji jedna pod drugą i dwa niezależne przełączniki
  * tego samego (produkt), plus dwie nawigacje po czasie. Teraz: werdykt,
@@ -57,13 +57,13 @@ export default async function ModelPage({
   const podglad = params.widok === "klient";
   const pelnyWglad = czyPelnyWglad(rola, podglad);
   // UKRYCIE W INTERFEJSIE TO ZA MAŁO: scena jest komponentem klienckim, więc
-  // wszystko, co dostanie w propsach, ląduje w źródle strony — nawet jeśli
+  // wszystko, co dostanie w propsach, ląduje w źródle strony – nawet jeśli
   // nic tego nie renderuje. Kuchnię modelu wycinamy z DANYCH, nie z widoku.
   const typy = pelnyWglad ? typySurowe : okrojDlaKlienta(typySurowe);
   const pods = typy.podsumowanie;
 
   // --- KUPONY: bilans per horyzont + historia + kronika wygranych ---
-  // (zakładka wyłącznie dla admina — klientowi nie budujemy jej wcale, bo
+  // (zakładka wyłącznie dla admina – klientowi nie budujemy jej wcale, bo
   //  React i tak wysłałby ją do przeglądarki jako props sceny)
   const kuponyPanel = !pelnyWglad ? null :
     (typy.kupony?.length ?? 0) > 0 || (typy.kupony_wygrane?.length ?? 0) > 0 ? (
@@ -73,9 +73,9 @@ export default async function ModelPage({
           opis={
             <>
               Kupon zapisujemy w chwili, gdy pojawia się na stronie, i już go nie
-              zmieniamy — chyba że ogłoszone składy wywrócą któryś typ. Jeden
+              zmieniamy – chyba że ogłoszone składy wywrócą któryś typ. Jeden
               nietrafiony typ przekreśla cały kupon, a typ, który poszedł na
-              zwrot (bo zawodnik nie zagrał), wypada z kursu — dokładnie tak,
+              zwrot (bo zawodnik nie zagrał), wypada z kursu – dokładnie tak,
               jak u bukmachera.
             </>
           }
@@ -143,7 +143,7 @@ export default async function ModelPage({
         {(typy.kupony_wygrane?.length ?? 0) > 0 && (
           <Sekcja
             tytul={`Kronika trafień (${typy.kupony_wygrane!.length})`}
-            opis="Każdy kupon, który kiedykolwiek wszedł, zostaje tu na stałe — niezależnie od tego, jak dawno temu i czy akurat go zagrałeś."
+            opis="Każdy kupon, który kiedykolwiek wszedł, zostaje tu na stałe – niezależnie od tego, jak dawno temu i czy akurat go zagrałeś."
           >
             <div className="grid max-w-4xl items-start gap-3 sm:grid-cols-2">
               {typy.kupony_wygrane!.map((k) => (
@@ -174,13 +174,13 @@ export default async function ModelPage({
           <>
             To nie są realne zakłady, tylko egzamin dla modelu: kazaliśmy mu
             typować {meta.meczow_kalibracja} meczów, których{" "}
-            <strong>nie widział, gdy się uczył</strong>. Chodzi o jedno — czy
+            <strong>nie widział, gdy się uczył</strong>. Chodzi o jedno – czy
             model mówi prawdę o własnej pewności. Jeśli obiecuje „60%”, to
             takie zdarzenia powinny zachodzić mniej więcej w 6 przypadkach na
             10. Na wykresie idealnie uczciwy model układa się wzdłuż przekątnej;
             im większa kropka, tym więcej prognoz się na nią złożyło.
             {meta.tryb === "ms2026" &&
-              " Egzamin zdawał na Premier League — to ten sam silnik, który liczy typy na MŚ."}
+              " Egzamin zdawał na Premier League – to ten sam silnik, który liczy typy na MŚ."}
           </>
         }
       >
@@ -254,7 +254,7 @@ export default async function ModelPage({
         lead={
           <>
             <strong className="font-semibold text-ink">
-              Każdy typ, który kiedykolwiek pokazaliśmy, trafia tu sam — razem
+              Każdy typ, który kiedykolwiek pokazaliśmy, trafia tu sam – razem
               z tymi, które nie weszły.
             </strong>{" "}
             Nic nie da się stąd usunąć ani dopisać ręcznie: liczby liczą się

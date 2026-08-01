@@ -38,7 +38,7 @@ function odmienOkazje(n: number): string {
  * Teza produktu jednym spojrzeniem: wycena kursu (1/kurs) i szansa modelu
  * na wspólnym torze 0–100%; zielony odcinek między znacznikami = o ile
  * bukmacher przepłaca. Kieszonkowa wersja toru dowodu z BetCard
- * (bez historii — w hero liczy się 2-sekundowa czytelność).
+ * (bez historii – w hero liczy się 2-sekundowa czytelność).
  */
 function TorWyceny({ model, kurs }: { model: number; kurs: number }) {
   if (kurs <= 1) return null;
@@ -131,7 +131,7 @@ function ZywyPodglad({ bets }: { bets: ValueBet[] }) {
       onMouseLeave={() => setWstrzymany(false)}
       className="relative"
     >
-      {/* celownik HUD — narożniki „namierzają" kartę przy każdej zmianie */}
+      {/* celownik HUD – narożniki „namierzają" kartę przy każdej zmianie */}
       <span aria-hidden className="pointer-events-none absolute -inset-2.5">
         {[
           "left-0 top-0 border-l-2 border-t-2",
@@ -152,7 +152,7 @@ function ZywyPodglad({ bets }: { bets: ValueBet[] }) {
       <div className="glow-pop">
       <div className="cut-corner relative overflow-hidden border border-brand/25 bg-card">
         {/* pasek postępu do następnego namierzenia; przy ograniczonym ruchu
-            chowa go CSS (motion-reduce) — warunek w JS dawałby inny HTML na
+            chowa go CSS (motion-reduce) – warunek w JS dawałby inny HTML na
             serwerze niż u klienta (hydration mismatch) */}
         {bets.length > 1 && (
           <span
@@ -191,7 +191,7 @@ function ZywyPodglad({ bets }: { bets: ValueBet[] }) {
               </div>
 
               {/* separator sekcji karty (motyw biletu z perforacją został
-                  wyłącznie na kuponach — tam ma sens) */}
+                  wyłącznie na kuponach – tam ma sens) */}
               <div aria-hidden className="mx-6 border-t border-dashed border-hairline-strong" />
 
               <div className="px-6 pb-1 pt-4">
@@ -245,7 +245,7 @@ function ZywyPodglad({ bets }: { bets: ValueBet[] }) {
           </motion.div>
         </AnimatePresence>
 
-        {/* strzałki + licznik w belce karty (obok „zobacz szczegóły") —
+        {/* strzałki + licznik w belce karty (obok „zobacz szczegóły") –
             nad Linkiem (z-10), więc klik nie otwiera pozycji */}
         {bets.length > 1 && (
           <div className="absolute bottom-3.5 right-4 z-10 flex items-center gap-1.5">
@@ -282,9 +282,9 @@ function ZywyPodglad({ bets }: { bets: ValueBet[] }) {
 }
 
 /**
- * Blueprint boiska — techniczny rysunek połowy boiska cienką kreską
+ * Blueprint boiska – techniczny rysunek połowy boiska cienką kreską
  * (tablica taktyczna), wtopiony w tło hero za kartą podglądu.
- * Kolor z tokenu marki, wygaszany maską — piłka nożna bez kiczu.
+ * Kolor z tokenu marki, wygaszany maską – piłka nożna bez kiczu.
  */
 function BlueprintBoiska({ className }: { className?: string }) {
   return (
@@ -354,7 +354,7 @@ function TickerRynkow({ bets }: { bets: ValueBet[] }) {
   );
   return (
     <div className="relative mt-10 flex items-center gap-5 border-y border-hairline py-2.5">
-      {/* stała plakietka — nie jedzie z feedem */}
+      {/* stała plakietka – nie jedzie z feedem */}
       <span className="font-display flex shrink-0 items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-brand-deep">
         <span aria-hidden className="live-dot h-1.5 w-1.5 rounded-full bg-data-green" />
         skan na żywo
@@ -389,7 +389,7 @@ export function Hero({
 }) {
   return (
     <section className="relative mb-12 pt-8 sm:pt-14">
-      {/* aurora marki — oddychające tło hero; pełna szerokość OKNA
+      {/* aurora marki – oddychające tło hero; pełna szerokość OKNA
           (kalkulacja 50%−50vw), żeby kolor nigdy nie ucinał się na
           krawędzi kontenera treści */}
       <div
@@ -398,7 +398,7 @@ export function Hero({
         style={{ left: "calc(50% - 50vw)", right: "calc(50% - 50vw)" }}
       />
 
-      {/* blueprint boiska — taktyczny rysunek wtopiony za prawą kolumną */}
+      {/* blueprint boiska – taktyczny rysunek wtopiony za prawą kolumną */}
       <div
         aria-hidden
         className="pointer-events-none absolute -right-40 -top-16 hidden lg:block"
@@ -486,7 +486,7 @@ export function Hero({
         </div>
 
         {/* prawa: żywy podgląd skanera; poniżej lg (kolumny w stosie) karta
-            nie rozjeżdża się na pełną szerokość — bilet, nie baner */}
+            nie rozjeżdża się na pełną szerokość – bilet, nie baner */}
         <motion.div
           variants={wejscie}
           initial="hidden"
@@ -496,7 +496,7 @@ export function Hero({
         >
           {/* Poświata jest DEKORACJĄ, więc nie wolno jej ruszać układu.
               `-inset-16` (64 px na stronę) mieści się na desktopie w marginesach
-              kontenera, ale na telefonie karta zajmuje prawie całą szerokość —
+              kontenera, ale na telefonie karta zajmuje prawie całą szerokość –
               i te 64 px wypychały CAŁĄ stronę w bok o 48 px (wykryte
               `npm run audyt`, 2026-07-27). Na wąskim ekranie poświata jest
               odpowiednio węższa. */}

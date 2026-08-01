@@ -5,7 +5,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { useSzerokosc } from "@/lib/useSzerokosc";
 
 /**
- * OsSzans — jedna oś wyceny 0–100% dla rozwinięcia karty typu.
+ * OsSzans – jedna oś wyceny 0–100% dla rozwinięcia karty typu.
  *
  * Zastępuje dawny układ „tor + osobna legenda + osobny rządek liczb":
  * liczby siedzą bezpośrednio przy swoich znacznikach (zakotwiczone etykiety
@@ -17,7 +17,7 @@ import { useSzerokosc } from "@/lib/useSzerokosc";
  * (procentowy odstęp zawodził na mobile: 13% z ~350 px to mniej niż
  * szerokość podpisu). Etykieta odsunięta od znacznika dostaje cienką
  * nóżkę, żeby liczba nie odklejała się od swojej kreski; etykietę górną
- * gasimy przy kolizji z etykietą odcinka — znacznik zostaje, liczby
+ * gasimy przy kolizji z etykietą odcinka – znacznik zostaje, liczby
  * ratuje tooltip.
  */
 
@@ -65,7 +65,7 @@ function rozsunEtykiety(
     torPx > 0
       ? Math.min((((szerokosci[a] + szerokosci[b]) / 2 + 8) / torPx) * 100, 46)
       : 13;
-  // margines krawędzi z realnej szerokości etykiety — żeby tekst nie
+  // margines krawędzi z realnej szerokości etykiety – żeby tekst nie
   // wystawał poza tor (przed pomiarem zapasowe 5 pp)
   const brzeg = (i: number) =>
     torPx > 0 ? Math.min(((szerokosci[i] / 2 + 2) / torPx) * 100, 30) : 5;
@@ -343,7 +343,7 @@ export function OsSzans({
         ))}
       </div>
 
-      {/* skala — bez niej znaczniki wiszą w próżni */}
+      {/* skala – bez niej znaczniki wiszą w próżni */}
       <div className="font-data relative h-3 text-[9px] text-faint">
         <span className="absolute left-0">0</span>
         <span className="absolute left-1/2 -translate-x-1/2">50%</span>

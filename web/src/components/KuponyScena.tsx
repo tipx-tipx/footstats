@@ -15,7 +15,7 @@ import {
 import type { Kupon } from "@/lib/types";
 
 /**
- * Scena kuponów: zamiast katalogu 10 biletów naraz — decyzja w trzech
+ * Scena kuponów: zamiast katalogu 10 biletów naraz – decyzja w trzech
  * krokach. 1) zakres (na dziś / na kilka dni / value), 2) cel na osi
  * ryzyka (kurs + szansa pod każdym punktem), 3) JEDEN bilet na scenie
  * z werdyktem po ludzku i akcjami. Mechanika slotów pipeline'u zostaje
@@ -47,14 +47,14 @@ const ZAKRESY: { kod: Zakres; label: string; opis: string }[] = [
  *
  * Do dziś stała tu lista „5–10, 10–15, 15–20, 20–25". Przebudowa kuponów
  * z 30.07 zmieniła przedziały w `kupony.py` na „2–3 / 4,5–5,5" i „9–11 /
- * 18–25" — i od tamtej chwili NIE ZGADZAŁA SIĘ ANI JEDNA etykieta. Skutek:
+ * 18–25" – i od tamtej chwili NIE ZGADZAŁA SIĘ ANI JEDNA etykieta. Skutek:
  * licznik przy zakładce liczył kupony poprawnie („2"), ale pozycje rysowały
  * się z martwej listy, więc żaden kupon nie pasował do żadnej pozycji i pod
  * spodem stało „Ten przedział czeka na kupon". Zakładka Kupony nie pokazała
  * ani jednego kuponu przez dwa dni.
  *
  * Teraz lista przychodzi z backendu (`meta.przedzialy_kuponow`), a gdyby
- * meta była starsza niż kupony — schodzimy na etykiety WYCIĄGNIĘTE Z SAMYCH
+ * meta była starsza niż kupony – schodzimy na etykiety WYCIĄGNIĘTE Z SAMYCH
  * KUPONÓW. Dzięki temu ten widok nie ma już fizycznej możliwości pokazać
  * pustki, mając kupony w ręku.
  */
@@ -67,7 +67,7 @@ function przedzialyZakresu(
   const zKuponow = Array.from(new Set(grupa.map(celKuponu)));
   if (!zBackendu || zBackendu.length === 0) return zKuponow;
   // etykiety, które przyszły z kuponami, a których meta nie zna (meta bywa
-  // z innego cyklu niż zamrożony kupon) — dokładamy, zamiast je gubić
+  // z innego cyklu niż zamrożony kupon) – dokładamy, zamiast je gubić
   const brakujace = zKuponow.filter((c) => !zBackendu.includes(c));
   return [...zBackendu, ...brakujace];
 }
@@ -115,7 +115,7 @@ function Werdykt({ kupon: k }: { kupon: Kupon }) {
               : typy o najwyższej szansie, które razem dają kurs ×{celKuponu(k)}
               .{" "}
               {jedenMecz
-                ? "Wszystkie z jednego meczu — a że jeden nudny mecz potrafi położyć je naraz, obcinamy za to szansę kuponu."
+                ? "Wszystkie z jednego meczu – a że jeden nudny mecz potrafi położyć je naraz, obcinamy za to szansę kuponu."
                 : `Rozłożone na ${meczeIds.length} mecze.`}
             </>
           )}
@@ -311,7 +311,7 @@ export function KuponyScena({
   przedzialyMeta,
 }: {
   kupony: Kupon[];
-  /** czy na stronie jest sekcja generatora (#generator) — cel mostu „zmień" */
+  /** czy na stronie jest sekcja generatora (#generator) – cel mostu „zmień" */
   jestGenerator?: boolean;
   /** etykiety przedziałów z backendu (meta.przedzialy_kuponow) */
   przedzialyMeta?: Record<string, string[]>;
@@ -373,7 +373,7 @@ export function KuponyScena({
       // To NIE jest render: funkcja jest procedurą obsługi kliknięcia (async,
       // wołana z onClick), a reguła czystości nie odróżnia jej od ciała
       // komponentu. Znacznik czasu pominięcia musi być realnym „teraz", więc
-      // `Date.now()` jest tu poprawne — inaczej niż w renderze, gdzie od tego
+      // `Date.now()` jest tu poprawne – inaczej niż w renderze, gdzie od tego
       // jest `terazTs()`. Dyrektywa MUSI stać bezpośrednio nad kodem.
       // eslint-disable-next-line react-hooks/purity
       localStorage.setItem(`kupon-pominiety:${kupon.klucz}`, String(Date.now()));
@@ -402,7 +402,7 @@ export function KuponyScena({
       localStorage.setItem(`kupon-przebudowa:${kupon.klucz}`, String(Date.now()));
       setPrzebudowa(true);
     } catch {
-      /* przycisk zostaje — można spróbować ponownie */
+      /* przycisk zostaje – można spróbować ponownie */
     }
   };
 
@@ -453,7 +453,7 @@ export function KuponyScena({
 
   return (
     <section aria-label="Wybór kuponu">
-      {/* krok 1: zakres — taby tekstowe jak na tablicy okazji */}
+      {/* krok 1: zakres – taby tekstowe jak na tablicy okazji */}
       <div
         className="flex flex-wrap items-end gap-x-6 gap-y-1 border-b border-hairline"
         role="tablist"
@@ -500,7 +500,7 @@ export function KuponyScena({
         </p>
       )}
 
-      {/* krok 2: cel na torze ryzyka — wszystko wyrównane do LEWEJ jak
+      {/* krok 2: cel na torze ryzyka – wszystko wyrównane do LEWEJ jak
           reszta strony: mnożnik, przystanek i szansa zaczynają się przy
           lewej krawędzi kolumny, szyna biegnie od przystanku w prawo */}
       <div
@@ -595,7 +595,7 @@ export function KuponyScena({
 
       <ProfilKuponow />
 
-      {/* krok 3: scena — jeden bilet + werdykt */}
+      {/* krok 3: scena – jeden bilet + werdykt */}
       <div className="mt-6">
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
@@ -621,7 +621,7 @@ export function KuponyScena({
               <div className="rounded-(--radius-card) border border-dashed border-hairline bg-card-soft/60 px-6 py-10 text-center">
                 <p className="text-sm font-medium text-ink">Kupon pominięty</p>
                 <p className="mx-auto mt-1 max-w-sm text-xs leading-relaxed text-muted">
-                  I tak sprawdzimy, jak by poszedł — model się na tym uczy.
+                  I tak sprawdzimy, jak by poszedł – model się na tym uczy.
                   Nowy kupon w tym miejscu pojawi się w kilka minut, o ile da
                   się ułożyć inny sensowny zestaw.
                 </p>

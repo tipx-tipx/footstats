@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { Chakra_Petch, IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import "./globals.css";
 
-// nagłówki: Chakra Petch — ścięte narożniki, klimat transmisji sportowej
+// nagłówki: Chakra Petch – ścięte narożniki, klimat transmisji sportowej
 const chakra = Chakra_Petch({
   subsets: ["latin", "latin-ext"],
   variable: "--font-chakra",
@@ -22,7 +22,7 @@ const plexMono = IBM_Plex_Mono({
   weight: ["400", "500", "600"],
 });
 
-// motyw: zapis usera z localStorage, bez zapisu — preferencja systemowa.
+// motyw: zapis usera z localStorage, bez zapisu – preferencja systemowa.
 // Skrypt inline w <head> działa PRZED pierwszym malowaniem (zero mignięcia
 // jasnym tłem przy wejściu w ciemny motyw). Lustro logiki ThemeToggle.
 const SKRYPT_MOTYWU = `(function(){try{var m=localStorage.getItem("footstats-motyw");if(m!=="dark"&&m!=="light"){m=window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"}document.documentElement.dataset.theme=m}catch(e){}})()`;
@@ -31,11 +31,11 @@ export const metadata: Metadata = {
   title: "FootStats – okazje na statystyki piłkarskie",
   description:
     "Osobisty silnik decyzyjny: model matematyczny szacuje prawdopodobieństwa statystyk zawodników i drużyn, porównuje je z kursami bukmacherów i pokazuje, gdzie kurs jest zawyżony.",
-  // BEZ pola `icons` — ikony biorą się z konwencji plikowej app/ (favicon.ico
+  // BEZ pola `icons` – ikony biorą się z konwencji plikowej app/ (favicon.ico
   // + icon.png). Ręcznie dopisany link nie NADPISYWAŁ tego, co Next generuje
   // z plików, tylko się dokładał: w <head> lądowały dwie ikony naraz, a
-  // przeglądarka brała tę pierwszą — czyli domyślny favicon.ico Next.js.
-  // narzędzie prywatne za hasłem — nie indeksować
+  // przeglądarka brała tę pierwszą – czyli domyślny favicon.ico Next.js.
+  // narzędzie prywatne za hasłem – nie indeksować
   robots: { index: false, follow: false },
 };
 
@@ -46,7 +46,7 @@ export default function RootLayout({
     <html
       lang="pl"
       className={`${chakra.variable} ${plexSans.variable} ${plexMono.variable} h-full`}
-      // data-theme ustawia skrypt przed hydracją — React ma tego nie zgłaszać
+      // data-theme ustawia skrypt przed hydracją – React ma tego nie zgłaszać
       suppressHydrationWarning
     >
       <head>

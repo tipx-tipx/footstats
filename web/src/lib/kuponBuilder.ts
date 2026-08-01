@@ -1,5 +1,5 @@
 /**
- * Generator kuponów NA ŻĄDANIE (klient) — wierny port beam searchu z
+ * Generator kuponów NA ŻĄDANIE (klient) – wierny port beam searchu z
  * pipeline/footstats/model/kupony.py. Składa kupon z PRZEANALIZOWANEJ puli
  * legów (legi_pool z Supabase) natychmiast, bez czekania na cykl.
  *
@@ -18,29 +18,29 @@ export interface Kary {
 }
 export const KARY_DEFAULT: Kary = { ta_sama: 0.92, przeciwne: 0.97, nieznane: 0.95 };
 // backendowy styl "value" (kupony.py:_kandydaci) filtruje ev_pct >= MIN_LEG_EV
-// i max 1 leg/mecz — ten sam próg tutaj, żeby GeneratorKuponu mógł go odtworzyć
+// i max 1 leg/mecz – ten sam próg tutaj, żeby GeneratorKuponu mógł go odtworzyć
 export const MIN_LEG_EV = 2.0;
 
 // urealnienie szansy przy SKŁADANIU (jak kupony.py:_p_skladania): p_model
 // ściągane ku cenie rynku (devig jednostronny) wagą zależną od pewności
-// estymaty — selekcja nie ufa już w 100% samodeklarowanej przewadze modelu.
+// estymaty – selekcja nie ufa już w 100% samodeklarowanej przewadze modelu.
 // WYŚWIETLANA szansa kuponu pozostaje iloczynem p_model legów.
 const MARZA_RYNKU = 0.07;
 const WAGA_MODELU: Record<string, number> = { wysoka: 0.75, srednia: 0.55 };
 const WAGA_MODELU_DEFAULT = 0.55;
-// płynna waga z szerokości przedziału wiarygodności (ci) — jak kupony.py
+// płynna waga z szerokości przedziału wiarygodności (ci) – jak kupony.py
 const WAGA_CI_BAZA = 0.85;
 const WAGA_CI_MIN = 0.5;
 const WAGA_CI_MAX = 0.8;
 // twarde widełki wagi EFEKTYWNEJ po nałożeniu zmierzonych delt zaufania
 // (kupony.py: WAGA_EFF_MIN/MAX; delty liczy backend z rozliczeń i podaje
-// w meta.wagi_zaufania — front tylko je stosuje, parytet 1:1)
+// w meta.wagi_zaufania – front tylko je stosuje, parytet 1:1)
 const WAGA_EFF_MIN = 0.35;
 const WAGA_EFF_MAX = 0.85;
-// twardy limit legów ryzykownych (p_model < progu) per kupon — wysoki kurs
+// twardy limit legów ryzykownych (p_model < progu) per kupon – wysoki kurs
 // ma się składać z większej liczby pewnych zdarzeń, nie z grubych strzałów.
 // Zbalansowany dopuszcza ryzykowny leg tylko z niezależnym potwierdzeniem
-// wartości (ev_uk > 0) — jak kupony.py
+// wartości (ev_uk > 0) – jak kupony.py
 const PROG_RYZYKA_P = 0.55;
 const MAX_RYZYKOWNE: Record<Profil, number> = {
   bezpieczny: 0, zbalansowany: 1, agresywny: 2,
@@ -72,16 +72,16 @@ const DYWERSYFIKACJA = 0.985;
 const MAX_LEGI = 12;
 const BEAM_W = 90;
 // minimalna reprezentacja każdej długości kuponu w wiązce (jak kupony.py:
-// MIN_NA_DLUGOSC) — bez tego krótkie, drogie stany wypychały długie, tanie
+// MIN_NA_DLUGOSC) – bez tego krótkie, drogie stany wypychały długie, tanie
 // trajektorie i "dokładnie 7-8 typów" zwracało brak mimo istniejącego kompletu
 const MIN_NA_DLUGOSC = 10;
 const MAX_KANDYDATOW = 120;
 // ilu RÓŻNYCH zestawów legów o przypadkowo identycznym (długość, kurs, score)
-// przetrwa dedup wiązki — jak kupony.py:MAX_TIE_REPR (ten sam fix, przeniesiony
+// przetrwa dedup wiązki – jak kupony.py:MAX_TIE_REPR (ten sam fix, przeniesiony
 // tutaj z opóźnieniem: przy pierwszej naprawie dedupu portowano tylko Python)
 const MAX_TIE_REPR = 3;
 
-/** Zaokrąglenie „pół w górę" — parytet z kupony.py:_zaokr. `toFixed` ma inne
+/** Zaokrąglenie „pół w górę" – parytet z kupony.py:_zaokr. `toFixed` ma inne
  * reguły połówek/precyzji, przez co kubełki dedupu wiązki potrafiły się
  * różnić od backendu na 8. miejscu po przecinku. */
 function zaokr(x: number, m: number): string {
@@ -93,7 +93,7 @@ function pRynku(kurs: number): number {
   return Math.min(Math.max((1.0 / kurs) * (1.0 - MARZA_RYNKU), 1e-6), 1.0 - 1e-6);
 }
 
-/** Zaufanie do p_model — jak kupony.py:_waga_modelu (parytet 1:1).
+/** Zaufanie do p_model – jak kupony.py:_waga_modelu (parytet 1:1).
  * `wagi` = zmierzone delty per kubełek pewności (meta.wagi_zaufania). */
 function wagaModelu(l: LegPool, wagi?: Record<string, number>): number {
   const ci = l.ci;
@@ -114,7 +114,7 @@ function wagaModelu(l: LegPool, wagi?: Record<string, number>): number {
   return w;
 }
 
-/** Szansa lega DO SKŁADANIA — jak kupony.py:_p_skladania (parytet 1:1). */
+/** Szansa lega DO SKŁADANIA – jak kupony.py:_p_skladania (parytet 1:1). */
 function pSkladania(l: LegPool, wagi?: Record<string, number>): number {
   const w = wagaModelu(l, wagi);
   return Math.exp(w * Math.log(l.p_model) + (1.0 - w) * Math.log(pRynku(l.kurs)));
@@ -122,8 +122,8 @@ function pSkladania(l: LegPool, wagi?: Record<string, number>): number {
 
 function legValue(l: LegPool, pSel: number): number {
   // no-vig UK (niezależne) wprost; przewaga deklarowana przez model liczona
-  // z UREALNIONEJ szansy — jak kupony.py:_leg_value. pSel podaje wywołujący
-  // (policzone raz i cache'owane — transcendentne funkcje w komparatorach
+  // z UREALNIONEJ szansy – jak kupony.py:_leg_value. pSel podaje wywołujący
+  // (policzone raz i cache'owane – transcendentne funkcje w komparatorach
   // sortowania kładły płynność UI przy dużej puli sezonu ligowego)
   const ev = l.ev_uk ?? (pSel * l.kurs - 1.0) * 100.0;
   return Math.max(0, Math.min(ev ?? 0, 30));
@@ -171,7 +171,7 @@ function scoreSelekcji(
 }
 
 function qLega(b: LegPool, profil: Profil, pSel: number, val: number): number {
-  // jakość z UREALNIONEJ szansy (nie surowego p_model) — jak kupony.py:_q
+  // jakość z UREALNIONEJ szansy (nie surowego p_model) – jak kupony.py:_q
   let q = Math.log(pSel) / Math.log(b.kurs);
   if (profil === "bezpieczny") return q;
   const v = val;
@@ -183,7 +183,7 @@ function qLega(b: LegPool, profil: Profil, pSel: number, val: number): number {
   return q;
 }
 
-/** Propozycja wymiany najsłabszego lega (rentgen kuponu — doradcza, jak
+/** Propozycja wymiany najsłabszego lega (rentgen kuponu – doradcza, jak
  * kupony.py:_rentgen). Kupon zostaje bez zmian, to tylko podpowiedź. */
 export interface KuponAlternatywaLeg extends LegPool {
   zamiast_idx: number;
@@ -202,9 +202,9 @@ export interface KuponWynik {
   kurs_laczny: number;
   p_model: number;
   fair_kurs: number;
-  /** BRUTTO — parytet z kupony.py, tym filtrowane są legi */
+  /** BRUTTO – parytet z kupony.py, tym filtrowane są legi */
   ev_pct: number;
-  /** PO PODATKU od stawki — to widzi użytkownik */
+  /** PO PODATKU od stawki – to widzi użytkownik */
   ev_netto?: number;
   cel_label: string;
   legi: LegPool[];
@@ -225,20 +225,20 @@ export interface OpcjeKuponu {
   maxNaMecz?: number;
   kary?: Kary;
   /** typy, które MUSZĄ wejść do kuponu (wybór użytkownika w generatorze).
-   * Wchodzą zawsze — z pominięciem filtrów profilu (świadoma decyzja usera
-   * bije bezpieczniki doboru) — a beam search dobiera do nich resztę.
-   * Rozszerzenie WYŁĄCZNIE frontowe (generator własnego kuponu) — kupony.py
+   * Wchodzą zawsze – z pominięciem filtrów profilu (świadoma decyzja usera
+   * bije bezpieczniki doboru) – a beam search dobiera do nich resztę.
+   * Rozszerzenie WYŁĄCZNIE frontowe (generator własnego kuponu) – kupony.py
    * celowo tego nie ma, automatyczne kupony zawsze składa model od zera. */
   przypiete?: LegPool[];
-  /** klucze typów (legKey) usuniętych przez użytkownika — nie wejdą do kuponu
+  /** klucze typów (legKey) usuniętych przez użytkownika – nie wejdą do kuponu
    * ani do propozycji rentgena/dołożenia. Rozszerzenie frontowe, jak wyżej. */
   wykluczone?: ReadonlySet<string>;
   /** zmierzone delty wag zaufania per kubełek pewności (meta.wagi_zaufania,
-   * liczone z rozliczeń przez backend) — jak kupony.py:build_kupony(wagi=) */
+   * liczone z rozliczeń przez backend) – jak kupony.py:build_kupony(wagi=) */
   wagi?: Record<string, number>;
 }
 
-/** Stabilny klucz typu w puli — ta sama czwórka co sygnatury kuponów. */
+/** Stabilny klucz typu w puli – ta sama czwórka co sygnatury kuponów. */
 export function legKey(l: LegPool): string {
   return `${l.mecz_id}:${l.podmiot_id}:${l.rynek_kod}:${l.linia}`;
 }
@@ -246,7 +246,7 @@ export function legKey(l: LegPool): string {
 type St = { kurs: number; p: number; legi: LegPool[] };
 
 /**
- * Pula po filtrach profilu — dokładnie te legi, które beam search ma prawo
+ * Pula po filtrach profilu – dokładnie te legi, które beam search ma prawo
  * wziąć (bezpieczny: p >= 0.58; zbalansowany: gambit p < 0.55 tylko z
  * niezależnym potwierdzeniem ev_uk > 0). Wspólne źródło prawdy dla
  * zlozKupon i podpowiedzi osiągalności w UI.
@@ -262,7 +262,7 @@ export function pulaEfektywna(pool: LegPool[], profil: Profil): LegPool[] {
 
 /**
  * Osiągalny przedział kursu łącznego przy ograniczeniach beam searchu
- * (unikalny zawodnik, limit typów z meczu, limit liczby typów) — do uczciwej
+ * (unikalny zawodnik, limit typów z meczu, limit liczby typów) – do uczciwej
  * podpowiedzi w UI. Zachłanne oszacowanie: najtańsze/najdroższe legi brane
  * w kolejności kursu z pominięciem naruszeń ograniczeń. Zwraca null, gdy
  * przy tych ograniczeniach nie da się wybrać nawet minLegi legów.
@@ -274,7 +274,7 @@ export function zakresOsiagalny(
   maxNaMecz: number,
   profil: Profil = "zbalansowany",
 ): { min: number; max: number; maxN: number } | null {
-  // ten sam limit legów ryzykownych co beam search — bez niego oszacowanie
+  // ten sam limit legów ryzykownych co beam search – bez niego oszacowanie
   // górne obiecywało kursy, których dobór nigdy nie osiągnie (drogie legi
   // to zwykle legi ryzykowne)
   const maxRyzykowne = MAX_RYZYKOWNE[profil];
@@ -338,7 +338,7 @@ export function zlozKupon(
     (b) => b.kurs > 1 && b.p_model > 0 && b.p_model < 1,
   );
   if (przypiete.length) {
-    // przypięte muszą same spełniać ograniczenia kuponu — inaczej żaden
+    // przypięte muszą same spełniać ograniczenia kuponu – inaczej żaden
     // komplet nie istnieje i uczciwie zwracamy null (UI tłumaczy dlaczego)
     if (przypiete.length > maxLegi) return null;
     if (new Set(przypiete.map((l) => l.podmiot_id)).size < przypiete.length) return null;
@@ -355,7 +355,7 @@ export function zlozKupon(
 
   // cache przeliczeń per leg: pSkladania/legValue mają log/exp w środku i
   // były liczone w komparatorach sortowania (2·n·log n wywołań na każdy ruch
-  // suwaka) — przy puli sezonu ligowego kładło to płynność podglądu na żywo
+  // suwaka) – przy puli sezonu ligowego kładło to płynność podglądu na żywo
   const pSelCache = new Map<LegPool, number>();
   const pSelOf = (l: LegPool): number => {
     let v = pSelCache.get(l);
@@ -422,7 +422,7 @@ export function zlozKupon(
     // warstwach (jak kupony.py:_zloz_pewniaki): prawdziwe duplikaty (ten sam
     // ZBIÓR zawodników, różna kolejność wstawienia) zawsze zwijamy do
     // jednego; RÓŻNE zestawy o przypadkowo identycznym (długość, kurs, score)
-    // dostają do MAX_TIE_REPR reprezentantów zamiast zwijać się do jednego —
+    // dostają do MAX_TIE_REPR reprezentantów zamiast zwijać się do jednego –
     // inaczej pula z wieloma podobnymi legami zapycha całą wiązkę stanami tej
     // samej długości i blokuje dojście do dłuższych kompletów.
     const tieRepr = new Map<string, Set<string>>();
@@ -445,7 +445,7 @@ export function zlozKupon(
       .map((o) => ({ st: o.st, rank: o.sc * Math.min(o.st.kurs / cmin, 1) }))
       .sort((a, b) => b.rank - a.rank)
       // top BEAM_W ogółem + gwarancja MIN_NA_DLUGOSC reprezentantów każdej
-      // długości (jak kupony.py) — nadzbiór starej wiązki, nigdy gorszy wynik
+      // długości (jak kupony.py) – nadzbiór starej wiązki, nigdy gorszy wynik
       .filter((o, i) => {
         const dl = o.st.legi.length;
         const licznik = perDl.get(dl) ?? 0;
@@ -467,9 +467,9 @@ export function zlozKupon(
   }));
   ocenione.sort((a, b) => {
     if (b.sc !== a.sc) return b.sc - a.sc;
-    // deterministyczny tie-break po zestawie podmiotów — porównanie LICZBOWE
+    // deterministyczny tie-break po zestawie podmiotów – porównanie LICZBOWE
     // element po elemencie (jak Python tuple(sorted(...))), NIE stringowe:
-    // "10,11" < "9,20" leksykograficznie, ale (9,20) < (10,11) liczbowo —
+    // "10,11" < "9,20" leksykograficznie, ale (9,20) < (10,11) liczbowo –
     // przy remisie score backend i frontend potrafiły wybrać inny komplet
     const n = Math.min(a.ident.length, b.ident.length);
     for (let i = 0; i < n; i++) {
@@ -493,11 +493,11 @@ export function zlozKupon(
       );
     return {
       kurs_laczny: Math.round(st.kurs * 100) / 100,
-      // zaokrąglone tak samo jak kupony.py:_kupon_z (round(p, 4)) — fair_kurs/
+      // zaokrąglone tak samo jak kupony.py:_kupon_z (round(p, 4)) – fair_kurs/
       // ev_pct dalej liczone z NIEzaokrąglonego pF, jak w Pythonie
       p_model: Math.round(pF * 10000) / 10000,
       fair_kurs: Math.round((1 / Math.max(pF, 1e-9)) * 100) / 100,
-      // BRUTTO — parytet z kupony.py (tym filtrujemy legi). Wartość PO
+      // BRUTTO – parytet z kupony.py (tym filtrujemy legi). Wartość PO
       // PODATKU dokłada warstwa widoku (`wyplata`/`wartoscNetto` z lib/
       // podatek.ts): ten plik jest uruchamiany gołym Node'em przez most
       // parytetu, więc nie może mieć importów runtime bez rozszerzenia.
@@ -512,10 +512,10 @@ export function zlozKupon(
   const legi = wynik.legi;
 
   // rentgen (jak kupony.py:_rentgen): najsłabsze ogniwo + czy pula ma lepszą
-  // zamianę, która realnie podnosi szansę kuponu. Czysto doradcze — kupon
+  // zamianę, która realnie podnosi szansę kuponu. Czysto doradcze – kupon
   // (legi) zostaje bez zmian. Badge "najsłabsze" pokazuje globalnie najsłabszy
   // typ, ale wymianę proponujemy tylko dla NIEPRZYPIĘTYCH (przypięty = user
-  // powiedział "ten ma zostać" — nie doradzamy wbrew niemu).
+  // powiedział "ten ma zostać" – nie doradzamy wbrew niemu).
   const weakIdx = legi.reduce(
     (mi, l, i, arr) => (l.p_model < arr[mi].p_model ? i : mi), 0,
   );
@@ -538,7 +538,7 @@ export function zlozKupon(
     if (i !== swapIdx) naMeczRentgen.set(l.mecz_id, (naMeczRentgen.get(l.mecz_id) ?? 0) + 1);
   });
   // zamiennik wybierany po p CAŁEGO kuponu (z karą korelacji), nie po
-  // najwyższym p_model lega — leg o niższym p_model, ale z innego meczu,
+  // najwyższym p_model lega – leg o niższym p_model, ale z innego meczu,
   // potrafi dać lepszy kupon niż skorelowany pewniak
   const legiBezWeak = legi.filter((_, i) => i !== swapIdx);
   const karaBaza = Math.max(karaKoszyka(legi, kary), 1e-9);
@@ -567,7 +567,7 @@ export function zlozKupon(
   }
 
   // dołożenie (jak kupony.py:_dolozenie): kupon wisi w dolnej połowie
-  // przedziału — zaproponuj dobicie kursu bardzo pewnym legiem (p>=0.70)
+  // przedziału – zaproponuj dobicie kursu bardzo pewnym legiem (p>=0.70)
   if (wynik.kurs_laczny < (cmin + cmax) / 2) {
     const uzyciDolozenie = new Set(legi.map((l) => l.podmiot_id));
     let bestAdd: LegPool | null = null;
@@ -590,7 +590,7 @@ export function zlozKupon(
   }
 
   // wariant B: najlepszy WYRAŹNIE INNY komplet (Jaccard < 0.5) z tej samej
-  // wiązki — czysto podglądowy, nie zajmuje slotu i nie dostaje własnego rentgenu
+  // wiązki – czysto podglądowy, nie zajmuje slotu i nie dostaje własnego rentgenu
   const sygnA = new Set(
     legi.map((l) => `${l.mecz_id}:${l.podmiot_id}:${l.rynek_kod}:${l.linia}`),
   );

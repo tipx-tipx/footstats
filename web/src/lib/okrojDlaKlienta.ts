@@ -4,19 +4,19 @@ import type { SkutecznoscDnia, TypyWyniki } from "./types";
  * Wytnij kuchnię modelu z danych, ZANIM trafią do przeglądarki.
  *
  * Ukrycie czegoś w interfejsie nie jest ukryciem: komponent sceny jest
- * kliencki, więc wszystko, co dostanie w propsach, ląduje w źródle strony —
+ * kliencki, więc wszystko, co dostanie w propsach, ląduje w źródle strony –
  * nawet jeśli nic tego nie renderuje. Przy przygotowaniu strony pod klienta
  * zewnętrznego to jest różnica między „nie pokazujemy" a „nie wysyłamy".
  *
  * Co wypada i dlaczego:
- *   diagnostyka, kupony_diag, epoki_per_rynek — narzędzia inżynierskie,
- *   po_rynku                                  — tabela „obiecywał vs weszło",
+ *   diagnostyka, kupony_diag, epoki_per_rynek – narzędzia inżynierskie,
+ *   po_rynku                                  – tabela „obiecywał vs weszło",
  *                                               czyli wprost miara tego, o ile
  *                                               model przeszacowuje pewność,
- *   typy z `poza_publikacja`                  — nigdy nie były na stronie,
+ *   typy z `poza_publikacja`                  – nigdy nie były na stronie,
  *                                               to nasza kontrola jakości.
  *
- * Liczniki dnia (`rozliczone`, `trafione`, `roi_flat`) zostają nietknięte —
+ * Liczniki dnia (`rozliczone`, `trafione`, `roi_flat`) zostają nietknięte –
  * one i tak NIGDY nie zawierały typów „na próbę" (patrz rozliczanie.py:
  * skutecznosc_per_dzien), więc usunięcie ich z listy nie rozjeżdża sum.
  */
@@ -33,7 +33,7 @@ function bezProbnych(dni: SkutecznoscDnia[]): SkutecznoscDnia[] {
 /**
  * Pola, których typ `TypyWyniki` w ogóle nie deklaruje, a które pipeline
  * wkłada do JSON-a (diagnostyka modelu). Nie widać ich w kodzie, więc tym
- * łatwiej byłoby je przeoczyć — kasujemy po nazwie.
+ * łatwiej byłoby je przeoczyć – kasujemy po nazwie.
  */
 const NIEZADEKLAROWANA_KUCHNIA = [
   "diagnostyka",

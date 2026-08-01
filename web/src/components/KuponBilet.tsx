@@ -16,7 +16,7 @@ function LegBadges({ l }: { l: KuponLeg }) {
       {l.matchup && (
         <span
           className="shrink-0 text-[11px] font-semibold text-brand"
-          title="Rywal dużo dopuszcza na tym rynku — zawodnicy z tej pozycji regularnie mu to robią"
+          title="Rywal dużo dopuszcza na tym rynku – zawodnicy z tej pozycji regularnie mu to robią"
         >
           ◎
         </span>
@@ -24,7 +24,7 @@ function LegBadges({ l }: { l: KuponLeg }) {
       {l.rotacja && (
         <span
           className="shrink-0 text-[11px] font-semibold text-data-amber-ink"
-          title="Wraca do pierwszego składu po przerwie — bukmacher często nie zdążył jeszcze poprawić kursu"
+          title="Wraca do pierwszego składu po przerwie – bukmacher często nie zdążył jeszcze poprawić kursu"
         >
           ↥
         </span>
@@ -42,10 +42,10 @@ function LegBadges({ l }: { l: KuponLeg }) {
 }
 
 /**
- * Bilet kuponu — jedna anatomia wszędzie (scena na /kupony, zajawka na
+ * Bilet kuponu – jedna anatomia wszędzie (scena na /kupony, zajawka na
  * głównej ma swoją wersję mini): gradientowy nagłówek z liczbami, pasek
  * szansy, perforacja, typy pogrupowane po meczu, krótka stopka faktów.
- * Cała głębia (rentgen, warianty, akcje) żyje POZA biletem — bilet ma
+ * Cała głębia (rentgen, warianty, akcje) żyje POZA biletem – bilet ma
  * wyglądać jak coś, co chce się zagrać, nie jak panel administracyjny.
  */
 export function KuponBilet({
@@ -88,7 +88,7 @@ export function KuponBilet({
           </span>
         </div>
         <div className="mt-3.5 flex flex-wrap items-end gap-x-7 gap-y-2.5">
-          <div title="Kursy wszystkich typów przemnożone przez siebie — tyle razy rośnie stawka, jeśli wejdzie cały kupon">
+          <div title="Kursy wszystkich typów przemnożone przez siebie – tyle razy rośnie stawka, jeśli wejdzie cały kupon">
             <p className="text-[10px] uppercase tracking-wide text-faint">
               kurs łączny
             </p>
@@ -151,7 +151,7 @@ export function KuponBilet({
         </div>
       )}
 
-      {/* typy zgrupowane po meczu — jak w bet builderze */}
+      {/* typy zgrupowane po meczu – jak w bet builderze */}
       <div className="flex-1">
         {k.legi.map((l, li) => {
           const nowyMecz = li === 0 || k.legi[li - 1].mecz_id !== l.mecz_id;
@@ -180,7 +180,7 @@ export function KuponBilet({
                   {li === weakIdx && k.legi.length > 1 && (
                     <span
                       className="shrink-0 rounded-full bg-data-amber-wash px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-data-amber-ink"
-                      title="Typ o najmniejszej szansie — to on najmocniej ciągnie cały kupon w dół"
+                      title="Typ o najmniejszej szansie – to on najmocniej ciągnie cały kupon w dół"
                     >
                       najsłabszy
                     </span>
@@ -192,7 +192,7 @@ export function KuponBilet({
                     {fmtKurs(l.kurs)}
                   </span>
                 </div>
-                {/* pasek szansy typu — rentgen na jeden rzut oka */}
+                {/* pasek szansy typu – rentgen na jeden rzut oka */}
                 <div
                   className="mt-1.5 h-[3px] overflow-hidden rounded-full bg-hairline/60"
                   aria-hidden

@@ -1,5 +1,5 @@
 /**
- * Zapisy do Supabase app_data (service_role) — WYŁĄCZNIE z route handlerów,
+ * Zapisy do Supabase app_data (service_role) – WYŁĄCZNIE z route handlerów,
  * nigdy z komponentów klienckich (service key nie może wyciekać do przeglądarki).
  */
 
@@ -17,7 +17,7 @@ export async function readAppData(
 }
 
 /** Nadpisz WHOLE payload (poprawne tylko dla wartości bez współbieżnych
- * częściowych aktualizacji — np. skalar jak wybrany profil buildera). Dla
+ * częściowych aktualizacji – np. skalar jak wybrany profil buildera). Dla
  * obiektów mutowanych po kluczu (pomiń/przywróć/...) użyj mergeAppData. */
 export async function writeAppData(
   url: string,
@@ -40,12 +40,12 @@ export async function writeAppData(
 
 /**
  * Atomowy merge/usunięcie top-level kluczy w app_data.payload (migracja
- * 0003, funkcja SQL merge_app_data) — jedno zapytanie do Postgresa zamiast
+ * 0003, funkcja SQL merge_app_data) – jedno zapytanie do Postgresa zamiast
  * read-modify-write z klienta, więc dwa równoległe żądania do TEGO SAMEGO
  * klucza (dwie karty przeglądarki, klik + auto-retry) już się nie nadpisują.
  *
  * GRACEFUL FALLBACK: gdy RPC jeszcze nie istnieje (migracja niezaaplikowana
- * na danym projekcie Supabase — PostgREST odpowiada 404), spada do starego
+ * na danym projekcie Supabase – PostgREST odpowiada 404), spada do starego
  * read-modify-write. Dzięki temu wdrożenie tego kodu jest bezpieczne
  * niezależnie od tego, czy/kiedy migracja zostanie odpalona.
  */
@@ -66,7 +66,7 @@ export async function mergeAppData(
     body: JSON.stringify({ p_key: name, p_patch: patch, p_remove: remove }),
   });
   if (rpc.ok) return true;
-  if (rpc.status !== 404) return false; // realny błąd — nie maskuj fallbackiem
+  if (rpc.status !== 404) return false; // realny błąd – nie maskuj fallbackiem
 
   const current = await readAppData(url, key, name);
   for (const [k, v] of Object.entries(patch)) current[k] = v;

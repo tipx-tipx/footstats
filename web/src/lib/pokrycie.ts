@@ -1,22 +1,22 @@
 /**
- * TOP POKRYCIA — zawodnicy z najlepszym pokryciem linii w ostatnich meczach.
+ * TOP POKRYCIA – zawodnicy z najlepszym pokryciem linii w ostatnich meczach.
  *
  * Zasady (wypracowane z użytkownikiem):
  *  • Próbka = ostatnie 5 meczów, w których zawodnik ZACZYNAŁ (minuty ≥ 60).
- *  • TRYB TURNIEJOWY (mecz reprezentacji, MŚ): preferujemy starty w kadrze —
+ *  • TRYB TURNIEJOWY (mecz reprezentacji, MŚ): preferujemy starty w kadrze –
  *    jeśli zawodnik ma ≥ 5 startów w kadrze, liczymy pokrycie z nich; jeśli
- *    nie (rezerwa kadry) — fallback na 5 ostatnich startów z flagą
+ *    nie (rezerwa kadry) – fallback na 5 ostatnich startów z flagą
  *    „forma klubowa".
- *  • TRYB LIGOWY (mecz klubowy): podział klub/kadra nie steruje niczym —
+ *  • TRYB LIGOWY (mecz klubowy): podział klub/kadra nie steruje niczym –
  *    próbka to po prostu 5 ostatnich startów (mecze reprezentacji z przerw
  *    kadrowych zostają w próbce, w hoverze widać ich oznaczenie).
- *  • Jeden wiersz na (zawodnik, rynek) — linie 1+/2+/3+ zwinięte obok siebie.
+ *  • Jeden wiersz na (zawodnik, rynek) – linie 1+/2+/3+ zwinięte obok siebie.
  *  • Zostają pokrycia ≥ 2/5. Kurs Superbet z siatki odds.
  */
 
 import type { OddsSuperbet, Zawodnik } from "./types";
 
-/** Etykiety rynków (kod → nazwa PL) — zgodne z pipeline MARKET_NAMES_PL. */
+/** Etykiety rynków (kod → nazwa PL) – zgodne z pipeline MARKET_NAMES_PL. */
 export const RYNEK_LABEL: Record<string, string> = {
   shots: "Strzały",
   sot: "Strzały celne",
@@ -68,8 +68,8 @@ export interface LiniaPokrycie {
   kurs: number | null;
   /**
    * Zgrubny sygnał WARTOŚCI: ile dałby ten zakład, gdyby surowe pokrycie było
-   * prawdziwym prawdopodobieństwem — (pokryte/próba × kurs − 1) × 100%.
-   * NIE jest to EV silnika (brak kalibracji, minut, kontekstu, próba tylko 5) —
+   * prawdziwym prawdopodobieństwem – (pokryte/próba × kurs − 1) × 100%.
+   * NIE jest to EV silnika (brak kalibracji, minut, kontekstu, próba tylko 5) –
    * to szybki filtr „czy kurs w ogóle opłaca to pokrycie" (odsiewa „5/5 @1,01”).
    * null, gdy brak kursu Superbet.
    */
@@ -88,9 +88,9 @@ export interface WierszPokrycia {
   /** true = pokrycie z meczów reprezentacji; false = fallback klubowy (ten rynek) */
   kadraBasis: boolean;
   /** true = zawodnik jest regularny w kadrze (≥5 startów kadry w najbogatszym
-   *  rynku) — sygnał na poziomie GRACZA, spójny między rynkami (kolejność + flaga) */
+   *  rynku) – sygnał na poziomie GRACZA, spójny między rynkami (kolejność + flaga) */
   kadraRegularny: boolean;
-  /** timestamp (s) najnowszego meczu w próbce — świeżość */
+  /** timestamp (s) najnowszego meczu w próbce – świeżość */
   ostatniMeczTs: number;
   /** pokrycie per linia (tylko te ≥ MIN_POKRYTE) */
   linie: LiniaPokrycie[];
@@ -110,15 +110,15 @@ export interface WierszPokrycia {
 
 /**
  * Ranga trafności na mecz REPREZENTACJI: 0 = regularny w kadrze (realnie zagra),
- * 1 = rezerwa kadry (forma klubowa, niżej). Sygnał na poziomie GRACZA — spójny
- * między jego rynkami. Świadomie NIE używamy statshub `in_predicted_lineup` —
+ * 1 = rezerwa kadry (forma klubowa, niżej). Sygnał na poziomie GRACZA – spójny
+ * między jego rynkami. Świadomie NIE używamy statshub `in_predicted_lineup` –
  * jest rzadki i migocze między cyklami (raz XI, raz nie); baza kadry jest stabilna.
  */
 function ranga(w: WierszPokrycia): number {
   return w.kadraRegularny ? 0 : 1;
 }
 
-/** Zawodnik po scaleniu duplikatów — trzyma wszystkie źródłowe ID (do kursów). */
+/** Zawodnik po scaleniu duplikatów – trzyma wszystkie źródłowe ID (do kursów). */
 type ZawodnikScalony = Zawodnik & { ids: number[] };
 
 const _norm = (s: string) =>
@@ -131,7 +131,7 @@ const _norm = (s: string) =>
 
 /**
  * Statshub bywa zwraca tego samego zawodnika pod kilkoma ID, z ROZBITĄ formą
- * (jeden rekord ma strzały, inny faule) i różną flagą składu — przez co ten
+ * (jeden rekord ma strzały, inny faule) i różną flagą składu – przez co ten
  * sam gracz pojawiał się raz z „XI", raz bez. Scalamy po nazwisku+drużynie:
  * suma rynków (rynek z większą próbką wygrywa), xi = OR, wszystkie ID zebrane.
  */
@@ -273,7 +273,7 @@ export function topPokrycia(
       ranga(a) - ranga(b) ||
       // 2) wiersze z kursem (dają się ocenić wartościowo) przed bez kursu
       (b.maxRankEv != null ? 1 : 0) - (a.maxRankEv != null ? 1 : 0) ||
-      // 3) WARTOŚĆ ważona pokryciem — realna przewaga, nie samo pokrycie
+      // 3) WARTOŚĆ ważona pokryciem – realna przewaga, nie samo pokrycie
       (b.maxRankEv ?? -Infinity) - (a.maxRankEv ?? -Infinity) ||
       // 4) dalej jak dotąd: pokrycie → linia → kurs
       b.maxPokryte - a.maxPokryte ||

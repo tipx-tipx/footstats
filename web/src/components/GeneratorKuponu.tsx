@@ -41,7 +41,7 @@ const PROFILE: { kod: Profil; label: string; opis: string }[] = [
   },
 ];
 
-// zapas na obstawienie — MUSI się zgadzać z pipeline (kupony.MARGINES_STARTU_S)
+// zapas na obstawienie – MUSI się zgadzać z pipeline (kupony.MARGINES_STARTU_S)
 const MARGINES_STARTU_S = 90 * 60;
 
 function odmienTyp(n: number): string {
@@ -49,11 +49,11 @@ function odmienTyp(n: number): string {
 }
 
 /**
- * UCZCIWA SZANSA — to samo, co robi silnik z kuponami automatycznymi
+ * UCZCIWA SZANSA – to samo, co robi silnik z kuponami automatycznymi
  * (kupony.py:_urealnij_szanse). Szansa kuponu to iloczyn szans typów, więc
  * błąd pojedynczego typu podnosi się do potęgi: rozliczenia pokazały kupony
  * obiecujące 17%, a wchodzące w 10%. Współczynnik jest ZMIERZONY na
- * rozliczonych kuponach (meta.kalibracja_kuponow) — tutaj bierzemy ten
+ * rozliczonych kuponach (meta.kalibracja_kuponow) – tutaj bierzemy ten
  * ostrożniejszy z dostępnych, bo kupon z generatora miesza horyzonty.
  *
  * Zostaje poza kuponBuilder.ts celowo: tamten plik jest portem 1:1
@@ -75,7 +75,7 @@ function urealnij(
   };
 }
 
-/** pinezka „na pewno w kuponie" — glif zamiast emoji, dziedziczy kolor */
+/** pinezka „na pewno w kuponie" – glif zamiast emoji, dziedziczy kolor */
 function PinIcon({ className }: { className?: string }) {
   return (
     <svg
@@ -105,14 +105,14 @@ export function GeneratorKuponu({
 }: {
   pool: LegPool[];
   kary?: Kary;
-  /** zmierzone delty wag zaufania (meta.wagi_zaufania) — te same co backend */
+  /** zmierzone delty wag zaufania (meta.wagi_zaufania) – te same co backend */
   wagi?: Record<string, number>;
   /** zmierzone urealnienie szansy kuponu (meta.kalibracja_kuponow) */
   kalibracja?: Record<string, number>;
-  /** gdy podany — generator ograniczony do jednego meczu (wersja na stronie meczu) */
+  /** gdy podany – generator ograniczony do jednego meczu (wersja na stronie meczu) */
   meczId?: number;
 }) {
-  // odcięcie startu jak backend (kupony.py: MARGINES_STARTU_S) — bez tego
+  // odcięcie startu jak backend (kupony.py: MARGINES_STARTU_S) – bez tego
   // dało się złożyć (i wysłać do nauki) kupon z meczem już trwającym;
   // znacznik czasu w stanie, żeby nie liczyć Date.now() w renderze
   const [teraz, setTeraz] = useState<number | null>(null);
@@ -144,7 +144,7 @@ export function GeneratorKuponu({
   // Mapy (klucz -> typ), żeby chipy znały nazwy nawet gdy kupon się nie składa.
   const [przypiete, setPrzypiete] = useState<Map<string, LegPool>>(new Map());
   const [wykluczone, setWykluczone] = useState<Map<string, LegPool>>(new Map());
-  // karta kuponu pokazuje ŻYWY podgląd (nie zamrożoną kopię) — dzięki temu
+  // karta kuponu pokazuje ŻYWY podgląd (nie zamrożoną kopię) – dzięki temu
   // przypięcie/usunięcie typu przelicza kupon na oczach usera
   const [pokazany, setPokazany] = useState(false);
   const [nauka, setNauka] = useState<"idle" | "wysylanie" | "ok" | "blad">("idle");
@@ -152,7 +152,7 @@ export function GeneratorKuponu({
   // komunikat mostu ze sceny (ile typów kuponu udało się przypiąć)
   const [mostInfo, setMostInfo] = useState<string | null>(null);
 
-  // pamięć ustawień (tylko pełna wersja na /kupony) — generator bez amnezji
+  // pamięć ustawień (tylko pełna wersja na /kupony) – generator bez amnezji
   useEffect(() => {
     if (meczId != null) return;
     try {
@@ -175,10 +175,10 @@ export function GeneratorKuponu({
       if (typeof u.maxJedenZMeczu === "boolean")
         setMaxJedenZMeczu(u.maxJedenZMeczu);
     } catch {
-      /* uszkodzony wpis — zostają domyślne */
+      /* uszkodzony wpis – zostają domyślne */
     }
     // mądry start: konsola nie może otwierać się w stanie „nie da się
-    // złożyć" — jeśli zapamiętany/domyślny cel jest poza zasięgiem puli,
+    // złożyć" – jeśli zapamiętany/domyślny cel jest poza zasięgiem puli,
     // dosuwamy go do osiągalnych widełek
     try {
       const u = JSON.parse(
@@ -223,7 +223,7 @@ export function GeneratorKuponu({
   }, [meczId, kursCel, liczbaTypow, trybDokladny, profil, tylkoValue, maxJedenZMeczu]);
 
   // most ze sceny („zmień coś w tym kuponie"): przypnij typy kuponu modelu,
-  // ustaw cel na jego kurs i od razu pokaż wynik — dalej edytuje się tu
+  // ustaw cel na jego kurs i od razu pokaż wynik – dalej edytuje się tu
   useEffect(() => {
     const handler = (e: Event) => {
       const det = (e as CustomEvent).detail as
@@ -250,7 +250,7 @@ export function GeneratorKuponu({
             Math.abs(s.linia - l.linia) < 0.01,
         ),
       );
-      // pula żyje (Superbet zmienia ofertę), kupon jest zamrożony — więc
+      // pula żyje (Superbet zmienia ofertę), kupon jest zamrożony – więc
       // przypinamy co się da i mówimy wprost, ile typów już nie ma w puli
       setPrzypiete(new Map(legi.map((l) => [legKey(l), l])));
       setWykluczone(new Map());
@@ -262,7 +262,7 @@ export function GeneratorKuponu({
       setPokazany(true);
       setMostInfo(
         legi.length === szukane.length
-          ? `Przypięliśmy wszystkie ${legi.length} typy tego kuponu. Usuń albo dodaj, co chcesz — resztę dobierze model.`
+          ? `Przypięliśmy wszystkie ${legi.length} typy tego kuponu. Usuń albo dodaj, co chcesz – resztę dobierze model.`
           : legi.length > 0
             ? `Przypięliśmy ${legi.length} z ${szukane.length} typów tego kuponu. Reszty nie ma już w aktualnej puli (oferta bukmachera się zmieniła), model dobierze zastępstwa.`
             : `Typów tego kuponu nie ma już w aktualnej puli (oferta bukmachera się zmieniła). Składamy podobny kupon od nowa przy kursie ×${det.cel ? fmtKurs(det.cel) : ""}.`,
@@ -272,12 +272,12 @@ export function GeneratorKuponu({
     return () => window.removeEventListener("footstats:kupon-edytuj", handler);
   }, [bazowa]);
 
-  // pula po filtrach meczów/value — bez tego podgląd liczyłby się na całej puli
+  // pula po filtrach meczów/value – bez tego podgląd liczyłby się na całej puli
   const pulaFiltrowana = useMemo(() => {
     let pp = bazowa;
     if (meczId == null && wybrane.size) pp = pp.filter((l) => wybrane.has(l.mecz_id));
     // styl "value" backendu (kupony.py:_kandydaci): wyraźna przewaga + 1 leg
-    // na mecz — bez tego generator dawał legi słabsze niż automatyczne kupony
+    // na mecz – bez tego generator dawał legi słabsze niż automatyczne kupony
     // value mimo tekstu "te same bezpieczniki"
     if (tylkoValue) pp = pp.filter((l) => (l.ev_pct ?? -Infinity) >= MIN_LEG_EV);
     return pp;
@@ -297,7 +297,7 @@ export function GeneratorKuponu({
     [profil, liczbaTypow, trybDokladny, tylkoValue, maxJedenZMeczu, kary, wagi, przypiete, wykluczone],
   );
 
-  // ŻYWY podgląd — liczony na bieżąco przy każdej zmianie suwaka, żeby user
+  // ŻYWY podgląd – liczony na bieżąco przy każdej zmianie suwaka, żeby user
   // widział OSIĄGALNOŚĆ przed kliknięciem, nie dopiero po (ten sam wynik,
   // klik tylko go "promuje" do dużej animowanej karty)
   const podglad = useMemo(() => {
@@ -313,7 +313,7 @@ export function GeneratorKuponu({
     const cmin = kursCel * 0.85;
     const cmax = kursCel * 1.18;
     const piny = [...przypiete.values()];
-    // najpierw powody wynikające z WYBORÓW usera — są najłatwiejsze do cofnięcia
+    // najpierw powody wynikające z WYBORÓW usera – są najłatwiejsze do cofnięcia
     if (piny.length > gornyLimit) {
       return `Wybrałeś ${piny.length} typów „na pewno”, a kupon ma mieć ${
         trybDokladny ? `dokładnie ${liczbaTypow}` : `najwyżej ${gornyLimit}`
@@ -329,7 +329,7 @@ export function GeneratorKuponu({
       return `Same wybrane typy dają już kurs ×${fmtKurs(kursPin)}, czyli powyżej celu. Podnieś kurs docelowy albo odepnij któryś typ.`;
     }
     // osiągalność liczona z TYMI SAMYMI ograniczeniami co dobór typów:
-    // filtry profilu (bezpieczny/gambity), unikalny zawodnik, limit z meczu —
+    // filtry profilu (bezpieczny/gambity), unikalny zawodnik, limit z meczu –
     // plus wybory usera (bez usuniętych, sloty zajęte przez przypięte)
     const pinIds = new Set(piny.map((l) => l.podmiot_id));
     const dostepna = pulaFiltrowana.filter(
@@ -436,7 +436,7 @@ export function GeneratorKuponu({
     setPokazany(false);
   };
 
-  // przypnij typ ("na pewno w kuponie") — ponowne kliknięcie odpina.
+  // przypnij typ ("na pewno w kuponie") – ponowne kliknięcie odpina.
   // Jeden typ na zawodnika: nowy pin zastępuje wcześniejszy pin tego samego
   // zawodnika (np. inna linia strzałów). Pin zdejmuje wcześniejsze usunięcie.
   const przypnij = (l: LegPool) => {
@@ -461,7 +461,7 @@ export function GeneratorKuponu({
     });
   };
 
-  // usuń typ z kuponu — model od razu dobiera inny (karta przelicza się sama)
+  // usuń typ z kuponu – model od razu dobiera inny (karta przelicza się sama)
   const usunTyp = (l: LegPool) => {
     const k = legKey(l);
     setWykluczone((m) => new Map(m).set(k, l));
@@ -499,7 +499,7 @@ export function GeneratorKuponu({
   return (
     <div className="overflow-hidden rounded-(--radius-card) border border-hairline bg-card shadow-(--shadow-card)">
       <div className="grid lg:grid-cols-[1.3fr_1fr]">
-      {/* KONSOLA — sterowanie krok po kroku */}
+      {/* KONSOLA – sterowanie krok po kroku */}
       <div className="p-4 sm:p-5 [&>*+*]:mt-5 [&>*+*]:border-t [&>*+*]:border-hairline [&>*+*]:pt-5">
       {mostInfo && (
         <p className="flex items-start justify-between gap-3 rounded-(--radius-control) border border-brand/25 bg-brand-wash/50 px-3 py-2.5 text-xs leading-relaxed text-brand-deep">
@@ -513,7 +513,7 @@ export function GeneratorKuponu({
           </button>
         </p>
       )}
-      {/* wybór meczów — tylko w wersji pełnej (/kupony) */}
+      {/* wybór meczów – tylko w wersji pełnej (/kupony) */}
       {meczId == null && (
         <div>
           <div className="flex items-baseline justify-between gap-2">
@@ -667,13 +667,13 @@ export function GeneratorKuponu({
         </div>
       </div>
 
-      {/* bezpieczniki — przełączniki zamiast checkboxów */}
+      {/* bezpieczniki – przełączniki zamiast checkboxów */}
       <div className="space-y-3">
         <button
           role="switch"
           aria-checked={tylkoValue}
           onClick={() => { setTylkoValue(!tylkoValue); setPokazany(false); }}
-          title={`Bierze tylko typy, w których kurs jest o co najmniej ${MIN_LEG_EV}% wyższy, niż wynika z naszej szansy — i najwyżej jeden typ z meczu`}
+          title={`Bierze tylko typy, w których kurs jest o co najmniej ${MIN_LEG_EV}% wyższy, niż wynika z naszej szansy – i najwyżej jeden typ z meczu`}
           className="group flex w-full items-start gap-3 text-left"
         >
           <span
@@ -732,7 +732,7 @@ export function GeneratorKuponu({
         </button>
       </div>
 
-      {/* własny wybór typów: przypnij z puli — resztę dobiera model */}
+      {/* własny wybór typów: przypnij z puli – resztę dobiera model */}
       <details className="group rounded-(--radius-control) border border-dashed border-hairline transition-colors open:border-solid open:bg-card-soft/50">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2.5 text-xs font-medium text-muted transition-colors hover:text-ink [&::-webkit-details-marker]:hidden">
           <span className="flex items-center gap-1.5">
@@ -772,7 +772,7 @@ export function GeneratorKuponu({
               .filter((l) => l.mecz_id === mid && !wykluczone.has(legKey(l)))
               .sort((a, b) => b.p_model - a.p_model);
             if (typyMeczu.length === 0) return null;
-            // wiersze zawodnik+rynek, linie jako przełączane pastylki —
+            // wiersze zawodnik+rynek, linie jako przełączane pastylki –
             // czytelniej niż ściana chipów i skaluje się na sezon ligowy
             const wiersze: {
               klucz: string;
@@ -861,7 +861,7 @@ export function GeneratorKuponu({
         </div>
       </details>
 
-      {/* podsumowanie wyborów usera — widoczne też, gdy kupon się nie składa */}
+      {/* podsumowanie wyborów usera – widoczne też, gdy kupon się nie składa */}
       {(przypiete.size > 0 || wykluczone.size > 0) && (
         <div className="space-y-1.5 text-xs">
           {przypiete.size > 0 && (
@@ -906,7 +906,7 @@ export function GeneratorKuponu({
 
       </div>
 
-      {/* PODGLĄD NA ŻYWO — prawa kolumna: osiągalność zanim klikniesz */}
+      {/* PODGLĄD NA ŻYWO – prawa kolumna: osiągalność zanim klikniesz */}
       <div className="flex flex-col border-t border-hairline bg-card-soft/60 p-4 sm:p-5 lg:border-l lg:border-t-0">
         <p className="font-display flex items-center gap-2 text-[10px] font-semibold uppercase tracking-widest text-brand">
           <span
@@ -989,7 +989,7 @@ export function GeneratorKuponu({
       </div>
       </div>
 
-      {/* wynik — karta pokazuje ŻYWY podgląd: usunięcie/przypięcie typu
+      {/* wynik – karta pokazuje ŻYWY podgląd: usunięcie/przypięcie typu
           przelicza kupon od razu, bez ponownego klikania "Złóż kupon" */}
       {pokazany && (
         <div className="border-t border-hairline px-4 pb-4 sm:px-5">

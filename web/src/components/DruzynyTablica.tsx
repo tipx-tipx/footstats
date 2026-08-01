@@ -11,7 +11,7 @@ import type { DruzynaForma, ValueBet, Zawodnik } from "@/lib/types";
 
 /**
  * Ceduła typów drużynowych pod SKALĘ sezonu (setki typów dziennie).
- * Układ: DZIŚ jest głównym elementem strony — top 3 jako karty, pod nimi
+ * Układ: DZIŚ jest głównym elementem strony – top 3 jako karty, pod nimi
  * sortowalna ceduła dnia przycięta do LIMIT_DZIS wierszy. Kolejne dni to
  * jedna linia nagłówka ze spisem rozgrywek, rozwijana na klik (animowane).
  * Dzięki temu strona przy wejściu ma stałą, krótką wysokość niezależnie
@@ -36,7 +36,7 @@ function etykietaDnia(ts: number, teraz: number): { glowna: string; data: string
   if (kluczDnia(ts) === kluczDnia(teraz + 86400))
     return { glowna: "jutro", data: pelna };
   const [dow, ...reszta] = pelna.split(" ");
-  // pl-PL daje "czwartek, 23 lipca" — przecinek zostaje przy dniu tygodnia
+  // pl-PL daje "czwartek, 23 lipca" – przecinek zostaje przy dniu tygodnia
   return { glowna: dow.replace(/,$/, ""), data: reszta.join(" ") };
 }
 
@@ -75,7 +75,7 @@ const SORTY: { kod: Sort; label: string }[] = [
   { kod: "godzina", label: "godzina" },
 ];
 
-/** Animowane rozwijanie bloku — wspólny ruch dla dni, sekcji i ceduły dnia. */
+/** Animowane rozwijanie bloku – wspólny ruch dla dni, sekcji i ceduły dnia. */
 function Rozwin({
   open,
   children,
@@ -101,7 +101,7 @@ function Rozwin({
   );
 }
 
-/** Linia "pokaż pozostałe / zwiń" — jedno domknięcie listy w całej tablicy. */
+/** Linia "pokaż pozostałe / zwiń" – jedno domknięcie listy w całej tablicy. */
 function PokazButton({
   open,
   ukryte,
@@ -134,7 +134,7 @@ export function DruzynyTablica({
   forma: DruzynaForma[];
   /** mecz_id -> nazwa rozgrywek (z matches.json) */
   ligaByMecz: Record<number, string>;
-  /** timestamp serwera (s) — spójne "dziś/jutro" bez zegara klienta */
+  /** timestamp serwera (s) – spójne "dziś/jutro" bez zegara klienta */
   teraz: number;
 }) {
   const [rynek, setRynek] = useState("wszystkie");
@@ -164,7 +164,7 @@ export function DruzynyTablica({
     [bets, ligaByMecz],
   );
 
-  // liczniki do chipów rozgrywek: po filtrze rynku, przed filtrem ligi —
+  // liczniki do chipów rozgrywek: po filtrze rynku, przed filtrem ligi –
   // chip mówi, ile typów kryje się za kliknięciem
   const licznikLig = useMemo(() => {
     const m = new Map<string, number>();
@@ -211,7 +211,7 @@ export function DruzynyTablica({
     [widoczne, dzisKlucz],
   );
 
-  // karty top: 3 najlepsze dnia wg rankingu silnika — stała kotwica,
+  // karty top: 3 najlepsze dnia wg rankingu silnika – stała kotwica,
   // niezależna od wybranego sortowania ceduły
   const topIds = useMemo(() => {
     if (dzisiejsze.length < PROG_SEKCJI_TOP) return new Set<number>();
@@ -227,7 +227,7 @@ export function DruzynyTablica({
 
   /**
    * Kolejne dni chronologicznie, w dniu sekcje rozgrywek (dla sortu
-   * "najmocniejsze") — rozgrywki i typy wg rankingu silnika.
+   * "najmocniejsze") – rozgrywki i typy wg rankingu silnika.
    */
   const dni = useMemo(() => {
     const rankiem = new Map(przyszle.map((b, i) => [b.id, i]));
@@ -258,7 +258,7 @@ export function DruzynyTablica({
   }, [przyszle, ligaByMecz]);
 
   // stała struktura sekcji: jutro zawsze osobno, dalsze dni w jednym
-  // slocie z kafelkami wyboru — liczba sekcji nie rośnie z terminarzem
+  // slocie z kafelkami wyboru – liczba sekcji nie rośnie z terminarzem
   const jutroKlucz = kluczDnia(teraz + 86400);
   const jutro = dni.find((d) => d.klucz === jutroKlucz);
   const dalsze = dni.filter((d) => d.klucz !== jutroKlucz);
@@ -291,7 +291,7 @@ export function DruzynyTablica({
    * liga dnia startuje otwarta (top 3), reszta to zwinięte nagłówki
    * z licznikami. Zwinięta liga = niezamontowane wiersze, więc duży dzień
    * kosztuje przy hydracji tylko tyle, ile realnie widać. Sortowanie działa
-   * wewnątrz lig — struktura ligowa zostaje przy każdym sorcie.
+   * wewnątrz lig – struktura ligowa zostaje przy każdym sorcie.
    */
   const blokDnia = ({ klucz, lista, sekcje }: (typeof dni)[number]) => {
     const et = etykietaDnia(lista[0].kickoff_ts, teraz);
@@ -315,7 +315,7 @@ export function DruzynyTablica({
           const kluczSekcji = `${klucz}|${nazwa}`;
           const stan = stanLig[kluczSekcji] ?? (idx === 0 ? "top" : "zwin");
           const otwarta = stan !== "zwin";
-          // zwijanie ogona dopiero gdy schowa ≥2 wiersze — "pokaż 1
+          // zwijanie ogona dopiero gdy schowa ≥2 wiersze – "pokaż 1
           // pozostały" to więcej UI niż treści
           const zwijalna = typy.length > LIMIT_LIGI_DNIA + 1;
           const posortowane = sortuj(typy);
@@ -500,9 +500,9 @@ export function DruzynyTablica({
         </p>
       ) : (
         <>
-          {/* GŁÓWNY ELEMENT: dzisiejsza tablica — karty top 3 + sortowalna
+          {/* GŁÓWNY ELEMENT: dzisiejsza tablica – karty top 3 + sortowalna
               ceduła dnia przycięta do LIMIT_DZIS wierszy */}
-          {/* dziś bez typów: jedna cicha linia zamiast znikającej sekcji —
+          {/* dziś bez typów: jedna cicha linia zamiast znikającej sekcji –
               strona nie wygląda na zepsutą, gdy terminarz ma dziurę */}
           {dzisiejsze.length === 0 && (jutro || dalszy) && (
             <div className="mt-7">
@@ -543,7 +543,7 @@ export function DruzynyTablica({
                         bet={bet}
                         rank={i + 1}
                         zawodnik={
-                          // BetCard czyta z tego obiektu wyłącznie `forma` —
+                          // BetCard czyta z tego obiektu wyłącznie `forma` –
                           // kształt DruzynaForma celowo pokrywa potrzebne pola
                           formaById.get(bet.podmiot_id) as unknown as
                             | Zawodnik
@@ -587,7 +587,7 @@ export function DruzynyTablica({
 
               {jutro && blokDnia(jutro)}
 
-              {/* slot dalszych dni: kafelki wyboru + jeden widoczny dzień —
+              {/* slot dalszych dni: kafelki wyboru + jeden widoczny dzień –
                   liczba sekcji strony stała niezależnie od terminarza */}
               {dalsze.length > 1 && (
                 <div

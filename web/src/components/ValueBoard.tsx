@@ -45,7 +45,7 @@ const PEWNOSC_FILTRY: { kod: Pewnosc | "kazda"; label: string }[] = [
 type SortKey = "ranking" | "ev" | "pewnosc" | "kickoff" | "kurs";
 
 /**
- * Sortowanie zakładki Drabinki — inne pytania niż przy typach modelu.
+ * Sortowanie zakładki Drabinki – inne pytania niż przy typach modelu.
  * "najlepsze" = ranking z backendu (ocena.miejsce): przewaga nad kursem po
  * korekcie na rywala, sędziego i scenariusz meczu.
  */
@@ -62,7 +62,7 @@ const SORTOWANIA_DRABINKI: { kod: SortDrabinki; label: string }[] = [
 ];
 
 // Kolejność wejściowa bets = ranking silnika (szansa × kurs + kontekst:
-// matchup, świeże składy, miękka linia) — to jest "Polecane".
+// matchup, świeże składy, miękka linia) – to jest "Polecane".
 const SORTOWANIA: { kod: SortKey; label: string }[] = [
   { kod: "ranking", label: "Polecane przez model" },
   { kod: "pewnosc", label: "Największa szansa trafienia" },
@@ -70,7 +70,7 @@ const SORTOWANIA: { kod: SortKey; label: string }[] = [
   { kod: "kurs", label: "Najwyższy kurs" },
   { kod: "kickoff", label: "Najbliższy mecz" },
 ];
-/** Ile czasu temu był skan STS (liczone po stronie klienta — patrz useEffect). */
+/** Ile czasu temu był skan STS (liczone po stronie klienta – patrz useEffect). */
 function odswiezTemu(ts?: number): { label: string; minuty: number } | null {
   if (!ts) return null;
   const minuty = Math.max(0, Math.floor((Date.now() / 1000 - ts) / 60));
@@ -121,24 +121,32 @@ export function ValueBoard({
   const [pewnosc, setPewnosc] = useState<Pewnosc | "kazda">("kazda");
   const [meczId, setMeczId] = useState<number | undefined>(initialMatchId);
   // Pewniaki pierwsze i domyślne (user wybiera z nich legi na kupony);
-  // domyślny sort = ranking silnika ("Polecane") — samo p_model wynosiłoby
+  // domyślny sort = ranking silnika ("Polecane") – samo p_model wynosiłoby
   // na górę zawsze linie 0,5 gwiazd i chowało typy kontekstowe (matchup)
   const [rodzaj, setRodzaj] = useState<
     "pewniaki" | "value" | "radar" | "wszystko"
   >(
+    // Zakładka „Wszystko" USUNIĘTA (decyzja usera 2026-08-01): dublowała
+    // pozostałe, a przy zawodnikach w kwarantannie pokazywała to samo co
+    // Drabinki. Domyślnie wchodzimy na pierwszą, która ma zawartość.
     () =>
-      initialRodzaj ?? (bets.some((b) => b.pewniak) ? "pewniaki" : "wszystko"),
+      initialRodzaj ??
+      (bets.some((b) => b.pewniak)
+        ? "pewniaki"
+        : radarWpisy.length > 0
+          ? "radar"
+          : "pewniaki"),
   );
   const [sortuj, setSortuj] = useState<SortKey>("ranking");
   const [limit, setLimit] = useState(25);
   // Drabinki: sortowanie osobne od typów modelu (inne pola, inne pytania).
-  // Domyślnie „najlepsze" — kolejność z backendu (ocena.miejsce), bo to
+  // Domyślnie „najlepsze" – kolejność z backendu (ocena.miejsce), bo to
   // JEDYNA definicja jakości karty w całym systemie. Przy sortowaniu po
   // jakości lista jest PŁASKA: grupowanie po meczach chowałoby ranking,
   // bo najlepsza karta dnia lądowałaby w środku listy pod nazwą meczu.
   const [sortDrabinki, setSortDrabinki] = useState<SortDrabinki>("najlepsze");
   // MAX 10 KART DZIENNIE (decyzja usera 2026-08-01). Wybieramy je ZAWSZE po
-  // `ocena.miejsce` — to backendowy ranking przewagi nad kursem po korekcie na
+  // `ocena.miejsce` – to backendowy ranking przewagi nad kursem po korekcie na
   // rywala, sędziego i scenariusz meczu, czyli jedyna definicja „najbardziej
   // value" w systemie. Sortowanie z rozwijanej listy działa DOPIERO na tej
   // dziesiątce: user zmienia kolejność patrzenia, a nie to, które karty
@@ -179,7 +187,7 @@ export function ValueBoard({
   // (backend sortuje wtedy chronologicznie, w meczu po jakości). Filtr „tylko
   // sygnały" USUNIĘTY 2026-07-25: odkąd każda karta musi przejść te same
   // twarde bramy, etykieta transfer/forma mówi tylko, dlaczego zwróciliśmy
-  // uwagę na gracza — nie ile karta jest warta.
+  // uwagę na gracza – nie ile karta jest warta.
   const radarGrupy = useMemo(() => {
     const grupy = new Map<
       number,
@@ -198,7 +206,7 @@ export function ValueBoard({
     return [...grupy.values()];
   }, [radarPosortowane]);
   // świeżość skanu STS liczona PO stronie klienta (po mount), żeby Date.now()
-  // nie rozjechał SSR/hydracji — do mount pole zostaje puste
+  // nie rozjechał SSR/hydracji – do mount pole zostaje puste
   const [swiezosc, setSwiezosc] = useState<ReturnType<typeof odswiezTemu>>(null);
   useEffect(() => {
     setSwiezosc(odswiezTemu(stsGeneratedTs));
@@ -221,7 +229,7 @@ export function ValueBoard({
     return [...seen.entries()];
   }, [bets]);
 
-  // liczba pozycji per rynek (przy aktywnym rodzaju) — do etykiet filtra
+  // liczba pozycji per rynek (przy aktywnym rodzaju) – do etykiet filtra
   const liczbaPerRynek = useMemo(() => {
     const m = new Map<string, number>();
     for (const b of bets) {
@@ -266,7 +274,7 @@ export function ValueBoard({
       return true;
     });
     // kolejność wejściowa = ranking silnika ("Polecane"); sort jest stabilny,
-    // więc remisy każdego kryterium zachowują tę kolejność — m.in. przy
+    // więc remisy każdego kryterium zachowują tę kolejność – m.in. przy
     // "najbliższym meczu" typy w obrębie meczu idą od najlepiej ocenianych
     switch (sortuj) {
       case "ev":
@@ -305,10 +313,10 @@ export function ValueBoard({
     return () => window.removeEventListener("hashchange", scrollToHash);
   }, []);
 
-  // zakładki "rodzaj": role=tab wymaga obsługi strzałek (WAI-ARIA Tabs) —
+  // zakładki "rodzaj": role=tab wymaga obsługi strzałek (WAI-ARIA Tabs) –
   // roving tabindex, Left/Right/Home/End przenoszą FOKUS I WYBÓR
   // Value Bety STS to skan ODPALANY RĘCZNIE (dwuklik odswiez-sts.bat), więc
-  // bywa pusty tygodniami — pusta zakładka tylko myliła. Chowamy ją, gdy nie
+  // bywa pusty tygodniami – pusta zakładka tylko myliła. Chowamy ją, gdy nie
   // ma czego pokazać (chyba że user właśnie na niej stoi, żeby nie zniknęła
   // mu pod palcami po odświeżeniu danych).
   const TABY_RODZAJ = (
@@ -320,14 +328,13 @@ export function ValueBoard({
       ["pewniaki", "Wysokie szanse", liczbaPewniakow],
       ["value", "Lepszy kurs w STS", liczbaValueSts],
       ["radar", "Drabinki", radarNajlepsze.length],
-      ["wszystko", "Wszystko", null],
     ] as const
   ).filter(
-    // Pusta zakładka tylko myli — chowamy ją, dopóki nie ma czego pokazać.
+    // Pusta zakładka tylko myli – chowamy ją, dopóki nie ma czego pokazać.
     // Dotyczy „Lepszy kurs w STS" (skan odpalany ręcznie, bywa pusty
     // tygodniami) ORAZ „Wysokie szanse" (decyzja usera 2026-08-01: rynki
     // zawodnicze potrafią stać puste, a pusta zakładka wygląda jak awaria).
-    // Wyjątek: gdy user właśnie na niej stoi — inaczej zniknęłaby mu spod
+    // Wyjątek: gdy user właśnie na niej stoi – inaczej zniknęłaby mu spod
     // palców przy odświeżeniu danych.
     ([kod, , liczba]) =>
       (kod !== "value" && kod !== "pewniaki") ||
@@ -356,7 +363,7 @@ export function ValueBoard({
 
   return (
     <section aria-label="Lista okazji">
-      {/* przełącznik rodzaju — tablica wyników: czysty tekst, aktywna
+      {/* przełącznik rodzaju – tablica wyników: czysty tekst, aktywna
           zakładka z podkreśleniem marki (żadnych kolejnych "przycisków") */}
       {(liczbaValueSts > 0 || liczbaPewniakow > 0 || radarNajlepsze.length > 0) && (
         <div
@@ -436,7 +443,7 @@ export function ValueBoard({
               </div>
 
               {sortDrabinki === "kickoff" ? (
-                /* chronologicznie — karty pogrupowane po meczach */
+                /* chronologicznie – karty pogrupowane po meczach */
                 <div className="space-y-6">
                   {radarGrupy.map((g) => (
                     <section key={`${g.mecz}-${g.kickoff_ts}`}>
@@ -467,7 +474,7 @@ export function ValueBoard({
                   ))}
                 </div>
               ) : (
-                /* ranking — lista płaska, bo to kolejność niesie informację */
+                /* ranking – lista płaska, bo to kolejność niesie informację */
                 <div className="space-y-3">
                   {radarPosortowane.map((w, i) => (
                     <motion.div
@@ -499,7 +506,7 @@ export function ValueBoard({
               </p>
               <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-muted">
                 Szukamy tu typów, za które STS płaci wyraźnie więcej niż
-                Superbet — a my dodatkowo uważamy, że mają szansę wejść. Takie
+                Superbet – a my dodatkowo uważamy, że mają szansę wejść. Takie
                 różnice w kursach zdarzają się nieregularnie i znikają, gdy STS
                 je zauważy.
               </p>
@@ -509,7 +516,7 @@ export function ValueBoard({
               <div className="mb-2 flex items-baseline justify-between gap-3">
                 <p className="max-w-prose text-xs leading-relaxed text-muted">
                   Za te typy STS płaci więcej niż Superbet, a my uważamy, że
-                  mają szansę wejść. Takie kursy szybko się zmieniają — jeśli
+                  mają szansę wejść. Takie kursy szybko się zmieniają – jeśli
                   chcesz je zagrać, lepiej nie zwlekać.
                 </p>
                 <span className="font-data shrink-0 text-sm font-semibold text-brand-deep">
@@ -530,7 +537,7 @@ export function ValueBoard({
               )}
               {swiezosc && swiezosc.minuty >= STS_STALE_MIN && (
                 <div className="mb-4 rounded-(--radius-control) border border-data-amber/30 bg-data-amber-wash px-3 py-2 text-xs leading-relaxed text-data-amber-ink">
-                  Te kursy sprawdzaliśmy {swiezosc.label} — mogły się już
+                  Te kursy sprawdzaliśmy {swiezosc.label} – mogły się już
                   zmienić. Odśwież je na komputerze, żeby zobaczyć aktualne.
                 </div>
               )}
@@ -623,7 +630,7 @@ export function ValueBoard({
         <div className="rounded-(--radius-card) border border-hairline bg-card px-6 py-12 text-center shadow-(--shadow-card)">
           {bets.length === 0 ? (
             // cała pula pusta (nie kwestia filtrów): dziś model nie wypuścił
-            // ani jednego typu ZAWODNICZEGO — rynki drużynowe mają własną
+            // ani jednego typu ZAWODNICZEGO – rynki drużynowe mają własną
             // stronę, a drabinki własną zakładkę. Bez tego użytkownik widzi
             // gołą pustkę i nie wie, że okazje w ogóle są.
             <>
@@ -639,11 +646,11 @@ export function ValueBoard({
                   , bo na ostatnich typach traciły pieniądze:{" "}
                   {Object.values(kwarantanna)
                     .map((k) =>
-                      // roi bywa pusty w danych sprzed bramy ROI — wtedy
+                      // roi bywa pusty w danych sprzed bramy ROI – wtedy
                       // zostaje samo trafienie zamiast "NaN% straty"
                       typeof k.roi === "number"
-                        ? `${k.nazwa.toLowerCase()} — ${Math.round(Math.abs(k.roi) * 100)}% straty na stawce, trafione ${Math.round(k.hit * 100)}% (${k.n} typów)`
-                        : `${k.nazwa.toLowerCase()} — trafione ${Math.round(k.hit * 100)}% przy zapowiadanych ${Math.round(k.sr_p * 100)}% (${k.n} typów)`,
+                        ? `${k.nazwa.toLowerCase()} – ${Math.round(Math.abs(k.roi) * 100)}% straty na stawce, trafione ${Math.round(k.hit * 100)}% (${k.n} typów)`
+                        : `${k.nazwa.toLowerCase()} – trafione ${Math.round(k.hit * 100)}% przy zapowiadanych ${Math.round(k.sr_p * 100)}% (${k.n} typów)`,
                     )
                     .join("; ")}
                   . To zabezpieczenie: typy z tych rynków rozliczają się dalej
@@ -655,7 +662,7 @@ export function ValueBoard({
                   Superbet nie wystawił jeszcze kursów na zawodników (robi to
                   zwykle 1–2 dni przed meczem), zawodników nie ma w ogłoszonych
                   składach, albo nasza szansa za mocno rozjeżdżała się z kursem
-                  — a wtedy z rozliczeń wychodzi, że to zwykle my się mylimy.
+                  – a wtedy z rozliczeń wychodzi, że to zwykle my się mylimy.
                   Pusta lista to działające zabezpieczenie, nie awaria.
                 </p>
               )}
