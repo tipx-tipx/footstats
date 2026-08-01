@@ -1950,15 +1950,27 @@ def _main_impl(tryb=None):
     # opublikowany zbiór od miesiąca deklaruje ~71% i trafia 58%. Ta korekta
     # mierzy resztę błędu NA OPUBLIKOWANYCH typach i dokłada ją do każdego
     # rynku danego strumienia (patrz rozliczanie.korekta_strumienia).
+    # WYPIS NIE MOŻE WYWRACAĆ UCZENIA (naprawa 2026-08-01). Od wprowadzenia
+    # przedziałów (31.07) korekta bywa słownikiem, a ta linia formatowała ją
+    # przez `:+.2f` — czyli SAM WYDRUK rzucał TypeError, wyjątek leciał w to
+    # `except` i `korekta_strumieni` wracało puste. Skutek: druga warstwa
+    # uczenia była wyłączona przez półtorej doby, mimo że liczyła się
+    # poprawnie, a typy dostawały stempel, że ją zastosowano. Model wchodził
+    # więc na bramę zgody z rynkiem NIESKORYGOWANY — a ta brama odrzuca
+    # wszystko, co jest 12 pp nad kursem (zmierzona mediana odrzuceń: +17,5 pp).
+    # Dlatego wypis jest teraz odporny na oba kształty i stoi PO ustawieniu
+    # korekty, a nie przed jej użyciem.
     try:
         korekta_strumieni = rozliczanie.korekta_strumienia()
         rozliczanie.ustaw_korekte_strumienia(korekta_strumieni)
-        if korekta_strumieni:
-            print("Korekta strumienia (Δlogit): " + ", ".join(
-                f"{s} {d:+.2f}" for s, d in korekta_strumieni.items()))
     except Exception as e:
         korekta_strumieni = {}
         print(f"Korekta strumienia pominięta ({e})")
+    if korekta_strumieni:
+        print("Korekta strumienia (Δlogit): " + ", ".join(
+            f"{s} {betting.delta_globalna(d):+.2f}"
+            + (f" (biny: {len(d.get('bins') or [])})" if isinstance(d, dict) else "")
+            for s, d in korekta_strumieni.items()))
 
     # SZANSA POKAZYWANA — ostatnia warstwa, wyłącznie na wyjściu.
     # Kalibracja i korekta strumienia działają PRZED bramą publikacji, więc

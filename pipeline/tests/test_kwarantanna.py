@@ -319,6 +319,57 @@ def test_korekta_strumienia_wymaga_proby():
     log = {str(i): _typ(i, 0.70, "przegrany") for i in range(20)}
     assert rozliczanie.korekta_strumienia(log) == {}
 
+
+# --- STEMPEL KOREKTY MUSI BYĆ LICZBĄ (regresja 2026-08-01) -----------------
+#
+# Co się stało na produkcji: od wprowadzenia przedziałów (31.07) korekta bywa
+# słownikiem i CAŁY ten słownik trafiał do księgi jako `kal_strumien`. Każde
+# `float(stempel)` wywalało TypeError, a że `korekta_strumienia` i
+# `szansa_pokazywana` stoją w cyklu w try/except, DRUGA WARSTWA UCZENIA CICHO
+# SIĘ WYŁĄCZYŁA na półtorej doby. Model szedł na bramę zgody z rynkiem
+# nieskorygowany (mediana odrzuceń: +17,5 pp nad kursem), a korekta pokazywana
+# nie miała czego odjąć, więc działała z podwójną siłą.
+
+BINOWANA = {"logit": True, "global": -0.30,
+            "bins": [[0.0, 0.55, -0.10], [0.55, 1.01, -0.50]]}
+
+
+def test_stempel_korekty_zapisuje_liczbe_nie_caly_rozklad():
+    rozliczanie.ustaw_korekte_strumienia({"pewniaki": BINOWANA})
+    try:
+        log = {}
+        rozliczanie._dopisz_nowe(log, [{
+            "mecz_id": 1, "mecz": "A – B", "kickoff_ts": 1_700_000_000,
+            "podmiot_id": 1, "podmiot": "G", "rynek_kod": "shots",
+            "rynek": "R", "linia": 1.5, "strona": "powyzej",
+            "kurs": 1.9, "p_model": 0.80,
+        }])
+        stempel = next(iter(log.values()))["kal_strumien"]
+        assert isinstance(stempel, float), f"stempel to {type(stempel).__name__}"
+        assert stempel == -0.50, "bin czytany po p_over typu"
+    finally:
+        rozliczanie.ustaw_korekte_strumienia({})
+
+
+def test_uczenie_przezywa_stary_stempel_slownikowy():
+    """87 rekordów w produkcyjnej księdze ma stary kształt — na zawsze."""
+    log = {}
+    for i in range(60):
+        log[str(i)] = _typ(i, 0.52, "wygrany" if i % 2 == 0 else "przegrany")
+        log[str(i)]["kal_strumien"] = BINOWANA      # stary, zły kształt
+    k = rozliczanie.korekta_strumienia(log)         # nie może rzucić
+    assert betting.delta_globalna(k["pewniaki"]) < 0.0
+    assert isinstance(rozliczanie.szansa_pokazywana(log), dict)
+
+
+def test_delta_zapisana_toleruje_smieci():
+    assert rozliczanie._delta_zapisana({}) == 0.0
+    assert rozliczanie._delta_zapisana({"kal_strumien": -0.4}) == -0.4
+    assert rozliczanie._delta_zapisana({"kal_strumien": "nonsens"}) == 0.0
+    assert rozliczanie._delta_zapisana(
+        {"kal_strumien": BINOWANA, "p_model": 0.80, "strona": "powyzej"}
+    ) == -0.50
+
 # --- WŁASNE UCZENIE DRABINEK (2026-07-29) ----------------------------------
 
 

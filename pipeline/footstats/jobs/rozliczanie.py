@@ -244,6 +244,29 @@ def _kupon_leg_do_logu(l: dict) -> dict:
     }
 
 
+def _delta_stempla(b: dict) -> float:
+    """Delta korekty strumienia UŻYTA dla tego typu — jako liczba.
+
+    Korekta bywa skalarem albo rozkładem po przedziałach `p`. Do księgi ma
+    trafić jedna liczba: ta, o którą faktycznie przesunięto ten typ. Bin
+    rozwiązujemy na `p_over`, bo tam korekta jest nakładana i stamtąd lustrzy
+    się na „poniżej" (patrz `_p_surowe`).
+
+    ZASTRZEŻENIE, świadome: bin czytamy z `p` JUŻ skorygowanego, a nakładano
+    go na surowym. Przedziały są szerokie (0,55 / 0,70 / 0,85), a korekta
+    przesuwa `p` o kilka pp, więc pokrywają się prawie zawsze — ale typ tuż
+    przy granicy binu może dostać stempel z sąsiedniego. Silnik może podać
+    deltę wprost (pole `kal_strumien` na typie) i wtedy bierzemy ją bez
+    zgadywania.
+    """
+    d = b.get("kal_strumien")
+    if isinstance(d, (int, float)):
+        return round(float(d), 4)
+    p = float(b.get("p_model") or 0.0)
+    p_over = p if b.get("strona") != "ponizej" else 1.0 - p
+    return round(betting.delta_dla_p(_KOREKTA_CYKLU.get(_strumien(b)), p_over), 4)
+
+
 def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
     for b in value_bets:
         k = _klucz(b)
@@ -293,7 +316,17 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
             # KOREKTA STRUMIENIA użyta przy publikacji — bez tego stempla
             # następny pomiar liczyłby się z już skorygowanego p i regulator
             # by oscylował (patrz `korekta_strumienia`)
-            **({"kal_strumien": _KOREKTA_CYKLU[_strumien(b)]}
+            #
+            # STEMPLUJEMY LICZBĘ, NIE CAŁY OBIEKT KOREKTY (2026-08-01).
+            # Od wprowadzenia przedziałów (31.07) korekta bywa słownikiem
+            # `{"global":…, "bins":[…]}`, a tu leciał on do księgi w całości —
+            # więc stempel mówił „skorygowano o CAŁY rozkład" zamiast „o tyle".
+            # `_p_surowe` odwraca stempel odejmowaniem, co na słowniku wywala
+            # się TypeError-em i kładzie `korekta_strumienia` oraz
+            # `szansa_pokazywana` (obie są w cyklu w try/except, więc uczenie
+            # cicho przestawało działać zamiast krzyczeć). Zapisujemy deltę
+            # rozwiązaną dla `p` TEGO typu — dokładnie tę, którą nałożono.
+            **({"kal_strumien": _delta_stempla(b)}
                if _KOREKTA_CYKLU.get(_strumien(b)) else {}),
             # kategorie typu — do diagnostyki per kategoria (Brier/log-loss)
             "matchup": bool(b.get("matchup")),
@@ -1135,6 +1168,28 @@ def _p_over_rekordu(r: dict) -> float:
     return 1.0 - p if r.get("strona") == "ponizej" else p
 
 
+def _delta_zapisana(r: dict) -> float:
+    """Stempel `kal_strumien` rekordu ZAWSZE jako liczba.
+
+    NAPRAWA 2026-08-01. Od 31.07 korekta bywa rozkładem po przedziałach, a do
+    księgi trafiał CAŁY ten słownik (patrz `_delta_stempla`). Każde miejsce,
+    które robiło na stempu `float(...)`, wywalało się wtedy TypeError-em —
+    a że `korekta_strumienia` i `szansa_pokazywana` stoją w cyklu w
+    `try/except`, uczenie CICHO się wyłączało zamiast krzyczeć. W księdze
+    zostało 87 takich rekordów, więc tolerancja dla starego kształtu musi
+    zostać na stałe, nie „do czasu migracji".
+    """
+    d = r.get("kal_strumien")
+    if isinstance(d, dict):
+        p = float(r.get("p_model") or 0.0)
+        p_over = p if r.get("strona") != "ponizej" else 1.0 - p
+        d = betting.delta_dla_p(d, p_over)
+    try:
+        return float(d or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def _p_surowe(r: dict) -> float:
     """p_model sprzed korekty strumienia — na tym mierzymy, żeby nie oscylować.
 
@@ -1147,7 +1202,7 @@ def _p_surowe(r: dict) -> float:
     błąd wracał do modelu przy każdym cyklu.
     """
     p = float(r.get("p_model") or 0.0)
-    d = float(r.get("kal_strumien") or 0.0)
+    d = _delta_zapisana(r)
     if not d:
         return p
     over = r.get("strona") != "ponizej"
@@ -1223,7 +1278,7 @@ def korekta_strumienia(log: dict | None = None) -> dict[str, float]:
             continue
         b = _bias_logit([{**r, "p_model": _p_surowe(r)} for r in grp])
         # dochodzimy do pełnej korekty przez kilka cykli, nie w jednym skoku
-        juz = [float(r.get("kal_strumien") or 0.0) for r in grp]
+        juz = [_delta_zapisana(r) for r in grp]
         srednia_juz = sum(juz) / len(juz)
         b = srednia_juz + KOREKTA_STRUMIENIA_TLUMIENIE * (b - srednia_juz)
         b = max(cap[0], min(cap[1], b))
