@@ -424,12 +424,15 @@ export function ValueBoard({
           ) : (
             <>
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                <p className="max-w-prose text-xs leading-relaxed text-muted">
-                  Drabinka kursów Superbetu + pełna analiza zawodnika. „8/10” =
-                  linia trafiona w 8 z 10 ostatnich meczów, a procent obok to
-                  szansa PO korekcie na ten mecz: kogo zawodnik ma przed sobą,
-                  kto sędziuje i jak zapowiada się spotkanie. Rozwiń kartę, żeby
-                  zobaczyć, co dokładnie ją podbiło albo ścięło.
+                {/* KRÓTKO I BEZ ŁAMAŃCÓW (2026-08-01, zgłoszenie usera).
+                    Poprzedni wstęp miał pięć linijek, tłumaczył zapis „8/10"
+                    i wyliczał składniki korekty – czyli mówił o kuchni, zanim
+                    ktokolwiek zobaczył kartę. Do tego wąska kolumna obok
+                    licznika łamała go w przypadkowych miejscach. */}
+                <p className="min-w-0 flex-1 text-xs leading-relaxed text-muted">
+                  Ten sam zawodnik na kilku poprzeczkach: im wyżej, tym wyższy
+                  kurs i mniejsza szansa. Przy każdej piszemy, ile razy przebił
+                  ją w ostatnich meczach i jaką szansę dajemy na ten mecz.
                 </p>
                 <span className="font-data shrink-0 text-sm font-semibold text-brand-deep">
                   {odmienPozycje(radarNajlepsze.length)}

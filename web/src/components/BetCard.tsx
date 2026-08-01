@@ -29,7 +29,6 @@ import {
   profilTypu,
   SILA_TYPU,
   silaTypu,
-  szansaWobecKursu,
 } from "@/lib/slownik";
 import type { FormaRynku, Strona, ValueBet, Zawodnik } from "@/lib/types";
 
@@ -354,7 +353,7 @@ function WerdyktPewniaka({ bet }: { bet: ValueBet }) {
       <p className="text-[17px] font-semibold leading-snug tracking-tight text-ink sm:text-lg">
         {glowne}
       </p>
-      <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-muted">
+      <p className="mt-1.5 text-sm leading-relaxed text-muted">
         {bet.bukmacher} płaci <Num>{kurs}</Num>, uczciwa cena to{" "}
         <Num>{fair}</Num>.{" "}
         {ev != null && ev >= 1 ? (
@@ -396,7 +395,7 @@ function WerdyktZdanie({ bet }: { bet: ValueBet }) {
           </span>{" "}
           w górę.
         </p>
-        <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-muted">
+        <p className="mt-1.5 text-sm leading-relaxed text-muted">
           Model daje temu zdarzeniu {p} szans. Kursu nie pobieramy automatycznie,
           bo ten rynek jest tylko w STS. Jeśli grasz, dodaj zakład ręcznie w
           Moich zakładach.
@@ -416,7 +415,7 @@ function WerdyktZdanie({ bet }: { bet: ValueBet }) {
             <Num>{fmtEV(ev)}</Num> ponad wartość.
           </span>
         </p>
-        <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-muted">
+        <p className="mt-1.5 text-sm leading-relaxed text-muted">
           Model daje temu zdarzeniu {p} szans, a kurs wycenia je na {wycena}.
           Ta różnica jest twoją przewagą.
         </p>
@@ -430,7 +429,7 @@ function WerdyktZdanie({ bet }: { bet: ValueBet }) {
           Warte <Num>{fair}</Num>, {bet.bukmacher} płaci tylko <Num>{kurs}</Num>.{" "}
           <span className="text-muted">Bez przewagi w kursie.</span>
         </p>
-        <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-muted">
+        <p className="mt-1.5 text-sm leading-relaxed text-muted">
           Kurs wycenia szansę aż na {wycena}, więc nie płaci ponad wartość. Typ
           jest na liście za wysoką szansę trafienia ({p}), nie za kurs.
         </p>
@@ -443,7 +442,7 @@ function WerdyktZdanie({ bet }: { bet: ValueBet }) {
         Warte <Num>{fair}</Num>, {bet.bukmacher} płaci <Num>{kurs}</Num>. Cena
         praktycznie uczciwa.
       </p>
-      <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-muted">
+      <p className="mt-1.5 text-sm leading-relaxed text-muted">
         Model daje temu zdarzeniu {p} szans, a kurs wycenia je na {wycena}. Bez
         przewagi po żadnej stronie.
       </p>
@@ -755,13 +754,13 @@ const SKALA_OCEN = SILA_TYPU;
  */
 function OcenaTypu({ bet }: { bet: ValueBet }) {
   const s = silaTypu(bet.p_model);
-  const wobecKursu =
-    bet.kurs != null && bet.kurs > 1
-      ? szansaWobecKursu(bet.p_model, bet.kurs)
-      : null;
+  // BEZ „KURS WYCENIA TO NA 46%, MY DAJEMY 47%" (2026-08-01, decyzja usera):
+  // dwie liczby tego samego rodzaju obok siebie kazały czytelnikowi samemu
+  // zgadywać, co z nich wynika – a zdanie wyżej mówi to samo w kursach
+  // („Superbet płaci 2,17, uczciwa cena to 2,13").
   return (
     <div>
-      <div className="grid max-w-xl grid-cols-4 gap-x-2.5">
+      <div className="grid grid-cols-4 gap-x-2.5">
         {SKALA_OCEN.map((k) => {
           const aktywna = k.kod === s.kod;
           return (
@@ -792,27 +791,16 @@ function OcenaTypu({ bet }: { bet: ValueBet }) {
       {/* OPIS SKALI NA STRONIE, NIE W DYMKU (2026-08-01). Wcześniej każda
           z czterech kratek miała `title` z wyjaśnieniem – czyli na telefonie
           skala była czterema słowami bez znaczenia. */}
-      <p className="mt-2 max-w-prose text-xs leading-relaxed text-faint">
+      <p className="mt-2 text-xs leading-relaxed text-faint">
         {s.opis}
       </p>
       {/* „pewność" była tylko trzema kropkami z dymkiem – a to zupełnie inna
           rzecz niż szansa i mylenie ich jest łatwe */}
-      <p className="mt-1 max-w-prose text-xs leading-relaxed text-faint">
+      <p className="mt-1 text-xs leading-relaxed text-faint">
         Obok kropki z napisem „{PEWNOSC_LABEL[bet.pewnosc]} pewność” – to nie
         to samo co szansa. Mówią, na ilu meczach i jak powtarzalnych opiera się
         ta prognoza.
       </p>
-      {/* „+6 pkt proc." zamienione na dwie liczby obok siebie: punkt
-          procentowy to jednostka, której prawie nikt nie odróżnia od
-          procenta, a tu akurat różnica jest sednem. */}
-      {wobecKursu && (
-        <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-ink-soft">
-          Przy tym typie {wobecKursu.zdanie}
-          {wobecKursu.przewaga != null && wobecKursu.przewaga > 0
-            ? " – czyli naszym zdaniem bukmacher płaci za dużo."
-            : "."}
-        </p>
-      )}
     </div>
   );
 }
@@ -854,7 +842,7 @@ function RozjazdZHistoria({
     .filter((c) => (wGore ? (c.mnoznik as number) < 1 : (c.mnoznik as number) > 1))
     .map((c) => (CZYNNIK_PO_LUDZKU[c.nazwa] ?? c.nazwa.toLowerCase()));
   return (
-    <p className="mt-2 max-w-prose text-sm leading-relaxed text-muted">
+    <p className="mt-2 text-sm leading-relaxed text-muted">
       Ta liczba i nasza szansa (
       <span className="font-data font-semibold text-ink">
         {fmtProc(bet.p_model)}
@@ -1062,12 +1050,12 @@ export function SzczegolyTypu({
                 {(proza || bet.uproszczony) && (
                   <Krok kod="skad">
                     {proza && (
-                      <p className="max-w-prose text-sm leading-relaxed text-ink-soft">
+                      <p className="text-sm leading-relaxed text-ink-soft">
                         {proza.baza}
                       </p>
                     )}
                     {bet.uproszczony && (
-                      <p className="mt-1.5 max-w-prose text-[13px] leading-relaxed text-faint">
+                      <p className="mt-1.5 text-[13px] leading-relaxed text-faint">
                         Tej karcie nie rozpiszemy pełnego rachunku: wróciła
                         z wcześniejszej publikacji, więc kurs i szansa są
                         zamrożone z chwili, gdy typ powstał, a rozpisane
@@ -1079,7 +1067,7 @@ export function SzczegolyTypu({
 
                 {proza && (
                   <Krok kod="zmiana">
-                    <p className="max-w-prose text-sm leading-relaxed text-ink-soft">
+                    <p className="text-sm leading-relaxed text-ink-soft">
                       {proza.zmiana}
                     </p>
                   </Krok>
@@ -1117,7 +1105,7 @@ export function SzczegolyTypu({
                   {/* jedna oś wyceny (liczby przy znacznikach, bez legendy);
                       zwężona, żeby znaczniki nie tonęły w torze */}
                   {!bet.pewniak && (implied != null || hist != null) && (
-                    <div className="mt-4 max-w-xl">
+                    <div className="mt-4">
                       <OsSzans
                         znaczniki={znaczniki}
                         przewaga={przewaga}
@@ -1237,7 +1225,7 @@ export function SzczegolyTypu({
                          1,00 znaczy „bez wpływu" – a to wiedza wewnętrzna.
                          Teraz każdy wiersz mówi wprost „podnosi" / „obniża",
                          a sama liczba została dla tych, którzy jej szukają. */
-                      <ul className="max-w-2xl space-y-2">
+                      <ul className="space-y-2">
                         {bet.uzasadnienie.czynniki.map((c) => (
                           <li
                             key={c.nazwa}
@@ -1270,7 +1258,7 @@ export function SzczegolyTypu({
                     )}
 
                     {tab === "wyniki" && bet.rozklad && (
-                      <div className="max-w-md">
+                      <div>
                         <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3">
                           <span className="text-[10px] uppercase tracking-wide text-faint">
                             liczba zdarzeń w meczu

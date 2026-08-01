@@ -112,17 +112,21 @@ export function profilTypu(bet: {
 /**
  * CHARAKTER SZCZEBLA drabinki – opis JEDNEJ linii, nie ocena całego typu.
  *
- * Dzięki temu widać istotę drabinki: idąc w górę linii kupujesz wyższy kurs
- * za niższą pewność. Żaden szczebel nie jest przy tym reklamowany („nasz typ"
- * nad wybraną kolumną nic nie tłumaczyło, tylko się chwaliło – decyzja usera
- * 2026-08-01). Progi celowo grubsze niż w `SILA_TYPU`: w komórce 84 px mieści
- * się jedno słowo, a nie „bardzo wysoka szansa".
+ * PODPIS MÓWI O CENIE, NIE O RYZYKU (decyzja usera 2026-08-01). Wcześniej
+ * było „wysoka szansa / realne / ryzykowne" i to nie działało: dolnych
+ * szczebli zawsze będzie najwięcej, więc drabinka w kółko krzyczała
+ * „ryzykowne" – choć wyższa poprzeczka nie jest wpadką, tylko innym
+ * wyborem: mniej pewności, więcej wypłaty.
+ *
+ * Liczymy z KURSU, nie z naszej szansy. Podpis wzięty z szansy potrafiłby
+ * przeczyć cenie stojącej dwa wiersze wyżej w tej samej komórce (typ
+ * z niską szansą i niskim kursem istnieje – to po prostu zły typ).
  */
-export function charakterSzczebla(p: number | null | undefined): string | null {
-  if (p == null) return null;
-  if (p >= 0.8) return "wysoka szansa";
-  if (p >= 0.5) return "realne";
-  return "ryzykowne";
+export function charakterSzczebla(kurs: number | null | undefined): string | null {
+  if (kurs == null || kurs <= 1) return null;
+  if (kurs < 1.6) return "niski kurs";
+  if (kurs < 2.5) return "średni kurs";
+  return "wysoki kurs";
 }
 
 /* ------------------------------------------------------------------ *

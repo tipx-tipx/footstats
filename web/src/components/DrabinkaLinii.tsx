@@ -81,7 +81,7 @@ export function DrabinkaLinii({
                   {fmtProc(b.p_model)}
                 </span>
                 <span className="mt-0.5 text-[9px] uppercase leading-tight tracking-tight text-faint">
-                  {charakterSzczebla(b.p_model) ?? ""}
+                  {charakterSzczebla(b.kurs) ?? ""}
                 </span>
               </button>
             );

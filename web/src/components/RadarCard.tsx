@@ -306,7 +306,7 @@ function DrabinkaPasek({ w }: { w: RadarWpis }) {
                     {p != null ? fmtProc(p) : "–"}
                   </span>
                   <span className="mt-0.5 text-[9px] uppercase leading-tight tracking-tight text-faint">
-                    {charakterSzczebla(p) ?? ""}
+                    {charakterSzczebla(s.kurs) ?? ""}
                   </span>
                 </span>
               );
@@ -339,18 +339,19 @@ function DrabinkaPasek({ w }: { w: RadarWpis }) {
                   {linLabel(hero.linia)}.{" "}
                 </>
               )}
+              {/* BEZ „KURS WYCENIA TO NA X%, MY NA Y%" (2026-08-01, decyzja
+                  usera). Na zwiniętej karcie ma stać JEDNA liczba – nasza
+                  szansa na ten mecz. Porównanie z wyceną kursu zostaje
+                  w rozwinięciu, w kroku „gdzie jest przewaga", gdzie jest
+                  miejsce, żeby je wytłumaczyć. */}
               {hero.p_final != null ? (
                 <>
-                  Kurs {fmtKurs(hero.kurs)} wycenia to na{" "}
-                  <span className="font-data">{fmtProc(1 / hero.kurs)}</span>, my
-                  dajemy{" "}
+                  Na ten mecz dajemy temu{" "}
                   <span className="font-data font-semibold text-ink">
                     {fmtProc(hero.p_final)}
-                  </span>
-                  {hero.p_final - 1 / hero.kurs > 0.01 && (
-                    <span className="text-data-green-ink"> – tu jest przewaga</span>
-                  )}
-                  .
+                  </span>{" "}
+                  szans przy kursie{" "}
+                  <span className="font-data">{fmtKurs(hero.kurs)}</span>.
                 </>
               ) : (
                 <>Kurs {fmtKurs(hero.kurs)} u Superbetu.</>
@@ -526,7 +527,7 @@ function PunktWyjscia({
   srednia90?: number | null;
 }) {
   return (
-    <p className="max-w-prose text-sm leading-relaxed text-ink-soft">
+    <p className="text-sm leading-relaxed text-ink-soft">
       Liczymy od jego własnej historii:{" "}
       <span className="text-ink">{trafioneZ(traf, z)}</span>
       {srednia90 != null && <>, {naMecz(srednia90)}</>}.
@@ -569,7 +570,7 @@ function CzynnikiMeczu({ kontekst }: { kontekst: RadarKontekst }) {
   if (!cokolwiek) return null;
 
   return (
-    <div className="max-w-prose">
+    <div>
       {/* WYJAŚNIENIA NA STRONIE, NIE W DYMKACH (2026-08-01). Sześć wierszy
           niżej miało sześć dymków z pełnymi zdaniami – czyli na telefonie
           była to lista skrótów bez znaczenia. Zdania, które naprawdę coś
@@ -645,34 +646,37 @@ function PrzewagaZdanie({
   linia: number;
 }) {
   if (pFinal == null) return null;
-  const cenaRynku = kurs > 0 ? 1 / kurs : null;
-  const przewaga =
-    cenaRynku != null ? Math.round((pFinal - cenaRynku) * 100) : null;
+  // JĘZYK KURSÓW, NIE DWÓCH PROCENTÓW (2026-08-01, decyzja usera). „Kurs jest
+  // wyceniony jak na 64%, my dajemy 73%" kazało czytelnikowi porównywać dwie
+  // liczby tego samego rodzaju i samemu zgadywać, co z tego wynika. Nasza
+  // szansa mówi swoje, a cenę porównujemy z ceną: ile ten typ jest wart
+  // i ile za niego płacą.
+  const uczciwy = pFinal > 0 ? 1 / pFinal : null;
+  const przewaga = uczciwy != null ? kurs / uczciwy - 1 : null;
   return (
-    <p className="max-w-prose text-sm leading-relaxed text-ink-soft">
+    <p className="text-sm leading-relaxed text-ink-soft">
       Po tych poprawkach dajemy {linLabel(linia)}{" "}
       <span className="font-data font-semibold text-ink">
         {fmtProc(pFinal)}
       </span>{" "}
       szans
-      {cenaRynku != null && (
+      {uczciwy != null && (
         <>
-          , a kurs{" "}
+          , czyli uczciwy kurs to{" "}
+          <span className="font-data">{fmtKurs(uczciwy)}</span>. Superbet płaci{" "}
           <span className="font-data font-semibold text-ink">
             {fmtKurs(kurs)}
-          </span>{" "}
-          jest wyceniony jak na{" "}
-          <span className="font-data text-muted">{fmtProc(cenaRynku)}</span>
-          {przewaga != null && przewaga > 0 && (
+          </span>
+          {przewaga != null && przewaga > 0.01 && (
             <span className="font-semibold text-data-green-ink">
               {" "}
-              – czyli naszym zdaniem bukmacher płaci tu za dużo
+              – czyli więcej, niż ten typ jest wart
             </span>
           )}
-          {przewaga != null && przewaga <= 0 && (
+          {przewaga != null && przewaga <= 0.01 && (
             <span className="font-semibold text-data-amber-ink">
               {" "}
-              – czyli cena jest uczciwa albo lekko za niska
+              – czyli tyle, ile trzeba, albo odrobinę mniej
             </span>
           )}
         </>
@@ -794,7 +798,7 @@ function RywaleMeczPoMeczu({ r }: { r: RadarRynek }) {
   const n = r.ostatnie?.length ?? 0;
   if (!n || !r.rywale?.length) return null;
   return (
-    <ul className="mt-2 max-w-md space-y-0.5">
+    <ul className="mt-2 space-y-0.5">
       {r.ostatnie!.slice(0, n).map((c, i) => {
         const rywal = r.rywale?.[i];
         const min = r.minuty?.[i];
@@ -817,13 +821,16 @@ function RywaleMeczPoMeczu({ r }: { r: RadarRynek }) {
             {rywal && (
               <span className="truncate text-muted">vs {rywal}</span>
             )}
+            {/* MINUTY PRZY RYWALU, NIE PRZY PRAWEJ KRAWĘDZI (2026-08-01):
+                odkąd rozwinięcie idzie na pełną szerokość, `ml-auto` odrzucał
+                „90 min" o pół ekranu od meczu, którego dotyczy. */}
             {min != null && (
               <span
-                className={`font-data ml-auto shrink-0 ${
+                className={`font-data shrink-0 ${
                   krotki ? "text-data-amber-ink" : "text-faint"
                 }`}
               >
-                {min} min{krotki && " – krótko, więc mało z tego wynika"}
+                · {min} min{krotki && " – krótko, więc mało z tego wynika"}
               </span>
             )}
           </li>
@@ -853,7 +860,7 @@ function HistoriaRynku({ r, linia }: { r: RadarRynek; linia: number }) {
         height={64}
         rynek={r.rynek.toLowerCase()}
       />
-      <p className="mt-2 max-w-prose text-sm leading-relaxed text-ink-soft">
+      <p className="mt-2 text-sm leading-relaxed text-ink-soft">
         W {ostatnie.length} ostatnich meczach przebił {linLabel(linia)}{" "}
         <span className="font-data font-semibold text-ink">{przebite}</span>{" "}
         {przebite === 1 ? "raz" : "razy"}
@@ -1181,7 +1188,7 @@ export const RadarCard = memo(function RadarCard({
                   OSTRZEŻENIE O SKŁADZIE STOI PRZED HISTORIĄ: jeśli zawodnik
                   raczej nie zagra, reszta rachunku jest bez znaczenia. */}
               {w.xi === false && (
-                <p className="mb-4 max-w-prose rounded-(--radius-control) bg-data-red-wash px-3.5 py-2.5 text-sm leading-relaxed text-data-red-ink">
+                <p className="mb-4 rounded-(--radius-control) bg-data-red-wash px-3.5 py-2.5 text-sm leading-relaxed text-data-red-ink">
                   <span className="font-medium">Raczej poza pierwszym składem:</span>{" "}
                   według składu (ogłoszonego albo przewidywanego) nie zaczyna
                   meczu. Ta karta powstała wcześniej – lepiej jej nie grać.
@@ -1211,12 +1218,12 @@ export const RadarCard = memo(function RadarCard({
                         {/* skąd BIORĄ SIĘ te dane: transfer z innej ligi,
                             debiutant bez historii, liga poza feedem */}
                         {opis && (
-                          <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-muted">
+                          <p className="mt-1.5 text-sm leading-relaxed text-muted">
                             {opis}
                           </p>
                         )}
                         {sygnal && w.rodzaj !== "forma" && (
-                          <p className="mt-1.5 max-w-prose text-[13px] leading-relaxed text-faint">
+                          <p className="mt-1.5 text-[13px] leading-relaxed text-faint">
                             <span className="font-medium text-ink-soft">
                               {sygnal.label}:
                             </span>{" "}
@@ -1227,7 +1234,7 @@ export const RadarCard = memo(function RadarCard({
                             ZAMROŻONY z chwili, gdy karta powstała – kurs
                             u bukmachera mógł się od tego czasu skrócić */}
                         {w.wznowiony && (
-                          <p className="mt-1.5 max-w-prose text-[13px] leading-relaxed text-faint">
+                          <p className="mt-1.5 text-[13px] leading-relaxed text-faint">
                             Ta karta powstała we wcześniejszym przeliczeniu,
                             więc kurs i szansa są zamrożone z tamtej chwili.
                             Cenę sprawdź u bukmachera przed postawieniem.
@@ -1246,7 +1253,7 @@ export const RadarCard = memo(function RadarCard({
                       <Krok kod="ostatnio">
                         <HistoriaRynku r={r} linia={hero.linia} />
                         {sygnal && w.rodzaj === "forma" && (
-                          <p className="mt-2 max-w-prose text-[13px] leading-relaxed text-faint">
+                          <p className="mt-2 text-[13px] leading-relaxed text-faint">
                             <span className="font-medium text-ink-soft">
                               {sygnal.label}:
                             </span>{" "}
@@ -1272,7 +1279,7 @@ export const RadarCard = memo(function RadarCard({
                         kat ||
                         w.ocena?.powod_wejscia === "seria" ||
                         w.xi === true) && (
-                        <ul className="mt-2.5 max-w-prose space-y-2 text-[13px] leading-relaxed text-muted">
+                        <ul className="mt-2.5 space-y-2 text-[13px] leading-relaxed text-muted">
                           {klasa && (
                             <li>
                               <span className="font-medium text-ink-soft">

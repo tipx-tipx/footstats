@@ -64,7 +64,7 @@ export function Krok({
 
 /** Kontener historii – trzyma kroki jednym rytmem odstępów. */
 export function Kroki({ children }: { children: React.ReactNode }) {
-  return <div className="max-w-3xl">{children}</div>;
+  return <div>{children}</div>;
 }
 
 /**
