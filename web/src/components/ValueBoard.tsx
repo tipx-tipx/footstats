@@ -9,6 +9,7 @@ import { FilterDropdown } from "./FilterDropdown";
 import { RadarCard } from "./RadarCard";
 import { StsBetCard } from "./StsBetCard";
 import { fmtDataCzas } from "@/lib/format";
+import { grupujWarianty } from "@/lib/warianty";
 import type {
   Meta,
   Pewnosc,
@@ -296,7 +297,12 @@ export function ValueBoard({
     return wynik;
   }, [bets, rynek, pewnosc, meczId, rodzaj, sortuj]);
 
-  const shown = filtered.slice(0, limit);
+  // JEDNA KARTA NA TYP, NIE NA LINIĘ (2026-08-01, zgłoszenie usera). Trzy
+  // karty „rożne poniżej 4,5 / 5,5 / 6,5" tej samej drużyny wyglądały jak trzy
+  // pomysły; to jeden pomysł na trzech poprzeczkach. Grupujemy PO filtrach
+  // i PRZED limitem, żeby „pokaż więcej" liczyło karty, a nie linie.
+  const grupy = useMemo(() => grupujWarianty(filtered), [filtered]);
+  const shown = grupy.slice(0, limit);
 
   // Kotwica ze spotlightu Hero (link „…#bet-<id>”): po wejściu na stronę
   // przewiń do wskazanej karty. Zakładkę ustawia initialRodzaj z ?rodzaj=,
@@ -615,13 +621,13 @@ export function ValueBoard({
             wynik skanu
           </span>
           <motion.span
-            key={filtered.length}
+            key={grupy.length}
             initial={{ opacity: 0, y: 5 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
             className="font-data text-sm font-semibold text-brand-deep"
           >
-            {odmienPozycje(filtered.length)}
+            {odmienPozycje(grupy.length)}
           </motion.span>
         </div>
       </div>
@@ -706,26 +712,35 @@ export function ValueBoard({
       {/* lista kart typów */}
       {shown.length > 0 && (
       <div className="space-y-3">
-        {shown.map((bet, i) => (
+        {shown.map(({ glowny, warianty }, i) => (
           <motion.div
-            key={bet.id}
-            id={`bet-${bet.id}`}
+            key={glowny.id}
+            id={`bet-${glowny.id}`}
             className="scroll-mt-24"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: Math.min(i * 0.03, 0.4), duration: 0.3 }}
           >
+            {/* kotwice pozostałych linii grupy: link „…#bet-<id>" z Hero albo
+                z czyjegoś zakładu musi trafić w kartę, choćby ta linia była
+                dziś tylko szczeblem, a nie osobną kartą */}
+            {warianty
+              .filter((b) => b.id !== glowny.id)
+              .map((b) => (
+                <span key={b.id} id={`bet-${b.id}`} aria-hidden />
+              ))}
             <BetCard
-              bet={bet}
+              bet={glowny}
               rank={i + 1}
-              zawodnik={zawodnikById.get(bet.podmiot_id)}
+              zawodnik={zawodnikById.get(glowny.podmiot_id)}
+              warianty={warianty}
             />
           </motion.div>
         ))}
       </div>
       )}
 
-      {filtered.length > limit && (
+      {grupy.length > limit && (
         <div className="mt-5 text-center">
           <button
             onClick={() => setLimit((l) => l + 25)}
@@ -733,7 +748,7 @@ export function ValueBoard({
           >
             Pokaż więcej
             <span className="font-data tracking-normal">
-              ({filtered.length - limit} pozostało)
+              ({grupy.length - limit} pozostało)
             </span>
             <span aria-hidden>↓</span>
           </button>

@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 
 import { BetCard } from "./BetCard";
 import { BetRow } from "./BetRow";
+import { grupujWarianty } from "@/lib/warianty";
 import { FilterDropdown } from "./FilterDropdown";
 import { Reveal } from "./Reveal";
 import type { DruzynaForma, ValueBet, Zawodnik } from "@/lib/types";
@@ -176,14 +177,25 @@ export function DruzynyTablica({
     return m;
   }, [bets, rynek, ligaByMecz]);
 
-  const widoczne = useMemo(
+  // JEDEN WIERSZ NA TYP, NIE NA LINIĘ (2026-08-01, zgłoszenie usera): ta sama
+  // drużyna z rożnymi poniżej 4,5 · 5,5 · 6,5 zajmowała trzy wiersze ceduły,
+  // choć to jeden pomysł na trzech poprzeczkach. Pozostałe linie jadą
+  // z wierszem jako drabinka wyboru w rozwinięciu. Patrz lib/warianty.ts.
+  const grupy = useMemo(
     () =>
-      bets.filter(
-        (b) =>
-          (rynek === "wszystkie" || b.rynek === rynek) &&
-          (liga === "wszystkie" || ligaByMecz[b.mecz_id] === liga),
+      grupujWarianty(
+        bets.filter(
+          (b) =>
+            (rynek === "wszystkie" || b.rynek === rynek) &&
+            (liga === "wszystkie" || ligaByMecz[b.mecz_id] === liga),
+        ),
       ),
     [bets, rynek, liga, ligaByMecz],
+  );
+  const widoczne = useMemo(() => grupy.map((g) => g.glowny), [grupy]);
+  const wariantyById = useMemo(
+    () => new Map(grupy.map((g) => [g.glowny.id, g.warianty])),
+    [grupy],
   );
 
   const sortuj = useMemo(
@@ -283,6 +295,7 @@ export function DruzynyTablica({
       forma={formaRynku(bet)}
       pokazGodzine={sort === "godzina"}
       liga={zLiga ? ligaByMecz[bet.mecz_id] : undefined}
+      warianty={wariantyById.get(bet.id)}
     />
   );
 
@@ -549,6 +562,7 @@ export function DruzynyTablica({
                             | Zawodnik
                             | undefined
                         }
+                        warianty={wariantyById.get(bet.id)}
                       />
                     </Reveal>
                   ))}

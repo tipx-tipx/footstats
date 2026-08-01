@@ -3,8 +3,10 @@
 import { memo, useState } from "react";
 
 import { SWIATLO_STYL, swiatloTypu, SzczegolyTypu } from "./BetCard";
+import { DrabinkaLinii } from "./DrabinkaLinii";
 import { fmtKurs, fmtLinia, fmtProc, STRONA_LABEL } from "@/lib/format";
 import type { FormaRynku, ValueBet } from "@/lib/types";
+import { odmienLinie } from "@/lib/warianty";
 
 /**
  * Gęsty wiersz ceduły typów – jednostka tablicy /druzyny przy skali sezonu
@@ -26,10 +28,11 @@ const rynekKrotko = (rynek: string) =>
   rynek.toLowerCase().replace(/\s*drużyny\s*/g, " ").trim();
 
 export const BetRow = memo(function BetRow({
-  bet,
-  forma,
+  bet: glowny,
+  forma: formaGlownego,
   pokazGodzine = false,
   liga,
+  warianty,
 }: {
   bet: ValueBet;
   forma?: FormaRynku;
@@ -37,8 +40,14 @@ export const BetRow = memo(function BetRow({
   pokazGodzine?: boolean;
   /** nazwa rozgrywek w metadanych – dla list płaskich, bez sekcji lig */
   liga?: string;
+  /** pozostałe linie tego samego typu – jeden wiersz zamiast trzech */
+  warianty?: ValueBet[];
 }) {
   const [open, setOpen] = useState(false);
+  const [wybranyId, setWybranyId] = useState(glowny.id);
+  const bet = warianty?.find((b) => b.id === wybranyId) ?? glowny;
+  // forma jest per rynek, a warianty dzielą rynek – ten sam wykres pasuje
+  const forma = formaGlownego;
   const swiatlo = swiatloTypu(forma, bet.linia, bet.p_model, bet.strona);
   const opisRynku = `${rynekKrotko(bet.rynek)} ${STRONA_LABEL[bet.strona]} ${fmtLinia(bet.linia)}`;
   const poz = Math.min(Math.max(bet.p_model * 100, 2), 98);
@@ -109,6 +118,11 @@ export const BetRow = memo(function BetRow({
 
         <span className="hidden min-w-0 truncate text-sm text-muted sm:block">
           {opisRynku}
+          {warianty && warianty.length > 1 && (
+            <span className="font-data ml-2 rounded-full bg-paper px-1.5 py-0.5 text-[10px] text-faint">
+              +{odmienLinie(warianty.length - 1)}
+            </span>
+          )}
         </span>
 
         {/* tor szansy: znacznik modelu na skali 0–100, kreska = rzut monetą */}
@@ -152,6 +166,15 @@ export const BetRow = memo(function BetRow({
           />
         </svg>
       </button>
+
+      {open && warianty && warianty.length > 1 && (
+        <DrabinkaLinii
+          warianty={warianty}
+          wybrany={bet.id}
+          onWybor={setWybranyId}
+          className="border-t border-hairline px-2 pb-3 pt-3 sm:px-3"
+        />
+      )}
 
       <SzczegolyTypu bet={bet} forma={forma} open={open} />
     </article>
