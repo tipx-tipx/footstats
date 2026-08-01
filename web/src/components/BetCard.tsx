@@ -900,6 +900,13 @@ export function SzczegolyTypu({
     ...(bet.rozklad ? [{ kod: "wyniki" as const, label: "Możliwe wyniki" }] : []),
   ];
   const [tab, setTab] = useState<TabSzczegolow>(taby[0]?.kod ?? "czynniki");
+  // SZCZEGÓŁY TECHNICZNE ZWINIĘTE (2026-08-01, zasada uzgodniona z userem).
+  // Rozwinięcie karty odpowiadało na pytania, których nikt nie zadał: tabela
+  // mnożników, przedział ufności, rozkład możliwych wyników. To materiał
+  // diagnostyczny – potrzebny, ale dla jednego użytkownika na stu. Na wierzchu
+  // zostaje proza „skąd ta liczba", która odpowiada na to jedno pytanie, które
+  // zadaje każdy: dlaczego ten typ i czemu mam w to wierzyć.
+  const [szczegoly, setSzczegoly] = useState(false);
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const onTabKeyDown = (
     e: React.KeyboardEvent<HTMLButtonElement>,
@@ -1136,11 +1143,37 @@ export function SzczegolyTypu({
 
             {/* głębia na żądaniu: jedna sekcja naraz = jeden wykres naraz */}
             {taby.length > 0 && (
+              <div className="mt-6">
+                <button
+                  type="button"
+                  onClick={() => setSzczegoly((v) => !v)}
+                  aria-expanded={szczegoly}
+                  className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint transition-colors hover:text-ink"
+                >
+                  Szczegóły techniczne
+                  <svg
+                    aria-hidden
+                    width="12"
+                    height="12"
+                    viewBox="0 0 14 14"
+                    className={`transition-transform ${szczegoly ? "rotate-180" : ""}`}
+                  >
+                    <path
+                      d="M3 5.5 L7 9.5 L11 5.5"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+                {szczegoly && (
               <motion.div
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: 0.22 }}
-                className="mt-6"
+                transition={{ duration: 0.25 }}
+                className="mt-3"
               >
                 <div
                   role="tablist"
@@ -1313,6 +1346,8 @@ export function SzczegolyTypu({
                   </motion.div>
                 </AnimatePresence>
               </motion.div>
+                )}
+              </div>
             )}
           </div>
         </motion.div>
