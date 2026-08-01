@@ -77,10 +77,7 @@ export const BetRow = memo(function BetRow({
               </span>
             )}
             {swiatlo ? (
-              <span
-                title={SWIATLO_STYL[swiatlo].opis}
-                className="relative inline-flex h-2 w-2 shrink-0 items-center justify-center"
-              >
+              <span className="relative inline-flex h-2 w-2 shrink-0 items-center justify-center">
                 <span
                   aria-hidden
                   className={`absolute -inset-1 rounded-full opacity-20 ${SWIATLO_STYL[swiatlo].pasek}`}
@@ -115,11 +112,9 @@ export const BetRow = memo(function BetRow({
         </span>
 
         {/* tor szansy: znacznik modelu na skali 0–100, kreska = rzut monetą */}
-        <span
-          aria-hidden
-          className="relative hidden h-4 md:block"
-          title={`Szansa modelu: ${fmtProc(bet.p_model)} (kreska na środku toru to 50%)`}
-        >
+        {/* bez dymka: sam procent stoi w następnej kolumnie, a pasek jest
+            tylko jego obrazkiem (przegląd kart 2026-08-01) */}
+        <span aria-hidden className="relative hidden h-4 md:block">
           <span className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-hairline" />
           <span
             className="absolute top-1/2 h-1 -translate-y-1/2 rounded-full bg-brand/25"
@@ -136,14 +131,7 @@ export const BetRow = memo(function BetRow({
           {fmtProc(bet.p_model)}
         </span>
 
-        <span
-          className="font-data w-12 text-right text-sm font-semibold"
-          title={
-            bet.kurs == null
-              ? `Kurs sprawdzasz ręcznie: od ~${fmtKurs(bet.fair_kurs * 1.05)} w górę warto grać`
-              : `Kurs ${bet.bukmacher}`
-          }
-        >
+        <span className="font-data w-12 text-right text-sm font-semibold">
           {bet.kurs != null ? fmtKurs(bet.kurs) : `~${fmtKurs(bet.fair_kurs * 1.05)}`}
         </span>
 

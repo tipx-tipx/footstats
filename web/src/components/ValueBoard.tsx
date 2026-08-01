@@ -296,7 +296,11 @@ export function ValueBoard({
   // mu pod palcami po odświeżeniu danych).
   const TABY_RODZAJ = (
     [
-      ["pewniaki", "Pewniaki", liczbaPewniakow],
+      // „Pewniaki" -> „Wysokie szanse" (decyzja usera 2026-08-01): stare
+      // słowo obiecywało pewność, której nie mamy, i kłóciło się z całą
+      // resztą produktu, która mówi o szansach. Kod zakładki zostaje
+      // („pewniaki" jedzie w adresie i w backendzie), zmienia się etykieta.
+      ["pewniaki", "Wysokie szanse", liczbaPewniakow],
       ["value", "Lepszy kurs w STS", liczbaValueSts],
       ["radar", "Drabinki", radarWpisy.length],
       ["wszystko", "Wszystko", null],

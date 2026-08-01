@@ -87,8 +87,9 @@ function Werdykt({ kupon: k }: { kupon: Kupon }) {
             </>
           ) : (
             <>
-              <strong className="font-semibold text-ink">Pewniaki</strong>:
-              najpewniejsze typy, które razem dają kurs ×{celKuponu(k)}.{" "}
+              <strong className="font-semibold text-ink">Wysokie szanse</strong>
+              : typy o najwyższej szansie, które razem dają kurs ×{celKuponu(k)}
+              .{" "}
               {jedenMecz
                 ? "Wszystkie z jednego meczu — a że jeden nudny mecz potrafi położyć je naraz, obcinamy za to szansę kuponu."
                 : `Rozłożone na ${meczeIds.length} mecze.`}

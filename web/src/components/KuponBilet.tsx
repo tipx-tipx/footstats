@@ -84,7 +84,7 @@ export function KuponBilet({
                 : "bg-card-soft text-muted"
             }`}
           >
-            {k.styl === "value" ? "value" : "pewniaki"}
+            {k.styl === "value" ? "z przewagą" : "wysokie szanse"}
           </span>
         </div>
         <div className="mt-3.5 flex flex-wrap items-end gap-x-7 gap-y-2.5">

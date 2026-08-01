@@ -21,6 +21,14 @@ import {
   PEWNOSC_LABEL,
   STRONA_LABEL,
 } from "@/lib/format";
+import {
+  kierunekMnoznika,
+  klasaKierunku,
+  profilTypu,
+  SILA_TYPU,
+  silaTypu,
+  szansaWobecKursu,
+} from "@/lib/slownik";
 import type { FormaRynku, Strona, ValueBet, Zawodnik } from "@/lib/types";
 
 /** Czy wynik z meczu wszedłby w ten typ (strona typu, nie zawsze „powyżej”). */
@@ -304,14 +312,15 @@ function WerdyktPewniaka({ bet }: { bet: ValueBet }) {
   } else if (bet.p_model >= 0.75) {
     glowne = (
       <>
-        Model daje temu typowi <Num>{p}</Num> szans. To najpewniejsza
-        kategoria na liście.
+        Model daje temu typowi <Num>{p}</Num> szans — najwyższy przedział na
+        liście. Uwaga: przy takich szansach kurs jest niski, więc częste
+        trafienia same z siebie nie oznaczają zysku.
       </>
     );
   } else if (bet.p_model >= 0.62) {
     glowne = (
       <>
-        Model daje temu typowi <Num>{p}</Num> szans. Mocny typ, dobry
+        Model daje temu typowi <Num>{p}</Num> szans. Wysoka szansa, dobry
         kandydat na kupon.
       </>
     );
@@ -325,8 +334,8 @@ function WerdyktPewniaka({ bet }: { bet: ValueBet }) {
   } else if ((bet.kurs ?? 0) >= 1.9) {
     glowne = (
       <>
-        Perełka na kupon: <Num>{p}</Num> szans, za to kurs <Num>{kurs}</Num>{" "}
-        płaci wyraźnie więcej.
+        Niska szansa — <Num>{p}</Num> — za to kurs <Num>{kurs}</Num> płaci
+        wyraźnie więcej. Świadome ryzyko, nie wpadka.
       </>
     );
   } else {
@@ -492,16 +501,19 @@ function SekcjaFormy({ bet, forma }: { bet: ValueBet; forma: FormaRynku }) {
           Ostatnie mecze: {bet.rynek.toLowerCase()}
         </h4>
         {zagrane > 0 && (
-          <span
-            className="flex items-center gap-2"
-            title="Jak często ten typ by wszedł: w ostatnich 5 / 10 / wszystkich meczach z minutami"
-          >
+          <span className="flex items-center gap-2">
             {odczyty.map((c) => (
               <OdczytOkna key={c.label} {...c} />
             ))}
           </span>
         )}
       </div>
+      {zagrane > 0 && (
+        <p className="-mt-1.5 mb-2.5 text-[11px] leading-relaxed text-faint">
+          Liczby po prawej mówią, jak często ten typ by wszedł — w ostatnich 5,
+          10 i we wszystkich meczach, w których zawodnik grał.
+        </p>
+      )}
       <FormBars
         counts={forma.ostatnie}
         minutes={forma.minuty}
@@ -514,22 +526,18 @@ function SekcjaFormy({ bet, forma }: { bet: ValueBet; forma: FormaRynku }) {
       />
       {/* jedna banda odczytów pod wykresem: średnia, minuty i splity razem */}
       <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-hairline pt-2.5">
-        <span
-          className="font-data text-[11px] font-semibold text-ink-soft"
-          title={`Średnia z ostatnich ${zagrane} rozegranych meczów`}
-        >
+        {/* etykiety mówią same za siebie — bez dymków, które i tak nie
+            działają na telefonie (przegląd kart 2026-08-01) */}
+        <span className="font-data text-[11px] font-semibold text-ink-soft">
           <span className="mr-1 text-[9px] font-medium uppercase opacity-70">
-            średnio na 90 min
+            średnio na mecz z ostatnich {zagrane}
           </span>
           {forma.srednia90.toFixed(2).replace(".", ",")}
         </span>
         {bet.oczekiwane_minuty != null && (
-          <span
-            className="font-data text-[11px] font-semibold text-ink-soft"
-            title="Ile minut spodziewamy się po nim w tym meczu"
-          >
+          <span className="font-data text-[11px] font-semibold text-ink-soft">
             <span className="mr-1 text-[9px] font-medium uppercase opacity-70">
-              przewidywane minuty
+              spodziewamy się minut w tym meczu
             </span>
             {Math.round(bet.oczekiwane_minuty)}
           </span>
@@ -605,63 +613,23 @@ export const SWIATLO_STYL = {
 } as const;
 
 /**
- * Oznaczenie typu z puli pewniaków wg szansy modelu. Sama etykieta "pewniak"
- * przy 55% wprowadzała w błąd — pula zawiera typy od ~42% (perełki) do 90%+.
- * Progi: ≥75% pewniak, 62–74% mocny typ, 52–61% umiarkowany, <52% perełka
- * (do puli poniżej 52% wchodzą tylko typy z kursem 1,9+).
+ * Oznaczenie typu — JEDNA skala z `lib/slownik.ts`, ta sama w całym
+ * produkcie (2026-08-01). Wcześniej były tu trzy równoległe słowniki:
+ * „★ pewniak / mocny typ / umiarkowany / ryzykowny" tutaj, „TOP / mocny /
+ * solidny" na kartach Drabinek i jeszcze raz czterostopniowa skala niżej
+ * w rozwinięciu. Do tego „perełka" i „wyższa linia" mówiły to samo dwiema
+ * nazwami, choć opisują nie SIŁĘ typu, tylko sposób jego postawienia —
+ * dlatego dziś to osobna, druga plakietka (`profilTypu`).
  */
-function tierPewniaka(bet: ValueBet): {
+function tierTypu(bet: ValueBet): {
   label: string;
   cls: string;
   opis: string;
 } {
-  if (bet.wyzsza_linia) {
-    if (bet.p_model < 0.52) {
-      return {
-        label: "✦ opcja ryzykowna",
-        cls: "bg-data-amber-wash text-data-amber-ink",
-        opis: "Wyżej postawiona poprzeczka za wyraźnie lepszy kurs. Wchodzi rzadziej niż co drugi raz — to świadome ryzyko, nie pewniak.",
-      };
-    }
-    return {
-      label: "✦ wyższa linia",
-      cls: "bg-data-amber-wash text-data-amber-ink",
-      opis: "Wyżej postawiona poprzeczka niż zwykle, ale szansa wciąż solidna, a kurs dużo lepszy",
-    };
-  }
-  if (bet.p_model < 0.52) {
-    if ((bet.kurs ?? 0) >= 1.9) {
-      return {
-        label: "◆ perełka",
-        cls: "bg-data-amber-wash text-data-amber-ink",
-        opis: "Wysoki kurs przy wciąż sensownej szansie — rodzynek na kupon, nie pewniak",
-      };
-    }
-    return {
-      label: "ryzykowny",
-      cls: "bg-paper text-muted",
-      opis: "Szansa poniżej 52% i bez wysokiego kursu w zamian — najsłabszy rodzaj typu, uważaj",
-    };
-  }
-  if (bet.p_model >= 0.75) {
-    return {
-      label: "★ pewniak",
-      cls: "bg-brand-wash text-brand-deep",
-      opis: "Szansa 75% i więcej — najmocniejszy rodzaj typu",
-    };
-  }
-  if (bet.p_model >= 0.62) {
-    return {
-      label: "mocny typ",
-      cls: "bg-data-green-wash text-data-green-ink",
-      opis: "Szansa 62-74% — solidny typ, ale jeszcze nie pewniak",
-    };
-  }
-  return {
-    label: "umiarkowany",
-    cls: "bg-paper text-muted",
-    opis: "Szansa 52-61% — niewiele ponad rzut monetą, uważaj",
-  };
+  const profil = profilTypu(bet);
+  if (profil) return profil;
+  const s = silaTypu(bet.p_model);
+  return { label: s.label, cls: s.cls, opis: s.opis };
 }
 
 /** Nazwy czynników w mianowniku prozy „skąd ta liczba". */
@@ -739,13 +707,8 @@ function skadTaLiczba(bet: ValueBet): string | null {
   return `${fmtOpisLiczby(baza.opis)}. ${korekta} – zostaje ok. ${ocz}. ${domkniecie}`;
 }
 
-/** Skala ocen pewniaków — progi te same co w tierPewniaka. */
-const SKALA_OCEN = [
-  { label: "ryzykowny", zakres: "do 52%", od: 0, do: 0.52 },
-  { label: "umiarkowany", zakres: "52–61%", od: 0.52, do: 0.62 },
-  { label: "mocny typ", zakres: "62–74%", od: 0.62, do: 0.75 },
-  { label: "pewniak", zakres: "75% i więcej", od: 0.75, do: 1.01 },
-] as const;
+/** Skala ocen = ta sama tabela co plakietka (patrz lib/slownik.ts). */
+const SKALA_OCEN = SILA_TYPU;
 
 /**
  * Własny system ocen zamiast osi z wyceną bukmachera: cztery kategorie
@@ -754,44 +717,68 @@ const SKALA_OCEN = [
  */
 function OcenaTypu({ bet }: { bet: ValueBet }) {
   const proza = skadTaLiczba(bet);
+  const s = silaTypu(bet.p_model);
+  const wobecKursu =
+    bet.kurs != null && bet.kurs > 1
+      ? szansaWobecKursu(bet.p_model, bet.kurs)
+      : null;
   return (
     <div>
       <h4 className="mb-2.5 text-xs font-semibold uppercase tracking-wide text-faint">
         Nasza ocena
       </h4>
       <div className="grid max-w-xl grid-cols-4 gap-x-2.5">
-        {SKALA_OCEN.map((s) => {
-          const aktywna = bet.p_model >= s.od && bet.p_model < s.do;
+        {SKALA_OCEN.map((k) => {
+          const aktywna = k.kod === s.kod;
           return (
             <div
-              key={s.label}
+              key={k.kod}
               className={`border-t-2 pt-1.5 ${
                 aktywna ? "border-brand" : "border-hairline"
               }`}
-              title={
-                aktywna
-                  ? `Ocena tego typu: ${s.label} (szansa modelu ${fmtProc(bet.p_model)})`
-                  : `Kategoria ${s.label}: szansa modelu ${s.zakres}`
-              }
             >
               <p
                 className={`font-display text-[10px] font-semibold uppercase tracking-wide ${
                   aktywna ? "text-brand-deep" : "text-faint"
                 }`}
               >
-                {s.label}
+                {k.label}
               </p>
               <p
                 className={`font-data mt-0.5 text-[10px] ${
                   aktywna ? "font-semibold text-brand-deep" : "text-faint"
                 }`}
               >
-                {aktywna ? fmtProc(bet.p_model) : s.zakres}
+                {aktywna ? fmtProc(bet.p_model) : k.zakres}
               </p>
             </div>
           );
         })}
       </div>
+      {/* OPIS SKALI NA STRONIE, NIE W DYMKU (2026-08-01). Wcześniej każda
+          z czterech kratek miała `title` z wyjaśnieniem — czyli na telefonie
+          skala była czterema słowami bez znaczenia. */}
+      <p className="mt-2 max-w-prose text-xs leading-relaxed text-faint">
+        {s.opis}
+      </p>
+      {/* „pewność" była tylko trzema kropkami z dymkiem — a to zupełnie inna
+          rzecz niż szansa i mylenie ich jest łatwe */}
+      <p className="mt-1 max-w-prose text-xs leading-relaxed text-faint">
+        Obok kropki z napisem „{PEWNOSC_LABEL[bet.pewnosc]} pewność" — to nie
+        to samo co szansa. Mówią, na ilu meczach i jak powtarzalnych opiera się
+        ta prognoza.
+      </p>
+      {/* „+6 pkt proc." zamienione na dwie liczby obok siebie: punkt
+          procentowy to jednostka, której prawie nikt nie odróżnia od
+          procenta, a tu akurat różnica jest sednem. */}
+      {wobecKursu && (
+        <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-ink-soft">
+          Przy tym typie {wobecKursu.zdanie}
+          {wobecKursu.przewaga != null && wobecKursu.przewaga > 0
+            ? " — czyli naszym zdaniem bukmacher płaci za dużo."
+            : "."}
+        </p>
+      )}
       {proza && (
         <p className="mt-3 max-w-prose text-sm leading-relaxed text-muted">
           <span className="font-medium text-ink">Skąd ta liczba:</span> {proza}
@@ -1117,6 +1104,12 @@ export function SzczegolyTypu({
                     )}
 
                     {tab === "czynniki" && (
+                      /* KIERUNEK SŁOWEM, MNOŻNIK JAKO PRZYPIS (2026-08-01).
+                         Kolumna liczb „×1,12" nie ma jednostki ani kierunku:
+                         żeby cokolwiek z niej wyczytać, trzeba wiedzieć, że
+                         1,00 znaczy „bez wpływu" — a to wiedza wewnętrzna.
+                         Teraz każdy wiersz mówi wprost „podnosi" / „obniża",
+                         a sama liczba została dla tych, którzy jej szukają. */
                       <ul className="max-w-2xl space-y-2">
                         {bet.uzasadnienie.czynniki.map((c) => (
                           <li
@@ -1130,27 +1123,17 @@ export function SzczegolyTypu({
                               </span>
                             </span>
                             {c.mnoznik !== null && (
-                              <span
-                                className="flex shrink-0 items-center gap-2 pt-1"
-                                title={`Ten czynnik ${
-                                  c.mnoznik > 1.02
-                                    ? "podnosi"
-                                    : c.mnoznik < 0.98
-                                      ? "obniża"
-                                      : "praktycznie nie rusza"
-                                } przewidywaną liczbę zdarzeń (1,00 = bez wpływu)`}
-                              >
+                              <span className="flex shrink-0 items-center gap-2 pt-1">
                                 <MnoznikBar m={c.mnoznik} />
-                                <span
-                                  className={`font-data w-12 text-right text-xs font-semibold ${
-                                    c.mnoznik > 1.02
-                                      ? "text-data-green-ink"
-                                      : c.mnoznik < 0.98
-                                        ? "text-data-red-ink"
-                                        : "text-faint"
-                                  }`}
-                                >
-                                  {fmtMnoznik(c.mnoznik)}
+                                <span className="w-24 text-right">
+                                  <span
+                                    className={`text-xs font-semibold ${klasaKierunku(c.mnoznik)}`}
+                                  >
+                                    {kierunekMnoznika(c.mnoznik)}
+                                  </span>
+                                  <span className="font-data block text-[10px] text-faint">
+                                    {fmtMnoznik(c.mnoznik)}
+                                  </span>
                                 </span>
                               </span>
                             )}
@@ -1301,11 +1284,10 @@ export const BetCard = memo(function BetCard({
             <span className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
               {/* dioda formy: historia vs model jednym rzutem oka (zamiast
                   paska na krawędzi, który ginął przy zielonych miernikach) */}
+              {/* bez dymka: dioda to skrót wykresu formy, który po rozwinięciu
+                  stoi na karcie w całości (przegląd 2026-08-01) */}
               {swiatlo && (
-                <span
-                  title={SWIATLO_STYL[swiatlo].opis}
-                  className="relative inline-flex h-2 w-2 shrink-0 translate-y-px items-center justify-center"
-                >
+                <span className="relative inline-flex h-2 w-2 shrink-0 translate-y-px items-center justify-center">
                   <span
                     aria-hidden
                     className={`absolute -inset-1 rounded-full opacity-20 ${SWIATLO_STYL[swiatlo].pasek}`}
@@ -1365,21 +1347,17 @@ export const BetCard = memo(function BetCard({
         <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1.5 px-4 pb-3.5 sm:pl-[4.75rem] sm:pr-5">
           {bet.pewniak ? (
             (() => {
-              const t = tierPewniaka(bet);
+              const t = tierTypu(bet);
               return (
                 <span
                   className={`font-data inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${t.cls}`}
-                  title={t.opis}
                 >
                   {t.label}
                 </span>
               );
             })()
           ) : bet.sugestia || bet.ev_pct == null ? (
-            <span
-              className="inline-flex items-center rounded-full bg-data-amber-wash px-2.5 py-0.5 text-xs font-semibold text-data-amber-ink"
-              title="Ten rynek jest w ofercie STS — kurs sprawdź sam"
-            >
+            <span className="inline-flex items-center rounded-full bg-data-amber-wash px-2.5 py-0.5 text-xs font-semibold text-data-amber-ink">
               sprawdź w STS
             </span>
           ) : (
@@ -1387,10 +1365,12 @@ export const BetCard = memo(function BetCard({
           )}
           {/* odznaki przewagi — tekstowe odczyty HUD zamiast kolejnych
               chipów; jedno źródło prawdy (odznakiPrzewagi) */}
+          {/* BEZ DYMKA: pełne wyjaśnienie każdej odznaki jest w rozwinięciu
+              (komponent Sygnaly, opis na stronie i na klik). Dymek dublował
+              tę treść tam, gdzie na telefonie i tak jej nie widać. */}
           {odznaki.map((o) => (
             <span
               key={o.label}
-              title={o.opis}
               className={`inline-flex items-center gap-1 px-1 text-[11px] font-medium ${
                 o.tone === "brand" ? "text-brand-deep" : "text-data-amber-ink"
               }`}
@@ -1399,15 +1379,12 @@ export const BetCard = memo(function BetCard({
             </span>
           ))}
           <span className="ml-auto flex items-center gap-3">
-            <span
-              className="flex items-center gap-1 text-[10px] text-faint"
-              title="Na ilu meczach i jak spójnych opiera się ta prognoza. Wysoka = dużo powtarzalnych danych."
-            >
+            <span className="flex items-center gap-1 text-[10px] text-faint">
               <PewnoscDots level={bet.pewnosc} />
               {PEWNOSC_LABEL[bet.pewnosc]} pewność
             </span>
             <span className="flex items-center gap-1 text-[10px] uppercase tracking-wide text-faint">
-              {open ? "zwiń" : "detale"}
+              {open ? "zwiń" : "skąd ta liczba"}
               <svg
                 aria-hidden
                 width="12"

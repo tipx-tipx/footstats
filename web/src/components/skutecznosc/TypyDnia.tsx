@@ -213,7 +213,7 @@ export function TypyDnia({
             {zakladow} {odmien(zakladow, "zakład", "zakłady", "zakładów")}
           </span>{" "}
           — ta sama drużyna i ten sam rynek stoją tu w kilku liniach naraz
-          (np. „poniżej 13,5", „poniżej 14,5", „poniżej 15,5”). Takie linie
+          (np. „poniżej 13,5”, „poniżej 14,5”, „poniżej 15,5”). Takie linie
           wchodzą albo przepadają <strong>razem</strong>, więc to jeden wynik
           meczu, nie kilka trafień. Od 1 sierpnia wystawiamy już tylko jedną
           linię na stronę.

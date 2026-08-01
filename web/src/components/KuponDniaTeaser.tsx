@@ -24,7 +24,7 @@ export function KuponDniaTeaser({ kupon }: { kupon: Kupon }) {
             kupon dnia od modelu
           </p>
           <span className="rounded-full bg-card-soft px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted">
-            {kupon.styl === "value" ? "value" : "pewniaki"}
+            {kupon.styl === "value" ? "z przewagą" : "wysokie szanse"}
           </span>
         </div>
 
