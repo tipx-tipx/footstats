@@ -624,3 +624,48 @@ def test_martwa_epoka_nowych_rynkow_nie_uczy_korekty():
     assert rozliczanie._z_martwej_epoki(stary)
     assert not rozliczanie._z_martwej_epoki(nowy)
     assert not rozliczanie._z_martwej_epoki(zwykly)
+
+
+def test_forward_test_liczy_tylko_nowa_epoke():
+    """Pre-rejestracja: docs/forward-test-druzynowe-ponizej.md.
+
+    Segment liczy sie WYLACZNIE na rekordach ze stemplem `wersje` — na
+    starszych model juz sie uczyl (bin korekty `druzyny 0,00-0,55` to
+    dokladnie ten segment), wiec mierzylibysmy wlasne dopasowanie.
+    """
+    from footstats.model import betting
+
+    def _typ(**kw):
+        r = {
+            "rynek_kod": "team_corners", "strona": "ponizej",
+            "kurs": 2.20, "p_model": 0.50, "wynik": "wygrany",
+            "tryb_podatku": "standard",
+            "wersje": betting.wersje_publikacji(),
+        }
+        r.update(kw)
+        return r
+
+    # p 0,50 przy kursie 2,20: cena rynku ~0,455, rozjazd +4,5 pp = w oknie
+    assert betting.w_oknie_zgody(0.50, 2.20)
+
+    log = {
+        "a": _typ(),
+        "b": _typ(wynik="przegrany"),
+        "stara_epoka": _typ(wersje=None),          # sprzed pre-rejestracji
+        "za_tani": _typ(kurs=1.50),                # ponizej 1,90
+        "powyzej": _typ(strona="powyzej"),         # zla strona
+        "zawodniczy": _typ(rynek_kod="shots"),     # zly strumien
+        "poza_pub": _typ(poza_publikacja="kwarantanna_rynku"),
+    }
+    out = rozliczanie.forward_test(log)
+    assert out["n"] == 2 and out["trafione"] == 1
+    assert out["cel"] == rozliczanie.FORWARD_TEST_CEL_N
+    assert out["gotowy"] is False          # 2 z 40 to nie jest wynik
+    # ROI po podatku: jedna wygrana po 2,20 -> 2,20 x 0,88 = 1,936 z dwoch stawek
+    assert abs(out["roi"] - (1.936 / 2 - 1.0)) < 1e-6
+
+
+def test_forward_test_milczy_gdy_pusto():
+    out = rozliczanie.forward_test({})
+    assert out["n"] == 0 and out["gotowy"] is False
+    assert out["dokument"].startswith("docs/")

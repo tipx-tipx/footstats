@@ -1245,6 +1245,67 @@ def korekta_strumienia(log: dict | None = None) -> dict[str, float]:
     return out
 
 
+# --- TEST W PRZÓD: drużynowe „poniżej", kurs 1,9+ (zarejestrowany 2026-08-01) ---
+#
+# PRE-REJESTRACJA LEŻY W REPO: docs/forward-test-druzynowe-ponizej.md.
+# Tam są kryteria, reguła stopu i to, czego do zamknięcia testu nie wolno
+# ruszać. Tutaj jest tylko licznik — celowo, żeby zmiana zasad wymagała
+# edycji dokumentu, a nie cichej poprawki w kodzie.
+#
+# Krótko, po co to jest: segment „poniżej / drużynowe / kurs ≥1,9" jako jedyny
+# w całym pomiarze 31.07 wyszedł na plus (n=24, ROI +48,8%, luka +16,7 pp).
+# Dwie rzeczy nie pozwalają zrobić z tego zasady: próba jest mała ORAZ jedna
+# warstwa modelu już się na niej uczyła (bin korekty `drużyny 0,00–0,55` to
+# dokładnie ten segment). Dlatego liczymy WYŁĄCZNIE rekordy ze stemplem
+# `wersje`, czyli opublikowane po 2026-08-01 — na tych model już się nie uczył.
+FORWARD_TEST_CEL_N = 40
+FORWARD_TEST_MIN_KURS = 1.90
+
+
+def forward_test(log: dict | None = None) -> dict:
+    """Licznik pre-zarejestrowanego testu w przód (patrz docs/ i komentarz).
+
+    Zwraca kształt gotowy dla zakładki „Czy się uczymy": ile już mamy, ile
+    trzeba, trafienia vs deklaracja i ROI po podatku. `gotowy=False` znaczy
+    „za wcześnie na wnioski" — i tak ma być raportowane na stronie.
+    """
+    if log is None:
+        log = _migruj_log(supa.get_key("typy_log") or {})
+    grp = [
+        r for r in log.values()
+        if r.get("wynik") in ("wygrany", "przegrany")
+        and not r.get("sugestia") and not r.get("odrzucony")
+        and not r.get("poza_publikacja")
+        and r.get("wersje")                      # tylko epoka po pre-rejestracji
+        and _strumien(r) == "druzyny"
+        and r.get("strona") == "ponizej"
+        and float(r.get("kurs") or 0.0) >= FORWARD_TEST_MIN_KURS
+        and r.get("p_model")
+        and betting.w_oknie_zgody(
+            float(r["p_model"]), float(r.get("kurs") or 0.0)
+        )
+    ]
+    n = len(grp)
+    if not n:
+        return {"n": 0, "cel": FORWARD_TEST_CEL_N, "gotowy": False,
+                "dokument": "docs/forward-test-druzynowe-ponizej.md"}
+    trafione = sum(1 for r in grp if r["wynik"] == "wygrany")
+    deklaracja = sum(float(r["p_model"]) for r in grp) / n
+    zwrot = sum(_zwrot_typu(r) for r in grp)
+    return {
+        "n": n,
+        "cel": FORWARD_TEST_CEL_N,
+        "gotowy": n >= FORWARD_TEST_CEL_N,
+        "trafione": trafione,
+        "hit": round(trafione / n, 4),
+        "deklaracja": round(deklaracja, 4),
+        "luka_pp": round((trafione / n - deklaracja) * 100.0, 1),
+        "roi": round(zwrot / n - 1.0, 4),
+        "bilans_j": round(zwrot - n, 2),
+        "dokument": "docs/forward-test-druzynowe-ponizej.md",
+    }
+
+
 def _biny_korekty(grp: list[dict], globalna: float, cap: tuple) -> list:
     """Delty per przedział szansy, ściągane do globalnej przy małej próbie.
 
@@ -3031,6 +3092,11 @@ def rozlicz(
         # postęp modelu w paczkach po 40 rozliczeń (deklaracja vs trafienia
         # vs ROI) — user ma to widzieć sam, bez pytania mnie
         "raport_uczenia": uczenie,
+        # TEST W PRZÓD (pre-rejestracja w docs/forward-test-druzynowe-ponizej.md)
+        # — jedyny zyskowny segment pomiaru 31.07, liczony od nowa na epoce,
+        # na której model się jeszcze nie uczył. Do 40 rozliczeń CZYTAMY, ale
+        # nie wyciągamy wniosków.
+        "forward_test": forward_test(log),
         # mundial vs ligi per rynek — czy sezon klubowy zmienił obraz
         # (patrz `epoki_per_rynek`: na 27.07 NIE zmienił, poza drużynowymi)
         "epoki_per_rynek": epoki_per_rynek(log),
