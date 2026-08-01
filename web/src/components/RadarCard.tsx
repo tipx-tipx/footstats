@@ -210,6 +210,7 @@ function DrabinkaPasek({ w }: { w: RadarWpis }) {
         {/* KOMÓRKI STAŁEJ SZEROKOŚCI, nie rozciągane na całą kartę: przy
             dwóch szczeblach `1fr` robił dwa ogromne pudła i pół karty pustki.
             Drabinka ma się czytać jak cennik – wąskie kolumny obok siebie. */}
+        <span className="flex flex-wrap items-start gap-x-6 gap-y-2 sm:flex-nowrap">
         <span className="flex flex-wrap gap-1">
           {widoczne.map((s) => {
             const wybrany = s.linia === hero.linia;
@@ -247,26 +248,33 @@ function DrabinkaPasek({ w }: { w: RadarWpis }) {
         </span>
 
         {ostatnie.length > 0 && (
-          <span className="mt-2 flex items-center gap-2">
-            {/* najnowszy mecz jest pierwszy w danych – odwracamy, żeby czas
-                płynął od lewej do prawej, jak każdy wykres */}
+          <span className="flex min-w-0 flex-col gap-0.5">
+            {/* SKALA CZASU (2026-08-01): dziesięć kresek bez podpisu nie
+                mówiło, czy pierwszy słupek to mecz sprzed tygodnia, czy sprzed
+                trzech miesięcy. Dane mają najnowszy mecz pierwszy, więc
+                odwracamy: czas płynie od lewej do prawej, jak na wykresie. */}
             <span className="flex gap-[3px]" aria-hidden>
               {[...ostatnie].reverse().map((x, i) => (
                 <span
                   key={i}
-                  title={`${x} w tym meczu`}
                   className={`h-3.5 w-1.5 rounded-[2px] ${
                     x > hero.linia ? "bg-brand" : "bg-faint/30"
                   }`}
                 />
               ))}
             </span>
-            <span className="text-[11px] text-faint">
-              {przebite} z {ostatnie.length} ostatnich meczów przebiło{" "}
-              {linLabel(hero.linia)}
+            {/* JEDNA LINIJKA ZAMIAST DWÓCH PODPISÓW: pasek ma ~90 px, więc
+                „10 meczów temu" i „ostatni" na obu końcach sklejały się
+                w jedno słowo. Kierunek czasu mówimy słowem, nie układem. */}
+            <span className="mt-0.5 text-[11px] leading-tight text-faint">
+              {przebite} z {ostatnie.length} przebiło {linLabel(hero.linia)}
+              <span className="block text-[9px] uppercase tracking-wide">
+                najnowszy mecz z prawej
+              </span>
             </span>
           </span>
         )}
+        </span>
       </span>
     </span>
   );
