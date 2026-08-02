@@ -707,6 +707,16 @@ export interface TypRozliczony {
   poza_publikacja?: string | null;
   /** tylko karty drabinek: klasa zamrożona przy publikacji (top/mocny/solidny) */
   klasa?: string | null;
+  /**
+   * NA KTÓRYM EKRANIE typ stał – stempel z chwili publikacji, nie zgadywanie
+   * po kodzie rynku (patrz `betting.ekran_typu` w pipelinie). `poza_lista`
+   * = typ zawodniczy bez znacznika „wysoka szansa": policzony i rozliczany,
+   * ale od 2026-08-01 żadna zakładka go nie listuje.
+   */
+  ekran?: Ekran | null;
+  /** stempel ODTWORZONY wstecz dla rekordu sprzed wdrożenia – dzień z takimi
+   *  typami ma się do rekonstrukcji przyznać, a nie udawać pewność */
+  ekran_odtworzony?: boolean | null;
 }
 
 /** Kupon w historii: zamrożony przy publikacji, rozliczany z legów. */
@@ -759,6 +769,18 @@ export interface SkutecznoscDnia {
 
 /** Strumień skuteczności – patrz rozliczanie._strumien. */
 export type Strumien = "pewniaki" | "druzyny" | "drabinki";
+
+/**
+ * Ekran, na którym typ się pokazał. Trzy pierwsze to zakładki, które user
+ * ogląda; `poza_lista` to typ opublikowany, którego żadna z nich nie listuje.
+ * Strumień (wyżej) dzieli PRODUKTY do uczenia, ekran dzieli WIDOKI – dlatego
+ * `wysokie_szanse` i `poza_lista` to jeden strumień, a dwa różne ekrany.
+ */
+export type Ekran =
+  | "wysokie_szanse"
+  | "druzyny"
+  | "drabinki"
+  | "poza_lista";
 
 /** Skuteczność jednego strumienia: dni + własne podsumowanie. */
 export interface SkutecznoscStrumienia {

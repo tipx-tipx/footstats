@@ -188,6 +188,55 @@ RODZINY_RYNKOW = {
 PRZEDROSTKI_DRUZYNOWE = ("team_", "match_", "wiecej_")
 
 
+# --- NA KTÓRYM EKRANIE TYP BYŁ POKAZANY (2026-08-02) ---
+#
+# Księga zapisywała, CZY typ poszedł na stronę (`poza_publikacja`), ale nigdy
+# GDZIE. Skuteczność musiała więc zgadywać po kodzie rynku — i zgadywała źle:
+# `match_corners` nie zaczyna się od `team_`, więc rożne całych meczów lądowały
+# w zakładce „Zawodnicy" (zgłoszenie usera 2026-08-02: „są jakieś typy
+# z niedzieli, mimo że nic nie pokazywało").
+#
+# Stempel zdejmuje zgadywanie: ekran zapisuje ten sam kod, który decyduje,
+# dokąd typ trafia. Zakładka Skuteczności pokazuje wtedy DOKŁADNIE to, co user
+# widział, a nie rekonstrukcję.
+#
+# CZTERY WARTOŚCI, BO TYLE JEST NAPRAWDĘ — a czwarta jest tu najważniejsza:
+#   wysokie_szanse — lista na stronie głównej (typ zawodniczy z `pewniak`),
+#   druzyny        — zakładka Drużyny,
+#   drabinki       — karta w Drabinkach (typ „hero" z radaru),
+#   poza_lista     — typ ZAWODNICZY bez `pewniak`. Policzony, opublikowany,
+#                    rozliczany… i niewidoczny: od 2026-08-01 nie ma zakładki,
+#                    która by go listowała („Wszystko" i „Okazje" zniknęły),
+#                    więc trafia najwyżej do paska u góry strony głównej.
+#                    Bez tej wartości Skuteczność liczyłaby go do wyniku
+#                    ekranu, na którym go nie było.
+#
+# UWAGA NA EPOKĘ UI przy stemplach ODTWORZONYCH wstecz. „poza_lista" opisuje
+# dzisiejszy układ strony. Typy opublikowane PRZED 2026-08-01 stały na wspólnej
+# liście, której dziś nie ma — czyli były widoczne, choć reguła nazywa je tak
+# samo. Dlatego rekonstrukcja zostawia `ekran_odtworzony`, a UI ma przy takich
+# dniach powiedzieć wprost, że podział jest odtworzony. Nie próbujemy zgadywać
+# epoki po dacie: układ strony zmieniał się częściej niż raz i pierwsza taka
+# heurystyka byłaby fałszywą precyzją.
+EKRANY = ("wysokie_szanse", "druzyny", "drabinki", "poza_lista")
+
+
+def ekran_typu(b: dict) -> str:
+    """Ekran, na którym typ się pokazał — po rekordzie, bez zgadywania.
+
+    Czyta zarówno świeży rekord (ma `podmiot_typ`), jak i wpis z księgi
+    (ma tylko `rynek_kod`), żeby ten sam kod dał się użyć do stemplowania
+    nowych typów i do odtworzenia stempla dla historii.
+    """
+    if b.get("zrodlo"):
+        return "drabinki"
+    if b.get("podmiot_typ") == "druzyna" or str(
+        b.get("rynek_kod") or ""
+    ).startswith(PRZEDROSTKI_DRUZYNOWE):
+        return "druzyny"
+    return "wysokie_szanse" if b.get("pewniak") else "poza_lista"
+
+
 # --- WERSJONOWANIE POLITYKI (2026-08-01) ---
 #
 # Problem, który to rozwiązuje, nazywa się „selection-induced miscalibration",

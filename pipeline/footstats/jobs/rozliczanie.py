@@ -197,6 +197,16 @@ def _strumien(r: dict) -> str:
     `betting.PRZEDROSTKI_DRUZYNOWE`; do 2026-08-01 to miejsce znało tylko
     `team_`, a kupony znały wszystkie trzy.
     """
+    ekran = r.get("ekran")
+    if ekran:
+        # stempel z chwili publikacji ma pierwszeństwo przed zgadywaniem
+        # (patrz betting.ekran_typu). „poza_lista" to nadal typ ZAWODNICZY —
+        # strumień uczenia dzieli produkty, nie ekrany, więc oba warianty
+        # zawodnicze zostają jednym strumieniem i korekta liczy się z tej
+        # samej próby co dotąd.
+        return {"drabinki": "drabinki", "druzyny": "druzyny"}.get(
+            ekran, "pewniaki"
+        )
     if r.get("zrodlo") == ZRODLO_DRABINKA:
         return "drabinki"
     if str(r.get("rynek_kod") or "").startswith(betting.PRZEDROSTKI_DRUZYNOWE):
@@ -291,6 +301,28 @@ def _delta_stempla(b: dict) -> float:
     return round(betting.delta_dla_p(_KOREKTA_CYKLU.get(_strumien(b)), p_over), 4)
 
 
+def _uzupelnij_ekrany(log: dict) -> int:
+    """Dopisz `ekran` rekordom sprzed wprowadzenia stempla (2026-08-02).
+
+    Nie przepisujemy historii — rekonstruujemy pole, którego wtedy nie było,
+    z danych, które w rekordzie SĄ (`zrodlo`, `rynek_kod`, `pewniak`), i od
+    razu oznaczamy je jako odtworzone. Dzięki temu dzień sprzed wdrożenia może
+    powiedzieć „podział odtworzony wstecz" zamiast udawać pewność: gdyby reguła
+    przypisania kiedyś się zmieniła, po tej fladze widać, których rekordów
+    dotyczyła rekonstrukcja, a nie zapis w chwili publikacji.
+
+    Idempotentne — rekord ze stemplem zostaje nietknięty, także rozliczony.
+    """
+    n = 0
+    for rec in log.values():
+        if rec.get("ekran"):
+            continue
+        rec["ekran"] = betting.ekran_typu(rec)
+        rec["ekran_odtworzony"] = True
+        n += 1
+    return n
+
+
 def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
     for b in value_bets:
         k = _klucz(b)
@@ -343,6 +375,11 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
             "kurs_ref": b.get("kurs_ref"),
             "p_model": b["p_model"], "pewnosc": b.get("pewnosc"),
             "sugestia": bool(b.get("sugestia")),
+            # EKRAN, NA KTÓRYM TYP SIĘ POKAZAŁ — zapisany w chwili publikacji,
+            # nie zgadywany później po kodzie rynku (patrz betting.ekran_typu).
+            # Bez tego Skuteczność wrzucała rożne całych meczów do zakładki
+            # „Zawodnicy", bo `match_corners` nie zaczyna się od `team_`.
+            "ekran": betting.ekran_typu(b),
             # historia predykcji typów DRUŻYNOWYCH — patrz kalibracja_tau.py
             **({"kal_tau": b["kal_tau"]} if b.get("kal_tau") else {}),
             # KOREKTA STRUMIENIA użyta przy publikacji — bez tego stempla
@@ -2731,6 +2768,12 @@ def _typ_dnia(r: dict) -> dict:
         # typ poza publikacją (kwarantanna/limit meczu) — w liście dnia
         # widoczny z oznaczeniem, ale poza licznikami skuteczności
         "poza_publikacja": r.get("poza_publikacja"),
+        # EKRAN i czy stempel jest odtworzony — Skuteczność pokazuje dzięki
+        # temu dokładnie to, co stało na danej zakładce, zamiast zgadywać
+        # po kodzie rynku; `ekran_odtworzony` jest po to, żeby dzień sprzed
+        # wdrożenia mógł się do rekonstrukcji przyznać
+        "ekran": r.get("ekran"),
+        "ekran_odtworzony": r.get("ekran_odtworzony"),
     }
 
 
@@ -3153,6 +3196,7 @@ def rozlicz(
             "żeby nie nadpisać historii"
         )
     log = _migruj_log(log_raw or {})
+    _uzupelnij_ekrany(log)
     _dopisz_nowe(log, value_bets)
     _dopisz_nowe(log, drabinki or [])
     # legi kuponów też muszą być w logu (pewniaki spoza publikowanych typów)

@@ -43,10 +43,14 @@ export const POZA_LABEL: Record<string, string> = {
 export function TabelaTypow({
   typy,
   pelnyWglad = true,
+  poziom,
 }: {
   typy: TypRozliczony[];
   /** false = widok klienta: bez kolumny „było" i oznaczeń „na próbę" */
   pelnyWglad?: boolean;
+  /** 1 = stał na tej zakładce, 2 = na innej, 3 = nigdy nie był na stronie
+   *  (patrz `poziomTypu` w TypyDnia – kolor mówi „czy to widziałeś") */
+  poziom?: (t: TypRozliczony) => 1 | 2 | 3;
 }) {
   return (
     <div>
@@ -78,6 +82,7 @@ export function TabelaTypow({
               key={`${t.podmiot}-${t.rynek_kod}-${t.linia}-${i}`}
               t={t}
               pelnyWglad={pelnyWglad}
+              poziom={poziom?.(t) ?? 1}
             />
           ))}
         </tbody>
@@ -89,25 +94,46 @@ export function TabelaTypow({
 function WierszTypu({
   t,
   pelnyWglad,
+  poziom = 1,
 }: {
   t: TypRozliczony;
   pelnyWglad: boolean;
+  poziom?: 1 | 2 | 3;
 }) {
   const wygral = t.wynik === "wygrany";
   const przegral = t.wynik === "przegrany";
+  // KOLOR MÓWI „CZY TO WIDZIAŁEŚ", nie „czy weszło" – od tego jest kolumna
+  // wyniku. Poziom 2 (był na stronie, ale na innej zakładce) blednie, poziom 3
+  // (nigdy nie był na stronie) traci kolor kropki i dostaje kreskowaną krawędź,
+  // żeby nie dało się go pomylić z wynikiem produktu.
+  const przygaszony = poziom > 1;
   return (
     <tr
-      className={`border-t border-hairline align-top transition-colors hover:bg-brand-wash/30 ${
-        t.poza_publikacja ? "opacity-60" : ""
-      }`}
+      className={`align-top transition-colors hover:bg-brand-wash/30 ${
+        poziom === 3
+          ? "border-t border-dashed border-hairline-strong/70 opacity-55"
+          : "border-t border-hairline"
+      } ${poziom === 2 ? "opacity-70" : ""}`}
     >
       <td className="py-2">
-        <span
-          aria-hidden
-          className={`mt-1.5 block h-2 w-2 rounded-full ${
-            wygral ? "bg-data-green" : przegral ? "bg-data-red" : "bg-data-amber"
-          }`}
-        />
+        {poziom === 3 ? (
+          // brak koloru wyniku – ten typ nie był ofertą, tylko pomiarem
+          <span
+            aria-hidden
+            className="mt-1.5 block h-2 w-2 rounded-full border border-dashed border-hairline-strong"
+          />
+        ) : (
+          <span
+            aria-hidden
+            className={`mt-1.5 block h-2 w-2 rounded-full ${
+              wygral
+                ? przygaszony ? "bg-data-green/45" : "bg-data-green"
+                : przegral
+                  ? przygaszony ? "bg-data-red/45" : "bg-data-red"
+                  : "bg-data-amber"
+            }`}
+          />
+        )}
       </td>
       <td className="py-2 pr-3">
         <span className="block truncate font-medium">{nazwaPodmiotu(t)}</span>
@@ -146,6 +172,14 @@ function WierszTypu({
             na próbę
           </span>
         )}
+        {poziom === 2 && (
+          <span
+            className="block text-[10px] uppercase tracking-wide text-faint"
+            title="Był na stronie, ale nie na tej zakładce – nie liczymy go do wyniku powyżej"
+          >
+            inna zakładka
+          </span>
+        )}
       </td>
       <td
         className="font-data py-2 pr-3 text-right tabular-nums text-ink-soft"
@@ -164,9 +198,9 @@ function WierszTypu({
       <td
         className={`py-2 text-right text-xs font-semibold whitespace-nowrap ${
           wygral
-            ? "text-data-green"
+            ? przygaszony ? "text-data-green/60" : "text-data-green"
             : przegral
-              ? "text-data-red"
+              ? przygaszony ? "text-data-red/60" : "text-data-red"
               : "text-data-amber-ink"
         }`}
       >

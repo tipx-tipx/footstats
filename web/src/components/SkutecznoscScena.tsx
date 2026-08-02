@@ -95,17 +95,39 @@ type IdZakladki = (typeof ZAKLADKI)[number]["id"];
 const N_ISTOTNE = 10;
 
 /**
+ * Rynki DRUŻYNOWE mają trzy przedrostki, nie jeden.
+ *
+ * `match_` (suma meczowa) i `wiecej_` („kto więcej") doszły 2026-07-30. Ta
+ * strona sprawdzała wyłącznie `team_`, więc rożne CAŁYCH MECZÓW liczyły się
+ * jako typy zawodnicze – stąd zgłoszenie usera 2026-08-02 („w Skuteczności
+ * są jakieś typy z niedzieli, mimo że nic nie pokazywało"). Backend ma tę
+ * listę od 2026-08-01 (`betting.PRZEDROSTKI_DRUZYNOWE`); tu jej brakowało.
+ */
+export const PRZEDROSTKI_DRUZYNOWE = ["team_", "match_", "wiecej_"];
+
+const czyDruzynowy = (kod: string) =>
+  PRZEDROSTKI_DRUZYNOWE.some((p) => kod.startsWith(p));
+
+/**
  * Do którego produktu należy typ – awaryjnie, po samym rekordzie.
  *
  * Backend liczy ten podział sam (`skutecznosc_strumienie`), ale dane sprzed
  * jego wdrożenia go nie mają i wtedy filtr produktu w ogóle nie pojawiał się
  * na stronie – user nie miał jak zobaczyć, co weszło z drużyn, a co
- * z drabinek. `klasa` (top/mocny/solidny) występuje wyłącznie na kartach
- * Drabinek, a rynki drużynowe mają kod z przedrostkiem `team_`.
+ * z drabinek.
+ *
+ * Kolejność źródeł jest istotna: najpierw STEMPEL z chwili publikacji
+ * (`ekran`), bo tylko on wie, gdzie typ naprawdę stał; dopiero potem
+ * rekonstrukcja z pól, które rekord niesie.
  */
 function strumienTypu(t: TypRozliczony): Strumien {
+  if (t.ekran) {
+    return t.ekran === "drabinki" || t.ekran === "druzyny"
+      ? t.ekran
+      : "pewniaki";
+  }
   if (t.klasa) return "drabinki";
-  return t.rynek_kod.startsWith("team_") ? "druzyny" : "pewniaki";
+  return czyDruzynowy(t.rynek_kod) ? "druzyny" : "pewniaki";
 }
 
 /** Awaryjne rozbicie dni na produkty, gdy backend go jeszcze nie przysłał. */
@@ -286,9 +308,9 @@ export function SkutecznoscScena({
     // deklaracja: średnia ważona z rynków należących do tego produktu
     const rynki = typy.po_rynku.filter((r) =>
       wybor === "druzyny"
-        ? r.rynek_kod.startsWith("team_")
+        ? czyDruzynowy(r.rynek_kod)
         : wybor === "pewniaki"
-          ? !r.rynek_kod.startsWith("team_")
+          ? !czyDruzynowy(r.rynek_kod)
           : true,
     );
     const nDekl = rynki.reduce((a, r) => a + r.n, 0);
@@ -336,9 +358,9 @@ export function SkutecznoscScena({
     return [...typy.po_rynku]
       .filter((r) =>
         wybor === "druzyny"
-          ? r.rynek_kod.startsWith("team_")
+          ? czyDruzynowy(r.rynek_kod)
           : wybor === "pewniaki"
-            ? !r.rynek_kod.startsWith("team_")
+            ? !czyDruzynowy(r.rynek_kod)
             : true,
       )
       .sort((a, b) => {
@@ -453,6 +475,9 @@ export function SkutecznoscScena({
             <TypyDnia
               dzien={wybranyDzien}
               pelnyWglad={pelnyWglad}
+              // wybrany produkt decyduje, który ekran jest „poziomem 1" –
+              // reszta schodzi pod przycisk i traci kolor (patrz poziomTypu)
+              wybor={wybor}
               // strzałki chodzą po TEJ SAMEJ liście co kafelki, a kalendarz
               // przewija się za wyborem (patrz KalendarzWynikow) – więc to
               // nadal jedna oś czasu, tylko dostępna bez celowania w siatkę

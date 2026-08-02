@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { TabelaTypow } from "./WierszTypu";
 import { useBilans } from "../useBilans";
 import { fmtDzien, odmien } from "@/lib/format";
-import type { SkutecznoscDnia } from "@/lib/types";
+import type { Ekran, SkutecznoscDnia, TypRozliczony } from "@/lib/types";
 
 /**
  * Panel JEDNEGO DNIA – pod kalendarzem, zawsze otwarty na którymś dniu.
@@ -22,6 +22,44 @@ import type { SkutecznoscDnia } from "@/lib/types";
  */
 
 type Filtr = "wszystko" | "weszly" | "nie";
+
+/**
+ * TRZY POZIOMY WIDOCZNOŚCI (decyzja usera 2026-08-02: „niech się wyświetla
+ * dokładnie to, co jest pokazywane w wysoka szansa/drużyny/drabinki; co jest
+ * dodatkowo, to nie tym samym kolorem").
+ *
+ * Kolor przestaje znaczyć „wygrał czy przegrał" – to mówi już kolumna wyniku –
+ * a zaczyna znaczyć CZY TO WIDZIAŁEŚ. Bo tylko to rozstrzyga, czy dana liczba
+ * jest oceną produktu, czy pomiarem w tle:
+ *
+ *   1 — stał na TEJ zakładce; to jest wynik, o który pytasz,
+ *   2 — był na stronie, ale gdzie indziej (np. typ zawodniczy bez znacznika
+ *       „wysoka szansa”, którego od 1 sierpnia nie listuje żadna zakładka),
+ *   3 — nigdy nie był na stronie: policzony „na próbę”, uczy model w tle.
+ *
+ * Rekord BEZ stempla (sprzed 2026-08-02) dostaje poziom 1 i osobny przypis –
+ * nie wiemy o nim, że stał gdzie indziej, więc nie wolno go za to karać.
+ */
+export type Poziom = 1 | 2 | 3;
+
+const EKRAN_STRUMIENIA: Record<string, Ekran> = {
+  pewniaki: "wysokie_szanse",
+  druzyny: "druzyny",
+  drabinki: "drabinki",
+};
+
+export function poziomTypu(t: TypRozliczony, wybor: string): Poziom {
+  if (t.poza_publikacja) return 3;
+  if (!t.ekran) return 1;
+  if (wybor === "wszystko") return t.ekran === "poza_lista" ? 2 : 1;
+  return t.ekran === EKRAN_STRUMIENIA[wybor] ? 1 : 2;
+}
+
+/** Czemu ten wiersz jest przygaszony – jedno zdanie, bez żargonu. */
+const OPIS_POZIOMU_2 =
+  "Ten typ był policzony i rozliczony, ale nie stał na tej zakładce – " +
+  "typy zawodnicze bez znacznika „wysoka szansa” nie mają od 1 sierpnia " +
+  "własnej listy. Nie liczymy ich do wyniku powyżej.";
 
 const FILTRY: { kod: Filtr; label: string }[] = [
   { kod: "wszystko", label: "Wszystkie" },
@@ -95,10 +133,13 @@ export function TypyDnia({
   pozycja,
   ile,
   pelnyWglad = true,
+  wybor = "wszystko",
 }: {
   dzien: SkutecznoscDnia;
   /** false = widok klienta: bez typów liczonych „na próbę" */
   pelnyWglad?: boolean;
+  /** wybrany produkt z góry strony – decyduje, który ekran jest poziomem 1 */
+  wybor?: string;
   /** krok do dnia WCZEŚNIEJSZEGO; brak = to najstarszy dzień */
   starszy?: () => void;
   /** krok do dnia PÓŹNIEJSZEGO; brak = to najnowszy dzień */
@@ -114,12 +155,27 @@ export function TypyDnia({
   const [pokazNaProbe, setPokazNaProbe] = useState(false);
   // `?? []` w ciele komponentu tworzyłoby nową tablicę co render i unieważniało
   // useMemo niżej przy każdym przerysowaniu
+  // typy z INNEJ zakładki (poziom 2) też schodzą pod przycisk – inaczej lista
+  // „Wysokich szans" pokazywałaby typy, których na tej zakładce nie było
+  const [pokazInne, setPokazInne] = useState(false);
   const typy = useMemo(
     () =>
-      (dzien.typy ?? []).filter(
-        (t) => !t.poza_publikacja || (pelnyWglad && pokazNaProbe),
-      ),
-    [dzien.typy, pelnyWglad, pokazNaProbe],
+      (dzien.typy ?? []).filter((t) => {
+        const p = poziomTypu(t, wybor);
+        if (p === 3) return pelnyWglad && pokazNaProbe;
+        if (p === 2) return pokazInne;
+        return true;
+      }),
+    [dzien.typy, pelnyWglad, pokazNaProbe, pokazInne, wybor],
+  );
+  // ile jest poziomu 2 (niezależnie od tego, czy rozwinięte)
+  const innaZakladka = useMemo(
+    () => (dzien.typy ?? []).filter((t) => poziomTypu(t, wybor) === 2),
+    [dzien.typy, wybor],
+  );
+  const bezStempla = useMemo(
+    () => (dzien.typy ?? []).some((t) => !t.ekran || t.ekran_odtworzony),
+    [dzien.typy],
   );
 
   const widoczne = useMemo(
@@ -189,6 +245,30 @@ export function TypyDnia({
         </div>
       </div>
 
+      {innaZakladka.length > 0 && (
+        <p className="mt-3 text-xs leading-relaxed text-faint">
+          Poza tym {innaZakladka.length}{" "}
+          {innaZakladka.length === 1 ? "typ był" : "typów było"} na stronie, ale{" "}
+          <strong className="font-semibold">nie na tej zakładce</strong> (weszło{" "}
+          {innaZakladka.filter((t) => t.wynik === "wygrany").length}).{" "}
+          <button
+            onClick={() => setPokazInne((v) => !v)}
+            aria-expanded={pokazInne}
+            title={OPIS_POZIOMU_2}
+            className="font-semibold text-brand underline underline-offset-2 hover:text-brand-deep"
+          >
+            {pokazInne ? "Ukryj je" : "Pokaż je na liście"}
+          </button>
+        </p>
+      )}
+
+      {pelnyWglad && bezStempla && (
+        <p className="mt-2 text-[11px] leading-relaxed text-faint">
+          Część typów z tego dnia jest sprzed wprowadzenia znacznika zakładki
+          (2 sierpnia) – przypisanie odtworzyliśmy wstecz z rodzaju rynku.
+        </p>
+      )}
+
       {pelnyWglad && (dzien.poza_n ?? 0) > 0 && (
         <p className="mt-3 text-xs leading-relaxed text-faint">
           Poza tym {dzien.poza_n}{" "}
@@ -244,7 +324,11 @@ export function TypyDnia({
 
       {widoczne.length > 0 ? (
         <div className="mt-3">
-          <TabelaTypow typy={widoczne} pelnyWglad={pelnyWglad} />
+          <TabelaTypow
+            typy={widoczne}
+            pelnyWglad={pelnyWglad}
+            poziom={(t) => poziomTypu(t, wybor)}
+          />
         </div>
       ) : (
         <p className="mt-3 rounded-(--radius-control) border border-hairline bg-card-soft px-3.5 py-3 text-sm text-muted">
