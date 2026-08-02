@@ -74,3 +74,46 @@ def test_pusta_nazwa_i_pusta_mapa():
     assert scores365.dopasuj_druzyne(MAPA, "") is None
     assert scores365.dopasuj_druzyne(MAPA, "fc") is None   # same skróty typu
     assert scores365.dopasuj_druzyne({}, "anderlecht") is None
+
+
+# --- IDENTYFIKACJA MECZU (2026-08-02) ---------------------------------------
+#
+# Rozliczanie szukało meczu porównując nazwy jak NAPISY. Zmierzone skutki:
+# 115 typów zamkniętych jako „brak danych źródła" i 45 wiszących w pięciu
+# meczach jednego weekendu — przy komplecie statystyk gotowym u źródła.
+
+
+def test_ta_sama_druzyna_wybacza_zapis_nie_tozsamosc():
+    """Cztery różnice, które gubiły całe mecze — każda potwierdzona na żywo."""
+    T = scores365.ta_sama_druzyna
+    assert T("bodo/glimt", "bodo glimt")           # ukośnik jako separator
+    assert T("lillestrom sk", "lillestrom")        # skrót typu klubu
+    assert T("sandefjord fotball", "sandefjord")   # dopisek w nazwie
+    assert T("aalesunds fk", "aalesund")           # skandynawska końcówka
+    assert T("agf", "aarhus")                      # alias z ręcznej listy
+    assert T("ik start", "start") and T("tromso il", "tromso")
+
+
+def test_ta_sama_druzyna_nie_sklei_sasiadow():
+    """SEDNO: przy szukaniu meczu wśród setek pomyłka jest nieodwracalna.
+
+    Te pary mają wspólne słowo albo wspólny prefiks, więc „najwięcej wspólnych
+    słów" (reguła `resolve_team_key`) wskazałaby je jako tę samą drużynę.
+    Tutaj wymagamy równości albo zawierania się zbiorów — i one odpadają.
+    """
+    T = scores365.ta_sama_druzyna
+    assert not T("deportivo riestra", "deportivo recoleta")
+    assert not T("riga fc", "rigas fs")            # rdzeń tnie dopiero od 6 liter
+    assert not T("estudiantes de la plata", "estudiantes de rio cuarto")
+    assert not T("gimnasia y esgrima", "gimnasia mendoza")
+    assert not T("", "lillestrom") and not T("fc", "fc koln")
+
+
+def test_resolve_team_key_domyka_te_same_przypadki():
+    """Ten sam zestaw różnic, ale przy wskazywaniu drużyny W ZNANYM meczu."""
+    R = scores365.resolve_team_key
+    assert R({"bodo glimt", "lillestrom"}, "bodo/glimt") == "bodo glimt"
+    assert R({"bodo glimt", "lillestrom"}, "lillestrom sk") == "lillestrom"
+    assert R({"aalesund", "tromso"}, "aalesunds fk") == "aalesund"
+    assert R({"lyngby", "aarhus"}, "agf") == "aarhus"
+    assert R({"start", "viking"}, "ik start") == "start"

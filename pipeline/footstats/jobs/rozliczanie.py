@@ -149,6 +149,11 @@ TERMIN_BRAK_DANYCH_S = 7 * 24 * 3600
 # rozliczania. Pytamy o maks. 60 meczów posortowanych po id, więc szersze okno
 # wpychałoby tam stare, nierozwiązywalne mecze kosztem świeżych.
 OKNO_DOLEWKI_TRENDOW_S = 48 * 3600
+# Ile czekamy, zanim uznamy, że 365Scores POWINNO już mieć mecz w wynikach.
+# Poniżej tego progu brak meczu u źródła jest normalny (statystyki dochodzą
+# przez kilkadziesiąt minut po gwizdku) i nie uruchamiamy drogiego szukania
+# po drużynie — patrz `_gid_365_z_druzyny`.
+OKNO_SWIEZOSCI_365_S = 3 * 3600
 
 
 # --- STRUMIENIE TYPÓW W LOGU ---
@@ -431,6 +436,64 @@ def _kopia_zapasowa_logu(log: dict, now: int) -> None:
         print(f"Kopia zapasowa księgi typów: {len(log)} wpisów")
 
 
+def _gid_365_z_druzyny(rec: dict, teams: list[str], cache: dict) -> int | None:
+    """Zapas dla `_gid_365`: mecz szukany po DRUŻYNIE, nie po rozgrywkach.
+
+    `/games/results?competitions=` oddaje wyłącznie ostatnią kolejkę, więc
+    mecz sprzed dwóch kolejek znika z puli i typ czeka na dane, których już
+    nikt nie znajdzie. `/games/results?competitors=` jako jedyny sięga w głąb
+    sezonu (patrz `scores365.recent_finished_games_z_rozgrywkami`).
+
+    BEZPIECZEŃSTWO. Nie zgadujemy tu nazw meczu: bierzemy competitorId naszej
+    drużyny przez `dopasuj_druzyne` (zbiory słów, wyłącznie dopasowanie
+    jednoznaczne), a potem pytamy o mecze TEJ drużyny. Cokolwiek wróci w oknie
+    ±3 h wokół naszego gwizdka, jest meczem tej drużyny o tej porze — jedna
+    drużyna nie gra dwóch meczów naraz.
+
+    DWA BEZPIECZNIKI KOSZTU, bo mapa nazw to ~34 zapytania, a nieudane `_get`
+    śpi 2 s i 4 s przed poddaniem się (czyli przy padniętym źródle ta jedna
+    linijka potrafi kosztować przebieg trzy minuty):
+
+      * tylko RYNKI DRUŻYNOWE — typ zawodniczy z ligi spoza zakresu (MLS,
+        Meksyk, Szkocja) rozlicza się z trendów statshub i gid nie jest mu
+        do niczego potrzebny; bez tego warunku te typy ciągnęłyby budowę mapy
+        w KAŻDYM przebiegu co 20 minut, do skutku, którego nigdy nie będzie,
+      * tylko mecze starsze niż `OKNO_SWIEZOSCI_365_S` — świeżo zakończonego
+        meczu źródło jeszcze nie opublikowało i to normalne, nie awaria.
+    """
+    if not str(rec.get("rynek_kod") or "").startswith(
+        betting.PRZEDROSTKI_DRUZYNOWE
+    ):
+        return None
+    if int(time.time()) - int(rec.get("kickoff_ts") or 0) < OKNO_SWIEZOSCI_365_S:
+        return None
+    if "_mapa_druzyn" not in cache:
+        try:
+            cache["_mapa_druzyn"] = scores365.competitor_ids_z_rozgrywek(
+                rozgrywki.comp365_druzynowe()
+            )
+        except Exception:
+            cache["_mapa_druzyn"] = {}
+    mapa = cache["_mapa_druzyn"]
+    if not mapa:
+        return None
+    for nazwa in teams:
+        cid = scores365.dopasuj_druzyne(mapa, nazwa)
+        if not cid:
+            continue
+        if cid not in cache.setdefault("_mecze_druzyny", {}):
+            try:
+                cache["_mecze_druzyny"][cid] = (
+                    scores365.recent_finished_games_z_rozgrywkami(cid, n=12)
+                )
+            except Exception:
+                cache["_mecze_druzyny"][cid] = []
+        for gid_k, ts_k, _comp in cache["_mecze_druzyny"][cid]:
+            if abs(ts_k - rec["kickoff_ts"]) < 3 * 3600:
+                return gid_k
+    return None
+
+
 def _gid_365(rec: dict, cache: dict) -> int | None:
     """Znajdź id zakończonego meczu w 365Scores (cache per mecz).
 
@@ -438,8 +501,27 @@ def _gid_365(rec: dict, cache: dict) -> int | None:
     plus MŚ (stare typy w logu). Mecze spoza tych rozgrywek (globalne propsy)
     nie mają gid — rozliczają się z banku/feedu trendów statshub.
     Endpoint /games/results per rozgrywki — /games/current ignoruje filtr
-    dat i nie zawiera wczorajszych meczów. Dopasowanie po znormalizowanych
-    nazwach drużyn; awaryjnie po kickoffie + jednej nazwie.
+    dat i nie zawiera wczorajszych meczów.
+
+    DWA ŹRÓDŁA MECZU, TRZY STOPNIE DOPASOWANIA (przebudowa 2026-08-02).
+    Poprzednia wersja porównywała nazwy jak NAPISY (`{home, away} == {...}`)
+    i przez to nie znajdowała meczów, których statystyki leżały u źródła
+    gotowe: 45 typów w pięciu meczach jednego weekendu, wcześniej 115 typów
+    zamkniętych jako „brak danych źródła". Nazwy różniły się o sufiks („FK"),
+    o ukośnik („Bodø/Glimt" vs „Bodo Glimt”) albo o jedną literę („Aalesunds”
+    vs „Aalesund”).
+
+      1. napis w napis — najtańsze, zostaje jako pierwsze podejście,
+      2. `scores365.ta_sama_druzyna` w oknie ±3 h wokół gwizdka, OBIE strony
+         i wymóg JEDNOZNACZNOŚCI (dokładnie jeden mecz w oknie pasuje),
+      3. endpoint PER DRUŻYNA — jako jedyny sięga w głąb sezonu; ten per
+         rozgrywki oddaje wyłącznie ostatnią kolejkę, więc mecz sprzed dwóch
+         kolejek przestawał istnieć i typ czekał na dane, których nikt już
+         nie miał skąd wziąć.
+
+    Stopień 2 NIE używa `resolve_team_key` (max wspólnych słów): przy szukaniu
+    wśród setek meczów wskazałby „Deportivo Recoleta" dla „Deportivo Riestra".
+    Tamta reguła jest bezpieczna dopiero, gdy mecz jest już znany.
     """
     mid = rec["mecz_id"]
     if mid in cache:
@@ -465,12 +547,20 @@ def _gid_365(rec: dict, cache: dict) -> int | None:
         if {g["home"], g["away"]} == {home, away}:
             gid = g["id"]
             break
-        if (
-            abs(g["ts"] - rec["kickoff_ts"]) < 3 * 3600
-            and {g["home"], g["away"]} & {home, away}
-        ):
-            gid = g["id"]
-            break
+    if gid is None:
+        # jednoznaczność liczona na CAŁYM oknie, nie „pierwszy z brzegu":
+        # dwa mecze „Estudiantes" tego samego wieczoru mają się wykluczyć,
+        # a nie rozstrzygnąć kolejnością w liście
+        pasujace = {
+            g["id"] for g in cache["_wyniki"]
+            if abs(g["ts"] - rec["kickoff_ts"]) < 3 * 3600
+            and scores365.ta_sama_druzyna(g["home"], home)
+            and scores365.ta_sama_druzyna(g["away"], away)
+        }
+        if len(pasujace) == 1:
+            gid = next(iter(pasujace))
+    if gid is None:
+        gid = _gid_365_z_druzyny(rec, teams, cache)
     cache[mid] = gid
     return gid
 

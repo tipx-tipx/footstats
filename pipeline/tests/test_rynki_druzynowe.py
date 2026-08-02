@@ -91,6 +91,13 @@ def _przygotuj(monkeypatch, rec, aet=False, staty=None):
     monkeypatch.setattr(
         rozliczanie.scores365, "finished_games_by_competition", lambda *a: []
     )
+    # zapas „szukaj po drużynie" — patrz bliźniacza zaślepka w teście multiligi
+    monkeypatch.setattr(
+        scores365, "competitor_ids_z_rozgrywek", lambda comp_ids: {}
+    )
+    monkeypatch.setattr(
+        scores365, "recent_finished_games_z_rozgrywkami", lambda cid, n=6: []
+    )
     # DOLEWKA TRENDÓW i fallbacki statshub — bez tych trzech zaślepek test
     # naprawdę wychodził do internetu (wykryte 2026-08-01 przez zaporę
     # sieciową w conftest.py; przedtem po prostu cicho odpytywał źródło)

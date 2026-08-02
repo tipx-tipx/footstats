@@ -413,6 +413,73 @@ _SZUM_NAZWY_KLUBU = frozenset({
     "sv", "vf", "vfb", "us", "as", "ss", "ssc", "cs", "rc", "sd",
 })
 
+# NAZWY, KTÓRYCH ŻADNA REGUŁA NIE POŁĄCZY — bo to po prostu inne słowa.
+# „AGF" to skrót od Aarhus Gymnastikforening; wspólnego tokenu nie ma i nigdy
+# nie będzie. Lista jest ostatnią deską ratunku i celowo krótka: każdy wpis
+# to ręczna decyzja, że dwie nazwy oznaczają ten sam klub. Zmierzone koszty
+# braku tej listy: 4 typy z „Lech Poznań – AGF" i 3 z „Lyngby – AGF"
+# zamknięte jako „brak danych źródła", choć statystyki meczu były u źródła.
+_ALIASY_KLUBU: dict[str, frozenset[str]] = {
+    "agf": frozenset({"aarhus"}),
+    "aarhus": frozenset({"agf"}),
+}
+
+
+def _tokeny_tozsamosci(nazwa: str) -> frozenset[str]:
+    """Słowa niosące tożsamość klubu — wspólna podstawa obu dopasowywaczy.
+
+    `_tokeny_druzyny` dzieli po ZNAKACH NIEALFANUMERYCZNYCH, więc rozumie
+    „Bodø/Glimt" jako dwa słowa; naiwne `.split()` widziało jedno („bodo/glimt")
+    i nie miało jak trafić w „bodo glimt" u źródła. To gubiło komplet typów
+    z każdego meczu tej drużyny (12 sztuk 31.07). Do tego odsiewamy szum nazw
+    klubowych — obie listy, bo jedna zna „fc", a druga „de" i „club".
+    """
+    return frozenset(_tokeny_druzyny(nazwa) - _SZUM_NAZWY_KLUBU)
+
+
+def _rdzen(token: str) -> str:
+    """Token bez skandynawskiej końcówki liczby mnogiej/określonej.
+
+    „Aalesunds FK" u nas, „Aalesund" u źródła — jedna litera różnicy kasowała
+    11 typów. Ucinamy wyłącznie końcowe „s" i tylko w słowach dostatecznie
+    długich, żeby nie skleić dwóch krótkich, różnych nazw.
+    """
+    return token[:-1] if len(token) > 5 and token.endswith("s") else token
+
+
+def ta_sama_druzyna(a: str, b: str) -> bool:
+    """Czy dwie nazwy z RÓŻNYCH źródeł oznaczają ten sam klub — ostro.
+
+    `resolve_team_key` liczy NAJWIĘCEJ wspólnych słów i to jest bezpieczne
+    tylko tam, gdzie kandydaci są dwaj: obie drużyny znanego już meczu. Do
+    SZUKANIA meczu wśród setek to za mało — „Deportivo Riestra" i „Deportivo
+    Recoleta" mają wspólne „deportivo", więc tamta reguła wskazałaby zupełnie
+    inny klub, cicho i bez śladu ([[parowanie-nazw-druzyn]]).
+
+    Tu obowiązuje reguła z `dopasuj_druzyne`: zbiory słów muszą być RÓWNE albo
+    jeden musi zawierać się w drugim. Wtedy:
+
+        lillestrom sk        == lillestrom          tak
+        bodo/glimt           == bodo glimt          tak (ukośnik to separator)
+        sandefjord fotball   >= sandefjord          tak
+        aalesunds fk         ~= aalesund            tak (rdzeń)
+        agf                  ~= aarhus              tak (alias)
+        deportivo riestra    vs deportivo recoleta  NIE
+        riga fc              vs rigas fs            NIE (rdzeń tnie od 6 liter)
+        estudiantes la plata vs estudiantes rio cuarto  NIE
+    """
+    ta, tb = _tokeny_tozsamosci(a), _tokeny_tozsamosci(b)
+    if not ta or not tb:
+        return False
+    for xa, xb in (
+        (ta, tb),
+        ({_rdzen(t) for t in ta}, {_rdzen(t) for t in tb}),
+        (ta | {al for t in ta for al in _ALIASY_KLUBU.get(t, ())}, tb),
+    ):
+        if xa == xb or xa <= xb or xb <= xa:
+            return True
+    return False
+
 
 def resolve_team_key(all_keys: set[str], team_name: str) -> str | None:
     """Klucz drużyny w statystykach meczu — po ZBIORACH SŁÓW, nie podobieństwie.
@@ -435,25 +502,42 @@ def resolve_team_key(all_keys: set[str], team_name: str) -> str | None:
     (po odsianiu szumu typu „FC") i wymagamy JEDNOZNACZNEGO maksimum — remis
     oznacza brak dopasowania, nie strzał. To bezpieczne także dlatego, że
     kandydaci są tylko dwaj: obie drużyny tego meczu.
+
+    TRZY PODEJŚCIA, OD NAJOSTRZEJSZEGO (rozszerzone 2026-08-02 — poprzednia
+    wersja gubiła 45 typów w pięciu meczach, mimo że źródło miało komplet
+    statystyk). Każde następne uruchamia się TYLKO wtedy, gdy poprzednie nic
+    nie znalazło, i każde wymaga jednoznacznego maksimum:
+
+      1. wspólne słowa           „lillestrom sk"  -> „lillestrom"
+      2. wspólne rdzenie          „aalesunds fk"   -> „aalesund"
+      3. alias z ręcznej listy    „agf"            -> „aarhus"
     """
     p = _norm(team_name)
     if p in all_keys:
         return p
-    tokeny = {t for t in p.split() if t not in _SZUM_NAZWY_KLUBU}
+    tokeny = _tokeny_tozsamosci(p)
     if not tokeny:
         return None
-    wyniki: list[tuple[int, str]] = []
-    for k in all_keys:
-        wspolne = tokeny & {
-            t for t in k.split() if t not in _SZUM_NAZWY_KLUBU
-        }
-        if wspolne:
-            wyniki.append((len(wspolne), k))
-    if not wyniki:
-        return None
-    naj = max(w[0] for w in wyniki)
-    najlepsze = [k for n, k in wyniki if n == naj]
-    return najlepsze[0] if len(najlepsze) == 1 else None
+    warianty = (
+        (tokeny, lambda t: t),
+        ({_rdzen(t) for t in tokeny}, _rdzen),
+        (tokeny | {a for t in tokeny for a in _ALIASY_KLUBU.get(t, ())},
+         lambda t: t),
+    )
+    for nasze, przeksztalc in warianty:
+        wyniki: list[tuple[int, str]] = []
+        for k in all_keys:
+            ich = {przeksztalc(t) for t in _tokeny_tozsamosci(k)}
+            wspolne = nasze & ich
+            if wspolne:
+                wyniki.append((len(wspolne), k))
+        if not wyniki:
+            continue
+        naj = max(w[0] for w in wyniki)
+        najlepsze = [k for n, k in wyniki if n == naj]
+        if len(najlepsze) == 1:
+            return najlepsze[0]
+    return None
 
 
 def resolve_player_key(all_keys: set[str], player_name: str) -> str | None:

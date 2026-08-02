@@ -41,6 +41,16 @@ def _przygotuj(monkeypatch, rec, trendy=None):
     monkeypatch.setattr(
         scores365, "finished_games_by_competition", lambda comp_id=None: []
     )
+    # ZAPAS „szukaj po drużynie" (`_gid_365_z_druzyny`) — też wychodzi do sieci
+    # i to drożej niż reszta: mapa nazw to ~34 adresy, a nieudane `_get` śpi
+    # 2 s i 4 s, więc bez tej zaślepki jeden test ciągnął się ponad trzy minuty
+    monkeypatch.setattr(
+        scores365, "competitor_ids_z_rozgrywek", lambda comp_ids: {}
+    )
+    monkeypatch.setattr(
+        scores365, "recent_finished_games_z_rozgrywkami",
+        lambda cid, n=6: [],
+    )
     monkeypatch.setattr(
         statshub, "fetch_event_trends", lambda mids: trendy or []
     )
