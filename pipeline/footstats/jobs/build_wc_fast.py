@@ -423,6 +423,45 @@ def scal_karty_z_publikacjami(
     return out
 
 
+def scal_forme_druzyn(swieza: dict, value_bets: list[dict]) -> list[dict]:
+    """Forma drużyn: bieżące przeliczenie DOSYPANE do poprzedniego snapshotu.
+
+    PO CO (2026-08-02, przegląd zakładki Drużyny). `druzyny_forma` była
+    budowana OD ZERA w każdym cyklu — wyłącznie z drużyn, dla których akurat
+    przyszły świeże trendy. Drużyna bez trendu w danym cyklu traciła historię,
+    choć te 20 meczów nigdzie się nie podziało. Skutek widać było na karcie:
+    typ WZNOWIONY (a takich jest większość listy) nie miał kroków „skąd ta
+    liczba" i „jak było ostatnio", więc rozwinięcie nie tłumaczyło niczego.
+    Zmierzone: 11 z 16 typów bez formy, w tym 4 z 9 na półce ryzykownej.
+
+    Świeże dane WYGRYWAJĄ — dosypka jest tylko dla drużyn, których w tym cyklu
+    nie policzyliśmy. Historia nie może się cofnąć, ale i nie ma prawa zniknąć.
+
+    Trzymamy wyłącznie drużyny, które mają dziś jakiś typ na liście. Inaczej
+    plik puchłby w nieskończoność o kluby, których nikt już nie ogląda.
+    """
+    potrzebne = {b.get("podmiot_id") for b in value_bets if b.get("podmiot_id")}
+    out = dict(swieza)
+    if _dry_run():
+        return [v for k, v in out.items() if k in potrzebne or not potrzebne]
+    try:
+        poprzednia = supa.get_key("druzyny_forma") or []
+    except Exception as e:
+        print(f"Forma drużyn: poprzedni snapshot niedostępny ({e})")
+        return list(out.values())
+    dosypane = 0
+    for rec in poprzednia:
+        tid = rec.get("id")
+        if tid is None or tid in out or tid not in potrzebne:
+            continue
+        out[tid] = rec
+        dosypane += 1
+    if dosypane:
+        print(f"Forma drużyn: {len(swieza)} świeżych + {dosypane} dosypanych "
+              f"z poprzedniego cyklu (drużyny z typem na liście)")
+    return list(out.values())
+
+
 def linie_opublikowane(log: dict) -> dict[tuple, set]:
     """Z ZAMROŻONEJ księgi: która linia zakładu jest już wystawiona.
 
@@ -4967,7 +5006,7 @@ def _main_impl(tryb=None):
     _dump("value_bets.json", lista_pub)
     _dump("matches.json", list(matches_out.values()))
     _dump("players.json", list(players_out.values()))
-    _dump("druzyny_forma.json", list(druzyny_forma.values()))
+    _dump("druzyny_forma.json", scal_forme_druzyn(druzyny_forma, lista_pub))
     _dump("odds_superbet.json", odds_grid)   # siatka kursów do TOP POKRYCIA
     _dump("odrzucenia.json", odrzucenia_out)  # "czemu nie ma typu" per mecz
     print(f"Rejestr odrzuceń: {len(odrzucenia_out)} wpisów, "

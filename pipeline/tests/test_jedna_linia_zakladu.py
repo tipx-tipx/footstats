@@ -107,3 +107,40 @@ def test_juz_wystawiona_poprzeczka_nie_blokuje_sama_siebie():
     zniknąłby userowi ze strony mimo że nadal jest aktualny."""
     assert _przepuszcza({0.5, 1.5}, 0.5)
     assert _przepuszcza({0.5, 1.5}, 1.5)
+
+
+# --- FORMA DRUŻYN: dosypka zamiast budowania od zera (2026-08-02) ----------
+#
+# Forma była liczona wyłącznie z drużyn, dla których w danym cyklu przyszły
+# świeże trendy. Drużyna bez trendu traciła 20 meczów historii, choć nic się
+# z nią nie stało — a wtedy karta typu WZNOWIONEGO nie miała czym wypełnić
+# kroków „skąd ta liczba" i „jak było ostatnio". Zmierzone: 11 z 16 typów
+# na stronie bez formy.
+
+def test_forma_dosypuje_brakujace_a_swieze_wygrywa(monkeypatch):
+    from footstats.jobs import build_wc_fast as bwf
+    monkeypatch.setattr(bwf, "_dry_run", lambda: False)
+    monkeypatch.setattr(bwf.supa, "get_key", lambda k: [
+        {"id": 1, "nazwa": "Stara wersja"},      # ma świeższą wersję niżej
+        {"id": 2, "nazwa": "Cracovia"},          # tylko tu — do dosypania
+        {"id": 9, "nazwa": "Klub bez typu"},     # nikt go dziś nie ogląda
+    ])
+    swieza = {1: {"id": 1, "nazwa": "Świeża wersja"}}
+    bets = [{"podmiot_id": 1}, {"podmiot_id": 2}]
+    out = {r["id"]: r for r in bwf.scal_forme_druzyn(swieza, bets)}
+    assert out[1]["nazwa"] == "Świeża wersja"   # świeże dane wygrywają
+    assert 2 in out                             # brakujące dosypane
+    assert 9 not in out                         # bez typu na liście nie wchodzi
+
+
+def test_forma_przezywa_padniety_odczyt(monkeypatch):
+    """Nieudany odczyt ma zostawić świeże dane, a nie wywalić cyklu."""
+    from footstats.jobs import build_wc_fast as bwf
+    monkeypatch.setattr(bwf, "_dry_run", lambda: False)
+
+    def _padnij(_k):
+        raise RuntimeError("supabase pada")
+
+    monkeypatch.setattr(bwf.supa, "get_key", _padnij)
+    out = bwf.scal_forme_druzyn({7: {"id": 7}}, [{"podmiot_id": 7}])
+    assert [r["id"] for r in out] == [7]

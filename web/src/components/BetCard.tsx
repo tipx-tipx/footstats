@@ -1006,22 +1006,36 @@ export function SzczegolyTypu({
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: 0.04 }}
             >
+              {/* LINIA KONTEKSTU, NIE KROK (2026-08-02). Karta zaczynała się
+                  krokiem „co musi się stać", który tłumaczył dorosłemu
+                  człowiekowi, że „poniżej 0,5" znaczy „bez gola". Zamiast tego
+                  jedno ciche zdanie: kiedy mecz i — przy typie wznowionym —
+                  kiedy go wystawiliśmy. To drugie jest potrzebne naprawdę:
+                  kurs jest ZAMROŻONY z tamtej chwili i u bukmachera może dziś
+                  wyglądać inaczej. */}
+              <p className="mb-4 text-[13px] leading-relaxed text-faint">
+                {bet.mecz} · {fmtDataCzas(bet.kickoff_ts)}
+                {bet.opublikowano_ts ? (
+                  <>
+                    {" · "}wystawiony {fmtDataCzas(bet.opublikowano_ts)} po
+                    kursie {bet.kurs != null ? fmtKurs(bet.kurs) : "–"}
+                  </>
+                ) : null}
+              </p>
+
               <Kroki>
-                {(proza || bet.uproszczony) && (
+                {/* KARTA NIGDY NIE MÓWI O SOBIE (2026-08-02). Stało tu zdanie
+                    „tej karcie nie rozpiszemy pełnego rachunku" — komunikat
+                    o naszej kuchni, nie o zakładzie, a czytelnik słyszał w nim
+                    „nie wiemy, czemu to polecamy". Zdanie wypada bez
+                    zastępstwa: krok, dla którego nie mamy materiału, po prostu
+                    nie istnieje. Materiał ma być, a nie tłumaczenie, czemu go
+                    nie ma — stąd dosypywanie formy drużyn w pipelinie. */}
+                {proza && (
                   <Krok kod="skad">
-                    {proza && (
-                      <p className="text-sm leading-relaxed text-ink-soft">
-                        {proza.baza}
-                      </p>
-                    )}
-                    {bet.uproszczony && (
-                      <p className="mt-1.5 text-[13px] leading-relaxed text-faint">
-                        Tej karcie nie rozpiszemy pełnego rachunku: wróciła
-                        z wcześniejszej publikacji, więc kurs i szansa są
-                        zamrożone z chwili, gdy typ powstał, a rozpisane
-                        czynniki zostały tamtego dnia.
-                      </p>
-                    )}
+                    <p className="text-sm leading-relaxed text-ink-soft">
+                      {proza.baza}
+                    </p>
                   </Krok>
                 )}
 
