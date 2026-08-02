@@ -192,6 +192,20 @@ export function rywalWZakladzie(b: ZakladDoOpisu): string {
  * `krotko` = wersja do gęstej ceduły: „Gole drużyny" -> „gole", bo w wierszu
  * liczy się rytm skanowania, a słowo „drużyny" stoi tam w każdej linii.
  */
+/**
+ * Ten sam opis, ale BEZ poprzeczki – do zwijania kilku linii jednego zakładu
+ * w jeden wiersz („rożne w meczu powyżej" + osobno „6,5 · 7,5 · 8,5").
+ * Rynki bez linii („kto więcej") zwracają swoje normalne zdanie: nie ma tam
+ * czego odejmować i nie ma czego zwijać.
+ */
+export function opisZakladuBezLinii(b: ZakladDoOpisu, krotko = false): string {
+  if (CZY_WIECEJ(b)) return opisZakladu(b, krotko);
+  const nazwa = krotko
+    ? b.rynek.toLowerCase().replace(/\s*drużyny\s*/g, " ").trim()
+    : b.rynek.toLowerCase();
+  return `${nazwa} ${STRONA_LABEL[b.strona] ?? b.strona}`;
+}
+
 export function opisZakladu(b: ZakladDoOpisu, krotko = false): string {
   if (CZY_WIECEJ(b)) {
     // „Więcej: strzały" -> „strzałów"; zdanie ma nieść kierunek zakładu,

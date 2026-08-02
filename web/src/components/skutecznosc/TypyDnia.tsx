@@ -6,6 +6,7 @@ import { TabelaTypow } from "./WierszTypu";
 import { useBilans } from "../useBilans";
 import { fmtDzien, odmien } from "@/lib/format";
 import type { Ekran, SkutecznoscDnia, TypRozliczony } from "@/lib/types";
+import { odmienLinie } from "@/lib/warianty";
 
 /**
  * Panel JEDNEGO DNIA – pod kalendarzem, zawsze otwarty na którymś dniu.
@@ -285,18 +286,27 @@ export function TypyDnia({
         </p>
       )}
 
+      {/* LISTA NIŻEJ JEST JUŻ ZWINIĘTA (jeden wiersz na zakład), więc ten
+          dopisek nie tłumaczy wyglądu listy – tłumaczy LICZBĘ W NAGŁÓWKU,
+          która nadal jest liczona po poprzeczkach. To jedyne miejsce, gdzie
+          te dwie wielkości się rozjeżdżają, i user ma prawo o tym wiedzieć,
+          zamiast domyślać się z rozbieżności. */}
       {widoczne.length > zakladow && (
         <p className="mt-3 rounded-(--radius-control) border border-hairline bg-card-soft px-3.5 py-2.5 text-xs leading-relaxed text-muted">
+          Wynik u góry liczy{" "}
           <span className="font-data font-semibold text-ink">
             {widoczne.length}{" "}
-            {odmien(widoczne.length, "wiersz", "wiersze", "wierszy")} ={" "}
+            {odmien(widoczne.length, "poprzeczkę", "poprzeczki", "poprzeczek")}
+          </span>
+          , ale to{" "}
+          <span className="font-data font-semibold text-ink">
             {zakladow} {odmien(zakladow, "zakład", "zakłady", "zakładów")}
           </span>{" "}
-          – ta sama drużyna i ten sam rynek stoją tu w kilku liniach naraz
-          (np. „poniżej 13,5”, „poniżej 14,5”, „poniżej 15,5”). Takie linie
-          wchodzą albo przepadają <strong>razem</strong>, więc to jeden wynik
-          meczu, nie kilka trafień. Od 1 sierpnia wystawiamy już tylko jedną
-          linię na stronę.
+          – ta sama drużyna i ten sam rynek bywają wycenione na kilku
+          poprzeczkach naraz (np. „poniżej 13,5”, „poniżej 14,5”). Wchodzą albo
+          przepadają <strong>razem</strong>, bo to jedna liczba z meczu. Na
+          liście niżej stoją jako jeden wiersz – kliknij „{odmienLinie(2)}”,
+          żeby rozwinąć poprzeczki.
         </p>
       )}
 
