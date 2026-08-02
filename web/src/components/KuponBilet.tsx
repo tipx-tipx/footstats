@@ -5,7 +5,8 @@ import {
   fmtKurs,
   fmtLinia,
   fmtProc,
-  STRONA_LABEL,
+  nazwaPodmiotu,
+  opisZakladu,
 } from "@/lib/format";
 import type { Kupon, KuponLeg } from "@/lib/types";
 
@@ -169,10 +170,9 @@ export function KuponBilet({
                 <div className="flex items-center gap-3">
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold">
-                      {l.podmiot}
+                      {nazwaPodmiotu(l)}
                       <span className="ml-1.5 font-normal text-muted">
-                        {l.rynek.toLowerCase()} {STRONA_LABEL[l.strona]}{" "}
-                        {fmtLinia(l.linia)}
+                        {opisZakladu(l)}
                       </span>
                     </p>
                   </div>

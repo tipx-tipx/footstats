@@ -18,17 +18,21 @@ export function ChanceBar({
   p,
   line,
   side = "powyzej",
+  opis,
 }: {
   p: number; // szansa modelu na wybraną stronę
   line: number;
   side?: "powyzej" | "ponizej";
+  /** gotowy opis zakładu – rynki bez linii („kto więcej") nie dają się
+   *  opisać jako „powyżej X"; wtedy podpis paska musi przyjść z zewnątrz */
+  opis?: string;
 }) {
-  const strona = side === "powyzej" ? "powyżej" : "poniżej";
+  const strona = opis ?? `${side === "powyzej" ? "powyżej" : "poniżej"} ${fmtLinia(line)}`;
   const poz = (x: number) => Math.min(Math.max(x * 100, 2), 98);
   return (
     <div
       className="w-full"
-      title={`Szansa modelu na ${strona} ${fmtLinia(line)}: ${fmtProc(p)}. Kreska na środku toru to 50%, rzut monetą`}
+      title={`Szansa modelu na ${strona}: ${fmtProc(p)}. Kreska na środku toru to 50%, rzut monetą`}
     >
       <div className="flex items-center gap-2.5">
         {/* tor szansy w języku karty hero: gładki tor, delikatne
@@ -36,7 +40,7 @@ export function ChanceBar({
         <div
           className="relative h-4 flex-1"
           role="img"
-          aria-label={`Szansa modelu na ${strona} ${fmtLinia(line)}: ${fmtProc(p)}`}
+          aria-label={`Szansa modelu na ${strona}: ${fmtProc(p)}`}
         >
           <span
             aria-hidden
@@ -69,7 +73,7 @@ export function ChanceBar({
         </span>
       </div>
       <p className="mt-1.5 text-[10px] leading-tight text-faint">
-        szansa na {strona} {fmtLinia(line)} wg modelu
+        szansa na {strona} wg modelu
       </p>
     </div>
   );

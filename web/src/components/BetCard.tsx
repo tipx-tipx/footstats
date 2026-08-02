@@ -20,8 +20,10 @@ import {
   fmtMnoznik,
   fmtOpisLiczby,
   fmtProc,
+  nazwaPodmiotu,
+  opisZakladu,
   PEWNOSC_LABEL,
-  STRONA_LABEL,
+  stronaLinii,
 } from "@/lib/format";
 import {
   kierunekMnoznika,
@@ -1272,7 +1274,7 @@ export function SzczegolyTypu({
                         <OutcomeColumns
                           dist={bet.rozklad}
                           line={bet.linia}
-                          side={bet.strona}
+                          side={stronaLinii(bet.strona)}
                         />
                         {/* rozkład liczy się przy przewidywanych minutach, a p_model
                             wlicza jeszcze ryzyko rotacji – bez tego zdania user widzi
@@ -1422,24 +1424,33 @@ export const BetCard = memo(function BetCard({
                   />
                 </span>
               )}
-              <span className="truncate font-semibold">{bet.podmiot}</span>
-              <span className="text-sm text-muted">
-                {bet.rynek.toLowerCase()} {STRONA_LABEL[bet.strona]}{" "}
-                {fmtLinia(bet.linia)}
+              <span className="truncate font-semibold">
+                {nazwaPodmiotu(bet)}
               </span>
+              <span className="text-sm text-muted">{opisZakladu(bet)}</span>
             </span>
             <span className="mt-1 block truncate text-xs text-faint">
               {bet.mecz} · {fmtDataCzas(bet.kickoff_ts)}
             </span>
             {/* pasek szansy na mobile – pod nazwą, żeby triage działał też kciukiem */}
             <span className="mt-2 block max-w-56 sm:hidden">
-              <ChanceBar p={bet.p_model} line={bet.linia} side={bet.strona} />
+              <ChanceBar
+                p={bet.p_model}
+                line={bet.linia}
+                side={stronaLinii(bet.strona)}
+                opis={opisZakladu(bet)}
+              />
             </span>
           </span>
 
           <span className="hidden min-w-0 items-center sm:flex">
             <span className="w-full max-w-48">
-              <ChanceBar p={bet.p_model} line={bet.linia} side={bet.strona} />
+              <ChanceBar
+                p={bet.p_model}
+                line={bet.linia}
+                side={stronaLinii(bet.strona)}
+                opis={opisZakladu(bet)}
+              />
             </span>
           </span>
 

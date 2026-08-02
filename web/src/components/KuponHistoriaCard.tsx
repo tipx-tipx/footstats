@@ -1,4 +1,10 @@
-import { fmtDataCzas, fmtKurs, fmtLinia, fmtProc, STRONA_LABEL } from "@/lib/format";
+import {
+  fmtDataCzas,
+  fmtKurs,
+  fmtProc,
+  nazwaPodmiotu,
+  opisZakladu,
+} from "@/lib/format";
 import type { KuponHistoria } from "@/lib/types";
 
 /** Techniczne powody z pipeline'u mówią „leg" (magiczne stringi logiki +
@@ -143,12 +149,9 @@ export function KuponHistoriaCard({
                           : ""
                     }`}
                   >
-                    {l.podmiot}
+                    {nazwaPodmiotu(l)}
                   </span>{" "}
-                  <span className="text-muted">
-                    {l.rynek.toLowerCase()} {STRONA_LABEL[l.strona]}{" "}
-                    {fmtLinia(l.linia)}
-                  </span>
+                  <span className="text-muted">{opisZakladu(l)}</span>
                 </p>
                 <span className="font-data shrink-0 text-xs text-muted">
                   {fmtProc(l.p_model)}

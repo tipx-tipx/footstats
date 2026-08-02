@@ -4,7 +4,13 @@ import { memo, useState } from "react";
 
 import { SWIATLO_STYL, swiatloTypu, SzczegolyTypu } from "./BetCard";
 import { DrabinkaLinii } from "./DrabinkaLinii";
-import { fmtKurs, fmtLinia, fmtProc, STRONA_LABEL } from "@/lib/format";
+import {
+  fmtKurs,
+  fmtProc,
+  nazwaPodmiotu,
+  opisZakladu,
+  rywalWZakladzie,
+} from "@/lib/format";
 import type { FormaRynku, ValueBet } from "@/lib/types";
 import { odmienLinie } from "@/lib/warianty";
 
@@ -22,10 +28,6 @@ function godzinaMeczu(ts: number): string {
     timeZone: "Europe/Warsaw",
   }).format(new Date(ts * 1000));
 }
-
-/** "Gole drużyny" → "gole": w wierszu liczy się rytm skanowania, nie pełna nazwa. */
-const rynekKrotko = (rynek: string) =>
-  rynek.toLowerCase().replace(/\s*drużyny\s*/g, " ").trim();
 
 export const BetRow = memo(function BetRow({
   bet: glowny,
@@ -49,15 +51,19 @@ export const BetRow = memo(function BetRow({
   // forma jest per rynek, a warianty dzielą rynek – ten sam wykres pasuje
   const forma = formaGlownego;
   const swiatlo = swiatloTypu(forma, bet.linia, bet.p_model, bet.strona);
-  const opisRynku = `${rynekKrotko(bet.rynek)} ${STRONA_LABEL[bet.strona]} ${fmtLinia(bet.linia)}`;
+  const opisRynku = opisZakladu(bet, true);
   const poz = Math.min(Math.max(bet.p_model * 100, 2), 98);
+  // rywala liczymy z nazwy meczu, gdy rekord go nie niesie: przy sumach
+  // meczowych pipeline zostawia `przeciwnik` pusty, a wtedy wiersz gubił
+  // nie tylko rywala, ale i GODZINĘ — bo obie wisiały na jednym warunku
+  const rywal = rywalWZakladzie(bet);
   const meta = (
     pokazGodzine
-      ? [bet.przeciwnik ? `z ${bet.przeciwnik}` : null, liga]
+      ? [rywal ? `z ${rywal}` : null, liga]
       : [
-          bet.przeciwnik
-            ? `${godzinaMeczu(bet.kickoff_ts)} z ${bet.przeciwnik}`
-            : null,
+          rywal
+            ? `${godzinaMeczu(bet.kickoff_ts)} z ${rywal}`
+            : godzinaMeczu(bet.kickoff_ts),
           liga,
         ]
   )
@@ -100,7 +106,9 @@ export const BetRow = memo(function BetRow({
               <span aria-hidden className="h-2 w-2 shrink-0 rounded-full bg-hairline-strong/60" />
             )}
             <span className="min-w-0 truncate">
-              <span className="text-sm font-semibold">{bet.podmiot}</span>
+              <span className="text-sm font-semibold">
+                {nazwaPodmiotu(bet)}
+              </span>
               {meta && (
                 <span className="ml-2 text-[11px] text-faint">{meta}</span>
               )}

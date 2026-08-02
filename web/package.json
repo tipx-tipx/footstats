@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit",
     "stop": "node scripts/ubij-zombie.mjs",
     "test:role": "node --experimental-strip-types --no-warnings scripts/test-rol.mjs",
+    "test:opis": "node --experimental-strip-types --no-warnings scripts/test-opis-zakladu.mjs",
     "zrzuty": "node scripts/zrzuty.mjs",
     "audyt": "node scripts/audyt-mobile.mjs"
   },

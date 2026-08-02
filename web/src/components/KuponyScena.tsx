@@ -6,7 +6,13 @@ import { useEffect, useMemo, useState } from "react";
 import { KuponBilet } from "./KuponBilet";
 import { akcjaKuponu, ProfilKuponow, ZastosujZamiane } from "./PominKupon";
 import { useStawka } from "./useStawka";
-import { fmtKurs, fmtLinia, fmtProc, STRONA_LABEL } from "@/lib/format";
+import {
+  fmtKurs,
+  fmtLinia,
+  fmtProc,
+  nazwaPodmiotu,
+  opisZakladu,
+} from "@/lib/format";
 import {
   addKuponZagrany,
   isKuponZagrany,
@@ -230,11 +236,8 @@ function Dopracuj({ kupon: k }: { kupon: Kupon }) {
               {k.legi[k.alternatywa.zamiast_idx]?.rynek.toLowerCase()}{" "}
               {fmtLinia(k.legi[k.alternatywa.zamiast_idx]?.linia ?? 0)}
             </span>{" "}
-            → <strong>{k.alternatywa.podmiot}</strong>{" "}
-            <span className="text-muted">
-              {k.alternatywa.rynek.toLowerCase()}{" "}
-              {STRONA_LABEL[k.alternatywa.strona]} {fmtLinia(k.alternatywa.linia)}
-            </span>{" "}
+            → <strong>{nazwaPodmiotu(k.alternatywa)}</strong>{" "}
+            <span className="text-muted">{opisZakladu(k.alternatywa)}</span>{" "}
             <span className="font-data font-semibold">
               @{fmtKurs(k.alternatywa.kurs)}
             </span>
@@ -256,11 +259,8 @@ function Dopracuj({ kupon: k }: { kupon: Kupon }) {
             dobij kurs pewnym typem
           </p>
           <p className="mt-1 text-sm leading-relaxed">
-            <strong>{k.dolozenie.podmiot}</strong>{" "}
-            <span className="text-muted">
-              {k.dolozenie.rynek.toLowerCase()} {STRONA_LABEL[k.dolozenie.strona]}{" "}
-              {fmtLinia(k.dolozenie.linia)}
-            </span>{" "}
+            <strong>{nazwaPodmiotu(k.dolozenie)}</strong>{" "}
+            <span className="text-muted">{opisZakladu(k.dolozenie)}</span>{" "}
             <span className="font-data font-semibold">
               @{fmtKurs(k.dolozenie.kurs)}
             </span>
@@ -285,10 +285,9 @@ function Dopracuj({ kupon: k }: { kupon: Kupon }) {
                 className="flex items-baseline justify-between gap-2 text-xs"
               >
                 <span className="min-w-0 truncate">
-                  <strong>{l.podmiot}</strong>{" "}
+                  <strong>{nazwaPodmiotu(l)}</strong>{" "}
                   <span className="text-muted">
-                    {l.rynek.toLowerCase()} {STRONA_LABEL[l.strona]}{" "}
-                    {fmtLinia(l.linia)} · {l.mecz}
+                    {opisZakladu(l)} · {l.mecz}
                   </span>
                 </span>
                 <span className="font-data shrink-0">{fmtKurs(l.kurs)}</span>

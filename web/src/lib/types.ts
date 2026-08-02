@@ -2,7 +2,16 @@
 
 export type Pewnosc = "wysoka" | "srednia" | "niska";
 export type Ryzyko = "niskie" | "srednie" | "wysokie";
-export type Strona = "powyzej" | "ponizej";
+/**
+ * Strona zakładu. Do 2026-07-30 były dwie i cała strona to zakładała.
+ *
+ * Rynek „kto więcej" (`wiecej_*`) nie ma linii ani kierunku — jego `strona`
+ * mówi, KTÓRA DRUŻYNA ma mieć więcej. Typ nie wiedział o tym przez trzy dni,
+ * więc kompilator nie miał jak ostrzec, że `STRONA_LABEL[strona]` zwróci
+ * `undefined`, a użytkownik zobaczy je dosłownie. Zdania buduje `opisZakladu`;
+ * tu chodzi o to, żeby TypeScript znów mówił prawdę o danych.
+ */
+export type Strona = "powyzej" | "ponizej" | "gospodarz" | "gosc";
 
 export interface CzynnikUzasadnienia {
   nazwa: string;
@@ -598,6 +607,11 @@ export interface KuponLeg {
   value_bet_id: number;
   podmiot: string;
   rynek: string;
+  /** kod rynku – bilet potrzebuje go, żeby nazwać zakład (`opisZakladu`);
+   *  opcjonalny, bo kupony sprzed 2026-07-30 go nie niosą */
+  rynek_kod?: string;
+  /** drużyna, NA KTÓRĄ typujemy – przy „kto więcej" różna od `podmiot` */
+  druzyna?: string;
   linia: number;
   strona: Strona;
   kurs: number;
@@ -669,6 +683,8 @@ export interface Kupon {
 export interface TypRozliczony {
   mecz: string;
   kickoff_ts: number;
+  /** przy „kto więcej" to ZAWSZE gospodarz (tak wymaga rozliczanie) – nazwę
+   *  typowanej drużyny wylicza `nazwaPodmiotu` z `mecz` i `strona` */
   podmiot: string;
   rynek_kod: string;
   rynek: string;

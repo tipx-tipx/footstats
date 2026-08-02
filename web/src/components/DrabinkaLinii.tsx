@@ -62,7 +62,7 @@ export function DrabinkaLinii({
                     aktywny ? "text-brand" : "text-ink-soft"
                   }`}
                 >
-                  {STRONA_LABEL[b.strona]} {fmtLinia(b.linia)}
+                  {STRONA_LABEL[b.strona] ?? b.strona} {fmtLinia(b.linia)}
                 </span>
                 <span
                   className={`font-data tabular-nums ${

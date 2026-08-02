@@ -11,7 +11,7 @@ import {
   removeZaklad,
   updateZaklad,
 } from "@/lib/tracker";
-import { fmtKurs, fmtLinia, STRONA_LABEL } from "@/lib/format";
+import { fmtKurs, nazwaPodmiotu, opisZakladu } from "@/lib/format";
 import type { MojZaklad } from "@/lib/types";
 
 const WYNIKI: { kod: MojZaklad["wynik"]; label: string }[] = [
@@ -185,10 +185,9 @@ export function BetTracker() {
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-semibold">
-                    {z.podmiot}
+                    {nazwaPodmiotu(z)}
                     <span className="ml-2 font-normal text-muted">
-                      {z.rynek.toLowerCase()} {STRONA_LABEL[z.strona]}{" "}
-                      {fmtLinia(z.linia)}
+                      {opisZakladu(z)}
                     </span>
                   </p>
                   <p className="mt-0.5 truncate text-xs text-faint">

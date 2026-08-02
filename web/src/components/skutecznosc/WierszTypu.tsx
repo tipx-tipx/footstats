@@ -1,6 +1,6 @@
 "use client";
 
-import { fmtKurs, fmtLinia, STRONA_LABEL } from "@/lib/format";
+import { fmtKurs, nazwaPodmiotu, opisZakladu } from "@/lib/format";
 import type { TypRozliczony } from "@/lib/types";
 
 /**
@@ -110,18 +110,16 @@ function WierszTypu({
         />
       </td>
       <td className="py-2 pr-3">
-        <span className="block truncate font-medium">{t.podmiot}</span>
+        <span className="block truncate font-medium">{nazwaPodmiotu(t)}</span>
         {/* na telefonie kolumna „typ" znika, więc rynek i linia schodzą tutaj –
             bez tego wiersz mówiłby „Kowalski 1,19 ✓" i nic poza tym */}
         <span className="block truncate text-xs text-muted sm:hidden">
-          {t.rynek.toLowerCase()} {STRONA_LABEL[t.strona]} {fmtLinia(t.linia)}
+          {opisZakladu(t)}
         </span>
         <span className="block truncate text-xs text-faint">{t.mecz}</span>
       </td>
       <td className="hidden py-2 pr-3 text-muted sm:table-cell">
-        <span className="block truncate">
-          {t.rynek.toLowerCase()} {STRONA_LABEL[t.strona]} {fmtLinia(t.linia)}
-        </span>
+        <span className="block truncate">{opisZakladu(t)}</span>
         {/* klasa karty (top/mocny/solidny) – mają ją WYŁĄCZNIE drabinki.
             Wcześniej mieszkała w osobnej liście „Karty rozliczone" pod
             kalendarzem, która przy kilku kartach dziennie powtarzała ten sam
