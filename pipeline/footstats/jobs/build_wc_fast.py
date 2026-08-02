@@ -351,8 +351,28 @@ def scal_z_publikacjami(
         uzyte.add(b["id"])
         nastepne = max(nastepne, b["id"]) + 1
 
+    # ZAPIS REJESTRU MUSI BYĆ SŁYSZALNY (2026-08-03).
+    #
+    # Rejestr jest JEDYNYM miejscem, w którym przeżywa rentgen typu (czynniki,
+    # przedział, lambda) — księga rozliczeń go nie trzyma, więc typ, który
+    # z rejestru wypadnie, wraca na stronę jako „uproszczony" i nie ma czym
+    # wypełnić rozwinięcia. Zmierzone 02.08: 12 z 16 typów na stronie było
+    # uproszczonych, a w rejestrze siedziało tylko 5 z nich.
+    #
+    # Wpis powstaje TYLKO w tym cyklu, w którym typ policzono na świeżo. Jeśli
+    # ten jeden zapis się nie uda, typ nie dostanie drugiej szansy — w kolejnym
+    # cyklu nie ma go już w `value_bets`. Dlatego nieudany zapis musi krzyczeć,
+    # a nie wracać cichym False.
+    #
+    # NIE `put_key_bezpiecznie`: ten rejestr kurczy się Z NATURY (wpisy giną po
+    # gwizdku), więc bezpiecznik „nie nadpisuj mniejszym" blokowałby zapis
+    # w każdy weekend z dużą liczbą gwizdków — patrz ostrzeżenie w docstringu
+    # `supa.put_key_bezpiecznie`.
     if not _dry_run() and odczyt_ok:
-        supa.put_key(PUBLIKACJE_KLUCZ, rej)
+        if not supa.put_key(PUBLIKACJE_KLUCZ, rej):
+            print("UWAGA: zapis rejestru publikacji NIE POWIÓDŁ SIĘ — typy "
+                  f"policzone w tym cyklu ({len(value_bets)}) wrócą jutro jako "
+                  "uproszczone, bez rozpisanych czynników")
     if wznowione or z_logu:
         print(f"Publikacje: wznowiono {wznowione} typów z rejestru"
               + (f" + {z_logu} z księgi rozliczeń" if z_logu else "")
@@ -449,17 +469,77 @@ def scal_forme_druzyn(swieza: dict, value_bets: list[dict]) -> list[dict]:
     except Exception as e:
         print(f"Forma drużyn: poprzedni snapshot niedostępny ({e})")
         return list(out.values())
-    dosypane = 0
+    # SCALAMY PER RYNEK, NIE PER DRUŻYNĘ (poprawka 2026-08-03).
+    #
+    # Pierwsza wersja dosypywała tylko BRAKUJĄCE DRUŻYNY, więc drużyna obecna
+    # w świeżym cyklu zostawała wyłącznie z rynkami z tego cyklu — a trendy
+    # przychodzą per rynek i rzadko komplet naraz. Efekt widać było wprost na
+    # karcie: Djurgårdens IF miał typ na rożne, a formę tylko na gole;
+    # Cracovia typ na gole, a formę tylko na rożne. Drużyna BYŁA, tylko nie
+    # dla tego rynku, o który pytamy — czyli krok „jak było ostatnio" dalej
+    # nie miał czego pokazać.
+    dosypane_druzyny = dosypane_rynki = 0
     for rec in poprzednia:
         tid = rec.get("id")
-        if tid is None or tid in out or tid not in potrzebne:
+        if tid is None or tid not in potrzebne:
             continue
-        out[tid] = rec
-        dosypane += 1
-    if dosypane:
-        print(f"Forma drużyn: {len(swieza)} świeżych + {dosypane} dosypanych "
-              f"z poprzedniego cyklu (drużyny z typem na liście)")
+        biezacy = out.get(tid)
+        if biezacy is None:
+            out[tid] = rec
+            dosypane_druzyny += 1
+            continue
+        # drużyna jest świeża, ale mogła stracić rynki, których ten cykl
+        # nie policzył — świeży rynek WYGRYWA, brakujący wraca ze starego
+        stara_forma = rec.get("forma") or {}
+        nowa_forma = biezacy.setdefault("forma", {})
+        for rynek, dane in stara_forma.items():
+            if rynek not in nowa_forma:
+                nowa_forma[rynek] = dane
+                dosypane_rynki += 1
+    if dosypane_druzyny or dosypane_rynki:
+        print(f"Forma drużyn: {len(swieza)} świeżych, dosypano "
+              f"{dosypane_druzyny} drużyn i {dosypane_rynki} rynków "
+              f"z poprzedniego cyklu")
     return list(out.values())
+
+
+def czynniki_pary(h_n: dict, a_n: dict, nazwa_bazy: str, rho: float) -> list[dict]:
+    """Uzasadnienie dla rynków liczonych z OBU drużyn (suma meczowa, „kto więcej").
+
+    PO CO (2026-08-03). Te dwa rynki były budowane z pustym `czynniki: []`,
+    więc karta nie miała czym wypełnić kroku „skąd ta liczba" — a `skadTaLiczba`
+    po stronie web zwraca `null`, gdy nie znajdzie „Poziomu bazowego". Efekt:
+    pierwszy typ na liście (suma rożnych) otwierał się i nie tłumaczył NICZEGO.
+
+    To nie jest dorabianie uzasadnienia po fakcie: model liczy `lam` osobno dla
+    każdej drużyny i mierzoną korelację między nimi — tylko nigdy tego nie
+    zapisywał w formie do przeczytania.
+    """
+    kto = nazwa_bazy.lower()
+    czynniki = [{
+        "nazwa": "Poziom bazowy",
+        "opis": (
+            f"{h_n['nazwa']} notuje średnio {h_n['pred'].lam:.1f} "
+            f"({kto}) na mecz, {a_n['nazwa']} {a_n['pred'].lam:.1f} — "
+            f"razem {h_n['pred'].lam + a_n['pred'].lam:.1f}. Obie liczby są "
+            f"już po korekcie na siłę rywala i miejsce gry"
+        ),
+        "mnoznik": None,
+    }]
+    # korelacja bywa zerowa (rynek bez pomiaru) — wtedy milczymy zamiast
+    # pisać „bez wpływu", bo to zdanie o naszej kuchni, nie o meczu
+    if abs(rho) > 0.02:
+        czynniki.append({
+            "nazwa": "Zależność między drużynami",
+            "opis": (
+                "Kiedy jedna drużyna notuje więcej, druga zwykle "
+                + ("też" if rho > 0 else "mniej")
+                + f" — zmierzone na historii ({rho:+.2f}). Bez tego suma "
+                  "wychodziłaby zbyt równa"
+            ),
+            "mnoznik": None,
+        })
+    return czynniki
 
 
 def linie_opublikowane(log: dict) -> dict[tuple, set]:
@@ -3938,7 +4018,8 @@ def _main_impl(tryb=None):
                         # kartkach to co piąty zakład
                         "p_remis": round(p_remis, 4),
                         "uzasadnienie": {
-                            "czynniki": [],
+                            "czynniki": czynniki_pary(
+                                h_n, a_n, nazwa_bazy, rho_n),
                             "oczekiwana_liczba": round(h_n["pred"].lam, 2),
                         },
                     })
@@ -4050,7 +4131,8 @@ def _main_impl(tryb=None):
                                 h_n["pred"].lam + a_n["pred"].lam, 3),
                             "rozklad": None, "czynniki": {}, "sugestia": False,
                             "uzasadnienie": {
-                                "czynniki": [],
+                                "czynniki": czynniki_pary(
+                                    h_n, a_n, nazwa_bazy, rho_n),
                                 "oczekiwana_liczba": round(
                                     h_n["pred"].lam + a_n["pred"].lam, 2),
                             },

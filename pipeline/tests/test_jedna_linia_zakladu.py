@@ -121,16 +121,33 @@ def test_forma_dosypuje_brakujace_a_swieze_wygrywa(monkeypatch):
     from footstats.jobs import build_wc_fast as bwf
     monkeypatch.setattr(bwf, "_dry_run", lambda: False)
     monkeypatch.setattr(bwf.supa, "get_key", lambda k: [
-        {"id": 1, "nazwa": "Stara wersja"},      # ma świeższą wersję niżej
-        {"id": 2, "nazwa": "Cracovia"},          # tylko tu — do dosypania
-        {"id": 9, "nazwa": "Klub bez typu"},     # nikt go dziś nie ogląda
+        {"id": 1, "forma": {"team_goals": "stare"}},   # ma świeższą wersję niżej
+        {"id": 2, "forma": {"team_goals": "x"}},       # tylko tu — do dosypania
+        {"id": 9, "forma": {"team_goals": "x"}},       # nikt go dziś nie ogląda
     ])
-    swieza = {1: {"id": 1, "nazwa": "Świeża wersja"}}
+    swieza = {1: {"id": 1, "forma": {"team_goals": "świeże"}}}
     bets = [{"podmiot_id": 1}, {"podmiot_id": 2}]
     out = {r["id"]: r for r in bwf.scal_forme_druzyn(swieza, bets)}
-    assert out[1]["nazwa"] == "Świeża wersja"   # świeże dane wygrywają
-    assert 2 in out                             # brakujące dosypane
-    assert 9 not in out                         # bez typu na liście nie wchodzi
+    assert out[1]["forma"]["team_goals"] == "świeże"   # świeże dane wygrywają
+    assert 2 in out                                    # brakujące dosypane
+    assert 9 not in out                                # bez typu na liście nie wchodzi
+
+
+def test_forma_dosypuje_BRAKUJACY_RYNEK_istniejacej_druzyny(monkeypatch):
+    """SEDNO poprawki z 03.08. Trendy przychodzą per rynek i rzadko komplet
+    naraz, więc drużyna obecna w świeżym cyklu traciła rynki, których ten cykl
+    nie policzył. Na karcie wyglądało to tak: Djurgårdens IF miał typ na rożne,
+    a formę wyłącznie na gole — czyli krok „jak było ostatnio" był pusty mimo
+    tego, że historia istniała."""
+    from footstats.jobs import build_wc_fast as bwf
+    monkeypatch.setattr(bwf, "_dry_run", lambda: False)
+    monkeypatch.setattr(bwf.supa, "get_key", lambda k: [
+        {"id": 1, "forma": {"team_goals": "stare", "team_corners": "ROŻNE"}},
+    ])
+    swieza = {1: {"id": 1, "forma": {"team_goals": "świeże"}}}
+    out = {r["id"]: r for r in bwf.scal_forme_druzyn(swieza, [{"podmiot_id": 1}])}
+    assert out[1]["forma"]["team_goals"] == "świeże"    # świeży rynek wygrywa
+    assert out[1]["forma"]["team_corners"] == "ROŻNE"   # brakujący wraca
 
 
 def test_forma_przezywa_padniety_odczyt(monkeypatch):
@@ -144,3 +161,46 @@ def test_forma_przezywa_padniety_odczyt(monkeypatch):
     monkeypatch.setattr(bwf.supa, "get_key", _padnij)
     out = bwf.scal_forme_druzyn({7: {"id": 7}}, [{"podmiot_id": 7}])
     assert [r["id"] for r in out] == [7]
+
+
+# --- UZASADNIENIE DLA RYNKÓW Z OBU DRUŻYN (2026-08-03) ---------------------
+#
+# Suma meczowa i „kto więcej" były budowane z pustym `czynniki: []`, więc karta
+# nie miała czym wypełnić kroku „skąd ta liczba" — a `skadTaLiczba` po stronie
+# web zwraca null, gdy nie znajdzie „Poziomu bazowego". Pierwszy typ na liście
+# (suma rożnych) otwierał się i nie tłumaczył NICZEGO.
+
+class _Pred:
+    def __init__(self, lam):
+        self.lam = lam
+
+
+def _pary():
+    return (
+        {"nazwa": "Aalesunds FK", "pred": _Pred(6.1)},
+        {"nazwa": "Tromsø IL", "pred": _Pred(4.4)},
+    )
+
+
+def test_poziom_bazowy_jest_zawsze():
+    """Bez „Poziomu bazowego" cały krok znika ze strony — to nie jest ozdoba,
+    tylko warunek, żeby rozwinięcie w ogóle się pokazało."""
+    from footstats.jobs.build_wc_fast import czynniki_pary
+    h, a = _pary()
+    cz = czynniki_pary(h, a, "Rzuty rożne", 0.0)
+    assert cz[0]["nazwa"] == "Poziom bazowy"
+    # obie liczby i ich suma muszą paść w zdaniu — to jest cały rachunek
+    assert "6.1" in cz[0]["opis"] and "4.4" in cz[0]["opis"]
+    assert "10.5" in cz[0]["opis"]
+
+
+def test_korelacja_wchodzi_tylko_gdy_zmierzona():
+    """Rynek bez pomiaru dostaje rho=0. Zdanie „bez wpływu" byłoby wtedy
+    komunikatem o naszej kuchni, nie o meczu — więc milczymy."""
+    from footstats.jobs.build_wc_fast import czynniki_pary
+    h, a = _pary()
+    assert len(czynniki_pary(h, a, "Rzuty rożne", 0.0)) == 1
+    z_rho = czynniki_pary(h, a, "Rzuty rożne", -0.13)
+    assert len(z_rho) == 2
+    assert "mniej" in z_rho[1]["opis"]        # ujemna = jedna więcej, druga mniej
+    assert "też" in czynniki_pary(h, a, "Kartki", 0.2)[1]["opis"]
