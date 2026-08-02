@@ -37,6 +37,8 @@ export const POZA_LABEL: Record<string, string> = {
     "Z jednego meczu pokazujemy ograniczoną liczbę typów; ten się nie zmieścił",
   ujemna_po_korekcie:
     "Po urealnieniu szansy na rozliczeniach ten zakład wychodził na minus – typ policzył się tylko na próbę",
+  trzecia_poprzeczka:
+    "Ten zakład miał już dwie poprzeczki na liście; trzeciej nie dokładamy, bo rozliczenia pokazują, że wypada najgorzej – ta policzyła się tylko na próbę",
   stare_dane: "Zawodnik dawno nie grał, więc typ policzył się tylko na próbę",
   za_pozno: "Powstał za blisko pierwszego gwizdka – nie zdążyłbyś go obstawić",
 };

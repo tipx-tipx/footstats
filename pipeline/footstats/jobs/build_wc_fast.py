@@ -423,6 +423,36 @@ def scal_karty_z_publikacjami(
     return out
 
 
+def linie_opublikowane(log: dict) -> dict[tuple, set]:
+    """Z ZAMROŻONEJ księgi: która linia zakładu jest już wystawiona.
+
+    Zwraca {(mecz_id, podmiot, rynek_kod, strona): {linie}}. „Zakład" to
+    mecz + drużyna/zawodnik + rynek + strona — POPRZECZKA nie jest częścią
+    tożsamości, bo „poniżej 4,5" i „poniżej 5,5" to jeden pomysł wyceniony
+    dwa razy, nie dwa zakłady.
+
+    PO CO (2026-08-02). Brama „jedna linia na stronę" z 01.08 widzi wyłącznie
+    BIEŻĄCE przeliczenie, więc łapie tylko połowę problemu. Zmierzone na
+    księdze: ze 171 zakładów stojących w kilku poprzeczkach 94 dorobiły się
+    drugiej w INNYM cyklu — o północy najlepsza była „poniżej 0,5", po
+    południu kurs się przesunął i model dołożył „poniżej 1,5". Obie zostawały
+    na stronie i obie się rozliczały.
+
+    Typy odrzucone i spoza publikacji NIE blokują: user ich nie widział, więc
+    nie ma z czym kolidować (ta sama zasada co w `kierunki_opublikowane`).
+    """
+    out: dict[tuple, set] = {}
+    for r in (log or {}).values():
+        if r.get("odrzucony") or r.get("poza_publikacja") or r.get("sugestia"):
+            continue
+        if r.get("linia") is None or not r.get("strona"):
+            continue
+        k = (r.get("mecz_id"), rotowire._norm(str(r.get("podmiot") or "")),
+             r.get("rynek_kod"), r.get("strona"))
+        out.setdefault(k, set()).add(float(r["linia"]))
+    return out
+
+
 def kierunki_opublikowane(log: dict) -> dict[tuple, dict]:
     """Z ZAMROŻONEGO logu: które strony linii są już opublikowane per mecz.
 
@@ -4015,9 +4045,15 @@ def _main_impl(tryb=None):
     # kierunki już zamrożone w logu — bez nich filtr widzi tylko bieżący cykl
     # i przepuszcza kolizję rozłożoną na kilka dni (pomiar 2026-07-26)
     try:
-        kierunki_log = kierunki_opublikowane(supa.get_key("typy_log") or {})
+        _log_publikacji = supa.get_key("typy_log") or {}
+        kierunki_log = kierunki_opublikowane(_log_publikacji)
+        # ...z tego samego odczytu: która LINIA zakładu jest już wystawiona
+        # (patrz `linie_opublikowane` i brama niżej) — drugi odczyt księgi
+        # kosztowałby kilkanaście megabajtów na cykl
+        linie_log = linie_opublikowane(_log_publikacji)
     except Exception as e:
         kierunki_log = {}
+        linie_log = {}
         print(f"Spójność kierunku: log niedostępny ({e}) — tylko bieżąca pula")
     legi_pool = filtr_spojnosci_kierunku(legi_pool, kierunki_log)
     if len(legi_pool) < n_przed_sp:
@@ -4252,6 +4288,56 @@ def _main_impl(tryb=None):
                     {**b, "poza_publikacja": "ujemna_po_korekcie"}
                 )
 
+    # === NAJWYŻEJ DWIE POPRZECZKI NA ZAKŁAD (2026-08-02, decyzja usera) ===
+    #
+    # Brama z 01.08 wybiera najlepszą poprzeczkę wg oceny modelu, ale widzi
+    # tylko BIEŻĄCE przeliczenie. Poprzeczki dokładały się więc MIĘDZY cyklami:
+    # o północy najlepsza była „poniżej 0,5", po południu kurs się przesunął
+    # i model dołożył „poniżej 1,5". Jeden zakład potrafił urosnąć do czterech
+    # wierszy.
+    #
+    # CZEMU DWIE, A NIE JEDNA — to nie jest kompromis, tylko pomiar. Poprzeczki
+    # ustawione wg kolejności wystawienia dają (cała księga, rozliczone):
+    #
+    #     1. bazowa              449 typów   57% trafień   -0,219 j./typ
+    #     2. pierwsza dołożona   135 typów   64% trafień   -0,147 j./typ  <-- NAJLEPSZA
+    #     3. i dalsze             37 typów   49% trafień   -0,298 j./typ  <-- najgorsza
+    #
+    # Druga poprzeczka bije bazową. Dopiero trzecia się załamuje — i tam leży
+    # granica. Rozkład to potwierdza: 419 zakładów ma jedną poprzeczkę, 139
+    # dwie, a tylko 35 trzy lub cztery. Limit ucina ogon (42 wiersze z 809),
+    # nie połowę listy.
+    #
+    # Zostają OBIE i obie liczą się w Skuteczności: to naprawdę dwa różne
+    # zakłady (łatwiejszy przy niższym kursie i ambitniejszy przy wyższym),
+    # a nie ten sam wyceniony dwa razy. Na liście stoją jako jeden wiersz
+    # z drabinką — zwijanie robi UI, nie publikacja.
+    #
+    # WYGRYWAJĄ WYSTAWIONE WCZEŚNIEJ. Typ raz pokazany wisi do gwizdka
+    # z zamrożonym kursem, user mógł go już zagrać, a księga rozliczy go po
+    # tamtej cenie — podmiana poprzeczki pod nim byłaby przepisywaniem historii.
+    #
+    # Stoi PO wszystkich bramach jakości, żeby liczyć tylko to, co naprawdę
+    # weszłoby na stronę. Typ nie znika bez śladu — jak każdy odsiew idzie do
+    # księgi i dalej uczy kalibrację.
+    MAX_POPRZECZEK_ZAKLADU = 2
+    if linie_log:
+        _zostaja, _nadmiar = [], []
+        for b in value_bets:
+            k = (b["mecz_id"], rotowire._norm(str(b.get("podmiot") or "")),
+                 b["rynek_kod"], b.get("strona"))
+            juz = linie_log.get(k) or set()
+            nowa = b.get("linia") is not None and float(b["linia"]) not in juz
+            if nowa and len(juz) >= MAX_POPRZECZEK_ZAKLADU:
+                _nadmiar.append({**b, "poza_publikacja": "trzecia_poprzeczka"})
+            else:
+                _zostaja.append(b)
+        if _nadmiar:
+            value_bets[:] = _zostaja
+            typy_poza_publikacja.extend(_nadmiar)
+            print(f"Limit poprzeczek zakładu: zdjęto {len(_nadmiar)} "
+                  f"(zakład ma już {MAX_POPRZECZEK_ZAKLADU} wystawione)")
+
     if typy_poza_publikacja:
         licz_poza = Counter(t["poza_publikacja"] for t in typy_poza_publikacja)
         print("Poza publikacją: " + ", ".join(
@@ -4330,6 +4416,13 @@ def _main_impl(tryb=None):
                 "nasza szansa za mocno rozjeżdża się z kursem. Rozliczenia "
                 "mówią jasno: im dalej jesteśmy od bukmachera, tym rzadziej "
                 "mamy rację — zwykle on wie coś, czego my nie wiemy"
+            )
+        elif t["poza_publikacja"] == "trzecia_poprzeczka":
+            szczegol = (
+                "ten zakład ma już dwie poprzeczki na liście — łatwiejszą "
+                "i ambitniejszą. Trzeciej nie dokładamy: rozliczenia mówią, "
+                "że druga poprzeczka wypada NAJLEPIEJ ze wszystkich, a trzecia "
+                "i dalsze najgorzej"
             )
         elif t["poza_publikacja"] == "kwarantanna_kategorii":
             flaga = next(
