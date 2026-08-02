@@ -119,9 +119,24 @@ def test_rozliczanie_team_dogrywka_czeka(monkeypatch):
     assert wynik["wynik"] is None
 
 
+def test_rozliczanie_team_czeka_trzy_doby(monkeypatch):
+    """Typ bez danych po TRZECH dobach ma jeszcze CZEKAĆ, nie zamykać się.
+
+    Termin był 48 h i kasował typy, dla których źródło miało komplet danych —
+    gubiło je nasze dopasowanie nazw meczu. 115 typów zamkniętych jako "zwrot",
+    54 z nich było na stronie. Zamknięcie jest nieodwracalne, więc dolna
+    granica terminu jest tu ważniejsza niż górna: ten test pilnuje, żeby
+    powrót do dwóch dób nie przeszedł niezauważony.
+    """
+    rec = _rec_druzynowy(kickoff_ts=int(time.time()) - 3 * 86400)
+    store = _przygotuj(monkeypatch, rec, staty={})
+    rozliczanie.rozlicz([], [])
+    assert list(store["typy_log"].values())[0]["wynik"] is None
+
+
 def test_rozliczanie_team_zwrot_po_terminie(monkeypatch):
     rec = _rec_druzynowy(
-        kickoff_ts=int(time.time()) - 3 * 86400   # dawno po terminie danych
+        kickoff_ts=int(time.time()) - 8 * 86400   # dawno po terminie danych
     )
     store = _przygotuj(monkeypatch, rec, staty={})
     rozliczanie.rozlicz([], [])

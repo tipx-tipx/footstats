@@ -81,7 +81,7 @@ def test_bez_trendow_czeka_potem_zwrot(monkeypatch):
     rozliczanie.rozlicz([], [])
     assert list(store["typy_log"].values())[0]["wynik"] is None
 
-    rec2 = _rec_zawodniczy(kickoff_ts=int(time.time()) - 3 * 86400)
+    rec2 = _rec_zawodniczy(kickoff_ts=int(time.time()) - 8 * 86400)
     store2 = _przygotuj(monkeypatch, rec2, trendy=[])
     rozliczanie.rozlicz([], [])
     wynik2 = list(store2["typy_log"].values())[0]

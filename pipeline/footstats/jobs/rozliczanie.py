@@ -129,7 +129,26 @@ MECZ_KONIEC_PO_S = 130 * 60
 OKNO_PAROWANIA_S = 36 * 3600
 # po tym czasie bez danych źródłowych typ zamyka się jako "zwrot" (brak
 # rozstrzygnięcia) — kupony nie mogą wisieć "w grze" w nieskończoność
-TERMIN_BRAK_DANYCH_S = 48 * 3600
+#
+# TERMIN WYDŁUŻONY 48 h -> 7 DNI (2026-08-02). Zamknięcie na "zwrot" jest
+# NIEODWRACALNE i kasuje typ z pomiaru: ani trafiony, ani nietrafiony, po
+# prostu znika. Zmierzone na księdze: 115 typów już tak zniknęło, 54 z nich
+# BYŁY na stronie. Sprawdzone u źródła, że to nie brak danych, tylko nasze
+# dopasowanie nazw meczu (Bodø/Glimt, Aalesunds FK, AGF) — 365Scores miał
+# komplet statystyk dla wszystkich pięciu wtedy wiszących meczów.
+#
+# Dwie doby nie były wyliczone z niczego — to zapas dla KUPONU, żeby nie
+# wisiał "w grze". Ale kupon i tak zamyka się od pierwszego przegranego lega
+# (`_rozlicz_kupony`), więc termin blokuje wyłącznie zestawy, w których
+# brakujący leg jest ostatnią niewiadomą: w chwili zmiany dwa kupony, oba
+# POMINIĘTE (mierzone, nie grane). Za tę cenę księga dostaje pięć dni więcej
+# na doczekanie się danych — a to ona uczy model.
+TERMIN_BRAK_DANYCH_S = 7 * 24 * 3600
+# Okno DOLEWKI świeżych trendów (`_dolej_swieze_trendy`) zostaje na dwóch
+# dobach i celowo NIE idzie za terminem wyżej: to budżet zapytań, nie polityka
+# rozliczania. Pytamy o maks. 60 meczów posortowanych po id, więc szersze okno
+# wpychałoby tam stare, nierozwiązywalne mecze kosztem świeżych.
+OKNO_DOLEWKI_TRENDOW_S = 48 * 3600
 
 
 # --- STRUMIENIE TYPÓW W LOGU ---
@@ -471,7 +490,7 @@ def _dolej_swieze_trendy(log: dict, lib: dict, now: int) -> None:
         r["mecz_id"] for r in log.values()
         if not r.get("wynik")
         and str(r.get("podmiot_typ", "zawodnik")) == "zawodnik"
-        and MECZ_KONIEC_PO_S < now - r["kickoff_ts"] < TERMIN_BRAK_DANYCH_S
+        and MECZ_KONIEC_PO_S < now - r["kickoff_ts"] < OKNO_DOLEWKI_TRENDOW_S
         and r.get("mecz_id")
     })
     if not mids:
