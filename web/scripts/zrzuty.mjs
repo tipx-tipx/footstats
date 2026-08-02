@@ -101,8 +101,15 @@ async function rozwinKarty(page, ile) {
   // w jeden wiersz (`WierszTypu`), a rozwinięcie siedzi w `<tbody>`, nie
   // w `<article>` — więc wpadało dokładnie w tę lukę, przed którą ten skrypt
   // miał chronić: user zobaczył je pierwszy i zgłosił jako nieczytelne.
+  //
+  // `:visible` JEST KONIECZNE, nie kosmetyczne. Skuteczność renderuje przycisk
+  // rozwijania DWA RAZY — raz dla telefonu, raz dla szerokiego ekranu (patrz
+  // `Drabinka` w WierszTypu) — więc jeden z nich jest zawsze `display: none`.
+  // Bez tego filtra Playwright brał pierwszy z brzegu, trafiał w ukryty,
+  // dostawał timeout i PRZERYWAŁ pętlę: zrzuty wychodziły ze zwiniętymi
+  // kartami, cicho, tak jakby wszystko było w porządku.
   const SEL =
-    'article button[aria-expanded="false"], table button[aria-expanded="false"]';
+    'article button[aria-expanded="false"]:visible, table button[aria-expanded="false"]:visible';
   const n = Math.min(await page.locator(SEL).count(), ile);
   for (let i = 0; i < n; i++) {
     // lista przelicza się po każdym kliknięciu (layout framer-motion),

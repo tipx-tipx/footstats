@@ -8,6 +8,7 @@ import {
   nazwaPodmiotu,
   opisZakladu,
   opisZakladuBezLinii,
+  STRONA_LABEL,
 } from "@/lib/format";
 import { odmienLinie } from "@/lib/warianty";
 import type { TypRozliczony } from "@/lib/types";
@@ -158,6 +159,91 @@ export function TabelaTypow({
   );
 }
 
+/**
+ * Zawartość rozwinięcia — wyciągnięta, bo renderujemy ją DWA RAZY: raz dla
+ * telefonu, raz dla szerokiego ekranu. Powód jest czysto tabelaryczny i był
+ * niewidoczny do pierwszego zrzutu z telefonu (2026-08-03):
+ *
+ * `colSpan` wiersza rozwinięcia liczyliśmy dla PEŁNEGO zestawu kolumn, a na
+ * wąskim ekranie dwie („typ" i „było") mają `display: none`. Wiersz deklarował
+ * więc więcej komórek, niż tabela realnie ma — a liczba kolumn bierze się
+ * z NAJSZERSZEGO wiersza, więc przeglądarka dorabiała dwie fantomowe kolumny
+ * i przy `table-fixed` odbierała szerokość kolumnie z nazwą. Efekt: „Aalesunds
+ * FK – Tromsø IL" ścinało się do „Al…", i to WYŁĄCZNIE gdy jakiś wiersz był
+ * rozwinięty — stąd tak łatwo było to przeoczyć.
+ */
+function Drabinka({
+  linie,
+  weszly,
+  faktyczna,
+}: {
+  linie: TypRozliczony[];
+  weszly: number;
+  faktyczna: number | string | null;
+}) {
+  return (
+    <div className="rounded-(--radius-control) border border-hairline bg-card-soft/70 p-3">
+                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                  {faktyczna != null && (
+                    <span className="font-data text-[15px] font-bold leading-none text-ink">
+                      padło {faktyczna}
+                    </span>
+                  )}
+                  <span className="text-[11px] leading-relaxed text-muted">
+                    {weszly === linie.length
+                      ? "– weszły wszystkie poprzeczki tego zakładu"
+                      : weszly === 0
+                        ? "– nie weszła żadna poprzeczka"
+                        : `– weszło ${weszly} z ${linie.length} poprzeczek`}
+                  </span>
+                </div>
+                <p className="mt-0.5 text-[11px] leading-relaxed text-faint">
+                  Jedna liczba z meczu rozstrzyga je wszystkie – dlatego stoją
+                  w jednym wierszu, a nie osobno.
+                </p>
+
+                <div className="mt-2.5 flex flex-wrap gap-1.5">
+                  {linie.map((l, i) => {
+                    const w = l.wynik === "wygrany";
+                    const prz = l.wynik === "przegrany";
+                    return (
+                      <div
+                        key={`${l.linia}-${i}`}
+                        className={`flex w-[104px] flex-col items-center justify-center rounded-md px-1.5 py-2 text-center ${
+                          w
+                            ? "bg-data-green-wash"
+                            : prz
+                              ? "bg-card/60"
+                              : "bg-card/60"
+                        }`}
+                      >
+                        {/* nowrap i szerszy kafel: „poniżej 13,5" łamało się
+                            na dwie linie i szczeble przestawały być równe */}
+                        <span className="font-data whitespace-nowrap text-[12px] font-semibold text-ink-soft">
+                          {STRONA_LABEL[l.strona] ?? l.strona} {fmtLinia(l.linia)}
+                        </span>
+                        <span className="font-data mt-0.5 text-[15px] font-bold leading-tight tabular-nums text-ink">
+                          {l.kurs != null ? fmtKurs(l.kurs) : "–"}
+                        </span>
+                        <span
+                          className={`mt-0.5 text-[10px] font-semibold ${
+                            w
+                              ? "text-data-green-ink"
+                              : prz
+                                ? "text-faint"
+                                : "text-data-amber-ink"
+                          }`}
+                        >
+                          {w ? "✓ weszło" : prz ? "✗ nie" : "zwrot"}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+  );
+}
+
 function WierszTypu({
   g,
   pelnyWglad,
@@ -234,6 +320,19 @@ function WierszTypu({
           <span className="block truncate text-xs text-muted sm:hidden">
             {opis}
           </span>
+          {/* …a RAZEM Z NIMI przycisk rozwijania. Stał wyłącznie w kolumnie
+              „typ", która na telefonie jest schowana — więc całego rozwinięcia
+              nie dało się tam otworzyć (złapane na zrzucie 2026-08-03). */}
+          {wiele && (
+            <button
+              onClick={() => setOtwarty((v) => !v)}
+              aria-expanded={otwarty}
+              className="mt-0.5 block whitespace-nowrap text-[10px] uppercase tracking-wide text-brand-deep sm:hidden"
+            >
+              {odmienLinie(linie.length)}{" "}
+              <span aria-hidden>{otwarty ? "▴" : "▾"}</span>
+            </button>
+          )}
           <span className="block truncate text-xs text-faint">{t.mecz}</span>
         </td>
         <td className="hidden py-2 pr-3 text-muted sm:table-cell">
@@ -285,7 +384,7 @@ function WierszTypu({
           )}
         </td>
         <td
-          className="font-data py-2 pr-3 text-right tabular-nums whitespace-nowrap text-ink-soft"
+          className="font-data py-2 pr-3 text-right tabular-nums text-ink-soft sm:whitespace-nowrap"
           title={
             wiele
               ? "Zakres kursów wszystkich poprzeczek tego zakładu"
@@ -315,7 +414,7 @@ function WierszTypu({
           </td>
         )}
         <td
-          className={`py-2 text-right text-xs font-semibold whitespace-nowrap ${
+          className={`py-2 text-right text-xs font-semibold sm:whitespace-nowrap ${
             wygral
               ? przygaszony
                 ? "text-data-green/60"
@@ -337,72 +436,24 @@ function WierszTypu({
         </td>
       </tr>
 
-      {/* ROZWINIĘCIE MÓWI ZDANIEM, NIE TABELKĄ (zgłoszenie usera 2026-08-03:
-          „rozwinięcie mało intuicyjne"). Wcześniej stały tu trzy gołe kolumny
-          — linia, kurs, wynik — bez ani jednego słowa, więc czytelnik sam
-          musiał się domyślić, że to poprzeczki jednego zakładu i że wszystkie
-          rozstrzyga ta sama liczba z meczu. Teraz zdanie u góry mówi, CO
-          padło i ile z tego wyszło, a każda poprzeczka jest opisana jak
-          zakład („powyżej 1,5 · kurs 1,95 · weszło”), nie jak wiersz danych. */}
+      {/* DWA WIERSZE, JEDNA TREŚĆ — patrz komentarz przy `Drabinka`.
+          `colSpan` musi zgadzać się z liczbą WIDOCZNYCH kolumn, a ta zmienia
+          się z szerokością ekranu. */}
       {wiele && otwarty && (
-        <tr className="border-t border-dotted border-hairline">
-          <td />
-          <td colSpan={pelnyWglad ? 5 : 4} className="pb-3 pr-3">
-            <p className="mb-2 text-xs leading-relaxed text-muted">
-              {faktyczna != null ? (
-                <>
-                  Padło{" "}
-                  <span className="font-data font-semibold text-ink">
-                    {faktyczna}
-                  </span>
-                  {" – "}
-                </>
-              ) : null}
-              {weszly === linie.length
-                ? `dlatego weszły wszystkie ${linie.length} poprzeczki tego zakładu.`
-                : weszly === 0
-                  ? `dlatego nie weszła żadna z ${linie.length} poprzeczek.`
-                  : `dlatego weszły ${weszly} z ${linie.length} poprzeczek.`}{" "}
-              To jedna liczba z meczu, nie kilka osobnych zakładów.
-            </p>
-            <ul className="space-y-1.5">
-              {linie.map((l, i) => (
-                <li
-                  key={`${l.linia}-${i}`}
-                  className="flex flex-wrap items-baseline gap-x-2 text-xs"
-                >
-                  <span className="min-w-[7.5rem] text-ink-soft">
-                    {opisZakladuBezLinii(l)}{" "}
-                    <span className="font-data font-semibold text-ink">
-                      {fmtLinia(l.linia)}
-                    </span>
-                  </span>
-                  <span className="text-faint">
-                    kurs{" "}
-                    <span className="font-data text-ink-soft">
-                      {l.kurs != null ? fmtKurs(l.kurs) : "–"}
-                    </span>
-                  </span>
-                  <span
-                    className={`font-semibold ${
-                      l.wynik === "wygrany"
-                        ? "text-data-green"
-                        : l.wynik === "przegrany"
-                          ? "text-data-red"
-                          : "text-data-amber-ink"
-                    }`}
-                  >
-                    {l.wynik === "wygrany"
-                      ? "✓ weszło"
-                      : l.wynik === "przegrany"
-                        ? "✗ nie weszło"
-                        : "zwrot"}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </td>
-        </tr>
+        <>
+          <tr className="border-t border-dotted border-hairline sm:hidden">
+            <td />
+            <td colSpan={3} className="pb-3 pr-3">
+              <Drabinka linie={linie} weszly={weszly} faktyczna={faktyczna} />
+            </td>
+          </tr>
+          <tr className="hidden border-t border-dotted border-hairline sm:table-row">
+            <td />
+            <td colSpan={pelnyWglad ? 5 : 4} className="pb-3 pr-3">
+              <Drabinka linie={linie} weszly={weszly} faktyczna={faktyczna} />
+            </td>
+          </tr>
+        </>
       )}
 
     </>
