@@ -10,6 +10,7 @@ import { RadarCard } from "./RadarCard";
 import { StsBetCard } from "./StsBetCard";
 import { fmtDataCzas } from "@/lib/format";
 import { grupujWarianty } from "@/lib/warianty";
+import { useTeraz } from "@/lib/useTeraz";
 import type {
   Meta,
   Pewnosc,
@@ -100,14 +101,15 @@ function odmienPozycje(n: number): string {
 
 
 export function ValueBoard({
-  bets,
+  bets: wszystkieBets,
   stsAlerty = [],
   stsGeneratedTs,
-  radarWpisy = [],
+  radarWpisy: wszystkieRadar = [],
   kwarantanna,
   zawodnicy,
   initialMatchId,
   initialRodzaj,
+  teraz: terazSerwera,
 }: {
   bets: ValueBet[];
   stsAlerty?: StsAlert[];
@@ -117,7 +119,22 @@ export function ValueBoard({
   zawodnicy: Zawodnik[];
   initialMatchId?: number;
   initialRodzaj?: "pewniaki" | "value" | "radar" | "wszystko";
+  /** znacznik serwera (s) – wartość startowa dla zegara przeglądarki */
+  teraz: number;
 }) {
+  // ZEGAR PRZEGLĄDARKI, nie chwila zbudowania strony. Strona bywa oddana
+  // z cache sprzed godzin, a wtedy serwerowe odcięcie „mecz się zaczął"
+  // (lib/data.tylkoNadchodzace) jest równie stare co ona i rozegrane mecze
+  // wiszą na liście do ręcznego odświeżenia (zgłoszenie usera 2026-08-02).
+  const teraz = useTeraz(terazSerwera);
+  const bets = useMemo(
+    () => wszystkieBets.filter((b) => b.kickoff_ts > teraz),
+    [wszystkieBets, teraz],
+  );
+  const radarWpisy = useMemo(
+    () => wszystkieRadar.filter((w) => w.kickoff_ts > teraz),
+    [wszystkieRadar, teraz],
+  );
   const [rynek, setRynek] = useState("wszystkie");
   const [pewnosc, setPewnosc] = useState<Pewnosc | "kazda">("kazda");
   const [meczId, setMeczId] = useState<number | undefined>(initialMatchId);

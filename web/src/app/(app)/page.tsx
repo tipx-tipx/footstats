@@ -11,6 +11,7 @@ import {
   getTypyWyniki,
   getValueBets,
   getZawodnicy,
+  terazTs,
 } from "@/lib/data";
 
 export default async function OkazjePage({
@@ -111,6 +112,7 @@ export default async function OkazjePage({
         radarWpisy={radar.wpisy}
         kwarantanna={meta.kwarantanna}
         zawodnicy={zawodnicyLite}
+        teraz={terazTs()}
         initialMatchId={mecz ? Number(mecz) : undefined}
         initialRodzaj={
           rodzaj === "pewniaki" ||

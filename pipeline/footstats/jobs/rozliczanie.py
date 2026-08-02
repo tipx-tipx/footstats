@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import math
 import time
+from collections import Counter
 
 from .. import rozgrywki, supa
 from ..model import betting
@@ -299,6 +300,38 @@ def _delta_stempla(b: dict) -> float:
     p = float(b.get("p_model") or 0.0)
     p_over = p if b.get("strona") != "ponizej" else 1.0 - p
     return round(betting.delta_dla_p(_KOREKTA_CYKLU.get(_strumien(b)), p_over), 4)
+
+
+POWOD_BRAK_DANYCH = "brak danych źródła"
+
+
+def _nierozstrzygniete(log: dict) -> dict:
+    """Typy zamknięte jako „zwrot" z braku danych — i ile z nich BYŁO na stronie.
+
+    Rozliczony rekord jest zamrożony, więc takie zamknięcie jest nieodwracalne:
+    typ nie liczy się ani do trafień, ani do straty, po prostu przestaje
+    istnieć w pomiarze. Bez tej liczby w UI kolejna dziura w źródłach znowu
+    będzie cicha — a poprzednia zjadła 115 typów, zanim ktokolwiek zauważył.
+
+    Rozbicie po rynku pokazuje OD RAZU, gdzie jest dziura: 50 rożnych
+    drużynowych i 5 sum meczowych to inna diagnoza niż 12 fauli wywalczonych.
+    """
+    braki = [
+        r for r in (log or {}).values()
+        if r.get("wynik") == "zwrot" and r.get("powod") == POWOD_BRAK_DANYCH
+    ]
+    per_rynek: Counter = Counter(str(r.get("rynek_kod") or "?") for r in braki)
+    return {
+        "n": len(braki),
+        # te, których user nie widział, bolą mniej — ale nadal są luką w nauce
+        "byly_na_stronie": sum(
+            1 for r in braki
+            if not r.get("poza_publikacja") and not r.get("odrzucony")
+        ),
+        "per_rynek": dict(per_rynek.most_common(6)),
+        "ostatni_ts": max((r.get("rozliczono_ts") or 0) for r in braki)
+        if braki else None,
+    }
 
 
 def _uzupelnij_ekrany(log: dict) -> int:
@@ -2779,6 +2812,7 @@ def _typ_dnia(r: dict) -> dict:
 
 def skutecznosc_per_dzien(
     settled: list[dict], dni: int = 21, poza: list[dict] | None = None,
+    braki: list[dict] | None = None,
 ) -> list[dict]:
     """Skuteczność realnych typów pogrupowana po DNIU meczu (kickoff).
 
@@ -2790,6 +2824,11 @@ def skutecznosc_per_dzien(
     `poza` = typy poza publikacją (kwarantanna rynku / limit meczu): trafiają
     do listy dnia z oznaczeniem i osobnych liczników (poza_n/poza_trafione),
     ale NIE wchodzą do trafień/ROI — user ich nie widział na liście typów.
+
+    `braki` = typy zamknięte jako „zwrot" bez danych ze źródła. Nie wchodzą
+    NIGDZIE poza własny licznik (`brak_danych_n`) — bo o nich nie wiemy nic:
+    ani że weszły, ani że nie. Bez tej liczby dzień, w którym źródło padło,
+    wygląda identycznie jak dzień, w którym po prostu było mniej meczów.
     """
     dzienne: dict[str, dict] = {}
 
@@ -2798,7 +2837,7 @@ def skutecznosc_per_dzien(
         return dzienne.setdefault(d, {
             "dzien": d, "rozliczone": 0, "trafione": 0,
             "okazje": 0, "_zwrot_j": 0.0, "typy": [],
-            "poza_n": 0, "poza_trafione": 0,
+            "poza_n": 0, "poza_trafione": 0, "brak_danych_n": 0,
         })
 
     for r in settled:
@@ -2816,6 +2855,10 @@ def skutecznosc_per_dzien(
         if r.get("wynik") == "wygrany":
             agg["poza_trafione"] += 1
         agg["typy"].append(_typ_dnia(r))
+    # sam licznik, BEZ dokładania do listy typów: wiersz „nie wiemy, jak
+    # poszło" nie ma czego pokazać w kolumnie wyniku i tylko rozmywałby dzień
+    for r in braki or []:
+        _agg(r)["brak_danych_n"] += 1
     out = []
     for d in sorted(dzienne, reverse=True)[:dni]:
         agg = dzienne[d]
@@ -3265,7 +3308,7 @@ def rozlicz(
                     and rec.get("mecz") not in mecze_przyszle
                 ):
                     rec.update(wynik="zwrot", faktyczna=None,
-                               rozliczono_ts=now, powod="brak danych źródła")
+                               rozliczono_ts=now, powod=POWOD_BRAK_DANYCH)
                 continue
             wh, wa = wartosci
             if mk in MARKETY_SUMY:
@@ -3349,7 +3392,7 @@ def rozlicz(
                     and rec.get("mecz") not in mecze_przyszle
                 ):
                     rec.update(wynik="zwrot", faktyczna=None,
-                               rozliczono_ts=now, powod="brak danych źródła")
+                               rozliczono_ts=now, powod=POWOD_BRAK_DANYCH)
                 continue
             traf_t = (
                 wartosc_t > rec["linia"] if rec["strona"] == "powyzej"
@@ -3482,7 +3525,7 @@ def rozlicz(
                 and rec.get("mecz") not in mecze_przyszle
             ):
                 rec.update(wynik="zwrot", faktyczna=None, rozliczono_ts=now,
-                           powod="brak danych źródła")
+                           powod=POWOD_BRAK_DANYCH)
             continue
         trafiony = (
             wartosc > rec["linia"] if rec["strona"] == "powyzej" else wartosc < rec["linia"]
@@ -3711,7 +3754,16 @@ def rozlicz(
 
     # skuteczność DZIEŃ PO DNIU (realne typy, bez rynków osobnych) — z listą
     # typów danego dnia (co siadło); zasila przełącznik dnia na Skuteczności
-    skutecznosc_dzienna = skutecznosc_per_dzien(settled, poza=poza_pub)
+    # typy zamknięte bez rozstrzygnięcia — osobny licznik dnia, żeby dzień
+    # z padniętym źródłem nie wyglądał jak dzień z małym terminarzem
+    _braki_dni = [
+        r for r in log.values()
+        if r.get("wynik") == "zwrot" and r.get("powod") == POWOD_BRAK_DANYCH
+        and r.get("rynek_kod") not in RYNKI_OSOBNE and not r.get("odrzucony")
+    ]
+    skutecznosc_dzienna = skutecznosc_per_dzien(
+        settled, poza=poza_pub, braki=_braki_dni,
+    )
     # ...i to samo rozbite na strumienie (pewniaki / drużyny / drabinki),
     # bo „skuteczność" bez podziału mieszała trzy różne produkty
     strumienie = skutecznosc_strumieni(log)
@@ -3805,6 +3857,20 @@ def rozlicz(
             # samego zakładu („poniżej 13,5 / 14,5 / 15,5") wchodzą razem
             # i liczone osobno zawyżają trafienia. Patrz `skutecznosc_zdarzen`.
             "zdarzenia": skutecznosc_zdarzen(settled),
+            # TYPY ZAMKNIĘTE BEZ ROZSTRZYGNIĘCIA (2026-08-02).
+            #
+            # Po `TERMIN_BRAK_DANYCH_S` typ bez danych ze źródła zamyka się
+            # jako „zwrot" — ani trafiony, ani nietrafiony. Znika z każdego
+            # licznika i z każdej krzywej. Zmierzone przy okazji naprawy
+            # dopasowania nazw meczu: **115 typów** już tak zniknęło, 54 z nich
+            # BYŁY na stronie — i nikt się o tym nie dowiedział, bo ta liczba
+            # nie istniała nigdzie w UI.
+            #
+            # Dlatego wychodzi tu osobno, obok trafień. To jedyny licznik,
+            # który mówi „tego nie wiemy" zamiast „to nie weszło", a różnica
+            # jest zasadnicza: przy 115 sztukach to nie zaokrąglenie, tylko
+            # jedna piąta wszystkiego, co kiedykolwiek pokazaliśmy.
+            "nierozstrzygniete": _nierozstrzygniete(log),
         },
         "po_rynku": po_rynku,
         "ostatnie": ostatnie,

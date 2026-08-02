@@ -263,6 +263,22 @@ export function TypyDnia({
         </p>
       )}
 
+      {/* NIE WIEMY ≠ NIE WESZŁO. Typ zamknięty bez danych ze źródła znika
+          z trafień i z bilansu, więc dzień z padniętym feedem wygląda jak
+          dzień z małym terminarzem. Ta linia jest jedynym miejscem, gdzie
+          taka strata w ogóle się ujawnia. */}
+      {(dzien.brak_danych_n ?? 0) > 0 && (
+        <p className="mt-3 rounded-(--radius-control) border border-dashed border-data-amber/50 bg-data-amber-wash/40 px-3.5 py-2.5 text-xs leading-relaxed text-data-amber-ink">
+          <span className="font-data font-semibold">
+            {dzien.brak_danych_n}{" "}
+            {odmien(dzien.brak_danych_n!, "typ", "typy", "typów")}
+          </span>{" "}
+          z tego dnia zamknęliśmy <strong>bez rozstrzygnięcia</strong> – źródło
+          nie podało statystyk z meczu w terminie. Nie wiemy, czy weszły, więc
+          nie liczą się ani do trafień, ani do bilansu wyżej.
+        </p>
+      )}
+
       {pelnyWglad && bezStempla && (
         <p className="mt-2 text-[11px] leading-relaxed text-faint">
           Część typów z tego dnia jest sprzed wprowadzenia znacznika zakładki

@@ -9,6 +9,7 @@ import { grupujWarianty } from "@/lib/warianty";
 import { FilterDropdown } from "./FilterDropdown";
 import { Reveal } from "./Reveal";
 import type { DruzynaForma, ValueBet, Zawodnik } from "@/lib/types";
+import { useTeraz } from "@/lib/useTeraz";
 
 /**
  * Ceduła typów drużynowych pod SKALĘ sezonu (setki typów dziennie).
@@ -125,10 +126,10 @@ function PokazButton({
 }
 
 export function DruzynyTablica({
-  bets,
+  bets: wszystkie,
   forma,
   ligaByMecz,
-  teraz,
+  teraz: terazSerwera,
 }: {
   /** typy drużynowe w kolejności rankingu silnika (najlepsze pierwsze) */
   bets: ValueBet[];
@@ -138,6 +139,15 @@ export function DruzynyTablica({
   /** timestamp serwera (s) – spójne "dziś/jutro" bez zegara klienta */
   teraz: number;
 }) {
+  // ZEGAR PRZEGLĄDARKI, nie chwila zbudowania strony. Strona bywa oddana
+  // z cache sprzed godzin (patrz useTeraz), a wtedy serwerowe odcięcie
+  // „mecz się zaczął" jest równie stare co ona — i rozegrane mecze wiszą
+  // na liście do ręcznego odświeżenia. Zgłoszenie usera 2026-08-02.
+  const teraz = useTeraz(terazSerwera);
+  const bets = useMemo(
+    () => wszystkie.filter((b) => b.kickoff_ts > teraz),
+    [wszystkie, teraz],
+  );
   const [rynek, setRynek] = useState("wszystkie");
   const [liga, setLiga] = useState("wszystkie");
   const [sort, setSort] = useState<Sort>("rank");
@@ -508,8 +518,13 @@ export function DruzynyTablica({
       </div>
 
       {widoczne.length === 0 ? (
+        // ROZRÓŻNIAMY DWA POWODY PUSTKI. „Zdejmij filtr" przy nieustawionym
+        // filtrze wyglądałoby na awarię — a to zwykle znaczy, że wszystkie
+        // mecze zdążyły się zacząć, odkąd strona została zbudowana.
         <p className="mt-8 text-sm text-muted">
-          Brak typów dla tych filtrów. Zdejmij filtr, żeby zobaczyć całą listę.
+          {bets.length === 0 && wszystkie.length > 0
+            ? "Wszystkie mecze z tej listy już się zaczęły – typ schodzi w chwili pierwszego gwizdka. Nowe pojawią się po najbliższym przeliczeniu."
+            : "Brak typów dla tych filtrów. Zdejmij filtr, żeby zobaczyć całą listę."}
         </p>
       ) : (
         <>

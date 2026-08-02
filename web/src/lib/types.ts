@@ -762,6 +762,10 @@ export interface SkutecznoscDnia {
   /** typy rozliczone poza publikacją tego dnia (kwarantanna/limit meczu) */
   poza_n?: number;
   poza_trafione?: number;
+  /** typy ZAMKNIĘTE BEZ ROZSTRZYGNIĘCIA: źródło nie podało statystyk meczu
+   *  w terminie, więc nie wiemy ani że weszły, ani że nie. Nie wchodzą do
+   *  żadnego licznika – i właśnie dlatego muszą mieć własny */
+  brak_danych_n?: number;
   /** realne typy tego dnia (co siadło / nie siadło) – trafione na górze,
    *  typy poza publikacją na końcu z oznaczeniem */
   typy?: TypRozliczony[];
@@ -865,6 +869,20 @@ export interface TypyWyniki {
     /** średnie CLV rozliczonych typów (dodatnie = bierzemy kursy lepsze niż zamknięcie) */
     clv_sr_pct?: number | null;
     clv_n?: number;
+    /**
+     * TYPY, KTÓRYCH NIE UMIELIŚMY ZAMKNĄĆ. Po terminie bez danych ze źródła
+     * typ zamyka się jako „zwrot" – ani trafiony, ani nietrafiony – i znika
+     * z każdego licznika. Do 2026-08-02 zdarzyło się to 115 razy (54 typy
+     * były na stronie) i nikt się nie dowiedział, bo ta liczba nie istniała
+     * w UI. To jedyny licznik, który mówi „tego nie wiemy".
+     */
+    nierozstrzygniete?: {
+      n: number;
+      byly_na_stronie: number;
+      /** rynek_kod -> ile; pokazuje OD RAZU, gdzie jest dziura w źródłach */
+      per_rynek?: Record<string, number>;
+      ostatni_ts?: number | null;
+    } | null;
   } | null;
   po_rynku: RynekSkutecznosc[];
   ostatnie: TypRozliczony[];

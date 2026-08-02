@@ -108,6 +108,24 @@ export const PRZEDROSTKI_DRUZYNOWE = ["team_", "match_", "wiecej_"];
 const czyDruzynowy = (kod: string) =>
   PRZEDROSTKI_DRUZYNOWE.some((p) => kod.startsWith(p));
 
+/** Kody rynków po ludzku – do listy „gdzie najczęściej brakuje danych". */
+const NAZWA_RYNKU: Record<string, string> = {
+  team_corners: "rożne drużyny",
+  match_corners: "rożne w meczu",
+  team_goals: "gole drużyny",
+  team_cards: "kartki drużyny",
+  team_shots: "strzały drużyny",
+  team_sot: "celne drużyny",
+  team_fouls: "faule drużyny",
+  shots: "strzały",
+  sot: "celne strzały",
+  fouls_won: "faule wywalczone",
+  fouls_committed: "faule popełnione",
+  tackles: "odbiory",
+  interceptions: "przechwyty",
+  offsides: "spalone",
+};
+
 /**
  * Do którego produktu należy typ – awaryjnie, po samym rekordzie.
  *
@@ -382,6 +400,45 @@ export function SkutecznoscScena({
       {werdykt && (
         <div className="max-w-3xl">
           <WerdyktModelu d={werdykt} pelnyWglad={pelnyWglad} />
+        </div>
+      )}
+
+      {/* CZEGO NIE WIEMY — obok tego, co wiemy.
+          Typ, którego nie dało się zamknąć (źródło nie podało statystyk
+          w terminie), znika ze wszystkich liczników: nie jest ani trafiony,
+          ani nietrafiony. Do 2 sierpnia zdarzyło się to 115 razy i nikt się
+          nie dowiedział, bo ta liczba nie istniała nigdzie na stronie —
+          a dziura w źródle wygląda wtedy identycznie jak spokojny tydzień. */}
+      {pelnyWglad && (typy.podsumowanie?.nierozstrzygniete?.n ?? 0) > 0 && (
+        <div className="mt-4 max-w-3xl rounded-(--radius-control) border border-dashed border-data-amber/50 bg-data-amber-wash/40 px-4 py-3">
+          <p className="text-xs leading-relaxed text-data-amber-ink">
+            <span className="font-data font-semibold">
+              {typy.podsumowanie!.nierozstrzygniete!.n} typów
+            </span>{" "}
+            nie dało się rozliczyć – źródło nie podało statystyk z meczu
+            w terminie, więc zamknęliśmy je <strong>bez rozstrzygnięcia</strong>.
+            Nie wiemy, czy weszły, więc nie ma ich w żadnej liczbie wyżej.
+            {typy.podsumowanie!.nierozstrzygniete!.byly_na_stronie > 0 && (
+              <>
+                {" "}
+                <span className="font-data font-semibold">
+                  {typy.podsumowanie!.nierozstrzygniete!.byly_na_stronie}
+                </span>{" "}
+                z nich było na stronie.
+              </>
+            )}
+          </p>
+          {typy.podsumowanie!.nierozstrzygniete!.per_rynek && (
+            <p className="mt-1.5 text-[11px] leading-relaxed text-data-amber-ink/80">
+              Najczęściej:{" "}
+              {Object.entries(typy.podsumowanie!.nierozstrzygniete!.per_rynek!)
+                .slice(0, 3)
+                .map(([kod, n]) => `${NAZWA_RYNKU[kod] ?? kod} (${n})`)
+                .join(", ")}
+              . Rynek, który powtarza się tu regularnie, znaczy dziurę
+              w źródle danych – nie słabszy model.
+            </p>
+          )}
         </div>
       )}
 
