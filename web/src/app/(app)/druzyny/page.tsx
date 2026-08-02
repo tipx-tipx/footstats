@@ -28,13 +28,17 @@ export default async function DruzynyPage() {
       <PageHeader
         eyebrow="statystyki drużynowe"
         title="Typy na całe drużyny"
+        // ZAKRES LIG ROZSZERZYLIŚMY 27.07, TEKST ZOSTAŁ ZE STAREJ EPOKI:
+        // obiecywał top 5 Europy i puchary, a na liście stały Allsvenskan,
+        // Liga Profesional i Superliga. To jedyny błąd tej strony, który
+        // czytelnik wykrywa sam w trzy sekundy — i pierwszy dowód, że opis
+        // nie zgadza się z produktem. Liczba rozgrywek zamiast wyliczanki:
+        // nie zestarzeje się przy następnym rozszerzeniu, a chipy niżej i tak
+        // pokazują konkretne ligi.
         lead={
           <>
-            Gole, rzuty rożne i kartki całych drużyn, nie pojedynczych
-            zawodników. Model liczy je tylko dla rozgrywek, które zna od
-            podszewki: pięć czołowych lig Europy, Ekstraklasa i puchary
-            europejskie razem z kwalifikacjami. Każdy typ ma na klik formę
-            drużyny w tym rynku i czynniki, z których wzięła się liczba.
+            Gole, rożne i kartki <strong>drużyny</strong> – nie pojedynczych
+            zawodników. Liczymy 17 rozgrywek, w których mamy komplet historii.
           </>
         }
       />

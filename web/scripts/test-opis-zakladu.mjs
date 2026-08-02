@@ -94,9 +94,14 @@ sprawdz(
   opisZakladu(suma),
 );
 sprawdz(
-  "rywal wyliczony z meczu — bez tego wiersz gubił GODZINĘ",
-  rywalWZakladzie(suma) === "Rosario Central",
-  rywalWZakladzie(suma),
+  "tytułem wiersza jest CAŁY mecz, nie jedna drużyna",
+  nazwaPodmiotu(suma) === "River Plate – Rosario Central",
+  nazwaPodmiotu(suma),
+);
+sprawdz(
+  "…więc dopisek „z X” znika, żeby nie powtarzać drużyny",
+  rywalWZakladzie(suma) === "",
+  `„${rywalWZakladzie(suma)}”`,
 );
 
 /* --- 3. zwykłe rynki bez zmian ------------------------------------------- */

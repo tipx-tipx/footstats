@@ -496,6 +496,9 @@ export function DruzynyTablica({
             >
               Wszystkie
             </button>
+            {/* „czemu Argentyna w sierpniu?" — pytanie, które zadaje sobie
+                każdy, kto pierwszy raz patrzy na te chipy. Jedna cicha linijka
+                zamienia dziwny zestaw lig w przemyślany zakres. */}
             {ligi.map((l) => (
               <button
                 key={l}
@@ -514,6 +517,11 @@ export function DruzynyTablica({
               </button>
             ))}
           </div>
+        )}
+        {ligi.length > 1 && (
+          <p className="mt-1.5 px-1 text-[11px] leading-relaxed text-faint">
+            Europa w sezonie, Ameryka Południowa i Skandynawia przez resztę roku.
+          </p>
         )}
       </div>
 

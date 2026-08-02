@@ -167,6 +167,12 @@ function stronyMeczu(mecz?: string): [string, string] {
  * zakładzie na gościa wiersz nazwałby zupełnie inną drużynę.
  */
 export function nazwaPodmiotu(b: ZakladDoOpisu): string {
+  // SUMA MECZOWA DOTYCZY OBU DRUŻYN (2026-08-02). „Vélez Sarsfield – rożne
+  // w meczu poniżej 11,5" sugerowało zakład na jedną drużynę, a liczy się
+  // dorobek obu. `podmiot` trzyma tam gospodarza wyłącznie po to, żeby
+  // rozliczanie wiedziało, od której strony liczyć — to nie jest podmiot
+  // zakładu i nie ma prawa być tytułem wiersza.
+  if (CZY_SUMA(b) && b.mecz) return b.mecz;
   if (!CZY_WIECEJ(b)) return b.podmiot;
   if (b.druzyna) return b.druzyna;
   const [gosp, gosc] = stronyMeczu(b.mecz);
@@ -180,9 +186,10 @@ export function rywalWZakladzie(b: ZakladDoOpisu): string {
     if (b.przeciwnik) return b.przeciwnik;
     return b.strona === "gosc" ? gosp : gosc;
   }
-  // suma meczowa: `przeciwnik` przychodzi z pipeline'u PUSTY, bo zakład jest
-  // o cały mecz — ale wiersz i tak ma prawo pokazać, z kim ten mecz jest
-  if (CZY_SUMA(b)) return b.podmiot === gosp ? gosc : gosp;
+  // suma meczowa: nazwą wiersza jest już CAŁY mecz (patrz `nazwaPodmiotu`),
+  // więc dopisek „z X" powtarzałby drużynę, która stoi dwa słowa wcześniej.
+  // Wiersz pokazuje wtedy samą godzinę.
+  if (CZY_SUMA(b)) return "";
   return b.przeciwnik || "";
 }
 

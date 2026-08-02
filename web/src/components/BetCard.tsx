@@ -3,14 +3,14 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { memo, useEffect, useRef, useState } from "react";
 
-import { EdgeBadge, PewnoscDots, RiskBadge } from "./badges";
+import { EdgeBadge, PewnoscDots } from "./badges";
 import { ChanceBar, OutcomeColumns } from "./DistributionStrip";
 import { DrabinkaLinii } from "./DrabinkaLinii";
 import { FormBars } from "./FormBars";
 import { Krok, Kroki, SzczegolyTechniczne } from "./KrokiRozwiniecia";
 import { OsSzans, type OsZnacznik } from "./OsSzans";
 import { Sygnaly, type Sygnal } from "./Sygnaly";
-import { wartoscNetto } from "@/lib/podatek";
+import { kursNetto, wartoscNetto } from "@/lib/podatek";
 import { addZakladFromBet, isTracked, onZakladyChange } from "@/lib/tracker";
 import {
   fmtDataCzas,
@@ -29,7 +29,6 @@ import {
   kierunekMnoznika,
   klasaKierunku,
   profilTypu,
-  SILA_TYPU,
   silaTypu,
 } from "@/lib/slownik";
 import type { FormaRynku, Strona, ValueBet, Zawodnik } from "@/lib/types";
@@ -363,13 +362,19 @@ function WerdyktPewniaka({ bet }: { bet: ValueBet }) {
             Do tego kurs płaci <Num>{fmtEV(ev)}</Num> ponad wartość. Rzadkie
             połączenie z tak wysoką szansą.
           </span>
-        ) : ev != null && ev <= -8 ? (
-          <>
-            Różnica to marża bukmachera. Ten typ bierzesz dla wysokiej szansy
-            trafienia, nie dla kursu.
-          </>
         ) : (
-          <>Cena jest w porządku, a na listę typ trafił za wysoką szansę.</>
+          /* JEDNA ODPOWIEDŹ ZAMIAST DWÓCH, I Z PODATKIEM (2026-08-02).
+             Były tu dwa progi: poniżej -8% „marża bukmachera", a pomiędzy
+             „cena jest w porządku". To drugie zdanie padało przy wartości
+             -6%, czyli mówiło „w porządku" o kursie, który realnie traci.
+             Powód rozjazdu jest zawsze ten sam i nie padał nigdzie na karcie:
+             liczymy PO PODATKU od stawki, a karta pokazywała kurs brutto. */
+          <>
+            Po podatku od stawki zostaje z tego{" "}
+            <Num>{fmtKurs(kursNetto(bet.kurs!, bet.tryb_podatku))}</Num> –
+            mniej niż uczciwe <Num>{fair}</Num>. Ten typ bierzesz za wysoką
+            szansę trafienia, nie za kurs.
+          </>
         )}
       </p>
     </>
@@ -425,15 +430,28 @@ function WerdyktZdanie({ bet }: { bet: ValueBet }) {
     );
   }
   if (ev != null && ev <= -1) {
+    // PODATEK MUSI PAŚĆ SŁOWEM (2026-08-02). Zdanie mówiło „bez przewagi",
+    // a obok stały liczby, z których wynikało coś odwrotnego: kurs 1,21 jest
+    // WYŻSZY niż uczciwe 1,15. Sprzeczność brała się stąd, że liczymy po 12%
+    // podatku od stawki, ale słowo „podatek" nie padało nigdzie na karcie.
+    // Czytelnik widział niespójność zamiast poprawnego rachunku.
+    const poPodatku = fmtKurs(kursNetto(bet.kurs!, bet.tryb_podatku));
     return (
       <>
         <p className="text-[17px] font-semibold leading-snug tracking-tight text-ink sm:text-lg">
-          Warte <Num>{fair}</Num>, {bet.bukmacher} płaci tylko <Num>{kurs}</Num>.{" "}
-          <span className="text-muted">Bez przewagi w kursie.</span>
+          {bet.bukmacher} płaci <Num>{kurs}</Num>, ale od stawki schodzi
+          podatek – realnie <Num>{poPodatku}</Num>.{" "}
+          <span className="text-muted">
+            Uczciwa cena to <Num>{fair}</Num>, więc ten kurs nie płaci tyle, ile
+            powinien.
+          </span>
         </p>
+        {/* DRUGIE ZDANIE JEST WAŻNIEJSZE OD PIERWSZEGO: mówi, co z tym zrobić.
+            Bez niego karta zostawiała człowieka z informacją „nie ma przewagi"
+            i zielonym przyciskiem „dodaj do zakładów" tuż pod spodem. */}
         <p className="mt-1.5 text-sm leading-relaxed text-muted">
-          Kurs wycenia szansę aż na {wycena}, więc nie płaci ponad wartość. Typ
-          jest na liście za wysoką szansę trafienia ({p}), nie za kurs.
+          Ten typ jest na liście za <strong>wysoką szansę</strong> ({p}), nie za
+          cenę. Do kuponu – tak. Jako pojedynczy zakład – raczej nie.
         </p>
       </>
     );
@@ -746,66 +764,6 @@ function skadTaLiczba(
   };
 }
 
-/** Skala ocen = ta sama tabela co plakietka (patrz lib/slownik.ts). */
-const SKALA_OCEN = SILA_TYPU;
-
-/**
- * Własny system ocen zamiast osi z wyceną bukmachera: cztery kategorie
- * naszej skali, ocena tego typu podświetlona, pod spodem proza „skąd ta
- * liczba". Czyta się jak skala ocen, nie jak wykres do interpretacji.
- */
-function OcenaTypu({ bet }: { bet: ValueBet }) {
-  const s = silaTypu(bet.p_model);
-  // BEZ „KURS WYCENIA TO NA 46%, MY DAJEMY 47%" (2026-08-01, decyzja usera):
-  // dwie liczby tego samego rodzaju obok siebie kazały czytelnikowi samemu
-  // zgadywać, co z nich wynika – a zdanie wyżej mówi to samo w kursach
-  // („Superbet płaci 2,17, uczciwa cena to 2,13").
-  return (
-    <div>
-      <div className="grid grid-cols-4 gap-x-2.5">
-        {SKALA_OCEN.map((k) => {
-          const aktywna = k.kod === s.kod;
-          return (
-            <div
-              key={k.kod}
-              className={`border-t-2 pt-1.5 ${
-                aktywna ? "border-brand" : "border-hairline"
-              }`}
-            >
-              <p
-                className={`font-display text-[10px] font-semibold uppercase tracking-wide ${
-                  aktywna ? "text-brand-deep" : "text-faint"
-                }`}
-              >
-                {k.label}
-              </p>
-              <p
-                className={`font-data mt-0.5 text-[10px] ${
-                  aktywna ? "font-semibold text-brand-deep" : "text-faint"
-                }`}
-              >
-                {aktywna ? fmtProc(bet.p_model) : k.zakres}
-              </p>
-            </div>
-          );
-        })}
-      </div>
-      {/* OPIS SKALI NA STRONIE, NIE W DYMKU (2026-08-01). Wcześniej każda
-          z czterech kratek miała `title` z wyjaśnieniem – czyli na telefonie
-          skala była czterema słowami bez znaczenia. */}
-      <p className="mt-2 text-xs leading-relaxed text-faint">
-        {s.opis}
-      </p>
-      {/* „pewność" była tylko trzema kropkami z dymkiem – a to zupełnie inna
-          rzecz niż szansa i mylenie ich jest łatwe */}
-      <p className="mt-1 text-xs leading-relaxed text-faint">
-        Obok kropki z napisem „{PEWNOSC_LABEL[bet.pewnosc]} pewność” – to nie
-        to samo co szansa. Mówią, na ilu meczach i jak powtarzalnych opiera się
-        ta prognoza.
-      </p>
-    </div>
-  );
-}
 
 /**
  * „W ostatnich 10 meczach weszłoby 2 razy, a wy dajecie 48%" – zgłoszenie
@@ -1087,21 +1045,25 @@ export function SzczegolyTypu({
                 )}
 
                 <Krok kod="przewaga">
-                  {/* niskie ryzyko to norma, nie informacja – badge tylko
-                      gdy zdarzenie jest realnie kapryśne */}
-                  {bet.ryzyko !== "niskie" && (
-                    <div className="mb-1.5">
-                      <RiskBadge level={bet.ryzyko} />
-                    </div>
-                  )}
+                  {/* PLAKIETKA RYZYKA USUNIĘTA (2026-08-02). Karta oceniała
+                      ryzyko TRZY RAZY jedna nad drugą: plakietką („ryzyko:
+                      średnie"), zdaniem werdyktu („niska szansa, świadome
+                      ryzyko") i czterostopniową skalą pod spodem. Trzy skale
+                      na jedną rzecz to nie precyzja, tylko szum — zostaje
+                      zdanie, bo jako jedyne mówi, co z tym zrobić. */}
                   <WerdyktZdanie bet={bet} />
 
-                  {/* przy wysokiej szansie oś z wyceną bukmachera nie mówi nic
-                      potrzebnego – zamiast niej nasza skala ocen */}
+                  {/* SKALA CZTERECH SZANS ZASTĄPIONA ZDANIEM (2026-08-02).
+                      Cztery kolumny zajmowały ćwierć rozwinięcia, żeby
+                      podświetlić jedną komórkę. Pełna skala ma sens RAZ na
+                      stronie, w „Jak to działa" — nie przy każdym typie. */}
                   {bet.pewniak && (
-                    <div className="mt-4">
-                      <OcenaTypu bet={bet} />
-                    </div>
+                    <p className="mt-3 text-sm leading-relaxed text-muted">
+                      <span className="font-data font-semibold text-ink">
+                        {fmtProc(bet.p_model)}
+                      </span>{" "}
+                      – {silaTypu(bet.p_model).label}. {silaTypu(bet.p_model).opis}
+                    </p>
                   )}
 
                   {/* jedna oś wyceny (liczby przy znacznikach, bez legendy);
