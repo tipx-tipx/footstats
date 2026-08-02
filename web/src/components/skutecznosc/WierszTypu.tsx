@@ -10,7 +10,6 @@ import {
   opisZakladuBezLinii,
   STRONA_LABEL,
 } from "@/lib/format";
-import { odmienLinie } from "@/lib/warianty";
 import type { TypRozliczony } from "@/lib/types";
 
 /**
@@ -282,12 +281,27 @@ function WierszTypu({
 
   return (
     <>
+      {/* CAŁY WIERSZ JEST KONTROLKĄ (decyzja usera 2026-08-03).
+          Wcześniej rozwijał podpis „2 LINIE · JEDEN WYNIK MECZU" — małe
+          wersaliki w kolorze przygaszonym, czyli coś, co wygląda na etykietę,
+          nie na przycisk. Do tego tłumaczył pojęcie, o które nikt jeszcze nie
+          zapytał (wyjaśnienie stoi RAZ, w ramce nad listą), i powtarzał to,
+          co wiersz i tak pokazuje: dwa kursy i „2 z 2 weszło".
+
+          Teraz klika się wszędzie, a jedynym znakiem jest strzałka przy
+          wyniku. Wiersz z jedną poprzeczką nie reaguje i strzałki nie ma —
+          brak reakcji też jest informacją.
+
+          Strzałka zostaje PRAWDZIWYM przyciskiem, mimo że wiersz i tak łapie
+          klik: inaczej rozwinięcia nie dałoby się otworzyć klawiaturą ani
+          odczytać czytnikiem ekranu (`<tr>` nie jest kontrolką). */}
       <tr
+        onClick={wiele ? () => setOtwarty((v) => !v) : undefined}
         className={`align-top transition-colors hover:bg-brand-wash/30 ${
           poziom === 3
             ? "border-t border-dashed border-hairline-strong/70 opacity-55"
             : "border-t border-hairline"
-        } ${poziom === 2 ? "opacity-70" : ""}`}
+        } ${poziom === 2 ? "opacity-70" : ""} ${wiele ? "cursor-pointer" : ""}`}
       >
         <td className="py-2">
           {poziom === 3 ? (
@@ -320,34 +334,11 @@ function WierszTypu({
           <span className="block truncate text-xs text-muted sm:hidden">
             {opis}
           </span>
-          {/* …a RAZEM Z NIMI przycisk rozwijania. Stał wyłącznie w kolumnie
-              „typ", która na telefonie jest schowana — więc całego rozwinięcia
-              nie dało się tam otworzyć (złapane na zrzucie 2026-08-03). */}
-          {wiele && (
-            <button
-              onClick={() => setOtwarty((v) => !v)}
-              aria-expanded={otwarty}
-              className="mt-0.5 block whitespace-nowrap text-[10px] uppercase tracking-wide text-brand-deep sm:hidden"
-            >
-              {odmienLinie(linie.length)}{" "}
-              <span aria-hidden>{otwarty ? "▴" : "▾"}</span>
-            </button>
-          )}
           <span className="block truncate text-xs text-faint">{t.mecz}</span>
         </td>
         <td className="hidden py-2 pr-3 text-muted sm:table-cell">
           <span className="block truncate">{opis}</span>
-          {wiele && (
-            <button
-              onClick={() => setOtwarty((v) => !v)}
-              aria-expanded={otwarty}
-              title="Te poprzeczki opisują jedną liczbę z meczu – wchodzą albo przepadają razem"
-              className="mt-0.5 block text-[10px] uppercase tracking-wide text-faint transition-colors hover:text-ink"
-            >
-              {odmienLinie(linie.length)} · jeden wynik meczu{" "}
-              <span aria-hidden>{otwarty ? "▴" : "▾"}</span>
-            </button>
-          )}
+
           {/* klasa karty (top/mocny/solidny) – mają ją WYŁĄCZNIE drabinki.
               Wcześniej mieszkała w osobnej liście „Karty rozliczone" pod
               kalendarzem, która przy kilku kartach dziennie powtarzała ten sam
@@ -426,13 +417,45 @@ function WierszTypu({
                 : "text-data-amber-ink"
           }`}
         >
-          {wiele
-            ? `${weszly} z ${linie.length} weszło`
-            : wygral
-              ? "✓ weszło"
-              : przegral
-                ? "✗ nie"
-                : "zwrot"}
+          {wiele ? (
+            <span className="inline-flex items-baseline gap-1">
+              {weszly} z {linie.length} weszło
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();   // wiersz też słucha – nie chcemy podwójnego przełączenia
+                  setOtwarty((v) => !v);
+                }}
+                aria-expanded={otwarty}
+                aria-label={
+                  otwarty ? "Zwiń poprzeczki zakładu" : "Pokaż poprzeczki zakładu"
+                }
+                className="text-faint transition-colors hover:text-ink"
+              >
+                <svg
+                  aria-hidden
+                  width="11"
+                  height="11"
+                  viewBox="0 0 14 14"
+                  className={`transition-transform ${otwarty ? "rotate-180" : ""}`}
+                >
+                  <path
+                    d="M3 5.5 L7 9.5 L11 5.5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+            </span>
+          ) : wygral ? (
+            "✓ weszło"
+          ) : przegral ? (
+            "✗ nie"
+          ) : (
+            "zwrot"
+          )}
         </td>
       </tr>
 
