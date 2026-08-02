@@ -2,7 +2,8 @@
 
 import { memo, useState } from "react";
 
-import { SWIATLO_STYL, swiatloTypu, SzczegolyTypu } from "./BetCard";
+import { SzczegolyTypu } from "./BetCard";
+import { KROPKA_STYL, przewagaKropki } from "@/lib/slownik";
 import { DrabinkaLinii } from "./DrabinkaLinii";
 import {
   fmtKurs,
@@ -50,7 +51,7 @@ export const BetRow = memo(function BetRow({
   const bet = warianty?.find((b) => b.id === wybranyId) ?? glowny;
   // forma jest per rynek, a warianty dzielą rynek – ten sam wykres pasuje
   const forma = formaGlownego;
-  const swiatlo = swiatloTypu(forma, bet.linia, bet.p_model, bet.strona);
+  const kropka = przewagaKropki(bet);
   const opisRynku = opisZakladu(bet, true);
   const poz = Math.min(Math.max(bet.p_model * 100, 2), 98);
   // rywala liczymy z nazwy meczu, gdy rekord go nie niesie: przy sumach
@@ -91,20 +92,18 @@ export const BetRow = memo(function BetRow({
                 {godzinaMeczu(bet.kickoff_ts)}
               </span>
             )}
-            {swiatlo ? (
-              <span className="relative inline-flex h-2 w-2 shrink-0 items-center justify-center">
-                <span
-                  aria-hidden
-                  className={`absolute -inset-1 rounded-full opacity-20 ${SWIATLO_STYL[swiatlo].pasek}`}
-                />
-                <span
-                  aria-hidden
-                  className={`h-2 w-2 rounded-full ${SWIATLO_STYL[swiatlo].pasek}`}
-                />
-              </span>
-            ) : (
-              <span aria-hidden className="h-2 w-2 shrink-0 rounded-full bg-hairline-strong/60" />
-            )}
+            {/* KROPKA = O ILE KURS BIJE NASZĄ WYCENĘ (2026-08-02, patrz
+                `przewagaKropki`). Wcześniej pokazywała zgodność z historią
+                i przez to była pusta w 11 przypadkach na 16, a gdy świeciła
+                na czerwono — podważała typ, który sami polecamy. Teraz jest
+                zawsze i mówi to, co decyduje o obecności typu na liście.
+                Lampka formy nie znika: schodzi do rozwinięcia, gdzie jest
+                dowodem obok wykresu, a nie wyrokiem w kolumnie. */}
+            <span
+              aria-hidden
+              title={`${kropka.label} – ${kropka.opis}`}
+              className={`h-2 w-2 shrink-0 rounded-full ${KROPKA_STYL[kropka.kod]}`}
+            />
             <span className="min-w-0 truncate">
               <span className="text-sm font-semibold">
                 {nazwaPodmiotu(bet)}

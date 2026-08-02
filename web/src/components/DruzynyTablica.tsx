@@ -10,6 +10,7 @@ import { FilterDropdown } from "./FilterDropdown";
 import { Reveal } from "./Reveal";
 import type { DruzynaForma, ValueBet, Zawodnik } from "@/lib/types";
 import { useTeraz } from "@/lib/useTeraz";
+import { KROPKA_STYL, PRZEWAGA_KROPKI } from "@/lib/slownik";
 
 /**
  * Ceduła typów drużynowych pod SKALĘ sezonu (setki typów dziennie).
@@ -71,11 +72,35 @@ function dataKrotka(ts: number): string {
 
 type Sort = "rank" | "szansa" | "kurs" | "godzina";
 const SORTY: { kod: Sort; label: string }[] = [
-  { kod: "rank", label: "najmocniejsze" },
+  // „NAJMOCNIEJSZE" -> „POLECANE" (2026-08-02). Tamto słowo obiecywało
+  // obiektywną moc, której nikt nie zdefiniował — a kolejność brała się
+  // z `rank_score`, które w każdym kanale znaczy co innego (wartość w %
+  // przy sumach meczowych, szansa × pierwiastek kursu przy drużynowych,
+  // ZERO przy typach wznowionych, czyli przy większości listy). Efekt:
+  // stronę otwierały typy 43% i 38% podpisane jako najmocniejsze.
+  // „Polecane" nie obiecuje obiektywności, tylko mówi „to nasza kolejność".
+  { kod: "rank", label: "polecane" },
   { kod: "szansa", label: "szansa" },
   { kod: "kurs", label: "kurs" },
   { kod: "godzina", label: "godzina" },
 ];
+
+/**
+ * JEDNA MIARA DLA WSZYSTKICH RYNKÓW, liczona tu — nie z backendu.
+ *
+ * Szansa × pierwiastek z kursu: sama szansa wynosiłaby na górę wyłącznie
+ * linie 0,5, a sama wartość — najdłuższe strzały. Pierwiastek tłumi kurs
+ * na tyle, żeby typ 87% po 1,21 wygrał z typem 43% po 3,55, ale nie na tyle,
+ * żeby wysoki kurs przestał się liczyć. Ta sama formuła, której backend
+ * używa do pewniaków (`_atrakcyjnosc`) — tyle że tutaj dostaje ją KAŻDY typ,
+ * niezależnie od kanału, którym powstał.
+ */
+const moc = (b: ValueBet) => b.p_model * Math.sqrt(b.kurs ?? b.fair_kurs ?? 1);
+
+/** Od tylu typów dnia rozdzielanie na półki przestaje być szumem. */
+const PROG_POLEK = 4;
+/** Granica półek: „częściej wchodzą" kontra „więcej płacą". */
+const PROG_PEWNE = 0.7;
 
 /** Animowane rozwijanie bloku – wspólny ruch dla dni, sekcji i ceduły dnia. */
 function Rozwin({
@@ -221,7 +246,11 @@ export function DruzynyTablica({
           case "godzina":
             return [...xs].sort((a, z) => a.kickoff_ts - z.kickoff_ts);
           default:
-            return xs; // kolejność wejścia = ranking silnika
+            // NIE kolejność wejścia. Payload nie jest posortowany: backend
+            // sortuje PRZED doklejeniem typów wznowionych, a te wchodzą na
+            // koniec w kolejności rejestru. Sprawdzone na żywej liście:
+            // rank_score szedł 0, 0, 0, 0, 7.3, 0, 0.94, 0.
+            return [...xs].sort((a, z) => moc(z) - moc(a));
         }
       },
     [sort],
@@ -252,7 +281,6 @@ export function DruzynyTablica({
    * "najmocniejsze") – rozgrywki i typy wg rankingu silnika.
    */
   const dni = useMemo(() => {
-    const rankiem = new Map(przyszle.map((b, i) => [b.id, i]));
     const wgDnia = new Map<string, ValueBet[]>();
     for (const b of [...przyszle].sort((a, z) => a.kickoff_ts - z.kickoff_ts)) {
       const k = kluczDnia(b.kickoff_ts);
@@ -264,17 +292,34 @@ export function DruzynyTablica({
         const l = ligaByMecz[b.mecz_id] ?? "Inne rozgrywki";
         (wgLigi.get(l) ?? wgLigi.set(l, []).get(l)!).push(b);
       }
-      const sekcje = [...wgLigi.entries()].map(([nazwa, typy]) => ({
-        nazwa,
-        typy: [...typy].sort(
-          (a, z) => (rankiem.get(a.id) ?? 0) - (rankiem.get(z.id) ?? 0),
-        ),
-      }));
-      sekcje.sort(
-        (a, z) =>
-          Math.min(...a.typy.map((t) => rankiem.get(t.id) ?? 0)) -
-          Math.min(...z.typy.map((t) => rankiem.get(t.id) ?? 0)),
-      );
+      // DWIE PÓŁKI ZAMIAST LIST LIG (2026-08-02, decyzja usera).
+      //
+      // Dzień był dzielony na rozgrywki, czyli po tym, KTO GRA — a to jest
+      // informacja, którą i tak niesie każdy wiersz i którą można wyfiltrować
+      // chipem. Podział, który naprawdę pomaga wybrać, idzie po tym, JAKI TO
+      // ZAKŁAD. Zmierzone na żywej liście: typy 70%+ mają średni kurs 1,31,
+      // reszta 3,01. To są dwa różne produkty, a leżały w jednym worku.
+      //
+      // Przy małym dniu nie dzielimy — dwie półki po dwa typy to nie porządek,
+      // tylko dwa nagłówki.
+      const wgMocy = (xs: ValueBet[]) => [...xs].sort((a, z) => moc(z) - moc(a));
+      const pewne = wgMocy(lista.filter((b) => b.p_model >= PROG_PEWNE));
+      const odwazne = wgMocy(lista.filter((b) => b.p_model < PROG_PEWNE));
+      const sekcje =
+        lista.length >= PROG_POLEK && pewne.length > 0 && odwazne.length > 0
+          ? [
+              {
+                nazwa: "częściej wchodzą",
+                opis: "Szansa 70% i więcej. Kurs niski, ale te typy trafiają regularnie – materiał na kupon.",
+                typy: pewne,
+              },
+              {
+                nazwa: "więcej płacą",
+                opis: "Szansa poniżej 70%. Wchodzą rzadziej, kurs to wynagradza.",
+                typy: odwazne,
+              },
+            ]
+          : [{ nazwa: "", opis: "", typy: wgMocy(lista) }];
       return { klucz, lista, sekcje };
     });
   }, [przyszle, ligaByMecz]);
@@ -291,9 +336,6 @@ export function DruzynyTablica({
   const dalszy = dalsze.find((d) => d.klucz === dalszyKlucz);
 
   const meczeN = new Set(widoczne.map((b) => b.mecz_id)).size;
-  const ligiN = new Set(
-    widoczne.map((b) => ligaByMecz[b.mecz_id]).filter(Boolean),
-  ).size;
 
   const formaRynku = (bet: ValueBet) =>
     formaById.get(bet.podmiot_id)?.forma[bet.rynek_kod];
@@ -334,10 +376,14 @@ export function DruzynyTablica({
           </div>
         </div>
 
-        {sekcje.map(({ nazwa, typy }, idx) => {
+        {sekcje.map(({ nazwa, opis, typy }) => {
           const kluczSekcji = `${klucz}|${nazwa}`;
-          const stan = stanLig[kluczSekcji] ?? (idx === 0 ? "top" : "zwin");
-          const otwarta = stan !== "zwin";
+          // OBIE PÓŁKI OTWARTE (2026-08-02). Przy ligach zwijanie miało sens:
+          // dzień potrafił mieć osiem rozgrywek i tylko pierwsza była ważna.
+          // Półki są DWIE i obie są treścią — chowanie drugiej znaczyłoby,
+          // że jeden z dwóch rodzajów typów jest mniej wart pokazania.
+          const stan = stanLig[kluczSekcji] ?? "top";
+          const otwarta = true;
           // zwijanie ogona dopiero gdy schowa ≥2 wiersze – "pokaż 1
           // pozostały" to więcej UI niż treści
           const zwijalna = typy.length > LIMIT_LIGI_DNIA + 1;
@@ -348,21 +394,8 @@ export function DruzynyTablica({
               aria-label={`${nazwa}: ${odmienTypy(typy.length)}`}
               className="mt-2 first:mt-1"
             >
-              <button
-                onClick={() =>
-                  setStanLig((s) => ({
-                    ...s,
-                    [kluczSekcji]: otwarta ? "zwin" : "top",
-                  }))
-                }
-                aria-expanded={otwarta}
-                className="group flex w-full items-baseline gap-2.5 py-1.5 text-left"
-              >
-                <h3
-                  className={`font-display shrink-0 text-[11px] font-semibold uppercase tracking-widest transition-colors ${
-                    otwarta ? "text-ink" : "text-muted group-hover:text-ink"
-                  }`}
-                >
+              <div className="flex w-full items-baseline gap-2.5 py-1.5 text-left">
+                <h3 className="font-display shrink-0 text-[11px] font-semibold uppercase tracking-widest text-ink">
                   {nazwa}
                 </h3>
                 <span
@@ -372,37 +405,27 @@ export function DruzynyTablica({
                 <span className="font-data shrink-0 text-[11px] text-faint">
                   {odmienTypy(typy.length)}
                 </span>
-                <svg
-                  aria-hidden
-                  width="11"
-                  height="11"
-                  viewBox="0 0 14 14"
-                  className={`shrink-0 self-center text-faint transition-transform ${
-                    otwarta ? "rotate-180" : ""
-                  }`}
-                >
-                  <path
-                    d="M3 5.5 L7 9.5 L11 5.5"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.6"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </button>
+              </div>
+              {/* JEDNO ZDANIE, CO TA PÓŁKA ZNACZY. Sama nazwa („więcej płacą")
+                  domyśla się reszty; zdanie mówi, dla kogo ten rodzaj typu
+                  jest i czego się po nim spodziewać. */}
+              {opis && (
+                <p className="mb-1 text-[11px] leading-relaxed text-faint">
+                  {opis}
+                </p>
+              )}
               <Rozwin open={otwarta}>
                 <div>
                   {posortowane
                     .slice(0, zwijalna ? LIMIT_LIGI_DNIA : typy.length)
-                    .map((b) => wiersz(b, false))}
+                    .map((b) => wiersz(b, true))}
                   {zwijalna && (
                     <>
                       <Rozwin open={stan === "all"}>
                         <div>
                           {posortowane
                             .slice(LIMIT_LIGI_DNIA)
-                            .map((b) => wiersz(b, false))}
+                            .map((b) => wiersz(b, true))}
                         </div>
                       </Rozwin>
                       <PokazButton
@@ -432,16 +455,19 @@ export function DruzynyTablica({
       {/* odczyty + sortowanie + filtry w jednej bandzie: żywy stan tablicy */}
       <div className="mt-6 border-y border-hairline py-3">
         <div className="flex flex-wrap items-center justify-between gap-x-5 gap-y-2.5">
+          {/* LICZNIK MÓWI, CO JEST W OFERCIE — nie ile rekordów mamy w bazie.
+              „17 typów · 12 meczów · 3 rozgrywek" to opis tabeli; człowiek,
+              który tu trafia, pyta „co dla mnie macie", a odpowiedzią są dwa
+              rodzaje zakładu, nie trzy liczby o zasobach. */}
           <p className="font-data text-xs text-muted">
-            <span className="font-semibold text-ink">{odmienTypy(widoczne.length)}</span>
+            <span className="font-semibold text-ink">
+              {widoczne.filter((b) => b.p_model >= PROG_PEWNE).length} częściej
+              wchodzą
+            </span>
+            {" · "}
+            {widoczne.filter((b) => b.p_model < PROG_PEWNE).length} więcej płacą
             {" · "}
             {meczeN} {meczeN === 1 ? "mecz" : meczeN < 5 ? "mecze" : "meczów"}
-            {ligiN > 0 && (
-              <>
-                {" · "}
-                {ligiN} {ligiN === 1 ? "rozgrywki" : "rozgrywek"}
-              </>
-            )}
           </p>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             <div
@@ -523,6 +549,21 @@ export function DruzynyTablica({
             Europa w sezonie, Ameryka Południowa i Skandynawia przez resztę roku.
           </p>
         )}
+        {/* LEGENDA KROPKI NA EKRANIE, NIE W DYMKU (2026-08-02). Kolor, którego
+            znaczenie siedzi w `title`, na telefonie nie znaczy nic — a to
+            pierwsza rzecz, którą oko widzi w każdym wierszu. */}
+        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-[11px] text-faint">
+          <span className="uppercase tracking-widest">kropka = przewaga w kursie</span>
+          {PRZEWAGA_KROPKI.map((k) => (
+            <span key={k.kod} className="flex items-center gap-1.5">
+              <span
+                aria-hidden
+                className={`h-2 w-2 shrink-0 rounded-full ${KROPKA_STYL[k.kod]}`}
+              />
+              {k.label}
+            </span>
+          ))}
+        </div>
       </div>
 
       {widoczne.length === 0 ? (
@@ -531,7 +572,7 @@ export function DruzynyTablica({
         // mecze zdążyły się zacząć, odkąd strona została zbudowana.
         <p className="mt-8 text-sm text-muted">
           {bets.length === 0 && wszystkie.length > 0
-            ? "Wszystkie mecze z tej listy już się zaczęły – typ schodzi w chwili pierwszego gwizdka. Nowe pojawią się po najbliższym przeliczeniu."
+            ? "Wszystkie mecze z tej listy już się zaczęły. Nowe typy pojawią się po najbliższym przeliczeniu."
             : "Brak typów dla tych filtrów. Zdejmij filtr, żeby zobaczyć całą listę."}
         </p>
       ) : (
@@ -550,9 +591,13 @@ export function DruzynyTablica({
                   {etykietaDnia(teraz, teraz).data}
                 </span>
               </div>
+              {/* PUSTY DZIEŃ TO CECHA, NIE AWARIA (2026-08-02). Poprzednia
+                  wersja brzmiała jak przeprosiny za brak towaru. Ta mówi, że
+                  mamy próg i że go trzymamy — a to jest argument sprzedażowy,
+                  nie usprawiedliwienie. */}
               <p className="mt-2 text-sm text-muted">
-                Na dziś nie ma typów drużynowych. Najbliższe mecze znajdziesz
-                niżej{jutro ? ", pierwsze już jutro" : ""}.
+                Dziś żaden typ nie przeszedł naszych progów. Kolejne mecze
+                znajdziesz niżej{jutro ? ", pierwsze już jutro" : ""}.
               </p>
             </div>
           )}

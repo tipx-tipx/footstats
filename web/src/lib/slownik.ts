@@ -75,6 +75,79 @@ export const SILA_TYPU = [
 
 export type SilaTypu = (typeof SILA_TYPU)[number];
 
+/* ------------------------------------------------------------------ *
+ * PRZEWAGA W CENIE – to, co niesie kropka przy wierszu
+ * ------------------------------------------------------------------ */
+
+/**
+ * KROPKA MUSI COŚ ZNACZYĆ (decyzja usera 2026-08-02).
+ *
+ * Poprzednia wersja odpowiadała na pytanie „czy historia zgadza się z tym
+ * typem": zielona, gdy linia padła w ≥65% z ostatnich 10 meczów. Trzy powody,
+ * dla których to nie działało:
+ *
+ *  1. NAJCZĘŚCIEJ JEJ NIE BYŁO – 11 z 16 typów miało szarą kropkę, bo dla
+ *     sum meczowych („rożne w meczu") nie ma czegoś takiego jak forma jednej
+ *     drużyny, a typy wznowione traciły historię między cyklami,
+ *  2. CZERWONA PODWAŻAŁA NASZ WŁASNY TYP – „historia przeczy temu typowi"
+ *     przy zakładzie, który sami polecamy, jest nie do obrony,
+ *  3. odpowiadała na pytanie, którego nikt nie zadaje.
+ *
+ * Teraz kropka mówi, O ILE KURS BIJE NASZĄ WYCENĘ. Liczona z pól, które ma
+ * KAŻDY typ (szansa i kurs), więc nigdy nie jest pusta; jest powodem, dla
+ * którego typ w ogóle trafił na listę; i nigdy nie przeczy produktowi –
+ * słabsza przewaga to nie „zły typ", tylko inny rodzaj typu.
+ *
+ * BRUTTO, NIE NETTO (decyzja usera): interesuje nas kurs, podatek jest
+ * dodatkiem i zostaje przypisem na karcie.
+ *
+ * Oś jest NIEZALEŻNA od podziału listy: półka mówi, jaki to rodzaj zakładu,
+ * kropka – jak dobra jest cena.
+ */
+export const PRZEWAGA_KROPKI = [
+  {
+    kod: "mocna",
+    label: "duża przewaga",
+    opis: "Kurs płaci co najmniej 15% ponad to, ile ten zakład jest wart według naszej liczby.",
+    od: 15,
+  },
+  {
+    kod: "jest",
+    label: "przewaga",
+    opis: "Kurs płaci 5–15% ponad naszą wycenę – zwykły powód, dla którego typ trafia na listę.",
+    od: 5,
+  },
+  {
+    kod: "cienka",
+    label: "cienka przewaga",
+    opis: "Kurs ledwie przekracza naszą wycenę. Typ jest tu za wysoką szansę, nie za cenę.",
+    od: -Infinity,
+  },
+] as const;
+
+export type PrzewagaKropki = (typeof PRZEWAGA_KROPKI)[number];
+
+/** Kropka dla typu – z `ev_pct` (brutto), a gdy go brak, liczona z szansy i kursu. */
+export function przewagaKropki(bet: {
+  ev_pct?: number | null;
+  p_model?: number | null;
+  kurs?: number | null;
+}): PrzewagaKropki {
+  const ev =
+    bet.ev_pct ??
+    (bet.p_model != null && bet.kurs != null
+      ? (bet.p_model * bet.kurs - 1) * 100
+      : 0);
+  return PRZEWAGA_KROPKI.find((k) => ev >= k.od) ?? PRZEWAGA_KROPKI[2];
+}
+
+/** Klasy kropki: pełna / obwódka / cienka obwódka – ta sama skala co wyżej. */
+export const KROPKA_STYL: Record<string, string> = {
+  mocna: "bg-data-green",
+  jest: "border-2 border-data-green bg-transparent",
+  cienka: "border border-hairline-strong bg-transparent",
+};
+
 export function silaTypu(p: number): SilaTypu {
   return SILA_TYPU.find((s) => p >= s.od && p < s.do) ?? SILA_TYPU[0];
 }
