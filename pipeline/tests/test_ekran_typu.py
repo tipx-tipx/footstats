@@ -59,3 +59,30 @@ def test_stempel_wygrywa_z_kodem_rynku():
     historii nie przepisujemy pod nową regułę."""
     rec = {"rynek_kod": "shots", "pewniak": True, "ekran": "drabinki"}
     assert rozliczanie._strumien(rec) == "drabinki"
+
+
+# --- DOBA LICZONA PO POLSKU, NIE PO SERWEROWEMU (2026-08-03) ---------------
+#
+# Dni w Skuteczności grupował `time.localtime()`, czyli strefa maszyny — a cykl
+# chodzi na GitHub Actions, gdzie jest UTC. Mecz o 00:30 czasu polskiego trafiał
+# do rozliczeń DZIEŃ WCZEŚNIEJ. Zmierzone: 107 z 987 rozliczonych typów (11%)
+# pod złą datą, głównie Ameryka Płd. i MLS. Zgłoszenie usera: „wczoraj było 10
+# typów w drabinkach, a nie widzę dziś 10 w rozliczeniach".
+
+def test_doba_konczy_sie_o_polnocy_CZASU_POLSKIEGO():
+    # 2026-08-01 23:30 UTC = 2026-08-02 01:30 w Warszawie (lato, UTC+2)
+    assert rozliczanie.dzien_pl(1785627000) == "2026-08-02"
+    # 2026-08-02 21:00 UTC = 2026-08-02 23:00 w Warszawie — ten sam dzień
+    assert rozliczanie.dzien_pl(1785704400) == "2026-08-02"
+
+
+def test_mecz_nocny_trafia_do_dnia_ktory_widzi_user(monkeypatch):
+    """Racing Club – Tigre, 2.08 o 01:30 czasu polskiego. Serwer w UTC widzi
+    1 sierpnia; user, kalendarz i cała reszta UI widzą 2 sierpnia."""
+    rec = {
+        "kickoff_ts": 1785627000, "wynik": "wygrany", "kurs": 1.8,
+        "p_model": 0.6, "rynek_kod": "shots", "rynek": "Strzały",
+        "podmiot": "X", "linia": 1.5, "strona": "powyzej", "mecz": "A – B",
+    }
+    dni = rozliczanie.skutecznosc_per_dzien([rec])
+    assert [d["dzien"] for d in dni] == ["2026-08-02"]

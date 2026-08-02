@@ -8,3 +8,9 @@ scipy>=1.11,<2.0
 curl_cffi>=0.7,<1.0
 python-dotenv>=1.0,<2.0
 pytest>=8.0,<10.0
+# BAZA STREF CZASOWYCH (2026-08-03). Doba w Skuteczności liczy się czasem
+# POLSKIM, nie strefą maszyny — a Windows nie ma systemowej bazy IANA, więc
+# `ZoneInfo("Europe/Warsaw")` wywala się lokalnie na starcie każdego testu.
+# Linux w Actions bazę ma, ale zależność wpisujemy jawnie: obraz runnera to
+# nie jest coś, na czym chcemy milcząco polegać.
+tzdata>=2024.1

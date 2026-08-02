@@ -292,11 +292,19 @@ function WierszTypu({
               : "Kurs z chwili, gdy typ pojawił się na stronie"
           }
         >
+          {/* MYŚLNIK SUGEROWAŁ ZAKRES (zgłoszenie usera 2026-08-03).
+              „1,95–3,60" czyta się jak „kurs gdzieś pomiędzy", a to są DWA
+              osobne kursy dwóch poprzeczek. Kropka rozdziela je tak samo jak
+              linie w kolumnie obok („1,5 · 2,5"), więc oko paruje je bez
+              wysiłku. Przy trzech i więcej pokazujemy dwa i wielokropek —
+              komplet jest w rozwinięciu. */}
           {kursy.length === 0
             ? "–"
-            : wiele
-              ? `${fmtKurs(Math.min(...kursy))}–${fmtKurs(Math.max(...kursy))}`
-              : fmtKurs(kursy[0])}
+            : !wiele
+              ? fmtKurs(kursy[0])
+              : kursy.length <= 2
+                ? kursy.map(fmtKurs).join(" · ")
+                : `${kursy.slice(0, 2).map(fmtKurs).join(" · ")} …`}
         </td>
         {pelnyWglad && (
           <td
@@ -329,36 +337,65 @@ function WierszTypu({
         </td>
       </tr>
 
-      {/* rozwinięcie: poszczególne poprzeczki tego samego zakładu */}
+      {/* ROZWINIĘCIE MÓWI ZDANIEM, NIE TABELKĄ (zgłoszenie usera 2026-08-03:
+          „rozwinięcie mało intuicyjne"). Wcześniej stały tu trzy gołe kolumny
+          — linia, kurs, wynik — bez ani jednego słowa, więc czytelnik sam
+          musiał się domyślić, że to poprzeczki jednego zakładu i że wszystkie
+          rozstrzyga ta sama liczba z meczu. Teraz zdanie u góry mówi, CO
+          padło i ile z tego wyszło, a każda poprzeczka jest opisana jak
+          zakład („powyżej 1,5 · kurs 1,95 · weszło”), nie jak wiersz danych. */}
       {wiele && otwarty && (
         <tr className="border-t border-dotted border-hairline">
           <td />
-          <td colSpan={pelnyWglad ? 5 : 4} className="pb-2.5 pr-3">
-            <ul className="space-y-1">
+          <td colSpan={pelnyWglad ? 5 : 4} className="pb-3 pr-3">
+            <p className="mb-2 text-xs leading-relaxed text-muted">
+              {faktyczna != null ? (
+                <>
+                  Padło{" "}
+                  <span className="font-data font-semibold text-ink">
+                    {faktyczna}
+                  </span>
+                  {" – "}
+                </>
+              ) : null}
+              {weszly === linie.length
+                ? `dlatego weszły wszystkie ${linie.length} poprzeczki tego zakładu.`
+                : weszly === 0
+                  ? `dlatego nie weszła żadna z ${linie.length} poprzeczek.`
+                  : `dlatego weszły ${weszly} z ${linie.length} poprzeczek.`}{" "}
+              To jedna liczba z meczu, nie kilka osobnych zakładów.
+            </p>
+            <ul className="space-y-1.5">
               {linie.map((l, i) => (
                 <li
                   key={`${l.linia}-${i}`}
-                  className="flex items-baseline gap-3 text-xs"
+                  className="flex flex-wrap items-baseline gap-x-2 text-xs"
                 >
-                  <span className="font-data w-12 shrink-0 tabular-nums text-muted">
-                    {fmtLinia(l.linia)}
+                  <span className="min-w-[7.5rem] text-ink-soft">
+                    {opisZakladuBezLinii(l)}{" "}
+                    <span className="font-data font-semibold text-ink">
+                      {fmtLinia(l.linia)}
+                    </span>
                   </span>
-                  <span className="font-data w-12 shrink-0 tabular-nums text-ink-soft">
-                    {l.kurs != null ? fmtKurs(l.kurs) : "–"}
+                  <span className="text-faint">
+                    kurs{" "}
+                    <span className="font-data text-ink-soft">
+                      {l.kurs != null ? fmtKurs(l.kurs) : "–"}
+                    </span>
                   </span>
                   <span
-                    className={
+                    className={`font-semibold ${
                       l.wynik === "wygrany"
                         ? "text-data-green"
                         : l.wynik === "przegrany"
                           ? "text-data-red"
                           : "text-data-amber-ink"
-                    }
+                    }`}
                   >
                     {l.wynik === "wygrany"
                       ? "✓ weszło"
                       : l.wynik === "przegrany"
-                        ? "✗ nie"
+                        ? "✗ nie weszło"
                         : "zwrot"}
                   </span>
                 </li>
@@ -367,6 +404,7 @@ function WierszTypu({
           </td>
         </tr>
       )}
+
     </>
   );
 }

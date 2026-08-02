@@ -93,9 +93,16 @@ async function przewinCalosc(page) {
  * więc jeden selektor łapie wszystkie rodzaje list.
  */
 async function rozwinKarty(page, ile) {
-  // TYLKO karty (`article`), nie każdy `aria-expanded` na stronie: filtry
-  // i przełączniki widoku też je mają i zjadały wszystkie kliknięcia
-  const SEL = 'article button[aria-expanded="false"]';
+  // TYLKO karty (`article`) i wiersze TABELI, nie każdy `aria-expanded` na
+  // stronie: filtry i przełączniki widoku też je mają i zjadały wszystkie
+  // kliknięcia.
+  //
+  // TABELA DOSZŁA 2026-08-03. Skuteczność zwija poprzeczki jednego zakładu
+  // w jeden wiersz (`WierszTypu`), a rozwinięcie siedzi w `<tbody>`, nie
+  // w `<article>` — więc wpadało dokładnie w tę lukę, przed którą ten skrypt
+  // miał chronić: user zobaczył je pierwszy i zgłosił jako nieczytelne.
+  const SEL =
+    'article button[aria-expanded="false"], table button[aria-expanded="false"]';
   const n = Math.min(await page.locator(SEL).count(), ile);
   for (let i = 0; i < n; i++) {
     // lista przelicza się po każdym kliknięciu (layout framer-motion),
