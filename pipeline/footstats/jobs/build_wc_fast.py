@@ -1084,6 +1084,11 @@ def dopelnij_oferte_zawodnicza(
 # kosztuje do trzech zapytań (wyszukiwarka, profil, historia), więc bez sufitu
 # jeden bogaty mecz zjadłby cały cykl — Sparta Praga – Lyon ma 66 kwotowanych
 # zawodników, czyli ~200 zapytań na jedno spotkanie.
+# Ile DRUŻYN pytamy o własną historię w jednym cyklu. Jedno zapytanie na
+# drużynę (wynik jest cache'owany na cykl), więc przy ~70 meczach w zakresie
+# drużynowym sufit 160 pokrywa komplet z zapasem.
+MAX_TEAM_PERF_CYKL = 160
+
 MAX_ODKRYC_CYKL = 220       # ilu zawodników odkrywamy na cykl (globalnie)
 MAX_ODKRYC_MECZ = 6         # ...i ilu z jednego meczu W JEDNEJ RUNDZIE
 MAX_WYSZUKAN_ODKRYC = 700   # sufit zapytań wyszukiwarki (statshub bez limitu,
@@ -3909,6 +3914,74 @@ def _main_impl(tryb=None):
         if syntetyczne_tt:
             print("Trendy drużynowe z własnego banku: "
                   + ", ".join(f"{k}={v}" for k, v in sorted(syntetyczne_tt.items())))
+
+        # --- TRZECIE ŹRÓDŁO: HISTORIA DRUŻYNY WPROST ZE STATSHUBA (2026-08-04)
+        #
+        # Dwa poprzednie mają tę samą dziurę: feed `props/team-trends` jest
+        # lustrem ofert bukmacherów UK, a bank stylu rośnie z meczów, które
+        # sami przeskanowaliśmy. W PRZERWIE LETNIEJ ligi oba stoją puste.
+        #
+        # Zmierzone na Sparcie Praga – Lyonie (kwalifikacje LM, komplet kursów,
+        # ZERO typów): model widział dla Sparty 0 meczów w oknie czterech
+        # miesięcy i odrzucał ją jako `za_stara_historia`. `/team/{id}/
+        # performance` ma dla niej 9 w tym oknie i 40 w ogóle — komplet sześciu
+        # rynków, razem z golami i rożnymi, których bank nie zna.
+        #
+        # Kolejność źródeł zostaje: feed pierwszy (niesie linie i kursy
+        # referencyjne), bank drugi, to trzecie. Dokładamy WYŁĄCZNIE brakujące
+        # pary (mecz, drużyna, rynek), więc nic nie nadpisujemy.
+        z_performance: Counter = Counter()
+        cache_hist: dict[int, dict] = {}
+        budzet_tp = [MAX_TEAM_PERF_CYKL]
+        for e in wszystkie_ev:
+            if tryb and e["id"] not in tryb.druzynowe_mids:
+                continue
+            lid_e = int(e.get("uniqueTournamentId") or 0)
+            for tid_e, opp_e, is_home_e in (
+                (e["homeTeamId"], e["awayTeamId"], True),
+                (e["awayTeamId"], e["homeTeamId"], False),
+            ):
+                nm_e = team_name.get(tid_e, "")
+                if not nm_e or not tid_e:
+                    continue
+                braki = [
+                    mk for mk in statshub.TEAM_PERF_MAP.values()
+                    if (e["id"], tid_e, mk) not in widziane_tt
+                ] + ([] if (e["id"], tid_e, "team_goals") in widziane_tt
+                     else ["team_goals"])
+                if not braki:
+                    continue
+                if tid_e not in cache_hist:
+                    if budzet_tp[0] <= 0:
+                        continue
+                    budzet_tp[0] -= 1
+                    cache_hist[tid_e] = statshub.historia_druzyny(
+                        int(tid_e), statshub.fetch_team_performance(int(tid_e))
+                    )
+                hist_e = cache_hist.get(tid_e) or {}
+                for mk_e in braki:
+                    dane = hist_e.get(mk_e)
+                    if not dane or len(dane[0]) < MIN_HIST_BANKU:
+                        continue
+                    c_p, t_p, opp_p, oppid_p, dom_p = dane
+                    team_trends.append(statshub.TeamTrend(
+                        team_id=tid_e, team_name=nm_e,
+                        opponent_name=team_name.get(opp_e, ""),
+                        opponent_id=int(opp_e or 0),
+                        event_id=e["id"], is_home=is_home_e,
+                        league_id=lid_e,
+                        market_code=mk_e, line=0.0,
+                        counts=c_p, timestamps=t_p,
+                        game_opponents=opp_p, game_opponent_ids=oppid_p,
+                        game_is_home=dom_p,
+                    ))
+                    widziane_tt.add((e["id"], tid_e, mk_e))
+                    z_performance[mk_e] += 1
+        if z_performance:
+            print("Trendy drużynowe z historii statshuba: "
+                  + ", ".join(f"{k}={v}" for k, v in sorted(z_performance.items()))
+                  + f" ({len(cache_hist)} drużyn"
+                  + (", budżet wyczerpany" if budzet_tp[0] <= 0 else "") + ")")
 
         # KONTEKST Z FEEDU — w lidze bank stylu bywa młody/pusty, a recentGames
         # CAŁEGO feedu team-trends to duża próbka: liczymy z niej średnią ligi

@@ -456,6 +456,98 @@ TEAM_STATTYPE_MAP = {
 }
 
 
+# Pola `/team/{id}/performance` -> nasze kody rynków. Gole NIE są statystyką
+# w tym feedzie — siedzą w `event.score`, więc dokładamy je osobno.
+TEAM_PERF_MAP = {
+    "totalShotsOnGoal": "team_shots",
+    "shotsOnGoal": "team_sot",
+    "cards": "team_cards",
+    "cornerKicks": "team_corners",
+    "fouls": "team_fouls",
+}
+
+# Ile meczów historii bierzemy dla DRUŻYNY. Bez parametru API oddaje 10 —
+# ta sama pułapka co przy zawodnikach (patrz PERF_LIMIT).
+TEAM_PERF_LIMIT = 40
+
+
+def fetch_team_performance(team_id: int, limit: int = TEAM_PERF_LIMIT) -> list[dict]:
+    """Historia meczowa DRUŻYNY — niezależna od tego, czy ktokolwiek ją kwotował.
+
+    ODKRYTE 2026-08-04, gdy Sparta Praga – Lyon nie dała ani jednego typu mimo
+    kompletu kursów. Historię drużyn braliśmy WYŁĄCZNIE z `/props/team-trends`,
+    a ten feed jest lustrem ofert bukmacherów UK — w przerwie letniej ligi
+    czeskiej i francuskiej stoi pusty. Zmierzone tego dnia: model widział dla
+    Sparty ZERO meczów w oknie czterech miesięcy i odrzucał ją jako
+    `za_stara_historia`, podczas gdy ten endpoint ma dla niej dziewięć
+    (a dla Lyonu sześć).
+
+    Zwraca surowe rekordy {event, statistics, opponentStatistics, homeTeam,
+    awayTeam, league}. `statistics` niesie komplet: kartki, rożne, faule,
+    strzały, celne, spalone, odbiory, xG. `opponentStatistics` to te same pola
+    po stronie RYWALA w tamtym meczu — czyli koncesje zmierzone, a nie
+    przybliżane. `league` mówi, z jakich rozgrywek jest każdy mecz historii.
+    """
+    try:
+        d = _get(f"{BASE}/team/{int(team_id)}/performance?limit={int(limit)}",
+                 timeout=25, retries=2)
+    except Exception:
+        return []
+    rows = d.get("data", d)
+    return rows if isinstance(rows, list) else []
+
+
+def historia_druzyny(team_id: int, rows: list[dict]) -> dict[str, tuple]:
+    """Rekordy z `fetch_team_performance` -> {kod_rynku: (counts, timestamps,
+    rywale, rywale_id, czy_u_siebie)}.
+
+    Kształt celowo „surowy", a nie gotowy TeamTrend: trend niesie też kontekst
+    NADCHODZĄCEGO meczu (linia, rywal, event_id), którego historia nie zna.
+    Składa go konsument — tak samo jak przy trendach z banku stylu.
+    """
+    out: dict[str, list] = {}
+    for rec in rows:
+        ev = rec.get("event") or {}
+        st = rec.get("statistics") or {}
+        try:
+            ts = int(ev.get("timeStartTimestamp") or 0)
+        except (TypeError, ValueError):
+            ts = 0
+        if not ts:
+            continue
+        home, away = rec.get("homeTeam") or {}, rec.get("awayTeam") or {}
+        u_siebie = int(home.get("id") or 0) == int(team_id)
+        rywal = (away if u_siebie else home) or {}
+        pary = dict(TEAM_PERF_MAP)
+        for pole, mk in pary.items():
+            v = st.get(pole)
+            if v is None:
+                continue
+            out.setdefault(mk, []).append(
+                (ts, float(v), str(rywal.get("name") or ""),
+                 int(rywal.get("id") or 0), u_siebie)
+            )
+        # GOLE: nie ma ich w `statistics`, są w wyniku meczu
+        wynik = ev.get("score") or {}
+        gole = wynik.get("home" if u_siebie else "away")
+        if gole is not None:
+            out.setdefault("team_goals", []).append(
+                (ts, float(gole), str(rywal.get("name") or ""),
+                 int(rywal.get("id") or 0), u_siebie)
+            )
+    gotowe: dict[str, tuple] = {}
+    for mk, pary in out.items():
+        pary.sort(key=lambda x: -x[0])
+        gotowe[mk] = (
+            [c for _, c, _, _, _ in pary],
+            [t for t, _, _, _, _ in pary],
+            [o for _, _, o, _, _ in pary],
+            [i for _, _, _, i, _ in pary],
+            [h for _, _, _, _, h in pary],
+        )
+    return gotowe
+
+
 @dataclass
 class TeamTrend:
     """Trend DRUŻYNOWY: (drużyna, rynek) z historią ~20 meczów i linią."""
