@@ -546,6 +546,61 @@ MAX_ODDS = 6.0                      # kursy wyżej to loteria, nie systematyczny
 MIN_ODDS = 1.19                     # poniżej 1.19 gra się nie opłaca (decyzja użytkownika)
 MAX_CI_WIDTH = 0.30                 # zbyt szerokie widełki szansy = nie stawiamy
 
+# --- PROFILE LEGA ZAWODNICZEGO (przeniesione z build_wc_fast 2026-08-03) ---
+#
+# To jest POLITYKA, a nie szczegół budowania listy — a leżała wpisana liczbami
+# w środku pętli, więc nie dało się jej ani przetestować, ani nazwać w
+# diagnostyce. Wartości bez zmian; przenosiny są po to, żeby powiedzieć, KTÓRY
+# warunek uciął typ (patrz `powod_profilu_zawodnika`).
+PROFIL_PEWNY_MAX_ODDS = 2.80        # pewniak: niski kurs, wysoka szansa
+PROFIL_PEWNY_MIN_P = 0.52
+PROFIL_PERELKA_ODDS = (1.90, 3.60)  # perełka: wyższy kurs, wciąż solidna szansa
+PROFIL_PERELKA_MIN_P = 0.42
+PROFIL_NISZOWA_MIN_P = 0.40         # rynek niszowy + sprzyjający profil rywala
+
+
+def powod_profilu_zawodnika(
+    odd: float, p_side: float, p_dec: float,
+    rzadki: bool = False, matchup: bool = False,
+) -> str:
+    """Dlaczego ta linia nie weszła w żaden profil lega — kod powodu.
+
+    POWÓD ROZDZIELENIA (2026-08-03). Wszystkie te warunki miały jeden wspólny
+    komunikat („kwotowane linie nie łączą sensownego kursu z szansą"), więc
+    137 odrzuceń dziennie nie mówiło NIC o tym, co właściwie tnie. Dokładnie
+    ta sama ślepota, którą po stronie drużynowej rozdzieliliśmy 2026-07-27
+    (`powod_widelek`) — i tam się okazało, że wina jest gdzie indziej, niż
+    wszyscy zakładali.
+
+    Kolejność od NAJBLIŻSZYCH publikacji: typ, któremu zabrakło tylko wartości,
+    jest ciekawszy niż taki, którego kurs w ogóle nie mieści się w paśmie.
+    """
+    lo_p, hi_p = PROFIL_PERELKA_ODDS
+    w_pasmie_pewny = MIN_ODDS <= odd <= PROFIL_PEWNY_MAX_ODDS
+    w_pasmie_perelka = lo_p <= odd <= hi_p
+    if not w_pasmie_pewny and not w_pasmie_perelka:
+        return "kurs_poza_pasmem"
+    prog = min(
+        PROFIL_PEWNY_MIN_P if w_pasmie_pewny else 1.0,
+        PROFIL_PERELKA_MIN_P if w_pasmie_perelka else 1.0,
+        PROFIL_NISZOWA_MIN_P if (rzadki and matchup and w_pasmie_perelka) else 1.0,
+    )
+    if p_side < prog:
+        return "szansa_za_niska"
+    if p_dec * odd - 1.0 < 0.0:
+        return "wartosc_ujemna_przy_ostroznym"
+    return "profil_ok"
+
+
+# nazwy powodów po ludzku — do `odrzucenia` i podsumowania cyklu
+POWODY_PROFILU_PL = {
+    "kurs_poza_pasmem": "kurs poza pasmem profilu (1,19–2,80 lub 1,90–3,60)",
+    "szansa_za_niska": "kurs w paśmie, ale szansa poniżej progu profilu",
+    "wartosc_ujemna_przy_ostroznym": (
+        "kurs i szansa w normie, ale przy szansie OSTROŻNEJ wartość wychodzi ujemna"
+    ),
+}
+
 
 def kurs_w_widelkach(kurs) -> bool:
     """Czy kurs mieści się w widełkach produktu (MIN_ODDS..MAX_ODDS).

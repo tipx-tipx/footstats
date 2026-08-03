@@ -1181,6 +1181,15 @@ def profil_sedziow(
 # bo korzystają z niego dwie ścieżki: typy drużynowe i drabinki
 sedzia_dla_rynku = context.sedzia_dla_rynku
 
+# Który powód odrzucenia zawodnika jest CIEKAWSZY, gdy kwotowanych linii jest
+# kilka: im wyżej, tym bliżej publikacji był ten typ. Zawodnikowi, któremu
+# zabrakło tylko wartości, warto się przyjrzeć; ten z kursem 8,0 nie mówi nic.
+_KOLEJNOSC_PROFILU = {
+    "kurs_poza_pasmem": 1,
+    "szansa_za_niska": 2,
+    "wartosc_ujemna_przy_ostroznym": 3,
+}
+
 
 # --- BANK STYLU (pełne matchupy, model/styl.py) ---
 # limity per cykl: pierwszy przebieg dogania cały turniej w 1-2 cyklach,
@@ -2958,6 +2967,7 @@ def _main_impl(tryb=None):
         # zasila rejestr odrzuceń precyzyjniejszym powodem niż "nie wyszło"
         n_pool_przed = len(legi_pool)
         prof_ok = ci_fail = div_fail = False
+        powod_profilu: str | None = None   # patrz `_KOLEJNOSC_PROFILU`
         hist_krotka = len(tr.counts) < 5
         for l, slot in sorted(merged.items()):
             over_odd = slot.get("over", (None,))[0]
@@ -3034,13 +3044,14 @@ def _main_impl(tryb=None):
                 # co selekcja premiuje: szerokie, niepewne oszacowania.
                 p_dec = (p_side + sm.ci_low) / 2.0 if sm.ci_low is not None else p_side
                 pewny = (
-                    betting.MIN_ODDS <= odd <= 2.80   # user: kursy od 1.19
-                    and p_side >= 0.52
+                    betting.MIN_ODDS <= odd <= betting.PROFIL_PEWNY_MAX_ODDS
+                    and p_side >= betting.PROFIL_PEWNY_MIN_P
                     and p_dec * odd - 1.0 >= 0.0
                 )
                 perelka = (
-                    1.90 <= odd <= 3.60
-                    and p_side >= 0.42
+                    betting.PROFIL_PERELKA_ODDS[0] <= odd
+                    <= betting.PROFIL_PERELKA_ODDS[1]
+                    and p_side >= betting.PROFIL_PERELKA_MIN_P
                     and p_dec * odd - 1.0 >= 0.0
                 )
                 # furtka kontekstowa: rynki niszowe (spalone / głową / celne
@@ -3052,10 +3063,24 @@ def _main_impl(tryb=None):
                 niszowa = (
                     mk in RARE_MARKETS
                     and matchup_typ
-                    and 1.90 <= odd <= 3.60
-                    and p_side >= 0.40
+                    and betting.PROFIL_PERELKA_ODDS[0] <= odd
+                    <= betting.PROFIL_PERELKA_ODDS[1]
+                    and p_side >= betting.PROFIL_NISZOWA_MIN_P
                     and p_dec * odd - 1.0 >= 0.0
                 )
+                if not (pewny or perelka or niszowa):
+                    # KTÓRY warunek uciął — patrz `powod_profilu_zawodnika`.
+                    # Trzymamy powód NAJBLIŻSZY publikacji spośród wszystkich
+                    # kwotowanych linii tego zawodnika: „zabrakło wartości"
+                    # mówi co innego niż „kurs w ogóle nie z tej półki".
+                    _p = betting.powod_profilu_zawodnika(
+                        odd, p_side, p_dec,
+                        rzadki=mk in RARE_MARKETS, matchup=matchup_typ,
+                    )
+                    if _KOLEJNOSC_PROFILU.get(_p, 0) > _KOLEJNOSC_PROFILU.get(
+                        powod_profilu or "", 0
+                    ):
+                        powod_profilu = _p
                 # typ kontekstowy (matchup): profil rywala wyraźnie sprzyja —
                 # model może rozejść się z rynkiem mocniej niż zwykle, bo zna
                 # kontekst, którego kurs mógł nie wycenić (weryfikują rozliczenia)
@@ -3145,8 +3170,17 @@ def _main_impl(tryb=None):
         # żadna linia nie weszła do puli kuponów — zapisz precyzyjny powód
         if len(legi_pool) == n_pool_przed:
             if not prof_ok:
-                _odrzuc(mid, tr, "kurs_lub_szansa_poza_widelkami",
-                        "kwotowane linie nie łączą sensownego kursu z szansą")
+                # POWÓD, NIE ZBIORCZA ETYKIETA (2026-08-03). Do dziś wszystkie
+                # trzy warunki profilu miały jeden komunikat, więc 137 odrzuceń
+                # dziennie nie mówiło, co właściwie tnie — i tym samym nie dało
+                # się zdecydować, czy problem jest w progach, w cenie, czy
+                # w tym, że korekta strumienia ściąga szansę pod próg.
+                _odrzuc(mid, tr,
+                        powod_profilu or "kurs_lub_szansa_poza_widelkami",
+                        betting.POWODY_PROFILU_PL.get(
+                            powod_profilu or "",
+                            "kwotowane linie nie łączą sensownego kursu z szansą",
+                        ))
             elif hist_krotka:
                 _odrzuc(mid, tr, "krotka_historia",
                         f"tylko {len(tr.counts)} meczów w historii (potrzeba 5)")
@@ -3507,9 +3541,28 @@ def _main_impl(tryb=None):
         wlasne_feed: dict[tuple[int, str], list[float]] = {}
         seen_gra: set = set()
         for tt in team_trends:
-            for v_g, ts_g, opp_g in zip(
-                tt.counts, tt.timestamps, tt.game_opponent_ids
-            ):
+            # NIE ZIPUJEMY PO `game_opponent_ids` (naprawa 2026-08-03).
+            #
+            # Trend zbudowany z NASZEGO banku (kartki, strzały, celne, faule —
+            # feed ich dla klubów nie wystawia) nie zna id rywali, więc ta lista
+            # jest pusta. `zip` ucina po najkrótszej, czyli te trendy wnosiły
+            # do normy ligowej DOKŁADNIE ZERO próbek — cicho, bez śladu.
+            #
+            # Skutek był konkretny: `lg_feed` nigdy nie zbierał wymaganych 30
+            # obserwacji, więc poziom bazowy dla kartek spadał na ŚREDNIĄ
+            # CAŁEGO BANKU, mieszając ligi. Zmierzone 03.08 na drużynach
+            # najbliższych meczów: Superliga duńska 1,05 kartki na drużynę-mecz,
+            # Brasileirão B 2,56, a wspólny prior 1,93 — czyli duński zespół
+            # startował z liczbą prawie dwukrotnie zawyżoną, i to przy rynku,
+            # na którym i tak zawyżamy ([[lambda-per-rynek]]).
+            #
+            # Koncesje rywala zostają warunkowe: bez id rywala nie ma czego
+            # przypisać, ale norma ligi i własne próbki są policzalne zawsze.
+            for i_g, (v_g, ts_g) in enumerate(zip(tt.counts, tt.timestamps)):
+                opp_g = (
+                    tt.game_opponent_ids[i_g]
+                    if i_g < len(tt.game_opponent_ids) else 0
+                )
                 k_g = (tt.team_id, tt.market_code, ts_g)
                 if k_g in seen_gra:
                     continue
