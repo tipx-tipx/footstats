@@ -215,7 +215,14 @@ function Fakty({ w }: { w: RadarWpis }) {
       .sort((a, b) => (b!.przewaga_pct ?? 0) - (a!.przewaga_pct ?? 0))[0];
 
   const fakty: { tekst: string; klasa: string }[] = [];
-  if (roz && roz.przewaga_pct >= 1) {
+  // CHIP TYLKO PRZY RÓŻNICY, PO KTÓRĄ SIĘ SIĘGA — 12 PUNKTÓW SZANSY
+  // (backend: radar.PROG_OKAZJI_PP). Mierzymy w punktach, nie w procentach
+  // kursu, bo ten sam procent znaczy co innego przy różnych cenach: 25% to
+  // 16,7 punktu przy 1,20/1,50 i tylko 5,0 punktu przy 4,00/5,00.
+  // POKAZUJEMY za to procent, bo user myśli w kursach – miara decyzji i liczba
+  // na ekranie to dwie różne rzeczy. Cena Betclica nie znika przy niższej
+  // różnicy: dalej stoi przy szczeblu jako „BC 1,82".
+  if (roz && (roz.roznica_pp ?? 0) >= 12) {
     fakty.push({
       // „gdzie" mówi, u KOGO jest lepsza cena — bez tego liczba wisi w próżni
       tekst: `+${Math.round(roz.przewaga_pct)}% u ${

@@ -214,8 +214,16 @@ export interface RadarRozjazd {
   /** wyższa z dwóch cen – tam się gra */
   lepszy: number;
   gdzie: "superbet" | "betclic";
-  /** o ile procent lepsza cena bije gorszą */
+  /** o ile procent lepsza cena bije gorszą – LICZBA NA EKRAN (user myśli w kursach) */
   przewaga_pct: number;
+  /**
+   * O ile PUNKTÓW SZANSY rozjeżdżają się obie księgi – MIARA DECYZJI.
+   * Procent znaczy co innego przy różnych cenach: 25% to 16,7 punktu przy
+   * kursach 1,20/1,50 i tylko 5,0 punktu przy 4,00/5,00. Dlatego próg okazji
+   * (radar.PROG_OKAZJI_PP) stoi na punktach, a nie na procentach.
+   * `undefined` = snapshot sprzed 2026-08-04.
+   */
+  roznica_pp?: number;
   /** szansa wynikająca z TAŃSZEJ ceny (ostrożniejsza ocena rynku) */
   p_rynku: number;
   /** „pewniak_taniej" = jeden mówi „to niemal pewne", drugi płaci sensownie */

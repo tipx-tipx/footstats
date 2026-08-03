@@ -1075,8 +1075,32 @@ def _sezony_wpisu(player_sezon: dict | None, pid: int | None) -> list[dict]:
 
 
 # Do ilu procent różnicy uznajemy, że dwa cenniki MÓWIĄ TO SAMO. Poniżej tego
-# druga księga jest potwierdzeniem naszej wyceny, powyżej — okazją.
+# druga księga jest potwierdzeniem naszej wyceny.
 PROG_ZGODNEGO_RYNKU_PCT = 8.0
+
+# ...a OD ILU nazywamy to okazją i malujemy na bursztynowo (2026-08-04).
+#
+# MIERZONE W PUNKTACH SZANSY, NIE W PROCENTACH KURSU — i to jest sedno.
+# Procent znaczy co innego przy różnych cenach, więc jeden próg procentowy
+# musiałby być jednocześnie za ostry i za luźny:
+#
+#     kursy         procent   punkty szansy
+#     4,00 / 5,00      25%       5,0 pp     <- prawie sama marża
+#     1,20 / 1,50      25%      16,7 pp     <- realna niezgoda
+#
+# Ten sam procent, dwa zupełnie różne zdarzenia. Punkty szansy mierzą w obu
+# przypadkach to samo: o ile obie księgi rozjeżdżają się co do tego, jak
+# prawdopodobne jest zdarzenie.
+#
+# 12 punktów bierze się z dwóch niezależnych stron i dlatego mu ufam:
+#   * układ „pewniak taniej" (1,45 wobec 1,75) to 11,8 pp na swojej granicy —
+#     dwie bramy mówiące o tym samym nie mogą stać w dwóch różnych miejscach,
+#   * przykłady usera: odrzucone 1,59/1,82 daje 7,9 pp, a akceptowane
+#     1,70/2,30 i 1,70/2,50 dają 15,3 i 18,8 pp. Próg trafia w tę szczelinę.
+#
+# Poniżej progu druga cena NIE ZNIKA — dalej stoi przy szczeblu jako „BC 1,82".
+# Przestaje tylko udawać okazję: karta jest wtedy zwykłą drabinką.
+PROG_OKAZJI_PP = 12.0
 
 
 def _klucz_zawodnika(nazwa: str) -> str:
@@ -1141,7 +1165,7 @@ def _kategoria_karty(w: dict) -> str:
                 for s in r.get("drabinka") or [] if s.get("rozjazd")]
     if not rozjazdy:
         return "analiza"
-    if max(r["przewaga_pct"] for r in rozjazdy) >= PROG_ZGODNEGO_RYNKU_PCT:
+    if max(r.get("roznica_pp") or 0.0 for r in rozjazdy) >= PROG_OKAZJI_PP:
         return "rozjazd"
     return "rynek_zgodny"
 

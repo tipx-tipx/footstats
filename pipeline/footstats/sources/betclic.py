@@ -956,6 +956,19 @@ def rozjazd(kurs_sb: float | None, kurs_bc: float | None,
         "lepszy": round(lepszy, 2),
         "gdzie": "superbet" if a >= b else "betclic",
         "przewaga_pct": round((lepszy / gorszy - 1) * 100, 1),
+        # O ILE PUNKTÓW SZANSY cenniki się nie zgadzają (2026-08-04).
+        #
+        # Procent sam w sobie nie mówi, czy spór jest duży — bo znaczy co
+        # innego przy różnych cenach. Te same 25% to 16,7 punktu przy kursach
+        # 1,20/1,50 (realna niezgoda co do zdarzenia) i tylko 5,0 punktu przy
+        # 4,00/5,00, gdzie prawie cała różnica to marża. Punkty szansy mierzą
+        # to samo w obu przypadkach, więc dopiero na nich da się postawić
+        # jeden próg dla całej drabinki.
+        #
+        # `przewaga_pct` ZOSTAJE — to jest liczba na kartę („+41% u Betclica"),
+        # bo user myśli w kursach, a nie w punktach szansy. Rozdzielamy więc
+        # miarę DECYZJI od liczby POKAZYWANEJ.
+        "roznica_pp": round((1.0 / gorszy - 1.0 / lepszy) * 100, 1),
         "p_rynku": round(1.0 / gorszy, 4),
         # nazwany układ, a nie sam procent — front ma to wyróżniać
         "typ": ("pewniak_taniej"
