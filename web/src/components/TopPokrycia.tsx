@@ -23,6 +23,63 @@ function dataMeczu(ts: number): string {
   }).format(new Date(ts * 1000));
 }
 
+/**
+ * Odczyty linii jednego wiersza: próg, pokrycie, kurs, wartość.
+ * Wspólne dla tabeli (laptop) i karty (telefon) – jedna definicja, żeby
+ * dwa układy nie rozjechały się przy następnej zmianie.
+ */
+function Linie({
+  w,
+  zKursami,
+}: {
+  w: WierszPokrycia;
+  /** false = mecz bez oferty zawodniczej, kolumna kursu nie ma czego pokazać */
+  zKursami: boolean;
+}) {
+  return (
+    <span className="flex flex-col gap-1">
+      {w.linie.map((l) => (
+        <span key={l.linia} className="font-data flex items-baseline gap-x-3 text-xs">
+          <span className="w-5 shrink-0 font-semibold text-faint">{l.prog}+</span>
+          <span
+            className={`w-8 shrink-0 font-semibold ${
+              l.pokryte === w.probka ? "text-data-green-ink" : "text-ink"
+            }`}
+          >
+            {l.pokryte}/{w.probka}
+          </span>
+          {zKursami && (
+            <span className="w-12 shrink-0 text-muted">
+              {l.kurs != null ? `@${fmtKurs(l.kurs)}` : "–"}
+            </span>
+          )}
+          {l.evPct != null && (
+            <span
+              title="Zgrubny sygnał wartości: ile dałby ten zakład, gdyby surowe pokrycie było prawdziwą szansą (pokrycie × kurs − 1). To NIE jest przewaga silnika, bo próba to tylko 5 startów, bez kalibracji i kontekstu. Odsiewa kursy typu „5/5 @1,01”."
+              className={`w-12 shrink-0 font-semibold ${
+                l.evPct >= 8
+                  ? "text-data-green-ink"
+                  : l.evPct < 0
+                    ? "text-data-red-ink"
+                    : "text-faint"
+              }`}
+            >
+              {l.evPct > 0 ? "+" : l.evPct < 0 ? "−" : "±"}
+              {Math.abs(l.evPct)}%
+            </span>
+          )}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/** Skąd próbka: opis pod nazwiskiem (wspólny dla tabeli i karty). */
+function opisProbki(w: WierszPokrycia, ligowy: boolean): string {
+  if (ligowy) return "ostatnie starty";
+  return w.kadraBasis ? "starty w kadrze" : "starty (klub)";
+}
+
 /** Poprawna polska odmiana: "1 propozycja", "3 propozycje", "8 propozycji". */
 function odmienPropozycje(n: number): string {
   if (n === 1) return "1 propozycja";
@@ -249,9 +306,45 @@ export function TopPokrycia({
         )}
       </div>
 
-      {/* tabela – przewija się w kontenerze (poziomo na mobile),
-          nagłówek kolumn przyklejony u góry */}
-      <div className="mt-3.5 max-h-[75vh] overflow-auto rounded-(--radius-card) border border-hairline bg-card shadow-(--shadow-card)">
+      {/* TELEFON: karta zamiast wiersza tabeli.
+          Tabela ma cztery kolumny i minimum 600–720 px, więc na ekranie 390 px
+          widać było wyłącznie „rynek" i nazwisko – pokrycie, czyli jedyny powód
+          istnienia tej tabeli, zostawało poza ekranem i trzeba było przesuwać
+          ją w bok (zgłoszenie usera 2026-08-03). Kafelki i odczyty linii są te
+          same co w tabeli (komponent `Linie`), zmienia się tylko układ. */}
+      <ul className="mt-3.5 max-h-[75vh] divide-y divide-hairline overflow-y-auto rounded-(--radius-card) border border-hairline bg-card shadow-(--shadow-card) sm:hidden">
+        {pokazane.map((w, i) => (
+          <li key={`m-${w.player_id}-${w.rynek_kod}-${i}`} className="px-3.5 py-3">
+            <div className="flex items-baseline justify-between gap-2">
+              <p className="min-w-0 truncate font-medium">{w.zawodnik}</p>
+              <span className="font-display shrink-0 text-[10px] font-semibold uppercase tracking-wide text-brand-deep">
+                {w.rynek}
+              </span>
+            </div>
+            <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-faint">
+              <span className="truncate">{w.druzyna}</span>
+              <span aria-hidden>·</span>
+              <span>
+                {opisProbki(w, ligowy)}, ost. {dataMeczu(w.ostatniMeczTs)}
+              </span>
+              {!w.kadraRegularny && (
+                <span className="inline-flex rounded-full bg-data-amber-wash px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-data-amber-ink">
+                  forma klubowa
+                </span>
+              )}
+            </p>
+            <div className="mt-2.5 flex flex-wrap items-start justify-between gap-x-4 gap-y-2.5">
+              <span className="flex gap-1">
+                {w.ostatnie.map((g, gi) => boks(g, gi))}
+              </span>
+              <Linie w={w} zKursami={!brakKursow} />
+            </div>
+          </li>
+        ))}
+      </ul>
+
+      {/* LAPTOP: tabela – nagłówek kolumn przyklejony u góry */}
+      <div className="mt-3.5 hidden max-h-[75vh] overflow-auto rounded-(--radius-card) border border-hairline bg-card shadow-(--shadow-card) sm:block">
         {/* bez kolumny kursu tabela potrzebuje mniej miejsca – na telefonie
             mniej przesuwania w bok, żeby dojść do samych pokryć */}
         <table
@@ -296,12 +389,8 @@ export function TopPokrycia({
                     )}
                   </div>
                   <p className="mt-0.5 text-[11px] text-faint">
-                    {ligowy
-                      ? "ostatnie starty"
-                      : w.kadraBasis
-                        ? "starty w kadrze"
-                        : "starty (klub)"}{" "}
-                    · ost. mecz {dataMeczu(w.ostatniMeczTs)}
+                    {opisProbki(w, ligowy)} · ost. mecz{" "}
+                    {dataMeczu(w.ostatniMeczTs)}
                   </p>
                 </td>
                 <td className="px-4 py-3">
@@ -313,45 +402,7 @@ export function TopPokrycia({
                     kurs, wartość. Segmentowe pudełka z ramkami robiły z każdego
                     wiersza pas przycisków */}
                 <td className="px-4 py-3">
-                  <span className="flex flex-col gap-1">
-                    {w.linie.map((l) => (
-                      <span
-                        key={l.linia}
-                        className="font-data flex items-baseline gap-x-3 text-xs"
-                      >
-                        <span className="w-5 shrink-0 font-semibold text-faint">
-                          {l.prog}+
-                        </span>
-                        <span
-                          className={`w-8 shrink-0 font-semibold ${
-                            l.pokryte === w.probka ? "text-data-green-ink" : "text-ink"
-                          }`}
-                        >
-                          {l.pokryte}/{w.probka}
-                        </span>
-                        {!brakKursow && (
-                          <span className="w-12 shrink-0 text-muted">
-                            {l.kurs != null ? `@${fmtKurs(l.kurs)}` : "–"}
-                          </span>
-                        )}
-                        {l.evPct != null && (
-                          <span
-                            title="Zgrubny sygnał wartości: ile dałby ten zakład, gdyby surowe pokrycie było prawdziwą szansą (pokrycie × kurs − 1). To NIE jest przewaga silnika, bo próba to tylko 5 startów, bez kalibracji i kontekstu. Odsiewa kursy typu „5/5 @1,01”."
-                            className={`w-12 shrink-0 font-semibold ${
-                              l.evPct >= 8
-                                ? "text-data-green-ink"
-                                : l.evPct < 0
-                                  ? "text-data-red-ink"
-                                  : "text-faint"
-                            }`}
-                          >
-                            {l.evPct > 0 ? "+" : l.evPct < 0 ? "−" : "±"}
-                            {Math.abs(l.evPct)}%
-                          </span>
-                        )}
-                      </span>
-                    ))}
-                  </span>
+                  <Linie w={w} zKursami={!brakKursow} />
                 </td>
               </tr>
             ))}
