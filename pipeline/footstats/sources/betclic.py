@@ -693,6 +693,27 @@ KLUB_ALIASY: dict[str, str] = {
     "steaua": "FCSB",
     "malezja": "Malaysia",
     "ac d`escaldes": "Atletic Club Escaldes",
+    # --- dopisane 2026-08-03 z `raport_parowania` na żywej ofercie.
+    # Każdy wpis potwierdzony tak samo: mecz bez pary + wpis Betclica o TEJ
+    # SAMEJ minucie, gdzie druga drużyna zgadza się wprost. To jest ta sama
+    # zasada co wszędzie — jednoznaczność zamiast podobieństwa tekstu.
+    # Kwalifikacje pucharów, czyli tam, gdzie brak drugiej ceny boli
+    # najbardziej (12 z 39 niesparowanych meczów to były one).
+    "olympiakos": "Olympiacos",
+    "sparta praga": "Sparta Praha",
+    "lyon": "Olympique Lyonnais",
+    "ferencvárosi tc": "Ferencvaros",
+    "gyori eto fc": "ETO FC Gyor",
+    "dynamo kijów": "Dynamo Kyiv",
+    "skendija tetovo": "Shkendija",
+    "auda": "FK Auda",
+    "dinamo tirana": "Dinamo City",
+    "twente": "FC Twente",
+    "dunajska streda": "DAC",
+    "bohemians dublin": "Bohemian",
+    "rigas futbola skola": "RFS",
+    "austria wiedeń": "Austria Wien",
+    "inter club de escaldes": "Inter Club d Escaldes",
 }
 
 

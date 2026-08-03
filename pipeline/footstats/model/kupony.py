@@ -47,6 +47,22 @@ PRZEDZIALY_DZIENNE = (
     (4.5, 5.5),      # trojka mocniejsza — szansa ~26%
 )
 PRZEDZIALY_DLUGOTERMINOWE = (
+    # POZYCJA DOLOZONA 2026-08-03 — bez niej zakladka bywala pusta NIE
+    # dlatego, ze brakowalo legow, tylko dlatego, ze zaden kupon nie mial
+    # prawa trafic w przedzial. Zmierzone tego dnia: cztery legi przed
+    # gwizdkiem, iloczyn WSZYSTKICH 6,78, a najnizszy przedzial zaczynal sie
+    # od 9,0. Zadnej kombinacji nie dalo sie zlozyc.
+    #
+    # Przedzialy powstaly przy grubszej podazy. Dzis zyskowny segment to
+    # "druzynowe + ponizej", a takie legi chodza po 1,21-1,24 — trzy z nich
+    # daja ~1,85, cztery ~2,3. Zeby siegnac 9,0 trzeba ich osmiu, czyli
+    # dokladnie tego, przed czym ostrzega komentarz wyzej: kupon podnosi
+    # blad lega do potegi, wiec ma byc KROTKI.
+    #
+    # 2,5-4,0 to dwa-trzy legi, ktorym ufamy. Kwarantann NIE ruszamy:
+    # trzymaja rynki z ROI -7% do -26%, a to najgorsze miejsce, zeby luzowac,
+    # bo blad lega mnozy sie przez caly kupon.
+    (2.5, 4.0),      # dwojka/trojka z kilku dni — szansa ~40%
     (9.0, 11.0),     # czworka z kilku dni — szansa ~18%
     (18.0, 25.0),    # dla chcacych wyzszego kursu — szansa ~7%
 )
