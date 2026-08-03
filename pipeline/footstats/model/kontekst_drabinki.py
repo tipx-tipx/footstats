@@ -335,8 +335,9 @@ def mnoznik_sedziego(rynek: str, sedzia: dict | None) -> tuple[float, dict]:
         return 1.0, {}
     if not sedzia or not sedzia.get("sedzia"):
         return 1.0, {"zrodlo": "brak_obsady"}
-    surowy = sedzia.get("mnoznik")
-    n = int(sedzia.get("n") or 0)
+    # kartka zawodnika idzie po KARTKOWYM profilu arbitra, nie po faulowym —
+    # patrz context.sedzia_dla_rynku (zgłoszenie usera 2026-08-03)
+    surowy, n = context.sedzia_dla_rynku(sedzia, rynek)
     if not surowy:
         return 1.0, {"zrodlo": "brak_profilu", "sedzia": sedzia["sedzia"]}
     m = context.referee_factor(float(surowy), n, market_is_disciplinary=True)

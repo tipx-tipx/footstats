@@ -102,6 +102,39 @@ def referee_factor(
     return cap(shrink_factor(referee_fouls_multiplier, sample_matches, 8.0), CAP_REFEREE)
 
 
+# Ile meczów arbitra musi zebrać profil KARTKOWY, żeby wyprzeć ten z fauli.
+# Niżej i tak działa `shrink_factor`, ale przy dwóch meczach mnożnik kartek
+# jest szumem, a mnożnik fauli — choć mierzy INNĄ cechę arbitra — stoi na
+# kilkunastu meczach i jest z kartkami skorelowany. Lepszy przybliżony sygnał
+# z próby niż dokładny z trzech meczów.
+MIN_MECZE_SEDZIA_KARTKI = 5
+
+RYNKI_KARTKOWE = frozenset({
+    "team_cards", "match_cards", "wiecej_cards", "yellow_card",
+})
+
+
+def sedzia_dla_rynku(
+    sed: dict | None, market_code: str,
+) -> tuple[float | None, int]:
+    """(mnożnik, próba) profilu arbitra właściwego dla TEGO rynku.
+
+    Do 2026-08-03 kartki jechały na mnożniku liczonym z FAULI, a to dwie różne
+    cechy: przy tej samej liczbie fauli jeden arbiter sięga po kartkę, drugi
+    upomina. Kartki mają więc własny profil (`build_wc_fast.profil_sedziow`),
+    a tutaj wybieramy właściwy — z zapasowym wyjściem na stary, gdy nowej
+    próby jeszcze nie ma.
+    """
+    if not sed:
+        return None, 0
+    if market_code in RYNKI_KARTKOWE:
+        n_k = int(sed.get("n_kartek") or 0)
+        if (sed.get("mnoznik_kartek") is not None
+                and n_k >= MIN_MECZE_SEDZIA_KARTKI):
+            return sed["mnoznik_kartek"], n_k
+    return sed.get("mnoznik"), int(sed.get("n") or 0)
+
+
 def home_away_factor(is_home: bool, market_code: str) -> float:
     """Efekt dom/wyjazd per rodzina rynków (stałe skalibrowane z literatury/danych).
 

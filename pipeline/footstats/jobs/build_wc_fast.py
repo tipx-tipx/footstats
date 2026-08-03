@@ -1006,6 +1006,7 @@ def profil_sedziow(
     events: list[dict], team_name: dict[int, str],
     comp_ids: list[int] | None = None,
     cache_key: str = "sedziowie_cache",
+    bank_gry: dict | None = None,
 ) -> dict[int, dict]:
     """Profil sędziego per nadchodzący mecz: {mid: {sedzia, mnoznik, n}}.
 
@@ -1016,6 +1017,18 @@ def profil_sedziow(
     stylu sędziego ze stylem drużyn (Maroko fauluje dużo u każdego arbitra).
     Mecze z dogrywką pomijane (staty obejmują 120 min i zawyżałyby profil).
     Wyniki per mecz cache'owane w Supabase (cache_key).
+
+    KARTKI MAJĄ WŁASNY MNOŻNIK (2026-08-03). Do dziś rynek `team_cards` jechał
+    na profilu liczonym z FAULI — a to dwie różne cechy arbitra: przy tej samej
+    liczbie fauli jeden sięga po kartkę, drugi upomina. Zgłoszenie usera:
+    „do kartek ważni są sędziowie". Liczymy więc drugi mnożnik, tą samą metodą
+    (iloraz do oczekiwań TEJ pary drużyn, leave-one-out), tylko na kartkach.
+
+    Nie kosztuje ani jednego zapytania: kartki per mecz leżą już w banku stylu
+    (`game_team_stats` -> `kartki` = żółte + czerwone), a bank i ten cache są
+    kluczowane tym samym id meczu 365Scores. Wystarczy je złączyć — stąd
+    `bank_gry`. Bez banku (albo przy chudej próbie) zostaje stary mnożnik
+    z fauli, czyli zachowanie sprzed zmiany.
 
     Domyślnie MŚ; tryb ligowy podaje comp_ids (rozgrywki drużynowe) i osobny
     cache (sedziowie_cache_liga) — profile arbitrów klubowych osobno.
@@ -1062,33 +1075,57 @@ def profil_sedziow(
     if zmieniony:
         supa.put_key_bezpiecznie(cache_key, cache)
 
-    per_sedzia: dict[str, list[tuple[float, list | None]]] = {}
-    sr_druzyny: dict[str, list[float]] = {}
-    for rec in cache.values():
-        if not rec.get("faule"):
-            continue
-        if rec.get("sedzia"):
-            per_sedzia.setdefault(rec["sedzia"], []).append(
-                (float(rec["faule"]), rec.get("druzyny"))
-            )
-        for d in rec.get("druzyny") or []:
-            sr_druzyny.setdefault(d, []).append(float(rec["faule"]))
-    wszystkie = [f for fl in per_sedzia.values() for f, _ in fl]
-    if not wszystkie:
-        return {}
-    turniej_sr = sum(wszystkie) / len(wszystkie)
+    # kartki per mecz z banku stylu — złączenie po id meczu 365, zero zapytań
+    kartki_meczu: dict[str, float] = {}
+    for gid_b, rec_b in (bank_gry or {}).items():
+        wart = [
+            float(d["kartki"]) for d in (rec_b.get("druzyny") or {}).values()
+            if d.get("kartki") is not None
+        ]
+        if len(wart) == 2:          # komplet obu drużyn albo nic
+            kartki_meczu[str(gid_b)] = sum(wart)
 
-    def _oczekiwane(druzyny: list | None, f_meczu: float) -> float:
-        """Faule, jakich spodziewamy się po TEJ parze drużyn (styl drużyn);
+    def _profil(pole: str) -> tuple[dict[str, list], float]:
+        """(sędzia -> [(wartość meczu, drużyny)], średnia ogólna) dla cechy."""
+        per: dict[str, list[tuple[float, list | None]]] = {}
+        sr_dr: dict[str, list[float]] = {}
+        for gid_c, rec in cache.items():
+            wart = (float(rec["faule"]) if pole == "faule" and rec.get("faule")
+                    else kartki_meczu.get(str(gid_c)) if pole == "kartki"
+                    else None)
+            if not wart:
+                continue
+            if rec.get("sedzia"):
+                per.setdefault(rec["sedzia"], []).append(
+                    (wart, rec.get("druzyny"))
+                )
+            for d in rec.get("druzyny") or []:
+                sr_dr.setdefault(d, []).append(wart)
+        wszystkie_p = [w for lista in per.values() for w, _ in lista]
+        sr_ogolna = sum(wszystkie_p) / len(wszystkie_p) if wszystkie_p else 0.0
+        _SREDNIE[pole] = sr_dr
+        return per, sr_ogolna
+
+    _SREDNIE: dict[str, dict[str, list[float]]] = {}
+    per_sedzia, turniej_sr = _profil("faule")
+    per_sedzia_k, turniej_sr_k = _profil("kartki")
+    if not per_sedzia and not per_sedzia_k:
+        return {}
+
+    def _oczekiwane(druzyny: list | None, f_meczu: float,
+                    pole: str = "faule") -> float:
+        """Ile spodziewamy się po TEJ parze drużyn (styl drużyn, nie arbitra);
         bieżący mecz wyłączony z oczekiwań (leave-one-out)."""
+        sr_dr = _SREDNIE.get(pole) or {}
+        ogolna = turniej_sr if pole == "faule" else turniej_sr_k
         srednie = []
         for d in druzyny or []:
-            fl = list(sr_druzyny.get(d) or [])
+            fl = list(sr_dr.get(d) or [])
             if f_meczu in fl:
                 fl.remove(f_meczu)
             if len(fl) >= 2:
                 srednie.append(sum(fl) / len(fl))
-        return sum(srednie) / len(srednie) if len(srednie) == 2 else turniej_sr
+        return sum(srednie) / len(srednie) if len(srednie) == 2 else ogolna
 
     # obsady nadchodzących meczów: parowanie fixtures 365 z eventami statshub
     # po znormalizowanych nazwach drużyn (awaryjnie kickoff +-3h + jedna nazwa)
@@ -1121,14 +1158,28 @@ def profil_sedziow(
             continue
         proby = per_sedzia.get(ref, [])
         ilorazy = [f / max(_oczekiwane(dr, f), 1e-6) for f, dr in proby]
+        proby_k = per_sedzia_k.get(ref, [])
+        ilorazy_k = [
+            k / max(_oczekiwane(dr, k, "kartki"), 1e-6) for k, dr in proby_k
+        ]
         out[e["id"]] = {
             "sedzia": ref,
             "mnoznik": (
                 round(sum(ilorazy) / len(ilorazy), 3) if ilorazy else None
             ),
             "n": len(proby),
+            # osobna cecha arbitra: chętnie sięga po kartkę czy upomina
+            "mnoznik_kartek": (
+                round(sum(ilorazy_k) / len(ilorazy_k), 3) if ilorazy_k else None
+            ),
+            "n_kartek": len(proby_k),
         }
     return out
+
+
+# wybór profilu arbitra (kartki mają własny) mieszka w `model/context.py`,
+# bo korzystają z niego dwie ścieżki: typy drużynowe i drabinki
+sedzia_dla_rynku = context.sedzia_dla_rynku
 
 
 # --- BANK STYLU (pełne matchupy, model/styl.py) ---
@@ -2194,9 +2245,14 @@ def _main_impl(tryb=None):
                 team_name,
                 comp_ids=rozgrywki.comp365_druzynowe(),
                 cache_key="sedziowie_cache_liga",
+                # kartki per mecz leżą już w banku — złączenie po id meczu
+                # daje drugi profil arbitra za darmo (patrz `profil_sedziow`)
+                bank_gry=(bank_stylu or {}).get("gry"),
             )
         else:
-            sedzia_by_mid = profil_sedziow(events, team_name)
+            sedzia_by_mid = profil_sedziow(
+                events, team_name, bank_gry=(bank_stylu or {}).get("gry"),
+            )
         _ev_by = {e["id"]: e for e in events}
         for mid_s, s in sedzia_by_mid.items():
             _e = _ev_by.get(mid_s, {})
@@ -3638,9 +3694,11 @@ def _main_impl(tryb=None):
             )
             sed_t = sedzia_by_mid.get(mid) or {}
             dyscyplinarny = tt.market_code in ("team_fouls", "team_cards")
+            # kartki mają WŁASNY profil arbitra (nie ten z fauli) — patrz
+            # `sedzia_dla_rynku`; przy chudej próbie wraca stary mnożnik
+            mn_sed, n_sed = sedzia_dla_rynku(sed_t, tt.market_code)
             f_sedzia = context.referee_factor(
-                sed_t.get("mnoznik"), sed_t.get("n", 0),
-                market_is_disciplinary=dyscyplinarny,
+                mn_sed, n_sed, market_is_disciplinary=dyscyplinarny,
             )
             tempo_m = tempo_cache.get(mid) or {}
             spread_home = tempo_m.get("spread")
