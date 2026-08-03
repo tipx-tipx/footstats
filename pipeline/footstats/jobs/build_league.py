@@ -24,6 +24,7 @@ import re
 import time
 import unicodedata
 from dataclasses import dataclass, field
+from difflib import SequenceMatcher
 from pathlib import Path
 
 from curl_cffi import requests
@@ -54,6 +55,19 @@ OKNO_CZASU_S = 3 * 3600
 
 # minimalne podobieństwo nazw (średnia z obu stron), żeby uznać parę
 PROG_PODOBIENSTWA = 0.51
+
+# RAPORT „PRAWIE SPAROWANE" IDZIE PO GODZINIE, NIE PO PODOBIEŃSTWIE.
+#
+# Kuszące było zgłaszać pary tuż pod progiem, ale to gubi dokładnie te
+# przypadki, które najbardziej bolą: gdy bukmacher spolszcza OBIE nazwy
+# (Debreceni VSC – FC København vs „Debreczyn VSC · FC Kopenhaga"),
+# podobieństwo wynosi 0,00 i para nie jest „prawie" niczym.
+#
+# Kickoff jest tu mocniejszym dowodem niż nazwa: oba źródła podają go zgodnie
+# co do sekundy (zmierzone 2026-07-20). Niesparowany mecz i niesparowana oferta
+# o TEJ SAMEJ godzinie to prawie na pewno ten sam mecz — i dokładnie to
+# człowiek ma zobaczyć w raporcie.
+OKNO_PRAWIE_S = 120
 
 
 def _sh(url: str) -> dict:
@@ -210,7 +224,30 @@ KLUB_ALIASY: dict[str, str] = {
     "atletico mg": "atletico mineiro",
     "atletico pr": "athletico paranaense",
     "america mg": "america mineiro",
+    # skrót po jednej stronie, rozwinięcie po drugiej — obie postacie
+    # sprowadzamy do skrótu, którym posługuje się statshub
+    "fs riga": "rfs",                  # RFS = Rīgas Futbola skola
+    "1904 dac": "dac",                 # DAC 1904 Dunajská Streda
+    "dunajska streda": "dac",
 }
+
+# aliasy POJEDYNCZYCH TOKENÓW — polskie nazwy miast w ofercie Superbetu.
+# Osobno od KLUB_ALIASY, bo miasto wraca w wielu klubach naraz (Sparta Praga,
+# Slavia Praga, Bohemians Praga) i alias na całą nazwę trzeba by dopisywać do
+# każdego z osobna. Podstawiane PRZED sortowaniem tokenów w norm_klub.
+# Dopisywać wyłącznie z raportu „prawie sparowane" — nie z głowy.
+TOKEN_ALIASY: dict[str, str] = {
+    "praga": "praha",           # Sparta Praga -> AC Sparta Praha
+    "kopenhaga": "kobenhavn",   # FC Kopenhaga -> FC København
+    "debreczyn": "debreceni",   # Debreczyn VSC -> Debreceni VSC
+}
+
+# ROCZNIK ZAŁOŻENIA ZOSTAJE TOKENEM — sprawdzone i odrzucone 03.08. Kuszące
+# było wyrzucić go jak „FC" (DAC 1904, St. Gallen 1879), ale: (1) na dłuższej
+# nazwie i tak nie szkodzi, bo podobieństwo dzieli przez KRÓTSZĄ stronę,
+# (2) klubom, których nazwa jest głównie rocznikiem (1860 Monachium), kasowałby
+# połowę tożsamości. Przypadek, który to sprowokował (DAC 1904 vs „Dunajska
+# Streda"), to zwykły rozjazd nazw i siedzi w aliasach niżej.
 
 
 # litery, których NFKD NIE rozkłada (to osobne znaki, nie diakrytyki):
@@ -231,7 +268,7 @@ def norm_klub(nazwa: str) -> str:
     s = str(nazwa or "").translate(_TRANSLITERACJA)
     s = unicodedata.normalize("NFKD", s)
     s = "".join(c for c in s if not unicodedata.combining(c)).lower()
-    tokeny = [t for t in re.split(r"[^a-z0-9]+", s) if t]
+    tokeny = [TOKEN_ALIASY.get(t, t) for t in re.split(r"[^a-z0-9]+", s) if t]
     istotne = [t for t in tokeny if t not in _SMIECI]
     if not istotne:  # nazwa złożona z samych "śmieci" (np. "AIK") — zostaw
         istotne = tokeny
@@ -267,14 +304,31 @@ def podobienstwo_klubu(a: str, b: str) -> float:
 
 
 def _tokeny_pasuja(a: str, b: str) -> bool:
-    """Tokeny równe albo jeden prefiksem drugiego (>=5 znaków).
+    """Tokeny równe, jeden prefiksem drugiego, albo wariant zapisu tej samej
+    nazwy.
 
     Łapie odmiany typu 'Djurgarden' vs 'Djurgardens' bez ryzyka sklejenia
     krótkich skrótów ('mg' vs 'mineiro' NIE przechodzi — od tego aliasy).
+
+    PREFIKS OD 4 ZNAKÓW (było 5). Na progu 5 wypadało 'Olympique Lyon'
+    (Superbet) vs 'Olympique Lyonnais' (statshub): 'lyon' ma cztery litery,
+    więc para szła do kosza mimo idealnego prefiksu. Kosztowało to Spartę
+    Pragę – Lyon, najbogatszą ofertę 4.08 (182 rynki). Cztery znaki nadal
+    zostawiają skróty ('mg', 'psg', 'rfs') poza regułą.
+
+    WARIANT ZAPISU: te same pierwsze dwie litery + 80% zgodności znaków.
+    Bukmacher spolszcza i upraszcza ('Praha'/'Praga', 'Nordsjaelland'/
+    'Nordsjalland'), a różnica siedzi w środku słowa, więc prefiks jej nie
+    złapie. Warunek na pierwsze dwie litery jest tu istotny: bez niego
+    'valencia' i 'palencia' (0,88 zgodności) byłyby tym samym klubem.
     """
     if a == b:
         return True
-    return len(a) >= 5 and len(b) >= 5 and (a.startswith(b) or b.startswith(a))
+    if len(a) >= 4 and len(b) >= 4 and (a.startswith(b) or b.startswith(a)):
+        return True
+    if len(a) >= 5 and len(b) >= 5 and a[:2] == b[:2]:
+        return SequenceMatcher(None, a, b).ratio() >= 0.8
+    return False
 
 
 def _sb_kickoff(ev: dict) -> int:
@@ -292,13 +346,19 @@ def _sb_kickoff(ev: dict) -> int:
 
 
 def paruj_superbet(
-    mecze: list[MeczLigowy], sb_events: list[dict]
+    mecze: list[MeczLigowy], sb_events: list[dict],
+    prawie: list[dict] | None = None,
 ) -> tuple[int, list[dict]]:
     """Dopasuj mecze statshub do eventów Superbetu (nazwy + okno czasu).
 
     Mutuje mecze (sb_event/sb_podobienstwo). Zwraca (ile sparowano,
     lista eventów Superbetu, które zostały BEZ pary — luka pokrycia).
     Każdy event Superbetu może być użyty raz (najlepsza para wygrywa).
+
+    `prawie` (opcjonalna lista) zbiera mecze zakresu drużynowego, które pary
+    NIE dostały, razem z ofertą Superbetu z tej samej minuty — patrz
+    OKNO_PRAWIE_S. Rozjazd nazewnictwa jest jedyną przyczyną braku pary, której
+    nie widać w żadnej liczbie zbiorczej: mecz po prostu nie istnieje.
     """
     kandydaci: list[tuple[float, MeczLigowy, int]] = []
     sb_parsed: list[tuple[int, str, str, int]] = []  # (idx, home, away, ts)
@@ -328,6 +388,43 @@ def paruj_superbet(
         m.sb_event = sb_events[i]
         m.sb_podobienstwo = sim
         n += 1
+    if prawie is not None:
+        # oba końce BEZ pary — sparowane nie są problemem do zgłoszenia
+        wolne_sb = [t for t in sb_parsed if t[0] not in zajete_sb]
+        for m in mecze:
+            if m.sb_event is not None or not m.kickoff_ts:
+                continue
+            # TYLKO ZAKRES DRUŻYNOWY. Poza nim raport tonie we własnym szumie:
+            # o okrągłej godzinie gra kilkanaście meczów, których bukmacher
+            # w ogóle nie kwotuje (puchar Rosji, Liga Mistrzyń), i każdy
+            # dostawał przypadkowego kandydata z tej samej minuty — 28 z 30
+            # wierszy pierwszego przebiegu. Brak pary poza zakresem drużynowym
+            # i tak nie gubi nam meczu: propsy odkrywamy OD OFERTY bukmachera,
+            # a ich lukę mierzy osobno `luka_superbet_propsy`.
+            if not m.druzynowe:
+                continue
+            kand = []
+            for i, sb_h, sb_a, sb_ts in wolne_sb:
+                if not sb_ts or abs(sb_ts - m.kickoff_ts) > OKNO_PRAWIE_S:
+                    continue
+                sim = (podobienstwo_klubu(m.home, sb_h)
+                       + podobienstwo_klubu(m.away, sb_a)) / 2.0
+                kand.append((sim, sb_h, sb_a))
+            # przy popularnej godzinie kandydatów bywa kilku — dwóch
+            # najbliższych wystarczy człowiekowi do rozstrzygnięcia
+            kand.sort(key=lambda k: -k[0])
+            for sim, sb_h, sb_a in kand[:2]:
+                prawie.append({
+                    "statshub": f"{m.home} - {m.away}",
+                    "superbet": f"{sb_h} - {sb_a}",
+                    "podobienstwo": round(sim, 2),
+                    "rozgrywki": m.rozgrywki_nazwa,
+                    "kickoff_ts": m.kickoff_ts,
+                })
+        # najbliższe trafienia na górze — raport czyta człowiek i patrzy
+        # na pierwsze wiersze
+        prawie.sort(key=lambda p: (-p["podobienstwo"], p["kickoff_ts"]))
+        del prawie[30:]
     luka = [sb_events[i] for i, _h, _a, _ts in sb_parsed if i not in zajete_sb]
     return n, luka
 
@@ -376,8 +473,16 @@ def raport_pokrycia(days: int = 4) -> dict:
           f"({len(set(m.utid for m in mecze))} rozgrywek, {days} dni)")
     sb_events = superbet.list_events(days_ahead=days)
     print(f"Superbet: {len(sb_events)} meczów w ofercie")
-    n_par, luka = paruj_superbet(mecze, sb_events)
+    prawie: list[dict] = []
+    n_par, luka = paruj_superbet(mecze, sb_events, prawie=prawie)
     print(f"Sparowano: {n_par}")
+
+    if prawie:
+        print(f"\nPrawie sparowane ({len(prawie)}) — mecz zakresu drużynowego "
+              "bez pary + oferta z tej samej minuty, kandydaci do aliasu:")
+        for p in prawie:
+            print(f"  {p['podobienstwo']:.2f}  {p['statshub']}"
+                  f"   ==?   {p['superbet']}   [{p['rozgrywki']}]")
 
     per_rozgrywki = _per_rozgrywki(mecze)
 
@@ -401,6 +506,7 @@ def raport_pokrycia(days: int = 4) -> dict:
         "sparowane": n_par,
         "per_rozgrywki": per_rozgrywki,
         "luka_superbet": luka,
+        "prawie_sparowane": prawie,
         "statshub_bez_superbetu": niedopasowane,
     }
 
@@ -448,10 +554,16 @@ def zbuduj_tryb(days: int = 5, publikuj: bool = False) -> TrybLigowy | None:
     except Exception as e:
         print(f"Superbet niedostępny: {e}")
         return None
-    n_par, luka = paruj_superbet(mecze, sb_events)
+    prawie: list[dict] = []
+    n_par, luka = paruj_superbet(mecze, sb_events, prawie=prawie)
     pary = [m for m in mecze if m.sb_event is not None]
     print(f"Tryb ligowy: {len(mecze)} meczów statshub, {len(sb_events)} Superbet, "
           f"sparowano {n_par}")
+    # rozjazd nazw MUSI być słyszalny w logu cyklu, nie tylko w raporcie na
+    # żądanie: mecz bez pary nie zostawia po sobie żadnego innego śladu
+    for p in prawie:
+        print(f"  prawie sparowane ({p['podobienstwo']:.2f}): "
+              f"{p['statshub']} ==? {p['superbet']}")
     if not pary:
         return None
     now = int(time.time())
@@ -461,6 +573,7 @@ def zbuduj_tryb(days: int = 5, publikuj: bool = False) -> TrybLigowy | None:
         "sparowane": n_par,
         "per_rozgrywki": _per_rozgrywki(mecze),
         "luka_superbet_propsy": _luka_propsy(luka),
+        "prawie_sparowane": prawie,
     }
     team_ids = {m.home_id for m in pary} | {m.away_id for m in pary}
     past_ids, past_druzynowe = past_events(team_ids)

@@ -240,10 +240,17 @@ export function TerminarzMeczy({
   const [tylkoNasze, setTylkoNasze] = useState(true);
 
   const wZakresie = useMemo(() => new Set(ligiWZakresie), [ligiWZakresie]);
+  /**
+   * Filtr ma UKRYWAĆ LIGI SPOZA ZAKRESU, a nie wszystko, czego nie rozpoznaje.
+   * Mecz bez etykiety rozgrywek (typ wznowiony z księgi sprzed stempla ligi –
+   * patrz scal_z_publikacjami) wypadał z terminarza, mimo że typ na niego stał
+   * na liście: zgłoszenie usera 03.08 o brakujących kwalifikacjach LM. Pusta
+   * nazwa to brak wiedzy, nie dowód, że mecz jest poza zakresem.
+   */
   const poLigach = useMemo(
     () =>
       tylkoNasze && wZakresie.size > 0
-        ? mecze.filter((m) => wZakresie.has(m.liga))
+        ? mecze.filter((m) => !m.liga || wZakresie.has(m.liga))
         : mecze,
     [mecze, wZakresie, tylkoNasze],
   );
@@ -274,7 +281,10 @@ export function TerminarzMeczy({
     (m) => (okazje[m.id] ?? 0) > 0 || (sugestie[m.id] ?? 0) > 0,
   ).length;
   const wNaszychLigach = useMemo(
-    () => (wZakresie.size > 0 ? mecze.filter((m) => wZakresie.has(m.liga)).length : 0),
+    () =>
+      wZakresie.size > 0
+        ? mecze.filter((m) => !m.liga || wZakresie.has(m.liga)).length
+        : 0,
     [mecze, wZakresie],
   );
 

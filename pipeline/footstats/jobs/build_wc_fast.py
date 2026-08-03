@@ -232,9 +232,45 @@ def _mecz_z_logu(rec: dict) -> dict | None:
     }
 
 
+def domknij_terminarz(
+    matches_out: dict, mids_zakresu, rekord_meczu, propsy_by_mid: dict | None = None,
+) -> int:
+    """Każdy mecz z zakresu skanu ląduje w `matches` — także taki, który nie dał
+    ani jednego typu.
+
+    ZGŁOSZENIE USERA 2026-08-03: „w Meczach i Drużynach brakuje jutrzejszych
+    kwalifikacji Ligi Mistrzów". Odkrywanie i parowanie działały bez zarzutu
+    (48 z 54 kwalifikacji sparowanych z Superbetem), model je policzył — ale
+    mecz trafiał do `matches` wyłącznie dwiema drogami: przez trend ZAWODNICZY
+    albo przy dopisywaniu okazji. Kwalifikacje nie mają propsów (Superbet ich
+    nie kwotuje), a wszystkie ich rynki drużynowe odpadły na bramach, więc mecz
+    znikał ze strony bez śladu. Zmierzone: 94 mecze weszły do liczenia, 60 było
+    na stronie.
+
+    To ta sama klasa błędu, którą dla typów łata `scal_z_publikacjami` — tyle że
+    tamto ratuje mecz, który KIEDYŚ dał typ. Mecz, który nie dał go nigdy, nie
+    miał żadnej drogi na stronę.
+
+    Zakładka Mecze to „terminarz skanu", więc jej zawartością ma być ZAKRES
+    skanu, a nie jego wynik. Zero typów to informacja dla usera (razem
+    z powodami z rejestru odrzuceń), a nie powód, żeby ukryć mecz.
+
+    Zwraca, ile meczów dołożono.
+    """
+    bylo = len(matches_out)
+    for mid in sorted(mids_zakresu):
+        rec = rekord_meczu(mid)
+        if rec is None:
+            continue
+        # ile propsów kwotuje bukmacher — pętla zawodnicza ustawia to tylko dla
+        # meczów, przez które przeszła; `setdefault` nie nadpisze jej liczby
+        rec.setdefault("propsy_superbet", (propsy_by_mid or {}).get(mid, 0))
+    return len(matches_out) - bylo
+
+
 def scal_z_publikacjami(
     value_bets: list[dict], matches_out: dict, teraz: int | None = None,
-    typy_log: dict | None = None,
+    typy_log: dict | None = None, liga_by_mid: dict | None = None,
 ) -> tuple[list[dict], int]:
     """Lista typów = wszystko, co OPUBLIKOWANE i czeka na gwizdek.
 
@@ -253,9 +289,31 @@ def scal_z_publikacjami(
     Razem z typem wraca jego rekord meczu — bez tego apka nie ma gdzie go
     pokazać.
 
+    `liga_by_mid` = etykiety rozgrywek z BIEŻĄCEGO terminarza (tryb.liga_by_mid).
+    Wznowiony mecz wraca z księgi albo rejestru, a te struktury dostały stempel
+    rozgrywek dopiero 03.08 — starsze wpisy niosą pustą ligę. Pusta liga nie jest
+    kosmetyką: zakładka Mecze filtruje domyślnie po „naszych ligach", więc mecz
+    bez etykiety znikał userowi z terminarza, mimo że typ na niego stał na
+    liście (zmierzone 03.08: 17 kwalifikacji pucharów). Skoro mecz jest w tym
+    cyklu w terminarzu, znamy jego rozgrywki — i tu je dopisujemy.
+
     Zwraca (lista do publikacji, ile wpisów wznowiono). Mutuje `matches_out`.
     """
     teraz = teraz or int(time.time())
+    ligi = liga_by_mid or {}
+
+    def _z_terminarza(mecz: dict | None) -> dict | None:
+        """Uzupełnij etykiety rozgrywek z bieżącego terminarza."""
+        if not mecz:
+            return mecz
+        et = ligi.get(mecz.get("id"))
+        if et and not mecz.get("liga"):
+            mecz["liga"] = et.get("liga", "")
+            mecz["sezon"] = mecz.get("sezon") or et.get("sezon", "")
+            if not mecz.get("kolejka"):
+                mecz["kolejka"] = et.get("kolejka", "")
+        return mecz
+
     rej_raw, odczyt_ok = supa.get_key_ok(PUBLIKACJE_KLUCZ)
     # nieudany odczyt rejestru = pracujemy bez niego, ale NIE zapisujemy go
     # z powrotem (inaczej garstka typów z tego cyklu zastąpiłaby cały rejestr)
@@ -326,7 +384,7 @@ def scal_z_publikacjami(
         wznowione += 1
         mid = bet.get("mecz_id")
         if mid is not None and mid not in matches_out and rec.get("mecz"):
-            matches_out[mid] = rec["mecz"]
+            matches_out[mid] = _z_terminarza(dict(rec["mecz"]))
 
     # DRUGIE ŹRÓDŁO: księga rozliczeń. Rejestr wyżej chroni tylko to, co przez
     # niego przeszło — typy opublikowane, zanim powstał (albo w cyklu, w którym
@@ -354,7 +412,7 @@ def scal_z_publikacjami(
         z_logu += 1
         mid = bet["mecz_id"]
         if mid not in matches_out:
-            mecz = _mecz_z_logu(rec)
+            mecz = _z_terminarza(_mecz_z_logu(rec))
             if mecz:
                 matches_out[mid] = mecz
 
@@ -390,6 +448,18 @@ def scal_z_publikacjami(
             print("UWAGA: zapis rejestru publikacji NIE POWIÓDŁ SIĘ — typy "
                   f"policzone w tym cyklu ({len(value_bets)}) wrócą jutro jako "
                   "uproszczone, bez rozpisanych czynników")
+    # OSTATNIA SZANSA NA ETYKIETĘ: rekord meczu mógł wejść do `matches_out`
+    # bez ligi także wcześniej (rejestr publikacji trzyma pełną kopię rekordu
+    # z chwili publikacji, więc niesie ze sobą także ówczesną pustkę).
+    bez_ligi = 0
+    for mecz in matches_out.values():
+        if not mecz.get("liga"):
+            _z_terminarza(mecz)
+            bez_ligi += not mecz.get("liga")
+    if bez_ligi:
+        print(f"Terminarz: {bez_ligi} meczów bez nazwy rozgrywek "
+              "(spoza bieżącego zakresu — pokażą się bez etykiety)")
+
     if wznowione or z_logu:
         print(f"Publikacje: wznowiono {wznowione} typów z rejestru"
               + (f" + {z_logu} z księgi rozliczeń" if z_logu else "")
@@ -5196,10 +5266,22 @@ def _main_impl(tryb=None):
             "zawodnicze": dict(zawodnicze.most_common()),
         }
 
+    # mecze, które weszły do `matches` Z DANYCH (trend zawodniczy albo
+    # drużynowy), a nie z przemiatania terminarza niżej. Diagnostyka pokrycia
+    # musi liczyć jedno i drugie osobno: po dołożeniu przemiatania `matches_out`
+    # zawiera KAŻDY mecz w zakresie, więc "mecze bez trendów" wyszłoby zawsze
+    # zerem i cicho straciłoby sens.
+    # None = przemiatanie jeszcze nie przeszło (dziś nie zdarza się na żadnej
+    # ścieżce, ale pusty ZBIÓR to prawdziwa odpowiedź „żaden mecz nie miał
+    # trendów" i nie wolno jej mylić z brakiem pomiaru)
+    mids_z_danymi: set[int] | None = None
+
     def _dump_pokrycie() -> None:
         if not (tryb and tryb.pokrycie):
             return
-        mecze_z_trendami = set(matches_out)
+        mecze_z_trendami = (
+            mids_z_danymi if mids_z_danymi is not None else set(matches_out)
+        )
         pokrycie = {
             **tryb.pokrycie,
             "wygenerowano_ts": int(time.time()),
@@ -5226,6 +5308,20 @@ def _main_impl(tryb=None):
               f"meczów sparowanych, {len(pokrycie['mecze_bez_trendow'])} bez trendów, "
               f"luka propsów Superbetu: {len(pokrycie['luka_superbet_propsy'])} meczów")
 
+    # TERMINARZ POKAZUJE KAŻDY PRZEANALIZOWANY MECZ — patrz `domknij_terminarz`.
+    # Przemiatamy zakres DRUŻYNOWY, czyli dokładnie ten, który zakładka Mecze
+    # i tak pokazuje domyślnie.
+    mids_z_danymi = set(matches_out)
+    _dolozone = domknij_terminarz(
+        matches_out,
+        (set(tryb.druzynowe_mids) if tryb else {e["id"] for e in events}),
+        lambda mid: _zapewnij_mecz(mid) if mid in ev_by_id else None,
+        {mid: len((sb or {}).get("players") or {}) for mid, sb in sb_cache.items()},
+    )
+    if _dolozone:
+        print(f"Terminarz: {_dolozone} meczów w zakresie bez własnych danych "
+              f"(dołożone do listy), {len(mids_z_danymi)} z trendami")
+
     # typ raz opublikowany zostaje na liście do gwizdka — patrz scal_z_publikacjami.
     # Księga rozliczeń jedzie jako DRUGIE źródło siatki (rejestr publikacji bywa
     # młodszy niż typy, które ma chronić); nieudany odczyt = pracujemy bez niej.
@@ -5235,6 +5331,7 @@ def _main_impl(tryb=None):
     value_bets_pub, _wzn = scal_z_publikacjami(
         value_bets, matches_out,
         typy_log=rozliczanie._migruj_log(log_do_siatki or {}),
+        liga_by_mid=(tryb.liga_by_mid if tryb else None),
     )
 
     # TYP WZNOWIONY TEŻ JEST LEGIEM (naprawa 2026-07-30, zgłoszenie usera:
