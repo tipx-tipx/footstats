@@ -1080,6 +1080,154 @@ def dopelnij_oferte_zawodnicza(
     return n_rynkow, n_kursow
 
 
+# Odkrywanie zawodników WPROST Z OFERTY: budżety per cykl. Jedno odkrycie
+# kosztuje do trzech zapytań (wyszukiwarka, profil, historia), więc bez sufitu
+# jeden bogaty mecz zjadłby cały cykl — Sparta Praga – Lyon ma 66 kwotowanych
+# zawodników, czyli ~200 zapytań na jedno spotkanie.
+MAX_ODKRYC_CYKL = 220       # ilu zawodników odkrywamy na cykl (globalnie)
+MAX_ODKRYC_MECZ = 6         # ...i ilu z jednego meczu W JEDNEJ RUNDZIE
+MAX_WYSZUKAN_ODKRYC = 700   # sufit zapytań wyszukiwarki (statshub bez limitu,
+#                             to próg grzeczności i czasu cyklu)
+RUNDY_ODKRYWANIA = 3        # ile razy przemiatamy listę meczów
+
+
+def odkryj_zawodnikow_z_oferty(
+    mecze_do_odkrycia: list[tuple],
+    sb_cache: dict[int, dict],
+    players_out: dict[int, dict],
+    odds_grid: dict[int, dict],
+    forma_z_trendu,
+    budzet: int = MAX_ODKRYC_CYKL,
+    maks_na_mecz: int = MAX_ODKRYC_MECZ,
+    budzet_wyszukan: int = MAX_WYSZUKAN_ODKRYC,
+    rundy: int = RUNDY_ODKRYWANIA,
+    debiutanci=None,
+    fetch_performance=None,
+    trendy_z_performance=None,
+) -> tuple[int, int]:
+    """Zawodnicy, o których wiemy WYŁĄCZNIE stąd, że bukmacher ich kwotuje.
+
+    ZGŁOSZENIE USERA 2026-08-03: „w wielu meczach nie ma tabel pokryć ani
+    kursów". `dopelnij_oferte_zawodnicza` odwróciło już kolejność (oferta →
+    historia), ale wzbogaca WYŁĄCZNIE zawodników, których zna z feedu propsów
+    statshuba. A ten feed jest lustrem ofert bukmacherów UK i na kwalifikacjach
+    pucharów jest PUSTY — więc nie było kogo wzbogacać.
+
+    Zmierzone: Sparta Praga – Lyon, 66 kwotowanych zawodników u Superbetu,
+    ZERO w siatce pokryć; cała siatka stała na 13 z 95 meczów.
+
+    Ścieżka identyfikacji jest ta sama, którą radar odkrywa debiutantów
+    (`radar.debiutanci_meczu`): wyszukiwarka statshuba po nazwisku z oferty,
+    a potem WERYFIKACJA klubu po `team_id` profilu. Weryfikacja jest tu
+    najważniejsza — samo podobieństwo nazwiska wybiera cudzego zawodnika, a
+    taka podmiana nie zostawia śladu w logu (patrz [[parowanie-nazw-druzyn]]).
+    Nie potwierdziliśmy klubu = nie zgadujemy, zawodnik nie wchodzi.
+
+    `mecze_do_odkrycia`: [(mid, team_ids, kickoff_ts, nazwy_druzyn)] — mecze
+    obsługiwane od NAJBLIŻSZEGO kickoffu, bo na nie ktoś dziś stawia.
+
+    Zwraca (ilu zawodników odkryto, ile wpisów kursów dopisano).
+    """
+    debiutanci = debiutanci or radar.debiutanci_meczu
+    fetch_performance = fetch_performance or statshub.fetch_player_performance
+    trendy = trendy_z_performance or statshub.trendy_z_performance
+    licznik = [0]                 # budżet wyszukiwarki, wspólny dla meczów
+    n_graczy = n_kursow = 0
+    sm_cache: dict[int, list] = {}
+    juz_odkryci: set[tuple[int, int]] = set()
+    # RUNDAMI, NIE MECZ PO MECZU (2026-08-03). Pierwsza wersja szła listą do
+    # wyczerpania budżetu i oddawała go kilku pierwszym meczom — 51 odkrytych
+    # zawodników, a Sparta Praga – Lyon dalej z pustą tabelą, bo budżet skończył
+    # się przed nią. Zgłoszenie brzmiało „w WIELU meczach nie ma tabel", więc
+    # liczy się SZEROKOŚĆ: lepiej sześć wierszy w każdym meczu niż komplet
+    # w trzech. Kolejność w rundzie: najpierw mecze z pustą tabelą, potem wg
+    # kickoffu — bo pusty mecz jutro jest pilniejszy niż dopełnienie pełnego
+    # dzisiaj.
+    kolejka = sorted(
+        mecze_do_odkrycia,
+        key=lambda x: (len(odds_grid.get(x[0]) or {}) > 0, x[2]),
+    )
+    for mid, team_ids, _ts, nazwy_druzyn in [
+        m for _runda in range(rundy) for m in kolejka
+    ]:
+        if n_graczy >= budzet or licznik[0] >= budzet_wyszukan:
+            break
+        sb_odds = sb_cache.get(mid) or {}
+        if not (sb_odds.get("players") or {}):
+            continue
+        znane = [
+            (players_out.get(pid) or {}).get("nazwa", "")
+            for pid in (odds_grid.get(mid) or {})
+        ]
+        try:
+            # min_rynkow=1: w tabeli pokryć jeden kwotowany rynek to
+            # pełnoprawny wiersz (radar wymaga dwóch — inny cel, patrz
+            # docstring debiutanci_meczu)
+            znalezieni = debiutanci(sb_odds, znane, tuple(team_ids), licznik,
+                                    min_rynkow=1, maks_kandydatow=maks_na_mecz,
+                                    budzet_wyszukan=budzet_wyszukan)
+        except Exception as e:
+            print(f"Odkrywanie z oferty: mecz {mid} pominięty ({e})")
+            continue
+        for kand in znalezieni[:maks_na_mecz]:
+            if n_graczy >= budzet:
+                break
+            profil = kand.get("profil") or {}
+            pid = profil.get("id")
+            rynki_sb = (sb_odds.get("players") or {}).get(kand["klucz_sb"]) or {}
+            if not pid or not rynki_sb:
+                continue
+            # w kolejnej rundzie odkryty gracz wraca jako „znany" przez
+            # odds_grid, ale bezpiecznik jest tani, a podwójne liczenie
+            # zjadałoby budżet po cichu
+            if (mid, int(pid)) in juz_odkryci:
+                continue
+            juz_odkryci.add((mid, int(pid)))
+            try:
+                rows = fetch_performance(int(pid))
+            except Exception:
+                continue
+            if not rows:
+                continue
+            druzyna = nazwy_druzyn.get(profil.get("team_id"), "")
+            swieze = trendy(int(pid), kand["nazwa"], profil.get("team_id"),
+                            rows, sm_cache=sm_cache, budzet=[0])
+            forma: dict[str, dict] = {}
+            for mk in rynki_sb:
+                s = swieze.get(mk)
+                if s is not None and s.counts:
+                    forma[mk] = forma_z_trendu(s, mk)
+            if not forma:
+                continue   # bukmacher kwotuje same rynki, których nie liczymy
+            rec = players_out.setdefault(int(pid), {
+                "id": int(pid), "nazwa": kand["nazwa"],
+                "pozycja": profil.get("position") or "?",
+                "druzyna": druzyna,
+                "minuty_lacznie": 0, "forma": {}, "xi": False,
+            })
+            rec["forma"].update(forma)
+            rec["minuty_lacznie"] = max(
+                rec.get("minuty_lacznie") or 0,
+                int(sum(next(iter(swieze.values())).minutes)) if swieze else 0,
+            )
+            n_graczy += 1
+            for mk, linie in rynki_sb.items():
+                if mk not in forma:
+                    continue
+                over = {
+                    str(l): round(float(v["over"]), 2)
+                    for l, v in (linie or {}).items() if (v or {}).get("over")
+                }
+                if over:
+                    odds_grid.setdefault(mid, {}).setdefault(int(pid), {})[mk] = over
+                    n_kursow += 1
+    if n_graczy or licznik[0]:
+        print(f"Odkrywanie z oferty: {n_graczy} zawodników spoza feedu propsów "
+              f"({n_kursow} wpisów kursów, {licznik[0]} zapytań wyszukiwarki)"
+              + (", budżet wyczerpany" if n_graczy >= budzet else ""))
+    return n_graczy, n_kursow
+
+
 # nazwy reprezentacji EN -> PL (do dopasowania z Superbetem)
 EN_PL = {v: k for k, v in superbet.TEAM_PL_EN.items()}
 # MŚ 2026 to NIE jest w pełni neutralny turniej — USA/Meksyk/Kanada są
@@ -5346,6 +5494,28 @@ def _main_impl(tryb=None):
     # TERMINARZ POKAZUJE KAŻDY PRZEANALIZOWANY MECZ — patrz `domknij_terminarz`.
     # Przemiatamy zakres DRUŻYNOWY, czyli dokładnie ten, który zakładka Mecze
     # i tak pokazuje domyślnie.
+    # ...a teraz mecze, w których feed propsów milczy CAŁKOWICIE — tam nie ma
+    # kogo wzbogacać, więc zawodników trzeba odkryć wprost z oferty bukmachera
+    # (patrz odkryj_zawodnikow_z_oferty). To domyka tabelę pokryć na
+    # kwalifikacjach pucharów, gdzie kursy są, a feedu nie ma.
+    _do_odkrycia = []
+    for _mid, _sb in sb_cache.items():
+        if not (_sb or {}).get("players"):
+            continue
+        _ev = ev_by_id.get(_mid) or {}
+        _h, _a = _ev.get("homeTeamId"), _ev.get("awayTeamId")
+        if not (_h and _a):
+            continue
+        _do_odkrycia.append((
+            _mid, (int(_h), int(_a)),
+            int(_ev.get("timeStartTimestamp") or 0),
+            {int(_h): team_name.get(_h, ""), int(_a): team_name.get(_a, "")},
+        ))
+    if _do_odkrycia:
+        odkryj_zawodnikow_z_oferty(
+            _do_odkrycia, sb_cache, players_out, odds_grid, _forma_z_trendu,
+        )
+
     mids_z_danymi = set(matches_out)
     # „mamy kursy" = bukmacher kwotuje na ten mecz cokolwiek, co umiemy wycenić:
     # rynek drużynowy albo propsy zawodnicze. Mecz spoza `sb_cache` to mecz,

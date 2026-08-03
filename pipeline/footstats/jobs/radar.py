@@ -534,11 +534,22 @@ def debiutanci_meczu(
     znane_nazwiska: list[str],
     team_ids: tuple[int, int],
     licznik_wyszukan: list[int],
+    min_rynkow: int = MIN_RYNKOW_DEBIUTANTA,
+    maks_kandydatow: int = MAX_DEBIUTANTOW_MECZU,
+    budzet_wyszukan: int = MAX_WYSZUKAN_CYKL,
 ) -> list[dict]:
     """Zawodnicy kwotowani przez Superbet, nieobecni w feedzie statshub.
 
     licznik_wyszukan: jednoelementowa lista-mutowalny budżet zapytań
-    /api/search współdzielony przez wszystkie mecze cyklu."""
+    /api/search współdzielony przez wszystkie mecze cyklu.
+
+    `min_rynkow` — ile rynków musi mieć kandydat. Domyślne 2 to próg RADARU:
+    karta z jednym rynkiem to za mało na analizę. Ale TABELA POKRYĆ ma inny
+    cel — tam jeden kwotowany rynek to pełnoprawny wiersz, i akurat na
+    kwalifikacjach pucharów bywa jedyny (Sparta Praga – Lyon, 03.08: 66
+    zawodników i u każdego WYŁĄCZNIE kartka). Domyślny próg wycinał tam
+    komplet kandydatów, więc strona zostawała pusta mimo pełnej oferty.
+    """
     players = sb_odds.get("players") or {}
     names = sb_odds.get("player_names") or {}
     if not players:
@@ -552,14 +563,14 @@ def debiutanci_meczu(
         if key in znane:
             continue
         n_rynkow = sum(1 for mk, linie in rynki.items() if linie)
-        if n_rynkow < MIN_RYNKOW_DEBIUTANTA:
+        if n_rynkow < min_rynkow:
             continue
         kandydaci.append((n_rynkow, key))
     out = []
     for n_rynkow, key in sorted(kandydaci, reverse=True):
-        if licznik_wyszukan[0] >= MAX_WYSZUKAN_CYKL:
+        if licznik_wyszukan[0] >= budzet_wyszukan:
             break
-        if len(out) >= MAX_DEBIUTANTOW_MECZU:
+        if len(out) >= maks_kandydatow:
             break  # komplet kart tego meczu — nie pal budżetu dalej
         surowa = (names.get(key) or key).strip()
         if "," in surowa:
