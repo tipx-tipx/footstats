@@ -500,6 +500,10 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
             # 1,05 na drużynę-mecz w Superlidze duńskiej i 2,56 w Brasileirão B.
             # Puste, gdy publikacja go nie znała — nie zgadujemy po fakcie.
             **({"liga": b["liga"]} if b.get("liga") else {}),
+            # EPOKA PRODUKTU (mundial/liga) — decyduje, czy ten rekord ma
+            # prawo uczyć dzisiejszy model. Stemplujemy przy publikacji;
+            # rekordy sprzed stempla rozpoznaje `epoka()` po nazwach drużyn.
+            "epoka": epoka(b),
             # historia predykcji typów DRUŻYNOWYCH — patrz kalibracja_tau.py
             **({"kal_tau": b["kal_tau"]} if b.get("kal_tau") else {}),
             # KOREKTA STRUMIENIA użyta przy publikacji — bez tego stempla
@@ -991,6 +995,11 @@ def compute_bias_full(
         # drabinki mają własne p (pokrycie + kontekst), nie p silnika —
         # kalibracja modelu musi je pomijać, inaczej uczy się cudzych błędów
         and _z_modelu(r)
+        # mundial to archiwum, nie nauczyciel — patrz `_z_biezacej_epoki`.
+        # Na mieszance kalibracja strzałów wychodziła −0,604, na samej lidze
+        # −0,144: cztery razy za mocno, i to na rynku, który w lidze trafia
+        # co do punktu.
+        and _z_biezacej_epoki(r)
     ]
     # ważenie świeżości względem najnowszego rozliczenia w logu — świeże
     # błędy ważą więcej, stare wygasają (półokres KALIBRACJA_POLOWICZNY_DNI)
@@ -1090,6 +1099,11 @@ def rynki_kwarantanna(log: dict | None = None) -> dict[str, dict]:
         and _z_modelu(r)   # kwarantanna dotyczy DEKLARACJI MODELU, nie drabinek
         # bez kursu nie ma ROI — typ jest wtedy niemierzalny tą bramą
         and r.get("kurs") and float(r["kurs"]) > 1.0
+        # TRZECIA BLOKADA NA TYM SAMYM RYNKU (2026-08-03). Okno tej kwarantanny
+        # sięga wstecz, więc na mieszance epok trzymało `shots` na ROI −14%
+        # (hit 55% vs deklaracja 70%) — a to jest obraz MUNDIALU. W lidze ten
+        # sam rynek trafia 58% przy deklaracji 58% i ma ROI +9,7%.
+        and _z_biezacej_epoki(r)
     ]
     out: dict[str, dict] = {}
     for mk in {r["rynek_kod"] for r in settled}:
@@ -1287,6 +1301,7 @@ def kategorie_kwarantanna(log: dict | None = None) -> dict[str, dict]:
         and not r.get("sugestia") and not r.get("odrzucony")
         and _z_modelu(r)
         and r.get("kurs") and float(r["kurs"]) > 1.0
+        and _z_biezacej_epoki(r)   # mundial to archiwum, nie nauczyciel
     ]
     out: dict[str, dict] = {}
     for flaga in KATEGORIE_KWARANTANNY:
@@ -1573,6 +1588,72 @@ def _z_martwej_epoki(r: dict) -> bool:
     )
 
 
+# --- MUNDIAL TO ARCHIWUM, NIE NAUCZYCIEL (2026-08-03) ----------------------
+#
+# Mistrzostwa były testem silnika; produktem jest faza ligowa. Do dziś jednak
+# WSZYSTKIE warstwy uczące liczyły się z całej księgi, a mundial to 27% jej
+# rozliczeń — i mówił coś zupełnie innego niż liga:
+#
+#     strzały zawodnicze   MUNDIAL  n=142  trafień 54%  deklaracja 69%  ROI −17,6%
+#     strzały zawodnicze   LIGA     n= 66  trafień 58%  deklaracja 58%  ROI  +9,7%
+#
+# W lidze ten rynek jest skalibrowany CO DO PUNKTU i jako jedyny zarabia.
+# Mieszanka kazała nam ukarać go dwa razy — kalibracją rynku (−0,604 zamiast
+# −0,144 z samej ligi) i korektą strumienia „pewniaki" (−0,418, policzoną
+# w 100% na mundialu, bo w lidze nie ma z czego). Kary się DODAJĄ: przy szansie
+# surowej 70% pokazywaliśmy 45,6%, czyli poniżej progu publikacji 52%. Do tego
+# kwarantanna ukryła `shots|powyzej` (se −2,91 na mieszance, +0,27 na lidze).
+# Stąd „strumień zawodniczy stoi": nie z powodu modelu ani oferty, tylko dlatego,
+# że karaliśmy ligę za turniej.
+#
+# ZAKRES: wyłącznie UCZENIE (kalibracja, korekty, przewaga, kwarantanna, wagi).
+# Rozliczenia, ROI i Skuteczność zostają NIETKNIĘTE — user te typy widział
+# i wynik jest jego wynikiem, tak samo jak przy martwej epoce.
+EPOKA_BIEZACA = "liga"
+
+
+def _kraje_reprezentacji() -> set[str]:
+    """Nazwy reprezentacji (PL i EN) — import leniwy, bo to źródło, nie model."""
+    global _KRAJE_CACHE
+    if _KRAJE_CACHE is None:
+        try:
+            from footstats.sources.superbet import TEAM_PL_EN
+            _KRAJE_CACHE = ({k.strip().lower() for k in TEAM_PL_EN}
+                            | {v.strip().lower() for v in TEAM_PL_EN.values()})
+        except Exception:                                  # pragma: no cover
+            _KRAJE_CACHE = set()
+    return _KRAJE_CACHE
+
+
+_KRAJE_CACHE: set[str] | None = None
+
+
+def epoka(r: dict) -> str:
+    """„ms" albo „liga" — z jakiego PRODUKTU pochodzi ten typ.
+
+    Nowe typy dostają stempel przy publikacji. Starym przypisujemy po nazwie
+    meczu: obie strony są reprezentacjami = mundial. To rozpoznanie jest
+    świadomie po DRUŻYNACH, nie po dacie — przerwa reprezentacyjna w środku
+    sezonu to też inny produkt niż liga i ma się uczyć osobno.
+    """
+    stempel = str(r.get("epoka") or "").strip()
+    if stempel:
+        return stempel
+    kraje = _kraje_reprezentacji()
+    if not kraje:
+        return EPOKA_BIEZACA
+    strony = [
+        s.strip().lower()
+        for s in str(r.get("mecz") or "").replace("–", "-").split("-")
+    ]
+    return "ms" if len(strony) == 2 and all(s in kraje for s in strony) else "liga"
+
+
+def _z_biezacej_epoki(r: dict) -> bool:
+    """Czy ten rekord ma prawo UCZYĆ dzisiejszy produkt."""
+    return epoka(r) == EPOKA_BIEZACA
+
+
 def korekta_strumienia(log: dict | None = None) -> dict[str, float]:
     """Delta logitowa per strumień: o ile ściągnąć szanse, żeby deklaracja
     zgadzała się z trafieniami. Zwraca {"pewniaki": -0.42, "druzyny": -0.11}.
@@ -1591,6 +1672,7 @@ def korekta_strumienia(log: dict | None = None) -> dict[str, float]:
         and not r.get("sugestia") and not r.get("odrzucony")
         and r.get("p_model")
         and not _z_martwej_epoki(r)   # patrz komentarz przy `_z_martwej_epoki`
+        and _z_biezacej_epoki(r)      # mundial uczy tylko mundial
         # typy modelu ORAZ drabinki — każdy mierzony na SWOICH rozliczeniach,
         # nigdy wymieszany (pętla niżej rozdziela je po strumieniu)
         and (_z_modelu(r) or r.get("zrodlo") == ZRODLO_DRABINKA)
@@ -1833,6 +1915,7 @@ def szansa_pokazywana(
         and r.get("rynek_kod") not in RYNKI_OSOBNE
         and r.get("p_model")
         and not _z_martwej_epoki(r)   # patrz komentarz przy `_z_martwej_epoki`
+        and _z_biezacej_epoki(r)      # mundial uczy tylko mundial
     ]
     out: dict[str, float] = {}
     for strumien in STRUMIENIE:
@@ -1903,7 +1986,7 @@ def przewaga_rynkow(log: dict | None = None) -> dict[str, dict]:
             continue
         if not r.get("kurs") or not r.get("p_model"):
             continue
-        if _z_martwej_epoki(r):
+        if _z_martwej_epoki(r) or not _z_biezacej_epoki(r):
             continue
         try:
             kurs = float(r["kurs"])
@@ -2086,6 +2169,8 @@ def przewaga_pasm(log: dict | None = None) -> dict[str, dict]:
         if r.get("sugestia") or r.get("odrzucony") or r.get("zrodlo"):
             continue
         if not r.get("kurs") or not r.get("p_model") or _z_martwej_epoki(r):
+            continue
+        if not _z_biezacej_epoki(r):
             continue
         try:
             kurs = float(r["kurs"])
@@ -2327,6 +2412,7 @@ def compute_wagi_zaufania(log: dict) -> dict[str, dict]:
             and _z_modelu(r)   # waga zaufania dotyczy p_model, nie drabinek
             and r.get("kurs") and float(r["kurs"]) > 1.0
             and (r.get("pewnosc") or "srednia") == kubelek
+            and _z_biezacej_epoki(r)   # mundial to archiwum, nie nauczyciel
         ]
         n = len(grp)
         if n < 5:
