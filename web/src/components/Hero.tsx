@@ -17,12 +17,27 @@ const wejscie = {
   }),
 };
 
+/**
+ * DOKĄD PROWADZI KARTA Z NAGŁÓWKA — musi trafiać w zakładkę, która ten typ
+ * POKAŻE (naprawione 2026-08-04).
+ *
+ * Zgłoszenie usera: „skąd ten typ Nahuel Banegas, jak nigdzie go nie widać".
+ * Nie widać go było dosłownie. Link prowadził do `?rodzaj=okazje`, a strona
+ * zna wyłącznie `pewniaki | value | radar | wszystko` — parametr leciał do
+ * kosza, otwierała się pierwsza niepusta zakładka (Drabinki), a kotwica
+ * `#bet-N` nie wskazywała na nic. Ten sam błąd miały sugestie STS
+ * (`?rodzaj=sugestie`). Oba kody zostały po starym układzie zakładek.
+ *
+ * Zwykły typ zawodniczy NIE MA dziś własnej listy na stronie głównej — od
+ * 1 sierpnia jest tam tylko „Wysokie szanse", a te wymagają flagi pewniaka.
+ * Więc dla takiego typu jedyne uczciwe miejsce to STRONA MECZU, gdzie stoi
+ * razem z pokryciami i kursami. Lepiej odesłać tam, niż udawać zakładkę,
+ * która go nie pokaże.
+ */
 function hrefPozycji(b: ValueBet): string {
-  return b.sugestia
-    ? `/?rodzaj=sugestie#bet-${b.id}`
-    : b.pewniak
-      ? `/?rodzaj=pewniaki#bet-${b.id}`
-      : `/?rodzaj=okazje#bet-${b.id}`;
+  if (b.sugestia) return `/?rodzaj=value#bet-${b.id}`;
+  if (b.pewniak) return `/?rodzaj=pewniaki#bet-${b.id}`;
+  return `/mecze/${b.mecz_id}`;
 }
 
 /** Poprawna polska odmiana: "1 okazję", "3 okazje", "8 okazji", "22 okazje". */
