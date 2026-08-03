@@ -234,9 +234,10 @@ def _mecz_z_logu(rec: dict) -> dict | None:
 
 def domknij_terminarz(
     matches_out: dict, mids_zakresu, rekord_meczu, propsy_by_mid: dict | None = None,
+    mids_z_kursami: set | None = None,
 ) -> int:
-    """Każdy mecz z zakresu skanu ląduje w `matches` — także taki, który nie dał
-    ani jednego typu.
+    """Mecz z zakresu skanu, dla którego MAMY KURSY, ląduje w `matches` — także
+    wtedy, gdy nie dał ani jednego typu.
 
     ZGŁOSZENIE USERA 2026-08-03: „w Meczach i Drużynach brakuje jutrzejszych
     kwalifikacji Ligi Mistrzów". Odkrywanie i parowanie działały bez zarzutu
@@ -255,10 +256,22 @@ def domknij_terminarz(
     skanu, a nie jego wynik. Zero typów to informacja dla usera (razem
     z powodami z rejestru odrzuceń), a nie powód, żeby ukryć mecz.
 
+    GRANICA TEGO ZAKRESU TO KURSY (`mids_z_kursami`, doprecyzowane 03.08 po
+    uwadze usera: „w Meczach mają być tylko mecze, które mają pokrycia
+    i kursy"). Pierwsza wersja przemiatała cały zakres drużynowy i dołożyła 40
+    meczów, z czego 6 nie miało ANI JEDNEGO kwotowania — ani rynku drużynowego,
+    ani propsa. Taki mecz nie jest „przeanalizowany bez wyniku", tylko
+    nietknięty: nie ma na nim czego pokazać ani czego wyjaśnić, bo nie powstało
+    nawet odrzucenie z powodem. Mecz z kursami, którego typy odpadły na bramach
+    (kurs poza widełkami, za niska szansa), zostaje — tam user ma i liczby,
+    i powód.
+
     Zwraca, ile meczów dołożono.
     """
     bylo = len(matches_out)
     for mid in sorted(mids_zakresu):
+        if mids_z_kursami is not None and mid not in mids_z_kursami:
+            continue
         rec = rekord_meczu(mid)
         if rec is None:
             continue
@@ -5312,11 +5325,19 @@ def _main_impl(tryb=None):
     # Przemiatamy zakres DRUŻYNOWY, czyli dokładnie ten, który zakładka Mecze
     # i tak pokazuje domyślnie.
     mids_z_danymi = set(matches_out)
+    # „mamy kursy" = bukmacher kwotuje na ten mecz cokolwiek, co umiemy wycenić:
+    # rynek drużynowy albo propsy zawodnicze. Mecz spoza `sb_cache` to mecz,
+    # któremu nawet nie pobraliśmy oferty — nie mamy o nim nic do powiedzenia.
+    mids_z_kursami = {
+        mid for mid, sb in sb_cache.items()
+        if (sb or {}).get("players") or any(((sb or {}).get("teams") or {}).values())
+    }
     _dolozone = domknij_terminarz(
         matches_out,
         (set(tryb.druzynowe_mids) if tryb else {e["id"] for e in events}),
         lambda mid: _zapewnij_mecz(mid) if mid in ev_by_id else None,
         {mid: len((sb or {}).get("players") or {}) for mid, sb in sb_cache.items()},
+        mids_z_kursami=mids_z_kursami,
     )
     if _dolozone:
         print(f"Terminarz: {_dolozone} meczów w zakresie bez własnych danych "

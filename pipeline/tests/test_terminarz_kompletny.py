@@ -50,6 +50,25 @@ def test_mecz_bez_typow_zostaje_w_terminarzu():
     assert matches[1]["propsy_superbet"] == 0
 
 
+def test_mecz_bez_zadnego_kwotowania_nie_wchodzi():
+    """Uwaga usera 03.08: w Meczach mają być mecze, które mają pokrycia
+    i kursy. Mecz bez ANI JEDNEGO kwotowania nie jest „policzony bez wyniku",
+    tylko nietknięty — nie ma na nim czego pokazać ani czego wyjaśnić.
+    Zmierzone: 6 z 40 dołożonych meczów było takich."""
+    matches, rekord = _budowniczy({1, 2, 3})
+    dolozone = B.domknij_terminarz(matches, {1, 2, 3}, rekord,
+                                   mids_z_kursami={1, 3})
+    assert dolozone == 2
+    assert sorted(matches) == [1, 3]
+
+
+def test_mecz_z_kursami_bez_typow_zostaje():
+    """Druga strona tej samej reguły: kursy są, typy odpadły na bramach —
+    to jest DOKŁADNIE ten mecz, który user chce widzieć razem z powodem."""
+    matches, rekord = _budowniczy({7})
+    assert B.domknij_terminarz(matches, {7}, rekord, mids_z_kursami={7}) == 1
+
+
 def test_liczba_propsow_z_pobranych_kursow_nie_jest_nadpisywana():
     matches, rekord = _budowniczy({1, 2})
     matches[1] = {"id": 1, "liga": "X", "okazje": [], "propsy_superbet": 14}
