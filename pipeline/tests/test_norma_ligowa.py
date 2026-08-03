@@ -56,6 +56,27 @@ def test_trend_z_feedu_dalej_zasila_koncesje():
     assert koncesje[(8, "team_cards")] == [3.0]
 
 
+def test_ksiega_zapamietuje_rozgrywki_typu():
+    """Bez stempla KAŻDY pomiar (kalibracja, kwarantanna, przewaga nad ceną)
+    leciał po samym rynku — a „team_cards" to dwa różne produkty: 1,05 kartki
+    na drużynę-mecz w Danii i 2,56 w Brazylii."""
+    from footstats.jobs import rozliczanie
+    log: dict = {}
+    wspolne = {
+        "mecz_id": 5, "mecz": "A – B", "kickoff_ts": 1785700000,
+        "podmiot_id": 1, "podmiot": "A", "rynek": "Kartki drużyny",
+        "rynek_kod": "team_cards", "linia": 1.5, "p_model": 0.6, "kurs": 1.9,
+    }
+    rozliczanie._dopisz_nowe(log, [
+        {**wspolne, "strona": "ponizej", "liga": "Superliga"},
+        {**wspolne, "strona": "powyzej"},          # publikacja nie znała ligi
+    ])
+    wpisy = {r["strona"]: r for r in log.values()}
+    assert wpisy["ponizej"]["liga"] == "Superliga"
+    # nie zgadujemy po fakcie — brak wiedzy zostaje brakiem pola
+    assert "liga" not in wpisy["powyzej"]
+
+
 def test_niepelna_lista_rywali_nie_ucina_reszty():
     """Sedno błędu: krótsza lista skracała CAŁĄ historię, nie tylko koncesje."""
     tt = _trend_z_banku(game_opponent_ids=[7])

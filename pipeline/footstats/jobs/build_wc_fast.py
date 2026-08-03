@@ -5498,6 +5498,20 @@ def _main_impl(tryb=None):
         rozliczanie.ustaw_cienie_skladow({})
         print(f"Cień wyceny pominięty ({e})")
 
+    # STEMPEL ROZGRYWEK NA TYPIE (2026-08-03). Księga nie zapisywała, z jakich
+    # rozgrywek był typ, więc KAŻDY pomiar — kalibracja, kwarantanna, przewaga
+    # nad ceną — leciał wyłącznie po rynku. A poziom bywa zupełnie inny: kartki
+    # to 1,05 na drużynę-mecz w duńskiej Superlidze i 2,56 w Brasileirão B
+    # (pomiar 03.08). Jedna liczba na „team_cards" opisuje więc dwa różne
+    # produkty i uśrednia je do kształtu, którego nie ma żaden.
+    #
+    # Stempel stawiamy PRZY PUBLIKACJI, nie odtwarzamy później — dokładnie z tego
+    # powodu co `ekran` ([[stempel-ekranu]]): rekord rozliczony jest zamrożony,
+    # a przypisanie po fakcie zgaduje wg dzisiejszego stanu terminarza.
+    for _b in value_bets:
+        if not _b.get("liga"):
+            _b["liga"] = (matches_out.get(_b.get("mecz_id")) or {}).get("liga", "")
+
     # publikacja kuponów idzie przez log (zamrożenie/anulowanie/rozliczenie)
     # wewnątrz _rozlicz_i_zapisz — kupony.json to aktywne kupony z logu
     _rozlicz_i_zapisz(value_bets, kupony_list, niedostepni,

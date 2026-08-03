@@ -495,6 +495,11 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
             # Bez tego Skuteczność wrzucała rożne całych meczów do zakładki
             # „Zawodnicy", bo `match_corners` nie zaczyna się od `team_`.
             "ekran": betting.ekran_typu(b),
+            # ROZGRYWKI, z których był typ (2026-08-03). Bez tego każdy pomiar
+            # szedł po samym rynku, a poziom bywa zupełnie inny: kartki to
+            # 1,05 na drużynę-mecz w Superlidze duńskiej i 2,56 w Brasileirão B.
+            # Puste, gdy publikacja go nie znała — nie zgadujemy po fakcie.
+            **({"liga": b["liga"]} if b.get("liga") else {}),
             # historia predykcji typów DRUŻYNOWYCH — patrz kalibracja_tau.py
             **({"kal_tau": b["kal_tau"]} if b.get("kal_tau") else {}),
             # KOREKTA STRUMIENIA użyta przy publikacji — bez tego stempla
