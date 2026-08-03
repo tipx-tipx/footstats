@@ -227,7 +227,21 @@ function Fakty({ w }: { w: RadarWpis }) {
   if (drugi?.p_final != null) {
     fakty.push({
       tekst: `drugi szczebel ${fmtProc(drugi.p_final)}`,
-      klasa: "bg-paper text-ink-soft border border-hairline",
+      // ZIELEŃ NIESIE TU INFORMACJĘ, nie ozdabia: mówi, że drabinkę da się
+      // rozegrać DALEJ NIŻ O JEDEN SZCZEBEL. Próg 0,40 jest ten sam, którym
+      // backend przyznaje kształt „dwa_szczeble" (radar.PEWNA_MIN_P_DRUGI) —
+      // dwie liczby w dwóch miejscach nie mogą mówić czego innego.
+      // Poniżej progu szczebel zostaje na karcie (drabinka urywa się dopiero
+      // pod 0,25), ale ma być widać, że to już nie jest pewny dalszy ciąg.
+      // PORÓWNUJEMY LICZBĘ, KTÓRĄ USER WIDZI, nie surową. p_final = 0,398
+      // wyświetla się jako „40%", więc porównanie na surowej wartości dawało
+      // chip z napisem „40%" pomalowany jak poniżej progu — etykieta mówiłaby
+      // co innego niż kolor, a to najszybszy sposób na utratę zaufania do
+      // obu naraz.
+      klasa:
+        Math.round(drugi.p_final * 100) >= 40
+          ? "bg-data-green-wash text-data-green-ink"
+          : "bg-paper text-ink-soft border border-hairline",
     });
   }
   if (w.hero?.z) {
