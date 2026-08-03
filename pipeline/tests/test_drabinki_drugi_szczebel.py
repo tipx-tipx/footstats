@@ -26,13 +26,13 @@ def _karta(rynek="shots", szczeble=()):
 
 def test_pewna_gdy_drugi_szczebel_realnie_wchodzi():
     w = _karta(szczeble=[(0.5, 1.45, 0.72), (1.5, 2.60, 0.44)])
-    assert R._profil_gry(w) == "pewna"
+    assert R._profil_gry(w) == "dwa_szczeble"
 
 
 def test_value_gdy_kurs_od_2_a_szansa_bliska_polowie():
     """Bukmacher wycenia jak rzut monetą, my mamy wyraźnie lepiej."""
     w = _karta(szczeble=[(1.5, 2.30, 0.51), (2.5, 4.10, 0.28)])
-    assert R._profil_gry(w) == "value"
+    assert R._profil_gry(w) == "wyzszy_kurs"
 
 
 def test_tani_pewniak_z_martwym_drugim_szczeblem_bez_etykiety():

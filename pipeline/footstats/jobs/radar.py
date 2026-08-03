@@ -111,9 +111,11 @@ MIN_P_DRUGIEGO_SZCZEBLA = 0.25
 # DWA RODZAJE GRY (propozycja usera 2026-08-03). Ten podział jest PROSTOPADŁY
 # do `kategoria` (ta mówi, co widać w drugim cenniku) — tu chodzi o to, jak
 # kartę się gra:
-#   * „pewna"  — tanio, ale drugi szczebel realnie wchodzi,
-#   * „value"  — pierwszy szczebel od 2,0 w górę, a mimo to szansa bliska
-#                rzutowi monetą; wtedy cena bukmachera jest przesadzona.
+#   * „dwa_szczeble" — tanio, ale drugi szczebel realnie wchodzi,
+#   * „wyzszy_kurs"  — pierwszy szczebel od 2,0 w górę, a mimo to szansa bliska
+#                     rzutowi monetą; wtedy cena bukmachera jest przesadzona.
+# NAZWY BEZ SŁOWA „PEWNY" — decyzja usera z 28.07 („różnica kursowa to nie
+# równa się pewniak") dotyczy CAŁEGO UI, nie tylko kategorii rozjazdu.
 # Karta, która nie spełnia żadnego z warunków, nie dostaje etykiety — lepiej
 # nie obiecywać nic, niż obiecywać po cichu.
 PEWNA_MIN_P_HERO = 0.60
@@ -1100,10 +1102,10 @@ def _profil_gry(w: dict) -> str | None:
     if p_hero is None or kurs_hero is None or p_drugi is None:
         return None
     if p_hero >= PEWNA_MIN_P_HERO and p_drugi >= PEWNA_MIN_P_DRUGI:
-        return "pewna"
+        return "dwa_szczeble"
     if (kurs_hero >= VALUE_MIN_KURS_HERO and p_hero >= VALUE_MIN_P_HERO
             and p_drugi >= VALUE_MIN_P_DRUGI):
-        return "value"
+        return "wyzszy_kurs"
     return None
 
 

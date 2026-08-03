@@ -330,14 +330,18 @@ export interface RadarWpis {
    */
   kategoria?: "analiza" | "rynek_zgodny" | "rozjazd" | "pewniak_taniej";
   /**
-   * JAK SIĘ TĘ KARTĘ GRA (backend: radar._profil_gry) – oś PROSTOPADŁA do
+   * KSZTAŁT DRABINKI (backend: radar._profil_gry) – oś PROSTOPADŁA do
    * `kategoria`, która mówi tylko, co widać w drugim cenniku:
-   *   "pewna" – tanio, ale drugi szczebel realnie wchodzi (p ≥ 0,40)
-   *   "value" – pierwszy szczebel od kursu 2,0, a szansa i tak bliska połowie
-   * Brak pola = karta nie spełnia żadnego z warunków; wtedy NIE obiecujemy
-   * niczego, bo cała rzecz w tym, żeby oba szczeble dały się zagrać.
+   *   "dwa_szczeble" – tanio, ale drugi szczebel realnie wchodzi (p ≥ 0,40)
+   *   "wyzszy_kurs"  – pierwszy szczebel od kursu 2,0, a szansa bliska połowie
+   * Brak pola = karta nie spełnia żadnego z warunków.
+   *
+   * NAZWY BEZ SŁOWA „PEWNY": decyzja z 28.07 („różnica kursowa to nie równa
+   * się pewniak") dotyczy całego UI. Karta i tak nie pokazuje tej etykiety –
+   * mówi FAKTAMI (patrz `Fakty` w RadarCard), bo liczba jest zrozumiała bez
+   * tłumaczenia, a przymiotnik wymaga zaufania.
    */
-  profil_gry?: "pewna" | "value" | null;
+  profil_gry?: "dwa_szczeble" | "wyzszy_kurs" | null;
   /** najmocniejszy układ „pewniak taniej" na karcie (do wyróżnienia) */
   rozjazd_pewniak?: (RadarRozjazd & { linia: number }) | null;
   /** rozjazd na linii, która wygrała kartę */

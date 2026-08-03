@@ -182,6 +182,77 @@ function maDrabinke(w: RadarWpis): boolean {
 }
 
 /**
+ * FAKTY KARTY — trzy liczby zamiast trzech przymiotników (2026-08-03).
+ *
+ * Zgłoszenie usera: „chodzi o proste oznaczenia typów — różnica kursów między
+ * bukami, szansa na drugi szczebel — żeby to było ładne i intuicyjne".
+ *
+ * Karta mówiła dotąd przymiotnikami: „wyraźna przewaga", „jeden płaci więcej".
+ * Przymiotnik wymaga zaufania — trzeba wiedzieć, co u nas znaczy „wyraźna".
+ * Liczba nie wymaga niczego: „+41% u Betclica" rozumie każdy od razu. Dlatego
+ * to NIE są kolejne plakietki oceny (zasada „najwyżej dwie" zostaje nietknięta
+ * w nagłówku) — to jest wiersz faktów tuż nad drabinką, którą opisują.
+ *
+ * Trzy, w kolejności rzadkości: różnica kursów jest najrzadsza i najcenniejsza,
+ * drugi szczebel decyduje, czy drabinkę da się rozegrać dalej niż o jeden
+ * szczebel, pokrycie to baza całej analizy. Czego nie ma — tego nie pokazujemy,
+ * zamiast wypisywać „brak".
+ */
+function Fakty({ w }: { w: RadarWpis }) {
+  const r =
+    w.rynki?.find((x) => x.rynek_kod === w.hero?.rynek_kod) ?? w.rynki?.[0];
+  const drabinka = r?.drabinka ?? [];
+  const i = drabinka.findIndex((s) => s.linia === w.hero?.linia);
+  const drugi = i >= 0 ? drabinka[i + 1] : undefined;
+
+  // różnica kursów: bierzemy tę przy linii, która wygrała kartę; gdy jej nie
+  // ma — najlepszą z całej drabinki, bo i tak dotyczy tego samego zawodnika
+  const roz =
+    w.rozjazd_hero ??
+    drabinka
+      .map((s) => s.rozjazd)
+      .filter(Boolean)
+      .sort((a, b) => (b!.przewaga_pct ?? 0) - (a!.przewaga_pct ?? 0))[0];
+
+  const fakty: { tekst: string; klasa: string }[] = [];
+  if (roz && roz.przewaga_pct >= 1) {
+    fakty.push({
+      // „gdzie" mówi, u KOGO jest lepsza cena — bez tego liczba wisi w próżni
+      tekst: `+${Math.round(roz.przewaga_pct)}% u ${
+        roz.gdzie === "betclic" ? "Betclica" : "Superbetu"
+      }`,
+      klasa: "bg-data-amber-wash text-data-amber-ink",
+    });
+  }
+  if (drugi?.p_final != null) {
+    fakty.push({
+      tekst: `drugi szczebel ${fmtProc(drugi.p_final)}`,
+      klasa: "bg-paper text-ink-soft border border-hairline",
+    });
+  }
+  if (w.hero?.z) {
+    fakty.push({
+      tekst: `${w.hero.traf}/${w.hero.z} ostatnich`,
+      klasa: "bg-paper text-ink-soft border border-hairline",
+    });
+  }
+  if (!fakty.length) return null;
+
+  return (
+    <span className="mx-4 mb-1.5 flex flex-wrap items-center gap-1.5 sm:mx-5">
+      {fakty.map((f) => (
+        <span
+          key={f.tekst}
+          className={`font-data inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${f.klasa}`}
+        >
+          {f.tekst}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/**
  * HISTORIA JAKO WYKRES, NIE DZIESIĘĆ RÓWNYCH KRESEK (2026-08-01, część 2).
  *
  * Zgłoszenie usera: „wykres ten x z 10 weszło jest słaby, nierówny". I był:
@@ -1130,6 +1201,9 @@ export const RadarCard = memo(function RadarCard({
             </span>
           </span>
         )}
+
+        {/* FAKTY tuż nad drabinką, którą opisują – patrz komentarz przy Fakty */}
+        <Fakty w={w} />
 
         {/* DRABINKA – to jest treść karty, patrz DrabinkaPasek */}
         <DrabinkaPasek w={w} />
