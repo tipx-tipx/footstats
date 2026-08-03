@@ -1066,6 +1066,53 @@ KWARANTANNA_ROI_WEJSCIE = -0.10   # wejście: strata > 10 gr na złotówce stawk
 KWARANTANNA_ROI_WYJSCIE = -0.02   # wyjście: dopiero gdy strata prawie znika
 KWARANTANNA_MIN_N = 15            # od tylu rozliczonych typów oceniamy rynek
 KWARANTANNA_OKNO = 40             # okno kroczące: tylko ostatnie N rozliczeń
+
+# OKNO MUSI OBEJMOWAĆ KILKA DNI MECZOWYCH, NIE TYLKO KILKADZIESIĄT REKORDÓW
+# (2026-08-03, zgłoszenie usera: „znowu przestały się generować kupony").
+#
+# Okna liczone w SZTUKACH powstały, gdy rozliczaliśmy 5-10 typów dziennie —
+# czterdzieści rekordów było wtedy „ostatnim tygodniem". Dziś jedna niedziela
+# potrafi rozliczyć 41 typów na samym `team_goals`, więc okno po cichu zmieniło
+# znaczenie na „wczoraj". Zmierzone tego dnia:
+#
+#     team_goals   ostatnie 40 (okno):  trafień 38%   ROI −34,5%   <- kwarantanna
+#                  ostatnie 120:        trafień 54%   ROI  −1,3%
+#                  całość (169):        trafień 58%   ROI  −1,2%
+#     dni: 31.07 ROI +26%, 01.08 +42%, 02.08 −44% (n=41), 03.08 +39%
+#
+# Rynek praktycznie na zero wpadł do kwarantanny za JEDEN zły dzień, a że stoi
+# na nim 12 z 20 typów strony, pula kuponów została z jednym legiem i kupony
+# przestały powstawać. To dokładnie ten przypadek, przed którym zabezpiecza
+# reguła ukrywania rynków („jeden zły dzień nie wystarcza") — tyle że tam
+# warunek jest, a tutaj go nie było.
+#
+# Dla porównania `team_corners` przegrywa w KAŻDYM oknie (−24%, −15%, −14%),
+# więc jego kwarantanna zostaje. O to chodzi: reguła ma odróżniać złą passę
+# od złego rynku.
+KWARANTANNA_MIN_DNI = 5           # tyle różnych dni meczowych minimum
+
+
+def okno_kroczace(
+    rek: list[dict], sztuk: int, min_dni: int = KWARANTANNA_MIN_DNI,
+) -> list[dict]:
+    """Ostatnie `sztuk` rozliczeń, ale rozszerzone do `min_dni` dni meczowych.
+
+    `rek` musi być posortowane rosnąco po `kickoff_ts`. Gdy historia jest
+    krótsza niż `min_dni` dni, zwraca ile ma — brak danych nie jest wyrokiem,
+    a od minimalnej próby jest osobny próg (`*_MIN_N`).
+    """
+    if not rek:
+        return []
+    i = max(len(rek) - sztuk, 0)
+    dni = {dzien_pl(r.get("kickoff_ts") or 0) for r in rek[i:]}
+    # SUFIT ROZSZERZANIA. Gdy rynek gra rzadko (albo cała historia zmieściła się
+    # w jednym dniu), szukanie pięciu dni cofałoby się przez całą księgę i okno
+    # przestałoby być kroczące — a to ono pozwala rynkowi wrócić po poprawie.
+    minimum = max(len(rek) - sztuk * 3, 0)
+    while i > minimum and len(dni) < min_dni:
+        i -= 1
+        dni.add(dzien_pl(rek[i].get("kickoff_ts") or 0))
+    return rek[i:]
 # ile ostatnich rozliczeń oglądamy w poszukiwaniu flagi z poprzedniego cyklu
 # (patrz `_byl_w_kwarantannie`)
 KWARANTANNA_HISTEREZA_OKNO = 5
@@ -1107,10 +1154,10 @@ def rynki_kwarantanna(log: dict | None = None) -> dict[str, dict]:
     ]
     out: dict[str, dict] = {}
     for mk in {r["rynek_kod"] for r in settled}:
-        grp = sorted(
+        grp = okno_kroczace(sorted(
             (r for r in settled if r["rynek_kod"] == mk),
             key=lambda r: r.get("kickoff_ts") or 0,
-        )[-KWARANTANNA_OKNO:]
+        ), KWARANTANNA_OKNO)
         if len(grp) < KWARANTANNA_MIN_N:
             continue
         traf = sum(1 for r in grp if r["wynik"] == "wygrany")
@@ -1189,11 +1236,11 @@ def strony_kwarantanna(log: dict | None = None) -> dict[str, dict]:
     out: dict[str, dict] = {}
     pary = {(r["rynek_kod"], r["strona"]) for r in settled}
     for mk, strona in pary:
-        grp = sorted(
+        grp = okno_kroczace(sorted(
             (r for r in settled
              if r["rynek_kod"] == mk and r["strona"] == strona),
             key=lambda r: r.get("kickoff_ts") or 0,
-        )[-STRONA_OKNO:]
+        ), STRONA_OKNO)
         if len(grp) < STRONA_MIN_N:
             continue
         traf = sum(1 for r in grp if r["wynik"] == "wygrany")
@@ -1305,10 +1352,10 @@ def kategorie_kwarantanna(log: dict | None = None) -> dict[str, dict]:
     ]
     out: dict[str, dict] = {}
     for flaga in KATEGORIE_KWARANTANNY:
-        grp = sorted(
+        grp = okno_kroczace(sorted(
             (r for r in settled if r.get(flaga)),
             key=lambda r: r.get("kickoff_ts") or 0,
-        )[-KATEGORIA_OKNO:]
+        ), KATEGORIA_OKNO)
         if len(grp) < KATEGORIA_MIN_N:
             continue
         traf = sum(1 for r in grp if r["wynik"] == "wygrany")

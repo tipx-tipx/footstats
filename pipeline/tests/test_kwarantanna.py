@@ -64,18 +64,28 @@ def test_bez_kursu_rynek_jest_niemierzalny():
     assert rozliczanie.rynki_kwarantanna(_log(recs)) == {}
 
 
+def _dni(recs, od_dnia: int):
+    """Rozłóż rozliczenia na kolejne DNI meczowe.
+
+    Od 2026-08-03 okno kwarantanny musi objąć kilka dni, a nie tylko N rekordów
+    (patrz `okno_kroczace`) — dane testowe upchnięte w jednej dobie mierzyłyby
+    już co innego niż reguła w produkcji.
+    """
+    DOBA = 86400
+    return [{**r, "kickoff_ts": (od_dnia + i % 8) * DOBA + i}
+            for i, r in enumerate(recs)]
+
+
 def test_okno_kroczace_pozwala_wrocic():
     # stare 40 przegranych, świeże 40 wygranych — okno widzi tylko świeże
-    stare = _seria("tackles", 40, 0, 1.5)
-    swieze = [{**r, "kickoff_ts": 100 + i}
-              for i, r in enumerate(_seria("tackles", 40, 40, 1.5))]
+    stare = _dni(_seria("tackles", 40, 0, 1.5), 100)
+    swieze = _dni(_seria("tackles", 40, 40, 1.5), 200)
     assert rozliczanie.rynki_kwarantanna(_log(stare + swieze)) == {}
     # i w drugą stronę: świeża zapaść wchodzi do kwarantanny mimo dobrej historii
-    zapasc = [{**r, "kickoff_ts": 100 + i}
-              for i, r in enumerate(_seria("tackles", 40, 0, 1.5))]
-    assert "tackles" in rozliczanie.rynki_kwarantanna(
-        _log(_seria("tackles", 40, 40, 1.5) + zapasc)
-    )
+    assert "tackles" in rozliczanie.rynki_kwarantanna(_log(
+        _dni(_seria("tackles", 40, 40, 1.5), 100)
+        + _dni(_seria("tackles", 40, 0, 1.5), 200)
+    ))
 
 
 def test_histereza_trzyma_stan_w_szarej_strefie():
