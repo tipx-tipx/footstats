@@ -150,6 +150,22 @@ def test_forma_dosypuje_BRAKUJACY_RYNEK_istniejacej_druzyny(monkeypatch):
     assert out[1]["forma"]["team_corners"] == "ROŻNE"   # brakujący wraca
 
 
+def test_forma_zostaje_druzynie_z_UJEMNYM_numerem(monkeypatch):
+    """Ta lista decyduje, czyja forma ZOSTAJE w banku. Typ wznowiony z księgi
+    przychodził z ujemnym numerem (patrz `rozliczanie._znak_podmiotu`), a
+    snapshot trzyma drużynę pod dodatnim — więc bank wyrzucał formę dokładnie
+    tych drużyn, które jej potrzebują najbardziej. Zmierzone 03.08: Sønderjyske
+    i IFK Värnamo zniknęły z banku, mając typ na liście."""
+    from footstats.jobs import build_wc_fast as bwf
+    monkeypatch.setattr(bwf, "_dry_run", lambda: False)
+    monkeypatch.setattr(bwf.supa, "get_key", lambda k: [
+        {"id": 1295, "forma": {"team_goals": "20 meczów"}},
+    ])
+    out = {r["id"]: r for r in
+           bwf.scal_forme_druzyn({}, [{"podmiot_id": -1295}])}
+    assert out[1295]["forma"]["team_goals"] == "20 meczów"
+
+
 def test_forma_przezywa_padniety_odczyt(monkeypatch):
     """Nieudany odczyt ma zostawić świeże dane, a nie wywalić cyklu."""
     from footstats.jobs import build_wc_fast as bwf

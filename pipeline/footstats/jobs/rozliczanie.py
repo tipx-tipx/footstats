@@ -389,6 +389,53 @@ def _uzupelnij_ekrany(log: dict) -> int:
     return n
 
 
+def _znak_podmiotu(b: dict) -> int | None:
+    """`podmiot_id` drużyny ZAWSZE dodatni — jeden klub, jeden numer.
+
+    Minus rodzi się w pomiarze progów (`build_wc_fast._odrzuc_druzyne` odróżnia
+    nim drużynę od zawodnika w swoim kluczu diagnostycznym) i przez `typy_log`
+    wyciekał do rekordów NORMALNIE OPUBLIKOWANYCH: typ pomiarowy trafiał do
+    księgi pierwszy, a gdy w kolejnym cyklu przechodził progi, aktualizacja
+    zdejmowała `odrzucony`, ale numer zostawał ujemny. Zmierzone 2026-08-03:
+    162 z 465 opublikowanych typów drużynowych w księdze (35%) miało minus,
+    ten sam klub siedział pod dwoma numerami (AGF jako 1291 i −1291).
+
+    Kosztowało to dwie rzeczy naraz:
+    * strona szuka formy drużyny PO NUMERZE (`DruzynyTablica.formaById`), więc
+      typ wznowiony z księgi nie miał jak pokazać kroku „jak było ostatnio" —
+      zmierzone tego dnia: 0 z 18 typów na stronie,
+    * kupon pilnuje „jeden leg na podmiot" też po numerze, więc ta sama drużyna
+      mogła wejść do kuponu dwa razy jako dwa różne podmioty.
+
+    Rozróżnienie drużyna/zawodnik niesie `rynek_kod` (PRZEDROSTKI_DRUZYNOWE) —
+    znak liczby nigdy nie był do tego potrzebny.
+    """
+    pid = b.get("podmiot_id")
+    if pid is None or not isinstance(pid, int) or pid >= 0:
+        return None
+    if not str(b.get("rynek_kod") or "").startswith(betting.PRZEDROSTKI_DRUZYNOWE):
+        return None
+    return abs(pid)
+
+
+def _uzupelnij_znak_id(log: dict) -> int:
+    """Zdejmij minus z numerów drużyn w istniejącej księdze (2026-08-03).
+
+    Idempotentne i bezpieczne dla rekordów rozliczonych: numer podmiotu nie
+    jest wynikiem rozliczenia, tylko kluczem do formy i do puli kuponów, a klucz
+    rekordu (`_klucz`) idzie po NAZWIE, więc nic się tu nie skleja ani nie gubi.
+    Bez tego 162 zamrożone rekordy zostałyby kalekie na zawsze — patrz
+    `_znak_podmiotu`.
+    """
+    n = 0
+    for rec in log.values():
+        dodatni = _znak_podmiotu(rec)
+        if dodatni is not None:
+            rec["podmiot_id"] = dodatni
+            n += 1
+    return n
+
+
 def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
     for b in value_bets:
         k = _klucz(b)
@@ -431,7 +478,9 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
         log[k] = {
             "mecz_id": b["mecz_id"], "mecz": b["mecz"],
             "kickoff_ts": b["kickoff_ts"],
-            "podmiot_id": b["podmiot_id"], "podmiot": b["podmiot"],
+            # numer drużyny bez minusa — patrz `_znak_podmiotu`
+            "podmiot_id": _znak_podmiotu(b) or b["podmiot_id"],
+            "podmiot": b["podmiot"],
             "rynek_kod": b["rynek_kod"], "rynek": b["rynek"],
             "linia": b["linia"], "strona": b["strona"],
             "kurs": b.get("kurs"), "bukmacher": b.get("bukmacher"),
@@ -3270,6 +3319,7 @@ def rozlicz(
         )
     log = _migruj_log(log_raw or {})
     _uzupelnij_ekrany(log)
+    _uzupelnij_znak_id(log)
     _dopisz_nowe(log, value_bets)
     _dopisz_nowe(log, drabinki or [])
     # legi kuponów też muszą być w logu (pewniaki spoza publikowanych typów)

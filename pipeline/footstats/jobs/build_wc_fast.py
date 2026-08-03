@@ -162,7 +162,14 @@ def _typ_z_logu(rec: dict) -> dict:
     mecz = str(rec.get("mecz") or "")
     strony = [s.strip() for s in mecz.split("–")] if "–" in mecz else []
     podmiot = str(rec.get("podmiot") or "")
-    druzynowy = str(rec.get("rynek_kod") or "").startswith("team_")
+    # `match_`/`wiecej_` to też rynki DRUŻYNOWE — to miejsce znało tylko
+    # `team_`, więc suma meczowa wznowiona z księgi wracała jako typ
+    # ZAWODNICZY i lądowała na stronie głównej zamiast w Drużynach
+    # (strona filtruje po `podmiot_typ`). Ta sama klasa pomyłki co
+    # w rozliczaniu przed 01.08 — stąd wspólna stała.
+    druzynowy = str(rec.get("rynek_kod") or "").startswith(
+        betting.PRZEDROSTKI_DRUZYNOWE
+    )
     przeciwnik = ""
     if druzynowy and len(strony) == 2:
         przeciwnik = strony[1] if strony[0] == podmiot else strony[0]
@@ -173,7 +180,17 @@ def _typ_z_logu(rec: dict) -> dict:
         "mecz_id": rec.get("mecz_id"), "mecz": mecz,
         "kickoff_ts": rec.get("kickoff_ts"),
         "podmiot_typ": "druzyna" if druzynowy else "zawodnik",
-        "podmiot_id": rec.get("podmiot_id"), "podmiot": podmiot,
+        # NUMER DRUŻYNY BEZ MINUSA (2026-08-03). Księga trzymała część klubów
+        # pod ujemnym numerem (wyciek z pomiaru progów — patrz
+        # `rozliczanie._znak_podmiotu`), a strona szuka po nim formy drużyny.
+        # Rozliczanie prostuje to u źródła, ale karta ma być poprawna także
+        # zanim tamten przebieg dotknie danego rekordu.
+        "podmiot_id": (
+            abs(rec["podmiot_id"])
+            if druzynowy and isinstance(rec.get("podmiot_id"), int)
+            else rec.get("podmiot_id")
+        ),
+        "podmiot": podmiot,
         "druzyna": podmiot if druzynowy else "", "przeciwnik": przeciwnik,
         "rynek_kod": rec.get("rynek_kod"), "rynek": rec.get("rynek"),
         "linia": rec.get("linia"), "strona": rec.get("strona"),
@@ -460,7 +477,16 @@ def scal_forme_druzyn(swieza: dict, value_bets: list[dict]) -> list[dict]:
     Trzymamy wyłącznie drużyny, które mają dziś jakiś typ na liście. Inaczej
     plik puchłby w nieskończoność o kluby, których nikt już nie ogląda.
     """
-    potrzebne = {b.get("podmiot_id") for b in value_bets if b.get("podmiot_id")}
+    # NUMER BEZ ZNAKU (2026-08-03). Ta linia decyduje, KTÓRE drużyny zostają
+    # w banku formy — a lista typów niesie też typy wznowione z księgi, które
+    # do dziś przychodziły z ujemnym numerem (patrz `rozliczanie._znak_podmiotu`).
+    # Snapshot trzyma drużynę pod dodatnim, więc porównanie nie trafiało i bank
+    # WYRZUCAŁ formę dokładnie tych drużyn, które jej najbardziej potrzebują:
+    # wznowionych. Potem karta nie miała czym pokazać kroku „jak było ostatnio",
+    # a wyglądało to na brak danych ze źródła. Zmierzone 03.08: Sønderjyske
+    # i IFK Värnamo zniknęły z banku mimo typów na liście.
+    potrzebne = {abs(b["podmiot_id"]) for b in value_bets
+                 if isinstance(b.get("podmiot_id"), int) and b["podmiot_id"]}
     out = dict(swieza)
     if _dry_run():
         return [v for k, v in out.items() if k in potrzebne or not potrzebne]
@@ -481,7 +507,7 @@ def scal_forme_druzyn(swieza: dict, value_bets: list[dict]) -> list[dict]:
     dosypane_druzyny = dosypane_rynki = 0
     for rec in poprzednia:
         tid = rec.get("id")
-        if tid is None or tid not in potrzebne:
+        if not isinstance(tid, int) or abs(tid) not in potrzebne:
             continue
         biezacy = out.get(tid)
         if biezacy is None:
@@ -3683,7 +3709,12 @@ def _main_impl(tryb=None):
                             odrzucone_pomiar.append({
                                 "id": 0, "mecz_id": mid, "mecz": match_label,
                                 "kickoff_ts": ts, "podmiot_typ": "druzyna",
-                                "podmiot_id": -abs(int(tt.team_id or 0)),
+                                # DODATNI, mimo że klucz diagnostyczny wyżej
+                                # (`_odrzuc_druzyne`) używa minusa: ten rekord
+                                # idzie do KSIĘGI, a stamtąd numer wracał na
+                                # stronę i rozjeżdżał tożsamość klubu — patrz
+                                # `rozliczanie._znak_podmiotu`.
+                                "podmiot_id": abs(int(tt.team_id or 0)),
                                 "podmiot": tt.team_name,
                                 "rynek_kod": tt.market_code,
                                 "rynek": MARKET_NAMES_PL.get(
