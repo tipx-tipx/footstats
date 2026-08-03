@@ -714,6 +714,13 @@ MAX_PERF_CYKL = 220                 # budżet zapytań /player/{id}/performance
 #   164 zawodników z martwą próbą (dry-run 2026-07-26); koszt ~0,26 s na
 #   zapytanie, więc pełne pokrycie to ~45 s w cyklu chodzącym co 30 min.
 
+MAX_PERF_OFERTA = 420               # osobny budżet na dopełnianie OFERTY
+#   bukmachera (patrz dopelnij_oferte_zawodnicza). Płacimy tylko za
+#   zawodników z meczów, w których Superbet realnie kwotuje zawodników —
+#   dry-run 3.08: 10 z 60 meczów, 186 naszych zawodników w nich, plus
+#   shotmapy (~10 na drużynę) tylko dla rynków „zza pola"/„głową". Przy 260
+#   budżet padał i 65 zawodników zostawało przy jednej statystyce.
+
 
 # --- PEŁNE SKŁADY (predicted/oficjalne) ---
 # okno pobierania: przewidywane XI pojawiają się ~36 h przed meczem
@@ -880,6 +887,114 @@ def odswiez_stare_trendy(
           f"próbą, odratowano {n_graczy} ({n_trendow} trendów)"
           + (f", budżet uciął {pominieto}" if pominieto else ""))
     return n_graczy, n_trendow
+
+
+def dopelnij_oferte_zawodnicza(
+    gracze_meczu: dict[int, dict[int, object]],
+    sb_cache: dict[int, dict],
+    players_out: dict[int, dict],
+    odds_grid: dict[int, dict],
+    forma_z_trendu,
+    budzet: int = MAX_PERF_OFERTA,
+    kolejnosc: dict[int, int] | None = None,
+    fetch_performance=None,
+    trendy_z_performance=None,
+) -> tuple[int, int]:
+    """Zakładka meczu ma pokazywać KURSY + wszystkie nasze statystyki
+    indywidualne, które da się na ten mecz obstawić.
+
+    Zgłoszenie usera 2026-08-03. Do dziś tabela pokazywała wyłącznie te
+    statystyki, które wymienił feed propsów statshuba (`/props/player-trends`)
+    — a on jest lustrem ofert bukmacherów UK, nie naszej oferty. Skutek
+    zmierzony na Odense – Sønderjyske: feed dał 27 rekordów i WYŁĄCZNIE
+    strzały, więc tabela znała jedną statystykę. W drugą stronę boli bardziej:
+    Superbet kwotuje celne strzały najczęściej ze wszystkiego (547 par
+    zawodnik–rynek w skanie 3.08), a formę na celne mieliśmy dla 15 zawodników
+    z 1035 — te kursy leżały nietknięte.
+
+    Dlatego kolejność odwracamy: punktem wyjścia jest OFERTA bukmachera na ten
+    mecz, a brakującą historię dociągamy z `/player/{id}/performance` (własne
+    dane meczowe statshuba, komplet statystyk, niezależne od tego, czy
+    ktokolwiek je kwotował). Przy okazji do siatki kursów wpisujemy wszystkie
+    kwotowane linie — dawniej trafiały tam tylko te, przy których silnik
+    doszedł do końca scoringu, więc zawodnik odrzucony np. na „za mało zdarzeń"
+    gubił kursy dla całej tabeli.
+
+    Świadomie NIE dokładamy tych rynków do trendów silnika: nowe statystyki
+    trafiają na stronę jako pokrycie z kursem, ale typów z nich nie stawiamy
+    (nie mają kontekstu rywala ani kalibracji). To osobna decyzja.
+
+    `kolejnosc` (mid -> kickoff_ts) decyduje, komu przypada budżet, gdy nie
+    starcza dla wszystkich: najpierw mecze, które zaczynają się najwcześniej —
+    to na nie ktoś dziś stawia.
+
+    Zwraca (ile rynków dołożonych do formy, ile wpisów kursów w siatce).
+    """
+    fetch_performance = fetch_performance or statshub.fetch_player_performance
+    trendy = trendy_z_performance or statshub.trendy_z_performance
+    licznik = [budzet]
+    sm_cache: dict[int, list] = {}
+    n_rynkow = n_kursow = 0
+    bez_pary: list[str] = []
+    mecze = sorted(
+        gracze_meczu.items(), key=lambda kv: (kolejnosc or {}).get(kv[0], 0)
+    )
+    for mid, gracze in mecze:
+        sb_players = (sb_cache.get(mid) or {}).get("players") or {}
+        if not sb_players:
+            continue   # bukmacher nie kwotuje zawodników — strona to mówi wprost
+        for pid, tr in gracze.items():
+            rec = superbet.znajdz_zawodnika(sb_players, tr.player_name)
+            if not rec:
+                bez_pary.append(tr.player_name)
+                continue
+            forma = (players_out.get(pid) or {}).get("forma")
+            if forma is None:
+                continue
+            braki = [mk for mk in rec if mk not in forma]
+            if braki and licznik[0] > 0:
+                licznik[0] -= 1
+                try:
+                    rows = fetch_performance(int(pid))
+                except Exception:
+                    rows = []
+                if rows:
+                    # shotmapy (rynki „zza pola" / „głową") kosztują ~10 zapytań
+                    # na drużynę — pobieramy je TYLKO wtedy, gdy bukmacher
+                    # rzeczywiście kwotuje któryś z tych rynków temu zawodnikowi
+                    trzeba_shotmap = any(
+                        mk in statshub.SHOTMAP_DERIVED for mk in braki
+                    )
+                    swieze = trendy(
+                        int(pid), tr.player_name, tr.team_id, rows,
+                        sm_cache=sm_cache if trzeba_shotmap else None,
+                        budzet=licznik,
+                    )
+                    for mk in braki:
+                        s = swieze.get(mk)
+                        if s is None or not s.counts:
+                            continue
+                        forma[mk] = forma_z_trendu(s, mk)
+                        n_rynkow += 1
+            # KURSY: wszystkie kwotowane linie „powyżej" dla rynków, które
+            # umiemy pokazać (mamy dla nich historię)
+            for mk, linie in rec.items():
+                if mk not in forma:
+                    continue
+                over = {
+                    str(l): round(float(v["over"]), 2)
+                    for l, v in (linie or {}).items() if (v or {}).get("over")
+                }
+                if over:
+                    odds_grid.setdefault(mid, {}).setdefault(pid, {})[mk] = over
+                    n_kursow += 1
+    if n_rynkow or n_kursow:
+        print(f"Oferta zawodnicza: dołożono {n_rynkow} rynków do formy "
+              f"i {n_kursow} wpisów kursów w siatce"
+              + (f", budżet performance wyczerpany" if licznik[0] <= 0 else "")
+              + (f", bez pary u bukmachera: {len(bez_pary)} zawodników"
+                 if bez_pary else ""))
+    return n_rynkow, n_kursow
 
 
 # nazwy reprezentacji EN -> PL (do dopasowania z Superbetem)
@@ -2458,6 +2573,32 @@ def _main_impl(tryb=None):
     # meczu: mecz_id -> player_id -> rynek -> "linia" -> kurs. Zbierana z tej
     # samej siatki co scoring (merged), tylko zapisywana na dysk (JSON).
     odds_grid: dict[int, dict[int, dict[str, dict[str, float]]]] = {}
+    # zawodnicy przypisani do meczu (mid -> pid -> trend) — z tego wychodzi
+    # dopelnij_oferte_zawodnicza(), która dokłada rynki z oferty bukmachera
+    gracze_meczu: dict[int, dict[int, object]] = {}
+
+    def _forma_z_trendu(tr, mk: str) -> dict:
+        """Forma jednego rynku do players.json (UI: sparkline, TOP POKRYCIA).
+
+        statshub daje ~40 meczów historii — trzymamy 20, żeby na stronie meczu
+        dało się PREFEROWAĆ ostatnie 5 startów w KADRZE (a nie klubowe) i pokazać
+        datę ostatniego meczu (świeżość). Model i tak liczy z pełnego tr.counts.
+        """
+        nt_zbior = nt_ts.get(tr.team_name, set())
+        N = 20
+        return {
+            "ostatnie": [int(c) for c in tr.counts[:N]],
+            "minuty": [int(m) for m in tr.minutes[:N]],
+            "rywale": [str(o) for o in tr.game_opponents[:N]],
+            "kadra": [
+                any(abs(ts_g - g) < 36 * 3600 for g in nt_zbior)
+                for ts_g in tr.timestamps[:N]
+            ],
+            "ts": [int(t) for t in tr.timestamps[:N]],
+            "srednia90": round(
+                float(np.sum(tr.counts) / max(np.sum(tr.minutes), 1) * 90.0), 2
+            ),
+        }
 
     # przewidywane XI z Rotowire (drugie źródło, działa z chmury)
     try:
@@ -2938,24 +3079,10 @@ def _main_impl(tryb=None):
             }
         elif tr.in_predicted_lineup:
             players_out[tr.player_id]["xi"] = True
-        nt_zbior = nt_ts.get(tr.team_name, set())
-        # statshub daje ~40 meczów historii — trzymamy 20, żeby na stronie meczu
-        # dało się PREFEROWAĆ ostatnie 5 startów w KADRZE (a nie klubowe) i pokazać
-        # datę ostatniego meczu (świeżość). Model i tak liczy z pełnego tr.counts.
-        N = 20
-        players_out[tr.player_id]["forma"][mk] = {
-            "ostatnie": [int(c) for c in tr.counts[:N]],
-            "minuty": [int(m) for m in tr.minutes[:N]],
-            "rywale": [str(o) for o in tr.game_opponents[:N]],
-            "kadra": [
-                any(abs(ts_g - g) < 36 * 3600 for g in nt_zbior)
-                for ts_g in tr.timestamps[:N]
-            ],
-            "ts": [int(t) for t in tr.timestamps[:N]],
-            "srednia90": round(
-                float(np.sum(tr.counts) / max(np.sum(tr.minutes), 1) * 90.0), 2
-            ),
-        }
+        players_out[tr.player_id]["forma"][mk] = _forma_z_trendu(tr, mk)
+        # zawodnicy per mecz — punkt wejścia dla dopelnij_oferte_zawodnicza()
+        # (tam odwracamy kolejność: oferta bukmachera → nasza historia)
+        gracze_meczu.setdefault(mid, {})[tr.player_id] = tr
 
         if not merged:
             _odrzuc(mid, tr, "brak_kursu",
@@ -3296,6 +3423,17 @@ def _main_impl(tryb=None):
             else:
                 value_bets.append(rec_okazji)
                 matches_out[mid]["okazje"].append(vb_id)
+
+    # --- OFERTA ZAWODNICZA MECZU: kursy + wszystkie statystyki, które da się
+    # na ten mecz obstawić (zgłoszenie usera 2026-08-03). Feed propsów bywa
+    # znacznie węższy od oferty bukmachera, więc brakującą historię dociągamy
+    # z danych meczowych statshuba. Szczegóły w dopelnij_oferte_zawodnicza().
+    dopelnij_oferte_zawodnicza(
+        gracze_meczu, sb_cache, players_out, odds_grid, _forma_z_trendu,
+        kolejnosc={
+            mid: int(m.get("kickoff_ts") or 0) for mid, m in matches_out.items()
+        },
+    )
 
     # --- SUGESTIE bez kursów: niecelne / zablokowane (rynki STS, blokowany w chmurze) ---
     # WYŁĄCZNIE z prawdziwej historii per strzał z 365Scores (real_split —

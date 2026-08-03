@@ -33,20 +33,23 @@ export const RYNEK_LABEL: Record<string, string> = {
   offsides: "Spalone",
 };
 
-/** Rynki brane pod uwagę (kolejność = domyślny priorytet). */
-const RYNKI_POKRYCIA = [
-  "shots",
-  "sot",
-  "shots_outside_box",
-  "shots_off_target",
-  "shots_blocked",
-  "fouls_committed",
-  "fouls_won",
-  "tackles",
-  "interceptions",
-];
+/**
+ * Rynki brane pod uwagę = WSZYSTKIE, dla których mamy nazwę (kolejność
+ * RYNEK_LABEL = priorytet wyświetlania).
+ *
+ * Dawniej była tu ręczna dziewiątka bez spalonych i rynków „głową", więc
+ * statystyka, którą bukmacher kwotował i którą umieliśmy policzyć, i tak nie
+ * miała jak trafić do tabeli (zgłoszenie usera 2026-08-03: w zakładce meczu
+ * mają być kursy i wszystkie nasze statystyki indywidualne możliwe do zagrania).
+ */
+const RYNKI_POKRYCIA = Object.keys(RYNEK_LABEL);
 
-const LINIE = [0.5, 1.5, 2.5];
+/**
+ * Linie liczone zawsze (1+/2+/3+) — do nich dokładamy KAŻDĄ linię, którą
+ * bukmacher kwotuje dla tej pary zawodnik–rynek. Bez tego kurs np. na 4+
+ * odbiorów nie miał gdzie się pokazać, mimo że dało się go zagrać.
+ */
+const LINIE_BAZOWE = [0.5, 1.5, 2.5];
 const PROBKA = 5; // ostatnie 5 startów
 const PROG_STARTU = 60; // minuty ≥ 60 = zaczynał w składzie (jak pipeline)
 const MIN_POKRYTE = 2; // ≥ 2/5 = 40%
@@ -226,16 +229,35 @@ export function topPokrycia(
       }
 
       const n = probka.length;
-      const linie: LiniaPokrycie[] = LINIE.map((linia) => {
-        const prog = Math.ceil(linia);
-        const pokryte = probka.filter((g) => g.v >= prog).length;
-        const kurs = oddsGracz[kod]?.[String(linia)] ?? null;
-        const evPct =
-          kurs != null && n > 0
-            ? Math.round(((pokryte / n) * kurs - 1) * 100)
-            : null;
-        return { linia, prog, pokryte, kurs, evPct };
-      }).filter((l) => l.pokryte >= MIN_POKRYTE);
+      // kursy tego rynku po liczbie linii (klucze z pipeline'u są tekstem,
+      // a "2.0" i "2" to ten sam zakład – porównujemy liczbami)
+      const kursyLinii = new Map<number, number>();
+      for (const [k, v] of Object.entries(oddsGracz[kod] ?? {})) {
+        const l = Number(k);
+        if (Number.isFinite(l)) kursyLinii.set(l, v);
+      }
+      const doPoliczenia = [
+        ...new Set([...LINIE_BAZOWE, ...kursyLinii.keys()]),
+      ].sort((a, b) => a - b);
+      const linie: LiniaPokrycie[] = doPoliczenia
+        .map((linia) => {
+          const prog = Math.ceil(linia);
+          const pokryte = probka.filter((g) => g.v >= prog).length;
+          const kurs = kursyLinii.get(linia) ?? null;
+          // WARTOŚCI NIE POKAZUJEMY PRZY JEDNYM TRAFIENIU. Wzór (pokrycie ×
+          // kurs − 1) robi z „1 raz na 5 startów @25,00" wielkie zielone
+          // „+400%", a to jest szum próby, nie okazja. Kurs zostaje widoczny
+          // (da się zagrać), sama liczba wartości znika.
+          const evPct =
+            kurs != null && n > 0 && pokryte >= MIN_POKRYTE
+              ? Math.round(((pokryte / n) * kurs - 1) * 100)
+              : null;
+          return { linia, prog, pokryte, kurs, evPct };
+        })
+        // linia bez kursu musi mieć realne pokrycie (inaczej to szum);
+        // linia Z KURSEM zostaje już przy jednym trafieniu – da się ją zagrać,
+        // a ujemna wartość obok mówi wprost, że to kiepski pomysł
+        .filter((l) => l.pokryte >= (l.kurs != null ? 1 : MIN_POKRYTE));
       if (linie.length === 0) continue;
 
       // wartość ważona pokryciem (do rankingu) i surowa najlepsza (do wyświetlenia)
