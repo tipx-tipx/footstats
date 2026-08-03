@@ -97,6 +97,21 @@ const SORTY: { kod: Sort; label: string }[] = [
  */
 const moc = (b: ValueBet) => b.p_model * Math.sqrt(b.kurs ?? b.fair_kurs ?? 1);
 
+/**
+ * Typ z rynku CHWILOWO WSTRZYMANEGO schodzi na koniec kolejności „polecane".
+ *
+ * Zostaje na liście, bo cena jest zamrożona i user mógł go zagrać — ale skoro
+ * sami przestaliśmy ten rynek polecać i nie wpuszczamy go do kuponów, to nie
+ * ma prawa otwierać listy podpisanej „polecane". Kolejność wewnątrz obu grup
+ * bez zmian.
+ */
+const wgPolecanych = (xs: ValueBet[]) =>
+  [...xs].sort(
+    (a, z) =>
+      Number(!!a.rynek_wstrzymany) - Number(!!z.rynek_wstrzymany) ||
+      moc(z) - moc(a),
+  );
+
 /** Od tylu typów dnia rozdzielanie na półki przestaje być szumem. */
 const PROG_POLEK = 4;
 /** Granica półek: „częściej wchodzą" kontra „więcej płacą". */
@@ -250,7 +265,7 @@ export function DruzynyTablica({
             // sortuje PRZED doklejeniem typów wznowionych, a te wchodzą na
             // koniec w kolejności rejestru. Sprawdzone na żywej liście:
             // rank_score szedł 0, 0, 0, 0, 7.3, 0, 0.94, 0.
-            return [...xs].sort((a, z) => moc(z) - moc(a));
+            return wgPolecanych(xs);
         }
       },
     [sort],
@@ -302,7 +317,7 @@ export function DruzynyTablica({
       //
       // Przy małym dniu nie dzielimy — dwie półki po dwa typy to nie porządek,
       // tylko dwa nagłówki.
-      const wgMocy = (xs: ValueBet[]) => [...xs].sort((a, z) => moc(z) - moc(a));
+      const wgMocy = wgPolecanych;
       const pewne = wgMocy(lista.filter((b) => b.p_model >= PROG_PEWNE));
       const odwazne = wgMocy(lista.filter((b) => b.p_model < PROG_PEWNE));
       const sekcje =

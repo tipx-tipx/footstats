@@ -1067,6 +1067,24 @@ export function SzczegolyTypu({
                       zdanie, bo jako jedyne mówi, co z tym zrobić. */}
                   <WerdyktZdanie bet={bet} />
 
+                  {/* RYNEK WSTRZYMANY — MÓWIMY, ZAMIAST MILCZEĆ (2026-08-03).
+                      Kwarantanna blokuje nowe typy z rynku, ale tego nie
+                      wycofujemy: cena jest zamrożona i user mógł go zagrać.
+                      Do dziś strona nie mówiła o tym ani słowa, a generator
+                      kuponów po cichu takie typy pomijał — człowiek widział
+                      typ i nie miał jak wiedzieć, że sami przestaliśmy ten
+                      rynek polecać. To jest informacja o ZAKŁADZIE, nie
+                      o naszej kuchni, więc karta ma prawo ją nieść. */}
+                  {bet.rynek_wstrzymany && (
+                    <p className="mt-3 border-l-2 border-hairline pl-3 text-sm leading-relaxed text-muted">
+                      Tego rynku chwilowo nie polecamy – ostatnie rozliczenia
+                      wychodzą pod kreską, więc nowych typów z niego nie
+                      wystawiamy i nie wchodzi do kuponów. Ten został
+                      wystawiony wcześniej, po cenie z tamtej chwili, i dlatego
+                      zostaje na liście.
+                    </p>
+                  )}
+
                   {/* SKALA CZTERECH SZANS ZASTĄPIONA ZDANIEM (2026-08-02).
                       Cztery kolumny zajmowały ćwierć rozwinięcia, żeby
                       podświetlić jedną komórkę. Pełna skala ma sens RAZ na

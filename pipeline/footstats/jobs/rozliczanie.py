@@ -970,6 +970,7 @@ def compute_bias_full(
     min_n: int = MIN_N_KALIBRACJI,
     sugestie: bool = False,
     cap: tuple[float, float] = BIAS_CAP_LOGIT,
+    _surowo: bool = False,
 ) -> dict[str, dict]:
     """Kalibracja przedziałowa z shrinkage: rodzina -> rynek -> przedział.
 
@@ -998,8 +999,9 @@ def compute_bias_full(
         # mundial to archiwum, nie nauczyciel — patrz `_z_biezacej_epoki`.
         # Na mieszance kalibracja strzałów wychodziła −0,604, na samej lidze
         # −0,144: cztery razy za mocno, i to na rynku, który w lidze trafia
-        # co do punktu.
-        and _z_biezacej_epoki(r)
+        # co do punktu. `_surowo` = liczymy PODANY zbiór bez filtrowania:
+        # tylko dolewka z poprzedniej epoki (`_dolej_z_innej_epoki`).
+        and (_surowo or _z_biezacej_epoki(r))
     ]
     # ważenie świeżości względem najnowszego rozliczenia w logu — świeże
     # błędy ważą więcej, stare wygasają (półokres KALIBRACJA_POLOWICZNY_DNI)
@@ -1048,6 +1050,56 @@ def compute_bias_full(
                 bb = g + k * (_bias_logit(bgrp, [_w(r) for r in bgrp]) - g)
             bins.append([lo, hi, _cap_bias(bb, cap)])
         out[mk] = {"logit": True, "global": _cap_bias(g, cap), "bins": bins}
+    if _surowo:
+        return out
+    return _dolej_z_innej_epoki(out, log, min_n, sugestie, cap)
+
+
+# ile zostaje z korekty policzonej na INNYM produkcie
+KOREKTA_OBCEJ_EPOKI = 0.5
+
+
+def _dolej_z_innej_epoki(
+    out: dict[str, dict], log: dict, min_n: int, sugestie: bool,
+    cap: tuple[float, float],
+) -> dict[str, dict]:
+    """Rynek bez własnej kalibracji dostaje przytłumioną z drugiej epoki.
+
+    PO CO (2026-08-03). Odcięcie mundialu od uczenia było słuszne, ale twardy
+    filtr wyrzuca informację zamiast ją ważyć. Dla strzałów to bez znaczenia —
+    mają 66 ligowych rozliczeń i własne zdanie. Dla fauli zawodniczych już nie:
+    zostały z 15 i 8 rozliczeniami, czyli BEZ kalibracji i bez osłony
+    kwarantanny, a w lidze wypadają fatalnie (20% i 25% trafień przy deklaracji
+    44% i 64%).
+
+    Obie epoki wskazują ten sam KIERUNEK (mundial: 45% przy deklaracji 72%),
+    różnią się siłą — stąd połowa, a nie pełna kara. To jest przyznanie się do
+    niewiedzy, nie pomiar.
+
+    WYGASA SAM: gdy rynek uzbiera własne ligowe rozliczenia, wchodzi normalną
+    ścieżką i ta dolewka przestaje go dotyczyć. Nikt nie musi o niej pamiętać.
+    """
+    obce = [r for r in log.values() if not _z_biezacej_epoki(r)]
+    if not obce:
+        return out
+    zapas = compute_bias_full(
+        {i: r for i, r in enumerate(obce)}, min_n, sugestie, cap, _surowo=True,
+    )
+    dolane = []
+    for mk, wpis in zapas.items():
+        if mk in out:
+            continue                       # własne dane zawsze wygrywają
+        out[mk] = {
+            "logit": True,
+            "global": _cap_bias(wpis["global"] * KOREKTA_OBCEJ_EPOKI, cap),
+            "bins": [[lo, hi, _cap_bias(b * KOREKTA_OBCEJ_EPOKI, cap)]
+                     for lo, hi, b in wpis["bins"]],
+        }
+        dolane.append(mk)
+    if dolane:
+        print(f"Kalibracja: {len(dolane)} rynków bez własnych rozliczeń "
+              f"w tej epoce jedzie na połowie korekty z poprzedniej "
+              f"({', '.join(sorted(dolane)[:6])})")
     return out
 
 

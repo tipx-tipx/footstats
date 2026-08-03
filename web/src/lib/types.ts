@@ -110,6 +110,14 @@ export interface ValueBet {
    *  publikacji, więc karta jedzie bez rentgenu (czynniki, przedział,
    *  rozkład, historia). Zawsze razem z `wznowiony`. */
   uproszczony?: boolean;
+  /**
+   * true = rynek tego typu jest CHWILOWO wstrzymany (traci w oknie ostatnich
+   * rozliczeń). Typ zostaje na liście do gwizdka, bo cena jest zamrożona
+   * i user mógł go zagrać — ale nowych typów z tego rynku nie wystawiamy
+   * i nie wchodzi on do kuponów. Karta ma to POWIEDZIEĆ: człowiek nie ma
+   * skąd wiedzieć, że sami przestaliśmy ten rynek polecać.
+   */
+  rynek_wstrzymany?: boolean;
   /** znacznik pierwszej publikacji typu (z rejestru, nie z bieżącego cyklu) */
   opublikowano_ts?: number;
   /** kurs, jaki wynika z pozostałych linii buka (gdy miekka_linia) */

@@ -5335,6 +5335,23 @@ def _main_impl(tryb=None):
                 print("Historia przewagi: stempel dnia zapisany")
         except Exception as e:
             print(f"Historia przewagi pominięta ({e})")
+    # RYNEK WSTRZYMANY — MÓWIMY O TYM, ZAMIAST MILCZEĆ (2026-08-03).
+    #
+    # Kwarantanna blokuje NOWE zobowiązania z rynku, ale typu raz pokazanego nie
+    # wycofujemy: cena jest zamrożona, user mógł go zagrać. Logika jest spójna
+    # (sprawdzone: wszystkie 8 takich typów na stronie to typy WZNOWIONE,
+    # wystawione zanim rynek wpadł do kwarantanny; świeżych zero) — ale strona
+    # nie mówiła o tym ani słowa, a generator kuponów po cichu je pomijał.
+    # Człowiek widział typ i nie miał jak wiedzieć, że sami przestaliśmy ten
+    # rynek polecać. To jest informacja o ZAKŁADZIE, nie o naszej kuchni.
+    for b in lista_pub:
+        if b.get("rynek_kod") in kwarantanna_rynkow:
+            b["rynek_wstrzymany"] = True
+    _wstrzymane = sum(1 for b in lista_pub if b.get("rynek_wstrzymany"))
+    if _wstrzymane:
+        print(f"Rynki wstrzymane: {_wstrzymane} typów na liście pochodzi "
+              f"z rynków w kwarantannie (wystawione wcześniej, zostają "
+              f"do gwizdka, ale nie wchodzą do kuponów)")
     _dump("value_bets.json", lista_pub)
     _dump("matches.json", list(matches_out.values()))
     _dump("players.json", list(players_out.values()))

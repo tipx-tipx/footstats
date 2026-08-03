@@ -85,6 +85,34 @@ def test_przewaga_rynkow_pomija_mundial():
     assert all(v["n"] == 40 for v in pelna.values())
 
 
+def test_rynek_bez_wlasnej_epoki_dostaje_polowe_korekty_z_poprzedniej():
+    """Twardy filtr epok wyrzucał informację zamiast ją ważyć. Strzały mają
+    66 ligowych rozliczeń i własne zdanie; faule zostały z 15 — czyli bez
+    kalibracji i bez osłony kwarantanny, przy 20% trafień na deklarowane 44%.
+    Obie epoki wskazują ten sam KIERUNEK, różnią się siłą — stąd połowa."""
+    log = {}
+    for i in range(60):        # rynek TYLKO mundialowy: mocno przeszacowany
+        log[f"ms{i}"] = _typ("Hiszpania – Francja", rynek_kod="fouls_committed",
+                             p_model=0.75, wynik="przegrany" if i % 4 else "wygrany",
+                             kickoff_ts=1785000000 + i)
+    for i in range(60):        # rynek ligowy: trafia zgodnie z deklaracją
+        log[f"lg{i}"] = _typ("Lech – Legia", p_model=0.55,
+                             wynik="wygrany" if i % 2 else "przegrany",
+                             kickoff_ts=1785500000 + i)
+    bias = R.compute_bias_full(log)
+    surowy = R.compute_bias_full(
+        {k: v for k, v in log.items() if k.startswith("ms")}, _surowo=True,
+    )
+    assert "fouls_committed" in bias, "rynek bez ligowych danych ma zostać bez kary?"
+    assert bias["fouls_committed"]["global"] == round(
+        surowy["fouls_committed"]["global"] * R.KOREKTA_OBCEJ_EPOKI, 6
+    ) or abs(bias["fouls_committed"]["global"]
+             - surowy["fouls_committed"]["global"] * R.KOREKTA_OBCEJ_EPOKI) < 1e-6
+    # rynek z WŁASNYMI danymi ligowymi nie widzi mundialu wcale
+    assert bias["shots"]["global"] == R.compute_bias_full(
+        {k: v for k, v in log.items() if k.startswith("lg")})["shots"]["global"]
+
+
 def test_rozliczenia_i_skutecznosc_zostaja_nietkniete():
     """Zakres zmiany to UCZENIE. Wynik usera jest wynikiem usera."""
     log = _ksiega()
