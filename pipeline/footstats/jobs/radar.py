@@ -781,6 +781,22 @@ def _rynki_wpisu(
             "rynek_kod": mk,
             "rynek": nazwy_pl.get(mk, mk),
             "drabinka": drabinka,
+            # WSZYSTKIE kwotowane linie, nie tylko opublikowane szczeble
+            # (2026-08-04). Porównanie cen z drugim bukmacherem wymaga co
+            # najmniej DWÓCH wspólnych linii — inaczej nie wiadomo, czy obaj
+            # liczą to samo (drabinki potrafią zachodzić przesunięte o szczebel).
+            # Karta pokazuje drabinkę przyciętą do tego, co grywalne, więc
+            # bywa jednoszczeblowa i wtedy porównanie nie miało z czego powstać:
+            # zmierzone 04.08 na Matíasie Verze — jedna nasza linia wobec dwóch
+            # u Betclica, porównanie odrzucone jako „za mało wspólnych".
+            #
+            # Rozdzielamy więc DWIE RÓŻNE RZECZY: na czym SPRAWDZAMY zgodność
+            # cenników (pełna lista) i co POKAZUJEMY userowi (przycięta
+            # drabinka). Weryfikacja dostaje komplet dowodów, karta zostaje
+            # krótka.
+            "linie_pelne": {str(k): v for k, v in sorted(
+                ((float(l), kurs) for l, kurs in linie.items()),
+            )},
             # WODOSPAD KONTEKSTU — karta ma powiedzieć wprost, czemu ścinamy
             # albo podbijamy pokrycie. Puste sekcje (np. sędzia bez obsady)
             # zostają z etykietą źródła, żeby UI mogło napisać „nie wiemy".
@@ -1169,6 +1185,12 @@ def _dopnij_betclic(wpisy: list[dict], events_meta: dict[int, dict]) -> None:
 
         n_szczebli = n_kart = n_pewniakow = 0
         pominiete = 0
+        # KAŻDE ZEJŚCIE Z DROGI MA SIĘ LICZYĆ (2026-08-04). Log mówił tylko
+        # „karty z drugą ceną 0/4" i ta jedna liczba znaczyła cztery różne
+        # rzeczy naraz: Betclic nie ma oferty / nie ma tego zawodnika / nie ma
+        # tego rynku / drabinki się nie zeszły. Prześledzenie tego ręcznie
+        # zajęło godzinę — tyle kosztuje cichy `continue`.
+        odpadki: Counter = Counter()
         for mid, bc in pary.items():
             if time.time() - start > BUDZET_BETCLIC_S:
                 pominiete += 1
@@ -1177,13 +1199,21 @@ def _dopnij_betclic(wpisy: list[dict], events_meta: dict[int, dict]) -> None:
                 paczka = betclic.kursy_zawodnikow(int(bc["id"]))
             except (RuntimeError, OSError, ValueError) as e:
                 print(f"Drabinki/Betclic: mecz {bc.get('nazwa')} — {e}")
+                odpadki["blad_pobrania"] += 1
                 continue
             gracze = paczka.get("players") or {}
             if not gracze:
+                # mecz sparowany, ale Betclic nie kwotuje ANI JEDNEGO zawodnika
+                odpadki["mecz_bez_zawodnikow"] += 1
                 continue
             for w in wpisy_mid.get(mid, []):
                 rynki_bc = betclic.znajdz_zawodnika(gracze, w.get("podmiot") or "")
                 if not rynki_bc:
+                    # Betclic kwotuje 26-30 zawodników (podstawowy skład),
+                    # a nasze karty coraz częściej stoją na graczach z głębi
+                    # kadry — odkrywamy ich z oferty Superbetu, która ma 40-66.
+                    # Taka karta NIE MA jak dostać drugiej ceny.
+                    odpadki["zawodnika_brak_u_bc"] += 1
                     continue
                 trafil = False
                 for r in w.get("rynki") or []:
@@ -1191,13 +1221,25 @@ def _dopnij_betclic(wpisy: list[dict], events_meta: dict[int, dict]) -> None:
                     # rozjazdy liczy JEDNA funkcja (razem z bramą wspólnych
                     # linii), żeby karta i porównywarka nie miały dwóch
                     # różnych definicji tego samego
+                    # SPRAWDZAMY NA PEŁNEJ LIŚCIE, POKAZUJEMY NA DRABINCE
+                    # — patrz `linie_pelne` w `_rynki_wpisu`. Bez tego karta
+                    # jednoszczeblowa nigdy nie zbierze dwóch wspólnych linii,
+                    # więc porównanie cen odpada zanim w ogóle spojrzy na ceny.
                     nasze_linie = {
+                        float(l): {"over": kurs}
+                        for l, kurs in (r.get("linie_pelne") or {}).items()
+                        if kurs
+                    } or {
                         float(s["linia"]): {"over": s.get("kurs")}
                         for s in r.get("drabinka") or [] if s.get("kurs")
                     }
-                    rozjazdy = betclic.porownaj_drabinke(
-                        nasze_linie, rynki_bc.get(r.get("rynek_kod")) or {}
-                    )
+                    bc_linie = rynki_bc.get(r.get("rynek_kod")) or {}
+                    if not bc_linie:
+                        odpadki["rynku_brak_u_bc"] += 1
+                        continue
+                    rozjazdy = betclic.porownaj_drabinke(nasze_linie, bc_linie)
+                    if not rozjazdy:
+                        odpadki["drabinki_nie_zeszly_sie"] += 1
                     for s in r.get("drabinka") or []:
                         r_oc = rozjazdy.get(float(s["linia"]))
                         if not r_oc:
@@ -1240,6 +1282,11 @@ def _dopnij_betclic(wpisy: list[dict], events_meta: dict[int, dict]) -> None:
               f"karty z drugą ceną {n_kart}/{len(wpisy)}, szczebli {n_szczebli}, "
               f"układów „pewniak taniej” {n_pewniakow}"
               + (f", pominięte mecze (budżet czasu): {pominiete}" if pominiete else ""))
+        # GDZIE UCIEKŁA RESZTA — bez tego „0/4" wygląda tak samo przy braku
+        # oferty Betclica, jak przy naszym błędzie odczytu
+        if odpadki:
+            print("Drabinki — druga cena nie doszła: " + ", ".join(
+                f"{k}={v}" for k, v in odpadki.most_common()))
         # CO ODRZUCIŁY BRAMY — bez tego obcinka jest cicha i „karty z drugą
         # ceną 1/3" wygląda tak samo, gdy Betclic nie ma oferty, jak wtedy,
         # gdy ma, ale liczy co innego (patrz betclic.ODRZUCONE_ROZJAZDY)
