@@ -504,6 +504,15 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
             # prawo uczyć dzisiejszy model. Stemplujemy przy publikacji;
             # rekordy sprzed stempla rozpoznaje `epoka()` po nazwach drużyn.
             "epoka": epoka(b),
+            # PRZEWIDYWANA LICZBA ZDARZEŃ (2026-08-03). Próg `λ ≥ 0,35` wycina
+            # setki kandydatów na cykl i nikt go nigdy nie zweryfikował — a nie
+            # dało się tego zrobić, bo księga λ NIE ZAPISYWAŁA. Bez stempla
+            # pytanie „czy typy z niską λ trafiają gorzej" jest niemierzalne
+            # wstecz, a zgadywanie nowego progu to majstrowanie. Za dwa
+            # tygodnie będzie z czego liczyć.
+            **({"lambda": round(float(b["lambda"]), 3)}
+               if isinstance(b.get("lambda"), (int, float)) and b["lambda"]
+               else {}),
             # historia predykcji typów DRUŻYNOWYCH — patrz kalibracja_tau.py
             **({"kal_tau": b["kal_tau"]} if b.get("kal_tau") else {}),
             # KOREKTA STRUMIENIA użyta przy publikacji — bez tego stempla
@@ -2061,6 +2070,93 @@ def szansa_pokazywana(
 # TO NIE JEST BRAMA. Wynik służy do UKŁADANIA KOLEJNOŚCI listy — rynek nie
 # znika, tylko czeka niżej, aż model się go nauczy, i wraca sam.
 PRZEWAGA_MIN_N = 25      # poniżej tego nie orzekamy nic (przewaga = 0)
+
+
+# --- ILE NASZEJ LICZBY WARTO MIESZAĆ Z CENĄ (pomiar, 2026-08-03) ----------
+#
+# `przewaga_rynkow` odpowiada „czy bijemy cenę". To jest pytanie następne
+# i praktyczniejsze: ILE naszego zdania warto dołożyć do ceny, żeby wyszła
+# najlepsza prognoza. Model mieszany:
+#
+#     logit(p) = logit(p_rynku) + w * [logit(p_model) - logit(p_rynku)]
+#
+# w = 0 -> ufamy wyłącznie cenie, w = 1 -> wyłącznie sobie (dzisiejszy stan).
+# Szukamy w, przy którym Brier jest najniższy.
+#
+# PIERWSZY POMIAR (932 rozliczenia ligowe, 03.08) jest niewygodny i dlatego
+# musi być widoczny w każdym cyklu, a nie raz w notatce:
+#
+#     całość                w*=0,00   Brier 0,2073 zamiast 0,2282 (-9,2%)
+#     shots powyżej   n=37  w*=1,00   ROI +20,4%
+#     team_corners powyżej n=67  w*=0,70   ROI  +8,5%
+#     team_corners poniżej n=331 w*=0,00   ROI -12,2%
+#     team_goals poniżej   n=227 w*=0,05   ROI  -7,6%
+#
+# Czyli: nasza liczba wnosi coś w trzech wąskich miejscach, a w reszcie —
+# w tym w NAJWIĘKSZYM wolumenie — tylko psuje cenę. To pomiar, NIE brama:
+# niczego jeszcze nie mieszamy w publikacji. Najpierw kilka cykli, żeby
+# zobaczyć, czy w* per segment się ustala, czy skacze z próbką.
+WAGA_MIN_N = 25          # poniżej tylu rozliczeń nie liczymy w* wcale
+WAGA_KROK = 0.05         # rozdzielczość przeszukiwania w
+
+
+def _wymieszaj(p_model: float, p_rynku: float, w: float) -> float:
+    """Szansa po zmieszaniu z ceną — wspólny wzór dla pomiaru i (kiedyś) bramy."""
+    lm = math.log(min(max(p_model, 1e-6), 1 - 1e-6) / (1 - min(max(p_model, 1e-6), 1 - 1e-6)))
+    lr = math.log(min(max(p_rynku, 1e-6), 1 - 1e-6) / (1 - min(max(p_rynku, 1e-6), 1 - 1e-6)))
+    return 1.0 / (1.0 + math.exp(-(lr + w * (lm - lr))))
+
+
+def waga_rynku_pomiar(log: dict | None = None) -> dict[str, dict]:
+    """Per (rynek, strona): jaka waga NASZEJ liczby dałaby najlepszą prognozę.
+
+    Zwraca {"team_corners|ponizej": {"n":.., "w":.., "brier_w":.., "brier_model":..,
+    "brier_kurs":.., "roi":..}}. `w` bliskie 0 = cena wie lepiej; bliskie 1 =
+    nasza liczba wnosi informację.
+
+    POMIAR, NIE BRAMA. Typy pomiarowe (odrzucone przy progu) wchodzą do próby
+    świadomie: bez nich mierzylibyśmy wyłącznie to, co sami wybraliśmy, czyli
+    czub własnego rozkładu — a to jest dokładnie ten błąd selekcji, który od
+    miesiąca zawyża deklarację.
+    """
+    if log is None:
+        log = _migruj_log(supa.get_key("typy_log") or {})
+    grupy: dict[str, list] = {}
+    for r in log.values():
+        if r.get("wynik") not in ("wygrany", "przegrany"):
+            continue
+        if r.get("sugestia") or r.get("zrodlo") or _z_martwej_epoki(r):
+            continue
+        if not r.get("kurs") or r.get("p_model") is None:
+            continue
+        if not _z_biezacej_epoki(r):
+            continue
+        grupy.setdefault(f"{r.get('rynek_kod')}|{r.get('strona')}", []).append(r)
+
+    out: dict[str, dict] = {}
+    kroki = [i * WAGA_KROK for i in range(int(1 / WAGA_KROK) + 1)]
+    for klucz, grp in grupy.items():
+        if len(grp) < WAGA_MIN_N:
+            continue
+        dane = [
+            (float(r["p_model"]),
+             betting.implied_prob_one_sided(float(r["kurs"])),
+             1.0 if r["wynik"] == "wygrany" else 0.0,
+             float(r["kurs"]))
+            for r in grp
+        ]
+        def _brier(w: float) -> float:
+            return sum((_wymieszaj(pm, pr, w) - y) ** 2 for pm, pr, y, _ in dane) / len(dane)
+        brier_w, w_naj = min((_brier(w), w) for w in kroki)
+        out[klucz] = {
+            "n": len(grp),
+            "w": round(w_naj, 2),
+            "brier_w": round(brier_w, 4),
+            "brier_model": round(_brier(1.0), 4),
+            "brier_kurs": round(_brier(0.0), 4),
+            "roi": round(sum((k - 1.0) if y else -1.0 for _, _, y, k in dane) / len(dane), 3),
+        }
+    return out
 
 
 def przewaga_rynkow(log: dict | None = None) -> dict[str, dict]:

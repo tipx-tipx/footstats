@@ -5319,6 +5319,20 @@ def _main_impl(tryb=None):
         _bija = [k for k, v in _przewaga.items() if v["przewaga"] > 0]
         print(f"Przewaga nad ceną: {len(_bija)} z {len(_przewaga)} rynków "
               f"bije kurs" + (f" ({', '.join(_bija)})" if _bija else ""))
+    # ILE NASZEJ LICZBY WARTO MIESZAĆ Z CENĄ — pomiar, nie brama (2026-08-03).
+    # Pierwszy odczyt był niewygodny (całość w*=0,00, czyli sama cena
+    # przewiduje lepiej), więc ma być widoczny w KAŻDYM cyklu, a nie raz
+    # w notatce. Patrz `rozliczanie.waga_rynku_pomiar`.
+    try:
+        _wagi = rozliczanie.waga_rynku_pomiar(_log_przewagi)
+        if _wagi:
+            print("Waga naszej liczby vs cena (w=0 cena wie lepiej, w=1 my): "
+                  + ", ".join(
+                      f"{k} w={v['w']:.2f} (n={v['n']}, ROI {v['roi']:+.0%})"
+                      for k, v in sorted(_wagi.items(), key=lambda kv: -kv[1]["n"])
+                  ))
+    except Exception as e:
+        print(f"Waga vs cena pominięta ({e})")
     if _pasma:
         print("Przewaga wg pasma ceny: " + ", ".join(
             f"{k} {v['przewaga']:+.4f} (weszło {100*v['hit']:.0f}%, n={v['n']})"
