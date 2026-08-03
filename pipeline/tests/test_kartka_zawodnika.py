@@ -107,6 +107,28 @@ def test_betclic_nie_bierze_cudzych_kartek(nazwa):
     assert betclic.kod_rynku(nazwa) is None
 
 
+def test_performance_prosi_o_glebsza_historie():
+    """Bez parametru API oddaje 10 meczów — najkrótszą historię w systemie.
+    Brama drabinek wymaga OŚMIU rozegranych występów, a dziesięć rekordów to
+    często pięć-sześć z minutami (reszta to ławka). Stąd 138 ze 189 kandydatów
+    odrzuconych na „krótkiej próbie" w przebiegu 03.08."""
+    wolane = {}
+
+    def _get(url, **kw):
+        wolane["url"] = url
+        return {"data": []}
+
+    stary = statshub._get
+    statshub._get = _get
+    try:
+        statshub.fetch_player_performance(123)
+        assert "limit=40" in wolane["url"]
+        statshub.fetch_player_performance(123, limit=100)
+        assert "limit=100" in wolane["url"]   # ścieżka średnich sezonowych
+    finally:
+        statshub._get = stary
+
+
 def test_pozostale_rynki_nie_dostaja_zer():
     """Brak pola przy statystyce mierzonej zawsze to luka w danych i ma
     zostać luką — inaczej cicho zaniżalibyśmy średnie."""

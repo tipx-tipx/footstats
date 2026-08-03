@@ -258,15 +258,33 @@ def _pierwszy(v):
     return v or {}
 
 
-def fetch_player_performance(player_id: int) -> list[dict]:
-    """Ostatnie ~10 meczów gracza ze statystykami — DZIAŁA W KAŻDEJ LIDZE.
+# Ile meczów historii bierzemy z performance. BEZ PARAMETRU API ODDAJE 10 —
+# i przez to była to najkrótsza historia w całym systemie (odkryte 2026-08-03).
+#
+# Dlaczego to bolało: gracz odkryty z oferty bukmachera nie ma nic poza tą
+# ścieżką, a brama drabinek wymaga OŚMIU ROZEGRANYCH występów w oknie. Dziesięć
+# rekordów to często pięć-sześć z minutami (reszta to ławka), więc karta
+# odpadała na „krótkiej próbie" — 138 ze 189 odrzuconych kandydatów w przebiegu
+# 03.08, przy dwóch przepuszczonych.
+#
+# 40 zamiast 10 sięga mniej więcej sezon wstecz. Głębiej NIE schodzimy domyślnie
+# (choć API pozwala — limit=100 sięga 2022 roku): mecz sprzed dwóch lat nie jest
+# dowodem o dzisiejszej formie, a model i tak wygasza próbę czasowo i ma bramę
+# świeżości. Parametr zostaje jawny, żeby liczenie ŚREDNICH SEZONOWYCH mogło
+# poprosić o więcej, nie ruszając ścieżki typów.
+PERF_LIMIT = 40
+
+
+def fetch_player_performance(player_id: int, limit: int = PERF_LIMIT) -> list[dict]:
+    """Ostatnie mecze gracza ze statystykami — DZIAŁA W KAŻDEJ LIDZE.
 
     Zwraca surowe rekordy {player_statistics_event, events, homeTeam,
     awayTeam}. Statystyki obejmują komplet rynków propsowych: strzały,
     celne, niecelne, zablokowane, faule popełnione i wywalczone, odbiory,
-    przechwyty, SPALONE, minuty, pozycję i rating.
+    przechwyty, SPALONE, minuty, pozycję, rating i kartki.
     """
-    d = _get(f"{BASE}/player/{player_id}/performance", timeout=20, retries=2)
+    d = _get(f"{BASE}/player/{player_id}/performance?limit={int(limit)}",
+             timeout=25, retries=2)
     rows = d.get("data", d)
     return rows if isinstance(rows, list) else []
 
