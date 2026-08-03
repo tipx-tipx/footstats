@@ -326,6 +326,22 @@ export function TypyDnia({
         </p>
       )}
 
+      {/* DZIEŃ TO SUMA, ZAKŁADKA TO ZDJĘCIE (2026-08-04).
+          Zgłoszenie usera: „czemu w Skuteczności z 3.08 jest 29 typów, przecież
+          wczoraj w Drużynach nie było 29". Obie liczby były prawdziwe i to jest
+          właśnie problem – odpowiadały na inne pytania. Zmierzone na tamtym
+          dniu: typy publikowaliśmy o 00, 01, 03, 11, 14, 15, 19, 20, 22 i 23,
+          bo mecze startowały od nocy do późnego wieczora, a każdy cykl dokładał
+          swoje. W żadnej chwili nie wisiało ich tyle naraz.
+          Bez tego zdania rozjazd wygląda na błąd w liczeniu. */}
+      {zakladow > 1 && (
+        <p className="mt-2 text-xs leading-relaxed text-faint">
+          To wszystko, co pokazaliśmy <strong>w ciągu całego dnia</strong> – typy
+          dochodzą przez dobę, razem z kolejnymi meczami. Zakładka pokazuje stan
+          na teraz, więc bywa krótsza; tu nic nie znika po gwizdku.
+        </p>
+      )}
+
       {typy.length >= PROG_FILTRA && (
         <div className="mt-3 flex flex-wrap items-center gap-2">
           {FILTRY.map((f) => (
