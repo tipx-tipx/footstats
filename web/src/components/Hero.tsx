@@ -173,12 +173,24 @@ function ZywyPodglad({ bets }: { bets: ValueBet[] }) {
             <Link href={hrefPozycji(bet)} className="group block">
               <div className="bg-gradient-to-br from-brand-wash via-brand-wash/60 to-card px-6 pb-5 pt-5">
                 <p className="font-display text-[11px] font-semibold uppercase tracking-widest text-brand">
+                  {/* ETYKIETA MA OPISYWAĆ, A NIE ŁADNIE BRZMIEĆ (2026-08-04).
+                      „najpewniejszy typ teraz" był FALLBACKIEM dla typów BEZ
+                      przewagi po podatku — czyli słowo „najpewniejszy" trafiało
+                      dokładnie tam, gdzie nie było czym się chwalić. Zmierzone
+                      na Nahuelu Banegasie: nagłówek strony obiecywał
+                      „najpewniejszy typ teraz", a rekord miał wartość netto
+                      −10,8%, własną pewność „niska" i był wznowiony z księgi
+                      bez pełnej analizy. Do tego karta pokazywała wyłącznie
+                      pochlebne liczby (szansa 80%), więc nic tego nie
+                      prostowało. */}
                   {idx === 0
                     ? bet.sugestia
                       ? "najmocniejszy typ dnia · kurs w STS"
                       : (wartoscNetto(bet) ?? 0) > 0
                         ? "najlepsza okazja teraz"
-                        : "najpewniejszy typ teraz"
+                        : bet.pewniak
+                          ? "najwyższa szansa na liście"
+                          : "pierwszy typ z listy"
                     : `namierzone przez skan · ${idx + 1} z ${bets.length}`}
                 </p>
                 <p className="mt-3.5 font-display text-[1.7rem] font-bold leading-tight tracking-tight">

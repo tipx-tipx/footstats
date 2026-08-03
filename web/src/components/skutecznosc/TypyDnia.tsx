@@ -174,8 +174,9 @@ export function TypyDnia({
     () => (dzien.typy ?? []).filter((t) => poziomTypu(t, wybor) === 2),
     [dzien.typy, wybor],
   );
+  // LICZBA, nie flaga — patrz zdanie niżej. „Część" przy 42 z 43 kłamie.
   const bezStempla = useMemo(
-    () => (dzien.typy ?? []).some((t) => !t.ekran || t.ekran_odtworzony),
+    () => (dzien.typy ?? []).filter((t) => !t.ekran || t.ekran_odtworzony).length,
     [dzien.typy],
   );
 
@@ -279,10 +280,23 @@ export function TypyDnia({
         </p>
       )}
 
-      {pelnyWglad && bezStempla && (
+      {/* ILE DOKŁADNIE, NIE „CZĘŚĆ" (2026-08-04). Zgłoszenie usera: „za chuj
+          wczoraj nie było tych wszystkich typów w zakładce Drużyny". Miał
+          rację i to zdanie mu to ukrywało: dla 3 sierpnia stempel był
+          odtworzony w 42 z 43 przypadków, a strona mówiła „część". Przy 98%
+          to nie jest zastrzeżenie, tylko wprowadzanie w błąd — bo sugeruje,
+          że reszta jest zapisana, a nie zgadnięta z rodzaju rynku.
+          Stempel istnieje od 2 sierpnia, więc liczba sama zejdzie do zera. */}
+      {pelnyWglad && bezStempla > 0 && (
         <p className="mt-2 text-[11px] leading-relaxed text-faint">
-          Część typów z tego dnia jest sprzed wprowadzenia znacznika zakładki
-          (2 sierpnia) – przypisanie odtworzyliśmy wstecz z rodzaju rynku.
+          <span className="font-data font-semibold">
+            {bezStempla} z {typy.length}
+          </span>{" "}
+          {odmien(bezStempla, "typu", "typów", "typów")} z tego dnia jest sprzed
+          wprowadzenia znacznika zakładki (2 sierpnia) – przypisanie do tej
+          listy <strong>odtworzyliśmy z rodzaju rynku</strong>, nie odczytali
+          z zapisu. Tam, gdzie ta liczba jest wysoka, sam podział na zakładki
+          jest domysłem.
         </p>
       )}
 
