@@ -1977,6 +1977,33 @@ POWROT_SE = -1.0            # powyżej tylu -> wróć na stronę
 UKRYCIE_MIN_N = 60          # przy mniejszej próbie sam błąd std jest niestabilny
 UKRYCIE_DNI = 3             # tyle dni z rzędu musi się utrzymać
 
+# SAMA ISTOTNOŚĆ NIE WYSTARCZY — DRUGI WARUNEK, NA ROZMIAR RÓŻNICY (2026-08-03).
+#
+# `se` to różnica podzielona przez jej błąd standardowy, a ten maleje jak √n.
+# Przy STAŁEJ, choćby maleńkiej stracie do ceny bukmachera `se` rośnie więc
+# z próbą bez końca i KAŻDY rynek, który nie bije kursu, prędzej czy później
+# przekroczy −2,5. To nie jest hipoteza, tylko arytmetyka — a jej skutkiem jest
+# strona, która z miesiąca na miesiąc pustoszeje sama z siebie, choć nic się
+# nie pogorszyło.
+#
+# Zmierzone 2026-08-03, i to zmierzone w ostatniej chwili:
+#     shots|powyzej         n=156  se −2,91  różnica −0,026   (już ukryty)
+#     team_corners|ponizej  n=216  se −2,78  różnica −0,025   <-- KWALIFIKUJE SIĘ
+#     team_goals|ponizej    n=164  se −0,65  różnica −0,005
+# Rożne „poniżej" to dziś 7 z 18 typów na stronie i 178 publikacji w historii.
+# Dzieliły je od automatycznego zniknięcia najwyżej trzy dni, a jego powodem
+# byłoby „jesteśmy o 0,025 Briera gorsi od kursu, za to bardzo dokładnie".
+#
+# User prosił o ukrywanie tego, co „TRAGICZNIE nie wchodzi". Tragedia to rozmiar,
+# nie precyzja pomiaru — więc rynek musi być jednocześnie istotnie gorszy
+# I WYRAŹNIE gorszy. Próg 0,05 to dwukrotność strat, które dziś widzimy na
+# rynkach roboczych; przy Brierze rzędu 0,22 oznacza „gorsi o ponad 20%".
+#
+# Świadomie NIE dotykamy warunku POWROTU: rynek już ukryty wychodzi na starych
+# zasadach (histereza), więc ta zmiana nikomu nagle nie przywraca produktu —
+# tylko przestaje go zabierać bez powodu.
+UKRYCIE_MIN_ROZNICA = -0.05  # o tyle Briera trzeba być gorszym, żeby zniknąć
+
 
 def rynki_do_ukrycia(
     teraz: dict[str, dict] | None = None, hist: dict | None = None,
@@ -1999,6 +2026,10 @@ def rynki_do_ukrycia(
                 out.add(klucz)
             continue
         if v.get("n", 0) < UKRYCIE_MIN_N or se > UKRYCIE_SE:
+            continue
+        # ...i musi być gorszy WYRAŹNIE, nie tylko wiarygodnie —
+        # patrz UKRYCIE_MIN_ROZNICA (bez tego strona pustoszeje sama)
+        if float(v.get("roznica") or 0.0) > UKRYCIE_MIN_ROZNICA:
             continue
         # ...i musi się utrzymać: jeden dzień to za mało na wyrok
         dni_zle = 1

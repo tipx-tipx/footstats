@@ -1161,6 +1161,80 @@ BENIAMINEK_GIER = 8
 BENIAMINEK_DRUZYN_CYKL = 12
 
 
+def zbuduj_aliasy_banku(
+    bank: dict, nazwy_druzyn: set[str], comp_ids: list[int] | None = None,
+) -> int:
+    """Nazwa drużyny ze statshub -> klucz(e), pod którymi siedzi w banku stylu.
+
+    POWÓD (zmierzone 2026-08-03). Bank zapisuje drużyny nazwami z 365Scores,
+    a silnik szuka ich nazwami ze statshub — i szukał po DOKŁADNYM kluczu:
+
+        statshub               bank (365Scores)
+        sarmiento           -> sarmiento junin
+        talleres            -> talleres cordoba
+        sonderjyske fodbold -> sonderjyske
+        viborg ff           -> viborg
+        central cordoba     -> central cordoba sde
+
+    Kosztowało to DWIE rzeczy naraz, obie widoczne na stronie:
+      * `_hist_z_banku` nie znajdował historii, więc rynki budowane z banku
+        (kartki, strzały, celne, faule) w ogóle nie były rozważane — Superbet
+        je kwotował, a my ich nawet nie odrzucaliśmy, bo nie było czego liczyć.
+        Zmierzone 03.08: połowa drużyn najbliższych meczów „nie istniała"
+        w banku, choć siedziała w nim pod nazwą 365,
+      * `dolej_historie_wlasna` liczy gry po tym samym kluczu, więc te drużyny
+        BEZ KOŃCA wyglądały na ubogie: co cykl brały cały budżet doganiania,
+        pobierały te same mecze, dopisywały zero (są już w banku) i lądowały
+        w logu jako „nieudane". Budżet nie docierał do drużyn, które naprawdę
+        historii nie mają.
+
+    JAK PARUJEMY — NIE PODOBIEŃSTWEM TEKSTU ([[parowanie-nazw-druzyn]]).
+    Idziemy przez id 365Scores: `dopasuj_druzyne` (zbiory słów + wymóg
+    jednoznaczności) daje competitorId, a potem bierzemy WSZYSTKIE nazwy
+    o tym id, które są w banku. Dla „Dundee FC" nie ma id Dundee United, więc
+    podmiana klubu jest niemożliwa — a przy dopasowaniu po samych nazwach
+    „dundee" zawiera się w „dundee united" i cicho wskazałoby cudzą historię.
+
+    Alias jest LISTĄ, bo ta sama drużyna bywa w banku pod dwoma zapisami —
+    wtedy historia jest rozbita i trzeba ją scalić, a nie wybrać jedną połowę.
+    Zapisujemy w banku (`bank["alias"]`), więc kolejne cykle nie płacą za to
+    ani jednym zapytaniem.
+    """
+    alias: dict = bank.setdefault("alias", {})
+    klucze_banku: set[str] = set()
+    for rec in (bank.get("gry") or {}).values():
+        klucze_banku |= set((rec.get("druzyny") or {}).keys())
+    brakujace = sorted(
+        nm for nm in {rotowire._norm(n) for n in nazwy_druzyn if n}
+        if nm and nm not in klucze_banku and nm not in alias
+    )
+    if not brakujace or not klucze_banku:
+        return 0
+    try:
+        id_map = scores365.competitor_ids_z_rozgrywek(comp_ids or [])
+    except Exception as e:
+        print(f"Aliasy banku: mapa id 365 niedostępna ({e})")
+        return 0
+    # id -> nazwy 365, które SĄ w banku (tylko one mają jakąkolwiek historię)
+    po_id: dict[int, list[str]] = {}
+    for nazwa365, cid in id_map.items():
+        if nazwa365 in klucze_banku:
+            po_id.setdefault(int(cid), []).append(nazwa365)
+    nowe = 0
+    for nm in brakujace:
+        cid = scores365.dopasuj_druzyne(id_map, nm)
+        if not cid:
+            continue
+        pod_id = po_id.get(int(cid)) or []
+        if pod_id:
+            alias[nm] = sorted(pod_id)
+            nowe += 1
+    if nowe:
+        print(f"Bank stylu: rozpoznano {nowe} drużyn zapisanych inną nazwą "
+              f"(np. {', '.join(f'{k}->{v[0]}' for k, v in list(alias.items())[:3])})")
+    return nowe
+
+
 def dolej_historie_wlasna(
     bank: dict, nazwy_druzyn: set[str], comp_ids: list[int] | None = None,
     budzet: int = BENIAMINEK_DRUZYN_CYKL,
@@ -1179,14 +1253,28 @@ def dolej_historie_wlasna(
     liczby zostają surowe, a to, jak je przeliczyć, jest decyzją modelu.
     """
     gry = bank.setdefault("gry", {})
+    alias = bank.get("alias") or {}
     ile_gier: dict[str, int] = {}
     for rec in gry.values():
         for nm in (rec.get("druzyny") or {}):
             ile_gier[nm] = ile_gier.get(nm, 0) + 1
+
+    def _ile(nm: str) -> int:
+        """Gry drużyny, licząc też te zapisane pod nazwą z 365Scores.
+
+        Bez aliasu drużyna obecna w banku pod innym zapisem wyglądała na
+        ubogą W KAŻDYM CYKLU: zabierała budżet doganiania, pobierała mecze,
+        które już tam są, dopisywała zero i wracała na początek kolejki.
+        Patrz `zbuduj_aliasy_banku`.
+        """
+        return ile_gier.get(nm, 0) + sum(
+            ile_gier.get(a, 0) for a in (alias.get(nm) or ())
+        )
+
     ubogie = sorted(
         (nm for nm in {rotowire._norm(n) for n in nazwy_druzyn if n}
-         if ile_gier.get(nm, 0) < MIN_GIER_BANKU),
-        key=lambda nm: ile_gier.get(nm, 0),
+         if _ile(nm) < MIN_GIER_BANKU),
+        key=_ile,
     )[:budzet]
     if not ubogie:
         return 0
@@ -1358,6 +1446,14 @@ def aktualizuj_bank_stylu(
     # 1b) beniaminkowie i wracający z niższych lig: bank zasilany per rozgrywki
     # nigdy ich nie zobaczy, dopóki nie rozegrają kilku kolejek nowego sezonu
     if nazwy_druzyn:
+        # NAJPIERW aliasy: bez nich lista „ubogich" niżej jest zafałszowana
+        # i budżet doganiania idzie na drużyny, które bank już zna pod nazwą
+        # z 365Scores (patrz `zbuduj_aliasy_banku`)
+        try:
+            if zbuduj_aliasy_banku(bank, nazwy_druzyn, comp_ids):
+                zmienione = True
+        except Exception as e:
+            print(f"Bank stylu: aliasy pominięte ({e})")
         try:
             if dolej_historie_wlasna(bank, nazwy_druzyn, comp_ids):
                 zmienione = True
@@ -3229,13 +3325,24 @@ def _main_impl(tryb=None):
             _skala_cache[pole] = skala
             return skala
 
-        def _hist_z_banku(team_nm: str, pole: str) -> tuple[list, list]:
+        # nazwa ze statshub -> klucze w banku (365Scores); patrz
+        # `zbuduj_aliasy_banku` — bez tego połowa drużyn „nie istniała"
+        aliasy_banku: dict = (bank_stylu.get("alias") or {})
+
+        def _klucze_banku(team_nm: str) -> list[str]:
             tn = rotowire._norm(team_nm)
+            return [tn, *(aliasy_banku.get(tn) or ())]
+
+        def _hist_z_banku(team_nm: str, pole: str) -> tuple[list, list]:
+            klucze = _klucze_banku(team_nm)
             skala = _skala_poziomu(pole)
             pary = []
             for rec_g in gry_banku:
                 dr = rec_g.get("druzyny") or {}
-                if tn in dr and dr[tn].get(pole) is not None:
+                # historia bywa ROZBITA na dwa zapisy tej samej drużyny —
+                # bierzemy pierwszy klucz obecny w tym meczu, nigdy dwa naraz
+                tn = next((k for k in klucze if k in dr), None)
+                if tn is not None and dr[tn].get(pole) is not None:
                     # mecz z niższej ligi liczy się, ale przeliczony na poziom
                     # rozgrywek, w których drużyna gra TERAZ
                     mnoznik = skala if rec_g.get("wlasna") else 1.0
@@ -3255,11 +3362,12 @@ def _main_impl(tryb=None):
 
         def _koncesja_druzynowa(opp_nm: str, pole: str) -> tuple[float | None, int]:
             """Ile tej statystyki notują PRZECIW rywalowi jego przeciwnicy."""
-            tn = rotowire._norm(opp_nm)
+            klucze = _klucze_banku(opp_nm)
             vals = []
             for rec_g in gry_banku:
                 dr = rec_g.get("druzyny") or {}
-                if tn in dr and len(dr) == 2:
+                tn = next((k for k in klucze if k in dr), None)
+                if tn is not None and len(dr) == 2:
                     inny = next(k for k in dr if k != tn)
                     v = dr[inny].get(pole)
                     if v is not None:

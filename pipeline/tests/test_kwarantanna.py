@@ -528,16 +528,22 @@ def test_historia_przycinana_do_okna():
 # User: „jak coś tragicznie nie wchodzi to ma być ukryte do czasu dopracowania,
 # ale jak coś raz na jakiś czas nie wejdzie to ma się pokazywać".
 
-def _dzien(se, n=120, klucz="shots|powyzej"):
+# `roznica` (o ile Briera jesteśmy gorsi od kursu) to od 2026-08-03 DRUGI
+# warunek ukrycia — patrz rozliczanie.UKRYCIE_MIN_ROZNICA i
+# tests/test_ukrywanie_rynkow.py. Tutejsze przypadki badają wymiar ISTOTNOŚCI,
+# więc domyślnie opisują rynek naprawdę tragiczny (−0,09), żeby to `se`
+# rozstrzygało o wyniku.
+def _dzien(se, n=120, klucz="shots|powyzej", roznica=-0.09):
     return {"rynki": {klucz: {"n": n, "se": se, "przewaga": -0.03,
-                              "brier_model": 0.25, "brier_kurs": 0.22}},
+                              "roznica": roznica,
+                              "brier_model": 0.31, "brier_kurs": 0.22}},
             "pasma": {}, "ukryte": []}
 
 
-def _teraz(se, n=120, klucz="shots|powyzej"):
+def _teraz(se, n=120, klucz="shots|powyzej", roznica=-0.09):
     return {klucz: {"rynek_kod": "shots", "strona": "powyzej", "n": n,
-                    "se": se, "przewaga": -0.03,
-                    "brier_model": 0.25, "brier_kurs": 0.22}}
+                    "se": se, "przewaga": -0.03, "roznica": roznica,
+                    "brier_model": 0.31, "brier_kurs": 0.22}}
 
 
 HIST_ZLA = {"2026-07-30": _dzien(-3.0), "2026-07-31": _dzien(-2.9),
