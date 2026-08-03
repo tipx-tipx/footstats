@@ -92,6 +92,35 @@ MAX_SZCZEBLI = 5            # tyle linii max na rynek
 MAX_LINIA_DOMYSLNA = 2.5    # czyli „3+"
 MAX_LINIA_RYNKU = {"tackles": 3.5}   # odbiory: „4+"
 MIN_P_SZCZEBLA = 0.03       # od 3. szczebla w górę: p_model < 3% ucina resztę
+
+# PODŁOGA DRUGIEGO SZCZEBLA (2026-08-03, zgłoszenie usera: „ważne, żeby realne
+# było wejście też drugiego szczebla").
+#
+# `MIN_P_SZCZEBLA` obowiązuje dopiero OD TRZECIEGO szczebla, więc pierwszy
+# i drugi nie miały żadnej podłogi. Zmierzone na bieżącym przebiegu: osiem
+# drugich szczebli miało szanse 0,08 · 0,13 · 0,15 · 0,17 · 0,17 · 0,27 · 0,28
+# · 0,40 — sześć z ośmiu poniżej 0,27. Drugi szczebel przy kursie 6,70
+# i szansie 8% stał obok sensownej jedynki i wyglądał jak część oferty,
+# a był losem na loterii.
+#
+# Ucinamy drabinkę na pierwszym szczeblu (poza pierwszym), który nie sięga
+# progu — dalsze są z definicji gorsze. Szczeble BEZ policzonej szansy
+# zostają: tam nie mamy czym oceniać i UI mówi o tym wprost.
+MIN_P_DRUGIEGO_SZCZEBLA = 0.25
+
+# DWA RODZAJE GRY (propozycja usera 2026-08-03). Ten podział jest PROSTOPADŁY
+# do `kategoria` (ta mówi, co widać w drugim cenniku) — tu chodzi o to, jak
+# kartę się gra:
+#   * „pewna"  — tanio, ale drugi szczebel realnie wchodzi,
+#   * „value"  — pierwszy szczebel od 2,0 w górę, a mimo to szansa bliska
+#                rzutowi monetą; wtedy cena bukmachera jest przesadzona.
+# Karta, która nie spełnia żadnego z warunków, nie dostaje etykiety — lepiej
+# nie obiecywać nic, niż obiecywać po cichu.
+PEWNA_MIN_P_HERO = 0.60
+PEWNA_MIN_P_DRUGI = 0.40
+VALUE_MIN_KURS_HERO = 2.00
+VALUE_MIN_P_HERO = 0.45
+VALUE_MIN_P_DRUGI = 0.25
 MAX_KURS_SZCZEBLA = 12.0    # ...podobnie kurs powyżej tego progu
 # pierwszy szczebel drabinki od 1.65 (decyzja usera 2026-07-25): linie po
 # 1.2-1.5 to pewniaki bez value — drabinka ma zaczynać się od grywalnej ceny
@@ -729,6 +758,12 @@ def _rynki_wpisu(
                         )), 3
                     )
             drabinka.append(szczebel)
+        # DRUGI SZCZEBEL MA BYĆ REALNY — patrz MIN_P_DRUGIEGO_SZCZEBLA.
+        for i, s in enumerate(drabinka):
+            p_f = s.get("p_final")
+            if i >= 1 and p_f is not None and p_f < MIN_P_DRUGIEGO_SZCZEBLA:
+                drabinka = drabinka[:i]
+                break
         # SZCZEBLE-ŚMIECI PRECZ. „Celne głową 1,5 — trafione 0/10, kurs 33,0"
         # nie niesie żadnej informacji poza tym, że bukmacher kwotuje wszystko.
         # Szczeble bez pokrycia (gołe drabinki, brak historii) zostają — tam
@@ -1041,6 +1076,37 @@ def _klucz_zawodnika(nazwa: str) -> str:
     return " ".join(sorted(tokeny))
 
 
+def _profil_gry(w: dict) -> str | None:
+    """Jak się tę kartę gra: „pewna", „value" albo nic — patrz stałe wyżej.
+
+    Bierzemy szczebel `hero` (ten, który zdecydował o wyborze karty) i szczebel
+    NASTĘPNY w tym samym rynku. Karta bez realnego drugiego szczebla nie dostaje
+    etykiety: cała rzecz w tym, żeby oba dały się zagrać.
+    """
+    hero = w.get("hero") or {}
+    mk, linia = hero.get("rynek_kod"), hero.get("linia")
+    if mk is None or linia is None:
+        return None
+    drabinka = next((r.get("drabinka") or [] for r in (w.get("rynki") or [])
+                     if r.get("rynek_kod") == mk), [])
+    idx = next((i for i, s in enumerate(drabinka)
+                if float(s.get("linia", -1)) == float(linia)), None)
+    if idx is None:
+        return None
+    p_hero = drabinka[idx].get("p_final")
+    kurs_hero = drabinka[idx].get("kurs")
+    p_drugi = (drabinka[idx + 1].get("p_final")
+               if idx + 1 < len(drabinka) else None)
+    if p_hero is None or kurs_hero is None or p_drugi is None:
+        return None
+    if p_hero >= PEWNA_MIN_P_HERO and p_drugi >= PEWNA_MIN_P_DRUGI:
+        return "pewna"
+    if (kurs_hero >= VALUE_MIN_KURS_HERO and p_hero >= VALUE_MIN_P_HERO
+            and p_drugi >= VALUE_MIN_P_DRUGI):
+        return "value"
+    return None
+
+
 def _kategoria_karty(w: dict) -> str:
     """Rodzaj karty — po czym front dobiera kolor i etykietę.
 
@@ -1167,6 +1233,7 @@ def _dopnij_betclic(wpisy: list[dict], events_meta: dict[int, dict]) -> None:
                         n_pewniakow += 1
         for w in wpisy:
             w["kategoria"] = _kategoria_karty(w)
+            w["profil_gry"] = _profil_gry(w)
         print(f"Drabinki — drugi cennik (Betclic): mecze {len(pary)}/{len(nasze)}, "
               f"karty z drugą ceną {n_kart}/{len(wpisy)}, szczebli {n_szczebli}, "
               f"układów „pewniak taniej” {n_pewniakow}"
@@ -1186,6 +1253,7 @@ def _dopnij_betclic(wpisy: list[dict], events_meta: dict[int, dict]) -> None:
         # każda karta MUSI mieć rodzaj, także gdy Betclic w ogóle nie odpowiedział
         for w in wpisy:
             w.setdefault("kategoria", _kategoria_karty(w))
+            w.setdefault("profil_gry", _profil_gry(w))
 
 
 def zbuduj(

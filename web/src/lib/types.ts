@@ -329,6 +329,15 @@ export interface RadarWpis {
    *   "pewniak_taniej" – jeden mówi „to niemal pewne", drugi płaci sensownie
    */
   kategoria?: "analiza" | "rynek_zgodny" | "rozjazd" | "pewniak_taniej";
+  /**
+   * JAK SIĘ TĘ KARTĘ GRA (backend: radar._profil_gry) – oś PROSTOPADŁA do
+   * `kategoria`, która mówi tylko, co widać w drugim cenniku:
+   *   "pewna" – tanio, ale drugi szczebel realnie wchodzi (p ≥ 0,40)
+   *   "value" – pierwszy szczebel od kursu 2,0, a szansa i tak bliska połowie
+   * Brak pola = karta nie spełnia żadnego z warunków; wtedy NIE obiecujemy
+   * niczego, bo cała rzecz w tym, żeby oba szczeble dały się zagrać.
+   */
+  profil_gry?: "pewna" | "value" | null;
   /** najmocniejszy układ „pewniak taniej" na karcie (do wyróżnienia) */
   rozjazd_pewniak?: (RadarRozjazd & { linia: number }) | null;
   /** rozjazd na linii, która wygrała kartę */

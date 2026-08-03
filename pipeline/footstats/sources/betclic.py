@@ -755,6 +755,15 @@ def paruj_mecze(nasze: list[dict], bc_mecze: list[dict] | None = None,
         rowne = [i for i, bh, ba in w_oknie if bh == th and ba == ta]
         zawarte = [i for i, bh, ba in w_oknie
                    if (bh <= th or th <= bh) and (ba <= ta or ta <= ba)]
+        # TRZECIEGO STOPNIA („wspólne słowo po obu stronach") NIE MA CELOWO —
+        # sprawdzone i odrzucone 2026-08-03. Kusiło, bo podniosłoby parowanie
+        # z 56/95: typowy przegrany to „CD Guadalajara" vs „Guadalajara
+        # Chivas", gdzie każda strona dokłada własny człon. Ale ta sama reguła
+        # sklejała „Deportivo Riestra" z „Deportivo Recoleta" — wspólne
+        # „deportivo", ten sam rywal, ta sama godzina, INNY KLUB. Test
+        # `test_nie_podmienia_klubu_o_podobnej_nazwie` złapał to od razu.
+        # Brak dopasowania widać, podmianę nie — więc brakujące pary domykamy
+        # aliasami z `raport_parowania`, nie luźniejszą regułą.
         for kandydaci in (rowne, zawarte):
             if len(kandydaci) == 1:
                 pary[nasz["klucz"]] = bc_mecze[kandydaci[0]]
