@@ -189,7 +189,30 @@ PERF_STATTYPE_MAP = {
     "totalOffside": "offsides",
     "shotOffTarget": "shots_off_target",
     "blockedScoringAttempt": "shots_blocked",
+    # ŻÓŁTA KARTKA (dołożona 2026-08-03). Pole `yellowCard` siedziało
+    # w performance od zawsze, tylko nikt go nie mapował — a to JEDYNA nasza
+    # statystyka, którą Superbet kwotuje na kwalifikacjach pucharów (strzałów
+    # i fauli tam nie wystawia). Bez tej linijki zakładka meczu zostawała
+    # pusta mimo 66 kwotowanych zawodników na Sparcie Praga – Lyonie.
+    #
+    # UWAGA: ta historia służy POKRYCIU (co zawodnik realnie zbierał).
+    # Wycena kartki idzie osobną drogą — przez faule, patrz model/cards.py.
+    "yellowCard": "yellow_card",
 }
+
+# Pola, w których BRAK WPISU znaczy „zero", a nie „nie zmierzono".
+#
+# Statshub wysyła `yellowCard` TYLKO w meczach, w których kartka padła —
+# w pozostałych pola nie ma w ogóle. Pomijanie takiego meczu (domyślne
+# zachowanie, słuszne dla statystyk mierzonych zawsze) dawało historię
+# złożoną z samych meczów z kartką: zmierzone na Palavecino 03.08 — 1 mecz
+# w historii kartek wobec 10 w faulach, czyli pokrycie 1/1 = „100% meczów
+# z kartką". To nie jest brak danych, tylko ich odwrotność.
+#
+# Warunek `minuty > 0` jest tu istotny: zero dopisujemy WYŁĄCZNIE zawodnikowi,
+# który wyszedł na boisko. Mecz przesiedziany na ławce nie jest dowodem, że
+# kartki nie zbiera.
+PERF_BRAK_ZNACZY_ZERO = frozenset({"yellowCard"})
 
 
 # rynki, których performance NIE rozbija, a shotmapa pozwala policzyć.
@@ -294,7 +317,9 @@ def trendy_z_performance(
         for pole, mk in PERF_STATTYPE_MAP.items():
             v = ps.get(pole)
             if v is None:
-                continue
+                if pole not in PERF_BRAK_ZNACZY_ZERO or minuty <= 0:
+                    continue
+                v = 0            # zagrał i nie dostał — to jest zero, nie luka
             zebrane.setdefault(mk, []).append(
                 (ts, float(v), minuty, rywal, int(rywal_id or 0), utid, poz)
             )

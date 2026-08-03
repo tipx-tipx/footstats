@@ -4952,24 +4952,46 @@ def _main_impl(tryb=None):
     # rynki w kwarantannie wypadają też z puli kuponów (generator i kupony
     # automatyczne nie budują na rynku, który trafia poniżej deklaracji);
     # to samo legi na starych danych (brama jakości ligi)
+    # POMIAR BRAM PULI (2026-08-03). Pusta zakładka Kuponów wraca jako
+    # zgłoszenie co kilka dni, a log mówił tylko, ILE legów zostało — nigdy,
+    # co je zabrało. Bez tego każda diagnoza zaczyna się od zgadywania, która
+    # z pięciu bram zjadła pulę (zmierzone 03.08: z ~52 legów drużynowych
+    # zostało 5, wszystkie „gole drużyny poniżej").
+    odpadki_legow: Counter = Counter()
+
     def _leg_dopuszczalny(b: dict) -> bool:
-        return bool(
-            b.get("kurs")
-            # ta sama podłoga co na stronie — bez niej pula kuponów brała
-            # tanie legi wznowione sprzed zmian bram (2026-08-01: 28 legów
-            # „rożne w meczu" po 1,05–1,17, przy MIN_ODDS 1,19)
-            and betting.kurs_w_widelkach(b["kurs"])
-            and b["rynek_kod"] not in kwarantanna_rynkow
-            and not b.get("stare_dane")
-            and not _kategoria_wstrzymana(b)
-            # ta sama brama co przy typach: leg poza oknem zgody z rynkiem nie
-            # wchodzi do kuponów. Błąd pojedynczego lega MNOŻY się przez kupon,
-            # więc to tu boli najbardziej (patrz kupony 0/18 w stylu
-            # „z przewagą")
-            and betting.w_oknie_zgody(b["p_model"], b["kurs"])
-        )
+        if not b.get("kurs"):
+            odpadki_legow["brak_kursu"] += 1
+            return False
+        # ta sama podłoga co na stronie — bez niej pula kuponów brała
+        # tanie legi wznowione sprzed zmian bram (2026-08-01: 28 legów
+        # „rożne w meczu" po 1,05–1,17, przy MIN_ODDS 1,19)
+        if not betting.kurs_w_widelkach(b["kurs"]):
+            odpadki_legow["kurs_poza_widelkami"] += 1
+            return False
+        if b["rynek_kod"] in kwarantanna_rynkow:
+            odpadki_legow[f"kwarantanna_rynku:{b['rynek_kod']}"] += 1
+            return False
+        if b.get("stare_dane"):
+            odpadki_legow["stare_dane"] += 1
+            return False
+        if _kategoria_wstrzymana(b):
+            odpadki_legow["kwarantanna_kategorii"] += 1
+            return False
+        # ta sama brama co przy typach: leg poza oknem zgody z rynkiem nie
+        # wchodzi do kuponów. Błąd pojedynczego lega MNOŻY się przez kupon,
+        # więc to tu boli najbardziej (patrz kupony 0/18 w stylu
+        # „z przewagą")
+        if not betting.w_oknie_zgody(b["p_model"], b["kurs"]):
+            odpadki_legow["poza_oknem_zgody"] += 1
+            return False
+        return True
 
     legi_pool_pub = [b for b in legi_pool if _leg_dopuszczalny(b)]
+    if odpadki_legow:
+        print(f"Pula kuponów — bramy zdjęły {sum(odpadki_legow.values())} "
+              f"z {len(legi_pool)} legów: " + ", ".join(
+                  f"{k}={v}" for k, v in odpadki_legow.most_common()))
 
     # REJESTR ODRZUCEŃ — domknięcie: para (zawodnik, rynek) opublikowana
     # (typ/sugestia) wypada z rejestru; obecna w puli kuponów, ale nie na
@@ -5681,6 +5703,27 @@ def _main_impl(tryb=None):
     n_dzis = len({b["mecz_id"] for b in legi_pool_pub
                   if b["kickoff_ts"] <= time.time() + kupony.OKNO_DZIS_S})
     print(f"Pula kuponów: {len(legi_pool_pub)} legów, meczów w oknie dziennym: {n_dzis}")
+    # CZY PULA W OGÓLE SIĘGA PRZEDZIAŁÓW KURSU (2026-08-03). Drugi, całkiem
+    # osobny powód pustej zakładki, i taki, którego liczba legów nie zdradza:
+    # kupon musi trafić w zadany przedział kursu, a iloczyn CAŁEJ puli bywa
+    # niższy niż dolna granica najtańszego z nich. Zmierzone 03.08: cztery legi
+    # przed gwizdkiem dawały maksymalnie 6,78, przy długoterminowych
+    # przedziałach od 9,0 — żaden kupon nie mógł powstać, choć pula „była".
+    _teraz_p = time.time() + kupony.MARGINES_STARTU_S
+    for _etykieta, _okno, _przedzialy in (
+        ("dzienny", kupony.OKNO_DZIS_S, kupony.PRZEDZIALY_DZIENNE),
+        ("długoterminowy", kupony.OKNO_DLUGO_S, kupony.PRZEDZIALY_DLUGOTERMINOWE),
+    ):
+        _legi = [b for b in legi_pool_pub
+                 if _teraz_p < b["kickoff_ts"] <= time.time() + _okno]
+        _max = 1.0
+        for _b in _legi:
+            _max *= float(_b.get("kurs") or 1.0)
+        _dolna = min(c[0] for c in _przedzialy)
+        if _legi and _max < _dolna:
+            print(f"  UWAGA: {_etykieta} — iloczyn WSZYSTKICH {len(_legi)} legów "
+                  f"to {_max:.2f}, a najniższy przedział zaczyna się od "
+                  f"{_dolna:.1f}. Żaden kupon nie ma z czego powstać.")
     fs = tempo.fallback_stats()
     n_total = fs["total_ok"] + fs["total_fallback"]
     n_spread = fs["spread_ok"] + fs["spread_fallback"]

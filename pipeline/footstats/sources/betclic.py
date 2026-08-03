@@ -102,7 +102,12 @@ WZORCE_RYNKOW: tuple[tuple[tuple[str, ...], str], ...] = (
     (("odbi",), "tackles"),
     (("przechw",), "interceptions"),
     (("spalon",), "offsides"),
-    (("kartk",), "yellow_card"),
+    # RDZEŃ „kart", NIE „kartk" (naprawione 2026-08-03). Betclic pisze
+    # „Liczba KARTEK zawodnika" — dopełniacz liczby mnogiej ma „e" w środku,
+    # więc wzorzec „kartk" go NIE łapał i rynek lądował w NIEZNANE_RYNKI.
+    # Jedna litera kosztowała cały rynek kartek u drugiego bukmachera —
+    # czyli dokładnie ten, którego Superbet kwotuje najszerzej.
+    (("kart",), "yellow_card"),
 )
 
 # Rynki Betclica, które WYGLĄDAJĄ jak nasze, a nimi nie są — odrzucamy je
@@ -113,6 +118,9 @@ WZORCE_RYNKOW: tuple[tuple[tuple[str, ...], str], ...] = (
 #   * podania — nie mamy takiego rynku.
 ODRZUCANE_WZORCE: tuple[str, ...] = (
     "połowa", "dogryw", "nogą", "podań", "podania", "asyst",
+    # czerwona kartka to inne zdarzenie niż nasz rynek żółtej — musi odpaść
+    # ZANIM zadziała rdzeń „kart"
+    "czerwon",
 )
 
 # nazwy rynków, których nie umiemy zaszufladkować — zbierane, nie gubione

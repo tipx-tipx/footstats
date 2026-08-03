@@ -31,6 +31,11 @@ export const RYNEK_LABEL: Record<string, string> = {
   tackles: "Odbiory",
   interceptions: "Przechwyty",
   offsides: "Spalone",
+  // Na końcu, bo kolejność = priorytet wyświetlania, a strzały mają być
+  // wyżej. Kartka i tak wypływa tam, gdzie jest jedyną statystyką z kursem —
+  // czyli na kwalifikacjach pucharów, gdzie Superbet nie kwotuje ani
+  // strzałów, ani fauli (zmierzone 03.08).
+  yellow_card: "Żółta kartka",
 };
 
 /**

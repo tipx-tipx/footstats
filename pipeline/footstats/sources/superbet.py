@@ -286,6 +286,48 @@ def _kod_rynku_druzyny(
     return slot, code
 
 
+# Nazwy rynku kartki, które NIE są naszym rynkiem — sprawdzać PRZED słowem
+# „kartk", bo każda z nich je zawiera.
+_KARTKA_ODRZUC = (
+    "czerwon",      # czerwona kartka to inne zdarzenie
+    "1. kartk", "pierwsz",   # kto dostanie pierwszą kartkę w meczu
+    "połow", "dogryw",       # my liczymy 90 minut
+    "liczba kartek",         # kartki DRUŻYNY, nie zawodnika
+)
+
+
+def _zawodnik_kartka(mname_l: str, spec: dict) -> str | None:
+    """Nazwa zawodnika, jeśli to rynek „zawodnik otrzyma (żółtą) kartkę".
+
+    GUBILIŚMY TEN RYNEK OD ZAWSZE (znalezione 2026-08-03) — przez dwa
+    niezależne rozjazdy naraz:
+
+    * nazwa w ofercie ma MYŚLNIK („Zawodnik - otrzyma kartkę"), a porównanie
+      szło po dokładnym stringu bez myślnika,
+    * zawodnik siedzi w `specifiers.player`, nie w `player_name` jak przy
+      rynkach liczbowych (strzały, faule).
+
+    Cena: 66 kwotowanych zawodników na Sparcie Praga – Lyonie i 38 na
+    Olympiakosie – NEC, czytanych jako zero. To bolało najbardziej tam, gdzie
+    bolało najbardziej: na kwalifikacjach pucharów Superbet NIE kwotuje
+    strzałów ani fauli, więc kartka bywa JEDYNĄ naszą statystyką z kursem,
+    a zakładka meczu zostawała pusta.
+
+    Ta sama lekcja co przy „Poniżej"/„poniżej" w rynkach drużynowych:
+    dopasowujemy po słowach kluczowych, nie po dokładnej nazwie.
+
+    Kupony łączone („X strzeli gola; Y otrzyma kartkę") też zawierają słowo
+    „kartkę", ale nie mają ani „zawodnik" w nazwie rynku, ani specyfikatora
+    `player` — trzymają graczy pod `ss_player_*`. Odpadają na obu warunkach.
+    """
+    if "kartk" not in mname_l or "zawodnik" not in mname_l:
+        return None
+    if any(x in mname_l for x in _KARTKA_ODRZUC):
+        return None
+    gracz = spec.get("player") or spec.get("player_name")
+    return str(gracz) if gracz else None
+
+
 def fetch_stat_odds(event_id: int, home_pl: str, away_pl: str) -> dict:
     """Pobierz i znormalizuj kursy statystyczne meczu.
 
@@ -398,11 +440,10 @@ def fetch_stat_odds(event_id: int, home_pl: str, away_pl: str) -> dict:
             continue
 
         # --- kartka zawodnika ---
-        if mname in ("Zawodnik otrzyma kartkę", "Zawodnik otrzyma żółtą kartkę") and spec.get(
-            "player_name"
-        ):
-            key = norm_name(spec["player_name"])
-            player_names.setdefault(key, str(spec["player_name"]))
+        kartkowy = _zawodnik_kartka(mname_l, spec)
+        if kartkowy:
+            key = norm_name(kartkowy)
+            player_names.setdefault(key, kartkowy)
             players[key]["yellow_card"].setdefault(0.5, {})["over"] = float(price)
             continue
 
