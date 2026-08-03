@@ -2763,6 +2763,17 @@ def _main_impl(tryb=None):
                 print(f"  tempo {match_label}: spread {tempo_m['spread']:+.2f}, "
                       f"gole {tempo_m['total']:.2f}")
 
+        # ILU ZAWODNIKÓW TEGO MECZU SUPERBET W OGÓLE KWOTUJE.
+        # Strona meczu musi odróżnić "bukmacher nie wystawia propsów" (Leagues
+        # Cup, Copa do Brasil, puchary — zmierzone 3.08: 25 z 26 meczów bez
+        # ani jednego propsa) od "wystawia, a my nic nie znaleźliśmy" (błąd
+        # parsera — taki już nas kosztował tydzień). Bez tej liczby TOP POKRYCIA
+        # zgadywało przyczynę pustej kolumny kursu.
+        if mid in matches_out:
+            matches_out[mid]["propsy_superbet"] = len(
+                (sb_odds or {}).get("players") or {}
+            )
+
         mf, mo = matchup_lite.matchup_lite_factor(
             tr.market_code,
             tr.game_positions[:6],

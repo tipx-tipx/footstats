@@ -206,7 +206,11 @@ export default async function MeczPage({
           TOP POKRYCIA
         </h2>
         <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted">
-          Kto ostatnio regularnie robił to, na co bukmacher daje kurs.{" "}
+          {/* mecz bez oferty zawodniczej u Superbetu: nie obiecuj kursów,
+              których w tabeli nie będzie (patrz nota w TopPokrycia) */}
+          {wiersze.some((w) => w.maKurs)
+            ? "Kto ostatnio regularnie robił to, na co bukmacher daje kurs."
+            : "Kto ostatnio regularnie zbierał te statystyki."}{" "}
           {ligowy
             ? "Liczymy z 5 ostatnich meczów, w których zawodnik zaczynał."
             : "Na mecz reprezentacji liczymy starty w kadrze, a gdy zawodnik gra w niej za rzadko, bierzemy klub."}{" "}
@@ -216,6 +220,8 @@ export default async function MeczPage({
           wiersze={wiersze}
           druzyny={[mecz.gospodarz, mecz.gosc]}
           ligowy={ligowy}
+          zawodnikow={gracze.length}
+          propsySuperbet={mecz.propsy_superbet}
         />
       </Reveal>
 

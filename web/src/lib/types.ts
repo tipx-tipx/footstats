@@ -503,6 +503,13 @@ export interface Mecz {
   okazje: number[];
   /** true = oficjalne XI ogłoszone (model przeliczony na pewnych składach) */
   sklady_ogloszone?: boolean;
+  /**
+   * Ilu zawodników tego meczu Superbet w ogóle kwotuje (0 = nie wystawia
+   * propsów). Dzięki temu pusta kolumna kursu w TOP POKRYCIA umie powiedzieć,
+   * czy to brak oferty, czy nasz problem z jej odczytaniem. `undefined` =
+   * snapshot sprzed 2026-08-03, gdy pipeline jeszcze tego nie zapisywał.
+   */
+  propsy_superbet?: number;
 }
 
 export interface FormaRynku {

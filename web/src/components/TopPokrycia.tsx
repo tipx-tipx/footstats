@@ -36,12 +36,18 @@ export function TopPokrycia({
   wiersze,
   druzyny,
   ligowy = false,
+  zawodnikow = 0,
+  propsySuperbet,
 }: {
   wiersze: WierszPokrycia[];
   /** [gospodarz, gość] – do filtra drużyn */
   druzyny: [string, string];
   /** tryb ligowy: bez podziału klub/kadra w opisach próbki */
   ligowy?: boolean;
+  /** ilu zawodników tych drużyn mamy w bazie (do opisu pustej tabeli) */
+  zawodnikow?: number;
+  /** ilu zawodników kwotuje w tym meczu Superbet (undefined = stary snapshot) */
+  propsySuperbet?: number;
 }) {
   const [druzyna, setDruzyna] = useState<string | null>(null);
   const [rynek, setRynek] = useState<string | null>(null);
@@ -49,10 +55,29 @@ export function TopPokrycia({
   const [rozwin, setRozwin] = useState(false);
   const [tip, setTip] = useState<Tip>(null);
 
-  // domyślnie chowamy rynki bez kursu Superbet (niecelne/zablokowane = „–")
+  /**
+   * MECZ BEZ KURSÓW ZAWODNICZYCH — tabela ma się POKAZAĆ, nie zniknąć.
+   *
+   * Zgłoszenie usera 2026-08-03: „w meczu nie ma tabeli pokryć". Pomiar na
+   * żywych danych: w 52 z 61 meczów żaden wiersz nie miał kursu, więc filtr
+   * „chowaj rynki bez kursu" zjadał CAŁĄ zawartość — zostawał sam nagłówek
+   * kolumn i „0 propozycji". W 32 z tych meczów pokrycia były policzone,
+   * tylko schowane.
+   *
+   * Przyczyna po stronie danych (sprawdzone u bukmachera 3.08): Superbet
+   * kwotuje zawodników praktycznie tylko w lidze argentyńskiej i brazylijskiej
+   * — na 26 zbadanych meczów bez kursów 25 nie miało u niego ANI JEDNEGO
+   * propsa (Leagues Cup, Copa do Brasil, puchary europejskie, Superliga).
+   * To nie jest nasz błąd parsera, więc strona ma to po prostu powiedzieć,
+   * a pokrycia pokazać bez kolumny kursu.
+   */
+  const brakKursow = useMemo(() => !wiersze.some((w) => w.maKurs), [wiersze]);
+
+  // domyślnie chowamy rynki bez kursu Superbet (niecelne/zablokowane = „–"),
+  // ale gdy kursu nie ma NIGDZIE, pokazujemy wszystko (patrz wyżej)
   const zKursem = useMemo(
-    () => (bezKursu ? wiersze : wiersze.filter((w) => w.maKurs)),
-    [wiersze, bezKursu],
+    () => (bezKursu || brakKursow ? wiersze : wiersze.filter((w) => w.maKurs)),
+    [wiersze, bezKursu, brakKursow],
   );
   const rynki = useMemo(() => {
     const obecne = new Set(zKursem.map((w) => w.rynek_kod));
@@ -72,9 +97,20 @@ export function TopPokrycia({
 
   if (wiersze.length === 0) {
     return (
-      <p className="mt-5 rounded-(--radius-card) border border-hairline bg-card px-4 py-3.5 text-sm text-muted shadow-(--shadow-card)">
-        Brak zawodników z pokryciem w ostatnich 5 startach. Pojawią się, gdy
-        zbierze się dość historii (albo po ogłoszeniu składów).
+      <p className="mt-5 rounded-(--radius-card) border border-hairline bg-card px-4 py-3.5 text-sm leading-relaxed text-muted shadow-(--shadow-card)">
+        {zawodnikow === 0 ? (
+          <>
+            Nie mamy historii zawodników z tych drużyn – nasze źródło statystyk
+            nie obsługuje tych rozgrywek, więc nie ma z czego liczyć pokrycia.
+            Statystyki drużynowe (gole, rożne, kartki) liczymy tu dalej.
+          </>
+        ) : (
+          <>
+            Mamy {zawodnikow} zawodników z tych drużyn, ale żaden nie ma jeszcze
+            5 meczów, w których zaczynał w składzie. Pokrycia policzymy, gdy
+            zbierze się tyle historii.
+          </>
+        )}
       </p>
     );
   }
@@ -147,16 +183,20 @@ export function TopPokrycia({
           ]}
         />
 
-        <button
-          onClick={() => setBezKursu((v) => !v)}
-          aria-pressed={bezKursu}
-          className={`font-display pb-1.5 text-[11px] font-semibold uppercase tracking-wide transition-colors ${
-            bezKursu ? "text-brand-deep" : "text-faint hover:text-ink"
-          }`}
-          title="Rynki, których Superbet w ogóle nie wystawia (strzały niecelne, zablokowane) – kursu tu nie będzie"
-        >
-          {bezKursu ? "✓ z rynkami bez kursu" : "+ rynki bez kursu"}
-        </button>
+        {/* przełącznik ma sens tylko wtedy, gdy JEST co chować – w meczu bez
+            kursów zawodniczych pokazujemy komplet i mówimy o tym wprost */}
+        {!brakKursow && (
+          <button
+            onClick={() => setBezKursu((v) => !v)}
+            aria-pressed={bezKursu}
+            className={`font-display pb-1.5 text-[11px] font-semibold uppercase tracking-wide transition-colors ${
+              bezKursu ? "text-brand-deep" : "text-faint hover:text-ink"
+            }`}
+            title="Rynki, których Superbet w ogóle nie wystawia (strzały niecelne, zablokowane) – kursu tu nie będzie"
+          >
+            {bezKursu ? "✓ z rynkami bez kursu" : "+ rynki bez kursu"}
+          </button>
+        )}
 
         <div
           aria-live="polite"
@@ -178,6 +218,18 @@ export function TopPokrycia({
         </div>
       </div>
 
+      {/* mecz bez oferty zawodniczej: powiedz to zdaniem, zamiast pokazywać
+          pustą ramkę (dawniej tabela znikała pod filtrem „bez kursu") */}
+      {brakKursow && (
+        <p className="mb-3 rounded-(--radius-card) border border-hairline bg-card-soft px-4 py-3 text-sm leading-relaxed text-muted">
+          {propsySuperbet
+            ? `Superbet kwotuje w tym meczu ${propsySuperbet} zawodników, ale nie w tych statystykach, dla których mamy ich historię – kolumna kursu zostaje pusta.`
+            : "Superbet nie wystawia w tym meczu kursów na zawodników – kolumna kursu i wartości zostaje pusta."}{" "}
+          Pokrycia liczymy tak samo, więc widać, kto jest w formie, ale zagrać
+          tego u tego bukmachera się nie da.
+        </p>
+      )}
+
       {/* legenda – jedna linia mikro-odczytów zamiast ściany tekstu */}
       <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-faint">
         <span>
@@ -189,16 +241,22 @@ export function TopPokrycia({
           </span>{" "}
           = rezerwa kadry, liczone z klubu
         </span>
-        <span title="Zgrubna podpowiedź, nie wyliczenie modelu: bierzemy sam odsetek trafień z ostatnich 5 startów i mnożymy przez kurs. Służy tylko do odsiewania kursów typu „5/5 za 1,01”.">
-          <span className="font-data font-semibold text-data-green-ink">+%</span> = ile
-          płaci kurs względem pokrycia (zgrubnie, próba 5)
-        </span>
+        {!brakKursow && (
+          <span title="Zgrubna podpowiedź, nie wyliczenie modelu: bierzemy sam odsetek trafień z ostatnich 5 startów i mnożymy przez kurs. Służy tylko do odsiewania kursów typu „5/5 za 1,01”.">
+            <span className="font-data font-semibold text-data-green-ink">+%</span>{" "}
+            = ile płaci kurs względem pokrycia (zgrubnie, próba 5)
+          </span>
+        )}
       </div>
 
       {/* tabela – przewija się w kontenerze (poziomo na mobile),
           nagłówek kolumn przyklejony u góry */}
       <div className="mt-3.5 max-h-[75vh] overflow-auto rounded-(--radius-card) border border-hairline bg-card shadow-(--shadow-card)">
-        <table className="w-full min-w-[720px] text-sm">
+        {/* bez kolumny kursu tabela potrzebuje mniej miejsca – na telefonie
+            mniej przesuwania w bok, żeby dojść do samych pokryć */}
+        <table
+          className={`w-full text-sm ${brakKursow ? "min-w-[600px]" : "min-w-[720px]"}`}
+        >
           <thead>
             <tr className="text-left text-[11px] uppercase tracking-wide text-faint">
               <th className="sticky top-0 z-[1] border-b border-hairline bg-card px-4 py-2.5 font-medium">
@@ -211,7 +269,7 @@ export function TopPokrycia({
                 ostatnie 5 startów
               </th>
               <th className="sticky top-0 z-[1] border-b border-hairline bg-card px-4 py-2.5 font-medium">
-                pokrycie · kurs · wartość
+                {brakKursow ? "pokrycie linii" : "pokrycie · kurs · wartość"}
               </th>
             </tr>
           </thead>
@@ -271,9 +329,11 @@ export function TopPokrycia({
                         >
                           {l.pokryte}/{w.probka}
                         </span>
-                        <span className="w-12 shrink-0 text-muted">
-                          {l.kurs != null ? `@${fmtKurs(l.kurs)}` : "–"}
-                        </span>
+                        {!brakKursow && (
+                          <span className="w-12 shrink-0 text-muted">
+                            {l.kurs != null ? `@${fmtKurs(l.kurs)}` : "–"}
+                          </span>
+                        )}
                         {l.evPct != null && (
                           <span
                             title="Zgrubny sygnał wartości: ile dałby ten zakład, gdyby surowe pokrycie było prawdziwą szansą (pokrycie × kurs − 1). To NIE jest przewaga silnika, bo próba to tylko 5 startów, bez kalibracji i kontekstu. Odsiewa kursy typu „5/5 @1,01”."
