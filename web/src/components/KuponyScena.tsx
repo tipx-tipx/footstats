@@ -649,16 +649,13 @@ export function KuponyScena({
                     {zagrany ? (
                       <span className="inline-flex flex-wrap items-center gap-x-2.5 gap-y-1 rounded-(--radius-control) border border-data-green/40 bg-data-green-wash px-3.5 py-2 text-xs font-semibold text-data-green-ink">
                         ✓ zagrany
-                        <a
-                          href="/zaklady"
-                          className="font-medium underline decoration-data-green/40 underline-offset-2 transition-colors hover:decoration-data-green"
-                        >
-                          zobacz w Moich zakładach
-                        </a>
+                        {/* link do „Moich zakładów" zniknął razem z zakładką
+                            (2026-08-04) — zagrane kupony mają własną historię
+                            niżej na tej stronie */}
                         <button
                           onClick={cofnijZagrany}
                           className="font-normal text-data-green-ink/70 transition-colors hover:text-data-green-ink"
-                          title="Usuwa wpis z Moich zakładów"
+                          title="Cofa oznaczenie kuponu jako zagranego"
                         >
                           cofnij
                         </button>

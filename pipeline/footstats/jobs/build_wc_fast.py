@@ -30,7 +30,7 @@ from curl_cffi import requests
 
 from dataclasses import replace as dc_replace
 
-from .. import rozgrywki, supa
+from .. import diagnostyka, rozgrywki, supa
 from ..engine import (
     MatchContext, PlayerHistory, RARE_MARKETS, apply_bias, score_player_market,
 )
@@ -1022,7 +1022,10 @@ def odswiez_stare_trendy(
     for pid, ich in kolejka:
         try:
             rows = statshub.fetch_player_performance(int(pid))
-        except Exception:
+        except Exception as e:
+            # zawodnik zostaje ze STARYM trendem — a odświeżenie było po to,
+            # żeby nie liczyć z historii sprzed pół roku
+            diagnostyka.cichy("cykl", "odswiezenie_trendu", e)
             continue
         if not rows:
             continue
@@ -1274,7 +1277,10 @@ def odkryj_zawodnikow_z_oferty(
             juz_odkryci.add((mid, int(pid)))
             try:
                 rows = fetch_performance(int(pid))
-            except Exception:
+            except Exception as e:
+                # zawodnik z oferty bukmachera, któremu nie dociągnęliśmy
+                # historii — wypada z typów, choć kurs na niego istnieje
+                diagnostyka.cichy("cykl", "historia_z_oferty", e)
                 continue
             if not rows:
                 continue
@@ -1477,7 +1483,8 @@ def profil_sedziow(
                 scores365.finished_games_by_competition(c)
                 if c else scores365.finished_games_by_competition()
             )
-        except Exception:
+        except Exception as e:
+            diagnostyka.cichy("cykl", "rozegrane_z_rozgrywek", e)
             continue
     nowych_sed = 0
     for g in rozegrane_365:
@@ -1503,8 +1510,10 @@ def profil_sedziow(
                     float(s.get("fouls_committed") or 0) for s in staty.values()
                 )
                 rec["faule"] = round(faule, 1) if faule > 0 else None
-        except Exception:
-            pass
+        except Exception as e:
+            # sędzia bez profilu fauli = mnożnik 1,0 dla całego meczu, czyli
+            # rynki kartek i fauli liczone bez jednego z mocniejszych czynników
+            diagnostyka.cichy("cykl", "profil_sedziego", e)
         cache[gid] = rec
         zmieniony = True
     if zmieniony:
@@ -1571,7 +1580,8 @@ def profil_sedziow(
                 scores365.scheduled_games_by_competition(c)
                 if c else scores365.scheduled_games_by_competition()
             )
-        except Exception:
+        except Exception as e:
+            diagnostyka.cichy("cykl", "terminarz_z_rozgrywek", e)
             continue
     out: dict[int, dict] = {}
     for e in events:
@@ -1892,7 +1902,8 @@ def aktualizuj_bank_stylu(
             try:
                 druzyny = scores365.game_team_stats(g["id"])
                 pelne = scores365.game_player_match_stats(g["id"])
-            except Exception:
+            except Exception as e:
+                diagnostyka.cichy("cykl", "bank_stylu_mecz", e)
                 continue
             if len(druzyny) != 2:
                 continue
@@ -1968,7 +1979,10 @@ def aktualizuj_bank_stylu(
                 break
             try:
                 strzaly = statshub.fetch_event_shotmap(ev["id"])
-            except Exception:
+            except Exception as e:
+                # mecz nie wchodzi do BANKU STYLU — a bank jest podstawą
+                # profilu rywala i rynków drużynowych budowanych z historii
+                diagnostyka.cichy("cykl", "bank_stylu_shotmapa", e)
                 continue
             if not strzaly:
                 continue
@@ -2006,7 +2020,8 @@ def aktualizuj_bank_stylu(
     for pid in brakujace[:LIMIT_WZROSTOW_NA_CYKL]:
         try:
             meta_p = statshub.fetch_player_meta(pid)
-        except Exception:
+        except Exception as e:
+            diagnostyka.cichy("cykl", "wzrost_zawodnika", e)
             continue
         wzrost[str(pid)] = meta_p.get("height") or 0
         zmienione = True
@@ -2928,6 +2943,9 @@ def _main_impl(tryb=None):
     ev_by_id = {e["id"]: e for e in events}
     sb_cache: dict[int, dict] = {}
     tempo.reset_fallback_stats()
+    # licznik cichych błędów zerujemy razem z resztą liczników przebiegu —
+    # patrz `footstats/diagnostyka.py` (79 miejsc bez logu, przegląd 04.08)
+    diagnostyka.reset()
     tempo_cache: dict[int, dict | None] = {}  # mid -> tempo z kursów 1X2/goli
     # pełna siatka kursów Superbet (over) do widoku TOP POKRYCIA na stronie
     # meczu: mecz_id -> player_id -> rynek -> "linia" -> kurs. Zbierana z tej
@@ -4711,6 +4729,34 @@ def _main_impl(tryb=None):
         # wystawiamy niczego, czego nie umiemy zamknąć.
         n_wiecej = n_sumy = 0
         odpadki_nowe: Counter = Counter()
+
+        def _do_puli_nowych(rec: dict) -> None:
+            """Sumy meczowe i „kto więcej" też są legami kuponu (2026-08-04).
+
+            ZMIERZONE tego dnia — pula kuponów i lista typów rozjechały się
+            całkowicie:
+
+                lista:  20 typów, średnia szansa 71,2%
+                pula:   24 legi,  średnia szansa 59,0%
+                wspólnych: 4
+
+            Na liście stało 12 typów o szansie 74–91% przy kursach 1,26–1,65
+            (kartki meczowe, gole drużyny) — czyli DOKŁADNIE materiał, którego
+            kupon dzienny potrzebuje. Żaden nie był dostępny dla kuponów, bo te
+            dwa rynki dopisują się do listy własną ścieżką i nigdy nie trafiały
+            do `legi_pool`.
+
+            Skutek widoczny dla użytkownika: zakładka „Kupony → na dziś"
+            świeciła zerem, bo w oknie dziennym zostawało 6 legów, z czego
+            5 „ryzykownych" (szansa < 55%), a profil zbalansowany dopuszcza
+            jeden taki. Trzy kartki meczowe z listy złożyłyby się na kurs 2,20
+            przy szansie ~71%.
+
+            To ta sama klasa błędu co kwarantanny omijane przez te rynki
+            (naprawione tego samego dnia): nowa ścieżka publikacji dopisana
+            obok głównej nie widzi mechanizmów, które główna ma.
+            """
+            legi_pool.append({**rec, "id": 0})
         for (mid_n, mk_n), strony_n in predykcje_druzyn.items():
             if "home" not in strony_n or "away" not in strony_n:
                 odpadki_nowe["tylko jedna druzyna"] += 1
@@ -4809,7 +4855,7 @@ def _main_impl(tryb=None):
                         continue
                     vb_id += 1
                     n_wiecej += 1
-                    value_bets.append({
+                    _rec_w = {
                         "id": vb_id, "mecz_id": mid_n, "mecz": h_n["mecz"],
                         "kickoff_ts": ts_n,
                         # podmiot ZAWSZE gospodarz — tak to rozlicza
@@ -4856,7 +4902,9 @@ def _main_impl(tryb=None):
                                 h_n, a_n, nazwa_bazy, rho_n),
                             "oczekiwana_liczba": round(h_n["pred"].lam, 2),
                         },
-                    })
+                    }
+                    value_bets.append(_rec_w)
+                    _do_puli_nowych(_rec_w)
 
             # --- SUMA MECZOWA: linia i strony jak przy jednej drużynie ---
             kod_s = "match_" + baza_n
@@ -4982,6 +5030,7 @@ def _main_impl(tryb=None):
                     n_sumy += 1
                     rec_s["id"] = vb_id
                     value_bets.append(rec_s)
+                    _do_puli_nowych(rec_s)
         if n_wiecej or n_sumy or odpadki_nowe:
             szczegoly = ", ".join(
                 str(k) + "=" + str(v) for k, v in odpadki_nowe.most_common()
@@ -5498,7 +5547,9 @@ def _main_impl(tryb=None):
                     sb_ev["eventId"], parts[0], parts[1]
                 )
                 dociagniete += 1
-            except Exception:
+            except Exception as e:
+                # dociągnięcie kursów do puli kuponów — bez niego leg wypada
+                diagnostyka.cichy("cykl", "dociagniecie_kursow", e)
                 continue
         if dociagniete:
             print(f"Kursy Superbet dociągnięte dla {dociagniete} meczów "
@@ -6312,7 +6363,15 @@ def _main_impl(tryb=None):
         # zgadzała się ani jedna etykieta: zakładka Kupony pokazywała pustkę
         # przez dwa dni, choć kupony istniały. Patrz kupony.przedzialy_publiczne.
         "przedzialy_kuponow": kupony.przedzialy_publiczne(),
+        # CICHE BŁĘDY tego przebiegu {"statshub:historia_druzyny": 3, ...}.
+        # W meta, a nie tylko w logu, bo log GitHub Actions znika po kilku
+        # dniach, a to jest jedyny ślad po danych, które przepadły.
+        "ciche_bledy": diagnostyka.raport(),
     })
+    # CO PRZEPADŁO PO CICHU — jedna linia na koniec przebiegu. Do 04.08 nie
+    # było tego widać w ogóle: 79 miejsc łapało wyjątek i szło dalej, więc
+    # ubytek danych wyglądał identycznie jak ich brak u źródła.
+    diagnostyka.wypisz()
     print(f"OK: {len(matches_out)} meczów, {len(value_bets)} okazji, "
           f"{len(players_out)} zawodników.")
 

@@ -24,6 +24,7 @@ import time as _time
 
 from curl_cffi import requests
 
+from .. import diagnostyka
 from .rotowire import _norm
 
 BASE = "https://webws.365scores.com/web"
@@ -164,7 +165,9 @@ def competitor_ids_z_rozgrywek(comp_ids: list[int]) -> dict[str, int]:
         for endpoint in ("fixtures", "results"):
             try:
                 data = _get(f"{BASE}/games/{endpoint}/?{Q}&competitions={comp}")
-            except Exception:
+            except Exception as e:
+                # całe ROZGRYWKI wypadają ze skanu bez śladu
+                diagnostyka.cichy("365scores", "rozgrywki_skan", e)
                 continue
             for g in data.get("games", []):
                 for side in ("homeCompetitor", "awayCompetitor"):
@@ -270,7 +273,10 @@ def finished_games_by_competition(comp_id: int = WC_COMPETITION_ID) -> list[dict
             continue
         try:
             ts = int(datetime.fromisoformat(str(g.get("startTime", ""))).timestamp())
-        except Exception:
+        except Exception as e:
+            # mecz bez czytelnej daty wypada z listy — jeśli to się mnoży,
+            # źródło zmieniło format i tracimy całe kolejki
+            diagnostyka.cichy("365scores", "data_meczu", e)
             continue
         gole: dict[str, float] = {}
         for side in ("homeCompetitor", "awayCompetitor"):
@@ -299,7 +305,10 @@ def scheduled_games_by_competition(comp_id: int = WC_COMPETITION_ID) -> list[dic
             continue
         try:
             ts = int(datetime.fromisoformat(str(g.get("startTime", ""))).timestamp())
-        except Exception:
+        except Exception as e:
+            # mecz bez czytelnej daty wypada z listy — jeśli to się mnoży,
+            # źródło zmieniło format i tracimy całe kolejki
+            diagnostyka.cichy("365scores", "data_meczu", e)
             continue
         out.append({
             "id": int(g["id"]), "ts": ts,
@@ -327,8 +336,9 @@ def game_referee(game_id: int) -> str | None:
         offs = (data.get("game") or {}).get("officials") or []
         if offs:
             name = _re.sub(r"\s*\(.*?\)\s*$", "", str(offs[0].get("name") or "")).strip()
-    except Exception:
-        pass
+    except Exception as e:
+        # brak sędziego = brak mnożnika fauli i kartek dla całego meczu
+        diagnostyka.cichy("365scores", "sedzia_meczu", e)
     _ref_cache[game_id] = name or None
     return _ref_cache[game_id]
 
@@ -364,7 +374,8 @@ def recent_finished_games_z_rozgrywkami(
             from datetime import datetime
 
             ts = int(datetime.fromisoformat(st).timestamp())
-        except Exception:
+        except Exception as e:
+            diagnostyka.cichy("365scores", "data_meczu", e)
             continue
         rows.append((int(g["id"]), ts, int(g.get("competitionId") or 0)))
     rows.sort(key=lambda x: x[1], reverse=True)
@@ -613,7 +624,8 @@ def game_substitutions(game_id: int) -> dict[str, dict]:
             continue
         try:
             gt = float(e.get("gameTime") or 0)
-        except (TypeError, ValueError):
+        except (TypeError, ValueError) as e:
+            diagnostyka.cichy("365scores", "minuta_zmiany", e)
             continue
         if gt > REGULARNY_CZAS_MIN:
             continue
@@ -633,7 +645,10 @@ def team_shot_history(
     for gid, ts in recent_finished_games(competitor_id, n_games):
         try:
             out.append((ts, game_player_shots(gid)))
-        except Exception:
+        except Exception as e:
+            # jeden mecz mniej w historii strzałów — przy próbie 5–10 meczów
+            # to jest realna zmiana wyceny, a wyglądało jak „tyle było"
+            diagnostyka.cichy("365scores", "historia_strzalow_meczu", e)
             continue
         _time.sleep(0.3)  # grzecznie dla API
     return out
@@ -756,8 +771,10 @@ def game_player_match_stats(game_id: int) -> dict[str, dict[str, float]]:
         for pkey, cnts in game_player_shots(game_id).items():
             if pkey in out:
                 out[pkey]["sot"] = float(cnts.get("sot", 0))
-    except Exception:
-        pass
+    except Exception as e:
+        # ŚCIEŻKA ROZLICZANIA statystyk zawodników — cichy błąd zostawia typy
+        # z tego meczu nierozliczone, a po siedmiu dniach idą na „zwrot"
+        diagnostyka.cichy("365scores", "rozliczenie_statystyk", e)
     _full_cache[game_id] = out
     return out
 
@@ -770,7 +787,8 @@ def team_match_history(
     for gid, ts in recent_finished_games(competitor_id, n_games):
         try:
             out.append((ts, game_player_match_stats(gid)))
-        except Exception:
+        except Exception as e:
+            diagnostyka.cichy("365scores", "historia_statystyk_meczu", e)
             continue
         _time.sleep(0.3)
     return out

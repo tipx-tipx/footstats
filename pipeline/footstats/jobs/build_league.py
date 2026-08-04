@@ -29,7 +29,7 @@ from pathlib import Path
 
 from curl_cffi import requests
 
-from .. import rozgrywki
+from .. import diagnostyka, rozgrywki
 from ..sources import superbet
 
 # .env jak w cycle.py — DRY-RUN BEZ TEGO KŁAMIE (zmierzone 2026-07-27).
@@ -130,7 +130,11 @@ def upcoming_events(days: int = 6) -> list[MeczLigowy]:
             data = _sh(
                 f"{SH_BASE}/event/by-date?startOfDay={start}&endOfDay={start + 86399}"
             ).get("data", [])
-        except Exception:
+        except Exception as e:
+            # CAŁY DZIEŃ MECZOWY wypada ze skanu bez śladu. Terminarz wygląda
+            # wtedy tak, jakby w ten dzień nikt nie grał (patrz „mecz bez typu
+            # znikał ze strony" — ta sama klasa objawu).
+            diagnostyka.cichy("cykl", "dzien_terminarza", e)
             continue
         for e in data:
             ev = e.get("events") or {}
@@ -183,7 +187,11 @@ def past_events(
             data = _sh(
                 f"{SH_BASE}/event/by-date?startOfDay={start}&endOfDay={start + 86399}"
             ).get("data", [])
-        except Exception:
+        except Exception as e:
+            # CAŁY DZIEŃ MECZOWY wypada ze skanu bez śladu. Terminarz wygląda
+            # wtedy tak, jakby w ten dzień nikt nie grał (patrz „mecz bez typu
+            # znikał ze strony" — ta sama klasa objawu).
+            diagnostyka.cichy("cykl", "dzien_terminarza", e)
             continue
         for e in data:
             ev = e.get("events") or {}

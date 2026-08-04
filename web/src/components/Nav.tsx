@@ -9,10 +9,17 @@ import { Logo } from "./Logo";
 import { ThemeToggle } from "./ThemeToggle";
 
 /**
- * Nawigacja w trzech logicznych grupach:
- *   1. codzienna praca – Okazje, Kupony, Mecze
- *   2. Twoje rzeczy   – Moje zakłady
- *   3. zaufanie       – Skuteczność, Jak to działa
+ * Nawigacja w dwóch logicznych grupach:
+ *   1. codzienna praca – Zawodnicy, Drużyny, Kupony, Mecze
+ *   2. zaufanie        – Skuteczność, Jak to działa
+ *
+ * „MOJE ZAKŁADY" USUNIĘTE 2026-08-04 (decyzja usera: niepotrzebne). Zakładka
+ * trzymała wpisy w localStorage przeglądarki, więc historia i tak nie
+ * przechodziła między urządzeniami, a jej sens (porównanie złapanego kursu
+ * z kursem zamknięcia) wymagał od użytkownika ręcznej pracy, której nie
+ * tłumaczyliśmy zrozumiale. Zagrane KUPONY to osobny mechanizm i zostają
+ * — patrz `lib/kuponyTracker.ts`.
+ *
  * Desktop (md+): pasek z pastylką aktywnej strony, która PŁYNIE między
  * pozycjami (framer-motion layoutId). Mobile: hamburger + panel na scrimie.
  */
@@ -23,7 +30,6 @@ const GRUPY: { href: string; label: string }[][] = [
     { href: "/kupony", label: "Kupony" },
     { href: "/mecze", label: "Mecze" },
   ],
-  [{ href: "/zaklady", label: "Moje zakłady" }],
   [
     { href: "/model", label: "Skuteczność" },
     { href: "/jak-to-dziala", label: "Jak to działa" },

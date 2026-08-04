@@ -61,7 +61,7 @@ def dzien_pl(ts: float | int | None) -> str:
         STREFA
     ).strftime("%Y-%m-%d")
 
-from .. import rozgrywki, supa
+from .. import diagnostyka, rozgrywki, supa
 from ..model import betting
 from ..model import kupony as kupony_model
 from ..sources import rotowire, scores365, statshub
@@ -709,7 +709,10 @@ def _gid_365(rec: dict, cache: dict) -> int | None:
                     scores365.finished_games_by_competition(c)
                     if c else scores365.finished_games_by_competition()
                 )
-            except Exception:
+            except Exception as e:
+                # bez id meczu w 365 typ NIE MA JAK się rozliczyć — po siedmiu
+                # dniach idzie na „zwrot", czyli znika z wyniku bez śladu
+                diagnostyka.cichy("rozliczanie", "szukanie_meczu_365", e)
                 continue
         cache["_wyniki"] = wyniki
     gid = None
@@ -860,7 +863,8 @@ def _superzmiana(
         return None
     try:
         subs = scores365.game_substitutions(gid)
-    except Exception:
+    except Exception as e:
+        diagnostyka.cichy("rozliczanie", "zmiany_w_meczu", e)
         return None
     klucz = scores365.resolve_player_key(set(subs), str(rec["podmiot"]))
     if not klucz:

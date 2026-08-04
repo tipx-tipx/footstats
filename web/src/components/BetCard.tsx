@@ -11,7 +11,6 @@ import { Krok, Kroki, SzczegolyTechniczne } from "./KrokiRozwiniecia";
 import { OsSzans, type OsZnacznik } from "./OsSzans";
 import { Sygnaly, type Sygnal } from "./Sygnaly";
 import { kursNetto, wartoscNetto } from "@/lib/podatek";
-import { addZakladFromBet, isTracked, onZakladyChange } from "@/lib/tracker";
 import {
   fmtDataCzas,
   fmtEV,
@@ -838,13 +837,6 @@ export function SzczegolyTypu({
   forma?: FormaRynku;
   open: boolean;
 }) {
-  const [tracked, setTracked] = useState(false);
-
-  useEffect(() => {
-    setTracked(isTracked(bet.id));
-    return onZakladyChange(() => setTracked(isTracked(bet.id)));
-  }, [bet.id]);
-
   const okna = forma ? oknaFormy(forma, bet.linia, bet.strona) : null;
   // historia do porównania wycen: L10 gdy jest sensowna próba, inaczej całość
   const historiaOkno =
@@ -1147,29 +1139,15 @@ export function SzczegolyTypu({
                     </div>
                   )}
 
-                  {bet.sugestia || bet.kurs == null ? (
+                  {/* PRZYCISK „dodaj do moich zakładów" USUNIĘTY 2026-08-04
+                      razem z całą zakładką (patrz Nav.tsx). Wpisy siedziały
+                      w localStorage, więc nie przechodziły między urządzeniami,
+                      a sam mechanizm wymagał od użytkownika ręcznego wpisywania
+                      kursu zamknięcia — pracy, której sensu nie tłumaczyliśmy. */}
+                  {(bet.sugestia || bet.kurs == null) && (
                     <p className="font-data mt-4 text-[10px] uppercase tracking-wide text-faint">
                       kurs sprawdzasz ręcznie
                     </p>
-                  ) : (
-                    <div className="mt-4">
-                      <button
-                        onClick={() => addZakladFromBet(bet, null)}
-                        disabled={tracked}
-                        className={`w-full rounded-(--radius-control) px-5 py-2.5 text-sm font-semibold transition-colors sm:w-auto ${
-                          tracked
-                            ? "cursor-default bg-brand-wash text-brand"
-                            : "bg-brand text-on-brand shadow-(--shadow-card) hover:bg-brand-strong"
-                        }`}
-                      >
-                        {tracked
-                          ? "✓ W moich zakładach"
-                          : "Dodaj do moich zakładów"}
-                      </button>
-                      <p className="mt-1.5 text-[10px] text-faint">
-                        rozliczymy go automatycznie po meczu
-                      </p>
-                    </div>
                   )}
                 </Krok>
               </Kroki>

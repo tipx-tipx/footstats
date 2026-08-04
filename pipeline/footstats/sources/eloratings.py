@@ -20,7 +20,7 @@ import unicodedata
 
 from curl_cffi import requests
 
-from .. import supa
+from .. import diagnostyka, supa
 
 BASE = "https://www.eloratings.net"
 CACHE_KEY = "elo_ratings"
@@ -79,8 +79,8 @@ def get_ratings() -> dict[str, int]:
     cached = None
     try:
         cached = supa.get_key(CACHE_KEY)
-    except Exception:
-        pass
+    except Exception as e:
+        diagnostyka.cichy("elo", "odczyt_cache", e)
     now = int(time.time())
     if cached and now - int(cached.get("ts", 0)) < CACHE_MAX_AGE_S:
         return {str(k): int(v) for k, v in cached.get("ratings", {}).items()}
@@ -89,12 +89,19 @@ def get_ratings() -> dict[str, int]:
         if ratings:
             try:
                 supa.put_key(CACHE_KEY, {"ts": now, "ratings": ratings})
-            except Exception:
-                pass
+            except Exception as e:
+                diagnostyka.cichy("elo", "zapis_cache", e)
             return ratings
-    except Exception:
-        pass
+    except Exception as e:
+        # POBRANIE ELO PADŁO. Zmierzone 04.08: cache miał wtedy 18 DNI, czyli
+        # ta ścieżka wywala się od tygodni, a jedynym objawem było to, że
+        # profil rywala jedzie na starych ratingach. Bez licznika nie było
+        # jak tego zauważyć — funkcja zawsze coś zwraca (starą kopię).
+        diagnostyka.cichy("elo", "pobranie_ratingow", e)
     if cached:  # stara kopia lepsza niż nic
+        wiek_dni = (now - int(cached.get("ts", 0))) / 86400
+        if wiek_dni > 7:
+            diagnostyka.cichy("elo", f"cache_starszy_niz_{int(wiek_dni)}dni")
         return {str(k): int(v) for k, v in cached.get("ratings", {}).items()}
     return {}
 

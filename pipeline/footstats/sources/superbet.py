@@ -18,6 +18,8 @@ from collections import defaultdict
 
 from curl_cffi import requests
 
+from .. import diagnostyka
+
 BASE = "https://production-superbet-offer-pl.freetls.fastly.net/v2/pl-PL"
 HEADERS = {
     "Accept": "application/json",
@@ -432,7 +434,11 @@ def fetch_stat_odds(event_id: int, home_pl: str, away_pl: str) -> dict:
         if code and spec.get("player_name") and spec.get("total") and side:
             try:
                 line = float(spec["total"])
-            except ValueError:
+            except ValueError as e:
+                # oferta zawodnicza z nieparsowalną linią przepada — a to
+                # dokładnie ta klasa, przez którą gubiliśmy całe rynki
+                # (patrz „Poniżej" vs „poniżej" i kartki u obu bukmacherów)
+                diagnostyka.cichy("superbet", "linia_zawodnicza", e)
                 continue
             key = norm_name(spec["player_name"])
             player_names.setdefault(key, str(spec["player_name"]))
@@ -456,7 +462,8 @@ def fetch_stat_odds(event_id: int, home_pl: str, away_pl: str) -> dict:
             if code:
                 try:
                     line = float(total)
-                except ValueError:
+                except ValueError as e:
+                    diagnostyka.cichy("superbet", "linia_druzynowa", e)
                     continue
                 teams[slot][code].setdefault(line, {})[side] = float(price)
 

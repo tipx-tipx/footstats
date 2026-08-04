@@ -20,6 +20,8 @@ import numpy as np
 from scipy import optimize
 from scipy import stats as _stats
 
+from .. import diagnostyka
+
 # Typowa marża polskich bukmacherów na player props (do jednostronnych kwotowań).
 DEFAULT_ONE_SIDED_MARGIN = 0.07
 
@@ -366,7 +368,11 @@ def internal_fair_odds(lines_probs: dict[float, float]) -> dict[float, float]:
             if f(0.01) * f(15.0) > 0:
                 return None
             return float(optimize.brentq(f, 0.01, 15.0))
-        except Exception:
+        except Exception as e:
+            # solver nie zbiegł = nie wykryjemy „miękkiej linii" (błędu
+            # tradera) w tym meczu. Cicho, bo to normalna ścieżka — ale gdy
+            # zdarza się MASOWO, znaczy że siatka kursów przyszła połamana
+            diagnostyka.cichy("betting", "solver_fair_odds", e)
             return None
 
     lams = {

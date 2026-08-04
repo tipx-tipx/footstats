@@ -27,6 +27,7 @@ from dataclasses import dataclass, field
 from curl_cffi import requests
 
 # geometria pola karnego współdzielona z Sofascore (te same współrzędne 0-100)
+from .. import diagnostyka
 from .sofascore import is_outside_box as sofa_is_outside_box
 
 BASE = "https://www.statshub.com/api"
@@ -352,7 +353,10 @@ def trendy_z_performance(
                 continue
             try:
                 sm_cache[eid] = fetch_event_shotmap(eid)
-            except Exception:
+            except Exception as e:
+                # brak shotmapy = zawodnik traci rozbicie strzałów (głową,
+                # zza pola, celne) — cicho wypadał z tych rynków
+                diagnostyka.cichy("statshub", "shotmap_meczu", e)
                 sm_cache[eid] = []
             if budzet is not None:
                 budzet[0] -= 1
@@ -437,7 +441,10 @@ def props_available(event_id: int) -> bool:
     """Czy statshub ma już wystawione propsy dla meczu (feed niepusty)."""
     try:
         return len(fetch_event_trends([event_id])) > 0
-    except Exception:
+    except Exception as e:
+        # „brak propsów" i „nie udało się sprawdzić" wyglądały tak samo —
+        # a to różnica między „bukmacher nie wystawił" a „nasz błąd"
+        diagnostyka.cichy("statshub", "sprawdzenie_propsow", e)
         return False
 
 
@@ -491,7 +498,10 @@ def fetch_team_performance(team_id: int, limit: int = TEAM_PERF_LIMIT) -> list[d
     try:
         d = _get(f"{BASE}/team/{int(team_id)}/performance?limit={int(limit)}",
                  timeout=25, retries=2)
-    except Exception:
+    except Exception as e:
+        # CICHY UBYTEK HISTORII DRUŻYNY — bez licznika wyglądał identycznie jak
+        # „ta drużyna nie ma historii" i wypadała z typów bez śladu
+        diagnostyka.cichy("statshub", "historia_druzyny", e)
         return []
     rows = d.get("data", d)
     return rows if isinstance(rows, list) else []
@@ -657,7 +667,9 @@ def fetch_event_result(event_id: int) -> dict | None:
     """
     try:
         d = _get(f"{BASE}/event/{event_id}")
-    except Exception:
+    except Exception as e:
+        # wynik meczu — bez niego typ idzie na „zwrot" po siedmiu dniach
+        diagnostyka.cichy("statshub", "wynik_meczu", e)
         return None
     root = d.get("data", d) or {}
     ev = root.get("events")
@@ -706,7 +718,10 @@ def player_shots_from_shotmap(event_id: int) -> dict[str, dict] | None:
     """
     try:
         sm = fetch_event_shotmap(event_id)
-    except Exception:
+    except Exception as e:
+        # ścieżka ROZLICZANIA strzałów — cichy błąd tutaj zostawia typ
+        # nierozliczony na zawsze (rekord zamrożony po siedmiu dniach)
+        diagnostyka.cichy("statshub", "rozliczenie_strzalow", e)
         return None
     if not sm:
         return None
@@ -740,8 +755,10 @@ def fetch_tournament_name(utid: int) -> str:
         kraj = str(rec.get("categoryName") or "")
         if nazwa and kraj and kraj.lower() not in nazwa.lower():
             nazwa = f"{nazwa} ({kraj})"
-    except Exception:
-        pass
+    except Exception as e:
+        # nazwa rozgrywek pusta = typ bez etykiety ligi (stempel rozgrywek
+        # dołożony 03.08 właśnie po to, żeby dało się mierzyć per liga)
+        diagnostyka.cichy("statshub", "nazwa_rozgrywek", e)
     _TOURNAMENT_NAME_CACHE[utid] = nazwa
     return nazwa
 
@@ -754,7 +771,8 @@ def search_players(nazwa: str) -> list[dict]:
     w feedzie propsów (bukmacherzy UK nie wystawili im linii)."""
     try:
         d = _get(f"{BASE}/search?q={nazwa}", timeout=15, retries=2)
-    except Exception:
+    except Exception as e:
+        diagnostyka.cichy("statshub", "szukanie_zawodnika", e)
         return []
     out = d.get("players") or []
     return out if isinstance(out, list) else []
@@ -769,7 +787,8 @@ def fetch_player_profile(player_id: int) -> dict:
         data = _get(f"{BASE}/player/{player_id}", timeout=15, retries=2).get(
             "data", {}
         )
-    except Exception:
+    except Exception as e:
+        diagnostyka.cichy("statshub", "profil_zawodnika", e)
         return {}
     rec = data.get("players")
     if isinstance(rec, list):
