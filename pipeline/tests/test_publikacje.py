@@ -150,6 +150,58 @@ def test_typ_wraca_z_ksiegi_gdy_rejestr_go_nie_zna(monkeypatch):
     assert mecze[1]["gosc"] == "GKS Katowice"
 
 
+def _policzony(**kw) -> dict:
+    """Ten sam typ policzony w BIEŻĄCYM cyklu — z pełnym rachunkiem."""
+    rec = {
+        "mecz_id": 1, "podmiot": "GKS Katowice", "rynek_kod": "team_corners",
+        "linia": 6.5, "strona": "ponizej", "p_model": 0.8844,
+        "czynniki": {"rywal": 1.08, "wyjazd": 0.97},
+        "uzasadnienie": {"czynniki": [{"nazwa": "Poziom bazowy"}]},
+        "ci": [0.81, 0.94], "lambda": 4.31, "rozklad": {"0": 0.1},
+        "poza_publikacja": "kwarantanna_strony",
+    }
+    rec.update(kw)
+    return rec
+
+
+def test_karta_z_ksiegi_odzyskuje_rachunek_policzony_w_tym_cyklu(monkeypatch):
+    """Typ zdjęty bramą jest liczony w KAŻDYM cyklu z pełnym rachunkiem, tylko
+    trafia do worka „poza publikacją" i tam ginie — a ten sam typ wraca na
+    listę z księgi jako uproszczony, bo księga rentgenu nie trzyma.
+
+    Zmierzone 2026-08-04: 9 z 20 kart na stronie nie miało czym wypełnić
+    rozwinięcia, a rejestr publikacji trzymał 6 wpisów wobec 46 typów przed
+    gwizdkiem w księdze.
+    """
+    magazyn: dict = {}
+    _stub_supa(monkeypatch, magazyn)
+    out, wzn = B.scal_z_publikacjami(
+        [], {}, typy_log={"k": _wpis_logu()},
+        policzone_w_cyklu=[_policzony()],
+    )
+    assert wzn == 1
+    b = out[0]
+    assert b["uproszczony"] is False
+    assert b["czynniki"] == {"rywal": 1.08, "wyjazd": 0.97}
+    assert b["ci"] == [0.81, 0.94] and b["lambda"] == 4.31
+    # ...ale CENA I SZANSA zostają zamrożone przy pierwszej publikacji
+    assert b["kurs"] == 1.28 and b["p_model"] == 0.8844
+
+
+def test_rachunek_nie_dokladany_gdy_szansa_sie_rozjechala(monkeypatch):
+    """Karta pokazuje szansę zamrożoną. Gdy dzisiejsze przeliczenie prowadzi
+    do wyraźnie innej liczby, jego czynniki tłumaczyłyby COŚ INNEGO niż to,
+    co widać na karcie — wtedy lepszy brak rachunku niż rachunek mylący."""
+    magazyn: dict = {}
+    _stub_supa(monkeypatch, magazyn)
+    out, _ = B.scal_z_publikacjami(
+        [], {}, typy_log={"k": _wpis_logu()},
+        policzone_w_cyklu=[_policzony(p_model=0.8844 - 0.2)],
+    )
+    assert out[0]["uproszczony"] is True
+    assert out[0]["czynniki"] == {}
+
+
 def test_ksiega_nie_wskrzesza_tego_czego_user_nie_widzial(monkeypatch):
     magazyn: dict = {}
     _stub_supa(monkeypatch, magazyn)

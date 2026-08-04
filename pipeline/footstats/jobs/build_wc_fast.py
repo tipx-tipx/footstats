@@ -281,9 +281,18 @@ def domknij_terminarz(
     return len(matches_out) - bylo
 
 
+# ILE SZANSA MOŻE SIĘ ROZJECHAĆ, ŻEBY ŚWIEŻY RACHUNEK NADAL PASOWAŁ DO KARTY
+# (2026-08-04). Karta wznowiona pokazuje szansę ZAMROŻONĄ przy publikacji, a
+# rentgen dokładamy policzony dziś. Przy dużym rozjeździe te dwie rzeczy
+# przestają być o tym samym — wtedy lepiej zostawić kartę uproszczoną niż
+# tłumaczyć liczbę czynnikami, które prowadzą do innej liczby.
+RENTGEN_MAX_ROZJAZD_P = 0.05
+
+
 def scal_z_publikacjami(
     value_bets: list[dict], matches_out: dict, teraz: int | None = None,
     typy_log: dict | None = None, liga_by_mid: dict | None = None,
+    policzone_w_cyklu: list[dict] | None = None,
 ) -> tuple[list[dict], int]:
     """Lista typów = wszystko, co OPUBLIKOWANE i czeka na gwizdek.
 
@@ -331,7 +340,15 @@ def scal_z_publikacjami(
     # nieudany odczyt rejestru = pracujemy bez niego, ale NIE zapisujemy go
     # z powrotem (inaczej garstka typów z tego cyklu zastąpiłaby cały rejestr)
     rej = rej_raw or {}
+    # LICZNIKI REJESTRU (2026-08-04). Rejestr jest JEDYNYM nośnikiem rentgenu
+    # typu, a zmierzone tego dnia: 6 wpisów wobec 46 typów przed gwizdkiem
+    # w księdze — czyli 40 kart wraca na stronę bez rachunku. Kod wygląda
+    # poprawnie (wpis ginie dopiero po gwizdku), więc zanim cokolwiek w nim
+    # ruszymy, cykl ma POWIEDZIEĆ, co się z wpisami dzieje: ile zastał, ile
+    # skasował po gwizdku, ile dopisał i z czym został.
+    _rej_na_wejsciu = len(rej)
     biezace = {_klucz_publikacji(b) for b in value_bets}
+    _rej_nowych = sum(1 for k in biezace if k not in rej)
 
     for b in value_bets:
         k = _klucz_publikacji(b)
@@ -353,11 +370,18 @@ def scal_z_publikacjami(
     out = list(value_bets)
     wznowione = 0
     odtworzone = set(biezace)
+    _skasowane_po_gwizdku = 0
+    _skasowane_bez_daty = 0
     for k, rec in list(rej.items()):
         ts_k = int(rec.get("kickoff_ts") or 0)
         # brak kickoffu traktujemy jak po gwizdku: wpis bez daty nigdy by nie
         # wygasł i wracałby na listę w nieskończoność
         if ts_k <= teraz:
+            # ROZDZIELONE, bo to dwie różne historie: wpis po gwizdku znika
+            # zgodnie z projektem, a wpis BEZ DATY to podejrzenie, że rejestr
+            # zjada typy przed czasem (patrz liczniki wyżej)
+            _skasowane_bez_daty += not ts_k
+            _skasowane_po_gwizdku += bool(ts_k)
             del rej[k]           # mecz się zaczął — typ żyje dalej w typy_log
             continue
         if k in biezace:
@@ -404,6 +428,45 @@ def scal_z_publikacjami(
     # zapis do bazy padł), znikały userowi mimo że normalnie się rozliczą.
     # Zmierzone 2026-07-26 na Wiśle Kraków–GKS: pięć typów drużynowych w księdze,
     # zero na liście, bo rejestr wdrożyliśmy cztery godziny po ich publikacji.
+    # RENTGEN Z BIEŻĄCEGO CYKLU (2026-08-04). Typ zdjęty bramą publikacji jest
+    # liczony w KAŻDYM cyklu z pełnym rachunkiem — tylko trafia do worka
+    # `typy_poza_publikacja` i tam ginie. Tymczasem ten sam typ wraca na listę
+    # z księgi jako „uproszczony", bo księga rentgenu nie trzyma.
+    #
+    # Zmierzone tego dnia: 9 z 20 kart na stronie nie miało czym wypełnić
+    # rozwinięcia, a rejestr publikacji — jedyny nośnik rentgenu — trzymał
+    # 6 wpisów wobec 46 typów przed gwizdkiem w księdze.
+    #
+    # Bierzemy WYŁĄCZNIE wyjaśnienie (czynniki, przedział, lambda, rozkład).
+    # Cena i szansa zostają zamrożone przy pierwszej publikacji — to po nich
+    # typ się rozliczy i to je user widział, gdy typ brał.
+    rentgen: dict[str, dict] = {}
+    for b in (policzone_w_cyklu or []):
+        if b.get("czynniki") or (b.get("uzasadnienie") or {}).get("czynniki"):
+            rentgen.setdefault(_klucz_publikacji(b), b)
+    _rentgen_dolozony = _rentgen_rozjazd = 0
+
+    def _dolóż_rentgen(bet: dict, k: str) -> dict:
+        swiezy = rentgen.get(k)
+        if not swiezy:
+            return bet
+        nonlocal _rentgen_dolozony, _rentgen_rozjazd
+        if abs(float(swiezy.get("p_model") or 0.0)
+               - float(bet.get("p_model") or 0.0)) > RENTGEN_MAX_ROZJAZD_P:
+            _rentgen_rozjazd += 1
+            return bet
+        bet.update({
+            "czynniki": swiezy.get("czynniki") or {},
+            "uzasadnienie": swiezy.get("uzasadnienie") or {"czynniki": []},
+            "ci": swiezy.get("ci") or [None, None],
+            "lambda": swiezy.get("lambda") or 0.0,
+            "rozklad": swiezy.get("rozklad"),
+            "oczekiwane_minuty": swiezy.get("oczekiwane_minuty"),
+            "uproszczony": False,
+        })
+        _rentgen_dolozony += 1
+        return bet
+
     z_logu = 0
     for rec in (typy_log or {}).values():
         if rec.get("wynik") is not None or rec.get("sugestia"):
@@ -417,7 +480,7 @@ def scal_z_publikacjami(
         k = _klucz_publikacji(rec)
         if k in odtworzone:
             continue
-        bet = _typ_z_logu(rec)
+        bet = _dolóż_rentgen(_typ_z_logu(rec), k)
         if bet["mecz_id"] is None or not bet["kurs"]:
             continue
         out.append(bet)
@@ -456,6 +519,27 @@ def scal_z_publikacjami(
     # gwizdku), więc bezpiecznik „nie nadpisuj mniejszym" blokowałby zapis
     # w każdy weekend z dużą liczbą gwizdków — patrz ostrzeżenie w docstringu
     # `supa.put_key_bezpiecznie`.
+    print(f"Rejestr publikacji: zastano {_rej_na_wejsciu}, dopisano "
+          f"{_rej_nowych} nowych z {len(value_bets)} świeżych, skasowano "
+          f"{_skasowane_po_gwizdku} po gwizdku"
+          + (f" + {_skasowane_bez_daty} BEZ DATY" if _skasowane_bez_daty else "")
+          + f", zostaje {len(rej)}; wznowiono z niego {wznowione}, "
+          f"z księgi {z_logu}")
+    if z_logu:
+        print(f"Rentgen z bieżącego cyklu: {_rentgen_dolozony} z {z_logu} kart "
+              f"wznowionych z księgi odzyskało rozpisany rachunek"
+              + (f" ({_rentgen_rozjazd} pominięte — szansa rozjechała się "
+                 f"o ponad {RENTGEN_MAX_ROZJAZD_P*100:.0f} pp)"
+                 if _rentgen_rozjazd else ""))
+    # CICHE POMINIĘCIE ZAPISU (załatane 2026-08-04). Gdy odczyt rejestru padł,
+    # ten `if` przechodził bokiem BEZ SŁOWA — a to znaczy, że typy policzone
+    # w tym cyklu tracą rentgen na zawsze (wpis powstaje tylko raz, patrz
+    # wyżej). Dokładnie ta klasa błędu, o którą chodzi w zasadzie „każde
+    # miejsce, które coś odrzuca, ma licznik z powodem".
+    if not _dry_run() and not odczyt_ok:
+        print("UWAGA: odczyt rejestru publikacji PADŁ — zapis pominięty, żeby "
+              f"nie nadpisać historii; {len(value_bets)} typów z tego cyklu "
+              "wróci jutro jako uproszczone, bez rozpisanych czynników")
     if not _dry_run() and odczyt_ok:
         if not supa.put_key(PUBLIKACJE_KLUCZ, rej):
             print("UWAGA: zapis rejestru publikacji NIE POWIÓDŁ SIĘ — typy "
@@ -5685,6 +5769,9 @@ def _main_impl(tryb=None):
         value_bets, matches_out,
         typy_log=rozliczanie._migruj_log(log_do_siatki or {}),
         liga_by_mid=(tryb.liga_by_mid if tryb else None),
+        # typy zdjęte bramami są policzone z pełnym rachunkiem — karta
+        # wznowiona z księgi może z niego skorzystać (patrz `_dolóż_rentgen`)
+        policzone_w_cyklu=typy_poza_publikacja,
     )
 
     # TYP WZNOWIONY TEŻ JEST LEGIEM (naprawa 2026-07-30, zgłoszenie usera:
