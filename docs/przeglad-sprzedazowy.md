@@ -19,6 +19,11 @@ zrozumiałe dla kogoś, kto nie zna zakładów. Widok KLIENTA ważniejszy niż a
 | „Moje zakłady" | **usunięte** | zakładka, strona, przycisk na karcie, `tracker.ts`, `BetTracker.tsx`. Zagrane KUPONY zostają — to osobny mechanizm |
 | Sumy meczowe i „kto więcej" nie trafiały do puli kuponów | **naprawione** | 12 typów o szansie 74–91% (kartki meczowe, gole) dostępnych dla kuponów; wcześniej pula miała średnią szansę 59% wobec 71% na liście |
 | 79 cichych połknięć błędu | **25 załatanych** | licznik `footstats/diagnostyka.py` + raport w logu cyklu i w `meta.ciche_bledy` |
+| Kupony obiecywały więcej, niż mogły dowieźć | **naprawione** | kara za odległość meczu: legi z meczów za 3 dni deklarowały 73%, wchodziły 52%. Kupon ×18–25 z „9% szans" (czyli +62% wartości) ma teraz uczciwe 5% (−9%). Podaż BEZ ZMIAN — nadal 5 kuponów |
+| „Ostatnio trafione" pokazywało 6 z 6 wygranych | **naprawione** | pełna historia + bilans całości (5 z 77) zamiast licznika z widocznych kart |
+| Ostrzeżenie o składach na kuponie drużynowym | **naprawione** | tylko przy typach zawodniczych |
+| TOP POKRYCIA udawało nasze typy („+52%") | **naprawione** | kolumna „kurs vs pokrycie", liczby szare, zdanie wprost nad tabelą |
+| `match_corners` w polskim zdaniu | **naprawione** | 10 rynków dostało nazwy + test pilnujący |
 
 **Które ciche błędy załatane** — wyłącznie te, które gubią DANE, nie pojedyncze
 pola: historia drużyny i zawodnika (statshub), shotmapy, wyniki meczów,

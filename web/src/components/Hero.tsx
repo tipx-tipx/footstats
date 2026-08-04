@@ -53,6 +53,19 @@ function etykietaLinku(b: ValueBet): string {
     : "zobacz analizę meczu →";
 }
 
+/** „1 typ", „3 typy", „8 typów" – trzy formy, nie dwie. */
+function odmienTypy(n: number): string {
+  if (n === 1) return "typ";
+  const r10 = n % 10;
+  const r100 = n % 100;
+  return r10 >= 2 && r10 <= 4 && (r100 < 12 || r100 > 14) ? "typy" : "typów";
+}
+
+/** „1 meczu", „3 meczach", „8 meczach" – po „w" idzie miejscownik. */
+function odmienMecze(n: number): string {
+  return n === 1 ? "meczu" : "meczach";
+}
+
 /** Poprawna polska odmiana: "1 okazję", "3 okazje", "8 okazji", "22 okazje". */
 function odmienOkazje(n: number): string {
   if (n === 1) return "1 okazję";
@@ -421,6 +434,7 @@ export function Hero({
   liczbaOkazji,
   spotlightBets,
   tickerBets = [],
+  konkrety,
 }: {
   liga: string;
   sezon: string;
@@ -428,6 +442,9 @@ export function Hero({
   liczbaOkazji: number;
   spotlightBets: ValueBet[];
   tickerBets?: ValueBet[];
+  /** co użytkownik dostaje DZIŚ (fakt, nie obietnica) — rozbite na dwa
+   *  produkty, bo prowadzą do różnych miejsc */
+  konkrety?: { zawodnicze: number; druzynowe: number; meczow: number };
 }) {
   return (
     <section className="relative mb-12 pt-8 sm:pt-14">
@@ -498,6 +515,45 @@ export function Hero({
             wybiera najpewniejsze typy i składa z nich gotowe kupony. A gdy
             bukmacher zawyży kurs – pokazuje, gdzie masz przewagę.
           </motion.p>
+
+          {/* CO DOSTAJESZ — trzy liczby zamiast obietnicy (2026-08-04).
+              Przegląd pod sprzedaż: nigdzie na stronie nie było odpowiedzi na
+              pierwsze pytanie kogoś, kto ma zapłacić — ile typów, na czym
+              i jak często. To są FAKTY Z DZIŚ, nie deklaracja („dziś 28
+              typów"), więc jutrzejsza inna liczba niczemu nie przeczy. */}
+          {konkrety && konkrety.zawodnicze + konkrety.druzynowe > 0 && (
+            <motion.div
+              variants={wejscie}
+              initial="hidden"
+              animate="show"
+              custom={3.5}
+              className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-muted"
+            >
+              <span>
+                <strong className="font-data font-semibold text-ink">
+                  {konkrety.zawodnicze}
+                </strong>{" "}
+                {odmienTypy(konkrety.zawodnicze)} na zawodników
+              </span>
+              <span aria-hidden className="h-3.5 w-px bg-hairline-strong" />
+              <span>
+                <strong className="font-data font-semibold text-ink">
+                  {konkrety.druzynowe}
+                </strong>{" "}
+                na drużyny
+              </span>
+              <span aria-hidden className="h-3.5 w-px bg-hairline-strong" />
+              <span>
+                w{" "}
+                <strong className="font-data font-semibold text-ink">
+                  {konkrety.meczow}
+                </strong>{" "}
+                {odmienMecze(konkrety.meczow)}
+              </span>
+              <span aria-hidden className="h-3.5 w-px bg-hairline-strong" />
+              <span>przeliczane co godzinę</span>
+            </motion.div>
+          )}
 
           <motion.div
             variants={wejscie}

@@ -37,8 +37,11 @@ export default async function DruzynyPage() {
         // pokazują konkretne ligi.
         lead={
           <>
+            {/* „komplet historii" to nasz żargon — użytkownika interesuje, że
+                liczymy tylko tam, gdzie mamy dość danych (2026-08-04) */}
             Gole, rożne i kartki <strong>drużyny</strong> – nie pojedynczych
-            zawodników. Liczymy 17 rozgrywek, w których mamy komplet historii.
+            zawodników. Bierzemy 17 rozgrywek, w których mamy dość historii,
+            żeby cokolwiek policzyć.
           </>
         }
       />

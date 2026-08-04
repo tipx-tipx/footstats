@@ -118,6 +118,14 @@ export interface ValueBet {
    * skąd wiedzieć, że sami przestaliśmy ten rynek polecać.
    */
   rynek_wstrzymany?: boolean;
+  /**
+   * Rozgrywki, z których jest mecz („Liga Europy", „Ekstraklasa"…).
+   * Backend stempluje to PRZY PUBLIKACJI od 2026-08-03 (`build_wc_fast`:
+   * „stempel stawiamy przy publikacji, nie odtwarzamy później"), ale typ
+   * front-endowy o tym nie wiedział — pole jechało w danych, a TypeScript
+   * go nie widział. Uzupełnione 2026-08-04.
+   */
+  liga?: string;
   /** znacznik pierwszej publikacji typu (z rejestru, nie z bieżącego cyklu) */
   opublikowano_ts?: number;
   /** kurs, jaki wynika z pozostałych linii buka (gdy miekka_linia) */

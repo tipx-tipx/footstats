@@ -70,6 +70,20 @@ export default async function OkazjePage({
 
   const okazje = bets.filter((b) => !b.sugestia);
   const sugestie = bets.filter((b) => b.sugestia);
+  // CO KUPUJĄCY DOSTAJE — pierwsza rzecz, o którą pyta ktoś, kto ma zapłacić,
+  // a do 2026-08-04 nie było jej nigdzie na stronie. Liczby są FAKTEM z dziś,
+  // nie obietnicą („dziś N typów"), więc jutro mogą być inne i to w porządku.
+  //
+  // ROZBITE NA ZAWODNICZE I DRUŻYNOWE, bo inaczej pasek kłóci się z guzikiem
+  // obok: guzik prowadzi do listy NA TEJ stronie (tylko zawodnicy), więc przy
+  // „20 typów dziś" i „zobacz 3 okazje" użytkownik nie wie, której liczbie
+  // wierzyć. Rozbicie tłumaczy przy okazji strukturę produktu.
+  const wszystkieTypy = wszystkieBets.filter((b) => !b.sugestia);
+  const konkrety = {
+    zawodnicze: okazje.length,
+    druzynowe: druzynoweN,
+    meczow: new Set(wszystkieTypy.map((b) => b.mecz_id)).size,
+  };
   // żywy podgląd w hero: do 4 najlepszych pozycji rankingu silnika
   // (kolejność wejściowa = ranking), sugestie tylko gdy brak innych
   const spotlight = (okazje.length > 0 ? okazje : sugestie).slice(0, 4);
@@ -97,6 +111,7 @@ export default async function OkazjePage({
         liczbaOkazji={bets.filter((b) => !b.sugestia).length}
         spotlightBets={spotlight}
         tickerBets={tickerBets}
+        konkrety={konkrety}
       />
 
       {meta.tryb === "demo" ? (

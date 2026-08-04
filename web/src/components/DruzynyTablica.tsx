@@ -323,14 +323,18 @@ export function DruzynyTablica({
       const sekcje =
         lista.length >= PROG_POLEK && pewne.length > 0 && odwazne.length > 0
           ? [
+              // BEZ ŻARGONU (2026-08-04). Było: „materiał na kupon" i „kurs to
+              // wynagradza" — jedno i drugie zakłada, że czytelnik zna świat
+              // zakładów. Te dwa zdania są jedynym miejscem, które tłumaczy
+              // podział całej listy, więc muszą być zrozumiałe bez wstępu.
               {
                 nazwa: "częściej wchodzą",
-                opis: "Szansa 70% i więcej. Kurs niski, ale te typy trafiają regularnie – materiał na kupon.",
+                opis: "Szansa 70% i więcej. Wygrana jest mniejsza, ale takie typy wchodzą regularnie – z nich składamy kupony.",
                 typy: pewne,
               },
               {
                 nazwa: "więcej płacą",
-                opis: "Szansa poniżej 70%. Wchodzą rzadziej, kurs to wynagradza.",
+                opis: "Szansa poniżej 70%. Wchodzą rzadziej, ale gdy wejdą, wygrana jest wyraźnie większa.",
                 typy: odwazne,
               },
             ]
@@ -417,9 +421,15 @@ export function DruzynyTablica({
                   aria-hidden
                   className="flex-1 self-center border-t border-dotted border-hairline-strong/70"
                 />
-                <span className="font-data shrink-0 text-[11px] text-faint">
-                  {odmienTypy(typy.length)}
-                </span>
+                {/* LICZNIK SEKCJI TYLKO GDY SEKCJI JEST WIĘCEJ (2026-08-04).
+                    Przy jednej półce w dniu ta liczba jest identyczna
+                    z licznikiem dnia dwa wiersze wyżej — wyglądało to jak
+                    „4 typy / 4 typy" pod sobą i czytało się jak usterka. */}
+                {sekcje.length > 1 && (
+                  <span className="font-data shrink-0 text-[11px] text-faint">
+                    {odmienTypy(typy.length)}
+                  </span>
+                )}
               </div>
               {/* JEDNO ZDANIE, CO TA PÓŁKA ZNACZY. Sama nazwa („więcej płacą")
                   domyśla się reszty; zdanie mówi, dla kogo ten rodzaj typu
@@ -568,7 +578,23 @@ export function DruzynyTablica({
             znaczenie siedzi w `title`, na telefonie nie znaczy nic — a to
             pierwsza rzecz, którą oko widzi w każdym wierszu. */}
         <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-[11px] text-faint">
-          <span className="uppercase tracking-widest">kropka = przewaga w kursie</span>
+          {/* „PRZEWAGA W KURSIE" TŁUMACZYŁO ŻARGON ŻARGONEM (2026-08-04).
+              To jedyne miejsce, które ma wyjaśnić symbol widoczny w KAŻDYM
+              wierszu — a samo wymagało wyjaśnienia. Nowe zdanie mówi, co ta
+              kropka znaczy dla pieniędzy, bez ani jednego słowa z branży. */}
+          <span className="uppercase tracking-widest">
+            kropka = ile bukmacher przepłaca
+          </span>
+          {/* CO ZNACZĄ DWIE LICZBY PO PRAWEJ (2026-08-04). Wiersz kończy się
+              „91%  1,34" i nigdzie nie było napisane, że pierwsza to nasza
+              szansa, a druga kurs bukmachera. Dla kogoś, kto nie zna zakładów,
+              to dwie liczby bez etykiet — a to one decydują o wyborze typu. */}
+          <span className="flex items-center gap-1.5">
+            <span className="font-data font-semibold text-brand-deep">91%</span>
+            <span>nasza szansa</span>
+            <span className="font-data font-semibold text-ink-soft">1,34</span>
+            <span>kurs</span>
+          </span>
           {PRZEWAGA_KROPKI.map((k) => (
             <span key={k.kod} className="flex items-center gap-1.5">
               <span

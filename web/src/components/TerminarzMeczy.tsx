@@ -29,6 +29,14 @@ function kluczDnia(ts: number): string {
   }).format(new Date(ts * 1000));
 }
 
+/** „1 mecz", „3 mecze", „8 meczów" – polski ma trzy formy, nie dwie. */
+function odmienMeczow(n: number): string {
+  if (n === 1) return "mecz";
+  const r10 = n % 10;
+  const r100 = n % 100;
+  return r10 >= 2 && r10 <= 4 && (r100 < 12 || r100 > 14) ? "mecze" : "meczów";
+}
+
 /** Etykieta dnia: „dziś" / „jutro" / „piątek, 24 lipca" (teraz z serwera). */
 function etykietaDnia(ts: number, teraz: number): { glowna: string; data: string } {
   const d = new Date(ts * 1000);
@@ -236,7 +244,27 @@ export function TerminarzMeczy({
    */
   ligiWZakresie?: string[];
 }) {
-  const [tylkoOkazje, setTylkoOkazje] = useState(false);
+  /**
+   * FILTR WŁĄCZONY SAM, GDY LISTA JEST ZA DŁUGA (2026-08-04).
+   *
+   * Zakładka jest „terminarzem skanu" i ma prawo pokazywać WSZYSTKO, co
+   * sprawdziliśmy — to była świadoma decyzja. Ale zmierzone na produkcji:
+   * 112 meczów to ~8300 px przewijania, z czego zdecydowana większość
+   * wierszy mówi „bez przewagi". Użytkownik szuka igły w stogu siana,
+   * mimo że filtr istnieje — tylko nikt go nie klika, bo nie wie, że jest.
+   *
+   * Kompromis: przy długiej liście startujemy z filtrem, a przełącznik
+   * (widoczny, z licznikiem) pozwala jednym kliknięciem wrócić do pełnego
+   * terminarza. Przy krótkiej liście nic się nie zmienia — chowanie czegoś,
+   * co i tak mieści się na ekranie, tylko utrudnia.
+   */
+  const DUZO_MECZOW = 25;
+  const [tylkoOkazje, setTylkoOkazje] = useState(() => {
+    const zTypami = mecze.filter(
+      (m) => (okazje[m.id] ?? 0) > 0 || (sugestie[m.id] ?? 0) > 0,
+    ).length;
+    return mecze.length > DUZO_MECZOW && zTypami > 0;
+  });
   const [tylkoNasze, setTylkoNasze] = useState(true);
 
   const wZakresie = useMemo(() => new Set(ligiWZakresie), [ligiWZakresie]);
@@ -354,6 +382,23 @@ export function TerminarzMeczy({
           </button>
         </div>
       </div>
+
+      {/* LISTA JEST PRZYCIĘTA — POWIEDZ TO (2026-08-04). Filtr włącza się sam
+          przy długim terminarzu; bez tego zdania użytkownik widzi 17 meczów
+          i nie ma skąd wiedzieć, że przeskanowaliśmy 112. */}
+      {tylkoOkazje && poLigach.length > widoczne.length && (
+        <p className="mt-3 text-xs leading-relaxed text-muted">
+          Pokazujemy{" "}
+          <strong className="font-data font-semibold text-ink">
+            {widoczne.length}
+          </strong>{" "}
+          {odmienMeczow(widoczne.length)} z okazjami. Przeskanowaliśmy{" "}
+          <strong className="font-data font-semibold text-ink">
+            {poLigach.length}
+          </strong>{" "}
+          – resztę pokaże przycisk „tylko z okazjami” wyżej.
+        </p>
+      )}
 
       {widoczne.length === 0 ? (
         <div className="mt-8 rounded-(--radius-card) border border-dashed border-hairline bg-card-soft/50 px-6 py-12 text-center">
