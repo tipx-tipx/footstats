@@ -845,6 +845,33 @@ def test_strona_bez_wlasnej_proby_dalej_podlega_rynkowi():
     assert "team_corners:powyzej" not in ocenione
 
 
+def test_kwarantanna_stron_nie_liczy_mundialu(monkeypatch):
+    """Blokada strony ma stac na meczach TEGO produktu, nie poprzedniego.
+
+    Zmierzone 2026-08-04 (zgloszenie usera): ta brama byla jedynym miejscem
+    w pipelinie bez filtra epoki, a trzymala 7 z 9 blokad. Cztery z nich staly
+    wylacznie na mundialu — `tackles|powyzej` miala 20 z 20 rekordow stamtad
+    i ZERO meczow ligowych.
+    """
+    monkeypatch.setattr(rozliczanie, "_kraje_reprezentacji",
+                        lambda: {"polska", "brazylia"})
+    # stare typy rozpoznajemy po nazwie meczu: OBIE strony to reprezentacje
+    ms = _seria("tackles", 30, 5, 1.7, strona="powyzej")
+    for r in ms:
+        r["mecz"] = "Polska – Brazylia"
+    assert rozliczanie.strony_kwarantanna(_log(ms)) == {}
+
+    # nowe typy niosą stempel epoki wprost — ta sama odpowiedź
+    ms_stempel = _seria("tackles", 30, 5, 1.7, strona="powyzej", epoka="ms")
+    assert rozliczanie.strony_kwarantanna(_log(ms_stempel)) == {}
+
+    # ...a mecz klubowy z tym samym wynikiem blokadę uruchamia
+    liga = _seria("tackles", 30, 5, 1.7, strona="powyzej")
+    for r in liga:
+        r["mecz"] = "Lech Poznań – Raków Częstochowa"
+    assert "tackles:powyzej" in rozliczanie.strony_kwarantanna(_log(liga))
+
+
 def test_brama_kwarantanny_jedna_regula_dla_wszystkich_sciezek():
     """Sumy meczowe i „kto wiecej" dopisuja sie do listy Z POMINIECIEM glownej
     petli publikacji — wiec regula musi byc JEDNA funkcja, ktora kazda sciezka

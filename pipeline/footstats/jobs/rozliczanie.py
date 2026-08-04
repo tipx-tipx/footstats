@@ -1294,6 +1294,28 @@ def _grupy_stron(log: dict | None = None) -> dict[tuple[str, str], list[dict]]:
         # 2026-07-30 okazalo sie najskuteczniejsze: to ono pokazalo, ze
         # wszystkie tracace strony to „powyzej".
         and r.get("strona") in ("powyzej", "ponizej", *STRONY_WIECEJ)
+        # MUNDIAL TO ARCHIWUM, NIE NAUCZYCIEL (dopisane 2026-08-04, zgłoszenie
+        # usera). Ta brama była JEDYNYM miejscem w całym pipelinie, które nadal
+        # liczyło z mieszanki epok — mają ten filtr kalibracja, kwarantanna
+        # rynków, kwarantanna kategorii, korekta strumienia, szansa pokazywana
+        # i pomiar wagi rynku. A to ona trzymała 7 z 9 dzisiejszych blokad.
+        #
+        # Zmierzone: próba 978 rozliczeń, z czego 251 (26%) to mundial. Cztery
+        # z siedmiu wstrzymanych stron stały WYŁĄCZNIE na nim:
+        #
+        #   tackles|powyzej          −18%  20 z 20 rekordów to mundial (liga: 0)
+        #   fouls_committed|powyzej  −28%  20 z 22                     (liga: 2)
+        #   fouls_won|powyzej        −12%  20 z 24                     (liga: 4)
+        #   shots|powyzej            − 5%  24 z 50 -> sama liga −2%, czyli WOLNA
+        #
+        # `tackles` blokowaliśmy więc na podstawie turnieju, w którym model nie
+        # miał historii drużyn ani składów — i ani jednego meczu ligowego.
+        # `shots|powyzej` to przy tym jedyny segment, w którym nasza liczba bije
+        # cenę bukmachera (`waga_rynku_pomiar`: w*=1,00).
+        #
+        # Trzy pozostałe blokady (team_goals|powyzej, match_corners|ponizej,
+        # team_corners|ponizej) mają ZERO rekordów mundialowych i zostają.
+        and _z_biezacej_epoki(r)
     ]
     out: dict[tuple[str, str], list[dict]] = {}
     for mk, strona in {(r["rynek_kod"], r["strona"]) for r in settled}:
