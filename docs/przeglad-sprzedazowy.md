@@ -24,6 +24,15 @@ zrozumiałe dla kogoś, kto nie zna zakładów. Widok KLIENTA ważniejszy niż a
 | Ostrzeżenie o składach na kuponie drużynowym | **naprawione** | tylko przy typach zawodniczych |
 | TOP POKRYCIA udawało nasze typy („+52%") | **naprawione** | kolumna „kurs vs pokrycie", liczby szare, zdanie wprost nad tabelą |
 | `match_corners` w polskim zdaniu | **naprawione** | 10 rynków dostało nazwy + test pilnujący |
+| Nie było napisane, co kupujący dostaje | **naprawione** | pasek faktów: „3 typy na zawodników / 17 na drużyny / w 17 meczach / przeliczane co godzinę" |
+| Mecze: 112 pozycji, 8300 px | **naprawione** | filtr włącza się sam przy >25 meczach + zdanie „pokazujemy 15 z 78". **8299 px → 3243 px** |
+| Drużyny: legenda tłumaczyła żargon żargonem | **naprawione** | „ile bukmacher przepłaca" + legenda dwóch liczb + opisy półek bez żargonu + podwójny licznik |
+| `ValueBet` nie znał pola `liga` | **naprawione** | pole jechało w danych od 03.08, typ go nie widział |
+
+**Osiem commitów na produkcji 2026-08-04.** Cztery pierwsze (przed przeglądem)
+o bramach i podaży: rozdzielenie kwarantanny rynku od strony, okno zgody
++12→+16 pp, sumy meczowe omijające bramy, mundial w kwarantannie stron.
+Cztery kolejne z przeglądu — w tabeli wyżej.
 
 **Które ciche błędy załatane** — wyłącznie te, które gubią DANE, nie pojedyncze
 pola: historia drużyny i zawodnika (statshub), shotmapy, wyniki meczów,
