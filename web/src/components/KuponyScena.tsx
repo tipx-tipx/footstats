@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { KuponBilet } from "./KuponBilet";
 import { akcjaKuponu, ProfilKuponow, ZastosujZamiane } from "./PominKupon";
+import { czyDruzynowy } from "@/lib/rynki";
 import { useStawka } from "./useStawka";
 import {
   fmtKurs,
@@ -101,6 +102,16 @@ function Werdykt({ kupon: k }: { kupon: Kupon }) {
     k.mecze_ze_skladami != null &&
     k.mecze_lacznie != null &&
     k.mecze_ze_skladami >= k.mecze_lacznie;
+  // OSTRZEŻENIE O SKŁADACH TYLKO TAM, GDZIE MA SENS (2026-08-04). Zdanie
+  // „jeśli któryś zawodnik siedzi na ławce, jego typ wypadnie i kupon się
+  // unieważni" opisuje typ ZAWODNICZY. Zmierzone na produkcji: kupon dnia
+  // składał się z dwóch typów „gole drużyny", a i tak niósł to ostrzeżenie —
+  // przy typie drużynowym skład zmienia wycenę, ale nie unieważnia zakładu.
+  // `KuponLeg` nie niesie `podmiot_typ`, ale niesie kod rynku — a przedrostki
+  // drużynowe to jedno źródło prawdy w całym produkcie (`lib/rynki.ts`,
+  // parytet z `betting.PRZEDROSTKI_DRUZYNOWE`). Leg bez kodu (kupony sprzed
+  // 30.07) traktujemy jak zawodniczy — czyli z ostrzeżeniem, bo tak było.
+  const maZawodniczy = (k.legi ?? []).some((l) => !czyDruzynowy(l.rynek_kod));
 
   return (
     <dl className="divide-y divide-hairline border-y border-hairline">
@@ -178,11 +189,18 @@ function Werdykt({ kupon: k }: { kupon: Kupon }) {
               {k.mecze_ze_skladami}/{k.mecze_lacznie}
             </strong>{" "}
             meczów miało już ogłoszone składy, gdy składaliśmy ten kupon.
-            {!skladyPelne && (
+            {!skladyPelne && maZawodniczy && (
               <span className="text-data-amber-ink">
                 {" "}
                 Jeśli okaże się, że któryś zawodnik siedzi na ławce, jego typ
                 wypadnie i kupon się unieważni.
+              </span>
+            )}
+            {!skladyPelne && !maZawodniczy && (
+              <span>
+                {" "}
+                Ten kupon stoi na statystykach całych drużyn, więc skład go nie
+                unieważni – ale przy pewnych składach liczby bywają inne.
               </span>
             )}
           </dd>

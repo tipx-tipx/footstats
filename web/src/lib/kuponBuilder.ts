@@ -114,10 +114,38 @@ function wagaModelu(l: LegPool, wagi?: Record<string, number>): number {
   return w;
 }
 
+/**
+ * Kara za odległość meczu w czasie – jak kupony.py:KARA_HORYZONTU.
+ *
+ * Zmierzone 2026-08-04 na 334 legach rozliczonych kuponów: im dalej mecz, tym
+ * gorzej trafia leg, niezależnie od tego, czy zawodniczy, czy drużynowy
+ * (na dziś −6,6/−11,0 pp, na kilka dni −20,4/−37,3 pp). Wartości niżej są
+ * mniejsze od zmierzonej luki, bo część błędu łapie już shrink ku cenie rynku.
+ */
+const KARA_HORYZONTU: [number, number][] = [
+  [24, 0.0],
+  [48, 0.06],
+  [Number.POSITIVE_INFINITY, 0.13],
+];
+
+function karaHoryzontu(l: LegPool, teraz?: number): number {
+  if (teraz == null) return 0;
+  const godzin = ((l.kickoff_ts ?? 0) - teraz) / 3600;
+  for (const [prog, kara] of KARA_HORYZONTU) if (godzin <= prog) return kara;
+  return 0;
+}
+
 /** Szansa lega DO SKŁADANIA – jak kupony.py:_p_skladania (parytet 1:1). */
-function pSkladania(l: LegPool, wagi?: Record<string, number>): number {
+function pSkladania(
+  l: LegPool,
+  wagi?: Record<string, number>,
+  teraz?: number,
+): number {
   const w = wagaModelu(l, wagi);
-  return Math.exp(w * Math.log(l.p_model) + (1.0 - w) * Math.log(pRynku(l.kurs)));
+  const p = Math.exp(
+    w * Math.log(l.p_model) + (1.0 - w) * Math.log(pRynku(l.kurs)),
+  );
+  return Math.max(p - karaHoryzontu(l, teraz), 0.01);
 }
 
 function legValue(l: LegPool, pSel: number): number {
@@ -236,6 +264,10 @@ export interface OpcjeKuponu {
   /** zmierzone delty wag zaufania per kubełek pewności (meta.wagi_zaufania,
    * liczone z rozliczeń przez backend) – jak kupony.py:build_kupony(wagi=) */
   wagi?: Record<string, number>;
+  /** „teraz" w sekundach – włącza karę za odległość meczu (KARA_HORYZONTU,
+   * parytet z kupony.py). Bez niego builder liczy jak przed 2026-08-04, więc
+   * stare wywołania i most parytetu nie zmieniają wyniku. */
+  teraz?: number;
 }
 
 /** Stabilny klucz typu w puli – ta sama czwórka co sygnatury kuponów. */
@@ -360,7 +392,7 @@ export function zlozKupon(
   const pSelOf = (l: LegPool): number => {
     let v = pSelCache.get(l);
     if (v === undefined) {
-      v = pSkladania(l, wagi);
+      v = pSkladania(l, wagi, opts.teraz);
       pSelCache.set(l, v);
     }
     return v;

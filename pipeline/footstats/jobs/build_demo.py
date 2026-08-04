@@ -65,6 +65,17 @@ MARKET_NAMES_PL = {
     "team_fouls": "Faule drużyny", "team_cards": "Kartki drużyny",
     "team_shots": "Strzały drużyny", "team_sot": "Strzały celne drużyny",
     "team_goals": "Gole drużyny", "team_corners": "Rzuty rożne drużyny",
+    # SUMY MECZOWE i „KTO WIĘCEJ" — dopisane 2026-08-04. Brak tych wpisów
+    # oznaczał, że `MARKET_NAMES_PL.get(kod, kod)` oddawał surowy KOD, i tak
+    # trafiał on do zdań po polsku: „Wstrzymane właśnie są: rzuty rożne
+    # drużyny, match_corners, najwyższa szansa w meczu" (Skuteczność, 04.08).
+    # Rynki żyją od 30.07, więc kod wyciekał do tekstu przez pięć dni.
+    "match_shots": "Strzały w meczu", "match_sot": "Strzały celne w meczu",
+    "match_fouls": "Faule w meczu", "match_cards": "Kartki w meczu",
+    "match_corners": "Rzuty rożne w meczu",
+    "wiecej_shots": "Więcej strzałów", "wiecej_sot": "Więcej celnych",
+    "wiecej_fouls": "Więcej fauli", "wiecej_cards": "Więcej kartek",
+    "wiecej_corners": "Więcej rożnych",
 }
 BOOKMAKERS = ["Superbet", "Betclic", "STS"]
 

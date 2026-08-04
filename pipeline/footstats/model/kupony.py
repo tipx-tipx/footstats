@@ -265,18 +265,60 @@ def _waga_modelu(l: dict, wagi: dict | None = None) -> float:
     return w
 
 
-def _p_skladania(l: dict, wagi: dict | None = None) -> float:
+# KARA ZA ODLEGŁOŚĆ MECZU W CZASIE (zmierzona 2026-08-04 na 334 legach
+# rozliczonych kuponów). Im dalej mecz, tym gorzej trafia leg — i to
+# NIEZALEŻNIE od tego, czy jest zawodniczy, czy drużynowy:
+#
+#   horyzont         typ lega     n    deklarował  weszło    luka
+#   na dziś          drużynowy   110      74,8%     68,2%   − 6,6 pp
+#   na dziś          zawodniczy   50      65,0%     54,0%   −11,0 pp
+#   na kilka dni     drużynowy   103      72,9%     52,4%   −20,4 pp
+#   na kilka dni     zawodniczy   33      64,6%     27,3%   −37,3 pp
+#
+# To ma fizyczny sens: kupon na mecz za trzy dni powstaje, gdy składów jeszcze
+# nie ma, forma się jeszcze zmieni, a kontuzje nie są znane. Hipoteza „winne są
+# legi zawodnicze" została SPRAWDZONA I ODRZUCONA — kupony długoterminowe
+# złożone WYŁĄCZNIE z drużynowych też mają 0 trafień na 19.
+#
+# Wartości niżej są MNIEJSZE niż zmierzona luka (tłumienie), bo część tego
+# błędu łapią już dwie warstwy wcześniej: shrink ku cenie rynku w tej samej
+# funkcji i korekta strumienia nałożona na `p_model` przed wejściem do puli.
+# Kara ma przesunąć WYBÓR buildera ku bliższym meczom, a nie ukarać dwa razy.
+KARA_HORYZONTU = ((24, 0.0), (48, 0.06), (10**9, 0.13))
+
+
+def _kara_horyzontu(l: dict, teraz: int | None = None) -> float:
+    """O ile ściągnąć szansę lega przez sam fakt, że mecz jest daleko."""
+    if teraz is None:
+        return 0.0
+    try:
+        godzin = (int(l.get("kickoff_ts") or 0) - int(teraz)) / 3600.0
+    except (TypeError, ValueError):
+        return 0.0
+    for prog, kara in KARA_HORYZONTU:
+        if godzin <= prog:
+            return kara
+    return 0.0
+
+
+def _p_skladania(
+    l: dict, wagi: dict | None = None, teraz: int | None = None
+) -> float:
     """Szansa lega DO SKŁADANIA: p_model ściągnięte ku cenie rynku.
 
     Średnia geometryczna (log-liniowa) p_model i p_rynku, ważona zaufaniem
     do estymaty (_waga_modelu). Im mocniej model rozjeżdża się z rynkiem i im
     szersze widełki szansy, tym mocniej ta korekta obcina deklarowaną
     przewagę; legi zgodne z rynkiem prawie nie drgną.
+
+    `teraz` — gdy podane, dokładamy karę za odległość meczu (KARA_HORYZONTU).
+    Bez niego funkcja liczy jak dotąd, więc stare wywołania nie zmieniają się.
     """
     w = _waga_modelu(l, wagi)
-    return math.exp(
+    p = math.exp(
         w * math.log(l["p_model"]) + (1.0 - w) * math.log(_p_rynku(l["kurs"]))
     )
+    return max(p - _kara_horyzontu(l, teraz), 0.01)
 
 
 def _leg_value(l: dict, wagi: dict | None = None) -> float:
@@ -632,6 +674,7 @@ def _zloz_pewniaki(
     profil: str = "zbalansowany",
     kary: dict | None = None,
     wagi: dict | None = None,
+    teraz: int | None = None,
 ) -> dict | None:
     """Maksymalizuj szansę kuponu przy kursie łącznym w przedziale [cmin, cmax].
 
@@ -658,7 +701,7 @@ def _zloz_pewniaki(
     def _q(b: dict) -> float:
         # bazowa jakość: koszt pewności na jednostkę kursu (q<0; bliżej 0 =
         # lepiej), liczony z UREALNIONEJ szansy — patrz _p_skladania
-        q = math.log(_p_skladania(b, wagi)) / math.log(b["kurs"])
+        q = math.log(_p_skladania(b, wagi, teraz)) / math.log(b["kurs"])
         if profil == "bezpieczny":
             return q
         # PREMIA ZA WARTOŚĆ (liczbowo): leg z realną przewagą wchodzi wyżej
@@ -697,7 +740,11 @@ def _zloz_pewniaki(
     for b in cands:
         ryzykowny = b["p_model"] < PROG_RYZYKA_P
         nowe = []
-        p_sel_b = _p_skladania(b, wagi)
+        # `teraz` MUSI iść i tutaj, nie tylko do `_q` (kolejność kandydatów).
+        # To jest funkcja celu beam searcha — bez kary horyzontu w tym miejscu
+        # builder sortował kandydatów z karą, a wybierał komplet bez niej
+        # i wychodziły mu legi z najdalszych meczów. Złapane parytetem z TS.
+        p_sel_b = _p_skladania(b, wagi, teraz)
         for kurs, p, legi in beam:
             if len(legi) >= MAX_LEGI_PEWNIAKI:
                 continue
@@ -953,13 +1000,13 @@ def build_kupony(
     for cmin, cmax in PRZEDZIALY_DZIENNE:
         k = (
             _zloz_pewniaki(dzis20, cmin, cmax, profil=profil, kary=kary,
-                           wagi=wagi, min_legi=MIN_LEGI_PEWNIAKI)
+                           wagi=wagi, min_legi=MIN_LEGI_PEWNIAKI, teraz=now)
             if tylko_dzis_ok else None
         )
         pula_k = dzis20
         if k is None:
             k = _zloz_pewniaki(dzis44, cmin, cmax, profil=profil, kary=kary,
-                               wagi=wagi, min_legi=MIN_LEGI_PEWNIAKI)
+                               wagi=wagi, min_legi=MIN_LEGI_PEWNIAKI, teraz=now)
             pula_k = dzis44
         if k is not None:
             k["horyzont"] = "dzienny"
@@ -970,7 +1017,7 @@ def build_kupony(
     dlugo = [b for b in pool if b["kickoff_ts"] <= now + OKNO_DLUGO_S]
     for cmin, cmax in PRZEDZIALY_DLUGOTERMINOWE:
         k = _zloz_pewniaki(dlugo, cmin, cmax, profil=profil, kary=kary,
-                           wagi=wagi, min_legi=MIN_LEGI_PEWNIAKI)
+                           wagi=wagi, min_legi=MIN_LEGI_PEWNIAKI, teraz=now)
         if k is not None:
             k["horyzont"] = "dlugoterminowy"
             _rentgen(k, dlugo, cmin, cmax, kary=kary)
@@ -988,7 +1035,7 @@ def build_kupony(
     for cmin, cmax in PRZEDZIALY_VALUE:
         k = _zloz_pewniaki(
             cands, cmin, cmax, max_na_mecz=1, min_legi=2, profil=profil,
-            kary=kary, wagi=wagi
+            kary=kary, wagi=wagi, teraz=now
         )
         if k is None or _sygnatura(k) in sygnatury:
             continue

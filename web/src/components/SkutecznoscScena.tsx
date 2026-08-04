@@ -94,19 +94,12 @@ type IdZakladki = (typeof ZAKLADKI)[number]["id"];
 /** Od tylu rozliczeń rynek w tabeli traktujemy jako mówiący cokolwiek. */
 const N_ISTOTNE = 10;
 
-/**
- * Rynki DRUŻYNOWE mają trzy przedrostki, nie jeden.
- *
- * `match_` (suma meczowa) i `wiecej_` („kto więcej") doszły 2026-07-30. Ta
- * strona sprawdzała wyłącznie `team_`, więc rożne CAŁYCH MECZÓW liczyły się
- * jako typy zawodnicze – stąd zgłoszenie usera 2026-08-02 („w Skuteczności
- * są jakieś typy z niedzieli, mimo że nic nie pokazywało"). Backend ma tę
- * listę od 2026-08-01 (`betting.PRZEDROSTKI_DRUZYNOWE`); tu jej brakowało.
- */
-export const PRZEDROSTKI_DRUZYNOWE = ["team_", "match_", "wiecej_"];
-
-const czyDruzynowy = (kod: string) =>
-  PRZEDROSTKI_DRUZYNOWE.some((p) => kod.startsWith(p));
+// PRZEDROSTKI_DRUZYNOWE / czyDruzynowy przeniesione do `lib/rynki.ts`
+// (2026-08-04): potrzebowała ich też scena Kuponów, a import komponentu
+// z komponentu ciągnąłby całą tę scenę (715 linii) do paczki Kuponów.
+// Re-eksport zostaje, bo importuje go strona `/model`.
+export { PRZEDROSTKI_DRUZYNOWE } from "@/lib/rynki";
+import { czyDruzynowy } from "@/lib/rynki";
 
 /** Kody rynków po ludzku – do listy „gdzie najczęściej brakuje danych". */
 const NAZWA_RYNKU: Record<string, string> = {

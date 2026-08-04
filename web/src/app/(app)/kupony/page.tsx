@@ -92,7 +92,15 @@ export default async function KuponyPage() {
         </details>
       </Reveal>
 
-      <TrafioneKupony kupony={typyWyniki.kupony_wygrane ?? []} />
+      {/* PEŁNA historia (`kupony`), nie sam log wygranych (2026-08-04).
+          `kupony_wygrane` z definicji nie zawiera ani jednego pudła, więc
+          sekcja pokazywała sześć zielonych kart z rzędu — patrz komentarz
+          w TrafioneKupony. `kupony` to te same kupony z ostatnich 21 dni,
+          z prawdziwym wynikiem każdego. */}
+      <TrafioneKupony
+        kupony={typyWyniki.kupony ?? []}
+        roi={typyWyniki.kupony_roi}
+      />
 
       {/* druga ścieżka: własny kupon z tej samej przeanalizowanej puli */}
       {legiPool.length > 0 && (

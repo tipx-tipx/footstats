@@ -55,13 +55,16 @@ function Linie({
           )}
           {l.evPct != null && (
             <span
-              title="Zgrubny sygnał wartości: ile dałby ten zakład, gdyby surowe pokrycie było prawdziwą szansą (pokrycie × kurs − 1). To NIE jest przewaga silnika, bo próba to tylko 5 startów, bez kalibracji i kontekstu. Odsiewa kursy typu „5/5 @1,01”."
-              className={`w-12 shrink-0 font-semibold ${
-                l.evPct >= 8
-                  ? "text-data-green-ink"
-                  : l.evPct < 0
-                    ? "text-data-red-ink"
-                    : "text-faint"
+              title="Kurs porównany z surowym pokryciem z 5 startów (pokrycie × kurs − 1). To NIE jest przewaga silnika — bez kalibracji, rywala i minut."
+              /* BEZ ZIELENI NA PLUSACH (2026-08-04). Zielony i pogrubiony
+                 „+52%" czytał się jak rekomendacja, a to jest surowy iloraz
+                 z pięciu meczów. Czerwień przy ujemnych ZOSTAJE: ostrzeżenie
+                 „ten kurs nie płaci nawet tego, co pokrycie" jest prawdziwe
+                 i użyteczne niezależnie od dokładności próby. */
+              className={`w-12 shrink-0 ${
+                l.evPct < 0
+                  ? "font-semibold text-data-red-ink"
+                  : "text-faint"
               }`}
             >
               {l.evPct > 0 ? "+" : l.evPct < 0 ? "−" : "±"}
@@ -299,12 +302,28 @@ export function TopPokrycia({
           = rezerwa kadry, liczone z klubu
         </span>
         {!brakKursow && (
-          <span title="Zgrubna podpowiedź, nie wyliczenie modelu: bierzemy sam odsetek trafień z ostatnich 5 startów i mnożymy przez kurs. Służy tylko do odsiewania kursów typu „5/5 za 1,01”.">
-            <span className="font-data font-semibold text-data-green-ink">+%</span>{" "}
-            = ile płaci kurs względem pokrycia (zgrubnie, próba 5)
+          <span>
+            <span className="font-data font-semibold text-ink-soft">+%</span>{" "}
+            = kurs kontra 5 ostatnich startów
           </span>
         )}
       </div>
+
+      {/* TO NIE SĄ NASZE TYPY — POWIEDZIANE WPROST (2026-08-04).
+          Kolumna nazywała się „wartość", liczby przy 8%+ były zielone
+          i pogrubione, a jedyne wyjaśnienie siedziało w `title`. Na produkcji
+          dawało to tabelę 37 propozycji z „+48%", „+52%" — wyglądającą jak
+          okazja życia, choć model tych typów świadomie nie wystawił. Zasada
+          produktu mówi wprost: nic ważnego nie może mieszkać w dymku. */}
+      {!brakKursow && (
+        <p className="mb-3 rounded-(--radius-control) border border-hairline bg-card-soft/60 px-3 py-2 text-[11px] leading-relaxed text-muted">
+          To jest <strong className="font-semibold text-ink-soft">przegląd
+          oferty bukmachera</strong>, a nie nasze typy. Procent obok kursu
+          porównuje go wyłącznie z tym, ile razy zawodnik przebił linię
+          w ostatnich pięciu startach – bez rywala, minut i kalibracji. Nasze
+          typy z tego meczu są wyżej, w sekcji okazji.
+        </p>
+      )}
 
       {/* TELEFON: karta zamiast wiersza tabeli.
           Tabela ma cztery kolumny i minimum 600–720 px, więc na ekranie 390 px
@@ -362,7 +381,12 @@ export function TopPokrycia({
                 ostatnie 5 startów
               </th>
               <th className="sticky top-0 z-[1] border-b border-hairline bg-card px-4 py-2.5 font-medium">
-                {brakKursow ? "pokrycie linii" : "pokrycie · kurs · wartość"}
+                {/* „wartość" znaczy w tym produkcie „przewaga po pełnej
+                    analizie" (karty typów, lista, kupony). Tutaj to co innego,
+                    więc nie może nazywać się tak samo — 2026-08-04. */}
+                {brakKursow
+                  ? "pokrycie linii"
+                  : "pokrycie · kurs · kurs vs pokrycie"}
               </th>
             </tr>
           </thead>

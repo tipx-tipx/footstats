@@ -64,6 +64,7 @@ def _run_py(pool: list[dict], cmin: float, cmax: float, opts: dict) -> dict | No
         profil=opts.get("profil", "zbalansowany"),
         kary=opts.get("kary"),
         wagi=opts.get("wagi"),
+        teraz=opts.get("teraz"),
     )
 
 
@@ -171,3 +172,58 @@ def test_parytet_zmierzone_wagi_zaufania():
         _assert_parity(
             pool, 6.0, 12.0, {"minLegi": 3, "profil": profil, "wagi": wagi}
         )
+
+
+def test_parytet_kara_za_odleglosc_meczu():
+    """Kara horyzontu (2026-08-04) musi działać IDENTYCZNIE po obu stronach.
+
+    Bez tego testu parytet sprawdzałby wyłącznie ścieżkę bez `teraz` — a to
+    właśnie ona się nie zmieniła. Produkcja liczy Z karą: silnik automatyczny
+    w `build_kupony`, generator na żądanie w `GeneratorKuponu`.
+
+    Pula miesza mecze z dziś, jutra i za trzy dni, żeby kara przesuwała WYBÓR,
+    a nie tylko skalowała wszystko po równo.
+    """
+    teraz = 1_000_000
+    H = 3600
+    pool = [
+        _leg(1, 11, 1.55, 0.74, kickoff=teraz + 6 * H),    # dziś
+        _leg(2, 22, 1.50, 0.76, kickoff=teraz + 30 * H),   # jutro
+        _leg(3, 33, 1.48, 0.78, kickoff=teraz + 80 * H),   # za trzy dni
+        _leg(4, 44, 1.60, 0.72, kickoff=teraz + 8 * H),    # dziś
+        _leg(5, 55, 1.52, 0.75, kickoff=teraz + 90 * H),   # za trzy dni
+    ]
+    for profil in ("bezpieczny", "zbalansowany", "agresywny"):
+        _assert_parity(
+            pool, 3.0, 6.0,
+            {"minLegi": 3, "profil": profil, "teraz": teraz},
+        )
+
+
+def test_kara_zmienia_wybor_legow():
+    """Sam parytet nie wystarcza — sprawdzamy, że kara COKOLWIEK robi.
+
+    Pula, w której leg z odległego meczu ma WYŻSZĄ deklarowaną szansę niż
+    bliskie. Bez kary builder wybierze go (bo maksymalizuje iloczyn szans);
+    z karą ma go odrzucić na rzecz bliskich, mimo niższej deklaracji.
+
+    Ten test złapał realny błąd przy pisaniu kary: `teraz` szło do sortowania
+    kandydatów, ale NIE do funkcji celu beam searcha, więc builder sortował
+    z karą, a wybierał bez niej.
+    """
+    teraz = 1_000_000
+    H = 3600
+    pool = [
+        _leg(1, 11, 1.70, 0.68, kickoff=teraz + 5 * H),    # dziś, słabszy
+        _leg(2, 22, 1.70, 0.78, kickoff=teraz + 90 * H),   # daleko, mocniejszy
+        _leg(3, 33, 1.70, 0.68, kickoff=teraz + 6 * H),    # dziś, słabszy
+    ]
+    bez_kary = kupony._zloz_pewniaki(pool, 2.5, 3.2, min_legi=2)
+    z_kara = kupony._zloz_pewniaki(pool, 2.5, 3.2, min_legi=2, teraz=teraz)
+    assert bez_kary is not None and z_kara is not None
+    assert 22 in {l["podmiot_id"] for l in bez_kary["legi"]}, (
+        "bez kary mocniejszy leg z dalekiego meczu powinien wejść"
+    )
+    assert 22 not in {l["podmiot_id"] for l in z_kara["legi"]}, (
+        "z karą leg z meczu za ~4 dni nie powinien wygrać z bliskimi"
+    )

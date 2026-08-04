@@ -291,10 +291,19 @@ export function GeneratorKuponu({
       maxNaMecz: tylkoValue || maxJedenZMeczu ? 1 : undefined,
       kary,
       wagi,
+      // KARA ZA ODLEGŁOŚĆ MECZU — parytet z silnikiem (kupony.py). Bez tego
+      // generator na żądanie składałby kupony inną miarą niż automatyczne:
+      // legi z meczów za kilka dni deklarują 73%, a wchodzą 52% (pomiar
+      // 2026-08-04 na 334 legach), więc bez kary wyglądają lepiej, niż są.
+      //
+      // Zegar bierzemy ze STANU (ustawianego w efekcie), nie z `Date.now()`
+      // w trakcie renderu: funkcja nieczysta w `useMemo` daje niestabilny
+      // wynik przy każdym przerysowaniu — złapane przez lint React.
+      teraz: teraz ?? undefined,
       przypiete: [...przypiete.values()],
       wykluczone: new Set(wykluczone.keys()),
     }),
-    [profil, liczbaTypow, trybDokladny, tylkoValue, maxJedenZMeczu, kary, wagi, przypiete, wykluczone],
+    [profil, liczbaTypow, trybDokladny, tylkoValue, maxJedenZMeczu, kary, wagi, teraz, przypiete, wykluczone],
   );
 
   // ŻYWY podgląd – liczony na bieżąco przy każdej zmianie suwaka, żeby user

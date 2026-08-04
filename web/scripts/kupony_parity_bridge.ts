@@ -30,6 +30,10 @@ async function main() {
       maxNaMecz?: number;
       kary?: Kary;
       wagi?: Record<string, number>;
+      /** „teraz" w sekundach – włącza karę za odległość meczu (2026-08-04).
+       * Musi przechodzić przez most, inaczej test parytetu sprawdzałby tylko
+       * ścieżkę BEZ kary, a produkcja liczy Z karą po obu stronach. */
+      teraz?: number;
     };
   };
   const wynik = zlozKupon(input.pool, input.cmin, input.cmax, input.opts ?? {});
