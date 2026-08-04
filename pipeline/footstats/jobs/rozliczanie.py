@@ -1273,11 +1273,12 @@ def _byla_wstrzymana_strona(grp: list[dict]) -> bool:
     )
 
 
-def strony_kwarantanna(log: dict | None = None) -> dict[str, dict]:
-    """Strony linii chwilowo poza publikacją: {"team_goals:powyzej": {...}}.
+def _grupy_stron(log: dict | None = None) -> dict[tuple[str, str], list[dict]]:
+    """Rozliczenia w podziale na (rynek, strona) — jedna próba dla obu bram.
 
-    ROI z okna ostatnich rozliczeń danej pary (rynek, strona), z tą samą
-    histerezą wejścia/wyjścia co kwarantanna rynków.
+    `strony_kwarantanna` orzeka z niej, kogo wstrzymać, a `strony_ocenione`
+    — o kim w ogóle miała prawo orzec. Muszą liczyć z TEJ SAMEJ próby,
+    inaczej strona mogłaby jednocześnie „mieć własny werdykt" i nie mieć go.
     """
     if log is None:
         log = _migruj_log(supa.get_key("typy_log") or {})
@@ -1294,14 +1295,56 @@ def strony_kwarantanna(log: dict | None = None) -> dict[str, dict]:
         # wszystkie tracace strony to „powyzej".
         and r.get("strona") in ("powyzej", "ponizej", *STRONY_WIECEJ)
     ]
-    out: dict[str, dict] = {}
-    pary = {(r["rynek_kod"], r["strona"]) for r in settled}
-    for mk, strona in pary:
-        grp = okno_kroczace(sorted(
+    out: dict[tuple[str, str], list[dict]] = {}
+    for mk, strona in {(r["rynek_kod"], r["strona"]) for r in settled}:
+        out[(mk, strona)] = okno_kroczace(sorted(
             (r for r in settled
              if r["rynek_kod"] == mk and r["strona"] == strona),
             key=lambda r: r.get("kickoff_ts") or 0,
         ), STRONA_OKNO)
+    return out
+
+
+def strony_ocenione(log: dict | None = None) -> set[str]:
+    """Strony z WŁASNYM werdyktem: `{"team_corners:powyzej", ...}`.
+
+    Strona, która ma dość własnych rozliczeń, jest oceniana wyłącznie swoim
+    wynikiem — kwarantanna rynku jej nie dotyczy.
+
+    POWÓD (zmierzone 2026-08-04, 727 rozliczeń bieżącej epoki). Kwarantanna
+    rynku zamykała rynek W CAŁOŚCI, razem ze stroną, która zarabia:
+
+        team_corners | powyzej   n=34   ROI  +9,4%   trafień 68%
+        team_corners | ponizej   n=246  ROI −11,6%   trafień 54%
+
+    Licznik rynku miesza te dwie kolumny i wychodzi mu −16,5%, więc „rożne
+    drużyny" stały wstrzymane w komplecie. A strona „powyżej" trzymała się
+    w każdym kolejnym oknie czasu (−11,7% → +16,8% → +22,1%) i jest jednym
+    z trzech segmentów, w których nasza liczba bije cenę bukmachera
+    (`waga_rynku_pomiar`: w*=0,65, Brier 0,2453 wobec 0,2485 z kursu).
+
+    Kwarantanna stron powstała 30.07 dokładnie po to, żeby rynek „nie wypadał
+    cały razem z dobrą stroną" — ale rynkowa brama stała PRZED nią i orzekała
+    pierwsza, więc drobniejszy pomiar nie miał czego rozstrzygać.
+
+    Strona bez własnej próby (poniżej `STRONA_MIN_N`) dalej podlega rynkowi:
+    brak danych nie jest ułaskawieniem.
+    """
+    return {
+        f"{mk}:{strona}"
+        for (mk, strona), grp in _grupy_stron(log).items()
+        if len(grp) >= STRONA_MIN_N
+    }
+
+
+def strony_kwarantanna(log: dict | None = None) -> dict[str, dict]:
+    """Strony linii chwilowo poza publikacją: {"team_goals:powyzej": {...}}.
+
+    ROI z okna ostatnich rozliczeń danej pary (rynek, strona), z tą samą
+    histerezą wejścia/wyjścia co kwarantanna rynków.
+    """
+    out: dict[str, dict] = {}
+    for (mk, strona), grp in _grupy_stron(log).items():
         if len(grp) < STRONA_MIN_N:
             continue
         traf = sum(1 for r in grp if r["wynik"] == "wygrany")

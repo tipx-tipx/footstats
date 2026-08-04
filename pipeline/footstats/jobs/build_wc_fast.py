@@ -2800,6 +2800,26 @@ def _main_impl(tryb=None):
     except Exception as e:
         kwarantanna_stron = {}
         print(f"Kwarantanna strony pominięta ({e})")
+    # PIERWSZEŃSTWO DROBNIEJSZEGO POMIARU (2026-08-04). Strona z własną próbą
+    # odpowiada za siebie — brama rynkowa jej nie dotyczy. Bez tego licznik
+    # rynku (średnia obu stron) zamykał `team_corners` w komplecie, choć jego
+    # strona „powyżej" zarabia +9,4% na 34 rozliczeniach i bije cenę
+    # bukmachera. Szczegóły i liczby: `rozliczanie.strony_ocenione`.
+    try:
+        strony_z_werdyktem = rozliczanie.strony_ocenione()
+        # LICZNIK PRZY BRAMIE, NIE PO ZGŁOSZENIU. Bez tej linii ułaskawienie
+        # jest niewidoczne: w logu cyklu wyglądałoby to jak kwarantanna, która
+        # nagle przestała działać na część typów.
+        _darowane = sorted(
+            k for k in strony_z_werdyktem
+            if k.split(":")[0] in kwarantanna_rynkow and k not in kwarantanna_stron
+        )
+        if _darowane:
+            print("Rynek w kwarantannie NIE zdejmuje stron z własnym "
+                  f"werdyktem: {', '.join(_darowane)}")
+    except Exception as e:
+        strony_z_werdyktem = set()
+        print(f"Werdykty stron pominięte ({e})")
 
     ev_by_id = {e["id"]: e for e in events}
     sb_cache: dict[int, dict] = {}
@@ -4934,6 +4954,17 @@ def _main_impl(tryb=None):
         """Czy ta STRONA tego rynku stoi w kwarantannie (patrz 30.07)."""
         return f"{b.get('rynek_kod')}:{b.get('strona')}" in kwarantanna_stron
 
+    def _rynek_wstrzymany(b: dict) -> bool:
+        """Czy typ zdejmuje BRAMA RYNKOWA — czyli średnia z obu stron linii.
+
+        Strona z własnym werdyktem odpowiada za siebie (`_strona_wstrzymana`),
+        więc rynek jej nie dotyczy: inaczej zarabiające „powyżej" wypadało
+        razem z tracącym „poniżej" (2026-08-04, `rozliczanie.strony_ocenione`).
+        """
+        if b.get("rynek_kod") not in kwarantanna_rynkow:
+            return False
+        return f"{b.get('rynek_kod')}:{b.get('strona')}" not in strony_z_werdyktem
+
     # perełki: do 2 wpisów z wyższym kursem (>=2.0) per mecz, po wartości
     perelki_kandydaci = sorted(
         (b for b in legi_pool if b["kurs"] >= 1.90),
@@ -5024,7 +5055,7 @@ def _main_impl(tryb=None):
         ci_w = (ci[1] - ci[0]) if ci[0] is not None else 1.0
         vb_id += 1
         powod_poza = None
-        if b["rynek_kod"] in kwarantanna_rynkow:
+        if _rynek_wstrzymany(b):
             powod_poza = "kwarantanna_rynku"
         elif _strona_wstrzymana(b):
             powod_poza = "kwarantanna_strony"
@@ -5190,8 +5221,17 @@ def _main_impl(tryb=None):
         if not betting.kurs_w_widelkach(b["kurs"]):
             odpadki_legow["kurs_poza_widelkami"] += 1
             return False
-        if b["rynek_kod"] in kwarantanna_rynkow:
+        if _rynek_wstrzymany(b):
             odpadki_legow[f"kwarantanna_rynku:{b['rynek_kod']}"] += 1
+            return False
+        # BRAMA STRONY, KTÓREJ TU NIE BYŁO (2026-08-04). Do dziś pulę chronił
+        # wyłącznie licznik rynku — a on miesza obie strony linii. Odkąd rynek
+        # przestał zdejmować stronę z własnym werdyktem (`_rynek_wstrzymany`),
+        # bez tego warunku do kuponów wchodziłoby dokładnie to, co brama stron
+        # wcześniej wstrzymała: `team_corners:ponizej` (ROI −19%, n=118).
+        if _strona_wstrzymana(b):
+            odpadki_legow[
+                f"kwarantanna_strony:{b['rynek_kod']}:{b.get('strona')}"] += 1
             return False
         if b.get("stare_dane"):
             odpadki_legow["stare_dane"] += 1
@@ -5282,6 +5322,19 @@ def _main_impl(tryb=None):
                 f"{abs(kk.get('roi', 0)):.0%} na złotówce stawki "
                 f"(trafienia {kk.get('hit', 0):.0%}, próba: {kk.get('n', 0)}). "
                 f"Wstrzymane, aż przestaną tracić"
+            )
+        elif t["poza_publikacja"] == "kwarantanna_strony":
+            # WŁASNE LICZBY STRONY, NIE RYNKU (2026-08-04). Wcześniej ta gałąź
+            # wpadała do `else` i tłumaczyła zdjęcie strony wynikiem CAŁEGO
+            # rynku — a to dwie różne liczby, często o przeciwnym znaku
+            # (`team_corners`: poniżej −19%, powyżej +9%).
+            ks = kwarantanna_stron.get(
+                f"{t['rynek_kod']}:{t.get('strona')}", {})
+            szczegol = (
+                f"ta strona zakładu jest chwilowo poza publikacją: ostatnie "
+                f"typy traciły {abs(ks.get('roi', 0)):.0%} na złotówce stawki "
+                f"(trafienia {ks.get('hit', 0):.0%}, próba: {ks.get('n', 0)}). "
+                f"Druga strona tego rynku może być dalej typowana"
             )
         else:
             kw = kwarantanna_rynkow.get(t["rynek_kod"], {})
@@ -5891,7 +5944,11 @@ def _main_impl(tryb=None):
     # Człowiek widział typ i nie miał jak wiedzieć, że sami przestaliśmy ten
     # rynek polecać. To jest informacja o ZAKŁADZIE, nie o naszej kuchni.
     for b in lista_pub:
-        if b.get("rynek_kod") in kwarantanna_rynkow:
+        # ETYKIETA MA MÓWIĆ PRAWDĘ O TYM ZAKŁADZIE (2026-08-04). Do dziś brała
+        # sam kod rynku, więc typ ze strony, którą dalej polecamy, dostawał
+        # ostrzeżenie „sami przestaliśmy ten rynek polecać" — nieprawdziwe
+        # odkąd rynek nie zdejmuje strony z własnym werdyktem.
+        if _rynek_wstrzymany(b) or _strona_wstrzymana(b):
             b["rynek_wstrzymany"] = True
     _wstrzymane = sum(1 for b in lista_pub if b.get("rynek_wstrzymany"))
     if _wstrzymane:
@@ -6128,6 +6185,16 @@ def _main_impl(tryb=None):
             mk: {"roi": v["roi"], "hit": v["hit"], "sr_p": v["sr_p"],
                  "n": v["n"], "nazwa": MARKET_NAMES_PL.get(mk, mk)}
             for mk, v in (kwarantanna_rynkow or {}).items()
+        },
+        # STRONY WSTRZYMANE: od 2026-08-04 wstrzymanie bywa WĘŻSZE niż rynek —
+        # zdejmujemy samą stronę linii, a druga strona tego samego rynku jest
+        # dalej typowana. Bez tego wpisu `kwarantanna` (rynki) opowiadałaby
+        # o zakładach, których nikt nie wstrzymał, i odwrotnie: strona zdjęta
+        # własnym wynikiem nie miałaby w meta żadnego śladu.
+        "kwarantanna_stron": {
+            k: {"roi": v["roi"], "hit": v["hit"], "sr_p": v["sr_p"],
+                "n": v["n"], "nazwa": v["rynek"], "strona": v["strona"]}
+            for k, v in (kwarantanna_stron or {}).items()
         },
         # POWODY WSTRZYMANE: to samo co wyżej, tylko po powodzie wejścia typu
         # na listę („ambitniejsza linia", „słaby rywal"...). Front tłumaczy

@@ -811,6 +811,53 @@ def test_korekta_dochodzi_do_zmierzonej_wartosci_przez_cykle():
     assert d2 < d1, "korekta musi pogłębiać się między cyklami, nie cofać"
 
 
+def test_strona_z_wlasna_proba_ma_wlasny_werdykt():
+    """Strona, którą da się ocenić osobno, nie podlega bramie rynkowej.
+
+    Pomiar 2026-08-04: `team_corners` stał w kwarantannie CAŁY (ROI −16,5%
+    z obu stron razem), choć jego strona „powyżej" zarabiała +9,4% na 34
+    rozliczeniach i biła cenę bukmachera. Licznik rynku to średnia dwóch
+    kolumn o przeciwnym znaku — nie ma prawa orzekać o stronie, która ma
+    własną próbę.
+    """
+    recs = (_seria("team_corners", 30, 8, 1.5, strona="ponizej")   # tonie
+            + _seria("team_corners", 20, 16, 1.6, strona="powyzej"))  # zarabia
+    log = _log(recs)
+    # rynek jako całość wpada do kwarantanny...
+    assert "team_corners" in rozliczanie.rynki_kwarantanna(log)
+    # ...ale obie strony mają dość rozliczeń, żeby odpowiadać za siebie
+    ocenione = rozliczanie.strony_ocenione(log)
+    assert "team_corners:powyzej" in ocenione
+    assert "team_corners:ponizej" in ocenione
+    # i tylko tracąca jest wstrzymana
+    kw = rozliczanie.strony_kwarantanna(log)
+    assert "team_corners:ponizej" in kw
+    assert "team_corners:powyzej" not in kw
+
+
+def test_strona_bez_wlasnej_proby_dalej_podlega_rynkowi():
+    """Brak danych nie jest ułaskawieniem — inaczej nowa strona wchodziłaby
+    na rynek, który udowodnił, że traci, i to bez żadnego zabezpieczenia."""
+    recs = (_seria("team_corners", 30, 8, 1.5, strona="ponizej")
+            + _seria("team_corners", rozliczanie.STRONA_MIN_N - 1, 9, 1.6,
+                     strona="powyzej"))
+    ocenione = rozliczanie.strony_ocenione(_log(recs))
+    assert "team_corners:powyzej" not in ocenione
+
+
+def test_obie_bramy_licza_z_tej_samej_proby():
+    """`strony_ocenione` i `strony_kwarantanna` muszą widzieć ten sam zbiór.
+
+    Gdyby liczyły z osobnych prób, strona mogłaby jednocześnie „mieć własny
+    werdykt" (więc rynek jej nie dotyczy) i nie mieć go (więc nikt jej nie
+    ocenia) — czyli wejść na listę bez żadnej bramy.
+    """
+    recs = (_seria("team_goals", 30, 5, 1.7, strona="powyzej")
+            + _seria("team_goals", 30, 25, 1.5, strona="ponizej"))
+    log = _log(recs)
+    assert set(rozliczanie.strony_kwarantanna(log)) <= rozliczanie.strony_ocenione(log)
+
+
 def test_kwarantanna_zna_strony_rynku_kto_wiecej():
     """Nowy rynek ma kierunki „gospodarz"/„gosc", nie „powyzej"/„ponizej".
     Bez tego wchodziłby BEZ zabezpieczenia, które 30.07 okazało się

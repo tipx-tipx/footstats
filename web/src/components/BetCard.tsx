@@ -1075,11 +1075,15 @@ export function SzczegolyTypu({
                       typ i nie miał jak wiedzieć, że sami przestaliśmy ten
                       rynek polecać. To jest informacja o ZAKŁADZIE, nie
                       o naszej kuchni, więc karta ma prawo ją nieść. */}
+                  {/* „TEGO ZAKŁADU", NIE „TEGO RYNKU" (2026-08-04). Od dziś
+                      wstrzymanie bywa węższe niż rynek: zdejmujemy samą stronę
+                      linii, a druga strona tego samego rynku jest dalej
+                      typowana. Zdanie o „rynku" byłoby wtedy nieprawdziwe. */}
                   {bet.rynek_wstrzymany && (
                     <p className="mt-3 border-l-2 border-hairline pl-3 text-sm leading-relaxed text-muted">
-                      Tego rynku chwilowo nie polecamy – ostatnie rozliczenia
-                      wychodzą pod kreską, więc nowych typów z niego nie
-                      wystawiamy i nie wchodzi do kuponów. Ten został
+                      Tego zakładu chwilowo nie polecamy – ostatnie rozliczenia
+                      takich typów wychodzą pod kreską, więc nowych nie
+                      wystawiamy i nie wchodzą do kuponów. Ten został
                       wystawiony wcześniej, po cenie z tamtej chwili, i dlatego
                       zostaje na liście.
                     </p>

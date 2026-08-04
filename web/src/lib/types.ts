@@ -611,6 +611,23 @@ export interface Meta {
     { roi?: number; hit: number; sr_p: number; n: number; nazwa: string }
   >;
   /**
+   * To samo, ale po STRONIE linii („powyżej" osobno od „poniżej"). Od
+   * 2026-08-04 wstrzymanie bywa węższe niż rynek: strona z własną próbą
+   * odpowiada za siebie, więc `team_corners powyżej` może być typowane,
+   * gdy `team_corners poniżej` stoi. Klucz to `rynek_kod:strona`.
+   */
+  kwarantanna_stron?: Record<
+    string,
+    {
+      roi: number;
+      hit: number;
+      sr_p: number;
+      n: number;
+      nazwa: string;
+      strona: string;
+    }
+  >;
+  /**
    * To samo, ale po POWODZIE, dla którego typ wchodził na listę
    * („ambitniejsza linia", „słaby rywal na tym rynku"...). Rozliczenia
    * pokazały, że model zarabia, gdy typuje nudno, i traci na każdej ścieżce
