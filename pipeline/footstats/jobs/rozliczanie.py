@@ -1375,6 +1375,35 @@ def strony_kwarantanna(log: dict | None = None) -> dict[str, dict]:
     return out
 
 
+def brama_kwarantanny(
+    rynki: dict[str, dict],
+    strony: dict[str, dict],
+    ocenione: set[str],
+):
+    """Zwraca funkcję `rec -> powód wstrzymania albo None`.
+
+    JEDNA DEFINICJA REGUŁY DLA WSZYSTKICH ŚCIEŻEK PUBLIKACJI (2026-08-04).
+    Powstała po tym, jak sumy meczowe i „kto więcej" — dopisujące się do listy
+    z pominięciem głównej pętli — okazały się nie widzieć kwarantanny w ogóle.
+    Dziura była niewidoczna, dopóki okno zgody stało na +12 pp i zdejmowało te
+    typy wcześniej; po rozszerzeniu na +16 pp od razu weszły trzy świeże
+    „rożne w meczu poniżej" z rynku, który stoi w kwarantannie (ROI −24%).
+
+    Kolejność ma znaczenie: rynek NIE zdejmuje strony z własnym werdyktem
+    (patrz `strony_ocenione`), więc pytamy o niego pierwszy i tylko po to,
+    żeby go w takim wypadku pominąć.
+    """
+    def _powod(rec: dict) -> str | None:
+        mk = rec.get("rynek_kod")
+        klucz = f"{mk}:{rec.get('strona')}"
+        if mk in rynki and klucz not in ocenione:
+            return "kwarantanna_rynku"
+        if klucz in strony:
+            return "kwarantanna_strony"
+        return None
+    return _powod
+
+
 def kwarantanna() -> dict[str, dict]:
     """Kwarantanna rynków z logu w Supabase (pusta, gdy brak danych/env)."""
     log = _migruj_log(supa.get_key("typy_log") or {})

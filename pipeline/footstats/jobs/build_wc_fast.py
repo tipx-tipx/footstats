@@ -2821,6 +2821,26 @@ def _main_impl(tryb=None):
         strony_z_werdyktem = set()
         print(f"Werdykty stron pominięte ({e})")
 
+    # OBIE BRAMY STOJĄ TU, PRZED WSZYSTKIMI ŚCIEŻKAMI PUBLIKACJI (2026-08-04).
+    # Wcześniej były definiowane dopiero przy układaniu listy pewniaków, więc
+    # sumy meczowe i „kto więcej" — które dopisują się do `value_bets` WPROST,
+    # z pominięciem tamtej pętli — nie widziały ich w ogóle. Dziura była
+    # niewidoczna, dopóki okno zgody stało na +12 pp i zdejmowało te typy
+    # wcześniej; po rozszerzeniu okna na +16 pp od razu weszły na listę trzy
+    # świeże „rożne w meczu poniżej" z rynku, który stoi w kwarantannie
+    # (ROI −24%). To ta sama klasa błędu co bramy stawiane przy narodzinach
+    # typu zamiast przy dumpie ([[wznowione-omijaly-bramy]]).
+    _powod_kwarantanny = rozliczanie.brama_kwarantanny(
+        kwarantanna_rynkow, kwarantanna_stron, strony_z_werdyktem)
+
+    def _strona_wstrzymana(b: dict) -> bool:
+        """Czy ta STRONA tego rynku stoi w kwarantannie (patrz 30.07)."""
+        return f"{b.get('rynek_kod')}:{b.get('strona')}" in kwarantanna_stron
+
+    def _rynek_wstrzymany(b: dict) -> bool:
+        """Czy typ zdejmuje BRAMA RYNKOWA — czyli średnia z obu stron linii."""
+        return _powod_kwarantanny(b) == "kwarantanna_rynku"
+
     ev_by_id = {e["id"]: e for e in events}
     sb_cache: dict[int, dict] = {}
     tempo.reset_fallback_stats()
@@ -3662,10 +3682,12 @@ def _main_impl(tryb=None):
             # brama jakości (liga): okazja na starych danych nie wchodzi do
             # publikacji, rozlicza się i uczy kalibrację w tle. To samo dotyczy
             # okazji, która powstałaby tuż przed gwizdkiem (zapas na obstawienie)
-            if f"{mk}:{a.side}" in kwarantanna_stron:
-                # ta STRONA tego rynku traci pieniądze w oknie rozliczeń —
-                # rynek jako całość może być w porządku (pomiar 30.07)
-                rec_okazji["poza_publikacja"] = "kwarantanna_strony"
+            # ta sama brama co wszędzie indziej: strona traci pieniądze
+            # w oknie rozliczeń (rynek jako całość może być w porządku —
+            # pomiar 30.07), albo rynek stoi i strona nie ma własnej próby
+            _kw_z = _powod_kwarantanny({"rynek_kod": mk, "strona": a.side})
+            if _kw_z:
+                rec_okazji["poza_publikacja"] = _kw_z
                 typy_poza_publikacja.append(rec_okazji)
             elif not betting.w_oknie_zgody(a.model_prob, kurs_wziety):
                 rec_okazji["poza_publikacja"] = "rozjazd_z_rynkiem"
@@ -4696,6 +4718,11 @@ def _main_impl(tryb=None):
                     if not betting.w_oknie_zgody(p_w, kurs_w):
                         odpadki_nowe["kto wiecej: rozjazd z rynkiem"] += 1
                         continue
+                    _kw_w = _powod_kwarantanny(
+                        {"rynek_kod": kod_w, "strona": strona_w})
+                    if _kw_w:
+                        odpadki_nowe[f"kto wiecej: {_kw_w}"] += 1
+                        continue
                     vb_id += 1
                     n_wiecej += 1
                     value_bets.append({
@@ -4814,6 +4841,11 @@ def _main_impl(tryb=None):
                         # z rynkiem nie publikujemy
                         if not betting.w_oknie_zgody(p_s, kurs_s):
                             odpadki_nowe["suma: rozjazd z rynkiem"] += 1
+                            continue
+                        _kw_s = _powod_kwarantanny(
+                            {"rynek_kod": kod_s, "strona": strona_s})
+                        if _kw_s:
+                            odpadki_nowe[f"suma: {_kw_s}"] += 1
                             continue
                         poprzedni = kandydaci_s.get(strona_s)
                         if poprzedni is not None and poprzedni["ev_pct"] >= ev_s:
@@ -4950,21 +4982,6 @@ def _main_impl(tryb=None):
             None,
         )
 
-    def _strona_wstrzymana(b: dict) -> bool:
-        """Czy ta STRONA tego rynku stoi w kwarantannie (patrz 30.07)."""
-        return f"{b.get('rynek_kod')}:{b.get('strona')}" in kwarantanna_stron
-
-    def _rynek_wstrzymany(b: dict) -> bool:
-        """Czy typ zdejmuje BRAMA RYNKOWA — czyli średnia z obu stron linii.
-
-        Strona z własnym werdyktem odpowiada za siebie (`_strona_wstrzymana`),
-        więc rynek jej nie dotyczy: inaczej zarabiające „powyżej" wypadało
-        razem z tracącym „poniżej" (2026-08-04, `rozliczanie.strony_ocenione`).
-        """
-        if b.get("rynek_kod") not in kwarantanna_rynkow:
-            return False
-        return f"{b.get('rynek_kod')}:{b.get('strona')}" not in strony_z_werdyktem
-
     # perełki: do 2 wpisów z wyższym kursem (>=2.0) per mecz, po wartości
     perelki_kandydaci = sorted(
         (b for b in legi_pool if b["kurs"] >= 1.90),
@@ -5054,23 +5071,22 @@ def _main_impl(tryb=None):
         ci = b.get("ci") or [None, None]
         ci_w = (ci[1] - ci[0]) if ci[0] is not None else 1.0
         vb_id += 1
-        powod_poza = None
-        if _rynek_wstrzymany(b):
-            powod_poza = "kwarantanna_rynku"
-        elif _strona_wstrzymana(b):
-            powod_poza = "kwarantanna_strony"
-        elif not betting.w_oknie_zgody(b["p_model"], b["kurs"]):
-            # najostrzejsza brama, zmierzona na 336 rozliczeniach — patrz
-            # betting.OKNO_ZGODY_*. Typ dalej się liczy i uczy w tle.
-            powod_poza = "rozjazd_z_rynkiem"
-        elif _kategoria_wstrzymana(b):
-            powod_poza = "kwarantanna_kategorii"
-        elif b.get("stare_dane"):
-            powod_poza = "stare_dane"
-        elif b["kickoff_ts"] <= teraz_pub + kupony.MARGINES_STARTU_S:
-            powod_poza = "za_pozno"
-        elif pewniaki_per_mecz.get(b["mecz_id"], 0) >= MAX_PEWNIAKOW_MECZ:
-            powod_poza = "limit_meczu"
+        # kwarantanny idą przez wspólną funkcję — tę samą, której używają
+        # sumy meczowe i „kto więcej" (patrz `_powod_kwarantanny`)
+        powod_poza = _powod_kwarantanny(b)
+        if powod_poza is None:
+            if not betting.w_oknie_zgody(b["p_model"], b["kurs"]):
+                # najostrzejsza brama, zmierzona na 336 rozliczeniach — patrz
+                # betting.OKNO_ZGODY_*. Typ dalej się liczy i uczy w tle.
+                powod_poza = "rozjazd_z_rynkiem"
+            elif _kategoria_wstrzymana(b):
+                powod_poza = "kwarantanna_kategorii"
+            elif b.get("stare_dane"):
+                powod_poza = "stare_dane"
+            elif b["kickoff_ts"] <= teraz_pub + kupony.MARGINES_STARTU_S:
+                powod_poza = "za_pozno"
+            elif pewniaki_per_mecz.get(b["mecz_id"], 0) >= MAX_PEWNIAKOW_MECZ:
+                powod_poza = "limit_meczu"
         rec_pewniaka = {
             "id": vb_id, "mecz_id": b["mecz_id"], "mecz": b["mecz"],
             "kickoff_ts": b["kickoff_ts"],
@@ -5221,17 +5237,15 @@ def _main_impl(tryb=None):
         if not betting.kurs_w_widelkach(b["kurs"]):
             odpadki_legow["kurs_poza_widelkami"] += 1
             return False
-        if _rynek_wstrzymany(b):
-            odpadki_legow[f"kwarantanna_rynku:{b['rynek_kod']}"] += 1
-            return False
         # BRAMA STRONY, KTÓREJ TU NIE BYŁO (2026-08-04). Do dziś pulę chronił
         # wyłącznie licznik rynku — a on miesza obie strony linii. Odkąd rynek
         # przestał zdejmować stronę z własnym werdyktem (`_rynek_wstrzymany`),
-        # bez tego warunku do kuponów wchodziłoby dokładnie to, co brama stron
+        # bez niej do kuponów wchodziłoby dokładnie to, co brama stron
         # wcześniej wstrzymała: `team_corners:ponizej` (ROI −19%, n=118).
-        if _strona_wstrzymana(b):
+        _kw = _powod_kwarantanny(b)
+        if _kw:
             odpadki_legow[
-                f"kwarantanna_strony:{b['rynek_kod']}:{b.get('strona')}"] += 1
+                f"{_kw}:{b['rynek_kod']}:{b.get('strona')}"] += 1
             return False
         if b.get("stare_dane"):
             odpadki_legow["stare_dane"] += 1

@@ -151,3 +151,30 @@ def test_kurs_w_widelkach_jest_podloga_na_wyjsciu():
     assert betting.kurs_w_widelkach(None)
     # śmieć w polu to NIE jest zgoda na publikację
     assert not betting.kurs_w_widelkach("brak")
+
+
+def test_okno_zgody_siega_zmierzonego_klifu():
+    """Górna granica okna idzie tam, gdzie NAPRAWDĘ zaczyna się strata.
+
+    Pomiar 2026-08-04 na 727 rozliczeniach bieżącej epoki: pasmo +12..+16 pp
+    zachowuje się jak to w środku okna (−2,0% wobec −1,6%), a klif jest
+    dopiero za +16 pp (−11,2%, n=126). Poprzednia granica +12 zjadała 54 z 86
+    gotowych kandydatów jednego cyklu, nie oddzielając niczego od niczego.
+    """
+    assert betting.OKNO_ZGODY_MAX == 0.16
+
+    def pp(ile: float) -> tuple[float, float]:
+        """Kurs 2,00 (implied 50%) i szansa o `ile` punktów wyżej."""
+        kurs = 2.00
+        return 0.50 + ile / 100.0 + (
+            betting.implied_prob_one_sided(kurs) - 0.50
+        ), kurs
+
+    # pasmo odzyskane tą zmianą wchodzi...
+    for ile in (12.5, 14.0, 15.5):
+        assert betting.w_oknie_zgody(*pp(ile)), ile
+    # ...a klif za +16 pp dalej stoi zamknięty
+    for ile in (16.5, 20.0, 30.0):
+        assert not betting.w_oknie_zgody(*pp(ile)), ile
+    # dolna granica bez zmian: pod ceną rynku nie ma czego odzyskiwać
+    assert not betting.w_oknie_zgody(*pp(-0.5))

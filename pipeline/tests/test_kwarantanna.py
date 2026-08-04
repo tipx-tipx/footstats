@@ -845,6 +845,32 @@ def test_strona_bez_wlasnej_proby_dalej_podlega_rynkowi():
     assert "team_corners:powyzej" not in ocenione
 
 
+def test_brama_kwarantanny_jedna_regula_dla_wszystkich_sciezek():
+    """Sumy meczowe i „kto wiecej" dopisuja sie do listy Z POMINIECIEM glownej
+    petli publikacji — wiec regula musi byc JEDNA funkcja, ktora kazda sciezka
+    wola, a nie warunkiem przepisanym w kilku miejscach.
+
+    Zmierzone 2026-08-04: dopoki okno zgody stalo na +12 pp, dziura byla
+    niewidoczna (te typy odpadaly wczesniej). Po rozszerzeniu okna na +16 pp
+    weszly na liste trzy SWIEZE „rozne w meczu ponizej" z rynku w kwarantannie.
+    """
+    brama = rozliczanie.brama_kwarantanny(
+        rynki={"team_corners": {}},
+        strony={"match_corners:ponizej": {}},
+        ocenione={"team_corners:powyzej", "team_corners:ponizej"},
+    )
+    # rynek w kwarantannie, ale strona ma wlasny werdykt -> przechodzi
+    assert brama({"rynek_kod": "team_corners", "strona": "powyzej"}) is None
+    # strona wstrzymana wlasnym wynikiem -> zdjeta, i to z wlasnym powodem
+    assert brama({"rynek_kod": "match_corners", "strona": "ponizej"}) == (
+        "kwarantanna_strony")
+    # strona bez wlasnej proby na rynku w kwarantannie -> zdejmuje ja rynek
+    assert brama({"rynek_kod": "team_corners", "strona": "gospodarz"}) == (
+        "kwarantanna_rynku")
+    # rynek zdrowy -> nic nie stoi na przeszkodzie
+    assert brama({"rynek_kod": "team_goals", "strona": "ponizej"}) is None
+
+
 def test_obie_bramy_licza_z_tej_samej_proby():
     """`strony_ocenione` i `strony_kwarantanna` muszą widzieć ten sam zbiór.
 

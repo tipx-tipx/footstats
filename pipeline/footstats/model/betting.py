@@ -532,8 +532,36 @@ MAX_RELATIVE_DIVERGENCE = 1.9       # p_model / p_rynku > 1.9x = podejrzane (lon
 # przy +14 zostaje 2 pp zapasu. Wariant +14 (206 typów, +0,5u, drużynowe +8,4u)
 # jest kuszący, ale stoi dokładnie na krawędzi — decyzja użytkownika 2026-07-27:
 # bierzemy +12 i wracamy do tego po kolejnej setce rozliczeń.
+# --- TRZECI POMIAR (2026-08-04, 727 rozliczeń BIEŻĄCEJ EPOKI, bez mundialu) ---
+# Wróciliśmy tu „po kolejnej setce rozliczeń", tak jak zapowiedziano wyżej —
+# i próba jest dziś inna: tamte granice powstały na księdze, która w 27% była
+# mundialem, a produktem jest liga.
+#
+#   pasmo         n     ROI      trafień
+#   +0..+4 pp    31   +11,9%      58%
+#   +4..+8 pp    90    −8,3%      51%
+#   +8..+12 pp  238    −0,8%      63%     <- koniec dzisiejszego okna
+#   +12..+16 pp 163    −2,0%      58%     <- ODCINANE, a zachowuje się TAK SAMO
+#   +16..+20 pp 126   −11,2%      54%     <- tu jest prawdziwy klif
+#   +20 pp i da  63    −5,9%      57%
+#
+# Brama przy +12 NIE ODDZIELA dobrego od złego: pasmo tuż za nią ma −2,0%
+# wobec −1,6% dla całego dzisiejszego okna, a rozbicie na czas daje ten sam
+# obraz po obu stronach (starsza połowa +7,2% vs +9,0%, nowsza −10,6% vs −11,2%).
+# Klif, dla którego tę bramę stawiano, przesunął się na +16 pp.
+#
+# KOSZT I ZYSK: okno do +16 dokłada 163 rozliczone typy (podaż +45%), a ROI
+# całości nie rusza się z miejsca (−1,6% -> −1,7%). To jest zmiana o PODAŻ,
+# nie o zysk — i tak została przedstawiona użytkownikowi.
+#
+# SŁABOŚĆ NAZWANA WPROST: wewnątrz pasma 12–16 wynik skacze (12–14 wypada źle,
+# 14–16 dobrze), więc +16 jest wyborem OSTROŻNYM, nie optimum. Dane mówią
+# pewnie tylko dwie rzeczy: „+12 jest za nisko" i „za +16 zaczyna się strata".
+#
+# Powód, dla którego to w ogóle mierzyliśmy: ta brama zjadała 54 z 86 gotowych
+# kandydatów jednego cyklu — dwie trzecie całego głodu typów na stronie.
 OKNO_ZGODY_MIN = 0.00   # p_model musi być co najmniej na poziomie ceny rynku
-OKNO_ZGODY_MAX = 0.12   # ...i najwyżej 12 pp nad nią
+OKNO_ZGODY_MAX = 0.16   # ...i najwyżej 16 pp nad nią (2026-08-04, było 0.12)
 
 
 def w_oknie_zgody(p_model: float, kurs: float) -> bool:
