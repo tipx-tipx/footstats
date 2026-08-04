@@ -40,6 +40,19 @@ function hrefPozycji(b: ValueBet): string {
   return `/mecze/${b.mecz_id}`;
 }
 
+/** Napis pod kartą MUSI zgadzać się z tym, dokąd ona prowadzi (2026-08-04).
+ *
+ * Link naprawiliśmy 03.08 („karta z nagłówka prowadzi tam, gdzie typ naprawdę
+ * jest"), ale napis został stary i przy typie, który nie jest ani pewniakiem,
+ * ani sugestią, obiecywał „niżej", a otwierał stronę meczu. Zmierzone na
+ * produkcji 04.08: jedyny typ zawodniczy dnia był dokładnie taki, więc kafelek
+ * kłamał przy KAŻDYM wejściu na stronę główną. */
+function etykietaLinku(b: ValueBet): string {
+  return b.sugestia || b.pewniak
+    ? "zobacz szczegóły niżej →"
+    : "zobacz analizę meczu →";
+}
+
 /** Poprawna polska odmiana: "1 okazję", "3 okazje", "8 okazji", "22 okazje". */
 function odmienOkazje(n: number): string {
   if (n === 1) return "1 okazję";
@@ -265,7 +278,7 @@ function ZywyPodglad({ bets }: { bets: ValueBet[] }) {
               </div>
               <p className="px-6 pb-5 pt-3">
                 <span className="inline-flex items-center gap-1 text-sm font-medium text-brand transition-transform group-hover:translate-x-0.5">
-                  zobacz szczegóły niżej →
+                  {etykietaLinku(bet)}
                 </span>
               </p>
             </Link>
@@ -388,7 +401,9 @@ function TickerRynkow({ bets }: { bets: ValueBet[] }) {
       </span>
       <div
         className="ticker relative flex-1"
-        title="Żywe pozycje z bieżącego skanu, pełna lista niżej"
+        // „pełna lista niżej" przestało być prawdą 2026-08-04: pasek pokazuje
+        // CAŁY skan (zawodnicy + drużyny), a lista niżej tylko zawodników
+        title="Żywe pozycje z bieżącego skanu — zawodnicy i drużyny"
       >
         <div className="ticker-tor">
           {tor(false)}

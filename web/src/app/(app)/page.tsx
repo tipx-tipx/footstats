@@ -73,6 +73,15 @@ export default async function OkazjePage({
   // żywy podgląd w hero: do 4 najlepszych pozycji rankingu silnika
   // (kolejność wejściowa = ranking), sugestie tylko gdy brak innych
   const spotlight = (okazje.length > 0 ? okazje : sugestie).slice(0, 4);
+  // PASEK BIERZE CAŁY SKAN, NIE TYLKO TĘ PODSTRONĘ (2026-08-04). Karmiony
+  // samymi typami zawodniczymi pokazywał tego dnia JEDEN typ powielony osiem
+  // razy — pasek dopełnia się kopiami, żeby taśma nie miała dziur, a typ
+  // zawodniczy był wtedy dokładnie jeden. W tym samym czasie mieliśmy 19 typów
+  // drużynowych, których nie tykał. To ma być „skan rynków", nie lista tej
+  // strony; klik i tak prowadzi tam, gdzie typ naprawdę jest (`hrefPozycji`).
+  const tickerBets = wszystkieBets
+    .filter((b) => !b.sugestia)
+    .slice(0, 14);
   const aktualizacja = new Intl.DateTimeFormat("pl-PL", {
     hour: "2-digit",
     minute: "2-digit",
@@ -87,7 +96,7 @@ export default async function OkazjePage({
         aktualizacja={aktualizacja}
         liczbaOkazji={bets.filter((b) => !b.sugestia).length}
         spotlightBets={spotlight}
-        tickerBets={bets.filter((b) => !b.sugestia).slice(0, 14)}
+        tickerBets={tickerBets}
       />
 
       {meta.tryb === "demo" ? (
