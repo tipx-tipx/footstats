@@ -6296,6 +6296,19 @@ def _main_impl(tryb=None):
             f"(kurs {k['kurs_laczny']}, szansa {k['p_model']*100:.0f}%)"
             for k in kupony_list
         ))
+    # BRAMA WARTOŚCI KUPONU (2026-08-05) — patrz kupony.MIN_WARTOSC_KUPONU.
+    # Nie publikujemy zakładu, o którym NASZA WŁASNA liczba mówi, że traci.
+    # Licznik jest obowiązkowy: żadna brama w tym projekcie nie ma prawa
+    # odrzucać po cichu (zasada z 2026-08-01).
+    _bez_wartosci = [k for k in kupony_list if not kupony.kupon_oplacalny(k)]
+    if _bez_wartosci:
+        kupony_list = [k for k in kupony_list if kupony.kupon_oplacalny(k)]
+        print("Kupony zdjęte na wartości: " + ", ".join(
+            f"{k.get('horyzont', '?')[:5]} x{k.get('cel_label', k['cel'])} "
+            f"(kurs {k['kurs_laczny']}, szansa {k['p_model']*100:.0f}%, "
+            f"z 1 zł zostaje {kupony.wartosc_brutto(k):.2f} zł)"
+            for k in _bez_wartosci
+        ) + f" — zostaje {len(kupony_list)}")
     # KSIĘGA DOSTAJE TO, CO NAPRAWDĘ POSZŁO NA STRONĘ (2026-08-01).
     # Typ ŚWIEŻY, zdjęty przez bramę wyświetlania (podłoga kursu albo ujemna
     # wartość po korekcie), idzie do logu z `poza_publikacja` — rozlicza się

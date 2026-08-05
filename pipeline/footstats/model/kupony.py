@@ -107,6 +107,64 @@ MIN_WARTOSC_LEGA = 1.0
 # legów zostaje nietknięty. Filtr jest gotowy i czeka na jeden przełącznik —
 # włączamy go, gdy pojedyncze typy zaczną mieć realną przewagę.
 FILTRUJ_WARTOSC_LEGA = False
+
+# --- BRAMA WARTOŚCI CAŁEGO KUPONU (2026-08-05, decyzja usera) --------------
+#
+# To NIE jest to samo co filtr legów wyżej. Tamten odsiewa SKŁADNIKI (i jest
+# wyłączony, bo dziś skasowałby kupony w całości). Ten patrzy na GOTOWY kupon
+# i zadaje jedno pytanie: czy według naszej własnej liczby ten zakład wychodzi
+# na plus.
+#
+#     wartość = szansa kuponu × kurs łączny
+#     powyżej 1,00 = bukmacher płaci więcej, niż powinien
+#     poniżej 1,00 = tracimy, i to WEDŁUG NAS SAMYCH
+#
+# Zmierzone na żywych kuponach 05.08 (szansa już po urealnieniu, czyli ta,
+# którą user widzi na stronie):
+#
+#     długoterminowy 18–25   kurs 19,24  szansa  6,0%  ->  1,16
+#     długoterminowy 9–11    kurs  9,09  szansa 12,7%  ->  1,15
+#     dzienny 4,5–5,5        kurs  4,89  szansa 21,7%  ->  1,06
+#     dzienny 2–3            kurs  2,22  szansa 46,2%  ->  1,02
+#     długoterminowy 2,5–4   kurs  2,54  szansa 30,9%  ->  0,79   <- ZDEJMUJEMY
+#
+# Ten ostatni to zakład, o którym sami mówimy, że z każdych postawionych 100 zł
+# zwraca statystycznie 79. Nie da się go obronić przy obietnicy „przekaz zgodny
+# z rzeczywistością", a jest na stronie tylko dlatego, że generator dostaje
+# polecenie „złóż kupon o kursie 2,5–4" i składa najlepszy DOSTĘPNY, nawet gdy
+# najlepszy dostępny jest zły. Nikt go potem nie pytał, czy warto go pokazać.
+#
+# PRÓG NA BRUTTO, ŚWIADOMIE — tak jak wszystkie inne bramy w tym projekcie
+# (patrz komentarz przy KWARANTANNA_ROI_*). Na netto (po podatku od stawki)
+# zostałyby dziś DWA kupony z pięciu i zakładka znowu świeciłaby pustką; to ta
+# sama ściana, o którą rozbiła się brama netto na typach (2 typy z 30) i user
+# odrzucił ją z tego samego powodu.
+#
+# NIE DOTYCZY generatora ręcznego na stronie meczu: tam user prosi o konkretny
+# zestaw i ma prawo go dostać razem z uczciwie policzoną wartością. Dlatego
+# brama stoi w JOBIE, nie w `build_kupony` — inaczej rozjechałby się parytet
+# z `kuponBuilder.ts`, pilnowany testem.
+MIN_WARTOSC_KUPONU = 1.0
+
+
+def wartosc_brutto(k: dict) -> float:
+    """Ile zostaje z jednej postawionej złotówki: szansa × kurs łączny.
+
+    Liczone z `p_model` GOTOWEGO kuponu, czyli po urealnieniu szansy — z tej
+    samej liczby, którą widzi user. Gdyby brać surowy iloczyn `p_model` legów,
+    brama oceniałaby coś innego, niż strona pokazuje.
+    """
+    try:
+        return float(k.get("p_model") or 0.0) * float(k.get("kurs_laczny") or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def kupon_oplacalny(k: dict) -> bool:
+    """Czy kupon ma dodatnią wartość brutto (patrz MIN_WARTOSC_KUPONU)."""
+    return wartosc_brutto(k) >= MIN_WARTOSC_KUPONU
+
+
 OKNO_DZIS_S = 20 * 3600       # "dziś" = mecze w ciągu ~20 h
 OKNO_JUTRO_S = 44 * 3600      # rozszerzenie na jutro, gdy dziś < 2 mecze
 OKNO_DLUGO_S = 4 * 86400      # długoterminowy: mecze z najbliższych 4 dni
