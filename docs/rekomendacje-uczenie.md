@@ -205,11 +205,16 @@ własnego ogona. Zamiast tego:
 
 ## Czujnik
 
-**Trend luki per strumień, liczony w każdym cyklu** i pokazywany w zakładce
-„Czy się uczymy". Dziś ta zakładka pokazuje paczki po 40 rozliczeń, ale
-**nie pokazuje kierunku** — a kierunek jest jedyną rzeczą, która mówi, czy
-model się uczy, czy psuje. Alarm, gdy nowsza połowa jest o ponad 3 pp gorsza
-od starszej przy n ≥ 100.
+**SPROSTOWANIE 2026-08-05:** kierunek JEST już liczony i pokazywany per
+strumień — `rozliczanie` dokłada do raportu blok `trend` (luka na starcie vs
+w ostatnich paczkach, z paczek PEŁNYCH i z całej historii, nie z przyciętej
+listy), a `RaportUczenia.Werdykt` pisze wprost „To idzie w dobrą stronę" albo
+„Model NIE robi postępów – jest gorzej". Pierwotne zdanie w tym miejscu było
+błędne.
+
+Brakuje więc tylko **alarmu w logu cyklu**: jednej linii, gdy nowsza połowa
+jest o ponad 3 pp gorsza od starszej przy n ≥ 100. Dziś pogorszenie widać
+wyłącznie wtedy, gdy ktoś otworzy zakładkę.
 
 ---
 
