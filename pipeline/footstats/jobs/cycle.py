@@ -1,11 +1,17 @@
-"""Jeden cykl automatycznego odświeżenia — uruchamiany przez Harmonogram zadań.
+"""Jeden cykl automatycznego odświeżenia — orkiestrator crona w chmurze.
 
 Wybiera właściwą robotę zależnie od trybu:
-  * TRYB MŚ (domyślnie teraz): przelicza okazje z statshub + Superbet + STS.
-  * TRYB LIGOWY (po starcie sezonu): odświeża dane ligowe.
+  * TRYB LIGOWY (produkcja): odświeża dane ligowe (`build_league`).
+  * TRYB MŚ (zakończony 2026-07-19): okazje z statshub + Superbet + STS.
 
-Uruchamiany co ~30 min przez Windows Task Scheduler (patrz scripts/). Loguje
-wynik z sygnaturą czasową; nie wymaga otwartej sesji ani terminala.
+URUCHAMIANY W GITHUB ACTIONS (`.github/workflows/cycle.yml`), nie na żadnym
+komputerze. Poprzednia wersja tego opisu mówiła o „Harmonogramie zadań Windows
+co ~30 min" — to było nieprawdą od przeprowadzki do chmury i wysyłało każdego,
+kto tu zajrzał, na poszukiwanie lokalnego crona, którego nie ma.
+
+Realna częstotliwość NIE wynosi 15 minut mimo takiej deklaracji w cronie:
+GitHub tworzy ~14% zadeklarowanych tyknięć, mediana odstępu to ~96 min.
+Pomiar i wnioski — w nagłówku `cycle.yml`.
 """
 
 from __future__ import annotations

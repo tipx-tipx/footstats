@@ -7,8 +7,24 @@ name: FootStats — cykl zbierania danych
 # Repo jest PUBLICZNE = nielimitowane minuty Actions, więc częstotliwość nie jest
 # ograniczona minutami. GitHub dopuszcza minimum co 5 min; trzymamy 15 min, żeby
 # nie prowokować rate-limitów/blokad po stronie źródeł (Sofascore/365/Superbet).
-# Cron GitHuba jest best-effort (bywa opóźniany); najpilniejsza ścieżka — nowy
-# kupon po pominięciu — i tak odpala pipeline od razu (workflow_dispatch z API).
+#
+# UWAGA — TA DEKLARACJA JEST FIKCJĄ I TRZEBA O TYM WIEDZIEĆ (zmierzone 05.08
+# na 100 przebiegach z API GitHuba, okno 183 h):
+#
+#     tyknięć wg `*/15`   ~732        UTWORZONYCH przez GitHuba   99  (14%)
+#     odstęp UTWORZEŃ     mediana  96 min,  p90 183 min,  max 227 min
+#     czekanie w kolejce  0,0 min   <- concurrency NIE jest winne
+#
+# Minuty odpaleń są rozrzucone po całej godzinie (0,1,2,4,7,...59), a `*/15`
+# może trafiać wyłącznie w :00/:15/:30/:45. To dowód, że GitHub PRZESUWA i GUBI
+# tyknięcia — nie że my je blokujemy. Zdarzenie `schedule` jest best-effort
+# i pierwsze idzie pod nóż przy obciążeniu Actions. `rozlicz.yml` ma to samo
+# (17% tyknięć), więc to nie jest wina tego pliku ani długości cyklu.
+#
+# WNIOSEK: skrócenie cyklu NIE poprawi świeżości strony. Jedyne, co realnie
+# działa, to `workflow_dispatch` z zewnątrz — nie jest dławiony i odpala od
+# razu. Mechanizm już mamy: `web/src/app/api/kupon-pomin/route.ts` woła go po
+# akcji usera (GH_DISPATCH_TOKEN). Brakuje wyłącznie regularnego pingu.
 
 on:
   schedule:
@@ -37,7 +53,19 @@ jobs:
     # Limit ZOSTAJE (a nie rośnie do maksimum), bo przebieg zawieszony na
     # padniętym źródle blokowałby kolejkę: concurrency nie przepuszcza drugiego
     # cyklu. Gdzie idą minuty — patrz stopery w cycle.py/build_league.py.
-    timeout-minutes: 35
+    #
+    # 35 -> 50 (2026-08-05). Zmierzone na 100 przebiegach z API GitHuba:
+    # mediana czasu cyklu SKOCZYŁA 03.08 -> 04.08 z 18,1 na 29,3 min, a 05.08
+    # stoi na 32,0 (max 35,0 — czyli DOKŁADNIE limit). To skutek naszych zmian
+    # z 03-04.08: siatka zawodnicza 185 -> 933 par i 3 -> 13 statystyk, plus
+    # szersze okno zgody = więcej typów do policzenia i zarejestrowania.
+    #
+    # Krok obronny, nie naprawa: przebieg ubity limitem nie wypycha NICZEGO,
+    # więc każde przekroczenie to kilka godzin nieświeżej strony. Prawdziwa
+    # naprawa to skrócenie kroku „Przelicz okazje" — zmierzone per krok joba:
+    # checkout + python + pip = 15 SEKUND, cała reszta (1719-1913 s) to nasz
+    # jeden krok. Po stronie CI nie ma czego optymalizować.
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@v4
 
