@@ -41,13 +41,23 @@ async function hmac(secret: string, payload: string): Promise<string> {
     .join("");
 }
 
-/** Porównanie stałoczasowe dwóch podpisów (bez wycieku przez czas). */
-function podpisyRowne(a: string, b: string): boolean {
+/**
+ * Porównanie stałoczasowe dwóch sekretów (bez wycieku przez czas odpowiedzi).
+ *
+ * Wyeksportowane, bo używa tego też `/api/tick` — bramka pingu crona. Sekret
+ * porównywany bajt po bajcie, nigdy `===`: zwykłe porównanie kończy się na
+ * pierwszej różnicy, więc czas odpowiedzi zdradza, ile znaków zgadło.
+ * Różnica długości daje `false` od razu — to jawne i nieszkodliwe, bo długości
+ * sekretu i tak nie ukrywamy.
+ */
+export function sekretyRowne(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
   let diff = 0;
   for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
   return diff === 0;
 }
+
+const podpisyRowne = sekretyRowne;
 
 /** Zbuduj wartość ciasteczka sesji ważnego SESSION_DAYS dni. */
 export async function createSessionToken(

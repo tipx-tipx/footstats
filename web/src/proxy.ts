@@ -25,7 +25,13 @@ export default async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // wszystko poza logowaniem, API logowania, wewnętrznymi zasobami Next
-  // i plikami statycznymi (ścieżki z kropką: logo.png, favicon.png, ...)
-  matcher: ["/((?!login|api/login|_next/static|_next/image|.*\\..*).*)"],
+  // wszystko poza logowaniem, API logowania, PINGIEM CRONA, wewnętrznymi
+  // zasobami Next i plikami statycznymi (ścieżki z kropką: logo.png, ...)
+  //
+  // `api/tick` musi być poza bramką, bo woła go zewnętrzny pinger, który nie
+  // ma jak się zalogować — bez tego dostawałby przekierowanie na /login
+  // i cykl nigdy by nie ruszył. Trasa NIE jest przez to otwarta: pilnuje się
+  // sama sekretem `TICK_SECRET` porównywanym stałoczasowo, a bez tej zmiennej
+  // w ogóle nic nie robi.
+  matcher: ["/((?!login|api/login|api/tick|_next/static|_next/image|.*\\..*).*)"],
 };

@@ -83,5 +83,36 @@ sprawdz("klient nie dostaje tabeli rynków", dlaKlienta.po_rynku.length === 0);
 sprawdz("żadna liczba z raportu uczenia nie zostaje w payloadzie",
   !wSzkielecie.includes("-0.13") && !wSzkielecie.includes("0.575"));
 
+/* ------------------------------------------------------------------ *
+ * BRAMKA DOSTĘPU — regex matchera z proxy.ts
+ *
+ * Matcher to jedno wyrażenie, w którym literówka po cichu otwiera CAŁĄ
+ * aplikację (albo zamyka ping crona i pipeline przestaje chodzić). Nic tego
+ * nie sprawdzało, a od 05.08 lista wyjątków ma trzy pozycje zamiast dwóch.
+ * Czytamy regex z pliku, żeby test nie trzymał własnej kopii — to ta sama
+ * zasada co przy RLS i BUNDLE_KEYS (patrz test-klucze-rls.mjs).
+ * ------------------------------------------------------------------ */
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const proxySrc = readFileSync(
+  join(dirname(fileURLToPath(import.meta.url)), "..", "src", "proxy.ts"),
+  "utf8",
+);
+const mMatcher = proxySrc.match(/matcher:\s*\["([^"]+)"\]/);
+sprawdz("matcher da się odczytać z proxy.ts", Boolean(mMatcher));
+if (mMatcher) {
+  const re = new RegExp(`^${mMatcher[1].replace(/\\\\/g, "\\")}$`);
+  const chronione = ["/", "/model", "/kupony", "/druzyny", "/mecze/123",
+                     "/api/kupon-pomin", "/zaklady"];
+  for (const p of chronione) {
+    sprawdz(`bramka chroni ${p}`, re.test(p));
+  }
+  for (const p of ["/login", "/api/login", "/api/tick"]) {
+    sprawdz(`bramka PRZEPUSZCZA ${p}`, !re.test(p));
+  }
+}
+
 console.log(bledy === 0 ? "\nWszystko gra." : `\n${bledy} błędów.`);
 process.exit(bledy === 0 ? 0 : 1);
