@@ -9,7 +9,15 @@ Stan wyjściowy: `docs/audyt-uczenia.md`.
 
 ---
 
-# ⚠ ZNALEZISKO NR 1: dziewięć warstw uczenia może umrzeć po cichu
+# ✅ ZNALEZISKO NR 1: dziewięć warstw uczenia może umrzeć po cichu
+
+> **WDROŻONE 2026-08-05.** Rejestr `rozliczanie.warstwa_uczenia` zastąpił
+> dwanaście bloków `try/except`. Stan idzie do `meta.uczenie_stan`, tabela
+> drukuje się w każdym cyklu, a padnięcie `korekta_strumienia` albo
+> `szansa_pokazywana` przerywa cykl (`build_wc_fast`) i wstrzymuje nadpisanie
+> kuponów (`rozlicz_only`). Czujnik: `tests/test_stan_uczenia.py` (8 testów) —
+> nowa warstwa bez wpięcia do rejestru wywala test. Panel dla admina:
+> `components/skutecznosc/StanWarstw.tsx`, zakładka „Postęp".
 
 **To jest najpilniejsza rzecz w całym audycie i odpowiedź na pytanie
 „czy coś się znowu wyjebie".** Odpowiedź brzmi: tak, i już się zdarzyło.
@@ -70,7 +78,13 @@ gdy to warstwa krytyczna.
 
 ---
 
-# ZNALEZISKO NR 2: uczymy się na rynku, którego nie sprzedajemy
+# ✅ ZNALEZISKO NR 2: uczymy się na rynku, którego nie sprzedajemy
+
+> **CZUJNIK WDROŻONY 2026-08-05.** `rozliczanie.rynki_bez_kalibracji` +
+> linia w każdym cyklu: „Rynki publikowane bez własnej kalibracji (próg 25):
+> match_cards — 3 typy, 1 rozliczeń". Punkt 2 (karta typu mówi o mniejszej
+> próbie) ZOSTAJE otwarty — to zmiana w treści karty, więc idzie z przejściem
+> strona po stronie.
 
 ```
 rynek              rozliczeń   na stronie   stan
@@ -112,7 +126,13 @@ z sumami meczowymi 30.07.
 
 ---
 
-# ZNALEZISKO NR 3: strumień zawodniczy stoi JEDEN rekord nad progiem
+# ✅ ZNALEZISKO NR 3: strumień zawodniczy stoi JEDEN rekord nad progiem
+
+> **CZUJNIK WDROŻONY 2026-08-05.** `rozliczanie.proby_strumieni` +
+> `ostrzezenia_prob`: cykl pisze „pewniaki: 41 rozliczeń przy progu 40 —
+> NA STYK, 2 rozliczeń od zniknięcia korekty", a `n` warstwy to teraz liczba
+> ROZLICZEŃ, nie liczba strumieni z korektą. Czujnik: `tests/test_proby_uczenia.py`.
+> Punkt 2 (decyzja o podaży typów zawodniczych) ZOSTAJE otwarty.
 
 ```
 ZAWODNICY   41 rozliczeń    próg korekty strumienia = 40
@@ -272,7 +292,21 @@ próbę.
 
 ---
 
-# ZNALEZISKO NR 7: czynniki modelu — dwie dziury
+# ✅ ZNALEZISKO NR 7: czynniki modelu — dwie dziury
+
+> **OBIE WDROŻONE 2026-08-05.**
+>
+> **Sumy meczowe:** `build_wc_fast.mnozniki_pary` składa mnożniki obu drużyn
+> średnią geometryczną i wypełnia `czynniki`, a `czynniki_pary` dopisuje zdania
+> („Profil rywali", „Dom i wyjazd", „Scenariusz meczu", „Styl rywali", „Sędzia").
+> To NIE była kosmetyka: brama uzasadnień patrzy dokładnie na pole `czynniki`,
+> więc każdy typ na sumie poniżej 70% szansy wypadał z listy jako „bez
+> uzasadnienia" — mimo że model policzył wszystko. Czujnik: `tests/test_czynniki_sum.py`.
+>
+> **Sędzia:** `context.MIN_MECZE_SEDZIA = 4` — poniżej mnożnik jest DOKŁADNIE
+> 1,00, a karta mówi „mamy za mało jego meczów, żeby cokolwiek o nim twierdzić"
+> zamiast „gwiżdże mniej niż przeciętny arbiter (1 jego meczów w danych)".
+> Czujnik: cztery testy w `tests/test_sedzia_kartki.py`.
 
 ## 7a. Sumy meczowe bez rachunku
 

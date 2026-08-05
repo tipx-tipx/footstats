@@ -680,6 +680,17 @@ function CzynnikiMeczu({ kontekst }: { kontekst: RadarKontekst }) {
             etykieta="sędzia"
             opis="jeszcze nie wiadomo, kto sędziuje – nie zgadujemy, więc nic tu nie zmieniamy"
           />
+        ) : /* ZA MAŁO MECZÓW TO NIE JEST „ARBITER PRZECIĘTNY". Do 05.08 ten
+               wiersz pisał „X gwiżdże mniej niż przeciętny arbiter (1 jego
+               meczów w danych)" – zdanie o stylu sędziego postawione na jednym
+               meczu. 210 z 444 arbitrów w bazie ma dokładnie jeden mecz. */
+        sedzia?.zrodlo === "za_chuda_proba" ? (
+          <CzynnikWiersz
+            etykieta="sędzia"
+            opis={`${sedzia.sedzia ?? "arbiter"} – mamy za mało jego meczów${
+              sedzia.mecze ? ` (${sedzia.mecze})` : ""
+            }, żeby cokolwiek o nim twierdzić, więc nic tu nie zmieniamy`}
+          />
         ) : sedzia?.sedzia ? (
           <CzynnikWiersz
             etykieta="sędzia"

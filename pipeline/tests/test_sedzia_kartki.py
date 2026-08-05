@@ -76,3 +76,41 @@ def test_profil_liczy_kartki_z_banku_bez_dodatkowych_zapytan(monkeypatch):
     assert prof["mnoznik_kartek"] > 1.3
     # faule miał identyczne jak Łagodny, więc stary mnożnik tego nie widział
     assert abs(prof["mnoznik"] - 1.0) < 0.01
+
+
+# --- PRÓG PRÓBY (2026-08-05, audyt uczenia) -------------------------------
+#
+# W bazie jest 444 arbitrów, z czego 210 z JEDNYM meczem i 137 z dwoma;
+# najlepiej pokryty ma siedem. Sam `shrink_factor` tego nie ratował: przy
+# jednym meczu i surowym ×0,63 wychodziło 0,96 — na tyle daleko od 1,00, że
+# karta pisała „gwiżdże mniej niż przeciętny arbiter (1 jego meczów w danych)".
+# Liczba była nieszkodliwa, zdanie już nie.
+
+def test_ponizej_progu_mnoznik_jest_dokladnie_neutralny():
+    for n in range(context.MIN_MECZE_SEDZIA):
+        assert context.referee_factor(0.63, n, market_is_disciplinary=True) == 1.0
+        assert context.referee_factor(1.55, n, market_is_disciplinary=True) == 1.0
+
+
+def test_od_progu_mnoznik_zaczyna_dzialac():
+    m = context.referee_factor(
+        1.55, context.MIN_MECZE_SEDZIA, market_is_disciplinary=True)
+    assert m > 1.0, "przy pełnej próbie arbiter ma prawo ruszyć liczbę"
+
+
+def test_chudy_profil_nie_udaje_arbitra_neutralnego():
+    """Karta MUSI odróżnić „za mało danych" od „arbiter przeciętny".
+
+    Bez własnego kodu źródła wiersz na karcie stwierdzałby styl sędziego na
+    mnożniku 1,00 — czyli mówiłby coś, czego nie zmierzyliśmy."""
+    sed = {"sedzia": "X", "mnoznik": 0.63, "n": 1}
+    m, opis = kontekst_drabinki.mnoznik_sedziego("yellow_card", sed)
+    assert m == 1.0
+    assert opis["zrodlo"] == "za_chuda_proba" and opis["mecze"] == 1
+    assert "mnoznik" not in opis, "brak liczby = karta nie ma czym twierdzić"
+
+
+def test_pelny_profil_dalej_opisuje_arbitra():
+    sed = {"sedzia": "X", "mnoznik": 1.40, "n": 12}
+    m, opis = kontekst_drabinki.mnoznik_sedziego("yellow_card", sed)
+    assert m > 1.0 and opis["zrodlo"] == "365"

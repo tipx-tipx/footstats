@@ -91,13 +91,38 @@ def opponent_factor(
     return cap(shrink_factor(raw, sample_matches, prior_strength=12.0), CAP_OPPONENT)
 
 
+# PONIŻEJ TYLU MECZÓW ARBITER NIE MA PROFILU — ani liczby, ani zdania na karcie.
+#
+# Audyt 05.08: 444 sędziów w bazie, z tego 210 z JEDNYM meczem, 137 z dwoma,
+# 53 z trzema; najlepiej pokryty (Szymon Marciniak) ma siedem. Sam `shrink_factor`
+# nie wystarczał: przy jednym meczu i surowym ×0.63 wychodziło 0.96, czyli
+# wystarczająco daleko od 1,00, żeby karta napisała „pobłażliwy" — na podstawie
+# jednego meczu. Liczba była nieszkodliwa, zdanie już nie.
+#
+# Czemu akurat 4: przy trzech meczach `shrink` przepuszcza jeszcze ~27% surowego
+# odchylenia, a przy czterech mamy pierwszą próbę, w której powtarzalność stylu
+# arbitra w ogóle da się odróżnić od przypadku. Skutek: profil zachowuje około
+# 10% sędziów — i to jest uczciwy obraz tego, ile o nich wiemy.
+#
+# Próg stoi TUTAJ, a nie przy budowie karty, bo miejsc, które czytają ten
+# mnożnik, jest kilka (czynniki drużynowe, sumy meczowe, opis karty) i każde
+# musiałoby pamiętać o swoim warunku.
+MIN_MECZE_SEDZIA = 4
+
+
 def referee_factor(
     referee_fouls_multiplier: float | None,
     sample_matches: int,
     market_is_disciplinary: bool,
 ) -> float:
-    """Czynnik sędziego — tylko faule i kartki. Brak obsady = neutralnie."""
+    """Czynnik sędziego — tylko faule i kartki. Brak obsady = neutralnie.
+
+    Poniżej `MIN_MECZE_SEDZIA` zwraca DOKŁADNIE 1.0, więc typ nie dostaje ani
+    poprawki, ani zdania o arbitrze (karta pomija czynniki równe 1,00).
+    """
     if not market_is_disciplinary or referee_fouls_multiplier is None:
+        return 1.0
+    if int(sample_matches or 0) < MIN_MECZE_SEDZIA:
         return 1.0
     return cap(shrink_factor(referee_fouls_multiplier, sample_matches, 8.0), CAP_REFEREE)
 

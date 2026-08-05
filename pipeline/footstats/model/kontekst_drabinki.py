@@ -340,6 +340,15 @@ def mnoznik_sedziego(rynek: str, sedzia: dict | None) -> tuple[float, dict]:
     surowy, n = context.sedzia_dla_rynku(sedzia, rynek)
     if not surowy:
         return 1.0, {"zrodlo": "brak_profilu", "sedzia": sedzia["sedzia"]}
+    # ZA CHUDA PRÓBA TO NIE JEST TO SAMO CO ARBITER NEUTRALNY (2026-08-05).
+    # Bez tego rozróżnienia karta pisała „X gwiżdże mniej niż przeciętny
+    # arbiter (1 jego meczów w danych)" — zdanie o stylu sędziego postawione
+    # na jednym meczu. Po podniesieniu progu w `context.referee_factor` byłoby
+    # jeszcze gorzej: mnożnik wracałby 1,00, a zdanie zostawało. Patrz
+    # `context.MIN_MECZE_SEDZIA`.
+    if int(n or 0) < context.MIN_MECZE_SEDZIA:
+        return 1.0, {"zrodlo": "za_chuda_proba", "sedzia": sedzia["sedzia"],
+                     "mecze": int(n or 0)}
     m = context.referee_factor(float(surowy), n, market_is_disciplinary=True)
     return m, {
         "zrodlo": "365", "sedzia": sedzia["sedzia"],
