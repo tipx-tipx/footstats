@@ -7,6 +7,7 @@ import { useMemo, useState } from "react";
 import { KalendarzWynikow } from "./KalendarzWynikow";
 import { KrzywaWyniku } from "./skutecznosc/KrzywaWyniku";
 import { RaportUczenia } from "./skutecznosc/RaportUczenia";
+import { StanWarstw } from "./skutecznosc/StanWarstw";
 import { TypyDnia } from "./skutecznosc/TypyDnia";
 import { WerdyktModelu, type WerdyktDane } from "./WerdyktModelu";
 import { fmtProc } from "@/lib/format";
@@ -612,6 +613,15 @@ export function SkutecznoscScena({
           aria-labelledby={`zakladka-${zakladka}`}
           className="mt-5"
         >
+          {zakladka === "postep" && (
+            <div className="mb-5 max-w-3xl">
+              {/* CZY W OGÓLE BYŁO SIĘ Z CZEGO UCZYĆ. Tabela niżej pokazuje,
+                  jak model się poprawia; ta karta odpowiada na wcześniejsze
+                  pytanie – czy poprawki w ogóle zostały policzone. */}
+              <StanWarstw stan={meta.uczenie_stan} />
+            </div>
+          )}
+
           {zakladka === "postep" && (
             <RaportUczenia
               raport={typy.raport_uczenia ?? {}}

@@ -60,6 +60,10 @@ export default async function ModelPage({
   // wszystko, co dostanie w propsach, ląduje w źródle strony – nawet jeśli
   // nic tego nie renderuje. Kuchnię modelu wycinamy z DANYCH, nie z widoku.
   const typy = pelnyWglad ? typySurowe : okrojDlaKlienta(typySurowe);
+  // TO SAMO DOTYCZY `meta`: stan warstw uczenia to czysta kuchnia (nazwy
+  // warstw, treść wyjątków, rozmiary prób). Scena dostaje `meta` w propsach
+  // niezależnie od roli, więc wycinamy tutaj, a nie w widoku.
+  const metaWidok = pelnyWglad ? meta : { ...meta, uczenie_stan: undefined };
   const pods = typy.podsumowanie;
 
   // --- KUPONY: bilans per horyzont + historia + kronika wygranych ---
@@ -273,7 +277,7 @@ export default async function ModelPage({
         <Reveal className="mt-7">
           <SkutecznoscScena
             typy={typy}
-            meta={meta}
+            meta={metaWidok}
             kuponyPanel={kuponyPanel}
             testPanel={testPanel}
             pelnyWglad={pelnyWglad}

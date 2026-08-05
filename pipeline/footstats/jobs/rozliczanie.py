@@ -24,6 +24,7 @@ Przepływ (wywoływane na końcu każdego cyklu):
 
 from __future__ import annotations
 
+import contextlib
 import math
 import time
 from collections import Counter
@@ -65,6 +66,160 @@ from .. import diagnostyka, rozgrywki, supa
 from ..model import betting
 from ..model import kupony as kupony_model
 from ..sources import rotowire, scores365, statshub
+
+# =========================================================================
+# STAN WARSTW UCZENIA — czy model faktycznie się uczy, czy tylko nie krzyczy
+# =========================================================================
+#
+# POWÓD (audyt 2026-08-05). Każde wywołanie warstwy uczenia w cyklu siedziało
+# w `try/except`, który łykał wyjątek, drukował jedną linijkę i leciał dalej
+# z pustym słownikiem. Dwanaście takich miejsc, dziewięć warstw. Skutek awarii:
+# cykl kończy się ZIELONO, strona działa, typy się publikują — a model przestaje
+# się uczyć. Jedyny ślad to linia w logu GitHub Actions, do którego nikt nie
+# zagląda.
+#
+# To nie jest hipoteza. 2026-08-01 cała warstwa uczenia leżała PÓŁTOREJ DOBY,
+# bo `print` z polskim znakiem rzucał UnicodeEncodeError wewnątrz `try`
+# (patrz komentarz przy korekcie strumienia w build_wc_fast). Wykryliśmy to
+# przypadkiem, po tym jak strona pokazywała 26 typów zamiast 99.
+#
+# ROZWIĄZANIE to NIE usunięcie `try/except` — cykl ma prawo dokończyć pracę,
+# gdy padnie warstwa poboczna. Rozwiązaniem jest PODNIESIENIE AWARII DO DANYCH,
+# dokładnie tak jak przy cichych błędach źródeł (`diagnostyka.cichy`):
+#   * stan każdej warstwy ląduje w `meta.uczenie_stan` i w tabeli w logu cyklu,
+#   * warstwa KRYTYCZNA, która padnie, kładzie cykl błędem — bo praca bez niej
+#     jest gorsza niż brak przeliczenia (patrz WARSTWY_KRYTYCZNE).
+
+# Warstwy, bez których cykl NIE MA PRAWA opublikować typów.
+#
+# Obie decydują o liczbie, którą user czyta przy typie. `korekta_strumienia`
+# działa PRZED bramą zgody z rynkiem — bez niej model wchodzi na bramę
+# nieskorygowany i brama odrzuca prawie wszystko (to był dokładnie incydent
+# z 01.08). `szansa_pokazywana` jest ostatnią warstwą na wyjściu: bez niej
+# strona pokazuje szansę, o której wiemy, że jest zawyżona.
+WARSTWY_KRYTYCZNE = frozenset({"korekta_strumienia", "szansa_pokazywana"})
+
+# Pełny rejestr warstw — używany przez raport i przez test. Dopisanie nowej
+# warstwy uczenia BEZ dopisania jej tutaj wywala `test_stan_uczenia.py`; to
+# celowe, bo warstwa spoza rejestru może paść niezauważona.
+WARSTWY_UCZENIA = (
+    "korekta_strumienia",
+    "szansa_pokazywana",
+    "kwarantanna_rynkow",
+    "kwarantanna_kategorii",
+    "kwarantanna_stron",
+    "przewaga_rynkow",
+    "waga_rynku",
+    "wagi_zaufania",
+    "kalibracja_kuponow",
+)
+
+# CO LICZY `n` W KAŻDEJ WARSTWIE. Bez tego panel podpisywał każdą liczbę
+# słowem „rozliczeń" — a `kwarantanna_rynkow` raportuje RYNKI, `wagi_zaufania`
+# KUBEŁKI, i tylko `korekta_strumienia` faktycznie rozliczenia. Jedna liczba
+# z niewłaściwą nazwą jest gorsza niż liczba bez nazwy.
+JEDNOSTKI_WARSTW = {
+    "korekta_strumienia": ("rozliczenie", "rozliczenia", "rozliczeń"),
+    "szansa_pokazywana": ("strumień", "strumienie", "strumieni"),
+    "kwarantanna_rynkow": ("rynek", "rynki", "rynków"),
+    "kwarantanna_kategorii": ("powód", "powody", "powodów"),
+    "kwarantanna_stron": ("strona linii", "strony linii", "stron linii"),
+    "przewaga_rynkow": ("segment", "segmenty", "segmentów"),
+    "waga_rynku": ("segment", "segmenty", "segmentów"),
+    "wagi_zaufania": ("kubełek pewności", "kubełki pewności", "kubełków pewności"),
+    "kalibracja_kuponow": ("horyzont", "horyzonty", "horyzontów"),
+}
+
+_STAN_UCZENIA: dict[str, dict] = {}
+
+
+def reset_stanu_uczenia() -> None:
+    """Czyści rejestr — wołane na starcie cyklu, żeby stan był z TEGO przebiegu."""
+    _STAN_UCZENIA.clear()
+
+
+class _Warstwa:
+    """Uchwyt warstwy: pozwala dopisać, ILE danych realnie miała."""
+
+    def __init__(self, stan: dict) -> None:
+        self._stan = stan
+
+    def opisz(self, n: int | None = None, opis: str | None = None) -> None:
+        """`n` = rozmiar próby, na której warstwa policzyła wynik.
+
+        Bez tego nie da się odróżnić „warstwa działa" od „warstwa działa, ale
+        na czterdziestu rekordach i zaraz spadnie poniżej progu" — a to była
+        druga rzecz, którą audyt wskazał jako niewidoczną.
+        """
+        if n is not None:
+            self._stan["n"] = int(n)
+        if opis is not None:
+            self._stan["opis"] = str(opis)
+
+
+@contextlib.contextmanager
+def warstwa_uczenia(nazwa: str):
+    """Odpal warstwę uczenia, zapamiętując, czy się udała.
+
+    Wyjątek jest ŁYKANY (cykl leci dalej), ale zostaje zapisany w rejestrze
+    i wydrukowany w sposób, którego nie da się przeoczyć. Zmienną wynikową
+    trzeba zainicjować PRZED blokiem — inaczej po awarii poleci NameError:
+
+        korekta = {}
+        with rozliczanie.warstwa_uczenia("korekta_strumienia") as w:
+            korekta = rozliczanie.korekta_strumienia()
+            w.opisz(n=len(korekta))
+    """
+    stan = {"ok": True, "blad": None, "n": None, "opis": None,
+            "krytyczna": nazwa in WARSTWY_KRYTYCZNE,
+            # co liczy `n` — front podpisuje nim liczbę, patrz JEDNOSTKI_WARSTW
+            "jednostka": list(JEDNOSTKI_WARSTW.get(nazwa) or ())}
+    _STAN_UCZENIA[nazwa] = stan
+    try:
+        yield _Warstwa(stan)
+    except Exception as e:                                   # noqa: BLE001
+        stan["ok"] = False
+        stan["blad"] = f"{type(e).__name__}: {e}"
+        print(f"[uczenie] WARSTWA PADŁA: {nazwa} — {stan['blad']}", flush=True)
+
+
+def stan_uczenia() -> dict[str, dict]:
+    """Kopia rejestru — do `meta.uczenie_stan` i do raportu."""
+    return {k: dict(v) for k, v in _STAN_UCZENIA.items()}
+
+
+def krytyczne_padniete() -> list[str]:
+    """Nazwy warstw krytycznych, które padły w tym cyklu."""
+    return sorted(
+        n for n, s in _STAN_UCZENIA.items()
+        if s.get("krytyczna") and not s.get("ok")
+    )
+
+
+def raport_stanu_uczenia() -> str:
+    """Tabela stanu warstw — drukowana w KAŻDYM cyklu, nie tylko przy awarii.
+
+    Drukujemy zawsze, bo cisza jest nieodróżnialna od sukcesu: log bez linii
+    o warstwie może znaczyć „warstwa poszła gładko" albo „nikt jej nie wołał".
+    """
+    if not _STAN_UCZENIA:
+        return "Warstwy uczenia: BRAK POMIARU (rejestr pusty)"
+    zywe = sum(1 for s in _STAN_UCZENIA.values() if s.get("ok"))
+    linie = [f"Warstwy uczenia: {zywe}/{len(WARSTWY_UCZENIA)} działa"]
+    for nazwa in WARSTWY_UCZENIA:
+        s = _STAN_UCZENIA.get(nazwa)
+        if s is None:
+            linie.append(f"   {nazwa:<24} NIE WOŁANA w tym cyklu")
+            continue
+        znacznik = "ok " if s["ok"] else "PADŁA"
+        kryt = " [krytyczna]" if s.get("krytyczna") else ""
+        szczegol = s.get("blad") or s.get("opis") or ""
+        n = ""
+        if s.get("n") is not None:
+            jed = tuple(s.get("jednostka") or ())
+            n = odmien(s["n"], *jed) if len(jed) == 3 else f"n={s['n']}"
+        linie.append(f"   {nazwa:<24} {znacznik} {n:<26}{szczegol}{kryt}")
+    return "\n".join(linie)
 
 # rynek -> pole w agregacie 365Scores (classify_event)
 MARKETY_365 = {
@@ -1918,6 +2073,126 @@ def korekta_strumienia(log: dict | None = None) -> dict[str, float]:
         else:
             out[strumien] = round(b, 3)
     return out
+
+
+# O ile procent nad progiem strumień jeszcze uchodzi za „na styk".
+KOREKTA_STRUMIENIA_MARGINES = 0.20
+
+
+def proby_strumieni(log: dict | None = None) -> dict[str, dict]:
+    """Ile rozliczeń ma KAŻDY strumień i jak blisko jest swojego progu.
+
+    Po co osobna funkcja, skoro `korekta_strumienia` liczy to samo: bo ona
+    zwraca WYNIK, a nie próbę. Strumień, który spadnie pod próg, wypada z jej
+    słownika bez śladu i wygląda dokładnie tak samo jak strumień idealnie
+    skalibrowany (oba są nieobecne — patrz „PRÓG SZUMU" wyżej). Audyt z 05.08
+    złapał zawodników na 41 rozliczeniach przy progu 40: jedno rozliczenie
+    mniej i cała warstwa dla tego strumienia znika po cichu.
+
+    Zwraca {"pewniaki": {"n": 41, "prog": 40, "dziala": True, "na_styk": True}}.
+    `na_styk` = jest nad progiem, ale w promieniu 20% nad nim.
+    """
+    if log is None:
+        log = _migruj_log(supa.get_key("typy_log") or {})
+    settled = [
+        r for r in log.values()
+        if r.get("wynik") in ("wygrany", "przegrany")
+        and not r.get("sugestia") and not r.get("odrzucony")
+        and r.get("p_model")
+        and not _z_martwej_epoki(r)
+        and _z_biezacej_epoki(r)
+        and (_z_modelu(r) or r.get("zrodlo") == ZRODLO_DRABINKA)
+    ]
+    out: dict[str, dict] = {}
+    for strumien in STRUMIENIE:
+        prog = (KOREKTA_DRABINEK_MIN_N if strumien == "drabinki"
+                else KOREKTA_STRUMIENIA_MIN_N)
+        n = min(
+            sum(1 for r in settled if _strumien(r) == strumien),
+            KOREKTA_STRUMIENIA_OKNO,   # okno i tak przycina próbę do ostatnich N
+        )
+        out[strumien] = {
+            "n": n,
+            "prog": prog,
+            "dziala": n >= prog,
+            "na_styk": prog <= n < prog * (1 + KOREKTA_STRUMIENIA_MARGINES),
+        }
+    return out
+
+
+def ostrzezenia_prob(proby: dict[str, dict] | None = None) -> list[str]:
+    """Zdania po ludzku o strumieniach na styku progu i pod progiem.
+
+    Drukowane w cyklu, żeby zniknięcie warstwy dla strumienia było
+    zapowiedziane, a nie odkryte tydzień później przy audycie.
+    """
+    proby = proby if proby is not None else proby_strumieni()
+    zdania = []
+    for strumien, s in sorted(proby.items()):
+        ile = odmien(s["n"], "rozliczenie", "rozliczenia", "rozliczeń")
+        if not s["dziala"]:
+            zdania.append(
+                f"{strumien}: {ile} przy progu {s['prog']} — "
+                f"BRAK własnej korekty, strumień jedzie na wartości globalnej")
+        elif s["na_styk"]:
+            zapas = odmien(s["n"] - s["prog"] + 1,
+                           "rozliczenie", "rozliczenia", "rozliczeń")
+            zdania.append(
+                f"{strumien}: {ile} przy progu {s['prog']} — "
+                f"NA STYK, {zapas} od zniknięcia korekty")
+    return zdania
+
+
+def odmien(n: int, jeden: str, kilka: str, wielu: str) -> str:
+    """Polska odmiana liczebnika: 1 typ, 4 typy, 5 typów, 22 typy, 25 typów."""
+    n = abs(int(n))
+    if n == 1:
+        return f"{n} {jeden}"
+    reszta10, reszta100 = n % 10, n % 100
+    if 2 <= reszta10 <= 4 and not 12 <= reszta100 <= 14:
+        return f"{n} {kilka}"
+    return f"{n} {wielu}"
+
+
+def rynki_bez_kalibracji(
+    opublikowane: list[dict], log: dict | None = None
+) -> list[dict]:
+    """Rynki, które SPRZEDAJEMY, choć nie mamy z czego ich skalibrować.
+
+    Audyt z 05.08 pokazał rozjazd, którego nikt nie widział: 78% materiału do
+    uczenia dawały dwa rynki, a jeden z nich (`team_corners`, 287 rozliczeń)
+    siedział w kwarantannie i miał ZERO typów na stronie. Jednocześnie rynki
+    realnie publikowane — `match_cards` (1 rozliczenie), `team_sot` (9) —
+    jechały na korekcie z poprzedniej epoki, udając, że wiedzą o sobie tyle
+    samo co `team_goals` (253).
+
+    Kwarantanna nie jest tu problemem, ona ma powód. Problemem jest cisza.
+    """
+    if log is None:
+        log = _migruj_log(supa.get_key("typy_log") or {})
+    rozliczen: dict[str, int] = {}
+    for r in log.values():
+        if (r.get("wynik") in ("wygrany", "przegrany")
+                and not r.get("sugestia") and not r.get("odrzucony")
+                and _z_biezacej_epoki(r) and not _z_martwej_epoki(r)):
+            kod = r.get("rynek_kod")
+            if kod:
+                rozliczen[kod] = rozliczen.get(kod, 0) + 1
+    publikacji: dict[str, int] = {}
+    for b in opublikowane or ():
+        if b.get("sugestia"):
+            continue
+        kod = b.get("rynek_kod")
+        if kod:
+            publikacji[kod] = publikacji.get(kod, 0) + 1
+    return sorted(
+        (
+            {"rynek": kod, "publikacji": n, "rozliczen": rozliczen.get(kod, 0)}
+            for kod, n in publikacji.items()
+            if rozliczen.get(kod, 0) < MIN_N_KALIBRACJI
+        ),
+        key=lambda d: -d["publikacji"],
+    )
 
 
 # --- TEST W PRZÓD: drużynowe „poniżej", kurs 1,9+ (zarejestrowany 2026-08-01) ---

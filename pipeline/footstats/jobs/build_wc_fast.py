@@ -696,6 +696,31 @@ def scal_forme_druzyn(swieza: dict, value_bets: list[dict]) -> list[dict]:
     return list(out.values())
 
 
+def mnozniki_pary(h_n: dict, a_n: dict) -> dict:
+    """Mnożniki rynku liczonego z DWÓCH drużyn — średnia geometryczna obu stron.
+
+    Suma meczowa nie ma „swojego" rywala ani „swojego" miejsca gry: gospodarz
+    gra u siebie, gość na wyjeździe, a każdy z nich ma innego przeciwnika.
+    Średnia geometryczna jest tu jedyną uczciwą liczbą, bo λ meczu to suma
+    dwóch λ, z których każda została już przemnożona przez własny zestaw.
+
+    Po co w ogóle: pole `czynniki` było puste `{}`, przez co brama uzasadnień
+    (`betting.ma_komplet_uzasadnienia`) traktowała te typy jak policzone bez
+    rachunku i zdejmowała je z listy poniżej 70% szansy — choć rachunek
+    istniał, tylko po stronie każdej drużyny osobno.
+    """
+    ha, aa = h_n.get("czynniki") or {}, a_n.get("czynniki") or {}
+    if not ha or not aa:
+        return {}
+    out = {}
+    for pole in ("rywal", "sedzia", "dom_wyjazd", "scenariusz_meczu",
+                 "matchup", "lacznie"):
+        h, a = float(ha.get(pole) or 1.0), float(aa.get(pole) or 1.0)
+        out[pole] = round((h * a) ** 0.5, 3)
+    out["opisy"] = {}
+    return out
+
+
 def czynniki_pary(h_n: dict, a_n: dict, nazwa_bazy: str, rho: float) -> list[dict]:
     """Uzasadnienie dla rynków liczonych z OBU drużyn (suma meczowa, „kto więcej").
 
@@ -731,6 +756,33 @@ def czynniki_pary(h_n: dict, a_n: dict, nazwa_bazy: str, rho: float) -> list[dic
                   "wychodziłaby zbyt równa"
             ),
             "mnoznik": None,
+        })
+    # CO PODNIOSŁO ALBO ŚCIĘŁO TĘ LICZBĘ. Do 05.08 karta sumy meczowej mówiła
+    # tylko „tyle notują średnio" i kończyła — a model liczył dla obu drużyn
+    # pełen zestaw poprawek, po prostu nigdzie ich nie opisywał.
+    mn = mnozniki_pary(h_n, a_n)
+    for pole, tytul, zdanie in (
+        ("rywal", "Profil rywali",
+         "przeciwnicy obu drużyn {kier} niż przeciętny zespół w tej lidze"),
+        ("dom_wyjazd", "Dom i wyjazd",
+         "miejsce gry {kier} liczbę względem neutralnego boiska"),
+        ("scenariusz_meczu", "Scenariusz meczu",
+         "kursy 1X2 zapowiadają mecz, który {kier} tę statystykę"),
+        ("matchup", "Styl rywali",
+         "styl przeciwników {kier} to, ile się tu dzieje"),
+        ("sedzia", "Sędzia",
+         "arbiter tego meczu {kier} liczbę względem przeciętnego"),
+    ):
+        m = float(mn.get(pole) or 1.0)
+        if abs(m - 1.0) < 0.02:      # mnożnik ~1,00 nic nie robi, więc milczymy
+            continue
+        kier = "podnoszą" if m > 1 else "obniżają"
+        if pole in ("dom_wyjazd", "scenariusz_meczu", "sedzia"):
+            kier = "podnosi" if m > 1 else "obniża"
+        czynniki.append({
+            "nazwa": tytul,
+            "opis": zdanie.format(kier=kier),
+            "mnoznik": round(m, 3),
         })
     return czynniki
 
@@ -2261,6 +2313,10 @@ def main(tryb=None) -> None:
     global _tryb
     _tryb = tryb
     _generated_this_run.clear()
+    # Rejestr warstw uczenia jest globalny w module `rozliczanie`, a w jednym
+    # procesie potrafią pójść dwa przebiegi (build_league woła main() per liga).
+    # Bez zerowania drugi przebieg dziedziczyłby werdykt pierwszego.
+    rozliczanie.reset_stanu_uczenia()
     try:
         _main_impl(tryb)
     finally:
@@ -2756,12 +2812,25 @@ def _main_impl(tryb=None):
     # wszystko, co jest 12 pp nad kursem (zmierzona mediana odrzuceń: +17,5 pp).
     # Dlatego wypis jest teraz odporny na oba kształty i stoi PO ustawieniu
     # korekty, a nie przed jej użyciem.
-    try:
-        korekta_strumieni = rozliczanie.korekta_strumienia()
+    korekta_strumieni, _proby = {}, {}
+    with rozliczanie.warstwa_uczenia("korekta_strumienia") as _w:
+        # księgę czytamy RAZ i podajemy obu funkcjom — inaczej ten sam klucz
+        # (ponad dwa tysiące wpisów) leciałby z Supabase dwukrotnie
+        _ksiega = rozliczanie._migruj_log(supa.get_key("typy_log") or {})
+        korekta_strumieni = rozliczanie.korekta_strumienia(_ksiega)
         rozliczanie.ustaw_korekte_strumienia(korekta_strumieni)
-    except Exception as e:
-        korekta_strumieni = {}
-        print(f"Korekta strumienia pominięta ({e})")
+        # `n` warstwy to LICZBA ROZLICZEŃ, nie liczba strumieni z korektą —
+        # inaczej strumień, który spadł pod próg, wyglądałby na „warstwa działa,
+        # policzyła dwa zamiast trzech", czyli dokładnie na sukces.
+        _proby = rozliczanie.proby_strumieni(_ksiega)
+        _w.opisz(n=sum(p["n"] for p in _proby.values()),
+                 opis=", ".join(f"{s} {p['n']}/{p['prog']}"
+                                for s, p in sorted(_proby.items())))
+    # OSTRZEŻENIE O PROGU: strumień pod progiem albo tuż nad nim znika
+    # z korekty BEZ BŁĘDU — audyt z 05.08 złapał zawodników na 41 rozliczeniach
+    # przy progu 40. Ten wypis odbiera zniknięciu efekt zaskoczenia.
+    for _zdanie in rozliczanie.ostrzezenia_prob(_proby):
+        print(f"[uczenie] próba strumienia — {_zdanie}")
     if korekta_strumieni:
         print("Korekta strumienia (Δlogit): " + ", ".join(
             f"{s} {betting.delta_globalna(d):+.2f}"
@@ -2773,19 +2842,34 @@ def _main_impl(tryb=None):
     # zjada je efekt selekcji: opublikowany zbiór i tak deklaruje ~71%, a
     # trafia 58%. Ta delta nie wraca do modelu — poprawia liczbę, którą user
     # czyta na stronie, i nic poza nią (patrz rozliczanie.szansa_pokazywana).
-    try:
+    korekta_pokazywana = {}
+    with rozliczanie.warstwa_uczenia("szansa_pokazywana") as _w:
         # korektę przed bramą PODAJEMY jawnie — inaczej funkcja policzyłaby ją
         # sobie drugi raz z księgi i mogłaby odjąć inną liczbę niż ta, z którą
         # typy faktycznie wychodzą w tym cyklu
         korekta_pokazywana = rozliczanie.szansa_pokazywana(
             korekta_przed_brama=korekta_strumieni
         )
+        _w.opisz(n=len(korekta_pokazywana),
+                 opis=", ".join(sorted(korekta_pokazywana)))
         if korekta_pokazywana:
             print("Szansa pokazywana (Δlogit): " + ", ".join(
                 f"{s} {d:+.2f}" for s, d in korekta_pokazywana.items()))
-    except Exception as e:
-        korekta_pokazywana = {}
-        print(f"Urealnienie pokazywanej szansy pominięte ({e})")
+
+    # TWARDY STOP NA WARSTWACH KRYTYCZNYCH (2026-08-05).
+    #
+    # Obie warstwy wyżej decydują o liczbie, którą user czyta przy typie.
+    # Publikacja bez nich jest GORSZA niż brak przeliczenia: strona pokazałaby
+    # szanse, o których wiemy, że są zawyżone, a brama zgody z rynkiem
+    # odrzuciłaby prawie wszystko (incydent 01.08 — 26 typów zamiast 99).
+    # Dry-run leci dalej, żeby dało się diagnozować lokalnie bez sekretów.
+    _padniete = rozliczanie.krytyczne_padniete()
+    if _padniete and not _dry_run():
+        raise RuntimeError(
+            "krytyczne warstwy uczenia padły: " + ", ".join(_padniete)
+            + " — cykl przerwany, żeby nie opublikować typów z niepoprawioną "
+              "szansą (patrz rozliczanie.WARSTWY_KRYTYCZNE)"
+        )
 
     def _urealnij_do_pokazania(b: dict) -> dict:
         """Kopia typu z szansą taką, jaka wychodzi z rozliczeń — do payloadu.
@@ -2859,46 +2943,46 @@ def _main_impl(tryb=None):
     # BRAMA PUBLIKACJI: rynki tracące pieniądze w oknie ostatnich rozliczeń
     # wypadają z publikacji (pewniaki, pula kuponów), ale dalej są scorowane
     # i logowane (poza_publikacja) — kalibracja mierzy je nadal i rynek wraca sam
-    try:
+    kwarantanna_rynkow = {}
+    with rozliczanie.warstwa_uczenia("kwarantanna_rynkow") as _w:
         kwarantanna_rynkow = rozliczanie.kwarantanna()
+        _w.opisz(n=len(kwarantanna_rynkow),
+                 opis=", ".join(sorted(kwarantanna_rynkow)) or "nic wstrzymane")
         if kwarantanna_rynkow:
             print("Kwarantanna rynków: " + ", ".join(
                 f"{mk} (ROI {v['roi']:+.0%}, hit {v['hit']:.0%} "
                 f"vs p {v['sr_p']:.0%}, n={v['n']})"
                 for mk, v in kwarantanna_rynkow.items()))
-    except Exception as e:
-        kwarantanna_rynkow = {}
-        print(f"Kwarantanna rynków pominięta ({e})")
     # TA SAMA BRAMA, ale po POWODZIE wejścia typu na listę, nie po rynku.
     # Rozliczenia pokazują, że model zarabia, gdy typuje nudno, a traci na
     # każdej ścieżce "znaleźliśmy coś więcej niż rynek" (ambitniejsza linia,
     # profil rywala, analogia stylu, rzekomy błąd tradera). Bez tej bramy
     # wystarczyło przekleić stratny typ na inny rynek, żeby przeszedł.
-    try:
+    kwarantanna_kategorii = {}
+    with rozliczanie.warstwa_uczenia("kwarantanna_kategorii") as _w:
         kwarantanna_kategorii = rozliczanie.kategorie_kwarantanna()
+        _w.opisz(n=len(kwarantanna_kategorii),
+                 opis=", ".join(sorted(kwarantanna_kategorii)) or "nic wstrzymane")
         if kwarantanna_kategorii:
             print("Kwarantanna kategorii: " + ", ".join(
                 f"{v['nazwa']} (ROI {v['roi']:+.0%}, hit {v['hit']:.0%} "
                 f"vs p {v['sr_p']:.0%}, n={v['n']})"
                 for v in kwarantanna_kategorii.values()))
-    except Exception as e:
-        kwarantanna_kategorii = {}
-        print(f"Kwarantanna kategorii pominięta ({e})")
     # TA SAMA BRAMA, ale po STRONIE LINII. Kwarantanna rynkowa miesza „powyżej"
     # z „poniżej" w jeden licznik i wychodzi jej średnia, a pomiar 30.07 mówi,
     # że to dwa różne światy: na tych samych rynkach „powyżej" ma ROI od −12%
     # do −32%, a „poniżej" nie wypada nigdzie. Bez tego wymiaru rynek albo
     # wypadał cały (razem z dobrą stroną), albo zostawał cały (razem ze złą).
-    try:
+    kwarantanna_stron = {}
+    with rozliczanie.warstwa_uczenia("kwarantanna_stron") as _w:
         kwarantanna_stron = rozliczanie.strony_kwarantanna()
+        _w.opisz(n=len(kwarantanna_stron),
+                 opis=", ".join(sorted(kwarantanna_stron)) or "nic wstrzymane")
         if kwarantanna_stron:
             print("Kwarantanna strony linii: " + ", ".join(
                 f"{v['rynek']} {v['strona']} (ROI {v['roi']:+.0%}, "
                 f"hit {v['hit']:.0%} vs p {v['sr_p']:.0%}, n={v['n']})"
                 for v in kwarantanna_stron.values()))
-    except Exception as e:
-        kwarantanna_stron = {}
-        print(f"Kwarantanna strony pominięta ({e})")
     # PIERWSZEŃSTWO DROBNIEJSZEGO POMIARU (2026-08-04). Strona z własną próbą
     # odpowiada za siebie — brama rynkowa jej nie dotyczy. Bez tego licznik
     # rynku (średnia obu stron) zamykał `team_corners` w komplecie, choć jego
@@ -4438,6 +4522,20 @@ def _main_impl(tryb=None):
                 # brama drużynowa decyduje o „p ostrożnym", a bez posteriora
                 # nie było czym go policzyć — patrz counts.przedzial_sumy
                 "posterior": posterior_t,
+                # MNOŻNIKI TEJ DRUŻYNY — bez nich suma meczowa i „kto więcej"
+                # wychodziły z `czynniki: {}`, czyli formalnie BEZ rachunku.
+                # To nie było kosmetyczne: brama uzasadnień
+                # (`betting.ma_komplet_uzasadnienia`) patrzy właśnie na to pole,
+                # więc każdy typ na sumie poniżej 70% szansy wypadał z listy jako
+                # „bez uzasadnienia" — mimo że model policzył wszystko, tylko
+                # nigdzie tego nie zapisał (audyt 05.08, znalezisko nr 7).
+                "czynniki": {
+                    "rywal": round(f_opp, 3), "sedzia": round(f_sedzia, 3),
+                    "dom_wyjazd": round(f_venue, 3),
+                    "scenariusz_meczu": round(f_script, 3),
+                    "matchup": round(f_styl_t, 3),
+                    "lacznie": round(factor_t, 3),
+                },
             }
             # KALIBRACJA rynków drużynowych: bias był dla nich LICZONY
             # (team_corners −0,466, team_goals −0,254), ale nigdy nie
@@ -4893,7 +4991,8 @@ def _main_impl(tryb=None):
                         "ci": [round(lo_w, 4), round(hi_w, 4)],
                         "oczekiwane_minuty": None,
                         "lambda": round(h_n["pred"].lam, 3),
-                        "rozklad": None, "czynniki": {}, "sugestia": False,
+                        "rozklad": None, "sugestia": False,
+                        "czynniki": mnozniki_pary(h_n, a_n),
                         # ile zabiera remis — user ma to widzieć, bo przy
                         # kartkach to co piąty zakład
                         "p_remis": round(p_remis, 4),
@@ -5016,7 +5115,8 @@ def _main_impl(tryb=None):
                             "oczekiwane_minuty": None,
                             "lambda": round(
                                 h_n["pred"].lam + a_n["pred"].lam, 3),
-                            "rozklad": None, "czynniki": {}, "sugestia": False,
+                            "rozklad": None, "sugestia": False,
+                            "czynniki": mnozniki_pary(h_n, a_n),
                             "uzasadnienie": {
                                 "czynniki": czynniki_pary(
                                     h_n, a_n, nazwa_bazy, rho_n),
@@ -5360,6 +5460,24 @@ def _main_impl(tryb=None):
         print("Poza publikacją: " + ", ".join(
             f"{v} ({k})" for k, v in licz_poza.most_common()
         ) + " — rozliczą się i uczą kalibrację w tle")
+
+    # CO SPRZEDAJEMY vs CZEGO SIĘ UCZYMY — jedna linia, w każdym cyklu.
+    # Rosnąca lista znaczy, że wypuszczamy nowe rynki szybciej, niż je mierzymy;
+    # dokładnie to stało się z sumami meczowymi 30.07 (patrz notatka
+    # „nowe rynki bez bram"). Nie jest to brama, tylko czujnik.
+    try:
+        _bez_kal = rozliczanie.rynki_bez_kalibracji(value_bets)
+        if _bez_kal:
+            print("Rynki publikowane bez własnej kalibracji (próg "
+                  f"{rozliczanie.MIN_N_KALIBRACJI}): " + ", ".join(
+                      f"{d['rynek']} — "
+                      + rozliczanie.odmien(d['publikacji'], "typ", "typy", "typów")
+                      + ", "
+                      + rozliczanie.odmien(d['rozliczen'], "rozliczenie",
+                                           "rozliczenia", "rozliczeń")
+                      for d in _bez_kal))
+    except Exception as e:
+        print(f"Raport rynków bez kalibracji pominięty ({e})")
 
     value_bets.sort(key=lambda b: -b["rank_score"])
 
@@ -6016,7 +6134,8 @@ def _main_impl(tryb=None):
         return k
 
     _ukryte: set[str] = set()
-    try:
+    _przewaga, _pasma, _log_przewagi = {}, {}, {}
+    with rozliczanie.warstwa_uczenia("przewaga_rynkow") as _w:
         _log_przewagi = rozliczanie._migruj_log(
             supa.get_key("typy_log") or {}
         )
@@ -6034,9 +6153,9 @@ def _main_impl(tryb=None):
             set((_hist_przewagi.get(_wczoraj) or {}).get("ukryte") or ())
             if _wczoraj else set(),
         )
-    except Exception as e:
-        _przewaga, _pasma = {}, {}
-        print(f"Przewaga rynków pominięta ({e})")
+        _w.opisz(n=len(_przewaga),
+                 opis=f"bije cenę {sum(1 for v in _przewaga.values() if v['przewaga'] > 0)}"
+                      f" z {len(_przewaga)}, ukryte: {', '.join(sorted(_ukryte)) or 'brak'}")
 
     def _klucz_listy(b: dict):
         # DWA NIEZALEŻNE SYGNAŁY, oba mierzone tym samym testem „czy bijemy
@@ -6113,16 +6232,17 @@ def _main_impl(tryb=None):
     # Pierwszy odczyt był niewygodny (całość w*=0,00, czyli sama cena
     # przewiduje lepiej), więc ma być widoczny w KAŻDYM cyklu, a nie raz
     # w notatce. Patrz `rozliczanie.waga_rynku_pomiar`.
-    try:
+    with rozliczanie.warstwa_uczenia("waga_rynku") as _w:
         _wagi = rozliczanie.waga_rynku_pomiar(_log_przewagi)
+        _w.opisz(n=len(_wagi), opis=", ".join(
+            f"{k} w={v['w']:.2f}" for k, v in
+            sorted(_wagi.items(), key=lambda kv: -kv[1]["n"])[:4]) or "brak segmentów")
         if _wagi:
             print("Waga naszej liczby vs cena (w=0 cena wie lepiej, w=1 my): "
                   + ", ".join(
                       f"{k} w={v['w']:.2f} (n={v['n']}, ROI {v['roi']:+.0%})"
                       for k, v in sorted(_wagi.items(), key=lambda kv: -kv[1]["n"])
                   ))
-    except Exception as e:
-        print(f"Waga vs cena pominięta ({e})")
     if _pasma:
         print("Przewaga wg pasma ceny: " + ", ".join(
             f"{k} {v['przewaga']:+.4f} (weszło {100*v['hit']:.0f}%, n={v['n']})"
@@ -6252,28 +6372,32 @@ def _main_impl(tryb=None):
     # UCZCIWA SZANSA KUPONU: zmierzone „ile z deklarowanej szansy naprawdę
     # wchodzi" per horyzont. Bez tego kupon obiecywał 17%, a wchodził w 10%
     # (a styl „z przewagą" — 34% deklaracji przy zerze na osiemnaście).
-    kal_kuponow = kupony.kalibracja_kuponow_z_pomiaru(
-        diag_kuponow.get("kalibracja") or {}
-    )
+    kal_kuponow = {}
+    with rozliczanie.warstwa_uczenia("kalibracja_kuponow") as _w:
+        kal_kuponow = kupony.kalibracja_kuponow_z_pomiaru(
+            diag_kuponow.get("kalibracja") or {}
+        )
+        _w.opisz(n=len(kal_kuponow), opis=", ".join(
+            f"{h} x{w}" for h, w in sorted(kal_kuponow.items())) or "brak pomiaru")
     if kal_kuponow:
         print("Urealnienie szansy kuponów (zmierzone): " + ", ".join(
             f"{h} x{w}" for h, w in sorted(kal_kuponow.items())))
     # ZMIERZONE wagi zaufania do p_model per kubełek pewności (z rozliczonych
     # typów) — składanie ufa modelowi dokładnie tyle, ile pokazały rozliczenia
     wagi_zauf: dict = {}
-    try:
+    with rozliczanie.warstwa_uczenia("wagi_zaufania") as _w:
         pomiar_wag = rozliczanie.compute_wagi_zaufania(
             rozliczanie._migruj_log(supa.get_key("typy_log") or {})
         )
         wagi_zauf = kupony.wagi_zaufania_z_pomiaru(pomiar_wag)
+        _w.opisz(n=len(wagi_zauf), opis=", ".join(
+            f"{k} {v:+.3f}" for k, v in wagi_zauf.items()) or "brak kubełków")
         if wagi_zauf:
             print("Wagi zaufania (zmierzone): " + ", ".join(
                 f"{k} {v:+.3f} (n={pomiar_wag[k]['n']}, "
                 f"hit {pomiar_wag[k]['hit']:.0%} vs p {pomiar_wag[k]['sr_p']:.0%})"
                 for k, v in wagi_zauf.items()
             ))
-    except Exception as e:
-        print(f"Wagi zaufania pominięte ({e})")
     kupony_list = kupony.build_kupony(
         value_bets, legi_pool_pub, profil=profil_kuponow, kary=kary_kor,
         wagi=wagi_zauf or None, kal_szansy=kal_kuponow or None,
@@ -6429,6 +6553,13 @@ def _main_impl(tryb=None):
         # zgadzała się ani jedna etykieta: zakładka Kupony pokazywała pustkę
         # przez dwa dni, choć kupony istniały. Patrz kupony.przedzialy_publiczne.
         "przedzialy_kuponow": kupony.przedzialy_publiczne(),
+        # STAN WARSTW UCZENIA tego przebiegu {"korekta_strumienia": {...}}.
+        # Warstwa, która padła, do 05.08 wyglądała identycznie jak warstwa,
+        # która policzyła zero — obie kończyły się pustym słownikiem i cichym
+        # printem w logu Actions. Raz kosztowało to półtorej doby uczenia
+        # (patrz `rozliczanie.warstwa_uczenia`). Tu jest jedyny ślad, który
+        # przeżywa czyszczenie logów Actions.
+        "uczenie_stan": rozliczanie.stan_uczenia(),
         # CICHE BŁĘDY tego przebiegu {"statshub:historia_druzyny": 3, ...}.
         # W meta, a nie tylko w logu, bo log GitHub Actions znika po kilku
         # dniach, a to jest jedyny ślad po danych, które przepadły.
@@ -6438,6 +6569,7 @@ def _main_impl(tryb=None):
     # było tego widać w ogóle: 79 miejsc łapało wyjątek i szło dalej, więc
     # ubytek danych wyglądał identycznie jak ich brak u źródła.
     diagnostyka.wypisz()
+    print(rozliczanie.raport_stanu_uczenia())
     print(f"OK: {len(matches_out)} meczów, {len(value_bets)} okazji, "
           f"{len(players_out)} zawodników.")
 

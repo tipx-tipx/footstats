@@ -661,6 +661,31 @@ export interface Meta {
    * ani jedna, więc zakładka świeciła pustką mimo istniejących kuponów.
    */
   przedzialy_kuponow?: Record<string, string[]>;
+  /**
+   * Stan warstw uczenia z OSTATNIEGO cyklu – klucz to nazwa warstwy.
+   * Warstwa, która padła, do 05.08 wyglądała identycznie jak warstwa, która
+   * policzyła zero: obie kończyły się pustym słownikiem i cichym printem
+   * w logu Actions, który znika po kilku dniach. To jest jedyny trwały ślad.
+   * Wyłącznie dla admina (`okrojDlaKlienta` to wycina).
+   */
+  uczenie_stan?: Record<
+    string,
+    {
+      ok: boolean;
+      blad: string | null;
+      /** rozmiar próby, na której warstwa policzyła wynik */
+      n: number | null;
+      opis: string | null;
+      /** bez warstwy krytycznej cykl w ogóle nie publikuje typów */
+      krytyczna: boolean;
+      /**
+       * Co liczy `n` – trzy formy odmiany z `rozliczanie.JEDNOSTKI_WARSTW`
+       * (`["rynek", "rynki", "rynków"]`). Każda warstwa liczy co innego,
+       * więc jednostka MUSI iść z backendu razem z liczbą.
+       */
+      jednostka?: string[];
+    }
+  >;
 }
 
 /** Jeden typ (leg) na kuponie. */

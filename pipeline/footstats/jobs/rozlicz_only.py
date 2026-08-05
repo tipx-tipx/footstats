@@ -36,6 +36,7 @@ from . import rozliczanie
 
 def main() -> None:
     stamp = time.strftime("%Y-%m-%d %H:%M:%S")
+    rozliczanie.reset_stanu_uczenia()
     print(f"[{stamp}] START rozliczania (lekki job, bez przeliczania modelu)",
           flush=True)
     ma_supabase = bool(
@@ -53,11 +54,21 @@ def main() -> None:
         # 18–25 wracał do netto +72,8% przy wartości brutto −10,6%. Naprawa
         # w dużym cyklu żyła około półtorej godziny, do najbliższego przebiegu
         # tego joba. Szczegóły: rozliczanie.kupon_do_pokazania.
-        try:
+        # TA WARSTWA JEST KRYTYCZNA (rozliczanie.WARSTWY_KRYTYCZNE). Gdy padnie,
+        # NIE nadpisujemy klucza `kupony` — na stronie zostaje poprzednia,
+        # urealniona lista. Do 05.08 wyjątek dawał pusty słownik i cicho
+        # publikował kupony z surową deklaracją szansy, czyli dokładnie ten błąd,
+        # który ten job kiedyś wprowadzał co 20 minut (patrz komentarz wyżej).
+        urealnienie = {}
+        with rozliczanie.warstwa_uczenia("szansa_pokazywana") as _w:
             urealnienie = rozliczanie.szansa_pokazywana()
-        except Exception as e:
-            urealnienie = {}
-            print(f"[{stamp}] Urealnienie szans legów pominięte ({e})", flush=True)
+            _w.opisz(n=len(urealnienie))
+        if rozliczanie.krytyczne_padniete():
+            print(f"[{stamp}] Kupony NIE nadpisane — padła warstwa "
+                  f"{', '.join(rozliczanie.krytyczne_padniete())}; "
+                  f"na stronie zostaje poprzednia lista.", flush=True)
+            supa.put_key("typy_wyniki", wyniki)
+            return
         aktywne = [
             rozliczanie.kupon_do_pokazania(k, urealnienie)
             for k in wyniki["kupony"]
