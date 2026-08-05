@@ -342,7 +342,33 @@ def _waga_modelu(l: dict, wagi: dict | None = None) -> float:
 # błędu łapią już dwie warstwy wcześniej: shrink ku cenie rynku w tej samej
 # funkcji i korekta strumienia nałożona na `p_model` przed wejściem do puli.
 # Kara ma przesunąć WYBÓR buildera ku bliższym meczom, a nie ukarać dwa razy.
-KARA_HORYZONTU = ((24, 0.0), (48, 0.06), (10**9, 0.13))
+#
+# PODNIESIONE 2026-08-05: 0,06 -> 0,10 i 0,13 -> 0,18. Powtórny pomiar per leg
+# (już bez selekcji przeżywalności — patrz niżej) dał lukę −16,3 pp na legach
+# drużynowych „na kilka dni" wobec −13,6 pp „na dziś", a poprzednie 0,13 było
+# stłumione poniżej OBU tych liczb.
+#
+# UCZCIWIE O SKUTKU: na puli z dnia wdrożenia ta zmiana nie robi NIC. Sprawdzone
+# przemiataniem buildera po żywej puli (0,13 / 0,18 / 0,22 / 0,28): te same
+# kupony, te same długości, kurs rusza się o grosze. Powód jest prozaiczny —
+# najdalszy leg w puli tego dnia był za 30 h, więc próg „powyżej 48 h" w ogóle
+# się nie odpalał. Kara zadziała w dni, gdy pula sięga w weekend; nie należy
+# jej mylić z rozwiązaniem problemu kuponów wielodniowych.
+#
+# CZEGO TA KARA NIE ZAŁATWIA — najważniejsza liczba o kuponach, zmierzona
+# 2026-08-05 na 69 rozliczeniach (krzyżówka horyzont × długość):
+#
+#     w dobę / 2-3 legi            n=11   1 wygrana    ROI  − 82%
+#     w dobę / 4+ legów            n= 6   3 wygrane    ROI  +249%
+#     leg dalej niż doba / 2-3     n=11   1 wygrana    ROI  − 54%
+#     leg dalej niż doba / 4+      n=41   0 wygranych  ROI  −100%   <- średni kurs 14,7
+#
+# Czterdzieści jeden kuponów długich I sięgających dalej niż doba, ZERO trafień.
+# To dokładnie sloty ×9–11 i ×18–25. Sam horyzont ani sama długość nie tłumaczą
+# straty (krótkie mają −68%, długie −55%) — dopiero ich POŁĄCZENIE.
+# Uwaga na drugą stronę tej tabeli: „w dobę zarabia +35%" opiera się na SZEŚCIU
+# kuponach z trzema trafieniami i nie jest dowodem na nic.
+KARA_HORYZONTU = ((24, 0.0), (48, 0.10), (10**9, 0.18))
 
 
 def _kara_horyzontu(l: dict, teraz: int | None = None) -> float:

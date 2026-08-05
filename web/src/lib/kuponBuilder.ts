@@ -121,11 +121,17 @@ function wagaModelu(l: LegPool, wagi?: Record<string, number>): number {
  * gorzej trafia leg, niezależnie od tego, czy zawodniczy, czy drużynowy
  * (na dziś −6,6/−11,0 pp, na kilka dni −20,4/−37,3 pp). Wartości niżej są
  * mniejsze od zmierzonej luki, bo część błędu łapie już shrink ku cenie rynku.
+ *
+ * PODNIESIONE 2026-08-05 (0,06 -> 0,10 i 0,13 -> 0,18) razem z wersją
+ * pythonową. TE LICZBY MUSZĄ SIĘ ZGADZAĆ Z `kupony.KARA_HORYZONTU` — generator
+ * na żądanie liczy tą samą miarą co kupony automatyczne i pilnuje tego test
+ * parytetu. Pełne uzasadnienie i pomiar (w tym to, czego ta kara NIE załatwia)
+ * stoją przy stałej w `kupony.py`; tutaj świadomie tylko kopia wartości.
  */
 const KARA_HORYZONTU: [number, number][] = [
   [24, 0.0],
-  [48, 0.06],
-  [Number.POSITIVE_INFINITY, 0.13],
+  [48, 0.1],
+  [Number.POSITIVE_INFINITY, 0.18],
 ];
 
 function karaHoryzontu(l: LegPool, teraz?: number): number {
