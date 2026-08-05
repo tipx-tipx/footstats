@@ -1058,6 +1058,23 @@ SUGESTIA_BIAS_CAP_LOGIT = (-1.0, 0.40)
 # bin góry pozwala kalibracji dociskać tam, gdzie faktycznie przeszacowuje
 BIAS_PRZEDZIALY = [(0.0, 0.55), (0.55, 0.70), (0.70, 0.85), (0.85, 1.01)]
 MIN_N_PRZEDZIAL = 15
+
+# SKĄD SIĘ WZIĘŁA LICZBA W PRZEDZIALE (2026-08-05).
+#
+# Przedział bez własnej próby dostaje wartość globalną rynku — i to jest
+# poprawne, bo lepiej korygować przybliżeniem niż nie korygować wcale. Wada
+# była w tym, że po zapisie NIC już tego nie odróżniało: raport pokazywał
+# cztery liczby w rzędzie i wyglądało to jak cztery pomiary, choć trzy z nich
+# były jedną liczbą powtórzoną. Zmierzone tego dnia: na 12 rynków tylko trzy
+# miały jakikolwiek przedział policzony z własnych danych.
+#
+# Etykieta jedzie OBOK `bins`, w osobnym polu, a nie jako czwarty element
+# przedziału — `[lo, hi, b]` jest rozpakowywane krotką w sześciu miejscach
+# (engine, betting, cykl), więc poszerzenie wiersza wywaliłoby je wszystkie.
+# Kto etykiety nie zna, po prostu ich nie widzi.
+ZRODLO_WLASNA = "wlasna"          # przedział miał swoją próbę
+ZRODLO_GLOBALNA = "globalna"      # za mało danych, wpisana wartość rynku
+ZRODLO_OBCA_EPOKA = "obca_epoka"  # połowa korekty z poprzedniego produktu
 # WAŻENIE ŚWIEŻOŚCI kalibracji: rozliczenie sprzed 14 dni waży połowę
 # najnowszego (półokres). Warunki gry zmieniają się (faza grupowa vs
 # pucharowa, klub vs turniej) — bez wygaszania stara prawda przykrywa nową
@@ -1208,16 +1225,21 @@ def compute_bias_full(
         else:
             continue  # za mało danych i brak rozliczonej rodziny
         bins = []
+        zrodla = []
         for lo, hi in BIAS_PRZEDZIALY:
             # po `p_over`, nie po `p` typu — patrz `_p_over_rekordu`
             bgrp = [r for r in grp if lo <= _p_over_rekordu(r) < hi]
             bb = g
+            zr = ZRODLO_GLOBALNA
             if len(bgrp) >= MIN_N_PRZEDZIAL:
                 b_eff = sum(_w(r) for r in bgrp)
                 k = b_eff / (b_eff + MIN_N_PRZEDZIAL)
                 bb = g + k * (_bias_logit(bgrp, [_w(r) for r in bgrp]) - g)
+                zr = ZRODLO_WLASNA
             bins.append([lo, hi, _cap_bias(bb, cap)])
-        out[mk] = {"logit": True, "global": _cap_bias(g, cap), "bins": bins}
+            zrodla.append(zr)
+        out[mk] = {"logit": True, "global": _cap_bias(g, cap),
+                   "bins": bins, "zrodla": zrodla}
     if _surowo:
         return out
     return _dolej_z_innej_epoki(out, log, min_n, sugestie, cap)
@@ -1262,6 +1284,10 @@ def _dolej_z_innej_epoki(
             "global": _cap_bias(wpis["global"] * KOREKTA_OBCEJ_EPOKI, cap),
             "bins": [[lo, hi, _cap_bias(b * KOREKTA_OBCEJ_EPOKI, cap)]
                      for lo, hi, b in wpis["bins"]],
+            # cała dolewka to przyznanie się do niewiedzy, więc żaden z jej
+            # przedziałów nie jest pomiarem w TEJ epoce — nawet ten, który
+            # w poprzedniej miał własną próbę
+            "zrodla": [ZRODLO_OBCA_EPOKA] * len(wpis["bins"]),
         }
         dolane.append(mk)
     if dolane:
@@ -2060,7 +2086,7 @@ def korekta_strumienia(log: dict | None = None) -> dict[str, float]:
         # DRABINKI zostają skalarem: ich `p` pochodzi z pokrycia linii, a nie
         # z silnika, więc przedziały `p` modelu nic tam nie znaczą — a próba
         # jest najmniejsza ze wszystkich strumieni.
-        biny = [] if drabinki else _biny_korekty(grp, b, cap)
+        biny, zrodla = ([], []) if drabinki else _biny_korekty(grp, b, cap)
         # PRÓG SZUMU OBEJMUJE CAŁĄ STRUKTURĘ: strumień idealnie skalibrowany
         # ma MILCZEĆ, a nie zwracać słownik zer. Delty 0,0 byłyby nieszkodliwe
         # w rachunku, ale znaczą co innego niż brak wpisu — a na braku wpisu
@@ -2069,7 +2095,8 @@ def korekta_strumienia(log: dict | None = None) -> dict[str, float]:
         if not istotna:
             continue
         if biny:
-            out[strumien] = {"logit": True, "global": round(b, 3), "bins": biny}
+            out[strumien] = {"logit": True, "global": round(b, 3),
+                             "bins": biny, "zrodla": zrodla}
         else:
             out[strumien] = round(b, 3)
     return out
@@ -2141,6 +2168,50 @@ def ostrzezenia_prob(proby: dict[str, dict] | None = None) -> list[str]:
                 f"{strumien}: {ile} przy progu {s['prog']} — "
                 f"NA STYK, {zapas} od zniknięcia korekty")
     return zdania
+
+
+def pokrycie_przedzialow(*mapy: dict | None) -> dict[str, int]:
+    """Ile przedziałów korekty stoi na WŁASNYCH danych, a ile na przybliżeniu.
+
+    Przyjmuje dowolną liczbę map korekt (kalibracja rynkowa, korekta
+    strumienia — każda w kształcie {klucz: {"bins": [...], "zrodla": [...]}}).
+    Skalary i wpisy bez przedziałów pomija: nie mają czego udawać.
+
+    `bez_etykiet` to wpisy zapisane przed 05.08, jeszcze bez `zrodla`. Nie
+    zgadujemy za nie — mają własny licznik, żeby stara korekta nie wliczała
+    się po cichu do „na własnych danych".
+    """
+    out = {ZRODLO_WLASNA: 0, ZRODLO_GLOBALNA: 0, ZRODLO_OBCA_EPOKA: 0,
+           "bez_etykiet": 0, "razem": 0}
+    for mapa in mapy:
+        for wpis in (mapa or {}).values():
+            if not isinstance(wpis, dict):
+                continue
+            biny = wpis.get("bins") or []
+            if not biny:
+                continue
+            zrodla = wpis.get("zrodla") or []
+            out["razem"] += len(biny)
+            for i in range(len(biny)):
+                zr = zrodla[i] if i < len(zrodla) else None
+                out[zr if zr in out else "bez_etykiet"] += 1
+    return out
+
+
+def zdanie_pokrycia(pokrycie: dict[str, int]) -> str:
+    """Jedno zdanie do logu cyklu: ile przedziałów to pomiar, ile przybliżenie."""
+    razem = pokrycie.get("razem", 0)
+    if not razem:
+        return "przedziały korekty: żaden rynek nie ma jeszcze przedziałów"
+    czesci = [f"{pokrycie.get(ZRODLO_WLASNA, 0)} z {razem} na własnych danych"]
+    for klucz, opis in (
+        (ZRODLO_GLOBALNA, "wartość globalna rynku"),
+        (ZRODLO_OBCA_EPOKA, "połowa korekty z poprzedniej epoki"),
+        ("bez_etykiet", "zapisane przed wprowadzeniem etykiet"),
+    ):
+        if pokrycie.get(klucz):
+            czesci.append(f"{pokrycie[klucz]} × {opis}")
+    return "przedziały korekty: " + ", ".join(czesci)
 
 
 def odmien(n: int, jeden: str, kilka: str, wielu: str) -> str:
@@ -2310,28 +2381,38 @@ def skutecznosc_zdarzen(recs: list[dict]) -> dict:
     }
 
 
-def _biny_korekty(grp: list[dict], globalna: float, cap: tuple) -> list:
+def _biny_korekty(
+    grp: list[dict], globalna: float, cap: tuple,
+) -> tuple[list, list]:
     """Delty per przedział szansy, ściągane do globalnej przy małej próbie.
 
-    Zwraca [] gdy ŻADEN przedział nie ma własnego pomiaru — wtedy wołający
-    zostaje przy jednej liczbie i nic się nie zmienia względem poprzedniej
-    wersji. To jest celowe: przedziały mają włączać się same, gdy danych
-    przybędzie, a nie od razu udawać wiedzę.
+    Zwraca ([], []) gdy ŻADEN przedział nie ma własnego pomiaru — wtedy
+    wołający zostaje przy jednej liczbie i nic się nie zmienia względem
+    poprzedniej wersji. To jest celowe: przedziały mają włączać się same, gdy
+    danych przybędzie, a nie od razu udawać wiedzę.
+
+    Druga zwracana lista to etykiety `ZRODLO_*` — po jednej na przedział,
+    w tej samej kolejności. Bez nich przedział bez próby jest w zapisie nie do
+    odróżnienia od zmierzonego (patrz komentarz przy `ZRODLO_WLASNA`).
     """
     biny = []
+    zrodla = []
     wlasne = 0
     for lo, hi in BIAS_PRZEDZIALY:
         bgrp = [r for r in grp if lo <= _p_over_rekordu(r) < hi]
         bb = globalna
+        zr = ZRODLO_GLOBALNA
         if len(bgrp) >= KOREKTA_PRZEDZIAL_MIN_N:
             k = len(bgrp) / (len(bgrp) + KOREKTA_PRZEDZIAL_MIN_N)
             surowy = _bias_logit(
                 [{**r, "p_model": _p_surowe(r)} for r in bgrp]
             )
             bb = globalna + k * (surowy - globalna)
+            zr = ZRODLO_WLASNA
             wlasne += 1
         biny.append([lo, hi, round(max(cap[0], min(cap[1], bb)), 3)])
-    return biny if wlasne else []
+        zrodla.append(zr)
+    return (biny, zrodla) if wlasne else ([], [])
 
 
 # --- SZANSA POKAZYWANA: co piszemy userowi na stronie (2026-07-29) ---
@@ -3735,6 +3816,19 @@ PACZKA_UCZENIA_MIN = 10     # krótszy ogon nie jest osobnym wierszem
 PACZEK_W_RAPORCIE = 10      # ile ostatnich wierszy trzymamy w payloadzie
 TREND_PACZEK = 3            # po tylu pierwszych/ostatnich liczymy kierunek
 
+# ALARM POGORSZENIA (2026-08-05). Kierunek liczyliśmy i pokazywali na stronie
+# od 04.08, ale cykl milczał — pogorszenie dało się zobaczyć wyłącznie wtedy,
+# gdy ktoś sam wszedł w zakładkę „Czy się uczymy".
+#
+# 3 pp, bo tyle mniej więcej dzieli nas od progu opłacalności ([[prog-
+# oplacalnosci-63]]). To jest jednak tylko PODŁOGA progu: prawdziwy próg liczy
+# się z rozrzutu samych paczek (`trend.szum`), bo 3 pp okazało się mniejsze niż
+# naturalne wahanie strumienia — patrz komentarz przy `szum` w `raport_uczenia`.
+# Próba 100 rozliczeń: przy 40 na paczkę trzy ostatnie dają 120, więc alarm
+# z definicji nie odpali na doklejonym ogonie.
+ALARM_TRENDU_PP = 0.03
+ALARM_TRENDU_MIN_N = 100
+
 
 def raport_uczenia(
     log: dict, rozmiar: int = PACZKA_UCZENIA,
@@ -3804,14 +3898,74 @@ def raport_uczenia(
             teraz = pelne[-TREND_PACZEK:]
             l_start = sum(p["luka"] for p in start) / len(start)
             l_teraz = sum(p["luka"] for p in teraz) / len(teraz)
+            # OKNO DO OKNA, OSOBNO OD „OD POCZĄTKU" (2026-08-05).
+            # `zmiana` mierzy się do PIERWSZYCH paczek w historii i to jest
+            # dobre na stronie: odpowiada na „czy przez ten miesiąc coś się
+            # poprawiło". Ale jako alarm nie nadaje się zupełnie — raz
+            # przekroczony próg zostaje przekroczony do końca istnienia
+            # produktu, bo punkt odniesienia się nie rusza. Alarm, który
+            # świeci codziennie, przestaje być alarmem po tygodniu.
+            # Dlatego `zmiana_ostatnio` porównuje trzy ostatnie paczki
+            # z trzema POPRZEDNIMI — mówi „psuje się TERAZ", nie „jest gorzej
+            # niż w lipcu".
+            poprzednio = pelne[-2 * TREND_PACZEK:-TREND_PACZEK]
+            l_poprzednio = sum(p["luka"] for p in poprzednio) / len(poprzednio)
+            # ILE WYNOSI SAM SZUM (2026-08-05). Zmierzone tego dnia na
+            # drużynach: luka kolejnych paczek to −6, −18, −21, +1, +4, −9,
+            # −18, −27, −18 pp. Odchylenie rzędu 10 pp na paczkę oznacza, że
+            # różnica dwóch trzypaczkowych okien waha się o ~8 pp SAMA Z SIEBIE.
+            # Alarm z progiem 3 pp odpalałby więc niemal co cykl i po tygodniu
+            # nikt by go nie czytał. `szum` to błąd standardowy tej różnicy —
+            # alarm musi go przekroczyć, żeby w ogóle się odezwać.
+            luki = [p["luka"] for p in pelne]
+            sr = sum(luki) / len(luki)
+            wariancja = sum((x - sr) ** 2 for x in luki) / len(luki)
+            szum = (wariancja * 2.0 / TREND_PACZEK) ** 0.5
             rec["trend"] = {
                 "luka_start": round(l_start, 3),
                 "luka_teraz": round(l_teraz, 3),
                 "zmiana": round(l_teraz - l_start, 3),
                 "paczek": len(pelne),
+                "luka_poprzednio": round(l_poprzednio, 3),
+                "zmiana_ostatnio": round(l_teraz - l_poprzednio, 3),
+                "szum": round(szum, 3),
+                # ROZLICZENIA POD KOŃCEM TRENDU — nie liczba paczek. Alarm
+                # potrzebuje próby, a paczka bywa doklejona (patrz wyżej), więc
+                # „3 paczki" nie zawsze znaczy 3 × `rozmiar`.
+                "n_teraz": sum(p["n"] for p in teraz),
+                "n_start": sum(p["n"] for p in start),
             }
         out[nazwa] = rec
     return out
+
+
+def ostrzezenia_trendu(uczenie: dict[str, dict]) -> list[str]:
+    """Zdania o strumieniach, które trafiają WYRAŹNIE gorzej niż na starcie.
+
+    Alarm, nie diagnoza: mówi, że luka między deklaracją a trafieniami rośnie,
+    a nie dlaczego. Przyczyna bywa poza modelem (zmiana podaży rynków, inna
+    liga w terminarzu) — dlatego to linia w logu, a nie brama.
+
+    Mierzy `zmiana_ostatnio` (okno do okna), NIE `zmiana` (od początku
+    historii) — patrz komentarz w `raport_uczenia`. Milczy przy poprawie,
+    przy próbie mniejszej niż `ALARM_TRENDU_MIN_N` i wtedy, gdy spadek mieści
+    się w zmierzonym szumie tego strumienia.
+    """
+    zdania = []
+    for nazwa, rec in sorted(uczenie.items()):
+        t = rec.get("trend") or {}
+        n_teraz = int(t.get("n_teraz") or 0)
+        zmiana = float(t.get("zmiana_ostatnio") or 0.0)
+        prog = max(ALARM_TRENDU_PP, float(t.get("szum") or 0.0))
+        if zmiana <= -prog and n_teraz >= ALARM_TRENDU_MIN_N:
+            zdania.append(
+                f"{nazwa}: luka pogłębiła się o {abs(zmiana) * 100:.1f} pp "
+                f"({t['luka_poprzednio'] * 100:+.1f} -> "
+                f"{t['luka_teraz'] * 100:+.1f} pp) na "
+                f"{odmien(n_teraz, 'rozliczeniu', 'rozliczeniach', 'rozliczeniach')}"
+                f", przy szumie {prog * 100:.1f} pp"
+            )
+    return zdania
 
 
 # POMIAR PROGU POKRYCIA DRABINEK (2026-07-29). Próg 0,5 (radar.
@@ -4562,6 +4716,11 @@ def rozlicz(
                 f" -> teraz {t['luka_teraz']:+.3f}"
                 f" (zmiana {t['zmiana']:+.3f}, paczek {t['paczek']})"
             )
+    # ...a tu głośno, gdy kierunek jest zły. Linia wyżej drukuje się zawsze
+    # i przy trzech strumieniach ginie w logu — pogorszenie musi mieć własne
+    # zdanie, inaczej znowu trzeba je odkrywać ręcznie w zakładce.
+    for _zdanie in ostrzezenia_trendu(uczenie):
+        print(f"[uczenie] POGORSZENIE — {_zdanie}")
 
     # czy próg pokrycia drabinek (0,5) stoi w dobrym miejscu — pomiar w tle
     prog_drabinek = pomiar_progu_drabinek(log)

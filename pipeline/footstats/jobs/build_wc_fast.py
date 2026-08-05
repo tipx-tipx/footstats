@@ -2837,6 +2837,17 @@ def _main_impl(tryb=None):
             + (f" (biny: {len(d.get('bins') or [])})" if isinstance(d, dict) else "")
             for s, d in korekta_strumieni.items()))
 
+    # ILE PRZEDZIAŁÓW TO POMIAR, A ILE PRZYBLIŻENIE (2026-08-05).
+    # Przedział bez własnej próby dostaje wartość globalną rynku i do dziś
+    # wyglądał w raporcie identycznie jak zmierzony — cztery liczby w rzędzie
+    # czytało się jak cztery pomiary. Ta linia mówi wprost, ile z nich to
+    # wiedza. Sam licznik, żadnej zmiany w rachunku.
+    try:
+        print("[uczenie] " + rozliczanie.zdanie_pokrycia(
+            rozliczanie.pokrycie_przedzialow(bias_map, korekta_strumieni)))
+    except Exception as e:
+        diagnostyka.cichy("cykl", "pokrycie_przedzialow", e)
+
     # SZANSA POKAZYWANA — ostatnia warstwa, wyłącznie na wyjściu.
     # Kalibracja i korekta strumienia działają PRZED bramą publikacji, więc
     # zjada je efekt selekcji: opublikowany zbiór i tak deklaruje ~71%, a
@@ -2920,18 +2931,36 @@ def _main_impl(tryb=None):
         if isinstance(v, dict) and v.get("logit"):
             biny = [[lo, hi, round(float(b) + _delta_dla(lo, hi), 3)]
                     for lo, hi, b in (v.get("bins") or [])]
+            # ETYKIETY PO ZSUMOWANIU. Bin jest sumą dwóch korekt, więc niesie
+            # pomiar, jeśli miała go KTÓRAKOLWIEK z nich — inaczej przedział
+            # zmierzony przez strumień znikałby pod „globalna" z rynku.
+            zr_rynku = list(v.get("zrodla") or [])
+            zr_strum = list(d.get("zrodla") or []) if isinstance(d, dict) else []
+            zrodla = [
+                rozliczanie.ZRODLO_WLASNA
+                if rozliczanie.ZRODLO_WLASNA in (
+                    zr_rynku[i:i + 1] + zr_strum[i:i + 1])
+                else (zr_rynku[i] if i < len(zr_rynku)
+                      else rozliczanie.ZRODLO_GLOBALNA)
+                for i in range(len(biny))
+            ]
             return {
                 **v,
                 "global": round(float(v.get("global", 0.0)) + d_glob, 3),
                 "bins": biny,
+                **({"zrodla": zrodla} if zrodla else {}),
             }
         if v is None or v == 1.0:
             # rynek bez własnej kalibracji dostaje samą korektę strumienia —
             # razem z jej przedziałami, jeśli je ma
             if isinstance(d, dict):
+                # etykiety źródeł jadą razem z binami — inaczej rynek bez
+                # własnej kalibracji wyglądałby w liczniku pokrycia na wpis
+                # sprzed wprowadzenia etykiet (patrz rozliczanie.ZRODLO_WLASNA)
                 return {"logit": True, "global": round(d_glob, 3),
                         "bins": [[lo, hi, round(float(b), 3)]
-                                 for lo, hi, b in (d.get("bins") or [])]}
+                                 for lo, hi, b in (d.get("bins") or [])],
+                        "zrodla": list(d.get("zrodla") or [])}
             return {"logit": True, "global": round(d_glob, 3), "bins": []}
         return v
 

@@ -111,12 +111,28 @@ def czesc2_warstwy(log: dict, R) -> None:
         print(f"   BŁĄD: {e}")
 
     print("\nKALIBRACJA PER RYNEK (bias logitowy z rozliczeń):")
+    bias = {}
     try:
         bias = R.compute_bias_full(log)
         if not bias:
             print("   PUSTA")
         for k, v in sorted(bias.items(), key=lambda x: str(x[0]))[:20]:
             print(f"   {str(k):<28} {v if not isinstance(v, dict) else v}")
+    except Exception as e:
+        print(f"   BŁĄD: {e}")
+
+    # SKĄD SIĘ WZIĘŁA KAŻDA Z TYCH LICZB (czujnik z 05.08). Wiersz wyżej
+    # pokazuje cztery liczby na rynek i wygląda to jak cztery pomiary —
+    # a przedział bez własnej próby dostaje po prostu wartość globalną.
+    print("\n   ILE Z TEGO TO POMIAR:")
+    try:
+        kor = R.korekta_strumienia(log)
+        print("   " + R.zdanie_pokrycia(R.pokrycie_przedzialow(bias, kor)))
+        for k, v in sorted(bias.items(), key=lambda x: str(x[0])):
+            zr = (v or {}).get("zrodla") or []
+            wlasne = sum(1 for z in zr if z == R.ZRODLO_WLASNA)
+            if zr:
+                print(f"   {str(k):<28} {wlasne}/{len(zr)}  {', '.join(zr)}")
     except Exception as e:
         print(f"   BŁĄD: {e}")
 
@@ -130,6 +146,22 @@ def czesc2_warstwy(log: dict, R) -> None:
                   + (f"  ({', '.join(sorted(d)[:6])})" if d else "  — nic"))
         except Exception as e:
             print(f"   {nazwa:<10} BŁĄD: {e}")
+
+    print("\nCZY SIĘ PSUJE (trzy ostatnie paczki wobec trzech poprzednich):")
+    try:
+        uczenie = R.raport_uczenia(log)
+        for nazwa, rec in sorted(uczenie.items()):
+            t = rec.get("trend")
+            if not t:
+                print(f"   {NAZWY_STRUMIENI.get(nazwa, nazwa):<12} za krótka historia")
+                continue
+            print(f"   {NAZWY_STRUMIENI.get(nazwa, nazwa):<12}"
+                  f" {t['luka_poprzednio'] * 100:+.1f} -> {t['luka_teraz'] * 100:+.1f} pp"
+                  f"   (szum {t['szum'] * 100:.1f} pp)")
+        for z in R.ostrzezenia_trendu(uczenie):
+            print(f"   ALARM: {z}")
+    except Exception as e:
+        print(f"   BŁĄD: {e}")
 
     print("\nPRZEWAGA NAD CENĄ (czy nasza liczba bije kurs):")
     try:

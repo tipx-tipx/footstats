@@ -941,6 +941,18 @@ export interface UczenieStrumienia {
     /** ujemne = luka się POWIĘKSZA, czyli model NIE robi postępów */
     zmiana: number;
     paczek: number;
+    /** luka z okna POPRZEDZAJĄCEGO trzy ostatnie paczki */
+    luka_poprzednio?: number;
+    /** zmiana okno do okna – „psuje się teraz", w odróżnieniu od `zmiana`,
+     *  która mierzy do początku historii i raz przekroczona zostaje taka
+     *  na zawsze. To na tym stoi alarm w logu cyklu. */
+    zmiana_ostatnio?: number;
+    /** o ile luka waha się SAMA – błąd standardowy różnicy dwóch okien.
+     *  Spadek mniejszy niż ta liczba nie znaczy nic. */
+    szum?: number;
+    /** rozliczenia w oknie „teraz" / „start" (paczka bywa doklejona) */
+    n_teraz?: number;
+    n_start?: number;
   };
 }
 
