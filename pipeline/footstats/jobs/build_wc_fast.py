@@ -5218,6 +5218,19 @@ def _main_impl(tryb=None):
                 powod_poza = "stare_dane"
             elif b["kickoff_ts"] <= teraz_pub + kupony.MARGINES_STARTU_S:
                 powod_poza = "za_pozno"
+            elif (betting.wymaga_uzasadnienia(b["p_model"])
+                  and not betting.ma_komplet_uzasadnienia(b)):
+                # BRAMA UZASADNIEŃ — patrz betting.PROG_POLKI_PEWNE.
+                #
+                # DOTYCZY WYŁĄCZNIE NOWYCH PUBLIKACJI i to jest zamierzone,
+                # mimo lekcji z [[wznowione-omijaly-bramy]] (bramy stawiać przy
+                # dumpie, nie przy narodzinach typu). Tutaj wyjątek jest
+                # świadomy: typ RAZ POKAZANY zostaje do gwizdka nawet bez
+                # materiału, bo cena jest zamrożona, user mógł go zagrać,
+                # a znikanie typów spod ręki naprawialiśmy osobno. Stąd to
+                # miejsce w kodzie — pętla po świeżych kandydatach, przed
+                # `scal_z_publikacjami`, które wznawia typy z księgi.
+                powod_poza = "bez_uzasadnienia"
             elif pewniaki_per_mecz.get(b["mecz_id"], 0) >= MAX_PEWNIAKOW_MECZ:
                 powod_poza = "limit_meczu"
         rec_pewniaka = {
@@ -5975,6 +5988,33 @@ def _main_impl(tryb=None):
     # listę samym pasmem 3,0+ (dziś jedynym, które bije cenę) — czyli tanie
     # kursy zniknęłyby po cichu, a tego user nie chce.
     LISTA_PER_PASMO = 6
+    # ...i na RODZINĘ STATYSTYKI (2026-08-05, zgłoszenie usera „bez przesytu").
+    #
+    # `LISTA_PER_RYNEK` liczy pary (kod, strona) OSOBNO, a kartki mają dwa
+    # osobne kody: `match_cards` i `team_cards`. Dla nas to różne rynki, dla
+    # patrzącego na listę to dwa razy to samo słowo — więc w najgorszym razie
+    # kartki mogły zająć 12 z 20 miejsc, nie łamiąc żadnego limitu. Zmierzone
+    # 05.08: 7 z 16 typów drużynowych to kartki (44%), przy 3 + 3 + 1 rozbitych
+    # na trzy pary rynek-strona.
+    #
+    # UWAGA NA DIAGNOZĘ: to NIE jest główna przyczyna przesytu. Pula tego samego
+    # cyklu ma 71% goli, a opublikowana lista 38% — czyli limity już dywersyfikują
+    # MOCNIEJ niż źródło, a prawdziwym ograniczeniem jest podaż (45 legów
+    # drużynowych, 32 z jednego rynku). Ten limit domyka wyłącznie przypadek
+    # skrajny; zaostrzanie go niżej skróciłoby listę, zamiast ją urozmaicić,
+    # bo nie ma czym zastąpić.
+    LISTA_PER_RODZINA = 6
+
+    def _rodzina_statystyki(kod) -> str:
+        """Kartki to kartki, wszystko jedno czyje — `match_cards` i `team_cards`
+        to dla użytkownika jedno i to samo."""
+        k = str(kod or "")
+        for r in ("cards", "corners", "goals", "shots", "sot", "fouls",
+                  "tackles"):
+            if r in k:
+                return r
+        return k
+
     _ukryte: set[str] = set()
     try:
         _log_przewagi = rozliczanie._migruj_log(
@@ -6024,6 +6064,7 @@ def _main_impl(tryb=None):
     _z_meczu: dict = {}
     _z_rynku: dict = {}
     _z_pasma: dict = {}
+    _z_rodziny: dict = {}
     lista_pub = []
     for b in sorted(do_pokazania, key=_klucz_listy, reverse=True):
         if b.get("sugestia"):
@@ -6042,16 +6083,28 @@ def _main_impl(tryb=None):
             continue
         if _z_pasma.get(pas, 0) >= LISTA_PER_PASMO:
             continue
+        rodz = _rodzina_statystyki(b.get("rynek_kod"))
+        if _z_rodziny.get(rodz, 0) >= LISTA_PER_RODZINA:
+            continue
         _z_meczu[mid] = _z_meczu.get(mid, 0) + 1
         _z_rynku[kl] = _z_rynku.get(kl, 0) + 1
         _z_pasma[pas] = _z_pasma.get(pas, 0) + 1
+        _z_rodziny[rodz] = _z_rodziny.get(rodz, 0) + 1
         lista_pub.append(b)
         if len(lista_pub) >= LISTA_CAP:
             break
     if len(do_pokazania) > len(lista_pub):
         print(f"Lista publikowana: {len(lista_pub)} z {len(do_pokazania)} "
-              f"kandydatów (max {LISTA_PER_MECZ}/mecz, {LISTA_PER_RYNEK}/rynek); "
-              f"reszta zostaje w puli kuponów")
+              f"kandydatów (max {LISTA_PER_MECZ}/mecz, {LISTA_PER_RYNEK}/rynek, "
+              f"{LISTA_PER_RODZINA}/rodzinę); reszta zostaje w puli kuponów")
+    if _z_rodziny:
+        # SKŁAD LISTY, NIE TYLKO DŁUGOŚĆ — po każdej zmianie bram trzeba
+        # widzieć, CO weszło (lekcja z rozszerzenia okna zgody 04.08: dry-run
+        # pokazał 20 typów zamiast 18 i wyglądało dobrze, dopóki nikt nie
+        # spojrzał, że trzy z nich są z rynku w kwarantannie).
+        print("Skład listy wg rodziny: " + ", ".join(
+            f"{k} {v}" for k, v in sorted(
+                _z_rodziny.items(), key=lambda x: -x[1])))
     if _przewaga:
         _bija = [k for k, v in _przewaga.items() if v["przewaga"] > 0]
         print(f"Przewaga nad ceną: {len(_bija)} z {len(_przewaga)} rynków "

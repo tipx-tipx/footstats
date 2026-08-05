@@ -580,6 +580,46 @@ MAX_ODDS = 6.0                      # kursy wyżej to loteria, nie systematyczny
 MIN_ODDS = 1.19                     # poniżej 1.19 gra się nie opłaca (decyzja użytkownika)
 MAX_CI_WIDTH = 0.30                 # zbyt szerokie widełki szansy = nie stawiamy
 
+# --- BRAMA UZASADNIEŃ: półka „więcej płacą" (2026-08-05) -------------------
+#
+# Strona dzieli typy na dwie półki: „częściej wchodzą" (szansa >= 70%)
+# i „więcej płacą" (niżej, za to wyższy kurs). Typ z tej drugiej BEZ rozpisanego
+# rachunku jest dla kupującego strzałem w ciemno, a dla nas rzeczą najtrudniejszą
+# do obrony — bo jedyne, co go usprawiedliwia, to nasze liczenie.
+#
+# WŁĄCZONE DOPIERO PO POMIARZE, w kolejności, która była warunkiem, nie
+# preferencją (patrz notatka „druzyny: przeglad sprzedazowy"):
+#   02.08  półka miała 9 typów, komplet materiału JEDEN — brama zostawiłaby 1 z 9,
+#   05.08  po dosypaniu formy i naprawie rejestru: 6 z 9. Dopiero to jest cena,
+#          którą wolno zapłacić.
+#
+# Trzy typy, które dziś odpadają, to dokładnie te, których nie umiemy wytłumaczyć
+# (brak czynników albo brak przedziału ufności) — czyli brama robi to, co ma.
+#
+# PRÓG MUSI SIĘ ZGADZAĆ Z FRONTEM (`PROG_PEWNE` w `web/src/components/
+# DruzynyTablica.tsx`) — inaczej brama tnie inną półkę, niż strona pokazuje.
+# Pilnuje tego `test_brama_uzasadnien.py`; nie zmieniać jednego bez drugiego.
+PROG_POLKI_PEWNE = 0.70
+
+
+def wymaga_uzasadnienia(p_model: float) -> bool:
+    """Czy typ jest na półce „więcej płacą" i musi mieć rozpisany rachunek."""
+    return float(p_model or 0.0) < PROG_POLKI_PEWNE
+
+
+def ma_komplet_uzasadnienia(b: dict) -> bool:
+    """Czy da się z tego zbudować kroki „skąd ta liczba" i „co ją zmienia".
+
+    Sprawdzamy DOKŁADNIE to, z czego karta buduje rozwinięcie: czynniki
+    (mnożniki rywala, sędziego, wyjazdu...) i przedział ufności. Historii formy
+    tu NIE wymagamy — dosypuje ją `scal_forme_druzyn` już po publikacji, więc
+    warunek na nią byłby sprawdzany za wcześnie i kasowałby typy, które na
+    stronie mają komplet. Zmierzone 05.08: na drużynowych warunek na sam
+    rachunek daje ten sam wynik co rachunek + forma (6 z 9).
+    """
+    ci = b.get("ci") or [None, None]
+    return bool(b.get("czynniki")) and ci[0] is not None
+
 # --- PROFILE LEGA ZAWODNICZEGO (przeniesione z build_wc_fast 2026-08-03) ---
 #
 # To jest POLITYKA, a nie szczegół budowania listy — a leżała wpisana liczbami
