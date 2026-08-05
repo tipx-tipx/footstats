@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { CzegoNieTypujemy } from "@/components/CzegoNieTypujemy";
 import { GeneratorKuponu } from "@/components/GeneratorKuponu";
 import { Reveal } from "@/components/Reveal";
 import { TopPokrycia } from "@/components/TopPokrycia";
@@ -13,7 +14,7 @@ import {
   getValueBets,
   getZawodnicy,
 } from "@/lib/data";
-import type { Odrzucenie } from "@/lib/types";
+import { etykietaPowodu } from "@/lib/odrzucenia";
 import { fmtKurs, fmtMnoznik, opisZakladu } from "@/lib/format";
 import { kluczWerdyktu, topPokrycia, type WerdyktRynku } from "@/lib/pokrycie";
 
@@ -34,6 +35,21 @@ export async function generateMetadata({
 /** Separator odczytów w bandzie meta. */
 function Kreska() {
   return <span aria-hidden className="h-3 w-px bg-hairline-strong" />;
+}
+
+/**
+ * „1 okazja", „2 okazje", „5 okazji" – TRZY formy, nie dwie.
+ *
+ * Było `okazje === 1 ? "1 okazja" : "N okazji"`, więc banda meta pokazywała
+ * „2 OKAZJI MODELU" (przegląd sprzedażowy, szlif). Ta sama funkcja stoi już
+ * w Hero.tsx — tam odmienia poprawnie; tutaj był drugi, uproszczony wariant.
+ */
+function odmienOkazje(n: number): string {
+  if (n === 1) return "1 okazja";
+  const r10 = n % 10;
+  const r100 = n % 100;
+  const kilka = r10 >= 2 && r10 <= 4 && (r100 < 12 || r100 > 14);
+  return `${n} ${kilka ? "okazje" : "okazji"}`;
 }
 
 function kiedy(ts: number): string {
@@ -96,7 +112,7 @@ export default async function MeczPage({
     if (o.podmiot_typ === "druzyna") continue; // tabela jest o zawodnikach
     werdykty.set(kluczWerdyktu(o.podmiot, o.rynek_kod), {
       stan: "odrzucony",
-      opis: POWOD_LABEL[o.powod] ?? o.powod.replace(/_/g, " "),
+      opis: etykietaPowodu(o.powod),
     });
   }
   for (const b of betyMeczu) {
@@ -178,7 +194,7 @@ export default async function MeczPage({
                 href={`/?mecz=${mecz.id}`}
                 className="font-display inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-brand transition-colors hover:text-brand-strong"
               >
-                {okazje === 1 ? "1 okazja modelu" : `${okazje} okazji modelu`}
+                {odmienOkazje(okazje)} modelu
                 <span aria-hidden>→</span>
               </Link>
             )}
@@ -263,113 +279,15 @@ export default async function MeczPage({
 
       {odrzucenia.length > 0 && (
         <Reveal className="mt-10">
-          {/* sito modelu: banda z odczytem, nie karta – to przypis, nie sekcja */}
-          <details className="group border-y border-hairline">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 py-3.5 text-sm font-semibold [&::-webkit-details-marker]:hidden">
-              <span>
-                Czego nie typujemy w tym meczu i dlaczego
-                <span className="font-data ml-2 text-xs font-normal text-faint">
-                  {odrzucenia.length} sprawdzonych bez typu
-                </span>
-              </span>
-              <svg
-                aria-hidden
-                width="14"
-                height="14"
-                viewBox="0 0 14 14"
-                className="shrink-0 text-faint transition-transform group-open:rotate-180"
-              >
-                <path
-                  d="M3 5.5 L7 9.5 L11 5.5"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </summary>
-            <div className="space-y-4 border-t border-hairline py-4">
-              <p className="text-xs leading-relaxed text-muted">
-                Model sprawdza każdego zawodnika i każdy rynek. Gdy typ się nie
-                pojawia, to nie przeoczenie: poniżej dokładny powód dla każdej
-                sprawdzonej pary.
-              </p>
-              {/* liczba i powód niosą treść; wyliczanka 200 nazwisk była
-                  ścianą tekstu, więc zostaje kilka przykładów na zachętę */}
-              {grupyOdrzucen(odrzucenia).map(([powod, wpisy]) => (
-                <div key={powod}>
-                  <div className="flex items-baseline justify-between gap-4 border-b border-hairline pb-1">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-faint">
-                      {POWOD_LABEL[powod] ?? powod}
-                    </p>
-                    <span className="font-data shrink-0 text-sm font-semibold text-ink-soft">
-                      {wpisy.length}
-                    </span>
-                  </div>
-                  <p className="mt-1.5 text-xs leading-relaxed text-muted">
-                    {wpisy[0].szczegol}
-                  </p>
-                  <p className="mt-1 text-xs leading-relaxed text-faint">
-                    {wpisy
-                      .slice(0, 6)
-                      .map((w) => `${w.podmiot} (${w.rynek.toLowerCase()})`)
-                      .join(", ")}
-                    {wpisy.length > 6 && ` i ${wpisy.length - 6} więcej`}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </details>
+          {/* sito modelu: banda z odczytem, nie karta – to przypis, nie sekcja.
+              Blok jest wspolny z Druzynami (CzegoNieTypujemy) — dwie kopie tej
+              samej sekcji rozjechalyby sie przy pierwszej poprawce tekstu. */}
+          <CzegoNieTypujemy
+            odrzucenia={odrzucenia}
+            tytul="Czego nie typujemy w tym meczu i dlaczego"
+          />
         </Reveal>
       )}
     </div>
-  );
-}
-
-const POWOD_LABEL: Record<string, string> = {
-  tylko_w_puli: "Dostępne w generatorze kuponów",
-  kwarantanna_rynku: "Rynek chwilowo wstrzymany (tracił pieniądze)",
-  stare_dane: "Zawodnik dawno nie grał, czekamy na świeże mecze",
-  za_stara_historia: "Dane o zawodniku są nieaktualne",
-  brak_kursu: "Superbet nie kwotuje tego rynku",
-  za_malo_zdarzen: "Model oczekuje za mało zdarzeń",
-  za_malo_historii: "Za mało meczów w historii",
-  krotka_historia: "Za krótka historia",
-  chwiejna_predykcja: "Model sam nie jest pewny swojej liczby",
-  rozjazd_z_rynkiem: "Model za daleko od kursu bukmachera",
-  kurs_lub_szansa_poza_widelkami: "Kurs i szansa nie składają się w grywalny typ",
-  // ten sam warunek rozbity na trzy (2026-07-27) – dla rynków drużynowych to
-  // najczęstszy powód braku typu, a jedna etykieta nie mówiła, co konkretnie
-  // zawiodło: cena bukmachera, nasza szansa czy sam rachunek opłacalności
-  kurs_poza_widelkami: "Kurs poza widełkami, w jakich gramy",
-  szansa_za_niska: "Szansa za niska jak na ten kurs",
-  wartosc_ujemna: "Przy ostrożnym liczeniu to nie wychodzi na plus",
-  // TRZY POWODY, KTÓRE OD ZAWSZE WYPISYWAŁY SIĘ SUROWYM KODEM (2026-08-05).
-  // Sekcja „Czego nie typujemy" pokazywała dosłownie „wartosc ujemna przy
-  // ostroznym", „za malo minut" i „kwarantanna strony" — czyli nazwy zmiennych
-  // w zdaniu po polsku. Widać to było dopiero po wstawieniu werdyktu do tabeli
-  // pokryć, bo tam ten sam napis stoi przy KAŻDYM wierszu, a nie w zwiniętej
-  // sekcji na dole strony. Razem 233 z 4126 odrzuceń w bazie.
-  wartosc_ujemna_przy_ostroznym: "Przy ostrożnym liczeniu wychodzi na minus",
-  za_malo_minut: "Zawodnik gra za mało minut, żeby to liczyć",
-  kwarantanna_strony: "Ta strona zakładu jest chwilowo wstrzymana (traciła)",
-  // w typie `Odrzucenie` są, w słowniku ich nie było
-  poza_skladem: "Zawodnika nie ma w składzie na ten mecz",
-  za_pozno: "Za blisko pierwszego gwizdka, żeby wystawić typ",
-};
-
-/** Grupuj wpisy po powodzie, w kolejności z POWOD_LABEL (reszta na końcu). */
-function grupyOdrzucen(wpisy: Odrzucenie[]): [string, Odrzucenie[]][] {
-  const m = new Map<string, Odrzucenie[]>();
-  for (const w of wpisy) {
-    const g = m.get(w.powod) ?? [];
-    g.push(w);
-    m.set(w.powod, g);
-  }
-  const kolejnosc = Object.keys(POWOD_LABEL);
-  return [...m.entries()].sort(
-    (a, b) =>
-      (kolejnosc.indexOf(a[0]) + 99) % 99 - (kolejnosc.indexOf(b[0]) + 99) % 99,
   );
 }

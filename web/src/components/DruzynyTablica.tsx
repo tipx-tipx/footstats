@@ -51,6 +51,37 @@ function odmienTypy(n: number): string {
   return `${n} ${kilka ? "typy" : "typów"}`;
 }
 
+function odmienMecze(n: number): string {
+  if (n === 1) return "1 mecz";
+  const r10 = n % 10;
+  const r100 = n % 100;
+  const kilka = r10 >= 2 && r10 <= 4 && (r100 < 12 || r100 > 14);
+  return `${n} ${kilka ? "mecze" : "meczów"}`;
+}
+
+/**
+ * Zdanie „czemu dziś tyle" — pokazywane tylko wtedy, gdy naprawdę jest co
+ * tłumaczyć: jutro musi mieć wyraźnie więcej meczów niż dziś. Przy zwykłym
+ * dniu nic nie piszemy, bo komentarz do normalnego stanu to szum.
+ */
+function CzemuTyleDzis({
+  meczeDzis,
+  meczeJutro,
+}: {
+  meczeDzis: number;
+  meczeJutro: number;
+}) {
+  if (!meczeDzis && !meczeJutro) return null;
+  if (meczeJutro < meczeDzis * 2 || meczeJutro < 5) return null;
+  return (
+    <p className="mt-2 text-sm leading-relaxed text-muted">
+      Dziś w naszych rozgrywkach jest {odmienMecze(meczeDzis)}, jutro{" "}
+      {odmienMecze(meczeJutro)} – stąd ta różnica. Typów nie dokładamy na siłę:
+      liczba zależy od terminarza, nie od tego, ile chcielibyśmy pokazać.
+    </p>
+  );
+}
+
 function odmienPozostale(n: number): string {
   const r10 = n % 10;
   const r100 = n % 100;
@@ -170,6 +201,7 @@ export function DruzynyTablica({
   forma,
   ligaByMecz,
   teraz: terazSerwera,
+  meczeTs = [],
 }: {
   /** typy drużynowe w kolejności rankingu silnika (najlepsze pierwsze) */
   bets: ValueBet[];
@@ -178,6 +210,13 @@ export function DruzynyTablica({
   ligaByMecz: Record<number, string>;
   /** timestamp serwera (s) – spójne "dziś/jutro" bez zegara klienta */
   teraz: number;
+  /**
+   * Gwizdki WSZYSTKICH nadchodzących meczów w bazie — do wytłumaczenia, czemu
+   * dziś typów jest mało. Surowe znaczniki, nie gotowe liczby: dzień tnie
+   * `kluczDnia` w tym pliku i musi to robić JEDNA definicja, inaczej strona
+   * policzyłaby mecze według innej granicy doby niż typy.
+   */
+  meczeTs?: number[];
 }) {
   // ZEGAR PRZEGLĄDARKI, nie chwila zbudowania strony. Strona bywa oddana
   // z cache sprzed godzin (patrz useTeraz), a wtedy serwerowe odcięcie
@@ -290,6 +329,33 @@ export function DruzynyTablica({
     () => widoczne.filter((b) => kluczDnia(b.kickoff_ts) !== dzisKlucz),
     [widoczne, dzisKlucz],
   );
+
+  /**
+   * ILE MECZÓW JEST DANEGO DNIA — czyli czemu typów jest tyle, ile jest.
+   *
+   * Zgłoszenie z przeglądu: „najwięcej typów jest pojutrze, nie dziś (3/4/10)".
+   * Zmierzone 05.08 na żywych danych: dziś 6 meczów i 2 typy, jutro 49 meczów
+   * i 14 typów. Czyli to NIE jest usterka selekcji ani modelu, tylko kształt
+   * terminarza — a strona milczała i wyglądała, jakby dziś nic nie znalazła.
+   *
+   * Mówimy to wprost, zamiast naciągać listę: naciąganie oznaczałoby
+   * wpuszczanie typów, które nie przeszły progów, czyli dokładnie odwrotność
+   * tego, po co te progi są.
+   */
+  const meczeDnia = useMemo(() => {
+    const licz = new Map<string, number>();
+    for (const ts of meczeTs) {
+      if (ts <= teraz) continue;
+      const k = kluczDnia(ts);
+      licz.set(k, (licz.get(k) ?? 0) + 1);
+    }
+    return licz;
+  }, [meczeTs, teraz]);
+  const meczeDzis = meczeDnia.get(dzisKlucz) ?? 0;
+  const meczeJutro = useMemo(() => {
+    const jutroKlucz = kluczDnia(teraz + 86400);
+    return meczeDnia.get(jutroKlucz) ?? 0;
+  }, [meczeDnia, teraz]);
 
   /**
    * Kolejne dni chronologicznie, w dniu sekcje rozgrywek (dla sortu
@@ -640,6 +706,7 @@ export function DruzynyTablica({
                 Dziś żaden typ nie przeszedł naszych progów. Kolejne mecze
                 znajdziesz niżej{jutro ? ", pierwsze już jutro" : ""}.
               </p>
+              <CzemuTyleDzis meczeDzis={meczeDzis} meczeJutro={meczeJutro} />
             </div>
           )}
 
@@ -656,6 +723,11 @@ export function DruzynyTablica({
                   {odmienTypy(dzisiejsze.length)}
                 </span>
               </div>
+              {/* dzień z małą liczbą typów tłumaczy się terminarzem, zamiast
+                  zostawiać wrażenie, że model dziś nic nie znalazł */}
+              {dzisiejsze.length < PROG_SEKCJI_TOP && (
+                <CzemuTyleDzis meczeDzis={meczeDzis} meczeJutro={meczeJutro} />
+              )}
 
               {top.length > 0 && (
                 <div className="mt-4 space-y-4">

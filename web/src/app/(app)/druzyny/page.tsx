@@ -1,7 +1,15 @@
+import { CzegoNieTypujemy } from "@/components/CzegoNieTypujemy";
 import { DruzynyTablica } from "@/components/DruzynyTablica";
 import { PageHeader } from "@/components/PageHeader";
 import { Reveal } from "@/components/Reveal";
-import { getDruzynyForma, getMecze, getMeta, getValueBets, terazTs } from "@/lib/data";
+import {
+  getDruzynyForma,
+  getMecze,
+  getMeta,
+  getOdrzucenia,
+  getValueBets,
+  terazTs,
+} from "@/lib/data";
 
 export const metadata = { title: "Drużyny – FootStats" };
 
@@ -14,14 +22,23 @@ export const metadata = { title: "Drużyny – FootStats" };
  * najmocniejsze typy doby na górze, reszta dniami, filtry rynku i rozgrywek.
  */
 export default async function DruzynyPage() {
-  const [bets, forma, mecze, meta] = await Promise.all([
+  const [bets, forma, mecze, meta, odrzucenia] = await Promise.all([
     getValueBets(),
     getDruzynyForma(),
     getMecze(),
     getMeta(),
+    getOdrzucenia(),
   ]);
   const typy = bets.filter((b) => b.podmiot_typ === "druzyna" && !b.sugestia);
   const ligaByMecz = Object.fromEntries(mecze.map((m) => [m.id, m.liga]));
+  // TYLKO odrzucenia DRUŻYNOWE i tylko z meczów, które się jeszcze nie zaczęły
+  // — sekcja ma tłumaczyć DZISIEJSZĄ listę, a nie archiwum. Rejestr trzyma
+  // tysiące wpisów ze wszystkich meczów w bazie.
+  const teraz = terazTs();
+  const kickoffById = new Map(mecze.map((m) => [m.id, m.kickoff_ts]));
+  const odrzuceniaDruzyn = odrzucenia.filter(
+    (o) => o.podmiot_typ === "druzyna" && (kickoffById.get(o.mecz_id) ?? 0) > teraz,
+  );
 
   return (
     <div>
@@ -63,8 +80,19 @@ export default async function DruzynyPage() {
           bets={typy}
           forma={forma}
           ligaByMecz={ligaByMecz}
-          teraz={terazTs()}
+          teraz={teraz}
+          meczeTs={mecze.map((m) => m.kickoff_ts)}
         />
+      )}
+
+      {/* CO MODEL ŚWIADOMIE ODRZUCIŁ — ta sama zasada co na stronie meczu
+          (przegląd sprzedażowy 05.08). Lista mówiła tylko, co wystawiliśmy;
+          bez tego „mało typów" czyta się jak słaby dzień, a nie jak działający
+          próg. Sekcja jest zwinięta: to dowód na żądanie, nie treść główna. */}
+      {odrzuceniaDruzyn.length > 0 && (
+        <Reveal className="mt-10">
+          <CzegoNieTypujemy odrzucenia={odrzuceniaDruzyn} />
+        </Reveal>
       )}
     </div>
   );
