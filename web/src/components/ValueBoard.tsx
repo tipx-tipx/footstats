@@ -201,6 +201,25 @@ export function ValueBoard({
     }
     return w;
   }, [radarNajlepsze, sortDrabinki]);
+
+  /**
+   * ILE DRABINEK POKAZUJEMY OD RAZU (2026-08-05).
+   *
+   * Zmierzone zrzutem tego dnia: zakładka miała **4605 px na laptopie
+   * i 6979 px na telefonie** — dziesięć kart po ~260 px jedna pod drugą.
+   * Karta jest gęsta i user ją chwali, więc NIE skracamy karty (drabinka jest
+   * jej treścią, patrz RadarCard); skracamy LISTĘ. Pięć kart to jeden ekran
+   * laptopa i dwa telefonu, a reszta jest o jedno kliknięcie.
+   *
+   * Świadomie tylko w widoku rankingowym: przy sortowaniu chronologicznym
+   * karty są pogrupowane po meczach i ucięcie w połowie grupy myliłoby
+   * bardziej, niż pomaga.
+   */
+  const LIMIT_DRABINEK = 5;
+  const [wszystkieDrabinki, setWszystkieDrabinki] = useState(false);
+  const radarPokazane = wszystkieDrabinki
+    ? radarPosortowane
+    : radarPosortowane.slice(0, LIMIT_DRABINEK);
   // Grupowanie po meczach ma sens WYŁĄCZNIE przy sortowaniu chronologicznym
   // (backend sortuje wtedy chronologicznie, w meczu po jakości). Filtr „tylko
   // sygnały" USUNIĘTY 2026-07-25: odkąd każda karta musi przejść te same
@@ -515,7 +534,7 @@ export function ValueBoard({
               ) : (
                 /* ranking – lista płaska, bo to kolejność niesie informację */
                 <div className="space-y-3">
-                  {radarPosortowane.map((w, i) => (
+                  {radarPokazane.map((w, i) => (
                     <motion.div
                       key={w.id}
                       initial={{ opacity: 0, y: 10 }}
@@ -531,6 +550,22 @@ export function ValueBoard({
                       <RadarCard w={w} />
                     </motion.div>
                   ))}
+                  {radarPosortowane.length > LIMIT_DRABINEK && (
+                    <button
+                      onClick={() => setWszystkieDrabinki((v) => !v)}
+                      className="font-display mt-1 inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-brand transition-colors hover:text-brand-strong"
+                    >
+                      {wszystkieDrabinki
+                        ? "Pokaż mniej"
+                        : `Pokaż pozostałe drabinki (${radarPosortowane.length - LIMIT_DRABINEK})`}
+                      <span
+                        aria-hidden
+                        className={wszystkieDrabinki ? "rotate-180" : ""}
+                      >
+                        ↓
+                      </span>
+                    </button>
+                  )}
                 </div>
               )}
             </>
