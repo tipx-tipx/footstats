@@ -432,10 +432,12 @@ export function ValueBoard({
                 Brak drabinek w tej chwili
               </p>
               <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-muted">
-                Drabinka to pełna analiza zawodnika: kursy Superbetu na kolejne
-                linie, ostatnie mecze, forma, hojność rywala i średnie sezonowe.
-                Karty pojawiają się, gdy Superbet wystawi kursy zawodnicze na
-                najbliższe mecze (zwykle 1–2 dni przed meczem).
+                Drabinka to jeden zawodnik na kilku poprzeczkach tej samej
+                statystyki – na przykład „1 strzał”, „2 strzały” i „3 strzały”
+                w tym samym meczu. Pokazujemy przy nich kursy, ostatnie mecze
+                i to, ile podobnych statystyk dopuszcza rywal. Karty pojawiają
+                się, gdy bukmacher wystawi kursy na zawodników – zwykle 1–2 dni
+                przed meczem.
               </p>
             </div>
           ) : (
@@ -446,10 +448,21 @@ export function ValueBoard({
                     i wyliczał składniki korekty – czyli mówił o kuchni, zanim
                     ktokolwiek zobaczył kartę. Do tego wąska kolumna obok
                     licznika łamała go w przypadkowych miejscach. */}
+                {/* SŁOWO „DRABINKA" MUSI BYĆ WYJAŚNIONE PRZY PIERWSZYM UŻYCIU
+                    (2026-08-05). Dotąd było wyłącznie etykietą zakładki i
+                    nagłówkiem – ktoś, kto nie zna zakładów, nie miał skąd
+                    wiedzieć, co kupuje. Definicja idzie z KONKRETNYM
+                    przykładem, bo „kilka poprzeczek tej samej statystyki"
+                    samo w sobie jest opisem dla kogoś, kto już wie. */}
                 <p className="min-w-0 flex-1 text-xs leading-relaxed text-muted">
-                  Ten sam zawodnik na kilku poprzeczkach: im wyżej, tym wyższy
-                  kurs i mniejsza szansa. Przy każdej piszemy, ile razy przebił
-                  ją w ostatnich meczach i jaką szansę dajemy na ten mecz.
+                  <span className="font-medium text-ink">
+                    Drabinka to jeden zawodnik na kilku poprzeczkach tej samej
+                    statystyki
+                  </span>{" "}
+                  – na przykład „1 strzał”, „2 strzały” i „3 strzały” w tym
+                  samym meczu. Im wyżej, tym wyższy kurs i mniejsza szansa. Przy
+                  każdej poprzeczce piszemy, ile razy zawodnik przebił ją w
+                  ostatnich meczach i jaką szansę dajemy na ten mecz.
                 </p>
                 <span className="font-data shrink-0 text-sm font-semibold text-brand-deep">
                   {odmienPozycje(radarNajlepsze.length)}
@@ -690,6 +703,18 @@ export function ValueBoard({
                   składach, albo nasza szansa za mocno rozjeżdżała się z kursem
                   – a wtedy z rozliczeń wychodzi, że to zwykle my się mylimy.
                   Pusta lista to działające zabezpieczenie, nie awaria.
+                </p>
+              )}
+              {/* Przycisk używa słowa „drabinki" w miejscu, w którym user
+                  jeszcze go nie widział wyjaśnionego (pusta lista typów) —
+                  więc wyjaśnienie idzie tuż nad nim, a nie dopiero po
+                  kliknięciu (2026-08-05). */}
+              {radarWpisy.length > 0 && (
+                <p className="mx-auto mt-4 max-w-lg text-xs leading-relaxed text-muted">
+                  Mamy za to <span className="font-medium text-ink">drabinki</span>:
+                  jeden zawodnik na kilku poprzeczkach tej samej statystyki
+                  („1 strzał”, „2 strzały”, „3 strzały”), z kursem i szansą przy
+                  każdej.
                 </p>
               )}
               <div className="mt-4 flex flex-wrap justify-center gap-2">
