@@ -16,6 +16,50 @@
 
 import type { OddsSuperbet, Zawodnik } from "./types";
 
+/* ------------------------------------------------------------------ *
+ * WERDYKT MODELU DLA WIERSZA TABELI
+ * ------------------------------------------------------------------ */
+
+/**
+ * Co model powiedział o parze (zawodnik, rynek) — do pokazania W TABELI, obok
+ * pokrycia.
+ *
+ * PO CO TO ISTNIEJE (przegląd sprzedażowy, 2026-08-04/05). Tabela TOP POKRYCIA
+ * pokazuje surowe „ile razy przebił w 5 meczach" i kurs. To NIE są nasze typy —
+ * model ich nie wystawił, a większość odrzucił z konkretnego powodu. Bez
+ * werdyktu wiersz z dobrym pokryciem i wysokim kursem czyta się jak
+ * rekomendacja, choć bywa dokładnie odwrotnie: właśnie ten wiersz sprawdziliśmy
+ * i uznali za niegrywalny. Kolumnę „WARTOŚĆ" już wyszarzyliśmy i przemianowali
+ * (04.08); to jest druga połowa tej samej naprawy.
+ *
+ * Trzy stany, bo tylko trzy są prawdziwe:
+ *   typujemy    – ten sam zawodnik, rynek i mecz stoi na naszej liście typów,
+ *   odrzucony   – model policzył i odrzucił, znamy powód,
+ *   nieliczony  – nie było czego liczyć (brak historii, brak oferty, nowy rynek).
+ *
+ * „nieliczony" NIE jest wstydem i nie należy go chować — to uczciwa odpowiedź
+ * na pytanie „czemu tego nie ma na liście".
+ */
+export type WerdyktRynku =
+  | { stan: "typujemy"; opis: string }
+  | { stan: "odrzucony"; opis: string }
+  | { stan: "nieliczony" };
+
+/**
+ * Klucz dopasowania wiersza do typu/odrzucenia: znormalizowane nazwisko + rynek.
+ *
+ * Po nazwisku, nie po `player_id`, z dwóch powodów: rejestr odrzuceń w ogóle
+ * nie niesie identyfikatora, a `topPokrycia` scala duplikaty zawodnika w jeden
+ * wiersz i zostawia tylko JEDNO z kilku źródłowych ID.
+ *
+ * Normalizacja idzie przez `_norm` — TĘ SAMĄ, którą scalanie duplikatów, i to
+ * jest warunek poprawności: gdyby werdykt normalizował inaczej, dopasowałby się
+ * do innego zawodnika niż ten, którego wiersz opisuje.
+ */
+export function kluczWerdyktu(podmiot: string, rynekKod: string): string {
+  return `${_norm(podmiot)}|${rynekKod}`;
+}
+
 /** Etykiety rynków (kod → nazwa PL) – zgodne z pipeline MARKET_NAMES_PL. */
 export const RYNEK_LABEL: Record<string, string> = {
   shots: "Strzały",
@@ -133,7 +177,7 @@ const _norm = (s: string) =>
   s
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z ]/g, "")
     .trim();
 

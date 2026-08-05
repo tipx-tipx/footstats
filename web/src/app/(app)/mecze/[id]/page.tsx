@@ -14,8 +14,8 @@ import {
   getZawodnicy,
 } from "@/lib/data";
 import type { Odrzucenie } from "@/lib/types";
-import { fmtMnoznik } from "@/lib/format";
-import { topPokrycia } from "@/lib/pokrycie";
+import { fmtKurs, fmtMnoznik, opisZakladu } from "@/lib/format";
+import { kluczWerdyktu, topPokrycia, type WerdyktRynku } from "@/lib/pokrycie";
 
 export async function generateMetadata({
   params,
@@ -75,7 +75,42 @@ export default async function MeczPage({
   const gracze = zawodnicy.filter((z) => druzyny.has(z.druzyna));
   const ligowy = meta.tryb === "liga";
   const wiersze = topPokrycia(gracze, meczId, odds, ligowy);
-  const okazje = bets.filter((b) => b.mecz_id === meczId && !b.sugestia).length;
+  const betyMeczu = bets.filter((b) => b.mecz_id === meczId && !b.sugestia);
+  const okazje = betyMeczu.length;
+
+  /**
+   * WERDYKT MODELU DLA KAŻDEGO WIERSZA TABELI POKRYĆ.
+   *
+   * Liczony na SERWERZE, bo obie składowe (lista typów, rejestr odrzuceń) i tak
+   * są tu już wczytane, a `TopPokrycia` jest komponentem klienta — przesyłanie
+   * do przeglądarki całych `value_bets` i `odrzucenia` tylko po to, żeby
+   * dopasować kilkadziesiąt wierszy, byłoby kilkoma megabajtami za rozpoznanie,
+   * które da się zrobić raz (patrz nota o okrojDlaKlienta w AGENTS.md).
+   *
+   * Kolejność ma znaczenie: NAJPIERW typy, potem odrzucenia. Ten sam zawodnik
+   * i rynek potrafi mieć jedno i drugie — typ na linii 1,5 i odrzucenie na 2,5.
+   * „Typujemy" jest wtedy prawdziwsze niż „odrzucone", bo na liście coś stoi.
+   */
+  const werdykty = new Map<string, WerdyktRynku>();
+  for (const o of odrzucenia) {
+    if (o.podmiot_typ === "druzyna") continue; // tabela jest o zawodnikach
+    werdykty.set(kluczWerdyktu(o.podmiot, o.rynek_kod), {
+      stan: "odrzucony",
+      opis: POWOD_LABEL[o.powod] ?? o.powod.replace(/_/g, " "),
+    });
+  }
+  for (const b of betyMeczu) {
+    if (b.podmiot_typ === "druzyna") continue;
+    werdykty.set(kluczWerdyktu(b.podmiot, b.rynek_kod), {
+      stan: "typujemy",
+      // kurs bywa pusty tylko przy sugestiach STS (odfiltrowane wyżej), ale
+      // typ bez ceny ma pokazać sam zakład zamiast „@ null"
+      opis:
+        b.kurs != null
+          ? `${opisZakladu(b, true)} @ ${fmtKurs(b.kurs)}`
+          : opisZakladu(b, true),
+    });
+  }
 
   return (
     <div>
@@ -222,6 +257,7 @@ export default async function MeczPage({
           ligowy={ligowy}
           zawodnikow={gracze.length}
           propsySuperbet={mecz.propsy_superbet}
+          werdykty={werdykty}
         />
       </Reveal>
 
@@ -309,6 +345,18 @@ const POWOD_LABEL: Record<string, string> = {
   kurs_poza_widelkami: "Kurs poza widełkami, w jakich gramy",
   szansa_za_niska: "Szansa za niska jak na ten kurs",
   wartosc_ujemna: "Przy ostrożnym liczeniu to nie wychodzi na plus",
+  // TRZY POWODY, KTÓRE OD ZAWSZE WYPISYWAŁY SIĘ SUROWYM KODEM (2026-08-05).
+  // Sekcja „Czego nie typujemy" pokazywała dosłownie „wartosc ujemna przy
+  // ostroznym", „za malo minut" i „kwarantanna strony" — czyli nazwy zmiennych
+  // w zdaniu po polsku. Widać to było dopiero po wstawieniu werdyktu do tabeli
+  // pokryć, bo tam ten sam napis stoi przy KAŻDYM wierszu, a nie w zwiniętej
+  // sekcji na dole strony. Razem 233 z 4126 odrzuceń w bazie.
+  wartosc_ujemna_przy_ostroznym: "Przy ostrożnym liczeniu wychodzi na minus",
+  za_malo_minut: "Zawodnik gra za mało minut, żeby to liczyć",
+  kwarantanna_strony: "Ta strona zakładu jest chwilowo wstrzymana (traciła)",
+  // w typie `Odrzucenie` są, w słowniku ich nie było
+  poza_skladem: "Zawodnika nie ma w składzie na ten mecz",
+  za_pozno: "Za blisko pierwszego gwizdka, żeby wystawić typ",
 };
 
 /** Grupuj wpisy po powodzie, w kolejności z POWOD_LABEL (reszta na końcu). */

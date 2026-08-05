@@ -7,11 +7,57 @@ import { FilterDropdown } from "./FilterDropdown";
 import { fmtKurs } from "@/lib/format";
 import {
   RYNEK_LABEL,
+  kluczWerdyktu,
   type GraForma,
+  type WerdyktRynku,
   type WierszPokrycia,
 } from "@/lib/pokrycie";
 
 const LIMIT = 40;
+
+/**
+ * WERDYKT MODELU przy wierszu — trzecia i ostatnia część naprawy „TOP POKRYCIA
+ * udaje nasze typy" (kolumna przemianowana i wyszarzona 04.08, zdanie nad
+ * tabelą 04.08, werdykt 05.08).
+ *
+ * Bez tego wiersz z pokryciem 5/5 i kursem 2,10 czyta się jak nasza
+ * rekomendacja. Werdykt mówi wprost jedną z trzech rzeczy: stoi na liście,
+ * sprawdziliśmy i odrzuciliśmy (z powodem), albo nie liczyliśmy.
+ *
+ * ODRZUCENIE JEST TU DOBRĄ WIADOMOŚCIĄ, nie przyznaniem się do porażki —
+ * dlatego nie jest czerwone. Czerwień znaczy w tym produkcie „tracisz na tym
+ * pieniądze"; tutaj znaczyłaby, że wiersz jest zły, a to model zadziałał.
+ */
+function Werdykt({ w }: { w: WerdyktRynku | undefined }) {
+  if (!w || w.stan === "nieliczony") {
+    return (
+      <span
+        className="text-[11px] text-faint"
+        title="Ta para zawodnik–statystyka nie przeszła nawet do liczenia: zwykle brak historii albo brak oferty bukmachera na tę linię."
+      >
+        nie liczyliśmy
+      </span>
+    );
+  }
+  if (w.stan === "typujemy") {
+    return (
+      <span className="inline-flex flex-wrap items-baseline gap-x-1.5 text-[11px]">
+        <span className="font-display rounded-full bg-brand-wash px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-brand-deep">
+          typujemy
+        </span>
+        <span className="text-muted">{w.opis}</span>
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex flex-wrap items-baseline gap-x-1.5 text-[11px]">
+      <span className="font-display rounded-full bg-paper px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-muted">
+        odrzucone
+      </span>
+      <span className="text-faint">{w.opis.toLowerCase()}</span>
+    </span>
+  );
+}
 
 type Tip = { x: number; y: number; g: GraForma } | null;
 
@@ -98,6 +144,7 @@ export function TopPokrycia({
   ligowy = false,
   zawodnikow = 0,
   propsySuperbet,
+  werdykty,
 }: {
   wiersze: WierszPokrycia[];
   /** [gospodarz, gość] – do filtra drużyn */
@@ -108,6 +155,11 @@ export function TopPokrycia({
   zawodnikow?: number;
   /** ilu zawodników kwotuje w tym meczu Superbet (undefined = stary snapshot) */
   propsySuperbet?: number;
+  /**
+   * Co model powiedział o parze (zawodnik, rynek) – klucz z `kluczWerdyktu`.
+   * Liczone na serwerze (patrz strona meczu); brak wpisu = „nie liczyliśmy".
+   */
+  werdykty?: Map<string, WerdyktRynku>;
 }) {
   const [druzyna, setDruzyna] = useState<string | null>(null);
   const [rynek, setRynek] = useState<string | null>(null);
@@ -144,15 +196,37 @@ export function TopPokrycia({
     return Object.keys(RYNEK_LABEL).filter((k) => obecne.has(k));
   }, [zKursem]);
 
-  const widoczne = useMemo(
-    () =>
-      zKursem.filter(
-        (w) =>
-          (druzyna === null || w.druzyna === druzyna) &&
-          (rynek === null || w.rynek_kod === rynek),
-      ),
-    [zKursem, druzyna, rynek],
-  );
+  /**
+   * NASZ TYP IDZIE NA GÓRĘ (2026-08-05).
+   *
+   * Znalezione przy pierwszym zrzucie z werdyktami: w meczu Grêmio – Mirassol
+   * jedyny wiersz, który NAPRAWDĘ typujemy (Reinaldo, strzały), wylądował
+   * w ukrytej reszcie — pod czterdziestoma pozycjami, które odrzuciliśmy albo
+   * których w ogóle nie liczyliśmy. Ranking tabeli premiuje surowe pokrycie
+   * i kurs, więc systematycznie spycha nasze typy w dół: typ przechodzi bramy
+   * właśnie wtedy, gdy kurs NIE jest przesadnie hojny.
+   *
+   * Sortujemy tu, a nie w `topPokrycia`, bo werdykt jest liczony na stronie
+   * (potrzebuje listy typów i rejestru odrzuceń, których biblioteka pokryć nie
+   * zna). Reszta kolejności zostaje nietknięta — to stabilne przestawienie
+   * jednej grupy na przód, nie nowy ranking.
+   */
+  const widoczne = useMemo(() => {
+    const wybrane = zKursem.filter(
+      (w) =>
+        (druzyna === null || w.druzyna === druzyna) &&
+        (rynek === null || w.rynek_kod === rynek),
+    );
+    if (!werdykty?.size) return wybrane;
+    const nasz = (w: WierszPokrycia) =>
+      werdykty.get(kluczWerdyktu(w.zawodnik, w.rynek_kod))?.stan === "typujemy"
+        ? 0
+        : 1;
+    return wybrane
+      .map((w, i) => ({ w, i }))
+      .sort((a, b) => nasz(a.w) - nasz(b.w) || a.i - b.i)
+      .map(({ w }) => w);
+  }, [zKursem, druzyna, rynek, werdykty]);
   const pokazane = rozwin ? widoczne : widoczne.slice(0, LIMIT);
 
   if (wiersze.length === 0) {
@@ -320,8 +394,10 @@ export function TopPokrycia({
           To jest <strong className="font-semibold text-ink-soft">przegląd
           oferty bukmachera</strong>, a nie nasze typy. Procent obok kursu
           porównuje go wyłącznie z tym, ile razy zawodnik przebił linię
-          w ostatnich pięciu startach – bez rywala, minut i kalibracji. Nasze
-          typy z tego meczu są wyżej, w sekcji okazji.
+          w ostatnich pięciu startach – bez rywala, minut i kalibracji.
+          W ostatniej kolumnie piszemy, co z każdą pozycją zrobił model:
+          typujemy ją, sprawdziliśmy i odrzuciliśmy (z powodem), czy w ogóle
+          nie było czego liczyć.
         </p>
       )}
 
@@ -358,6 +434,9 @@ export function TopPokrycia({
               </span>
               <Linie w={w} zKursami={!brakKursow} />
             </div>
+            <div className="mt-2 border-t border-hairline pt-2">
+              <Werdykt w={werdykty?.get(kluczWerdyktu(w.zawodnik, w.rynek_kod))} />
+            </div>
           </li>
         ))}
       </ul>
@@ -367,7 +446,9 @@ export function TopPokrycia({
         {/* bez kolumny kursu tabela potrzebuje mniej miejsca – na telefonie
             mniej przesuwania w bok, żeby dojść do samych pokryć */}
         <table
-          className={`w-full text-sm ${brakKursow ? "min-w-[600px]" : "min-w-[720px]"}`}
+          /* +160 px na kolumnę werdyktu (2026-08-05) — bez tego ostatnia
+             kolumna zwija się do jednego słowa na wiersz i traci sens */
+          className={`w-full text-sm ${brakKursow ? "min-w-[760px]" : "min-w-[880px]"}`}
         >
           <thead>
             <tr className="text-left text-[11px] uppercase tracking-wide text-faint">
@@ -387,6 +468,9 @@ export function TopPokrycia({
                 {brakKursow
                   ? "pokrycie linii"
                   : "pokrycie · kurs · kurs vs pokrycie"}
+              </th>
+              <th className="sticky top-0 z-[1] border-b border-hairline bg-card px-4 py-2.5 font-medium">
+                nasz werdykt
               </th>
             </tr>
           </thead>
@@ -427,6 +511,11 @@ export function TopPokrycia({
                     wiersza pas przycisków */}
                 <td className="px-4 py-3">
                   <Linie w={w} zKursami={!brakKursow} />
+                </td>
+                <td className="px-4 py-3">
+                  <Werdykt
+                    w={werdykty?.get(kluczWerdyktu(w.zawodnik, w.rynek_kod))}
+                  />
                 </td>
               </tr>
             ))}
