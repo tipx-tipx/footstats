@@ -93,12 +93,24 @@ function WierszMeczu({
   najlepsza?: number;
   soon: boolean;
 }) {
+  /**
+   * „BEZ PRZEWAGI" -> „BEZ TYPÓW" (2026-08-05, przegląd sprzedażowy).
+   *
+   * Słowo „przewaga" znaczy w tym produkcie JEDNO: bukmacher płaci więcej, niż
+   * wynika z naszej szansy. Tak jest w kropce przy wierszu, w kroku karty
+   * „gdzie jest przewaga" i w kuponach „z przewagą". Tutaj znaczyło coś
+   * zupełnie innego — „nie mamy w tym meczu żadnego typu" — a to nie to samo:
+   * typu może nie być z dziesięciu powodów, z których większość nie ma nic
+   * wspólnego z ceną (brak kursów na zawodników, za krótka historia, rynek
+   * wstrzymany). Jedno słowo w dwóch znaczeniach na sąsiednich zakładkach
+   * uczy czytelnika, że nie znaczy nic.
+   */
   const skan =
     okazje > 0
       ? odmienOkazje(okazje)
       : sugestie > 0
         ? `${sugestie} sug. STS`
-        : "bez przewagi";
+        : "bez typów";
   return (
     <li>
       <Link
@@ -250,7 +262,7 @@ export function TerminarzMeczy({
    * Zakładka jest „terminarzem skanu" i ma prawo pokazywać WSZYSTKO, co
    * sprawdziliśmy — to była świadoma decyzja. Ale zmierzone na produkcji:
    * 112 meczów to ~8300 px przewijania, z czego zdecydowana większość
-   * wierszy mówi „bez przewagi". Użytkownik szuka igły w stogu siana,
+   * wierszy mówi „bez typów". Użytkownik szuka igły w stogu siana,
    * mimo że filtr istnieje — tylko nikt go nie klika, bo nie wie, że jest.
    *
    * Kompromis: przy długiej liście startujemy z filtrem, a przełącznik

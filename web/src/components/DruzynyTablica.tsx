@@ -4,7 +4,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useMemo, useState } from "react";
 
 import { BetCard } from "./BetCard";
-import { BetRow } from "./BetRow";
+import { BetRow, BetRowNaglowek } from "./BetRow";
 import { grupujWarianty } from "@/lib/warianty";
 import { FilterDropdown } from "./FilterDropdown";
 import { Reveal } from "./Reveal";
@@ -507,6 +507,7 @@ export function DruzynyTablica({
               )}
               <Rozwin open={otwarta}>
                 <div>
+                  <BetRowNaglowek />
                   {posortowane
                     .slice(0, zwijalna ? LIMIT_LIGI_DNIA : typy.length)
                     .map((b) => wiersz(b, true))}
@@ -648,8 +649,16 @@ export function DruzynyTablica({
               To jedyne miejsce, które ma wyjaśnić symbol widoczny w KAŻDYM
               wierszu — a samo wymagało wyjaśnienia. Nowe zdanie mówi, co ta
               kropka znaczy dla pieniędzy, bez ani jednego słowa z branży. */}
+          {/* SŁOWO „PRZEWAGA" DEFINIUJEMY TAM, GDZIE PADA PIERWSZY RAZ
+              (2026-08-05). Legenda tłumaczyła kropkę, nie używając tego słowa,
+              a etykiety tuż obok mówią „duża przewaga / przewaga / cienka
+              przewaga" — czyli czytelnik dostawał termin bez definicji dwa
+              centymetry od jego wyjaśnienia. W całym produkcie „przewaga"
+              znaczy odtąd DOKŁADNIE jedno: bukmacher płaci więcej, niż wynika
+              z naszej szansy. Na liście meczów to samo słowo znaczyło „brak
+              typu" — poprawione osobno (TerminarzMeczy). */}
           <span className="uppercase tracking-widest">
-            kropka = ile bukmacher przepłaca
+            kropka = przewaga, czyli ile bukmacher przepłaca
           </span>
           {/* CO ZNACZĄ DWIE LICZBY PO PRAWEJ (2026-08-04). Wiersz kończy się
               „91%  1,34" i nigdzie nie było napisane, że pierwsza to nasza
@@ -752,6 +761,7 @@ export function DruzynyTablica({
 
               {cedulaDzis.length > 0 && (
                 <div className="mt-5">
+                  <BetRowNaglowek />
                   {cedulaDzis.slice(0, LIMIT_DZIS).map((b) => wiersz(b, true))}
                   {cedulaDzis.length > LIMIT_DZIS && (
                     <>

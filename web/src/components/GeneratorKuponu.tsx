@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { kursNetto, wyplata } from "@/lib/podatek";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   CountUpKurs,
@@ -207,6 +207,48 @@ export function GeneratorKuponu({
       /* bez dopasowania */
     }
   }, [meczId, bazowa]);
+  /**
+   * MĄDRY START NA STRONIE MECZU (2026-08-05, przegląd sprzedażowy).
+   *
+   * Generator wita komunikatem „Ten zestaw się nie składa", ZANIM user
+   * czegokolwiek dotknie. Przyczyna: startowaliśmy od sztywnych ×4,00 i trzech
+   * pozycji, a pula jednego meczu często nie ma z czego tego złożyć —
+   * najczęstszy komunikat to nie „za wysoki kurs", tylko „za mało dostępnych
+   * typów przy tych ustawieniach".
+   *
+   * Dosuwanie celu do puli ISTNIAŁO od dawna, ale w efekcie wyżej, który
+   * zaczyna się od `if (meczId != null) return` — czyli działało wszędzie poza
+   * jedynym miejscem, gdzie boli. Tutaj jest ta sama zasada, tylko dobieramy
+   * OBIE rzeczy: najpierw liczbę typów, którą pula udźwignie, potem kurs.
+   *
+   * Uruchamia się raz na pulę (ref), więc nie walczy z ręcznymi zmianami usera
+   * — po pierwszym dotknięciu suwaków ustawienia są jego.
+   */
+  const dopasowanoStart = useRef<LegPool[] | null>(null);
+  useEffect(() => {
+    if (meczId == null) return;                 // /kupony ma własną ścieżkę
+    if (dopasowanoStart.current === bazowa) return;
+    dopasowanoStart.current = bazowa;
+    if (bazowa.length === 0) return;
+    const pula = pulaEfektywna(bazowa, profil);
+    // ile pozycji pula w ogóle udźwignie — schodzimy do dwóch, bo dwójka to
+    // nadal kupon, a „nie da się złożyć" nie jest
+    let n = liczbaTypow;
+    let zakres = zakresOsiagalny(pula, n, 12, 4, profil);
+    while (zakres === null && n > 2) {
+      n -= 1;
+      zakres = zakresOsiagalny(pula, n, 12, 4, profil);
+    }
+    if (zakres === null) return;                // pula pusta — komunikat zostaje
+    if (n !== liczbaTypow) setLiczbaTypow(n);
+    // widełki podglądu to cel ×0,85 … ×1,18 — cel musi wpaść tak, żeby ten
+    // przedział miał część wspólną z osiągalnym
+    if (kursCel * 0.85 > zakres.max || kursCel * 1.18 < zakres.min) {
+      const cel = Math.min(Math.max(kursCel, zakres.min * 1.1), zakres.max * 0.95);
+      setKursCel(Math.min(12, Math.max(2, Math.round(cel * 2) / 2)));
+    }
+  }, [meczId, bazowa, profil, liczbaTypow, kursCel]);
+
   useEffect(() => {
     if (meczId != null) return;
     localStorage.setItem(

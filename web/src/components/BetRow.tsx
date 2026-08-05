@@ -22,6 +22,47 @@ import { odmienLinie } from "@/lib/warianty";
  * dosłownie "staje się" kartą, lista wraca do gęstej ceduły po zwinięciu.
  */
 
+/**
+ * SIATKA WIERSZA — jedna definicja dla wiersza i dla nagłówka kolumn.
+ *
+ * Nagłówek musi stać DOKŁADNIE nad swoimi kolumnami, więc gdyby trzymał własną
+ * kopię tego napisu, pierwsza zmiana szerokości rozjechałaby podpisy z danymi
+ * i nikt by tego nie zauważył poza zrzutem. Ta sama zasada, co przy słowniku
+ * powodów i przy przedziałach kursowych kuponów.
+ */
+export const GRID_WIERSZA =
+  "grid w-full grid-cols-[minmax(0,1fr)_auto_auto] gap-x-3" +
+  " sm:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)_auto_auto_auto]" +
+  " md:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)_7rem_auto_auto_auto]";
+
+/**
+ * NAGŁÓWKI KOLUMN (2026-08-05, przegląd sprzedażowy).
+ *
+ * Wiersz to: nazwa → rynek → pasek → `91%` → `1,34`. Nigdzie nie było
+ * napisane, że pierwsza liczba to nasza szansa, a druga kurs bukmachera —
+ * czytelnik musiał zgadnąć, i to przy dwóch liczbach, które wyglądają
+ * podobnie i znaczą coś zupełnie innego.
+ *
+ * Wersaliki 10 px i kolor `faint`: to ma być podpis, nie kolejny element
+ * krzyczący o uwagę. Na telefonie znika razem z kolumnami, które opisuje
+ * (tam rynek stoi pod nazwą, a nie w osobnej kolumnie).
+ */
+export function BetRowNaglowek() {
+  return (
+    <div
+      aria-hidden
+      className={`${GRID_WIERSZA} hidden items-end px-2 pb-1 pt-1 text-[10px] uppercase tracking-wide text-faint sm:grid sm:px-3`}
+    >
+      <span>drużyna</span>
+      <span>zakład</span>
+      <span className="hidden md:block" />
+      <span className="w-11 text-right">szansa</span>
+      <span className="w-12 text-right">kurs</span>
+      <span className="w-3" />
+    </div>
+  );
+}
+
 function godzinaMeczu(ts: number): string {
   return new Intl.DateTimeFormat("pl-PL", {
     hour: "2-digit",
@@ -82,7 +123,7 @@ export const BetRow = memo(function BetRow({
       <button
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        className="grid w-full grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-3 px-2 py-2 text-left sm:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)_auto_auto_auto] sm:px-3 md:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)_7rem_auto_auto_auto]"
+        className={`${GRID_WIERSZA} items-center px-2 py-2 text-left sm:px-3`}
       >
         {/* kto gra: dioda formy + drużyna, obok cicho godzina i rywal */}
         <span className="min-w-0">
