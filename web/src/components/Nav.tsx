@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { Logo } from "./Logo";
+import { SwiezoscDanych } from "./SwiezoscDanych";
 import { ThemeToggle } from "./ThemeToggle";
 
 /**
@@ -53,7 +54,7 @@ function IkonaWyloguj() {
   );
 }
 
-export function Nav() {
+export function Nav({ wygenerowanoTs }: { wygenerowanoTs?: number }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const reduced = useReducedMotion();
@@ -146,6 +147,16 @@ export function Nav() {
         </nav>
 
         <div className="ml-auto flex items-center gap-1 lg:ml-0">
+          {/* ŚWIEŻOŚĆ DANYCH — na desktopie w pasku, na telefonie w panelu
+              (niżej), bo w 390 px pasek ma miejsce tylko na logo i hamburger.
+              Musi być widoczna z KAŻDEJ strony: obiecujemy żywe dane i kursy
+              do zagrania, więc informacja „ile mają lat" nie może mieszkać
+              w stopce najmniejszą czcionką. */}
+          {wygenerowanoTs ? (
+            <span className="mr-1.5 hidden lg:inline-flex">
+              <SwiezoscDanych wygenerowanoTs={wygenerowanoTs} />
+            </span>
+          ) : null}
           <ThemeToggle />
           <button
             onClick={wyloguj}
@@ -200,6 +211,11 @@ export function Nav() {
           }`}
         >
           <div className="flex flex-col px-3 py-2 pb-3">
+            {wygenerowanoTs ? (
+              <div className="mb-1.5 border-b border-hairline px-3.5 pb-2.5 pt-1">
+                <SwiezoscDanych wygenerowanoTs={wygenerowanoTs} />
+              </div>
+            ) : null}
             {GRUPY.map((grupa, gi) => (
               <div
                 key={gi}

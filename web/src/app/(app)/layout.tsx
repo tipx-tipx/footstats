@@ -31,7 +31,7 @@ export default async function AppLayout({
   }).format(new Date(meta.wygenerowano_ts * 1000));
   return (
     <>
-      <Nav />
+      <Nav wygenerowanoTs={meta.wygenerowano_ts} />
       <MainShell>{children}</MainShell>
       <SiteFooter
         zrodlo={meta.zrodlo}
