@@ -346,7 +346,9 @@ function DrabinkaPasek({ w }: { w: RadarWpis }) {
 
   return (
     <span className="block px-4 pb-3 sm:px-5">
-      <span className="block rounded-(--radius-control) border border-hairline bg-card-soft/70 p-3">
+      {/* bez własnej ramki — patrz DrabinkaLinii: karta ma już obramowanie,
+          a trzeci poziom (wybrana poprzeczka) i tak jest wyróżniony (06.08) */}
+      <span className="block rounded-(--radius-control) bg-card-soft/70 p-3">
         {/* legenda PRZY drabince, nie przy prawej krawędzi karty – opisuje
             szczeble, a nie zdanie, które od 2026-08-01 stoi po prawej */}
         <span className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-ink-soft">

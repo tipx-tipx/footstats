@@ -35,7 +35,10 @@ export function DrabinkaLinii({
   const b0 = warianty[0];
   return (
     <div className={className}>
-      <div className="rounded-(--radius-control) border border-hairline bg-card-soft/70 p-2.5">
+      {/* bez własnej ramki: to blok WEWNĄTRZ karty, a karta ma już swoją.
+          Trzy poziomy obramowań na 300 px wysokości (karta -> tabelka ->
+          wybrana poprzeczka) robiły z niej formularz (06.08). */}
+      <div className="rounded-(--radius-control) bg-card-soft/70 p-2.5">
         <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-ink-soft">
           {odmienLinie(warianty.length)} tego samego typu
           <span className="ml-2 font-normal normal-case tracking-normal text-faint">

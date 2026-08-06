@@ -207,25 +207,50 @@ export default async function OkazjePage({
       {/* pod listą: obietnice hero z pokryciem – bilet kuponu dnia i bliźniacza
           karta trafień (ta sama anatomia); oba znikają same, gdy brak danych */}
       {(kuponDnia || (pods && pods.rozliczone > 0)) && (
+        /* ODDECH MIĘDZY SEKCJAMI (2026-08-06). Cała strona szła jednym
+           ciągiem: hero, pasek, lista, most, kafelki — to samo tło, ta sama
+           szerokość, ten sam odstęp. Oko nie miało gdzie odpocząć i strona
+           czytała się jak jedna długa lista.
+           Te dwa kafelki to inna rzecz niż typy wyżej (dowód, nie oferta),
+           więc dostają własne tło na pełną szerokość okna. Kalkulacja
+           `50% − 50vw` jest ta sama co przy aurorze w hero — sprawdzona, nie
+           wypycha strony w bok na 390 px (`npm run audyt`). */
         <section
           aria-label="Kupon dnia i skuteczność"
-          className="mt-14 grid items-stretch gap-5 md:grid-cols-2"
+          className="relative mt-14 py-12"
         >
-          {kuponDnia && (
-            <Reveal className="h-full">
-              <KuponDniaTeaser kupon={kuponDnia} />
-            </Reveal>
-          )}
-          {pods && pods.rozliczone > 0 && (
-            <Reveal delay={0.08} className="h-full">
-              <SkutecznoscTeaser
-                ostatnie={typyWyniki.ostatnie}
-                dni={typyWyniki.skutecznosc_dzienna ?? []}
-                trafione={pods.trafione}
-                rozliczone={pods.rozliczone}
-              />
-            </Reveal>
-          )}
+          <div
+            aria-hidden
+            className="absolute inset-y-0 bg-card-soft"
+            style={{ left: "calc(50% - 50vw)", right: "calc(50% - 50vw)" }}
+          />
+          {/* JEDEN KAFELEK NIE MA WISIEĆ W SIATCE NA DWA (06.08). Kupon dnia
+              znika, gdy wszystkie mecze puli już się zaczęły — wtedy przy
+              `md:grid-cols-2` zostawała karta wyników i pół ekranu pustki.
+              Przy jednym kafelku siatka schodzi do jednej kolumny i wyśrodkowuje. */}
+          <div
+            className={`relative grid items-stretch gap-5 ${
+              kuponDnia && pods && pods.rozliczone > 0
+                ? "md:grid-cols-2"
+                : "mx-auto max-w-xl"
+            }`}
+          >
+            {kuponDnia && (
+              <Reveal className="h-full">
+                <KuponDniaTeaser kupon={kuponDnia} />
+              </Reveal>
+            )}
+            {pods && pods.rozliczone > 0 && (
+              <Reveal delay={0.08} className="h-full">
+                <SkutecznoscTeaser
+                  ostatnie={typyWyniki.ostatnie}
+                  dni={typyWyniki.skutecznosc_dzienna ?? []}
+                  trafione={pods.trafione}
+                  rozliczone={pods.rozliczone}
+                />
+              </Reveal>
+            )}
+          </div>
         </section>
       )}
     </>
