@@ -105,6 +105,12 @@ export function KuponBilet({
               prefix="×"
               className="font-data mt-0.5 block text-[1.7rem] font-bold leading-none"
             />
+            {/* jedna zasada na całą stronę (06.08): mnożnik prowadzi,
+                złotówki tłumaczą — patrz Hero i KuponDniaTeaser */}
+            <p className="mt-1 text-[11px] text-faint">
+              z {stawka} zł →{" "}
+              {Math.round(wyplata(k.kurs_laczny, stawka, k.tryb_podatku))} zł
+            </p>
           </div>
           <div title="Szansa, że wejdą wszystkie typy naraz. Typy z jednego meczu potrafią paść razem, więc za nie obcinamy tę szansę.">
             <p className="text-[10px] uppercase tracking-wide text-faint">
@@ -112,14 +118,6 @@ export function KuponBilet({
             </p>
             <p className="font-data mt-0.5 text-lg font-semibold leading-tight">
               {fmtProc(k.p_model)}
-            </p>
-          </div>
-          <div>
-            <p className="text-[10px] uppercase tracking-wide text-faint">
-              z {stawka} zł robi się
-            </p>
-            <p className="font-data mt-0.5 text-lg font-semibold leading-tight">
-              {Math.round(wyplata(k.kurs_laczny, stawka, k.tryb_podatku))} zł
             </p>
           </div>
         </div>
