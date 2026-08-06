@@ -151,18 +151,30 @@ function ZywyPodglad({ bets }: { bets: ValueBet[] }) {
 
   if (bets.length === 0) {
     return (
+      /* PUSTY STAN MA PROWADZIĆ DALEJ, NIE TŁUMACZYĆ RYNKU (2026-08-06).
+         Stało tu „STAN RYNKU / Rynek wycenia blisko modelu" — nasze
+         słownictwo, a do tego zdanie nieprawdziwe w najczęstszym przypadku:
+         listy zwykle nie ma nie dlatego, że bukmacher nie przepłaca, tylko
+         dlatego, że nie wystawił jeszcze kursów na zawodników albo część
+         rynków mamy wstrzymanych. Zamiast diagnozy — jedno zdanie i wyjście. */
       <div className="glow-pop">
       <div className="cut-corner relative border border-hairline bg-card p-6 text-center">
         <p className="text-[11px] font-semibold uppercase tracking-widest text-faint">
-          stan rynku
+          dziś na zawodników
         </p>
         <p className="mt-3 font-display text-lg font-bold">
-          Rynek wycenia blisko modelu
+          Nic, co warto zagrać
         </p>
         <p className="mx-auto mt-1.5 max-w-xs text-sm leading-relaxed text-muted">
-          W tej chwili bukmacher nie przepłaca za żadne zdarzenie. Liczymy
-          dalej – strona odświeży się sama, gdy coś się pojawi.
+          Kursy na statystyki piłkarzy bukmacher wystawia zwykle dzień przed
+          meczem. Typy na całe drużyny mamy gotowe cały czas.
         </p>
+        <Link
+          href="/druzyny"
+          className="font-display mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-brand transition-colors hover:text-brand-strong"
+        >
+          Zobacz typy na drużyny →
+        </Link>
       </div>
       </div>
     );
@@ -622,15 +634,29 @@ export function Hero({
             custom={4}
             className="mt-7 flex flex-wrap items-center gap-3"
           >
+            {/* GŁÓWNY PRZYCISK MA PROWADZIĆ DO CZEGOŚ (2026-08-06).
+                Przy zerze typów zawodniczych „Zobacz dzisiejsze typy ↓"
+                przewijało do pustej listy — jedyna wyraźna akcja na ekranie
+                kończyła się komunikatem o braku. Gdy tu nic nie ma, przycisk
+                prowadzi tam, gdzie towar jest. */}
             <span className="glow-drop inline-flex transition-transform hover:-translate-y-0.5">
-              <a
-                href="#okazje"
-                className="cut-corner-sm font-display inline-flex items-center gap-2 bg-brand px-6 py-3 text-sm font-semibold uppercase tracking-wide text-on-brand transition-colors hover:bg-brand-strong"
-              >
-                Zobacz{" "}
-                {liczbaOkazji > 0 ? odmienOkazje(liczbaOkazji) : "dzisiejsze typy"}
-                <span aria-hidden>↓</span>
-              </a>
+              {liczbaOkazji > 0 ? (
+                <a
+                  href="#okazje"
+                  className="cut-corner-sm font-display inline-flex items-center gap-2 bg-brand px-6 py-3 text-sm font-semibold uppercase tracking-wide text-on-brand transition-colors hover:bg-brand-strong"
+                >
+                  Zobacz {odmienOkazje(liczbaOkazji)}
+                  <span aria-hidden>↓</span>
+                </a>
+              ) : (
+                <Link
+                  href="/druzyny"
+                  className="cut-corner-sm font-display inline-flex items-center gap-2 bg-brand px-6 py-3 text-sm font-semibold uppercase tracking-wide text-on-brand transition-colors hover:bg-brand-strong"
+                >
+                  Zobacz typy na drużyny
+                  <span aria-hidden>→</span>
+                </Link>
+              )}
             </span>
             <Link
               href="/jak-to-dziala"

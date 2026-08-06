@@ -685,12 +685,16 @@ export function ValueBoard({
               ? "Dziś jedna pozycja w tym zestawieniu."
               : `Dziś ${odmienPozycje(grupy.length)} w tym zestawieniu.`}
           </span>
-          <button
-            onClick={() => setFiltryOtwarte(true)}
-            className="shrink-0 whitespace-nowrap text-sm text-muted underline decoration-hairline-strong underline-offset-4 transition-colors hover:text-brand hover:decoration-brand"
-          >
-            pokaż filtry
-          </button>
+          {/* przy pustej liście filtrowanie nie ma czego filtrować — sam
+              komunikat niżej tłumaczy, dlaczego jest pusto (06.08) */}
+          {grupy.length > 0 && (
+            <button
+              onClick={() => setFiltryOtwarte(true)}
+              className="shrink-0 whitespace-nowrap text-sm text-muted underline decoration-hairline-strong underline-offset-4 transition-colors hover:text-brand hover:decoration-brand"
+            >
+              pokaż filtry
+            </button>
+          )}
         </div>
       ) : (
       <div className="mb-6 grid grid-cols-2 items-end gap-x-6 gap-y-4 pt-4 lg:flex lg:gap-x-9">
@@ -769,24 +773,28 @@ export function ValueBoard({
               <p className="text-sm font-medium text-ink">
                 Brak typów zawodniczych na te mecze
               </p>
+              {/* KOMUNIKAT KWARANTANNY PRZEPISANY (2026-08-06).
+                  Poprzedni wypisywał wprost „na ostatnich typach traciły
+                  pieniądze" i podawał statystyki porażek rynek po rynku:
+                  „strzały – trafione 50% przy zapowiadanych 71% (40 typów)".
+                  To jest nasza diagnostyka wewnętrzna wyłożona na ekran
+                  w miejscu, w którym użytkownik szuka typów.
+                  Sam MECHANIZM zostaje i nadal o nim mówimy — bo wstrzymanie
+                  rynku, który nam nie wychodzi, jest argumentem NA NASZĄ
+                  korzyść. Nie mówimy tylko, o ile dokładnie nie wychodzi. */}
               {kwarantanna && Object.keys(kwarantanna).length > 0 ? (
                 <p className="mx-auto mt-1 max-w-lg text-xs leading-relaxed text-muted">
-                  Główne rynki zawodnicze są chwilowo{" "}
+                  Część rynków zawodniczych mamy dziś{" "}
                   <strong className="font-semibold text-ink-soft">
-                    wstrzymane
+                    wstrzymanych
                   </strong>
-                  , bo na ostatnich typach traciły pieniądze:{" "}
-                  {Object.values(kwarantanna)
-                    .map((k) =>
-                      // roi bywa pusty w danych sprzed bramy ROI – wtedy
-                      // zostaje samo trafienie zamiast "NaN% straty"
-                      typeof k.roi === "number"
-                        ? `${k.nazwa.toLowerCase()} – ${Math.round(Math.abs(k.roi) * 100)}% straty na stawce, trafione ${Math.round(k.hit * 100)}% (${k.n} typów)`
-                        : `${k.nazwa.toLowerCase()} – trafione ${Math.round(k.hit * 100)}% przy zapowiadanych ${Math.round(k.sr_p * 100)}% (${k.n} typów)`,
-                    )
-                    .join("; ")}
-                  . To zabezpieczenie: typy z tych rynków rozliczają się dalej
-                  w tle i rynek wraca sam, gdy przestanie tracić.
+                  {" "}
+                  ({Object.values(kwarantanna)
+                    .map((k) => k.nazwa.toLowerCase())
+                    .join(", ")}
+                  ) – ostatnie wyniki na nich nie trzymały naszego poziomu, więc
+                  do czasu poprawy ich nie typujemy. Sprawdzamy je dalej w tle
+                  i wracają same, gdy liczby się zgodzą.
                 </p>
               ) : (
                 <p className="mx-auto mt-1 max-w-lg text-xs leading-relaxed text-muted">
