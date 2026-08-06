@@ -43,6 +43,13 @@ function LegBadges({ l }: { l: KuponLeg }) {
 }
 
 /**
+ * TON KUPONÓW SPRAWDZONY 2026-08-06 — nic tu nie trzeba dokładać.
+ * Przegląd pod sprzedaż zgłaszał „z 10 zł robi się 152 zł" jako zbyt
+ * agresywne, ale panel obok biletu (`KuponyScena`) mówi przy KAŻDYM kuponie:
+ * „63% na komplet, czyli ~1 trafienie na 2 takich prób. Graj stawką, którą
+ * spokojnie postawisz wiele razy z rzędu". Drugie zdanie o tym samym w samym
+ * bilecie byłoby szumem, nie ostrożnością.
+ *
  * Bilet kuponu – jedna anatomia wszędzie (scena na /kupony, zajawka na
  * głównej ma swoją wersję mini): gradientowy nagłówek z liczbami, pasek
  * szansy, perforacja, typy pogrupowane po meczu, krótka stopka faktów.

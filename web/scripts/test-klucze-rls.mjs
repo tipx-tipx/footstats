@@ -24,10 +24,31 @@ function kluczeZSql(tekst) {
   return [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]);
 }
 
+/**
+ * DWIE ŚCIEŻKI ODCZYTU, JEDNA LISTA UPRAWNIEŃ (od 2026-08-06).
+ *
+ * Strona czyta klucze na dwa sposoby: bazowy `BUNDLE_KEYS` (jedno zapytanie
+ * przy każdym renderze) oraz `fetchKlucz("nazwa", …)` — trzy najcięższe
+ * klucze dociągane dopiero, gdy strona ich zażąda. Dla RLS to bez różnicy:
+ * jedno i drugie idzie kluczem anon, więc polityka musi przepuszczać oba
+ * zbiory. Gdyby ten test znał tylko `BUNDLE_KEYS`, kazałby usunąć z migracji
+ * `players`, `typy_wyniki` i `odrzucenia` — a wtedy Skuteczność, Zawodnicy
+ * i „czego nie typujemy" po cichu pokazałyby dane demo.
+ */
 function kluczeZKodu(tekst) {
   const m = tekst.match(/const BUNDLE_KEYS = \[([\s\S]*?)\] as const/);
   if (!m) throw new Error("nie znalazłem BUNDLE_KEYS w lib/data.ts");
-  return [...m[1].matchAll(/"([^"]+)"/g)].map((x) => x[1]);
+  const bazowe = [...m[1].matchAll(/"([^"]+)"/g)].map((x) => x[1]);
+  const leniwe = [...tekst.matchAll(/fetchKlucz<[^>]*>\(\s*"([^"]+)"/g)].map(
+    (x) => x[1],
+  );
+  if (leniwe.length === 0) {
+    throw new Error(
+      "nie znalazłem ani jednego fetchKlucz() — jeśli leniwe pobieranie zniknęło, " +
+        "usuń ten fragment testu razem z nim",
+    );
+  }
+  return [...new Set([...bazowe, ...leniwe])];
 }
 
 const sql = kluczeZSql(readFileSync(SQL, "utf8"));
