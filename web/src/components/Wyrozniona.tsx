@@ -32,8 +32,15 @@ export function Wyrozniona({
 }) {
   return (
     <div className="relative">
-      <p className="font-display mb-1.5 inline-flex items-center gap-1.5 rounded-full bg-brand-wash px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest text-brand-deep">
-        <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-brand" />
+      {/* KRESKA I WERSALIKI, NIE PASTYLKA Z KROPKĄ (poprawka 06.08).
+          Pierwsza wersja miała zaokrągloną plakietkę z kropką — kształt,
+          który stoi w co drugim szablonie i nie ma nic wspólnego z resztą
+          tej strony. Tu wszystkie nagłówki sekcji wyglądają tak samo:
+          krótka kreska marki i wersaliki („— KUPON NA DZIŚ", „— WERDYKT").
+          Odstęp `mb-3` jest większy niż wysunięcie narożników (`-inset-2`),
+          więc celownik nie wchodzi już na napis. */}
+      <p className="font-display mb-3 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-widest text-brand">
+        <span aria-hidden className="h-px w-5 bg-brand-bright" />
         {etykieta}
       </p>
       <div className="relative">

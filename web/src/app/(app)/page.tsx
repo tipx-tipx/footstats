@@ -125,18 +125,12 @@ export default async function OkazjePage({
     tickerBets.push(b);
     if (tickerBets.length >= 14) break;
   }
-  const aktualizacja = new Intl.DateTimeFormat("pl-PL", {
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "Europe/Warsaw",
-  }).format(new Date(meta.wygenerowano_ts * 1000));
 
   return (
     <>
       <Hero
         liga={meta.liga}
         sezon={meta.sezon}
-        aktualizacja={aktualizacja}
         liczbaOkazji={bets.filter((b) => !b.sugestia).length}
         spotlightBets={spotlight}
         tickerBets={tickerBets}
@@ -219,9 +213,15 @@ export default async function OkazjePage({
           aria-label="Kupon dnia i skuteczność"
           className="relative mt-14 py-12"
         >
+          {/* PRZEJŚCIE, NIE USKOK (poprawka 06.08). Pierwsza wersja miała
+              płaskie `bg-card-soft` z twardymi krawędziami — szare pole
+              zaczynało się i kończyło znikąd, a że stopka niżej jest znowu
+              jasna, wyglądało to jak przypadkowy pas. Teraz tło wygasa
+              w górę i w dół (gradient), a krawędzie mają tę samą włosową
+              kreskę, co reszta strony. */}
           <div
             aria-hidden
-            className="absolute inset-y-0 bg-card-soft"
+            className="absolute inset-y-0 border-y border-hairline bg-gradient-to-b from-transparent via-card-soft to-transparent"
             style={{ left: "calc(50% - 50vw)", right: "calc(50% - 50vw)" }}
           />
           {/* JEDEN KAFELEK NIE MA WISIEĆ W SIATCE NA DWA (06.08). Kupon dnia

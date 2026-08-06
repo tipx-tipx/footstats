@@ -91,10 +91,14 @@ export function SiteFooter({
               <p className="font-display text-[10px] font-semibold uppercase tracking-wider text-faint">
                 Zasady
               </p>
+              {/* „Gramy dla rozrywki, nie na zarobek" zdjęte (06.08):
+                  brzmiało jak zaprzeczenie sensu produktu, który ma pomagać
+                  wygrywać. Zostaje to, co naprawdę trzeba powiedzieć —
+                  wiek, legalność i to, że typ nie jest gwarancją. */}
               <ul className="mt-2.5 space-y-1.5 text-xs leading-relaxed text-ink-soft">
                 <li>Tylko dla pełnoletnich (18+)</li>
                 <li>Obstawiaj u legalnych bukmacherów</li>
-                <li>Gramy dla rozrywki, nie na zarobek</li>
+                <li>Stawiaj tyle, ile możesz stracić</li>
               </ul>
             </div>
           </div>

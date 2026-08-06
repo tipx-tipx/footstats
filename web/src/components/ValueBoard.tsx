@@ -507,22 +507,31 @@ export function ValueBoard({
                     wiedzieć, co kupuje. Definicja idzie z KONKRETNYM
                     przykładem, bo „kilka poprzeczek tej samej statystyki"
                     samo w sobie jest opisem dla kogoś, kto już wie. */}
-                <p className="min-w-0 flex-1 text-xs leading-relaxed text-muted">
+                {/* JEDNO ZDANIE, RESZTA POD DYMKIEM (06.08). Wyjaśnienie
+                    miało trzy linijki i stało między nagłówkiem a pierwszą
+                    kartą — czyli dokładnie tam, gdzie czytelnik chce zobaczyć
+                    typ, a nie czytać definicję. Definicja zostaje (słowo
+                    „drabinka" musi być wyjaśnione przy pierwszym użyciu),
+                    ale w jednym zdaniu; szczegóły czekają w dymku i tak samo
+                    tłumaczy je każda karta niżej. */}
+                <p
+                  className="min-w-0 flex-1 text-xs leading-relaxed text-muted"
+                  title="Im wyżej postawiona poprzeczka, tym wyższy kurs i mniejsza szansa. Przy każdej piszemy, ile razy zawodnik ją przebił w ostatnich meczach i jaką szansę dajemy na ten mecz."
+                >
                   <span className="font-medium text-ink">
                     Drabinka to jeden zawodnik na kilku poprzeczkach tej samej
                     statystyki
                   </span>{" "}
-                  – na przykład „1 strzał”, „2 strzały” i „3 strzały” w tym
-                  samym meczu. Im wyżej, tym wyższy kurs i mniejsza szansa. Przy
-                  każdej poprzeczce piszemy, ile razy zawodnik przebił ją w
-                  ostatnich meczach i jaką szansę dajemy na ten mecz.
+                  – „1 strzał”, „2 strzały”, „3 strzały” w tym samym meczu.
                 </p>
                 <span className="font-data shrink-0 text-sm font-semibold text-brand-deep">
                   {odmienPozycje(radarNajlepsze.length)}
                 </span>
               </div>
 
-              <div className="mb-4">
+              {/* rozwijane pole rozciągało się na CAŁĄ szerokość listy —
+                  wyglądało jak pasek narzędzi, a nie jak jeden wybór (06.08) */}
+              <div className="mb-4 max-w-56">
                 <FilterDropdown
                   label="Sortuj"
                   value={sortDrabinki}
@@ -578,8 +587,15 @@ export function ValueBoard({
                         duration: 0.3,
                       }}
                     >
-                      <p className="mb-1 truncate text-[11px] text-faint">
-                        {w.mecz} · {fmtDataCzas(w.kickoff_ts)}
+                      {/* było 11 px w kolorze `faint` — nazwa meczu i godzina
+                          to podstawowy kontekst typu, nie przypis (06.08) */}
+                      <p className="mb-1.5 flex flex-wrap items-baseline gap-x-2 text-xs">
+                        <span className="truncate font-medium text-ink-soft">
+                          {w.mecz}
+                        </span>
+                        <span className="font-data text-faint">
+                          {fmtDataCzas(w.kickoff_ts)}
+                        </span>
                       </p>
                       {/* pierwsza karta wygląda jak pierwsza — ale tylko przy
                           sortowaniu po jakości (patrz `Wyrozniona`) */}
@@ -595,7 +611,9 @@ export function ValueBoard({
                   {radarPosortowane.length > LIMIT_DRABINEK && (
                     <button
                       onClick={() => setWszystkieDrabinki((v) => !v)}
-                      className="font-display mt-1 inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-brand transition-colors hover:text-brand-strong"
+                      /* był drobnym szarym napisem pod listą i ginął —
+                         to jedyne wyjście do POŁOWY kart dnia (06.08) */
+                      className="font-display mt-3 inline-flex w-full items-center justify-center gap-2 rounded-(--radius-control) border border-hairline-strong bg-card px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-ink transition-colors hover:border-brand hover:text-brand sm:w-auto"
                     >
                       {wszystkieDrabinki
                         ? "Pokaż mniej"

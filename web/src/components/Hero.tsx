@@ -474,7 +474,6 @@ function TickerRynkow({ bets }: { bets: ValueBet[] }) {
 export function Hero({
   liga,
   sezon,
-  aktualizacja,
   liczbaOkazji,
   spotlightBets,
   tickerBets = [],
@@ -482,7 +481,6 @@ export function Hero({
 }: {
   liga: string;
   sezon: string;
-  aktualizacja: string;
   liczbaOkazji: number;
   spotlightBets: ValueBet[];
   tickerBets?: ValueBet[];
@@ -525,22 +523,17 @@ export function Hero({
             custom={0}
             className="flex flex-wrap items-center gap-3"
           >
-            <p className="flex items-center gap-2.5 text-xs font-semibold uppercase tracking-widest text-brand">
-              <span aria-hidden className="h-px w-6 bg-brand-bright" />
-              Typy na dziś · {liga} {sezon}
+            {/* GÓRA STRONY BYŁA ZAGRACONA (06.08). Nad nagłówkiem stały dwie
+                rzeczy naraz: nadtytuł „Typy na dziś · Piłka klubowa 2026/27"
+                i plakietka „ostatnie sprawdzenie · 14:40" — czyli dwie linijki
+                drobnego tekstu, zanim czytelnik dojdzie do zdania, po które
+                przyszedł. Godzina i tak stoi w pasku na górze („kursy z 14:40")
+                i jest widoczna z każdej strony, więc tutaj była trzecim
+                powtórzeniem tej samej informacji.
+                Zostaje sam sezon, drobnym drukiem — kontekst, nie nagłówek. */}
+            <p className="text-xs font-medium uppercase tracking-widest text-faint">
+              {liga} {sezon}
             </p>
-            {/* DWA KOMUNIKATY O TYM SAMYM, SPRZECZNE (naprawione 06.08).
-                Tu stało „żywe dane · 12:13" z zieloną kropką, a dwa
-                centymetry wyżej, w pasku, plakietka świeżości mówiła
-                „dane opóźnione". Ocena stanu należy do JEDNEGO miejsca —
-                plakietki w pasku; tutaj zostaje sam fakt, bez wartościowania. */}
-            <span
-              className="inline-flex items-center gap-1.5 rounded-full border border-hairline bg-card px-2.5 py-1 text-[11px] text-muted shadow-(--shadow-card)"
-              title="O tej godzinie ostatnio pobieraliśmy kursy i statystyki"
-            >
-              <span aria-hidden className="live-dot h-1.5 w-1.5 rounded-full bg-data-green" />
-              ostatnie sprawdzenie · {aktualizacja}
-            </span>
           </motion.div>
 
           <motion.h1
