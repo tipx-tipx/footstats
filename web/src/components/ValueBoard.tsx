@@ -421,9 +421,12 @@ export function ValueBoard({
 
   return (
     <section aria-label="Lista okazji">
-      {/* przełącznik rodzaju – tablica wyników: czysty tekst, aktywna
-          zakładka z podkreśleniem marki (żadnych kolejnych "przycisków") */}
-      {(liczbaValueSts > 0 || liczbaPewniakow > 0 || radarNajlepsze.length > 0) && (
+      {/* PASEK ZAKŁADEK POKAZUJEMY DOPIERO OD DWÓCH (2026-08-06).
+          Typy zawodnicze potrafią stać puste tygodniami — wtedy zostawała
+          jedna zakładka „Drabinki 8", a pasek z jedną pozycją wygląda jak
+          interfejs, któremu coś się nie doładowało. Przy jednej zakładce
+          zamiast paska idzie zwykły nagłówek sekcji (niżej). */}
+      {TABY_RODZAJ.length > 1 && (
         <div
           className="flex flex-wrap items-end gap-x-6 gap-y-1 border-b border-hairline"
           role="tablist"
@@ -456,6 +459,20 @@ export function ValueBoard({
               )}
             </button>
           ))}
+        </div>
+      )}
+
+      {/* jedna zakładka = nagłówek sekcji zamiast paska (patrz wyżej) */}
+      {TABY_RODZAJ.length === 1 && (
+        <div className="flex items-baseline gap-x-3 border-b border-hairline pb-2.5">
+          <h2 className="font-display text-xs font-semibold uppercase tracking-wide text-brand-deep">
+            {TABY_RODZAJ[0][1]}
+          </h2>
+          {TABY_RODZAJ[0][2] != null && (
+            <span className="font-data text-[11px] text-faint">
+              {TABY_RODZAJ[0][2]} na dziś
+            </span>
+          )}
         </div>
       )}
 

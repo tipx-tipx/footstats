@@ -1040,7 +1040,7 @@ export function SzczegolyTypu({
                 )}
 
                 {pokazHistorie && forma && (
-                  <Krok kod="ostatnio">
+                  <Krok kod="ostatnio" zwijalny>
                     <HistoriaKrotko bet={bet} forma={forma} />
                     {/* DLACZEGO NIE TYLE, ILE MÓWI OSTATNIE 10 MECZÓW.
                         Odpowiedź na najczęstsze „czy to na pewno nie błąd" –

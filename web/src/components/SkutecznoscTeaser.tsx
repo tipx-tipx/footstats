@@ -65,7 +65,7 @@ function DniSlupki({ dni }: { dni: SkutecznoscDnia[] }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col justify-end">
       <p className="text-[10px] uppercase tracking-wide text-faint">
-        skuteczność dzień po dniu
+        ostatnie dni
       </p>
       {/* słupki rosną z kartą (bliźniak wyższego biletu kuponu), z sufitem –
           bez tego środek karty wisiał z pustymi pasami */}
@@ -127,12 +127,15 @@ export function SkutecznoscTeaser({
     <article className="flex h-full flex-col overflow-hidden rounded-(--radius-card) border border-hairline bg-card shadow-(--shadow-card) transition-shadow hover:shadow-(--shadow-card-hover)">
       <header className="bg-gradient-to-br from-card-soft via-card-soft/60 to-card px-4 pb-4 pt-4 sm:px-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
+          {/* „jak trafia model" i „rozliczane automatycznie" opisują nasz
+              proces. Czytelnik chce wiedzieć, jak nam poszło i czy tych
+              wyników nie dobieramy sobie ręcznie (06.08). */}
           <p className="font-display flex items-center gap-2 text-[10px] font-semibold uppercase tracking-widest text-brand">
             <span aria-hidden className="h-px w-5 bg-brand-bright" />
-            jak trafia model
+            jak nam poszło
           </p>
           <span className="rounded-full bg-card px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted shadow-(--shadow-card)">
-            rozliczane automatycznie
+            wyniki liczone same
           </span>
         </div>
 
@@ -169,7 +172,7 @@ export function SkutecznoscTeaser({
         <div>
         <div className="flex items-center justify-between gap-2">
           <p className="text-[10px] uppercase tracking-wide text-faint">
-            ostatnie rozliczone typy
+            ostatnie typy
           </p>
           <p className="flex items-center gap-3 text-[10px] text-faint">
             <span className="flex items-center gap-1">
@@ -195,7 +198,7 @@ export function SkutecznoscTeaser({
         href="/model"
         className="font-display group mt-auto flex items-center justify-between gap-2 border-t border-hairline px-4 py-3 text-xs font-semibold uppercase tracking-widest text-brand transition-colors hover:bg-brand-wash/50 hover:text-brand-strong sm:px-5"
       >
-        pełna skuteczność dzień po dniu
+        zobacz wszystkie wyniki
         <span aria-hidden className="transition-transform group-hover:translate-x-0.5">
           →
         </span>

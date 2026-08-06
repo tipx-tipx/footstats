@@ -19,9 +19,11 @@ export function KuponDniaTeaser({ kupon }: { kupon: Kupon }) {
       {/* nagłówek biletu */}
       <header className="bg-gradient-to-br from-brand-wash via-brand-wash/60 to-card px-4 pb-4 pt-4 sm:px-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
+          {/* „od modelu" mówi o NASZEJ kuchni — czytelnika interesuje, że to
+              kupon na dziś, gotowy do zagrania (06.08) */}
           <p className="font-display flex items-center gap-2 text-[10px] font-semibold uppercase tracking-widest text-brand">
             <span aria-hidden className="h-px w-5 bg-brand-bright" />
-            kupon dnia od modelu
+            kupon na dziś
           </p>
           <span className="rounded-full bg-card-soft px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted">
             {kupon.styl === "value" ? "z przewagą" : "wysokie szanse"}
@@ -100,7 +102,7 @@ export function KuponDniaTeaser({ kupon }: { kupon: Kupon }) {
         href="/kupony"
         className="font-display group mt-auto flex items-center justify-between gap-2 border-t border-hairline px-4 py-3 text-xs font-semibold uppercase tracking-widest text-brand transition-colors hover:bg-brand-wash/50 hover:text-brand-strong sm:px-5"
       >
-        wszystkie kupony i wyższe kursy
+        zobacz wszystkie kupony
         <span aria-hidden className="transition-transform group-hover:translate-x-0.5">
           →
         </span>

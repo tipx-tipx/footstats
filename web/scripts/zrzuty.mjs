@@ -108,8 +108,14 @@ async function rozwinKarty(page, ile) {
   // Bez tego filtra Playwright brał pierwszy z brzegu, trafiał w ukryty,
   // dostawał timeout i PRZERYWAŁ pętlę: zrzuty wychodziły ze zwiniętymi
   // kartami, cicho, tak jakby wszystko było w porządku.
+  // `:not([data-rozwiniecie="krok"])` — kroki WEWNĄTRZ rozwiniętej karty
+  // („jak było ostatnio") mają własne rozwijanie i domyślnie są zamknięte.
+  // Bez tego wyjątku skrypt otwierał je wszystkie i zrzut pokazywał kartę
+  // dłuższą, niż ktokolwiek ją widzi — czyli dokładnie odwrotność tego,
+  // po co ta flaga istnieje.
   const SEL =
-    'article button[aria-expanded="false"]:visible, table button[aria-expanded="false"]:visible';
+    'article button[aria-expanded="false"]:not([data-rozwiniecie]):visible,' +
+    ' table button[aria-expanded="false"]:not([data-rozwiniecie]):visible';
   const n = Math.min(await page.locator(SEL).count(), ile);
   for (let i = 0; i < n; i++) {
     // lista przelicza się po każdym kliknięciu (layout framer-motion),

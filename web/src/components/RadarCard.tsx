@@ -1359,7 +1359,7 @@ export const RadarCard = memo(function RadarCard({
                     )}
 
                     {r && hero && (r.ostatnie?.length ?? 0) > 0 && (
-                      <Krok kod="ostatnio">
+                      <Krok kod="ostatnio" zwijalny>
                         <HistoriaRynku r={r} linia={hero.linia} />
                         {sygnal && w.rodzaj === "forma" && (
                           <p className="mt-2 text-[13px] leading-relaxed text-faint">

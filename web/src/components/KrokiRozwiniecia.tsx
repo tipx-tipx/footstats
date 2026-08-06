@@ -45,19 +45,54 @@ export const KROK_TYTUL: Record<KrokKod, string> = {
 export function Krok({
   kod,
   tytul,
+  zwijalny = false,
   children,
 }: {
   kod: KrokKod;
   /** nadpisanie tytułu, gdy karta nazywa ten krok trafniej */
   tytul?: string;
+  /**
+   * KROK NA KLIK, NIE NA ZAWSZE OTWARTY (2026-08-06).
+   *
+   * Rozwinięta karta drabinki miała ~1000 px na telefonie, a cztery takie
+   * karty dawały stronę na 7650 px — nikt nie dochodził do końca. Najdłuższy
+   * jest krok „jak było ostatnio": lista dziesięciu meczów, czyli surowy
+   * materiał do sprawdzenia NASZEJ liczby, a nie do podjęcia decyzji.
+   * Decyzję niosą trzy pozostałe kroki, więc historia czeka pod jednym
+   * kliknięciem — nie znika, przestaje tylko zajmować pół ekranu.
+   */
+  zwijalny?: boolean;
   children: React.ReactNode;
 }) {
+  const [open, setOpen] = useState(false);
+  const naglowek = tytul ?? KROK_TYTUL[kod];
   return (
     <section className="border-t border-hairline py-4 first:border-t-0 first:pt-0 sm:grid sm:grid-cols-[7.5rem_minmax(0,1fr)] sm:gap-x-6">
-      <h4 className="mb-1.5 text-[10px] font-semibold uppercase leading-relaxed tracking-[0.12em] text-faint sm:mb-0">
-        {tytul ?? KROK_TYTUL[kod]}
-      </h4>
-      <div className="min-w-0">{children}</div>
+      {zwijalny ? (
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          // `npm run zrzuty --rozwin` klika wszystko, co ma aria-expanded —
+          // bez tego znacznika rozwijałby też kroki i zrzut pokazywałby stan,
+          // którego użytkownik nigdy nie widzi (patrz scripts/zrzuty.mjs)
+          data-rozwiniecie="krok"
+          className="mb-1.5 flex items-center gap-1.5 text-left text-[10px] font-semibold uppercase leading-relaxed tracking-[0.12em] text-faint transition-colors hover:text-brand sm:mb-0 sm:items-start"
+        >
+          {naglowek}
+          <span
+            aria-hidden
+            className={`transition-transform ${open ? "rotate-180" : ""}`}
+          >
+            ⌄
+          </span>
+        </button>
+      ) : (
+        <h4 className="mb-1.5 text-[10px] font-semibold uppercase leading-relaxed tracking-[0.12em] text-faint sm:mb-0">
+          {naglowek}
+        </h4>
+      )}
+      {(!zwijalny || open) && <div className="min-w-0">{children}</div>}
     </section>
   );
 }
@@ -86,6 +121,9 @@ export function SzczegolyTechniczne({
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
+        // to samo co przy `Krok`: zrzuty nie mają otwierać sekcji, które
+        // użytkownik zastaje zamknięte (patrz scripts/zrzuty.mjs)
+        data-rozwiniecie="szczegoly"
         className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint transition-colors hover:text-ink"
       >
         {etykieta}
