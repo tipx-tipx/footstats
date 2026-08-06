@@ -38,6 +38,12 @@ export function KuponDniaTeaser({ kupon }: { kupon: Kupon }) {
               prefix="×"
               className="font-data mt-0.5 block text-[1.7rem] font-bold leading-none"
             />
+            {/* ta sama zasada co na karcie w nagłówku: mnożnik prowadzi,
+                złotówki tłumaczą (06.08) */}
+            <p className="mt-1 text-[11px] text-faint">
+              z 10 zł →{" "}
+              {Math.round(wyplata(kupon.kurs_laczny, 10, kupon.tryb_podatku))} zł
+            </p>
           </div>
           <div title="Prawdopodobieństwo, że wejdą wszystkie typy naraz (wg modelu)">
             <p className="text-[10px] uppercase tracking-wide text-faint">
@@ -45,14 +51,6 @@ export function KuponDniaTeaser({ kupon }: { kupon: Kupon }) {
             </p>
             <p className="font-data mt-0.5 text-lg font-semibold leading-tight">
               {fmtProc(kupon.p_model)}
-            </p>
-          </div>
-          <div>
-            <p className="text-[10px] uppercase tracking-wide text-faint">
-              z 10 zł robi się
-            </p>
-            <p className="font-data mt-0.5 text-lg font-semibold leading-tight">
-              {Math.round(wyplata(kupon.kurs_laczny, 10, kupon.tryb_podatku))} zł
             </p>
           </div>
         </div>

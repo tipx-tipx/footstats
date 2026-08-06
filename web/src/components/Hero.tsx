@@ -265,12 +265,21 @@ function ZywyPodglad({ bets }: { bets: ValueBet[] }) {
               <div className="px-6 pb-1 pt-4">
                 <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
                   {bet.kurs != null ? (
+                    /* KURS NA PIERWSZYM PLANIE, KWOTA POD SPODEM (06.08).
+                       Jedna zasada na całą stronę: główną liczbą jest zawsze
+                       kurs albo mnożnik, bo nie ma w sobie skali — „3,90"
+                       wygląda tak samo mocno przy stawce 10 i 500 zł.
+                       Złotówki wyjaśniają, co to znaczy, ale nie ustawiają
+                       wrażenia: przy małej stawce zawsze brzmią jak drobne. */
                     <div>
                       <p className="text-[10px] uppercase tracking-wide text-faint">
                         kurs ({bet.bukmacher})
                       </p>
                       <p className="font-data mt-0.5 text-2xl font-semibold text-ink">
                         {fmtKurs(bet.kurs)}
+                      </p>
+                      <p className="mt-1 text-[11px] text-faint">
+                        z 10 zł → {Math.round(wyplata(bet.kurs, 10, bet.tryb_podatku))} zł
                       </p>
                     </div>
                   ) : (
@@ -298,13 +307,15 @@ function ZywyPodglad({ bets }: { bets: ValueBet[] }) {
                       tor niżej, który tę samą rzecz pokazuje dwiema liczbami,
                       jakie każdy rozumie: ile dajemy my, ile wycenia kurs. */}
                   {bet.kurs != null && (
-                    <div title="Tyle wraca do Ciebie z dziesięciu złotych, jeśli ten typ wejdzie (po podatku od stawki)">
+                    <div title="Tyle szans dajemy temu zdarzeniu po naszych wyliczeniach">
                       <p className="text-[10px] uppercase tracking-wide text-faint">
-                        z 10 zł robi się
+                        nasza szansa
                       </p>
                       <p className="font-data mt-0.5 text-2xl font-semibold text-ink">
-                        {Math.round(wyplata(bet.kurs, 10, bet.tryb_podatku))} zł
+                        {fmtProc(bet.p_model)}
                       </p>
+                      {/* porównanie z wyceną kursu robi tor niżej — tu byłoby
+                          trzecią kopią tej samej liczby na jednej karcie */}
                     </div>
                   )}
                 </div>

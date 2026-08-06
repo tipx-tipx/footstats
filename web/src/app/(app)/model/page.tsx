@@ -256,15 +256,27 @@ export default async function ModelPage({
         eyebrow={pelnyWglad ? "kontrola jakości" : "wyniki"}
         title={pelnyWglad ? "Czy model mówi prawdę?" : "Co z tego wyszło"}
         lead={
-          <>
-            <strong className="font-semibold text-ink">
-              Każdy typ, który kiedykolwiek pokazaliśmy, trafia tu sam – razem
-              z tymi, które nie weszły.
-            </strong>{" "}
-            Nic nie da się stąd usunąć ani dopisać ręcznie: liczby liczą się
-            z rozliczeń meczów. Zacznij od werdyktu na górze, a jeśli chcesz
-            sprawdzić, skąd się wziął, schodź niżej.
-          </>
+          pelnyWglad ? (
+            <>
+              <strong className="font-semibold text-ink">
+                Każdy typ, który kiedykolwiek pokazaliśmy, trafia tu sam – razem
+                z tymi, które nie weszły.
+              </strong>{" "}
+              Nic nie da się stąd usunąć ani dopisać ręcznie: liczby liczą się
+              z rozliczeń meczów. Zacznij od werdyktu na górze, a jeśli chcesz
+              sprawdzić, skąd się wziął, schodź niżej.
+            </>
+          ) : (
+            <>
+              <strong className="font-semibold text-ink">
+                Wszystkie nasze typy, dzień po dniu – te, które weszły, i te,
+                które nie.
+              </strong>{" "}
+              Wyniki dopisują się same po ostatnim gwizdku. Kliknij dowolny
+              dzień w kalendarzu, żeby zobaczyć, co wtedy typowaliśmy i po
+              jakim kursie.
+            </>
+          )
         }
       />
 

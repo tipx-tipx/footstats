@@ -34,6 +34,19 @@ function dataPl(dzien: string): string {
   });
 }
 
+/**
+ * Data dnia w nagłówku: „6 sierpnia".
+ *
+ * Kusiło, żeby pisać „Wczoraj" — brzmi świeżej. Ale to wymaga porównania
+ * z dzisiejszą datą, a strony są ISR-owe i bywają oddane z cache sprzed
+ * godzin: „wczoraj" policzone na serwerze potrafiłoby znaczyć co innego niż
+ * u czytelnika, i do tego rozjeżdżałoby hydrację. Data jest zawsze prawdziwa.
+ */
+function kiedy(dzien: string): string {
+  const d = dataPl(dzien);
+  return d.charAt(0).toUpperCase() + d.slice(1);
+}
+
 /** Bilans w jednostkach → złotówki przy stawce usera ("+124 zł", "−936 zł"). */
 function zlote(jednostki: number, stawka: number): string {
   const v = Math.round(jednostki * stawka);
@@ -84,6 +97,12 @@ export interface WerdyktDane {
   rozliczone: number;
   trafione: number;
   roi: number;
+  /** ostatni dzień z rozliczeniami — nagłówek widoku użytkownika stoi na nim */
+  ostatniDzien?: {
+    dzien: string;
+    trafione: number;
+    rozliczone: number;
+  } | null;
   /** średnia szansa deklarowana przez model (ważona próbą); null gdy brak */
   deklaracja: number | null;
   /** próg opłacalności: 1 / średni kurs rozliczonych typów; null gdy brak kursów */
@@ -124,7 +143,9 @@ export function WerdyktModelu({
       <div className="border-b border-hairline px-5 py-5 sm:px-6">
         <p className="flex items-center gap-2.5 text-xs font-semibold uppercase tracking-widest text-brand">
           <span aria-hidden className="h-px w-6 bg-brand-bright" />
-          werdykt
+          {/* „werdykt" to słowo z naszej kontroli jakości — dla czytelnika
+              ta karta jest po prostu ostatnim dniem (06.08) */}
+          {pelnyWglad ? "werdykt" : "ostatni rozliczony dzień"}
         </p>
         {/* DWA RÓŻNE PYTANIA, DWA RÓŻNE NAGŁÓWKI (2026-08-06).
             Dla nas ta zakładka odpowiada na „czy model zarabia" i tak ma
@@ -145,14 +166,16 @@ export function WerdyktModelu({
                 Na razie <span className="text-data-red">jesteśmy pod kreską</span>
               </>
             )
-          ) : (
+          ) : d.ostatniDzien ? (
             <>
-              Weszło{" "}
+              {kiedy(d.ostatniDzien.dzien)} weszło{" "}
               <span className="text-brand">
-                {d.trafione} z {d.rozliczone}
+                {d.ostatniDzien.trafione} z {d.ostatniDzien.rozliczone}
               </span>{" "}
               typów
             </>
+          ) : (
+            <>Wyniki dzień po dniu</>
           )}
         </h2>
 
@@ -192,13 +215,18 @@ export function WerdyktModelu({
           </p>
         ) : (
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">
-            To wszystkie typy z tego sezonu, jakie pokazaliśmy – razem z tymi,
-            które nie weszły. Niżej masz je dzień po dniu, z kursem i wynikiem
-            każdego.
+            Niżej masz ten dzień rozpisany na typy – z kursem i wynikiem
+            każdego. Kalendarz obok przenosi na dowolny inny dzień.
           </p>
         )}
       </div>
 
+      {/* SUMA OD POCZĄTKU SEZONU ZESZŁA Z PIERWSZEGO PLANU (06.08).
+          „Weszło 420 z 721" jest prawdziwe, ale odpowiada na pytanie,
+          którego nikt nie zadaje — i pokazuje trzysta porażek w jednej
+          liczbie. Czytelnik pyta „jak wam idzie teraz", więc nagłówek stoi
+          na ostatnim dniu, a całość sezonu zostaje drobnym drukiem pod
+          liczbami: nic nie znika, zmienia się kolejność. */}
       <dl className="grid grid-cols-2 gap-y-5 px-5 py-5 sm:flex sm:items-stretch sm:px-6">
         {pelnyWglad && (
           <Liczba
@@ -208,21 +236,31 @@ export function WerdyktModelu({
             tytul="Ile zostałoby w kieszeni, gdybyś zagrał każdy z tych typów tą samą stawką: wypłaty minus to, co postawione"
           />
         )}
-        <Kolumna>
-          <Liczba
-            etykieta={`weszło (${d.trafione}/${d.rozliczone})`}
-            wartosc={fmtProc(hit)}
-          />
-        </Kolumna>
-        {!pelnyWglad && (
+        {pelnyWglad ? (
           <Kolumna>
             <Liczba
-              etykieta="rozliczonych typów"
-              wartosc={String(d.rozliczone)}
-              tytul="Wszystko, co kiedykolwiek pokazaliśmy i co już się zakończyło – razem z tym, co nie weszło"
+              etykieta={`weszło (${d.trafione}/${d.rozliczone})`}
+              wartosc={fmtProc(hit)}
             />
           </Kolumna>
-        )}
+        ) : d.ostatniDzien ? (
+          <>
+            <Liczba
+              etykieta="typów weszło tego dnia"
+              wartosc={`${d.ostatniDzien.trafione} z ${d.ostatniDzien.rozliczone}`}
+            />
+            <Kolumna>
+              <Liczba
+                etykieta="skuteczność tego dnia"
+                wartosc={fmtProc(
+                  d.ostatniDzien.rozliczone > 0
+                    ? d.ostatniDzien.trafione / d.ostatniDzien.rozliczone
+                    : 0,
+                )}
+              />
+            </Kolumna>
+          </>
+        ) : null}
         {pelnyWglad && d.prog != null && (
           <Kolumna>
             <Liczba
@@ -287,7 +325,8 @@ export function WerdyktModelu({
       {!pelnyWglad && (
         <div className="border-t border-hairline px-5 py-3.5 text-xs leading-relaxed text-faint sm:px-6">
           Każdy typ trafia tu automatycznie po ostatnim gwizdku – niczego nie
-          dopisujemy ani nie usuwamy ręcznie.
+          dopisujemy ani nie usuwamy ręcznie. W tym sezonie rozliczyliśmy już{" "}
+          <span className="font-data">{d.rozliczone}</span> typów.
         </div>
       )}
 

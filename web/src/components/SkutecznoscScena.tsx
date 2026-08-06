@@ -342,11 +342,23 @@ export function SkutecznoscScena({
       }
     }
 
+    // OSTATNI ROZLICZONY DZIEŃ — na nim stoi nagłówek w widoku użytkownika.
+    // `dni` przychodzi posortowane od najnowszego (patrz wyżej), bierzemy
+    // pierwszy, który cokolwiek rozliczył.
+    const ostatni = dni.find((d) => d.rozliczone > 0) ?? null;
+
     return {
       coLiczymy: W_ZDANIU[wybor],
       rozliczone: s.rozliczone,
       trafione: s.trafione,
       roi: s.roi_flat,
+      ostatniDzien: ostatni
+        ? {
+            dzien: ostatni.dzien,
+            trafione: ostatni.trafione,
+            rozliczone: ostatni.rozliczone,
+          }
+        : null,
       deklaracja,
       prog: progOplacalnosci(dni),
       clv: wybor === "wszystko" ? pods?.clv_sr_pct : null,
