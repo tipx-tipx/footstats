@@ -108,7 +108,7 @@ export function WerdyktModelu({
   /** false = widok klienta: trzy liczby, złotówki, bez kuchni */
   pelnyWglad?: boolean;
 }) {
-  const [stawka, setStawka] = useStawka();
+  const [stawka] = useStawka();
   if (d.rozliczone === 0) return null;
 
   const hit = d.trafione / d.rozliczone;
@@ -126,14 +126,32 @@ export function WerdyktModelu({
           <span aria-hidden className="h-px w-6 bg-brand-bright" />
           werdykt
         </p>
+        {/* DWA RÓŻNE PYTANIA, DWA RÓŻNE NAGŁÓWKI (2026-08-06).
+            Dla nas ta zakładka odpowiada na „czy model zarabia" i tak ma
+            zostać — z bilansem, progiem opłacalności i winowajcą.
+            Widok użytkownika odpowiada na „ile z tego weszło" — liczbą typów
+            i historią dzień po dniu, w tym samym języku, w którym mówi cała
+            reszta produktu. Bilansu tam nie ma: to nasze narzędzie pracy,
+            nie treść dla kupującego. Żadna z tych wersji niczego nie zmyśla —
+            różnią się tym, na które pytanie odpowiadają. */}
         <h2 className="mt-2.5 text-xl font-bold tracking-tight sm:text-2xl">
-          {zarabia ? (
-            <>
-              Na razie <span className="text-data-green">wychodzi na plus</span>
-            </>
+          {pelnyWglad ? (
+            zarabia ? (
+              <>
+                Na razie <span className="text-data-green">wychodzi na plus</span>
+              </>
+            ) : (
+              <>
+                Na razie <span className="text-data-red">jesteśmy pod kreską</span>
+              </>
+            )
           ) : (
             <>
-              Na razie <span className="text-data-red">jesteśmy pod kreską</span>
+              Weszło{" "}
+              <span className="text-brand">
+                {d.trafione} z {d.rozliczone}
+              </span>{" "}
+              typów
             </>
           )}
         </h2>
@@ -174,25 +192,22 @@ export function WerdyktModelu({
           </p>
         ) : (
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">
-            Grając po {stawka} zł na każdy z {d.rozliczone} rozliczonych typów,
-            miałbyś dziś{" "}
-            <strong
-              className={`font-semibold ${zarabia ? "text-data-green" : "text-data-red"}`}
-            >
-              {zlote(d.roi, stawka)}
-            </strong>
-            . Weszło {d.trafione} z {d.rozliczone}.
+            To wszystkie typy z tego sezonu, jakie pokazaliśmy – razem z tymi,
+            które nie weszły. Niżej masz je dzień po dniu, z kursem i wynikiem
+            każdego.
           </p>
         )}
       </div>
 
       <dl className="grid grid-cols-2 gap-y-5 px-5 py-5 sm:flex sm:items-stretch sm:px-6">
-        <Liczba
-          etykieta={pelnyWglad ? "bilans" : `bilans przy ${stawka} zł na typ`}
-          wartosc={pelnyWglad ? fmtU(d.roi) : zlote(d.roi, stawka)}
-          ton={d.roi > 0 ? "dodatni" : d.roi < 0 ? "ujemny" : undefined}
-          tytul="Ile zostałoby w kieszeni, gdybyś zagrał każdy z tych typów tą samą stawką: wypłaty minus to, co postawione"
-        />
+        {pelnyWglad && (
+          <Liczba
+            etykieta="bilans"
+            wartosc={fmtU(d.roi)}
+            ton={d.roi > 0 ? "dodatni" : d.roi < 0 ? "ujemny" : undefined}
+            tytul="Ile zostałoby w kieszeni, gdybyś zagrał każdy z tych typów tą samą stawką: wypłaty minus to, co postawione"
+          />
+        )}
         <Kolumna>
           <Liczba
             etykieta={`weszło (${d.trafione}/${d.rozliczone})`}
@@ -238,7 +253,9 @@ export function WerdyktModelu({
         )}
       </dl>
 
-      {zRozliczeniami > 0 && (
+      {/* pasek „dni na plusie / stratnych" to rozliczenie finansowe —
+          w widoku użytkownika mówimy o typach, nie o bilansie dni */}
+      {pelnyWglad && zRozliczeniami > 0 && (
         <div className="border-t border-hairline px-5 py-4 sm:px-6">
           <div className="flex items-center justify-between gap-4 text-xs">
             <span className="text-muted">
@@ -264,21 +281,13 @@ export function WerdyktModelu({
         </div>
       )}
 
-      {/* STAWKA – dla klienta to jedyny sposób, żeby liczby znaczyły cokolwiek
-          osobistego; dla admina jednostki wystarczą, więc nie zabieramy miejsca */}
+      {/* PRZELICZNIK STAWKI ZDJĘTY Z WIDOKU UŻYTKOWNIKA (2026-08-06) —
+          służył wyłącznie bilansowi, którego już tu nie ma. Zostawiony
+          w kalendarzu, gdzie dotyczy pojedynczego dnia. */}
       {!pelnyWglad && (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-hairline px-5 py-3.5 text-xs text-muted sm:px-6">
-          <label htmlFor="stawka-werdykt">Przelicz na moją stawkę:</label>
-          <input
-            id="stawka-werdykt"
-            type="number"
-            min={1}
-            step={1}
-            value={stawka}
-            onChange={(e) => setStawka(Number(e.target.value))}
-            className="font-data w-20 rounded-(--radius-control) border border-hairline bg-card-soft px-2 py-1 text-sm text-ink"
-          />
-          <span>zł na każdy typ</span>
+        <div className="border-t border-hairline px-5 py-3.5 text-xs leading-relaxed text-faint sm:px-6">
+          Każdy typ trafia tu automatycznie po ostatnim gwizdku – niczego nie
+          dopisujemy ani nie usuwamy ręcznie.
         </div>
       )}
 

@@ -3752,6 +3752,9 @@ def skutecznosc_strumieni(log: dict, dni: int = 21) -> dict[str, dict]:
             if r.get("wynik") in ("wygrany", "przegrany")
             and r.get("rynek_kod") not in RYNKI_OSOBNE
             and not r.get("odrzucony")
+            # tylko obecny produkt — patrz komentarz przy `settled`
+            # w budowie payloadu Skuteczności
+            and _z_biezacej_epoki(r) and not _z_martwej_epoki(r)
             and _strumien(r) == nazwa
         ]
         settled = [r for r in w_strumieniu if not r.get("poza_publikacja")]
@@ -4656,6 +4659,19 @@ def rozlicz(
         # ich tutaj zmieniłoby wstecz znaczenie liczb modelu, na których stoi
         # kalibracja, kalendarz i wykresy
         and _z_modelu(r)
+        # TYLKO OBECNY PRODUKT (2026-08-06). Skuteczność mieszała mistrzostwa
+        # świata z ligą, czyli dwa różne silniki, dwa różne zakresy drużyn
+        # i produkt sprzed zmiany zasad selekcji. Zmierzone tego dnia:
+        #
+        #     wszystko razem   779 typów   bilans −769 zł   57% trafień
+        #     obecna liga      481 typów   bilans −352 zł   54%
+        #     mistrzostwa      251 typów   bilans −395 zł   57%
+        #
+        # Ponad połowa liczby, którą pokazywaliśmy jako „nasz wynik", opisuje
+        # więc silnik, którego nie ma w produkcie. To ta sama poprawka, co
+        # w `raport_uczenia` (patrz tam) — pytanie „jak nam idzie" ma dotyczyć
+        # tego, co dziś sprzedajemy.
+        and _z_biezacej_epoki(r) and not _z_martwej_epoki(r)
     ]
     okazje = [r for r in settled if not r["sugestia"] and r.get("kurs")]
     roi = sum(_zwrot_typu(r) - 1.0 for r in okazje)
@@ -4668,6 +4684,7 @@ def rozlicz(
         and not r.get("odrzucony")
         and r.get("poza_publikacja")
         and _z_modelu(r)
+        and _z_biezacej_epoki(r) and not _z_martwej_epoki(r)
     ]
 
     def _po_rynku(recs: list[dict]) -> list[dict]:

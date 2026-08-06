@@ -209,23 +209,30 @@ export function TypyDnia({
           <h4 className="font-display text-base font-bold tracking-tight first-letter:uppercase">
             {fmtDzien(dzien.dzien, true)}
           </h4>
+          {/* bilans dnia to widok pełny — użytkownik czyta ten sam dzień
+              w typach, tak jak resztę zakładki (06.08) */}
           <p className="mt-0.5 text-xs text-muted">
             <span className="font-data font-semibold text-ink">
               {dzien.trafione}/{dzien.rozliczone}
             </span>{" "}
-            weszło ({proc}%) · bilans{" "}
-            <span
-              className={`font-data font-semibold ${
-                dzien.roi_flat > 0
-                  ? "text-data-green"
-                  : dzien.roi_flat < 0
-                    ? "text-data-red"
-                    : "text-ink-soft"
-              }`}
-            >
-              {bilans(dzien.roi_flat)}
-            </span>{" "}
-            · {dzien.okazje} z kursem
+            weszło ({proc}%)
+            {pelnyWglad && (
+              <>
+                {" "}· bilans{" "}
+                <span
+                  className={`font-data font-semibold ${
+                    dzien.roi_flat > 0
+                      ? "text-data-green"
+                      : dzien.roi_flat < 0
+                        ? "text-data-red"
+                        : "text-ink-soft"
+                  }`}
+                >
+                  {bilans(dzien.roi_flat)}
+                </span>{" "}
+                · {dzien.okazje} z kursem
+              </>
+            )}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -321,7 +328,10 @@ export function TypyDnia({
           która nadal jest liczona po poprzeczkach. To jedyne miejsce, gdzie
           te dwie wielkości się rozjeżdżają, i user ma prawo o tym wiedzieć,
           zamiast domyślać się z rozbieżności. */}
-      {widoczne.length > zakladow && (
+      {/* Ten akapit tłumaczy rozjazd DWÓCH NASZYCH SPOSOBÓW LICZENIA
+          (poprzeczki vs zakłady). Dla użytkownika to wewnętrzna księgowość —
+          na liście niżej i tak widzi jeden wiersz na zakład (06.08). */}
+      {pelnyWglad && widoczne.length > zakladow && (
         <p className="mt-3 rounded-(--radius-control) border border-hairline bg-card-soft px-3.5 py-2.5 text-xs leading-relaxed text-muted">
           Wynik u góry liczy{" "}
           <span className="font-data font-semibold text-ink">

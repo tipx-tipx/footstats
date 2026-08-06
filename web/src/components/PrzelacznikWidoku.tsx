@@ -42,8 +42,8 @@ export function PrzelacznikWidoku({ podglad }: { podglad: boolean }) {
       </div>
       <p className="text-muted">
         {podglad
-          ? "Oglądasz to, co widzi klient: bez kuchni modelu, liczby w złotówkach."
-          : "Widzisz komplet, razem z diagnostyką, której klient nie dostaje."}
+          ? "Oglądasz to, co widzi klient: wyniki w typach, bez bilansu i bez kuchni modelu."
+          : "Widzisz komplet: bilans, próg opłacalności i diagnostyka, których klient nie dostaje."}
       </p>
     </div>
   );

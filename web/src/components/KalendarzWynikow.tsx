@@ -49,7 +49,7 @@ export function KalendarzWynikow({
   pelnyWglad?: boolean;
 }) {
   // `pisz`, nie `bilans` – zmienna `bilans` niżej trzyma sumę miesiąca
-  const { bilans: pisz, stawka } = useBilans(pelnyWglad);
+  const { bilans: pisz } = useBilans(pelnyWglad);
   const mapa = useMemo(() => {
     const m = new Map<string, SkutecznoscDnia>();
     for (const d of dni) if (d.rozliczone > 0) m.set(d.dzien, d);
@@ -111,6 +111,7 @@ export function KalendarzWynikow({
   });
   const bilans = miesieczne.reduce((s, d) => s + d.roi_flat, 0);
   const rozliczonych = miesieczne.reduce((s, d) => s + d.rozliczone, 0);
+  const trafionych = miesieczne.reduce((s, d) => s + d.trafione, 0);
 
   const idx = miesiace.indexOf(widok);
 
@@ -159,21 +160,35 @@ export function KalendarzWynikow({
             </svg>
           </button>
         </div>
-        <p className="text-xs text-faint">
-          bilans miesiąca:{" "}
-          <span
-            className={`font-data text-sm font-semibold ${
-              bilans > 0
-                ? "text-data-green"
-                : bilans < 0
-                  ? "text-data-red-ink"
-                  : "text-ink-soft"
-            }`}
-          >
-            {pisz(bilans)}
-          </span>{" "}
-          · {rozliczonych} rozliczonych
-        </p>
+        {/* MIESIĄC W TYPACH, NIE W ZŁOTÓWKACH (widok użytkownika, 06.08).
+            Bilans miesiąca to rozliczenie finansowe — należy do widoku
+            pełnego. Użytkownik dostaje tę samą informację w języku, w którym
+            czyta resztę produktu: ile typów weszło. */}
+        {pelnyWglad ? (
+          <p className="text-xs text-faint">
+            bilans miesiąca:{" "}
+            <span
+              className={`font-data text-sm font-semibold ${
+                bilans > 0
+                  ? "text-data-green"
+                  : bilans < 0
+                    ? "text-data-red-ink"
+                    : "text-ink-soft"
+              }`}
+            >
+              {pisz(bilans)}
+            </span>{" "}
+            · {rozliczonych} rozliczonych
+          </p>
+        ) : (
+          <p className="text-xs text-faint">
+            w tym miesiącu weszło{" "}
+            <span className="font-data text-sm font-semibold text-ink-soft">
+              {trafionych} z {rozliczonych}
+            </span>{" "}
+            typów
+          </p>
+        )}
       </div>
 
       <div className="grid grid-cols-7 gap-1.5">
@@ -199,8 +214,14 @@ export function KalendarzWynikow({
               </span>
             );
           }
-          const zysk = k.roi_flat > 0.005;
-          const strata = k.roi_flat < -0.005;
+          // W widoku pełnym kolor mówi o bilansie dnia, w widoku użytkownika
+          // o tym, czy weszła większość typów — inaczej kafelek byłby
+          // czerwony przy 5 na 8 trafionych i przeczył własnej liczbie.
+          const udanyDzien = k.rozliczone > 0 && k.trafione * 2 >= k.rozliczone;
+          const zysk = pelnyWglad ? k.roi_flat > 0.005 : udanyDzien;
+          const strata = pelnyWglad
+            ? k.roi_flat < -0.005
+            : k.rozliczone > 0 && !udanyDzien;
           const swiezy = poZmianie(k.dzien);
           const aktywny = wybrany === k.dzien;
           return (
@@ -208,7 +229,9 @@ export function KalendarzWynikow({
               key={i}
               onClick={() => onWybierz?.(k.dzien)}
               aria-pressed={aktywny}
-              title={`${k.dzien}: weszło ${k.trafione} z ${k.rozliczone} · bilans ${pisz(k.roi_flat)}${
+              title={`${k.dzien}: weszło ${k.trafione} z ${k.rozliczone}${
+                pelnyWglad ? ` · bilans ${pisz(k.roi_flat)}` : ""
+              }${
                 swiezy ? "" : " · typy sprzed zmiany zasad"
               } – kliknij, żeby zobaczyć ten dzień`}
               className={`flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-(--radius-control) border text-xs transition-transform hover:scale-[1.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
@@ -226,8 +249,12 @@ export function KalendarzWynikow({
               }`}
             >
               <span className="text-[10px] opacity-70">{nrDnia}</span>
+              {/* kafelek ma ~40 px: w widoku pełnym bilans, w widoku
+                  użytkownika liczba trafionych typów tego dnia */}
               <span className="font-data text-[11px] font-semibold leading-none">
-                {pisz(k.roi_flat, true)}
+                {pelnyWglad
+                  ? pisz(k.roi_flat, true)
+                  : `${k.trafione}/${k.rozliczone}`}
               </span>
             </button>
           );
@@ -237,26 +264,36 @@ export function KalendarzWynikow({
       <div className="mt-3 space-y-1.5 text-[11px] leading-relaxed text-faint">
         <p>
           Kliknij dowolny dzień, żeby zobaczyć jego typy. Puste pola
-          = brak rozliczeń; każdy dzień zostaje w kalendarzu, także stratny.
-          {/* kafelek ma ~40 px, więc mieści samą liczbę bez „zł" – jednostkę
-              trzeba dopowiedzieć tutaj, inaczej „−160" nic nie znaczy */}
+          = brak rozliczeń.
           {!pelnyWglad && (
-            <> Liczba na kafelku to złotówki przy {stawka} zł na typ.</>
+            <> Liczba na kafelku to typy, które weszły tego dnia.</>
           )}
         </p>
+        {/* „sprzed zmiany zasad selekcji" to nasze słownictwo i nasza
+            wewnętrzna cezura — użytkownikowi mówimy prościej, o co chodzi
+            z wyblakłymi dniami (06.08) */}
         {OSTATNIA_ZMIANA && (
           <p>
             <span
               aria-hidden
               className="mr-1.5 inline-block h-2.5 w-2.5 rounded-[3px] border border-hairline bg-card-soft align-[-1px] opacity-55"
             />
-            Wyblakłe dni są sprzed{" "}
-            {new Date(`${OSTATNIA_ZMIANA.od}T12:00:00`).toLocaleDateString(
-              "pl-PL",
-              { day: "numeric", month: "long" },
+            {pelnyWglad ? (
+              <>
+                Wyblakłe dni są sprzed{" "}
+                {new Date(`${OSTATNIA_ZMIANA.od}T12:00:00`).toLocaleDateString(
+                  "pl-PL",
+                  { day: "numeric", month: "long" },
+                )}
+                , czyli sprzed zmiany zasad selekcji – opisują model, którego
+                już nie ma w produkcji.
+              </>
+            ) : (
+              <>
+                Wyblakłe dni to starsze typy, wybierane jeszcze według
+                wcześniejszych zasad.
+              </>
             )}
-            , czyli sprzed zmiany zasad selekcji – opisują model, którego już
-            nie ma w produkcji.
           </p>
         )}
       </div>

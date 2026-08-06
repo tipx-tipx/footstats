@@ -505,7 +505,11 @@ export function SkutecznoscScena({
           osobne dzieci siatki i jawne `col/row-start` dopiero od XL –
           w jednej kolumnie układają się w naturalnej kolejności czytania. */}
       <div className="mt-8 grid max-w-3xl gap-5 xl:max-w-6xl xl:grid-cols-[minmax(0,1fr)_26rem]">
-        {dni.length > 1 && (
+        {/* KRZYWA NARASTAJĄCEGO BILANSU — widok pełny (06.08). To wykres
+            rozliczenia finansowego, czyli dokładnie ta rzecz, której widok
+            użytkownika nie prowadzi; bez bilansu w werdykcie wisiałby sam,
+            w innym języku niż cała reszta ekranu. */}
+        {pelnyWglad && dni.length > 1 && (
           <div className="min-w-0 xl:col-start-1 xl:row-start-1">
             <KrzywaWyniku dni={dni} pelnyWglad={pelnyWglad} />
           </div>
