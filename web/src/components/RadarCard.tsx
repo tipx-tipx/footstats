@@ -728,9 +728,11 @@ function CzynnikiMeczu({ kontekst }: { kontekst: RadarKontekst }) {
           />
         )}
         {sezony?.mnoznik != null && (
+          /* bez „przez cały sezon" w opisie – etykieta już to mówi, a razem
+             czytało się „cały sezon przez cały sezon 2,0 na mecz" (06.08) */
           <CzynnikWiersz
             etykieta="cały sezon"
-            opis={`przez cały sezon ${naMecz(sezony.sezon90 ?? 0, "")}, w ostatnich meczach ${naMecz(sezony.okno90 ?? 0, "")} – dłuższa historia waży więcej`}
+            opis={`${naMecz(sezony.sezon90 ?? 0, "")}, w ostatnich meczach ${naMecz(sezony.okno90 ?? 0, "")} – dłuższa historia waży więcej`}
             mnoznik={sezony.mnoznik}
           />
         )}
@@ -763,10 +765,13 @@ function PrzewagaZdanie({
   // i ile za niego płacą.
   const uczciwy = pFinal > 0 ? 1 / pFinal : null;
   const przewaga = uczciwy != null ? kurs / uczciwy - 1 : null;
+  // PRZYPIS, NIE WERDYKT (2026-08-06, decyzja usera). Cena przestała być
+  // najgłośniejszym elementem rozwinięcia: to dodatek do historii, więc mówi
+  // tym samym drobnym drukiem co inne dopiski, bez wytłuszczeń na całą linię.
   return (
-    <p className="text-sm leading-relaxed text-ink-soft">
+    <p className="text-[13px] leading-relaxed text-muted">
       Po tych poprawkach dajemy {linLabel(linia)}{" "}
-      <span className="font-data font-semibold text-ink">
+      <span className="font-data font-semibold text-ink-soft">
         {fmtProc(pFinal)}
       </span>{" "}
       szans
@@ -774,19 +779,19 @@ function PrzewagaZdanie({
         <>
           , czyli uczciwy kurs to{" "}
           <span className="font-data">{fmtKurs(uczciwy)}</span>. Superbet płaci{" "}
-          <span className="font-data font-semibold text-ink">
+          <span className="font-data font-semibold text-ink-soft">
             {fmtKurs(kurs)}
           </span>
           {przewaga != null && przewaga > 0.01 && (
-            <span className="font-semibold text-data-green-ink">
+            <span className="text-data-green-ink">
               {" "}
-              – czyli więcej, niż ten typ jest wart
+              – więcej, niż ten typ jest wart
             </span>
           )}
           {przewaga != null && przewaga <= 0.01 && (
-            <span className="font-semibold text-data-amber-ink">
+            <span className="text-data-amber-ink">
               {" "}
-              – czyli tyle, ile trzeba, albo odrobinę mniej
+              – tyle, ile trzeba, albo odrobinę mniej
             </span>
           )}
         </>
@@ -905,48 +910,69 @@ const KROTKI_WYSTEP_MIN = 60;
  * z ławki – a to zupełnie inna informacja o zawodniku.
  */
 function RywaleMeczPoMeczu({ r }: { r: RadarRynek }) {
+  // TELEFON WIDZI 5 NAJNOWSZYCH, RESZTA NA KLIK (2026-08-06, przebudowa
+  // rozwinięcia). Krok „jak było ostatnio" jest od dziś otwarty z domysłu,
+  // więc pełna lista dziesięciu meczów jedną kolumną robiłaby z karty tę samą
+  // ścianę, przez którą krok wcześniej zwinęliśmy. Laptop ma miejsce: tam
+  // lista idzie w dwie kolumny i pokazuje wszystko od razu.
+  const [wszystkie, setWszystkie] = useState(false);
   const n = r.ostatnie?.length ?? 0;
   if (!n || !r.rywale?.length) return null;
+  const LIMIT_TELEFON = 5;
   return (
-    <ul className="mt-2 space-y-0.5">
-      {r.ostatnie!.slice(0, n).map((c, i) => {
-        const rywal = r.rywale?.[i];
-        const min = r.minuty?.[i];
-        const krotki = min != null && min < KROTKI_WYSTEP_MIN;
-        return (
-          <li
-            key={i}
-            className="flex items-baseline gap-1.5 text-[11px] leading-relaxed"
-          >
-            <span
-              className={`font-data font-semibold ${
-                c > 0 ? "text-ink-soft" : "text-faint"
-              }`}
+    <div className="mt-2.5">
+      <ul className="space-y-0.5 sm:columns-2 sm:gap-x-8 sm:space-y-0">
+        {r.ostatnie!.slice(0, n).map((c, i) => {
+          const rywal = r.rywale?.[i];
+          const min = r.minuty?.[i];
+          const krotki = min != null && min < KROTKI_WYSTEP_MIN;
+          const tylkoLaptop = !wszystkie && i >= LIMIT_TELEFON;
+          return (
+            <li
+              key={i}
+              className={`${
+                tylkoLaptop ? "hidden sm:flex" : "flex"
+              } items-baseline gap-1.5 text-[11px] leading-relaxed sm:break-inside-avoid sm:py-px`}
             >
-              {c}
-            </span>
-            <span className={c > 0 ? "text-muted" : "text-faint"}>
-              {odmien(c, r.rynek_kod)}
-            </span>
-            {rywal && (
-              <span className="truncate text-muted">vs {rywal}</span>
-            )}
-            {/* MINUTY PRZY RYWALU, NIE PRZY PRAWEJ KRAWĘDZI (2026-08-01):
-                odkąd rozwinięcie idzie na pełną szerokość, `ml-auto` odrzucał
-                „90 min" o pół ekranu od meczu, którego dotyczy. */}
-            {min != null && (
               <span
-                className={`font-data shrink-0 ${
-                  krotki ? "text-data-amber-ink" : "text-faint"
+                className={`font-data font-semibold ${
+                  c > 0 ? "text-ink-soft" : "text-faint"
                 }`}
               >
-                · {min} min{krotki && " – krótko, więc mało z tego wynika"}
+                {c}
               </span>
-            )}
-          </li>
-        );
-      })}
-    </ul>
+              <span className={c > 0 ? "text-muted" : "text-faint"}>
+                {odmien(c, r.rynek_kod)}
+              </span>
+              {rywal && (
+                <span className="truncate text-muted">vs {rywal}</span>
+              )}
+              {/* MINUTY PRZY RYWALU, NIE PRZY PRAWEJ KRAWĘDZI (2026-08-01):
+                  odkąd rozwinięcie idzie na pełną szerokość, `ml-auto` odrzucał
+                  „90 min" o pół ekranu od meczu, którego dotyczy. */}
+              {min != null && (
+                <span
+                  className={`font-data shrink-0 ${
+                    krotki ? "text-data-amber-ink" : "text-faint"
+                  }`}
+                >
+                  · {min} min{krotki && " – krótko, więc mało z tego wynika"}
+                </span>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      {n > LIMIT_TELEFON && !wszystkie && (
+        <button
+          type="button"
+          onClick={() => setWszystkie(true)}
+          className="mt-1.5 text-[11px] font-medium text-brand transition-colors hover:text-brand-bright sm:hidden"
+        >
+          pokaż wszystkie {n} meczów ↓
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -1331,8 +1357,12 @@ export const RadarCard = memo(function RadarCard({
                           />
                         )}
                         {/* skąd BIORĄ SIĘ te dane: transfer z innej ligi,
-                            debiutant bez historii, liga poza feedem */}
-                        {opis && (
+                            debiutant bez historii, liga poza feedem.
+                            BEZ WPISU „forma" (06.08): odkąd krok „jak było
+                            ostatnio" jest otwarty, te same liczby serii stały
+                            trzy razy na jednej karcie – zdanie o serii niesie
+                            teraz historia i notka „seria formy" pod nią. */}
+                        {opis && w.rodzaj !== "forma" && (
                           <p className="mt-1.5 text-sm leading-relaxed text-muted">
                             {opis}
                           </p>
@@ -1364,8 +1394,14 @@ export const RadarCard = memo(function RadarCard({
                       </Krok>
                     )}
 
+                    {/* OTWARTE Z DOMYSŁU (2026-08-06, przebudowa na życzenie
+                        usera). Zwinięty krok wyglądał jak pusta etykieta
+                        z myślnikiem — a historia ma być sercem rozwinięcia,
+                        nie schowkiem. Wysokość trzyma w ryzach lista mecz po
+                        meczu: dwie kolumny na laptopie, 5 najnowszych na
+                        telefonie (patrz RywaleMeczPoMeczu). */}
                     {r && hero && (r.ostatnie?.length ?? 0) > 0 && (
-                      <Krok kod="ostatnio" zwijalny>
+                      <Krok kod="ostatnio">
                         <HistoriaRynku r={r} linia={hero.linia} />
                         {sygnal && w.rodzaj === "forma" && (
                           <p className="mt-2 text-[13px] leading-relaxed text-faint">
@@ -1378,7 +1414,10 @@ export const RadarCard = memo(function RadarCard({
                       </Krok>
                     )}
 
-                    <Krok kod="przewaga">
+                    {/* „CENA", NIE „GDZIE JEST PRZEWAGA" (2026-08-06, decyzja
+                        usera): to dodatek do historii, nie punkt kulminacyjny.
+                        Treść mówi drobnym drukiem — patrz PrzewagaZdanie. */}
+                    <Krok kod="przewaga" tytul="cena">
                       {hero && (
                         <PrzewagaZdanie
                           pFinal={hero.p_final}
@@ -1446,7 +1485,7 @@ export const RadarCard = memo(function RadarCard({
                 const maSezony = (w.sezony?.length ?? 0) > 0;
                 if (!r && !maSezony) return null;
                 return (
-                  <SzczegolyTechniczne>
+                  <SzczegolyTechniczne etykieta="Pełny rachunek i wszystkie linie">
                     {r && <TabelaDrabinki r={r} />}
                     {maSezony && (
                       <div className="mt-4">

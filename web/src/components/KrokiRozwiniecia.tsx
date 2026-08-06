@@ -117,6 +117,11 @@ export function SzczegolyTechniczne({
   const [open, setOpen] = useState(false);
   return (
     <div className="mt-5 border-t border-hairline pt-4">
+      {/* PRZYCISK, NIE SZARY NAPIS (2026-08-06, uwaga usera: „szczegóły
+          techniczne powinny być lepiej widoczne"). Etykieta w kolorze `faint`
+          ginęła na dole rozwinięcia — jedyne zejście do pełnego rachunku
+          wyglądało jak przypis. Ten sam wygląd co „Pokaż pozostałe drabinki":
+          pełna szerokość, ramka, hover marki. */}
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -124,7 +129,7 @@ export function SzczegolyTechniczne({
         // to samo co przy `Krok`: zrzuty nie mają otwierać sekcji, które
         // użytkownik zastaje zamknięte (patrz scripts/zrzuty.mjs)
         data-rozwiniecie="szczegoly"
-        className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint transition-colors hover:text-ink"
+        className="font-display flex w-full items-center justify-center gap-2 rounded-(--radius-control) border border-hairline-strong bg-card px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-ink-soft transition-colors hover:border-brand hover:text-brand"
       >
         {etykieta}
         <svg
