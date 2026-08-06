@@ -3842,6 +3842,18 @@ def raport_uczenia(
 
     Liczone na tych samych typach, co pokazywana skuteczność: bez sugestii,
     bez typów pomiarowych, bez typów spoza publikacji i bez rynków osobnych.
+
+    TYLKO BIEŻĄCA EPOKA (2026-08-06). Ten raport nie filtrował po epoce, więc
+    odpowiadał na „czy się uczymy" danymi z produktu, którego już nie ma.
+    Zmierzone tego dnia na zawodnikach: okno alarmu to 104 typy mundialowe
+    i 16 ligowych, a okno porównawcze — 120 mundialowych w całości. Alarm
+    „luka pogłębiła się o 14,2 pp" mówił więc o mistrzostwach świata.
+    To trzeci raz, gdy pomiar bez filtra epoki daje zły wniosek (patrz
+    komentarz przy `_z_martwej_epoki` i przy stemplu `wersje`).
+
+    CENA JEST ŚWIADOMA: strumień, który po odcięciu mundialu ma mniej niż
+    sześć pełnych paczek, traci `trend` i zakładka mówi „za krótka historia".
+    Puste miejsce jest uczciwsze niż wykres cudzego produktu.
     """
     out: dict[str, dict] = {}
     for nazwa in STRUMIENIE:
@@ -3852,6 +3864,7 @@ def raport_uczenia(
                 and r.get("rynek_kod") not in RYNKI_OSOBNE
                 and not r.get("odrzucony") and not r.get("poza_publikacja")
                 and not r.get("sugestia") and r.get("p_model")
+                and not _z_martwej_epoki(r) and _z_biezacej_epoki(r)
                 and _strumien(r) == nazwa
             ),
             key=lambda r: r.get("kickoff_ts") or 0,

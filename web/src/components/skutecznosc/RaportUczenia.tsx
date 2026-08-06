@@ -207,6 +207,17 @@ export function RaportUczenia({
         model się pomylił: na minusie był zbyt pewny siebie. Jeśli się uczy, ta
         liczba z wiersza na wiersz zbliża się do zera.
       </p>
+      {/* Bez tego zdania zanik lipcowych wierszy wygląda na awarię. Mundial
+          poszedł stąd świadomie (06.08): mierzył co innego niż liga, a przy
+          zawodnikach robił 104 ze 120 typów w oknie porównawczym. */}
+      <p className="max-w-prose text-sm leading-relaxed text-muted">
+        Liczymy wyłącznie typy z{" "}
+        <strong className="font-semibold">obecnych rozgrywek ligowych</strong>.
+        Mistrzostwa świata były innym produktem – inne drużyny, inne poziomy
+        statystyk – więc ich wyniki nie mówią nic o tym, jak model radzi sobie
+        dziś. Dlatego strumień, który po mundialu ma jeszcze mało rozliczeń,
+        pokazuje tu krótką tabelę albo nic.
+      </p>
       {widoczne.map((k) => {
         const u = raport[k]!;
         return (

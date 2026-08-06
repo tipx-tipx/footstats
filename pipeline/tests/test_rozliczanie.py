@@ -557,6 +557,23 @@ def test_raport_uczenia_pomija_typy_pomiarowe_i_spoza_publikacji():
     assert len(p) == 1 and p[0]["n"] == 40 and p[0]["hit"] == 1.0
 
 
+def test_raport_uczenia_nie_liczy_poprzedniej_epoki():
+    """Raport odpowiada na „czy uczymy się TERAZ", więc mundial go nie dotyczy.
+
+    Zmierzone 06.08 na żywej księdze: okno alarmu dla zawodników miało 104
+    typy mundialowe i 16 ligowych, a okno porównawcze — 120 mundialowych
+    w całości. Alarm mówił o produkcie, którego już nie ma.
+    """
+    log = {}
+    for i in range(40):
+        log[f"ms{i}"] = {**_typ_uczenia(i, 0.7, "przegrany"), "epoka": "ms"}
+    for i in range(40, 80):
+        log[f"liga{i}"] = {**_typ_uczenia(i, 0.7, "wygrany"), "epoka": "liga"}
+    p = rozliczanie.raport_uczenia(log, rozmiar=40)["pewniaki"]["paczki"]
+    assert len(p) == 1 and p[0]["n"] == 40
+    assert p[0]["hit"] == 1.0, "same ligowe — mundialowe przegrane nie wchodzą"
+
+
 # --- WYNIK MECZU TYLKO Z MECZU ZAKOŃCZONEGO (2026-07-30) --------------------
 
 
