@@ -188,6 +188,43 @@ def test_karta_z_ksiegi_odzyskuje_rachunek_policzony_w_tym_cyklu(monkeypatch):
     assert b["kurs"] == 1.28 and b["p_model"] == 0.8844
 
 
+def test_odzyskany_rachunek_wraca_do_rejestru(monkeypatch):
+    """SAMOLECZENIE REJESTRU (2026-08-06). Wpis rejestru powstaje tylko
+    w cyklu narodzin typu — gdy tamten zapis padł, karta wracała z księgi
+    bez rachunku na zawsze, bo rentgen żyje tylko dopóki bukmacher kwotuje
+    linię (zmierzone: 5 kart „gole poniżej 0,5" z nocnych cykli 04–05.08).
+    Odzyskany rachunek ma trafić do rejestru, żeby przeżył zdjęcie linii."""
+    magazyn: dict = {}
+    _stub_supa(monkeypatch, magazyn)
+    # cykl 1: typ wraca z księgi, rentgen łata mu rachunek
+    out, _ = B.scal_z_publikacjami(
+        [], {}, typy_log={"k": _wpis_logu()},
+        policzone_w_cyklu=[_policzony()],
+    )
+    assert out[0]["uproszczony"] is False
+    rej = magazyn[B.PUBLIKACJE_KLUCZ]
+    assert len(rej) == 1
+    wpis = list(rej.values())[0]
+    assert wpis["bet"]["czynniki"] == {"rywal": 1.08, "wyjazd": 0.97}
+    assert wpis["opublikowano_ts"] == 1000    # data PIERWSZEJ publikacji
+    # cykl 2: bukmacher zdjął linię (bez rentgenu) — rachunek przeżył w rejestrze
+    out2, wzn2 = B.scal_z_publikacjami([], {}, typy_log={"k": _wpis_logu()})
+    assert wzn2 == 1
+    assert out2[0]["uproszczony"] is False
+    assert out2[0]["czynniki"] == {"rywal": 1.08, "wyjazd": 0.97}
+    assert out2[0]["kurs"] == 1.28            # cena wciąż zamrożona
+
+
+def test_karta_bez_rachunku_nie_zasmieca_rejestru(monkeypatch):
+    """Samoleczenie dotyczy TYLKO kart z odzyskanym rachunkiem — wpis
+    z gołą kartą niczego by nie chronił, a rósłby w rejestrze bez końca."""
+    magazyn: dict = {}
+    _stub_supa(monkeypatch, magazyn)
+    out, _ = B.scal_z_publikacjami([], {}, typy_log={"k": _wpis_logu()})
+    assert out[0]["uproszczony"] is True
+    assert magazyn[B.PUBLIKACJE_KLUCZ] == {}
+
+
 def test_rachunek_nie_dokladany_gdy_szansa_sie_rozjechala(monkeypatch):
     """Karta pokazuje szansę zamrożoną. Gdy dzisiejsze przeliczenie prowadzi
     do wyraźnie innej liczby, jego czynniki tłumaczyłyby COŚ INNEGO niż to,

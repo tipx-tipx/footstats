@@ -468,6 +468,7 @@ def scal_z_publikacjami(
         return bet
 
     z_logu = 0
+    _rej_uzdrowione = 0
     for rec in (typy_log or {}).values():
         if rec.get("wynik") is not None or rec.get("sugestia"):
             continue                      # rozliczony albo bez kursu
@@ -491,6 +492,23 @@ def scal_z_publikacjami(
             mecz = _z_terminarza(_mecz_z_logu(rec))
             if mecz:
                 matches_out[mid] = mecz
+        # SAMOLECZENIE REJESTRU (2026-08-06). Wpis rejestru powstaje tylko
+        # w cyklu narodzin typu — jeśli tamten jeden zapis padł, karta wracała
+        # z księgi bez rachunku już NA ZAWSZE, nawet gdy rentgen z bieżącego
+        # cyklu właśnie jej ten rachunek przywrócił (Superbet zdejmuje linię
+        # i rentgen znika razem z nią; zmierzone 06.08: pięć kart „gole
+        # poniżej 0,5" bez analizy, wszystkie z nocnych cykli 04–05.08).
+        # Odzyskany rachunek zapisujemy więc do rejestru — jednorazowa czkawka
+        # zapisu przestaje być wyrokiem. Cena i szansa są już zamrożone
+        # w `bet`, więc wpis niczego nie odświeży w złą stronę.
+        if not bet.get("uproszczony") and k not in rej:
+            rej[k] = {
+                "bet": {kk: vv for kk, vv in bet.items() if kk != "kal_tau"},
+                "mecz": matches_out.get(mid),
+                "kickoff_ts": bet.get("kickoff_ts"),
+                "opublikowano_ts": bet.get("opublikowano_ts") or teraz,
+            }
+            _rej_uzdrowione += 1
 
     # id typów są numerowane od zera w każdym cyklu, więc wpis wznowiony potrafi
     # trafić na cudzy numer — front używa ich jako kluczy i kotwic (#bet-N)
@@ -530,7 +548,9 @@ def scal_z_publikacjami(
               f"wznowionych z księgi odzyskało rozpisany rachunek"
               + (f" ({_rentgen_rozjazd} pominięte — szansa rozjechała się "
                  f"o ponad {RENTGEN_MAX_ROZJAZD_P*100:.0f} pp)"
-                 if _rentgen_rozjazd else ""))
+                 if _rentgen_rozjazd else "")
+              + (f"; {_rej_uzdrowione} z nich dopisane z powrotem do rejestru"
+                 if _rej_uzdrowione else ""))
     # CICHE POMINIĘCIE ZAPISU (załatane 2026-08-04). Gdy odczyt rejestru padł,
     # ten `if` przechodził bokiem BEZ SŁOWA — a to znaczy, że typy policzone
     # w tym cyklu tracą rentgen na zawsze (wpis powstaje tylko raz, patrz
