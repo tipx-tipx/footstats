@@ -1400,7 +1400,7 @@ export const BetCard = memo(function BetCard({
                   />
                 </span>
               )}
-              <span className="truncate font-semibold">
+              <span role="heading" aria-level={3} className="truncate font-semibold">
                 {nazwaPodmiotu(bet)}
               </span>
               <span className="text-sm text-muted">{opisZakladu(bet)}</span>

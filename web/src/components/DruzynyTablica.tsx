@@ -8,6 +8,7 @@ import { BetRow, BetRowNaglowek } from "./BetRow";
 import { grupujWarianty } from "@/lib/warianty";
 import { FilterDropdown } from "./FilterDropdown";
 import { Reveal } from "./Reveal";
+import { Wyrozniona } from "./Wyrozniona";
 import type { DruzynaForma, ValueBet, Zawodnik } from "@/lib/types";
 import { useTeraz } from "@/lib/useTeraz";
 import { KROPKA_STYL, PRZEWAGA_KROPKI } from "@/lib/slownik";
@@ -801,8 +802,8 @@ export function DruzynyTablica({
 
               {top.length > 0 && (
                 <div className="mt-4 space-y-4">
-                  {top.map((bet, i) => (
-                    <Reveal key={bet.id} delay={Math.min(i * 0.05, 0.2)}>
+                  {top.map((bet, i) => {
+                    const karta = (
                       <BetCard
                         bet={bet}
                         rank={i + 1}
@@ -815,8 +816,22 @@ export function DruzynyTablica({
                         }
                         warianty={wariantyById.get(bet.id)}
                       />
-                    </Reveal>
-                  ))}
+                    );
+                    return (
+                      <Reveal key={bet.id} delay={Math.min(i * 0.05, 0.2)}>
+                        {/* pierwsza karta dnia wygląda jak pierwsza — ale
+                            tylko przy naszej kolejności („polecane"), bo przy
+                            sortowaniu po kursie numer 1 nic nie znaczy */}
+                        {i === 0 && sort === "rank" ? (
+                          <Wyrozniona etykieta="nasz typ numer 1 na dziś">
+                            {karta}
+                          </Wyrozniona>
+                        ) : (
+                          karta
+                        )}
+                      </Reveal>
+                    );
+                  })}
                 </div>
               )}
 

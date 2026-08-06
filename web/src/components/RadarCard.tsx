@@ -236,7 +236,8 @@ function Fakty({ w }: { w: RadarWpis }) {
   }
   if (drugi?.p_final != null) {
     fakty.push({
-      tekst: `drugi szczebel ${fmtProc(drugi.p_final)}`,
+      // „szczebel" to nasze słowo na poprzeczkę drabinki (06.08)
+      tekst: `druga poprzeczka ${fmtProc(drugi.p_final)}`,
       // ZIELEŃ NIESIE TU INFORMACJĘ, nie ozdabia: mówi, że drabinkę da się
       // rozegrać DALEJ NIŻ O JEDEN SZCZEBEL. Próg 0,40 jest ten sam, którym
       // backend przyznaje kształt „dwa_szczeble" (radar.PEWNA_MIN_P_DRUGI) —
@@ -256,7 +257,8 @@ function Fakty({ w }: { w: RadarWpis }) {
   }
   if (w.hero?.z) {
     fakty.push({
-      tekst: `${w.hero.traf}/${w.hero.z} ostatnich`,
+      // „7/10 ostatnich" nie mówi, czego siedem z dziesięciu (06.08)
+      tekst: `przebił w ${w.hero.traf} z ${w.hero.z} meczów`,
       klasa: "bg-paper text-ink-soft border border-hairline",
     });
   }
@@ -1179,7 +1181,9 @@ export const RadarCard = memo(function RadarCard({
                   />
                 </span>
               )}
-              <span className="truncate font-semibold">{w.podmiot}</span>
+              <span role="heading" aria-level={3} className="truncate font-semibold">
+                {w.podmiot}
+              </span>
               <span className="text-sm text-muted">
                 {w.druzyna}
                 {w.pozycja && w.pozycja !== "?" ? ` · ${w.pozycja}` : ""}
@@ -1187,7 +1191,7 @@ export const RadarCard = memo(function RadarCard({
             </span>
             <span className="mt-0.5 block truncate text-xs text-faint">
               vs {w.przeciwnik}
-              {w.minuty_sr6 != null && ` · gra śr. ${w.minuty_sr6} min`}
+              {w.minuty_sr6 != null && ` · gra średnio ${w.minuty_sr6} min`}
             </span>
           </span>
 

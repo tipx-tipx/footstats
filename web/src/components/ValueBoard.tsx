@@ -8,6 +8,7 @@ import { BetCard } from "./BetCard";
 import { FilterDropdown } from "./FilterDropdown";
 import { RadarCard } from "./RadarCard";
 import { StsBetCard } from "./StsBetCard";
+import { Wyrozniona } from "./Wyrozniona";
 import { fmtDataCzas } from "@/lib/format";
 import { grupujWarianty } from "@/lib/warianty";
 import { useTeraz } from "@/lib/useTeraz";
@@ -580,7 +581,15 @@ export function ValueBoard({
                       <p className="mb-1 truncate text-[11px] text-faint">
                         {w.mecz} · {fmtDataCzas(w.kickoff_ts)}
                       </p>
-                      <RadarCard w={w} />
+                      {/* pierwsza karta wygląda jak pierwsza — ale tylko przy
+                          sortowaniu po jakości (patrz `Wyrozniona`) */}
+                      {i === 0 && sortDrabinki === "najlepsze" ? (
+                        <Wyrozniona>
+                          <RadarCard w={w} />
+                        </Wyrozniona>
+                      ) : (
+                        <RadarCard w={w} />
+                      )}
                     </motion.div>
                   ))}
                   {radarPosortowane.length > LIMIT_DRABINEK && (

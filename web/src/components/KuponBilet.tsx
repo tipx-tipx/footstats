@@ -114,7 +114,7 @@ export function KuponBilet({
           </div>
           <div title="Szansa, że wejdą wszystkie typy naraz. Typy z jednego meczu potrafią paść razem, więc za nie obcinamy tę szansę.">
             <p className="text-[10px] uppercase tracking-wide text-faint">
-              szansa modelu
+              nasza szansa
             </p>
             <p className="font-data mt-0.5 text-lg font-semibold leading-tight">
               {fmtProc(k.p_model)}

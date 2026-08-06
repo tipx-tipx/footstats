@@ -94,7 +94,7 @@ function TorWyceny({ model, kurs }: { model: number; kurs: number }) {
   return (
     <div
       className="mt-4"
-      title={`Kurs ${fmtKurs(kurs)} wycenia tę szansę na ${fmtProc(implied)} (z marżą bukmachera), model daje ${fmtProc(model)}. Gdy model stoi wyżej niż wycena kursu, bukmacher płaci więcej, niż powinien.`}
+      title={`Kurs ${fmtKurs(kurs)} wycenia tę szansę na ${fmtProc(implied)} (z marżą bukmachera), a my dajemy ${fmtProc(model)}. Gdy nasza liczba stoi wyżej niż wycena kursu, bukmacher płaci więcej, niż powinien.`}
     >
       <div className="relative h-4">
         <span className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-hairline" />
@@ -121,7 +121,7 @@ function TorWyceny({ model, kurs }: { model: number; kurs: number }) {
         </div>
         <div className="flex items-baseline gap-1.5">
           <span aria-hidden className="inline-block h-2 w-2 translate-y-px rounded-full bg-brand" />
-          <dt className="text-[11px] text-faint">model daje</dt>
+          <dt className="text-[11px] text-faint">nasza szansa</dt>
           <dd className="font-data text-sm font-semibold text-ink">{fmtProc(model)}</dd>
         </div>
       </dl>
@@ -160,8 +160,8 @@ function ZywyPodglad({ bets }: { bets: ValueBet[] }) {
           Rynek wycenia blisko modelu
         </p>
         <p className="mx-auto mt-1.5 max-w-xs text-sm leading-relaxed text-muted">
-          W tej chwili bukmacher nie przepłaca za żadne zdarzenie. Skan trwa,
-          a strona odświeży się sama po każdym przeliczeniu kursów.
+          W tej chwili bukmacher nie przepłaca za żadne zdarzenie. Liczymy
+          dalej – strona odświeży się sama, gdy coś się pojawi.
         </p>
       </div>
       </div>
@@ -285,7 +285,7 @@ function ZywyPodglad({ bets }: { bets: ValueBet[] }) {
                   ) : (
                     <>
                       <div>
-                        <p className="text-[10px] uppercase tracking-wide text-faint">szansa modelu</p>
+                        <p className="text-[10px] uppercase tracking-wide text-faint">nasza szansa</p>
                         <p className="font-data mt-0.5 text-2xl font-semibold text-ink">
                           {fmtProc(bet.p_model)}
                         </p>
@@ -442,7 +442,7 @@ function TickerRynkow({ bets }: { bets: ValueBet[] }) {
       {/* stała plakietka – nie jedzie z feedem */}
       <span className="font-display flex shrink-0 items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-brand-deep">
         <span aria-hidden className="live-dot h-1.5 w-1.5 rounded-full bg-data-green" />
-        skan na żywo
+        dziś typujemy
       </span>
       <div
         className="ticker relative flex-1"
@@ -515,7 +515,7 @@ export function Hero({
           >
             <p className="flex items-center gap-2.5 text-xs font-semibold uppercase tracking-widest text-brand">
               <span aria-hidden className="h-px w-6 bg-brand-bright" />
-              Skan rynków · {liga} {sezon}
+              Typy na dziś · {liga} {sezon}
             </p>
             {/* DWA KOMUNIKATY O TYM SAMYM, SPRZECZNE (naprawione 06.08).
                 Tu stało „żywe dane · 12:13" z zieloną kropką, a dwa

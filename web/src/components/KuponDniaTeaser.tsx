@@ -49,7 +49,7 @@ export function KuponDniaTeaser({ kupon }: { kupon: Kupon }) {
           </div>
           <div title="Prawdopodobieństwo, że wejdą wszystkie typy naraz (wg modelu)">
             <p className="text-[10px] uppercase tracking-wide text-faint">
-              szansa modelu
+              nasza szansa
             </p>
             <p className="font-data mt-0.5 text-lg font-semibold leading-tight">
               {fmtProc(kupon.p_model)}
