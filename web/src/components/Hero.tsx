@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { wartoscNetto } from "@/lib/podatek";
+import { wartoscNetto, wyplata } from "@/lib/podatek";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -228,15 +228,19 @@ function ZywyPodglad({ bets }: { bets: ValueBet[] }) {
                       bez pełnej analizy. Do tego karta pokazywała wyłącznie
                       pochlebne liczby (szansa 80%), więc nic tego nie
                       prostowało. */}
+                  {/* MÓWIMY PO LUDZKU, NIE PO NASZEMU (06.08). „Namierzone
+                      przez skan" to nasze wewnętrzne słownictwo — pierwszy
+                      napis, jaki widzi ktoś wchodzący na stronę, nie może
+                      wymagać znajomości tego, jak działa nasz pipeline. */}
                   {idx === 0
                     ? bet.sugestia
-                      ? "najmocniejszy typ dnia · kurs w STS"
+                      ? "nasz typ dnia · kurs w STS"
                       : (wartoscNetto(bet) ?? 0) > 0
-                        ? "najlepsza okazja teraz"
+                        ? "nasz typ na dziś"
                         : bet.pewniak
-                          ? "najwyższa szansa na liście"
-                          : "pierwszy typ z listy"
-                    : `namierzone przez skan · ${idx + 1} z ${bets.length}`}
+                          ? "największa szansa na dziś"
+                          : "pierwszy z naszej listy"
+                    : `nasz typ ${idx + 1} z ${bets.length}`}
                 </p>
                 <p className="mt-3.5 font-display text-[1.7rem] font-bold leading-tight tracking-tight">
                   {bet.podmiot}
@@ -287,13 +291,19 @@ function ZywyPodglad({ bets }: { bets: ValueBet[] }) {
                       </div>
                     </>
                   )}
-                  {bet.kurs != null && (wartoscNetto(bet) ?? 0) > 0 && (
-                    <div title="O tyle wypłata z kursu przebija realną szansę zdarzenia. To nadwyżka, którą bukmacher płaci ponad uczciwą wycenę">
+                  {/* „+81,0% bukmacher przepłaca" ZDJĘTE 06.08. Liczba była
+                      prawdziwa w naszej arytmetyce, ale czyta się jak
+                      obietnica 81% zysku — a to nasza ocena różnicy zdań
+                      z bukmacherem, nie fakt o wypłacie. W dodatku dublowała
+                      tor niżej, który tę samą rzecz pokazuje dwiema liczbami,
+                      jakie każdy rozumie: ile dajemy my, ile wycenia kurs. */}
+                  {bet.kurs != null && (
+                    <div title="Tyle wraca do Ciebie z dziesięciu złotych, jeśli ten typ wejdzie (po podatku od stawki)">
                       <p className="text-[10px] uppercase tracking-wide text-faint">
-                        bukmacher przepłaca
+                        z 10 zł robi się
                       </p>
-                      <p className="font-data mt-0.5 text-2xl font-semibold text-data-green">
-                        +{(wartoscNetto(bet) as number).toFixed(1).replace(".", ",")}%
+                      <p className="font-data mt-0.5 text-2xl font-semibold text-ink">
+                        {Math.round(wyplata(bet.kurs, 10, bet.tryb_podatku))} zł
                       </p>
                     </div>
                   )}
@@ -496,12 +506,17 @@ export function Hero({
               <span aria-hidden className="h-px w-6 bg-brand-bright" />
               Skan rynków · {liga} {sezon}
             </p>
+            {/* DWA KOMUNIKATY O TYM SAMYM, SPRZECZNE (naprawione 06.08).
+                Tu stało „żywe dane · 12:13" z zieloną kropką, a dwa
+                centymetry wyżej, w pasku, plakietka świeżości mówiła
+                „dane opóźnione". Ocena stanu należy do JEDNEGO miejsca —
+                plakietki w pasku; tutaj zostaje sam fakt, bez wartościowania. */}
             <span
               className="inline-flex items-center gap-1.5 rounded-full border border-hairline bg-card px-2.5 py-1 text-[11px] text-muted shadow-(--shadow-card)"
-              title="Cykl w chmurze pobiera statystyki i kursy, przelicza model i odświeża tę stronę"
+              title="O tej godzinie ostatnio pobieraliśmy kursy i statystyki"
             >
               <span aria-hidden className="live-dot h-1.5 w-1.5 rounded-full bg-data-green" />
-              żywe dane · {aktualizacja}
+              ostatnie sprawdzenie · {aktualizacja}
             </span>
           </motion.div>
 

@@ -108,9 +108,23 @@ export default async function OkazjePage({
   // zawodniczy był wtedy dokładnie jeden. W tym samym czasie mieliśmy 19 typów
   // drużynowych, których nie tykał. To ma być „skan rynków", nie lista tej
   // strony; klik i tak prowadzi tam, gdzie typ naprawdę jest (`hrefPozycji`).
-  const tickerBets = wszystkieBets
-    .filter((b) => !b.sugestia)
-    .slice(0, 14);
+  // NAJWYŻEJ DWA TAKIE SAME ZAKŁADY W PASKU (2026-08-06). Pasek brał
+  // czternaście pierwszych pozycji rankingu, a ranking potrafi mieć na czele
+  // pięć razy „gole poniżej 0,5" w różnych meczach — bo model widzi dziś
+  // przewagę głównie tam. Pierwsze, co widział wchodzący, to wrażenie, że
+  // umiemy jedną rzecz. To NIE jest zmiana reguł publikacji: te same typy,
+  // inna kolejność w pasku dekoracyjnym.
+  const tickerBets: typeof wszystkieBets = [];
+  const ileTakich = new Map<string, number>();
+  for (const b of wszystkieBets) {
+    if (b.sugestia) continue;
+    const klucz = `${b.rynek_kod}|${b.strona}`;
+    const ile = ileTakich.get(klucz) ?? 0;
+    if (ile >= 2) continue;
+    ileTakich.set(klucz, ile + 1);
+    tickerBets.push(b);
+    if (tickerBets.length >= 14) break;
+  }
   const aktualizacja = new Intl.DateTimeFormat("pl-PL", {
     hour: "2-digit",
     minute: "2-digit",

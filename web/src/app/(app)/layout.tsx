@@ -34,10 +34,8 @@ export default async function AppLayout({
       <Nav wygenerowanoTs={meta.wygenerowano_ts} />
       <MainShell>{children}</MainShell>
       <SiteFooter
-        zrodlo={meta.zrodlo}
         liga={meta.liga}
         sezon={meta.sezon}
-        meczow={meta.meczow_w_bazie}
         aktualizacja={aktualizacja}
       />
     </>

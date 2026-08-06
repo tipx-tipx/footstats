@@ -120,7 +120,6 @@ export function SkutecznoscTeaser({
     .slice(0, 18)
     .reverse();
   const ostatniDzien = dni[0];
-  const trafialnosc = rozliczone > 0 ? trafione / rozliczone : 0;
 
   if (kropki.length === 0 || rozliczone === 0) return null;
 
@@ -137,63 +136,31 @@ export function SkutecznoscTeaser({
           </span>
         </div>
 
-        <div className="mt-3.5 flex flex-wrap items-end gap-x-7 gap-y-2.5">
-          {ostatniDzien ? (
-            <div
-              title={`Trafione / rozliczone typy z meczów ${fmtDzien(ostatniDzien.dzien)}`}
-            >
-              <p className="text-[10px] uppercase tracking-wide text-faint">
-                ostatni dzień ({fmtDzien(ostatniDzien.dzien)})
-              </p>
-              <p className="font-data mt-0.5 text-[1.7rem] font-bold leading-none">
-                {ostatniDzien.trafione}
-                <span className="text-lg font-semibold text-muted">
-                  /{ostatniDzien.rozliczone}
-                </span>
-              </p>
-            </div>
-          ) : (
-            <div title="Trafione / rozliczone typy od startu modelu">
-              <p className="text-[10px] uppercase tracking-wide text-faint">
-                łącznie
-              </p>
-              <p className="font-data mt-0.5 text-[1.7rem] font-bold leading-none">
-                {trafione}
-                <span className="text-lg font-semibold text-muted">
-                  /{rozliczone}
-                </span>
-              </p>
-            </div>
-          )}
-          {ostatniDzien && (
-            <div title="Trafione / rozliczone typy od startu modelu">
-              <p className="text-[10px] uppercase tracking-wide text-faint">
-                łącznie
-              </p>
-              <p className="font-data mt-0.5 text-lg font-semibold leading-tight">
-                {trafione}/{rozliczone}
-              </p>
-            </div>
-          )}
-          <div title="Odsetek trafionych wśród wszystkich rozliczonych typów">
-            <p className="text-[10px] uppercase tracking-wide text-faint">
-              trafialność
-            </p>
-            <p className="font-data mt-0.5 text-lg font-semibold leading-tight text-data-green">
-              {fmtProc(trafialnosc)}
-            </p>
-          </div>
-        </div>
-
-        <div
-          className="mt-3.5 h-1.5 w-full overflow-hidden rounded-full bg-ink/10"
-          role="img"
-          aria-label={`trafialność ${fmtProc(trafialnosc)}`}
-        >
-          <div
-            className="h-full rounded-full bg-gradient-to-r from-data-green/60 to-data-green"
-            style={{ width: `${Math.round(trafialnosc * 100)}%` }}
-          />
+        {/* JEDNA LICZBA, NIE TABLICA WYNIKÓW (06.08). Kafelek pokazywał
+            naraz „12/16", „420/721" i „58%" plus pasek — trzy sposoby na
+            powiedzenie tego samego, z czego dwa wymagają od czytelnika
+            dzielenia w pamięci. Zostaje zdanie, które rozumie każdy;
+            komplet liczb czeka na Skuteczności, jedno kliknięcie dalej. */}
+        <div className="mt-3.5">
+          <p className="font-data text-[1.7rem] font-bold leading-none">
+            {ostatniDzien ? ostatniDzien.trafione : trafione}
+            <span className="text-lg font-semibold text-muted">
+              {" "}z {ostatniDzien ? ostatniDzien.rozliczone : rozliczone}
+            </span>
+          </p>
+          <p className="mt-1.5 text-sm text-muted">
+            typów weszło{" "}
+            {ostatniDzien ? (
+              <>
+                w meczach z{" "}
+                <strong className="font-medium text-ink-soft">
+                  {fmtDzien(ostatniDzien.dzien)}
+                </strong>
+              </>
+            ) : (
+              "od początku"
+            )}
+          </p>
         </div>
       </header>
 

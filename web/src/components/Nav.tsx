@@ -100,7 +100,7 @@ export function Nav({ wygenerowanoTs }: { wygenerowanoTs?: number }) {
           className="shrink-0 rounded-lg transition-opacity hover:opacity-80"
           aria-label="FootStats, strona główna"
         >
-          <Logo className="h-10 w-auto" />
+          <Logo wysokosc={40} />
         </Link>
 
         {/* pasek desktopowy */}

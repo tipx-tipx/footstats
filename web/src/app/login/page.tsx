@@ -52,7 +52,7 @@ export default function LoginPage() {
           className="rounded-(--radius-card) border border-hairline bg-card p-8 shadow-(--shadow-pop)"
         >
           <div className="flex flex-col items-center text-center">
-            <Logo className="h-20 w-auto" />
+            <Logo wysokosc={80} />
             <p className="mt-4 text-[11px] font-semibold uppercase tracking-widest text-brand">
               narzędzie prywatne
             </p>

@@ -68,7 +68,10 @@ const KATEGORIE: Record<
     label: "tylko nasza analiza",
     pasek: "bg-hairline-strong",
     badge: "border border-hairline bg-paper text-muted",
-    opis: "Ta karta stoi wyłącznie na naszej analizie: jak często przebijał tę linię, forma, minuty, rywal i przewidywany przebieg meczu. Drugiego cennika na tę linię nie mamy – albo Betclic nie prowadzi tego meczu, albo nie wystawił tego rynku.",
+    // NAZWA DRUGIEGO BUKMACHERA NIC TU NIE WNOSI (06.08). Czytelnik nie wie,
+    // czym jest Betclic ani dlaczego ma go obchodzić — a zdanie i tak mówi
+    // wszystko, co potrzebne: nie mamy z czym porównać naszej wyceny.
+    opis: "Ta karta stoi wyłącznie na naszej analizie: jak często przebijał tę linię, forma, minuty, rywal i przewidywany przebieg meczu. Żaden inny bukmacher nie wystawił na to kursu, więc nie mamy z czym porównać naszej wyceny.",
   },
   rynek_zgodny: {
     label: "obaj bukmacherzy zgodni",
