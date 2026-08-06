@@ -8,7 +8,6 @@ import { ChanceBar, OutcomeColumns } from "./DistributionStrip";
 import { DrabinkaLinii } from "./DrabinkaLinii";
 import { FormBars } from "./FormBars";
 import { Krok, Kroki, SzczegolyTechniczne } from "./KrokiRozwiniecia";
-import { OsSzans, type OsZnacznik } from "./OsSzans";
 import { Sygnaly, type Sygnal } from "./Sygnaly";
 import { kursNetto, wartoscNetto } from "@/lib/podatek";
 import {
@@ -350,10 +349,10 @@ function WerdyktPewniaka({ bet }: { bet: ValueBet }) {
 
   return (
     <>
-      <p className="text-[17px] font-semibold leading-snug tracking-tight text-ink sm:text-lg">
+      <p className="text-[12px] leading-relaxed text-muted">
         {glowne}
       </p>
-      <p className="mt-1.5 text-sm leading-relaxed text-muted">
+      <p className="mt-1 text-[12px] leading-relaxed text-muted">
         {bet.bukmacher} płaci <Num>{kurs}</Num>, uczciwa cena to{" "}
         <Num>{fair}</Num>.{" "}
         {ev != null && ev >= 1 ? (
@@ -394,14 +393,14 @@ function WerdyktZdanie({ bet }: { bet: ValueBet }) {
   if (bet.sugestia || bet.kurs == null) {
     return (
       <>
-        <p className="text-[17px] font-semibold leading-snug tracking-tight text-ink sm:text-lg">
+        <p className="text-[12px] leading-relaxed text-muted">
           Uczciwa cena to <Num>{fair}</Num>. W STS warto grać od{" "}
           <span className="text-brand-deep">
             <Num>~{fmtKurs(bet.fair_kurs * 1.05)}</Num>
           </span>{" "}
           w górę.
         </p>
-        <p className="mt-1.5 text-sm leading-relaxed text-muted">
+        <p className="mt-1 text-[12px] leading-relaxed text-muted">
           Model daje temu zdarzeniu {p} szans. Kursu nie pobieramy automatycznie,
           bo ten rynek jest tylko w STS. Jeśli grasz, dodaj zakład ręcznie w
           Moich zakładach.
@@ -415,13 +414,13 @@ function WerdyktZdanie({ bet }: { bet: ValueBet }) {
   if (ev != null && ev >= 1) {
     return (
       <>
-        <p className="text-[17px] font-semibold leading-snug tracking-tight text-ink sm:text-lg">
+        <p className="text-[12px] leading-relaxed text-muted">
           Warte <Num>{fair}</Num>, {bet.bukmacher} płaci <Num>{kurs}</Num>.{" "}
           <span className="text-data-green-ink">
             <Num>{fmtEV(ev)}</Num> ponad wartość.
           </span>
         </p>
-        <p className="mt-1.5 text-sm leading-relaxed text-muted">
+        <p className="mt-1 text-[12px] leading-relaxed text-muted">
           Model daje temu zdarzeniu {p} szans, a kurs wycenia je na {wycena}.
           Ta różnica jest twoją przewagą.
         </p>
@@ -437,7 +436,7 @@ function WerdyktZdanie({ bet }: { bet: ValueBet }) {
     const poPodatku = fmtKurs(kursNetto(bet.kurs!, bet.tryb_podatku));
     return (
       <>
-        <p className="text-[17px] font-semibold leading-snug tracking-tight text-ink sm:text-lg">
+        <p className="text-[12px] leading-relaxed text-muted">
           {bet.bukmacher} płaci <Num>{kurs}</Num>, ale od stawki schodzi
           podatek – realnie <Num>{poPodatku}</Num>.{" "}
           <span className="text-muted">
@@ -448,7 +447,7 @@ function WerdyktZdanie({ bet }: { bet: ValueBet }) {
         {/* DRUGIE ZDANIE JEST WAŻNIEJSZE OD PIERWSZEGO: mówi, co z tym zrobić.
             Bez niego karta zostawiała człowieka z informacją „nie ma przewagi"
             i zielonym przyciskiem „dodaj do zakładów" tuż pod spodem. */}
-        <p className="mt-1.5 text-sm leading-relaxed text-muted">
+        <p className="mt-1 text-[12px] leading-relaxed text-muted">
           Ten typ jest na liście za <strong>wysoką szansę</strong> ({p}), nie za
           cenę. Do kuponu – tak. Jako pojedynczy zakład – raczej nie.
         </p>
@@ -457,11 +456,11 @@ function WerdyktZdanie({ bet }: { bet: ValueBet }) {
   }
   return (
     <>
-      <p className="text-[17px] font-semibold leading-snug tracking-tight text-ink sm:text-lg">
+      <p className="text-[12px] leading-relaxed text-muted">
         Warte <Num>{fair}</Num>, {bet.bukmacher} płaci <Num>{kurs}</Num>. Cena
         praktycznie uczciwa.
       </p>
-      <p className="mt-1.5 text-sm leading-relaxed text-muted">
+      <p className="mt-1 text-[12px] leading-relaxed text-muted">
         Model daje temu zdarzeniu {p} szans, a kurs wycenia je na {wycena}. Bez
         przewagi po żadnej stronie.
       </p>
@@ -838,9 +837,6 @@ export function SzczegolyTypu({
   open: boolean;
 }) {
   const okna = forma ? oknaFormy(forma, bet.linia, bet.strona) : null;
-  // historia do porównania wycen: L10 gdy jest sensowna próba, inaczej całość
-  const historiaOkno =
-    okna == null ? null : okna.l10.n >= 5 ? okna.l10 : okna.all;
   const sygnaly = sygnalyTypu(bet, okna, forma);
 
   // SZCZEGÓŁY TECHNICZNE ZWINIĘTE (2026-08-01, zasada uzgodniona z userem).
@@ -872,80 +868,6 @@ export function SzczegolyTypu({
     setTab(taby[next].kod);
     tabRefs.current[next]?.focus();
   };
-
-  // oś wyceny: trzy głosy na jednej skali szans, liczby przy znacznikach
-  const hist =
-    historiaOkno && historiaOkno.n >= 3
-      ? historiaOkno.traf / historiaOkno.n
-      : null;
-  const implied = bet.kurs != null && bet.kurs > 1 ? 1 / bet.kurs : null;
-  const ci = bet.ci[0] != null ? ([bet.ci[0], bet.ci[1]] as [number, number]) : null;
-  const znaczniki: OsZnacznik[] = [
-    ...(hist != null
-      ? [
-          {
-            id: "forma",
-            p: hist,
-            wartosc: `${historiaOkno!.traf}/${historiaOkno!.n}`,
-            podpis: "forma",
-            ton: "duch-zielony" as const,
-            etykieta: "gora" as const,
-            tytul: `W ${historiaOkno!.traf} z ostatnich ${historiaOkno!.n} meczów ten typ by wszedł`,
-          },
-        ]
-      : []),
-    {
-      id: "model",
-      p: bet.p_model,
-      wartosc: fmtProc(bet.p_model),
-      podpis: "model",
-      ton: "brand",
-      etykieta: "dol",
-      tytul: ci
-        ? `Model daje ${fmtProc(bet.p_model)}. Gdyby zawodnik zagrał przewidywane ${
-            bet.oczekiwane_minuty != null
-              ? Math.round(bet.oczekiwane_minuty)
-              : "wszystkie"
-          } minut, szansa mieściłaby się w ${fmtProc(ci[0])}–${fmtProc(
-            ci[1],
-          )}. Model podaje ostrożniejszą liczbę, bo wlicza też ryzyko, że zagra krócej${
-            // przedział ufności liczy się przy przewidywanych minutach, a
-            // pokazywana szansa jest jeszcze ściągnięta o zmierzony rozjazd –
-            // bez tej wzmianki wygląda, jakby model wypadał poza własny przedział
-            bet.p_urealnione
-              ? ", oraz to, o ile takie typy rozmijały się z rzeczywistością w rozliczeniach"
-              : ""
-          }`
-        : `Model daje ${fmtProc(bet.p_model)}`,
-    },
-    ...(implied != null
-      ? [
-          {
-            id: "kurs",
-            p: implied,
-            wartosc: fmtProc(implied),
-            podpis: "kurs wycenia",
-            ton: "ink" as const,
-            etykieta: "dol" as const,
-            tytul: `Kurs ${fmtKurs(bet.kurs as number)} odpowiada szansie ${fmtProc(
-              implied,
-            )} (z marżą bukmachera, więc realna opinia rynku jest odrobinę niższa)`,
-          },
-        ]
-      : []),
-  ];
-  const przewaga =
-    implied != null && bet.p_model > implied
-      ? { od: implied, do: bet.p_model }
-      : null;
-  // odwrotność przewagi: kurs wycenia szansę wyżej niż model (głównie marża)
-  // – bez tego oś pewniaka to dwa znaczniki i pusta luka; odcinek dopiero od
-  // 1 pp na zaokrąglonych liczbach, żeby nie znaczyć szumu
-  const przeplata =
-    implied != null &&
-    Math.round(implied * 100) - Math.round(bet.p_model * 100) >= 1
-      ? { od: bet.p_model, do: implied }
-      : null;
 
   // rozkład (i „inne linie”) liczą się przy przewidywanych minutach, p_model
   // dokłada do tego scenariusze rotacji – te dwie liczby potrafią się rozjechać
@@ -1015,6 +937,25 @@ export function SzczegolyTypu({
                 ) : null}
               </p>
 
+              {/* RYNEK WSTRZYMANY — MÓWIMY, ZAMIAST MILCZEĆ (2026-08-03).
+                  Kwarantanna blokuje nowe typy z rynku, ale tego nie
+                  wycofujemy: cena jest zamrożona i user mógł go zagrać.
+                  OSTRZEŻENIE STOI PRZED HISTORIĄ (2026-08-06, ta sama zasada
+                  co „raczej poza składem" na drabince): jeśli sami przestaliśmy
+                  ten zakład polecać, reszta rachunku jest drugorzędna —
+                  w kroku ceny na dole nikt go nie widział. */}
+              {/* „TEGO ZAKŁADU", NIE „TEGO RYNKU" (2026-08-04). Wstrzymanie
+                  bywa węższe niż rynek: zdejmujemy samą stronę linii, a druga
+                  strona tego samego rynku jest dalej typowana. */}
+              {bet.rynek_wstrzymany && (
+                <p className="mb-4 rounded-(--radius-control) bg-data-amber-wash px-3.5 py-2.5 text-sm leading-relaxed text-data-amber-ink">
+                  Tego zakładu chwilowo nie polecamy – ostatnie rozliczenia
+                  takich typów wychodzą pod kreską, więc nowych nie wystawiamy
+                  i nie wchodzą do kuponów. Ten został wystawiony wcześniej,
+                  po cenie z tamtej chwili, i dlatego zostaje na liście.
+                </p>
+              )}
+
               <Kroki>
                 {/* KARTA NIGDY NIE MÓWI O SOBIE (2026-08-02). Stało tu zdanie
                     „tej karcie nie rozpiszemy pełnego rachunku" — komunikat
@@ -1031,16 +972,12 @@ export function SzczegolyTypu({
                   </Krok>
                 )}
 
-                {proza && (
-                  <Krok kod="zmiana">
-                    <p className="text-sm leading-relaxed text-ink-soft">
-                      {proza.zmiana}
-                    </p>
-                  </Krok>
-                )}
-
+                {/* FAKTY PRZED KOREKTAMI, HISTORIA OTWARTA (2026-08-06,
+                    układ „historia sercem" zaakceptowany na drabinkach):
+                    najpierw surowe mecze, potem nasze korekty, cena na końcu.
+                    Zwinięty krok wyglądał jak pusta etykieta z myślnikiem. */}
                 {pokazHistorie && forma && (
-                  <Krok kod="ostatnio" zwijalny>
+                  <Krok kod="ostatnio">
                     <HistoriaKrotko bet={bet} forma={forma} />
                     {/* DLACZEGO NIE TYLE, ILE MÓWI OSTATNIE 10 MECZÓW.
                         Odpowiedź na najczęstsze „czy to na pewno nie błąd" –
@@ -1050,7 +987,20 @@ export function SzczegolyTypu({
                   </Krok>
                 )}
 
-                <Krok kod="przewaga">
+                {proza && (
+                  <Krok kod="zmiana">
+                    <p className="text-sm leading-relaxed text-ink-soft">
+                      {proza.zmiana}
+                    </p>
+                  </Krok>
+                )}
+
+                {/* „CENA", NIE „GDZIE JEST PRZEWAGA" (2026-08-06, układ
+                    „historia sercem"): dodatek do historii, nie punkt
+                    kulminacyjny. Stoi OSTATNIA i mówi najdrobniejszym drukiem
+                    na karcie. Oś wyceny wypadła bez zastępstwa — jej liczby
+                    (uczciwy kurs, cena, marża) są w zdaniu obok. */}
+                <Krok kod="przewaga" tytul="cena">
                   {/* PLAKIETKA RYZYKA USUNIĘTA (2026-08-02). Karta oceniała
                       ryzyko TRZY RAZY jedna nad drugą: plakietką („ryzyko:
                       średnie"), zdaniem werdyktu („niska szansa, świadome
@@ -1059,75 +1009,22 @@ export function SzczegolyTypu({
                       zdanie, bo jako jedyne mówi, co z tym zrobić. */}
                   <WerdyktZdanie bet={bet} />
 
-                  {/* RYNEK WSTRZYMANY — MÓWIMY, ZAMIAST MILCZEĆ (2026-08-03).
-                      Kwarantanna blokuje nowe typy z rynku, ale tego nie
-                      wycofujemy: cena jest zamrożona i user mógł go zagrać.
-                      Do dziś strona nie mówiła o tym ani słowa, a generator
-                      kuponów po cichu takie typy pomijał — człowiek widział
-                      typ i nie miał jak wiedzieć, że sami przestaliśmy ten
-                      rynek polecać. To jest informacja o ZAKŁADZIE, nie
-                      o naszej kuchni, więc karta ma prawo ją nieść. */}
-                  {/* „TEGO ZAKŁADU", NIE „TEGO RYNKU" (2026-08-04). Od dziś
-                      wstrzymanie bywa węższe niż rynek: zdejmujemy samą stronę
-                      linii, a druga strona tego samego rynku jest dalej
-                      typowana. Zdanie o „rynku" byłoby wtedy nieprawdziwe. */}
-                  {bet.rynek_wstrzymany && (
-                    <p className="mt-3 border-l-2 border-hairline pl-3 text-sm leading-relaxed text-muted">
-                      Tego zakładu chwilowo nie polecamy – ostatnie rozliczenia
-                      takich typów wychodzą pod kreską, więc nowych nie
-                      wystawiamy i nie wchodzą do kuponów. Ten został
-                      wystawiony wcześniej, po cenie z tamtej chwili, i dlatego
-                      zostaje na liście.
-                    </p>
-                  )}
-
                   {/* SKALA CZTERECH SZANS ZASTĄPIONA ZDANIEM (2026-08-02).
                       Cztery kolumny zajmowały ćwierć rozwinięcia, żeby
                       podświetlić jedną komórkę. Pełna skala ma sens RAZ na
                       stronie, w „Jak to działa" — nie przy każdym typie. */}
                   {bet.pewniak && (
-                    <p className="mt-3 text-sm leading-relaxed text-muted">
-                      <span className="font-data font-semibold text-ink">
+                    <p className="mt-2 text-[12px] leading-relaxed text-muted">
+                      <span className="font-data font-semibold text-ink-soft">
                         {fmtProc(bet.p_model)}
                       </span>{" "}
                       – {silaTypu(bet.p_model).label}. {silaTypu(bet.p_model).opis}
                     </p>
                   )}
 
-                  {/* jedna oś wyceny (liczby przy znacznikach, bez legendy);
-                      zwężona, żeby znaczniki nie tonęły w torze */}
-                  {!bet.pewniak && (implied != null || hist != null) && (
-                    <div className="mt-4">
-                      <OsSzans
-                        znaczniki={znaczniki}
-                        przewaga={przewaga}
-                        przewagaWartosc={
-                          przewaga && (wartoscNetto(bet) ?? -99) >= 1
-                            ? fmtEV(wartoscNetto(bet) as number)
-                            : undefined
-                        }
-                        przewagaPodpis="twoja przewaga"
-                        przeplata={przeplata}
-                        przeplataPodpis="marża bukmachera"
-                        przeplataTytul={
-                          przeplata && bet.kurs != null && implied != null
-                            ? `Kurs ${fmtKurs(bet.kurs)} odpowiada szansie ${fmtProc(
-                                implied,
-                              )}, a model daje ${fmtProc(
-                                bet.p_model,
-                              )}. Różnica to w większości marża bukmachera, dlatego kurs płaci mniej, niż typ jest wart`
-                            : undefined
-                        }
-                        ariaLabel={`Oś szans: ${znaczniki
-                          .map((z) => `${z.podpis} ${z.wartosc}`)
-                          .join(", ")}`}
-                      />
-                    </div>
-                  )}
-
                   {/* sygnały w jednej linii, opis na klik */}
                   {sygnalyDoPokazania.length > 0 && (
-                    <div className="mt-4">
+                    <div className="mt-3">
                       <Sygnaly
                         naglowek={
                           sygnalyDoPokazania.some((s) => s.ton === "czerwony")
