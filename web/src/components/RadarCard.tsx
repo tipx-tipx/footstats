@@ -4,7 +4,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { memo, useState } from "react";
 
 import { FormBars } from "./FormBars";
-import { Krok, Kroki, SzczegolyTechniczne } from "./KrokiRozwiniecia";
+import { Krok, Kroki } from "./KrokiRozwiniecia";
 import { fmtKurs, fmtProc } from "@/lib/format";
 import {
   charakterSzczebla,
@@ -19,7 +19,6 @@ import type {
   RadarKontekst,
   RadarRynek,
   RadarSezon,
-  RadarSzczebel,
   RadarWpis,
 } from "@/lib/types";
 
@@ -808,9 +807,12 @@ function PrzewagaZdanie({
  * KROK „POKRYCIE POPRZECZEK" (2026-08-06, przebudowa na życzenie usera):
  * fakty z historii — w ilu z ostatnich meczów każda poprzeczka by weszła —
  * stały schowane w „Pełnym rachunku", a mają stać NAD naszymi korektami
- * i ceną. Wersja odchudzona względem tabeli rachunku: linia, kurs, pasek
- * pokrycia. Bez szansy modelu (jest w pasku drabinki na zwiniętej karcie),
- * bez drugiej ceny i znaczników ścięcia (zostają w pełnym rachunku).
+ * i ceną.
+ *
+ * OD TRZECIEJ RUNDY UWAG to JEDYNA tabela linii na karcie: doszła kolumna
+ * naszej szansy, druga cena i znacznik „ścięta", a bliźniacza tabela
+ * w „Pełnym rachunku" zniknęła razem z całym przyciskiem — dwie tabele
+ * o tych samych liniach to było czyste duplikowanie.
  */
 function PokryciePoprzeczek({
   r,
@@ -823,15 +825,22 @@ function PokryciePoprzeczek({
   if (zPokryciem.length < 2) return null;
   return (
     <div>
-      <div className="space-y-1.5">
+      <div className="grid grid-cols-[2.4rem_3.2rem_3rem_1fr_auto] items-center gap-x-3 border-b border-hairline pb-1 text-[9px] uppercase tracking-wide text-faint">
+        <span>linia</span>
+        <span>kurs</span>
+        <span>szansa</span>
+        <span className="col-span-2">weszło w ost. meczach</span>
+      </div>
+      <div className="mt-1.5 space-y-1.5">
         {zPokryciem.map((s) => {
           const p = s.pokrycie!;
           const udzial = p.traf / p.z;
           const ten = s.linia === heroLinia;
+          const szansa = s.p_final ?? s.p_model;
           return (
             <div
               key={s.linia}
-              className="grid grid-cols-[2.4rem_3.2rem_1fr_auto] items-center gap-x-3"
+              className="grid grid-cols-[2.4rem_3.2rem_3rem_1fr_auto] items-center gap-x-3"
             >
               <span
                 className={`font-data text-xs font-semibold ${
@@ -840,8 +849,33 @@ function PokryciePoprzeczek({
               >
                 {linLabel(s.linia)}
               </span>
-              <span className="font-data text-xs text-ink-soft">
+              <span className="font-data text-xs font-semibold text-ink-soft">
                 {fmtKurs(s.kurs)}
+                {/* druga cena POD pierwszą – piąta kolumna rozpychałaby
+                    wiersz na telefonie (ta sama zasada co w starej tabeli) */}
+                {s.rozjazd && (
+                  <span
+                    className={`block text-[10px] font-medium ${
+                      s.rozjazd.gdzie === "betclic"
+                        ? "text-data-amber-ink"
+                        : "text-faint"
+                    }`}
+                  >
+                    BC {fmtKurs(s.rozjazd.betclic)}
+                  </span>
+                )}
+              </span>
+              <span
+                className={`font-data text-[11px] ${
+                  ten ? "font-semibold text-brand-deep" : "text-ink-soft"
+                }`}
+              >
+                {szansa != null ? fmtProc(szansa) : "–"}
+                {s.strzyzenie_modelu && (
+                  <span className="block text-[9px] font-normal text-data-amber-ink">
+                    ścięta
+                  </span>
+                )}
               </span>
               <span className="h-1.5 overflow-hidden rounded-full bg-paper">
                 <span
@@ -868,77 +902,21 @@ function PokryciePoprzeczek({
         })}
       </div>
       <p className="mt-1.5 text-[10px] leading-relaxed text-faint">
-        W ilu z ostatnich meczów każda poprzeczka by weszła. Wyższa poprzeczka
-        = rzadsze trafienia i wyższy kurs.
+        „Szansa” to nasza ocena na ten mecz – zaczyna od tego, jak często
+        przebijał linię, i poprawia o rywala, sędziego i przebieg meczu.
+        Wyższa poprzeczka = rzadsze trafienia i wyższy kurs.
       </p>
-    </div>
-  );
-}
-
-/** Wiersz szczebla drabinki: linia · kurs · szansa modelu · pokrycie. */
-function SzczebelWiersz({ s }: { s: RadarSzczebel }) {
-  const p = s.pokrycie;
-  const udzial = p && p.z > 0 ? p.traf / p.z : null;
-  return (
-    /* BEZ DYMKA (2026-08-01): powtarzał liczby, które i tak są w wierszu.
-       Jedyna rzecz, której w wierszu nie było – „szansa ścięta, bo model
-       widzi tę linię ciemniej niż historia" – dostała widoczny znacznik. */
-    <div className="grid grid-cols-[2.4rem_3.2rem_3rem_1fr] items-center gap-x-3 py-1">
-      <span className="font-data text-xs font-semibold text-ink">
-        {linLabel(s.linia)}
-      </span>
-      <span className="font-data text-xs font-semibold text-brand-deep">
-        {fmtKurs(s.kurs)}
-        {/* druga cena POD pierwszą, a nie w nowej kolumnie – na telefonie
-            piąta kolumna rozpychała wiersz w bok */}
-        {s.rozjazd && (
-          <span
-            className={`block text-[10px] font-medium ${
-              s.rozjazd.gdzie === "betclic"
-                ? "text-data-amber-ink"
-                : "text-faint"
-            }`}
-          >
-            BC {fmtKurs(s.rozjazd.betclic)}
-          </span>
-        )}
-      </span>
-      <span
-        className={`font-data text-[11px] ${
-          s.p_final != null ? "font-semibold text-ink-soft" : "text-muted"
-        }`}
-      >
-        {s.p_final != null
-          ? fmtProc(s.p_final)
-          : s.p_model != null
-            ? fmtProc(s.p_model)
-            : "–"}
-        {s.strzyzenie_modelu && (
-          <span className="block text-[9px] font-normal text-data-amber-ink">
-            ścięta
-          </span>
-        )}
-      </span>
-      {udzial != null ? (
-        <span className="flex items-center gap-2">
-          <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-paper">
-            <span
-              className={`block h-full rounded-full ${
-                udzial >= 0.7
-                  ? "bg-data-green"
-                  : udzial >= 0.4
-                    ? "bg-data-amber"
-                    : "bg-ink/25"
-              }`}
-              style={{ width: `${Math.round(udzial * 100)}%` }}
-            />
-          </span>
-          <span className="font-data w-8 shrink-0 text-right text-[11px] text-ink-soft">
-            {p!.traf}/{p!.z}
-          </span>
-        </span>
-      ) : (
-        <span className="text-[11px] text-faint">brak historii</span>
+      {zPokryciem.some((s) => s.rozjazd) && (
+        <p className="mt-1 text-[10px] leading-relaxed text-faint">
+          „BC” to cena Betclica za to samo zdarzenie. Stawia się tam, gdzie
+          płacą więcej.
+        </p>
+      )}
+      {zPokryciem.some((s) => s.strzyzenie_modelu) && (
+        <p className="mt-1 text-[10px] leading-relaxed text-faint">
+          „ścięta” znaczy, że model widzi tę linię ciemniej niż sama historia
+          – i zostawiamy tę niższą liczbę, nie wyższą.
+        </p>
       )}
     </div>
   );
@@ -1106,100 +1084,49 @@ function HistoriaRynku({ r, linia }: { r: RadarRynek; linia: number }) {
 }
 
 /**
- * SZCZEGÓŁY TECHNICZNE: pełna drabinka wszystkich szczebli z pokryciem.
- * Do decyzji wystarczą trzy szczeble z paska na zwiniętej karcie – tabela
- * z ośmioma liniami, drugą ceną i znacznikami ścięcia to materiał dla kogoś,
- * kto chce sprawdzić nasz rachunek, a nie postawić zakład.
+ * ŚREDNIE SEZONOWE JAKO LINIJKA HISTORII (2026-08-06, trzecia runda uwag
+ * usera: „średnią sezonową dałbym wyżej, ale nie wiem, czy aż tak"). Zamiast
+ * kart-sezonów schowanych w „Pełnym rachunku" – jedna zbita linijka na końcu
+ * kroku „jak było ostatnio": szersze tło dla dziesięciu meczów nad nią.
+ * Przy kartach bez historii meczowej (liga poza feedem) to jedyna historia,
+ * jaką mamy – wtedy niesie cały krok.
  */
-function TabelaDrabinki({ r }: { r: RadarRynek }) {
-  return (
-    <div>
-      <div className="mt-2">
-        <div className="grid grid-cols-[2.4rem_3.2rem_3rem_1fr] gap-x-3 border-b border-hairline pb-1 text-[9px] uppercase tracking-wide text-faint">
-          <span>linia</span>
-          <span>kurs</span>
-          <span>szansa</span>
-          <span>trafienia w ost. meczach</span>
-        </div>
-        {/* NAGŁÓWKI TŁUMACZĄ SIĘ POD TABELĄ, NIE W DYMKU. Dwa z czterech
-            miały wcześniej `title` z pełnym zdaniem – na telefonie nie do
-            odczytania, a bez nich kolumna „szansa" nie mówi, czyja to szansa
-            i skąd się bierze. */}
-        <p className="mt-1 text-[10px] leading-relaxed text-faint">
-          „Szansa” to nasza ocena, że przebije tę linię akurat w tym meczu:
-          zaczynamy od tego, jak często robił to ostatnio, a potem poprawiamy
-          o rywala, sędziego i przewidywany przebieg meczu.
-        </p>
-        {r.drabinka.map((s) => (
-          <SzczebelWiersz key={s.linia} s={s} />
-        ))}
-        {/* LEGENDA DRUGIEJ CENY na stronie zamiast w dymku przy „BC 1,85" */}
-        {r.drabinka.some((s) => s.rozjazd) && (
-          <p className="mt-1.5 text-[10px] leading-relaxed text-faint">
-            „BC” to cena Betclica za to samo zdarzenie. Stawia się tam, gdzie
-            płacą więcej.
-          </p>
-        )}
-        {r.drabinka.some((s) => s.strzyzenie_modelu) && (
-          <p className="mt-1 text-[10px] leading-relaxed text-faint">
-            „ścięta” znaczy, że model widzi tę linię ciemniej niż sama historia
-            – i zostawiamy tę niższą liczbę, nie wyższą.
-          </p>
-        )}
-      </div>
-
-      {r.rywal?.srednia != null && (
-        <p className="mt-2 text-[11px] leading-relaxed text-muted">
-          Najbliższy rywal pozwala na tym rynku{" "}
-          <span className="font-data font-semibold text-ink-soft">
-            {liczba(r.rywal.srednia)}
-          </span>{" "}
-          na mecz
-          {r.rywal.liga != null && (
-            <span className="text-faint">
-              {" "}
-              przy średniej ligi {liczba(r.rywal.liga)}
-            </span>
-          )}
-          {r.rywal.rank != null && r.rywal.z != null && (
-            <span className="text-faint">
-              {" – "}
-              {miejsceWLidze(r.rywal.rank, r.rywal.z)}
-            </span>
-          )}
-          .
-        </p>
-      )}
-    </div>
-  );
-}
-
-/** Wiersz sezonu: liga, rok, mecze i średnia – TYLKO dla wybranego rynku. */
-function SezonWiersz({ s, rynekKod }: { s: RadarSezon; rynekKod?: string }) {
-  const wpisy = Object.entries(s.na_mecz).filter(
-    ([mk]) => SEZON_RYNKI_PL[mk] && (!rynekKod || mk === rynekKod),
-  );
+function SezonyLinijka({
+  sezony,
+  rynekKod,
+}: {
+  sezony?: RadarSezon[] | null;
+  rynekKod?: string;
+}) {
+  const wpisy = (sezony ?? [])
+    .map((s) => {
+      const pary = Object.entries(s.na_mecz).filter(
+        ([mk]) => SEZON_RYNKI_PL[mk] && (!rynekKod || mk === rynekKod),
+      );
+      if (!pary.length) return null;
+      const liczby = pary
+        .map(
+          ([mk, v]) =>
+            `${rynekKod ? "" : `${SEZON_RYNKI_PL[mk]} `}${liczba(v)}/mecz`,
+        )
+        .join(", ");
+      return `${s.turniej} ${s.rok}: ${liczby} (${s.mecze} ${
+        s.mecze === 1 ? "mecz" : s.mecze < 5 ? "mecze" : "meczów"
+      })`;
+    })
+    .filter(Boolean);
   if (!wpisy.length) return null;
   return (
-    <div className="rounded-(--radius-control) border border-hairline bg-card px-3.5 py-2.5">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
-        <span className="text-xs font-semibold text-ink">
-          {s.turniej} {s.rok}
-        </span>
-        <span className="font-data text-[11px] text-muted">
-          {s.mecze} meczów · {s.minuty} min
-        </span>
-      </div>
-      <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
-        {wpisy.map(([mk, v]) => (
-          <span key={mk} className="font-data text-[11px] text-ink-soft">
-            <span className="text-faint">{SEZON_RYNKI_PL[mk]}</span>{" "}
-            <span className="font-semibold">{liczba(v)}</span>
-            <span className="text-faint">/mecz</span>
-          </span>
-        ))}
-      </div>
-    </div>
+    <p className="mt-2 border-t border-hairline pt-2 text-[11px] leading-relaxed text-muted">
+      <span className="mr-1.5 text-[9px] font-semibold uppercase tracking-wide text-faint">
+        całe sezony
+      </span>
+      {wpisy.join(" · ")}
+      <span className="text-faint">
+        {" "}
+        – także z poprzedniego klubu i ligi, jeśli zmienił barwy.
+      </span>
+    </p>
   );
 }
 
@@ -1475,9 +1402,12 @@ export const RadarCard = memo(function RadarCard({
                         wyglądał jak pusta etykieta z myślnikiem. Wysokość
                         trzyma w ryzach lista mecz po meczu: dwie kolumny na
                         laptopie, 5 najnowszych na telefonie. */}
-                    {r && hero && (r.ostatnie?.length ?? 0) > 0 && (
+                    {((r && hero && (r.ostatnie?.length ?? 0) > 0) ||
+                      (w.sezony?.length ?? 0) > 0) && (
                       <Krok kod="ostatnio">
-                        <HistoriaRynku r={r} linia={hero.linia} />
+                        {r && hero && (r.ostatnie?.length ?? 0) > 0 && (
+                          <HistoriaRynku r={r} linia={hero.linia} />
+                        )}
                         {sygnal && w.rodzaj === "forma" && (
                           <p className="mt-2 text-[13px] leading-relaxed text-faint">
                             <span className="font-medium text-ink-soft">
@@ -1486,6 +1416,12 @@ export const RadarCard = memo(function RadarCard({
                             {sygnal.tytul}
                           </p>
                         )}
+                        {/* szersze tło pod dziesięcioma meczami; przy lidze
+                            poza feedem to JEDYNA historia i niesie cały krok */}
+                        <SezonyLinijka
+                          sezony={w.sezony}
+                          rynekKod={w.hero?.rynek_kod}
+                        />
                       </Krok>
                     )}
 
@@ -1566,38 +1502,11 @@ export const RadarCard = memo(function RadarCard({
                 );
               })()}
 
-              {(() => {
-                const r =
-                  w.rynki.find((x) => x.rynek_kod === w.hero?.rynek_kod) ??
-                  w.rynki[0];
-                const maSezony = (w.sezony?.length ?? 0) > 0;
-                if (!r && !maSezony) return null;
-                return (
-                  <SzczegolyTechniczne etykieta="Pełny rachunek i wszystkie linie">
-                    {r && <TabelaDrabinki r={r} />}
-                    {maSezony && (
-                      <div className="mt-4">
-                        <p className="mb-0.5 text-[10px] uppercase tracking-wide text-faint">
-                          średnie sezonowe
-                        </p>
-                        <p className="mb-2 text-[10px] leading-relaxed text-faint">
-                          Średnie z całych sezonów – także z poprzedniego klubu
-                          i ligi, jeśli zmienił barwy.
-                        </p>
-                        <div className="space-y-2">
-                          {w.sezony!.map((s, i) => (
-                            <SezonWiersz
-                              key={`${s.turniej}-${s.rok}-${i}`}
-                              s={s}
-                              rynekKod={w.hero?.rynek_kod}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </SzczegolyTechniczne>
-                );
-              })()}
+              {/* PRZYCISK „PEŁNY RACHUNEK" ZNIKŁ (2026-08-06, trzecia runda
+                  uwag usera). Po wciągnięciu pokryć (z szansą i drugą ceną)
+                  oraz sezonów do kroków nie zostało w nim NIC, czego nie ma
+                  na wierzchu — karta drabinki nie ma już żadnej schowanej
+                  sekcji. */}
             </div>
           </motion.div>
         )}
