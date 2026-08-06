@@ -447,8 +447,21 @@ def _kupon_leg_do_logu(l: dict) -> dict:
     trafia do typy_log — value_bets trzyma tylko best-per-side, a spora
     część legów z legi_pool nigdy nie zostaje osobno opublikowaną okazją.
     Musi więc przenosić WSZYSTKIE pola, które _dopisz_nowe zapisuje/aktualizuje
-    (patrz tam), inaczej te legi są ślepą plamą dla diagnostyki per kategoria."""
+    (patrz tam), inaczej te legi są ślepą plamą dla diagnostyki per kategoria.
+
+    `poza_publikacja="leg_kuponu"` (2026-08-07, decyzja usera „w Skuteczności
+    tylko typy ukazane na liście"): typ widoczny wyłącznie jako leg kuponu NIE
+    stał na liście typów, więc nie liczy się do bilansu zakładki — rozlicza
+    się i uczy w tle, a wynik kuponu i tak mierzy osobno `kupony_log`.
+    Bez tej flagi leg co cykl przechodził przez `_dopisz_nowe` jak świeża
+    publikacja: zakładał rekord „opublikowany" (stąd 82 ze 131 żywych rekordów
+    księgi było legami, pomiar 01.08) i — po wejściu odrodzenia — zdejmował
+    znacznik tła z rekordów oznaczonych przy sprzątaniu 06.08 (zmierzone:
+    134 → 124 w jedną noc). Rekordu typu NAPRAWDĘ opublikowanego flaga nie
+    tyka: `_dopisz_nowe` nigdy nie degraduje (patrz tam), a `value_bets`
+    idzie do księgi PRZED kuponami."""
     return {
+        "poza_publikacja": "leg_kuponu",
         "mecz_id": l["mecz_id"], "mecz": l["mecz"],
         "kickoff_ts": l["kickoff_ts"],
         "podmiot_id": l.get("podmiot_id", 0),
@@ -592,9 +605,11 @@ def _uzupelnij_znak_id(log: dict) -> int:
 
 
 # Powody `poza_publikacja` nadawane przez SELEKCJĘ LISTY (limit dwudziestki
-# i ukrycie rynku), nie przez bramy jakości. Tylko te powody uprawniają do
-# odrodzenia rekordu przy prawdziwej publikacji — patrz `_dopisz_nowe`.
-POZA_LISTA_POWODY = ("poza_lista_dnia", "rynek_ukryty")
+# i ukrycie rynku) albo przez ścieżkę legów kuponów — nie przez bramy jakości.
+# Tylko te powody uprawniają do odrodzenia rekordu przy prawdziwej publikacji
+# (patrz `_dopisz_nowe`): typ spod nich NIGDY nie stał na liście typów, więc
+# jego zamrożona cena nie jest ceną, którą ktokolwiek widział.
+POZA_LISTA_POWODY = ("poza_lista_dnia", "rynek_ukryty", "leg_kuponu")
 
 
 def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:

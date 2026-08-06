@@ -86,6 +86,60 @@ def test_kwarantanna_awansuje_po_staremu_bez_przepisania_ceny():
     assert rec["kurs"] == 1.23             # dataset kalibracji nietknięty
 
 
+# --- LEGI KUPONÓW: widoczne w kuponie ≠ ukazane na liście typów ---
+
+def _leg(**kw) -> dict:
+    l = {
+        "mecz_id": 1, "mecz": "Wisła Kraków – GKS Katowice",
+        "kickoff_ts": int(time.time()) + 7200,
+        "podmiot": "GKS Katowice", "rynek_kod": "team_corners",
+        "rynek": "Rzuty rożne drużyny", "linia": 6.5, "strona": "ponizej",
+        "kurs": 1.23, "p_model": 0.88,
+    }
+    l.update(kw)
+    return l
+
+
+def test_leg_kuponu_liczy_sie_w_tle():
+    """Typ widoczny wyłącznie jako leg kuponu nie stał na liście typów —
+    do księgi wchodzi jako tło; wynik kuponu mierzy osobno kupony_log."""
+    log: dict = {}
+    R._dopisz_nowe(log, [R._kupon_leg_do_logu(_leg())])
+    rec = next(iter(log.values()))
+    assert rec["poza_publikacja"] == "leg_kuponu"
+
+
+def test_leg_nie_zdejmuje_znacznika_tla():
+    """Regresja z nocy 06/07.08: leg aktywnego kuponu przechodził przez
+    _dopisz_nowe jak świeża publikacja i odradzał rekord spod
+    `poza_lista_dnia` — sprzątanie księgi cofało się co cykl (134 → 124)."""
+    log: dict = {}
+    R._dopisz_nowe(log, [_typ(kurs=1.23, poza_publikacja="poza_lista_dnia")])
+    R._dopisz_nowe(log, [R._kupon_leg_do_logu(_leg(kurs=1.31))])
+    rec = next(iter(log.values()))
+    assert rec["poza_publikacja"] == "poza_lista_dnia"
+    assert rec["kurs"] == 1.23
+
+
+def test_leg_nie_degraduje_typu_z_listy():
+    log: dict = {}
+    R._dopisz_nowe(log, [_typ(kurs=1.23)])
+    R._dopisz_nowe(log, [R._kupon_leg_do_logu(_leg(kurs=1.31))])
+    rec = next(iter(log.values()))
+    assert not rec.get("poza_publikacja") and rec["kurs"] == 1.23
+
+
+def test_typ_z_lega_odradza_sie_gdy_wchodzi_na_liste():
+    """Rekord urodzony z lega niesie cenę, której nikt nie widział na liście —
+    prawdziwa publikacja rodzi go od nowa, jak przy `poza_lista_dnia`."""
+    log: dict = {}
+    R._dopisz_nowe(log, [R._kupon_leg_do_logu(_leg(kurs=1.23))])
+    R._dopisz_nowe(log, [_typ(kurs=1.31, p_model=0.84)])
+    rec = next(iter(log.values()))
+    assert not rec.get("poza_publikacja")
+    assert rec["kurs"] == 1.31 and rec["p_model"] == 0.84
+
+
 # --- REJESTR: trzyma tylko to, co weszło na listę ---
 
 def _stub_supa(monkeypatch, magazyn: dict, odczyt_ok: bool = True):
