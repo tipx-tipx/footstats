@@ -86,10 +86,65 @@ const SUPABASE_ANON =
  * (pomiar 2026-07-22, głównego winowajcę wolnych Zawodników).
  */
 const BUNDLE_KEYS = [
-  "value_bets", "matches", "players", "calibration", "meta", "kupony",
-  "typy_wyniki", "odds_superbet", "legi_pool", "odrzucenia", "sts_value",
+  "value_bets", "matches", "calibration", "meta", "kupony",
+  "odds_superbet", "legi_pool", "sts_value",
   "druzyny_forma", "radar", "pokrycie_liga",
 ] as const;
+
+/**
+ * TRZY NAJCIĘŻSZE KLUCZE POBIERANE OSOBNO, DOPIERO GDY STRONA O NIE POPROSI
+ * (2026-08-06). Zmierzone na żywej bazie:
+ *
+ *     players       3121 kB      odrzucenia    1772 kB      typy_wyniki  1077 kB
+ *     cała reszta   1410 kB      RAZEM         6300 kB
+ *
+ * Te trzy to 78% wagi, a żadna strona nie potrzebuje wszystkich trzech:
+ * lista meczów nie tyka ani jednego, `/druzyny` potrzebuje tylko odrzuceń,
+ * `/model` tylko wyników. Do 06.08 KAŻDA strona ciągnęła komplet — pierwsze
+ * wejście po wygaśnięciu cache kosztowało 1,19 s samego oczekiwania na dane
+ * (z ciepłym cache 0,02 s).
+ *
+ * Efekt uboczny, który był powodem zapisania tego w ogóle: bazowy bundle
+ * schodzi z 6,3 MB do ~1,4 MB, czyli PONIŻEJ limitu 2 MB data cache Next.
+ * Dotąd ten odczyt nie był cache'owany w ogóle i każda instancja szła po
+ * komplet do Supabase.
+ *
+ * Klucze leniwe celowo NIE przechodzą przez `tylkoNadchodzace` — ten filtr
+ * dotyczy wyłącznie kluczy bazowych (typy, mecze, pula legów, radar, STS).
+ */
+const LAZY_TTL_MS = 60_000;
+const lazyCache = new Map<string, { ts: number; dane: Promise<unknown> }>();
+
+async function fetchKlucz<T>(key: string, fallback: T): Promise<T> {
+  if (!SUPABASE_URL || !SUPABASE_ANON) return fallback;
+  const cached = lazyCache.get(key);
+  if (cached && Date.now() - cached.ts < LAZY_TTL_MS) {
+    return cached.dane as Promise<T>;
+  }
+  const dane = (async () => {
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/app_data?select=payload&key=eq.${key}`,
+        {
+          headers: {
+            apikey: SUPABASE_ANON,
+            Authorization: `Bearer ${SUPABASE_ANON}`,
+          },
+          // to samo co przy bundlu: revalidate, NIGDY no-store — patrz
+          // komentarz w `fetchBundle` (incydent 2026-07-21)
+          next: { revalidate: 60 },
+        },
+      );
+      if (!res.ok) return fallback;
+      const rows: { payload: unknown }[] = await res.json();
+      return (rows[0]?.payload ?? fallback) as T;
+    } catch {
+      return fallback;
+    }
+  })();
+  lazyCache.set(key, { ts: Date.now(), dane });
+  return dane;
+}
 
 /**
  * Odetnij mecze, które już się zaczęły: typ nie do obstawienia nie może
@@ -153,14 +208,18 @@ async function fetchBundle(): Promise<Bundle> {
     return tylkoNadchodzace({
       value_bets: (map.value_bets ?? LOCAL.value_bets) as ValueBet[],
       matches: (map.matches ?? LOCAL.matches) as Mecz[],
-      players: (map.players ?? LOCAL.players) as Zawodnik[],
+      // players / odrzucenia / typy_wyniki NIE jadą w bundlu — patrz
+      // `fetchKlucz`. W typie zostają, żeby `Bundle` dalej opisywał komplet
+      // danych aplikacji; tu wypełniamy je lokalnym fallbackiem, bo nikt
+      // ich stąd nie czyta (gettery mają własną ścieżkę).
+      players: LOCAL.players,
       calibration: (map.calibration ?? LOCAL.calibration) as Kalibracja,
       meta: (map.meta ?? LOCAL.meta) as Meta,
       kupony: (map.kupony ?? LOCAL.kupony) as Kupon[],
-      typy_wyniki: (map.typy_wyniki ?? LOCAL.typy_wyniki) as TypyWyniki,
+      typy_wyniki: LOCAL.typy_wyniki,
       odds_superbet: (map.odds_superbet ?? LOCAL.odds_superbet) as OddsSuperbet,
       legi_pool: (map.legi_pool ?? LOCAL.legi_pool) as LegPool[],
-      odrzucenia: (map.odrzucenia ?? LOCAL.odrzucenia) as Odrzucenie[],
+      odrzucenia: LOCAL.odrzucenia,
       sts_value: (map.sts_value ?? LOCAL.sts_value) as StsValue,
       druzyny_forma: (map.druzyny_forma ?? LOCAL.druzyny_forma) as DruzynaForma[],
       radar: (map.radar ?? LOCAL.radar) as Radar,
@@ -203,14 +262,14 @@ export async function getMecze(): Promise<Mecz[]> {
 
 /** Rejestr odrzuceń: czemu para (zawodnik, rynek) nie dostała typu. */
 export async function getOdrzucenia(meczId?: number): Promise<Odrzucenie[]> {
-  const wszystkie = (await loadBundle()).odrzucenia;
+  const wszystkie = await fetchKlucz<Odrzucenie[]>("odrzucenia", LOCAL.odrzucenia);
   return meczId == null
     ? wszystkie
     : wszystkie.filter((o) => o.mecz_id === meczId);
 }
 
 export async function getZawodnicy(): Promise<Zawodnik[]> {
-  return (await loadBundle()).players;
+  return fetchKlucz<Zawodnik[]>("players", LOCAL.players);
 }
 
 /** Forma drużyn z typami drużynowymi (karta typu na /druzyny). */
@@ -254,7 +313,7 @@ export async function getKuponDnia(): Promise<Kupon | undefined> {
 }
 
 export async function getTypyWyniki(): Promise<TypyWyniki> {
-  return (await loadBundle()).typy_wyniki;
+  return fetchKlucz<TypyWyniki>("typy_wyniki", LOCAL.typy_wyniki);
 }
 
 export async function getOddsSuperbet(): Promise<OddsSuperbet> {

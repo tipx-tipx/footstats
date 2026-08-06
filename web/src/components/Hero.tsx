@@ -547,13 +547,23 @@ export function Hero({
               custom={3.5}
               className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-muted"
             >
-              <span>
-                <strong className="font-data font-semibold text-ink">
-                  {konkrety.zawodnicze}
-                </strong>{" "}
-                {odmienTypy(konkrety.zawodnicze)} na zawodników
-              </span>
-              <span aria-hidden className="h-3.5 w-px bg-hairline-strong" />
+              {/* ZERA NIE OGŁASZAMY (2026-08-06). Strumień zawodniczy bywa
+                  pusty całymi dniami — Superbet kwotuje propsy niemal tylko
+                  w Ameryce Południowej. „0 typów na zawodników" jako PIERWSZA
+                  liczba na stronie brzmiało jak awaria, choć obok stało
+                  dwadzieścia typów drużynowych. Nie chowamy niczego: brak
+                  pozycji znaczy brak, a nie „mamy, ale nie pokażemy". */}
+              {konkrety.zawodnicze > 0 && (
+                <>
+                  <span>
+                    <strong className="font-data font-semibold text-ink">
+                      {konkrety.zawodnicze}
+                    </strong>{" "}
+                    {odmienTypy(konkrety.zawodnicze)} na zawodników
+                  </span>
+                  <span aria-hidden className="h-3.5 w-px bg-hairline-strong" />
+                </>
+              )}
               {/* KLIKALNE, bo to zwykle NAJWIĘKSZA liczba na tej stronie,
                   a jedyne przejście do tych typów stało dotąd pod listą,
                   drobnym drukiem — poniżej pierwszego ekranu telefonu */}
