@@ -584,6 +584,40 @@ def scal_z_publikacjami(
     return out, wznowione + z_logu
 
 
+def przytnij_rejestr_do_listy(lista_pub: list[dict], teraz: int) -> int:
+    """Zdejmij z rejestru wpisy z TEGO cyklu, które nie weszły na listę.
+
+    `scal_z_publikacjami` rejestruje całe bieżące przeliczenie, ZANIM selekcja
+    (LISTA_CAP i limity różnorodności) wybierze dwudziestkę — więc rejestr
+    trzymał też typy, których nikt nie widział, i co cykl wznawiał je jako
+    „wznowione" z zamrożoną ceną, której nikt nie mógł wziąć (zmierzone
+    2026-08-06: 141 wpisów wobec 20 typów na stronie). Rejestr ma trzymać
+    wyłącznie to, co user naprawdę widział.
+
+    Wpis świeżo dopisany w tym cyklu poznajemy po `opublikowano_ts == teraz`
+    (pierwsza publikacja wygrywa, więc starszy wpis zachowuje starszy stempel).
+    Wpisów z poprzednich cykli NIE tykamy: to typy naprawdę pokazane,
+    chronione do gwizdka. Typ przycięty tutaj wróci do gry, gdy świeże
+    przeliczenie znów go wystawi — wtedy zarejestruje się z datą i ceną
+    z chwili PRAWDZIWEJ publikacji (patrz odrodzenie w `_dopisz_nowe`).
+    """
+    rej_raw, odczyt_ok = supa.get_key_ok(PUBLIKACJE_KLUCZ)
+    if not odczyt_ok or not rej_raw:
+        return 0
+    lista_klucze = {_klucz_publikacji(b) for b in lista_pub}
+    przyciety = {
+        k: v for k, v in rej_raw.items()
+        if k in lista_klucze or (v or {}).get("opublikowano_ts") != teraz
+    }
+    n = len(rej_raw) - len(przyciety)
+    if n and not _dry_run():
+        if not supa.put_key(PUBLIKACJE_KLUCZ, przyciety):
+            print("UWAGA: przycięcie rejestru publikacji NIE POWIODŁO SIĘ — "
+                  "wpisy spoza listy zostają do następnego cyklu")
+            return 0
+    return n
+
+
 PUBLIKACJE_KART_KLUCZ = "publikacje_karty"
 
 
@@ -5996,8 +6030,12 @@ def _main_impl(tryb=None):
     # Siatka MUSI być przed bramką „0 okazji" niżej: cykl, w którym feed zamilkł
     # na całej linii, to dokładnie ten, w którym typy sprzed gwizdka mają wrócić.
     log_do_siatki, _ok_log = supa.get_key_ok("typy_log")
+    # jeden zegar na scalenie i przycięcie rejestru — po `opublikowano_ts ==
+    # _teraz_publikacji` poznajemy wpisy dopisane w TYM cyklu (patrz
+    # `przytnij_rejestr_do_listy`)
+    _teraz_publikacji = int(time.time())
     value_bets_pub, _wzn = scal_z_publikacjami(
-        value_bets, matches_out,
+        value_bets, matches_out, teraz=_teraz_publikacji,
         typy_log=rozliczanie._migruj_log(log_do_siatki or {}),
         liga_by_mid=(tryb.liga_by_mid if tryb else None),
         # typy zdjęte bramami są policzone z pełnym rachunkiem — karta
@@ -6241,8 +6279,11 @@ def _main_impl(tryb=None):
         mid = b.get("mecz_id")
         kl = (b.get("rynek_kod"), b.get("strona"))
         # rynek ukryty do czasu dopracowania — zostaje w puli kuponów i dalej
-        # rozlicza sie w ksiedze, wiec ma jak udowodnic poprawe
+        # rozlicza sie w ksiedze, wiec ma jak udowodnic poprawe; świeży typ
+        # dostaje znacznik, żeby księga wiedziała, że NIE był na stronie
         if f'{b.get("rynek_kod")}|{b.get("strona")}' in _ukryte:
+            if not b.get("wznowiony"):
+                zdjete_klucze.setdefault(_klucz_publikacji(b), "rynek_ukryty")
             continue
         pas = _pasmo_kursu(b.get("kurs"))
         if _z_meczu.get(mid, 0) >= LISTA_PER_MECZ:
@@ -6265,6 +6306,27 @@ def _main_impl(tryb=None):
         print(f"Lista publikowana: {len(lista_pub)} z {len(do_pokazania)} "
               f"kandydatów (max {LISTA_PER_MECZ}/mecz, {LISTA_PER_RYNEK}/rynek, "
               f"{LISTA_PER_RODZINA}/rodzinę); reszta zostaje w puli kuponów")
+    # KSIĘGA MA WIEDZIEĆ, ŻE ODCIĘTY SELEKCJĄ TYP NIE BYŁ NA STRONIE
+    # (2026-08-06, decyzja usera: „w Skuteczności tylko typy ukazane na
+    # liście, reszta niech uczy się w tle"). Selekcja wyżej weszła 01.08 jako
+    # trzecia brama wyświetlania, ale jako JEDYNA nie meldowała księdze
+    # zdjęć — świeży typ wycięty z dwudziestki szedł do `typy_log` jako
+    # opublikowany i Skuteczność liczyła go do bilansu dnia. Zmierzone
+    # 06.08: 22 z 26 wpisów „opublikowanych" w oknie ostatniego cyklu nie
+    # było na stronie, a księga trzymała 154 typy „na liście" wobec 20
+    # w `value_bets`. Typów WZNOWIONYCH nie tykamy: były pokazane wcześniej,
+    # a rekordu raz opublikowanego nigdy nie degradujemy (rozliczanie).
+    lista_klucze = {_klucz_publikacji(b) for b in lista_pub}
+    for b in do_pokazania:
+        if b.get("sugestia") or b.get("wznowiony"):
+            continue
+        if _klucz_publikacji(b) not in lista_klucze:
+            zdjete_klucze.setdefault(_klucz_publikacji(b), "poza_lista_dnia")
+    _przyciete_rej = przytnij_rejestr_do_listy(lista_pub, _teraz_publikacji)
+    if _przyciete_rej:
+        print(f"Rejestr publikacji: przycięto {_przyciete_rej} wpisów z tego "
+              f"cyklu, które nie weszły na listę (rejestr trzyma tylko to, "
+              f"co user widział)")
     if _z_rodziny:
         # SKŁAD LISTY, NIE TYLKO DŁUGOŚĆ — po każdej zmianie bram trzeba
         # widzieć, CO weszło (lekcja z rozszerzenia okna zgody 04.08: dry-run
@@ -6499,8 +6561,13 @@ def _main_impl(tryb=None):
         if _zdjete_swieze:
             value_bets = _zostaja
             typy_poza_publikacja.extend(_zdjete_swieze)
+            _pp: dict[str, int] = {}
+            for _z in _zdjete_swieze:
+                _pp[_z["poza_publikacja"]] = _pp.get(_z["poza_publikacja"], 0) + 1
             print(f"Do księgi jako 'poza publikacją': {len(_zdjete_swieze)} "
-                  f"świeżych typów zdjętych bramą wyświetlania")
+                  f"świeżych typów zdjętych bramą wyświetlania ("
+                  + ", ".join(f"{k} {v}" for k, v in
+                              sorted(_pp.items(), key=lambda x: -x[1])) + ")")
     # CIEŃ WYCENY — ile naprawdę dają potwierdzone składy (patrz
     # rozliczanie.ustaw_cienie_skladow). Bierzemy ŚWIEŻO policzone `p` dla
     # typów z meczów, gdzie skład jest już potwierdzony, a gwizdek jest blisko.

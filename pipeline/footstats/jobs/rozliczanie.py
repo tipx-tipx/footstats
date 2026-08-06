@@ -591,9 +591,28 @@ def _uzupelnij_znak_id(log: dict) -> int:
     return n
 
 
+# Powody `poza_publikacja` nadawane przez SELEKCJĘ LISTY (limit dwudziestki
+# i ukrycie rynku), nie przez bramy jakości. Tylko te powody uprawniają do
+# odrodzenia rekordu przy prawdziwej publikacji — patrz `_dopisz_nowe`.
+POZA_LISTA_POWODY = ("poza_lista_dnia", "rynek_ukryty")
+
+
 def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
     for b in value_bets:
         k = _klucz(b)
+        # ODRODZENIE TYPU SPOZA LISTY DNIA (2026-08-06). Typ odcięty selekcją
+        # listy (`poza_lista_dnia`/`rynek_ukryty`) nigdy nie był na stronie,
+        # więc jego rekord niesie cenę z cyklu, w którym NIKT go nie widział.
+        # Gdy typ naprawdę wchodzi na listę, rekord rodzi się od nowa — z ceną,
+        # szansą i stemplami z chwili PRAWDZIWEJ publikacji. Zwykły awans
+        # (`pop` niżej) by tu nie wystarczył: zostawiałby w bilansie kurs,
+        # którego user nie mógł wziąć. Kwarantann celowo NIE ruszamy — ich
+        # awans działa po staremu od 08.01 i ma za sobą rozliczone pomiary.
+        rec0 = log.get(k)
+        if (rec0 is not None and rec0.get("wynik") is None
+                and rec0.get("poza_publikacja") in POZA_LISTA_POWODY
+                and not b.get("poza_publikacja") and not b.get("odrzucony")):
+            del log[k]
         if k in log:
             # flagi kategorii potrafią pojawić się PO pierwszej publikacji
             # (miękka linia w dniu meczu, matchup gdy urośnie profil rywala,
