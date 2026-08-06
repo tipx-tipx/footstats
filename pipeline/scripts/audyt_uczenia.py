@@ -12,7 +12,12 @@ Odpowiada na trzy rzeczy, których nie widać z kodu:
      albo zero, a produkt wygląda, jakby się uczył.
   2. ILE KAŻDA WARSTWA REALNIE POPRAWIA — deklaracja kontra trafienia przed
      korektą i po niej.
-  3. CZY CZYNNIKI MODELU ŻYJĄ. `czynniki` to mnożniki (rywal, sędzia,
+  3. KIEDY ZARABIAMY I NA CZYM. Dzień tygodnia i rozgrywki — bo ten sam
+     skład typów daje ROI +11% w piątek i sobotę, a −9% w resztę tygodnia.
+     Tu też widać, z jakich DNI zrobione jest okno alarmu z części 2:
+     paczka to jeden–dwa dni meczowe, więc „model się psuje" bywa tylko
+     tyle, że akurat graliśmy w gorsze dni.
+  4. CZY CZYNNIKI MODELU ŻYJĄ. `czynniki` to mnożniki (rywal, sędzia,
      dom/wyjazd, scenariusz meczu, styl). Mnożnik równy 1,00 nic nie robi —
      pole może istnieć i być martwe. Sprawdzamy, ile typów danego rynku ma
      dany czynnik RÓŻNY od 1,00, czyli ile razy realnie ruszył liczbę.
@@ -28,6 +33,7 @@ from __future__ import annotations
 import os
 import sys
 from collections import defaultdict
+from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -38,6 +44,16 @@ NAZWY_STRUMIENI = {
     "drabinki": "DRABINKI",
 }
 
+DNI_PL = ["poniedziałek", "wtorek", "środa", "czwartek",
+          "piątek", "sobota", "niedziela"]
+DNI_SKROT = ["pn", "wt", "śr", "cz", "pt", "sb", "nd"]
+
+# Piątek i sobota grają w innym produkcie niż reszta tygodnia — zmierzone
+# 05.08: ROI +12,3% wobec −17,2% przy tym samym składzie typów. Ten podział
+# jest tu wpisany na sztywno, żeby kontrola startowa pokazywała go SAMA,
+# a nie żeby ktoś odkrywał go raz na miesiąc.
+WEEKEND_KODY = (4, 5)
+
 
 def _roi(grp: list[dict]) -> float:
     if not grp:
@@ -46,6 +62,31 @@ def _roi(grp: list[dict]) -> float:
         (float(r["kurs"]) - 1.0) if r["wynik"] == "wygrany" else -1.0
         for r in grp if r.get("kurs")
     ) / max(len(grp), 1)
+
+
+def _staty(grp: list[dict]) -> tuple[int, float, float, float, float, float]:
+    """n, deklaracja, trafienia, luka, ROI i WŁASNY SZUM tego wycinka.
+
+    Szum (błąd standardowy trafień) jedzie obok każdej liczby, bo bez niego
+    „−17% na 40 typach" wygląda tak samo groźnie jak „−17% na 400" —
+    ta sama pułapka, która kazała alarmowi trendu liczyć własny próg.
+    """
+    n = max(len(grp), 1)
+    dekl = sum(float(r["p_model"]) for r in grp) / n
+    traf = sum(1 for r in grp if r["wynik"] == "wygrany") / n
+    szum = (traf * (1.0 - traf) / n) ** 0.5
+    return len(grp), dekl, traf, traf - dekl, _roi(grp), szum
+
+
+def _wiersz(nazwa: str, grp: list[dict], szer: int = 16) -> None:
+    n, dekl, traf, luka, roi, szum = _staty(grp)
+    print(f"{nazwa[:szer]:<{szer}}{n:>7}{dekl:>11.1%}{traf:>9.1%}"
+          f"{luka * 100:>+8.1f}{roi:>9.1%}{szum * 100:>9.1f}")
+
+
+def _naglowek_tabeli(pierwsza: str, szer: int = 16) -> None:
+    print(f"{pierwsza:<{szer}}{'n':>7}{'deklaruje':>11}{'trafia':>9}"
+          f"{'luka':>8}{'ROI':>9}{'szum':>9}")
 
 
 def rozliczone(log: dict, R) -> list[dict]:
@@ -173,10 +214,121 @@ def czesc2_warstwy(log: dict, R) -> None:
         print(f"   BŁĄD: {e}")
 
 
-def czesc3_czynniki(vb: list[dict]) -> None:
+def czesc3_kalendarz(settled: list[dict], log: dict, R) -> None:
+    """KIEDY zarabiamy i NA CZYM — dzień tygodnia oraz rozgrywki.
+
+    Oba przekroje tylko MIERZĄ. Nie ma tu progu, bramy ani reguły publikacji —
+    dzień tygodnia nie jest przyczyną, tylko etykietą na czymś, czego jeszcze
+    nie nazwaliśmy (rozgrywki? pora dnia? rozmiar oferty?). Rozbicie per liga
+    jest jedyną rzeczą, która może pokazać mechanizm — dlatego stoi obok.
+    """
+    print("\n" + "=" * 78)
+    print("3. KIEDY ZARABIAMY (dzień tygodnia) I NA CZYM (rozgrywki)")
+    print("=" * 78)
+
+    wg_dnia: dict[int, list] = defaultdict(list)
+    for r in settled:
+        try:
+            d = datetime.strptime(R.dzien_pl(r.get("kickoff_ts")), "%Y-%m-%d")
+        except Exception:
+            continue
+        wg_dnia[d.weekday()].append(r)
+
+    _naglowek_tabeli("dzień")
+    for kod in range(7):
+        grp = wg_dnia.get(kod) or []
+        if grp:
+            _wiersz(DNI_PL[kod], grp)
+
+    weekend = [r for k in WEEKEND_KODY for r in wg_dnia.get(k, [])]
+    reszta = [r for k, g in wg_dnia.items() if k not in WEEKEND_KODY for r in g]
+    if weekend and reszta:
+        print()
+        _wiersz("PIĄTEK+SOBOTA", weekend)
+        _wiersz("RESZTA TYGODNIA", reszta)
+        roznica = (_staty(weekend)[4] - _staty(reszta)[4]) * 100
+        print(f"   różnica ROI: {roznica:+.1f} pp"
+              f"   (na {len(weekend)} vs {len(reszta)} typach)")
+
+    # CZY ALARM Z CZĘŚCI 2 TO NIE JEST ZNOWU KALENDARZ (2026-08-06).
+    # Alarm porównuje trzy ostatnie paczki po 40 rozliczeń z trzema
+    # poprzednimi. Paczka to ~jeden–dwa dni meczowe, więc okno potrafi
+    # w całości wpaść w niedzielę i poniedziałek — i wtedy „model się psuje"
+    # znaczy tylko tyle, że graliśmy w gorsze dni ([[uskok-luki-od-02-08]]).
+    # Ta tabela pokazuje, z jakich DNI zrobione są ostatnie paczki.
+    print("\nZ JAKICH DNI ZROBIONE SĄ PACZKI ALARMU (część 2):")
+    try:
+        uczenie = R.raport_uczenia(log)
+        for nazwa, rec in sorted(uczenie.items()):
+            paczki = [p for p in (rec.get("paczki") or []) if p.get("pelna")]
+            if not paczki:
+                continue
+            print(f"   {NAZWY_STRUMIENI.get(nazwa, nazwa)}"
+                  f"   (ostatnie {min(len(paczki), 6)} pełnych paczek,"
+                  f" trzy ostatnie = okno alarmu)")
+            for p in paczki[-6:]:
+                od, do = p.get("od", "?"), p.get("do", "?")
+                dni = []
+                for d in (od, do):
+                    try:
+                        dni.append(DNI_SKROT[
+                            datetime.strptime(d, "%Y-%m-%d").weekday()])
+                    except Exception:
+                        dni.append("??")
+                roi = p.get("roi")
+                print(f"      {od} ({dni[0]}) – {do} ({dni[1]})"
+                      f"   n={p.get('n'):>3}"
+                      f"   luka {p.get('luka', 0) * 100:+6.1f} pp"
+                      f"   ROI {(f'{roi:+.1%}' if roi is not None else '   —'):>8}")
+    except Exception as e:
+        print(f"   BŁĄD: {e}")
+
+    print("\nROZGRYWKI — ile rozliczeń niesie stempel ligi:")
+    ze_stemplem = [r for r in settled if r.get("liga")]
+    print(f"   {len(ze_stemplem)} z {len(settled)} rozliczonych"
+          f"   (stempel wszedł 03.08, więc rośnie z dnia na dzień)")
+    if not ze_stemplem:
+        print("   Za wcześnie na jakikolwiek wniosek per liga.")
+        return
+
+    wg_ligi: dict[str, list] = defaultdict(list)
+    for r in ze_stemplem:
+        wg_ligi[str(r["liga"])].append(r)
+
+    MIN_LIGA = 10
+    duze = {k: v for k, v in wg_ligi.items() if len(v) >= MIN_LIGA}
+    print(f"   {len(wg_ligi)} rozgrywek, z tego {len(duze)} ma choć"
+          f" {MIN_LIGA} rozliczeń:")
+    if duze:
+        _naglowek_tabeli("liga", szer=24)
+        for nazwa, grp in sorted(duze.items(), key=lambda x: -len(x[1])):
+            _wiersz(nazwa, grp, szer=24)
+    ogon = sum(len(v) for k, v in wg_ligi.items() if k not in duze)
+    if ogon:
+        print(f"   + {ogon} rozliczeń w rozgrywkach poniżej progu — nie liczone")
+
+    # Ten przekrój ma sens dopiero, gdy stempel obejmie WIĘKSZOŚĆ rozliczeń;
+    # inaczej „piątek na lidze X" to garść typów udająca prawidłowość.
+    if len(ze_stemplem) < 0.5 * len(settled):
+        print("   UWAGA: stempel ma mniej niż połowa rozliczeń — rozbicie"
+              " efektu dnia tygodnia PER LIGA jeszcze nie ma podstawy.")
+    else:
+        print("\n   DZIEŃ TYGODNIA W ROZBICIU NA LIGI (tylko rozgrywki z próbą):")
+        for nazwa, grp in sorted(duze.items(), key=lambda x: -len(x[1])):
+            we = [r for r in grp
+                  if datetime.strptime(R.dzien_pl(r.get("kickoff_ts")),
+                                       "%Y-%m-%d").weekday() in WEEKEND_KODY]
+            re_ = [r for r in grp if r not in we]
+            if we and re_:
+                print(f"   {nazwa[:24]:<24} pt+sb {_staty(we)[4]:+6.1%}"
+                      f" ({len(we)})   reszta {_staty(re_)[4]:+6.1%}"
+                      f" ({len(re_)})")
+
+
+def czesc4_czynniki(vb: list[dict]) -> None:
     """Czy czynniki modelu ŻYJĄ — mnożnik 1,00 niczego nie zmienia."""
     print("\n" + "=" * 78)
-    print("3. CZY CZYNNIKI MODELU ŻYJĄ (mnożnik ≠ 1,00 = realnie ruszył liczbę)")
+    print("4. CZY CZYNNIKI MODELU ŻYJĄ (mnożnik ≠ 1,00 = realnie ruszył liczbę)")
     print("=" * 78)
     zyw = [b for b in vb if not b.get("sugestia")]
     grupy: dict[str, list] = defaultdict(list)
@@ -221,7 +373,8 @@ def main() -> None:
     print(f"Księga: {len(log)} wpisów, rozliczonych w bieżącej epoce: {len(settled)}\n")
     czesc1_strumienie(settled, R)
     czesc2_warstwy(log, R)
-    czesc3_czynniki(supa.get_key("value_bets") or [])
+    czesc3_kalendarz(settled, log, R)
+    czesc4_czynniki(supa.get_key("value_bets") or [])
 
 
 if __name__ == "__main__":
