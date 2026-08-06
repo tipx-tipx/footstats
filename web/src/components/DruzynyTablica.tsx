@@ -82,6 +82,64 @@ function CzemuTyleDzis({
   );
 }
 
+/**
+ * RODZINA RYNKU — kartki drużyny i kartki w meczu to dla czytelnika JEDNO
+ * („znowu kartki"), choć w danych mają osobne kody. Ta sama definicja, co
+ * w limicie `LISTA_PER_RODZINA` po stronie pipeline'u.
+ */
+function rodzinaRynku(kod: string): string {
+  return kod.replace(/^(team_|match_|wiecej_)/, "");
+}
+
+const NAZWA_RODZINY: Record<string, string> = {
+  goals: "gole",
+  corners: "rzuty rożne",
+  cards: "kartki",
+  shots: "strzały",
+  sot: "celne strzały",
+  fouls: "faule",
+};
+
+/**
+ * DZIEŃ ZŁOŻONY Z JEDNEGO ZAKŁADU MA SIĘ DO TEGO PRZYZNAĆ (2026-08-06).
+ *
+ * Zgłoszenie usera brzmiało „bez przesytu". Zmierzone 05.08: limity listy
+ * dywersyfikują MOCNIEJ niż źródło (16 opublikowanych typów było
+ * różnorodniejsze niż pula 45 legów, w której 71% to jeden rynek), więc
+ * zaostrzanie ich tylko skróciłoby listę — nie ma czym zastąpić. Ale limit
+ * pilnuje CAŁEJ listy, a czytelnik patrzy na JEDEN DZIEŃ i widzi w sobotę
+ * cztery razy „gole poniżej 0,5" pod rząd.
+ *
+ * Skoro nie wolno tego wyciąć bez wyrzucania dobrych typów, strona to mówi.
+ * Powtórzenie z wyjaśnieniem czyta się jak decyzja; bez wyjaśnienia — jak
+ * brak pomysłu.
+ */
+function JedenZaklad({ lista }: { lista: ValueBet[] }) {
+  if (lista.length < 3) return null;
+  const licznik = new Map<string, number>();
+  for (const b of lista) {
+    const klucz = `${rodzinaRynku(b.rynek_kod)}|${b.strona}`;
+    licznik.set(klucz, (licznik.get(klucz) ?? 0) + 1);
+  }
+  const [klucz, n] = [...licznik.entries()].sort((a, b) => b[1] - a[1])[0];
+  if (n < 3 || n / lista.length < 0.6) return null;
+  const [rodzina, strona] = klucz.split("|");
+  const nazwa = NAZWA_RODZINY[rodzina];
+  if (!nazwa) return null;
+  const kierunek = strona === "ponizej" ? "poniżej" : strona === "powyzej" ? "powyżej" : null;
+  return (
+    <p className="mt-2 text-sm leading-relaxed text-muted">
+      {n} z {lista.length} typów na ten dzień to ten sam zakład –{" "}
+      <strong className="font-medium text-ink-soft">
+        {nazwa}
+        {kierunek ? ` ${kierunek}` : ""}
+      </strong>{" "}
+      w różnych meczach. Tak wyszedł rachunek: w pozostałych rynkach kursy
+      stały bliżej naszych liczb. Nie dokładamy typów dla odmiany.
+    </p>
+  );
+}
+
 function odmienPozostale(n: number): string {
   const r10 = n % 10;
   const r100 = n % 100;
@@ -461,6 +519,8 @@ export function DruzynyTablica({
           </div>
         </div>
 
+        <JedenZaklad lista={lista} />
+
         {sekcje.map(({ nazwa, opis, typy }) => {
           const kluczSekcji = `${klucz}|${nazwa}`;
           // OBIE PÓŁKI OTWARTE (2026-08-02). Przy ligach zwijanie miało sens:
@@ -737,6 +797,7 @@ export function DruzynyTablica({
               {dzisiejsze.length < PROG_SEKCJI_TOP && (
                 <CzemuTyleDzis meczeDzis={meczeDzis} meczeJutro={meczeJutro} />
               )}
+              <JedenZaklad lista={dzisiejsze} />
 
               {top.length > 0 && (
                 <div className="mt-4 space-y-4">

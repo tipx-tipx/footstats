@@ -157,6 +157,11 @@ export function ValueBoard({
   );
   const [sortuj, setSortuj] = useState<SortKey>("ranking");
   const [limit, setLimit] = useState(25);
+  // KONSOLA FILTRÓW PRZY LIŚCIE NA JEDNĄ POZYCJĘ (2026-08-06). Cztery
+  // rozwijane pola zajmowały na telefonie pół pierwszego ekranu po to, żeby
+  // przefiltrować JEDEN typ — a strumień zawodniczy bywa jednoelementowy
+  // tygodniami. Filtry nie znikają, tylko czekają za jednym kliknięciem.
+  const [filtryOtwarte, setFiltryOtwarte] = useState(false);
   // Drabinki: sortowanie osobne od typów modelu (inne pola, inne pytania).
   // Domyślnie „najlepsze" – kolejność z backendu (ocena.miejsce), bo to
   // JEDYNA definicja jakości karty w całym systemie. Przy sortowaniu po
@@ -339,6 +344,17 @@ export function ValueBoard({
   // i PRZED limitem, żeby „pokaż więcej" liczyło karty, a nie linie.
   const grupy = useMemo(() => grupujWarianty(filtered), [filtered]);
   const shown = grupy.slice(0, limit);
+
+  // Filtry chowamy TYLKO wtedy, gdy naprawdę nie mają czego filtrować:
+  // lista jest krótka i żaden filtr nie jest ustawiony. Gdyby warunek nie
+  // patrzył na stan filtrów, panel znikałby użytkownikowi spod palca
+  // w chwili, gdy jego własny wybór zawęzi listę do jednej pozycji.
+  const malaLista =
+    grupy.length <= 2 &&
+    rynek === "wszystkie" &&
+    pewnosc === "kazda" &&
+    meczId === undefined &&
+    sortuj === "ranking";
 
   // Kotwica ze spotlightu Hero (link „…#bet-<id>”): po wejściu na stronę
   // przewiń do wskazanej karty. Zakładkę ustawia initialRodzaj z ?rodzaj=,
@@ -636,6 +652,21 @@ export function ValueBoard({
       ) : (
         <>
       {/* konsola filtrów: dopracowane dropdowny + żywy odczyt wyniku */}
+      {malaLista && !filtryOtwarte ? (
+        <div className="mb-6 flex items-baseline justify-between gap-3 pt-4">
+          <span className="text-sm text-muted">
+            {grupy.length === 1
+              ? "Dziś jedna pozycja w tym zestawieniu."
+              : `Dziś ${odmienPozycje(grupy.length)} w tym zestawieniu.`}
+          </span>
+          <button
+            onClick={() => setFiltryOtwarte(true)}
+            className="shrink-0 whitespace-nowrap text-sm text-muted underline decoration-hairline-strong underline-offset-4 transition-colors hover:text-brand hover:decoration-brand"
+          >
+            pokaż filtry
+          </button>
+        </div>
+      ) : (
       <div className="mb-6 grid grid-cols-2 items-end gap-x-6 gap-y-4 pt-4 lg:flex lg:gap-x-9">
         <FilterDropdown
           label="Rynek"
@@ -699,6 +730,7 @@ export function ValueBoard({
           </motion.span>
         </div>
       </div>
+      )}
 
       {filtered.length === 0 && (
         <div className="rounded-(--radius-card) border border-hairline bg-card px-6 py-12 text-center shadow-(--shadow-card)">

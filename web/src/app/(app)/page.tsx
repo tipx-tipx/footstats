@@ -42,9 +42,10 @@ export default async function OkazjePage({
   // ta strona to STATYSTYKI ZAWODNIKÓW – typy drużynowe mają własną
   // podstronę /druzyny (osobna funkcja produktu, nie ta sama lista)
   const bets = wszystkieBets.filter((b) => b.podmiot_typ !== "druzyna");
-  const druzynoweN = wszystkieBets.filter(
+  const druzynowe = wszystkieBets.filter(
     (b) => b.podmiot_typ === "druzyna" && !b.sugestia,
-  ).length;
+  );
+  const druzynoweN = druzynowe.length;
 
   // ODCHUDZENIE payloadu: ValueBoard/BetCard czytają z zawodnika wyłącznie
   // forma[rynek_kod] typu – a pełna baza (każdy zawodnik × wszystkie rynki
@@ -86,7 +87,21 @@ export default async function OkazjePage({
   };
   // żywy podgląd w hero: do 4 najlepszych pozycji rankingu silnika
   // (kolejność wejściowa = ranking), sugestie tylko gdy brak innych
-  const spotlight = (okazje.length > 0 ? okazje : sugestie).slice(0, 4);
+  //
+  // KARTA POKAZUJE CAŁY SKAN, GDY ZAWODNIKÓW JEST GARSTKA (2026-08-06).
+  // Strumień zawodniczy bywa jednoelementowy — Superbet kwotuje propsy
+  // praktycznie tylko w Ameryce Południowej. Karta karmiona wyłącznie nim
+  // pokazywała wtedy JEDEN typ bez rotacji, a obok, na drugiej zakładce,
+  // stało 19 typów drużynowych. Pierwsze wrażenie z produktu było więc
+  // „pusto", mimo pełnej listy dwa kliknięcia dalej. Ten sam błąd co
+  // w pasku skanu, naprawiony 04.08 — karta została wtedy pominięta.
+  const spotlight = (
+    okazje.length >= 3
+      ? okazje
+      : okazje.length + druzynowe.length > 0
+        ? [...okazje, ...druzynowe]
+        : sugestie
+  ).slice(0, 4);
   // PASEK BIERZE CAŁY SKAN, NIE TYLKO TĘ PODSTRONĘ (2026-08-04). Karmiony
   // samymi typami zawodniczymi pokazywał tego dnia JEDEN typ powielony osiem
   // razy — pasek dopełnia się kopiami, żeby taśma nie miała dziur, a typ

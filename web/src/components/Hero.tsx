@@ -5,7 +5,7 @@ import { wartoscNetto } from "@/lib/podatek";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { fmtKurs, fmtLinia, fmtProc } from "@/lib/format";
+import { fmtKurs, fmtProc, opisZakladu } from "@/lib/format";
 import type { ValueBet } from "@/lib/types";
 
 const wejscie = {
@@ -35,6 +35,9 @@ const wejscie = {
  * która go nie pokaże.
  */
 function hrefPozycji(b: ValueBet): string {
+  // typ drużynowy ma własną stronę i tam jest jego karta z rozpisanym
+  // rachunkiem; strona meczu pokazałaby go jako jeden wiersz wśród pokryć
+  if (b.podmiot_typ === "druzyna") return "/druzyny";
   if (b.sugestia) return `/?rodzaj=value#bet-${b.id}`;
   if (b.pewniak) return `/?rodzaj=pewniaki#bet-${b.id}`;
   return `/mecze/${b.mecz_id}`;
@@ -48,6 +51,7 @@ function hrefPozycji(b: ValueBet): string {
  * produkcji 04.08: jedyny typ zawodniczy dnia był dokładnie taki, więc kafelek
  * kłamał przy KAŻDYM wejściu na stronę główną. */
 function etykietaLinku(b: ValueBet): string {
+  if (b.podmiot_typ === "druzyna") return "zobacz typy na drużyny →";
   return b.sugestia || b.pewniak
     ? "zobacz szczegóły niżej →"
     : "zobacz analizę meczu →";
@@ -237,9 +241,16 @@ function ZywyPodglad({ bets }: { bets: ValueBet[] }) {
                 <p className="mt-3.5 font-display text-[1.7rem] font-bold leading-tight tracking-tight">
                   {bet.podmiot}
                 </p>
+                {/* ZDANIE SKŁADA `opisZakladu`, NIE TA KARTA (2026-08-06).
+                    Tu stało „powyżej" wpisane na sztywno — nieszkodliwe,
+                    dopóki karta widziała wyłącznie typy zawodnicze (te są
+                    praktycznie zawsze „powyżej"). Od dziś trafiają tu też
+                    drużynowe, a wśród nich „gole drużyny PONIŻEJ 0,5" —
+                    karta ogłaszałaby zakład odwrotny do tego, który stawiamy.
+                    `opisZakladu` zna też rynek „kto więcej", który nie ma
+                    ani linii, ani kierunku. */}
                 <p className="mt-1 text-sm text-muted">
-                  {bet.rynek.toLowerCase()} powyżej{" "}
-                  {fmtLinia(bet.linia)} · {bet.mecz}
+                  {opisZakladu(bet)} · {bet.mecz}
                 </p>
               </div>
 
@@ -393,9 +404,9 @@ function TickerRynkow({ bets }: { bets: ValueBet[] }) {
             <span className="font-medium text-ink transition-colors group-hover/poz:text-brand">
               {b.podmiot}
             </span>
-            <span className="text-muted">
-              {b.rynek.toLowerCase()} {fmtLinia(b.linia)}+
-            </span>
+            {/* pasek pokazuje CAŁY skan od 04.08, więc „0,5+" kłamało przy
+                każdym typie „poniżej" — a te są dziś większością drużynowych */}
+            <span className="text-muted">{opisZakladu(b, true)}</span>
             <span className="font-data font-semibold text-brand-deep">
               {b.kurs != null ? `@${fmtKurs(b.kurs)}` : fmtProc(b.p_model)}
             </span>
@@ -511,9 +522,16 @@ export function Hero({
             custom={3}
             className="mt-6 max-w-xl text-base leading-relaxed text-muted"
           >
-            Liczy prawdziwe szanse piłkarzy na strzały, faule czy odbiory,
-            wybiera najpewniejsze typy i składa z nich gotowe kupony. A gdy
-            bukmacher zawyży kurs – pokazuje, gdzie masz przewagę.
+            {/* OBIETNICA MA PASOWAĆ DO TEGO, CO DZIŚ JEST (2026-08-06).
+                Zdanie mówiło wyłącznie o piłkarzach, a typy zawodnicze to
+                dziś jeden na dwadzieścia — bukmacher kwotuje ich statystyki
+                niemal tylko w Ameryce Południowej. Ktoś, kto wchodzi po raz
+                pierwszy, czytał obietnicę o piłkarzach i widział pod nią
+                jedną pozycję. */}
+            Liczy prawdziwe szanse – gole, rożne i kartki całych drużyn oraz
+            strzały i faule pojedynczych piłkarzy. Wybiera najpewniejsze typy
+            i składa z nich gotowe kupony. A gdy bukmacher zawyży kurs –
+            pokazuje, gdzie masz przewagę.
           </motion.p>
 
           {/* CO DOSTAJESZ — trzy liczby zamiast obietnicy (2026-08-04).
@@ -536,12 +554,18 @@ export function Hero({
                 {odmienTypy(konkrety.zawodnicze)} na zawodników
               </span>
               <span aria-hidden className="h-3.5 w-px bg-hairline-strong" />
-              <span>
+              {/* KLIKALNE, bo to zwykle NAJWIĘKSZA liczba na tej stronie,
+                  a jedyne przejście do tych typów stało dotąd pod listą,
+                  drobnym drukiem — poniżej pierwszego ekranu telefonu */}
+              <Link
+                href="/druzyny"
+                className="underline decoration-hairline-strong underline-offset-4 transition-colors hover:text-brand hover:decoration-brand"
+              >
                 <strong className="font-data font-semibold text-ink">
                   {konkrety.druzynowe}
                 </strong>{" "}
                 na drużyny
-              </span>
+              </Link>
               <span aria-hidden className="h-3.5 w-px bg-hairline-strong" />
               <span>
                 w{" "}
