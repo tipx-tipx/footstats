@@ -64,6 +64,9 @@ const KATEGORIE: Record<
   string,
   { label: string; pasek: string; badge: string; opis: string }
 > = {
+  // OPISY W JEDNYM ZDANIU (2026-08-06, druga runda uwag usera): sekcja ceny
+  // ma być najmniejszym priorytetem karty, więc każde wyjaśnienie mówi jedno
+  // zdanie — kto chce więcej, ma „Pełny rachunek".
   analiza: {
     label: "tylko nasza analiza",
     pasek: "bg-hairline-strong",
@@ -71,25 +74,25 @@ const KATEGORIE: Record<
     // NAZWA DRUGIEGO BUKMACHERA NIC TU NIE WNOSI (06.08). Czytelnik nie wie,
     // czym jest Betclic ani dlaczego ma go obchodzić — a zdanie i tak mówi
     // wszystko, co potrzebne: nie mamy z czym porównać naszej wyceny.
-    opis: "Ta karta stoi wyłącznie na naszej analizie: jak często przebijał tę linię, forma, minuty, rywal i przewidywany przebieg meczu. Żaden inny bukmacher nie wystawił na to kursu, więc nie mamy z czym porównać naszej wyceny.",
+    opis: "Żaden inny bukmacher nie wystawił na to kursu, więc nie mamy z czym porównać naszej wyceny.",
   },
   rynek_zgodny: {
     label: "obaj bukmacherzy zgodni",
     pasek: "bg-brand-bright",
     badge: "bg-brand-wash text-brand-deep",
-    opis: "Drugi bukmacher wycenia to niemal identycznie. Okazji cenowej tu nie ma, ale jest potwierdzenie: obie firmy widzą to tak samo, więc nasza linia nie jest wzięta z sufitu.",
+    opis: "Drugi bukmacher wycenia to niemal identycznie – to potwierdzenie naszej linii, nie okazja cenowa.",
   },
   rozjazd: {
     label: "jeden płaci więcej",
     pasek: "bg-data-amber",
     badge: "bg-data-amber-wash text-data-amber-ink",
-    opis: "Za to samo zdarzenie jeden bukmacher płaci zauważalnie więcej niż drugi. Stawia się tam, gdzie płacą więcej – przy tej samej analizie dostajesz lepszą cenę. Sama różnica kursów nie jest powodem, dla którego ta karta tu jest: najpierw musiała przejść całą analizę.",
+    opis: "Za to samo zdarzenie jeden bukmacher płaci zauważalnie więcej – stawia się tam, gdzie płacą więcej.",
   },
   pewniak_taniej: {
     label: "drugi bukmacher: to niemal pewne",
     pasek: "bg-data-amber",
     badge: "bg-data-amber text-white",
-    opis: "Jeden bukmacher wycenia to jako niemal pewne (kurs poniżej 1,45), a drugi płaci za to samo 1,75 lub więcej. To opinia rynku o pewności, nie nasza gwarancja – i nie ona zdecydowała o tej karcie. Karta i tak musiała przejść wszystkie nasze progi; różnica cen jest dodatkowym dowodem, nie przepustką.",
+    opis: "Jeden bukmacher wycenia to jako niemal pewne, a drugi płaci wyraźnie więcej – to opinia rynku, nie nasza gwarancja.",
   },
 };
 
@@ -769,7 +772,7 @@ function PrzewagaZdanie({
   // najgłośniejszym elementem rozwinięcia: to dodatek do historii, więc mówi
   // tym samym drobnym drukiem co inne dopiski, bez wytłuszczeń na całą linię.
   return (
-    <p className="text-[13px] leading-relaxed text-muted">
+    <p className="text-[12px] leading-relaxed text-muted">
       Po tych poprawkach dajemy {linLabel(linia)}{" "}
       <span className="font-data font-semibold text-ink-soft">
         {fmtProc(pFinal)}
@@ -798,6 +801,77 @@ function PrzewagaZdanie({
       )}
       .
     </p>
+  );
+}
+
+/**
+ * KROK „POKRYCIE POPRZECZEK" (2026-08-06, przebudowa na życzenie usera):
+ * fakty z historii — w ilu z ostatnich meczów każda poprzeczka by weszła —
+ * stały schowane w „Pełnym rachunku", a mają stać NAD naszymi korektami
+ * i ceną. Wersja odchudzona względem tabeli rachunku: linia, kurs, pasek
+ * pokrycia. Bez szansy modelu (jest w pasku drabinki na zwiniętej karcie),
+ * bez drugiej ceny i znaczników ścięcia (zostają w pełnym rachunku).
+ */
+function PokryciePoprzeczek({
+  r,
+  heroLinia,
+}: {
+  r: RadarRynek;
+  heroLinia: number;
+}) {
+  const zPokryciem = r.drabinka.filter((s) => s.pokrycie && s.pokrycie.z > 0);
+  if (zPokryciem.length < 2) return null;
+  return (
+    <div>
+      <div className="space-y-1.5">
+        {zPokryciem.map((s) => {
+          const p = s.pokrycie!;
+          const udzial = p.traf / p.z;
+          const ten = s.linia === heroLinia;
+          return (
+            <div
+              key={s.linia}
+              className="grid grid-cols-[2.4rem_3.2rem_1fr_auto] items-center gap-x-3"
+            >
+              <span
+                className={`font-data text-xs font-semibold ${
+                  ten ? "text-brand-deep" : "text-ink"
+                }`}
+              >
+                {linLabel(s.linia)}
+              </span>
+              <span className="font-data text-xs text-ink-soft">
+                {fmtKurs(s.kurs)}
+              </span>
+              <span className="h-1.5 overflow-hidden rounded-full bg-paper">
+                <span
+                  className={`block h-full rounded-full ${
+                    udzial >= 0.7
+                      ? "bg-data-green"
+                      : udzial >= 0.4
+                        ? "bg-data-amber"
+                        : "bg-ink/25"
+                  }`}
+                  style={{ width: `${Math.round(udzial * 100)}%` }}
+                />
+              </span>
+              <span className="font-data text-right text-[11px] text-ink-soft">
+                {p.traf}/{p.z}
+                {ten && (
+                  <span className="ml-1.5 text-[9px] font-semibold uppercase tracking-wide text-brand-deep">
+                    ten typ
+                  </span>
+                )}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      <p className="mt-1.5 text-[10px] leading-relaxed text-faint">
+        W ilu z ostatnich meczów każda poprzeczka by weszła. Wyższa poprzeczka
+        = rzadsze trafienia i wyższy kurs.
+      </p>
+    </div>
   );
 }
 
@@ -1344,6 +1418,11 @@ export const RadarCard = memo(function RadarCard({
                   w.rynki[0];
                 const kontekst = w.ocena?.kontekst ?? r?.kontekst;
                 const hero = w.hero;
+                // bez tego warunku krok „pokrycie poprzeczek" potrafiłby
+                // stanąć jako sam nagłówek nad niczym (komponent zwraca null
+                // przy mniej niż dwóch liniach z historią)
+                const liniePokrycia =
+                  r?.drabinka.filter((s) => (s.pokrycie?.z ?? 0) > 0).length ?? 0;
                 return (
                   <Kroki>
                     {(hero || opis) && (
@@ -1388,18 +1467,14 @@ export const RadarCard = memo(function RadarCard({
                       </Krok>
                     )}
 
-                    {kontekst && r && (
-                      <Krok kod="zmiana">
-                        <CzynnikiMeczu kontekst={kontekst} />
-                      </Krok>
-                    )}
-
-                    {/* OTWARTE Z DOMYSŁU (2026-08-06, przebudowa na życzenie
-                        usera). Zwinięty krok wyglądał jak pusta etykieta
-                        z myślnikiem — a historia ma być sercem rozwinięcia,
-                        nie schowkiem. Wysokość trzyma w ryzach lista mecz po
-                        meczu: dwie kolumny na laptopie, 5 najnowszych na
-                        telefonie (patrz RywaleMeczPoMeczu). */}
+                    {/* FAKTY PRZED KOREKTAMI (2026-08-06, druga runda uwag
+                        usera): najpierw cała historia — mecz po meczu i
+                        pokrycie poprzeczek — a dopiero potem to, co my z nią
+                        robimy („co zmienia ten mecz") i na końcu cena.
+                        Krok „ostatnio" jest OTWARTY Z DOMYSŁU: zwinięty
+                        wyglądał jak pusta etykieta z myślnikiem. Wysokość
+                        trzyma w ryzach lista mecz po meczu: dwie kolumny na
+                        laptopie, 5 najnowszych na telefonie. */}
                     {r && hero && (r.ostatnie?.length ?? 0) > 0 && (
                       <Krok kod="ostatnio">
                         <HistoriaRynku r={r} linia={hero.linia} />
@@ -1414,9 +1489,22 @@ export const RadarCard = memo(function RadarCard({
                       </Krok>
                     )}
 
+                    {r && hero && liniePokrycia >= 2 && (
+                      <Krok kod="pokrycie">
+                        <PokryciePoprzeczek r={r} heroLinia={hero.linia} />
+                      </Krok>
+                    )}
+
+                    {kontekst && r && (
+                      <Krok kod="zmiana">
+                        <CzynnikiMeczu kontekst={kontekst} />
+                      </Krok>
+                    )}
+
                     {/* „CENA", NIE „GDZIE JEST PRZEWAGA" (2026-08-06, decyzja
                         usera): to dodatek do historii, nie punkt kulminacyjny.
-                        Treść mówi drobnym drukiem — patrz PrzewagaZdanie. */}
+                        Stoi OSTATNIA i mówi najdrobniejszym drukiem na karcie
+                        — patrz PrzewagaZdanie. */}
                     <Krok kod="przewaga" tytul="cena">
                       {hero && (
                         <PrzewagaZdanie
@@ -1433,7 +1521,7 @@ export const RadarCard = memo(function RadarCard({
                         kat ||
                         w.ocena?.powod_wejscia === "seria" ||
                         w.xi === true) && (
-                        <ul className="mt-2.5 space-y-2 text-[13px] leading-relaxed text-muted">
+                        <ul className="mt-2 space-y-1.5 text-[12px] leading-relaxed text-muted">
                           {klasa && (
                             <li>
                               <span className="font-medium text-ink-soft">

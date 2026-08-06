@@ -16,6 +16,12 @@
  * marki, ze ściętym rogiem — tym samym, który ma główny przycisk strony
  * (`cut-corner-sm`). Nic nie unosi się nad kartą i nie ma czego z czym mylić.
  *
+ * CZWARTE PODEJŚCIE (2026-08-06, drugie zgłoszenie usera): wersja „wpięta
+ * w krawędź" wciąż stała za blisko linii „kto gra i kiedy" nad kartą. Znacznik
+ * przestaje być pozycjonowany absolutnie — to chorągiewka w NORMALNYM
+ * PRZEPŁYWIE, z własnym wierszem, przyklejona do górnej krawędzi karty.
+ * Ma własną wysokość w układzie, więc z niczym nie może kolidować.
+ *
  * WYŁĄCZNIE przy sortowaniu „najlepsze". Przy sortowaniu po kursie albo
  * godzinie meczu „nasz typ numer 1" byłoby nieprawdą — pierwsza pozycja
  * znaczy wtedy tylko tyle, że coś musiało być pierwsze.
@@ -29,16 +35,14 @@ export function Wyrozniona({
   children: React.ReactNode;
 }) {
   return (
-    /* `pt-2` rezerwuje miejsce na wystającą część znacznika. Bez tego znacznik
-       wychodził PONAD obrys komponentu i najeżdżał na to, co stoi wyżej —
-       na stronie głównej zakrywał linię „kto gra i kiedy" nad kartą
-       (zgłoszenie usera 2026-08-06). */
-    <div className="relative pt-2">
-      {/* `top-0` + `pt-2` wpinają znacznik w krawędź karty; `z-10`, bo karta ma
-          własne tło i cień. Lewy margines mija kolumnę numeru na karcie drużynowej. */}
-      <span className="cut-corner-sm font-display absolute top-0 left-5 z-10 bg-brand px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest text-on-brand shadow-(--shadow-card)">
-        {etykieta}
-      </span>
+    <div>
+      {/* chorągiewka w przepływie: własny wiersz, przyklejona do karty od góry
+          (mt na linii wyżej robi odstęp, tu go celowo nie ma) */}
+      <div className="pl-5 pt-1">
+        <span className="cut-corner-sm font-display inline-block bg-brand px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest text-on-brand">
+          {etykieta}
+        </span>
+      </div>
       {children}
     </div>
   );

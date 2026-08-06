@@ -27,12 +27,15 @@ import { useState } from "react";
  * o zakładzie, jedzie do `SzczegolyTechniczne` – zwiniętej z domysłu.
  */
 
-export type KrokKod = "skad" | "zmiana" | "ostatnio" | "przewaga";
+export type KrokKod = "skad" | "zmiana" | "ostatnio" | "pokrycie" | "przewaga";
 
 export const KROK_TYTUL: Record<KrokKod, string> = {
   skad: "skąd ta liczba",
   zmiana: "co zmienia ten mecz",
   ostatnio: "jak było ostatnio",
+  // pokrycie poprzeczek doszło 2026-08-06 (przebudowa na życzenie usera):
+  // fakty z historii mają stać PRZED naszymi korektami i ceną
+  pokrycie: "pokrycie poprzeczek",
   przewaga: "gdzie jest przewaga",
 };
 
