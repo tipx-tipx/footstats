@@ -79,6 +79,59 @@ def test_dzien_liczony_doba_polska():
     assert set(per_dzien) == {R.dzien_pl(JUTRO), R.dzien_pl(POJUTRZE)}
 
 
+# --- jeden typ na zawodnika (2026-08-08, wpięcie oferty do silnika) ---
+
+def _typ_zawodnika(nazwa="K. Mbappe", rynek="shots", mecz_id=1, kurs=1.8,
+                   **kw) -> dict:
+    return _typ(mecz_id=mecz_id, rynek=rynek, kurs=kurs,
+                podmiot=nazwa, podmiot_typ="zawodnik", podmiot_id=555, **kw)
+
+
+def test_jeden_zawodnik_nie_zajmuje_listy_kilkoma_rynkami():
+    """User: „żeby nie było kanibalizowania". Strzały, celne i „zza pola" tego
+    samego gracza to jeden zakład w trzech opakowaniach."""
+    kand = [
+        _typ_zawodnika(rynek="shots", kurs=1.90),
+        _typ_zawodnika(rynek="sot", kurs=1.80),
+        _typ_zawodnika(rynek="shots_outside_box", kurs=1.70),
+    ]
+    lista, zdjete, _p = B.wybierz_liste_publikowana(kand, _klucz)
+    assert len(lista) == B.LISTA_PER_ZAWODNIKA == 1
+    assert lista[0]["rynek_kod"] == "shots"      # najlepszy wg klucza
+    assert set(zdjete.values()) == {"poza_lista_dnia"}
+
+
+def test_limit_zawodnika_nie_dotyczy_druzyn():
+    """„Gole poniżej" i „rożne powyżej" tej samej drużyny to różne zdarzenia —
+    ogranicza je limit meczu, nie ten licznik."""
+    kand = [
+        _typ(mecz_id=1, rynek="team_goals", kurs=1.9),
+        _typ(mecz_id=1, rynek="team_corners", kurs=1.8),
+    ]
+    lista, _zdjete, _p = B.wybierz_liste_publikowana(kand, _klucz)
+    assert len(lista) == 2
+
+
+def test_ten_sam_zawodnik_w_dwoch_dniach_dostaje_dwa_typy():
+    """Limit jest DZIENNY, jak wszystkie pozostałe."""
+    kand = [
+        _typ_zawodnika(kickoff=JUTRO, mecz_id=1),
+        _typ_zawodnika(kickoff=POJUTRZE, mecz_id=2),
+    ]
+    lista, _zdjete, _p = B.wybierz_liste_publikowana(kand, _klucz)
+    assert len(lista) == 2
+
+
+def test_pokazany_typ_zawodnika_wchodzi_mimo_limitu():
+    """Typ raz pokazany zostaje do gwizdka — także przy tym liczniku."""
+    kand = [
+        _typ_zawodnika(rynek="shots", kurs=1.90),
+        _typ_zawodnika(rynek="sot", kurs=1.80, wznowiony=True),
+    ]
+    lista, zdjete, _p = B.wybierz_liste_publikowana(kand, _klucz)
+    assert len(lista) == 2 and not zdjete
+
+
 # --- typ raz pokazany zostaje do gwizdka ---
 
 def test_pokazany_typ_wchodzi_ponad_limit_dnia():
