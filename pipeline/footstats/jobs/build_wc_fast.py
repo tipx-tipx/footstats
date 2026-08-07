@@ -588,7 +588,7 @@ def przytnij_rejestr_do_listy(lista_pub: list[dict], teraz: int) -> int:
     """Zdejmij z rejestru wpisy z TEGO cyklu, które nie weszły na listę.
 
     `scal_z_publikacjami` rejestruje całe bieżące przeliczenie, ZANIM selekcja
-    (LISTA_CAP i limity różnorodności) wybierze dwudziestkę — więc rejestr
+    (`wybierz_liste_publikowana`) ułoży listę dnia — więc rejestr
     trzymał też typy, których nikt nie widział, i co cykl wznawiał je jako
     „wznowione" z zamrożoną ceną, której nikt nie mógł wziąć (zmierzone
     2026-08-06: 141 wpisów wobec 20 typów na stronie). Rejestr ma trzymać
@@ -616,6 +616,130 @@ def przytnij_rejestr_do_listy(lista_pub: list[dict], teraz: int) -> int:
                   "wpisy spoza listy zostają do następnego cyklu")
             return 0
     return n
+
+
+# NIC NIE BLOKUJEMY (zasada stała, user 2026-08-01: „my nie mamy blokować
+# nic; mamy miesiąc, żeby nauczyć model na wszystkie typy i kursy").
+# Limity poniżej NIE są bramami — żaden rynek, strona ani pasmo ceny nie jest
+# wykluczone. To są GWARANCJE RÓŻNORODNOŚCI: pilnują, żeby lista nie zwyrodniała
+# w dwadzieścia pozycji z jednego rynku albo z jednego przedziału kursowego.
+# Pomiar przewagi układa kolejność, ale nikogo nie usuwa — co się nie zmieści,
+# żyje dalej w puli kuponów.
+#
+# KAŻDY LIMIT LICZY SIĘ OSOBNO NA DZIEŃ MECZOWY (2026-08-07).
+LISTA_CAP = 20
+LISTA_PER_MECZ = 2
+LISTA_PER_RYNEK = 6
+# ...i tyle samo na przedział kursowy, żeby na liście były i tanie, i drogie
+# typy. Bez tego sortowanie po zmierzonej przewadze wypełniłoby listę samym
+# pasmem 3,0+ (dziś jedynym, które bije cenę), czyli tanie kursy zniknęłyby
+# po cichu, a tego user nie chce.
+LISTA_PER_PASMO = 6
+# ...i na RODZINĘ STATYSTYKI (2026-08-05, zgłoszenie usera „bez przesytu").
+#
+# `LISTA_PER_RYNEK` liczy pary (kod, strona) OSOBNO, a kartki mają dwa osobne
+# kody: `match_cards` i `team_cards`. Dla nas to różne rynki, dla patrzącego na
+# listę to dwa razy to samo słowo — więc w najgorszym razie kartki mogły zająć
+# 12 z 20 miejsc, nie łamiąc żadnego limitu. Zmierzone 05.08: 7 z 16 typów
+# drużynowych to kartki (44%), przy 3 + 3 + 1 rozbitych na trzy pary.
+#
+# UWAGA NA DIAGNOZĘ: to NIE jest główna przyczyna przesytu. Pula tego samego
+# cyklu ma 71% goli, a opublikowana lista 38% — limity dywersyfikują MOCNIEJ
+# niż źródło, a prawdziwym ograniczeniem jest podaż. Ten limit domyka wyłącznie
+# przypadek skrajny; zaostrzanie go skróciłoby listę, zamiast ją urozmaicić.
+LISTA_PER_RODZINA = 6
+
+
+def _rodzina_statystyki(kod) -> str:
+    """Kartki to kartki, wszystko jedno czyje — `match_cards` i `team_cards`
+    to dla użytkownika jedno i to samo."""
+    k = str(kod or "")
+    for r in ("cards", "corners", "goals", "shots", "sot", "fouls", "tackles"):
+        if r in k:
+            return r
+    return k
+
+
+def _pasmo_kursu(kurs) -> str:
+    try:
+        k = float(kurs or 0)
+    except (TypeError, ValueError):
+        return "?"
+    for lo, hi in rozliczanie.PASMA_CENY:
+        if lo <= k < hi:
+            return f"{lo}-{hi}"
+    return "?"
+
+
+def wybierz_liste_publikowana(
+    kandydaci: list[dict], klucz_sortowania, ukryte=frozenset(),
+) -> tuple[list[dict], dict, dict]:
+    """Które typy staną na stronie. Zwraca (lista, zdjęte, ile na dzień).
+
+    DWIE ZASADY, obie z 2026-08-07 (zgłoszenie usera „żeby typy nie pojawiały
+    się i nie znikały"):
+
+    1. **Limity liczą się per DZIEŃ MECZOWY.** Dwudziestka na całą listę robiła
+       z niej ruchome schody — typ na sobotę konkurował z typem na poniedziałek,
+       więc świeże wejście wypychało ze strony typ pokazany trzy dni wcześniej,
+       z zamrożoną ceną, którą user mógł już zagrać. Zmierzone tego dnia: 45
+       żywych typów biło się o 20 miejsc, a 22 z nich (te, które user WIDZIAŁ)
+       stały poza stroną — 11 zdjął limit rynku, 7 dwudziestka, 4 limit pasma.
+       Do Skuteczności liczyły się dalej, bo naprawdę były pokazane, więc bilans
+       dnia znów rozjeżdżał się z listą (ta sama skarga co przy 460180d, tylko
+       innym wejściem). Dzień meczowy jest naturalną jednostką: listę czyta się
+       jako „co gramy dziś, co jutro". Doba POLSKA (`rozliczanie.dzien_pl`) —
+       ta sama definicja, której używa Skuteczność, żeby mecz o 00:30 nie wpadł
+       do wczoraj.
+
+    2. **Typ raz pokazany wchodzi zawsze.** Limity dotyczą wyłącznie NOWYCH
+       wejść. Cena wznowionego typu jest zamrożona i po niej rozliczy go księga,
+       więc zdjęcie go ze strony przed gwizdkiem znaczyłoby, że user nie ma
+       gdzie sprawdzić zakładu, który wziął. Limity i tak go LICZĄ, żeby nowe
+       typy nie dokładały przesytu ponad to, co na liście już stoi.
+
+    Wyjątkiem zostaje rynek w kwarantannie: typ z rynku „tragicznie
+    niewchodzącego" schodzi ze strony także wtedy, gdy był pokazany (decyzja
+    z 01.08 — rynek czeka na dopracowanie, a typ dalej rozlicza się w księdze).
+    """
+    z_meczu: dict = {}
+    z_rynku: dict = {}
+    z_pasma: dict = {}
+    z_rodziny: dict = {}
+    z_dnia: dict = {}
+    lista_pub: list[dict] = []
+    zdjete: dict = {}
+    for b in sorted(kandydaci, key=klucz_sortowania, reverse=True):
+        if b.get("sugestia"):
+            lista_pub.append(b)      # sugestia nie jest zakładem, nie liczy się
+            continue
+        # rynek ukryty do czasu dopracowania — zostaje w puli kuponów i dalej
+        # rozlicza się w księdze, więc ma jak udowodnić poprawę; świeży typ
+        # dostaje znacznik, żeby księga wiedziała, że NIE był na stronie
+        if f'{b.get("rynek_kod")}|{b.get("strona")}' in ukryte:
+            if not b.get("wznowiony"):
+                zdjete.setdefault(_klucz_publikacji(b), "rynek_ukryty")
+            continue
+        dzien = rozliczanie.dzien_pl(b.get("kickoff_ts"))
+        mecz = (dzien, b.get("mecz_id"))
+        rynek = (dzien, b.get("rynek_kod"), b.get("strona"))
+        pasmo = (dzien, _pasmo_kursu(b.get("kurs")))
+        rodzina = (dzien, _rodzina_statystyki(b.get("rynek_kod")))
+        if not b.get("wznowiony"):
+            if (z_dnia.get(dzien, 0) >= LISTA_CAP
+                    or z_meczu.get(mecz, 0) >= LISTA_PER_MECZ
+                    or z_rynku.get(rynek, 0) >= LISTA_PER_RYNEK
+                    or z_pasma.get(pasmo, 0) >= LISTA_PER_PASMO
+                    or z_rodziny.get(rodzina, 0) >= LISTA_PER_RODZINA):
+                zdjete.setdefault(_klucz_publikacji(b), "poza_lista_dnia")
+                continue
+        z_dnia[dzien] = z_dnia.get(dzien, 0) + 1
+        z_meczu[mecz] = z_meczu.get(mecz, 0) + 1
+        z_rynku[rynek] = z_rynku.get(rynek, 0) + 1
+        z_pasma[pasmo] = z_pasma.get(pasmo, 0) + 1
+        z_rodziny[rodzina] = z_rodziny.get(rodzina, 0) + 1
+        lista_pub.append(b)
+    return lista_pub, zdjete, z_dnia
 
 
 PUBLIKACJE_KART_KLUCZ = "publikacje_karty"
@@ -6178,48 +6302,9 @@ def _main_impl(tryb=None):
     # czyli sortowanie po cichu robiło się amputacją pozostałych rynków —
     # dokładnie tego, czego user nie chce. Rynek ma czekać niżej, aż model się
     # go nauczy, a nie znikać.
-    # NIC NIE BLOKUJEMY (zasada stała, user 2026-08-01: „my nie mamy blokować
-    # nic; mamy miesiąc, żeby nauczyć model na wszystkie typy i kursy").
-    # Limity poniżej NIE są bramami — żaden rynek, strona ani pasmo ceny nie
-    # jest wykluczone. To są GWARANCJE RÓŻNORODNOŚCI: pilnują, żeby lista nie
-    # zwyrodniała w 20 pozycji z jednego rynku albo z jednego przedziału
-    # kursowego. Pomiar przewagi układa kolejność, ale nikogo nie usuwa —
-    # wszystko, co się nie zmieści, żyje dalej w puli kuponów.
-    LISTA_CAP = 20
-    LISTA_PER_MECZ = 2
-    LISTA_PER_RYNEK = 6
-    # ...i tyle samo na przedział kursowy, żeby na liście były i tanie, i
-    # drogie typy. Bez tego sortowanie po zmierzonej przewadze wypełniłoby
-    # listę samym pasmem 3,0+ (dziś jedynym, które bije cenę) — czyli tanie
-    # kursy zniknęłyby po cichu, a tego user nie chce.
-    LISTA_PER_PASMO = 6
-    # ...i na RODZINĘ STATYSTYKI (2026-08-05, zgłoszenie usera „bez przesytu").
-    #
-    # `LISTA_PER_RYNEK` liczy pary (kod, strona) OSOBNO, a kartki mają dwa
-    # osobne kody: `match_cards` i `team_cards`. Dla nas to różne rynki, dla
-    # patrzącego na listę to dwa razy to samo słowo — więc w najgorszym razie
-    # kartki mogły zająć 12 z 20 miejsc, nie łamiąc żadnego limitu. Zmierzone
-    # 05.08: 7 z 16 typów drużynowych to kartki (44%), przy 3 + 3 + 1 rozbitych
-    # na trzy pary rynek-strona.
-    #
-    # UWAGA NA DIAGNOZĘ: to NIE jest główna przyczyna przesytu. Pula tego samego
-    # cyklu ma 71% goli, a opublikowana lista 38% — czyli limity już dywersyfikują
-    # MOCNIEJ niż źródło, a prawdziwym ograniczeniem jest podaż (45 legów
-    # drużynowych, 32 z jednego rynku). Ten limit domyka wyłącznie przypadek
-    # skrajny; zaostrzanie go niżej skróciłoby listę, zamiast ją urozmaicić,
-    # bo nie ma czym zastąpić.
-    LISTA_PER_RODZINA = 6
-
-    def _rodzina_statystyki(kod) -> str:
-        """Kartki to kartki, wszystko jedno czyje — `match_cards` i `team_cards`
-        to dla użytkownika jedno i to samo."""
-        k = str(kod or "")
-        for r in ("cards", "corners", "goals", "shots", "sot", "fouls",
-                  "tackles"):
-            if r in k:
-                return r
-        return k
-
+    # Same limity i selekcja siedzą na poziomie modułu
+    # (`wybierz_liste_publikowana`) — tam też jest opis, dlaczego liczą się
+    # per dzień meczowy i czemu typ raz pokazany wchodzi poza limitem.
     _ukryte: set[str] = set()
     _przewaga, _pasma, _log_przewagi = {}, {}, {}
     with rozliczanie.warstwa_uczenia("przewaga_rynkow") as _w:
@@ -6257,84 +6342,50 @@ def _main_impl(tryb=None):
         return (round(float(p_rynek) + float(p_pasmo), 4),
                 float(b.get("kurs") or 0.0), ma_rachunek)
 
-    def _pasmo_kursu(kurs) -> str:
-        try:
-            k = float(kurs or 0)
-        except (TypeError, ValueError):
-            return "?"
-        for lo, hi in rozliczanie.PASMA_CENY:
-            if lo <= k < hi:
-                return f"{lo}-{hi}"
-        return "?"
-
-    _z_meczu: dict = {}
-    _z_rynku: dict = {}
-    _z_pasma: dict = {}
-    _z_rodziny: dict = {}
-    lista_pub = []
-    for b in sorted(do_pokazania, key=_klucz_listy, reverse=True):
-        if b.get("sugestia"):
-            lista_pub.append(b)          # sugestie nie są zakładem, nie liczą się do limitu
-            continue
-        mid = b.get("mecz_id")
-        kl = (b.get("rynek_kod"), b.get("strona"))
-        # rynek ukryty do czasu dopracowania — zostaje w puli kuponów i dalej
-        # rozlicza sie w ksiedze, wiec ma jak udowodnic poprawe; świeży typ
-        # dostaje znacznik, żeby księga wiedziała, że NIE był na stronie
-        if f'{b.get("rynek_kod")}|{b.get("strona")}' in _ukryte:
-            if not b.get("wznowiony"):
-                zdjete_klucze.setdefault(_klucz_publikacji(b), "rynek_ukryty")
-            continue
-        pas = _pasmo_kursu(b.get("kurs"))
-        if _z_meczu.get(mid, 0) >= LISTA_PER_MECZ:
-            continue
-        if _z_rynku.get(kl, 0) >= LISTA_PER_RYNEK:
-            continue
-        if _z_pasma.get(pas, 0) >= LISTA_PER_PASMO:
-            continue
-        rodz = _rodzina_statystyki(b.get("rynek_kod"))
-        if _z_rodziny.get(rodz, 0) >= LISTA_PER_RODZINA:
-            continue
-        _z_meczu[mid] = _z_meczu.get(mid, 0) + 1
-        _z_rynku[kl] = _z_rynku.get(kl, 0) + 1
-        _z_pasma[pas] = _z_pasma.get(pas, 0) + 1
-        _z_rodziny[rodz] = _z_rodziny.get(rodz, 0) + 1
-        lista_pub.append(b)
-        if len(lista_pub) >= LISTA_CAP:
-            break
-    if len(do_pokazania) > len(lista_pub):
-        print(f"Lista publikowana: {len(lista_pub)} z {len(do_pokazania)} "
-              f"kandydatów (max {LISTA_PER_MECZ}/mecz, {LISTA_PER_RYNEK}/rynek, "
-              f"{LISTA_PER_RODZINA}/rodzinę); reszta zostaje w puli kuponów")
     # KSIĘGA MA WIEDZIEĆ, ŻE ODCIĘTY SELEKCJĄ TYP NIE BYŁ NA STRONIE
     # (2026-08-06, decyzja usera: „w Skuteczności tylko typy ukazane na
-    # liście, reszta niech uczy się w tle"). Selekcja wyżej weszła 01.08 jako
-    # trzecia brama wyświetlania, ale jako JEDYNA nie meldowała księdze
-    # zdjęć — świeży typ wycięty z dwudziestki szedł do `typy_log` jako
-    # opublikowany i Skuteczność liczyła go do bilansu dnia. Zmierzone
-    # 06.08: 22 z 26 wpisów „opublikowanych" w oknie ostatniego cyklu nie
-    # było na stronie, a księga trzymała 154 typy „na liście" wobec 20
-    # w `value_bets`. Typów WZNOWIONYCH nie tykamy: były pokazane wcześniej,
-    # a rekordu raz opublikowanego nigdy nie degradujemy (rozliczanie).
-    lista_klucze = {_klucz_publikacji(b) for b in lista_pub}
-    for b in do_pokazania:
-        if b.get("sugestia") or b.get("wznowiony"):
-            continue
-        if _klucz_publikacji(b) not in lista_klucze:
-            zdjete_klucze.setdefault(_klucz_publikacji(b), "poza_lista_dnia")
+    # liście, reszta niech uczy się w tle"). Selekcja weszła 01.08 jako trzecia
+    # brama wyświetlania, ale jako JEDYNA nie meldowała księdze zdjęć — świeży
+    # typ wycięty z dwudziestki szedł do `typy_log` jako opublikowany
+    # i Skuteczność liczyła go do bilansu dnia. Zmierzone 06.08: 22 z 26 wpisów
+    # „opublikowanych" w oknie ostatniego cyklu nie było na stronie, a księga
+    # trzymała 154 typy „na liście" wobec 20 w `value_bets`. Typów WZNOWIONYCH
+    # `wybierz_liste_publikowana` nie zdejmuje w ogóle (patrz tam).
+    lista_pub, _zdjete_selekcja, _z_dnia = wybierz_liste_publikowana(
+        do_pokazania, _klucz_listy, _ukryte,
+    )
+    for _k, _powod in _zdjete_selekcja.items():
+        zdjete_klucze.setdefault(_k, _powod)
+    _pokazane_wracaja = sum(1 for b in lista_pub if b.get("wznowiony"))
+    if len(do_pokazania) > len(lista_pub):
+        print(f"Lista publikowana: {len(lista_pub)} z {len(do_pokazania)} "
+              f"kandydatów (na KAŻDY dzień meczowy max {LISTA_CAP}, "
+              f"{LISTA_PER_MECZ}/mecz, {LISTA_PER_RYNEK}/rynek, "
+              f"{LISTA_PER_RODZINA}/rodzinę); reszta zostaje w puli kuponów")
+    if _z_dnia:
+        print("Lista wg dnia meczu: " + ", ".join(
+            f"{d} {n}" for d, n in sorted(_z_dnia.items()))
+            + (f" (w tym {_pokazane_wracaja} pokazanych wcześniej — te wchodzą "
+               f"poza limitem)" if _pokazane_wracaja else ""))
     _przyciete_rej = przytnij_rejestr_do_listy(lista_pub, _teraz_publikacji)
     if _przyciete_rej:
         print(f"Rejestr publikacji: przycięto {_przyciete_rej} wpisów z tego "
               f"cyklu, które nie weszły na listę (rejestr trzyma tylko to, "
               f"co user widział)")
-    if _z_rodziny:
-        # SKŁAD LISTY, NIE TYLKO DŁUGOŚĆ — po każdej zmianie bram trzeba
-        # widzieć, CO weszło (lekcja z rozszerzenia okna zgody 04.08: dry-run
-        # pokazał 20 typów zamiast 18 i wyglądało dobrze, dopóki nikt nie
-        # spojrzał, że trzy z nich są z rynku w kwarantannie).
+    # SKŁAD LISTY, NIE TYLKO DŁUGOŚĆ — po każdej zmianie bram trzeba widzieć,
+    # CO weszło (lekcja z rozszerzenia okna zgody 04.08: dry-run pokazał 20
+    # typów zamiast 18 i wyglądało dobrze, dopóki nikt nie spojrzał, że trzy
+    # z nich są z rynku w kwarantannie). Limity liczą się per dzień, ale
+    # o przesycie decyduje to, co user widzi na CAŁEJ liście.
+    _rodziny_razem: dict = {}
+    for _b in lista_pub:
+        if not _b.get("sugestia"):
+            _r = _rodzina_statystyki(_b.get("rynek_kod"))
+            _rodziny_razem[_r] = _rodziny_razem.get(_r, 0) + 1
+    if _rodziny_razem:
         print("Skład listy wg rodziny: " + ", ".join(
             f"{k} {v}" for k, v in sorted(
-                _z_rodziny.items(), key=lambda x: -x[1])))
+                _rodziny_razem.items(), key=lambda x: -x[1])))
     if _przewaga:
         _bija = [k for k, v in _przewaga.items() if v["przewaga"] > 0]
         print(f"Przewaga nad ceną: {len(_bija)} z {len(_przewaga)} rynków "
