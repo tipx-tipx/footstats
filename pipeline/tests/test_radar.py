@@ -39,8 +39,18 @@ KADRA = 16
 # przy kursie 2,05" opisywaly sytuacje, ktora w praktyce nie zdarza sie inaczej
 # niz przez nasz blad: bukmacher nie placi 2,05 za pewniaka. Kurs 1,80 wycenia
 # to na 55%, a my po korekcie kontekstu na 64% — rozjazd ok. +10 pp, w oknie.
-SIEDEM_Z_DZIESIECIU = [2, 2, 0, 2, 2, 0, 2, 2, 2, 0, 2, 2, 0, 2]
+#
+# 2026-08-08: wektor przeliczony tak, zeby dawal DWA SZCZEBLE. Dawny (same
+# dwojki) przebijal linie 1,5 siedem razy na dziesiec, ale linie 2,5 ZERO razy,
+# wiec opisywal karte jednoszczeblowa — produkt, ktorego juz nie wydajemy
+# (radar.MIN_P_DRUGIEGO_SZCZEBLA, zgloszenie usera „drugi szczebel jest glownym
+# celem"). Teraz: 7/10 nad 1,5 i 5/10 nad 2,5, co przy kursach 1,70 / 3,20 daje
+# szanse 0,64 i 0,46 — realna drabinka, ktora przechodzi okno zgody z rynkiem.
+SIEDEM_Z_DZIESIECIU = [3, 3, 0, 3, 2, 0, 3, 2, 3, 0, 3, 2, 0, 3]
 KURS_W_OKNIE = 1.7
+# Drugi szczebel do fikstur siatki kursow: linia 2,5 przy cenie, ktora zostawia
+# nasza szanse (0,46) nad cena rynku, ale w granicach MAX_ROZJAZD_KARTY.
+KURS_DRUGIEGO = 3.2
 
 
 def _trend(
@@ -227,10 +237,10 @@ def test_zbuduj_transfer_z_drabinka_i_p_model(monkeypatch):
     assert (s0["linia"], s0["kurs"], s0["p_model"]) == (1.5, KURS_W_OKNIE, 0.65)
     # pokrycie: 7 z 10 ostatnich występów przebiło linię 1,5
     assert s0["pokrycie"] == {"traf": 7, "z": 10}
-    # szczebel 2,5 ma pokrycie 0/10 (same dwójki) — od 2026-07-27 szczeble
-    # trafione mniej niż dwa razy nie trafiają na kartę (MIN_TRAF_SZCZEBLA)
-    assert [s["linia"] for s in rynek["drabinka"]] == [1.5]
-    assert rynek["ostatnie"][:3] == [2, 2, 0]
+    # DWA SZCZEBLE, nie jeden: od 2026-08-08 karta bez realnego drugiego
+    # szczebla nie jest drabinką i w ogóle nie powstaje (MIN_P_DRUGIEGO_SZCZEBLA)
+    assert [s["linia"] for s in rynek["drabinka"]] == [1.5, 2.5]
+    assert rynek["ostatnie"][:3] == [3, 3, 0]
     assert w["stara_liga"] == "Stara Liga"
 
 
@@ -274,7 +284,7 @@ def test_zbuduj_dolacza_srednie_sezonowe_z_cache():
         events_meta={999: {"label": "Klub – Rywal", "ts": TERAZ + DZIEN,
                            "hid": 100, "aid": 200,
                            "home": "Klub", "away": "Rywal"}},
-        odds_grid={999: {1: {"shots": {"1.5": KURS_W_OKNIE}}}},
+        odds_grid={999: {1: {"shots": {"1.5": KURS_W_OKNIE, "2.5": KURS_DRUGIEGO}}}},
         sb_cache={},
         model_pokrycie=[],
         players_out={},
@@ -291,8 +301,10 @@ def test_zbuduj_sygnaly_przed_drabinkami():
     kolega = _trend(player_id=7, utids=[LIGA_NOWA] * 12, counts=[1] * 12)
     nowy = _trend(player_id=1, utids=[LIGA_NOWA] + [LIGA_STARA] * 12,
                   counts=SIEDEM_Z_DZIESIECIU)
+    # zwykła drabinka musi mieć DWA szczeble jak każda inna (2026-08-08),
+    # więc dostaje tę samą historię co kandydat z transferu
     zwykly = _trend(player_id=7, utids=[LIGA_NOWA] * 14,
-                    counts=[1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1])
+                    counts=SIEDEM_Z_DZIESIECIU)
     import unittest.mock as _m
     with _m.patch.object(radar.statshub, "fetch_tournament_name",
                          lambda utid: {LIGA_STARA: "Stara",
@@ -302,8 +314,11 @@ def test_zbuduj_sygnaly_przed_drabinkami():
             events_meta={999: {"label": "Klub – Rywal", "ts": TERAZ + DZIEN,
                                "hid": 100, "aid": 200,
                                "home": "Klub", "away": "Rywal"}},
-            odds_grid={999: {1: {"shots": {"1.5": KURS_W_OKNIE}},
-                             7: {"shots": {"0.5": 1.75}}}},
+            odds_grid={999: {1: {"shots": {"1.5": KURS_W_OKNIE, "2.5": KURS_DRUGIEGO}},
+                             # gorsza cena = słabsza karta, więc sygnał
+                             # (transfer) ma wyjść przed zwykłą drabinką
+                             7: {"shots": {"1.5": 1.67,
+                                           "2.5": KURS_DRUGIEGO}}}},
             sb_cache={},
             model_pokrycie=[],
             players_out={},
@@ -363,8 +378,8 @@ def test_bramy_odrzucaja_karte_bez_przewagi_nad_kursem():
         trends=[slaby, mocny, pozny],
         events_meta={999: _meta(TERAZ + DZIEN), 998: _meta(TERAZ + 2 * DZIEN)},
         odds_grid={999: {1: {"shots": {"0.5": 1.7}},
-                         2: {"shots": {"1.5": KURS_W_OKNIE}}},
-                   998: {3: {"shots": {"1.5": KURS_W_OKNIE}}}},
+                         2: {"shots": {"1.5": KURS_W_OKNIE, "2.5": KURS_DRUGIEGO}}},
+                   998: {3: {"shots": {"1.5": KURS_W_OKNIE, "2.5": KURS_DRUGIEGO}}}},
         sb_cache={}, model_pokrycie=[], players_out={}, nazwy_pl={},
         teraz=TERAZ,
     )
@@ -449,16 +464,14 @@ def test_pierwszy_szczebel_od_progu_ceny():
         trends=[tr],
         events_meta={999: {"label": "A – B", "ts": TERAZ + DZIEN,
                            "hid": 100, "aid": 200, "home": "A", "away": "B"}},
-        odds_grid={999: {1: {"shots": {"0.5": 1.2, "1.5": 1.55,
-                                       "2.5": KURS_W_OKNIE, "3.5": 4.9}}}},
+        odds_grid={999: {1: {"shots": {"0.5": 1.2, "1.5": KURS_W_OKNIE,
+                                       "2.5": KURS_DRUGIEGO, "3.5": 4.9}}}},
         sb_cache={}, model_pokrycie=[], players_out={}, nazwy_pl={},
         teraz=TERAZ,
     )
     (rynek,) = wpisy[0]["rynki"]
-    # 0,5 @1.20 odpada na progu ceny (MIN_KURS_PIERWSZEGO = 1,45), 1,5 @1.55
-    # już wchodzi. 3,5 nie wchodzi od 2026-07-30: sufit linii dla strzałów to
-    # „3+" (2,5). Próg ceny zszedł razem z sufitem — inaczej przy samych
-    # niskich liniach karta nie powstawałaby wcale (dry-run: zero kart).
+    # 0,5 @1.20 odpada na progu ceny (MIN_KURS_PIERWSZEGO), 1,5 @1.70 wchodzi.
+    # 3,5 nie wchodzi od 2026-07-30: sufit linii dla strzałów to „3+" (2,5).
     assert [s["linia"] for s in rynek["drabinka"]] == [1.5, 2.5]
 
 
@@ -580,7 +593,7 @@ def test_karta_nie_powstaje_gdy_za_mocno_rozjezdzamy_sie_z_kursem():
     )
     # kurs zgodny z naszą szansą — karta powstaje
     assert len(radar.zbuduj(
-        odds_grid={999: {1: {"shots": {"1.5": KURS_W_OKNIE}}}}, **wspolne
+        odds_grid={999: {1: {"shots": {"1.5": KURS_W_OKNIE, "2.5": KURS_DRUGIEGO}}}}, **wspolne
     )) == 1
     # ten sam zawodnik, kurs jak u Fehra — nasza szansa 1,4x ponad cenę rynku
     assert radar.zbuduj(
@@ -600,7 +613,7 @@ def test_rzadki_rezerwowy_nie_dostaje_karty():
         trends=[tr],
         events_meta={999: {"label": "A – B", "ts": TERAZ + DZIEN,
                            "hid": 100, "aid": 200, "home": "A", "away": "B"}},
-        odds_grid={999: {1: {"shots": {"1.5": KURS_W_OKNIE}}}},
+        odds_grid={999: {1: {"shots": {"1.5": KURS_W_OKNIE, "2.5": KURS_DRUGIEGO}}}},
         sb_cache={}, model_pokrycie=[], players_out={}, nazwy_pl={},
         teraz=TERAZ,
     ) == []
@@ -629,12 +642,14 @@ def test_karta_bez_smieci_trzy_najlepsze_rynki():
         trends=trendy,
         events_meta={999: {"label": "A – B", "ts": TERAZ + DZIEN,
                            "hid": 100, "aid": 200, "home": "A", "away": "B"}},
+        # każdy rynek z drugim szczeblem — o kolejności decyduje pierwszy
+        # (pokrycie × kurs), ale bez następnika karta w ogóle nie powstaje
         odds_grid={999: {1: {
-            "shots": {"1.5": 1.70},              # 0,7 × 1,70 = 1,19
-            "shots_outside_box": {"1.5": 1.95},  # 0,7 × 1,95 = 1,37  <- najlepszy
-            "headed_sot": {"1.5": 9.0},          # rynek-przypadek
-            "sot": {"1.5": 1.80},                # 0,7 × 1,80 = 1,26
-            "fouls_won": {"1.5": 1.66},          # 0,7 × 1,66 = 1,16  <- wypada
+            "shots": {"1.5": 1.70, "2.5": 3.2},              # 0,7 × 1,70 = 1,19
+            "shots_outside_box": {"1.5": 1.95, "2.5": 3.6},  # 1,37 <- najlepszy
+            "headed_sot": {"1.5": 9.0, "2.5": 15.0},         # rynek-przypadek
+            "sot": {"1.5": 1.80, "2.5": 3.4},                # 1,26
+            "fouls_won": {"1.5": 1.66, "2.5": 3.1},          # 1,16 <- wypada
         }}},
         sb_cache={}, model_pokrycie=[], players_out={}, nazwy_pl={},
         teraz=TERAZ,
@@ -649,23 +664,38 @@ def test_karta_bez_smieci_trzy_najlepsze_rynki():
 # --- UCZENIE DRABINEK (2026-07-29): pomiar progu pokrycia + własna korekta ---
 
 
-def _karta_do_oceny(traf, kurs=2.5, p_final=0.45, z=10):
-    """Kandydat na kartę z JEDNYM szczeblem — wszystko poza pokryciem gra.
+def _karta_do_oceny(traf, kurs=2.5, p_final=0.45, z=10,
+                    drugi_p=0.40, drugi_kurs=3.6):
+    """Kandydat na kartę z DWOMA szczeblami — wszystko poza pokryciem gra.
 
     Bramy karty (minuty, udział startów) przechodzą, kurs jest grywalny,
     przewaga nad ceną mieści się w oknie zgody z rynkiem. Jedyną zmienną
     jest `traf`, czyli pokrycie linii — dokładnie to, o co pytamy.
+
+    DRUGI SZCZEBEL JEST OBOWIĄZKOWY od 2026-08-08 (radar.MIN_P_DRUGIEGO_
+    SZCZEBLA): karta bez realnego następnika nie jest drabinką, więc fikstura
+    z jednym szczeblem opisywałaby produkt, którego już nie wydajemy.
+    `drugi_p=None` daje starą, jednoszczeblową kartę — do testów tej bramy.
     """
+    drabinka = [{
+        "linia": 1.5, "kurs": kurs,
+        "pokrycie": {"traf": traf, "z": z},
+        "p_bazowe": p_final, "korekta": 1.0, "p_final": p_final,
+    }]
+    if drugi_p is not None:
+        drabinka.append({
+            "linia": 2.5, "kurs": drugi_kurs,
+            # o jedno trafienie mniej niż pierwszy szczebel — wyższa linia musi
+            # wchodzić rzadziej, ale ma zostać nad progiem MIN_POKRYCIE_DRUGIEGO,
+            # bo te testy pytają o INNE bramy niż pokrycie drugiego szczebla
+            "pokrycie": {"traf": max(traf - 1, 0), "z": z},
+            "p_bazowe": drugi_p, "korekta": 1.0, "p_final": drugi_p,
+        })
     return {
         "minuty_sr6": 85,
         "udzial_startow": 0.9,
         "rynki": [{
-            "rynek_kod": "shots", "rynek": "Strzały",
-            "drabinka": [{
-                "linia": 1.5, "kurs": kurs,
-                "pokrycie": {"traf": traf, "z": z},
-                "p_bazowe": p_final, "korekta": 1.0, "p_final": p_final,
-            }],
+            "rynek_kod": "shots", "rynek": "Strzały", "drabinka": drabinka,
         }],
     }
 

@@ -106,7 +106,35 @@ MIN_P_SZCZEBLA = 0.03       # od 3. szczebla w górę: p_model < 3% ucina reszt�
 # Ucinamy drabinkę na pierwszym szczeblu (poza pierwszym), który nie sięga
 # progu — dalsze są z definicji gorsze. Szczeble BEZ policzonej szansy
 # zostają: tam nie mamy czym oceniać i UI mówi o tym wprost.
+#
+# ZOSTAJE 0,25 — i to jest świadomy powrót po nieudanej próbie 0,33.
+#
+# Podniesienie tego progu wyglądało na oczywistą realizację życzenia usera
+# („drugi szczebel ma być realny"), a okazało się sprzeczne samo w sobie.
+# Przykłady typerów, które user wkleił 08.08, mają drugi szczebel po kursie
+# 3,20–6,60 — czyli rynek wycenia go na 15–31%. Żądając od niego 33% naszej
+# szansy, wymuszamy, żeby nasza liczba była o jedną trzecią WYŻSZA od ceny
+# rynku — dokładnie ten rozjazd, który w pomiarach oznacza NASZ błąd
+# (MAX_ROZJAZD_KARTY = 1,25). Karta wzorcowa (Hellebrand, 5/8 nad drugą linią)
+# lądowała przy 0,33 dokładnie na granicy odrzucenia.
+#
+# Realność drugiego szczebla pilnuje więc POKRYCIE, nie nasz procent — patrz
+# MIN_POKRYCIE_DRUGIEGO. Ten próg zostaje jako dolny bezpiecznik na szczeble
+# całkiem martwe (rozkład z dry-runu: 336 następników poniżej 10%).
 MIN_P_DRUGIEGO_SZCZEBLA = 0.25
+# ⚑ ILE RAZY DRUGI SZCZEBEL MA WCHODZIĆ (2026-08-08, decyzja usera:
+# „drugi szczebel musi być bardzo realny, nie zważając już nawet na nasze %,
+# bo z reguły oni dają typy takie, że drugi szczebel też często wchodzi").
+#
+# To jest ta sama liczba, którą typer wypisuje mecz po meczu — i jedyna, która
+# nie zależy od naszego własnego ścinania szansy (Wilson + korekta strumienia
+# −0,40 logit potrafią zrobić z pokrycia 5/8 szansę 0,33). Pokrycie drugiego
+# szczebla w przykładach usera:
+#     Mbappé 5/7 · Igbekeme 7/8 · Hellebrand 5/8 · Berg 3/5 · Yamal 2/4
+#     · Lokilo 2/5 · Sánchez 0/4  (mediana 60%)
+# Próg 0,50 wpuszcza pięć z siedmiu i odcina te, gdzie drugi szczebel jest
+# czystą opcją ryzykowną bez pokrycia.
+MIN_POKRYCIE_DRUGIEGO = 0.50
 
 # DWA RODZAJE GRY (propozycja usera 2026-08-03). Ten podział jest PROSTOPADŁY
 # do `kategoria` (ta mówi, co widać w drugim cenniku) — tu chodzi o to, jak
@@ -122,7 +150,9 @@ PEWNA_MIN_P_HERO = 0.60
 PEWNA_MIN_P_DRUGI = 0.40
 VALUE_MIN_KURS_HERO = 2.00
 VALUE_MIN_P_HERO = 0.45
-VALUE_MIN_P_DRUGI = 0.25
+# równe podłodze drugiego szczebla (2026-08-08): etykieta nie ma prawa być
+# łatwiejsza niż warunek, na którym drugi szczebel w ogóle zostaje na karcie
+VALUE_MIN_P_DRUGI = 0.33
 MAX_KURS_SZCZEBLA = 12.0    # ...podobnie kurs powyżej tego progu
 # pierwszy szczebel drabinki od 1.65 (decyzja usera 2026-07-25): linie po
 # 1.2-1.5 to pewniaki bez value — drabinka ma zaczynać się od grywalnej ceny
@@ -132,13 +162,62 @@ MAX_KURS_SZCZEBLA = 12.0    # ...podobnie kurs powyżej tego progu
 # (wcześniej 1–3), bo cała drabinka wypadała na cenie. Dwa życzenia usera —
 # „max 3+" i „za mało kart" — da się spełnić naraz tylko wtedy, gdy próg ceny
 # zejdzie razem z sufitem linii.
+# ⚑ PODŁOGA CENY DOTYCZY *NASZEGO TYPU*, NIE POCZĄTKU DRABINKI (2026-08-08).
+#
+# Życzenie usera („pierwszy szczebel min. 1,6/1,7") realizuje `MIN_KURS_SCORE`
+# niżej, a NIE ta stała. Różnica wygląda na kosmetyczną, a jest zasadnicza —
+# zmierzona dry-runem, po tym jak podniesienie TEJ stałej do 1,60 zbiło podaż
+# z ~20 kart do JEDNEJ:
+#
+#   drabinka startuje od pierwszej linii spełniającej próg, więc podnosząc go,
+#   przesuwamy CAŁĄ drabinkę w górę — a drugi szczebel ląduje na linii, której
+#   nikt nie przebija. Przykład z danych: zawodnik z 1+ @1,55 (70%), 2+ @2,60
+#   (42%), 3+ @6,00 (15%). Przy progu 1,45 drabinka to [1+, 2+] i drugi
+#   szczebel ma 42% — dokładnie to, o co prosi user. Przy progu 1,60 pierwsza
+#   linia wypada, drabinka to [2+, 3+], a drugi szczebel ma 15% i karta ginie.
+#
+# Dowód liczbowy (dry-run 08.08, rozkład szansy drugiego szczebla przed cięciem):
+#   poniżej 10%: 336 | 10–20%: 52 | 20–25%: 4 | 25–30%: 8 | 30–33%: 1 | 33%+: 5
+# Czyli przy podniesionej podłodze drugi szczebel jest MARTWY w 96% przypadków.
+# Podnoszenie progu ceny startu działa więc PRZECIWKO drugiemu szczeblowi.
+#
+# Zostaje 1,45: drabinka ma prawo POKAZAĆ tanią linię (to kontekst i dowód, że
+# zdarzenie jest częste — dokładnie jak we wzorcu typera, gdzie tania cena
+# Superbetu jest argumentem), ale NASZYM TYPEM zostaje dopiero szczebel od 1,60.
 MIN_KURS_PIERWSZEGO = 1.45
+# --- Rozliczenia 82 drabinek: całą zyskowność niesie wąskie pasmo ceny ---
+#     poniżej 1,50   n= 3   trafia   0,0%   zwrot −100,0%
+#     1,50–1,70      n=10   trafia  70,0%   zwrot   +9,3%   <- jedyne dodatnie
+#     1,70–2,00      n=17   trafia  23,5%   zwrot  −56,1%
+#     2,00–2,50      n=23   trafia  39,1%   zwrot  −14,4%
+#     powyżej 2,50   n=29   trafia  17,2%   zwrot  −46,9%
+# W paśmie 1,50–1,70 deklaracja zgadza się z wynikiem co do punktu (69,7%
+# obiecane, 70,0% trafione) — jedyne miejsce w drabinkach, gdzie nasza liczba
+# jest prawdziwa. Podłoga (nie okno) to decyzja usera: droższe karty zostają
+# w grze, ale ranking je odsuwa (patrz OKNO_CENY_PREF_*).
+#
 # --- TWARDE BRAMY JAKOŚCI (decyzja usera 2026-07-25: „tylko najlepsze
 # drabinki, nie randomowe"). Sygnał (transfer/forma/debiutant) NIE jest już
 # przepustką — zostaje plakietką, ale karta musi obronić się liczbami. ---
-MIN_KURS_SCORE = 1.45       # linia liczy się dopiero od grywalnej ceny
-                            # (zeszło z 1,65 razem z MIN_KURS_PIERWSZEGO —
-                            # patrz tam, sufit linii „3+" wymusza tańsze linie)
+# ⚑ TO TU MIESZKA ŻYCZENIE „PIERWSZY SZCZEBEL OD 1,6/1,7" (2026-08-08):
+# szczebel tańszy niż próg może stać na karcie jako kontekst, ale nie zostanie
+# NASZYM TYPEM (hero). Podniesione z 1,45 razem ze zgłoszeniem usera —
+# w odróżnieniu od MIN_KURS_PIERWSZEGO nie przesuwa całej drabinki w górę,
+# więc nie zabija drugiego szczebla (patrz długa nota wyżej).
+#
+# 1,55, nie 1,60 — decyzja usera 08.08 poparta rozliczeniami: zyskowne pasmo to
+# 1,50–1,70, więc próg 1,60 odcinałby jego lepszą, dolną połowę. Przykłady
+# typerów zaczynają się od 1,48 (mediana 1,90), więc 1,55 jest po bezpiecznej
+# stronie i nadal spełnia „minimum 1,6/1,7" tam, gdzie to ma znaczenie.
+MIN_KURS_SCORE = 1.55
+# RANKING PREFERUJE OKNO, W KTÓRYM DRABINKI ZARABIAJĄ (patrz tabela wyżej).
+# Nie brama, tylko premia w kolejności: karta startująca od 1,65 wychodzi przed
+# kartę startującą od 2,40 przy podobnej przewadze. Wartość w punktach
+# przewagi — 0,015 to tyle, co półtora punktu procentowego edge, czyli premia
+# realna, ale nie przebijająca wyraźnie lepszej karty.
+OKNO_CENY_PREF_OD = 1.55
+OKNO_CENY_PREF_DO = 1.90
+BONUS_OKNA_CENY = 0.015
 MIN_PROBA_SCORE = 8         # min. występów w próbie (było 5 — za krótkie
                             # serie udawały pewniaki: 3/5 = "60%")
 # Surowe pokrycie linii. ZEJŚCIE 0.6 -> 0.5 (decyzja usera 2026-07-26):
@@ -227,6 +306,27 @@ MIN_KURS_SERII_DROGIEJ = 2.00
 # Przewaga NIE jest wymagana, ale karta nie może być jawnie gorsza od ceny:
 # przy −6 pp nasze własne liczby mówią, że bukmacher ma rację, a my nie.
 MIN_EDGE_SERII = -0.06
+
+# --- TRZECIA ŚCIEŻKA WEJŚCIA: RÓŻNICA MIĘDZY BUKMACHERAMI („hybryda") ---
+# Decyzja usera 2026-08-08. Dotąd różnica kursów była wyłącznie ETYKIETĄ:
+# karta musiała najpierw przejść bramę „nasz model bije cenę", a rozjazd tylko
+# ją opisywał. To odwracało kolejność dowodów — bo różnica między dwoma
+# cennikami jest przewagą, która NIE ZALEŻY od tego, czy nasz model ma rację,
+# a my mamy zmierzone, że nasza liczba jest gorsza od samego kursu w 7 z 9
+# rynków ([[czy-bijemy-kurs]]).
+#
+# ZASTRZEŻENIE USERA, KTÓRE JEST TU NAJWAŻNIEJSZE: „tylko gdy serio ten typ ma
+# szansę realnie wejść, nie możemy opierać się tylko na kursie". Dlatego
+# różnica zastępuje WYŁĄCZNIE wymóg przewagi modelu. Wszystkie pozostałe
+# warunki zostają: minuty, udział startów, realny drugi szczebel, brak
+# kwarantanny — a pokrycie musi być WYŻSZE niż przy zwykłej karcie, bo skoro
+# model nie wnosi przewagi, dowód ma nieść historia.
+PROG_POKRYCIA_HYBRYDY = 0.60
+# Ile punktów procentowych różnicy uznajemy za okazję — ta sama liczba, którą
+# front nazywa „rozjazdem" (PROG_OKAZJI_PP), bo dwie bramy mówiące o tym samym
+# nie mogą stać w dwóch różnych miejscach. Osobna stała, żeby dało się stroić
+# wejście bez ruszania etykiety.
+MIN_ROZJAZD_WEJSCIA = 12.0
 # GÓRNA granica przewagi — brama zgody z rynkiem (pomiar 2026-07-27 na 336
 # rozliczonych typach modelu, patrz betting.OKNO_ZGODY_*): im mocniej nasza
 # szansa rozjeżdża się z ceną bukmachera, tym RZADZIEJ mamy rację.
@@ -667,6 +767,7 @@ def _rynki_wpisu(
     sezony: list[dict] | None = None,
     teraz: int = 0,
     korekta_logit: float = 0.0,
+    diag: Counter | None = None,
 ) -> list[dict]:
     """Sekcja `rynki` wpisu: przycięta drabinka kursów + pokrycie linii
     w ostatnich występach + forma i PEŁNY kontekst meczu per rynek.
@@ -718,8 +819,16 @@ def _rynki_wpisu(
         drabinka = []
         for linia_s, kurs in sorted(linie.items(), key=lambda kv: float(kv[0])):
             if float(linia_s) > sufit_linii:
+                # GDZIE GINIE DRUGI SZCZEBEL (2026-08-08). Sufit linii ucina tu
+                # NASTĘPNIK już zbudowanej drabinki — czyli dokładnie to, czego
+                # user szuka na karcie. Bez licznika „karta jednoszczeblowa"
+                # wygląda tak samo, jakby bukmacher po prostu nie kwotował.
+                if diag is not None and len(drabinka) == 1:
+                    diag["nastepnik_ucialy_sufit_linii"] += 1
                 break   # linie posortowane rosnąco — wyżej już nic nie weźmiemy
             if not drabinka and kurs < MIN_KURS_PIERWSZEGO:
+                if diag is not None:
+                    diag["start_pominiety_przez_cene"] += 1
                 continue  # drabinka startuje od pierwszej grywalnej ceny
             if len(drabinka) >= MAX_SZCZEBLI:
                 break
@@ -760,21 +869,41 @@ def _rynki_wpisu(
                         )), 3
                     )
             drabinka.append(szczebel)
+        # ROZKŁAD SZANSY DRUGIEGO SZCZEBLA — zbierany ZANIM cokolwiek utniemy.
+        # Sam licznik „ilu nie przeszło" nie mówi, gdzie postawić próg: przy
+        # 0,33 wygląda tak samo świat, w którym następniki mają po 0,32, jak
+        # ten, w którym mają po 0,10. Koszyki odpowiadają na to jednym
+        # przebiegiem, zamiast strojenia progu po omacku.
+        if diag is not None and len(drabinka) >= 2:
+            p2 = drabinka[1].get("p_final")
+            if p2 is not None:
+                prog_k = (
+                    "00-10" if p2 < 0.10 else "10-20" if p2 < 0.20
+                    else "20-25" if p2 < 0.25 else "25-30" if p2 < 0.30
+                    else "30-33" if p2 < 0.33 else "33-40" if p2 < 0.40
+                    else "40+"
+                )
+                diag[f"p2_{prog_k}"] += 1
         # DRUGI SZCZEBEL MA BYĆ REALNY — patrz MIN_P_DRUGIEGO_SZCZEBLA.
         for i, s in enumerate(drabinka):
             p_f = s.get("p_final")
             if i >= 1 and p_f is not None and p_f < MIN_P_DRUGIEGO_SZCZEBLA:
+                if diag is not None and i == 1:
+                    diag["nastepnik_ponizej_progu_szansy"] += 1
                 drabinka = drabinka[:i]
                 break
         # SZCZEBLE-ŚMIECI PRECZ. „Celne głową 1,5 — trafione 0/10, kurs 33,0"
         # nie niesie żadnej informacji poza tym, że bukmacher kwotuje wszystko.
         # Szczeble bez pokrycia (gołe drabinki, brak historii) zostają — tam
         # nie mamy czym oceniać, a UI mówi wprost, że historii nie znamy.
+        przed_smieciami = len(drabinka)
         drabinka = [
             s for s in drabinka
             if (s.get("pokrycie") or {}).get("traf", MIN_TRAF_SZCZEBLA)
             >= MIN_TRAF_SZCZEBLA
         ]
+        if diag is not None and przed_smieciami > 1 and len(drabinka) == 1:
+            diag["nastepnik_trafiony_mniej_niz_dwa_razy"] += 1
         if not drabinka:
             continue
         rec: dict = {
@@ -874,6 +1003,26 @@ def _rynki_wpisu(
     return out[:MAX_RYNKOW_KARTY]
 
 
+def _p_po_strzyzeniu(s: dict | None) -> float | None:
+    """Szansa szczebla po tym samym ścięciu, które robi `_oceń_karte`.
+
+    Gdy model liczy niżej niż pokrycie z historii, bierzemy średnią z obu —
+    bo dwa źródła, które się nie zgadzają, nie dają pewności jednego z nich.
+    Ocena DRUGIEGO szczebla musi używać tej samej liczby co ocena hero,
+    inaczej brama przepuszczałaby szczeble, które i tak zaraz spadną poniżej
+    progu (a user zobaczyłby na karcie inną szansę, niż przeszła selekcję).
+    """
+    if not s:
+        return None
+    p_final = s.get("p_final")
+    if p_final is None:
+        return None
+    p_mod = s.get("p_model")
+    if p_mod is not None and float(p_mod) < float(p_final):
+        return round((float(p_final) + float(p_mod)) / 2.0, 3)
+    return float(p_final)
+
+
 def _oceń_karte(
     w: dict,
     powody: Counter | None = None,
@@ -926,7 +1075,24 @@ def _oceń_karte(
     pomiar_score, pomiar_s = float("-inf"), None
     lokalne: Counter = Counter()
     for r in w.get("rynki", []):
-        for s in r.get("drabinka", []):
+        szczeble = r.get("drabinka", [])
+        for i, s in enumerate(szczeble):
+            # DRABINKA MUSI MIEĆ DRUGI SZCZEBEL (2026-08-08, decyzja usera).
+            # Zmierzone na 20 żywych kartach: 12 miało JEDEN szczebel, 8 dwa,
+            # trzeciego nie miała ani jedna — czyli w większości sprzedawaliśmy
+            # pojedynczy typ pod nazwą „drabinka". User: „drugi szczebel bardzo
+            # często siada i jest jakby głównym celem, żeby go upolować".
+            # Szczebel bez realnego następnika nie zostaje więc nagłówkiem
+            # karty — nie ma czego polować.
+            nast = szczeble[i + 1] if i + 1 < len(szczeble) else None
+            p_nast = _p_po_strzyzeniu(nast)
+            # ILE RAZY DRUGI SZCZEBEL WCHODZIŁ — twarda liczba z historii,
+            # niezależna od naszego ścinania szansy (patrz MIN_POKRYCIE_DRUGIEGO)
+            pok_nast = (nast or {}).get("pokrycie") or {}
+            udzial_nast = (
+                pok_nast["traf"] / pok_nast["z"]
+                if pok_nast.get("z") else None
+            )
             p = s.get("pokrycie")
             if not p or p["z"] < MIN_PROBA_SCORE:
                 lokalne["krotka_proba"] += 1
@@ -949,6 +1115,43 @@ def _oceń_karte(
                 if powody_pomiaru is not None:
                     powody_pomiaru["w_przedziale"] += 1
                 if pomiar_out is None:
+                    continue
+            # DRABINKA MUSI MIEĆ DRUGI SZCZEBEL (2026-08-08, decyzja usera).
+            # Zmierzone na 20 żywych kartach: 12 miało JEDEN szczebel, 8 dwa,
+            # trzeciego nie miała ani jedna — czyli w większości sprzedawaliśmy
+            # pojedynczy typ pod nazwą „drabinka". User: „drugi szczebel bardzo
+            # często siada i jest jakby głównym celem, żeby go upolować".
+            #
+            # SZCZEBLA POMIAROWEGO TO NIE DOTYCZY, i to nie jest wygodnictwo:
+            # pomiarowy ma pokrycie 0,40–0,50, a następnik (linia wyżej) zawsze
+            # niższe, więc progu 0,50 nie przeszedłby NIGDY. Brama zabiłaby więc
+            # cały pomiar progu pokrycia (patrz NEAR_POKRYCIA), zamiast zmierzyć
+            # go osobno. Pomiarowy i tak nie wraca jako hero.
+            if not pomiarowy:
+                if udzial_nast is not None \
+                        and udzial_nast < MIN_POKRYCIE_DRUGIEGO:
+                    lokalne["drugi_szczebel_rzadko_wchodzil"] += 1
+                    continue
+                if p_nast is None or p_nast < MIN_P_DRUGIEGO_SZCZEBLA:
+                    # CZTERY RÓŻNE DIAGNOZY, nie jedna ([[ciche-odrzucenia-zasada]]):
+                    # drabinka jednoszczeblowa z powodu sufitu linii albo braku
+                    # oferty, następnik za słaby, następnik bez policzonej szansy.
+                    # Bez tego podziału „400 odrzuceń" nie mówi, który próg ruszyć.
+                    if len(szczeble) == 1:
+                        sufit = MAX_LINIA_RYNKU.get(
+                            r.get("rynek_kod"), MAX_LINIA_DOMYSLNA
+                        )
+                        lokalne[
+                            "jednoszczeblowa_start_na_suficie"
+                            if float(s.get("linia", 0)) >= sufit
+                            else "jednoszczeblowa_brak_kolejnej_linii"
+                        ] += 1
+                    elif nast is None:
+                        pass   # ostatni szczebel dłuższej drabinki — to norma
+                    elif p_nast is None:
+                        lokalne["drugi_szczebel_bez_szansy"] += 1
+                    else:
+                        lokalne["slaby_drugi_szczebel"] += 1
                     continue
             p_final = s.get("p_final")
             if p_final is None:
@@ -982,8 +1185,19 @@ def _oceń_karte(
                         and s["kurs"] >= MIN_KURS_SERII_DROGIEJ)
                 )
             )
+            # ...albo TRZECIA ścieżka: dwaj bukmacherzy wyceniają to samo
+            # zdarzenie wyraźnie inaczej (patrz MIN_ROZJAZD_WEJSCIA). Przewagą
+            # jest wtedy sama różnica cen, ale zdarzenie musi realnie wchodzić —
+            # stąd ostrzejszy próg pokrycia niż przy zwykłej karcie.
+            _roz = s.get("rozjazd") or {}
+            hybryda = (
+                not pomiarowy
+                and edge >= MIN_EDGE_SERII
+                and pokrycie >= PROG_POKRYCIA_HYBRYDY
+                and float(_roz.get("roznica_pp") or 0.0) >= MIN_ROZJAZD_WEJSCIA
+            )
             if edge < (MIN_EDGE_POMIARU if pomiarowy else MIN_EDGE_KARTY) \
-                    and not seria:
+                    and not seria and not hybryda:
                 if not pomiarowy:
                     lokalne["brak_przewagi"] += 1
                     # CO DOKŁADNIE ODPADA NA PRZEWADZE (2026-07-30). User:
@@ -1024,14 +1238,47 @@ def _oceń_karte(
                 "korekta": s.get("korekta"),
                 # na czym stoi ta linia — front ma to napisać wprost, żeby
                 # karta bez przewagi nie udawała karty z przewagą
-                "powod_wejscia": ("przewaga" if edge >= MIN_EDGE_KARTY
-                                  else "seria"),
+                # NA CZYM STOI TA LINIA — trzy różne dowody, trzy różne nazwy.
+                # Kolejność od najmocniejszego: własna przewaga, potem mocna
+                # seria, na końcu różnica między cennikami.
+                "powod_wejscia": (
+                    "przewaga" if edge >= MIN_EDGE_KARTY
+                    else "seria" if seria else "roznica_kursow"
+                ),
+                # DRUGI SZCZEBEL — cel polowania, nie ozdoba. Front ma go z czego
+                # nazwać po imieniu, a rozliczenia — z czego zmierzyć osobno.
+                # Szczebel pomiarowy bywa bez następnika (nie przechodzi przez
+                # bramę pary), więc pola zostają puste zamiast wywalać cykl.
+                "drugi_linia": (nast or {}).get("linia"),
+                "drugi_kurs": (nast or {}).get("kurs"),
+                "drugi_p": round(p_nast, 3) if p_nast is not None else None,
+                # „wchodził w 5 z 8 meczów" — argument, którym typer uzasadnia
+                # drugi szczebel; karta ma go pokazać zamiast samego procentu
+                "drugi_traf": pok_nast.get("traf"),
+                "drugi_z": pok_nast.get("z"),
             }
+            # OCENA KARTY LICZY SIĘ Z PARY SZCZEBLI, nie z jednej linii
+            # (2026-08-08). Dotąd wygrywała karta z najlepszą pojedynczą linią,
+            # więc na górę listy szła ta, która ma świetny pierwszy szczebel
+            # i nic dalej — dokładne przeciwieństwo tego, po co ktoś otwiera
+            # Drabinki. Średnia z dwóch przewag premiuje kartę, w której OBA
+            # szczeble są warte zagrania.
+            # Szczebel pomiarowy pary nie ma (brama go nie dotyczy), więc dla
+            # niego zostaje sama przewaga — i tak nie rywalizuje o nagłówek.
+            if nast is not None and p_nast is not None:
+                edge_nast = p_nast - 1.0 / nast["kurs"]
+                ocena = (edge + edge_nast) / 2.0
+            else:
+                ocena = edge
+            # premia za cenę startu w paśmie, w którym drabinki realnie
+            # zarabiają (patrz OKNO_CENY_PREF_*) — kolejność, nie brama
+            if OKNO_CENY_PREF_OD <= s["kurs"] <= OKNO_CENY_PREF_DO:
+                ocena += BONUS_OKNA_CENY
             if pomiarowy:
-                if edge > pomiar_score:
-                    pomiar_score, pomiar_s = edge, trafiony
-            elif edge > best_score:
-                best_score, best_s = edge, trafiony
+                if ocena > pomiar_score:
+                    pomiar_score, pomiar_s = ocena, trafiony
+            elif ocena > best_score:
+                best_score, best_s = ocena, trafiony
     if pomiar_out is not None and pomiar_s is not None:
         pomiar_out.append(pomiar_s)
     if powody is not None and best_s is None:
@@ -1101,6 +1348,39 @@ PROG_ZGODNEGO_RYNKU_PCT = 8.0
 # Poniżej progu druga cena NIE ZNIKA — dalej stoi przy szczeblu jako „BC 1,82".
 # Przestaje tylko udawać okazję: karta jest wtedy zwykłą drabinką.
 PROG_OKAZJI_PP = 12.0
+
+
+def podsumuj_rozjazdy_karty(w: dict) -> bool:
+    """Wyciągnij na wierzch karty rozjazd przy szczeblu `hero` i układ
+    „pewniak taniej". Zwraca True, gdy taki układ znaleziono.
+
+    WYDZIELONE Z `_dopnij_betclic` (2026-08-08), bo od tej pory druga cena
+    dopinana jest DWA RAZY w różnych momentach: przed selekcją (żeby rozjazd
+    mógł wpuścić kartę — patrz `MIN_ROZJAZD_WEJSCIA`) i po niej (żeby
+    podsumowanie liczyło się względem ostatecznego `hero`). Przed selekcją
+    `hero` jeszcze nie istnieje, więc podsumowanie musi być osobnym krokiem.
+    """
+    hero = w.get("hero") or {}
+    wszystkie = [s for r in w.get("rynki") or []
+                 for s in r.get("drabinka") or [] if s.get("rozjazd")]
+    for r in w.get("rynki") or []:
+        if r.get("rynek_kod") != hero.get("rynek_kod"):
+            continue
+        for s in r.get("drabinka") or []:
+            if (s.get("rozjazd")
+                    and float(s["linia"]) == float(hero.get("linia", -1))):
+                w["rozjazd_hero"] = s["rozjazd"]
+    # UKŁAD „PEWNIAK TANIEJ": jeden bukmacher mówi „to niemal pewne"
+    # (kurs <= 1,45), drugi płaci za to 1,75+. To jest ten rodzaj rozjazdu,
+    # na którym stoją wpisy typerów — wyciągamy go na wierzch karty, żeby front
+    # mógł go wyróżnić, a nie topić w liście szczebli.
+    pewniaki = [s for s in wszystkie
+                if s["rozjazd"].get("typ") == "pewniak_taniej"]
+    if not pewniaki:
+        return False
+    najlepszy = max(pewniaki, key=lambda s: s["rozjazd"]["przewaga_pct"])
+    w["rozjazd_pewniak"] = {"linia": najlepszy["linia"], **najlepszy["rozjazd"]}
+    return True
 
 
 def _klucz_zawodnika(nazwa: str) -> str:
@@ -1176,13 +1456,26 @@ def _kategoria_karty(w: dict) -> str:
 BUDZET_BETCLIC_S = 150.0
 
 
-def _dopnij_betclic(wpisy: list[dict], events_meta: dict[int, dict]) -> None:
+def _dopnij_betclic(
+    wpisy: list[dict],
+    events_meta: dict[int, dict],
+    paczki_bc: dict[int, dict] | None = None,
+    podsumuj_karty: bool = True,
+) -> None:
     """Dopnij do szczebli drugą cenę (Betclic) i rozjazd wobec Superbetu.
 
     PO CO: wzorzec z wpisów typerów — gra się tam, gdzie płacą więcej, a niski
-    kurs drugiego bukmachera jest dowodem, że zdarzenie jest pewne. To DODATEK
-    do analizy, nie kryterium selekcji: karty są już wybrane, tu tylko
-    dokładamy informację.
+    kurs drugiego bukmachera jest dowodem, że zdarzenie jest pewne.
+
+    OD 2026-08-08 TO NIE JEST JUŻ SAM DODATEK: przy `paczki_bc` (oferta pobrana
+    raz przez cykl) dopinamy drugą cenę PRZED selekcją, więc różnica kursów może
+    wpuścić kartę, której model sam by nie wystawił — patrz `MIN_ROZJAZD_WEJSCIA`
+    i „hybryda" w `_oceń_karte`. Bez paczek zachowanie zostaje stare: dociągamy
+    po selekcji, tylko dla kart, które przeszły.
+
+    `podsumuj_karty=False` robi wyłącznie krok pierwszy (rozjazdy przy
+    szczeblach). Podsumowanie karty liczy się względem `hero`, którego przed
+    selekcją jeszcze nie ma.
 
     Wszystko w bezpiecznej klamrze — Betclic jest źródłem pomocniczym i jego
     awaria (albo zmiana protokołu) nie ma prawa wywalić całego przebiegu.
@@ -1202,7 +1495,15 @@ def _dopnij_betclic(wpisy: list[dict], events_meta: dict[int, dict]) -> None:
                               "away": meta["away"], "kickoff_ts": meta.get("ts")})
         if not nasze:
             return
-        pary, _luka = betclic.paruj_mecze(nasze)
+        # PACZKI Z ZEWNĄTRZ: cykl pobiera ofertę Betclica raz, na potrzeby
+        # silnika typów, i podaje ją tutaj gotową. Dzięki temu drugą cenę da się
+        # dopiąć PRZED selekcją kart (rozjazd jako przepustka) bez ani jednego
+        # dodatkowego zapytania — dawniej ten sam mecz pobierałyby dwa miejsca.
+        if paczki_bc:
+            pary = {mid: {"id": mid, "nazwa": (events_meta.get(mid) or {}).get("label", "")}
+                    for mid in mids if paczki_bc.get(mid)}
+        else:
+            pary, _luka = betclic.paruj_mecze(nasze)
         wpisy_mid: dict[int, list[dict]] = defaultdict(list)
         for w in wpisy:
             wpisy_mid[w["mecz_id"]].append(w)
@@ -1216,15 +1517,18 @@ def _dopnij_betclic(wpisy: list[dict], events_meta: dict[int, dict]) -> None:
         # zajęło godzinę — tyle kosztuje cichy `continue`.
         odpadki: Counter = Counter()
         for mid, bc in pary.items():
-            if time.time() - start > BUDZET_BETCLIC_S:
-                pominiete += 1
-                continue
-            try:
-                paczka = betclic.kursy_zawodnikow(int(bc["id"]))
-            except (RuntimeError, OSError, ValueError) as e:
-                print(f"Drabinki/Betclic: mecz {bc.get('nazwa')} — {e}")
-                odpadki["blad_pobrania"] += 1
-                continue
+            if paczki_bc:
+                paczka = paczki_bc.get(mid) or {}
+            else:
+                if time.time() - start > BUDZET_BETCLIC_S:
+                    pominiete += 1
+                    continue
+                try:
+                    paczka = betclic.kursy_zawodnikow(int(bc["id"]))
+                except (RuntimeError, OSError, ValueError) as e:
+                    print(f"Drabinki/Betclic: mecz {bc.get('nazwa')} — {e}")
+                    odpadki["blad_pobrania"] += 1
+                    continue
             gracze = paczka.get("players") or {}
             if not gracze:
                 # mecz sparowany, ale Betclic nie kwotuje ANI JEDNEGO zawodnika
@@ -1274,34 +1578,12 @@ def _dopnij_betclic(wpisy: list[dict], events_meta: dict[int, dict]) -> None:
                         trafil = True
                 if trafil:
                     n_kart += 1
-                    hero = w.get("hero") or {}
-                    wszystkie = [s for r in w.get("rynki") or []
-                                 for s in r.get("drabinka") or [] if s.get("rozjazd")]
-                    for r in w.get("rynki") or []:
-                        if r.get("rynek_kod") != hero.get("rynek_kod"):
-                            continue
-                        for s in r.get("drabinka") or []:
-                            if (s.get("rozjazd")
-                                    and float(s["linia"]) == float(hero.get("linia", -1))):
-                                w["rozjazd_hero"] = s["rozjazd"]
-                    # UKŁAD „PEWNIAK TANIEJ": jeden bukmacher mówi „to niemal
-                    # pewne" (kurs <= 1,45), drugi płaci za to 1,75+. To jest
-                    # ten rodzaj rozjazdu, na którym stoją wpisy typerów —
-                    # wyciągamy go na wierzch karty, żeby front mógł go
-                    # wyróżnić, a nie topić w liście szczebli.
-                    pewniaki = [s for s in wszystkie
-                                if s["rozjazd"].get("typ") == "pewniak_taniej"]
-                    if pewniaki:
-                        najlepszy = max(
-                            pewniaki, key=lambda s: s["rozjazd"]["przewaga_pct"]
-                        )
-                        w["rozjazd_pewniak"] = {
-                            "linia": najlepszy["linia"], **najlepszy["rozjazd"]
-                        }
+                    if podsumuj_karty and podsumuj_rozjazdy_karty(w):
                         n_pewniakow += 1
-        for w in wpisy:
-            w["kategoria"] = _kategoria_karty(w)
-            w["profil_gry"] = _profil_gry(w)
+        if podsumuj_karty:
+            for w in wpisy:
+                w["kategoria"] = _kategoria_karty(w)
+                w["profil_gry"] = _profil_gry(w)
         print(f"Drabinki — drugi cennik (Betclic): mecze {len(pary)}/{len(nasze)}, "
               f"karty z drugą ceną {n_kart}/{len(wpisy)}, szczebli {n_szczebli}, "
               f"układów „pewniak taniej” {n_pewniakow}"
@@ -1346,8 +1628,15 @@ def zbuduj(
     margines_startu_s: int = 0,
     korekta_logit: float = 0.0,
     pomiar_out: list | None = None,
+    bc_cache: dict[int, dict] | None = None,
 ) -> list[dict]:
     """Złóż wpisy radaru/drabinek ze zbiorów, które cykl i tak ma w pamięci.
+
+    `bc_cache` — oferta Betclica pobrana raz przez cykl (mecz -> paczka
+    `kursy_zawodnikow`). Podana tutaj pozwala dopiąć drugą cenę PRZED selekcją,
+    więc różnica kursów może wpuścić kartę („hybryda", patrz
+    MIN_ROZJAZD_WEJSCIA) — i przy okazji oszczędza zapytania, bo bez niej ten
+    sam mecz pobierałyby dwa miejsca w cyklu.
 
     DRABINKI (przebudowa 2026-07-24, decyzja produktowa): wpis dostaje KAŻDY
     kwotowany przez Superbet gracz z historią statshub — drabina linii z
@@ -1407,6 +1696,12 @@ def zbuduj(
     xi_znany = xi_znany or {}
 
     wpisy: list[dict] = []
+    # GDZIE GINIE DRUGI SZCZEBEL — licznik na etapie BUDOWY drabinki, nie
+    # selekcji. `_oceń_karte` widzi drabinkę już przyciętą, więc „karta ma jeden
+    # szczebel" wygląda tam identycznie niezależnie od tego, czy bukmacher nie
+    # kwotował kolejnej linii, czy myśmy ją ucięli progiem. To rozróżnienie
+    # decyduje, który próg ruszyć, gdy kart jest za mało.
+    diag_drabinki: Counter = Counter()
     for mid, gracze in odds_grid.items():
         meta = events_meta.get(mid)
         if not meta:
@@ -1494,6 +1789,7 @@ def zbuduj(
                 sezony=sez,
                 teraz=teraz,
                 korekta_logit=korekta_logit,
+                diag=diag_drabinki,
             )
             if not rynki:
                 continue  # same puste drabinki (kursy-szum) = nie ma karty
@@ -1674,6 +1970,7 @@ def zbuduj(
                     sezony=sez_deb,
                     teraz=teraz,
                     korekta_logit=korekta_logit,
+                    diag=diag_drabinki,
                 ),
             })
 
@@ -1703,6 +2000,15 @@ def zbuduj(
     # trzyma eksplozję: każdy kwotowany gracz = kandydat na kartę.
     # TWARDE BRAMY: karta bez ani jednej linii z realną przewagą odpada,
     # niezależnie od rodzaju. Sygnał to plakietka, nie przepustka.
+    #
+    # DRUGA CENA PRZED SELEKCJĄ (2026-08-08): mając ofertę Betclica pobraną raz
+    # przez cykl, dopinamy rozjazdy do WSZYSTKICH kandydatów, zanim cokolwiek
+    # ocenimy. Dopiero wtedy różnica kursów może wpuścić kartę, której model sam
+    # by nie wystawił. Bez `bc_cache` nic tu nie robimy — dociąganie po selekcji
+    # zostaje jak było, żeby nie palić budżetu czasu na setki kandydatów.
+    if bc_cache:
+        _dopnij_betclic(wpisy, events_meta, paczki_bc=bc_cache,
+                        podsumuj_karty=False)
     ocenione = []
     powody_odpadniecia: Counter = Counter()
     pomiar_kandydaci: list[dict] = []
@@ -1756,6 +2062,19 @@ def zbuduj(
         print("Drabinki — kandydaci odrzuceni: " + ", ".join(
             f"{k}={v}" for k, v in powody_odpadniecia.most_common()
         ) + f" (przeszło: {len(ocenione)})")
+    if diag_drabinki:
+        # dlaczego drabinka skończyła się na pierwszym szczeblu — cztery różne
+        # przyczyny, cztery różne lekarstwa (patrz komentarz przy diag_drabinki)
+        print("Drabinki — gdzie ginie drugi szczebel: " + ", ".join(
+            f"{k}={v}" for k, v in diag_drabinki.most_common()
+            if not k.startswith("p2_")
+        ))
+        rozklad = sorted(
+            (k[3:], v) for k, v in diag_drabinki.items() if k.startswith("p2_")
+        )
+        if rozklad:
+            print("Drabinki — szansa drugiego szczebla (przed cięciem): "
+                  + ", ".join(f"{k}={v}" for k, v in rozklad))
     # JEDEN ZAWODNIK = JEDNA KARTA W MECZU. Zgłoszenie usera 2026-07-28:
     # „w drabinkach są 4 typy, a 2 są na tego samego zawodnika". Powód:
     # kartę buduje DWIE ścieżki — po historii z trendów i po profilu
@@ -1790,10 +2109,18 @@ def zbuduj(
         sorted(wpisy, key=lambda w: -w["_score"]), start=1
     ):
         hero = w.get("hero") or {}
+        # KOLEJNOŚĆ liczy się z pary szczebli (`_score`), ale KLASA i liczba
+        # „przewaga" na karcie zostają przy pierwszym szczeblu — to jego cenę
+        # user widzi w nagłówku i to ją porównuje z bukmacherem. Wpisanie tu
+        # średniej z dwóch szczebli zmieniłoby znaczenie pola, którego front
+        # używa jako „o ile bijemy cenę".
+        edge_hero = float(
+            hero.get("edge") if hero.get("edge") is not None else w["_score"]
+        )
         w["ocena"] = {
             "miejsce": miejsce,
-            "klasa": _klasa_karty(w["_score"], miejsce, len(wpisy)),
-            "edge": round(w["_score"], 3),
+            "klasa": _klasa_karty(edge_hero, miejsce, len(wpisy)),
+            "edge": round(edge_hero, 3),
             # NA CZYM STOI KARTA: „przewaga" (nasza szansa bije cenę) albo
             # „seria" (mocne pokrycie przy grywalnej cenie, bez przewagi).
             # Front pisze to wprost — karta bez przewagi nie ma prawa
@@ -1810,7 +2137,17 @@ def zbuduj(
                 None,
             ),
         }
-    _dopnij_betclic(wpisy, events_meta)
+    # drugi przebieg: rozjazdy są już przy szczeblach (albo dociągamy je teraz,
+    # gdy cykl nie podał oferty), a tu liczy się PODSUMOWANIE karty — rozjazd
+    # przy `hero`, układ „pewniak taniej", kategoria i profil gry. Wszystko to
+    # zależy od `hero`, którego przed selekcją jeszcze nie było.
+    if bc_cache:
+        for w in wpisy:
+            podsumuj_rozjazdy_karty(w)
+            w["kategoria"] = _kategoria_karty(w)
+            w["profil_gry"] = _profil_gry(w)
+    else:
+        _dopnij_betclic(wpisy, events_meta)
     wpisy.sort(key=lambda w: (w["kickoff_ts"], w["mecz_id"], -w["_score"]))
     for i, w in enumerate(wpisy, start=1):
         w.pop("_score", None)

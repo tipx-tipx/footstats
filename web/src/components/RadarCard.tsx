@@ -245,7 +245,8 @@ function Fakty({ w }: { w: RadarWpis }) {
       // backend przyznaje kształt „dwa_szczeble" (radar.PEWNA_MIN_P_DRUGI) —
       // dwie liczby w dwóch miejscach nie mogą mówić czego innego.
       // Poniżej progu szczebel zostaje na karcie (drabinka urywa się dopiero
-      // pod 0,25), ale ma być widać, że to już nie jest pewny dalszy ciąg.
+      // pod 0,33 – radar.MIN_P_DRUGIEGO_SZCZEBLA, podniesione z 0,25 w dniu
+      // 2026-08-08), ale ma być widać, że to już nie jest pewny dalszy ciąg.
       // PORÓWNUJEMY LICZBĘ, KTÓRĄ USER WIDZI, nie surową. p_final = 0,398
       // wyświetla się jako „40%", więc porównanie na surowej wartości dawało
       // chip z napisem „40%" pomalowany jak poniżej progu — etykieta mówiłaby

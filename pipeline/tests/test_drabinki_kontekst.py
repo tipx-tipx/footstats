@@ -169,9 +169,14 @@ def _zbuduj(opponent_average, league_average, sedzia_by_mid=None):
     szansa stoi 50% nad ceną rynku — po wprowadzeniu bramy zgody z rynkiem
     (radar.MAX_ROZJAZD_KARTY) taka karta słusznie nie powstaje. Tu chodzi
     o sprawdzenie KONTEKSTU, więc dane muszą być realistyczne.
+
+    2026-08-08: historia przeliczona tak, żeby drabinka miała DWA szczeble
+    (7/10 nad linią 1,5 i 5/10 nad 2,5). Poprzedni wektor przebijał 2,5 tylko
+    dwa razy na dziesięć, więc drugi szczebel wypadał na podłodze
+    (radar.MIN_P_DRUGIEGO_SZCZEBLA), a karta bez niego nie jest już drabinką.
     """
     tr = _trend(
-        counts=[2, 3, 2, 2, 0, 2, 3, 2, 1, 1], league_average=league_average,
+        counts=[3, 3, 0, 3, 2, 0, 3, 2, 3, 0], league_average=league_average,
         opponent_average=opponent_average, opponent_rank=5, total_ranks=30,
     )
     trends = [tr]
