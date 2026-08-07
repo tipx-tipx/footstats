@@ -558,6 +558,74 @@ def historia_druzyny(team_id: int, rows: list[dict]) -> dict[str, tuple]:
     return gotowe
 
 
+def koncesje_druzyny(team_id: int, rows: list[dict]) -> dict[str, tuple]:
+    """Ile ta drużyna DOPUSZCZA — z `opponentStatistics`, mecz po meczu.
+
+    Bliźniak `historia_druzyny`, tylko z drugiej strony boiska: tam czytamy, co
+    drużyna notowała, tu — co notowali przeciwko niej jej rywale. Feed niesie
+    oba komplety w KAŻDYM rekordzie historii, więc to nie kosztuje ani jednego
+    dodatkowego zapytania.
+
+    PO CO (2026-08-07). Czynnik rywala miał dotąd dwa źródła: bank stylu
+    (365Scores, po nazwach drużyn) i `recentGames` z feedu propsów. To drugie
+    jest lustrem oferty bukmacherów UK, więc dla Ekstraklasy, kwalifikacji
+    pucharów i części Ameryki Południowej po prostu nie istnieje — zmierzone
+    07.08: komplet czynników miało 18 ze 134 kandydatów, reszta szła
+    z czynnikiem rywala równym 1,00, czyli bez kontekstu przeciwnika.
+    Ten endpoint działa dla KAŻDEJ ligi i ma 40 meczów wstecz (do 182 przy
+    wyższym `limit`), więc domyka dziurę u źródła.
+
+    Zmierzone na tych samych danych: „ile rywal dopuszcza" to NAJSILNIEJSZA
+    pojedyncza zależność w każdym z pięciu rynków drużynowych — model uczony
+    od zera na 3018 obserwacjach stawia ją na pierwszym miejscu z wagą dwa do
+    czterech razy większą niż cokolwiek innego, a samo dołożenie jej do własnej
+    średniej zmniejsza błąd przewidywania o 5–15% (najwięcej przy faulach).
+
+    Kształt jak w `historia_druzyny`: {kod_rynku: (wartości, znaczniki czasu,
+    nazwy rywali, id rywali, czy_u_siebie)}, od najnowszego.
+    """
+    out: dict[str, list] = {}
+    for rec in rows:
+        ev = rec.get("event") or {}
+        opp_st = rec.get("opponentStatistics") or {}
+        try:
+            ts = int(ev.get("timeStartTimestamp") or 0)
+        except (TypeError, ValueError):
+            ts = 0
+        if not ts:
+            continue
+        home, away = rec.get("homeTeam") or {}, rec.get("awayTeam") or {}
+        u_siebie = int(home.get("id") or 0) == int(team_id)
+        rywal = (away if u_siebie else home) or {}
+        for pole, mk in TEAM_PERF_MAP.items():
+            v = opp_st.get(pole)
+            if v is None:
+                continue
+            out.setdefault(mk, []).append(
+                (ts, float(v), str(rywal.get("name") or ""),
+                 int(rywal.get("id") or 0), u_siebie)
+            )
+        # GOLE STRACONE — jak w `historia_druzyny`, tylko druga strona wyniku
+        wynik = ev.get("score") or {}
+        stracone = wynik.get("away" if u_siebie else "home")
+        if stracone is not None:
+            out.setdefault("team_goals", []).append(
+                (ts, float(stracone), str(rywal.get("name") or ""),
+                 int(rywal.get("id") or 0), u_siebie)
+            )
+    gotowe: dict[str, tuple] = {}
+    for mk, pary in out.items():
+        pary.sort(key=lambda x: -x[0])
+        gotowe[mk] = (
+            [c for _, c, _, _, _ in pary],
+            [t for t, _, _, _, _ in pary],
+            [o for _, _, o, _, _ in pary],
+            [i for _, _, _, i, _ in pary],
+            [h for _, _, _, _, h in pary],
+        )
+    return gotowe
+
+
 @dataclass
 class TeamTrend:
     """Trend DRUŻYNOWY: (drużyna, rynek) z historią ~20 meczów i linią."""

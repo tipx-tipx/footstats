@@ -719,6 +719,25 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
             # rozwiązaną dla `p` TEGO typu — dokładnie tę, którą nałożono.
             **({"kal_strumien": _delta_stempla(b)}
                if _KOREKTA_CYKLU.get(_strumien(b)) else {}),
+            # WKŁAD KAŻDEJ ZALEŻNOŚCI, ZAMROŻONY PRZY PUBLIKACJI (2026-08-07).
+            #
+            # Do dziś księga zapisywała sam WYNIK rachunku (`p_model`), więc po
+            # rozliczeniu dało się powiedzieć tylko „przeszacowaliśmy o 12 pp" —
+            # nigdy „bo czynnik rywala był za mocny". Uczenie mogło więc
+            # przesunąć całą prognozę naraz i nic ponadto: pięć mnożników
+            # (rywal, sędzia, dom/wyjazd, tempo, matchup) jest wpisanych ręcznie
+            # i ŻADEN nigdy nie został porównany z wynikiem.
+            #
+            # Ten stempel to brakujące ogniwo sprzężenia zwrotnego: mając przy
+            # każdym rozliczonym typie wkład poszczególnych czynników, da się
+            # policzyć, który z nich systematycznie pcha prognozę w złą stronę,
+            # i stroić je OSOBNO zamiast zgadywać. Pięć liczb na rekord —
+            # księga rośnie o ~40 bajtów na typ.
+            **({"czynniki": {
+                k: round(float(v), 3)
+                for k, v in (b.get("czynniki") or {}).items()
+                if isinstance(v, (int, float))
+            }} if b.get("czynniki") else {}),
             # kategorie typu — do diagnostyki per kategoria (Brier/log-loss)
             "matchup": bool(b.get("matchup")),
             "matchup_styl": bool(b.get("matchup_styl")),

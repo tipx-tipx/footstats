@@ -35,8 +35,8 @@ from ..engine import (
     MatchContext, PlayerHistory, RARE_MARKETS, apply_bias, score_player_market,
 )
 from ..model import (
-    betting, context, counts, koncesje, kupony, matchup, matchup_lite, styl,
-    tempo,
+    betting, context, counts, koncesje, kupony, matchup, matchup_lite,
+    profil_druzyn, styl, tempo,
 )
 from ..sources import eloratings, rotowire, scores365, sofascore, statshub, superbet
 from . import radar, rozliczanie
@@ -142,6 +142,9 @@ def _rozlicz_i_zapisz(
     print(f"Typy: {p['opublikowane']} w logu, {p['rozliczone']} rozliczonych, "
           f"{p['trafione']} trafionych, ROI flat {p['roi_flat']:+.2f} j.")
 PUBLIKACJE_KLUCZ = "publikacje_typy"
+# Profil drużyn (ile notują, ile dopuszczają) pamiętany między cyklami —
+# patrz `model/profil_druzyn.py` i użycie przy czynniku rywala.
+PROFIL_DRUZYN_KLUCZ = "druzyny_profil"
 
 
 def _klucz_publikacji(b: dict) -> str:
@@ -4367,7 +4370,61 @@ def _main_impl(tryb=None):
         # pary (mecz, drużyna, rynek), więc nic nie nadpisujemy.
         z_performance: Counter = Counter()
         cache_hist: dict[int, dict] = {}
+        _perf_rekordy: dict[int, list] = {}
         budzet_tp = [MAX_TEAM_PERF_CYKL]
+
+        def _perf(tid: int) -> list:
+            """Surowa historia drużyny, pobrana RAZ na cykl i dzielona przez
+            oba zastosowania: własne statystyki i profil rywala."""
+            tid = int(tid)
+            if tid not in _perf_rekordy:
+                if budzet_tp[0] <= 0:
+                    return []
+                budzet_tp[0] -= 1
+                _perf_rekordy[tid] = statshub.fetch_team_performance(tid)
+            return _perf_rekordy[tid]
+
+        # PROFIL DRUŻYNY PAMIĘTANY MIĘDZY CYKLAMI (2026-08-07).
+        #
+        # Ile drużyna NOTUJE i ile DOPUSZCZA — z `opponentStatistics`, które
+        # feed niesie w każdym rekordzie historii. To domyka dziurę: czynnik
+        # rywala braliśmy z `recentGames` feedu propsów, czyli z lustra oferty
+        # bukmacherów UK, więc dla Ekstraklasy, kwalifikacji i części Ameryki
+        # Południowej wychodził 1,00 (zmierzone 07.08: komplet czynników miało
+        # 18 ze 134 kandydatów).
+        #
+        # DLACZEGO PAMIĘTANY, A NIE LICZONY CO CYKL: pierwsza wersja pytała
+        # o historię przy każdym przebiegu i wydłużyła dry-run z ~15 do ~23
+        # minut przy twardym limicie 35. Profil starzeje się wolno (drużyny
+        # grają co 3–7 dni), więc odświeżamy najwyżej raz na dobę — to ścina
+        # ~95% zapytań wobec pytania w każdym cyklu, a cykl czyta gotowe liczby.
+        _profil_raw, _profil_ok = supa.get_key_ok(PROFIL_DRUZYN_KLUCZ)
+        _profil_mag = [_profil_raw or {}]
+        _profil_licz = Counter()
+
+        def _profil_druzyny(tid) -> dict | None:
+            """Profil drużyny: z pamięci, a gdy stary — odświeżony z feedu."""
+            if not tid:
+                return None
+            p = profil_druzyn.pobierz(_profil_mag[0], tid)
+            if not profil_druzyn.wymaga_odswiezenia(p, now_t):
+                _profil_licz["z_pamieci"] += 1
+                return p
+            rek = _perf(abs(int(tid)))
+            if not rek:
+                # budżet wyczerpany albo feed milczy — stary profil jest lepszy
+                # niż brak profilu, bo alternatywą jest czynnik rywala 1,00
+                _profil_licz["bez_odswiezenia"] += 1
+                return p
+            nowy = profil_druzyn.zbuduj(
+                abs(int(tid)), rek, now_t, statshub.TEAM_PERF_MAP
+            )
+            if not nowy:
+                _profil_licz["za_chuda_historia"] += 1
+                return p
+            _profil_mag[0] = profil_druzyn.scal(_profil_mag[0], tid, nowy)
+            _profil_licz["odswiezone"] += 1
+            return nowy
         for e in wszystkie_ev:
             if tryb and e["id"] not in tryb.druzynowe_mids:
                 continue
@@ -4387,11 +4444,11 @@ def _main_impl(tryb=None):
                 if not braki:
                     continue
                 if tid_e not in cache_hist:
-                    if budzet_tp[0] <= 0:
+                    rek_e = _perf(tid_e)
+                    if not rek_e:
                         continue
-                    budzet_tp[0] -= 1
                     cache_hist[tid_e] = statshub.historia_druzyny(
-                        int(tid_e), statshub.fetch_team_performance(int(tid_e))
+                        int(tid_e), rek_e
                     )
                 hist_e = cache_hist.get(tid_e) or {}
                 for mk_e in braki:
@@ -4470,6 +4527,11 @@ def _main_impl(tryb=None):
         # mecz co ~tydzień; 14 dni z koncesje.py jest strojone pod turniej
         # i zabiłoby próbę), do kalibracji po rozliczeniach cykli jak marża UK
         KONCESJE_FEED_TAU_DNI = 45.0
+
+        # ILE TYPÓW DOSTAŁO PROFIL RYWALA Z POMIARU, a nie z przybliżenia —
+        # licznik, bo do 07.08 brak kontekstu rywala wyglądał identycznie jak
+        # „rywal przeciętny" (czynnik 1,00) i nie zostawiał śladu.
+        _konc_zmierzone: Counter = Counter()
 
         def _konc_feed_srednia(kf: list[tuple[float, int]]) -> float:
             """Płaska średnia koncesji (do korekty historii — bez świeżości)."""
@@ -4651,6 +4713,27 @@ def _main_impl(tryb=None):
                 bool(spread_teamu is not None and spread_teamu > 0.15),
             )
             konc, konc_n = _koncesja_druzynowa(tt.opponent_name, pole)
+            # KONCESJE ZMIERZONE U ŹRÓDŁA (2026-08-07) — drugie w kolejności,
+            # przed feedem. Bank stylu zostaje pierwszy, bo jest zbudowany
+            # z meczów, które sami przeskanowaliśmy; ale tam, gdzie go nie ma,
+            # dotąd schodziliśmy na `recentGames` z feedu propsów, czyli na
+            # lustro oferty bukmacherów UK. Dla Ekstraklasy, kwalifikacji
+            # pucharów i części Ameryki Południowej tego lustra nie ma wcale
+            # i czynnik rywala wychodził 1,00 — zmierzone 07.08: komplet
+            # czynników miało 18 ze 134 kandydatów.
+            #
+            # `opponentStatistics` przychodzi w KAŻDYM rekordzie historii
+            # drużyny, w każdej lidze, i jest pomiarem, nie przybliżeniem.
+            # Zmierzone na 3018 obserwacjach: „ile rywal dopuszcza" to
+            # najsilniejsza pojedyncza zależność w każdym z pięciu rynków
+            # drużynowych, a dołożenie jej zmniejsza błąd o 5–15%.
+            if konc is None and tt.opponent_id:
+                km, km_n = profil_druzyn.wartosc(
+                    _profil_druzyny(tt.opponent_id), tt.market_code, "dopuszcza"
+                )
+                if km is not None:
+                    konc, konc_n = km, km_n
+                    _konc_zmierzone[tt.market_code] += 1
             if konc is None:
                 # koncesje z feedu: co drużyny notują przeciw temu rywalowi,
                 # ważone świeżością (mecz sprzed tygodnia > sprzed 3 miesięcy)
@@ -5352,6 +5435,34 @@ def _main_impl(tryb=None):
                   + (f"; odpadło: " + ", ".join(
                       f"{k}={v}" for k, v in odpadki_t.most_common())
                      if odpadki_t else ""))
+        if _konc_zmierzone:
+            print("Profil rywala ZMIERZONY (z historii, nie z przybliżenia): "
+                  + ", ".join(f"{k}={v}" for k, v
+                              in _konc_zmierzone.most_common()))
+        # ZAPIS PROFILU — te same zasady, co przy rejestrze publikacji:
+        # nieudany odczyt oznacza „nie zapisuj", bo garstka drużyn z tego cyklu
+        # nadpisałaby pamięć zbieraną tygodniami (patrz `supa.get_key_ok`).
+        # `put_key_bezpiecznie` byłoby tu złym narzędziem: przycinanie martwych
+        # drużyn z natury zmniejsza payload i bezpiecznik blokowałby zapis.
+        if _profil_licz:
+            print("Profil drużyn: "
+                  + ", ".join(f"{k}={v}" for k, v in _profil_licz.most_common())
+                  + f"; w pamięci {len((_profil_mag[0].get('druzyny') or {}))}")
+        if not _profil_ok:
+            print("UWAGA: odczyt profilu drużyn PADŁ — zapis pominięty, żeby "
+                  "nie nadpisać pamięci; czynnik rywala jedzie w tym cyklu "
+                  "ze źródeł zapasowych")
+        elif _profil_licz.get("odswiezone") and not _dry_run():
+            _profil_mag[0], _zeszlo_pd = profil_druzyn.przytnij(
+                _profil_mag[0], now_t
+            )
+            if _zeszlo_pd:
+                print(f"Profil drużyn: {_zeszlo_pd} drużyn zeszło z pamięci "
+                      f"(brak meczu od {profil_druzyn.ROTACJA_DNI:.0f} dni)")
+            if not supa.put_key(PROFIL_DRUZYN_KLUCZ, _profil_mag[0]):
+                print("UWAGA: zapis profilu drużyn NIE POWIÓDŁ SIĘ — następny "
+                      "cykl policzy te drużyny od nowa (koszt: zapytania, "
+                      "nie dane)")
     except Exception as e:
         print(f"Rynki drużynowe pominięte ({e})")
 
