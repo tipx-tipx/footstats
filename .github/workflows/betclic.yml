@@ -1,0 +1,54 @@
+name: FootStats — oferta Betclica
+
+# Osobne zadanie, które robi TYLKO jedno: pobiera oferty zawodnicze Betclica
+# i odkłada je do Supabase (klucz `betclic_oferty`). Główny cykl czyta gotowe.
+#
+# PO CO ODDZIELNIE: cykl ma twardy limit 35 minut i robi w nim wszystko, więc
+# Betclic dostawał ~3 minuty i zdążał pobrać 3 mecze z 60. Przy pamięci ważnej
+# dobę wpisy przepadały szybciej, niż je dobieraliśmy — pełne pokrycie było
+# nieosiągalne. Tutaj mamy własne 20 minut, czyli ~17 meczów na przebieg
+# i komplet po trzech-czterech uruchomieniach (~71 s na mecz, zmierzone 08.08).
+#
+# Awaria tego joba NIE dotyka produktu: cykl pracuje wtedy na ostatnim zapisie
+# albo bez Betclica, dokładnie jak przed jego wprowadzeniem.
+
+on:
+  schedule:
+    - cron: "25 * * * *"     # co godzinę, w połowie drogi między cyklami (UTC)
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+# WŁASNY group, NIE `footstats-cycle`. Ten job nie dotyka typy_log ani
+# kupony_log — pisze wyłącznie pod własny klucz, więc może biec równolegle
+# z cyklem. Blokowanie go razem z cyklem odbierałoby mu jedyną przewagę:
+# własny czas.
+concurrency:
+  group: footstats-betclic
+  cancel-in-progress: false
+
+jobs:
+  oferta:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalacja zależności
+        working-directory: pipeline
+        run: pip install -r requirements.txt
+
+      - name: Pobierz oferty Betclica do Supabase
+        working-directory: pipeline
+        env:
+          PYTHONIOENCODING: utf-8
+          PYTHONUTF8: "1"
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: python -m footstats.jobs.betclic_oferty

@@ -71,9 +71,18 @@ from .build_demo import MARKET_NAMES_PL, WEB_DATA_DIR, line_for_lambda
 #   2. wynik zapisujemy między cyklami (patrz BETCLIC_KLUCZ), więc kolejne
 #      przebiegi dobierają tylko brakujące mecze,
 #   3. kolejność po godzinie rozpoczęcia — najbliższe mecze pierwsze.
-# Pełne pokrycie buduje się w ten sposób przez 3–4 cykle, czyli ~4 godziny,
-# bez ani jednej sekundy ponad budżet.
-BUDZET_BETCLIC_TYPY_S = 180.0
+# ⚑ OD 2026-08-08 CYKL SAM NIC NIE POBIERA — czyta gotowe.
+#
+# Pobieranie przeniesione do osobnego zadania (`jobs/betclic_oferty.py` +
+# workflow „oferta Betclica"), bo w cyklu było nie do uratowania: 180 s budżetu
+# starczało na 3 mecze z 60, a pamięć wygasa po dobie, więc wpisy przepadały
+# szybciej, niż je dobieraliśmy. Osobny job ma własne 20 minut i domyka komplet
+# po trzech–czterech uruchomieniach.
+#
+# Zero, nie mała liczba: gdyby cykl dobierał „przy okazji", wracalibyśmy do
+# konkurowania o ten sam budżet, tylko ciszej. Zmienna środowiskowa zostaje
+# jako awaryjne wejście (np. do dry-runu z sieci).
+BUDZET_BETCLIC_TYPY_S = float(os.getenv("BETCLIC_BUDZET_CYKLU_S", "0"))
 # Oferta Betclica pamiętana MIĘDZY CYKLAMI: mecz -> {ts, players}.
 BETCLIC_KLUCZ = "betclic_oferty"
 # ⚑ POBIERAMY RAZ NA MECZ (decyzja usera 08.08: „kurs pobierany jednorazowo na
@@ -3876,7 +3885,12 @@ def _main_impl(tryb=None):
             _pamiec = dict(_pamiec_raw or {}) if _odczyt_ok else {}
             bc_cache = bc_z_pamieci(_kolejnosc_meczow, _pamiec, _teraz_bc)
             _z_pamieci = len(bc_cache)
-            _do_pobrania = bc_do_pobrania(_kolejnosc_meczow, bc_cache, sb_cache)
+            # przy budżecie 0 (domyślnie) cykl nie pobiera nic — oferta pochodzi
+            # w całości z osobnego joba, a ta lista służy już tylko do logu
+            _do_pobrania = (
+                bc_do_pobrania(_kolejnosc_meczow, bc_cache, sb_cache)
+                if BUDZET_BETCLIC_TYPY_S > 0 else []
+            )
             _n_bc = 0
             if _do_pobrania:
                 _pary_bc, _ = betclic.paruj_mecze([
