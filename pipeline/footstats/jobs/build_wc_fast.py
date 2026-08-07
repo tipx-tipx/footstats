@@ -38,15 +38,63 @@ from ..model import (
     betting, context, counts, koncesje, kupony, matchup, matchup_lite,
     profil_druzyn, styl, tempo,
 )
-from ..sources import eloratings, rotowire, scores365, sofascore, statshub, superbet
+from ..sources import (
+    betclic, eloratings, rotowire, scores365, sofascore, statshub, superbet,
+)
 from . import radar, rozliczanie
 from .build_demo import MARKET_NAMES_PL, WEB_DATA_DIR, line_for_lambda
 
-# KURSY GŁÓWNE: wyłącznie Superbet. STS blokuje IP serwerowni (chmura = źródło
-# prawdy, cron GitHub Actions), więc kursy STS w line-shoppingu powodowały
-# rozjazd danych między przebiegiem lokalnym a chmurowym (typy "znikały").
-# STS zostaje tylko jako adresat SUGESTII bez kursu (niecelne/zablokowane).
-# Wróci do kursów głównych, gdy pipeline pójdzie z domowego IP (telefon/Pi).
+# KURSY GŁÓWNE: Superbet i Betclic (drugi dołożony 2026-08-08, decyzja usera).
+# STS blokuje IP serwerowni (chmura = źródło prawdy, cron GitHub Actions), więc
+# kursy STS w line-shoppingu powodowały rozjazd danych między przebiegiem
+# lokalnym a chmurowym (typy „znikały"). STS zostaje tylko jako adresat
+# SUGESTII bez kursu (niecelne/zablokowane). Wróci do kursów głównych, gdy
+# pipeline pójdzie z domowego IP (telefon/Pi).
+#
+# DWA CENNIKI, JEDEN TYP: ten sam zakład u dwóch bukmacherów to jedna pozycja
+# na liście (klucz publikacji nie zna bukmachera), zagrana tam, gdzie płacą
+# więcej. Bukmacher jest zapisywany PRZY TYPIE — razem z trybem podatkowym —
+# więc historia wie, gdzie ten kurs był brany i da się to później rozliczyć
+# osobno dla każdego z nich.
+#
+# Ile sekund wolno zużyć na pobranie oferty Betclica w jednym przebiegu.
+#
+# ZMIERZONE 08.08, bo pierwsza wersja tego budżetu stała na złej liczbie:
+#   * `kursy_zawodnikow` meczu Z propsami:  ~71 s
+#   * meczu bez propsów:                    30–40 s (i tak zwraca zero)
+#   * `kalendarz()` do parowania:           ~150 s
+# Przy 140 meczach pełne pokrycie kosztowałoby 2,2 godziny — czyli JEST
+# NIEOSIĄGALNE w cyklu, który ma 8 minut zapasu. Zamiast tego trzy rzeczy:
+#   1. pytamy WYŁĄCZNIE o mecze, w których Superbet kwotuje zawodników
+#      (zmierzone: 70 ze 140, i rozkład jest zerojedynkowy — mecz ma albo 0
+#      propsów, albo od razu 20+),
+#   2. wynik zapisujemy między cyklami (patrz BETCLIC_KLUCZ), więc kolejne
+#      przebiegi dobierają tylko brakujące mecze,
+#   3. kolejność po godzinie rozpoczęcia — najbliższe mecze pierwsze.
+# Pełne pokrycie buduje się w ten sposób przez 3–4 cykle, czyli ~4 godziny,
+# bez ani jednej sekundy ponad budżet.
+BUDZET_BETCLIC_TYPY_S = 180.0
+# Oferta Betclica pamiętana MIĘDZY CYKLAMI: mecz -> {ts, players}.
+BETCLIC_KLUCZ = "betclic_oferty"
+# ⚑ POBIERAMY RAZ NA MECZ (decyzja usera 08.08: „kurs pobierany jednorazowo na
+# dany typ, nawet jak później się zmieni").
+#
+# Uzasadnienie jest mocniejsze, niż wygląda: cenę i tak ZAMRAŻAMY przy
+# publikacji typu — po niej rozlicza księga i ją user widzi na karcie. Kolejne
+# pobranie tego samego meczu nie poprawia więc ani jednego opublikowanego typu;
+# służyłoby wyłącznie łapaniu nowych okazji po ruchu kursu. Przy 71 s na mecz
+# ten sam budżet wydany na mecze JESZCZE NIEZNANE daje dużo więcej, a pełne
+# pokrycie robi się po dwóch–trzech cyklach zamiast nigdy.
+SWIEZOSC_BETCLIC_S = 24 * 3600
+# ...z JEDNYM wyjątkiem: mecz tuż przed gwizdkiem odświeżamy raz, choćby
+# oferta była zapamiętana. To okno, w którym user realnie stawia i w którym
+# znane są składy — a pokazanie ceny, której już nie ma, boli bardziej niż
+# brak typu. Meczów w takim oknie jest w cyklu kilka, więc kosztuje to 2–3
+# zapytania, nie budżet.
+OKNO_ODSWIEZENIA_BC_S = 6 * 3600
+# Ile meczów maksymalnie trzymamy w pamięci między cyklami (bezpiecznik
+# objętości klucza — jedna paczka to ~30 kB przy 60 kwotowanych zawodnikach).
+MAX_MECZOW_W_PAMIECI_BC = 80
 
 SH_BASE = "https://www.statshub.com/api"
 SH_HEADERS = {"Accept": "application/json", "Referer": "https://www.statshub.com/"}
@@ -651,6 +699,20 @@ LISTA_PER_PASMO = 6
 # niż źródło, a prawdziwym ograniczeniem jest podaż. Ten limit domyka wyłącznie
 # przypadek skrajny; zaostrzanie go skróciłoby listę, zamiast ją urozmaicić.
 LISTA_PER_RODZINA = 6
+# ...i JEDEN TYP NA ZAWODNIKA W DNIU (2026-08-08, przy wpięciu oferty do
+# silnika; user: „żeby nie było kanibalizowania").
+#
+# Do tego dnia strumień zawodniczy jechał praktycznie na jednym rynku
+# (41 z 46 typów to strzały), więc pytanie nie powstawało. Po wpięciu oferty
+# ten sam zawodnik ma naraz strzały, celne, „zza pola", faule i odbiory —
+# a to są rzeczy SKORELOWANE: kto dużo uderza, ten uderza też celnie. Trzy
+# pozycje na Mbappé wyglądałyby jak trzy typy, a byłyby jednym zakładem
+# w trzech opakowaniach; przy limicie 20 pozycji na dzień zjadłyby miejsce
+# typom z innych meczów.
+#
+# DRUŻYN TO NIE DOTYCZY: „gole poniżej" i „rożne powyżej" tej samej drużyny
+# to naprawdę różne zdarzenia, a limit meczu (2) i tak je ogranicza.
+LISTA_PER_ZAWODNIKA = 1
 
 
 def _rodzina_statystyki(kod) -> str:
@@ -710,6 +772,7 @@ def wybierz_liste_publikowana(
     z_pasma: dict = {}
     z_rodziny: dict = {}
     z_dnia: dict = {}
+    z_zawodnika: dict = {}
     lista_pub: list[dict] = []
     zdjete: dict = {}
     for b in sorted(kandydaci, key=klucz_sortowania, reverse=True):
@@ -728,12 +791,20 @@ def wybierz_liste_publikowana(
         rynek = (dzien, b.get("rynek_kod"), b.get("strona"))
         pasmo = (dzien, _pasmo_kursu(b.get("kurs")))
         rodzina = (dzien, _rodzina_statystyki(b.get("rynek_kod")))
+        # jeden typ na ZAWODNIKA w dniu (patrz LISTA_PER_ZAWODNIKA); drużyny
+        # zostają poza tym licznikiem — u nich rynki nie są tak skorelowane
+        zawodnik = (
+            (dzien, rotowire._norm(str(b.get("podmiot") or "")))
+            if b.get("podmiot_typ") == "zawodnik" else None
+        )
         if not b.get("wznowiony"):
             if (z_dnia.get(dzien, 0) >= LISTA_CAP
                     or z_meczu.get(mecz, 0) >= LISTA_PER_MECZ
                     or z_rynku.get(rynek, 0) >= LISTA_PER_RYNEK
                     or z_pasma.get(pasmo, 0) >= LISTA_PER_PASMO
-                    or z_rodziny.get(rodzina, 0) >= LISTA_PER_RODZINA):
+                    or z_rodziny.get(rodzina, 0) >= LISTA_PER_RODZINA
+                    or (zawodnik is not None
+                        and z_zawodnika.get(zawodnik, 0) >= LISTA_PER_ZAWODNIKA)):
                 zdjete.setdefault(_klucz_publikacji(b), "poza_lista_dnia")
                 continue
         z_dnia[dzien] = z_dnia.get(dzien, 0) + 1
@@ -741,6 +812,8 @@ def wybierz_liste_publikowana(
         z_rynku[rynek] = z_rynku.get(rynek, 0) + 1
         z_pasma[pasmo] = z_pasma.get(pasmo, 0) + 1
         z_rodziny[rodzina] = z_rodziny.get(rodzina, 0) + 1
+        if zawodnik is not None:
+            z_zawodnika[zawodnik] = z_zawodnika.get(zawodnik, 0) + 1
         lista_pub.append(b)
     return lista_pub, zdjete, z_dnia
 
@@ -1329,6 +1402,126 @@ def _trend_z_kontekstem_meczu(swiezy, bazowy, mid: int):
         return None
 
 
+def bc_z_pamieci(
+    kolejnosc: dict[int, int], pamiec: dict, teraz: int,
+    swiezosc_s: int = SWIEZOSC_BETCLIC_S,
+    okno_odswiezenia_s: int = OKNO_ODSWIEZENIA_BC_S,
+) -> dict[int, dict]:
+    """Oferty Betclica zapamiętane w poprzednich cyklach, wciąż ważne.
+
+    Zasada: POBIERAMY RAZ NA MECZ (patrz SWIEZOSC_BETCLIC_S) — cena i tak jest
+    zamrażana przy publikacji typu, więc ponowne pytanie o ten sam mecz niczego
+    nie poprawia, a kosztuje 71 sekund, które lepiej wydać na mecz nieznany.
+
+    Wyjątkiem jest mecz TUŻ PRZED GWIZDKIEM: tam odświeżamy raz, bo to okno,
+    w którym user realnie stawia — a pokazanie ceny, której już nie ma, jest
+    gorsze niż brak typu.
+
+    Klucze pamięci są tekstowe (JSON), a mecze liczbowe — stąd konwersja
+    w jednym miejscu zamiast w trzech.
+    """
+    out: dict[int, dict] = {}
+    for mid, kickoff in kolejnosc.items():
+        zap = (pamiec or {}).get(str(mid))
+        if not zap or not zap.get("players"):
+            continue
+        zapisano = int(zap.get("ts") or 0)
+        if teraz - zapisano > swiezosc_s:
+            continue
+        # mecz wszedł w okno przedmeczowe PO tym, jak zapamiętaliśmy ofertę
+        do_gwizdka = int(kickoff or 0) - teraz
+        if 0 < do_gwizdka <= okno_odswiezenia_s and zapisano < int(kickoff) - okno_odswiezenia_s:
+            continue
+        # `ts` jedzie razem z ofertą, bo typ z tej ceny musi zapisać, KIEDY ją
+        # widzieliśmy — przy ofercie pamiętanej do doby „kurs_ts = teraz" byłby
+        # po prostu nieprawdą (patrz `kurs_ts` w rozliczaniu)
+        out[mid] = {"players": zap["players"], "ts": zapisano}
+    return out
+
+
+def bc_do_pobrania(
+    kolejnosc: dict[int, int], juz_mamy: dict[int, dict], sb_cache: dict,
+) -> list[tuple[int, int]]:
+    """Mecze, o które WARTO zapytać Betclica — najbliższe pierwsze.
+
+    Dwa odsiewy, oba zmierzone 08.08:
+      * mecz już w pamięci nie potrzebuje zapytania,
+      * mecz, w którym Superbet nie kwotuje ANI JEDNEGO zawodnika, prawie na
+        pewno nie ma propsów też u Betclica (rozkład jest zerojedynkowy: 70 ze
+        140 meczów ma 0, reszta od razu 20+). Takie zapytanie kosztuje 30–40 s
+        i zwraca zero — to była połowa spalonego budżetu.
+    """
+    do_pobrania = [
+        (mid, ts) for mid, ts in kolejnosc.items()
+        if mid not in juz_mamy
+        and len(((sb_cache or {}).get(mid) or {}).get("players") or {}) > 0
+    ]
+    do_pobrania.sort(key=lambda kv: kv[1])
+    return do_pobrania
+
+
+def bc_rotuj_pamiec(
+    pamiec: dict, kolejnosc: dict[int, int], teraz: int,
+    maks: int = MAX_MECZOW_W_PAMIECI_BC,
+) -> dict:
+    """Wyrzuć z pamięci mecze po gwizdku i wpisy starsze niż doba.
+
+    Mecz spoza `kolejnosc` (czyli spoza bieżącego zakresu cyklu) ZOSTAJE,
+    dopóki jest świeży — zakres bywa węższy w pojedynczym przebiegu, a
+    kasowanie takich wpisów kazałoby pobierać je od nowa.
+    """
+    zywe = {
+        k: v for k, v in (pamiec or {}).items()
+        if teraz - int((v or {}).get("ts") or 0) < 86400
+        and kolejnosc.get(_int_lub_zero(k), teraz + 1) > teraz
+    }
+    if len(zywe) <= maks:
+        return zywe
+    return dict(sorted(
+        zywe.items(), key=lambda kv: -int((kv[1] or {}).get("ts") or 0)
+    )[:maks])
+
+
+def _int_lub_zero(x) -> int:
+    try:
+        return int(x)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _scal_oferty_zawodnika(sb_rec: dict, bc_rec: dict) -> dict:
+    """Oferty dwóch bukmacherów na jednego zawodnika w jeden słownik rynków.
+
+    Kształt obu jest identyczny (`{rynek: {linia: {strona: kurs}}}`), więc
+    scalanie jest sumą — z jednym wyjątkiem: gdy obaj kwotują TĘ SAMĄ linię,
+    zostaje WYŻSZY kurs, bo to on jest do wzięcia (decyzja usera 08.08:
+    „stawiać będziemy tam, gdzie wyższy").
+
+    Uwaga na później: ta struktura nie niesie nazwy bukmachera, więc służy
+    wyłącznie do ustalenia, JAKIE rynki i linie w ogóle istnieją (dociąganie
+    historii, siatka pokryć). Typ dostaje bukmachera osobno, w pętli scoringu,
+    gdzie kurs i jego źródło idą parą.
+    """
+    if not bc_rec:
+        return sb_rec or {}
+    if not sb_rec:
+        return bc_rec
+    out: dict = {mk: {l: dict(s) for l, s in linie.items()}
+                 for mk, linie in sb_rec.items()}
+    for mk, linie in bc_rec.items():
+        cel = out.setdefault(mk, {})
+        for l, strony in (linie or {}).items():
+            slot = cel.setdefault(l, {})
+            for strona, kurs in (strony or {}).items():
+                try:
+                    k = float(kurs)
+                except (TypeError, ValueError):
+                    continue
+                if slot.get(strona) is None or k > float(slot[strona]):
+                    slot[strona] = k
+    return out
+
+
 def dopelnij_oferte_zawodnicza(
     gracze_meczu: dict[int, dict[int, object]],
     sb_cache: dict[int, dict],
@@ -1340,6 +1533,7 @@ def dopelnij_oferte_zawodnicza(
     fetch_performance=None,
     trendy_z_performance=None,
     trends_out: list | None = None,
+    oferty_extra: dict[int, dict] | None = None,
 ) -> tuple[int, int]:
     """Zakładka meczu ma pokazywać KURSY + wszystkie nasze statystyki
     indywidualne, które da się na ten mecz obstawić.
@@ -1398,10 +1592,18 @@ def dopelnij_oferte_zawodnicza(
     )
     for mid, gracze in mecze:
         sb_players = (sb_cache.get(mid) or {}).get("players") or {}
-        if not sb_players:
+        bc_players = ((oferty_extra or {}).get(mid) or {}).get("players") or {}
+        if not sb_players and not bc_players:
             continue   # bukmacher nie kwotuje zawodników — strona to mówi wprost
         for pid, tr in gracze.items():
-            rec = superbet.znajdz_zawodnika(sb_players, tr.player_name)
+            # OFERTA = SUMA OBU CENNIKÓW (2026-08-08). Rynki rozchodzą się
+            # mocno: „zza pola" i odbiory Superbet kwotuje śladowo, a Betclic
+            # normalnie — i to na nich stoją wzorcowe typy usera.
+            rec = _scal_oferty_zawodnika(
+                superbet.znajdz_zawodnika(sb_players, tr.player_name),
+                betclic.znajdz_zawodnika(bc_players, tr.player_name)
+                if bc_players else {},
+            )
             if not rec:
                 bez_pary.append(tr.player_name)
                 continue
@@ -3560,6 +3762,181 @@ def _main_impl(tryb=None):
     # Klucz sts_model jest backendowy (apka go nie czyta).
     model_pokrycie: list[dict] = []
 
+    # --- OFERTA BUKMACHERA JAKO PUNKT WYJŚCIA DLA SILNIKA (2026-08-08) ---
+    #
+    # Do dziś historia dociągana pod ofertę Superbetu szła WYŁĄCZNIE do
+    # `players_out["forma"]` i do siatki kursów, czyli zasilała tabelę pokryć
+    # i drabinki, a typu z niej nie powstawało nigdy. Skutek zmierzony 07.08:
+    # z 46 typów zawodniczych z trzech dni **41 to zwykłe strzały**, a odbiorów,
+    # celnych, „zza pola" i spalonych nie było ANI JEDNEGO — mimo że kursy
+    # i historia leżały w ręku ([[strumien-zawodniczy-martwy]]).
+    #
+    # Powód był czysto techniczny: silnik iteruje po `trends`, a dociągnięte
+    # rynki lądowały w innym worku. Dlatego dopełnienie musi wykonać się TU —
+    # przed pętlą scoringu — żeby jego trendy przeszły przez te same bramy,
+    # kalibrację i kwarantanny co reszta. Wymaga to wcześniejszego pobrania
+    # oferty (`sb_cache`), która dotąd powstawała w trakcie pętli.
+    # znacznik czasu tego przebiegu — wiek ceny liczymy od niego, a nie od
+    # `time.time()` w środku pętli, żeby wszystkie typy jednego cyklu miały
+    # spójny stempel (patrz `kurs_ts` przy okazji)
+    ts_cyklu = int(time.time())
+    ev_by_para = {
+        frozenset({e.get("homeTeamId"), e.get("awayTeamId")}): e
+        for e in events
+    }
+
+    def _mecz_trendu(tr_x):
+        """Mecz zawodnika po jego drużynie i przeciwniku (indeks zamiast
+        skanowania listy `events` dla każdego trendu z osobna)."""
+        return ev_by_para.get(frozenset({tr_x.team_id, tr_x.opponent_id}))
+
+    def _oferta_meczu(mid_o: int, home_o: str, away_o: str, ts_o: int) -> dict:
+        """Kursy Superbetu dla meczu, z cache i pomiarem tempa.
+
+        Wyjęte z pętli scoringu bez zmiany zachowania: to ten sam kod, który
+        wcześniej stał przy pierwszym trendzie danego meczu.
+        """
+        sb_o = sb_cache.get(mid_o)
+        if sb_o is not None or not sb_events:
+            return sb_o or {"players": {}, "teams": {}}
+        if tryb:
+            sb_ev = tryb.sb_ev_by_mid.get(mid_o)
+        else:
+            sb_ev = superbet.match_superbet_event(
+                sb_events, home_o, away_o, ts_o
+            )
+        if sb_ev:
+            parts = [p.strip() for p in (sb_ev.get("matchName") or "·").split("·")]
+            try:
+                sb_o = superbet.fetch_stat_odds(
+                    sb_ev["eventId"], parts[0], parts[1]
+                )
+            except Exception:
+                sb_o = {"players": {}, "teams": {}}
+        else:
+            sb_o = {"players": {}, "teams": {}}
+        sb_cache[mid_o] = sb_o
+        tempo_m = tempo.tempo_from_match_odds(sb_o.get("match"))
+        tempo_cache[mid_o] = tempo_m
+        return sb_o
+
+    _kolejnosc_meczow: dict[int, int] = {}
+    for _tr in trends:
+        _ev = _mecz_trendu(_tr)
+        if _ev is None:
+            continue
+        _mid = _ev["id"]
+        _ts = _ev.get("timeStartTimestamp") or int(time.time())
+        _kolejnosc_meczow[_mid] = _ts
+        # zawodnicy meczu: pierwszy trend danego gracza niesie kontekst
+        # (rywal, dom/wyjazd) — z niego korzysta `_trend_z_kontekstem_meczu`
+        gracze_meczu.setdefault(_mid, {}).setdefault(_tr.player_id, _tr)
+        # rekord zawodnika z formą rynków, które przyszły z feedu propsów —
+        # `dopelnij_oferte_zawodnicza` dokłada do niego BRAKUJĄCE rynki oferty
+        rec_p = players_out.setdefault(_tr.player_id, {
+            "id": _tr.player_id, "nazwa": _tr.player_name,
+            "pozycja": _tr.position or "?", "druzyna": _tr.team_name,
+            "minuty_lacznie": int(sum(_tr.minutes)), "forma": {},
+            "xi": bool(_tr.in_predicted_lineup),
+        })
+        if _tr.in_predicted_lineup:
+            rec_p["xi"] = True
+        rec_p["forma"].setdefault(_tr.market_code, _forma_z_trendu(_tr, _tr.market_code))
+    for _mid, _ts in sorted(_kolejnosc_meczow.items(), key=lambda kv: kv[1]):
+        _ev = ev_by_id.get(_mid) or {}
+        _oferta_meczu(
+            _mid,
+            team_name.get(_ev.get("homeTeamId"), ""),
+            team_name.get(_ev.get("awayTeamId"), ""),
+            _ts,
+        )
+    # --- DRUGI BUKMACHER JAKO ŹRÓDŁO OFERT (2026-08-08, decyzja usera) ---
+    #
+    # Do dziś Betclic dawał WYŁĄCZNIE drugą cenę na kartach drabinek. A oferty
+    # obu bukmacherów nie pokrywają się ani trochę: zmierzone 08.08 na żywej
+    # siatce Superbetu — „zza pola" ma 2 zawodników, odbiory 73, przy 1756 na
+    # zwykłych strzałach. Tymczasem wzorcowe typy, które user wkleił (Igbekeme,
+    # Hellebrand, Lokilo, Yamal — wszystko „zza pola"; Paredes i Anderson —
+    # odbiory), stoją właśnie na tych rynkach i wszystkie u Betclica.
+    #
+    # ZASADA (user): model ocenia, czy zdarzenie wejdzie; bukmacher to miejsce,
+    # gdzie stawiamy, więc wybieramy tego, który płaci więcej. Jeden typ, przy
+    # nim napisane, u kogo grać — `merged` w pętli scoringu bierze wyższy kurs
+    # i zapamiętuje jego źródło.
+    bc_cache: dict[int, dict] = {}
+    if not _dry_run() or os.getenv("BETCLIC_W_DRYRUN"):
+        try:
+            _teraz_bc = int(time.time())
+            # PAMIĘĆ MIĘDZY CYKLAMI — bez niej pełne pokrycie jest nieosiągalne
+            # (patrz nota przy BUDZET_BETCLIC_TYPY_S). Padnięty odczyt traktujemy
+            # jak pustą pamięć, ale wtedy NIE zapisujemy z powrotem — inaczej
+            # jeden timeout Supabase kasowałby dorobek kilku cykli
+            # ([[supabase-read-modify-write]]).
+            _pamiec_raw, _odczyt_ok = supa.get_key_ok(BETCLIC_KLUCZ)
+            _pamiec = dict(_pamiec_raw or {}) if _odczyt_ok else {}
+            bc_cache = bc_z_pamieci(_kolejnosc_meczow, _pamiec, _teraz_bc)
+            _z_pamieci = len(bc_cache)
+            _do_pobrania = bc_do_pobrania(_kolejnosc_meczow, bc_cache, sb_cache)
+            _n_bc = 0
+            if _do_pobrania:
+                _pary_bc, _ = betclic.paruj_mecze([
+                    {"klucz": _mid,
+                     "home": team_name.get((ev_by_id.get(_mid) or {}).get("homeTeamId"), ""),
+                     "away": team_name.get((ev_by_id.get(_mid) or {}).get("awayTeamId"), ""),
+                     "kickoff_ts": _ts}
+                    for _mid, _ts in _do_pobrania
+                ])
+                _start_bc = time.time()
+                for _mid, _ts in _do_pobrania:
+                    _bc = _pary_bc.get(_mid)
+                    if not _bc:
+                        continue
+                    if time.time() - _start_bc > BUDZET_BETCLIC_TYPY_S:
+                        print(f"Betclic: budżet czasu wyczerpany po {_n_bc} "
+                              f"meczach (zostaje {len(_do_pobrania) - _n_bc} "
+                              "na następny cykl)")
+                        break
+                    try:
+                        _paczka = betclic.kursy_zawodnikow(int(_bc["id"]))
+                    except (RuntimeError, OSError, ValueError) as e:
+                        diagnostyka.cichy("betclic", "kursy_zawodnikow", e)
+                        continue
+                    _n_bc += 1
+                    if _paczka.get("players"):
+                        bc_cache[_mid] = {
+                            "players": _paczka["players"], "ts": _teraz_bc,
+                        }
+                        _pamiec[str(_mid)] = {
+                            "ts": _teraz_bc, "players": _paczka["players"],
+                        }
+            _pamiec = bc_rotuj_pamiec(_pamiec, _kolejnosc_meczow, _teraz_bc)
+            if bc_cache:
+                print(f"Betclic jako źródło ofert: {len(bc_cache)} meczów "
+                      f"(z pamięci {_z_pamieci}, pobrane {_n_bc}), "
+                      f"{sum(len(p.get('players') or {}) for p in bc_cache.values())} "
+                      "kwotowanych zawodników")
+            if _odczyt_ok and _pamiec and not _dry_run():
+                supa.put_key_bezpiecznie(BETCLIC_KLUCZ, _pamiec)
+        except Exception as e:
+            bc_cache = {}
+            print(f"Betclic niedostępny jako źródło ofert ({e})")
+
+    trendy_z_oferty: list = []
+    try:
+        dopelnij_oferte_zawodnicza(
+            gracze_meczu, sb_cache, players_out, odds_grid, _forma_z_trendu,
+            kolejnosc=_kolejnosc_meczow,
+            trends_out=trendy_z_oferty,
+            oferty_extra=bc_cache,
+        )
+    except Exception as e:
+        # oferta to DODATEK do feedu propsów — jej awaria nie ma prawa
+        # zatrzymać cyklu, który i tak policzy typy ze zwykłych trendów
+        trendy_z_oferty = []
+        print(f"Oferta zawodnicza — dopełnienie padło ({e})")
+    if trendy_z_oferty:
+        trends = list(trends) + trendy_z_oferty
+
     for tr in trends:
         if (tr.player_id, tr.market_code) in seen_player_market:
             continue
@@ -3611,31 +3988,11 @@ def _main_impl(tryb=None):
                 ),
             }
 
-        # kursy Superbetu dla meczu — POBIERANE PRZED scoringiem, bo tempo
-        # meczu (1X2 + total goli) wchodzi do kontekstu predykcji
-        sb_odds = sb_cache.get(mid)
-        if sb_odds is None and sb_events:
-            if tryb:
-                # parowanie klubów zrobił build_league (nazwy + okno czasu)
-                sb_ev = tryb.sb_ev_by_mid.get(mid)
-            else:
-                sb_ev = superbet.match_superbet_event(
-                    sb_events, home_name, away_name, ts
-                )
-            if sb_ev:
-                parts = [p.strip() for p in (sb_ev.get("matchName") or "·").split("·")]
-                try:
-                    sb_odds = superbet.fetch_stat_odds(sb_ev["eventId"], parts[0], parts[1])
-                except Exception:
-                    sb_odds = {"players": {}, "teams": {}}
-            else:
-                sb_odds = {"players": {}, "teams": {}}
-            sb_cache[mid] = sb_odds
-            tempo_m = tempo.tempo_from_match_odds(sb_odds.get("match"))
-            tempo_cache[mid] = tempo_m
-            if tempo_m:
-                print(f"  tempo {match_label}: spread {tempo_m['spread']:+.2f}, "
-                      f"gole {tempo_m['total']:.2f}")
+        # kursy Superbetu dla meczu — pobrane PRZED pętlą (patrz pre-pass oferty
+        # wyżej), bo z nich powstają trendy dokładane do silnika. Tu już tylko
+        # odczyt z cache; `_oferta_meczu` dociąga wyłącznie mecz, który z jakiegoś
+        # powodu ominął pre-pass.
+        sb_odds = _oferta_meczu(mid, home_name, away_name, ts)
 
         # ILU ZAWODNIKÓW TEGO MECZU SUPERBET W OGÓLE KWOTUJE.
         # Strona meczu musi odróżnić "bukmacher nie wystawia propsów" (Leagues
@@ -3781,14 +4138,27 @@ def _main_impl(tryb=None):
                 sb_odds.get("players", {}), tr.player_name
             ).get(mk, {})
 
-        # kursy: linia -> strona -> (kurs, bukmacher) — tylko Superbet (patrz nota u góry)
+        # kursy Betclica dla tego samego zawodnika i rynku (drugie źródło ofert
+        # od 2026-08-08 — patrz nota u góry pliku)
+        bc_lines = {}
+        bc_odds = bc_cache.get(mid) or {}
+        if bc_odds:
+            bc_lines = betclic.znajdz_zawodnika(
+                bc_odds.get("players") or {}, tr.player_name
+            ).get(mk, {})
+
+        # kursy: linia -> strona -> (kurs, bukmacher). Gdy obaj kwotują tę samą
+        # linię, zostaje WYŻSZY — ten sam zakład za więcej pieniędzy. Nazwa
+        # bukmachera jedzie razem z kursem, więc typ zawsze wie (i pokazuje),
+        # gdzie ta cena była do wzięcia.
         merged: dict = {}
-        for l, v in sb_lines.items():
-            slot = merged.setdefault(l, {})
-            for side in ("over", "under"):
-                odd = v.get(side)
-                if odd and (side not in slot or odd > slot[side][0]):
-                    slot[side] = (odd, "Superbet")
+        for zrodlo, linie_z in (("Superbet", sb_lines), ("Betclic", bc_lines)):
+            for l, v in (linie_z or {}).items():
+                slot = merged.setdefault(l, {})
+                for side in ("over", "under"):
+                    odd = (v or {}).get(side)
+                    if odd and (side not in slot or odd > slot[side][0]):
+                        slot[side] = (odd, zrodlo)
 
         # siatka kursów Superbet (over) do TOP POKRYCIA — wszystkie linie danego
         # zawodnika/rynku, keyed po player_id (players.json nie ma mecz_id)
@@ -4115,6 +4485,15 @@ def _main_impl(tryb=None):
                 "linia": l, "strona": a.side,
                 "kurs": kurs_wziety,
                 "bukmacher": book,
+                # KIEDY TĘ CENĘ WIDZIELIŚMY. Superbet pobieramy co cykl, więc
+                # jego kurs jest sprzed minut; oferta Betclica jest pamiętana
+                # (patrz SWIEZOSC_BETCLIC_S) i bywa sprzed godzin. Bez tego
+                # stempla front nie miałby jak uczciwie powiedzieć, że cena
+                # mogła się od tego czasu ruszyć.
+                "kurs_ts": (
+                    int((bc_odds or {}).get("ts") or ts_cyklu)
+                    if book == "Betclic" else ts_cyklu
+                ),
                 "kurs_ref": kurs_ref,
                 "kurs_novig": kurs_novig, "ev_uk": ev_uk,
                 "p_model": a.model_prob, "p_rynku": a.implied_prob,
@@ -4159,16 +4538,12 @@ def _main_impl(tryb=None):
                 value_bets.append(rec_okazji)
                 matches_out[mid]["okazje"].append(vb_id)
 
-    # --- OFERTA ZAWODNICZA MECZU: kursy + wszystkie statystyki, które da się
-    # na ten mecz obstawić (zgłoszenie usera 2026-08-03). Feed propsów bywa
-    # znacznie węższy od oferty bukmachera, więc brakującą historię dociągamy
-    # z danych meczowych statshuba. Szczegóły w dopelnij_oferte_zawodnicza().
-    dopelnij_oferte_zawodnicza(
-        gracze_meczu, sb_cache, players_out, odds_grid, _forma_z_trendu,
-        kolejnosc={
-            mid: int(m.get("kickoff_ts") or 0) for mid, m in matches_out.items()
-        },
-    )
+    # --- OFERTA ZAWODNICZA MECZU: wykonana PRZED pętlą scoringu (2026-08-08).
+    # Dawniej stała tutaj i przez to jej rynki mogły zasilić tabelę pokryć oraz
+    # drabinki, ale nigdy nie stawały się typem — pętla, która robi typy, była
+    # już za nami. Drugiego wywołania NIE MA celowo: budżet zapytań do
+    # `/player/{id}/performance` jest wspólny na cykl, a powtórka kosztowałaby
+    # go dwa razy przy zerowym zysku (forma jest już uzupełniona).
 
     # --- SUGESTIE bez kursów: niecelne / zablokowane (rynki STS, blokowany w chmurze) ---
     # WYŁĄCZNIE z prawdziwej historii per strzał z 365Scores (real_split —
@@ -6106,6 +6481,10 @@ def _main_impl(tryb=None):
                 korekta_strumieni.get("drabinki")
             ),
             # ...i pomiar progu pokrycia: szczeble tuż pod nim, do rozliczenia
+            # oferta drugiego bukmachera, pobrana raz w tym cyklu — pozwala
+            # dopiąć drugą cenę PRZED selekcją kart (różnica jako przepustka)
+            # i oszczędza powtórne zapytania
+            bc_cache=bc_cache,
             # w tle (patrz radar.NEAR_POKRYCIA)
             pomiar_out=pomiar_drabinek,
         )

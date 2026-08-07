@@ -50,6 +50,14 @@ export interface ValueBet {
   strona: Strona;
   kurs: number | null;          // null dla sugestii (rynek STS – sprawdź ręcznie)
   bukmacher: string;
+  /**
+   * KIEDY WIDZIELIŚMY TĘ CENĘ (unix). Kurs Superbetu pobieramy co cykl, więc
+   * jest sprzed minut; oferta Betclica jest pamiętana między cyklami (raz na
+   * mecz, patrz build_wc_fast.SWIEZOSC_BETCLIC_S) i bywa sprzed godzin.
+   * Karta mówi o tym wprost, gdy cena się zestarzała – lepiej uprzedzić, niż
+   * pokazać kurs, którego u bukmachera już nie ma.
+   */
+  kurs_ts?: number | null;
   /** mediana kursów bukmacherów UK (Bet365, WH...) dla tej linii – konsensus rynku */
   kurs_ref?: number | null;
   /** uczciwy kurs UK po zdjęciu marży (no-vig) – benchmark „prawdziwej" ceny */

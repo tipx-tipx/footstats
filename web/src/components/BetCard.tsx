@@ -251,6 +251,25 @@ function sygnalyTypu(
       }
     }
   }
+  // WIEK CENY (2026-08-08). Kurs zapisujemy w chwili, gdy typ trafia na listę,
+  // i po nim rozlicza księga – ale u bukmachera mógł się od tego czasu ruszyć.
+  // Ofertę drugiego bukmachera pobieramy raz na mecz (decyzja usera: „kurs
+  // pobierany jednorazowo, nawet jak później się zmieni"), więc bywa sprzed
+  // godzin. Milczenie o tym byłoby najgorszym wyjściem: user zobaczyłby cenę,
+  // której nie dostanie, i to wygląda na oszustwo, a nie na nieaktualność.
+  // Próg dwóch godzin, żeby nie zawracać głowy przy każdym świeżym typie.
+  if (!bet.sugestia && bet.kurs != null && bet.kurs_ts != null) {
+    const godzin = Math.floor((Date.now() / 1000 - bet.kurs_ts) / 3600);
+    if (godzin >= 2) {
+      s.push({
+        id: "wiek-ceny",
+        znak: "◷",
+        label: `cena sprawdzona ${godzin} h temu`,
+        ton: "cichy",
+        opis: `Ten kurs widzieliśmy ${godzin} godz. temu u ${bet.bukmacher || "bukmachera"} i po nim liczymy wynik. Do gwizdka mógł się lekko zmienić – sprawdź go przed zagraniem.`,
+      });
+    }
+  }
   const maUk = s.some((x) => x.id.includes("vs UK") || x.id === "odstaje od rynku");
   if (!bet.sugestia && bet.kurs_ref != null && !maUk) {
     s.push({

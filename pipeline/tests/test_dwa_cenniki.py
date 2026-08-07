@@ -1,0 +1,60 @@
+"""Dwa cenniki, jeden typ — Superbet i Betclic jako równorzędne źródła ofert.
+
+Decyzja usera 2026-08-08: „bierzemy pod uwagę i Betclic, i Superbet, tylko musi
+być jasno napisane, jaki bukmacher" oraz „stawiać będziemy tam, gdzie wyższy
+[kurs]". Powód jest w podaży: zmierzone tego dnia na żywej siatce Superbetu —
+„zza pola" ma 2 zawodników, odbiory 73, przy 1756 na zwykłych strzałach.
+Wzorcowe typy, które user wkleił (Igbekeme, Hellebrand, Lokilo, Yamal — „zza
+pola"; Paredes, Anderson — odbiory), stoją właśnie na tych rynkach i wszystkie
+u Betclica.
+"""
+from footstats.jobs import build_wc_fast as B
+from footstats.model import betting
+
+
+def test_scalanie_sumuje_rynki_obu_bukmacherow():
+    """Rynek kwotowany tylko przez jednego z nich ma zostać w ofercie —
+    inaczej odbiory i „zza pola" przepadają, bo Superbet ich nie wystawia."""
+    sb = {"shots": {1.5: {"over": 1.80}}}
+    bc = {"tackles": {1.5: {"over": 2.10}},
+          "shots_outside_box": {0.5: {"over": 1.95}}}
+    out = B._scal_oferty_zawodnika(sb, bc)
+    assert set(out) == {"shots", "tackles", "shots_outside_box"}
+
+
+def test_przy_wspolnej_linii_zostaje_wyzszy_kurs():
+    """Ten sam zakład za więcej pieniędzy — decyzja usera."""
+    sb = {"sot": {1.5: {"over": 1.72}}}
+    bc = {"sot": {1.5: {"over": 2.05}}}
+    assert B._scal_oferty_zawodnika(sb, bc)["sot"][1.5]["over"] == 2.05
+    # i w drugą stronę — kolejność argumentów nie może decydować
+    assert B._scal_oferty_zawodnika(bc, sb)["sot"][1.5]["over"] == 2.05
+
+
+def test_scalanie_nie_psuje_zrodla():
+    """Wejście ma zostać nietknięte — cache Superbetu jest współdzielony
+    przez cały cykl (scoring, drabinki, tabela pokryć)."""
+    sb = {"sot": {1.5: {"over": 1.72}}}
+    B._scal_oferty_zawodnika(sb, {"sot": {1.5: {"over": 2.05}}})
+    assert sb["sot"][1.5]["over"] == 1.72
+
+
+def test_brak_drugiego_cennika_niczego_nie_zmienia():
+    sb = {"shots": {1.5: {"over": 1.80}}}
+    assert B._scal_oferty_zawodnika(sb, {}) == sb
+    assert B._scal_oferty_zawodnika({}, sb) == sb
+
+
+def test_kurs_nieliczbowy_nie_wywala_scalania():
+    """Oferta bywa niepełna (None, pusty string) — to nie może zatrzymać cyklu."""
+    sb = {"shots": {1.5: {"over": 1.80}}}
+    bc = {"shots": {1.5: {"over": None}, 2.5: {"over": "—"}}}
+    out = B._scal_oferty_zawodnika(sb, bc)
+    assert out["shots"][1.5]["over"] == 1.80
+
+
+def test_obaj_bukmacherzy_maja_zapisany_tryb_podatku():
+    """Bukmacher jedzie z kursem aż do księgi, bo od niego zależy rachunek
+    netto — a ten musi być zamrożony przy typie, nie liczony po fakcie."""
+    assert betting.tryb_podatku("Betclic") in betting.WSPOLCZYNNIK_PODATKU
+    assert betting.tryb_podatku("Superbet") in betting.WSPOLCZYNNIK_PODATKU
