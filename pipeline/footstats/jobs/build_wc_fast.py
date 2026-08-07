@@ -28,7 +28,7 @@ from scipy import stats as _stats
 import numpy as np
 from curl_cffi import requests
 
-from dataclasses import replace as dc_replace
+from dataclasses import fields as dc_fields, replace as dc_replace
 
 from .. import diagnostyka, rozgrywki, supa
 from ..engine import (
@@ -1292,6 +1292,43 @@ def odswiez_stare_trendy(
     return n_graczy, n_trendow
 
 
+def _trend_z_kontekstem_meczu(swiezy, bazowy, mid: int):
+    """Trend dociągnięty z historii + kontekst NADCHODZĄCEGO meczu.
+
+    `/player/{id}/performance` zna tylko przeszłość zawodnika: kto był rywalem
+    w każdym z minionych meczów, ile grał, ile notował. Nie wie natomiast nic
+    o meczu, na który właśnie typujemy — a bez tego silnik nie policzy ani
+    czynnika rywala, ani dom/wyjazd. Kontekst bierzemy więc z trendu bazowego
+    tego samego zawodnika w tym samym spotkaniu (ten przyszedł z feedu propsów
+    i kontekst niesie).
+
+    Linia zostaje pusta: silnik dobiera ją sam z przewidywanej liczby zdarzeń,
+    tak samo jak dla trendów, którym bukmacher UK nie podał swojej.
+
+    Zwraca `None`, gdy kształt trendu nie pasuje — zamiast wywalać cykl.
+    """
+    try:
+        pola = {f.name for f in dc_fields(type(swiezy))}
+    except TypeError:
+        return None
+    kontekst = {
+        "event_id": getattr(bazowy, "event_id", 0) or int(mid),
+        "team_id": getattr(bazowy, "team_id", None),
+        "team_name": getattr(bazowy, "team_name", None),
+        "opponent_id": getattr(bazowy, "opponent_id", 0),
+        "opponent_name": getattr(bazowy, "opponent_name", ""),
+        "is_home": getattr(bazowy, "is_home", False),
+        "in_predicted_lineup": getattr(bazowy, "in_predicted_lineup", False),
+        "position": getattr(bazowy, "position", None),
+        "line": 0.0,
+    }
+    zmiany = {k: v for k, v in kontekst.items() if k in pola and v is not None}
+    try:
+        return dc_replace(swiezy, **zmiany)
+    except (TypeError, ValueError):
+        return None
+
+
 def dopelnij_oferte_zawodnicza(
     gracze_meczu: dict[int, dict[int, object]],
     sb_cache: dict[int, dict],
@@ -1302,6 +1339,7 @@ def dopelnij_oferte_zawodnicza(
     kolejnosc: dict[int, int] | None = None,
     fetch_performance=None,
     trendy_z_performance=None,
+    trends_out: list | None = None,
 ) -> tuple[int, int]:
     """Zakładka meczu ma pokazywać KURSY + wszystkie nasze statystyki
     indywidualne, które da się na ten mecz obstawić.
@@ -1323,9 +1361,25 @@ def dopelnij_oferte_zawodnicza(
     doszedł do końca scoringu, więc zawodnik odrzucony np. na „za mało zdarzeń"
     gubił kursy dla całej tabeli.
 
-    Świadomie NIE dokładamy tych rynków do trendów silnika: nowe statystyki
-    trafiają na stronę jako pokrycie z kursem, ale typów z nich nie stawiamy
-    (nie mają kontekstu rywala ani kalibracji). To osobna decyzja.
+    DOŁĄCZAMY TE RYNKI DO SILNIKA TYPÓW (2026-08-07, decyzja usera).
+    Do tego dnia dociągnięta historia szła wyłącznie do `players_out["forma"]`
+    i do siatki kursów — czyli zasilała tabelę pokryć i drabinki, a typu z niej
+    nigdy nie powstawało. Powód z 03.08 („nie mają kontekstu rywala ani
+    kalibracji") przestał obowiązywać: kontekst rywala ma teraz kaskadę źródeł
+    (`model/koncesje.py` + profil drużyn), a rynek bez własnej kalibracji jedzie
+    na globalnej i jest o tym meldunek w logu (`rynki_bez_kalibracji`).
+    Zmierzone 07.08, co tamta decyzja kosztowała: z 46 typów zawodniczych
+    z trzech dni **41 to strzały**, a celnych, „zza pola", odbiorów i spalonych
+    nie było ANI JEDNEGO — mimo że kursy i historia były w ręku.
+
+    Trend z tej ścieżki niesie historię, ale nie zna kontekstu NADCHODZĄCEGO
+    meczu (rywal, gdzie gramy, event_id) — bierzemy go z trendu bazowego tego
+    samego zawodnika w tym samym meczu. Linia zostaje pusta: silnik dobiera ją
+    sam z przewidywanej liczby zdarzeń (`line_for_lambda`), tak samo jak dla
+    trendów z feedu, którym bukmacher UK nie podał swojej.
+
+    `trends_out` jest opcjonalne — bez niego funkcja zachowuje się jak dawniej,
+    co trzyma testy tabeli pokryć niezależne od tej zmiany.
 
     `kolejnosc` (mid -> kickoff_ts) decyduje, komu przypada budżet, gdy nie
     starcza dla wszystkich: najpierw mecze, które zaczynają się najwcześniej —
@@ -1337,7 +1391,7 @@ def dopelnij_oferte_zawodnicza(
     trendy = trendy_z_performance or statshub.trendy_z_performance
     licznik = [budzet]
     sm_cache: dict[int, list] = {}
-    n_rynkow = n_kursow = 0
+    n_rynkow = n_kursow = n_do_silnika = 0
     bez_pary: list[str] = []
     mecze = sorted(
         gracze_meczu.items(), key=lambda kv: (kolejnosc or {}).get(kv[0], 0)
@@ -1379,6 +1433,11 @@ def dopelnij_oferte_zawodnicza(
                             continue
                         forma[mk] = forma_z_trendu(s, mk)
                         n_rynkow += 1
+                        if trends_out is not None:
+                            nowy = _trend_z_kontekstem_meczu(s, tr, mid)
+                            if nowy is not None:
+                                trends_out.append(nowy)
+                                n_do_silnika += 1
             # KURSY: wszystkie kwotowane linie „powyżej" dla rynków, które
             # umiemy pokazać (mamy dla nich historię)
             for mk, linie in rec.items():
@@ -1394,6 +1453,8 @@ def dopelnij_oferte_zawodnicza(
     if n_rynkow or n_kursow:
         print(f"Oferta zawodnicza: dołożono {n_rynkow} rynków do formy "
               f"i {n_kursow} wpisów kursów w siatce"
+              + (f", z tego {n_do_silnika} poszło DO SILNIKA TYPÓW"
+                 if n_do_silnika else "")
               + (f", budżet performance wyczerpany" if licznik[0] <= 0 else "")
               + (f", bez pary u bukmachera: {len(bez_pary)} zawodników"
                  if bez_pary else ""))

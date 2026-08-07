@@ -12,7 +12,21 @@ import numpy as np
 
 from .model import betting, cards, context, counts, matchup, minutes as minutes_mod
 
-RARE_MARKETS = {"sot_outside_box", "headed_shots", "headed_sot", "fh_sot", "offsides"}
+# RYNKI RZADKIE Z NATURY — niższy próg „za mało zdarzeń" (0,2 zamiast 0,35).
+#
+# `shots_outside_box` dołączony 2026-08-07. Do tego dnia lista była niespójna:
+# celne zza pola były rzadkie, a strzały zza pola już nie — mimo że to ten sam
+# typ zagrania, tylko szerszy. Skutek: rynek „zza pola" praktycznie nigdy nie
+# osiągał 0,35 i nie miał szans wejść, choć oferta go kwotuje.
+#
+# Decyzja usera 07.08: „nie zgadzam się, najwięcej wartości jest właśnie w tych
+# typach". Zmierzone dane są na razie niekonkluzywne — `shots_outside_box` ma
+# 20 rozliczeń przy ROI −8,5%, `interceptions` 11 przy −6,3% — ale to są próby
+# rzędu kilkunastu zdarzeń i dotyczą wyłącznie tych typów, które próg
+# PRZEPUŚCIŁ. O odciętych nie wiemy nic, bo nigdy nie powstały. Zgodnie
+# z zasadą „nic nie blokujemy, model ma się uczyć" wpuszczamy je i mierzymy.
+RARE_MARKETS = {"sot_outside_box", "shots_outside_box", "headed_shots",
+                "headed_sot", "fh_sot", "offsides"}
 DISCIPLINARY_MARKETS = {"fouls_committed", "yellow_card", "team_fouls", "team_cards"}
 
 
