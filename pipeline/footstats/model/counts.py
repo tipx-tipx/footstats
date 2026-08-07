@@ -273,12 +273,31 @@ def p_over_credible_interval(
 # znakiem PLUS przy sumie i MINUS przy różnicy. To jest minimalna poprawka,
 # która naprawia zmierzony błąd i nie udaje wiedzy, której nie mamy.
 #
-# CZEGO NIE MAMY: pomiaru dla strzałów, celnych, fauli i kartek — historia
-# drużynowa trzyma dziś tylko rożne (i gole, ale tych jako sumy nie gramy).
-# Rynek bez pomiaru dostaje ρ = 0, czyli zachowuje się dokładnie jak dotąd.
+# ZMIERZONE 2026-08-07 na banku stylu (1509 meczów; rekord trzyma obie drużyny
+# naraz, więc para jest z definicji i nic nie parujemy po nazwach). Do tego dnia
+# tabela miała JEDEN wiersz — rożne z próby 204 — a pozostałe rynki jechały na
+# ρ = 0, czyli na założeniu, że drużyny w jednym meczu są niezależne.
+#
+# Pomiar pokazał, że to założenie myli się w OBIE strony i to mocno:
+#
+#   kartki  +0,273   faule  +0,205   — DODATNIA: ostry mecz jest ostry dla obu
+#   strzały −0,260   rożne  −0,241   — UJEMNA: kto dominuje, ten ma; drugi nie
+#   celne   −0,156   gole   −0,073
+#
+# Rożne wyszły prawie DWA RAZY mocniej niż w pierwszym pomiarze (−0,241 wobec
+# −0,127) — tamta próba była sześciokrotnie mniejsza.
+#
+# Każda liczba przeszła próg istotności: |r| > 2 błędy standardowe. Spalone
+# (+0,025 przy błędzie 0,026) go NIE przeszły i dlatego ich tu nie ma —
+# rynek bez wiarygodnego pomiaru zostaje przy ρ = 0.
 # Pomiar powtarza `scripts/zmierz_korelacje.py`.
 KORELACJA_DRUZYN: dict[str, float] = {
-    "corners": -0.127,   # n=204, 2026-08-01
+    "cards": 0.273,      # n=1509, 2026-08-07
+    "shots": -0.260,     # n=1324
+    "corners": -0.241,   # n=1490 (było -0.127 przy n=204)
+    "fouls": 0.205,      # n=967
+    "sot": -0.156,       # n=1324
+    "goals": -0.073,     # n=1407
 }
 
 

@@ -256,9 +256,27 @@ def test_wariancja_predykcji_zgadza_sie_z_nb():
 def test_korelacja_rynku_czyta_wszystkie_konwencje_kodu():
     for kod in ("corners", "team_corners", "match_corners", "wiecej_corners"):
         assert counts.korelacja_rynku(kod) == counts.KORELACJA_DRUZYN["corners"]
-    # rynek bez pomiaru = zero, czyli zachowanie sprzed zmiany
-    assert counts.korelacja_rynku("match_fouls") == 0.0
+    # rynek bez pomiaru = zero, czyli zachowanie sprzed zmiany. Spalone przeszły
+    # pomiar 07.08, ale NIE przeszły progu istotności (+0,025 przy błędzie
+    # 0,026), więc świadomie zostają na zerze.
+    assert counts.korelacja_rynku("match_offsides") == 0.0
+    assert counts.korelacja_rynku("tackles") == 0.0
     assert counts.korelacja_rynku(None) == 0.0
+
+
+def test_korelacje_maja_znak_zgodny_z_pomiarem():
+    """Znak jest tu całą treścią: przy kartkach i faulach drużyny „zarażają się"
+    ostrą grą (ρ dodatnie), a przy rożnych, strzałach i celnych jedna drużyna
+    ma dużo WTEDY, gdy druga ma mało (ρ ujemne). Odwrócenie znaku popsułoby
+    sumy i „kto więcej" w przeciwne strony naraz."""
+    for kod in ("cards", "fouls"):
+        assert counts.KORELACJA_DRUZYN[kod] > 0.15, kod
+    for kod in ("corners", "shots", "sot", "goals"):
+        assert counts.KORELACJA_DRUZYN[kod] < 0.0, kod
+    # wszystkie zmierzone leżą w zakresie, w którym korekta momentów ma sens
+    for kod, r in counts.KORELACJA_DRUZYN.items():
+        assert -0.9 < r < 0.9, (kod, r)
+        assert abs(r) > counts.MIN_KORELACJA, (kod, r)
 
 
 def test_pmf_z_momentow_odtwarza_srednia_i_wariancje():
