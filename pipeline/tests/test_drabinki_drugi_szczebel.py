@@ -231,3 +231,65 @@ def test_podloga_ucina_martwy_drugi_szczebel(p_drugiego, zostaje):
             drabinka = drabinka[:i]
             break
     assert len(drabinka) == zostaje
+
+
+# --- ta sama reguła zadana karcie GOTOWEJ (wznowionej z rejestru) ---
+# Karta z rejestru nie przechodzi już budowy drabinki, więc bramę trzeba jej
+# postawić na zapisanych liczbach — inaczej reguły wprowadzone po publikacji
+# omijają cały wznowiony strumień (zmierzone 08.08: 23 z 23 kart na stronie
+# pochodziły z rejestru).
+
+def _gotowa(szczeble, hero_linia=0.5):
+    return {"hero": {"rynek_kod": "shots", "linia": hero_linia},
+            "rynki": [{"rynek_kod": "shots", "drabinka": list(szczeble)}]}
+
+
+def _s(linia, p_final, traf, z=10, p_model=None):
+    return {"linia": linia, "kurs": 2.0, "p_final": p_final,
+            "p_model": p_final if p_model is None else p_model,
+            "pokrycie": {"z": z, "traf": traf}}
+
+
+def test_gotowa_karta_bez_nastepnika_to_nie_drabinka():
+    assert R.karta_ma_realny_drugi_szczebel(_gotowa([_s(0.5, 0.66, 7)])) is False
+
+
+def test_gotowa_karta_z_realnym_nastepnikiem_przechodzi():
+    karta = _gotowa([_s(0.5, 0.66, 7), _s(1.5, 0.42, 6)])
+    assert R.karta_ma_realny_drugi_szczebel(karta) is True
+
+
+def test_gotowa_karta_odpada_na_pokryciu_nastepnika():
+    """Pokrycie to ta sama liczba co przy budowie (MIN_POKRYCIE_DRUGIEGO)."""
+    karta = _gotowa([_s(0.5, 0.66, 7), _s(1.5, 0.42, 2)])   # 2/10 < 0,50
+    assert R.karta_ma_realny_drugi_szczebel(karta) is False
+
+
+def test_gotowa_karta_odpada_gdy_nastepnik_jest_martwy():
+    karta = _gotowa([_s(0.5, 0.66, 7),
+                     _s(1.5, R.MIN_P_DRUGIEGO_SZCZEBLA - 0.05, 6)])
+    assert R.karta_ma_realny_drugi_szczebel(karta) is False
+
+
+def test_nastepnik_oceniany_po_strzyzeniu_tak_jak_hero():
+    """Model niżej niż historia -> liczy się średnia z obu, jak w `_oceń_karte`.
+
+    Bez tego brama przepuszczałaby szczeble, które na karcie pokazują już
+    inną (niższą) szansę, niż ta, którą przeszły selekcję.
+    """
+    tuz_nad = R.MIN_P_DRUGIEGO_SZCZEBLA + 0.02
+    karta = _gotowa([_s(0.5, 0.66, 7),
+                     _s(1.5, tuz_nad, 6, p_model=tuz_nad - 0.10)])
+    assert R.karta_ma_realny_drugi_szczebel(karta) is False
+
+
+@pytest.mark.parametrize("karta", [
+    {},                                             # nic
+    {"hero": {"rynek_kod": "shots", "linia": 0.5}},  # hero bez drabinki
+    {"hero": {"rynek_kod": "shots", "linia": 9.5},   # hero spoza drabinki
+     "rynki": [{"rynek_kod": "shots", "drabinka": [_s(0.5, 0.66, 7)]}]},
+])
+def test_brak_danych_to_nie_odmowa(karta):
+    """`None`, nie `False` — brak pola nie dowodzi braku szczebla, a karta
+    zdjęta z niewiedzy to ciche odrzucenie z fałszywej przesłanki."""
+    assert R.karta_ma_realny_drugi_szczebel(karta) is None

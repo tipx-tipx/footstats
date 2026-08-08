@@ -1429,6 +1429,43 @@ def _profil_gry(w: dict) -> str | None:
     return None
 
 
+def karta_ma_realny_drugi_szczebel(w: dict) -> bool | None:
+    """Czy `hero` GOTOWEJ karty ma następnik, którego wolno polować.
+
+    Ta sama reguła co przy wyborze hero (patrz MIN_POKRYCIE_DRUGIEGO), tylko
+    zadana kartcie już zbudowanej. PO CO OSOBNO: karta zapisana w rejestrze
+    publikacji wraca na listę w kolejnych cyklach z zamrożoną treścią, więc
+    reguły wprowadzone PO jej publikacji nigdy jej nie dotykały. Zmierzone
+    2026-08-08, dzień po wdrożeniu wymogu drugiego szczebla: wszystkie 23
+    karty na stronie pochodziły z rejestru, a 10 z nich miało jeden szczebel —
+    czyli nowa reguła nie zmieniła na stronie niczego ([[wznowione-omijaly-bramy]]
+    dla typów, tu ten sam mechanizm dla kart).
+
+    Trzy odpowiedzi, nie dwie. `None` znaczy „nie ma czego oceniać" (karta bez
+    zapisanej drabinki rynku hero) i NIE jest odmową: brak pola nie dowodzi
+    braku szczebla, a zdejmowanie karty na tej podstawie byłoby cichym
+    odrzuceniem z fałszywej przesłanki ([[ciche-odrzucenia-zasada]]).
+    """
+    hero = w.get("hero") or {}
+    mk, linia = hero.get("rynek_kod"), hero.get("linia")
+    if mk is None or linia is None:
+        return None
+    drabinka = next((r.get("drabinka") or [] for r in (w.get("rynki") or [])
+                     if r.get("rynek_kod") == mk), [])
+    idx = next((i for i, s in enumerate(drabinka)
+                if float(s.get("linia", -1)) == float(linia)), None)
+    if idx is None:
+        return None
+    nast = drabinka[idx + 1] if idx + 1 < len(drabinka) else None
+    if nast is None:
+        return False          # hero jest ostatnim szczeblem — nie ma co polować
+    pok = nast.get("pokrycie") or {}
+    if pok.get("z") and pok["traf"] / pok["z"] < MIN_POKRYCIE_DRUGIEGO:
+        return False
+    p_nast = _p_po_strzyzeniu(nast)
+    return p_nast is not None and p_nast >= MIN_P_DRUGIEGO_SZCZEBLA
+
+
 def _kategoria_karty(w: dict) -> str:
     """Rodzaj karty — po czym front dobiera kolor i etykietę.
 

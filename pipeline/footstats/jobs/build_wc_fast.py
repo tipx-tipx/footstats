@@ -847,6 +847,17 @@ def scal_karty_z_publikacjami(
     publikacji) i flagą `wznowiony`. Sufit 30 kart obowiązuje tylko NOWE —
     przypięta karta nie może wypaść przez to, że model znalazł dziś coś
     lepszego, bo wtedy wracamy do punktu wyjścia.
+
+    ⚑ ZAMROŻONA JEST CENA, NIE DEFINICJA DRABINKI (2026-08-08). Wznowienie
+    chroni kartę przed WAHANIEM KURSU — po to powstało. Nie ma natomiast
+    chronić jej przed zmianą reguł: wpis z rejestru wraca z treścią sprzed
+    wdrożenia, więc każda nowa reguła omija cały wznowiony strumień.
+    Zmierzone dzień po wymogu drugiego szczebla (commit 3338925): 23 z 23
+    kart na stronie pochodziły z rejestru, 10 miało jeden szczebel — reguła
+    nie zmieniła na stronie NICZEGO, a user zgłosił „nadal stare drabinki".
+    Dlatego wznowiona karta przechodzi bramę struktury jeszcze raz, na
+    zapisanych liczbach. To ten sam wniosek co przy typach
+    ([[wznowione-omijaly-bramy]]): nowe progi wpinamy przy ODTWORZENIU.
     """
     teraz = teraz or int(time.time())
     # jak przy typach: nieudany odczyt = pracujemy bez rejestru, ale go nie
@@ -865,6 +876,8 @@ def scal_karty_z_publikacjami(
         }
     out = list(wpisy)
     wznowione = 0
+    bez_drugiego = 0
+    nierozstrzygniete = 0
     for k, rec in list(rej.items()):
         # jak przy typach: karta bez kickoffu wygasa od razu, zamiast wracać
         # na listę w nieskończoność
@@ -875,15 +888,28 @@ def scal_karty_z_publikacjami(
         if k in biezace or not rec.get("wpis"):
             continue
         w = dict(rec["wpis"])
+        # brama struktury na wznowieniu (patrz nota w docstringu). Wpis
+        # ZOSTAJE w rejestrze — zdejmujemy go z listy, nie z historii; sam
+        # wyleci rotacją po gwizdku.
+        ma_drugi = radar.karta_ma_realny_drugi_szczebel(w)
+        if ma_drugi is False:
+            bez_drugiego += 1
+            continue
+        if ma_drugi is None:
+            nierozstrzygniete += 1
         w["wznowiony"] = True
         w["opublikowano_ts"] = rec.get("opublikowano_ts")
         out.append(w)
         wznowione += 1
     if not _dry_run() and odczyt_ok:
         supa.put_key(PUBLIKACJE_KART_KLUCZ, rej)
-    if wznowione:
+    if wznowione or bez_drugiego:
+        # licznik przy bramie, nie cisza ([[ciche-odrzucenia-zasada]])
         print(f"Publikacje kart: wznowiono {wznowione} "
-              f"(bieżące przeliczenie dało {len(wpisy)})")
+              f"(bieżące przeliczenie dało {len(wpisy)}), "
+              f"bez drugiego szczebla zdjęto {bez_drugiego}"
+              + (f", bez zapisanej drabinki {nierozstrzygniete}"
+                 if nierozstrzygniete else ""))
     out.sort(key=lambda w: (w.get("kickoff_ts") or 0, w.get("mecz_id") or 0))
     for i, w in enumerate(out, start=1):
         w["id"] = i
@@ -1428,6 +1454,16 @@ def bc_z_pamieci(
 
     Klucze pamięci są tekstowe (JSON), a mecze liczbowe — stąd konwersja
     w jednym miejscu zamiast w trzech.
+
+    ⚑ DOTYCZY TO TAKŻE LINII, i to WYWRACAŁO CAŁY CYKL (2026-08-08).
+    JSON nie zna kluczy liczbowych, więc oferta zapisana jako `{0.5: ...}`
+    wraca z Supabase jako `{"0.5": ...}`. Po scaleniu z Superbetem (float)
+    `merged` miał klucze dwóch typów naraz, a pierwsze `sorted()` po nich
+    wywalało `TypeError: '<' not supported between 'str' and 'float'` —
+    w `internal_fair_odds`, czyli w środku pętli scoringu, więc ginął CAŁY
+    przebieg, nie jeden zawodnik. Objaw z produkcji: ostatni typ zapisany
+    22:15, dokładnie wtedy, gdy osobny job zaczął napełniać `betclic_oferty`
+    (22:08) — od tej chwili cykl nie dowiózł ani jednego typu.
     """
     out: dict[int, dict] = {}
     for mid, kickoff in kolejnosc.items():
@@ -1444,7 +1480,30 @@ def bc_z_pamieci(
         # `ts` jedzie razem z ofertą, bo typ z tej ceny musi zapisać, KIEDY ją
         # widzieliśmy — przy ofercie pamiętanej do doby „kurs_ts = teraz" byłby
         # po prostu nieprawdą (patrz `kurs_ts` w rozliczaniu)
-        out[mid] = {"players": zap["players"], "ts": zapisano}
+        out[mid] = {"players": _linie_na_liczby(zap["players"]), "ts": zapisano}
+    return out
+
+
+def _linie_na_liczby(players: dict) -> dict:
+    """`{"0.5": {...}}` z JSON-a z powrotem na `{0.5: {...}}` (patrz wyżej).
+
+    Linia nieparsowalna WYPADA, zamiast jechać dalej jako tekst: jedna taka
+    para przewraca `sorted()` w scoringu, a to kosztuje cały przebieg. Lepiej
+    stracić linię niż cykl.
+    """
+    out: dict = {}
+    for nazwisko, rynki in (players or {}).items():
+        cel: dict = {}
+        for mk, linie in (rynki or {}).items():
+            slot: dict = {}
+            for l, strony in (linie or {}).items():
+                try:
+                    slot[float(l)] = strony
+                except (TypeError, ValueError):
+                    continue
+            if slot:
+                cel[mk] = slot
+        out[nazwisko] = cel
     return out
 
 
@@ -1498,6 +1557,14 @@ def _int_lub_zero(x) -> int:
         return 0
 
 
+def _da_sie_na_liczbe(x) -> bool:
+    try:
+        float(x)
+        return True
+    except (TypeError, ValueError):
+        return False
+
+
 def _scal_oferty_zawodnika(sb_rec: dict, bc_rec: dict) -> dict:
     """Oferty dwóch bukmacherów na jednego zawodnika w jeden słownik rynków.
 
@@ -1510,16 +1577,29 @@ def _scal_oferty_zawodnika(sb_rec: dict, bc_rec: dict) -> dict:
     wyłącznie do ustalenia, JAKIE rynki i linie w ogóle istnieją (dociąganie
     historii, siatka pokryć). Typ dostaje bukmachera osobno, w pętli scoringu,
     gdzie kurs i jego źródło idą parą.
+
+    LINIA JEST LICZBĄ, po obu stronach. Wynik trafia prosto do `sorted()`
+    w scoringu, a klucze dwóch typów naraz przewracają tam cały przebieg
+    (patrz `_linie_na_liczby`) — więc drugie źródło normalizujemy tutaj,
+    niezależnie od tego, którędy przyszło.
     """
     if not bc_rec:
         return sb_rec or {}
     if not sb_rec:
-        return bc_rec
+        # też przez normalizację — zawodnik kwotowany WYŁĄCZNIE przez Betclica
+        # idzie tą gałęzią i inaczej wniósłby do silnika tekstowe linie
+        return {mk: {float(l): s for l, s in (linie or {}).items()
+                     if _da_sie_na_liczbe(l)}
+                for mk, linie in bc_rec.items()}
     out: dict = {mk: {l: dict(s) for l, s in linie.items()}
                  for mk, linie in sb_rec.items()}
     for mk, linie in bc_rec.items():
         cel = out.setdefault(mk, {})
-        for l, strony in (linie or {}).items():
+        for l_raw, strony in (linie or {}).items():
+            try:
+                l = float(l_raw)
+            except (TypeError, ValueError):
+                continue
             slot = cel.setdefault(l, {})
             for strona, kurs in (strony or {}).items():
                 try:

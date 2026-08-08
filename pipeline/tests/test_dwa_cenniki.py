@@ -53,6 +53,27 @@ def test_kurs_nieliczbowy_nie_wywala_scalania():
     assert out["shots"][1.5]["over"] == 1.80
 
 
+def test_linia_jest_liczba_po_obu_stronach():
+    """⚑ Wynik idzie prosto do `sorted()` w scoringu, a klucze dwóch typów
+    naraz przewracają tam CAŁY przebieg (regresja 08.08 — patrz
+    `test_linie_wracaja_z_pamieci_jako_liczby`). Druga brama, bo oferta
+    Betclica dociera dwiema drogami: świeżo z sieci (float) i z pamięci
+    Supabase, gdzie JSON zrobił z linii tekst."""
+    sb = {"shots": {1.5: {"over": 1.80}}}
+    bc = {"shots": {"0.5": {"over": 1.30}}, "tackles": {"1.5": {"over": 2.10}}}
+    out = B._scal_oferty_zawodnika(sb, bc)
+    assert sorted(out["shots"]) == [0.5, 1.5]
+    assert list(out["tackles"]) == [1.5]
+
+
+def test_sam_betclic_tez_wnosi_linie_liczbowe():
+    """Zawodnik kwotowany WYŁĄCZNIE przez Betclica idzie krótszą gałęzią —
+    i to właśnie ci zawodnicy są celem drugiego cennika (odbiory, „zza pola")."""
+    bc = {"tackles": {"0.5": {"over": 1.09}, "1.5": {"over": 1.55}}}
+    out = B._scal_oferty_zawodnika({}, bc)
+    assert sorted(out["tackles"]) == [0.5, 1.5]
+
+
 def test_obaj_bukmacherzy_maja_zapisany_tryb_podatku():
     """Bukmacher jedzie z kursem aż do księgi, bo od niego zależy rachunek
     netto — a ten musi być zamrożony przy typie, nie liczony po fakcie."""

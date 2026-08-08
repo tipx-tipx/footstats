@@ -50,6 +50,35 @@ def test_pamiec_z_innego_cyklu_nie_wywraca_sie_na_kluczach_tekstowych():
     assert B.bc_z_pamieci(kol, _pamiec("101", TERAZ - 10), TERAZ)
 
 
+def test_linie_wracaja_z_pamieci_jako_liczby():
+    """⚑ REGRESJA 2026-08-08, która zabiła cały cykl (nie jednego zawodnika).
+
+    JSON nie zna kluczy liczbowych, więc `{0.5: ...}` wraca jako `{"0.5": ...}`.
+    Po scaleniu z ofertą Superbetu (float) `merged` miał klucze dwóch typów,
+    a `sorted()` w `internal_fair_odds` rzucał
+    `TypeError: '<' not supported between 'str' and 'float'` — w środku pętli
+    scoringu, więc ginął CAŁY przebieg. Objaw z produkcji: ostatni typ zapisany
+    22:15, dokładnie gdy osobny job zaczął napełniać `betclic_oferty` (22:08).
+    """
+    kol = {101: TERAZ + GODZINA}
+    pamiec = {"101": {"ts": TERAZ - 60, "players": {
+        "kowalski": {"shots": {"0.5": {"over": 1.5}, "1.5": {"over": 2.6}}},
+    }}}
+    linie = B.bc_z_pamieci(kol, pamiec, TERAZ)[101]["players"]["kowalski"]["shots"]
+    assert sorted(linie) == [0.5, 1.5]
+    assert all(isinstance(l, float) for l in linie)
+
+
+def test_niepoprawna_linia_wypada_zamiast_przewrocic_cykl():
+    """Lepiej stracić linię niż przebieg — patrz test wyżej."""
+    kol = {101: TERAZ + GODZINA}
+    pamiec = {"101": {"ts": TERAZ - 60, "players": {
+        "kowalski": {"shots": {"0.5": {"over": 1.5}, "byle co": {"over": 9.0}}},
+    }}}
+    linie = B.bc_z_pamieci(kol, pamiec, TERAZ)[101]["players"]["kowalski"]["shots"]
+    assert list(linie) == [0.5]
+
+
 def test_oferta_sprzed_doby_wciaz_wazna_bo_pobieramy_raz():
     """Decyzja usera: „kurs pobierany jednorazowo na dany typ, nawet jak
     później się zmieni". Cena i tak jest zamrażana przy publikacji, więc

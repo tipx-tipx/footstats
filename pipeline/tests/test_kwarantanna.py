@@ -1,5 +1,7 @@
 """Brama publikacji: kwarantanna rynków + flaga poza_publikacja w logu."""
 
+import time
+
 import pytest
 
 from footstats.jobs import rozliczanie
@@ -498,12 +500,23 @@ def test_nieudany_odczyt_nie_kasuje_historii(monkeypatch):
     assert rozliczanie.zapisz_przewage(_pomiar(0.01), {}) is False
 
 
+def _dzien_temu(n: int) -> str:
+    """Data sprzed `n` dni w konwencji `trend_przewagi` (czas lokalny).
+
+    Daty MUSZĄ być liczone od dziś, nie wpisane na sztywno: „2026-08-01" było
+    pomiarem świeższym w dniu pisania testu, a 08.08 wpadło już poza okno
+    siedmiu dni — wtedy `bylo` i `teraz` wskazują ten sam dzień, funkcja
+    poprawnie milczy, a test zgłasza awarię, której nie ma.
+    """
+    return time.strftime("%Y-%m-%d", time.localtime(time.time() - n * 86400))
+
+
 def test_trend_pokazuje_kierunek():
     hist = {
-        "2026-07-20": {"rynki": {"team_goals|ponizej":
-                                 {"n": 30, "przewaga": -0.010}}, "pasma": {}},
-        "2026-08-01": {"rynki": {"team_goals|ponizej":
-                                 {"n": 90, "przewaga": +0.015}}, "pasma": {}},
+        _dzien_temu(20): {"rynki": {"team_goals|ponizej":
+                                    {"n": 30, "przewaga": -0.010}}, "pasma": {}},
+        _dzien_temu(0): {"rynki": {"team_goals|ponizej":
+                                   {"n": 90, "przewaga": +0.015}}, "pasma": {}},
     }
     t = rozliczanie.trend_przewagi(7, hist)["team_goals|ponizej"]
     assert t["bylo"] == -0.010 and t["teraz"] == 0.015

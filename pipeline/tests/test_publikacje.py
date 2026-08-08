@@ -310,6 +310,81 @@ def test_karta_wraca_gdy_kurs_wypchnal_ja_z_bramy(monkeypatch):
     assert out2[0]["id"] == 1                  # numeracja przeliczona
 
 
+def _szczebel(linia, kurs, p_final, traf, z=10, p_model=None):
+    return {"linia": linia, "kurs": kurs, "p_final": p_final,
+            "p_model": p_model if p_model is not None else p_final,
+            "pokrycie": {"z": z, "traf": traf}}
+
+
+def _karta_z_drabinka(szczeble, hero_linia=0.5, **kw):
+    """Karta w kształcie, w jakim leży w rejestrze: hero + drabinka rynku."""
+    k = _karta(linia=hero_linia, **kw)
+    k["hero"]["rynek_kod"] = "shots"
+    k["rynki"] = [{"rynek_kod": "shots", "rynek": "Strzały",
+                   "drabinka": szczeble}]
+    return k
+
+
+def test_wznowiona_karta_bez_drugiego_szczebla_schodzi_z_listy(monkeypatch):
+    """Reguła wprowadzona PO publikacji ma dosięgnąć wznowienia.
+
+    Bez tego karta zapisana pod starymi regułami wraca na listę do gwizdka
+    i nowy wymóg nie zmienia na stronie niczego (zmierzone 08.08: 10 z 23
+    kart na stronie miało jeden szczebel, dzień po wdrożeniu wymogu).
+    """
+    magazyn: dict = {}
+    _stub_supa(monkeypatch, magazyn)
+    jednoszczeblowa = _karta_z_drabinka([_szczebel(0.5, 1.62, 0.66, 7)])
+    assert len(B.scal_karty_z_publikacjami([jednoszczeblowa])) == 1
+
+    # kolejny cykl bez świeżego przeliczenia: karta NIE wraca
+    assert B.scal_karty_z_publikacjami([]) == []
+    # ...ale historia publikacji zostaje — zdejmujemy z listy, nie z rejestru
+    assert len(magazyn[B.PUBLIKACJE_KART_KLUCZ]) == 1
+
+
+def test_wznowiona_karta_z_realnym_drugim_szczeblem_wraca(monkeypatch):
+    magazyn: dict = {}
+    _stub_supa(monkeypatch, magazyn)
+    pelna = _karta_z_drabinka([_szczebel(0.5, 1.62, 0.66, 7),
+                               _szczebel(1.5, 3.65, 0.42, 6)])
+    B.scal_karty_z_publikacjami([pelna])
+    out = B.scal_karty_z_publikacjami([])
+    assert len(out) == 1 and out[0]["wznowiony"] is True
+    assert out[0]["hero"]["kurs"] == 2.05      # cena dalej ZAMROŻONA
+
+
+def test_wznowienie_patrzy_na_pokrycie_nastepnika(monkeypatch):
+    """Drugi szczebel istnieje, ale prawie nigdy nie wchodził — to nie drabinka."""
+    magazyn: dict = {}
+    _stub_supa(monkeypatch, magazyn)
+    slaba = _karta_z_drabinka([_szczebel(0.5, 1.62, 0.66, 7),
+                               _szczebel(1.5, 6.20, 0.30, 2)])   # 2/10 < 0,50
+    B.scal_karty_z_publikacjami([slaba])
+    assert B.scal_karty_z_publikacjami([]) == []
+
+
+def test_karta_bez_zapisanej_drabinki_nie_jest_karana(monkeypatch):
+    """Brak pola to nie dowód braku szczebla — nie zdejmujemy z niewiedzy."""
+    magazyn: dict = {}
+    _stub_supa(monkeypatch, magazyn)
+    B.scal_karty_z_publikacjami([_karta()])       # sam hero, bez `rynki`
+    out = B.scal_karty_z_publikacjami([])
+    assert len(out) == 1 and out[0]["wznowiony"] is True
+
+
+def test_swieza_karta_nie_przechodzi_bramy_wznowienia(monkeypatch):
+    """Bieżące przeliczenie ma własną bramę w radarze — tu jej nie dublujemy.
+
+    Gdyby brama łapała też świeże wpisy, karta pomiarowa (świadomie wpuszczana
+    bez drugiego szczebla, patrz NEAR_POKRYCIA w radarze) ginęłaby po drodze.
+    """
+    magazyn: dict = {}
+    _stub_supa(monkeypatch, magazyn)
+    swieza = _karta_z_drabinka([_szczebel(0.5, 1.62, 0.66, 7)])
+    assert len(B.scal_karty_z_publikacjami([swieza])) == 1
+
+
 def test_karta_schodzi_po_kickoffie(monkeypatch):
     magazyn: dict = {}
     _stub_supa(monkeypatch, magazyn)
