@@ -6586,13 +6586,25 @@ def _main_impl(tryb=None):
             # w tle (patrz radar.NEAR_POKRYCIA)
             pomiar_out=pomiar_drabinek,
         )
+        radar_padl = False
     except Exception as ex:
         radar_wpisy = []
+        radar_padl = True
         # pełny traceback, nie sam komunikat: pusty radar NIE nadpisuje
         # poprzedniego pliku, więc bez tego awaria drabinek wygląda w logu
         # identycznie jak „dziś nic nie przeszło bram"
         print(f"Radar pominięty w tym cyklu ({ex})\n{traceback.format_exc()}")
-    if radar_wpisy:
+    # ⚑ „AWARIA" i „BRAMY ZDJĘŁY WSZYSTKO" TO DWIE RÓŻNE RZECZY (2026-08-08).
+    # Dotąd rozstrzygał je jeden warunek `if radar_wpisy`, więc przy zerze
+    # kandydatów cykl w ogóle nie wołał `scal_karty_z_publikacjami` i nie
+    # zapisywał pliku — a wtedy na stronie zostawał POPRZEDNI radar, nietknięty
+    # przez żadną nową regułę. Zmierzone tego dnia: cykl #657 zielony, świeżych
+    # kart 0, a w Supabase dalej wisiały 23 karty z 07.08 22:09, z czego 10
+    # jednoszczeblowych — czyli wymóg drugiego szczebla drugi dzień z rzędu nie
+    # zmieniał niczego, mimo dwóch wdrożeń. Przy awarii zachowanie ZOSTAJE
+    # (nie kasujemy strony z powodu wyjątku), przy zerze po bramach wznowione
+    # przechodzą przez bramę i zapisujemy wynik, choćby był pusty.
+    if not radar_padl:
         # karta raz pokazana zostaje do gwizdka — ta sama zasada co przy typach
         radar_wpisy = scal_karty_z_publikacjami(radar_wpisy)
         _dump("radar.json", {
@@ -6600,9 +6612,10 @@ def _main_impl(tryb=None):
             "wpisy": radar_wpisy,
         })
         rodzaje = Counter(w["rodzaj"] for w in radar_wpisy)
-        print("Radar: " + ", ".join(
+        print("Radar: " + (", ".join(
             f"{k}={v}" for k, v in sorted(rodzaje.items())
-        ))
+        ) if radar_wpisy else
+            "pusto — żadna karta nie przeszła bram, poprzednie schodzą ze strony"))
         # KANDYDACI do średnich sezonowych: worker domowy (sofa_worker,
         # Sofascore blokuje chmurę) czyta tę listę i wypełnia player_sezon —
         # następny cykl dolewa sekcję "sezony" do kart drabinek

@@ -392,3 +392,29 @@ def test_karta_schodzi_po_kickoffie(monkeypatch):
     B.scal_karty_z_publikacjami([_karta(kickoff_ts=teraz + 60)])
     assert B.scal_karty_z_publikacjami([], teraz=teraz + 120) == []
     assert magazyn[B.PUBLIKACJE_KART_KLUCZ] == {}
+
+
+def test_zero_swiezych_kart_i_tak_przelicza_wznowione():
+    """⚑ Luka, przez którą reguła drugiego szczebla NIE dotarła na stronę.
+
+    Cykl decydował o zapisie radaru jednym warunkiem `if radar_wpisy`, więc
+    „bramy zdjęły wszystko" wyglądało tak samo jak „radar padł": scalanie
+    z rejestrem w ogóle się nie odpalało, plik nie powstawał, a strona
+    zostawała z POPRZEDNIM radarem. Zmierzone 08.08: cykl #657 zielony,
+    świeżych kart 0, w Supabase dalej 23 karty z 07.08 22:09 — z czego 10
+    jednoszczeblowych, drugi dzień po wdrożeniu wymogu.
+
+    Test czyta źródło, bo warunek siedzi w środku funkcji na kilkaset linii,
+    której nie da się zawołać bez całego cyklu (ten sam chwyt co
+    `test_stan_uczenia.py`).
+    """
+    import inspect
+
+    zrodlo = inspect.getsource(B)
+    i = zrodlo.index('_dump("radar.json"')
+    przed = zrodlo[:i]
+    # ostatni warunek przed zapisem rozstrzyga o AWARII, nie o liczbie kart
+    assert "if not radar_padl:" in przed[-1200:], (
+        "zapis radaru znowu zależy od tego, ile kart przeszło bramy — "
+        "wtedy przy zerze na stronie zostaje poprzedni radar")
+    assert "radar_padl = True" in przed
