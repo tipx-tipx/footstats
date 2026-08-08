@@ -26,6 +26,18 @@ import type {
 const linLabel = (linia: number) => `${Math.ceil(linia)}+`;
 
 /**
+ * „u kogo" – dopełniacz nazwy bukmachera. Backend zapisuje mianownik i tylko
+ * wtedy, gdy cena NIE jest z Superbetu (domyślny cennik), więc brak pola musi
+ * dawać poprawne zdanie tak samo jak nazwa obca.
+ */
+const uKogo = (bukmacher?: string | null) =>
+  !bukmacher || bukmacher === "Superbet"
+    ? "Superbetu"
+    : bukmacher === "Betclic"
+      ? "Betclica"
+      : bukmacher;
+
+/**
  * Klasa karty (backend: radar._klasa_karty). NAZWY ZMIENIONE 2026-08-01:
  * „TOP / mocny / solidny" brzmiało jak ocena szkolna i zderzało się z drugą
  * skalą produktu (siła typu wg szansy, `lib/slownik.ts`). Klasa mierzy coś
@@ -456,7 +468,7 @@ function DrabinkaPasek({ w }: { w: RadarWpis }) {
                   <span className="font-data">{fmtKurs(hero.kurs)}</span>.
                 </>
               ) : (
-                <>Kurs {fmtKurs(hero.kurs)} u Superbetu.</>
+                <>Kurs {fmtKurs(hero.kurs)} u {uKogo(hero.bukmacher)}.</>
               )}
             </span>
           </span>

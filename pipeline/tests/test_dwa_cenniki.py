@@ -79,3 +79,33 @@ def test_obaj_bukmacherzy_maja_zapisany_tryb_podatku():
     netto — a ten musi być zamrożony przy typie, nie liczony po fakcie."""
     assert betting.tryb_podatku("Betclic") in betting.WSPOLCZYNNIK_PODATKU
     assert betting.tryb_podatku("Superbet") in betting.WSPOLCZYNNIK_PODATKU
+
+
+# ---------------------------------------------------------------------------
+# Kto daje tę cenę (2026-08-08, zgłoszenie usera)
+# ---------------------------------------------------------------------------
+
+def test_zrodlo_wskazuje_betclica_tylko_gdy_placi_wiecej():
+    """Karta drabinki pisze w nagłówku „Kurs X u Superbetu". Siatka bierze
+    WYŻSZĄ z dwóch cen, więc bez mapy źródeł karta podpisywała cenę Betclica
+    cudzym nazwiskiem — i wysyłała usera do bukmachera, który jej nie ma."""
+    sb = {"shots": {0.5: {"over": 1.80}, 1.5: {"over": 3.00}}}
+    bc = {"shots": {"0.5": {"over": 1.70}, "1.5": {"over": 3.40}}}
+    z = B.zrodla_kursow(sb, bc)
+    # 0,5 zostaje u Superbetu (1,80 > 1,70) — nie zapisujemy nic
+    assert "0.5" not in (z.get("shots") or {})
+    # 1,5 przechodzi do Betclica (3,40 > 3,00)
+    assert z["shots"]["1.5"] == "Betclic"
+
+
+def test_rynek_ktorego_superbet_nie_kwotuje_jest_betclica():
+    """Odbiory i „zza pola" Superbet kwotuje śladowo — cała drabinka jest
+    wtedy z drugiego cennika i karta musi to napisać."""
+    z = B.zrodla_kursow({}, {"tackles": {"0.5": {"over": 1.58}}})
+    assert z["tackles"]["0.5"] == "Betclic"
+
+
+def test_brak_drugiego_cennika_nie_daje_zadnych_zrodel():
+    """Superbet jest domyślny — zapisujemy WYŁĄCZNIE wyjątki, żeby mapa nie
+    puchła do rozmiaru całej siatki."""
+    assert B.zrodla_kursow({"shots": {0.5: {"over": 1.8}}}, {}) == {}

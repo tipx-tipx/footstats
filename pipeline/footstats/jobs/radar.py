@@ -768,9 +768,14 @@ def _rynki_wpisu(
     teraz: int = 0,
     korekta_logit: float = 0.0,
     diag: Counter | None = None,
+    zrodla: dict[str, dict[str, str]] | None = None,
 ) -> list[dict]:
     """Sekcja `rynki` wpisu: przycięta drabinka kursów + pokrycie linii
     w ostatnich występach + forma i PEŁNY kontekst meczu per rynek.
+
+    `zrodla` (rynek -> "linia" -> nazwa bukmachera) niesie WYJĄTKI od Superbetu.
+    Siatka kursów bierze wyższą z dwóch cen, więc bez tego szczebel pokazywałby
+    cenę Betclica podpisaną cudzym nazwiskiem — patrz `zrodla_kursow`.
 
     Każdy szczebel dostaje `p_final` — pokrycie Wilsona przemnożone przez
     korektę kontekstową (rywal na tym rynku, sędzia przy faulach, scenariusz
@@ -845,6 +850,12 @@ def _rynki_wpisu(
                 "linia": linia, "kurs": kurs,
                 "p_model": round(p, 3) if p is not None else None,
             }
+            # u kogo ta cena jest do wzięcia — zapisujemy tylko wtedy, gdy to
+            # NIE Superbet, więc front ma domyślną nazwę i nie musi jej znać
+            _kto = ((zrodla or {}).get(mk) or {}).get(str(linia)) \
+                or ((zrodla or {}).get(mk) or {}).get(linia_s)
+            if _kto:
+                szczebel["bukmacher"] = _kto
             if okno:
                 # POKRYCIE: ile z ostatnich występów przebiło tę linię —
                 # rdzeń analizy tipsterskiej ("2+ trafione w 8/10")
@@ -1231,6 +1242,9 @@ def _oceń_karte(
             trafiony = {
                 "rynek_kod": r["rynek_kod"], "rynek": r.get("rynek"),
                 "linia": s["linia"], "kurs": s["kurs"],
+                # u kogo ta cena jest — nagłówek karty mówi „u Superbetu",
+                # więc gdy cena przyszła skądinąd, musi to wiedzieć
+                **({"bukmacher": s["bukmacher"]} if s.get("bukmacher") else {}),
                 "traf": p["traf"], "z": p["z"],
                 "edge": round(edge, 3),
                 "p_final": p_final,
@@ -1666,6 +1680,7 @@ def zbuduj(
     korekta_logit: float = 0.0,
     pomiar_out: list | None = None,
     bc_cache: dict[int, dict] | None = None,
+    zrodla_grid: dict[int, dict] | None = None,
 ) -> list[dict]:
     """Złóż wpisy radaru/drabinek ze zbiorów, które cykl i tak ma w pamięci.
 
@@ -1827,6 +1842,7 @@ def zbuduj(
                 teraz=teraz,
                 korekta_logit=korekta_logit,
                 diag=diag_drabinki,
+                zrodla=((zrodla_grid or {}).get(mid) or {}).get(pid),
             )
             if not rynki:
                 continue  # same puste drabinki (kursy-szum) = nie ma karty

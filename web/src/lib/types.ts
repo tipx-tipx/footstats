@@ -202,10 +202,16 @@ export interface StsValue {
   alerty: StsAlert[];
 }
 
-/** Jeden szczebel drabinki kursów Superbetu na karcie radaru. */
+/** Jeden szczebel drabinki kursów na karcie radaru. */
 export interface RadarSzczebel {
   linia: number;
   kurs: number;
+  /**
+   * U kogo ta cena jest do wzięcia. BRAK POLA = Superbet (domyślny cennik),
+   * więc zapisujemy tylko wyjątki. Siatka kursów bierze wyższą z dwóch cen,
+   * więc bez tego karta pisałaby „u Superbetu" nad ceną Betclica.
+   */
+  bukmacher?: string | null;
   /** szansa modelu na „powyżej" tej linii; null = model nie liczył */
   p_model: number | null;
   /** ile z ostatnich występów przebiło tę linię ("trafione 8/10") */
@@ -376,6 +382,8 @@ export interface RadarWpis {
     rynek?: string;
     linia: number;
     kurs: number;
+    /** jak w RadarSzczebel: brak pola = Superbet */
+    bukmacher?: string | null;
     traf: number;
     z: number;
     /** przewaga nad kursem: p_final − 1/kurs */

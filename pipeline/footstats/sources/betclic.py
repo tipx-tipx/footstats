@@ -855,7 +855,83 @@ def znajdz_zawodnika(gracze_bc: dict, nazwa: str) -> dict:
         v for k, v in gracze_bc.items()
         if (tk := set(k.split())) and (tokeny <= tk or tk <= tokeny)
     ]
-    return trafienia[0] if len(trafienia) == 1 else {}
+    if len(trafienia) == 1:
+        return trafienia[0]
+    if trafienia:
+        return {}          # niejednoznaczne — nie zgadujemy (imiennicy istnieją)
+    # TRZECIA PRÓBA: JEDNA LITERÓWKA W CAŁYM NAZWISKU (2026-08-08).
+    # Zmierzone na 33 meczach wspólnych z ofertą Betclica: 91 z 779 naszych
+    # zawodników nie dostawało pary, a rozkład przyczyn był taki:
+    #     48  Betclic ich nie kwotuje wcale (zero wspólnych tokenów)
+    #     42  część wspólna, ale zbiory tokenów się nie zawierają
+    #      1  niejednoznaczne
+    # W tej środkowej grupie siedzą DWA różne przypadki i tylko jeden jest
+    # nasz do odzyskania:
+    #     „ralf seuntjens"   vs „ralf seuntjes"      <- literówka, ten sam człowiek
+    #     „niang ousseyynou" vs „niang ousseynou"    <- literówka
+    #     „pinho rodrigo"    vs „rodrigo zalazar"    <- DWAJ RÓŻNI ludzie
+    #     „beltran lucas"    vs „lucas martinez"     <- DWAJ RÓŻNI ludzie
+    # Samo „wspólny token" ich nie rozdziela (wszędzie jest jeden wspólny), więc
+    # warunek jest ostrzejszy: KAŻDY token musi mieć swój odpowiednik, a na całe
+    # nazwisko wolno się pomylić o JEDEN znak. Wtedy pierwsze dwa wchodzą,
+    # a dwa ostatnie nadal odpadają. Jednoznaczność obowiązuje jak wyżej.
+    bliskie = [v for k, v in gracze_bc.items()
+               if _tokeny_z_literowka(tokeny, set(k.split()))]
+    return bliskie[0] if len(bliskie) == 1 else {}
+
+
+def _odleglosc_do_jeden(a: str, b: str) -> bool:
+    """Czy `a` i `b` różnią się co najwyżej JEDNĄ operacją edycji.
+
+    Własna implementacja zamiast difflib: interesuje nas wyłącznie próg 1,
+    a to da się rozstrzygnąć jednym przejściem bez macierzy.
+    """
+    if a == b:
+        return True
+    la, lb = len(a), len(b)
+    if abs(la - lb) > 1:
+        return False
+    if la == lb:                       # podmiana jednego znaku
+        return sum(1 for x, y in zip(a, b) if x != y) == 1
+    dluzszy, krotszy = (a, b) if la > lb else (b, a)
+    i = j = 0
+    pominiete = False
+    while i < len(dluzszy) and j < len(krotszy):
+        if dluzszy[i] == krotszy[j]:
+            i += 1
+            j += 1
+            continue
+        if pominiete:
+            return False
+        pominiete = True               # wstawienie/usunięcie jednego znaku
+        i += 1
+    return True
+
+
+def _tokeny_z_literowka(nasze: set[str], obce: set[str]) -> bool:
+    """Czy zbiory nazwisk opisują tę samą osobę przy JEDNEJ literówce łącznie.
+
+    Każdy token krótszego zbioru musi mieć własny odpowiednik w dłuższym
+    (przyporządkowanie 1:1), a suma odległości nie może przekroczyć jednego
+    znaku. Dwa niedopasowane tokeny to już dwie różne osoby, nie literówka.
+    """
+    if not nasze or not obce:
+        return False
+    krotszy, dluzszy = sorted((nasze, obce), key=len)
+    wolne = set(dluzszy)
+    budzet = 1
+    for t in krotszy:
+        if t in wolne:
+            wolne.discard(t)
+            continue
+        kandydat = next(
+            (u for u in sorted(wolne) if _odleglosc_do_jeden(t, u)), None
+        )
+        if kandydat is None or budzet <= 0:
+            return False
+        wolne.discard(kandydat)
+        budzet -= 1
+    return True
 
 
 # ---------------------------------------------------------------------------

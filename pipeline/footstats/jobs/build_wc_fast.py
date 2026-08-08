@@ -1222,12 +1222,24 @@ MAX_PERF_CYKL = 220                 # budżet zapytań /player/{id}/performance
 #   164 zawodników z martwą próbą (dry-run 2026-07-26); koszt ~0,26 s na
 #   zapytanie, więc pełne pokrycie to ~45 s w cyklu chodzącym co 30 min.
 
-MAX_PERF_OFERTA = 420               # osobny budżet na dopełnianie OFERTY
+MAX_PERF_OFERTA = 900               # osobny budżet na dopełnianie OFERTY
 #   bukmachera (patrz dopelnij_oferte_zawodnicza). Płacimy tylko za
-#   zawodników z meczów, w których Superbet realnie kwotuje zawodników —
-#   dry-run 3.08: 10 z 60 meczów, 186 naszych zawodników w nich, plus
-#   shotmapy (~10 na drużynę) tylko dla rynków „zza pola"/„głową". Przy 260
+#   zawodników z meczów, w których bukmacher realnie kwotuje zawodników —
+#   dry-run 3.08: 10 z 60 meczów, 186 naszych zawodników w nich. Przy 260
 #   budżet padał i 65 zawodników zostawało przy jednej statystyce.
+#
+#   420 -> 900 (2026-08-08). Drugi cennik podwoił lejek: 779 naszych zawodników
+#   ma dziś kursy w meczach wspólnych z Betclikiem, a budżet 420 kończył się
+#   co przebieg („budżet performance wyczerpany" w każdym logu). Skutek był
+#   niewidoczny, bo kurs bez historii po prostu NIE WCHODZI do siatki —
+#   wyglądało to jak brak oferty, a było brakiem zapytań. Koszt ~0,26 s na
+#   zapytanie, czyli 900 to ~4 min w cyklu, który ma 50 min limitu i schodzi
+#   dziś w 16.
+MAX_SHOTMAP_OFERTA = 400            # ...i OSOBNY na mapy strzałów, bo to inna
+#   cena: ~10 zapytań na drużynę zamiast 1 na zawodnika. Wspólny licznik
+#   sprawiał, że mapy z pierwszych meczów zjadały historię wszystkim
+#   pozostałym. Cache (`sm_cache`) jest wspólny dla graczy jednej drużyny,
+#   więc realny koszt to liczba unikalnych meczów historycznych, nie graczy.
 
 
 # --- PEŁNE SKŁADY (predicted/oficjalne) ---
@@ -1611,6 +1623,44 @@ def _scal_oferty_zawodnika(sb_rec: dict, bc_rec: dict) -> dict:
     return out
 
 
+def zrodla_kursow(sb_rec: dict, bc_rec: dict) -> dict:
+    """{rynek: {"linia": "Betclic"}} — gdzie cena po scaleniu pochodzi z Betclica.
+
+    Ta sama reguła co w `_scal_oferty_zawodnika` (wygrywa wyższy kurs „over"),
+    tylko zapisana osobno: sam scalony słownik nie niesie źródła, a karta
+    drabinki musi wiedzieć, u KOGO ta cena była — inaczej pisze „u Superbetu"
+    nad ceną, której tam nie ma (zgłoszenie usera 2026-08-08).
+
+    Zwracamy WYŁĄCZNIE wyjątki. Superbet jest domyślnym cennikiem, więc mapa
+    obcych cen jest o rząd wielkości mniejsza niż siatka i nie ma sensu
+    powielać w niej całości.
+    """
+    out: dict = {}
+    for mk, linie in (bc_rec or {}).items():
+        sb_linie = (sb_rec or {}).get(mk) or {}
+        for l_raw, strony in (linie or {}).items():
+            try:
+                l = float(l_raw)
+            except (TypeError, ValueError):
+                continue
+            k_bc = (strony or {}).get("over")
+            if k_bc is None:
+                continue
+            try:
+                k_bc = float(k_bc)
+            except (TypeError, ValueError):
+                continue
+            k_sb = ((sb_linie.get(l) or sb_linie.get(str(l)) or {})
+                    .get("over"))
+            try:
+                lepszy = k_sb is None or k_bc > float(k_sb)
+            except (TypeError, ValueError):
+                lepszy = True
+            if lepszy:
+                out.setdefault(mk, {})[str(l)] = "Betclic"
+    return out
+
+
 def dopelnij_oferte_zawodnicza(
     gracze_meczu: dict[int, dict[int, object]],
     sb_cache: dict[int, dict],
@@ -1618,11 +1668,13 @@ def dopelnij_oferte_zawodnicza(
     odds_grid: dict[int, dict],
     forma_z_trendu,
     budzet: int = MAX_PERF_OFERTA,
+    budzet_shotmap: int = MAX_SHOTMAP_OFERTA,
     kolejnosc: dict[int, int] | None = None,
     fetch_performance=None,
     trendy_z_performance=None,
     trends_out: list | None = None,
     oferty_extra: dict[int, dict] | None = None,
+    zrodla_grid: dict[int, dict] | None = None,
 ) -> tuple[int, int]:
     """Zakładka meczu ma pokazywać KURSY + wszystkie nasze statystyki
     indywidualne, które da się na ten mecz obstawić.
@@ -1673,6 +1725,18 @@ def dopelnij_oferte_zawodnicza(
     fetch_performance = fetch_performance or statshub.fetch_player_performance
     trendy = trendy_z_performance or statshub.trendy_z_performance
     licznik = [budzet]
+    # ⚑ DWA BUDŻETY, BO TO DWA RÓŻNE KOSZTY (2026-08-08). Do dziś jeden licznik
+    # obsługiwał historię zawodnika (1 zapytanie na osobę) i mapy strzałów
+    # (~10 na drużynę). Mapy zjadały go w pierwszych meczach, więc reszta
+    # zawodników nie dostawała nawet TANIEJ historii — a bez niej kurs nie
+    # wchodzi do siatki („if mk not in forma: continue" niżej).
+    # Zmierzone tego dnia na 33 meczach wspólnych z ofertą Betclica:
+    #     odbiory            466 zawodników ma kurs, NIE MA historii
+    #     strzały zza pola   384 zawodników ma kurs, NIE MA historii
+    #     gotowych par (kurs + historia): 78 z 779
+    # To był najgrubszy przeciek w całym lejku drabinek — grubszy niż progi
+    # i niż parowanie nazwisk (91 z 779).
+    licznik_sm = [budzet_shotmap]
     sm_cache: dict[int, list] = {}
     n_rynkow = n_kursow = n_do_silnika = 0
     bez_pary: list[str] = []
@@ -1688,14 +1752,15 @@ def dopelnij_oferte_zawodnicza(
             # OFERTA = SUMA OBU CENNIKÓW (2026-08-08). Rynki rozchodzą się
             # mocno: „zza pola" i odbiory Superbet kwotuje śladowo, a Betclic
             # normalnie — i to na nich stoją wzorcowe typy usera.
-            rec = _scal_oferty_zawodnika(
-                superbet.znajdz_zawodnika(sb_players, tr.player_name),
-                betclic.znajdz_zawodnika(bc_players, tr.player_name)
-                if bc_players else {},
-            )
+            _sb = superbet.znajdz_zawodnika(sb_players, tr.player_name)
+            _bc = (betclic.znajdz_zawodnika(bc_players, tr.player_name)
+                   if bc_players else {})
+            rec = _scal_oferty_zawodnika(_sb, _bc)
             if not rec:
                 bez_pary.append(tr.player_name)
                 continue
+            # kto daje cenę tam, gdzie NIE jest to Superbet (patrz `zrodla_kursow`)
+            zrodla_gracza = zrodla_kursow(_sb, _bc) if _bc else {}
             forma = (players_out.get(pid) or {}).get("forma")
             if forma is None:
                 continue
@@ -1716,7 +1781,7 @@ def dopelnij_oferte_zawodnicza(
                     swieze = trendy(
                         int(pid), tr.player_name, tr.team_id, rows,
                         sm_cache=sm_cache if trzeba_shotmap else None,
-                        budzet=licznik,
+                        budzet=licznik_sm,     # NIE `licznik` — patrz wyżej
                     )
                     for mk in braki:
                         s = swieze.get(mk)
@@ -1741,12 +1806,25 @@ def dopelnij_oferte_zawodnicza(
                 if over:
                     odds_grid.setdefault(mid, {}).setdefault(pid, {})[mk] = over
                     n_kursow += 1
+                    obce = {l: kto for l, kto
+                            in (zrodla_gracza.get(mk) or {}).items()
+                            if l in over}
+                    if obce and zrodla_grid is not None:
+                        zrodla_grid.setdefault(mid, {}).setdefault(
+                            pid, {})[mk] = obce
     if n_rynkow or n_kursow:
+        # DWA BUDŻETY = DWIE RÓŻNE DIAGNOZY. „Wyczerpany" bez nazwy nie mówi,
+        # czy zabrakło taniej historii, czy drogich map strzałów — a to zupełnie
+        # inna decyzja ([[ciche-odrzucenia-zasada]]).
         print(f"Oferta zawodnicza: dołożono {n_rynkow} rynków do formy "
               f"i {n_kursow} wpisów kursów w siatce"
               + (f", z tego {n_do_silnika} poszło DO SILNIKA TYPÓW"
                  if n_do_silnika else "")
-              + (f", budżet performance wyczerpany" if licznik[0] <= 0 else "")
+              + f"; historia {budzet - licznik[0]}/{budzet}"
+              + (" WYCZERPANA" if licznik[0] <= 0 else "")
+              + (f", mapy strzałów {budzet_shotmap - licznik_sm[0]}"
+                 f"/{budzet_shotmap}" if budzet_shotmap != licznik_sm[0] else "")
+              + (" WYCZERPANE" if licznik_sm[0] <= 0 else "")
               + (f", bez pary u bukmachera: {len(bez_pary)} zawodników"
                  if bez_pary else ""))
     return n_rynkow, n_kursow
@@ -3597,6 +3675,9 @@ def _main_impl(tryb=None):
     # meczu: mecz_id -> player_id -> rynek -> "linia" -> kurs. Zbierana z tej
     # samej siatki co scoring (merged), tylko zapisywana na dysk (JSON).
     odds_grid: dict[int, dict[int, dict[str, dict[str, float]]]] = {}
+    # ...i kto daje tę cenę, gdy NIE jest to Superbet: mecz -> gracz -> rynek ->
+    # "linia" -> nazwa bukmachera. Tylko wyjątki (patrz nota przy zapisie).
+    zrodla_grid: dict[int, dict[int, dict[str, dict[str, str]]]] = {}
     # zawodnicy przypisani do meczu (mid -> pid -> trend) — z tego wychodzi
     # dopelnij_oferte_zawodnicza(), która dokłada rynki z oferty bukmachera
     gracze_meczu: dict[int, dict[int, object]] = {}
@@ -4026,6 +4107,7 @@ def _main_impl(tryb=None):
             kolejnosc=_kolejnosc_meczow,
             trends_out=trendy_z_oferty,
             oferty_extra=bc_cache,
+            zrodla_grid=zrodla_grid,
         )
     except Exception as e:
         # oferta to DODATEK do feedu propsów — jej awaria nie ma prawa
@@ -4258,8 +4340,8 @@ def _main_impl(tryb=None):
                     if odd and (side not in slot or odd > slot[side][0]):
                         slot[side] = (odd, zrodlo)
 
-        # siatka kursów Superbet (over) do TOP POKRYCIA — wszystkie linie danego
-        # zawodnika/rynku, keyed po player_id (players.json nie ma mecz_id)
+        # siatka kursów (over) do TOP POKRYCIA i do drabinek — wszystkie linie
+        # danego zawodnika/rynku, keyed po player_id (players.json nie ma mecz_id)
         over_linie = {
             str(l): round(slot["over"][0], 2)
             for l, slot in merged.items() if slot.get("over")
@@ -4268,6 +4350,23 @@ def _main_impl(tryb=None):
             odds_grid.setdefault(mid, {}).setdefault(tr.player_id, {})[mk] = (
                 over_linie
             )
+            # ⚑ ŹRÓDŁO JEDZIE RAZEM Z CENĄ (2026-08-08, zgłoszenie usera:
+            # „czy przy typie jest napisane jaki bukmacher w drabinkach").
+            # `merged` wybiera WYŻSZY kurs z dwóch cenników, więc od 08.08 do
+            # siatki trafiają też ceny Betclica — ale sama liczba, bez nazwy.
+            # Karta drabinki pisała wtedy „Kurs 1,82 u Superbetu" nad ceną,
+            # której u Superbetu nie ma. Typy miały to dobrze od początku
+            # (pole `bukmacher`), drabinki czytają siatkę i nie miały skąd wziąć.
+            # Zapisujemy TYLKO wyjątki, bo Superbet jest domyślny i mapa
+            # obcych cen jest o rząd wielkości mniejsza niż cała siatka.
+            obce = {
+                str(l): slot["over"][1]
+                for l, slot in merged.items()
+                if slot.get("over") and slot["over"][1] != "Superbet"
+            }
+            if obce:
+                zrodla_grid.setdefault(mid, {}).setdefault(
+                    tr.player_id, {})[mk] = obce
 
         # zapisz formę zawodnika (dla UI)
         if tr.player_id not in players_out:
@@ -6583,6 +6682,8 @@ def _main_impl(tryb=None):
             # dopiąć drugą cenę PRZED selekcją kart (różnica jako przepustka)
             # i oszczędza powtórne zapytania
             bc_cache=bc_cache,
+            # kto daje cenę tam, gdzie nie Superbet — karta musi to napisać
+            zrodla_grid=zrodla_grid,
             # w tle (patrz radar.NEAR_POKRYCIA)
             pomiar_out=pomiar_drabinek,
         )

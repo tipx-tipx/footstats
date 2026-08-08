@@ -295,3 +295,58 @@ def test_obie_wersje_zle_to_nie_dowod_przesuniecia():
     mediana, _ = betclic._mediana_rozjazdu(sb, bc)
     assert betclic._drabinka_przesunieta(sb, bc, mediana) is False
     assert betclic.porownaj_drabinke(sb, bc) == {}
+
+
+# ---------------------------------------------------------------------------
+# Parowanie zawodnika: literówka w nazwisku (2026-08-08)
+# ---------------------------------------------------------------------------
+
+def _bc_gracze(*klucze):
+    return {k: {"shots": {1.5: {"over": 2.0}}} for k in klucze}
+
+
+def test_literowka_w_nazwisku_nie_gubi_zawodnika():
+    """⚑ Zmierzone na 33 meczach: 91 z 779 naszych zawodników nie dostawało
+    pary u Betclica, a 42 z tego miały część nazwiska wspólną. Wśród nich
+    siedziały zwykłe literówki jednego znaku — a kurs bez pary nie wchodzi
+    do siatki, więc karta na takiego zawodnika nie ma prawa powstać."""
+    assert betclic.znajdz_zawodnika(_bc_gracze("ralf seuntjes"),
+                                    "Ralf Seuntjens")
+    assert betclic.znajdz_zawodnika(_bc_gracze("niang ousseynou"),
+                                    "Ousseyynou Niang")
+
+
+def test_dwaj_rozni_ludzie_ze_wspolnym_imieniem_dalej_nie_paruja():
+    """Druga połowa tamtych 42 to NIE literówki, tylko różni zawodnicy
+    dzielący imię. Rozluźnienie parowania nie ma prawa ich skleić — kurs
+    trafiłby wtedy do kartoteki obcego człowieka."""
+    assert not betclic.znajdz_zawodnika(_bc_gracze("rodrigo zalazar"),
+                                        "Rodrigo Pinho")
+    assert not betclic.znajdz_zawodnika(_bc_gracze("lucas martinez quarta"),
+                                        "Lucas Beltran")
+    assert not betclic.znajdz_zawodnika(_bc_gracze("gonzalez santiago"),
+                                        "Santiago Lencina")
+    assert not betclic.znajdz_zawodnika(_bc_gracze("da luan silva"),
+                                        "Luan Santos")
+
+
+def test_dwoch_kandydatow_to_dalej_brak_dopasowania():
+    """Jednoznaczność obowiązuje na każdej ścieżce — imiennicy istnieją."""
+    assert not betclic.znajdz_zawodnika(
+        _bc_gracze("paula paulinho", "filho paulinho"), "Paulinho")
+
+
+def test_dwie_literowki_to_juz_inne_nazwisko():
+    """Budżet jest JEDEN znak na całe nazwisko, nie na token."""
+    assert not betclic.znajdz_zawodnika(_bc_gracze("rolf seuntjes"),
+                                        "Ralf Seuntjens")
+
+
+def test_odleglosc_do_jeden_zna_trzy_rodzaje_pomylki():
+    f = betclic._odleglosc_do_jeden
+    assert f("kowalski", "kowalski")      # bez zmian
+    assert f("kowalski", "kowalsky")      # podmiana
+    assert f("seuntjens", "seuntjes")     # usunięcie
+    assert f("ousseynou", "ousseyynou")   # wstawienie
+    assert not f("pinho", "zalazar")
+    assert not f("kowalski", "kowaski1")  # dwie operacje
