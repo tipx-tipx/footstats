@@ -65,7 +65,27 @@ jobs:
     # naprawa to skrócenie kroku „Przelicz okazje" — zmierzone per krok joba:
     # checkout + python + pip = 15 SEKUND, cała reszta (1719-1913 s) to nasz
     # jeden krok. Po stronie CI nie ma czego optymalizować.
-    timeout-minutes: 50
+    #
+    # 50 -> 70 (2026-08-08). Ten sam krok obronny, ta sama przyczyna: czas
+    # cyklu znowu urósł, bo silnik liczy teraz DZIEWIĘĆ RAZY więcej rynków
+    # (378 -> 3450 po rozdzieleniu budżetów zapytań — patrz MAX_PERF_OFERTA
+    # i MAX_SHOTMAP_OFERTA w build_wc_fast). Zmierzone tego dnia:
+    #
+    #     #660  15,6 min      #663  31,2 min
+    #     #661  29,3 min      #664  33,3 min
+    #     #662  49,7 min  <-- 18 SEKUND od limitu      #666  36,1 min
+    #
+    # Przebieg #662 minął się z limitem o 18 sekund. Trend jest wyraźny i idzie
+    # za zakresem danych, nie za jednorazowym zacięciem źródła, więc zapas 14
+    # minut jest za cienki. Repo jest publiczne = minuty Actions nielimitowane,
+    # czyli ta zmiana nie kosztuje NIC poza dłuższym czekaniem w patologicznym
+    # przypadku zawieszonego źródła.
+    #
+    # UWAGA NA SKUTEK UBOCZNY: `concurrency` trzyma tylko jeden przebieg
+    # oczekujący, więc im dłuższy cykl, tym więcej tyknięć crona jest
+    # anulowanych (tak zginął #665). Wyższy limit tego NIE naprawia — to jest
+    # argument za skróceniem samego liczenia, gdy zacznie boleć świeżość.
+    timeout-minutes: 70
     steps:
       - uses: actions/checkout@v4
 
