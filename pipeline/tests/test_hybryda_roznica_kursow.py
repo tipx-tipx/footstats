@@ -44,10 +44,22 @@ def _kandydat(pokrycie_traf=6, kurs=1.75, p_final=0.54, roznica_pp=None,
     }
 
 
-def test_bez_roznicy_karta_nie_wchodzi():
-    """Punkt wyjścia: ta sama karta bez drugiego cennika odpada."""
+def test_bez_roznicy_karta_wchodzi_ale_z_innym_powodem():
+    """⚑ PRZEPISANE 2026-08-08 PO ZDJĘCIU BRAMY PRZEWAGI.
+
+    Do tego dnia ta sama karta bez drugiego cennika ODPADAŁA i to był punkt
+    wyjścia dla hybrydy. Dziś przewaga nie jest już bramą (`BRAMA_PRZEWAGI`),
+    bo pomiar na 86 rozliczeniach pokazał, że nie porządkuje wyników: karty
+    z ujemną przewagą wypadały lepiej (−25,7%) niż te z przewagą 8 pp+
+    (−57,4%). Kartę zdejmuje odtąd pokrycie, cena i rynek.
+
+    Hybryda NIE STAJE SIĘ PRZEZ TO ZBĘDNA — przestaje być przepustką, zostaje
+    nazwą powodu. Różnica cen dalej jest najmocniejszym dowodem, jaki mamy,
+    więc karta z nią ma się nazywać inaczej niż karta bez niej.
+    """
     _score, hero = R._oceń_karte(_kandydat(roznica_pp=None))
-    assert hero is None
+    assert hero is not None
+    assert hero["powod_wejscia"] != "roznica_kursow"
 
 
 def test_roznica_kursow_wpuszcza_karte_bez_przewagi_modelu():
@@ -65,12 +77,15 @@ def test_sama_roznica_nie_wystarcza_gdy_typ_realnie_nie_wchodzi():
     assert hero is None
 
 
-def test_mala_roznica_nie_otwiera_karty():
-    """Poniżej progu różnica jest zwykłym szumem marży, nie okazją."""
+def test_mala_roznica_nie_liczy_sie_jako_powod_wejscia():
+    """Poniżej progu różnica jest zwykłym szumem marży, nie okazją — więc
+    karta może wejść (przewaga nie jest bramą), ale NIE wolno jej się tłumaczyć
+    rozjazdem cenowym, bo żadnego rozjazdu nie ma."""
     _score, hero = R._oceń_karte(
         _kandydat(roznica_pp=R.MIN_ROZJAZD_WEJSCIA - 0.1)
     )
-    assert hero is None
+    assert hero is not None
+    assert hero["powod_wejscia"] != "roznica_kursow"
 
 
 def test_prog_pokrycia_hybrydy_jest_ostrzejszy_niz_zwyklej_karty():

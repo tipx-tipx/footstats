@@ -404,12 +404,16 @@ export interface RadarWpis {
     edge: number;
     /**
      * Na czym stoi karta:
-     *   "przewaga" – nasza szansa bije cenę bukmachera,
-     *   "seria"    – mocne pokrycie przy grywalnej cenie, BEZ przewagi.
+     *   "przewaga"       – nasza szansa bije cenę bukmachera,
+     *   "seria"          – mocne pokrycie przy grywalnej cenie, BEZ przewagi,
+     *   "roznica_kursow" – dwaj bukmacherzy wyceniają to samo inaczej,
+     *   "pokrycie"       – samo pokrycie linii; ani przewagi, ani rozjazdu.
      * Karta bez przewagi nie ma prawa wyglądać jak karta z przewagą,
      * dlatego front pisze to wprost (decyzja usera 2026-07-30).
+     * „pokrycie" doszło 2026-08-08, gdy przewaga przestała być bramą — wcześniej
+     * taka karta w ogóle nie mogła powstać i dostawała cudzą etykietę.
      */
-    powod_wejscia?: "przewaga" | "seria";
+    powod_wejscia?: "przewaga" | "seria" | "roznica_kursow" | "pokrycie";
     p_final?: number | null;
     p_bazowe?: number | null;
     korekta?: number | null;

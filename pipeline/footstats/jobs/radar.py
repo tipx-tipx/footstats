@@ -284,6 +284,37 @@ MIN_NIEZEROWYCH_RYNKU = 5   # rynek, w którym zawodnik ma <5 niezerowych
 MAX_RYNKOW_KARTY = 3        # tyle rynków max na karcie, wybrane po jakości
 MIN_MINUT_KARTY = 62        # zmiennik (52-55 min śr.) to ryzyko, nie typ
 MIN_EDGE_KARTY = 0.03       # przewaga po korekcie próby, w pkt proc.
+# ...ale JUŻ NIE JAKO BRAMA (decyzja usera 2026-08-08). Zostaje w rankingu
+# i w etykiecie `powod_wejscia`; kartę zdejmuje odtąd pokrycie, cena i rynek.
+#
+# POWÓD JEST POMIAROWY, nie estetyczny. 86 rozliczonych kart rozbitych wg
+# naszej przewagi nad ceną NIE UKŁADA SIĘ W ŻADEN PORZĄDEK:
+#     przewaga < 0      n=18   trafia 33,3%   zwrot −25,7%
+#     przewaga 0-3 pp   n=17   trafia 17,6%   zwrot −61,9%
+#     przewaga 3-8 pp   n=42   trafia 35,7%   zwrot −24,1%
+#     przewaga 8 pp+    n= 9   trafia 22,2%   zwrot −57,4%
+# Karty BEZ przewagi wypadają lepiej niż te z przewagą 8 pp+. Brama na tym
+# postawiona nie broniła jakości — ucinała podaż. To ta sama obserwacja co
+# [[czy-bijemy-kurs]]: nasza liczba jest gorsza od samego kursu.
+BRAMA_PRZEWAGI = False
+
+# --- CO NAPRAWDĘ ROZDZIELA KARTY (pomiar 2026-08-08 na 86 rozliczeniach) ---
+# Cel produktu wg usera: „wyławiamy kursy w okolicach 2 i więcej, to są value
+# kursy i realne znaleziska". Pasmo 2,00+ traciło −32,5% — ale nie z powodu
+# ceny, tylko JEDNEGO RYNKU i górnego końca skali:
+#     faule popełnione, kurs 2,00+        n=13   trafia  7,7%   zwrot  −80,4%
+#     faule popełnione, kurs poniżej 2    n= 5   trafia  0,0%   zwrot −100,0%
+#     bez fauli, kurs 2,00-2,50           n=22   trafia 45,5%   zwrot   −1,1%
+#     bez fauli, kurs 2,50+               n=20        —          zwrot  −35,7%
+# Osiemnaście kart na faulach, JEDNA trafiona. Ten rynek nie jest słaby przy
+# wysokich kursach — jest słaby zawsze, więc nie daje kart w ogóle.
+RYNKI_BEZ_KARTY = frozenset({"fouls_committed"})
+# Powyżej tej ceny karta musi mieć mocną serię NA TEJ LINII (decyzja usera:
+# „wpuszczaj, ale tylko z mocnym pokryciem"). Bez tego 2,50+ to −35,7% nawet
+# po odsianiu fauli, a z nim zostają te karty, które user pokazuje jako
+# wzorcowe — drugi szczebel po 3,50-5,50 z realną historią za sobą.
+CENA_WYMAGAJACA_SERII = 2.50
+PROG_POKRYCIA_DROGIEJ = 0.70
 
 # --- DRUGA ŚCIEŻKA WEJŚCIA: MOCNA SERIA (decyzja usera 2026-07-30) ---
 # „Drabinka to nie tylko przewaga nad kursem" — karta „7 na 10 meczów po 2+
@@ -1111,6 +1142,11 @@ def _oceń_karte(
             if s["kurs"] < MIN_KURS_SCORE:
                 lokalne["kurs_ponizej_progu"] += 1
                 continue
+            # rynek, który nie daje kart w ogóle (patrz RYNKI_BEZ_KARTY) —
+            # osobny licznik, bo to decyzja o RYNKU, nie o tej konkretnej linii
+            if r.get("rynek_kod") in RYNKI_BEZ_KARTY:
+                lokalne["rynek_bez_karty"] += 1
+                continue
             # SZCZEBEL POMIAROWY: pokrycie pod progiem, ale w tolerancji.
             # Nie przerywamy od razu — przepuszczamy go przez WSZYSTKIE
             # pozostałe bramy, żeby zmierzyć wyłącznie efekt progu pokrycia,
@@ -1139,6 +1175,17 @@ def _oceń_karte(
             # cały pomiar progu pokrycia (patrz NEAR_POKRYCIA), zamiast zmierzyć
             # go osobno. Pomiarowy i tak nie wraca jako hero.
             if not pomiarowy:
+                # DROGA KARTA MUSI MIEĆ SERIĘ (decyzja usera 2026-08-08).
+                # Powyżej 2,50 sam kurs nie wystarcza: bez fauli to wciąż
+                # −35,7%, a z serią 7+/10 zostają te karty, które user pokazuje
+                # jako wzorcowe — drugi szczebel po 3,50–5,50 z historią.
+                # TU, A NIE WYŻEJ, z tego samego powodu co brama drugiego
+                # szczebla: pomiarowy ma pokrycie 0,40–0,50, więc progu 0,70
+                # nie przeszedłby NIGDY i brama zjadłaby cały pomiar progu.
+                if s["kurs"] >= CENA_WYMAGAJACA_SERII \
+                        and pokrycie < PROG_POKRYCIA_DROGIEJ:
+                    lokalne["droga_bez_serii"] += 1
+                    continue
                 if udzial_nast is not None \
                         and udzial_nast < MIN_POKRYCIE_DRUGIEGO:
                     lokalne["drugi_szczebel_rzadko_wchodzil"] += 1
@@ -1207,25 +1254,29 @@ def _oceń_karte(
                 and pokrycie >= PROG_POKRYCIA_HYBRYDY
                 and float(_roz.get("roznica_pp") or 0.0) >= MIN_ROZJAZD_WEJSCIA
             )
-            if edge < (MIN_EDGE_POMIARU if pomiarowy else MIN_EDGE_KARTY) \
-                    and not seria and not hybryda:
+            # ⚑ PRZEWAGA NIE JEST JUŻ BRAMĄ DLA KARTY (patrz BRAMA_PRZEWAGI).
+            # Dla SZCZEBLA POMIAROWEGO zostaje — on nie trafia na stronę, tylko
+            # do pomiaru progu pokrycia, a tam „poniżej ceny fair" to sensowna
+            # granica tego, co w ogóle warto mierzyć.
+            _slaba_przewaga = edge < (
+                MIN_EDGE_POMIARU if pomiarowy else MIN_EDGE_KARTY
+            ) and not seria and not hybryda
+            if _slaba_przewaga and not pomiarowy and statystyki is not None:
+                # POMIAR ZOSTAJE, CHOĆ BRAMY JUŻ NIE MA. Te same kubełki co
+                # wcześniej, tylko teraz opisują karty WPUSZCZONE bez przewagi
+                # — czyli dokładnie ten materiał, na którym za kilka tygodni
+                # sprawdzimy, czy zdjęcie bramy było słuszne.
+                pas_p = ("mocne 7+/10" if pokrycie >= 0.7 else
+                         "srednie 6/10" if pokrycie >= 0.6 else
+                         "slabe 5/10")
+                pas_k = ("kurs 2,0+" if s["kurs"] >= 2.0 else
+                         "kurs 1,7-2,0" if s["kurs"] >= 1.7 else
+                         "kurs do 1,7")
+                statystyki[f"{pas_p} / {pas_k}"] += 1
+            _brama = BRAMA_PRZEWAGI if not pomiarowy else True
+            if _brama and _slaba_przewaga:
                 if not pomiarowy:
                     lokalne["brak_przewagi"] += 1
-                    # CO DOKŁADNIE ODPADA NA PRZEWADZE (2026-07-30). User:
-                    # „drabinka to nie tylko przewaga nad kursem" — karta
-                    # z mocną serią przy grywalnej cenie też jest wartościowa.
-                    # Zanim wpuścimy drugą ścieżkę wejścia, trzeba wiedzieć,
-                    # ile z tych odrzuceń to naprawdę mocne serie, a ile
-                    # 5/10 przy kursie 1,5. Bez tego zamienimy „za mało kart"
-                    # na „dużo słabych kart".
-                    if statystyki is not None:
-                        pas_p = ("mocne 7+/10" if pokrycie >= 0.7 else
-                                 "srednie 6/10" if pokrycie >= 0.6 else
-                                 "slabe 5/10")
-                        pas_k = ("kurs 2,0+" if s["kurs"] >= 2.0 else
-                                 "kurs 1,7-2,0" if s["kurs"] >= 1.7 else
-                                 "kurs do 1,7")
-                        statystyki[f"{pas_p} / {pas_k}"] += 1
                 elif powody_pomiaru is not None:
                     powody_pomiaru["ponizej_ceny_fair"] += 1
                 continue
@@ -1250,14 +1301,23 @@ def _oceń_karte(
                 "p_final": p_final,
                 "p_bazowe": s.get("p_bazowe"),
                 "korekta": s.get("korekta"),
-                # na czym stoi ta linia — front ma to napisać wprost, żeby
-                # karta bez przewagi nie udawała karty z przewagą
-                # NA CZYM STOI TA LINIA — trzy różne dowody, trzy różne nazwy.
-                # Kolejność od najmocniejszego: własna przewaga, potem mocna
-                # seria, na końcu różnica między cennikami.
+                # NA CZYM STOI TA LINIA — CZTERY różne dowody, cztery nazwy.
+                # Kolejność od najmocniejszego: własna przewaga, mocna seria,
+                # różnica między cennikami, a na końcu samo pokrycie.
+                #
+                # ⚑ CZWARTA NAZWA DOSZŁA 2026-08-08 I JEST OBOWIĄZKOWA. Dopóki
+                # przewaga była bramą, karta bez przewagi i bez serii mogła
+                # wejść WYŁĄCZNIE rozjazdem cen, więc „roznica_kursow" jako
+                # ostatnia gałąź była prawdą. Po zdjęciu bramy (BRAMA_PRZEWAGI)
+                # wchodzą też karty stojące na samym pokryciu — i dostawały tę
+                # samą etykietę, czyli karta tłumaczyła się rozjazdem, którego
+                # NIE MIAŁA. To jest dokładnie ta klasa błędu, której pilnujemy
+                # w całym produkcie: nie wolno pokazać dowodu, który nie istnieje.
                 "powod_wejscia": (
                     "przewaga" if edge >= MIN_EDGE_KARTY
-                    else "seria" if seria else "roznica_kursow"
+                    else "seria" if seria
+                    else "roznica_kursow" if hybryda
+                    else "pokrycie"
                 ),
                 # DRUGI SZCZEBEL — cel polowania, nie ozdoba. Front ma go z czego
                 # nazwać po imieniu, a rozliczenia — z czego zmierzyć osobno.

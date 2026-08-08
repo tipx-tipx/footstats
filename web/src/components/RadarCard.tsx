@@ -1469,6 +1469,7 @@ export const RadarCard = memo(function RadarCard({
                       {(klasa ||
                         kat ||
                         w.ocena?.powod_wejscia === "seria" ||
+                        w.ocena?.powod_wejscia === "pokrycie" ||
                         w.xi === true) && (
                         <ul className="mt-2 space-y-1.5 text-[12px] leading-relaxed text-muted">
                           {klasa && (
@@ -1496,6 +1497,17 @@ export const RadarCard = memo(function RadarCard({
                               Zawodnik regularnie przebija tę linię, a cena
                               jest grywalna – ale nasza szansa NIE bije tu
                               kursu bukmachera.
+                            </li>
+                          )}
+                          {w.ocena?.powod_wejscia === "pokrycie" && (
+                            <li>
+                              <span className="font-medium text-ink-soft">
+                                sama historia:
+                              </span>{" "}
+                              tę kartę wybraliśmy po tym, jak często zawodnik
+                              przebijał tę linię – nie dlatego, że uważamy kurs
+                              za zaniżony. Nasza liczba jest tu zgodna z ceną
+                              bukmachera albo od niej niższa.
                             </li>
                           )}
                           {w.xi === true && (

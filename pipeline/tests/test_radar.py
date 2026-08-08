@@ -664,13 +664,18 @@ def test_karta_bez_smieci_trzy_najlepsze_rynki():
 # --- UCZENIE DRABINEK (2026-07-29): pomiar progu pokrycia + własna korekta ---
 
 
-def _karta_do_oceny(traf, kurs=2.5, p_final=0.45, z=10,
+def _karta_do_oceny(traf, kurs=2.40, p_final=0.45, z=10,
                     drugi_p=0.40, drugi_kurs=3.6):
     """Kandydat na kartę z DWOMA szczeblami — wszystko poza pokryciem gra.
 
     Bramy karty (minuty, udział startów) przechodzą, kurs jest grywalny,
     przewaga nad ceną mieści się w oknie zgody z rynkiem. Jedyną zmienną
     jest `traf`, czyli pokrycie linii — dokładnie to, o co pytamy.
+
+    KURS 2,40, NIE 2,50 (zmiana 2026-08-08): od `CENA_WYMAGAJACA_SERII` karta
+    musi mieć pokrycie 0,70, więc fikstura z ceną 2,50 mieszałaby dwie różne
+    bramy i testy pokrycia pytałyby po cichu o cenę. Regułę drogiej karty
+    sprawdzają osobne testy niżej.
 
     DRUGI SZCZEBEL JEST OBOWIĄZKOWY od 2026-08-08 (radar.MIN_P_DRUGIEGO_
     SZCZEBLA): karta bez realnego następnika nie jest drabinką, więc fikstura
@@ -756,10 +761,18 @@ def test_bez_kolektora_pomiar_nic_nie_zmienia():
 
 
 def test_korekta_strumienia_sciaga_szanse_kart():
-    """Własne uczenie drabinek: gdy strumień przeszacowywał, karta z granicy
-    przestaje przechodzić bramę przewagi (a nie tylko ładniej wygląda)."""
-    assert len(radar.zbuduj(**_pod_karte())) == 1
-    assert radar.zbuduj(**_pod_karte(korekta_logit=-0.5)) == []
+    """Własne uczenie drabinek: gdy strumień przeszacowywał, karta pokazuje
+    NIŻSZĄ szansę.
+
+    ⚑ PRZEPISANE 2026-08-08. Wcześniej test sprawdzał, że korekta ZDEJMUJE
+    kartę — przez bramę przewagi. Bramy już nie ma (patrz
+    `test_karta_gorsza_od_ceny_juz_NIE_odpada`), więc korekta nie usuwa kart,
+    tylko urealnia liczbę na nich. Uczenie działa dalej, zmienia się miejsce,
+    w którym widać jego skutek: było „karta znika", jest „karta mówi mniej".
+    """
+    (bez,) = radar.zbuduj(**_pod_karte())
+    (mocno_sciete,) = radar.zbuduj(**_pod_karte(korekta_logit=-0.5))
+    assert mocno_sciete["ocena"]["p_final"] < bez["ocena"]["p_final"]
 
 
 def test_korekta_strumienia_widac_w_p_final_karty():
@@ -800,9 +813,57 @@ def test_slaba_seria_przy_taniej_cenie_dalej_odpada():
     assert hero is None
 
 
-def test_seria_jawnie_gorsza_od_ceny_odpada():
-    """Przewaga nie jest wymagana, ale karta nie może być jawnie gorsza:
-    przy −6 pp nasze własne liczby mówią, że rację ma bukmacher."""
+def test_karta_gorsza_od_ceny_juz_NIE_odpada():
+    """⚑ PRZEPISANE 2026-08-08 — reguła zmieniona świadomie, nie zepsuta.
+
+    Do tego dnia karta, której nasza szansa była wyraźnie gorsza od ceny
+    (tu −10 pp), odpadała. Pomiar na 86 rozliczonych kartach pokazał, że ta
+    brama nie broniła pieniędzy, bo przewaga NIE PORZĄDKUJE wyników:
+
+        przewaga < 0      n=18   trafia 33,3%   zwrot −25,7%
+        przewaga 0-3 pp   n=17   trafia 17,6%   zwrot −61,9%
+        przewaga 3-8 pp   n=42   trafia 35,7%   zwrot −24,1%
+        przewaga 8 pp+    n= 9   trafia 22,2%   zwrot −57,4%
+
+    Karty BEZ przewagi wypadały LEPIEJ niż te z przewagą 8 pp+. Decyzja usera:
+    cel produktu to wyławianie kursów 2,00+, a o karcie mają decydować rzeczy,
+    które realnie rozdzielają wyniki — pokrycie, cena i rynek.
+    """
     karta = _karta_do_oceny(7, kurs=2.0, p_final=0.40)   # edge = −0,10
     _score, hero = radar._oceń_karte(karta)
-    assert hero is None
+    assert hero is not None
+    assert hero["kurs"] == 2.0
+
+
+def test_droga_karta_bez_serii_odpada():
+    """...ale cena JEST bramą, bo ona akurat rozdziela wyniki.
+
+    Zmierzone 08.08 po odsianiu fauli: kurs 2,00–2,50 daje −1,1% na 22 kartach,
+    a 2,50+ nadal −35,7% na 20. Decyzja usera: „wpuszczaj, ale tylko z mocnym
+    pokryciem" — powyżej 2,50 karta musi mieć serię 7/10.
+    """
+    # p_final dobrane do ceny, żeby test pytał WYŁĄCZNIE o pokrycie: przy 2,60
+    # cena rynku bez marży to ~0,358, więc 0,40 mieści się pod górną granicą
+    # rozjazdu (MAX_ROZJAZD_KARTY). Bez tego karta odpadałaby na innej bramie
+    # i test kłamałby o tym, co sprawdza.
+    slaba = _karta_do_oceny(6, kurs=2.60, p_final=0.40)
+    assert radar._oceń_karte(slaba)[1] is None
+    mocna = _karta_do_oceny(8, kurs=2.60, p_final=0.40)
+    assert radar._oceń_karte(mocna)[1] is not None
+
+
+def test_tansza_karta_nie_potrzebuje_serii():
+    """Poniżej progu ceny zostaje zwykłe pokrycie — inaczej zabralibyśmy
+    produktowi jego serce (pasmo 2,00–2,50, jedyne bliskie zeru)."""
+    assert radar._oceń_karte(_karta_do_oceny(6, kurs=2.30))[1] is not None
+
+
+def test_faule_nie_daja_kart_wcale():
+    """18 kart na faulach popełnionych, JEDNA trafiona — i to niezależnie od
+    ceny (2,00+: −80,4% na 13 kartach; poniżej 2,00: −100% na 5). Rynek nie
+    jest słaby „przy wysokich kursach", jest słaby zawsze."""
+    karta = _karta_do_oceny(8, kurs=2.30)
+    karta["rynki"][0]["rynek_kod"] = "fouls_committed"
+    assert radar._oceń_karte(karta)[1] is None
+    # ...a ten sam materiał na innym rynku kartę daje
+    assert radar._oceń_karte(_karta_do_oceny(8, kurs=2.30))[1] is not None
