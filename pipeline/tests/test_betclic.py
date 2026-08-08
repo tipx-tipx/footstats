@@ -157,6 +157,20 @@ def test_kod_rynku_odsiewa_nie_nasze_rynki():
     assert betclic.kod_rynku([]) is None
 
 
+def test_linia_i_strona_znosi_pusta_nazwe_z_dekodera():
+    """⚑ REGRESJA 2026-08-08. `kod_rynku` szedł przez `_tekst`, a bliźniacze
+    `linia_i_strona` przez gołe `.lower()` — więc pusta wiadomość z dekodera
+    (`[]` zamiast napisu) rzucała `AttributeError` w pętli po zakładach
+    i kładła cały przebieg joba. Ta sama nazwa, dwie różne odporności."""
+    assert betclic.linia_i_strona([]) == (None, None)
+    assert betclic.linia_i_strona(None) == (None, None)
+    assert betclic.linia_i_strona("") == (None, None)
+    assert betclic.linia_i_strona(123) == (None, None)
+    # a normalne nazwy dalej czytamy tak samo
+    assert betclic.linia_i_strona("Powyżej 1,5") == (1.5, "over")
+    assert betclic.linia_i_strona("Poniżej 2,5") == (2.5, "under")
+
+
 def test_rozjazd_odrzuca_smieci():
     assert betclic.rozjazd(None, 1.9) is None
     assert betclic.rozjazd(1.0, 1.9) is None

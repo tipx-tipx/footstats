@@ -135,9 +135,17 @@ def main() -> int:
             break
         try:
             paczka = betclic.kursy_zawodnikow(int(bc["id"]))
-        except (RuntimeError, OSError, ValueError) as e:
+        except Exception as e:
+            # ⚑ SZEROKO, i to jest przemyślane (2026-08-08). Wąska lista
+            # wyjątków przepuściła `AttributeError` z jednego zakładu i zabiła
+            # CAŁY przebieg — razem z dwiema minutami parowania i szesnastoma
+            # meczami, które czekały w kolejce. Jeden mecz nie ma prawa tyle
+            # kosztować. Cisza się przy tym nie robi: liczymy błędy i piszemy
+            # typ wyjątku, bo bez niego „mecz X — coś" jest bezużyteczne
+            # ([[ciche-odrzucenia-zasada]]).
             bledy += 1
-            print(f"Betclic: mecz {bc.get('nazwa') or mid} — {e}")
+            print(f"Betclic: mecz {bc.get('nazwa') or mid} pominięty — "
+                  f"{type(e).__name__}: {e}")
             continue
         gracze = paczka.get("players") or {}
         if not gracze:

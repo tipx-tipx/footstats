@@ -597,11 +597,18 @@ def kod_rynku(nazwa: str | None, wymagaj_zawodnika: bool = True) -> str | None:
     return None
 
 
-def linia_i_strona(nazwa: str | None) -> tuple[float | None, str | None]:
-    """'Powyżej 1,5' -> (1.5, 'over'). Przecinek dziesiętny jak w PL."""
-    if not nazwa:
+def linia_i_strona(nazwa) -> tuple[float | None, str | None]:
+    """'Powyżej 1,5' -> (1.5, 'over'). Przecinek dziesiętny jak w PL.
+
+    Nazwa idzie przez `_tekst` z tego samego powodu co w `kod_rynku`: dekoder
+    gRPC oddaje pustą wiadomość jako `[]`, nie jako pusty napis. Gołe
+    `.lower()` wywalało wtedy `AttributeError` — a że siedzi w pętli po
+    zakładach, ginął CAŁY mecz i cały przebieg joba. Zmierzone na produkcji
+    08.08: trzy uruchomienia z rzędu na czerwono, ostatni zapis oferty 13:38.
+    """
+    n = _tekst(nazwa).lower()
+    if not n:
         return None, None
-    n = nazwa.lower()
     strona = "over" if "powyżej" in n or "ponad" in n else (
         "under" if "poniżej" in n else None)
     m = re.search(r"(\d+(?:[.,]\d+)?)", n)

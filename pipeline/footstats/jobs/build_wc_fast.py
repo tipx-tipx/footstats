@@ -3992,7 +3992,11 @@ def _main_impl(tryb=None):
                         break
                     try:
                         _paczka = betclic.kursy_zawodnikow(int(_bc["id"]))
-                    except (RuntimeError, OSError, ValueError) as e:
+                    except Exception as e:
+                        # szeroko z tego samego powodu co w `betclic_oferty`:
+                        # tu wyjątek spoza listy nie kładł cyklu (jest szerszy
+                        # `except` niżej), ale ucinał pobieranie WSZYSTKIM
+                        # kolejnym meczom w tym przebiegu
                         diagnostyka.cichy("betclic", "kursy_zawodnikow", e)
                         continue
                     _n_bc += 1

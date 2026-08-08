@@ -75,3 +75,33 @@ def test_brak_meczow_konczy_sie_spokojnie(monkeypatch):
                         lambda k, v: zapisy.append(k) or True)
     assert J.main() == 0
     assert zapisy == []
+
+
+def test_jeden_zepsuty_mecz_nie_zabija_przebiegu(monkeypatch):
+    """⚑ REGRESJA 2026-08-08: trzy przebiegi joba z rzędu na czerwono.
+
+    `AttributeError` z JEDNEGO zakładu (dekoder oddał `[]` zamiast nazwy)
+    przeleciał przez wąską listę wyjątków i zabił cały przebieg — razem
+    z dwiema minutami parowania i szesnastoma meczami, które czekały
+    w kolejce. Drugi mecz musi się pobrać mimo padniętego pierwszego.
+    """
+    kick = int(time.time()) + GODZINA
+    matches = [_mecz(1, kick, home="A", away="B"),
+               _mecz(2, kick + 60, home="C", away="D")]
+    monkeypatch.setattr(J.supa, "get_key", lambda k: matches)
+    monkeypatch.setattr(J.supa, "get_key_ok", lambda k: ({}, True))
+    monkeypatch.setattr(J.betclic, "paruj_mecze", lambda *a, **kw: (
+        {1: {"id": 11, "nazwa": "A - B"}, 2: {"id": 22, "nazwa": "C - D"}}, []))
+
+    def _kursy(bc_id):
+        if bc_id == 11:
+            raise AttributeError("'list' object has no attribute 'lower'")
+        return {"players": {"kowalski": {"shots": {1.5: {"over": 2.0}}}}}
+
+    monkeypatch.setattr(J.betclic, "kursy_zawodnikow", _kursy)
+    zapisy = {}
+    monkeypatch.setattr(J.supa, "put_key_bezpiecznie",
+                        lambda k, v: zapisy.update({k: v}) or True)
+
+    assert J.main() == 0
+    assert list(zapisy[J.BETCLIC_KLUCZ]) == ["2"]
