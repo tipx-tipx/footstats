@@ -49,12 +49,28 @@ Legenda: `[x]` zrobione · `[~]` w toku / obejście · `[ ]` otwarte
   per użytkownik, parametry modelowe odtwarzać po stronie serwera
   z kanonicznych identyfikatorów.
 
-- [ ] **Decyzja produktowa o EV netto.** Wszystkie 20 typów ostatniego
-  dry-runu miało ujemną wartość po podatku (mediana ok. −5,8%); bramy stoją
-  na EV brutto. To nie jest regresja naprawy znaku, tylko ujawnienie
-  ekonomiki. → „Duża szansa" może być treścią analityczną, ale nie zakładem
-  o dodatniej wartości; „Value" powinno wymagać dodatniego EV netto
-  z marginesem na niepewność.
+- [~] **EV netto — DECYZJA WŁAŚCICIELA PODJĘTA 11.08.** Stan zmierzony na
+  produkcji: wszystkie 19 typów na stronie ma ujemną wartość po podatku
+  (mediana −6,3%), a **żaden segment z n≥25 nie ma dodatniego zwrotu netto**
+  w historii (najlepszy: `match_corners|powyzej` −4,6%). Realny zwrot epoki
+  ligowej: brutto −6,4%, **netto −17,7%** (−1475 zł przy 10 zł na typ, 835
+  zakładów). Do wyjścia na zero po podatku trzeba zwrotu brutto powyżej
+  +13,6% — brakuje 20 punktów procentowych.
+
+  **PRZYJĘTE:**
+  * strona przestaje obiecywać zysk — „Duża szansa" mówi o trafialności
+    (to dowozi: 83,6% w paśmie ≥85%), nie o zarobku,
+  * druga zakładka („Wyszukane okazje") wymaga dodatniego EV netto i póki
+    co będzie **pusta** — z jawnym komunikatem „dziś nic nie znaleźliśmy".
+
+  **ODRZUCONE, z uzasadnieniem właściciela:**
+  * ~~podłoga −5% na EV netto w bramach~~ — wycinanie typów idzie pod prąd
+    celowi „jak najwięcej rodzajów typów"; model ma się nauczyć, a nie
+    dostawać coraz ciaśniejsze sito,
+  * ~~wstrzymanie sprzedaży do czasu dodatniego segmentu~~ — decyzja, którą
+    trzeba by potem odwracać.
+
+  **Nie proponować ponownie bez nowych danych.**
 
 ---
 
@@ -157,6 +173,13 @@ Legenda: `[x]` zrobione · `[~]` w toku / obejście · `[ ]` otwarte
 
 ## Produkt
 
+- [ ] **Podział na zakładki NIE JEST wdrożony zgodnie z dokumentem.** Audyt
+  sprawdził stan faktyczny: nadal obowiązuje limit **dwóch** typów na mecz,
+  lista jest wybierana od nowa w każdym cyklu (brak trwałego manifestu dnia
+  i zamknięcia o 06:00), a kwarantanny i ukrywanie rynków **są aktywne** mimo
+  deklaracji „bez blacklist". To są cztery osobne rzeczy do zrobienia, nie
+  jedna.
+
 - [ ] **Routing rynku z wagą modelu < 0,2 do „Value" — WYCOFANY.** Jeśli cena
   przewiduje lepiej niż model, to nie jest dowód, że model znalazł wartość.
   Taki segment → shadow, bez kuponów i bez stawki. (Moja pierwotna
@@ -246,6 +269,45 @@ Do odhaczenia przed uznaniem V2 za w pełni wdrożone:
 i 30 „poniżej"), paired Brier / log-loss. Nie po ROI z kilku dni.
 
 ---
+
+## Kolejność prac zalecana przez audyt
+
+Zapisana w całości, bo porządkuje zależności — nie każda pozycja z listy wyżej
+ma sens przed poprzednią.
+
+```
+1. Wstrzymać publikację nowych rekomendacji i kuponów V2 przed następnym
+   cyklem; nie zatrzymywać rozliczania istniejących rekordów.
+   → ODRZUCONE decyzją właściciela: trzy najgroźniejsze rzeczy były do
+     naprawy w godziny, a alternatywą dla publikacji była pusta strona.
+     Naprawione tego samego dnia (P0-1, P0-2, P0-5).
+2. Naprawić tożsamość karta–księga, immutable snapshot i pełną izolację
+   wersji.                                        → CZĘŚCIOWO (brama kolizji)
+3. Frozen calibration jako fail-closed + stemple dla wszystkich ścieżek.
+                                                  → CZĘŚCIOWO (fail-closed)
+4. Usunąć podwójną korektę w kuponach.            → ZROBIONE
+5. Jawna decyzja produktowa o EV netto i komunikacja dla klienta.
+                                                  → PODJĘTA (patrz wyżej)
+6. Ograniczyć `kupon-pomin` do administratora i osobno domknąć RLS.
+7. Zbudować niezależne `p_sport` i dopiero po nim dołączać cenę.
+8. Rozszerzać pokrycie, źródła składów, cache i monitoring źródeł.
+                                                  → ZACZĘTE (Rotowire, +2 ligi)
+9. Na końcu: nowy ranking, zamrożona lista dnia, drabinki i kupony.
+```
+
+## Co audyt potwierdził jako JUŻ DZIAŁAJĄCE
+
+Ważne, żeby tego nie „naprawiać" drugi raz — mój dokument twierdził inaczej
+i było to nieaktualne:
+
+- `opponentStatistics` jest przetwarzane i używane (`profil_druzyn.py`),
+- endpoint `performance` działa, ma budżet i cache,
+- Betclic potrafi dostarczać ofertę,
+- model minut ma scenariusze start / zmiana / ławka / DNP,
+- korelacje kontekstu są stosowane dla kilku rynków,
+- rozliczenia grupują po strefie Europe/Warsaw, najwcześniejsze rozliczenie
+  wymaga 130 minut i zakończonego statusu, dogrywka ma zabezpieczenia,
+- korelacje drużynowe są mierzone i wykorzystywane (`counts.py`).
 
 ## Czego audyt nie potwierdził (i co z tym zrobić)
 
