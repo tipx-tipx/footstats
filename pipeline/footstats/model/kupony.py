@@ -530,6 +530,34 @@ def urealnij_leg(p: float, delta: float) -> float:
     return 1.0 / (1.0 + math.exp(-(math.log(p / (1.0 - p)) + delta)))
 
 
+def urealnij_leg_wg_strony(leg: dict, korekty: dict | None) -> float:
+    """Szansa lega po korekcie strumienia — NAŁOŻONEJ TAM, GDZIE JEST UCZONA.
+
+    ⚑ 2026-08-11, razem z naprawą znaku kalibracji (rozliczanie.w_orientacji_over).
+    Korekta strumienia żyje w skali `p_over`: tak jest uczona i tak nakłada ją
+    silnik na typy (`apply_bias(bias, pred.p_over(linia))`). Kupony brały ją
+    dotąd wprost na `p` LEGA, więc dla lega „poniżej" przesuwały szansę
+    w przeciwną stronę, niż wynikało z pomiaru — a legi drużynowe to w ponad
+    90% „poniżej".
+
+    Dodatkowo `delta_dla_p` wybiera PRZEDZIAŁ po podanej szansie, a przedziały
+    są wyznaczone na `p_over` (rozliczanie._biny_korekty). Podanie `p` typu
+    trafiało więc również w lustrzany bin — ten sam błąd, który przy typach
+    naprawiono 31.07 (`_p_over_rekordu`), tu został.
+
+    Dla legów zawodniczych („powyżej") nic nie zmienia: `p` lega JEST `p_over`.
+    """
+    p_leg = float(leg.get("p_model") or 0.0)
+    kor = (korekty or {}).get(_strumien_lega(leg))
+    if not kor:
+        return p_leg
+    over = leg.get("strona") != "ponizej"
+    p_over = p_leg if over else 1.0 - p_leg
+    d = betting.delta_dla_p(kor, p_over)
+    p_over_kor = urealnij_leg(p_over, d)
+    return p_over_kor if over else 1.0 - p_over_kor
+
+
 def _strumien_lega(leg: dict) -> str:
     # ta sama stała co w rozliczaniu (rozliczanie._strumien) — do 2026-08-01
     # obie listy przedrostków żyły osobno i rozjechały się przy nowych rynkach
@@ -549,11 +577,10 @@ def szansa_z_legow(kupon: dict, korekty: dict | None) -> float:
         return float(kupon.get("p_model") or 0.0)
     p = 1.0
     for leg in kupon.get("legi") or []:
-        # delta dobierana pod SZANSĘ TEGO LEGA — korekta bywa binowana
-        # (rozliczanie.korekta_strumienia), bo błąd modelu zmienia znak
-        p_leg = float(leg.get("p_model") or 0.0)
-        d = betting.delta_dla_p(korekty.get(_strumien_lega(leg)), p_leg)
-        p *= urealnij_leg(p_leg, d)
+        # delta dobierana pod SZANSĘ TEGO LEGA i nakładana w skali `p_over`
+        # — patrz `urealnij_leg_wg_strony` (korekta bywa binowana, bo błąd
+        # modelu zmienia znak między przedziałami szansy)
+        p *= urealnij_leg_wg_strony(leg, korekty)
     return p
 
 
@@ -638,9 +665,7 @@ def legi_z_wartoscia(
         kurs = float(l.get("kurs") or 0.0)
         if kurs <= 1.0:
             continue
-        p_leg = float(l.get("p_model") or 0.0)
-        d = betting.delta_dla_p((korekty or {}).get(_strumien_lega(l)), p_leg)
-        p = urealnij_leg(p_leg, d)
+        p = urealnij_leg_wg_strony(l, korekty)
         if (p * kurs - 1.0) * 100.0 >= min_ev:
             out.append(l)
     return out

@@ -1,0 +1,555 @@
+{
+ "wersja_kalibracji": "2026-08-11-orientacja-over",
+ "zamrozono_ts": 1786452303,
+ "zrodlo": "replay na migawce typy_log (3471 rekordow, 2809 rozliczonych)",
+ "cap": [
+  -0.8,
+  0.8
+ ],
+ "bias": {
+  "sot": {
+   "logit": true,
+   "global": -0.648,
+   "bins": [
+    [
+     0.0,
+     0.55,
+     -0.648
+    ],
+    [
+     0.55,
+     0.7,
+     -0.648
+    ],
+    [
+     0.7,
+     0.85,
+     -0.648
+    ],
+    [
+     0.85,
+     1.01,
+     -0.648
+    ]
+   ],
+   "zrodla": [
+    "globalna",
+    "globalna",
+    "globalna",
+    "globalna"
+   ]
+  },
+  "shots": {
+   "logit": true,
+   "global": -0.638,
+   "bins": [
+    [
+     0.0,
+     0.55,
+     -0.638
+    ],
+    [
+     0.55,
+     0.7,
+     -0.638
+    ],
+    [
+     0.7,
+     0.85,
+     -0.602
+    ],
+    [
+     0.85,
+     1.01,
+     -0.638
+    ]
+   ],
+   "zrodla": [
+    "globalna",
+    "globalna",
+    "wlasna",
+    "globalna"
+   ]
+  },
+  "team_sot": {
+   "logit": true,
+   "global": 0.269,
+   "bins": [
+    [
+     0.0,
+     0.55,
+     0.309
+    ],
+    [
+     0.55,
+     0.7,
+     0.269
+    ],
+    [
+     0.7,
+     0.85,
+     0.269
+    ],
+    [
+     0.85,
+     1.01,
+     0.269
+    ]
+   ],
+   "zrodla": [
+    "wlasna",
+    "globalna",
+    "globalna",
+    "globalna"
+   ]
+  },
+  "team_goals": {
+   "logit": true,
+   "global": 0.466,
+   "bins": [
+    [
+     0.0,
+     0.55,
+     0.752
+    ],
+    [
+     0.55,
+     0.7,
+     0.208
+    ],
+    [
+     0.7,
+     0.85,
+     -0.263
+    ],
+    [
+     0.85,
+     1.01,
+     0.466
+    ]
+   ],
+   "zrodla": [
+    "wlasna",
+    "wlasna",
+    "wlasna",
+    "globalna"
+   ]
+  },
+  "team_cards": {
+   "logit": true,
+   "global": 0.621,
+   "bins": [
+    [
+     0.0,
+     0.55,
+     0.59
+    ],
+    [
+     0.55,
+     0.7,
+     0.621
+    ],
+    [
+     0.7,
+     0.85,
+     0.621
+    ],
+    [
+     0.85,
+     1.01,
+     0.621
+    ]
+   ],
+   "zrodla": [
+    "wlasna",
+    "globalna",
+    "globalna",
+    "globalna"
+   ]
+  },
+  "match_cards": {
+   "logit": true,
+   "global": -0.347,
+   "bins": [
+    [
+     0.0,
+     0.55,
+     -0.101
+    ],
+    [
+     0.55,
+     0.7,
+     -0.347
+    ],
+    [
+     0.7,
+     0.85,
+     -0.347
+    ],
+    [
+     0.85,
+     1.01,
+     -0.347
+    ]
+   ],
+   "zrodla": [
+    "wlasna",
+    "globalna",
+    "globalna",
+    "globalna"
+   ]
+  },
+  "team_shots": {
+   "logit": true,
+   "global": 0.8,
+   "bins": [
+    [
+     0.0,
+     0.55,
+     0.8
+    ],
+    [
+     0.55,
+     0.7,
+     0.8
+    ],
+    [
+     0.7,
+     0.85,
+     0.8
+    ],
+    [
+     0.85,
+     1.01,
+     0.8
+    ]
+   ],
+   "zrodla": [
+    "wlasna",
+    "globalna",
+    "globalna",
+    "globalna"
+   ]
+  },
+  "team_corners": {
+   "logit": true,
+   "global": 0.8,
+   "bins": [
+    [
+     0.0,
+     0.55,
+     0.8
+    ],
+    [
+     0.55,
+     0.7,
+     0.689
+    ],
+    [
+     0.7,
+     0.85,
+     0.443
+    ],
+    [
+     0.85,
+     1.01,
+     0.8
+    ]
+   ],
+   "zrodla": [
+    "wlasna",
+    "wlasna",
+    "wlasna",
+    "globalna"
+   ]
+  },
+  "team_fouls": {
+   "logit": true,
+   "global": 0.109,
+   "bins": [
+    [
+     0.0,
+     0.55,
+     0.233
+    ],
+    [
+     0.55,
+     0.7,
+     0.109
+    ],
+    [
+     0.7,
+     0.85,
+     0.109
+    ],
+    [
+     0.85,
+     1.01,
+     0.109
+    ]
+   ],
+   "zrodla": [
+    "wlasna",
+    "globalna",
+    "globalna",
+    "globalna"
+   ]
+  },
+  "match_corners": {
+   "logit": true,
+   "global": 0.216,
+   "bins": [
+    [
+     0.0,
+     0.55,
+     0.564
+    ],
+    [
+     0.55,
+     0.7,
+     0.139
+    ],
+    [
+     0.7,
+     0.85,
+     0.146
+    ],
+    [
+     0.85,
+     1.01,
+     -0.137
+    ]
+   ],
+   "zrodla": [
+    "wlasna",
+    "wlasna",
+    "wlasna",
+    "wlasna"
+   ]
+  },
+  "tackles": {
+   "logit": true,
+   "global": -0.203,
+   "bins": [
+    [
+     0.0,
+     0.55,
+     -0.203
+    ],
+    [
+     0.55,
+     0.7,
+     -0.203
+    ],
+    [
+     0.7,
+     0.85,
+     -0.203
+    ],
+    [
+     0.85,
+     1.01,
+     -0.203
+    ]
+   ],
+   "zrodla": [
+    "obca_epoka",
+    "obca_epoka",
+    "obca_epoka",
+    "obca_epoka"
+   ]
+  },
+  "fouls_won": {
+   "logit": true,
+   "global": -0.255,
+   "bins": [
+    [
+     0.0,
+     0.55,
+     -0.255
+    ],
+    [
+     0.55,
+     0.7,
+     -0.255
+    ],
+    [
+     0.7,
+     0.85,
+     -0.255
+    ],
+    [
+     0.85,
+     1.01,
+     -0.255
+    ]
+   ],
+   "zrodla": [
+    "obca_epoka",
+    "obca_epoka",
+    "obca_epoka",
+    "obca_epoka"
+   ]
+  },
+  "headed_shots": {
+   "logit": true,
+   "global": -0.386,
+   "bins": [
+    [
+     0.0,
+     0.55,
+     -0.386
+    ],
+    [
+     0.55,
+     0.7,
+     -0.386
+    ],
+    [
+     0.7,
+     0.85,
+     -0.386
+    ],
+    [
+     0.85,
+     1.01,
+     -0.386
+    ]
+   ],
+   "zrodla": [
+    "obca_epoka",
+    "obca_epoka",
+    "obca_epoka",
+    "obca_epoka"
+   ]
+  },
+  "interceptions": {
+   "logit": true,
+   "global": -0.163,
+   "bins": [
+    [
+     0.0,
+     0.55,
+     -0.163
+    ],
+    [
+     0.55,
+     0.7,
+     -0.163
+    ],
+    [
+     0.7,
+     0.85,
+     -0.163
+    ],
+    [
+     0.85,
+     1.01,
+     -0.163
+    ]
+   ],
+   "zrodla": [
+    "obca_epoka",
+    "obca_epoka",
+    "obca_epoka",
+    "obca_epoka"
+   ]
+  },
+  "fouls_committed": {
+   "logit": true,
+   "global": -0.388,
+   "bins": [
+    [
+     0.0,
+     0.55,
+     -0.388
+    ],
+    [
+     0.55,
+     0.7,
+     -0.388
+    ],
+    [
+     0.7,
+     0.85,
+     -0.388
+    ],
+    [
+     0.85,
+     1.01,
+     -0.388
+    ]
+   ],
+   "zrodla": [
+    "obca_epoka",
+    "obca_epoka",
+    "obca_epoka",
+    "obca_epoka"
+   ]
+  },
+  "sot_outside_box": {
+   "logit": true,
+   "global": -0.389,
+   "bins": [
+    [
+     0.0,
+     0.55,
+     -0.389
+    ],
+    [
+     0.55,
+     0.7,
+     -0.389
+    ],
+    [
+     0.7,
+     0.85,
+     -0.389
+    ],
+    [
+     0.85,
+     1.01,
+     -0.389
+    ]
+   ],
+   "zrodla": [
+    "obca_epoka",
+    "obca_epoka",
+    "obca_epoka",
+    "obca_epoka"
+   ]
+  },
+  "shots_outside_box": {
+   "logit": true,
+   "global": -0.308,
+   "bins": [
+    [
+     0.0,
+     0.55,
+     -0.308
+    ],
+    [
+     0.55,
+     0.7,
+     -0.308
+    ],
+    [
+     0.7,
+     0.85,
+     -0.308
+    ],
+    [
+     0.85,
+     1.01,
+     -0.308
+    ]
+   ],
+   "zrodla": [
+    "obca_epoka",
+    "obca_epoka",
+    "obca_epoka",
+    "obca_epoka"
+   ]
+  }
+ }
+}

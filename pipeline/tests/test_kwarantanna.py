@@ -147,10 +147,21 @@ def test_kalibracja_uczy_sie_na_typach_poza_publikacja():
     assert bias["shots"]["global"] < 0
 
 
-def test_cap_logit_poszerzony_w_dol():
+def test_cap_logit_symetryczny():
+    """Cap ma być na tyle szeroki, żeby zmierzona korekta przechodziła w CAŁOŚCI.
+
+    Do 2026-08-11 górna granica stała na 0,40 — nie z pomiaru, tylko dlatego,
+    że przed naprawą orientacji kalibracji (`w_orientacji_over`) każda delta
+    szła w dół i nic w górną nie uderzało. Po naprawie delty rynków
+    drużynowych są dodatnie: team_corners +0,909 (n=554), team_shots +0,844,
+    team_cards +0,579 — czyli cap 0,40 publikowałby połowę tego, co zmierzone,
+    dokładnie na rynkach z największym błędem. Przed przestrzeleniem przy
+    krótkiej próbie chroni shrinkage n/(n+25), nie cap.
+    """
     lo, hi = rozliczanie.BIAS_CAP_LOGIT
-    assert lo <= -0.75  # zmierzone błędy wymagały delty ~-0.6
-    assert hi == 0.40
+    assert lo <= -0.75   # zmierzone błędy wymagały delty ~-0.6
+    assert hi >= 0.80    # ...a po naprawie znaku ~+0.9 w drugą stronę
+    assert abs(lo) == abs(hi), "brak powodu, by karać jeden kierunek mocniej"
 
 
 def test_skutecznosc_pokazuje_poza_publikacja_bez_liczenia():

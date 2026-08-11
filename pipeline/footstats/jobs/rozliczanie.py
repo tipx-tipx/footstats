@@ -25,10 +25,12 @@ Przepływ (wywoływane na końcu każdego cyklu):
 from __future__ import annotations
 
 import contextlib
+import json
 import math
 import time
 from collections import Counter
 from datetime import datetime, timezone
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 # STREFA PRODUKTU, NIE STREFA SERWERA (2026-08-03).
@@ -477,6 +479,8 @@ def _kupon_leg_do_logu(l: dict) -> dict:
         "miekka_linia": l.get("miekka_linia"),
         "xi_sygnal": l.get("xi_sygnal"),
         "kal_tau": l.get("kal_tau"),
+        # na czym stała prognoza — patrz stempel w `_dopisz_nowe`
+        "ess": l.get("ess"), "udzial_priora": l.get("udzial_priora"),
     }
 
 
@@ -702,6 +706,27 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
             **({"lambda": round(float(b["lambda"]), 3)}
                if isinstance(b.get("lambda"), (int, float)) and b["lambda"]
                else {}),
+            # NA CZYM STAŁA TA PROGNOZA (2026-08-11) — dokładnie ten sam powód
+            # co przy `lambda` wyżej. `ess` to efektywna liczba meczów własnej
+            # historii (wagi wykładnicze, tau 180 dni), `udzial_priora` — jaka
+            # część wyniku pochodzi ze średniej rozgrywek zamiast z tej drużyny.
+            # Zmierzone przy wprowadzeniu: mediana ESS 10,3, ale Boca Juniors
+            # 1,97 (67% prognozy z priora). Bez stempla pytanie „czy typy
+            # stojące na średniej ligi trafiają gorzej" jest niemierzalne
+            # wstecz — a od odpowiedzi zależy, czy próg
+            # `counts.MIN_EFFECTIVE_MATCHES` ma sens jako brama.
+            **({"ess": round(float(b["ess"]), 2)}
+               if isinstance(b.get("ess"), (int, float)) else {}),
+            **({"udzial_priora": round(float(b["udzial_priora"]), 3)}
+               if isinstance(b.get("udzial_priora"), (int, float)) else {}),
+            # DELTA KALIBRACJI RYNKU użyta przy publikacji (2026-08-11).
+            # Razem z `kal_strumien` daje pełny rachunek tego, co nałożono na
+            # surowe `p_over` — bez tego `_p_surowe` odwraca połowę korekty,
+            # a regulator `compute_bias_full` uczy się na `p`, z którego nie
+            # potrafi zdjąć własnej poprzedniej delty (stąd zamrożenie mapy,
+            # patrz KALIBRACJA_ZAMROZONA).
+            **({"kal_rynek": round(float(b["kal_rynek"]), 4)}
+               if isinstance(b.get("kal_rynek"), (int, float)) else {}),
             # historia predykcji typów DRUŻYNOWYCH — patrz kalibracja_tau.py
             **({"kal_tau": b["kal_tau"]} if b.get("kal_tau") else {}),
             # KOREKTA STRUMIENIA użyta przy publikacji — bez tego stempla
@@ -1100,7 +1125,27 @@ BIAS_CAP = (0.85, 1.15)        # (stary format mnożnikowy — compute_bias/rapo
 # błędy realnych rynków wymagały delty −0.58 (shots) i −1.1 (fouls_committed),
 # a cap −0.40 ucinał korektę w połowie — model NIE MÓGŁ się skalibrować mimo
 # danych. Przed przestrzeleniem chroni shrinkage (waga n/(n+25)), nie cap.
-BIAS_CAP_LOGIT = (-0.80, 0.40)
+#
+# ⚑ GÓRNA GRANICA SYMETRYZOWANA 0.40 -> 0.80 (2026-08-11), z tego samego
+# powodu i tym samym argumentem co dolna półtora miesiąca wcześniej.
+#
+# Asymetria była pozostałością po czasach, gdy KAŻDA zmierzona korekta szła
+# w dół — dolną poszerzono pod realne pomiary, górnej nikt nie ruszał, bo nic
+# w nią nie uderzało. Po naprawie orientacji kalibracji
+# (`w_orientacji_over`) delty rynków drużynowych zmieniły znak na dodatni
+# i cap zaczął ucinać dokładnie tam, gdzie błąd jest największy. Zmierzone
+# tego dnia na migawce księgi — pomiar kontra to, co przechodziło:
+#
+#     team_corners  +0,909  ucinane do +0,40   (n=554)
+#     team_shots    +0,844  ucinane do +0,40   (n= 74)
+#     team_cards    +0,579  ucinane do +0,40   (n=121)
+#     team_goals    +0,360  mieściło się
+#
+# Cztery rynki na progu i 19 delt na capie (wobec 10 przed naprawą) — to nie
+# jest bezpiecznik chroniący przed szumem, tylko systematyczne publikowanie
+# połowy zmierzonej korekty. Przed przestrzeleniem przy chudej próbie dalej
+# chroni shrinkage n/(n+25), a te rynki mają setki rozliczeń.
+BIAS_CAP_LOGIT = (-0.80, 0.80)
 # sugestie STS (bez kursu, bez bezpieczników rynkowych) kalibrują się OSOBNO
 # i mylą się dużo mocniej niż typy z kursem — cap w dół musi być szerszy
 SUGESTIA_BIAS_CAP_LOGIT = (-1.0, 0.40)
@@ -1189,6 +1234,63 @@ def _bias_logit(grp: list[dict], wagi: list[float] | None = None) -> float:
     return (lo + hi) / 2.0
 
 
+def w_orientacji_over(grp: list[dict]) -> list[dict]:
+    """Rekordy sprowadzone do JEDNEJ strony linii: `p_over` i wynik „powyżej".
+
+    ⚑ NAPRAWA ODWRÓCONEGO ZNAKU KALIBRACJI (2026-08-11). To jest najcięższy
+    błąd, jaki wyszedł w tym modelu, i mieszkał w nim od początku rynków
+    drużynowych.
+
+    KAŻDA delta, którą liczy `compute_bias_full` i `korekta_strumienia`, jest
+    nakładana na `p_over` — `engine.apply_bias(bias, pred.p_over(linia))` —
+    a „poniżej" powstaje dopiero potem jako `1 − p_over`. Ale UCZONE były na
+    `r["p_model"]`, czyli na `p` SAMEGO TYPU: dla „poniżej" to `p_under`.
+    Ponieważ 89–97% typów drużynowych to „poniżej", korekta uczyła się prawie
+    wyłącznie po jednej stronie skali i lądowała po przeciwnej.
+
+    Zmierzone 2026-08-11 na 1583 rozliczeniach epoki ligowej — delta obecna
+    kontra delta w orientacji „powyżej":
+
+        team_corners  n=554  93% poniżej   −0,904  vs  +0,909
+        team_goals    n=485  89%           −0,607  vs  +0,360
+        team_cards    n=121  97%           −0,552  vs  +0,579
+        team_shots    n= 74  82%           −0,831  vs  +0,844
+        team_sot      n= 97  96%           −0,336  vs  +0,241
+
+    Siedem rynków na osiem z odwróconym znakiem. Skutek na team_corners dla
+    typu „poniżej" z szansą 0,75: obecny kod PODNOSIŁ ją do 0,881, zamiast
+    ściągnąć do 0,547 — przy realnej trafialności 60,8% na tym rynku. Warstwa
+    lecząca przeszacowanie pogłębiała je o 13 punktów procentowych.
+
+    Stąd rosnąca luka mimo dziewięciu warstw uczenia i stąd `szansa_pokazywana`
+    z dodatnią deltą dla drużyn: ona kompensowała bałagan piętro niżej.
+
+    DLA STRUMIENI CAŁKOWICIE „POWYŻEJ" (zawodnicy, drabinki) TA FUNKCJA JEST
+    TOŻSAMOŚCIĄ — `p` typu jest tam `p_over`, więc nic nie przestawia. To
+    celowe: jedno wywołanie obsługuje wszystkie strumienie, a różnicę robi
+    wyłącznie tam, gdzie strony linii są mieszane.
+
+    NIE UŻYWAĆ w `szansa_pokazywana` — tamta delta jest uczona i nakładana na
+    `p` WYBRANEGO ZAKŁADU (`urealnij_p(p_model, d)`), więc jej orientacja
+    typu jest poprawna. Dwie różne semantyki, dwie różne transformacje.
+    """
+    out: list[dict] = []
+    for r in grp:
+        if r.get("strona") != "ponizej":
+            out.append(r)
+            continue
+        p = float(r.get("p_model") or 0.0)
+        out.append({
+            **r,
+            "p_model": 1.0 - p,
+            # wynik też się odbija: „poniżej trafione" znaczy „powyżej pudło"
+            "wynik": (
+                "przegrany" if r.get("wynik") == "wygrany" else "wygrany"
+            ),
+        })
+    return out
+
+
 def compute_bias(log: dict, min_n: int = MIN_N_KALIBRACJI) -> dict[str, float]:
     """Płaski bias per rynek (stary format) — zachowany dla raportu i testów."""
     grupy: dict[str, list[dict]] = {}
@@ -1256,8 +1358,11 @@ def compute_bias_full(
         fam = RODZINY_RYNKOW.get(r["rynek_kod"])
         if fam:
             rodziny.setdefault(fam, []).append(r)
+    # ⚑ ORIENTACJA „POWYŻEJ" NA KAŻDYM POZIOMIE (rodzina/rynek/przedział) —
+    # patrz `w_orientacji_over`. Wagi liczymy z rekordu ORYGINALNEGO: świeżość
+    # nie zależy od strony linii, a transformacja kopiuje `kickoff_ts`.
     fam_bias = {
-        f: _bias_logit(g, [_w(r) for r in g])
+        f: _bias_logit(w_orientacji_over(g), [_w(r) for r in g])
         for f, g in rodziny.items() if len(g) >= min_n
     }
     grupy: dict[str, list[dict]] = {}
@@ -1270,7 +1375,7 @@ def compute_bias_full(
         # rozliczenia nie tylko mniej znaczą w biasie, ale i słabiej
         # emancypują rynek od rodziny
         n_eff = sum(_w(r) for r in grp)
-        raw = _bias_logit(grp, [_w(r) for r in grp])
+        raw = _bias_logit(w_orientacji_over(grp), [_w(r) for r in grp])
         if fb is not None:
             g = fb + (n_eff / (n_eff + min_n)) * (raw - fb)
         elif len(grp) >= min_n:
@@ -1287,7 +1392,10 @@ def compute_bias_full(
             if len(bgrp) >= MIN_N_PRZEDZIAL:
                 b_eff = sum(_w(r) for r in bgrp)
                 k = b_eff / (b_eff + MIN_N_PRZEDZIAL)
-                bb = g + k * (_bias_logit(bgrp, [_w(r) for r in bgrp]) - g)
+                bb = g + k * (
+                    _bias_logit(w_orientacji_over(bgrp), [_w(r) for r in bgrp])
+                    - g
+                )
                 zr = ZRODLO_WLASNA
             bins.append([lo, hi, _cap_bias(bb, cap)])
             zrodla.append(zr)
@@ -2130,7 +2238,14 @@ def korekta_strumienia(log: dict | None = None) -> dict[str, float]:
         )[-KOREKTA_STRUMIENIA_OKNO:]
         if len(grp) < min_n:
             continue
-        b = _bias_logit([{**r, "p_model": _p_surowe(r)} for r in grp])
+        # ⚑ ORIENTACJA „POWYŻEJ" — patrz `w_orientacji_over`. Ta delta ląduje
+        # na `p_over` (build_wc_fast: `_dodaj_delte(bias_t, korekta["druzyny"])`
+        # → `apply_bias(..., pred_t.p_over(l_t))`), więc uczyć ją trzeba tam,
+        # gdzie działa. Dla „pewniaków" i „drabinek" transformacja jest
+        # tożsamością — te strumienie są w 100% „powyżej".
+        b = _bias_logit(
+            w_orientacji_over([{**r, "p_model": _p_surowe(r)} for r in grp])
+        )
         # dochodzimy do pełnej korekty przez kilka cykli, nie w jednym skoku
         juz = [_delta_zapisana(r) for r in grp]
         srednia_juz = sum(juz) / len(juz)
@@ -2458,7 +2573,9 @@ def _biny_korekty(
         if len(bgrp) >= KOREKTA_PRZEDZIAL_MIN_N:
             k = len(bgrp) / (len(bgrp) + KOREKTA_PRZEDZIAL_MIN_N)
             surowy = _bias_logit(
-                [{**r, "p_model": _p_surowe(r)} for r in bgrp]
+                w_orientacji_over(
+                    [{**r, "p_model": _p_surowe(r)} for r in bgrp]
+                )
             )
             bb = globalna + k * (surowy - globalna)
             zr = ZRODLO_WLASNA
@@ -3077,8 +3194,66 @@ def kupon_do_pokazania(k: dict, urealnienie: dict[str, float] | None = None) -> 
     ]}
 
 
+# ⚑ MAPA KALIBRACJI ZAMROŻONA (2026-08-11, warunek wdrożenia V2) ------------
+#
+# `compute_bias_full` jest regulatorem ze sprzężeniem zwrotnym, który NIE
+# ODEJMUJE WŁASNEJ POPRZEDNIEJ KOREKTY. Uczy się na `p_model` zamrożonym
+# w księdze, a to `p` już zawiera deltę z chwili publikacji — w odróżnieniu
+# od `korekta_strumienia`, gdzie `_p_surowe` tę deltę zdejmuje. Stempla
+# `kal_rynek` do niedawna nie było, więc nie dało się jej odjąć nawet chcąc.
+#
+# Objaw, po którym to widać: w wersji sprzed naprawy znaku WSZYSTKIE duże
+# rynki drużynowe siedziały dokładnie na dolnym capie (team_corners −0,800,
+# team_shots −0,800). Regulator piął się do sufitu, bo mierzył błąd resztkowy
+# po własnej korekcie i publikował go jako korektę pełną.
+#
+# Do czasu przebudowy tej pętli mapa jest ZAMROŻONA na wartościach
+# z zatwierdzonego replayu. Cykl ją czyta, ale nie przelicza — regulator nie
+# może więc narastać na własnym ogonie, a każdy typ V2 dostaje deltę, którą
+# da się wskazać palcem w pliku.
+#
+# ODMROŻENIE: skasować plik albo ustawić KALIBRACJA_ZAMROZONA=False — wtedy
+# wraca liczenie co cykl. Nie robić tego przed naprawą pętli.
+KALIBRACJA_ZAMROZONA = True
+_PLIK_KALIBRACJI = (
+    Path(__file__).resolve().parent.parent / "kalibracja_zamrozona.json"
+)
+
+
+def kalibracja_zamrozona() -> dict[str, dict] | None:
+    """Zatwierdzona mapa kalibracji z pliku — albo None, gdy jej nie ma.
+
+    Zwraca tylko mapę zgodną z BIEŻĄCĄ `WERSJA_KALIBRACJI`: plik z innej
+    wersji jest po cichu ignorowany, żeby podbicie wersji nie odziedziczyło
+    delt policzonych dla innego rachunku.
+    """
+    if not KALIBRACJA_ZAMROZONA or not _PLIK_KALIBRACJI.exists():
+        return None
+    try:
+        dane = json.loads(_PLIK_KALIBRACJI.read_text(encoding="utf-8"))
+    except Exception as e:
+        print(f"Kalibracja zamrożona: plik nieczytelny ({e}) — liczę z księgi")
+        return None
+    if dane.get("wersja_kalibracji") != betting.WERSJA_KALIBRACJI:
+        print("Kalibracja zamrożona: plik z wersji "
+              f"{dane.get('wersja_kalibracji')}, a produkt jedzie na "
+              f"{betting.WERSJA_KALIBRACJI} — pomijam plik")
+        return None
+    return dane.get("bias") or None
+
+
 def market_bias() -> dict[str, dict]:
-    """Korekty kalibracyjne z logu w Supabase (puste, gdy brak danych/env)."""
+    """Korekty kalibracyjne (puste, gdy brak danych/env).
+
+    Najpierw zamrożona mapa z pliku — patrz `kalibracja_zamrozona`. Dopiero
+    gdy jej nie ma, liczymy z księgi.
+    """
+    zamrozona = kalibracja_zamrozona()
+    if zamrozona is not None:
+        print(f"Kalibracja: mapa ZAMROŻONA z pliku ({len(zamrozona)} rynków, "
+              f"wersja {betting.WERSJA_KALIBRACJI}) — regulator nie przelicza "
+              "jej co cykl (patrz KALIBRACJA_ZAMROZONA)")
+        return zamrozona
     log = _migruj_log(supa.get_key("typy_log") or {})
     return compute_bias_full(log)
 

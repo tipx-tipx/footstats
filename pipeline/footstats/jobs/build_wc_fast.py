@@ -413,7 +413,16 @@ def scal_z_publikacjami(
     for b in value_bets:
         k = _klucz_publikacji(b)
         rej[k] = {
-            "bet": {kk: vv for kk, vv in b.items() if kk != "kal_tau"},
+            # STEMPEL WERSJI TRAFIA DO REJESTRU (2026-08-11). Dotąd `wersje`
+            # nakładało dopiero `rozliczanie._dopisz_nowe`, więc rejestr
+            # publikacji — jedyne miejsce, z którego typ WRACA na listę —
+            # nie wiedział, którym rachunkiem policzono jego `p`. Bez tego
+            # reguła „wznowienia między wersjami zabronione" (niżej) nie ma
+            # czego sprawdzić.
+            "bet": {
+                **{kk: vv for kk, vv in b.items() if kk != "kal_tau"},
+                "wersje": betting.wersje_publikacji(),
+            },
             "mecz": matches_out.get(b.get("mecz_id")),
             "kickoff_ts": b.get("kickoff_ts"),
             # pierwsza publikacja wygrywa — to ona jest cena, ktora wzial user
@@ -432,6 +441,7 @@ def scal_z_publikacjami(
     odtworzone = set(biezace)
     _skasowane_po_gwizdku = 0
     _skasowane_bez_daty = 0
+    _wznow_obca_wersja = 0   # patrz reguła wersji przy wznawianiu, niżej
     for k, rec in list(rej.items()):
         ts_k = int(rec.get("kickoff_ts") or 0)
         # brak kickoffu traktujemy jak po gwizdku: wpis bez daty nigdy by nie
@@ -448,6 +458,28 @@ def scal_z_publikacjami(
             continue
         bet = dict(rec.get("bet") or {})
         if not bet:
+            continue
+        # ⚑ WZNOWIENIA MIĘDZY WERSJAMI SĄ ZABRONIONE (2026-08-11, warunek
+        # wdrożenia V2).
+        #
+        # Typ policzony poprzednią wersją kalibracji niesie ZAMROŻONE `p`
+        # z tamtego rachunku — a przy naprawie orientacji kalibracji
+        # (`rozliczanie.w_orientacji_over`) delty rynków drużynowych zmieniły
+        # ZNAK. Wznawiając taki typ, pokazalibyśmy szansę, o której już wiemy,
+        # że jest liczona odwrotnie, i to bez żadnego znaku dla użytkownika,
+        # które liczby są z której wersji. Zmierzone przy wdrożeniu: 119 ze 133
+        # typów na liście to byłyby wznowienia sprzed naprawy.
+        #
+        # Przeliczyć się ich NIE DA: surowego `p` sprzed kalibracji rynkowej
+        # nie odzyskamy dla rekordów bez stempla `kal_rynek` (wprowadzony
+        # razem z tą regułą, więc pierwsze mają go dopiero typy V2).
+        #
+        # Rekord zostaje w rejestrze i w księdze — rozliczy się i policzy jako
+        # V1, tylko nie wraca na LISTĘ REKOMENDACJI. To jest różnica między
+        # „usuwamy historię" a „przestajemy to polecać".
+        _w_bet = (bet.get("wersje") or {}).get("kalibracja")
+        if _w_bet != betting.WERSJA_KALIBRACJI:
+            _wznow_obca_wersja += 1
             continue
         bet["wznowiony"] = True
         bet["opublikowano_ts"] = rec.get("opublikowano_ts")
@@ -538,6 +570,12 @@ def scal_z_publikacjami(
             continue                      # drabinki mają własną zakładkę i siatkę
         if int(rec.get("kickoff_ts") or 0) <= teraz:
             continue                      # po gwizdku
+        # ta sama reguła wersji co przy rejestrze wyżej — księga jest DRUGIM
+        # źródłem wznowień, więc bez tego typ V1 wracałby na listę tędy
+        if (rec.get("wersje") or {}).get("kalibracja") \
+                != betting.WERSJA_KALIBRACJI:
+            _wznow_obca_wersja += 1
+            continue
         k = _klucz_publikacji(rec)
         if k in odtworzone:
             continue
@@ -563,7 +601,13 @@ def scal_z_publikacjami(
         # w `bet`, więc wpis niczego nie odświeży w złą stronę.
         if not bet.get("uproszczony") and k not in rej:
             rej[k] = {
-                "bet": {kk: vv for kk, vv in bet.items() if kk != "kal_tau"},
+                # stempel wersji jak w głównej pętli wyżej — tędy przechodzą
+                # wyłącznie rekordy, które właśnie przeszły kontrolę wersji,
+                # więc wpisujemy bieżącą (`_typ_z_logu` pola nie przenosi)
+                "bet": {
+                    **{kk: vv for kk, vv in bet.items() if kk != "kal_tau"},
+                    "wersje": betting.wersje_publikacji(),
+                },
                 "mecz": matches_out.get(mid),
                 "kickoff_ts": bet.get("kickoff_ts"),
                 "opublikowano_ts": bet.get("opublikowano_ts") or teraz,
@@ -641,6 +685,12 @@ def scal_z_publikacjami(
         print(f"Publikacje: wznowiono {wznowione} typów z rejestru"
               + (f" + {z_logu} z księgi rozliczeń" if z_logu else "")
               + f" (bieżące przeliczenie dało {len(value_bets)})")
+    if _wznow_obca_wersja:
+        # NIE „zniknęły" — zostają w rejestrze i w księdze, rozliczą się
+        # i policzą jako swoja wersja. Przestają tylko być rekomendacją.
+        print(f"Wznowienia wstrzymane przez wersję: {_wznow_obca_wersja} typów "
+              f"policzonych inną kalibracją niż {betting.WERSJA_KALIBRACJI} "
+              "— zostają w księdze, nie wracają na listę")
     return out, wznowione + z_logu
 
 
@@ -1194,6 +1244,14 @@ WC_UTID = 16
 # zawodniku (kontuzja, wypadł z rotacji, transfer, przerwa w lidze).
 OKNO_SWIEZEJ_PROBY_S = 120 * 86400  # okno "żywej" historii (pokrywa przerwę letnią)
 MIN_MECZE_W_OKNIE = 2               # mniej występów w oknie = historia martwa, typu nie ma
+# ⚑ Najstarszy mecz, który w ogóle wolno pokazać jako „ostatnie mecze" i wziąć
+# do średniej opisowej drużyny (2026-08-11). Do prognozy i tak nie wchodził —
+# wagi wykładniczne `counts.fit_posterior` ścinają go do zera — ale wchodził
+# do KAŻDEJ liczby, którą widzi człowiek: uzasadnienia, karty, kontroli bazy.
+# Osiemnaście miesięcy = dwa sezony rozgrywek; krócej zabrałoby historię
+# drużynom grającym tylko w pucharach (sześć meczów na sezon).
+MAX_WIEK_HISTORII_DRUZYNY_S = 548 * 86400
+MIN_HISTORII_PO_PRZYCIECIU = 5      # tyle świeżych meczów musi zostać po suficie
 STARE_DANE_S = 45 * 86400           # ostatni występ dawniej -> typ tylko "w tle"
 #   (liczy się, uczy kalibrację, widoczny w Skuteczności; wraca do publikacji
 #    po 1-2 kolejkach, gdy zawodnik znów ma świeże mecze)
@@ -5288,8 +5346,56 @@ def _main_impl(tryb=None):
             prior_t = counts.GroupPrior(
                 mean_per90=max(lg_mean, 0.5), pseudo_matches=4.0
             )
-            n_h = min(len(tt.counts), 20)
             now_t = int(time.time())
+            # ⚑ TWARDY SUFIT WIEKU HISTORII (2026-08-11).
+            #
+            # `fit_posterior` waży mecze wykładniczo (tau 180 dni), więc do
+            # SAMEJ PROGNOZY mecz sprzed czterech lat i tak wnosi ułamek
+            # promila — to nie tam był problem. Problem jest wszędzie indziej,
+            # bo `tt.counts[:20]` bierze dwadzieścia ostatnich REKORDÓW, nie
+            # dwadzieścia ostatnich meczów: średnia w uzasadnieniu, historia
+            # rozpisana na karcie („ostatnie mecze"), kontrola rozjazdu bazy
+            # i pomiar `srednia_hist` liczyły się z archiwum. Zmierzone tego
+            # dnia na dumpie dry-runu: Bolívar miał w próbie rzuty rożne
+            # z października 2020, Raków gole od sierpnia 2022 — 186 z ~960
+            # meczów historii goli było starszych niż 400 dni.
+            #
+            # Klient czytał więc na karcie „w ostatnich meczach", patrząc na
+            # spotkania sprzed pięciu lat, w zupełnie innym składzie.
+            #
+            # Sufit, a NIE okno o stałej długości: drużyna z pucharów gra
+            # sześć razy w sezonie i okno „ostatnie 180 dni" zabrałoby jej
+            # historię w całości. Osiemnaście miesięcy przepuszcza dwa pełne
+            # sezony rozgrywek i odcina to, co i tak waży zero.
+            _sufit_ts = now_t - MAX_WIEK_HISTORII_DRUZYNY_S
+            # MASKA, NIE PREFIKS — i to nie jest nadgorliwość. `historia_druzyny`
+            # sortuje malejąco jawnie (statshub.py), ale GŁÓWNE źródło trendów
+            # to `fetch_team_trends`, gdzie kolejność `recentGames` jest taka,
+            # jaką odda feed, i nic w naszym kodzie jej nie porządkuje.
+            # Zmierzone przy wprowadzaniu: 86 z 86 serii przyszło posortowanych,
+            # więc prefiks DZIŚ dawał ten sam wynik — ale opierałby całą maskę
+            # wieku na obietnicy cudzego API. Przy odwróconej serii prefiks
+            # wpuściłby dokładnie te mecze, które ma odciąć.
+            _idx = [
+                i for i in range(min(len(tt.counts), 20))
+                if i >= len(tt.timestamps) or tt.timestamps[i] >= _sufit_ts
+            ]
+            if len(_idx) < min(len(tt.counts), 20):
+                odpadki_t["historia_przycieta_wiekiem"] += 1
+            n_h = len(_idx)
+            if n_h < MIN_HISTORII_PO_PRZYCIECIU:
+                # Nie „ten rynek jest zły" — po prostu nie mamy czym liczyć.
+                # Rekord odrzucenia trafia do rejestru, więc za tydzień widać,
+                # ilu meczów nam brakuje i gdzie dociągnąć dane, zamiast tylko
+                # tego, że typów jest mało (patrz zasada: żadnych cichych
+                # odrzuceń).
+                odpadki_t["historia_za_stara"] += 1
+                _odrzuc_druzyne(
+                    mid, tt, "historia_za_stara",
+                    f"tylko {n_h} meczów z ostatnich 18 miesięcy "
+                    f"(w feedzie {len(tt.counts)}, reszta starsza)"
+                )
+                continue
             # KOREKTA KALENDARZA: każdy mecz historii sprowadzamy do warunków
             # neutralnych — dzielimy przez to, co tamten rywal przeciętnie
             # dopuszcza (koncesje feedu, ten sam shrink+cap co czynnik rywala)
@@ -5298,7 +5404,7 @@ def _main_impl(tryb=None):
             # u siebie; kontekst NADCHODZĄCEGO meczu nakłada potem f_opp
             # i f_venue — bez podwójnego liczenia, bo historia jest już czysta.
             hist_t: list[float] = []
-            for i_g in range(n_h):
+            for i_g in _idx:
                 mnoznik_gry = 1.0
                 oid_g = (
                     tt.game_opponent_ids[i_g]
@@ -5319,12 +5425,15 @@ def _main_impl(tryb=None):
                         tt.game_is_home[i_g], tt.market_code
                     )
                 hist_t.append(float(tt.counts[i_g]) / max(mnoznik_gry, 0.5))
+            _ts_h = [
+                tt.timestamps[i] if i < len(tt.timestamps) else now_t
+                for i in _idx
+            ]
             posterior_t = counts.fit_posterior(
                 np.array(hist_t),
                 np.array([90.0] * n_h),
                 np.array([
-                    max((now_t - t) / 86400.0, 0.0)
-                    for t in (tt.timestamps[:n_h] or [now_t] * n_h)
+                    max((now_t - t) / 86400.0, 0.0) for t in _ts_h
                 ]),
                 prior=prior_t,
             )
@@ -5412,7 +5521,7 @@ def _main_impl(tryb=None):
             f_mostek_t = _mostek(tt.market_code, tt.opponent_id, tt.league_id)
             f_styl_t = float(np.clip(f_matchup_t * f_mostek_t, 0.85, 1.20))
             factor_t = f_sedzia * f_script * f_opp * f_venue * f_styl_t
-            srednia_hist = float(np.mean(tt.counts[:n_h]))
+            srednia_hist = float(np.mean([tt.counts[i] for i in _idx]))
             # brama jakości (liga) także dla drużyn: historia klubu sprzed
             # przerwy/awansu podlega tym samym progom co zawodnicza
             stare_t = False
@@ -5490,7 +5599,17 @@ def _main_impl(tryb=None):
                 _bias_t_pelny = _dodaj_delte(
                     bias_t, korekta_strumieni.get("druzyny", 0.0)
                 )
-                p_over_t = apply_bias(_bias_t_pelny, pred_t.p_over(l_t))
+                _p_over_sur_t = pred_t.p_over(l_t)
+                p_over_t = apply_bias(_bias_t_pelny, _p_over_sur_t)
+                # DELTA KALIBRACJI RYNKU FAKTYCZNIE UŻYTA DLA TEGO TYPU
+                # (2026-08-11, warunek wdrożenia V2). `kal_strumien` zapisuje
+                # tylko część strumieniową; części rynkowej nie zapisywał NIKT,
+                # więc `_p_surowe` potrafiło odwrócić jedną z dwóch nałożonych
+                # korekt, a `compute_bias_full` uczyło się na `p`, z którego nie
+                # dało się zdjąć własnej poprzedniej delty. Stempel zamyka tę
+                # lukę OD PIERWSZEGO REKORDU V2 — bez niego przebudowa pętli
+                # regulatora znów nie miałaby na czym się oprzeć.
+                _kal_rynek_t = betting.delta_dla_p(bias_t, _p_over_sur_t)
                 lo_o, hi_o = counts.p_over_credible_interval(
                     posterior_t, 90.0, factor_t, l_t
                 )
@@ -5696,6 +5815,32 @@ def _main_impl(tryb=None):
                         "miekka_linia": False, "kurs_oczekiwany": None,
                         "ci": [round(lo_t, 4), round(hi_t, 4)],
                         "oczekiwane_minuty": None,
+                        # ILE Z TEJ PROGNOZY JEST NASZE (2026-08-11).
+                        # `fit_posterior` waży mecze wykładniczo (tau 180 dni),
+                        # więc archiwum sprzed lat prawie nie wchodzi — ale
+                        # zamiast niego wchodzi PRIOR, czyli średnia ligi.
+                        # Zmierzone tego dnia na dumpie dry-runu: Boca Juniors
+                        # ma efektywną próbę 1,97 z dwunastu meczów, więc 67%
+                        # jego prognozy to zdanie „przeciętna drużyna w tej
+                        # lidze notuje tyle" — a nic w rekordzie tego nie
+                        # mówiło. `counts.MIN_EFFECTIVE_MATCHES` istnieje od
+                        # początku i NIE JEST NIGDZIE UŻYWANY.
+                        #
+                        # Stempel, nie brama: dopiero rozliczenia pokażą, czy
+                        # typy stojące na priorze wypadają gorzej. Bez zapisu
+                        # to pytanie jest niemierzalne wstecz (ta sama lekcja
+                        # co przy `lambda` — patrz rozliczanie._dopisz_nowe).
+                        # delta kalibracji RYNKU użyta dla tego typu — patrz
+                        # `_kal_rynek_t`. Razem z `kal_strumien` daje komplet
+                        # tego, co nałożono na surowe `p_over`.
+                        "kal_rynek": round(float(_kal_rynek_t), 4),
+                        "ess": round(float(posterior_t.effective_matches), 2),
+                        "udzial_priora": round(
+                            prior_t.pseudo_matches
+                            / (prior_t.pseudo_matches
+                               + max(float(posterior_t.effective_matches), 0.0)),
+                            3,
+                        ),
                         "ryzyko": betting.risk_level(pred_t.lam, False, 1.0),
                         "czynniki": {
                             "rywal": round(f_opp, 3), "sedzia": round(f_sedzia, 3),
@@ -5716,7 +5861,7 @@ def _main_impl(tryb=None):
                         # przy różnych tau i mierzy Briera na wynikach
                         "kal_tau": {
                             "hist": [round(h, 2) for h in hist_t],
-                            "ts": [int(x) for x in tt.timestamps[:n_h]],
+                            "ts": [int(x) for x in _ts_h],
                             "factor": round(factor_t, 4),
                             "prior": round(float(lg_mean), 3),
                         },
@@ -5729,18 +5874,36 @@ def _main_impl(tryb=None):
                         "forma": {},
                     })
                     if tt.market_code not in f_slot["forma"]:
-                        N_T = 20
-                        n_f = min(len(tt.counts), N_T)
+                        # TYLE, ILE ZOSTAŁO PO SUFICIE WIEKU (patrz `n_h`).
+                        # To jest karta, którą czyta człowiek: „ostatnie mecze"
+                        # muszą być ostatnimi meczami, a nie ostatnimi
+                        # rekordami w feedzie. Przed tą zmianą karta Bolívara
+                        # pokazywała rzuty rożne z 2020 roku pod nagłówkiem
+                        # „ostatnio".
+                        # te same indeksy co likelihood — jedna maska wieku
+                        # na cały rekord, bez drugiego, rozjeżdżającego się
+                        # przycięcia dla UI
+                        n_f = len(_idx)
+
+                        def _po_idx(seq, dom=None):
+                            return [
+                                seq[i] for i in _idx if i < len(seq)
+                            ] if seq else ([] if dom is None else dom)
+
                         f_slot["forma"][tt.market_code] = {
-                            "ostatnie": [int(c) for c in tt.counts[:N_T]],
+                            "ostatnie": [int(c) for c in _po_idx(tt.counts)],
                             # mecz drużyny = zawsze pełne 90 (okna formy w UI
                             # filtrują po minutach > 0)
                             "minuty": [90] * n_f,
-                            "rywale": [str(o) for o in tt.game_opponents[:N_T]],
-                            "ts": [int(t) for t in tt.timestamps[:N_T]],
-                            "dom": [bool(h) for h in tt.game_is_home[:N_T]],
+                            "rywale": [
+                                str(o) for o in _po_idx(tt.game_opponents)
+                            ],
+                            "ts": [int(t) for t in _ts_h],
+                            "dom": [
+                                bool(h) for h in _po_idx(tt.game_is_home)
+                            ],
                             "srednia90": round(
-                                float(np.mean(tt.counts[:N_T])), 2
+                                float(np.mean([tt.counts[i] for i in _idx])), 2
                             ) if n_f else 0.0,
                         }
         # === NOWE RYNKI: „KTO WIĘCEJ" I SUMA MECZOWA (2026-07-30) ===
@@ -6068,6 +6231,26 @@ def _main_impl(tryb=None):
                   + (f"; odpadło: " + ", ".join(
                       f"{k}={v}" for k, v in odpadki_t.most_common())
                      if odpadki_t else ""))
+            # NA CZYM STOJĄ TE LEGI — własna historia czy średnia ligi.
+            # Bez tej linii nie da się odróżnić „model policzył tę drużynę"
+            # od „model podstawił średnią rozgrywek i nazwał to prognozą".
+            _ess = [
+                float(l["ess"]) for l in legi_pool
+                if l.get("podmiot_typ") == "druzyna" and l.get("ess") is not None
+            ]
+            if _ess:
+                _ess_s = sorted(_ess)
+                _chude = sum(
+                    1 for e in _ess if e < counts.MIN_EFFECTIVE_MATCHES
+                )
+                print(
+                    "Rynki drużynowe — na czym stoi prognoza: efektywna próba "
+                    f"mediana {_ess_s[len(_ess_s) // 2]:.1f} meczów "
+                    f"(min {_ess_s[0]:.1f}, max {_ess_s[-1]:.1f}); "
+                    f"{_chude} z {len(_ess)} legów poniżej progu "
+                    f"{counts.MIN_EFFECTIVE_MATCHES:.0f} — tam ponad połowę "
+                    "prognozy wnosi średnia rozgrywek, nie ta drużyna"
+                )
         if _konc_zmierzone:
             print("Profil rywala ZMIERZONY (z historii, nie z przybliżenia): "
                   + ", ".join(f"{k}={v}" for k, v
@@ -6318,6 +6501,15 @@ def _main_impl(tryb=None):
             "ci": ci, "oczekiwane_minuty": b.get("oczekiwane_minuty"),
             "lambda": round(b.get("lambda", 0.0), 3),
             "rozklad": b.get("rozklad"),
+            # NA CZYM STOI TA PROGNOZA — stempel z pętli drużynowej. To jest
+            # BIAŁA LISTA PÓL: co nie zostanie tu wymienione, ginie w drodze
+            # z puli na stronę i do księgi, choć w legu było (ta sama pułapka
+            # co przy `kal_tau` i `swieze_sklady` wyżej).
+            **({"ess": b["ess"]} if b.get("ess") is not None else {}),
+            **({"udzial_priora": b["udzial_priora"]}
+               if b.get("udzial_priora") is not None else {}),
+            **({"kal_rynek": b["kal_rynek"]}
+               if b.get("kal_rynek") is not None else {}),
             **({"kal_tau": b["kal_tau"]} if b.get("kal_tau") else {}),
             "czynniki": b.get("czynniki", {}),
             "uzasadnienie": b.get("uzasadnienie", {"czynniki": []}),

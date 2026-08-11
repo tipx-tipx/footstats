@@ -16,6 +16,7 @@ pilnowana tu osobno:
 import time
 
 from footstats.jobs import build_wc_fast as B
+from footstats.model import betting
 
 
 def _stub_supa(monkeypatch, magazyn: dict):
@@ -133,6 +134,8 @@ def test_wznowienie_z_ksiegi_tez_dostaje_lige(monkeypatch):
         "podmiot": "SK Sturm Graz", "podmiot_id": 5, "rynek_kod": "team_goals",
         "linia": 1.5, "strona": "powyzej", "kurs": 1.73, "p_model": 0.62,
         "kickoff_ts": kickoff, "wynik": None,
+        # wznowienie działa tylko dla bieżącej wersji kalibracji (2026-08-11)
+        "wersje": betting.wersje_publikacji(),
     }}
     mecze: dict = {}
     out, _ = B.scal_z_publikacjami(

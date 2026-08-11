@@ -8,6 +8,7 @@ a przy zerze typów mecz wypadał nawet z `matches`.
 import time
 
 from footstats.jobs import build_wc_fast as B
+from footstats.model import betting
 
 
 def _bet(mecz_id=1, podmiot="GKS Katowice", linia=6.5, kurs=1.23,
@@ -129,9 +130,37 @@ def _wpis_logu(**kw) -> dict:
         "linia": 6.5, "strona": "ponizej", "kurs": 1.28,
         "p_model": 0.8844, "sugestia": False, "wynik": None,
         "opublikowano_ts": 1000,
+        # BIEŻĄCA WERSJA KALIBRACJI (2026-08-11). Wznowienie typu policzonego
+        # innym rachunkiem jest od tej pory zabronione — patrz reguła wersji
+        # w `scal_z_publikacjami`. Te testy opisują wznawianie typu, który
+        # DALEJ jest rekomendacją, więc stempel musi się zgadzać; osobny test
+        # niżej pilnuje, że typ z obcej wersji NIE wraca.
+        "wersje": betting.wersje_publikacji(),
     }
     rec.update(kw)
     return rec
+
+
+def test_typ_z_obcej_wersji_kalibracji_nie_wraca_na_liste(monkeypatch):
+    """Naprawa znaku kalibracji zmieniła rachunek `p` (2026-08-11).
+
+    Typ policzony poprzednią wersją niesie zamrożoną szansę z odwróconą
+    korektą. Ma się rozliczyć jako swoja wersja, ale nie wolno go wznowić
+    jako bieżącej rekomendacji — user nie miałby jak odróżnić, która liczba
+    jest z którego rachunku.
+    """
+    magazyn: dict = {}
+    _stub_supa(monkeypatch, magazyn)
+    stary = _wpis_logu(wersje={**betting.wersje_publikacji(),
+                               "kalibracja": "2026-07-31-przedzialy-korekty"})
+    out, wzn = B.scal_z_publikacjami([], {}, typy_log={"k": stary})
+    assert wzn == 0 and out == []
+
+    # ...a bez stempla w ogóle (rekordy sprzed wersjonowania) — tak samo
+    bez = _wpis_logu()
+    bez.pop("wersje")
+    out2, wzn2 = B.scal_z_publikacjami([], {}, typy_log={"k": bez})
+    assert wzn2 == 0 and out2 == []
 
 
 def test_typ_wraca_z_ksiegi_gdy_rejestr_go_nie_zna(monkeypatch):

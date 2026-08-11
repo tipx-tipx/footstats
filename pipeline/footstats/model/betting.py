@@ -266,8 +266,13 @@ def ekran_typu(b: dict) -> str:
 #
 # Format: data wdrożenia + krótki slug. Data pierwsza, żeby sortowanie
 # leksykalne dawało chronologię.
-WERSJA_MODELU = "2026-07-31-korekta-znaku"
-WERSJA_KALIBRACJI = "2026-07-31-przedzialy-korekty"
+# ⚑ 2026-08-11: kalibracja uczona w orientacji „powyżej"
+# (rozliczanie.w_orientacji_over). Delty dla rynków drużynowych ZMIENIAJĄ ZNAK,
+# więc rekordy sprzed tej chwili opisują inny produkt i NIE WOLNO ich mieszać
+# z nowymi w żadnym pomiarze kalibracji. Epoka produktu zostaje „liga" —
+# zmienia się rachunek, nie zakres rozgrywek.
+WERSJA_MODELU = "2026-08-11-orientacja-over"
+WERSJA_KALIBRACJI = "2026-08-11-orientacja-over"
 WERSJA_POLITYKI = "2026-08-01-podloga-kursu"
 WERSJA_DANYCH = "2026-07-27-liga-klubowa"
 
