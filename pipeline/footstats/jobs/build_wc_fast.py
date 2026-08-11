@@ -1126,6 +1126,42 @@ def czynniki_pary(h_n: dict, a_n: dict, nazwa_bazy: str, rho: float) -> list[dic
     return czynniki
 
 
+def wersje_w_ksiedze(log: dict) -> dict[str, str]:
+    """Z ZAMROŻONEJ księgi: jaką wersją kalibracji policzono NIEROZLICZONY typ.
+
+    ⚑ ROZJAZD KARTA–KSIĘGA (znaleziony audytem 2026-08-11, potwierdzony na
+    danych). `rozliczanie._dopisz_nowe` przy istniejącym kluczu aktualizuje
+    tylko flagi kategorii i robi `continue` — `p_model`, kurs i stempel wersji
+    ZOSTAJĄ z pierwszej publikacji. To jest poprawne, dopóki rachunek się nie
+    zmienia: cena i szansa mają być te, które user widział, biorąc typ.
+
+    Ale po zmianie wersji kalibracji ten sam zakład policzony na nowo ma inne
+    `p`. Karta pokazywałaby wtedy V2, a księga rozliczyłaby i NAUCZYŁA model
+    na V1 — czyli mierzylibyśmy co innego, niż pokazaliśmy. Zmierzone na
+    pierwszej liście V2: 7 z 20 typów miało w księdze rekord z poprzedniej
+    wersji (Kairat Almaty: księga 0,869, strona 0,8325).
+
+    Typ z takiej kolizji NIE WRACA na listę — schodzi jako `kolizja_wersji`.
+    Świadomie nie „odradzamy" rekordu (skasuj i zapisz od nowa): rekord V1 ma
+    zostać nietknięty i rozliczyć się jako historia tego, co naprawdę stało
+    na stronie. Kolizja wygasa sama, gdy tamten typ przejdzie swój mecz.
+
+    Zwraca {klucz_publikacji: wersja_kalibracji}; tylko typy NIEROZLICZONE
+    i tylko te, które faktycznie były na liście (odrzucone i tło nie kolidują
+    — user ich nie widział, ta sama zasada co w `linie_opublikowane`).
+    """
+    out: dict[str, str] = {}
+    for r in (log or {}).values():
+        if r.get("wynik") is not None or r.get("sugestia"):
+            continue
+        if r.get("odrzucony") or r.get("poza_publikacja"):
+            continue
+        w = (r.get("wersje") or {}).get("kalibracja")
+        if w:
+            out[_klucz_publikacji(r)] = w
+    return out
+
+
 def linie_opublikowane(log: dict) -> dict[tuple, set]:
     """Z ZAMROŻONEJ księgi: która linia zakładu jest już wystawiona.
 
@@ -6294,9 +6330,13 @@ def _main_impl(tryb=None):
         # (patrz `linie_opublikowane` i brama niżej) — drugi odczyt księgi
         # kosztowałby kilkanaście megabajtów na cykl
         linie_log = linie_opublikowane(_log_publikacji)
+        # ...i z tego samego odczytu: którą wersją policzono typ, który już
+        # stoi w księdze (patrz `wersje_w_ksiedze` i brama kolizji niżej)
+        wersje_log = wersje_w_ksiedze(_log_publikacji)
     except Exception as e:
         kierunki_log = {}
         linie_log = {}
+        wersje_log = {}
         print(f"Spójność kierunku: log niedostępny ({e}) — tylko bieżąca pula")
     legi_pool = filtr_spojnosci_kierunku(legi_pool, kierunki_log)
     if len(legi_pool) < n_przed_sp:
@@ -6595,6 +6635,26 @@ def _main_impl(tryb=None):
         if _nadmiar:
             value_bets[:] = _zostaja
             typy_poza_publikacja.extend(_nadmiar)
+
+    # ⚑ KOLIZJA WERSJI: karta pokazywałaby inną liczbę, niż rozliczy księga.
+    # Patrz `wersje_w_ksiedze` — pełny opis i pomiar. Brama stoi TU, obok
+    # pozostałych filtrów korzystających z zamrożonej księgi, i przed
+    # `_urealnij_do_pokazania`, więc typ nie zdąży trafić na listę.
+    if wersje_log:
+        _zostaja, _kolizje = [], []
+        for b in value_bets:
+            w_ksiegi = wersje_log.get(_klucz_publikacji(b))
+            if w_ksiegi and w_ksiegi != betting.WERSJA_KALIBRACJI:
+                _kolizje.append({**b, "poza_publikacja": "kolizja_wersji"})
+            else:
+                _zostaja.append(b)
+        if _kolizje:
+            value_bets[:] = _zostaja
+            typy_poza_publikacja.extend(_kolizje)
+            print(f"Kolizja wersji: {len(_kolizje)} typów ma w księdze rekord "
+                  f"policzony inną kalibracją niż {betting.WERSJA_KALIBRACJI} "
+                  "— nie wracają na listę, bo karta i rozliczenie mówiłyby co "
+                  "innego (rekord w księdze zostaje nietknięty)")
             print(f"Limit poprzeczek zakładu: zdjęto {len(_nadmiar)} "
                   f"(zakład ma już {MAX_POPRZECZEK_ZAKLADU} wystawione)")
 
@@ -7518,12 +7578,24 @@ def _main_impl(tryb=None):
     kupony_list = kupony.build_kupony(
         value_bets, legi_pool_pub, profil=profil_kuponow, kary=kary_kor,
         wagi=wagi_zauf or None, kal_szansy=kal_kuponow or None,
-        # ZMIERZONE KOREKTY PER STRUMIEŃ (2026-07-31, domknięcie przebudowy
-        # kuponów): odsiewają legi, które po korekcie tracą, i dają szansę
-        # kuponu liczoną z już skorygowanych legów. Gdy są podane, stary
-        # `kal_szansy` jest w build_kupony pomijany — inaczej ta sama
-        # pomyłka byłaby korygowana dwa razy.
-        korekty_legow=korekta_strumieni or None,
+        # ⚑ KOREKTA STRUMIENIA JUŻ SIEDZI W `p_model` LEGA (audyt 2026-08-11).
+        #
+        # Leg drużynowy powstaje z `p_over_t = apply_bias(_bias_t_pelny, …)`,
+        # a `_bias_t_pelny` to kalibracja rynku PLUS korekta strumienia —
+        # czyli szansa w puli jest już skorygowana. Przekazanie tych samych
+        # delt do `build_kupony` nakładało je DRUGI RAZ: raz w silniku, raz
+        # w `szansa_z_legow`/`legi_z_wartoscia`. Przy sześciu legach ta sama
+        # poprawka wchodziła do iloczynu szóstą potęgą.
+        #
+        # Komentarz, który tu stał, ostrzegał przed podwójnym liczeniem, ale
+        # w innej parze: `kal_szansy` (stary współczynnik na gotowy kupon)
+        # kontra `korekty_legow`. Tamten konflikt jest obsłużony w
+        # `build_kupony`; ten — nie był widziany w ogóle.
+        #
+        # `kal_szansy` zostaje: on działa na szansę CAŁEGO kuponu i mierzy
+        # coś innego niż korekta pojedynczego typu (zależność między legami
+        # i przeszacowanie iloczynu).
+        korekty_legow=None,
     )
     # znacznik: na ilu meczach kuponu składy były już POTWIERDZONE przy
     # budowie (mniejsze ryzyko anulowań/zwrotów niż na prognozach XI)

@@ -3227,19 +3227,47 @@ def kalibracja_zamrozona() -> dict[str, dict] | None:
     wersji jest po cichu ignorowany, żeby podbicie wersji nie odziedziczyło
     delt policzonych dla innego rachunku.
     """
-    if not KALIBRACJA_ZAMROZONA or not _PLIK_KALIBRACJI.exists():
+    if not KALIBRACJA_ZAMROZONA:
         return None
+    # ⚑ FAIL-CLOSED, NIE FAIL-OPEN (audyt 2026-08-11).
+    #
+    # Pierwsza wersja tej funkcji przy braku/uszkodzeniu pliku wracała `None`,
+    # a `market_bias` szło wtedy dalej do `compute_bias_full` — czyli awaria
+    # pliku PO CICHU przywracała regulator, który zamrożenie miało wyłączyć,
+    # i to bez śladu w logu poza jednym zdaniem. Skutek byłby dokładnie
+    # odwrotny do zamiaru: im gorzej z artefaktem, tym większa swoboda
+    # mechanizmu, któremu nie ufamy.
+    #
+    # Odkąd tryb jest włączony, brak poprawnej mapy PRZERYWA cykl. Cykl ubity
+    # nic nie publikuje, więc strona zostaje przy poprzednich danych — to jest
+    # bezpieczniejsze niż wypuszczenie listy policzonej regulatorem, który
+    # uczy się na `p` zawierającym jego własną poprzednią korektę.
+    if not _PLIK_KALIBRACJI.exists():
+        raise RuntimeError(
+            f"kalibracja zamrożona (KALIBRACJA_ZAMROZONA=True), a pliku "
+            f"{_PLIK_KALIBRACJI.name} nie ma — cykl przerwany, żeby nie "
+            "wrócić po cichu do regulatora dynamicznego"
+        )
     try:
         dane = json.loads(_PLIK_KALIBRACJI.read_text(encoding="utf-8"))
     except Exception as e:
-        print(f"Kalibracja zamrożona: plik nieczytelny ({e}) — liczę z księgi")
-        return None
+        raise RuntimeError(
+            f"kalibracja zamrożona: {_PLIK_KALIBRACJI.name} nieczytelny ({e})"
+        ) from e
     if dane.get("wersja_kalibracji") != betting.WERSJA_KALIBRACJI:
-        print("Kalibracja zamrożona: plik z wersji "
-              f"{dane.get('wersja_kalibracji')}, a produkt jedzie na "
-              f"{betting.WERSJA_KALIBRACJI} — pomijam plik")
-        return None
-    return dane.get("bias") or None
+        raise RuntimeError(
+            f"kalibracja zamrożona: plik z wersji "
+            f"{dane.get('wersja_kalibracji')}, a produkt jedzie na "
+            f"{betting.WERSJA_KALIBRACJI} — przeliczyć mapę i podmienić plik"
+        )
+    bias = dane.get("bias")
+    if not bias:
+        raise RuntimeError(
+            f"kalibracja zamrożona: {_PLIK_KALIBRACJI.name} nie zawiera mapy "
+            "`bias` — pusta mapa znaczy „brak korekt”, a tego nie chcemy "
+            "opublikować przez przypadek"
+        )
+    return bias
 
 
 def market_bias() -> dict[str, dict]:
