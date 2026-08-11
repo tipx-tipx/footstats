@@ -3,16 +3,23 @@
 from footstats import rozgrywki
 
 
-def test_zakres_druzynowy_dokladnie_17_rozgrywek():
+def test_zakres_druzynowy_dokladnie_19_rozgrywek():
     """Europa (top 5 + Ekstraklasa + puchary) + Ameryka Płd. + Skandynawia.
 
     Rozszerzone 2026-07-27: rynki drużynowe to jedyny dochodowy produkt, więc
     zakres poszedł tam, gdzie sonda statshub pokazała komplet danych. Lista
     jest zamknięta celowo — każda dołożona rozgrywka kosztuje czas cyklu
     (bank stylu + terminarze 365Scores), więc nie rośnie sama z siebie.
+
+    Rozszerzone 2026-08-11 o Leagues Cup i Libertadores. Powód pomiarowy:
+    67 ze 160 nadchodzących meczów było POZA rejestrem, czyli nie liczyliśmy
+    dla nich ani jednego rynku drużynowego — przy celu „różne typy na jak
+    największej liczbie meczów" to była największa pojedyncza blokada podaży.
+    Obie dołożone rozgrywki mają POTWIERDZONE `comp365` (patrz test niżej);
+    South African Premier Division czeka na identyfikator.
     """
     druzynowe = [p for p in rozgrywki.PROFILE.values() if p.druzynowe]
-    assert len(druzynowe) == 17
+    assert len(druzynowe) == 19
     nazwy = {p.nazwa for p in druzynowe}
     assert nazwy == {
         # Europa (zakres pierwotny 2026-07-20)
@@ -23,6 +30,8 @@ def test_zakres_druzynowy_dokladnie_17_rozgrywek():
         "CONMEBOL Sudamericana",
         # Skandynawia — sezon letni, luka przed startem top 5
         "Allsvenskan", "Superettan", "Eliteserien", "Superliga",
+        # dołożone 2026-08-11 pod podaż typów
+        "Leagues Cup", "CONMEBOL Libertadores",
     }
 
 
@@ -35,7 +44,11 @@ def test_nowe_ligi_maja_obie_polowki_pary_id():
     między statshub (utid) a 365Scores (comp365).
     """
     PARY = {155: 72, 325: 113, 390: 116, 480: 389,
-            40: 122, 46: 123, 20: 131, 39: 119}
+            40: 122, 46: 123, 20: 131, 39: 119,
+            # 2026-08-11: id z wyszukiwarki 365 (`/search/?query=`),
+            # sprawdzone na realnych meczach — Leagues Cup 18 gier
+            # w fixtures i results, Libertadores 15 i 33
+            13783: 7242, 384: 102}
     for utid, comp in PARY.items():
         p = rozgrywki.profil(utid)
         assert p is not None and p.druzynowe, f"utid {utid} poza zakresem"

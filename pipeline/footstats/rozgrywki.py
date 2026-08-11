@@ -101,6 +101,34 @@ PROFILE: dict[int, ProfilRozgrywek] = {
                         comp365=(131,)),
         ProfilRozgrywek(39, "Superliga", "Dania", druzynowe=True,
                         comp365=(119,)),
+        # --- ROZSZERZENIE ZAKRESU (2026-08-11) ---
+        #
+        # Zmierzone tego dnia na terminarzu: 67 ze 160 nadchodzących meczów
+        # było POZA rejestrem, więc nie liczyliśmy dla nich ani jednego rynku
+        # drużynowego. Nie chodziło o egzotykę — odpadały Leagues Cup,
+        # Libertadores, J1, Championship czy Eredivisie, czyli rozgrywki
+        # z porządnym pokryciem danych.
+        #
+        # To była największa pojedyncza blokada podaży: cel „różne typy na
+        # jak największej liczbie meczów" nie miał prawa się spełnić, dopóki
+        # dwie piąte terminarza w ogóle nie wchodziło do liczenia.
+        #
+        # `utid` z endpointu `event/by-date`, sparowany z nazwą z `matches`.
+        # `comp365` z wyszukiwarki 365Scores (`/search/?query=`) i SPRAWDZONY
+        # na realnych meczach — bez tego rozgrywka daje typy, które nigdy się
+        # nie rozliczą (rozliczanie szuka wyniku po `comp365`, brak id nie
+        # rzuca błędu, typ po prostu wisi i zamyka się jako zwrot):
+        #     Leagues Cup    comp365=7242   fixtures 18, results 18
+        #     Libertadores   comp365=102    fixtures 15, results 33
+        #
+        # South African Premier Division (utid 358, 9 meczów) NIE WCHODZI:
+        # wyszukiwarka 365 nie dała jednoznacznego dopasowania, a rozgrywka
+        # bez pary identyfikatorów to cicha strata typów. Wraca, gdy id
+        # zostanie potwierdzone — zapisane w `docs/kolejka-po-audycie.md`.
+        ProfilRozgrywek(13783, "Leagues Cup", "Ameryka Płn.", druzynowe=True,
+                        comp365=(7242,)),
+        ProfilRozgrywek(384, "CONMEBOL Libertadores", "Ameryka Płd.",
+                        druzynowe=True, comp365=(102,)),
     )
 }
 

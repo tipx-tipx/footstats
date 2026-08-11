@@ -79,10 +79,34 @@ Legenda: `[x]` zrobione · `[~]` w toku / obejście · `[ ]` otwarte
 
 ## Dane i źródła
 
-- [ ] **Zdrowie źródeł** — stan per źródło, odróżniający legalny brak danych
+- [~] **Zdrowie źródeł** — stan per źródło, odróżniający legalny brak danych
   od awarii. Rotowire (`league=WOC`) milczał trzy tygodnie bez alarmu.
-- [ ] **Rotowire: poprawne kody lig.** Obsłuży ~20% naszego zakresu, więc to
-  nie jest rozwiązanie problemu składów — ale jest darmowe.
+  → zrobione DLA ROTOWIRE (rozróżnia „żadna strona nie odpowiedziała" od
+  „strony działają, ale brak meczów"). Pozostałe źródła nadal bez strażnika.
+- [x] **Rotowire: poprawne kody lig.** `league=WOC` → osiem lig
+  (EPL/LALIGA/SERIEA/BUNDESLIGA/LIGUE1/MLS/UCL/UEL). Sprawdzone na żywym
+  źródle: **0 → 25 drużyn ze składem**, 90 bloków meczowych zamiast zera.
+
+- [x] **Zakres drużynowy: +2 rozgrywki.** Zmierzone 11.08: **67 ze 160**
+  nadchodzących meczów było poza rejestrem, więc nie liczyliśmy dla nich ani
+  jednego rynku drużynowego. Doszły Leagues Cup (utid 13783 / comp365 7242,
+  18 meczów) i CONMEBOL Libertadores (384 / 102, 7 meczów) — obie z parą
+  identyfikatorów sprawdzoną na realnych meczach.
+- [ ] **South African Premier Division** (utid 358, 9 meczów) — czeka na
+  `comp365`. Wyszukiwarka 365 nie dała jednoznacznego dopasowania, a bez pary
+  identyfikatorów typy z tej rozgrywki nigdy by się nie rozliczyły.
+- [ ] **Reszta rozgrywek spoza rejestru** — J1 League, Championship,
+  Eredivisie, Süper Lig, Liga Portugal, Pro League, MLS, Liga MX. Ta sama
+  procedura: `utid` z `event/by-date`, `comp365` z `/search/?query=`,
+  weryfikacja liczby gier w `fixtures`/`results` PRZED dopisaniem.
+
+- [ ] **Diagnoza składów — zrobiona, wynik zmienia priorytet.** statshub
+  oddaje przewidywane XI dla **1 z 12** sprawdzonych meczów (endpoint działa —
+  Lyon 22 zawodników — po prostu nie ma danych dla naszych lig). Sofascore
+  jest jedynym realnym źródłem, ale kod ostrzega, że **blokuje IP serwerowni**,
+  więc w chmurze wypada; 13 składów z dry-runu to wynik LOKALNY.
+  → wniosek: dla Ameryki Płd. i Skandynawii nikt nie poda nam składów.
+  Jedyna droga to własny skład przewidywany z rotacji minut.
 - [ ] **Sofascore jako główne źródło składów** (dziś 13 z 307 meczów) —
   najpierw diagnoza, czy to limit budżetu, czy coś innego.
 - [ ] **365Scores jako drugie źródło składów** (ma `lineups`, jest wpięte do

@@ -20,7 +20,36 @@ import unicodedata
 
 from curl_cffi import requests
 
-URL = "https://www.rotowire.com/soccer/lineups.php?league=WOC"
+_BAZA = "https://www.rotowire.com/soccer/lineups.php"
+
+# ⚑ MUNDIAL SKOŃCZYŁ SIĘ 19.07, A MY PYTALIŚMY O NIEGO DO 11.08 (trzy tygodnie).
+#
+# Adres był zaszyty jako `?league=WOC` — kod mistrzostw świata — z czasów, gdy
+# to był cały nasz produkt. Po przejściu na ligi strona oddawała pustą listę,
+# a `fetch_predicted_lineups` traktuje pustkę i awarię tak samo, więc **nic
+# nie krzyczało**. Skutek zmierzony 11.08: składy dla 13 z 307 meczów, 199 par
+# (mecz, zawodnik) odpadało jako „poza znanym składem", zakładka zawodnicza
+# bez typu od 05.08, drabinki na trzech wznowionych kartach.
+#
+# UCZCIWIE O ZASIĘGU: Rotowire kwotuje głównie Europę Zachodnią i MLS, a nasz
+# zakres to w większości Ameryka Południowa i Skandynawia. To źródło NIE
+# rozwiąże problemu składów — jest darmowe i warto je mieć, ale głównym
+# zostaje Sofascore. Lista kodów poniżej to te ligi Rotowire, które faktycznie
+# przecinają się z naszym terminarzem; nieznany kod oddaje pustą stronę, więc
+# nadmiar w tej liście kosztuje jedno zapytanie, a nie awarię.
+LIGI = (
+    "EPL",          # Premier League
+    "LALIGA",       # La Liga
+    "SERIEA",       # Serie A
+    "BUNDESLIGA",
+    "LIGUE1",
+    "MLS",
+    "UCL",          # Liga Mistrzów (u nas kwalifikacje)
+    "UEL",          # Liga Europy
+)
+
+# zostawione dla zgodności z testami i starymi wywołaniami
+URL = f"{_BAZA}?league={LIGI[0]}"
 
 
 # Litery, których NFKD NIE rozkłada, bo w Unicode są OSOBNYMI znakami
@@ -62,13 +91,19 @@ def fetch_predicted_lineups(include_tomorrow: bool = True) -> dict[str, dict]:
     Pusta mapa = strona niedostępna / brak meczów.
     """
     out: dict[str, dict] = {}
-    urls = [URL] + ([URL + "&date=tomorrow"] if include_tomorrow else [])
+    urls = []
+    for liga in LIGI:
+        urls.append(f"{_BAZA}?league={liga}")
+        if include_tomorrow:
+            urls.append(f"{_BAZA}?league={liga}&date=tomorrow")
+    ok_stron = 0
     for url in urls:
         try:
             r = requests.get(url, impersonate="chrome124", timeout=30)
             r.raise_for_status()
         except Exception:
             continue
+        ok_stron += 1
         for blok in r.text.split('class="lineup is-soccer"')[1:]:
             teams = [
                 s.strip()
@@ -89,6 +124,15 @@ def fetch_predicted_lineups(include_tomorrow: bool = True) -> dict[str, dict]:
                     # nie nadpisuj dzisiejszego meczu jutrzejszym
                     if key not in out:
                         out[key] = {"xi": players, "confirmed": confirmed}
+    # ⚑ ROZRÓŻNIENIE „PUSTO" OD „PADŁO" — brak tego przepuścił mundial przez
+    # trzy tygodnie. Zero składów przy zero odpowiedziach to awaria źródła;
+    # zero składów przy działających stronach to normalna noc bez meczów.
+    if not ok_stron:
+        print("Rotowire: ŻADNA ze stron nie odpowiedziała "
+              f"({len(urls)} prób) — źródło niedostępne, nie brak meczów")
+    elif not out:
+        print(f"Rotowire: {ok_stron} stron odpowiedziało, ale ani jednego "
+              "składu — sprawdź kody lig w `LIGI`, jeśli to się powtarza")
     return out
 
 
