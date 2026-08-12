@@ -270,6 +270,14 @@ Legenda: `[x]` zrobione · `[~]` w toku / obejście · `[ ]` otwarte
   znika sortowanie „największa przewaga nad kursem" (górna 1/3 tego sortowania
   dawała −41,2%, dolna +32,5%); nagłówek nie zależy od znaku wartości.
 
+- [x] **Ten sam zakład miał dwie szanse w dwóch miejscach produktu**
+  (13.08, `4b132e5`). Lista typów przechodzi urealnienie i ściągnięcie do ceny,
+  a pula legów (generator kuponów na żądanie) była dumpowana surowa: 32 z 32
+  typów listy jest też w puli, mediana różnicy **+10,5 pp**, max +13,8.
+  → leg niesie `p_model` (surowe, do składania — parytet z `build_kupony`)
+  i `p_pokaz` (do pokazania); front czyta przez `szansaLega` z fallbackiem.
+  `rozlicz_only` dostał tę samą warstwę, bo pisze `kupony` co 20 minut.
+
 - [ ] **Stopka obiecuje przewagę cenową, której nie pokazujemy.** „Pokazujemy,
   gdzie kurs bukmachera jest naszym zdaniem za wysoki" — po zmianie z 13.08
   karta o tym nie mówi i mówić nie może. Do przejrzenia razem z resztą tekstów
