@@ -271,8 +271,13 @@ def ekran_typu(b: dict) -> str:
 # więc rekordy sprzed tej chwili opisują inny produkt i NIE WOLNO ich mieszać
 # z nowymi w żadnym pomiarze kalibracji. Epoka produktu zostaje „liga" —
 # zmienia się rachunek, nie zakres rozgrywek.
+# ⚑ 2026-08-12: prior przedziału kalibracji to ZERO, nie wartość rynku
+# (rozliczanie: PRIOR PRZEDZIAŁU). Delty w górnych przedziałach zmieniają
+# znak — `team_corners` 0,70-0,85 idzie z +0,443 na −0,588 — więc rekordy
+# sprzed tej chwili znowu opisują inny produkt. Rachunek `p` bez zmian, stąd
+# `WERSJA_MODELU` stoi.
 WERSJA_MODELU = "2026-08-11-orientacja-over"
-WERSJA_KALIBRACJI = "2026-08-11-orientacja-over"
+WERSJA_KALIBRACJI = "2026-08-12-prior-przedzialu"
 WERSJA_POLITYKI = "2026-08-01-podloga-kursu"
 WERSJA_DANYCH = "2026-07-27-liga-klubowa"
 

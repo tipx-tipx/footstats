@@ -1,7 +1,7 @@
 {
- "wersja_kalibracji": "2026-08-11-orientacja-over",
- "zamrozono_ts": 1786452303,
- "zrodlo": "replay na migawce typy_log (3471 rekordow, 2809 rozliczonych)",
+ "wersja_kalibracji": "2026-08-12-prior-przedzialu",
+ "zamrozono_ts": 1786529039,
+ "zrodlo": "compute_bias_full na księdze 2026-08-12 (1777 rozliczeń bieżącej epoki); prior przedziału = 0, dolewka obcej epoki jako jedna liczba",
  "cap": [
   -0.8,
   0.8
@@ -9,226 +9,258 @@
  "bias": {
   "sot": {
    "logit": true,
-   "global": -0.648,
+   "global": -0.681,
    "bins": [
     [
      0.0,
      0.55,
-     -0.648
+     0.0
     ],
     [
      0.55,
      0.7,
-     -0.648
+     0.0
     ],
     [
      0.7,
      0.85,
-     -0.648
+     0.0
     ],
     [
      0.85,
      1.01,
-     -0.648
+     0.0
     ]
    ],
    "zrodla": [
-    "globalna",
-    "globalna",
-    "globalna",
-    "globalna"
-   ]
-  },
-  "shots": {
-   "logit": true,
-   "global": -0.638,
-   "bins": [
-    [
-     0.0,
-     0.55,
-     -0.638
-    ],
-    [
-     0.55,
-     0.7,
-     -0.638
-    ],
-    [
-     0.7,
-     0.85,
-     -0.602
-    ],
-    [
-     0.85,
-     1.01,
-     -0.638
-    ]
-   ],
-   "zrodla": [
-    "globalna",
-    "globalna",
-    "wlasna",
-    "globalna"
+    "bez_proby",
+    "bez_proby",
+    "bez_proby",
+    "bez_proby"
    ]
   },
   "team_sot": {
    "logit": true,
-   "global": 0.269,
+   "global": 0.029,
    "bins": [
     [
      0.0,
      0.55,
-     0.309
+     0.253
     ],
     [
      0.55,
      0.7,
-     0.269
+     0.0
     ],
     [
      0.7,
      0.85,
-     0.269
+     0.0
     ],
     [
      0.85,
      1.01,
-     0.269
+     0.0
     ]
    ],
    "zrodla": [
     "wlasna",
-    "globalna",
-    "globalna",
-    "globalna"
+    "bez_proby",
+    "bez_proby",
+    "bez_proby"
+   ]
+  },
+  "shots": {
+   "logit": true,
+   "global": -0.677,
+   "bins": [
+    [
+     0.0,
+     0.55,
+     0.0
+    ],
+    [
+     0.55,
+     0.7,
+     0.0
+    ],
+    [
+     0.7,
+     0.85,
+     -0.332
+    ],
+    [
+     0.85,
+     1.01,
+     0.0
+    ]
+   ],
+   "zrodla": [
+    "bez_proby",
+    "bez_proby",
+    "wlasna",
+    "bez_proby"
    ]
   },
   "team_goals": {
    "logit": true,
-   "global": 0.466,
+   "global": 0.413,
    "bins": [
     [
      0.0,
      0.55,
-     0.752
+     0.712
     ],
     [
      0.55,
      0.7,
-     0.208
+     0.083
     ],
     [
      0.7,
      0.85,
-     -0.263
+     -0.479
     ],
     [
      0.85,
      1.01,
-     0.466
+     0.0
     ]
    ],
    "zrodla": [
     "wlasna",
     "wlasna",
     "wlasna",
-    "globalna"
+    "bez_proby"
    ]
   },
   "team_cards": {
    "logit": true,
-   "global": 0.621,
+   "global": 0.56,
    "bins": [
     [
      0.0,
      0.55,
-     0.59
+     0.507
     ],
     [
      0.55,
      0.7,
-     0.621
+     0.0
     ],
     [
      0.7,
      0.85,
-     0.621
+     0.0
     ],
     [
      0.85,
      1.01,
-     0.621
+     0.0
     ]
    ],
    "zrodla": [
     "wlasna",
-    "globalna",
-    "globalna",
-    "globalna"
+    "bez_proby",
+    "bez_proby",
+    "bez_proby"
    ]
   },
-  "match_cards": {
+  "team_fouls": {
    "logit": true,
-   "global": -0.347,
+   "global": -0.298,
    "bins": [
     [
      0.0,
      0.55,
-     -0.101
+     0.04
     ],
     [
      0.55,
      0.7,
-     -0.347
+     0.0
     ],
     [
      0.7,
      0.85,
-     -0.347
+     0.0
     ],
     [
      0.85,
      1.01,
-     -0.347
+     0.0
     ]
    ],
    "zrodla": [
     "wlasna",
-    "globalna",
-    "globalna",
-    "globalna"
+    "bez_proby",
+    "bez_proby",
+    "bez_proby"
    ]
   },
   "team_shots": {
    "logit": true,
-   "global": 0.8,
+   "global": 0.619,
    "bins": [
     [
      0.0,
      0.55,
-     0.8
+     0.694
     ],
     [
      0.55,
      0.7,
-     0.8
+     0.0
     ],
     [
      0.7,
      0.85,
-     0.8
+     0.0
     ],
     [
      0.85,
      1.01,
-     0.8
+     0.0
     ]
    ],
    "zrodla": [
     "wlasna",
-    "globalna",
-    "globalna",
-    "globalna"
+    "bez_proby",
+    "bez_proby",
+    "bez_proby"
+   ]
+  },
+  "match_cards": {
+   "logit": true,
+   "global": -0.336,
+   "bins": [
+    [
+     0.0,
+     0.55,
+     0.009
+    ],
+    [
+     0.55,
+     0.7,
+     0.0
+    ],
+    [
+     0.7,
+     0.85,
+     0.0
+    ],
+    [
+     0.85,
+     1.01,
+     0.0
+    ]
+   ],
+   "zrodla": [
+    "wlasna",
+    "bez_proby",
+    "bez_proby",
+    "bez_proby"
    ]
   },
   "team_corners": {
@@ -243,56 +275,24 @@
     [
      0.55,
      0.7,
-     0.689
+     0.416
     ],
     [
      0.7,
      0.85,
-     0.443
+     -0.588
     ],
     [
      0.85,
      1.01,
-     0.8
+     -0.406
     ]
    ],
    "zrodla": [
     "wlasna",
     "wlasna",
     "wlasna",
-    "globalna"
-   ]
-  },
-  "team_fouls": {
-   "logit": true,
-   "global": 0.109,
-   "bins": [
-    [
-     0.0,
-     0.55,
-     0.233
-    ],
-    [
-     0.55,
-     0.7,
-     0.109
-    ],
-    [
-     0.7,
-     0.85,
-     0.109
-    ],
-    [
-     0.85,
-     1.01,
-     0.109
-    ]
-   ],
-   "zrodla": [
-    "wlasna",
-    "globalna",
-    "globalna",
-    "globalna"
+    "wlasna"
    ]
   },
   "match_corners": {
@@ -302,22 +302,22 @@
     [
      0.0,
      0.55,
-     0.564
+     0.493
     ],
     [
      0.55,
      0.7,
-     0.139
+     0.025
     ],
     [
      0.7,
      0.85,
-     0.146
+     0.049
     ],
     [
      0.85,
      1.01,
-     -0.137
+     -0.199
     ]
    ],
    "zrodla": [

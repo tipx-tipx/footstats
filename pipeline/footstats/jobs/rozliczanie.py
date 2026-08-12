@@ -1157,14 +1157,58 @@ SUGESTIA_BIAS_CAP_LOGIT = (-1.0, 0.40)
 BIAS_PRZEDZIALY = [(0.0, 0.55), (0.55, 0.70), (0.70, 0.85), (0.85, 1.01)]
 MIN_N_PRZEDZIAL = 15
 
+# ⚑⚑⚑ PRIOR PRZEDZIAŁU: ZERO, NIE WARTOŚĆ RYNKU (2026-08-12).
+#
+# Do 12.08 przedział bez własnej próby dostawał `g` — bias całego rynku — a
+# przedział z próbą był do `g` ŚCIĄGANY. Brzmi to jak zwykły shrinkage i przy
+# równomiernym materiale nim jest. Nasz materiał równomierny nie jest.
+#
+# `g` liczy się PO OBSERWACJACH, a te siedzą prawie wyłącznie w jednym
+# przedziale: do 11.08 produkt typował „poniżej" (83% rozliczeń), więc `p_over`
+# tych rekordów było NISKIE. Zmierzone na księdze 12.08:
+#
+#   team_corners   p_over 0,00-0,55  n=513   model ZANIŻA o +16,1 pp
+#                  p_over 0,70-0,85  n= 27   model ZAWYŻA o -22,6 pp
+#                  p_over 0,85-1,01  n= 14   model ZAWYŻA o -17,2 pp
+#
+# Błąd ZMIENIA ZNAK wzdłuż skali, a 86% obserwacji jest po jednej jej stronie.
+# `g` = +0,80 (górny cap) było więc wartością przedziału niskiego, wpisywaną
+# w przedziały wysokie — te same, w których model zawyża. Po naprawie znaku
+# (11.08) produkt przeskoczył na stronę „powyżej", czyli DOKŁADNIE w te
+# przedziały: 89% rozliczeń V2 stoi w `p_over` ≥ 0,55.
+#
+# To ta sama rodzina błędu co odwrócony znak: liczba zmierzona w jednym
+# reżimie stosowana w przeciwnym.
+#
+# ZMIERZONE OUT-OF-SAMPLE (mapa uczona tylko na V1, sprawdzona na 100
+# rozliczeniach V2 z 11-12.08, w skali `p_over`):
+#
+#   prior = wartość rynku (dawniej)   Brier 0,2774   log-loss 0,7632   -24,1 pp
+#   prior = 0 (dziś)                  Brier 0,2625   log-loss 0,7192   -18,9 pp
+#
+# Sprawdzone i ODRZUCONE warianty (gorsze albo bez różnicy): wartość z
+# najbliższego zmierzonego przedziału (Brier +0,8%), prior jako średnia PO
+# przedziałach zamiast po obserwacjach (+0,7%), zerowanie wyłącznie
+# przedziałów bez próby (-0,6%, bo nie rusza tych ŚCIĄGANYCH do `g`).
+#
+# UCZCIWIE: to zmniejsza szkodę, nie leczy. Luka -18,9 pp zostaje, więc główna
+# przyczyna przeszacowania leży poza kalibracją.
+#
+# Przedział z próbą dostaje `k * własny bias`, gdzie k = n/(n+MIN_N_PRZEDZIAL)
+# — przy chudej próbie korekta jest przytłumiona, przy grubej pełna. Ochrona
+# przed szumem została, zniknęło tylko przenoszenie liczby między reżimami.
+
 # SKĄD SIĘ WZIĘŁA LICZBA W PRZEDZIALE (2026-08-05).
 #
-# Przedział bez własnej próby dostaje wartość globalną rynku — i to jest
-# poprawne, bo lepiej korygować przybliżeniem niż nie korygować wcale. Wada
-# była w tym, że po zapisie NIC już tego nie odróżniało: raport pokazywał
-# cztery liczby w rzędzie i wyglądało to jak cztery pomiary, choć trzy z nich
-# były jedną liczbą powtórzoną. Zmierzone tego dnia: na 12 rynków tylko trzy
-# miały jakikolwiek przedział policzony z własnych danych.
+# Raport pokazywał cztery liczby w rzędzie i wyglądało to jak cztery pomiary,
+# choć trzy z nich były jedną liczbą powtórzoną. Zmierzone tego dnia: na
+# 12 rynków tylko trzy miały jakikolwiek przedział policzony z własnych danych.
+#
+# UWAGA: zdanie „przedział bez próby dostaje wartość rynku i to jest poprawne,
+# bo lepiej korygować przybliżeniem niż nie korygować wcale" stało tu do
+# 12.08 i było BŁĘDNE — przybliżenie brało się z przedziału o przeciwnym
+# znaku błędu. Powód i pomiar: PRIOR PRZEDZIAŁU wyżej. Etykiety zostają, bo
+# dopiero dzięki nim dało się to policzyć.
 #
 # Etykieta jedzie OBOK `bins`, w osobnym polu, a nie jako czwarty element
 # przedziału — `[lo, hi, b]` jest rozpakowywane krotką w sześciu miejscach
@@ -1173,6 +1217,7 @@ MIN_N_PRZEDZIAL = 15
 ZRODLO_WLASNA = "wlasna"          # przedział miał swoją próbę
 ZRODLO_GLOBALNA = "globalna"      # za mało danych, wpisana wartość rynku
 ZRODLO_OBCA_EPOKA = "obca_epoka"  # połowa korekty z poprzedniego produktu
+ZRODLO_BEZ_PROBY = "bez_proby"    # za mało danych i nie zgadujemy — patrz niżej
 # WAŻENIE ŚWIEŻOŚCI kalibracji: rozliczenie sprzed 14 dni waży połowę
 # najnowszego (półokres). Warunki gry zmieniają się (faza grupowa vs
 # pucharowa, klub vs turniej) — bez wygaszania stara prawda przykrywa nową
@@ -1387,14 +1432,17 @@ def compute_bias_full(
         for lo, hi in BIAS_PRZEDZIALY:
             # po `p_over`, nie po `p` typu — patrz `_p_over_rekordu`
             bgrp = [r for r in grp if lo <= _p_over_rekordu(r) < hi]
-            bb = g
-            zr = ZRODLO_GLOBALNA
+            # ⚑ PRZEDZIAŁ NIE JEST ŚCIĄGANY DO WARTOŚCI RYNKU (2026-08-12) —
+            # patrz PRIOR PRZEDZIAŁU niżej przy MIN_N_PRZEDZIAL. Prior zerowy
+            # znaczy „nie wiem", a nie „zachowaj się jak najliczniejszy
+            # przedział tego rynku".
+            bb = 0.0
+            zr = ZRODLO_BEZ_PROBY
             if len(bgrp) >= MIN_N_PRZEDZIAL:
                 b_eff = sum(_w(r) for r in bgrp)
                 k = b_eff / (b_eff + MIN_N_PRZEDZIAL)
-                bb = g + k * (
-                    _bias_logit(w_orientacji_over(bgrp), [_w(r) for r in bgrp])
-                    - g
+                bb = k * _bias_logit(
+                    w_orientacji_over(bgrp), [_w(r) for r in bgrp]
                 )
                 zr = ZRODLO_WLASNA
             bins.append([lo, hi, _cap_bias(bb, cap)])
@@ -1440,11 +1488,19 @@ def _dolej_z_innej_epoki(
     for mk, wpis in zapas.items():
         if mk in out:
             continue                       # własne dane zawsze wygrywają
+        # DOLEWKA JEST JEDNĄ LICZBĄ NA RYNEK, nie czterema (doprecyzowane
+        # 12.08 przy zmianie priora przedziału). Wcześniej wychodziło to samo
+        # ubocznie — przedział bez próby dostawał `global`, więc kopiowanie
+        # `bins` kopiowało tę samą liczbę. Odkąd pusty przedział zostaje
+        # zerem, kopiowanie `bins` skasowałoby dolewkę dla rynków, które
+        # dostały ją właśnie dlatego, że własnych rozliczeń NIE MAJĄ
+        # (faule, przechwyty, strzały głową). Bierzemy więc wprost `global`:
+        # przyznanie się do niewiedzy nie ma przedziałów.
+        _dol = _cap_bias(wpis["global"] * KOREKTA_OBCEJ_EPOKI, cap)
         out[mk] = {
             "logit": True,
-            "global": _cap_bias(wpis["global"] * KOREKTA_OBCEJ_EPOKI, cap),
-            "bins": [[lo, hi, _cap_bias(b * KOREKTA_OBCEJ_EPOKI, cap)]
-                     for lo, hi, b in wpis["bins"]],
+            "global": _dol,
+            "bins": [[lo, hi, _dol] for lo, hi, _ in wpis["bins"]],
             # cała dolewka to przyznanie się do niewiedzy, więc żaden z jej
             # przedziałów nie jest pomiarem w TEJ epoce — nawet ten, który
             # w poprzedniej miał własną próbę
@@ -2350,7 +2406,7 @@ def pokrycie_przedzialow(*mapy: dict | None) -> dict[str, int]:
     się po cichu do „na własnych danych".
     """
     out = {ZRODLO_WLASNA: 0, ZRODLO_GLOBALNA: 0, ZRODLO_OBCA_EPOKA: 0,
-           "bez_etykiet": 0, "razem": 0}
+           ZRODLO_BEZ_PROBY: 0, "bez_etykiet": 0, "razem": 0}
     for mapa in mapy:
         for wpis in (mapa or {}).values():
             if not isinstance(wpis, dict):
@@ -2373,6 +2429,7 @@ def zdanie_pokrycia(pokrycie: dict[str, int]) -> str:
         return "przedziały korekty: żaden rynek nie ma jeszcze przedziałów"
     czesci = [f"{pokrycie.get(ZRODLO_WLASNA, 0)} z {razem} na własnych danych"]
     for klucz, opis in (
+        (ZRODLO_BEZ_PROBY, "bez próby w przedziale — nie korygujemy"),
         (ZRODLO_GLOBALNA, "wartość globalna rynku"),
         (ZRODLO_OBCA_EPOKA, "połowa korekty z poprzedniej epoki"),
         ("bez_etykiet", "zapisane przed wprowadzeniem etykiet"),

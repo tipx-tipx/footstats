@@ -2,10 +2,15 @@
 """Dwa czujniki dołożone 05.08 — oba tylko mierzą, żaden nie zmienia rachunku.
 
 1. PRZEDZIAŁ BEZ PRÓBY MA SIĘ PRZYZNAĆ. Korekta dzieli się na cztery przedziały
-   szansy, ale przedział bez własnych rozliczeń dostaje wartość globalną rynku.
-   Do 05.08 nic tego nie odróżniało: raport pokazywał cztery liczby w rzędzie
-   i czytało się to jak cztery pomiary. Zmierzone tego dnia — na 12 rynków
-   tylko trzy miały jakikolwiek przedział policzony z własnych danych.
+   szansy. Do 05.08 nic nie odróżniało pomiaru od przybliżenia: raport
+   pokazywał cztery liczby w rzędzie i czytało się to jak cztery pomiary.
+   Zmierzone tego dnia — na 12 rynków tylko trzy miały jakikolwiek przedział
+   policzony z własnych danych.
+
+   Od 12.08 przedział bez próby nie dostaje już wartości rynku, tylko ZERO —
+   ta wartość okazała się liczbą z przedziału o przeciwnym znaku błędu
+   (patrz PRIOR PRZEDZIAŁU w `rozliczanie`). Czujnik został, zmieniła się
+   odpowiedź, którą raportuje.
 
 2. POGORSZENIE MA KRZYCZEĆ. Kierunek trendu był liczony i pokazywany na
    stronie, ale cykl o nim milczał — spadek dało się zobaczyć wyłącznie wtedy,
@@ -37,7 +42,7 @@ def _log(wpisy: list[dict]) -> dict:
 
 # --- 1. skąd wzięła się liczba w przedziale ---
 
-def test_przedzial_bez_proby_przyznaje_sie_do_globalnej():
+def test_przedzial_bez_proby_przyznaje_sie_do_niewiedzy():
     """Sedno czujnika: wszystkie typy w jednym przedziale, reszta pusta."""
     log = _log([
         _typ(i, 0.75, "wygrany" if i % 3 else "przegrany")
@@ -47,8 +52,54 @@ def test_przedzial_bez_proby_przyznaje_sie_do_globalnej():
     zrodla = wpis["zrodla"]
     assert len(zrodla) == len(wpis["bins"]), "etykieta na KAŻDY przedział"
     # 0,75 wpada w przedział (0.70, 0.85) — tylko on ma z czego się policzyć
-    assert zrodla == [R.ZRODLO_GLOBALNA, R.ZRODLO_GLOBALNA,
-                      R.ZRODLO_WLASNA, R.ZRODLO_GLOBALNA]
+    assert zrodla == [R.ZRODLO_BEZ_PROBY, R.ZRODLO_BEZ_PROBY,
+                      R.ZRODLO_WLASNA, R.ZRODLO_BEZ_PROBY]
+
+
+def test_przedzial_bez_proby_nie_bierze_korekty_z_innego_przedzialu():
+    """⚑ PRIOR PRZEDZIAŁU (12.08): pusty przedział NIE dziedziczy po rynku.
+
+    Do 12.08 brał `global`, a ten liczy się po obserwacjach — przy materiale
+    skupionym w jednym przedziale była to po prostu wartość TAMTEGO przedziału,
+    wpisywana w przedziały o przeciwnym znaku błędu. Ten test pilnuje, żeby
+    nikt nie przywrócił dziedziczenia w dobrej wierze.
+    """
+    log = _log([
+        _typ(i, 0.75, "wygrany" if i % 3 else "przegrany")
+        for i in range(R.MIN_N_KALIBRACJI + R.MIN_N_PRZEDZIAL + 10)
+    ])
+    wpis = R.compute_bias_full(log)["team_goals"]
+    mierzony = [b for b, z in zip(wpis["bins"], wpis["zrodla"])
+                if z == R.ZRODLO_WLASNA]
+    puste = [b for b, z in zip(wpis["bins"], wpis["zrodla"])
+             if z == R.ZRODLO_BEZ_PROBY]
+    assert mierzony and puste, "test wymaga obu rodzajów przedziału"
+    assert abs(mierzony[0][2]) > 0.05, "przedział z próbą ma realną korektę"
+    assert all(b[2] == 0.0 for b in puste), \
+        "przedział bez próby nie korygujemy wcale"
+
+
+def test_przedzial_z_proba_nie_jest_sciagany_do_wartosci_rynku():
+    """Przedział z własnym pomiarem odpowiada za siebie, nie za rynek.
+
+    Dwa przedziały o PRZECIWNYCH błędach: model zawyża przy 0,90 i zaniża
+    przy 0,60. Gdyby liczby były ściągane do wspólnej wartości rynku, obie
+    poszłyby w tę samą stronę.
+    """
+    wpisy = [
+        # 0,90 deklarowane, wchodzi co drugi raz — model mocno zawyża
+        *[_typ(i, 0.90, "wygrany" if i % 2 else "przegrany")
+          for i in range(60)],
+        # 0,60 deklarowane, wchodzi 7 razy na 8 — model zaniża
+        *[_typ(100 + i, 0.60, "wygrany" if i % 8 else "przegrany")
+          for i in range(60)],
+    ]
+    wpis = R.compute_bias_full(_log(wpisy))["team_goals"]
+    biny = {(lo, hi): b for lo, hi, b in wpis["bins"]}
+    gorny = biny[(0.85, 1.01)]
+    dolny = biny[(0.55, 0.70)]
+    assert gorny < 0, "przedział, w którym model zawyża, ma korektę w dół"
+    assert dolny > 0, "przedział, w którym model zaniża, ma korektę w górę"
 
 
 def test_dolewka_z_poprzedniej_epoki_nie_udaje_pomiaru():
@@ -60,6 +111,26 @@ def test_dolewka_z_poprzedniej_epoki_nie_udaje_pomiaru():
     wpis = R.compute_bias_full(_log(stare)).get("team_goals")
     assert wpis, "rynek bez własnych danych ma dostać dolewkę"
     assert set(wpis["zrodla"]) == {R.ZRODLO_OBCA_EPOKA}
+
+
+def test_dolewka_przezywa_zerowy_prior_przedzialu():
+    """⚑ PUŁAPKA 12.08: dolewka dotyczy rynków BEZ własnych rozliczeń.
+
+    Zerowy prior przedziału i dolewka z poprzedniej epoki spotykają się w
+    najgorszym możliwym miejscu: rynek dostaje dolewkę właśnie dlatego, że
+    nie ma z czego policzyć przedziałów, więc kopiowanie `bins` dałoby cztery
+    zera i po cichu zdjęłoby korektę z fauli, przechwytów i strzałów głową.
+    Dolewka to JEDNA liczba na rynek — ma taka zostać.
+    """
+    stare = [
+        {**_typ(i, 0.75, "wygrany" if i % 3 else "przegrany"), "epoka": "ms"}
+        for i in range(R.MIN_N_KALIBRACJI + R.MIN_N_PRZEDZIAL + 10)
+    ]
+    wpis = R.compute_bias_full(_log(stare))["team_goals"]
+    wartosci = {b for _, _, b in wpis["bins"]}
+    assert len(wartosci) == 1, "dolewka nie ma przedziałów — jedna liczba"
+    assert abs(wartosci.pop()) > 0.05, "dolewka nie może wyjść zerem"
+    assert wpis["global"] == wpis["bins"][0][2]
 
 
 def test_licznik_pokrycia_rozdziela_pomiar_od_przyblizenia():

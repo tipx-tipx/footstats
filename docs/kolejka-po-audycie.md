@@ -154,10 +154,18 @@ Legenda: `[x]` zrobione · `[~]` w toku / obejście · `[ ]` otwarte
   i mostki** — dziś maskujemy likelihood i opisy, ale norma ligi liczy się ze
   wszystkiego. Do tego: jawne sortowanie po czasie przed wyborem najnowszych,
   a brak timestampu nie może znaczyć „dzisiaj".
-- [ ] **Kalibracja per (rynek, strona, przedział)** z hierarchią i ściąganiem
+- [~] **Kalibracja per (rynek, strona, przedział)** z hierarchią i ściąganiem
   proporcjonalnym do próby. Rdzeń musi zostać w jednej orientacji „powyżej",
   żeby `p_over + p_under = 1`; strona może być wymiarem diagnostycznym, ale
   nie osobną korektą rozrywającą komplementarność.
+  → **ZROBIONE 12.08 w części „przedział":** hierarchia rynek→przedział była
+  wręcz szkodliwa, bo `global` liczy się po obserwacjach, a 86% z nich siedzi
+  w jednym przedziale (`p_over` 0,00–0,55, bo V1 typowało „poniżej"). Prior
+  przedziału to teraz ZERO. Zmierzone out-of-sample na 100 rozliczeniach V2:
+  Brier 0,2774 → 0,2625, luka −24,1 → −18,9 pp. Pełny pomiar i odrzucone
+  warianty: `docs/pomiar-prior-przedzialu.md`. **Zostaje wymiar „strona"** —
+  dziś strona nie jest osobnym wymiarem kalibracji i po naprawie znaku produkt
+  stoi w 91% po stronie „powyżej", która traci −14…−20 pp od zawsze.
 - [ ] **`szansa_pokazywana` nie jest dziś tylko prezentacją** — zmienia
   eligibility i wybór listy (brama „ujemna po korekcie"). Na starcie V2
   wyzerować lub zamrozić, uczyć wyłącznie na V2.
@@ -267,6 +275,13 @@ Do odhaczenia przed uznaniem V2 za w pełni wdrożone:
 
 **Ocena V2 dopiero po ~100 sparowanych rozliczeniach** (min. 30 „powyżej"
 i 30 „poniżej"), paired Brier / log-loss. Nie po ROI z kilku dni.
+
+⚑ **STAN 12.08: 100 rozliczeń V2, ale rozkład 91 „powyżej" / 5 „poniżej"** —
+warunek sparowania NIE jest spełniony i formalnej oceny nadal nie da się
+zrobić. Powód jest sam w sobie znaleziskiem: naprawa znaku przewróciła stronę
+typów (V1: 83% „poniżej" → V2: 91% „powyżej"), czyli przeniosła produkcję ze
+strony o ROI ≈ 0 na stronę, która traci −13…−17% od początku epoki ligowej.
+Liczby: `docs/pomiar-prior-przedzialu.md`.
 
 ---
 
