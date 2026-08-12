@@ -143,6 +143,55 @@ pomiarem przed i po, nie razem z tą.
 
 ---
 
+## 5. Okno zgody z rynkiem — dopisane 14.08 wieczorem
+
+Ostatnia nieruszona brama. Dziś: typ wchodzi, gdy `p_model − implied(kurs)`
+mieści się w **[0; 16 pp)**. Wycina więc dwie różne rzeczy naraz: typy poniżej
+ceny rynku (dziś praktycznie nie powstają — 11 rozliczeń) i typy 16+ pp nad nią.
+
+**Pełna skala rozjazdu** (wszystkie rozliczone, epoka ligowa):
+
+| rozjazd | n | deklaruje | trafia | luka | ROI |
+|---|---|---|---|---|---|
+| 0–4 pp | 38 | 35,4% | 31,6% | −3,8 pp | **−24,8%** |
+| 4–8 pp | 49 | 51,1% | 40,8% | −10,3 pp | −14,2% |
+| 8–12 pp | 144 | 62,8% | 52,1% | −10,7 pp | −6,9% |
+| **12–16 pp** (przy granicy) | 482 | 71,1% | 60,6% | −10,5 pp | −1,4% |
+| 16–20 pp | 359 | 74,2% | 58,5% | −15,7 pp | −4,1% |
+| 20–30 pp | 371 | 74,9% | 59,3% | −15,6 pp | **+6,3%** |
+| 30+ pp | 64 | 65,4% | 18,8% | **−46,7 pp** | −23,8% |
+
+Zwrot **rośnie** z rozjazdem aż do 30 pp — odwrotnie, niż zakłada brama.
+Najgorszy segment (0–4 pp) brama przepuszcza, bo mieści się w oknie.
+Kontrola po paśmie kursu: w **każdym** paśmie typy 16+ pp mają lepszy zwrot
+niż te w oknie (−1,8% wobec −6,3% przy kursie 2,00+ itd.).
+
+**⚑ Ale progu NIE wolno stawiać na ROI.** Podział rozliczeń na starszą
+i nowszą połowę:
+
+```
+przedział       starsze ROI    nowsze ROI     luka starsze / nowsze
+0-16 pp             -6,7%         -2,6%           -10,8 / -9,5     stabilne
+16-20 pp            +2,8%         -9,7%           -11,0 / -19,4    ZNAK SIĘ ZMIENIA
+20-30 pp            +4,7%         +8,4%           -14,5 / -17,1    stabilne
+30+ pp             -55,1%        +14,0%           -53,6 / -38,3    ZNAK SIĘ ZMIENIA
+```
+
+Zwrot w tych przedziałach jest w dużej części szumem. **Stabilna jest luka** —
+rośnie z rozjazdem monotonicznie, a przy 30+ pp wybucha (−53 i −38 pp w obu
+połowach: model deklaruje 65%, wchodzi 19%).
+
+**Rekomendacja:** górna granica 16 → **30 pp**, czyli tam, gdzie luka faktycznie
+wybucha, a nie tam, gdzie ROI akurat wygląda korzystnie. Dolna zostaje.
+Symulacja: 274 typy wracają, zwrot całości −3,3% wobec −3,5% dziś — czyli
+**efekt na wynik jest znikomy**. To zmiana o różnorodność i o zgodność z zasadą
+„nic nie blokujemy", nie o zysk. Przy limicie 12 typów na dobę te typy są
+materiałem dla kolejności, a nie zalewem listy.
+
+**Nie wdrożone** — czeka na decyzję właściciela.
+
+---
+
 ## Jak to odtworzyć
 
 Skrypty pomiarowe (jednorazowe, w katalogu roboczym sesji): tercje rankingu,

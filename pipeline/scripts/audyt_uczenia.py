@@ -356,6 +356,50 @@ def czesc4_czynniki(vb: list[dict]) -> None:
     print("Powód bywa niewinny (rynek go nie używa) albo nie — patrz raport.")
 
 
+def czesc5_bramy(settled: list[dict]) -> None:
+    """ILE PIENIĘDZY ZDEJMUJĄ BRAMY — czyli czy w ogóle się opłacają.
+
+    Typ zdjęty bramą nie znika: rozlicza się „w tle" i uczy model, więc znamy
+    jego wynik. To jedyne miejsce w projekcie, gdzie widać, czy brama wycina
+    coś gorszego od tego, co przepuszcza — a to nie jest oczywiste. Zmierzone
+    14.08 na epoce ligowej: kwarantanna rynku zdejmowała typy o ROI +10,3%,
+    przy publikowanych −3,5%. Trzy bramy trafiły wtedy do przeglądu, dwie
+    zostały zdjęte.
+
+    Bez tej tabeli takie rzeczy wychodzą raz na miesiąc, przy okazji.
+    Z nią widać je w każdej kontroli startowej.
+    """
+    print()
+    print("=" * 78)
+    print("5. CO ZDEJMUJĄ BRAMY (typ zdjęty rozlicza się dalej — znamy wynik)")
+    print("=" * 78)
+    pub = [r for r in settled if not r.get("poza_publikacja")]
+    if not pub:
+        print("   brak rozliczeń publikowanych — nie ma do czego porównywać")
+        return
+    _naglowek_tabeli("co się stało", szer=22)
+    _wiersz("POKAZANE NA STRONIE", pub, szer=22)
+    print()
+    grupy: dict[str, list] = defaultdict(list)
+    for r in settled:
+        if r.get("poza_publikacja"):
+            grupy[str(r["poza_publikacja"])].append(r)
+    roi_pub = _roi(pub)
+    lepsze = []
+    for powod, grp in sorted(grupy.items(), key=lambda kv: -len(kv[1])):
+        _wiersz(f"zdjęte: {powod}", grp, szer=22)
+        if len(grp) >= 25 and _roi(grp) > roi_pub:
+            lepsze.append((powod, len(grp), _roi(grp)))
+    if lepsze:
+        print()
+        print("   ⚑ BRAMY, KTÓRE ZDEJMUJĄ MATERIAŁ LEPSZY NIŻ PUBLIKOWANY:")
+        for powod, n, roi in lepsze:
+            print(f"      {powod:<24} n={n:>4}  ROI {roi:>6.1%} "
+                  f"wobec {roi_pub:>6.1%} na stronie")
+        print("      (bramy wybierają nielosowo — to sygnał do pomiaru,")
+        print("       nie dowód; patrz docs/pomiar-bramy-i-kolejnosc.md)")
+
+
 def main() -> None:
     try:
         from dotenv import load_dotenv
@@ -375,6 +419,7 @@ def main() -> None:
     czesc2_warstwy(log, R)
     czesc3_kalendarz(settled, log, R)
     czesc4_czynniki(supa.get_key("value_bets") or [])
+    czesc5_bramy(settled)
 
 
 if __name__ == "__main__":
