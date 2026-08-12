@@ -8,6 +8,7 @@ import {
   nazwaPodmiotu,
   opisZakladu,
 } from "@/lib/format";
+import { szansaLega } from "@/lib/slownik";
 import type { Kupon, KuponLeg } from "@/lib/types";
 
 /** mini-znaczniki: sprzyjający rywal / powrót do składu / zaniżony kurs */
@@ -66,7 +67,10 @@ export function KuponBilet({
 }) {
   const weakIdx =
     k.najslabszy_idx ??
-    k.legi.reduce((mi, l, ix, arr) => (l.p_model < arr[mi].p_model ? ix : mi), 0);
+    k.legi.reduce(
+      (mi, l, ix, arr) => (szansaLega(l) < szansaLega(arr[mi]) ? ix : mi),
+      0,
+    );
 
   // oś czasu meczów (tylko gdy kupon łączy 2+ meczów)
   const mecze: { mecz: string; kickoff: number; legi: KuponLeg[] }[] = [];
@@ -191,7 +195,7 @@ export function KuponBilet({
                     </span>
                   )}
                   <span className="font-data shrink-0 text-xs text-muted">
-                    {fmtProc(l.p_model)}
+                    {fmtProc(szansaLega(l))}
                   </span>
                   <span className="font-data shrink-0 rounded-(--radius-control) border border-hairline bg-card-soft px-2 py-0.5 text-sm font-semibold">
                     {fmtKurs(l.kurs)}
@@ -204,13 +208,13 @@ export function KuponBilet({
                 >
                   <div
                     className={`h-full rounded-full ${
-                      l.p_model >= 0.65
+                      szansaLega(l) >= 0.65
                         ? "bg-data-green/80"
-                        : l.p_model >= 0.5
+                        : szansaLega(l) >= 0.5
                           ? "bg-data-amber/80"
                           : "bg-data-red/70"
                     }`}
-                    style={{ width: `${Math.round(l.p_model * 100)}%` }}
+                    style={{ width: `${Math.round(szansaLega(l) * 100)}%` }}
                   />
                 </div>
               </div>

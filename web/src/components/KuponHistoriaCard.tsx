@@ -5,6 +5,7 @@ import {
   nazwaPodmiotu,
   opisZakladu,
 } from "@/lib/format";
+import { szansaLega } from "@/lib/slownik";
 import type { KuponHistoria } from "@/lib/types";
 
 /** Techniczne powody z pipeline'u mówią „leg" (magiczne stringi logiki +
@@ -154,7 +155,7 @@ export function KuponHistoriaCard({
                   <span className="text-muted">{opisZakladu(l)}</span>
                 </p>
                 <span className="font-data shrink-0 text-xs text-muted">
-                  {fmtProc(l.p_model)}
+                  {fmtProc(szansaLega(l))}
                 </span>
                 <span className="font-data shrink-0 rounded-md bg-card-soft px-1.5 py-0.5 text-xs font-semibold">
                   {fmtKurs(l.kurs)}

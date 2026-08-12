@@ -150,6 +150,7 @@ def _rozlicz_i_zapisz(
     urealnienie: dict[str, float] | None = None,
     przewaga: dict[str, dict] | None = None,
     pasma: dict[str, dict] | None = None,
+    sciaganie: tuple[float, float] | None = None,
 ) -> None:
     """Rozliczanie + zapis wyników. Wywoływane w KAŻDYM cyklu — także gdy
     statshub nie ma propsów (rozliczenia nie mogą czekać na nowe typy).
@@ -191,7 +192,7 @@ def _rozlicz_i_zapisz(
     # był taki, że naprawa wartości netto wracała do stanu sprzed naprawy przy
     # pierwszym lekkim rozliczeniu (patrz rozliczanie.kupon_do_pokazania).
     _dump("kupony.json", [
-        rozliczanie.kupon_do_pokazania(k, urealnienie)
+        rozliczanie.kupon_do_pokazania(k, urealnienie, sciaganie)
         for k in wyniki["kupony"]
         if k.get("wynik") is None and not k.get("pominiety")
     ])
@@ -7689,8 +7690,31 @@ def _main_impl(tryb=None):
         # uboższy niż ten sam typ opublikowany normalnie.
         "rachunek",
     )
+    # ⚑ JEDEN ZAKŁAD — JEDNA SZANSA NA EKRANIE (2026-08-13).
+    #
+    # Pula jedzie do generatora kuponów na żądanie i do niej ZAGLĄDA user.
+    # Do dziś dumpowaliśmy ją z surowym `p_model`, a lista typów pokazywała
+    # tę samą pozycję po urealnieniu i po ściągnięciu do ceny. Zmierzone tego
+    # dnia: 32 z 32 typów listy jest też w puli, mediana różnicy +10,5 pp,
+    # maksymalnie +13,8 (Pafos FC, kartki poniżej 2,5: 61,6% na liście, 74,8%
+    # w generatorze). Ten sam zakład pokazywał więc dwie różne szanse dwa
+    # kliknięcia od siebie.
+    #
+    # `p_model` ZOSTAJE SUROWE, bo na nim składa się kupon — i tak samo robi
+    # backend (`build_kupony` dostaje surowe `value_bets`). Parytet front-backend
+    # jest tu warunkiem, a nie ozdobą: generator na żądanie ma dawać ten sam
+    # kupon co cykl. Do POKAZANIA dochodzi osobne pole.
+    _pokaz_lega = {}
+    for _b in legi_pool_pub:
+        try:
+            _pokaz_lega[id(_b)] = _sciagnij_karte_do_ceny(
+                _urealnij_do_pokazania(_b)
+            ).get("p_model")
+        except Exception as e:
+            diagnostyka.cichy("cykl", "p_pokaz_lega", e)
     _dump("legi_pool.json", [
-        {**{k: b.get(k) for k in _POLA_LEGA}, "id": i}
+        {**{k: b.get(k) for k in _POLA_LEGA}, "id": i,
+         "p_pokaz": _pokaz_lega.get(id(b))}
         for i, b in enumerate(legi_pool_pub)
     ])
     n_dzis = len({b["mecz_id"] for b in legi_pool_pub
@@ -7887,6 +7911,10 @@ def _main_impl(tryb=None):
                       poza_publikacja=typy_poza_publikacja,
                       legi_pool=legi_pool_pub, drabinki=drabinki_typy,
                       urealnienie=korekta_pokazywana,
+                      # legi kuponów mają pokazywać tę samą szansę co lista
+                      # typów — patrz `rozliczanie.kupon_do_pokazania`
+                      sciaganie=((_waga_karty, _marza_karty)
+                                 if _waga_karty else None),
                       # policzone wyżej przy układaniu listy — nie liczymy
                       # drugi raz, bo to kolejny odczyt księgi z Supabase
                       przewaga=_przewaga, pasma=_pasma)

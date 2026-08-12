@@ -13,6 +13,7 @@ import {
 import { Segmented } from "./Segmented";
 import { useStawka } from "./useStawka";
 import { fmtDataCzas, fmtEV, fmtKurs, fmtLinia, fmtProc } from "@/lib/format";
+import { szansaLega } from "@/lib/slownik";
 import {
   KARY_DEFAULT,
   MIN_LEG_EV,
@@ -821,7 +822,9 @@ export function GeneratorKuponu({
           {mecze.map(([mid, { label }]) => {
             const typyMeczu = pulaFiltrowana
               .filter((l) => l.mecz_id === mid && !wykluczone.has(legKey(l)))
-              .sort((a, b) => b.p_model - a.p_model);
+              // sortujemy po liczbie POKAZYWANEJ — user porządkuje to,
+              // co widzi; składanie i tak idzie na surowym `p_model`
+              .sort((a, b) => szansaLega(b) - szansaLega(a));
             if (typyMeczu.length === 0) return null;
             // wiersze zawodnik+rynek, linie jako przełączane pastylki –
             // czytelniej niż ściana chipów i skaluje się na sezon ligowy
@@ -868,9 +871,9 @@ export function GeneratorKuponu({
                           const kx = legKey(l);
                           const pin = przypiete.has(kx);
                           const kropka =
-                            l.p_model >= 0.65
+                            szansaLega(l) >= 0.65
                               ? "bg-data-green"
-                              : l.p_model >= 0.5
+                              : szansaLega(l) >= 0.5
                                 ? "bg-data-amber"
                                 : "bg-data-red";
                           return (
@@ -878,7 +881,7 @@ export function GeneratorKuponu({
                               key={kx}
                               onClick={() => przypnij(l)}
                               aria-pressed={pin}
-                              title={`Szansa ${fmtProc(l.p_model)}${
+                              title={`Szansa ${fmtProc(szansaLega(l))}${
                                 pin ? ". Kliknij, żeby odpiąć" : ""
                               }`}
                               className={`font-data inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] transition-colors ${
@@ -1192,7 +1195,7 @@ function KuponKarta({
                       </span>
                     </span>
                     <span className="flex shrink-0 items-center gap-2">
-                      <span className="font-data text-xs text-faint">{fmtProc(l.p_model)}</span>
+                      <span className="font-data text-xs text-faint">{fmtProc(szansaLega(l))}</span>
                       <span className="font-data font-semibold">@{fmtKurs(l.kurs)}</span>
                       <span className="flex items-center gap-1">
                         <button

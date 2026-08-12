@@ -63,6 +63,22 @@ def main() -> None:
         with rozliczanie.warstwa_uczenia("szansa_pokazywana") as _w:
             urealnienie = rozliczanie.szansa_pokazywana()
             _w.opisz(n=len(urealnienie))
+        # ⚑ TEN JOB PISZE `kupony` CO 20 MINUT, WIĘC MUSI ZNAĆ TE SAME WARSTWY
+        # CO DUŻY CYKL (2026-08-13). Bez ściągnięcia leg kuponu pokazywałby
+        # szansę wyższą niż ta sama pozycja na liście typów — a wystarczyłby
+        # jeden przebieg tego joba, żeby cofnąć to, co ustawił cykl (ta sama
+        # klasa błędu co przy wartości netto, patrz komentarz wyżej).
+        # Księga jest już wczytana wewnątrz `rozlicz`, ale te dwie warstwy
+        # czytają ją same — koszt to jeden dodatkowy odczyt na 20 minut.
+        sciaganie = None
+        with rozliczanie.warstwa_uczenia("sciaganie_karty") as _w:
+            _ksiega_s = rozliczanie._migruj_log(supa.get_key("typy_log") or {})
+            _marza = rozliczanie.marza_sciagania(_ksiega_s)
+            _waga = rozliczanie.waga_sciagania(_ksiega_s, _marza)
+            sciaganie = (_waga, _marza) if _waga else None
+            _w.opisz(n=(1 if _waga else 0),
+                     opis=(f"w={_waga:.2f} / cena minus {_marza:.1%}"
+                           if _waga else "za mała próba — legi bez zmian"))
         if rozliczanie.krytyczne_padniete():
             print(f"[{stamp}] Kupony NIE nadpisane — padła warstwa "
                   f"{', '.join(rozliczanie.krytyczne_padniete())}; "
@@ -70,7 +86,7 @@ def main() -> None:
             supa.put_key("typy_wyniki", wyniki)
             return
         aktywne = [
-            rozliczanie.kupon_do_pokazania(k, urealnienie)
+            rozliczanie.kupon_do_pokazania(k, urealnienie, sciaganie)
             for k in wyniki["kupony"]
             if k.get("wynik") is None and not k.get("pominiety")
         ]

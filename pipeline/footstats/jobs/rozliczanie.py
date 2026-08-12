@@ -3476,7 +3476,11 @@ def urealnij_p(p: float, delta: float) -> float:
     return 1.0 / (1.0 + math.exp(-(_logit(p) + delta)))
 
 
-def kupon_do_pokazania(k: dict, urealnienie: dict[str, float] | None = None) -> dict:
+def kupon_do_pokazania(
+    k: dict,
+    urealnienie: dict[str, float] | None = None,
+    sciaganie: tuple[float, float] | None = None,
+) -> dict:
     """Kupon z logu przygotowany do POKAZANIA — wartość przeliczona od nowa.
 
     JEDNA FUNKCJA DLA WSZYSTKICH PISARZY KLUCZA `kupony` (2026-08-01).
@@ -3500,6 +3504,15 @@ def kupon_do_pokazania(k: dict, urealnienie: dict[str, float] | None = None) -> 
       różnych szans dwa kliknięcia od siebie. Sam kupon ma WŁASNE urealnienie
       (`kupony._urealnij_szanse`), więc jego `p_model` zostaje nietknięte.
 
+    ⚑ LICZBA POKAZYWANA IDZIE W OSOBNYM POLU (2026-08-13). Do dziś nadpisywała
+    `p_model` lega, a od 12.08 lista typów przeszła jeszcze jedną warstwę
+    (ściągnięcie do ceny, `sciagnij_do_ceny`), której kupon nie miał — więc
+    obietnica z punktu wyżej przestała być prawdziwa. Teraz leg niesie OBIE
+    liczby: `p_model` (surowa, na niej składa się kupon — tu i w generatorze
+    na żądanie, parytet z `build_kupony`) oraz `p_pokaz` (to, co widzi user).
+    `sciaganie` to (waga, marża) z tego samego cyklu; bez niej `p_pokaz`
+    kończy się na urealnieniu, czyli na zachowaniu sprzed tej zmiany.
+
     Dotyczy WYŁĄCZNIE tego, co pokazujemy — log kuponów zostaje surowy.
     """
     p_k = k.get("p_model")
@@ -3511,14 +3524,20 @@ def kupon_do_pokazania(k: dict, urealnienie: dict[str, float] | None = None) -> 
             "ev_netto": round(betting.ev_pct(
                 float(p_k), float(kurs_k), k.get("tryb_podatku")), 1),
         }
-    if not urealnienie:
+    if not urealnienie and not sciaganie:
         return k
-    return {**k, "legi": [
-        {**l, "p_model": round(urealnij_p(
-            float(l["p_model"]), urealnienie.get(_strumien(l), 0.0),
-        ), 4)} if l.get("p_model") else l
-        for l in k.get("legi", [])
-    ]}
+
+    def _pokaz(l: dict) -> dict:
+        if not l.get("p_model"):
+            return l
+        p = urealnij_p(float(l["p_model"]),
+                       (urealnienie or {}).get(_strumien(l), 0.0))
+        if sciaganie and l.get("kurs"):
+            waga, marza = sciaganie
+            p = sciagnij_do_ceny(p, float(l["kurs"]), float(waga), float(marza))
+        return {**l, "p_pokaz": round(p, 4)}
+
+    return {**k, "legi": [_pokaz(l) for l in k.get("legi", [])]}
 
 
 # ⚑ MAPA KALIBRACJI ZAMROŻONA (2026-08-11, warunek wdrożenia V2) ------------

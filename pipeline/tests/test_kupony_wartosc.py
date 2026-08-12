@@ -199,8 +199,47 @@ def test_kupon_do_pokazania_netto_nie_moze_bic_brutto():
 
 def test_kupon_do_pokazania_urealnia_szanse_legow():
     k = rozliczanie.kupon_do_pokazania(_kupon_klamiacy(), {"druzyny": -0.3})
-    assert k["legi"][0]["p_model"] < 0.6791     # leg ściągnięty
+    # ⚑ LICZBA POKAZYWANA W OSOBNYM POLU (2026-08-13). Do dziś urealnienie
+    # nadpisywało `p_model` lega — a na nim składa się kupon, tu i w generatorze
+    # na żądanie. Surowa liczba musi zostać nietknięta, żeby parytet
+    # front-backend się trzymał; user widzi `p_pokaz`.
+    assert k["legi"][0]["p_pokaz"] < 0.6791      # pokazywana ściągnięta
+    assert k["legi"][0]["p_model"] == 0.6791     # składanie na surowej
     assert k["p_model"] == 0.049                 # kupon ma własne urealnienie
+
+
+def test_leg_kuponu_pokazuje_te_sama_szanse_co_lista_typow():
+    """⚑ SEDNO: ten sam zakład nie może mieć dwóch szans dwa kliknięcia od siebie.
+
+    Zmierzone 13.08 przed naprawą: 32 z 32 typów listy było też w puli
+    generatora, mediana różnicy +10,5 pp, maksymalnie +13,8 (Pafos FC,
+    kartki poniżej 2,5: 61,6% na liście, 74,8% w generatorze). Lista przechodzi
+    urealnienie ORAZ ściągnięcie do ceny, a kupon miał tylko urealnienie.
+    """
+    kurs = 1.56
+    surowe = 0.7952
+    urealnienie = {"druzyny": -0.3}
+    waga, marza = 0.05, 0.035
+
+    k = rozliczanie.kupon_do_pokazania(
+        {"p_model": 0.4, "kurs_laczny": kurs, "wynik": None, "pominiety": False,
+         "legi": [{"p_model": surowe, "kurs": kurs, "rynek_kod": "team_cards"}]},
+        urealnienie, (waga, marza),
+    )
+    # dokładnie ta sama ścieżka co karta typu w `build_wc_fast`
+    z_listy = rozliczanie.sciagnij_do_ceny(
+        rozliczanie.urealnij_p(surowe, urealnienie["druzyny"]), kurs, waga, marza,
+    )
+    assert abs(k["legi"][0]["p_pokaz"] - round(z_listy, 4)) < 1e-4
+    assert k["legi"][0]["p_model"] == surowe
+
+
+def test_bez_sciagania_leg_zostaje_na_urealnieniu():
+    """Gdy warstwa nie ma próby, leg wraca do zachowania sprzed 13.08 —
+    a nie do surowej liczby, bo to byłby cichy powrót do zawyżonej szansy."""
+    k = rozliczanie.kupon_do_pokazania(_kupon_klamiacy(), {"druzyny": -0.3}, None)
+    oczek = rozliczanie.urealnij_p(0.6791, -0.3)
+    assert abs(k["legi"][0]["p_pokaz"] - round(oczek, 4)) < 1e-4
 
 
 def test_lekki_job_rozliczeniowy_normalizuje_kupony(monkeypatch):

@@ -290,3 +290,20 @@ export function zeStawki(
   const zwrot = p * kurs * wspPodatku * stawka;
   return `postawione ${stawka} zł wraca średnio jako ${przecinek(zwrot, 2)} zł`;
 }
+
+/**
+ * SZANSA LEGA DO POKAZANIA — jedna liczba dla jednego zakładu (2026-08-13).
+ *
+ * Leg niesie dwie: `p_model` (surowa, na niej składa się kupon — parytet
+ * z `kupony.build_kupony`) i `p_pokaz` (po urealnieniu i ściągnięciu do ceny,
+ * czyli ta sama, którą ten zakład ma na liście typów). Zmierzone przed
+ * rozdzieleniem: 32 z 32 typów listy było też w puli generatora, mediana
+ * różnicy +10,5 pp, maksymalnie +13,8 — ten sam zakład pokazywał dwie różne
+ * szanse dwa kliknięcia od siebie.
+ *
+ * Brak `p_pokaz` = rekord sprzed tej zmiany (pula i kupony żyją w Supabase
+ * dłużej niż jeden deploy), więc fallback na `p_model`.
+ */
+export function szansaLega(l: { p_pokaz?: number | null; p_model: number }): number {
+  return l.p_pokaz ?? l.p_model;
+}

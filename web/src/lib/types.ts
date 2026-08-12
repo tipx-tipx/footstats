@@ -511,7 +511,13 @@ export interface LegPool {
   strona: Strona;
   kurs: number;
   bukmacher: string;
+  /** SUROWA szansa – na niej składa się kupon (parytet z kupony.build_kupony).
+   *  Do POKAZANIA służy `p_pokaz`; te dwie liczby różnią się o ~10 pp. */
   p_model: number;
+  /** Szansa POKAZYWANA – ta sama liczba, którą ten zakład ma na liście typów
+   *  (po urealnieniu i ściągnięciu do ceny). Brak pola = pula sprzed
+   *  2026-08-13; wtedy front pokazuje `p_model`, czyli stan sprzed zmiany. */
+  p_pokaz?: number | null;
   matchup?: boolean;
   /** pełny matchup STYLU (silnik matchup.py) realnie ruszył predykcję */
   matchup_styl?: boolean;
@@ -722,7 +728,11 @@ export interface KuponLeg {
   strona: Strona;
   kurs: number;
   bukmacher: string;
+  /** SUROWA szansa – tą liczbą kupon był składany i tą się rozlicza. */
   p_model: number;
+  /** Szansa POKAZYWANA – ta sama, którą ten zakład ma na liście typów
+   *  (rozliczanie.kupon_do_pokazania). Brak = kupon sprzed 2026-08-13. */
+  p_pokaz?: number | null;
   pewnosc: Pewnosc;
   mecz: string;
   mecz_id: number;
