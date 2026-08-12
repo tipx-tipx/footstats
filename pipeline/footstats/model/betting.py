@@ -189,6 +189,7 @@ def stempel_rachunku(
     kal_strumien: float | None = None,
     p_over_final: float | None = None,
     p_pokazane: float | None = None,
+    kal_pokazywana: float | None = None,
 ) -> dict:
     """Komplet „skąd się wzięła ta liczba" — jeden słownik na typ.
 
@@ -206,7 +207,16 @@ def stempel_rachunku(
         ("kal_rynek", kal_rynek),
         ("kal_strumien", kal_strumien),
         ("p_over_final", p_over_final),
+        # ⚑ OSTATNIA WARSTWA, JUŻ PO STRONIE ZAKŁADU (2026-08-12). `p_pokazane`
+        # to liczba, którą realnie widzi klient — a nie jest ona dopełnieniem
+        # `p_over_final`. Zmierzone na dumpie tego dnia: typ team_fouls
+        # „poniżej" miał p_over_final 0,3681, więc strona zakładu wychodziła
+        # 0,6319, a karta pokazywała 0,6663. Różnicę robi `szansa_pokazywana`
+        # (+0,151 logita dla drużyn), nakładana PO wyborze strony i po bramie.
+        # Bez tych dwóch pól stempel tłumaczyłby rachunek modelu, ale nie
+        # liczbę na karcie — czyli nie to, o co klient by zapytał.
         ("p_pokazane", p_pokazane),
+        ("kal_pokazywana", kal_pokazywana),
     ):
         if wart is not None:
             out[klucz] = round(float(wart), 4)

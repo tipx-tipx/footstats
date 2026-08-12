@@ -3610,6 +3610,13 @@ def _main_impl(tryb=None):
         p = rozliczanie.urealnij_p(float(b["p_model"]), d)
         out = {**b, "p_model": round(p, 4), "p_urealnione": True,
                "fair_kurs": round(1.0 / max(p, 1e-6), 3)}
+        # ...i dopisz do stempla liczbę, którą realnie zobaczy klient. Bez tego
+        # rachunek kończył się na `p_over_final`, a karta pokazywała co innego
+        # — patrz nota przy `p_pokazane` w betting.stempel_rachunku.
+        if isinstance(b.get("rachunek"), dict) and b["rachunek"]:
+            out["rachunek"] = {**b["rachunek"],
+                               "p_pokazane": round(p, 4),
+                               "kal_pokazywana": round(float(d), 4)}
         if b.get("p_rynku") is not None:
             out["edge_pp"] = round((p - float(b["p_rynku"])) * 100.0, 2)
         if b.get("kurs"):

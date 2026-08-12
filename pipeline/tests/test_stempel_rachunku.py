@@ -73,6 +73,40 @@ def test_silnik_zawodniczy_oddaje_surowe_p_over():
     )
 
 
+def test_p_pokazane_nie_jest_dopelnieniem_p_over_final():
+    """⚑ Liczba na karcie NIE wynika z `p_over_final` (zmierzone 12.08).
+
+    Typ `team_fouls` „poniżej" miał p_over_final 0,3681, więc strona zakładu
+    wychodziła 0,6319 — a karta pokazywała 0,6663. Różnicę robi
+    `szansa_pokazywana`, nakładana PO wyborze strony i po bramie publikacji.
+    Stempel bez tych pól tłumaczyłby rachunek modelu, ale nie to, o co klient
+    faktycznie by zapytał.
+    """
+    s = betting.stempel_rachunku(
+        p_over_raw=0.4866, kal_rynek=0.04, kal_strumien=-0.527,
+        p_over_final=0.3681, p_pokazane=0.6663, kal_pokazywana=0.151,
+    )
+    strona_zakladu = 1.0 - s["p_over_final"]
+    assert abs(strona_zakladu - 0.6319) < 1e-3
+    assert abs(s["p_pokazane"] - strona_zakladu) > 0.03, (
+        "test straciłby sens, gdyby obie liczby były równe"
+    )
+    # ...i da się przejść z jednej do drugiej deltą, która jest w stemplu
+    def lg(p):
+        return math.log(p / (1 - p))
+    odtworzone = 1.0 / (1.0 + math.exp(-(lg(strona_zakladu) + s["kal_pokazywana"])))
+    assert abs(odtworzone - s["p_pokazane"]) < 2e-3
+
+
+def test_komplet_nie_wymaga_liczby_z_karty():
+    """`p_pokazane` dochodzi PO bramach, więc typ liczony w tle go nie ma —
+    i to nie znaczy, że jego rachunek jest niepełny."""
+    s = betting.stempel_rachunku(p_over_raw=0.6, kal_rynek=0.1,
+                                 kal_strumien=-0.4, p_over_final=0.52)
+    assert betting.stempel_kompletny(s)
+    assert "p_pokazane" not in s
+
+
 def test_stempel_zaokragla_do_czterech_miejsc():
     """Księga rośnie o jeden słownik na typ — bez ogonów zmiennoprzecinkowych."""
     s = betting.stempel_rachunku(p_over_raw=0.6234567, kal_rynek=0.1234567,
