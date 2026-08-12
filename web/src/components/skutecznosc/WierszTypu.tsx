@@ -41,6 +41,18 @@ export const POZA_LABEL: Record<string, string> = {
     "Ten zakład miał już dwie poprzeczki na liście; trzeciej nie dokładamy, bo rozliczenia pokazują, że wypada najgorzej – ta policzyła się tylko na próbę",
   stare_dane: "Zawodnik dawno nie grał, więc typ policzył się tylko na próbę",
   za_pozno: "Powstał za blisko pierwszego gwizdka – nie zdążyłbyś go obstawić",
+  // Lista dnia domyka się raz na dobę (2026-08-14) — typ, który powstał po
+  // domknięciu, nie dochodzi już do ogłoszonej listy. Bez tego wpisu w tabeli
+  // stałby surowy kod „dzien_zamkniety" (ta sama wpadka co przy trzech
+  // powodach z 04.08).
+  dzien_zamkniety:
+    "Lista na ten dzień była już zamknięta – typ powstał później i policzył się tylko na próbę",
+  poza_lista_dnia:
+    "Tego dnia mieliśmy komplet typów; ten się nie zmieścił i policzył się tylko na próbę",
+  rynek_ukryty:
+    "Ten rynek czeka na dopracowanie – typ policzył się tylko na próbę",
+  leg_kuponu:
+    "Ten zakład wszedł tylko do kuponu, nie na listę typów",
 };
 
 /**

@@ -617,12 +617,20 @@ def _uzupelnij_znak_id(log: dict) -> int:
     return n
 
 
-# Powody `poza_publikacja` nadawane przez SELEKCJĘ LISTY (limit dwudziestki
-# i ukrycie rynku) albo przez ścieżkę legów kuponów — nie przez bramy jakości.
-# Tylko te powody uprawniają do odrodzenia rekordu przy prawdziwej publikacji
-# (patrz `_dopisz_nowe`): typ spod nich NIGDY nie stał na liście typów, więc
-# jego zamrożona cena nie jest ceną, którą ktokolwiek widział.
-POZA_LISTA_POWODY = ("poza_lista_dnia", "rynek_ukryty", "leg_kuponu")
+# Powody `poza_publikacja` nadawane przez SELEKCJĘ LISTY (limit dnia, ukrycie
+# rynku, domknięta lista dnia) albo przez ścieżkę legów kuponów — nie przez
+# bramy jakości. Tylko te powody uprawniają do odrodzenia rekordu przy
+# prawdziwej publikacji (patrz `_dopisz_nowe`): typ spod nich NIGDY nie stał
+# na liście typów, więc jego zamrożona cena nie jest ceną, którą ktokolwiek
+# widział.
+#
+# ⚑ `dzien_zamkniety` dopisany 14.08 razem z zamrożoną listą dnia. Bez tego
+# typ, który nie wszedł, bo dzień był już domknięty, zostawałby w księdze
+# z ceną z cyklu, w którym NIKT go nie widział — i nie odrodziłby się nazajutrz,
+# gdy naprawdę trafi na listę. Zmierzone w dry-runie z domkniętym dniem:
+# 20 typów w jednym przebiegu.
+POZA_LISTA_POWODY = ("poza_lista_dnia", "rynek_ukryty", "leg_kuponu",
+                     "dzien_zamkniety")
 
 
 def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
