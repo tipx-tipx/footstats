@@ -163,6 +163,66 @@ def prog_oplacalnosci(kurs: float, tryb: str | None = None) -> float:
     netto = kurs_netto(kurs, tryb)
     return 1.0 / netto if netto > 0 else 1.0
 
+
+# --- NA CZYM STOI LICZBA POKAZANA KLIENTOWI (2026-08-12) -------------------
+#
+# Warunek wdrożenia V2 z audytu: „100% wymaganych stempli dla wszystkich klas
+# typów". Do 12.08 stempel miała WYŁĄCZNIE pętla drużynowa — zmierzone na
+# produkcji tego dnia: `kal_rynek` przy 418 z 708 typów drużynowych, przy
+# 0 z 4 zawodniczych i 0 z 14 drabinek, a `p_over_raw` nie istniało wcale.
+#
+# Konsekwencja była praktyczna, nie kosmetyczna: rozłożenie strumienia na
+# czynniki (ile dołożyła kalibracja, ile korekta, jaki był surowy model) dało
+# się zrobić TYLKO dla drużyn. Dla dwóch strumieni, o które pyta właściciel,
+# taki pomiar był niewykonalny — nie z braku danych, tylko dlatego, że typ nie
+# zapisywał, skąd wzięła się jego własna liczba.
+#
+# Stempel jest JEDNYM słownikiem, nie pięcioma polami, bo każde pole osobno
+# musiałoby przejść przez białe listy w `build_wc_fast` (`rec_pewniaka`,
+# `rec_druzyny`, legi kuponów) — a to jest udokumentowana pułapka: co nie
+# zostanie tam wymienione, ginie w drodze z puli na stronę i do księgi.
+# Jeden klucz przechodzi raz, a jego zawartość może rosnąć bez ruszania
+# tamtych list.
+def stempel_rachunku(
+    p_over_raw: float | None,
+    kal_rynek: float | None = None,
+    kal_strumien: float | None = None,
+    p_over_final: float | None = None,
+    p_pokazane: float | None = None,
+) -> dict:
+    """Komplet „skąd się wzięła ta liczba" — jeden słownik na typ.
+
+    Wszystkie korekty to DELTY LOGITOWE na `p_over` (nie na stronie zakładu),
+    bo tylko w tej orientacji mają jeden znak — patrz `w_orientacji_over`
+    w `rozliczanie` i awaria odwróconego znaku z 11.08.
+
+    Pola nieznane w danej ścieżce zostają puste. `None` znaczy „ta ścieżka
+    tego nie liczy", a nie „zero" — mylenie tych dwóch rzeczy kosztowało nas
+    już raz cały pomiar (`brak_kursu` nigdy nie dowodziło braku oferty).
+    """
+    out: dict[str, float] = {}
+    for klucz, wart in (
+        ("p_over_raw", p_over_raw),
+        ("kal_rynek", kal_rynek),
+        ("kal_strumien", kal_strumien),
+        ("p_over_final", p_over_final),
+        ("p_pokazane", p_pokazane),
+    ):
+        if wart is not None:
+            out[klucz] = round(float(wart), 4)
+    return out
+
+
+# ile pól musi mieć stempel, żeby dało się z niego odtworzyć rachunek:
+# surowe p, obie korekty i wynik. `p_pokazane` dochodzi dopiero po bramach,
+# więc nie wchodzi do kompletu liczonego przy narodzinach typu.
+STEMPEL_KOMPLET = ("p_over_raw", "kal_rynek", "kal_strumien", "p_over_final")
+
+
+def stempel_kompletny(stempel: dict | None) -> bool:
+    """Czy z tego stempla da się odtworzyć rachunek typu."""
+    return bool(stempel) and all(k in stempel for k in STEMPEL_KOMPLET)
+
 # pokrewne rynki dzielą błąd modelu i korelują przez tempo meczu — wspólna
 # mapa dla kalibracji (rozliczanie) i dywersyfikacji kuponów (kupony)
 RODZINY_RYNKOW = {

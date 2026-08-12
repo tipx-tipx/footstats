@@ -3541,6 +3541,16 @@ def _main_impl(tryb=None):
             f"{s} {betting.delta_globalna(d):+.2f}"
             + (f" (biny: {len(d.get('bins') or [])})" if isinstance(d, dict) else "")
             for s, d in korekta_strumieni.items()))
+    # NA CZYM STOI TA KOREKTA — ile z jej okna to BIEŻĄCA wersja produktu.
+    # Audyt zalecał twardy filtr wersji; pomiar z 12.08 pokazał, że filtr
+    # skasowałby warstwę zawodnikom i drabinkom, nie zmieniając nic drużynom
+    # (okno 120 już je izoluje). Zamiast filtra — licznik. Patrz
+    # `rozliczanie.sklad_wersji_okna`.
+    try:
+        print("[uczenie] " + rozliczanie.zdanie_skladu_wersji(
+            rozliczanie.sklad_wersji_okna(_ksiega)))
+    except Exception as e:
+        diagnostyka.cichy("cykl", "sklad_wersji_okna", e)
 
     # ILE PRZEDZIAŁÓW TO POMIAR, A ILE PRZYBLIŻENIE (2026-08-05).
     # Przedział bez własnej próby dostaje wartość globalną rynku i do dziś
@@ -4694,6 +4704,20 @@ def _main_impl(tryb=None):
                         "rozklad": [
                             float(_stats.poisson.pmf(k, sm.lam)) for k in range(7)
                         ] + [float(_stats.poisson.sf(6, sm.lam))],
+                        # NA CZYM STOI TA LICZBA — patrz betting.stempel_rachunku.
+                        # Silnik dostał deltę ŁĄCZNĄ (`_bias_z_korekta`), więc
+                        # składowe liczymy tutaj, gdzie znamy obie z osobna.
+                        "rachunek": betting.stempel_rachunku(
+                            p_over_raw=sm.p_over_raw,
+                            kal_rynek=betting.delta_dla_p(
+                                bias_map.get(mk), sm.p_over_raw
+                            ) if sm.p_over_raw is not None else None,
+                            kal_strumien=betting.delta_dla_p(
+                                korekta_strumieni.get("pewniaki", 0.0),
+                                sm.p_over_raw,
+                            ) if sm.p_over_raw is not None else None,
+                            p_over_final=sm.p_over,
+                        ),
                     })
             for a in sm.assessments:
                 if a.side not in best_by_side or a.rank_score > best_by_side[a.side].rank_score:
@@ -5870,6 +5894,19 @@ def _main_impl(tryb=None):
                         # `_kal_rynek_t`. Razem z `kal_strumien` daje komplet
                         # tego, co nałożono na surowe `p_over`.
                         "kal_rynek": round(float(_kal_rynek_t), 4),
+                        # ...i to samo w jednym słowniku, wspólnym formacie dla
+                        # WSZYSTKICH strumieni (betting.stempel_rachunku).
+                        # `kal_rynek` wyżej zostaje dla zgodności z rekordami
+                        # zapisanymi między 11 a 12.08.
+                        "rachunek": betting.stempel_rachunku(
+                            p_over_raw=_p_over_sur_t,
+                            kal_rynek=_kal_rynek_t,
+                            kal_strumien=betting.delta_dla_p(
+                                korekta_strumieni.get("druzyny", 0.0),
+                                _p_over_sur_t,
+                            ),
+                            p_over_final=p_over_t,
+                        ),
                         "ess": round(float(posterior_t.effective_matches), 2),
                         "udzial_priora": round(
                             prior_t.pseudo_matches
@@ -6115,6 +6152,19 @@ def _main_impl(tryb=None):
                         "lambda": round(h_n["pred"].lam, 3),
                         "rozklad": None, "sugestia": False,
                         "czynniki": mnozniki_pary(h_n, a_n),
+                        # ⚑ STEMPEL MÓWI PRAWDĘ, TAKŻE NIEWYGODNĄ (2026-08-12).
+                        # Ta ścieżka liczy `p_w` wprost z rozkładów obu drużyn
+                        # (`counts.porownanie_druzyn` na SUROWYCH `pred`) i nie
+                        # nakłada ani kalibracji rynku, ani korekty strumienia —
+                        # `korekta_strumieni` jest wołana tylko w ścieżce
+                        # zawodniczej, drużynowej i drabinek. Zera są tu więc
+                        # pomiarem, nie zaokrągleniem: pokażą w księdze, że ten
+                        # rynek idzie bez warstw uczenia. Patrz nota w
+                        # `docs/kolejka-po-audycie.md`.
+                        "rachunek": betting.stempel_rachunku(
+                            p_over_raw=p_w, kal_rynek=0.0, kal_strumien=0.0,
+                            p_over_final=p_w,
+                        ),
                         # ile zabiera remis — user ma to widzieć, bo przy
                         # kartkach to co piąty zakład
                         "p_remis": round(p_remis, 4),
@@ -6239,6 +6289,15 @@ def _main_impl(tryb=None):
                                 h_n["pred"].lam + a_n["pred"].lam, 3),
                             "rozklad": None, "sugestia": False,
                             "czynniki": mnozniki_pary(h_n, a_n),
+                            # jak przy „kto więcej": suma meczowa liczy się
+                            # z surowych rozkładów obu drużyn i nie przechodzi
+                            # przez żadną warstwę uczenia, mimo że
+                            # `match_corners` ma własną kalibrację ze WSZYSTKICH
+                            # czterech przedziałów. Zera są pomiarem.
+                            "rachunek": betting.stempel_rachunku(
+                                p_over_raw=p_over_s, kal_rynek=0.0,
+                                kal_strumien=0.0, p_over_final=p_over_s,
+                            ),
                             "uzasadnienie": {
                                 "czynniki": czynniki_pary(
                                     h_n, a_n, nazwa_bazy, rho_n),
@@ -6550,6 +6609,7 @@ def _main_impl(tryb=None):
                if b.get("udzial_priora") is not None else {}),
             **({"kal_rynek": b["kal_rynek"]}
                if b.get("kal_rynek") is not None else {}),
+            **({"rachunek": b["rachunek"]} if b.get("rachunek") else {}),
             **({"kal_tau": b["kal_tau"]} if b.get("kal_tau") else {}),
             "czynniki": b.get("czynniki", {}),
             "uzasadnienie": b.get("uzasadnienie", {"czynniki": []}),
@@ -7009,6 +7069,24 @@ def _main_impl(tryb=None):
             "p_model": h.get("p_final") or 0.0,
             "pewnosc": None, "sugestia": False,
             "zrodlo": rozliczanie.ZRODLO_DRABINKA,
+            # RACHUNEK DRABINKI (2026-08-12). Inny niż w reszcie produktu i tak
+            # ma zostać: `p` bierze się z pokrycia linii (Wilson) przemnożonego
+            # przez kontekst meczu, a nie z p_over silnika. Kalibracji RYNKU
+            # więc tu nie ma i nie jest to usterka — patrz `_biny_korekty`,
+            # drabinki celowo uczą się własną, skalarną korektą.
+            # `kal_rynek` zostaje pusty, bo `None` znaczy „ta ścieżka tego nie
+            # liczy", a zero znaczyłoby „policzone i wyszło zero".
+            "rachunek": betting.stempel_rachunku(
+                p_over_raw=(
+                    round(float(h["p_bazowe"]) * float(h["korekta"]), 4)
+                    if h.get("p_bazowe") is not None
+                    and h.get("korekta") is not None else None
+                ),
+                kal_strumien=rozliczanie.betting.delta_globalna(
+                    korekta_strumieni.get("drabinki")
+                ),
+                p_over_final=h.get("p_final"),
+            ),
             "klasa": ocena.get("klasa"),
             "edge": ocena.get("edge"),
         })

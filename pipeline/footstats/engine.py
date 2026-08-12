@@ -120,6 +120,20 @@ class ScoredMarket:
     reasoning: dict = field(default_factory=dict)
     # odrzucenia TUŻ przy progu (betting.NEAR_*) — do rejestru pomiaru progów
     odrzucone: list = field(default_factory=list)
+    # NA CZYM STOI TA LICZBA (2026-08-12, warunek wdrożenia V2 z audytu).
+    # `p_over` wychodzi stąd JUŻ skalibrowane, więc bez tych dwóch pól nie da
+    # się później odtworzyć, ile dołożyła kalibracja rynku — a bez tego nie da
+    # się zmierzyć ani jej samej, ani modelu pod nią. Ścieżka drużynowa miała
+    # taki stempel od 11.08 (`kal_rynek`), zawodnicza NIE MIAŁA GO WCALE:
+    # zmierzone 12.08 na produkcji, 0 z 4 żywych typów zawodniczych i 0 z 14
+    # drabinek, wobec 418 z 708 drużynowych.
+    #
+    # `kal_laczna` to delta ŁĄCZNA — do silnika trafia już suma kalibracji
+    # rynku i korekty strumienia (`_bias_z_korekta`), więc rozbicie na
+    # składowe robi wołający, który zna obie. Nazwa mówi wprost, co to jest,
+    # żeby nikt nie wziął tej liczby za samą kalibrację rynku.
+    p_over_raw: float | None = None      # przed jakąkolwiek korektą
+    kal_laczna: float | None = None      # delta logitowa faktycznie użyta
 
 
 def _build_reasoning(
@@ -325,6 +339,10 @@ def score_player_market(
         lam = pred_center.lam
 
     p_over = minutes_mod.p_over_mixture(mm, p_over_given_minutes)
+    # ⚑ SUROWE p_over ZAPAMIĘTANE PRZED KALIBRACJĄ — patrz `p_over_raw`
+    # w `ScoredMarket`. Musi być brane TU, bo niżej `p_over` jest nadpisywane
+    # w miejscu i pierwotna liczba przepada.
+    p_over_surowe = float(p_over)
     # samokalibracja z rozliczeń: nowy format = delta logitowa
     # (p' = sigmoid(logit(p)+b), równa korekta w całej skali), stary = mnożnik
     bias = _select_bias(market_bias, p_over)
@@ -390,4 +408,10 @@ def score_player_market(
         reasoning=_build_reasoning(market_code, posterior, mm, cf, ctx, lam,
                                    prior=group_prior),
         odrzucone=odrzucone_przy_progu,
+        p_over_raw=round(p_over_surowe, 4),
+        # deltę zapisujemy TYLKO w trybie logitowym: w starym, mnożnikowym
+        # `bias` jest współczynnikiem, nie deltą, a stempel udający deltę
+        # byłby gorszy niż jego brak — patrz lekcja o `brak_kursu`, które
+        # nigdy nie dowodziło braku oferty.
+        kal_laczna=(round(float(bias), 4) if logit_mode else None),
     )

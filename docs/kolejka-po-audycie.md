@@ -29,18 +29,55 @@ Legenda: `[x]` zrobione · `[~]` w toku / obejście · `[ ]` otwarte
   → `korekty_legow=None`. `kal_szansy` zostaje: działa na szansę całego
   kuponu i mierzy co innego.
 
-- [ ] **Izolacja wersji w POZOSTAŁYCH warstwach uczenia.** Zweryfikowane:
+- [~] **Izolacja wersji w POZOSTAŁYCH warstwach uczenia.** Zweryfikowane:
   `compute_bias_full`, `korekta_strumienia`, `szansa_pokazywana`,
   `compute_wagi_zaufania` — **żadna nie filtruje wersji**, tylko epokę.
-  `compute_bias_full` jest zamrożony (obejście), trzy pozostałe nadal uczą się
-  na mieszance V1+V2. Docelowo: filtr dokładnego reżimu, a na starcie nowej
-  wersji korekty rezydualne wyzerowane lub zamrożone do zebrania danych V2.
+  → **FILTRA NIE MA I TO JEST DECYZJA, NIE ZANIEDBANIE.** Zmierzone 12.08
+  przed zmianą:
 
-- [ ] **Niekompletne stemple.** `kal_rynek` zapisujemy tylko w pętli
+  ```
+  korekta strumienia (drużyny)   wszystko -0,439   tylko V2 -0,428   bez V2 +0,174
+  rozliczeń bieżącej wersji      drużyny 128       zawodnicy 0       drabinki 2
+  ```
+
+  Okno ostatnich 120 rozliczeń **samo już izoluje wersję** tam, gdzie
+  strumień żyje — dla drużyn filtr zmieniłby korektę o 0,011 logita, czyli
+  poniżej progu istotności warstwy (0,02). Tam, gdzie strumień nie żyje,
+  twardy filtr skasowałby korektę do zera: zawodnicy zostaliby BEZ warstwy
+  uczenia w ogóle, a nie z gorszą warstwą.
+  → zamiast filtra **licznik**: `rozliczanie.sklad_wersji_okna` +
+  linia w logu cyklu „ile z okna liczy BIEŻĄCA wersja". Gdy udział spadnie,
+  będzie to widać od razu, a nie dopiero w audycie.
+  **Zostaje otwarte:** `compute_wagi_zaufania` (nie sprawdzone pomiarem) oraz
+  decyzja, co zrobić, gdy udział bieżącej wersji spadnie poniżej ~50%.
+
+- [x] **Niekompletne stemple.** `kal_rynek` zapisywaliśmy tylko w pętli
   drużynowej; zawodnicy i rynki `match_*`/`wiecej_*` idą własnymi ścieżkami
-  i go nie mają. Docelowo dla KAŻDEGO typu: `p_over_raw`, korekta rynku,
-  korekta strumienia, `p_over_final`, `p` pokazane klientowi, wersja modelu
-  i kalibracji.
+  i go nie miały. Zmierzone 12.08 na produkcji: `kal_rynek` przy 423 z 684
+  typów drużynowych, **0 z 18** zawodniczych, **0 z 25** sum meczowych,
+  **0 z 7** „kto więcej", a `p_over_raw` nie istniało w ogóle.
+  → `betting.stempel_rachunku` — JEDEN słownik `rachunek` (`p_over_raw`,
+  `kal_rynek`, `kal_strumien`, `p_over_final`) wpięty we wszystkie cztery
+  ścieżki plus drabinki. Jeden klucz, bo każde pole osobno musiałoby przejść
+  przez białe listy w `build_wc_fast` — udokumentowana pułapka tego repo.
+  `None` znaczy „ta ścieżka tego nie liczy", zero znaczy „policzono i wyszło
+  zero"; mylenie tych dwóch rzeczy kosztowało nas już jeden pomiar.
+
+- [ ] ⚑ **ZNALEZISKO 12.08: `match_*` i `wiecej_*` NIE PRZECHODZĄ PRZEZ
+  WARSTWY UCZENIA.** Wyszło przy wpinaniu stempli. Suma meczowa liczy
+  `counts.p_over_sumy` z SUROWYCH rozkładów obu drużyn, „kto więcej"
+  `counts.porownanie_druzyn` tak samo — i obie idą prosto do `p_model`.
+  `korekta_strumieni` jest wołana wyłącznie w ścieżce zawodniczej,
+  drużynowej i drabinek (`build_wc_fast`: 3675, 5650, 6957), a `bias_map`
+  nie dotyka tych rynków wcale. Dotyczy 25 + 7 żywych typów i 78 + 17
+  rozliczeń bieżącej epoki (luka −4,9 i −5,2 pp).
+  **`match_corners` ma własną kalibrację ze WSZYSTKICH czterech przedziałów
+  policzoną z rozliczeń — i nigdy nie jest stosowana.** To ta sama klasa co
+  „nowe rynki bez bram" z 31.07: rynek dopisany osobną ścieżką ominął
+  mechanizm, który wszyscy uważali za globalny. Stempel zapisuje tam teraz
+  jawne zera, więc od 12.08 widać to w księdze, a nie tylko w kodzie.
+  → **decyzja właściciela**: naprawa zmienia liczby na produkcji, więc
+  wymaga pomiaru przed/po, nie „przy okazji".
 
 - [ ] **Endpoint `kupon-pomin` bez kontroli roli.** Zalogowany klient przez
   endpoint z kluczem serwisowym zmienia globalny profil i kupony oraz woła
@@ -267,7 +304,10 @@ Do odhaczenia przed uznaniem V2 za w pełni wdrożone:
 - [x] dokładnie jedno zastosowanie korekty strumienia w kuponach
 - [ ] zero rozjazdów karta–księga w `p`, kursie i wersji *(brama stoi;
       do potwierdzenia na produkcji)*
-- [ ] 100% wymaganych stempli dla wszystkich klas typów
+- [x] 100% wymaganych stempli dla wszystkich klas typów *(wdrożone 12.08,
+      `betting.stempel_rachunku`; do potwierdzenia na pierwszych rekordach
+      z produkcji — pola przechodzą przez białe listy, a te już raz gubiły
+      stempel w drodze z puli na stronę)*
 - [ ] ustalona i przetestowana reguła EV netto
 - [ ] V2 oceniane na danych spoza próby użytej do dopasowania mapy
 - [ ] aktywne kontrole zdrowia źródeł

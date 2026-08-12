@@ -481,6 +481,13 @@ def _kupon_leg_do_logu(l: dict) -> dict:
         "kal_tau": l.get("kal_tau"),
         # na czym stała prognoza — patrz stempel w `_dopisz_nowe`
         "ess": l.get("ess"), "udzial_priora": l.get("udzial_priora"),
+        # ...i cały rachunek (betting.stempel_rachunku). Leg kuponu to
+        # TRZECIA biała lista pól na drodze typu do księgi — obok
+        # `rec_pewniaka` i `_dopisz_nowe`. Rekord urodzony z lega bywa
+        # jedynym śladem po typie, który nie wszedł na listę, więc bez tego
+        # stempla cały strumień kuponowy byłby dla pomiaru ślepy.
+        **({"rachunek": l["rachunek"]}
+           if isinstance(l.get("rachunek"), dict) and l["rachunek"] else {}),
     }
 
 
@@ -727,6 +734,12 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
             # patrz KALIBRACJA_ZAMROZONA).
             **({"kal_rynek": round(float(b["kal_rynek"]), 4)}
                if isinstance(b.get("kal_rynek"), (int, float)) else {}),
+            # ...i ten sam rachunek w JEDNYM słowniku, wspólnym dla wszystkich
+            # klas typów (betting.stempel_rachunku, 2026-08-12). `kal_rynek`
+            # wyżej zostaje dla rekordów zapisanych 11-12.08, zanim stempel
+            # objął zawodników, drabinki i rynki match_*/wiecej_*.
+            **({"rachunek": b["rachunek"]}
+               if isinstance(b.get("rachunek"), dict) and b["rachunek"] else {}),
             # historia predykcji typów DRUŻYNOWYCH — patrz kalibracja_tau.py
             **({"kal_tau": b["kal_tau"]} if b.get("kal_tau") else {}),
             # KOREKTA STRUMIENIA użyta przy publikacji — bez tego stempla
@@ -2369,6 +2382,74 @@ def proby_strumieni(log: dict | None = None) -> dict[str, dict]:
             "na_styk": prog <= n < prog * (1 + KOREKTA_STRUMIENIA_MARGINES),
         }
     return out
+
+
+def sklad_wersji_okna(log: dict | None = None) -> dict[str, dict]:
+    """Ile z okna korekty strumienia pochodzi z BIEŻĄCEJ wersji produktu.
+
+    PO CO (2026-08-12, warunek wdrożenia V2 z audytu). Audyt zapisał, że trzy
+    warstwy uczenia — ta, `szansa_pokazywana` i `compute_wagi_zaufania` — nie
+    filtrują wersji, tylko epokę, i zalecił dołożenie filtra. Zmierzone przed
+    zmianą, na księdze 12.08:
+
+        korekta strumienia (drużyny)   wszystko -0,439   tylko V2 -0,428
+                                       bez V2   +0,174
+        rozliczeń bieżącej wersji      drużyny 128   zawodnicy 0   drabinki 2
+
+    Wniosek jest odwrotny do oczekiwanego i dlatego filtra NIE MA: okno
+    ostatnich 120 rozliczeń samo już izoluje wersję tam, gdzie strumień żyje
+    (drużyny — różnica 0,011 logita, poniżej progu istotności warstwy), a tam,
+    gdzie nie żyje, twardy filtr skasowałby korektę do zera. Zawodnicy
+    zostaliby BEZ warstwy uczenia w ogóle, a nie z gorszą warstwą.
+
+    Zamiast filtra jest więc licznik: cykl ma powiedzieć wprost, na czym stoi
+    korekta, tak samo jak `zrodla` mówią to o przedziałach kalibracji. Gdy
+    udział bieżącej wersji spadnie, będzie to widać w logu, a nie dopiero
+    w audycie.
+
+    Zwraca {"druzyny": {"n": 120, "biezaca": 118, "udzial": 0.98}}.
+    """
+    if log is None:
+        log = _migruj_log(supa.get_key("typy_log") or {})
+    biezaca = betting.WERSJA_KALIBRACJI
+    settled = [
+        r for r in log.values()
+        if r.get("wynik") in ("wygrany", "przegrany")
+        and not r.get("sugestia") and not r.get("odrzucony")
+        and r.get("p_model")
+        and not _z_martwej_epoki(r)
+        and _z_biezacej_epoki(r)
+        and (_z_modelu(r) or r.get("zrodlo") == ZRODLO_DRABINKA)
+    ]
+    out: dict[str, dict] = {}
+    for strumien in STRUMIENIE:
+        grp = sorted(
+            (r for r in settled if _strumien(r) == strumien),
+            key=lambda r: r.get("kickoff_ts") or 0,
+        )[-KOREKTA_STRUMIENIA_OKNO:]
+        if not grp:
+            out[strumien] = {"n": 0, "biezaca": 0, "udzial": 0.0}
+            continue
+        ile = sum(1 for r in grp
+                  if (r.get("wersje") or {}).get("kalibracja") == biezaca)
+        out[strumien] = {
+            "n": len(grp), "biezaca": ile,
+            "udzial": round(ile / len(grp), 3),
+        }
+    return out
+
+
+def zdanie_skladu_wersji(sklad: dict[str, dict] | None = None) -> str:
+    """Jedno zdanie do logu cyklu — patrz `sklad_wersji_okna`."""
+    sklad = sklad if sklad is not None else sklad_wersji_okna()
+    czesci = []
+    for strumien, s in sorted(sklad.items()):
+        if not s["n"]:
+            czesci.append(f"{strumien}: brak rozliczeń")
+            continue
+        czesci.append(f"{strumien}: {s['biezaca']}/{s['n']} ({s['udzial']:.0%})")
+    return ("Korekta strumienia — ile z okna liczy BIEŻĄCA wersja: "
+            + ", ".join(czesci))
 
 
 def ostrzezenia_prob(proby: dict[str, dict] | None = None) -> list[str]:
