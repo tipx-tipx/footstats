@@ -112,7 +112,6 @@ export function ValueBoard({
   stsAlerty = [],
   stsGeneratedTs,
   radarWpisy: wszystkieRadar = [],
-  kwarantanna,
   zawodnicy,
   initialMatchId,
   initialRodzaj,
@@ -122,7 +121,6 @@ export function ValueBoard({
   stsAlerty?: StsAlert[];
   stsGeneratedTs?: number;
   radarWpisy?: RadarWpis[];
-  kwarantanna?: Meta["kwarantanna"];
   zawodnicy: Zawodnik[];
   initialMatchId?: number;
   initialRodzaj?: "pewniaki" | "value" | "radar" | "wszystko";
@@ -792,39 +790,27 @@ export function ValueBoard({
               <p className="text-sm font-medium text-ink">
                 Brak typów zawodniczych na te mecze
               </p>
-              {/* KOMUNIKAT KWARANTANNY PRZEPISANY (2026-08-06).
-                  Poprzedni wypisywał wprost „na ostatnich typach traciły
-                  pieniądze" i podawał statystyki porażek rynek po rynku:
-                  „strzały – trafione 50% przy zapowiadanych 71% (40 typów)".
-                  To jest nasza diagnostyka wewnętrzna wyłożona na ekran
-                  w miejscu, w którym użytkownik szuka typów.
-                  Sam MECHANIZM zostaje i nadal o nim mówimy — bo wstrzymanie
-                  rynku, który nam nie wychodzi, jest argumentem NA NASZĄ
-                  korzyść. Nie mówimy tylko, o ile dokładnie nie wychodzi. */}
-              {kwarantanna && Object.keys(kwarantanna).length > 0 ? (
-                <p className="mx-auto mt-1 max-w-lg text-xs leading-relaxed text-muted">
-                  Część rynków zawodniczych mamy dziś{" "}
-                  <strong className="font-semibold text-ink-soft">
-                    wstrzymanych
-                  </strong>
-                  {" "}
-                  ({Object.values(kwarantanna)
-                    .map((k) => k.nazwa.toLowerCase())
-                    .join(", ")}
-                  ) – ostatnie wyniki na nich nie trzymały naszego poziomu, więc
-                  do czasu poprawy ich nie typujemy. Sprawdzamy je dalej w tle
-                  i wracają same, gdy liczby się zgodzą.
-                </p>
-              ) : (
-                <p className="mx-auto mt-1 max-w-lg text-xs leading-relaxed text-muted">
-                  Dziś nic nie przeszło naszych progów. Najczęstsze powody:
-                  Superbet nie wystawił jeszcze kursów na zawodników (robi to
-                  zwykle 1–2 dni przed meczem), zawodników nie ma w ogłoszonych
-                  składach, albo nasza szansa za mocno rozjeżdżała się z kursem
-                  – a wtedy z rozliczeń wychodzi, że to zwykle my się mylimy.
-                  Pusta lista to działające zabezpieczenie, nie awaria.
-                </p>
-              )}
+              {/* ⚑ KOMUNIKAT O WSTRZYMANYCH RYNKACH ZDJĘTY (2026-08-14).
+                  Stał tu tekst „do czasu poprawy ich nie typujemy" — prawdziwy
+                  dopóty, dopóki kwarantanna zdejmowała typy z listy. Od 14.08
+                  nie zdejmuje (backend: KWARANTANNA_ZDEJMUJE_Z_LISTY; pomiar
+                  pokazał, że wstrzymane segmenty wypadały LEPIEJ niż to, co
+                  zostawało na stronie), więc kwarantanna przestała być powodem
+                  pustej listy — a tekst tłumaczyłby pustkę czymś, co się nie
+                  wydarzyło.
+
+                  Sam mechanizm nie zniknął i dalej o nim mówimy, tylko na
+                  właściwej karcie („ostrożnie z tym zakładem" w `BetCard`) —
+                  czyli przy konkretnym zakładzie, którego dotyczy, zamiast
+                  w miejscu, gdzie ktoś szuka typów. */}
+              <p className="mx-auto mt-1 max-w-lg text-xs leading-relaxed text-muted">
+                Dziś nic nie przeszło naszych progów. Najczęstsze powody:
+                Superbet nie wystawił jeszcze kursów na zawodników (robi to
+                zwykle 1–2 dni przed meczem), zawodników nie ma w ogłoszonych
+                składach, albo nasza szansa za mocno rozjeżdżała się z kursem
+                – a wtedy z rozliczeń wychodzi, że to zwykle my się mylimy.
+                Pusta lista to działające zabezpieczenie, nie awaria.
+              </p>
               {/* Przycisk używa słowa „drabinki" w miejscu, w którym user
                   jeszcze go nie widział wyjaśnionego (pusta lista typów) —
                   więc wyjaśnienie idzie tuż nad nim, a nie dopiero po

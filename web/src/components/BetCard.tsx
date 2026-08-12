@@ -910,22 +910,34 @@ export function SzczegolyTypu({
                 ) : null}
               </p>
 
-              {/* RYNEK WSTRZYMANY — MÓWIMY, ZAMIAST MILCZEĆ (2026-08-03).
-                  Kwarantanna blokuje nowe typy z rynku, ale tego nie
-                  wycofujemy: cena jest zamrożona i user mógł go zagrać.
+              {/* SŁABSZA SERIA — MÓWIMY, ZAMIAST MILCZEĆ (2026-08-03).
                   OSTRZEŻENIE STOI PRZED HISTORIĄ (2026-08-06, ta sama zasada
-                  co „raczej poza składem" na drabince): jeśli sami przestaliśmy
-                  ten zakład polecać, reszta rachunku jest drugorzędna —
-                  w kroku ceny na dole nikt go nie widział. */}
-              {/* „TEGO ZAKŁADU", NIE „TEGO RYNKU" (2026-08-04). Wstrzymanie
-                  bywa węższe niż rynek: zdejmujemy samą stronę linii, a druga
-                  strona tego samego rynku jest dalej typowana. */}
+                  co „raczej poza składem" na drabince): jeśli uprzedzamy
+                  o zakładzie, reszta rachunku jest drugorzędna — w kroku ceny
+                  na dole nikt tego nie widział.
+
+                  ⚑ TEKST PRZEPISANY 2026-08-14. Do tego dnia mówił „nowych
+                  nie wystawiamy, ten został wystawiony wcześniej" — i to było
+                  prawdą tak długo, jak kwarantanna zdejmowała typy z listy.
+                  Od 14.08 nie zdejmuje (patrz build_wc_fast:
+                  KWARANTANNA_ZDEJMUJE_Z_LISTY — zmierzone, że wstrzymane
+                  segmenty wypadały LEPIEJ niż to, co zostawało na stronie),
+                  więc nowe typy z takich rynków normalnie się pojawiają.
+                  Stare zdanie byłoby po prostu nieprawdziwe.
+
+                  Co zostało prawdą i dlatego zostaje w tekście: seria jest
+                  słabsza, a do kuponów takich typów nie dokładamy (tam brama
+                  dalej działa — błąd jednego lega mnoży się przez cały kupon).
+
+                  „TEGO ZAKŁADU", NIE „TEGO RYNKU" (2026-08-04): wstrzymanie
+                  bywa węższe niż rynek — dotyczy samej strony linii, a druga
+                  strona tego samego rynku wypada często odwrotnie. */}
               {bet.rynek_wstrzymany && (
                 <p className="mb-4 rounded-(--radius-control) bg-data-amber-wash px-3.5 py-2.5 text-sm leading-relaxed text-data-amber-ink">
-                  Tego zakładu chwilowo nie polecamy – ostatnie rozliczenia
-                  takich typów wychodzą pod kreską, więc nowych nie wystawiamy
-                  i nie wchodzą do kuponów. Ten został wystawiony wcześniej,
-                  po cenie z tamtej chwili, i dlatego zostaje na liście.
+                  Ostrożnie z tym zakładem – ostatnio takie typy częściej
+                  przegrywały, niż wygrywały. Pokazujemy go, bo jedna słabsza
+                  seria jeszcze o niczym nie przesądza, ale do kuponów go nie
+                  dokładamy.
                 </p>
               )}
 

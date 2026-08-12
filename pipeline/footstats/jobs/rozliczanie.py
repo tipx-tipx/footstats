@@ -1818,6 +1818,7 @@ def brama_kwarantanny(
     rynki: dict[str, dict],
     strony: dict[str, dict],
     ocenione: set[str],
+    blokuje: bool = True,
 ):
     """Zwraca funkcję `rec -> powód wstrzymania albo None`.
 
@@ -1831,8 +1832,17 @@ def brama_kwarantanny(
     Kolejność ma znaczenie: rynek NIE zdejmuje strony z własnym werdyktem
     (patrz `strony_ocenione`), więc pytamy o niego pierwszy i tylko po to,
     żeby go w takim wypadku pominąć.
+
+    `blokuje=False` (od 2026-08-14 tak stoi lista typów) — funkcja zawsze
+    zwraca `None`, czyli kwarantanna niczego nie zdejmuje. Rozdzielenie jest
+    celowe: ta sama brama, wywołana z `blokuje=True`, dalej służy jako POMIAR
+    i jako źródło etykiety „sami przestaliśmy ten rynek polecać", a pula
+    kuponów dalej z niej korzysta jako z bramy. Powód decyzji i liczby:
+    `build_wc_fast.KWARANTANNA_ZDEJMUJE_Z_LISTY`.
     """
     def _powod(rec: dict) -> str | None:
+        if not blokuje:
+            return None
         mk = rec.get("rynek_kod")
         klucz = f"{mk}:{rec.get('strona')}"
         if mk in rynki and klucz not in ocenione:

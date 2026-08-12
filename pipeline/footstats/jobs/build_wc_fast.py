@@ -2804,11 +2804,29 @@ PRIOR_MIN_MECZE, PRIOR_MAX_MECZE = 4.0, 12.0
 # (dowód okazji z kursem). Skaluje się z kursem, w odróżnieniu od dawnej sztywnej
 # różnicy 0.10 kursu. Strojony — kandydat do kalibracji z rozliczeń okazji.
 PROG_EV_UK = 4.0
-# limit ekspozycji: maks. tylu publikowanych pewniaków z JEDNEGO meczu —
-# typy z tego samego meczu padają razem (korelacja), a czerwone dni
-# kalendarza to głównie dni z wieloma typami z jednego zamulonego meczu.
-# Nadmiar zostaje w puli generatora kuponów (decyzja usera: 4)
+# ⚑ LIMIT EKSPOZYCJI NA MECZ ZDJĘTY Z LISTY (decyzja właściciela 14.08).
+#
+# Powód nie jest kosmetyczny — zmierzony na 366 rozliczeniach epoki ligowej
+# (bez drabinek), w podziale na to, ILE typów model wystawił w danym meczu:
+#   1 typ w meczu    n= 33  luka -10,9 pp  ROI  +6,4%   (próba za mała)
+#   2-4 typy         n=176  luka -13,3 pp  ROI  -6,7%
+#   5 i więcej       n=157  luka  -5,3 pp  ROI  +8,3%
+# Mecz, o którym model ma dużo do powiedzenia, jest DWA RAZY lepiej
+# skalibrowany i jako jedyny zarabia. Efekt przeżył kontrolę na pasmo kursu
+# (monotoniczny w 9 z 9 komórek), horyzont publikacji, ligę i drabinki.
+# Limit obcinałby więc dokładnie najlepszy materiał.
+#
+# Przy okazji zmierzone: ta brama i tak była martwa — w całej księdze (4594
+# wpisów) odpaliła RAZ, bo stała na końcu łańcucha i wcześniejsze bramy
+# zdejmowały typy przed nią. Zostaje jako stała, bo używa jej pula kuponów
+# (tam korelacja legów realnie boli), ale lista jej nie pyta.
+#
+# Bogactwo materiału meczu przeszło za to do RANKINGU — patrz `_atrakcyjnosc`.
 MAX_PEWNIAKOW_MECZ = 4
+# ⚑ Czy kwarantanna (rynku / strony / kategorii) ZDEJMUJE typ z listy.
+# Od 14.08 nie — pełne uzasadnienie i liczby przy `_kwarantanna_zdejmuje`.
+# W puli kuponów brama zostaje niezależnie od tej stałej.
+KWARANTANNA_ZDEJMUJE_Z_LISTY = False
 
 
 def klub_prior(
@@ -3817,6 +3835,31 @@ def _main_impl(tryb=None):
     # typu zamiast przy dumpie ([[wznowione-omijaly-bramy]]).
     _powod_kwarantanny = rozliczanie.brama_kwarantanny(
         kwarantanna_rynkow, kwarantanna_stron, strony_z_werdyktem)
+
+    # ⚑ CZY KWARANTANNA ZDEJMUJE TYP Z LISTY — od 14.08 NIE.
+    #
+    # Decyzja właściciela, poparta pomiarem księgi (epoka ligowa, rozliczone,
+    # ROI brutto):
+    #
+    #     pokazane klientowi         n=419  luka -10,8 pp  ROI  -3,5%
+    #     zdjęte: wstrzymany rynek   n= 34  luka  -7,3 pp  ROI +10,3%
+    #     zdjęte: wstrzymana strona  n=190  luka -16,3 pp  ROI  -1,3%
+    #
+    # Kwarantanna wyrzucała materiał, który wypada NIE GORZEJ niż to, co
+    # zostawało na stronie. Mechanizm jest zrozumiały: brama patrzy na okno
+    # 40 rozliczeń, więc wstrzymuje segment po serii pecha — czyli dokładnie
+    # wtedy, gdy ten i tak wraca do średniej. Zasada właściciela z 05.08
+    # („nic nie blokujemy, model ma się nauczyć wszystkiego") dostaje tu
+    # pokrycie w kodzie.
+    #
+    # Co ZOSTAJE: `_powod_kwarantanny` wyżej dalej liczy to samo i dalej daje
+    # typowi etykietę `rynek_wstrzymany` przy dumpie (typ schodzi na koniec
+    # kolejności „polecane" i mówi o tym na karcie). Brama zostaje też w PULI
+    # KUPONÓW (`_leg_dopuszczalny`) — tam błąd jednego lega mnoży się przez
+    # cały kupon, więc to osobna decyzja i osobny pomiar.
+    _kwarantanna_zdejmuje = rozliczanie.brama_kwarantanny(
+        kwarantanna_rynkow, kwarantanna_stron, strony_z_werdyktem,
+        blokuje=KWARANTANNA_ZDEJMUJE_Z_LISTY)
 
     def _strona_wstrzymana(b: dict) -> bool:
         """Czy ta STRONA tego rynku stoi w kwarantannie (patrz 30.07)."""
@@ -4894,7 +4937,7 @@ def _main_impl(tryb=None):
             # ta sama brama co wszędzie indziej: strona traci pieniądze
             # w oknie rozliczeń (rynek jako całość może być w porządku —
             # pomiar 30.07), albo rynek stoi i strona nie ma własnej próby
-            _kw_z = _powod_kwarantanny({"rynek_kod": mk, "strona": a.side})
+            _kw_z = _kwarantanna_zdejmuje({"rynek_kod": mk, "strona": a.side})
             if _kw_z:
                 rec_okazji["poza_publikacja"] = _kw_z
                 typy_poza_publikacja.append(rec_okazji)
@@ -6163,7 +6206,7 @@ def _main_impl(tryb=None):
                     if not betting.w_oknie_zgody(p_w, kurs_w):
                         odpadki_nowe["kto wiecej: rozjazd z rynkiem"] += 1
                         continue
-                    _kw_w = _powod_kwarantanny(
+                    _kw_w = _kwarantanna_zdejmuje(
                         {"rynek_kod": kod_w, "strona": strona_w})
                     if _kw_w:
                         odpadki_nowe[f"kto wiecej: {_kw_w}"] += 1
@@ -6346,7 +6389,7 @@ def _main_impl(tryb=None):
                         if not betting.w_oknie_zgody(p_s, kurs_s):
                             odpadki_nowe["suma: rozjazd z rynkiem"] += 1
                             continue
-                        _kw_s = _powod_kwarantanny(
+                        _kw_s = _kwarantanna_zdejmuje(
                             {"rynek_kod": kod_s, "strona": strona_s})
                         if _kw_s:
                             odpadki_nowe[f"suma: {_kw_s}"] += 1
@@ -6541,12 +6584,25 @@ def _main_impl(tryb=None):
         return r
 
     def _kategoria_wstrzymana(b: dict) -> str | None:
-        """Pierwsza flaga typu, która stoi w kwarantannie (albo None)."""
+        """Pierwsza flaga typu, która stoi w kwarantannie (albo None).
+
+        POMIAR — mówi, z jakiej kategorii typ pochodzi. Czy to go zdejmuje
+        z listy, decyduje `_kategoria_zdejmuje` niżej.
+        """
         return next(
             (f for f in rozliczanie.KATEGORIE_KWARANTANNY
              if b.get(f) and f in kwarantanna_kategorii),
             None,
         )
+
+    def _kategoria_zdejmuje(b: dict) -> str | None:
+        """Czy kwarantanna KATEGORII zdejmuje typ z listy. Od 14.08: nie.
+
+        Ta sama decyzja i ten sam pomiar co przy `_kwarantanna_zdejmuje`.
+        Kategoria dalej jest liczona i dalej odbiera typowi premię
+        w rankingu (patrz `_atrakcyjnosc`) — po prostu nie kasuje go z listy.
+        """
+        return _kategoria_wstrzymana(b) if KWARANTANNA_ZDEJMUJE_Z_LISTY else None
 
     # perełki: do 2 wpisów z wyższym kursem (>=2.0) per mecz, po wartości
     perelki_kandydaci = sorted(
@@ -6564,11 +6620,17 @@ def _main_impl(tryb=None):
     # — a w puli bywają perełki typu "strzały 1,5+" albo "odbiory 2,5+"
     # (kurs wyraźnie wyższy przy wciąż solidnej szansie). Per (mecz, rynek)
     # dokładamy najlepszego kandydata z linią >= 1,5 po jakości p×kurs.
-    # Kategoria w kwarantannie nie dokłada NOWYCH kandydatów: gdy „ambitniejsza
-    # linia" traci pieniądze, samo oznaczenie jej flagą po wyemitowaniu to za
-    # mało — trzeba przestać ją w ogóle produkować.
+    # ⚑ 14.08: kategoria w kwarantannie DALEJ dokłada kandydatów. Wcześniej
+    # „ambitniejsza linia" w kwarantannie przestawała w ogóle powstawać —
+    # czyli znikała nie tylko ze strony, ale i z pomiaru, więc brama nie miała
+    # jak się nigdy odwrócić (typów brak → próba nie rośnie → kwarantanna
+    # trwa). To był jedyny cichy samopodtrzymujący się wycinek w tym pliku,
+    # ta sama pułapka co samozagładzanie kwarantanny w [[roznorodnosc-typow]].
+    # Kategoria zostaje jako pomiar i odbiera premię w rankingu.
     wyzsze: dict[tuple[int, str], dict] = {}
-    for b in ([] if "wyzsza_linia" in kwarantanna_kategorii else legi_pool):
+    for b in ([] if (KWARANTANNA_ZDEJMUJE_Z_LISTY
+                     and "wyzsza_linia" in kwarantanna_kategorii)
+              else legi_pool):
         # przy kursie 1,9+ dopuszczamy "opcję ryzykowną" już od p>=40%
         # (format tipsterski: linia wyżej, kurs wyraźnie wyższy)
         prog_p = 0.40 if b["kurs"] >= 1.9 else 0.52
@@ -6618,11 +6680,13 @@ def _main_impl(tryb=None):
               f"{len(najlepsza_na_strone)} (zdjęte zagnieżdżone linie tego "
               f"samego zakładu)")
     do_emisji = list(najlepsza_na_strone.values())
-    # LIMIT EKSPOZYCJI DZIENNEJ: do publikacji wchodzi maks. MAX_PEWNIAKOW_MECZ
-    # pewniaków z jednego meczu (w kolejności atrakcyjności) — czerwone dni
-    # kalendarza brały się z 5+ skorelowanych typów z jednego zamulonego
-    # meczu. Nadmiar oraz rynki w kwarantannie dalej się rozliczają i UCZĄ
-    # kalibrację (flaga poza_publikacja), ale nie wchodzą do apki/kalendarza.
+    # LIMIT EKSPOZYCJI NA MECZ ZDJĘTY Z LISTY 14.08 — liczby i powód przy
+    # `MAX_PEWNIAKOW_MECZ`. Skrót: mecz z 5+ typami jest naszym NAJLEPSZYM
+    # materiałem (ROI +8,3%, luka −5,3 pp), a sama brama i tak odpaliła raz
+    # w całej księdze. Licznik zostaje, bo mówi, ile typów mecz już dostał —
+    # z tego liczy się premia bogactwa w kolejności listy.
+    # Typy zdjęte innymi bramami dalej się rozliczają i UCZĄ kalibrację
+    # (flaga poza_publikacja), ale nie wchodzą do apki/kalendarza.
     # (typy_poza_publikacja zainicjalizowane przed pętlą trendów — zbiera
     # też okazje z kursem i sugestie zdjęte przez bramę jakości)
     pewniaki_per_mecz: dict[int, int] = {}
@@ -6638,14 +6702,14 @@ def _main_impl(tryb=None):
         ci_w = (ci[1] - ci[0]) if ci[0] is not None else 1.0
         vb_id += 1
         # kwarantanny idą przez wspólną funkcję — tę samą, której używają
-        # sumy meczowe i „kto więcej" (patrz `_powod_kwarantanny`)
-        powod_poza = _powod_kwarantanny(b)
+        # sumy meczowe i „kto więcej" (patrz `_kwarantanna_zdejmuje`)
+        powod_poza = _kwarantanna_zdejmuje(b)
         if powod_poza is None:
             if not betting.w_oknie_zgody(b["p_model"], b["kurs"]):
                 # najostrzejsza brama, zmierzona na 336 rozliczeniach — patrz
                 # betting.OKNO_ZGODY_*. Typ dalej się liczy i uczy w tle.
                 powod_poza = "rozjazd_z_rynkiem"
-            elif _kategoria_wstrzymana(b):
+            elif _kategoria_zdejmuje(b):
                 powod_poza = "kwarantanna_kategorii"
             elif b.get("stare_dane"):
                 powod_poza = "stare_dane"
@@ -6664,8 +6728,6 @@ def _main_impl(tryb=None):
                 # miejsce w kodzie — pętla po świeżych kandydatach, przed
                 # `scal_z_publikacjami`, które wznawia typy z księgi.
                 powod_poza = "bez_uzasadnienia"
-            elif pewniaki_per_mecz.get(b["mecz_id"], 0) >= MAX_PEWNIAKOW_MECZ:
-                powod_poza = "limit_meczu"
         rec_pewniaka = {
             "id": vb_id, "mecz_id": b["mecz_id"], "mecz": b["mecz"],
             "kickoff_ts": b["kickoff_ts"],
@@ -7637,11 +7699,12 @@ def _main_impl(tryb=None):
         # odkąd rynek nie zdejmuje strony z własnym werdyktem.
         if _rynek_wstrzymany(b) or _strona_wstrzymana(b):
             b["rynek_wstrzymany"] = True
+
     _wstrzymane = sum(1 for b in lista_pub if b.get("rynek_wstrzymany"))
     if _wstrzymane:
         print(f"Rynki wstrzymane: {_wstrzymane} typów na liście pochodzi "
-              f"z rynków w kwarantannie (wystawione wcześniej, zostają "
-              f"do gwizdka, ale nie wchodzą do kuponów)")
+              f"z rynków/stron ze słabszą serią — od 14.08 wchodzą normalnie, "
+              f"z etykietą na karcie i na końcu kolejności; do kuponów nie")
     _dump("value_bets.json", lista_pub)
     _dump("matches.json", list(matches_out.values()))
     _dump("players.json", list(players_out.values()))

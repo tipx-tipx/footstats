@@ -119,11 +119,18 @@ export interface ValueBet {
    *  rozkład, historia). Zawsze razem z `wznowiony`. */
   uproszczony?: boolean;
   /**
-   * true = rynek tego typu jest CHWILOWO wstrzymany (traci w oknie ostatnich
-   * rozliczeń). Typ zostaje na liście do gwizdka, bo cena jest zamrożona
-   * i user mógł go zagrać — ale nowych typów z tego rynku nie wystawiamy
-   * i nie wchodzi on do kuponów. Karta ma to POWIEDZIEĆ: człowiek nie ma
-   * skąd wiedzieć, że sami przestaliśmy ten rynek polecać.
+   * true = ten zakład (rynek albo sama strona linii) ma SŁABSZĄ SERIĘ w oknie
+   * ostatnich rozliczeń.
+   *
+   * ⚑ Od 2026-08-14 to jest ETYKIETA, nie blokada: takie typy normalnie
+   * wchodzą na listę. Powód w backendzie (`KWARANTANNA_ZDEJMUJE_Z_LISTY`) —
+   * zmierzone, że segmenty zdejmowane przez kwarantannę wypadały nie gorzej
+   * niż to, co zostawało na stronie, bo brama patrzy na okno 40 rozliczeń
+   * i wstrzymuje po serii pecha, czyli w chwili powrotu do średniej.
+   *
+   * Co robi flaga: karta uprzedza o serii, a typ schodzi na koniec kolejności
+   * „polecane". Do kuponów taki typ dalej nie wchodzi (tam brama została —
+   * błąd jednego lega mnoży się przez cały kupon).
    */
   rynek_wstrzymany?: boolean;
   /**
