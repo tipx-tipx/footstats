@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { wartoscNetto, wyplata } from "@/lib/podatek";
+import { wyplata } from "@/lib/podatek";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -244,14 +244,19 @@ function ZywyPodglad({ bets }: { bets: ValueBet[] }) {
                       przez skan" to nasze wewnętrzne słownictwo — pierwszy
                       napis, jaki widzi ktoś wchodzący na stronę, nie może
                       wymagać znajomości tego, jak działa nasz pipeline. */}
+                  {/* ETYKIETA NIE ZALEŻY JUŻ OD ZNAKU WARTOŚCI (2026-08-13).
+                      Gałąź „nasz typ na dziś" odpalała się przy wartości
+                      netto > 0, a odkąd karta pokazuje szansę ściągniętą do
+                      uczciwej ceny, ta wartość jest ujemna przy każdym typie —
+                      więc nagłówek zawsze schodził do fallbacku. Etykieta ma
+                      mówić, CZYM jest typ, a nie jaki ma znak przy liczbie,
+                      która opisuje marżę bukmachera. */}
                   {idx === 0
                     ? bet.sugestia
                       ? "nasz typ dnia · kurs w STS"
-                      : (wartoscNetto(bet) ?? 0) > 0
-                        ? "nasz typ na dziś"
-                        : bet.pewniak
-                          ? "największa szansa na dziś"
-                          : "pierwszy z naszej listy"
+                      : bet.pewniak
+                        ? "największa szansa na dziś"
+                        : "pierwszy z naszej listy"
                     : `nasz typ ${idx + 1} z ${bets.length}`}
                 </p>
                 <p className="mt-3.5 font-display text-[1.7rem] font-bold leading-tight tracking-tight">

@@ -133,13 +133,13 @@ export const BetRow = memo(function BetRow({
                 {godzinaMeczu(bet.kickoff_ts)}
               </span>
             )}
-            {/* KROPKA = O ILE KURS BIJE NASZĄ WYCENĘ (2026-08-02, patrz
-                `przewagaKropki`). Wcześniej pokazywała zgodność z historią
-                i przez to była pusta w 11 przypadkach na 16, a gdy świeciła
-                na czerwono — podważała typ, który sami polecamy. Teraz jest
-                zawsze i mówi to, co decyduje o obecności typu na liście.
-                Lampka formy nie znika: schodzi do rozwinięcia, gdzie jest
-                dowodem obok wykresu, a nie wyrokiem w kolumnie. */}
+            {/* KROPKA = SIŁA TYPU, NIE PRZEWAGA W CENIE (2026-08-13).
+                Do dziś liczyła się z `ev_pct`, czyli z tego, o ile kurs bije
+                naszą wycenę. Odkąd szansa na karcie jest ściągana do uczciwej
+                ceny, ta różnica to marża bukmachera — jednakowa przy każdym
+                typie, więc KAŻDY wiersz dostawał najsłabszą kropkę i kolumna
+                przestała cokolwiek odróżniać. Kropka pokazuje teraz to, co
+                naprawdę różni typy między sobą: szansę trafienia. */}
             <span
               aria-hidden
               title={`${kropka.label} – ${kropka.opis}`}

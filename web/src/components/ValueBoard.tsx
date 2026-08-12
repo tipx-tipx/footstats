@@ -1,7 +1,6 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { wartoscNetto } from "@/lib/podatek";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { BetCard } from "./BetCard";
@@ -45,7 +44,7 @@ const PEWNOSC_FILTRY: { kod: Pewnosc | "kazda"; label: string }[] = [
   { kod: "wysoka", label: "Tylko wysoka" },
 ];
 
-type SortKey = "ranking" | "ev" | "pewnosc" | "kickoff" | "kurs";
+type SortKey = "ranking" | "pewnosc" | "kickoff" | "kurs";
 
 /**
  * Sortowanie zakładki Drabinki – inne pytania niż przy typach modelu.
@@ -66,10 +65,17 @@ const SORTOWANIA_DRABINKI: { kod: SortDrabinki; label: string }[] = [
 
 // Kolejność wejściowa bets = ranking silnika (szansa × kurs + kontekst:
 // matchup, świeże składy, miękka linia) – to jest "Polecane".
+//
+// NIE MA SORTOWANIA PO WARTOŚCI (2026-08-13). Stało tu „Największa przewaga
+// nad kursem". Dwa powody, oba zmierzone: (1) odkąd szansa na karcie jest
+// ściągana do uczciwej ceny, wartość netto to praktycznie marża plus podatek,
+// więc sortowanie ustawiało typy po cenie, a nie po jakości; (2) sortowanie po
+// DEKLAROWANEJ przewadze działa odwrotnie, niż wygląda – górna jedna trzecia
+// dawała −41,2%, dolna +32,5% (pomiar na 114 rozliczeniach). Wynoszenie na
+// górę największego rozjazdu z kursem to przepis na wybranie najgorszych.
 const SORTOWANIA: { kod: SortKey; label: string }[] = [
   { kod: "ranking", label: "Polecane przez model" },
   { kod: "pewnosc", label: "Największa szansa trafienia" },
-  { kod: "ev", label: "Największa przewaga nad kursem" },
   { kod: "kurs", label: "Najwyższy kurs" },
   { kod: "kickoff", label: "Najbliższy mecz" },
 ];
@@ -320,11 +326,6 @@ export function ValueBoard({
     // więc remisy każdego kryterium zachowują tę kolejność – m.in. przy
     // "najbliższym meczu" typy w obrębie meczu idą od najlepiej ocenianych
     switch (sortuj) {
-      case "ev":
-        wynik.sort(
-          (a, b) => (wartoscNetto(b) ?? -999) - (wartoscNetto(a) ?? -999),
-        );
-        break;
       case "pewnosc":
         // "największa szansa" = liczba, którą user widzi na karcie
         wynik.sort((a, b) => b.p_model - a.p_model);

@@ -3629,16 +3629,24 @@ def _main_impl(tryb=None):
     # ŚCIĄGNIĘCIE LICZBY NA KARCIE DO CENY — ostatni krok, już za bramami.
     # Waga liczona z rozliczeń raz na cykl; brak próby = karta bez zmian.
     _waga_karty = None
+    _marza_karty = rozliczanie.MARZA_SCIAGANIA_DOMYSLNA
     with rozliczanie.warstwa_uczenia("sciaganie_karty") as _w:
-        _waga_karty = rozliczanie.waga_sciagania(_ksiega)
+        # NAJPIERW CENA, POTEM WAGA. Do jakiej ceny ściągamy, wynika z
+        # rozliczeń (`marza_sciagania`) — dopóki brała się ze stałej 7%,
+        # karta ściągała się do jednej ceny, a wartość liczyła wobec innej
+        # i wychodziła ujemna przy KAŻDYM typie.
+        _marza_karty = rozliczanie.marza_sciagania(_ksiega)
+        _waga_karty = rozliczanie.waga_sciagania(_ksiega, _marza_karty)
         _w.opisz(n=(1 if _waga_karty else 0),
                  opis=(f"w={_waga_karty:.2f} (nasza liczba) / "
-                       f"{1 - _waga_karty:.2f} (cena)" if _waga_karty
-                       else "za mała próba — karta bez zmian"))
+                       f"{1 - _waga_karty:.2f} (cena minus {_marza_karty:.1%})"
+                       if _waga_karty else "za mała próba — karta bez zmian"))
     if _waga_karty:
         print(f"Szansa na karcie ściągana do ceny: w={_waga_karty:.2f} "
-              f"naszej liczby, reszta z kursu — poprawia kalibrację o ~10% "
-              f"(Brier), NIE poprawia ROI; selekcja bez zmian")
+              f"naszej liczby, reszta z kursu po zdjęciu zmierzonej marży "
+              f"{_marza_karty:.1%} (domyślna "
+              f"{rozliczanie.MARZA_SCIAGANIA_DOMYSLNA:.0%}) — poprawia "
+              f"kalibrację o ~10% (Brier), NIE poprawia ROI; selekcja bez zmian")
 
     def _sciagnij_karte_do_ceny(u: dict) -> dict:
         """Liczba POKAZYWANA klientowi, ściągnięta do ceny. Tylko karta.
@@ -3651,7 +3659,7 @@ def _main_impl(tryb=None):
                 or not u.get("p_model")):
             return u
         p = rozliczanie.sciagnij_do_ceny(float(u["p_model"]), float(u["kurs"]),
-                                         _waga_karty)
+                                         _waga_karty, _marza_karty)
         out = {**u, "p_model": round(p, 4), "p_sciagniete": True,
                "fair_kurs": round(1.0 / max(p, 1e-6), 3)}
         if u.get("p_rynku") is not None:
@@ -3661,8 +3669,11 @@ def _main_impl(tryb=None):
             betting.ev_pct(p, u["kurs"], u.get("tryb_podatku")), 2
         )
         if isinstance(u.get("rachunek"), dict) and u["rachunek"]:
+            # marża idzie do stempla razem z wagą — bez niej rachunku karty
+            # nie da się odtworzyć, bo `p_pokazane` zależy od OBU liczb
             out["rachunek"] = {**u["rachunek"], "p_pokazane": round(p, 4),
-                               "waga_sciagania": round(float(_waga_karty), 2)}
+                               "waga_sciagania": round(float(_waga_karty), 2),
+                               "marza_sciagania": round(float(_marza_karty), 4)}
         return out
 
     # Korekta strumienia drużynowego NIE jest już stosowana po wyborze strony

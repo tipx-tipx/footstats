@@ -746,8 +746,10 @@ export function DruzynyTablica({
               znaczy odtąd DOKŁADNIE jedno: bukmacher płaci więcej, niż wynika
               z naszej szansy. Na liście meczów to samo słowo znaczyło „brak
               typu" — poprawione osobno (TerminarzMeczy). */}
+          {/* LEGENDA IDZIE ZA KROPKĄ (2026-08-13). Kropka liczy się teraz
+              z szansy, nie z przewagi w cenie — patrz `PRZEWAGA_KROPKI`. */}
           <span className="uppercase tracking-widest">
-            kropka = przewaga, czyli ile bukmacher przepłaca
+            kropka = jak często ten typ wchodzi według nas
           </span>
           {/* CO ZNACZĄ DWIE LICZBY PO PRAWEJ (2026-08-04). Wiersz kończy się
               „91%  1,34" i nigdzie nie było napisane, że pierwsza to nasza

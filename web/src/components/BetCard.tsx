@@ -3,16 +3,15 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { memo, useEffect, useRef, useState } from "react";
 
-import { EdgeBadge, PewnoscDots } from "./badges";
+import { PewnoscDots } from "./badges";
 import { ChanceBar, OutcomeColumns } from "./DistributionStrip";
 import { DrabinkaLinii } from "./DrabinkaLinii";
 import { FormBars } from "./FormBars";
 import { Krok, Kroki, SzczegolyTechniczne } from "./KrokiRozwiniecia";
 import { Sygnaly, type Sygnal } from "./Sygnaly";
-import { kursNetto, wartoscNetto } from "@/lib/podatek";
+import { kursNetto } from "@/lib/podatek";
 import {
   fmtDataCzas,
-  fmtEV,
   fmtKurs,
   fmtLinia,
   fmtMnoznik,
@@ -283,21 +282,22 @@ function sygnalyTypu(
           : `W Anglii za to samo płacą średnio ${fmtKurs(bet.kurs_ref)}. To punkt odniesienia niezależny od nas.`,
     });
   }
-  // pewniak z kursem sporo poniżej wartości: uczciwa uwaga o cenie zamiast
-  // negatywnego werdyktu na całą kartę
-  if (
-    bet.pewniak &&
-    bet.kurs != null &&
-    (wartoscNetto(bet) ?? 0) <= -8
-  ) {
+  // CENA JEST INFORMACJĄ, NIE WERDYKTEM (decyzja właściciela 2026-08-13).
+  //
+  // Stał tu sygnał „kurs poniżej wartości" przy wartości netto ≤ −8%. Odkąd
+  // szansa na karcie jest ściągana do uczciwej ceny (backend: `marza_sciagania`),
+  // ta różnica to po prostu marża bukmachera — więc sygnał zapalał się przy
+  // KAŻDYM typie i przestał cokolwiek odróżniać. Zamiast werdyktu mówimy
+  // wprost, ile zabiera zakład; to ta sama liczba, ale bez oceny typu.
+  if (!bet.sugestia && bet.pewniak && bet.kurs != null && bet.fair_kurs) {
     s.push({
       id: "cena",
       znak: "·",
-      label: "kurs poniżej wartości",
+      label: `bez marży byłoby ${fmtKurs(bet.fair_kurs)}`,
       ton: "cichy",
-      opis: `${bet.bukmacher} płaci ${fmtKurs(bet.kurs)}, a przy takiej szansie sprawiedliwy kurs to ${fmtKurs(
+      opis: `${bet.bukmacher} płaci ${fmtKurs(bet.kurs)}. Bez marży bukmachera ten sam zakład płaciłby ${fmtKurs(
         bet.fair_kurs,
-      )}. Różnicę zabiera bukmacher. Ten typ bierzesz dlatego, że często wchodzi – nie dlatego, że dobrze płaci.`,
+      )} – tę różnicę zabiera zakład i jest ona w każdym kursie, u każdego bukmachera. Ten typ bierzesz za to, jak często wchodzi.`,
     });
   }
   return s;
@@ -319,7 +319,6 @@ function WerdyktPewniaka({ bet }: { bet: ValueBet }) {
   const p = fmtProc(bet.p_model);
   const fair = fmtKurs(bet.fair_kurs);
   const kurs = fmtKurs(bet.kurs as number);
-  const ev = wartoscNetto(bet);
 
   let glowne: React.ReactNode;
   if (bet.wyzsza_linia) {
@@ -371,28 +370,18 @@ function WerdyktPewniaka({ bet }: { bet: ValueBet }) {
       <p className="text-[12px] leading-relaxed text-muted">
         {glowne}
       </p>
+      {/* CENA JAKO INFORMACJA, NIE WERDYKT (2026-08-13).
+          Stały tu dwie gałęzie: „kurs płaci +X ponad wartość" albo „mniej niż
+          uczciwe Y – bierzesz za szansę". Odkąd szansa na karcie jest ściągana
+          do uczciwej ceny, pierwsza gałąź nie odpala się nigdy, a druga przy
+          każdym typie – bo różnica między kursem a uczciwą ceną to po prostu
+          marża. Zdanie mówi więc, ile zabiera zakład, i nie ocenia typu.
+          Podatek zostaje, bo to jedyne miejsce, gdzie user widzi, co naprawdę
+          zostaje z kursu. */}
       <p className="mt-1 text-[12px] leading-relaxed text-muted">
-        {bet.bukmacher} płaci <Num>{kurs}</Num>, uczciwa cena to{" "}
-        <Num>{fair}</Num>.{" "}
-        {ev != null && ev >= 1 ? (
-          <span className="text-data-green-ink">
-            Do tego kurs płaci <Num>{fmtEV(ev)}</Num> ponad wartość. Rzadkie
-            połączenie z tak wysoką szansą.
-          </span>
-        ) : (
-          /* JEDNA ODPOWIEDŹ ZAMIAST DWÓCH, I Z PODATKIEM (2026-08-02).
-             Były tu dwa progi: poniżej -8% „marża bukmachera", a pomiędzy
-             „cena jest w porządku". To drugie zdanie padało przy wartości
-             -6%, czyli mówiło „w porządku" o kursie, który realnie traci.
-             Powód rozjazdu jest zawsze ten sam i nie padał nigdzie na karcie:
-             liczymy PO PODATKU od stawki, a karta pokazywała kurs brutto. */
-          <>
-            Po podatku od stawki zostaje z tego{" "}
-            <Num>{fmtKurs(kursNetto(bet.kurs!, bet.tryb_podatku))}</Num> –
-            mniej niż uczciwe <Num>{fair}</Num>. Ten typ bierzesz za wysoką
-            szansę trafienia, nie za kurs.
-          </>
-        )}
+        {bet.bukmacher} płaci <Num>{kurs}</Num>, bez marży bukmachera byłoby{" "}
+        <Num>{fair}</Num> – tę różnicę zabiera zakład. Po podatku od stawki
+        zostaje <Num>{fmtKurs(kursNetto(bet.kurs!, bet.tryb_podatku))}</Num>.
       </p>
     </>
   );
@@ -429,59 +418,24 @@ function WerdyktZdanie({ bet }: { bet: ValueBet }) {
   }
   const kurs = fmtKurs(bet.kurs);
   const wycena = fmtProc(1 / bet.kurs);
-  const ev = wartoscNetto(bet);
-  if (ev != null && ev >= 1) {
-    return (
-      <>
-        <p className="text-[12px] leading-relaxed text-muted">
-          Warte <Num>{fair}</Num>, {bet.bukmacher} płaci <Num>{kurs}</Num>.{" "}
-          <span className="text-data-green-ink">
-            <Num>{fmtEV(ev)}</Num> ponad wartość.
-          </span>
-        </p>
-        <p className="mt-1 text-[12px] leading-relaxed text-muted">
-          Model daje temu zdarzeniu {p} szans, a kurs wycenia je na {wycena}.
-          Ta różnica jest twoją przewagą.
-        </p>
-      </>
-    );
-  }
-  if (ev != null && ev <= -1) {
-    // PODATEK MUSI PAŚĆ SŁOWEM (2026-08-02). Zdanie mówiło „bez przewagi",
-    // a obok stały liczby, z których wynikało coś odwrotnego: kurs 1,21 jest
-    // WYŻSZY niż uczciwe 1,15. Sprzeczność brała się stąd, że liczymy po 12%
-    // podatku od stawki, ale słowo „podatek" nie padało nigdzie na karcie.
-    // Czytelnik widział niespójność zamiast poprawnego rachunku.
-    const poPodatku = fmtKurs(kursNetto(bet.kurs!, bet.tryb_podatku));
-    return (
-      <>
-        <p className="text-[12px] leading-relaxed text-muted">
-          {bet.bukmacher} płaci <Num>{kurs}</Num>, ale od stawki schodzi
-          podatek – realnie <Num>{poPodatku}</Num>.{" "}
-          <span className="text-muted">
-            Uczciwa cena to <Num>{fair}</Num>, więc ten kurs nie płaci tyle, ile
-            powinien.
-          </span>
-        </p>
-        {/* DRUGIE ZDANIE JEST WAŻNIEJSZE OD PIERWSZEGO: mówi, co z tym zrobić.
-            Bez niego karta zostawiała człowieka z informacją „nie ma przewagi"
-            i zielonym przyciskiem „dodaj do zakładów" tuż pod spodem. */}
-        <p className="mt-1 text-[12px] leading-relaxed text-muted">
-          Ten typ jest na liście za <strong>wysoką szansę</strong> ({p}), nie za
-          cenę. Do kuponu – tak. Jako pojedynczy zakład – raczej nie.
-        </p>
-      </>
-    );
-  }
+  // JEDNO ZDANIE ZAMIAST TRZECH WERDYKTÓW (2026-08-13, decyzja właściciela).
+  //
+  // Stały tu trzy gałęzie po wartości netto: „X ponad wartość" / „nie płaci
+  // tyle, ile powinien" / „cena praktycznie uczciwa". Odkąd szansa na karcie
+  // jest ściągana do uczciwej ceny (backend: `marza_sciagania`), różnica
+  // między kursem a naszą wyceną to po prostu marża bukmachera — pierwsza
+  // gałąź nie odpalała się nigdy, druga przy każdym typie. Werdykt o przewadze
+  // przestał więc cokolwiek znaczyć i schodzi z karty; zostaje to, co jest
+  // prawdą i co odróżnia typy od siebie: szansa, cena i podatek.
+  const poPodatku = fmtKurs(kursNetto(bet.kurs, bet.tryb_podatku));
   return (
     <>
       <p className="text-[12px] leading-relaxed text-muted">
-        Warte <Num>{fair}</Num>, {bet.bukmacher} płaci <Num>{kurs}</Num>. Cena
-        praktycznie uczciwa.
+        {bet.bukmacher} płaci <Num>{kurs}</Num>, bez marży bukmachera byłoby{" "}
+        <Num>{fair}</Num>. Po podatku od stawki zostaje <Num>{poPodatku}</Num>.
       </p>
       <p className="mt-1 text-[12px] leading-relaxed text-muted">
-        Model daje temu zdarzeniu {p} szans, a kurs wycenia je na {wycena}. Bez
-        przewagi po żadnej stronie.
+        Model daje temu zdarzeniu {p} szans, a kurs wycenia je na {wycena}.
       </p>
     </>
   );
@@ -1372,7 +1326,17 @@ export const BetCard = memo(function BetCard({
         {/* linia meta: ocena typu + odznaki przewagi + pewność + detale –
             bez własnego pudełka, wcięta do kolumny nazwiska */}
         <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1.5 px-4 pb-3.5 sm:pl-[4.75rem] sm:pr-5">
-          {bet.pewniak ? (
+          {/* KATEGORIA TYPU, NIE PROCENT WARTOŚCI (2026-08-13). Stała tu
+              odznaka z wartością netto – zawsze na zielonym tle, także gdy
+              liczba była ujemna. Odkąd karta pokazuje szansę ściągniętą do
+              uczciwej ceny, ta wartość jest ujemna przy każdym typie i mówi
+              o marży bukmachera, nie o typie. Wszystkie typy z kursem
+              dostają więc tę samą etykietę co pewniaki – kategorię. */}
+          {bet.sugestia || bet.kurs == null ? (
+            <span className="inline-flex items-center rounded-full bg-data-amber-wash px-2.5 py-0.5 text-xs font-semibold text-data-amber-ink">
+              sprawdź w STS
+            </span>
+          ) : (
             (() => {
               const t = tierTypu(bet);
               return (
@@ -1383,12 +1347,6 @@ export const BetCard = memo(function BetCard({
                 </span>
               );
             })()
-          ) : bet.sugestia || bet.ev_pct == null ? (
-            <span className="inline-flex items-center rounded-full bg-data-amber-wash px-2.5 py-0.5 text-xs font-semibold text-data-amber-ink">
-              sprawdź w STS
-            </span>
-          ) : (
-            <EdgeBadge ev={wartoscNetto(bet) as number} />
           )}
           {/* odznaki przewagi – tekstowe odczyty HUD zamiast kolejnych
               chipów; jedno źródło prawdy (odznakiPrzewagi) */}

@@ -2904,12 +2904,69 @@ WAGA_SCIAGANIA_DOMYSLNA = 0.10
 # przyznać się, że nie mamy nic ponad rynek, niż udawać własną liczbę
 WAGA_SCIAGANIA_PODLOGA = 0.05
 
+# --- DO JAKIEJ CENY ŚCIĄGAMY (2026-08-13) --------------------------------
+#
+# ⚑ CENA, DO KTÓREJ ŚCIĄGAMY, BYŁA WZIĘTA Z SUFITU, NIE ZE ZMIERZENIA.
+# Ściągaliśmy do `implied_prob_one_sided`, czyli ceny po zdjęciu ZAŁOŻONYCH
+# 7% marży, a wartość, uczciwy kurs i odznakę liczyliśmy wobec kursu Z marżą.
+# Pierwszy cykl z aktywnym ściąganiem dał 0 z 31 typów z dodatnią wartością.
+# Zmierzony próg przewagi, przy którym karta w ogóle pokazuje plus (w=0,10,
+# przeszukiwanie w logicie — wzór liniowy daje tu zły wynik):
+#
+#     kurs        1,40   1,75   2,10   2,45   3,25
+#     marża 7%    23,9   28,0   27,7   26,1   22,2  pp
+#     marża 3,5%  16,6   16,3   14,8   13,3   10,5  pp
+#
+# Nasze typy mają medianę przewagi ~10 pp, więc przy 7% na plus nie wychodził
+# ŻADEN — karta ogłaszała „kurs poniżej wartości" przy każdym typie.
+#
+# ZMIERZONE (2451 rozliczeń epoki ligowej): cena zawyża o 1,8 pp, czyli
+# relatywnie 3,2% — nie 7%.
+#
+#     sama cena 1/kurs   deklaruje 57,0%   trafia 55,2%   Brier 0,2094
+#     cena minus 7%      deklaruje 53,0%   trafia 55,2%   Brier 0,2097
+#     nasza liczba       deklaruje 69,0%   trafia 55,2%   Brier 0,2336
+#
+# Brier dla marż 0,03–0,07 jest nie do rozróżnienia (0,2110 vs 0,2111
+# out-of-sample), więc jakości prognozy to nie zmienia — zmienia to, czy karta
+# mówi prawdę o cenie. Walidacja czasowa (marża ze starszej połowy, sprawdzana
+# na nowszej): cena po zdjęciu 3,9% daje 55,4% przy 55,8% realnych trafień,
+# luka +0,4 pp.
+#
+# ⚑ CZEGO TO NIE ROBI — I TO JEST WAŻNIEJSZE OD TEGO, CO ROBI. Nie robi
+# z typów okazji i NIE naprawia komunikatu karty. Zmierzone na liście z 13.08:
+# przy marży z pomiaru waga schodzi z 0,10 na 0,05 (podłoga — pod uczciwą ceną
+# nasza liczba nie wnosi już nic ponad rynek), szansa na karcie rośnie
+# o medianę 1,1 pp, a dodatnią wartość ma nadal 0 z 31 typów.
+#
+# To NIE jest usterka do dalszego strojenia: dopóki karta pokazuje szansę
+# ściągniętą do uczciwej ceny, „wartość" liczona wobec kursu Z marżą jest
+# z definicji ujemna i równa mniej więcej marży. Ta liczba mówi wtedy o
+# cenniku Superbetu, nie o typie — rozrzut na całej liście to −1,0…−3,3%.
+# Decyzja, czy „wartość" ma w ogóle zostać na karcie typu, jest produktowa
+# i należy do właściciela. Ta warstwa odpowiada wyłącznie za to, żeby liczba,
+# do której ściągamy, pochodziła z rozliczeń, a nie z założenia.
+#
+# Realny zwrot epoki to −3,9% brutto i ta liczba się nie zmienia.
+#
+# CO TO ZAWIERA POZA MARŻĄ BUKMACHERA: błąd naszej SELEKCJI. Mierzymy
+# „ile realnie wchodzi z tego, co wybieramy przy danej cenie", a nie marżę
+# w oderwaniu — i to jest właściwa liczba na kartę, bo karta ma mówić, ile
+# realnie wchodzi. Widać to per pasmo kursu (1,0–1,6: 2,2% · 1,6–1,9: 5,1% ·
+# 1,9–2,3: 12,5% · 2,3+: −0,2%): pasmo 1,9–2,3 to nasza słabość selekcji,
+# nie cennik Superbetu. Globalna liczba jest świadomym kompromisem —
+# rozbicie per pasmo dopiero po tym, jak zobaczymy, czy się utrzymuje.
+MARZA_SCIAGANIA_MIN_N = 200      # poniżej tylu rozliczeń zostaje domyślna
+MARZA_SCIAGANIA_DOMYSLNA = betting.DEFAULT_ONE_SIDED_MARGIN
+MARZA_SCIAGANIA_SHRINK_N0 = 200  # siła ciągnięcia do domyślnej przy małej próbie
+MARZA_SCIAGANIA_SUFIT = 0.10     # wyżej niż to znaczyłoby błąd danych, nie marżę
 
-def waga_sciagania(log: dict | None = None) -> float | None:
-    """Ile NASZEJ liczby zostaje w szansie pokazywanej na karcie.
 
-    Zwraca `w` z przedziału [PODLOGA, 1] albo None, gdy próba jest za mała —
-    wtedy karta pokazuje liczbę bez zmian, jak dotąd.
+def _proba_ceny(log: dict | None = None) -> list[tuple[float, float, float]]:
+    """(p_model, kurs, wynik) z rozliczeń, na których uczy się ściąganie karty.
+
+    Jedna próba dla marży i dla wagi — inaczej waga dobrałaby się pod inną
+    skalę ceny, niż ta, do której faktycznie ściągamy.
     """
     if log is None:
         log = _migruj_log(supa.get_key("typy_log") or {})
@@ -2923,11 +2980,51 @@ def waga_sciagania(log: dict | None = None) -> float | None:
             continue
         if not _z_biezacej_epoki(r):
             continue
-        dane.append((
-            float(r["p_model"]),
-            betting.implied_prob_one_sided(float(r["kurs"])),
-            1.0 if r["wynik"] == "wygrany" else 0.0,
-        ))
+        dane.append((float(r["p_model"]), float(r["kurs"]),
+                     1.0 if r["wynik"] == "wygrany" else 0.0))
+    return dane
+
+
+def marza_sciagania(log: dict | None = None) -> float:
+    """O ile cena bukmachera jest zawyżona wobec realnych trafień.
+
+    Zwraca marżę jednostronną z rozliczeń, ściągniętą do domyślnej przy małej
+    próbie. Przy braku danych zwraca domyślną, czyli zachowanie sprzed pomiaru.
+    """
+    dane = _proba_ceny(log)
+    if not dane:
+        return MARZA_SCIAGANIA_DOMYSLNA
+    n = len(dane)
+    sr_cena = sum(1.0 / kurs for _, kurs, _ in dane) / n
+    if sr_cena <= 0:
+        return MARZA_SCIAGANIA_DOMYSLNA
+    traf = sum(y for *_, y in dane) / n
+    m = 1.0 - traf / sr_cena
+    # shrink do domyślnej: przy 200 rozliczeniach pomiar waży połowę, przy
+    # 2000 — dziewięć dziesiątych. Bez tego marża skakałaby z tygodnia na
+    # tydzień razem z serią wyników, a ona ma opisywać cennik, nie passę.
+    m = ((n * m + MARZA_SCIAGANIA_SHRINK_N0 * MARZA_SCIAGANIA_DOMYSLNA)
+         / (n + MARZA_SCIAGANIA_SHRINK_N0))
+    return round(min(max(m, 0.0), MARZA_SCIAGANIA_SUFIT), 4)
+
+
+def waga_sciagania(log: dict | None = None,
+                   marza: float | None = None) -> float | None:
+    """Ile NASZEJ liczby zostaje w szansie pokazywanej na karcie.
+
+    Zwraca `w` z przedziału [PODLOGA, 1] albo None, gdy próba jest za mała —
+    wtedy karta pokazuje liczbę bez zmian, jak dotąd.
+
+    `marza` — cena, do której ściągamy (patrz `marza_sciagania`). Podajemy ją
+    jawnie, żeby waga dobrała się pod TĘ SAMĄ cenę, do której karta zostanie
+    ściągnięta w tym cyklu.
+    """
+    if marza is None:
+        marza = marza_sciagania(log)
+    dane = [
+        (p, betting.implied_prob_one_sided(kurs, marza), y)
+        for p, kurs, y in _proba_ceny(log)
+    ]
     if len(dane) < WAGA_SCIAGANIA_MIN_N:
         return None
 
@@ -2939,10 +3036,25 @@ def waga_sciagania(log: dict | None = None) -> float | None:
     return round(max(w_naj, WAGA_SCIAGANIA_PODLOGA), 2)
 
 
-def sciagnij_do_ceny(p_model: float, kurs: float, w: float) -> float:
-    """Szansa pokazywana klientowi: nasza liczba ściągnięta do ceny."""
+def sciagnij_do_ceny(p_model: float, kurs: float, w: float,
+                     marza: float | None = None) -> float:
+    """Szansa pokazywana klientowi: nasza liczba ściągnięta do ceny.
+
+    `marza` — cena, do której ściągamy. Cykl podaje ją z pomiaru rozliczeń
+    (`marza_sciagania`); bez niej zostaje domyślna, czyli zachowanie sprzed
+    pomiaru. Funkcja NIE czyta księgi sama — inaczej każde wywołanie w środku
+    pętli typów byłoby osobnym zapytaniem do Supabase.
+
+    Ta sama marża musi jechać do wszystkich pochodnych karty (wartość, uczciwy
+    kurs, przewaga), inaczej karta ściąga się do jednej ceny, a ocenia wobec
+    innej — patrz nota przy `MARZA_SCIAGANIA_MIN_N`.
+    """
+    if marza is None:
+        marza = MARZA_SCIAGANIA_DOMYSLNA
     return _wymieszaj(
-        float(p_model), betting.implied_prob_one_sided(float(kurs)), float(w)
+        float(p_model),
+        betting.implied_prob_one_sided(float(kurs), float(marza)),
+        float(w),
     )
 
 

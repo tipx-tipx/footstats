@@ -104,41 +104,46 @@ export type SilaTypu = (typeof SILA_TYPU)[number];
  * Oś jest NIEZALEŻNA od podziału listy: półka mówi, jaki to rodzaj zakładu,
  * kropka – jak dobra jest cena.
  */
+// ⚑ KROPKA MÓWI O SZANSIE, NIE O PRZEWADZE W CENIE (2026-08-13).
+//
+// Do 13.08 progi liczyły się z `ev_pct`: „kurs płaci 15% ponad naszą wycenę".
+// Odkąd szansa pokazywana jest ściągana do uczciwej ceny (backend:
+// `rozliczanie.marza_sciagania`), różnica między kursem a naszą wyceną to po
+// prostu marża bukmachera — praktycznie taka sama przy każdym typie. Skutek
+// na produkcji: wszystkie 31 typów dostawało kropkę „cienka przewaga", czyli
+// kolumna widoczna w KAŻDYM wierszu przestała cokolwiek odróżniać.
+//
+// Progi szansy są te same, co w podziale listy na półki, żeby kropka i
+// etykieta nie mówiły dwóch różnych rzeczy o tym samym typie.
 export const PRZEWAGA_KROPKI = [
   {
     kod: "mocna",
-    label: "duża przewaga",
-    opis: "Kurs płaci co najmniej 15% ponad to, ile ten zakład jest wart według naszej liczby.",
-    od: 15,
+    label: "duża szansa",
+    opis: "Nasza liczba daje temu zdarzeniu co najmniej 65% szans na wejście.",
+    od: 65,
   },
   {
     kod: "jest",
-    label: "przewaga",
-    opis: "Kurs płaci 5–15% ponad naszą wycenę – zwykły powód, dla którego typ trafia na listę.",
-    od: 5,
+    label: "średnia szansa",
+    opis: "Nasza liczba daje temu zdarzeniu 52–65% szans – najczęstszy typ na liście.",
+    od: 52,
   },
   {
     kod: "cienka",
-    label: "cienka przewaga",
-    opis: "Kurs ledwie przekracza naszą wycenę. Typ jest tu za wysoką szansę, nie za cenę.",
+    label: "niższa szansa, wyższy kurs",
+    opis: "Poniżej połowy szans, za to kurs płaci wyraźnie więcej. Świadome ryzyko.",
     od: -Infinity,
   },
 ] as const;
 
 export type PrzewagaKropki = (typeof PRZEWAGA_KROPKI)[number];
 
-/** Kropka dla typu – z `ev_pct` (brutto), a gdy go brak, liczona z szansy i kursu. */
+/** Kropka dla typu – z szansy pokazywanej na karcie (ta sama liczba co w wierszu). */
 export function przewagaKropki(bet: {
-  ev_pct?: number | null;
   p_model?: number | null;
-  kurs?: number | null;
 }): PrzewagaKropki {
-  const ev =
-    bet.ev_pct ??
-    (bet.p_model != null && bet.kurs != null
-      ? (bet.p_model * bet.kurs - 1) * 100
-      : 0);
-  return PRZEWAGA_KROPKI.find((k) => ev >= k.od) ?? PRZEWAGA_KROPKI[2];
+  const p = (bet.p_model ?? 0) * 100;
+  return PRZEWAGA_KROPKI.find((k) => p >= k.od) ?? PRZEWAGA_KROPKI[2];
 }
 
 /** Klasy kropki: pełna / obwódka / cienka obwódka – ta sama skala co wyżej. */
