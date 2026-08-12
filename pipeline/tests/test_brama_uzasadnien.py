@@ -23,19 +23,37 @@ FRONT = (
 
 
 def test_prog_polki_zgadza_sie_z_frontem():
-    """`PROG_PEWNE` w DruzynyTablica.tsx == `PROG_POLKI_PEWNE` w betting.py."""
+    """`PROG_KURSU_POLEK` w DruzynyTablica.tsx == to samo w betting.py.
+
+    Od 12.08 półki dzieli KURS, nie nasza szansa — patrz nota przy stałej
+    w `betting`. Test pilnuje tej samej rzeczy co wcześniej: żeby brama tnąca
+    półkę i strona ją rysująca liczyły ją z tej samej liczby.
+    """
     assert FRONT.exists(), f"nie znalazłem {FRONT}"
-    m = re.search(r"const PROG_PEWNE\s*=\s*([0-9.]+)\s*;", FRONT.read_text("utf-8"))
-    assert m, "nie znalazłem PROG_PEWNE w DruzynyTablica.tsx"
-    assert float(m.group(1)) == betting.PROG_POLKI_PEWNE
+    m = re.search(r"const PROG_KURSU_POLEK\s*=\s*([0-9.]+)\s*;",
+                  FRONT.read_text("utf-8"))
+    assert m, "nie znalazłem PROG_KURSU_POLEK w DruzynyTablica.tsx"
+    assert float(m.group(1)) == betting.PROG_KURSU_POLEK
 
 
 def test_polka_wiecej_placa_wymaga_uzasadnienia():
-    assert betting.wymaga_uzasadnienia(0.45)
-    assert betting.wymaga_uzasadnienia(0.69)
-    # granica należy do półki „częściej wchodzą" — tam brama nie sięga
-    assert not betting.wymaga_uzasadnienia(0.70)
-    assert not betting.wymaga_uzasadnienia(0.91)
+    assert betting.wymaga_uzasadnienia(2.50)
+    assert betting.wymaga_uzasadnienia(1.91)
+    # granica należy do półki „więcej płacą" — tak samo jak we froncie,
+    # gdzie „częściej wchodzą" to kurs OSTRO poniżej progu
+    assert betting.wymaga_uzasadnienia(1.90)
+    assert not betting.wymaga_uzasadnienia(1.89)
+    assert not betting.wymaga_uzasadnienia(1.35)
+
+
+def test_brak_kursu_nie_wymaga_uzasadnienia():
+    """Typ bez kursu nie jest „droższy" — nie ma go czym zmierzyć.
+
+    Wpuszczenie go do bramy zdejmowałoby z listy typy, o których nic złego nie
+    wiemy; `brak_kursu` nigdy nie dowodził niczego poza brakiem odczytu.
+    """
+    assert not betting.wymaga_uzasadnienia(None)
+    assert not betting.wymaga_uzasadnienia(0.0)
 
 
 def test_komplet_to_czynniki_ORAZ_przedzial():

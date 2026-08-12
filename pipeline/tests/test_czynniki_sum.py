@@ -47,11 +47,12 @@ def test_suma_przechodzi_brame_uzasadnien():
     """Sedno naprawy: z tym polem typ na sumie NIE wypada już jako bez rachunku."""
     h, a = _druzyna("Gospodarz", 1.2, rywal=1.1), _druzyna("Gość", 1.0)
     typ = {
-        "p_model": 0.55,                     # poniżej PROG_POLKI_PEWNE
-        "ci": [0.48, 0.63],
+        "p_model": 0.55,
+        "kurs": 2.10,                        # półka „więcej płacą" (od 12.08
+        "ci": [0.48, 0.63],                  # kryterium to KURS, nie szansa)
         "czynniki": mnozniki_pary(h, a),
     }
-    assert betting.wymaga_uzasadnienia(typ["p_model"])
+    assert betting.wymaga_uzasadnienia(typ["kurs"])
     assert betting.ma_komplet_uzasadnienia(typ)
 
 

@@ -114,6 +114,7 @@ WARSTWY_UCZENIA = (
     "waga_rynku",
     "wagi_zaufania",
     "kalibracja_kuponow",
+    "sciaganie_karty",
 )
 
 # CO LICZY `n` W KAŻDEJ WARSTWIE. Bez tego panel podpisywał każdą liczbę
@@ -130,6 +131,7 @@ JEDNOSTKI_WARSTW = {
     "waga_rynku": ("segment", "segmenty", "segmentów"),
     "wagi_zaufania": ("kubełek pewności", "kubełki pewności", "kubełków pewności"),
     "kalibracja_kuponow": ("horyzont", "horyzonty", "horyzontów"),
+    "sciaganie_karty": ("waga karty", "wagi karty", "wag karty"),
 }
 
 _STAN_UCZENIA: dict[str, dict] = {}
@@ -2867,6 +2869,81 @@ def _wymieszaj(p_model: float, p_rynku: float, w: float) -> float:
     lm = math.log(min(max(p_model, 1e-6), 1 - 1e-6) / (1 - min(max(p_model, 1e-6), 1 - 1e-6)))
     lr = math.log(min(max(p_rynku, 1e-6), 1 - 1e-6) / (1 - min(max(p_rynku, 1e-6), 1 - 1e-6)))
     return 1.0 / (1.0 + math.exp(-(lr + w * (lm - lr))))
+
+
+# --- ŚCIĄGANIE LICZBY POKAZYWANEJ DO CENY (2026-08-12) -------------------
+#
+# DECYZJA WŁAŚCICIELA: ściągamy WYŁĄCZNIE liczbę na karcie. Selekcja, bramy
+# i pula kuponów zostają na naszej liczbie, więc lista nie ginie.
+#
+# PO CO. Trzy niezależne pomiary mówią to samo — wartość jest w cenie, a nasze
+# odchylenia od niej są w większości błędem:
+#   * waga rynku wobec modelu wychodzi ~0 globalnie (`waga_rynku_pomiar`),
+#   * model jest skalibrowany tam, gdzie zgadza się z ceną (przewaga ≤0 pp →
+#     luka −1,6 pp), a psuje się proporcjonalnie do rozjazdu (+12…20 pp →
+#     −22,5 pp),
+#   * usunięcie ceny Z prognozy pogarsza ją o 3,1% Briera — cena niesie realną
+#     informację (`docs/pomiar-cena-w-prognozie.md`).
+#
+# ZMIERZONE, WALIDACJA CZASOWA (waga uczona na starszych rozliczeniach,
+# sprawdzana na nowszych — optymalne `w` in-sample zawsze wygląda świetnie
+# i nic nie znaczy):
+#
+#     podział   40%    50%    60%    70%    80%
+#     w*       0,00   0,10   0,10   0,10   0,10
+#     zysk    +10,5% +11,2%  +9,9% +10,9% +10,2%   (Brier, out-of-sample)
+#
+# ⚑ CZEGO TO NIE ROBI: nie poprawia ROI. Na żadnym poziomie wagi zysk nie jest
+# istotny — przy w=0,10 zostają 64 typy z ROI +8,2%, ale bootstrap daje
+# przedział 90% od −27,8% do +47,1%. To jest naprawa UCZCIWOŚCI LICZBY
+# (przestajemy pokazywać 74% tam, gdzie wchodzi 57%), nie sposób na zysk.
+# Nie uzasadniać tym żadnej zmiany w selekcji.
+WAGA_SCIAGANIA_MIN_N = 200   # poniżej tylu rozliczeń nie ruszamy karty
+WAGA_SCIAGANIA_DOMYSLNA = 0.10
+# `w` mniejsze niż to znaczyłoby „karta pokazuje samą cenę" — wtedy wolimy
+# przyznać się, że nie mamy nic ponad rynek, niż udawać własną liczbę
+WAGA_SCIAGANIA_PODLOGA = 0.05
+
+
+def waga_sciagania(log: dict | None = None) -> float | None:
+    """Ile NASZEJ liczby zostaje w szansie pokazywanej na karcie.
+
+    Zwraca `w` z przedziału [PODLOGA, 1] albo None, gdy próba jest za mała —
+    wtedy karta pokazuje liczbę bez zmian, jak dotąd.
+    """
+    if log is None:
+        log = _migruj_log(supa.get_key("typy_log") or {})
+    dane = []
+    for r in log.values():
+        if r.get("wynik") not in ("wygrany", "przegrany"):
+            continue
+        if r.get("sugestia") or r.get("zrodlo") or _z_martwej_epoki(r):
+            continue
+        if not r.get("kurs") or r.get("p_model") is None:
+            continue
+        if not _z_biezacej_epoki(r):
+            continue
+        dane.append((
+            float(r["p_model"]),
+            betting.implied_prob_one_sided(float(r["kurs"])),
+            1.0 if r["wynik"] == "wygrany" else 0.0,
+        ))
+    if len(dane) < WAGA_SCIAGANIA_MIN_N:
+        return None
+
+    def _brier(w: float) -> float:
+        return sum((_wymieszaj(pm, pr, w) - y) ** 2 for pm, pr, y in dane) / len(dane)
+
+    kroki = [i * WAGA_KROK for i in range(int(1 / WAGA_KROK) + 1)]
+    _, w_naj = min((_brier(w), w) for w in kroki)
+    return round(max(w_naj, WAGA_SCIAGANIA_PODLOGA), 2)
+
+
+def sciagnij_do_ceny(p_model: float, kurs: float, w: float) -> float:
+    """Szansa pokazywana klientowi: nasza liczba ściągnięta do ceny."""
+    return _wymieszaj(
+        float(p_model), betting.implied_prob_one_sided(float(kurs)), float(w)
+    )
 
 
 def waga_rynku_pomiar(log: dict | None = None) -> dict[str, dict]:

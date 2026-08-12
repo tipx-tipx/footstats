@@ -113,7 +113,16 @@ Legenda: `[x]` zrobione · `[~]` w toku / obejście · `[ ]` otwarte
 
 ## Fundament — przeciek kursu do prognozy
 
-- [ ] **`p_sport` — prognoza liczona BEZ jakichkolwiek danych kursowych.**
+- [~] **`p_sport` — prognoza liczona BEZ jakichkolwiek danych kursowych.**
+  → **ZMIERZONE 12.08, wynik zmienia uzasadnienie tej pozycji:**
+  `docs/pomiar-cena-w-prognozie.md`. Test niezmienniczości **nie przechodzi**
+  (sam kurs rusza mnożnik prognozy o 41% na `team_corners`/`team_shots`, 21%
+  przez samą linię goli), więc audyt ma rację co do faktu. Ale usunięcie ceny
+  **pogarsza** prognozę o 3,1% Briera na 409 rozliczeniach — i najbardziej
+  tam, gdzie cena rusza najmocniej (−10,1% przy |mnożnik−1| > 0,15).
+  → wniosek: rozdzielenie ma sens **jako narzędzie pomiaru**, nie jako sposób
+  na poprawę typów. Przed przebudową trzeba zdecydować, po co ją robimy:
+  do mierzenia przewagi czy do typowania. To dwie różne decyzje.
   Dziś kursy 1X2 i linii goli przeliczamy na tempo i spread, które wchodzą
   w kontekst meczu, λ i końcowe `p_model`. Cena wpływa też na pokrycie, bo do
   silnika trafiają głównie mecze sparowane z ofertą. Korelacja model–rynek

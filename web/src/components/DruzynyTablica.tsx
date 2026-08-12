@@ -204,8 +204,27 @@ const wgPolecanych = (xs: ValueBet[]) =>
 
 /** Od tylu typów dnia rozdzielanie na półki przestaje być szumem. */
 const PROG_POLEK = 4;
-/** Granica półek: „częściej wchodzą" kontra „więcej płacą". */
-const PROG_PEWNE = 0.7;
+/**
+ * Granica półek: „częściej wchodzą" kontra „więcej płacą" — po KURSIE.
+ *
+ * ⚑ Do 12.08 dzieliliśmy po naszej szansie (`p_model >= 0,7`). Od 12.08 szansa
+ * na karcie jest ściągana do ceny (backend: `rozliczanie.waga_sciagania`), bo
+ * tak liczba jest uczciwa — luka deklaracji spadła z −12,9 pp do +0,3 pp. Ale
+ * ściągnięta szansa to w 90% cena, więc próg 0,70 odpowiadał odtąd kursowi
+ * ~1,35 i pierwsza półka robiła się pusta: zmierzone na żywej liście, 5 typów
+ * przed zmianą, 0 po niej.
+ *
+ * Dzielimy więc po kursie, bo to FAKT RYNKU, a nie nasza deklaracja — nie
+ * przesunie się przy następnej zmianie modelu ani wagi ściągania. Inaczej ten
+ * próg trzeba by przestawiać po każdej takiej zmianie, a pustą półkę
+ * odkrywalibyśmy dopiero wtedy, gdy ktoś ją zobaczy.
+ *
+ * 1,90 nie jest liczbą z sufitu: przy niej mierzyliśmy różnicę segmentów
+ * (drużynowe „poniżej" przy kursie 1,9+ to jedyny wycinek z dodatnim zwrotem).
+ */
+const PROG_KURSU_POLEK = 1.9;
+const czesciejWchodzi = (b: ValueBet) =>
+  (b.kurs ?? b.fair_kurs ?? 0) < PROG_KURSU_POLEK;
 
 /** Animowane rozwijanie bloku – wspólny ruch dla dni, sekcji i ceduły dnia. */
 function Rozwin({
@@ -439,12 +458,15 @@ export function DruzynyTablica({
       // chipem. Podział, który naprawdę pomaga wybrać, idzie po tym, JAKI TO
       // ZAKŁAD. Zmierzone na żywej liście: typy 70%+ mają średni kurs 1,31,
       // reszta 3,01. To są dwa różne produkty, a leżały w jednym worku.
+      // (Od 12.08 kryterium to sam kurs — patrz `PROG_KURSU_POLEK`. Pomiar
+      // wyżej zostaje, bo to on uzasadnił podział; zmieniła się tylko liczba,
+      // po której go robimy.)
       //
       // Przy małym dniu nie dzielimy — dwie półki po dwa typy to nie porządek,
       // tylko dwa nagłówki.
       const wgMocy = wgPolecanych;
-      const pewne = wgMocy(lista.filter((b) => b.p_model >= PROG_PEWNE));
-      const odwazne = wgMocy(lista.filter((b) => b.p_model < PROG_PEWNE));
+      const pewne = wgMocy(lista.filter(czesciejWchodzi));
+      const odwazne = wgMocy(lista.filter((b) => !czesciejWchodzi(b)));
       const sekcje =
         lista.length >= PROG_POLEK && pewne.length > 0 && odwazne.length > 0
           ? [
@@ -452,14 +474,21 @@ export function DruzynyTablica({
               // wynagradza" — jedno i drugie zakłada, że czytelnik zna świat
               // zakładów. Te dwa zdania są jedynym miejscem, które tłumaczy
               // podział całej listy, więc muszą być zrozumiałe bez wstępu.
+              //
+              // ⚑ OPIS MUSI PASOWAĆ DO KRYTERIUM (poprawione 12.08). Zdania
+              // mówiły „Szansa 70% i więcej", a podział idzie od 12.08 po
+              // KURSIE — na zrzucie w pierwszej półce stały typy z szansą 69%,
+              // 66% i 61% pod nagłówkiem obiecującym 70%+. Nagłówek, który
+              // opisuje inne kryterium niż to użyte, jest po prostu
+              // nieprawdziwy; tego pilnujemy w całym produkcie.
               {
                 nazwa: "częściej wchodzą",
-                opis: "Szansa 70% i więcej. Wygrana jest mniejsza, ale takie typy wchodzą regularnie – z nich składamy kupony.",
+                opis: "Kurs poniżej 1,90. Wygrana jest mniejsza, ale takie typy wchodzą regularnie – z nich składamy kupony.",
                 typy: pewne,
               },
               {
                 nazwa: "więcej płacą",
-                opis: "Szansa poniżej 70%. Wchodzą rzadziej, ale gdy wejdą, wygrana jest wyraźnie większa.",
+                opis: "Kurs 1,90 i wyżej. Wchodzą rzadziej, ale gdy wejdą, wygrana jest wyraźnie większa.",
                 typy: odwazne,
               },
             ]
@@ -614,11 +643,10 @@ export function DruzynyTablica({
               rodzaje zakładu, nie trzy liczby o zasobach. */}
           <p className="font-data text-xs text-muted">
             <span className="font-semibold text-ink">
-              {widoczne.filter((b) => b.p_model >= PROG_PEWNE).length} częściej
-              wchodzą
+              {widoczne.filter(czesciejWchodzi).length} częściej wchodzą
             </span>
             {" · "}
-            {widoczne.filter((b) => b.p_model < PROG_PEWNE).length} więcej płacą
+            {widoczne.filter((b) => !czesciejWchodzi(b)).length} więcej płacą
             {" · "}
             {meczeN} {meczeN === 1 ? "mecz" : meczeN < 5 ? "mecze" : "meczów"}
           </p>

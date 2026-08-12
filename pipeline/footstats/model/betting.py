@@ -676,15 +676,28 @@ MAX_CI_WIDTH = 0.30                 # zbyt szerokie widełki szansy = nie stawia
 # Trzy typy, które dziś odpadają, to dokładnie te, których nie umiemy wytłumaczyć
 # (brak czynników albo brak przedziału ufności) — czyli brama robi to, co ma.
 #
-# PRÓG MUSI SIĘ ZGADZAĆ Z FRONTEM (`PROG_PEWNE` w `web/src/components/
+# PRÓG MUSI SIĘ ZGADZAĆ Z FRONTEM (`PROG_KURSU_POLEK` w `web/src/components/
 # DruzynyTablica.tsx`) — inaczej brama tnie inną półkę, niż strona pokazuje.
 # Pilnuje tego `test_brama_uzasadnien.py`; nie zmieniać jednego bez drugiego.
-PROG_POLKI_PEWNE = 0.70
+#
+# ⚑ KRYTERIUM ZMIENIONE Z SZANSY NA KURS (2026-08-12). Do 12.08 półka szła po
+# `p_model < 0,70`. Tego samego dnia szansa na karcie zaczęła być ściągana do
+# ceny (`rozliczanie.waga_sciagania`), bo tak jest uczciwa — luka deklaracji
+# spadła z −12,9 pp do +0,3 pp. Ale ściągnięta szansa to w 90% cena, więc próg
+# 0,70 odpowiadałby odtąd kursowi ~1,35 i pierwsza półka robiła się pusta
+# (zmierzone na żywej liście: 5 typów przed, 0 po).
+#
+# Kurs jest lepszym kryterium także merytorycznie: brama istnieje po to, żeby
+# typ RYZYKOWNY nie wchodził bez rozpisanego rachunku, a po ściągnięciu do ceny
+# „niska szansa" i „wysoki kurs" to dosłownie ta sama informacja. Różnica jest
+# taka, że kurs jest faktem rynku i nie przesunie się przy następnej zmianie
+# modelu — a próg oparty na naszej liczbie trzeba by przestawiać po każdej.
+PROG_KURSU_POLEK = 1.90
 
 
-def wymaga_uzasadnienia(p_model: float) -> bool:
+def wymaga_uzasadnienia(kurs: float | None) -> bool:
     """Czy typ jest na półce „więcej płacą" i musi mieć rozpisany rachunek."""
-    return float(p_model or 0.0) < PROG_POLKI_PEWNE
+    return float(kurs or 0.0) >= PROG_KURSU_POLEK
 
 
 def ma_komplet_uzasadnienia(b: dict) -> bool:

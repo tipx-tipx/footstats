@@ -3626,6 +3626,45 @@ def _main_impl(tryb=None):
             )
         return out
 
+    # ŚCIĄGNIĘCIE LICZBY NA KARCIE DO CENY — ostatni krok, już za bramami.
+    # Waga liczona z rozliczeń raz na cykl; brak próby = karta bez zmian.
+    _waga_karty = None
+    with rozliczanie.warstwa_uczenia("sciaganie_karty") as _w:
+        _waga_karty = rozliczanie.waga_sciagania(_ksiega)
+        _w.opisz(n=(1 if _waga_karty else 0),
+                 opis=(f"w={_waga_karty:.2f} (nasza liczba) / "
+                       f"{1 - _waga_karty:.2f} (cena)" if _waga_karty
+                       else "za mała próba — karta bez zmian"))
+    if _waga_karty:
+        print(f"Szansa na karcie ściągana do ceny: w={_waga_karty:.2f} "
+              f"naszej liczby, reszta z kursu — poprawia kalibrację o ~10% "
+              f"(Brier), NIE poprawia ROI; selekcja bez zmian")
+
+    def _sciagnij_karte_do_ceny(u: dict) -> dict:
+        """Liczba POKAZYWANA klientowi, ściągnięta do ceny. Tylko karta.
+
+        Przeliczamy też liczby pochodne, żeby karta nie mówiła „szansa 57%,
+        kurs 1,70, wartość +21%" — trzech liczb, z których dwie zaprzeczają
+        trzeciej, pilnujemy w całym produkcie.
+        """
+        if (not _waga_karty or u.get("sugestia") or not u.get("kurs")
+                or not u.get("p_model")):
+            return u
+        p = rozliczanie.sciagnij_do_ceny(float(u["p_model"]), float(u["kurs"]),
+                                         _waga_karty)
+        out = {**u, "p_model": round(p, 4), "p_sciagniete": True,
+               "fair_kurs": round(1.0 / max(p, 1e-6), 3)}
+        if u.get("p_rynku") is not None:
+            out["edge_pp"] = round((p - float(u["p_rynku"])) * 100.0, 2)
+        out["ev_pct"] = round(betting.ev_brutto_pct(p, u["kurs"]), 2)
+        out["ev_netto"] = round(
+            betting.ev_pct(p, u["kurs"], u.get("tryb_podatku")), 2
+        )
+        if isinstance(u.get("rachunek"), dict) and u["rachunek"]:
+            out["rachunek"] = {**u["rachunek"], "p_pokazane": round(p, 4),
+                               "waga_sciagania": round(float(_waga_karty), 2)}
+        return out
+
     # Korekta strumienia drużynowego NIE jest już stosowana po wyborze strony
     # zakładu — wchodzi do kalibracji „powyżej" razem z biasem rynku
     # (patrz pętla linii drużynowych i pomiar z 2026-07-30).
@@ -6558,9 +6597,9 @@ def _main_impl(tryb=None):
                 powod_poza = "stare_dane"
             elif b["kickoff_ts"] <= teraz_pub + kupony.MARGINES_STARTU_S:
                 powod_poza = "za_pozno"
-            elif (betting.wymaga_uzasadnienia(b["p_model"])
+            elif (betting.wymaga_uzasadnienia(b.get("kurs"))
                   and not betting.ma_komplet_uzasadnienia(b)):
-                # BRAMA UZASADNIEŃ — patrz betting.PROG_POLKI_PEWNE.
+                # BRAMA UZASADNIEŃ — patrz betting.PROG_KURSU_POLEK.
                 #
                 # DOTYCZY WYŁĄCZNIE NOWYCH PUBLIKACJI i to jest zamierzone,
                 # mimo lekcji z [[wznowione-omijaly-bramy]] (bramy stawiać przy
@@ -7373,6 +7412,13 @@ def _main_impl(tryb=None):
             zdjete += 1
             zdjete_klucze[_klucz_publikacji(b)] = "ujemna_po_korekcie"
             continue
+        # ⚑ ŚCIĄGNIĘCIE DO CENY DOPIERO TUTAJ — ZA BRAMĄ (2026-08-12).
+        # Kolejność jest treścią decyzji właściciela, nie szczegółem: gdyby
+        # ściągnięta liczba trafiła WYŻEJ, brama „ujemna po korekcie" zdjęłaby
+        # z listy setki typów (zmierzone: 967 -> 64 przy w=0,10). Selekcja
+        # zostaje więc na naszej liczbie, a klient widzi liczbę uczciwą.
+        # Patrz `rozliczanie.waga_sciagania`.
+        u = _sciagnij_karte_do_ceny(u)
         do_pokazania.append({k: v for k, v in u.items() if k != "kal_tau"})
     if poza_kursem:
         print(f"Zdjęte przez podłogę kursu: {poza_kursem} typów poza "
