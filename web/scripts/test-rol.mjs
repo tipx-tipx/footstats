@@ -114,5 +114,50 @@ if (mMatcher) {
   }
 }
 
+/* ------------------------------------------------------------------ *
+ * UPRAWNIENIA W /api/kupon-pomin (P0 z audytu, naprawione 2026-08-12)
+ *
+ * Bramka wyżej sprawdza tylko, czy ktoś JEST zalogowany — a `KLIENT_PASSWORD`
+ * daje sesję tak samo jak `APP_PASSWORD`. Klient mógł więc zmienić globalny
+ * profil buildera, pominąć cudzy kupon i wywołać cykl pipeline'u. Do tego
+ * `wlasny_nauka` przyjmowało `p_model`, kursy i EV wprost z żądania i
+ * zapisywało je do księgi, czyli do WARSTW UCZENIA.
+ *
+ * Czytamy źródło trasy, żeby test nie trzymał własnej kopii reguły — ta sama
+ * zasada co przy matcherze wyżej.
+ * ------------------------------------------------------------------ */
+const trasaSrc = readFileSync(
+  join(dirname(fileURLToPath(import.meta.url)), "..", "src", "app", "api",
+       "kupon-pomin", "route.ts"),
+  "utf8",
+);
+
+sprawdz("trasa w ogóle sprawdza rolę", trasaSrc.includes("czytajRole()"));
+sprawdz("odmowa to 403, nie ciche przepuszczenie",
+  /status:\s*403/.test(trasaSrc));
+
+const mAkcje = trasaSrc.match(/AKCJE_ADMINA\s*=\s*new Set\(\[([^\]]+)\]\)/);
+sprawdz("lista akcji administratora da się odczytać", Boolean(mAkcje));
+if (mAkcje) {
+  const akcje = mAkcje[1].match(/"([^"]+)"/g).map((s) => s.replace(/"/g, ""));
+  // każda z nich rusza WSPÓLNY stan produktu albo odpala cykl
+  for (const a of ["profil", "pomin", "przywroc", "wymien", "przebuduj"]) {
+    sprawdz(`akcja "${a}" wymaga administratora`, akcje.includes(a));
+  }
+  // ...a ta jest własnym kuponem klienta i ma dla niego zostać dostępna
+  sprawdz('akcja "wlasny_nauka" NIE jest zablokowana dla klienta',
+    !akcje.includes("wlasny_nauka"));
+}
+
+// parametry modelowe mają pochodzić z naszej puli, nie z przeglądarki
+sprawdz("wlasny_nauka czyta pulę legów z serwera",
+  trasaSrc.includes('readKey("legi_pool")'));
+sprawdz("leg spoza puli jest odrzucany",
+  trasaSrc.includes("if (!zrodlo) return null"));
+sprawdz("kurs łączny liczony z legów, nie z żądania",
+  !/kurs_laczny:\s*Number\(kk\.kurs_laczny\)/.test(trasaSrc));
+sprawdz("szansa kuponu liczona z legów, nie z żądania",
+  !/p_model:\s*Number\(kk\.p_model\)/.test(trasaSrc));
+
 console.log(bledy === 0 ? "\nWszystko gra." : `\n${bledy} błędów.`);
 process.exit(bledy === 0 ? 0 : 1);

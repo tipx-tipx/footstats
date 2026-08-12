@@ -211,7 +211,13 @@ function Werdykt({ kupon: k }: { kupon: Kupon }) {
 }
 
 /** Zwijana strefa dopracowania: wymiana, inny wariant, dobicie kursu. */
-function Dopracuj({ kupon: k }: { kupon: Kupon }) {
+function Dopracuj({
+  kupon: k,
+  akcjeDostepne = true,
+}: {
+  kupon: Kupon;
+  akcjeDostepne?: boolean;
+}) {
   const propozycje = [k.alternatywa, k.dolozenie, k.wariant_b].filter(
     Boolean,
   ).length;
@@ -267,7 +273,7 @@ function Dopracuj({ kupon: k }: { kupon: Kupon }) {
             </strong>{" "}
             · kurs {fmtKurs(k.kurs_laczny)} → {fmtKurs(k.alternatywa.kurs_po)}
           </p>
-          <ZastosujZamiane klucz={k.klucz} />
+          {akcjeDostepne && <ZastosujZamiane klucz={k.klucz} />}
         </div>
       )}
 
@@ -326,12 +332,19 @@ export function KuponyScena({
   kupony,
   jestGenerator = false,
   przedzialyMeta,
+  akcjeDostepne = true,
 }: {
   kupony: Kupon[];
   /** czy na stronie jest sekcja generatora (#generator) – cel mostu „zmień" */
   jestGenerator?: boolean;
   /** etykiety przedziałów z backendu (meta.przedzialy_kuponow) */
   przedzialyMeta?: Record<string, string[]>;
+  /**
+   * Czy pokazywać akcje zmieniające WSPÓLNY stan (pomiń, wymień, profil).
+   * Od 12.08 `/api/kupon-pomin` odrzuca je klientowi (403) — przycisk, który
+   * i tak zwróci błąd, nie ma prawa się rysować.
+   */
+  akcjeDostepne?: boolean;
 }) {
   const reduced = useReducedMotion();
   const [stawka, setStawka] = useStawka();
@@ -610,7 +623,7 @@ export function KuponyScena({
         })}
       </div>
 
-      <ProfilKuponow />
+      {akcjeDostepne && <ProfilKuponow />}
 
       {/* krok 3: scena – jeden bilet + werdykt */}
       <div className="mt-6">
@@ -724,7 +737,7 @@ export function KuponyScena({
                       </button>
                     )}
 
-                    {stan === "wybor" ? (
+                    {!akcjeDostepne ? null : stan === "wybor" ? (
                       <span className="flex flex-wrap items-center gap-1.5 rounded-(--radius-control) border border-hairline bg-card px-2 py-1.5 shadow-(--shadow-card)">
                         <span className="pl-1 text-xs text-faint">
                           dlaczego pomijasz?
@@ -773,7 +786,8 @@ export function KuponyScena({
                       </button>
                     )}
 
-                    {kupon.klucz &&
+                    {akcjeDostepne &&
+                      kupon.klucz &&
                       kupon.horyzont === "dzienny" &&
                       !przebudowa &&
                       stan !== "wybor" && (
@@ -797,7 +811,7 @@ export function KuponyScena({
                   <div className="mt-3">
                     <Werdykt kupon={kupon} />
                   </div>
-                  <Dopracuj kupon={kupon} />
+                  <Dopracuj kupon={kupon} akcjeDostepne={akcjeDostepne} />
                 </div>
               </div>
             )}

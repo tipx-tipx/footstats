@@ -7670,6 +7670,13 @@ def _main_impl(tryb=None):
         # inne wagi (fallback z pewności) niż silnik automatyczny na tej
         # samej puli — cicha rozbieżność mimo parytetu algorytmów
         "ci",
+        # rachunek — „skąd wzięła się ta liczba" (betting.stempel_rachunku).
+        # To CZWARTA biała lista na drodze stempla, obok `rec_pewniaka`,
+        # `_dopisz_nowe` i `_kupon_leg_do_logu`. Od 12.08 endpoint kuponów
+        # własnych odtwarza parametry modelowe WŁAŚNIE z tej puli (zamiast
+        # ufać przeglądarce), więc leg bez rachunku wchodziłby do księgi
+        # uboższy niż ten sam typ opublikowany normalnie.
+        "rachunek",
     )
     _dump("legi_pool.json", [
         {**{k: b.get(k) for k in _POLA_LEGA}, "id": i}

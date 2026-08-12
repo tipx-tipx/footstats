@@ -4,16 +4,29 @@ import { PageHeader } from "@/components/PageHeader";
 import { Reveal } from "@/components/Reveal";
 import { TrafioneKupony } from "@/components/TrafioneKupony";
 import { getKupony, getLegiPool, getMeta, getTypyWyniki } from "@/lib/data";
+import { czyPelnyWglad, czytajRole } from "@/lib/rola";
 
 export const metadata = { title: "Kupony – FootStats" };
 
-export default async function KuponyPage() {
-  const [kupony, meta, legiPool, typyWyniki] = await Promise.all([
+export default async function KuponyPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ widok?: string }>;
+}) {
+  const [kupony, meta, legiPool, typyWyniki, rola, params] = await Promise.all([
     getKupony(),
     getMeta(),
     getLegiPool(),
     getTypyWyniki(),
+    czytajRole(),
+    searchParams,
   ]);
+  // AKCJE NA WSPÓLNYM STANIE TYLKO DLA ADMINA (2026-08-12, P0 z audytu).
+  // Endpoint `/api/kupon-pomin` odrzuca je teraz klientowi (403), więc
+  // przycisk, który i tak zwróci błąd, nie ma prawa się rysować. To nie jest
+  // ukrywanie kuchni — te akcje zmieniają produkt WSZYSTKIM naraz (globalny
+  // profil buildera, pominięcie kuponu, wywołanie cyklu).
+  const pelnyWglad = czyPelnyWglad(rola, params.widok === "klient");
 
   return (
     <div>
@@ -21,11 +34,24 @@ export default async function KuponyPage() {
         eyebrow="gotowe zestawy"
         title="Wybierz, ile chcesz wygrać"
         lead={
-          <>
-            Model składa gotowe kupony z typów po pełnej analizie. Ty wybierasz
-            tylko cel: im wyższy kurs, tym rzadziej wchodzi całość. Kupon Ci
-            nie leży? Pomiń go, a model złoży inny.
-          </>
+          // ZDANIE MUSI PASOWAĆ DO PRZYCISKÓW, KTÓRE WIDAĆ (2026-08-12).
+          // „Pomiń go, a model złoży inny" obiecywało akcję, której klient
+          // od dziś nie ma — pomijanie zmienia kupon WSZYSTKIM naraz, więc
+          // zostało przy administratorze. Klient dostaje zdanie o tym, co
+          // faktycznie może zrobić: zbudować własny zestaw.
+          pelnyWglad ? (
+            <>
+              Model składa gotowe kupony z typów po pełnej analizie. Ty
+              wybierasz tylko cel: im wyższy kurs, tym rzadziej wchodzi całość.
+              Kupon Ci nie leży? Pomiń go, a model złoży inny.
+            </>
+          ) : (
+            <>
+              Model składa gotowe kupony z typów po pełnej analizie. Ty
+              wybierasz tylko cel: im wyższy kurs, tym rzadziej wchodzi całość.
+              Kupon Ci nie leży? Zbuduj własny z tej samej puli.
+            </>
+          )
         }
       />
 
@@ -49,6 +75,7 @@ export default async function KuponyPage() {
             kupony={kupony}
             jestGenerator={legiPool.length > 0}
             przedzialyMeta={meta.przedzialy_kuponow}
+            akcjeDostepne={pelnyWglad}
           />
         </div>
       )}

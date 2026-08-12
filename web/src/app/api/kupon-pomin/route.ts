@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { mergeAppData, readAppData, writeAppData } from "@/lib/appDataWrite";
+import { czytajRole } from "@/lib/rola";
 
 /**
  * Akcje na kuponach (za bramką logowania – proxy.ts):
@@ -11,6 +12,25 @@ import { mergeAppData, readAppData, writeAppData } from "@/lib/appDataWrite";
  *  - {akcja: "profil", profil}      – charakter buildera kuponów.
  * Pipeline czyta te klucze w każdym cyklu (kupony_pominiete / kupony_wymiana
  * / kupony_przebudowa / kupony_profil). Wymaga SUPABASE_SERVICE_KEY.
+ *
+ * ⚑ DWA ZABEZPIECZENIA DOŁOŻONE 2026-08-12 (P0 z audytu zewnętrznego).
+ *
+ * 1. KONTROLA ROLI. Bramka w `proxy.ts` sprawdza tylko, czy ktoś JEST
+ *    zalogowany — a `KLIENT_PASSWORD` daje sesję tak samo jak `APP_PASSWORD`.
+ *    Klient mógł więc przez ten endpoint zmienić GLOBALNY profil buildera,
+ *    pominąć cudzy kupon i wywołać cykl pipeline'u. To są operacje na wspólnym
+ *    stanie produktu, nie na jego własnym koncie, więc wymagają administratora.
+ *    Kupony per użytkownik to osobna, większa zmiana (jest w kolejce) — do
+ *    tego czasu obowiązuje ta prostsza i bezpieczniejsza reguła.
+ *
+ * 2. PARAMETRY MODELOWE NIE POCHODZĄ JUŻ Z PRZEGLĄDARKI. Ścieżka
+ *    `wlasny_nauka` przyjmowała `p_model`, kursy, EV i flagi diagnostyczne
+ *    wprost z żądania i zapisywała je do `kupony_wlasne` — a stamtąd trafiają
+ *    do księgi i do WARSTW UCZENIA. Dowolna liczba wysłana z konsoli
+ *    przeglądarki uczyła model. Teraz z żądania bierzemy WYŁĄCZNIE
+ *    identyfikatory (mecz, zawodnik/drużyna, rynek, linia, strona), a resztę
+ *    odtwarzamy po stronie serwera z `legi_pool` — czyli z tego, co sami
+ *    policzyliśmy w ostatnim cyklu. Leg bez pokrycia w puli jest odrzucany.
  */
 
 const POWODY = new Set(["nie zagrałem", "słaby zestaw", "za niski kurs"]);
@@ -49,6 +69,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "zły JSON" }, { status: 400 });
   }
   const akcja = typeof body.akcja === "string" ? body.akcja : "pomin";
+
+  // ⚑ Akcje ruszające WSPÓLNY stan produktu — tylko administrator.
+  // `wlasny_nauka` zostaje dostępne dla klienta: to jego własny kupon
+  // z generatora, a parametry modelowe i tak odtwarzamy z serwera niżej.
+  const AKCJE_ADMINA = new Set(["profil", "pomin", "przywroc", "wymien", "przebuduj"]);
+  if (AKCJE_ADMINA.has(akcja) && (await czytajRole()) !== "admin") {
+    return NextResponse.json(
+      { error: "ta akcja wymaga konta administratora" },
+      { status: 403 },
+    );
+  }
 
   const readKey = (name: string) => readAppData(url, key, name);
   const writeKey = (name: string, payload: unknown) => writeAppData(url, key, name, payload);
@@ -106,43 +137,83 @@ export async function POST(req: Request) {
     if (!kk || !Array.isArray(kk.legi) || kk.legi.length < 2 || kk.legi.length > 12) {
       return NextResponse.json({ error: "zły kupon" }, { status: 400 });
     }
+    // PULA Z OSTATNIEGO CYKLU — jedyne źródło parametrów modelowych.
+    // Żądanie wskazuje TYLKO, o który leg chodzi; wszystko, co wpływa na
+    // księgę i uczenie (p_model, EV, flagi, kurs), bierzemy stąd.
+    const pool = await readKey("legi_pool");
+    const poolLista: Record<string, unknown>[] = Array.isArray(pool)
+      ? (pool as Record<string, unknown>[])
+      : Array.isArray((pool as { legi?: unknown }).legi)
+        ? ((pool as { legi: Record<string, unknown>[] }).legi)
+        : [];
+    const kluczLega = (x: Record<string, unknown>) =>
+      [
+        Number(x.mecz_id) || 0,
+        Number(x.podmiot_id) || 0,
+        String(x.rynek_kod ?? ""),
+        Number(x.linia) || 0,
+        x.strona === "ponizej" ? "ponizej" : "powyzej",
+      ].join(":");
+    const wPuli = new Map(poolLista.map((l) => [kluczLega(l), l]));
+
     const legi = kk.legi
       .map((l) => {
         const x = l as Record<string, unknown>;
+        const zrodlo = wPuli.get(kluczLega(x));
+        if (!zrodlo) return null;
+        // od tego miejsca `zrodlo` (nasza pula), nigdy `x` (przeglądarka)
+        const s = zrodlo as Record<string, unknown>;
+        const opcjonalnaFlaga = (k: string) => (s[k] ? true : undefined);
+        const opcjonalnaLiczba = (k: string) =>
+          Number.isFinite(Number(s[k])) && s[k] != null ? Number(s[k]) : undefined;
         return {
-          mecz_id: Number(x.mecz_id) || 0,
-          mecz: String(x.mecz ?? "").slice(0, 80),
-          kickoff_ts: Number(x.kickoff_ts) || 0,
-          podmiot_id: Number(x.podmiot_id) || 0,
-          podmiot: String(x.podmiot ?? "").slice(0, 60),
-          druzyna: String(x.druzyna ?? "").slice(0, 60),
-          rynek_kod: String(x.rynek_kod ?? "").slice(0, 30),
-          rynek: String(x.rynek ?? "").slice(0, 40),
-          linia: Number(x.linia) || 0,
-          strona: x.strona === "ponizej" ? "ponizej" : "powyzej",
-          kurs: Number(x.kurs) || 0,
-          bukmacher: String(x.bukmacher ?? "Superbet").slice(0, 20),
-          p_model: Number(x.p_model) || 0,
-          pewnosc: x.pewnosc === "wysoka" || x.pewnosc === "srednia" ? x.pewnosc : undefined,
+          mecz_id: Number(s.mecz_id) || 0,
+          mecz: String(s.mecz ?? "").slice(0, 80),
+          kickoff_ts: Number(s.kickoff_ts) || 0,
+          podmiot_id: Number(s.podmiot_id) || 0,
+          podmiot: String(s.podmiot ?? "").slice(0, 60),
+          druzyna: String(s.druzyna ?? "").slice(0, 60),
+          rynek_kod: String(s.rynek_kod ?? "").slice(0, 30),
+          rynek: String(s.rynek ?? "").slice(0, 40),
+          linia: Number(s.linia) || 0,
+          strona: s.strona === "ponizej" ? "ponizej" : "powyzej",
+          kurs: Number(s.kurs) || 0,
+          bukmacher: String(s.bukmacher ?? "Superbet").slice(0, 20),
+          p_model: Number(s.p_model) || 0,
+          pewnosc: s.pewnosc === "wysoka" || s.pewnosc === "srednia" ? s.pewnosc : undefined,
           // te same flagi co kupony.py:_leg_dict – bez nich legi trafiające do
           // nauki WYŁĄCZNIE przez własny kupon są ślepą plamą dla diagnostyki
-          // miękkich linii/sygnałów XI/marży UK (dokładnie ten sam P0 fix z tej
-          // sesji, ale dla ścieżki "wlasny_nauka", którą wtedy pominięto)
-          matchup: Boolean(x.matchup) || undefined,
-          matchup_styl: Boolean(x.matchup_styl) || undefined,
-          rotacja: Boolean(x.rotacja) || undefined,
-          wyzsza_linia: Boolean(x.wyzsza_linia) || undefined,
-          miekka_linia: Boolean(x.miekka_linia) || undefined,
-          swieze_sklady: Boolean(x.swieze_sklady) || undefined,
-          xi_sygnal: x.xi_sygnal === "official" || x.xi_sygnal === "predicted" ? x.xi_sygnal : undefined,
-          kurs_ref: Number.isFinite(Number(x.kurs_ref)) && x.kurs_ref != null ? Number(x.kurs_ref) : undefined,
-          ev_uk: Number.isFinite(Number(x.ev_uk)) && x.ev_uk != null ? Number(x.ev_uk) : undefined,
-          ev_pct: Number.isFinite(Number(x.ev_pct)) && x.ev_pct != null ? Number(x.ev_pct) : undefined,
+          // miękkich linii/sygnałów XI/marży UK
+          matchup: opcjonalnaFlaga("matchup"),
+          matchup_styl: opcjonalnaFlaga("matchup_styl"),
+          rotacja: opcjonalnaFlaga("rotacja"),
+          wyzsza_linia: opcjonalnaFlaga("wyzsza_linia"),
+          miekka_linia: opcjonalnaFlaga("miekka_linia"),
+          swieze_sklady: opcjonalnaFlaga("swieze_sklady"),
+          xi_sygnal:
+            s.xi_sygnal === "official" || s.xi_sygnal === "predicted"
+              ? s.xi_sygnal
+              : undefined,
+          kurs_ref: opcjonalnaLiczba("kurs_ref"),
+          ev_uk: opcjonalnaLiczba("ev_uk"),
+          ev_pct: opcjonalnaLiczba("ev_pct"),
+          // rachunek „skąd wzięła się ta liczba" — jeśli pula go niesie,
+          // niech jedzie razem z legiem (patrz betting.stempel_rachunku)
+          rachunek:
+            s.rachunek && typeof s.rachunek === "object" ? s.rachunek : undefined,
         };
       })
+      .filter((l): l is NonNullable<typeof l> => !!l)
       .filter((l) => l.mecz_id && l.podmiot && l.kurs > 1);
     if (legi.length < 2) {
-      return NextResponse.json({ error: "za mało poprawnych typów" }, { status: 400 });
+      return NextResponse.json(
+        {
+          error:
+            "za mało typów z bieżącej puli – kupon mógł się zdezaktualizować, " +
+            "odśwież stronę",
+        },
+        { status: 400 },
+      );
     }
     const sygn = legi
       .map((l) => `${l.mecz_id}:${l.podmiot_id}:${l.rynek_kod}:${l.linia}`)
@@ -156,11 +227,17 @@ export async function POST(req: Request) {
     const wlasne = await readKey("kupony_wlasne");
     const klucze = Object.keys(wlasne);
     const doUsuniecia = klucze.slice(0, Math.max(0, klucze.length - 40));
+    // ...a liczby całego kuponu z LEGÓW, nie z żądania — tą samą zasadą co
+    // wyżej. Iloczyn szans zakłada niezależność zdarzeń; pipeline i tak liczy
+    // kupon własnym rachunkiem (z korelacją), więc to jest wartość zapasowa,
+    // która ma być spójna z legami, a nie przyjęta na słowo.
+    const kursLaczny = legi.reduce((acc, l) => acc * l.kurs, 1);
+    const pKuponu = legi.reduce((acc, l) => acc * (l.p_model || 0), 1);
     const ok = await merge("kupony_wlasne", {
       [sygn]: {
         legi,
-        kurs_laczny: Number(kk.kurs_laczny) || 0,
-        p_model: Number(kk.p_model) || 0,
+        kurs_laczny: Math.round(kursLaczny * 100) / 100,
+        p_model: Math.round(pKuponu * 10000) / 10000,
         zapisano_ts: now,
       },
     }, doUsuniecia);
