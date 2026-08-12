@@ -253,6 +253,28 @@ Legenda: `[x]` zrobione · `[~]` w toku / obejście · `[ ]` otwarte
 
 ## Produkt
 
+- [x] **Cena, do której ściągamy kartę, brała się z założenia, nie z pomiaru**
+  (13.08, `04ff875`). Ściągaliśmy do kursu po zdjęciu ZAŁOŻONYCH 7% marży,
+  a wartość liczyliśmy wobec kursu Z marżą — pierwszy cykl z aktywnym
+  ściąganiem dał **0 z 31 typów z dodatnią wartością**. Zmierzone na 2451
+  rozliczeniach: cena zawyża relatywnie o 3,2%, nie 7% (walidacja czasowa:
+  luka +0,4 pp). → warstwa `rozliczanie.marza_sciagania`, waga dobierana pod
+  tę samą cenę, obie liczby w stemplu `rachunek`.
+  ⚑ Sama marża **nie naprawia komunikatu**: waga schodzi na podłogę 0,05,
+  a wartość zostaje ujemna u wszystkich — bo po ściągnięciu do uczciwej ceny
+  „wartość" wobec kursu z marżą JEST marżą. Stąd druga część niżej.
+
+- [x] **Cena jest informacją, nie werdyktem** (13.08, decyzja właściciela).
+  Z karty schodzi werdykt o przewadze i odznaka z procentem; kropka w wierszu
+  liczy się z szansy, nie z `ev_pct` (wcześniej wszystkie typy miały najsłabszą);
+  znika sortowanie „największa przewaga nad kursem" (górna 1/3 tego sortowania
+  dawała −41,2%, dolna +32,5%); nagłówek nie zależy od znaku wartości.
+
+- [ ] **Stopka obiecuje przewagę cenową, której nie pokazujemy.** „Pokazujemy,
+  gdzie kurs bukmachera jest naszym zdaniem za wysoki" — po zmianie z 13.08
+  karta o tym nie mówi i mówić nie może. Do przejrzenia razem z resztą tekstów
+  sprzedażowych.
+
 - [ ] **Podział na zakładki NIE JEST wdrożony zgodnie z dokumentem.** Audyt
   sprawdził stan faktyczny: nadal obowiązuje limit **dwóch** typów na mecz,
   lista jest wybierana od nowa w każdym cyklu (brak trwałego manifestu dnia
