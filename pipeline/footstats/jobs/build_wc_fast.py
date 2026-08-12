@@ -6198,15 +6198,22 @@ def _main_impl(tryb=None):
                         "lambda": round(h_n["pred"].lam, 3),
                         "rozklad": None, "sugestia": False,
                         "czynniki": mnozniki_pary(h_n, a_n),
-                        # ⚑ STEMPEL MÓWI PRAWDĘ, TAKŻE NIEWYGODNĄ (2026-08-12).
-                        # Ta ścieżka liczy `p_w` wprost z rozkładów obu drużyn
-                        # (`counts.porownanie_druzyn` na SUROWYCH `pred`) i nie
-                        # nakłada ani kalibracji rynku, ani korekty strumienia —
-                        # `korekta_strumieni` jest wołana tylko w ścieżce
-                        # zawodniczej, drużynowej i drabinek. Zera są tu więc
-                        # pomiarem, nie zaokrągleniem: pokażą w księdze, że ten
-                        # rynek idzie bez warstw uczenia. Patrz nota w
-                        # `docs/kolejka-po-audycie.md`.
+                        # ⚑ „KTO WIĘCEJ" ZOSTAJE BEZ WARSTW UCZENIA — ŚWIADOMIE
+                        # (rozstrzygnięte 12.08, przy wpinaniu ich do sum).
+                        #
+                        # To jest TRÓJMIAN: gospodarz / remis / gość, a
+                        # `p_h + p_remis + p_a = 1`. Delta logitowa z naszych
+                        # warstw jest zdefiniowana na `p_over` dwustronnego
+                        # rynku — nałożona na jedną nogę trójmianu rozerwałaby
+                        # tę sumę, czyli dokładnie ten błąd, dla którego cała
+                        # kalibracja jedzie w orientacji „powyżej" (awaria
+                        # odwróconego znaku, 11.08). `wiecej_*` nie ma zresztą
+                        # wpisu w mapie kalibracji, bo nie ma czego tam liczyć.
+                        #
+                        # Zera są więc pomiarem, nie zaokrągleniem: mówią
+                        # wprost, że ten rynek idzie bez warstw — i to zostaje
+                        # do czasu, aż ktoś policzy korektę dla trójmianu.
+                        # Dotyczy 17 rozliczeń bieżącej epoki.
                         "rachunek": betting.stempel_rachunku(
                             p_over_raw=p_w, kal_rynek=0.0, kal_strumien=0.0,
                             p_over_final=p_w,
@@ -6234,10 +6241,41 @@ def _main_impl(tryb=None):
                 # Zbieramy kandydatów i wystawiamy najlepszego po wartości;
                 # patrz bliźniacza brama przy pewniakach niżej.
                 kandydaci_s: dict[str, dict] = {}
+                # ⚑ SUMA MECZOWA PRZECHODZI PRZEZ TE SAME WARSTWY CO DRUŻYNY
+                # (2026-08-12). Do dziś ten rynek liczył `p` z SUROWYCH
+                # rozkładów obu drużyn i szedł prosto do `p_model` — omijał
+                # i kalibrację rynku, i korektę strumienia, bo
+                # `korekta_strumieni` była wołana tylko w ścieżce zawodniczej,
+                # drużynowej i drabinek. `match_corners` ma przy tym własną
+                # kalibrację ze WSZYSTKICH czterech przedziałów, policzoną z
+                # jego rozliczeń, i nigdy jej nie używał.
+                #
+                # ZMIERZONE na 95 rozliczeniach match_*/wiecej_* bieżącej epoki
+                # (skala `p_over`):
+                #     dziś                 Brier 0,1718   luka -7,9 pp
+                #     + korekta strumienia Brier 0,1617   luka +1,2 pp
+                #     + obie warstwy       Brier 0,1625   luka +1,2 pp
+                # Sama kalibracja rynku wypadła neutralnie (-0,5%, czyli szum
+                # przy tej próbie), ale wchodzi razem z drugą: różnica między
+                # „samą korektą" a „obiema" jest w szumie, a JEDNOLITOŚĆ
+                # ścieżek to realna wartość — dziś właśnie zapłaciliśmy za to,
+                # że jedna ścieżka miała inny zestaw warstw niż reszta.
+                #
+                # Korekta leci na `p_over`, nie na wybraną stronę, żeby
+                # „poniżej" zostało dokładnym dopełnieniem „powyżej" (patrz
+                # pętla drużynowa i awaria odwróconego znaku z 11.08).
+                _bias_s_pelny = _dodaj_delte(
+                    bias_map.get(kod_s), korekta_strumieni.get("druzyny", 0.0)
+                )
                 for linia_s, slot_s in sorted(linie_s.items()):
-                    p_over_s = counts.p_over_sumy(
+                    _p_over_s_sur = counts.p_over_sumy(
                         h_n["pred"], a_n["pred"], float(linia_s), rho=rho_n
                     )
+                    p_over_s = apply_bias(_bias_s_pelny, _p_over_s_sur)
+                    _kal_rynek_s = betting.delta_dla_p(
+                        bias_map.get(kod_s), _p_over_s_sur)
+                    _kal_strum_s = betting.delta_dla_p(
+                        korekta_strumieni.get("druzyny", 0.0), _p_over_s_sur)
                     # PRZEDZIAŁ liczony RAZ na linię, dla strony „powyżej";
                     # „poniżej" jest jego lustrem — tak samo jak w rynkach
                     # drużynowych (p_under = 1 − p_over, więc granice się
@@ -6248,6 +6286,11 @@ def _main_impl(tryb=None):
                             a_n["posterior"], a_n["pred"].exposure,
                             float(linia_s), rho=rho_n,
                         )
+                        # ...i w TEJ SAMEJ skali co `p`, inaczej brama
+                        # „p ostrożne" rozwadnia korektę (ta sama poprawka co
+                        # w pętli drużynowej, 2026-07-27)
+                        lo_o_s = apply_bias(_bias_s_pelny, lo_o_s)
+                        hi_o_s = apply_bias(_bias_s_pelny, hi_o_s)
                     except Exception:
                         lo_o_s = hi_o_s = None
                     for strona_s, p_s, kurs_s in (
@@ -6335,14 +6378,13 @@ def _main_impl(tryb=None):
                                 h_n["pred"].lam + a_n["pred"].lam, 3),
                             "rozklad": None, "sugestia": False,
                             "czynniki": mnozniki_pary(h_n, a_n),
-                            # jak przy „kto więcej": suma meczowa liczy się
-                            # z surowych rozkładów obu drużyn i nie przechodzi
-                            # przez żadną warstwę uczenia, mimo że
-                            # `match_corners` ma własną kalibrację ze WSZYSTKICH
-                            # czterech przedziałów. Zera są pomiarem.
+                            # od 12.08 ta ścieżka ma komplet warstw — patrz
+                            # nota przy `_bias_s_pelny` wyżej
                             "rachunek": betting.stempel_rachunku(
-                                p_over_raw=p_over_s, kal_rynek=0.0,
-                                kal_strumien=0.0, p_over_final=p_over_s,
+                                p_over_raw=_p_over_s_sur,
+                                kal_rynek=_kal_rynek_s,
+                                kal_strumien=_kal_strum_s,
+                                p_over_final=p_over_s,
                             ),
                             "uzasadnienie": {
                                 "czynniki": czynniki_pary(

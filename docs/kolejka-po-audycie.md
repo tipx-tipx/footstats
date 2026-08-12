@@ -63,8 +63,22 @@ Legenda: `[x]` zrobione · `[~]` w toku / obejście · `[ ]` otwarte
   `None` znaczy „ta ścieżka tego nie liczy", zero znaczy „policzono i wyszło
   zero"; mylenie tych dwóch rzeczy kosztowało nas już jeden pomiar.
 
-- [ ] ⚑ **ZNALEZISKO 12.08: `match_*` i `wiecej_*` NIE PRZECHODZĄ PRZEZ
-  WARSTWY UCZENIA.** Wyszło przy wpinaniu stempli. Suma meczowa liczy
+- [~] ⚑ **ZNALEZISKO 12.08: `match_*` i `wiecej_*` NIE PRZECHODZĄ PRZEZ
+  WARSTWY UCZENIA.** → **SUMY NAPRAWIONE tego samego dnia**, „kto więcej"
+  zostaje świadomie. Zmierzone na 95 rozliczeniach epoki (skala `p_over`):
+  dziś Brier 0,1718 i luka −7,9 pp; z korektą strumienia 0,1617 i **+1,2 pp**;
+  z obiema warstwami 0,1625. Sama kalibracja rynku wypadła neutralnie (−0,5%,
+  szum przy tej próbie), ale wchodzi razem z drugą — różnica jest w szumie,
+  a jednolitość ścieżek to realna wartość, za brak której właśnie zapłaciliśmy.
+  Per rynek: `match_corners` +8,2%, `match_cards` +3,5%.
+  **`wiecej_*` ZOSTAJE bez warstw i to nie jest zaniedbanie:** to trójmian
+  (gospodarz/remis/gość, sumuje się do 1), a delta logitowa jest zdefiniowana
+  na `p_over` rynku dwustronnego — nałożona na jedną nogę rozerwałaby tę sumę.
+  Test `test_sumy_maja_warstwy.py` pilnuje, żeby nikt nie dopisał rynków
+  trójmianowych do mapy kalibracji bez policzenia korekty dla trzech wyników.
+  Dotyczy 17 rozliczeń. Otwarte: policzyć taką korektę.
+
+  *(oryginalny opis znaleziska niżej)* Wyszło przy wpinaniu stempli. Suma meczowa liczy
   `counts.p_over_sumy` z SUROWYCH rozkładów obu drużyn, „kto więcej"
   `counts.porownanie_druzyn` tak samo — i obie idą prosto do `p_model`.
   `korekta_strumieni` jest wołana wyłącznie w ścieżce zawodniczej,
