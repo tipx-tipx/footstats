@@ -9,7 +9,7 @@ import { grupujWarianty } from "@/lib/warianty";
 import { FilterDropdown } from "./FilterDropdown";
 import { Reveal } from "./Reveal";
 import { Wyrozniona } from "./Wyrozniona";
-import type { DruzynaForma, ValueBet, Zawodnik } from "@/lib/types";
+import type { DruzynaForma, Meta, ValueBet, Zawodnik } from "@/lib/types";
 import { useTeraz } from "@/lib/useTeraz";
 import { KROPKA_STYL, PRZEWAGA_KROPKI } from "@/lib/slownik";
 
@@ -22,11 +22,29 @@ import { KROPKA_STYL, PRZEWAGA_KROPKI } from "@/lib/slownik";
  * od tego, czy w bazie jest 10 czy 300 typów.
  */
 
+/**
+ * DOBA PRODUKTOWA 6:00 → 6:00, nie kalendarzowa (2026-08-14).
+ *
+ * 41% naszych typów to mecze grane między północą a 4:00 rano — Ameryka Płd.
+ * Przy dacie kalendarzowej mecz o 2:00 w nocy z piątku na sobotę pokazywałby
+ * się jako „jutro", choć człowiek obstawia go w piątek wieczorem i choć
+ * należy do PIĄTKOWEJ listy dnia, którą backend zamyka o 6:00 (patrz
+ * `build_wc_fast.dzien_listy` — ta sama definicja po obu stronach).
+ *
+ * ⚑ Terminarz meczów (`TerminarzMeczy`) świadomie zostaje przy dacie
+ * kalendarzowej: tam pytanie brzmi „kiedy jest ten mecz", a nie „co mogę
+ * dziś zagrać". Skuteczność i rozliczenia też liczą doby kalendarzowo
+ * (`rozliczanie.dzien_pl`) i tego nie wolno zmieniać — przestawiłoby
+ * całą historię.
+ */
+const GODZINA_DOMKNIECIA = 6;
+
 function kluczDnia(ts: number): string {
+  const przesuniete = (ts - GODZINA_DOMKNIECIA * 3600) * 1000;
   return new Intl.DateTimeFormat("en-CA", {
     dateStyle: "short",
     timeZone: "Europe/Warsaw",
-  }).format(new Date(ts * 1000));
+  }).format(new Date(przesuniete));
 }
 
 function etykietaDnia(ts: number, teraz: number): { glowna: string; data: string } {
@@ -42,6 +60,27 @@ function etykietaDnia(ts: number, teraz: number): { glowna: string; data: string
   const [dow, ...reszta] = pelna.split(" ");
   // pl-PL daje "czwartek, 23 lipca" – przecinek zostaje przy dniu tygodnia
   return { glowna: dow.replace(/,$/, ""), data: reszta.join(" ") };
+}
+
+/**
+ * Znacznik przy nagłówku dnia: czy ta lista jest już kompletna.
+ *
+ * Lista domyka się raz na dobę o 6:00 i od tej chwili nic do niej nie dochodzi
+ * ani z niej nie znika. To jest obietnica dla człowieka, który wchodzi rano
+ * i chce wiedzieć, że widzi całość — więc mówimy o niej wprost, zamiast
+ * liczyć na to, że ktoś zauważy brak zmian.
+ */
+function StanListy({ zamknieta }: { zamknieta: boolean }) {
+  return (
+    <span
+      className={
+        "shrink-0 font-data text-[0.7rem] uppercase tracking-wide " +
+        (zamknieta ? "text-muted" : "text-faint")
+      }
+    >
+      {zamknieta ? "lista zamknięta" : "jeszcze się uzupełnia"}
+    </span>
+  );
 }
 
 function odmienTypy(n: number): string {
@@ -176,16 +215,25 @@ const SORTY: { kod: Sort; label: string }[] = [
 ];
 
 /**
- * JEDNA MIARA DLA WSZYSTKICH RYNKÓW, liczona tu — nie z backendu.
+ * JEDNA MIARA DLA WSZYSTKICH RYNKÓW — od 14.08 liczy ją BACKEND.
  *
- * Szansa × pierwiastek z kursu: sama szansa wynosiłaby na górę wyłącznie
- * linie 0,5, a sama wartość — najdłuższe strzały. Pierwiastek tłumi kurs
- * na tyle, żeby typ 87% po 1,21 wygrał z typem 43% po 3,55, ale nie na tyle,
- * żeby wysoki kurs przestał się liczyć. Ta sama formuła, której backend
- * używa do pewniaków (`_atrakcyjnosc`) — tyle że tutaj dostaje ją KAŻDY typ,
- * niezależnie od kanału, którym powstał.
+ * Podstawa się nie zmieniła: szansa × pierwiastek z kursu. Sama szansa
+ * wynosiłaby na górę wyłącznie linie 0,5, a sama wartość — najdłuższe
+ * strzały. Pierwiastek tłumi kurs na tyle, żeby typ 87% po 1,21 wygrał
+ * z typem 43% po 3,55, ale nie na tyle, żeby kurs przestał się liczyć.
+ *
+ * Co doszło w backendzie (`moc_listy`, liczone przy dumpie, więc obejmuje
+ * też typy wznowione): premia za BOGACTWO MATERIAŁU MECZU. Zmierzone na
+ * 366 rozliczeniach — mecze, w których model wystawił 5+ typów, mają lukę
+ * deklaracji −5,3 pp wobec −13,3 pp przy 2–4 typach i jako jedyne zarabiają.
+ * Front nie ma jak tego policzyć: widzi listę po filtrach, a nie to, ile
+ * typów mecz naprawdę dostał.
+ *
+ * Fallback zostaje dla danych sprzed tej zmiany (typ z rejestru publikacji
+ * może być starszy niż dzisiejszy dump) — wtedy dokładnie stara formuła.
  */
-const moc = (b: ValueBet) => b.p_model * Math.sqrt(b.kurs ?? b.fair_kurs ?? 1);
+const moc = (b: ValueBet) =>
+  b.moc_listy ?? b.p_model * Math.sqrt(b.kurs ?? b.fair_kurs ?? 1);
 
 /**
  * Typ z rynku CHWILOWO WSTRZYMANEGO schodzi na koniec kolejności „polecane".
@@ -280,6 +328,7 @@ export function DruzynyTablica({
   ligaByMecz,
   teraz: terazSerwera,
   meczeTs = [],
+  listaDnia,
 }: {
   /** typy drużynowe w kolejności rankingu silnika (najlepsze pierwsze) */
   bets: ValueBet[];
@@ -288,6 +337,13 @@ export function DruzynyTablica({
   ligaByMecz: Record<number, string>;
   /** timestamp serwera (s) – spójne "dziś/jutro" bez zegara klienta */
   teraz: number;
+  /**
+   * Stan zamknięcia listy dnia (`meta.lista_dnia`). Lista domyka się raz na
+   * dobę o 6:00 i potem się nie zmienia — a to jest obietnica, więc musi być
+   * widoczna. Bez niej zamrożenie wygląda jak zwykły dzień, w którym nic
+   * nowego nie przyszło.
+   */
+  listaDnia?: Meta["lista_dnia"];
   /**
    * Gwizdki WSZYSTKICH nadchodzących meczów w bazie — do wytłumaczenia, czemu
    * dziś typów jest mało. Surowe znaczniki, nie gotowe liczby: dzień tnie
@@ -546,6 +602,9 @@ export function DruzynyTablica({
             <span className="ml-auto shrink-0 font-data text-xs text-muted">
               {odmienTypy(lista.length)}
             </span>
+            {listaDnia?.dni?.[klucz] && (
+              <StanListy zamknieta={!!listaDnia.dni[klucz].zamkniete_ts} />
+            )}
           </div>
         </div>
 
@@ -822,6 +881,13 @@ export function DruzynyTablica({
                 <span className="ml-auto shrink-0 font-data text-xs text-muted">
                   {odmienTypy(dzisiejsze.length)}
                 </span>
+                {listaDnia?.dni?.[dzisKlucz] && (
+                  <StanListy
+                    zamknieta={
+                      !!listaDnia.dni[dzisKlucz].zamkniete_ts
+                    }
+                  />
+                )}
               </div>
               {/* dzień z małą liczbą typów tłumaczy się terminarzem, zamiast
                   zostawiać wrażenie, że model dziś nic nie znalazł */}

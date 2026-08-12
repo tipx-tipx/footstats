@@ -82,6 +82,7 @@ export default async function DruzynyPage() {
           ligaByMecz={ligaByMecz}
           teraz={teraz}
           meczeTs={mecze.map((m) => m.kickoff_ts)}
+          listaDnia={meta.lista_dnia}
         />
       )}
 

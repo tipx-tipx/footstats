@@ -283,28 +283,105 @@ Legenda: `[x]` zrobione · `[~]` w toku / obejście · `[ ]` otwarte
   karta o tym nie mówi i mówić nie może. Do przejrzenia razem z resztą tekstów
   sprzedażowych.
 
-- [ ] **Podział na zakładki NIE JEST wdrożony zgodnie z dokumentem.** Audyt
+- [~] **Podział na zakładki NIE JEST wdrożony zgodnie z dokumentem.** Audyt
   sprawdził stan faktyczny: nadal obowiązuje limit **dwóch** typów na mecz,
   lista jest wybierana od nowa w każdym cyklu (brak trwałego manifestu dnia
   i zamknięcia o 06:00), a kwarantanny i ukrywanie rynków **są aktywne** mimo
   deklaracji „bez blacklist". To są cztery osobne rzeczy do zrobienia, nie
   jedna.
+  → **14.08 zamknięte trzy z czterech:** limit na mecz (szczegóły niżej),
+  **kwarantanny przestały zdejmować typy** — deklaracja „bez blacklist" ma
+  wreszcie pokrycie w kodzie — oraz **trwały manifest dnia z zamknięciem
+  o 6:00**. Zostaje sam podział na zakładki.
+  ⚑ Przy okazji wyszło, że limity **tylko udawały, że działają**: deklarowany
+  cap 20 dawał realnie medianę 67 typów na dzień (13.08 — 185), a „2 typy
+  z meczu" pozwalało na 16. Powód: typ wznowiony wchodził poza limitem, ale
+  licznik rósł dopiero po nim, więc mocny nowy typ przechodził przed nim.
+  Naprawione jednym posortowaniem (wznowione pierwsze) — nic nie znika ze
+  strony, nowe wchodzą na to, co realnie zostało wolne.
 
 - [ ] **Routing rynku z wagą modelu < 0,2 do „Value" — WYCOFANY.** Jeśli cena
   przewiduje lepiej niż model, to nie jest dowód, że model znalazł wartość.
   Taki segment → shadow, bez kuponów i bez stawki. (Moja pierwotna
   rekomendacja B2 była błędna.)
-- [ ] **„Bez blacklist" znaczy: nic nie znika z pomiaru i z shadow.** Nie
+- [x] **„Bez blacklist" znaczy: nic nie znika z pomiaru i z shadow.** Nie
   znaczy: obowiązek publicznego rekomendowania segmentu bez potwierdzonej
   jakości.
-- [ ] **Zamrożona lista dnia** — niezmienny snapshot z `valid_until` =
-  początek meczu, obok osobno aktualny kurs i status. Wyjątki bezpieczeństwa:
-  odwołanie/przełożenie, potwierdzona absencja, zawieszenie rynku, uszkodzone
-  dane, unieważniona wersja modelu.
-- [ ] **Limit 1 typ/mecz** (dziś 2) + nowe kryterium rankingu: świeżość
-  i długość historii → jednoznaczność serii → zgodność źródeł → dopiero
-  szansa i cena. Dzisiejsze sortowanie po pewności i przewadze jest
-  **odwrócone** (górna tercja −4,2% / −41,2%, dolna +26,6% / +32,5%).
+  → **14.08: kwarantanny przestały zdejmować typy z listy** (decyzja
+  właściciela, `KWARANTANNA_ZDEJMUJE_Z_LISTY = False`). Powodem nie jest sama
+  zasada, tylko pomiar — bramy wyrzucały materiał LEPSZY niż to, co zostawało:
+
+  ```
+  pokazane klientowi          n=419  luka -10,8 pp  ROI  -3,5%
+  zdjęte: kwarantanna rynku   n= 34  luka  -7,3 pp  ROI +10,3%
+  zdjęte: kwarantanna strony  n=190  luka -16,3 pp  ROI  -1,3%
+  zdjęte: poza listą dnia     n=149  luka  -9,2 pp  ROI  +1,2%
+  ```
+
+  Mechanizm: brama patrzy na okno 40 rozliczeń, więc wstrzymuje segment po
+  serii pecha — czyli dokładnie wtedy, gdy ten i tak wraca do średniej.
+  Rozstrzygnięcie tego punktu jest więc takie: segment bez potwierdzonej
+  jakości **jest publikowany, ale oznaczony** („ostrożnie z tym zakładem"),
+  schodzi na koniec kolejności „polecane" i **nie wchodzi do kuponów**.
+  Przy okazji naprawione samopodtrzymywanie się kwarantanny kategorii:
+  „ambitniejsza linia" w kwarantannie przestawała w ogóle powstawać, więc
+  znikała też z pomiaru i brama nie miała jak się nigdy odwrócić.
+  **Zostaje otwarte:** okno zgody (`rozjazd_z_rynkiem`) — 274 rozliczone typy
+  o ROI −3,0%, czyli lepszym niż publikowane, i 174 typy zdejmowane dziś przed
+  gwizdkiem. Ten sam wniosek co przy kwarantannach, ale własna skala, więc
+  własny pomiar przed i po.
+- [x] **Zamrożona lista dnia — WDROŻONA 14.08.** Pełny plan, liczby i decyzje:
+  `docs/plan-lista-dnia.md`. Lista domyka się o 6:00 (pierwszy cykl po tej
+  godzinie), manifest w Supabase pod kluczem `lista_dnia`; po domknięciu skład
+  się nie zmienia, a nowy typ na ten dzień dostaje `dzien_zamkniety` i żyje
+  dalej w puli kuponów oraz w rozliczeniach w tle.
+  ⚑ **Doba PRODUKTOWA 6:00 → 6:00, nie kalendarzowa** — 41% typów to mecze
+  grane między północą a 4:00 (Ameryka Płd.), więc przy dacie kalendarzowej
+  „lista na piątek" domykana o 6:00 w piątek zawierałaby mecze rozpoczęte
+  o 2:00. `rozliczanie.dzien_pl` (rozliczenia, Skuteczność, archiwum) zostaje
+  kalendarzowe i **nie wolno go ruszać**. Konsekwencja: mecz o 2:00 z piątku
+  na sobotę jest na liście PIĄTKOWEJ, a w Skuteczności pod datą SOBOTNIĄ.
+  Koszt domknięcia: 18,7% typów nie zdąży (i są to typy nieco gorsze niż te,
+  które zdążyły: −6,5% wobec −2,6%, przy n=99 w granicach szumu).
+  **Zostaje otwarte:** wyjątki bezpieczeństwa poza odwołanym meczem
+  (potwierdzona absencja, zawieszenie rynku) — dziś typ zostaje na liście
+  z zamrożoną ceną, bez osobnego oznaczenia.
+- [x] **Limit 1 typ/mecz — ODRZUCONY POMIAREM (14.08).** Pełne liczby:
+  `docs/pomiar-bramy-i-kolejnosc.md`. Trzy powody, każdy osobno wystarczający:
+
+  ```
+  typów w meczu    n     luka          ROI      <- 366 rozliczeń, bez drabinek
+  1               33   -10,9 pp      +6,4%      (próba za mała)
+  2-4            176   -13,3 pp      -6,7%
+  5 i więcej     157    -5,3 pp      +8,3%      <- NASZ NAJLEPSZY MATERIAŁ
+  ```
+
+  (1) mecz, o którym model ma dużo do powiedzenia, jest dwa razy lepiej
+  skalibrowany — limit obcinałby dokładnie ten segment; efekt monotoniczny
+  w 9 z 9 komórek pasma kursu, przeżył kontrolę na horyzont, ligę i drabinki;
+  (2) zostawienie jednego typu z meczu daje 143 zakłady o ROI −11,7% zamiast
+  419 o ROI −3,5%; (3) brama i tak była martwa — w całej księdze (4594 wpisy)
+  powód `limit_meczu` wystąpił **raz**, bo stała na końcu łańcucha.
+  → limit zdjęty z listy, **zostaje w puli kuponów** (tam korelacja legów
+  realnie boli). Stała `MAX_PEWNIAKOW_MECZ` żyje dalej dla kuponów.
+
+- [x] **Nowe kryterium rankingu — WESZŁO W WERSJI ZMIERZONEJ (14.08).**
+  Teza „dzisiejsze sortowanie jest odwrócone" **nie potwierdziła się**: stała
+  na 114 rozliczeniach sprzed naprawy znaku kalibracji i dotyczyła sortowania
+  po PRZEWADZE NAD KURSEM — a to zdjęliśmy już 13.08 (`04ff875`). Na 419
+  rozliczeniach dzisiejsza kolejność ma kierunek poprawny (góra +0,6%,
+  dół −11,6%); odwrócone jest wyłącznie sortowanie po przewadze (−7,4% na
+  górze), którego nie ma.
+  → zamiast przepisywania rankingu na niezmierzone kryteria audytu (świeżość
+  historii, jednoznaczność serii, zgodność źródeł — **żadnego z nich nie da
+  się dziś ocenić wstecz, bo księga ich nie stempluje**) doszedł jeden
+  czynnik, który JEST zmierzony: bogactwo materiału meczu (premia 1,10 od
+  5 typów w meczu). `build_wc_fast.moc_listy`, liczone przy dumpie — więc
+  obejmuje typy wznowione, które omijają pętlę scoringu.
+  ⚑ Front przestał liczyć własną kopię formuły (`moc` w `DruzynyTablica`)
+  i bierze gotową liczbę z backendu.
+  **Otwarte:** stempel `rank_score` / miar historii w księdze — bez niego
+  następnego kryterium rankingu też nie da się ocenić wstecz.
 - [ ] **Kupony: limit ekspozycji** na mecz, drużynę i pojedynczy leg (dziś
   jeden zakład w 4 z 5 kuponów), metryki klastrowane, append-only historia
   wszystkich rezultatów (dziś log rotuje po 21 dniach zachowując wygrane —

@@ -122,14 +122,26 @@ def test_ten_sam_zawodnik_w_dwoch_dniach_dostaje_dwa_typy():
     assert len(lista) == 2
 
 
-def test_pokazany_typ_zawodnika_wchodzi_mimo_limitu():
-    """Typ raz pokazany zostaje do gwizdka — także przy tym liczniku."""
+def test_pokazany_typ_zawodnika_zostaje_i_zajmuje_swoje_miejsce():
+    """Typ raz pokazany zostaje do gwizdka — i LICZY SIĘ do limitu.
+
+    ⚑ ZMIANA SEMANTYKI 2026-08-14. Do tego dnia test wymagał, żeby weszły OBA
+    typy: wznowiony (bo raz pokazany) i nowy (bo licznik zdążył urosnąć
+    dopiero po nim). To był właśnie przeciek — przy limicie „1 typ na
+    zawodnika" na liście lądowały dwa, a w skali dnia deklarowane 20 typów
+    zamieniało się w medianę 67.
+
+    Teraz wznowione są przetwarzane pierwsze, więc zajmują swoje miejsca:
+    pokazany typ zostaje (to się NIE zmieniło i nie ma prawa się zmienić),
+    a nowy czeka na wolne miejsce.
+    """
     kand = [
         _typ_zawodnika(rynek="shots", kurs=1.90),
         _typ_zawodnika(rynek="sot", kurs=1.80, wznowiony=True),
     ]
     lista, zdjete, _p = B.wybierz_liste_publikowana(kand, _klucz)
-    assert len(lista) == 2 and not zdjete
+    assert [b["rynek_kod"] for b in lista] == ["sot"]      # pokazany zostaje
+    assert len(zdjete) == 1                                # nowy czeka
 
 
 # --- typ raz pokazany zostaje do gwizdka ---

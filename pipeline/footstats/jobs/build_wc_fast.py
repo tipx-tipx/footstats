@@ -14,6 +14,7 @@ a strażnik/kolejne uruchomienie dokończy, gdy propsy się pojawią.
 
 from __future__ import annotations
 
+import datetime as _dt
 import json
 import os
 import statistics
@@ -348,6 +349,92 @@ def domknij_terminarz(
 # przestają być o tym samym — wtedy lepiej zostawić kartę uproszczoną niż
 # tłumaczyć liczbę czynnikami, które prowadzą do innej liczby.
 RENTGEN_MAX_ROZJAZD_P = 0.05
+
+
+# =========================================================================
+# LISTA DNIA — jedna publikacja dziennie, potem skład się nie zmienia
+# =========================================================================
+#
+# ⚑ DOBA PRODUKTOWA 6:00 -> 6:00, NIE KALENDARZOWA. Rozkład godzin gwizdka
+# (czas polski, 862 typy): 00:00-04:00 = 355 typów, czyli **41%** naszej
+# listy to mecze grane nad ranem — Ameryka Płd. Przy dobie kalendarzowej
+# „lista na piątek" domykana o 6:00 w piątek zawierałaby mecze, które
+# zaczęły się o 2:00 w nocy, czyli cztery godziny wcześniej.
+#
+# Dzień listy D = mecze od 6:00 dnia D do 6:00 dnia D+1. Klient wchodzi rano
+# i widzi komplet tego, co realnie może dziś obstawić: europejskie wieczory
+# i południowoamerykańską noc.
+#
+# ⚑ CZEGO TO NIE ZMIENIA: `rozliczanie.dzien_pl` (doba kalendarzowa) zostaje
+# definicją dla rozliczeń, Skuteczności i archiwum. Zmiana tamtej przestawiłaby
+# całą historię — raz już mieliśmy 11% typów pod złą datą, gdy doba liczyła się
+# strefą maszyny ([[doba-czasem-polskim]]). Konsekwencja do zaakceptowania:
+# mecz o 2:00 w nocy z piątku na sobotę jest na liście PIĄTKOWEJ, a w
+# Skuteczności pod datą SOBOTNIĄ. Dwie jednostki, każda poprawna u siebie.
+GODZINA_DOMKNIECIA = 6
+
+
+def _lokalnie(ts) -> _dt.datetime:
+    """Czas polski. Bez bazy stref zostaje strefa maszyny — tak jak w rozliczaniu."""
+    if rozliczanie.STREFA is None:                          # pragma: no cover
+        return _dt.datetime.fromtimestamp(int(ts))
+    return _dt.datetime.fromtimestamp(
+        int(ts), _dt.timezone.utc).astimezone(rozliczanie.STREFA)
+
+
+def dzien_listy(ts, godzina: int = GODZINA_DOMKNIECIA) -> str:
+    """Doba PRODUKTOWA („YYYY-MM-DD") — mecz o 2:00 należy do dnia poprzedniego."""
+    if not ts:
+        return ""
+    d = _lokalnie(ts)
+    if d.hour < godzina:
+        d -= _dt.timedelta(days=1)
+    return d.strftime("%Y-%m-%d")
+
+
+def moment_domkniecia(dzien: str, godzina: int = GODZINA_DOMKNIECIA) -> int:
+    """Kiedy (ts) domyka się lista dnia `dzien` — o `godzina`:00 czasu polskiego.
+
+    Uwaga na zmianę czasu: godzina jest przypinana do daty W STREFIE, więc
+    doba przestawiana z lata na zimę ma 25 godzin i to jest poprawne.
+    """
+    d = _dt.datetime.strptime(dzien, "%Y-%m-%d").replace(
+        hour=godzina, minute=0, second=0, microsecond=0)
+    if rozliczanie.STREFA is not None:
+        d = d.replace(tzinfo=rozliczanie.STREFA)
+    return int(d.timestamp())
+
+
+def moc_listy(b: dict, kandydatow_w_meczu: int) -> float:
+    """Kolejność „polecane" — JEDNA miara dla wszystkich kanałów listy.
+
+    Podstawa: szansa × pierwiastek z kursu. Sama szansa wynosiłaby na górę
+    wyłącznie linie 0,5, a sama wartość — najdłuższe strzały; pierwiastek
+    tłumi kurs na tyle, żeby typ 87% po 1,21 wygrał z typem 43% po 3,55, ale
+    nie na tyle, żeby kurs przestał się liczyć.
+
+    Do tego jeden zmierzony czynnik: BOGACTWO MATERIAŁU MECZU, czyli ile
+    typów model w tym meczu w ogóle wystawił (liczby i zastrzeżenia przy
+    `PROG_BOGATEGO_MECZU`). Skrót: przy 10+ kandydatach luka deklaracji spada
+    z około −20 pp do −9 pp i lepiej.
+
+    ⚑ `kandydatow_w_meczu` liczy się z PULI PRZED SELEKCJĄ, nie z gotowej
+    listy. Inaczej powstałoby błędne koło (kolejność zależy od listy, lista od
+    kolejności), a przy pomiarze — zaglądanie w przyszłość, bo liczba typów,
+    które przeżyły bramy, jest znana dopiero po fakcie.
+
+    ⚑ To jest KOLEJNOŚĆ, nie brama i nie korekta szansy: żaden typ przez to
+    nie znika z listy ani nie zmienia liczby na karcie.
+
+    Front bierze gotową liczbę zamiast liczyć własną kopię formuły
+    ([[kupony-przebudowa-domknieta]], lekcja o kopii konfiguracji backendu
+    we froncie).
+    """
+    kurs = b.get("kurs") or b.get("fair_kurs") or 1.0
+    moc = float(b.get("p_model") or 0.0) * (float(kurs) ** 0.5)
+    if kandydatow_w_meczu >= PROG_BOGATEGO_MECZU:
+        moc *= PREMIA_BOGATEGO_MECZU
+    return round(moc, 4)
 
 
 def scal_z_publikacjami(
@@ -737,15 +824,33 @@ def przytnij_rejestr_do_listy(lista_pub: list[dict], teraz: int) -> int:
 # Pomiar przewagi układa kolejność, ale nikogo nie usuwa — co się nie zmieści,
 # żyje dalej w puli kuponów.
 #
-# KAŻDY LIMIT LICZY SIĘ OSOBNO NA DZIEŃ MECZOWY (2026-08-07).
-LISTA_CAP = 20
-LISTA_PER_MECZ = 2
-LISTA_PER_RYNEK = 6
+# KAŻDY LIMIT LICZY SIĘ OSOBNO NA DZIEŃ (2026-08-07), a od 14.08 na DOBĘ
+# PRODUKTOWĄ 6:00 -> 6:00 (`dzien_listy`).
+#
+# ⚑ ROZMIARY Z 14.08 — decyzja właściciela po pomiarze. Do tego dnia limity
+# tylko UDAWAŁY, że działają: deklarowany cap 20 dawał realnie medianę 67
+# typów na dzień (13.08 — 185), a „2 typy z meczu" pozwalało na 16. Powód
+# i naprawa: nota o kolejności wznowionych w `wybierz_liste_publikowana`.
+#
+# Skąd 12: symulacja na 419 rozliczeniach pokazała, że przy budżecie 10–15
+# typów dziennie i kolejności z premią za bogaty mecz zwrot brutto wychodzi
+# dodatni (+1,7% / +1,2%) wobec −3,5% dziś, a przy 20 już nie (−0,7%).
+# ⚑ UCZCIWIE: to jest SUFIT, nie obietnica — symulacja wybiera spośród typów,
+# które dotrwały do rozliczenia, i zna ich siłę z góry. Netto dalej jesteśmy
+# pod kreską (−10,5% przy 10/dzień wobec −15,1% dziś). Limit ma porządkować
+# produkt; poprawa zwrotu jest hipotezą do sprawdzenia na nowych danych,
+# nie deklaracją.
+LISTA_CAP = 12
+# 3, nie 2: mecze bogate w typy są naszym najlepszym materiałem (luka
+# deklaracji −2,1 pp przy 20+ kandydatach wobec −21,7 pp przy kilku), ale
+# przy budżecie 12 pięć typów z jednego meczu to 40% listy.
+LISTA_PER_MECZ = 3
+LISTA_PER_RYNEK = 4
 # ...i tyle samo na przedział kursowy, żeby na liście były i tanie, i drogie
 # typy. Bez tego sortowanie po zmierzonej przewadze wypełniłoby listę samym
 # pasmem 3,0+ (dziś jedynym, które bije cenę), czyli tanie kursy zniknęłyby
 # po cichu, a tego user nie chce.
-LISTA_PER_PASMO = 6
+LISTA_PER_PASMO = 4
 # ...i na RODZINĘ STATYSTYKI (2026-08-05, zgłoszenie usera „bez przesytu").
 #
 # `LISTA_PER_RYNEK` liczy pary (kod, strona) OSOBNO, a kartki mają dwa osobne
@@ -758,7 +863,7 @@ LISTA_PER_PASMO = 6
 # cyklu ma 71% goli, a opublikowana lista 38% — limity dywersyfikują MOCNIEJ
 # niż źródło, a prawdziwym ograniczeniem jest podaż. Ten limit domyka wyłącznie
 # przypadek skrajny; zaostrzanie go skróciłoby listę, zamiast ją urozmaicić.
-LISTA_PER_RODZINA = 6
+LISTA_PER_RODZINA = 4
 # ...i JEDEN TYP NA ZAWODNIKA W DNIU (2026-08-08, przy wpięciu oferty do
 # silnika; user: „żeby nie było kanibalizowania").
 #
@@ -798,35 +903,39 @@ def _pasmo_kursu(kurs) -> str:
 
 def wybierz_liste_publikowana(
     kandydaci: list[dict], klucz_sortowania, ukryte=frozenset(),
+    zamkniete: dict[str, set] | None = None,
 ) -> tuple[list[dict], dict, dict]:
     """Które typy staną na stronie. Zwraca (lista, zdjęte, ile na dzień).
 
-    DWIE ZASADY, obie z 2026-08-07 (zgłoszenie usera „żeby typy nie pojawiały
-    się i nie znikały"):
+    TRZY ZASADY:
 
-    1. **Limity liczą się per DZIEŃ MECZOWY.** Dwudziestka na całą listę robiła
+    1. **Limity liczą się per DZIEŃ.** Dwudziestka na całą listę robiła
        z niej ruchome schody — typ na sobotę konkurował z typem na poniedziałek,
        więc świeże wejście wypychało ze strony typ pokazany trzy dni wcześniej,
-       z zamrożoną ceną, którą user mógł już zagrać. Zmierzone tego dnia: 45
+       z zamrożoną ceną, którą user mógł już zagrać. Zmierzone 07.08: 45
        żywych typów biło się o 20 miejsc, a 22 z nich (te, które user WIDZIAŁ)
-       stały poza stroną — 11 zdjął limit rynku, 7 dwudziestka, 4 limit pasma.
-       Do Skuteczności liczyły się dalej, bo naprawdę były pokazane, więc bilans
-       dnia znów rozjeżdżał się z listą (ta sama skarga co przy 460180d, tylko
-       innym wejściem). Dzień meczowy jest naturalną jednostką: listę czyta się
-       jako „co gramy dziś, co jutro". Doba POLSKA (`rozliczanie.dzien_pl`) —
-       ta sama definicja, której używa Skuteczność, żeby mecz o 00:30 nie wpadł
-       do wczoraj.
+       stały poza stroną. Dzień jest naturalną jednostką: listę czyta się jako
+       „co gramy dziś, co jutro".
+       ⚑ Od 14.08 to DOBA PRODUKTOWA 6:00 → 6:00 (`dzien_listy`), bo 41% typów
+       to mecze grane nad ranem — patrz nota przy `GODZINA_DOMKNIECIA`.
 
     2. **Typ raz pokazany wchodzi zawsze.** Limity dotyczą wyłącznie NOWYCH
        wejść. Cena wznowionego typu jest zamrożona i po niej rozliczy go księga,
        więc zdjęcie go ze strony przed gwizdkiem znaczyłoby, że user nie ma
-       gdzie sprawdzić zakładu, który wziął. Limity i tak go LICZĄ, żeby nowe
-       typy nie dokładały przesytu ponad to, co na liście już stoi.
+       gdzie sprawdzić zakładu, który wziął.
+       ⚑ Od 14.08 wznowione są przetwarzane PIERWSZE, więc naprawdę zajmują
+       swoje miejsca w limicie (wcześniej mocny nowy typ wchodził przed nimi
+       i limit przeciekał — 67 typów dziennie zamiast 20).
 
-    Wyjątkiem zostaje rynek w kwarantannie: typ z rynku „tragicznie
-    niewchodzącego" schodzi ze strony także wtedy, gdy był pokazany (decyzja
-    z 01.08 — rynek czeka na dopracowanie, a typ dalej rozlicza się w księdze).
+    3. **Dzień domknięty się nie zmienia.** Gdy lista dnia została ogłoszona
+       (`zamkniete[dzien]` = zbiór kluczy publikacji), wchodzi dokładnie to, co
+       w niej stoi. Nowy typ na ten dzień dostaje `dzien_zamkniety` i żyje
+       dalej w puli kuponów oraz w rozliczeniach w tle.
+
+    Wyjątkiem zostaje rynek UKRYTY do dopracowania: schodzi ze strony także
+    wtedy, gdy był pokazany, i dalej rozlicza się w księdze.
     """
+    zamkniete = zamkniete or {}
     z_meczu: dict = {}
     z_rynku: dict = {}
     z_pasma: dict = {}
@@ -835,7 +944,27 @@ def wybierz_liste_publikowana(
     z_zawodnika: dict = {}
     lista_pub: list[dict] = []
     zdjete: dict = {}
-    for b in sorted(kandydaci, key=klucz_sortowania, reverse=True):
+    # ⚑ WZNOWIONE IDĄ PIERWSZE — NAPRAWA PRZECIEKU LIMITÓW (2026-08-14).
+    #
+    # Limity sprawdzają się tylko dla NOWYCH wejść, bo typ raz pokazany musi
+    # zostać do gwizdka. Licznik rósł jednak dla wszystkich — a ponieważ
+    # kandydaci szli wg siły, MOCNY NOWY typ był przetwarzany przed wznowionymi
+    # i wchodził, zanim licznik zdążył urosnąć. Dzień zbierał typy przez
+    # kilkanaście cykli i 3–4 dni horyzontu, więc rósł bez końca.
+    #
+    # Zmierzone przed naprawą: LISTA_CAP deklarował 20, a realnie na dzień
+    # stała mediana 67 typów (13.08 — 185); LISTA_PER_MECZ deklarował 2, a
+    # mecze miały do 16 typów. To ta sama klasa błędu co
+    # [[wznowione-omijaly-bramy]], tylko od strony liczników.
+    #
+    # Naprawa jest jednym posortowaniem: najpierw typy już pokazane (zajmują
+    # swoje miejsca), potem nowe wg siły. Nic nie znika ze strony — nowe po
+    # prostu wchodzą na to, co realnie zostało wolne.
+    # dwa przebiegi, bo `klucz_sortowania` bywa krotką (przewaga, kurs, …),
+    # a sort w Pythonie jest stabilny: siła układa kolejność WEWNĄTRZ grup
+    kolejnosc = sorted(kandydaci, key=klucz_sortowania, reverse=True)
+    kolejnosc.sort(key=lambda b: 0 if b.get("wznowiony") else 1)
+    for b in kolejnosc:
         if b.get("sugestia"):
             lista_pub.append(b)      # sugestia nie jest zakładem, nie liczy się
             continue
@@ -846,7 +975,19 @@ def wybierz_liste_publikowana(
             if not b.get("wznowiony"):
                 zdjete.setdefault(_klucz_publikacji(b), "rynek_ukryty")
             continue
-        dzien = rozliczanie.dzien_pl(b.get("kickoff_ts"))
+        # DOBA PRODUKTOWA (6:00 -> 6:00), nie kalendarzowa — patrz `dzien_listy`.
+        # 41% typów to mecze grane nad ranem, a one należą do dnia, w którym
+        # człowiek je obstawia, nie do daty w kalendarzu.
+        dzien = dzien_listy(b.get("kickoff_ts"))
+        if dzien in zamkniete:
+            # dzień domknięty: skład jest już ogłoszony i się nie zmienia
+            if _klucz_publikacji(b) not in zamkniete[dzien]:
+                if not b.get("wznowiony"):
+                    zdjete.setdefault(_klucz_publikacji(b), "dzien_zamkniety")
+                continue
+            lista_pub.append(b)
+            z_dnia[dzien] = z_dnia.get(dzien, 0) + 1
+            continue
         mecz = (dzien, b.get("mecz_id"))
         rynek = (dzien, b.get("rynek_kod"), b.get("strona"))
         pasmo = (dzien, _pasmo_kursu(b.get("kurs")))
@@ -876,6 +1017,73 @@ def wybierz_liste_publikowana(
             z_zawodnika[zawodnik] = z_zawodnika.get(zawodnik, 0) + 1
         lista_pub.append(b)
     return lista_pub, zdjete, z_dnia
+
+
+LISTA_DNIA_KLUCZ = "lista_dnia"
+
+
+def wczytaj_zamkniete(manifest: dict | None) -> dict[str, set]:
+    """Manifest z Supabase -> {dzień: zbiór kluczy publikacji}."""
+    out: dict[str, set] = {}
+    for dzien, wpis in (manifest or {}).items():
+        if isinstance(wpis, dict) and wpis.get("zamkniete_ts"):
+            out[dzien] = set(wpis.get("klucze") or [])
+    return out
+
+
+def domknij_dni(
+    lista_pub: list[dict], manifest: dict | None, teraz: int,
+) -> tuple[dict, list[str]]:
+    """Zamknij listy dni, których godzina domknięcia właśnie minęła.
+
+    Zwraca (manifest, dni domknięte w tym przebiegu). Manifest jest zapisywany
+    przez wywołującego — ta funkcja jest czysta, żeby dała się przetestować.
+
+    ⚑ DOMKNIĘCIE JEST NIEODWRACALNE w obrębie dnia: raz zapisany skład wraca
+    z manifestu przy każdym kolejnym cyklu, także wtedy, gdy model przestanie
+    dany typ liczyć. To jest cel — klient ma raz zobaczyć listę i móc na niej
+    polegać do wieczora.
+
+    ⚑ CZEGO NIE ROBIMY: nie domykamy dnia, który jeszcze się nie zaczął
+    (lista na jutro ma prawo rosnąć do swojej 6:00) ani dnia bez ani jednego
+    typu — pusty manifest zamroziłby pustkę na cały dzień, gdyby cykl akurat
+    padł przed świtem.
+
+    Cron nie chodzi punktualnie (deklaruje 15 minut, realnie ~1–1,5 h), więc
+    „o 6:00" znaczy „w pierwszym cyklu po 6:00", a faktyczny moment zapisujemy
+    w `zamkniete_ts` — inaczej nie da się później odtworzyć, co i kiedy zostało
+    zamrożone.
+    """
+    manifest = dict(manifest or {})
+    dni: dict[str, list[str]] = {}
+    for b in lista_pub:
+        if b.get("sugestia"):
+            continue                       # sugestia nie jest zakładem
+        dzien = dzien_listy(b.get("kickoff_ts"))
+        if dzien:
+            dni.setdefault(dzien, []).append(_klucz_publikacji(b))
+    swiezo: list[str] = []
+    for dzien, klucze in sorted(dni.items()):
+        wpis = manifest.get(dzien) or {}
+        if wpis.get("zamkniete_ts"):
+            continue                       # już domknięty
+        if teraz < moment_domkniecia(dzien):
+            continue                       # dzień jeszcze rośnie
+        if not klucze:
+            continue                       # pustki nie zamrażamy
+        manifest[dzien] = {
+            "zamkniete_ts": int(teraz),
+            "klucze": sorted(set(klucze)),
+        }
+        swiezo.append(dzien)
+    return manifest, swiezo
+
+
+def przytnij_manifest(manifest: dict | None, teraz: int,
+                      dni_wstecz: int = 4) -> dict:
+    """Zostaw tylko dni, które jeszcze mogą być komuś potrzebne."""
+    granica = dzien_listy(teraz - dni_wstecz * 86400)
+    return {d: w for d, w in (manifest or {}).items() if d >= granica}
 
 
 PUBLIKACJE_KART_KLUCZ = "publikacje_karty"
@@ -2827,6 +3035,31 @@ MAX_PEWNIAKOW_MECZ = 4
 # Od 14.08 nie — pełne uzasadnienie i liczby przy `_kwarantanna_zdejmuje`.
 # W puli kuponów brama zostaje niezależnie od tej stałej.
 KWARANTANNA_ZDEJMUJE_Z_LISTY = False
+# ⚑ OD ILU KANDYDATÓW MECZ JEST „BOGATY" — próg wzięty z LUKI KALIBRACJI,
+# nie z ROI. Rozkład na 419 rozliczeniach, wg liczby typów, które model
+# wystawił w danym meczu (KANDYDACI, czyli razem z tłem — liczba znana PRZED
+# selekcją, więc bez zaglądania w przyszłość):
+#
+#      1-4 kandydatów   n= 46  luka -21,7 pp   ROI -22,4%
+#      5-9              n= 69  luka -18,9 pp   ROI -14,9%
+#     10-19             n=216  luka  -9,4 pp   ROI  -3,5%
+#     20+               n= 88  luka  -2,1 pp   ROI +15,1%
+#
+# Granica 10 dzieli „luka około −20 pp" od „luka −9 pp i lepiej". Wzięta
+# z LUKI, bo ta jest stabilna: dobieranie progu i siły premii pod ROI dawało
+# przy n=107 wyniki od −2,7% do +2,4%, czyli strojenie pod szum.
+#
+# ⚑ CZEGO TA LICZBA NIE MÓWI: kontroli per liga NIE DA SIĘ przeprowadzić —
+# mecze z 20+ kandydatami to niemal wyłącznie Brasileirão i Liga Profesional,
+# a te z kilkoma to egzotyka. Sygnał może więc znaczyć „mecz, o którym mamy
+# dużo danych" albo po prostu „liga, którą dobrze pokrywamy". Obie
+# interpretacje prowadzą do tej samej kolejności, ale gdyby doszło pokrycie
+# nowych lig, trzeba to przemierzyć.
+PROG_BOGATEGO_MECZU = 10
+# Premia w kolejności listy, w skali pozostałych premii (matchup 1,15,
+# rotacja 1,10). To jest KOLEJNOŚĆ, nie korekta szansy — i świadomie nie jest
+# strojona pod ROI.
+PREMIA_BOGATEGO_MECZU = 1.10
 
 
 def klub_prior(
@@ -7591,18 +7824,35 @@ def _main_impl(tryb=None):
                  opis=f"bije cenę {sum(1 for v in _przewaga.values() if v['przewaga'] > 0)}"
                       f" z {len(_przewaga)}, ukryte: {', '.join(sorted(_ukryte)) or 'brak'}")
 
+    # ILE TYPÓW MODEL WYSTAWIŁ W TYM MECZU — liczone z PULI PRZED SELEKCJĄ
+    # (kandydaci z listy + te zdjęte bramami, bo jedno i drugie świadczy o tym,
+    # ile o meczu wiemy). Wchodzi do `moc_listy`; szczegóły i zastrzeżenia przy
+    # `PROG_BOGATEGO_MECZU`.
+    _kandydatow_w_meczu: Counter = Counter(
+        b.get("mecz_id") for b in (do_pokazania + typy_poza_publikacja)
+        if not b.get("sugestia")
+    )
+
     def _klucz_listy(b: dict):
-        # DWA NIEZALEŻNE SYGNAŁY, oba mierzone tym samym testem „czy bijemy
-        # cenę": jeden dla rynku i strony, drugi dla przedziału kursowego.
-        # Sumujemy, bo typ z dobrego rynku W DOBRYM PAŚMIE ma dwa powody, żeby
-        # być wyżej, a typ z dobrego rynku po cenie, w której nic nie wiemy
-        # (1,19-1,35 — tam bukmacher trafia co do punktu), traci połowę atutu.
-        p_rynek = (_przewaga.get(f'{b.get("rynek_kod")}|{b.get("strona")}')
-                   or {}).get("przewaga", 0.0)
-        p_pasmo = rozliczanie.przewaga_pasma_dla(b.get("kurs"), _pasma)
+        # ⚑ JEDNA MIARA DLA WEJŚCIA I DLA KOLEJNOŚCI (2026-08-14).
+        #
+        # Do 14.08 o wejściu na listę decydowała zmierzona PRZEWAGA RYNKU
+        # I PASMA (czy bijemy cenę), a o kolejności na ekranie — zupełnie inna
+        # liczba (p × √kurs, liczona dodatkowo we froncie). Produkt miał więc
+        # dwie różne definicje „najlepszego typu", a klient widział skutek obu
+        # naraz, nie znając żadnej.
+        #
+        # Teraz decyduje `moc_listy` — ta sama liczba, którą pokazujemy jako
+        # kolejność „polecane". Za nią stoi pomiar (tercje 419 rozliczeń: góra
+        # +0,6%, dół −11,6%) i premia za bogactwo materiału meczu.
+        #
+        # Przewaga rynku NIE znika z produktu: dalej decyduje o UKRYCIU rynku
+        # „tragicznie niewchodzącego" (`_ukryte` wyżej) i dalej jest raportowana
+        # w logu cyklu. Zmienił się jej zakres: z układania kolejności na
+        # wskazywanie, czego model jeszcze nie umie.
         ma_rachunek = bool(b.get("czynniki")) and (b.get("ci") or [None])[0] is not None
-        return (round(float(p_rynek) + float(p_pasmo), 4),
-                float(b.get("kurs") or 0.0), ma_rachunek)
+        return (moc_listy(b, _kandydatow_w_meczu.get(b.get("mecz_id"), 0)),
+                ma_rachunek)
 
     # KSIĘGA MA WIEDZIEĆ, ŻE ODCIĘTY SELEKCJĄ TYP NIE BYŁ NA STRONIE
     # (2026-08-06, decyzja usera: „w Skuteczności tylko typy ukazane na
@@ -7613,22 +7863,56 @@ def _main_impl(tryb=None):
     # „opublikowanych" w oknie ostatniego cyklu nie było na stronie, a księga
     # trzymała 154 typy „na liście" wobec 20 w `value_bets`. Typów WZNOWIONYCH
     # `wybierz_liste_publikowana` nie zdejmuje w ogóle (patrz tam).
+    # LISTA DNIA: raz ogłoszona, do końca dnia się nie zmienia. Manifest
+    # trzyma skład każdej domkniętej doby produktowej — nieudany odczyt
+    # traktujemy jak „brak domknięć" i NIE zapisujemy go z powrotem, żeby
+    # jeden timeout nie skasował dnia (ta sama zasada co przy rejestrze
+    # publikacji, [[supabase-read-modify-write]]).
+    _manifest_raw, _manifest_ok = supa.get_key_ok(LISTA_DNIA_KLUCZ)
+    _zamkniete = wczytaj_zamkniete(_manifest_raw if _manifest_ok else None)
+    if _zamkniete:
+        print("Lista dnia — domknięte: " + ", ".join(
+            f"{d} ({len(k)} typów)" for d, k in sorted(_zamkniete.items())))
+    elif not _manifest_ok:
+        print("UWAGA: nie udało się odczytać manifestu listy dnia — ten cykl "
+              "pracuje bez domknięć (nie nadpisujemy go)")
     lista_pub, _zdjete_selekcja, _z_dnia = wybierz_liste_publikowana(
-        do_pokazania, _klucz_listy, _ukryte,
+        do_pokazania, _klucz_listy, _ukryte, zamkniete=_zamkniete,
     )
     for _k, _powod in _zdjete_selekcja.items():
         zdjete_klucze.setdefault(_k, _powod)
     _pokazane_wracaja = sum(1 for b in lista_pub if b.get("wznowiony"))
     if len(do_pokazania) > len(lista_pub):
         print(f"Lista publikowana: {len(lista_pub)} z {len(do_pokazania)} "
-              f"kandydatów (na KAŻDY dzień meczowy max {LISTA_CAP}, "
+              f"kandydatów (na KAŻDĄ dobę produktową max {LISTA_CAP}, "
               f"{LISTA_PER_MECZ}/mecz, {LISTA_PER_RYNEK}/rynek, "
               f"{LISTA_PER_RODZINA}/rodzinę); reszta zostaje w puli kuponów")
     if _z_dnia:
-        print("Lista wg dnia meczu: " + ", ".join(
+        print("Lista wg doby produktowej (6:00→6:00): " + ", ".join(
             f"{d} {n}" for d, n in sorted(_z_dnia.items()))
             + (f" (w tym {_pokazane_wracaja} pokazanych wcześniej — te wchodzą "
                f"poza limitem)" if _pokazane_wracaja else ""))
+    # DOMKNIĘCIE — po selekcji, bo zamrażamy dokładnie to, co idzie na stronę
+    _swiezo_domkniete: list[str] = []
+    _zamkniete_meta: dict = dict(_manifest_raw or {}) if _manifest_ok else {}
+    if _manifest_ok:
+        _manifest_out, _swiezo_domkniete = domknij_dni(
+            lista_pub, _manifest_raw, _teraz_publikacji)
+        if _swiezo_domkniete:
+            _manifest_out = przytnij_manifest(_manifest_out, _teraz_publikacji)
+            _zamkniete_meta = _manifest_out
+            if _dry_run():
+                print(f"[dry-run] domknęłoby listę dnia: "
+                      f"{', '.join(_swiezo_domkniete)}")
+            elif supa.put_key(LISTA_DNIA_KLUCZ, _manifest_out):
+                print("Lista dnia DOMKNIĘTA: " + ", ".join(
+                    f"{d} — {len(_manifest_out[d]['klucze'])} typów"
+                    for d in _swiezo_domkniete)
+                    + " (od teraz skład się nie zmienia)")
+            else:
+                print("UWAGA: domknięcia listy dnia NIE UDAŁO SIĘ zapisać — "
+                      "lista pozostaje otwarta do następnego cyklu")
+                _zamkniete_meta = dict(_manifest_raw or {})
     _przyciete_rej = przytnij_rejestr_do_listy(lista_pub, _teraz_publikacji)
     if _przyciete_rej:
         print(f"Rejestr publikacji: przycięto {_przyciete_rej} wpisów z tego "
@@ -7700,6 +7984,37 @@ def _main_impl(tryb=None):
         if _rynek_wstrzymany(b) or _strona_wstrzymana(b):
             b["rynek_wstrzymany"] = True
 
+    # ⚑ KOLEJNOŚĆ NA LIŚCIE — JEDNA MIARA, LICZONA PRZY DUMPIE (2026-08-14).
+    #
+    # Dotąd kolejność „polecane" liczył FRONT (`moc` w DruzynyTablica), bo
+    # `rank_score` z backendu znaczy co innego w każdym kanale i jest zerem
+    # przy typach wznowionych — czyli przy większości listy. Front liczył
+    # p × √kurs i tyle; nie miał jak uwzględnić niczego, czego nie widzi.
+    #
+    # Teraz backend podaje gotową liczbę `moc_listy`, a front tylko z niej
+    # korzysta (z fallbackiem na starą formułę dla starszych danych). Liczona
+    # jest TU, przy dumpie — więc obejmuje typy wznowione z rejestru, które
+    # przechodzą obok całej pętli scoringu ([[wznowione-omijaly-bramy]]).
+    #
+    # Poza p × √kurs wchodzi jeden zmierzony czynnik: BOGACTWO MATERIAŁU
+    # MECZU (ile typów model w tym meczu wystawił). Liczby i zastrzeżenia przy
+    # `PROG_BOGATEGO_MECZU`. To zmienia WYŁĄCZNIE kolejność — żaden typ przez
+    # to nie znika z listy ani nie zmienia swojej szansy.
+    #
+    # ⚑ Ta sama liczba co przy selekcji (`_kandydatow_w_meczu`, pula PRZED
+    # bramami). Gdyby liczyć ją z gotowej listy, kolejność zależałaby od
+    # wyniku selekcji, a selekcja od kolejności — i przy okazji sam limit
+    # dzienny odbierałby premię meczom, którym się ona należy.
+    for b in lista_pub:
+        _ile = _kandydatow_w_meczu.get(b.get("mecz_id"), 0)
+        if _ile >= PROG_BOGATEGO_MECZU:
+            b["mecz_bogaty"] = True
+        b["moc_listy"] = moc_listy(b, _ile)
+    _bogate = sum(1 for b in lista_pub if b.get("mecz_bogaty"))
+    if _bogate:
+        print(f"Kolejność listy: {_bogate} typów z meczów, o których model ma "
+              f"dużo do powiedzenia ({PROG_BOGATEGO_MECZU}+ kandydatów w "
+              f"meczu) — premia {PREMIA_BOGATEGO_MECZU:.2f} w „polecanych”")
     _wstrzymane = sum(1 for b in lista_pub if b.get("rynek_wstrzymany"))
     if _wstrzymane:
         print(f"Rynki wstrzymane: {_wstrzymane} typów na liście pochodzi "
@@ -8021,6 +8336,20 @@ def _main_impl(tryb=None):
         # zapas na obstawienie w minutach — front pisze go wprost, zamiast
         # trzymać własną kopię liczby (rozjazd byłby nie do wytłumaczenia)
         "margines_startu_min": kupony.MARGINES_STARTU_S // 60,
+        # LISTA DNIA — front ma powiedzieć wprost, czy dzień jest już
+        # domknięty („to jest komplet na dziś"), czy jeszcze rośnie
+        # („zapowiedź, dojdą kolejne"). Bez tego zamrożenie jest niewidoczne
+        # i wygląda jak zwykły dzień, w którym nic nowego nie przyszło.
+        "lista_dnia": {
+            "godzina_domkniecia": GODZINA_DOMKNIECIA,
+            "limit": LISTA_CAP,
+            "dni": {
+                d: {"ile": n,
+                    "zamkniete_ts": (_zamkniete_meta.get(d) or {}).get(
+                        "zamkniete_ts")}
+                for d, n in sorted(_z_dnia.items())
+            },
+        },
         # zmierzone urealnienie szansy kuponu per horyzont — generator na
         # żądanie pokazuje te same liczby co kupony automatyczne
         "kalibracja_kuponow": kal_kuponow or {},

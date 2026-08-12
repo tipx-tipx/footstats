@@ -89,6 +89,13 @@ export interface ValueBet {
   pewnosc_score: number;
   ryzyko: Ryzyko;
   rank_score: number;
+  /** Kolejność „polecane" — JEDNA miara liczona przez backend przy dumpie
+   *  (p × √kurs + premia za bogactwo materiału meczu). Brak pola = rekord
+   *  sprzed 2026-08-14; wtedy front liczy starą formułę sam (patrz `moc`). */
+  moc_listy?: number;
+  /** Model ma o tym meczu dużo do powiedzenia (5+ typów) — zmierzony
+   *  najlepszy materiał: luka deklaracji −5,3 pp wobec −13,3 pp. */
+  mecz_bogaty?: boolean;
   ci: [number, number] | [null, null];
   oczekiwane_minuty: number | null;
   lambda: number;
@@ -680,6 +687,22 @@ export interface Meta {
   >;
   /** zapas na obstawienie w minutach – nic nowego nie wchodzi później */
   margines_startu_min?: number;
+  /**
+   * LISTA DNIA – jedna publikacja dziennie (2026-08-14).
+   *
+   * Lista domyka się o `godzina_domkniecia` i od tej chwili skład się nie
+   * zmienia: nic nie dochodzi i nic nie znika (poza wyjątkami w rodzaju
+   * odwołanego meczu). `dni` jest kluczowane DOBĄ PRODUKTOWĄ 6:00 → 6:00,
+   * bo 41% typów to mecze grane nad ranem – patrz `kluczDnia`
+   * w `DruzynyTablica` i `build_wc_fast.dzien_listy`.
+   *
+   * `zamkniete_ts` puste = dzień jeszcze rośnie (zapowiedź).
+   */
+  lista_dnia?: {
+    godzina_domkniecia: number;
+    limit: number;
+    dni: Record<string, { ile: number; zamkniete_ts?: number | null }>;
+  };
   /**
    * Zmierzone urealnienie szansy kuponu per horyzont (dzienny /
    * dlugoterminowy / value). Szansa kuponu to iloczyn szans typów, więc błąd
