@@ -93,7 +93,19 @@ Legenda: `[x]` zrobione · `[~]` w toku / obejście · `[ ]` otwarte
   → **decyzja właściciela**: naprawa zmienia liczby na produkcji, więc
   wymaga pomiaru przed/po, nie „przy okazji".
 
-- [ ] **Endpoint `kupon-pomin` bez kontroli roli.** Zalogowany klient przez
+- [x] **Endpoint `kupon-pomin` bez kontroli roli.** → NAPRAWIONE 12.08
+  dwuwarstwowo: (1) akcje ruszające wspólny stan (`profil`, `pomin`,
+  `przywroc`, `wymien`, `przebuduj`) wymagają roli `admin` — 403 dla klienta;
+  (2) `wlasny_nauka` bierze z żądania **tylko identyfikatory**, a `p_model`,
+  kurs, EV, flagi i `rachunek` odtwarza z `legi_pool`, czyli z tego, co sami
+  policzyliśmy w ostatnim cyklu — leg bez pokrycia w puli jest odrzucany,
+  a kurs łączny i szansa kuponu liczą się z legów. UI poszedł za tym: strona
+  kuponów czyta rolę i nie rysuje przycisków, które zwróciłyby 403 (razem
+  z leadem, który obiecywał pomijanie). `rachunek` dopisany do `_POLA_LEGA` —
+  czwarta biała lista na drodze stempla.
+  **Zostaje otwarte:** kupony per użytkownik (osobna, większa zmiana) oraz RLS.
+
+  *(oryginalny opis niżej)* Zalogowany klient przez
   endpoint z kluczem serwisowym zmienia globalny profil i kupony oraz woła
   cykl; przyjmuje z przeglądarki `p_model`, kursy i EV, które trafiają do
   księgi i warstw uczenia. → ograniczyć do administratora, kupony klienta
