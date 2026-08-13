@@ -17,6 +17,7 @@ Pomiar i wnioski — w nagłówku `cycle.yml`.
 from __future__ import annotations
 
 import os
+import re
 import sys
 import time
 import traceback
@@ -34,6 +35,74 @@ except Exception:
 # 2026-07-19) / "demo". Fazy 1-3 roadmapy ligowej domknięte — silnik,
 # brama jakości, rynki drużynowe, składy i rozliczanie multi-liga.
 MODE = "liga"
+
+# ile ostatnich awarii trzymamy w Supabase (patrz `_zapisz_slad_awarii`)
+AWARIE_ILE = 30
+KLUCZ_AWARII = "awarie_cyklu"
+
+# Wzorce, których NIE wolno wpuścić do bazy razem z komunikatem błędu.
+# Wyjątek sieciowy potrafi nieść cały URL z kluczem w query albo nagłówek
+# Authorization — a ślad awarii ma być diagnostyką, nie wyciekiem.
+_MASKI = (
+    re.compile(r"(apikey|api_key|key|token|secret|password)=[^&\s\"']+", re.I),
+    re.compile(r"Bearer\s+[A-Za-z0-9._\-]+", re.I),
+    re.compile(r"eyJ[A-Za-z0-9._\-]{20,}"),          # JWT (Supabase)
+    re.compile(r"https://[a-z0-9\-]+\.supabase\.co", re.I),
+)
+
+
+def _bez_sekretow(tekst: str) -> str:
+    for wzor in _MASKI:
+        tekst = wzor.sub("[usunięte]", tekst)
+    return tekst
+
+
+def _zapisz_slad_awarii(stamp: str, minuty: float, wyjatek: BaseException) -> None:
+    """Zostaw w bazie ślad po padniętym cyklu — bo LOGÓW NIE MAMY.
+
+    Cykl pada średnio raz na kilkanaście przebiegów (13.08: dwa razy na
+    szesnaście) i za każdym razem traciliśmy diagnozę w całości: traceback szedł
+    wyłącznie na stderr, czyli do logu GitHub Actions, a tego bez tokena nie da
+    się pobrać — API bez uwierzytelnienia oddaje status przebiegu, nie treść.
+    Zostawało „padło i tyle", więc ta sama awaria mogła wracać tygodniami.
+
+    Zapisujemy tylko przy PADZIE, więc normalny cykl nie płaci za to niczym.
+    Klucza NIE MA na liście z migracji 0004, czyli anon go nie przeczyta —
+    ślad jest do diagnostyki, nie dla przeglądarki.
+
+    Sam zapis jest opakowany w `except`: awaria zapisu śladu nie ma prawa
+    przykryć awarii, którą właśnie opisujemy.
+    """
+    try:
+        from .. import supa
+        stare, ok = supa.get_key_ok(KLUCZ_AWARII)
+        if not ok:
+            print("Ślad awarii pominięty: baza nie oddała poprzedniej listy",
+                  file=sys.stderr, flush=True)
+            return
+        lista = list(stare or []) if isinstance(stare, list) else []
+        ramki = traceback.extract_tb(wyjatek.__traceback__)
+        lista.append({
+            "ts": int(time.time()),
+            "kiedy": stamp,
+            "tryb": MODE,
+            "minuty": round(minuty, 1),
+            "wyjatek": type(wyjatek).__name__,
+            "komunikat": _bez_sekretow(str(wyjatek))[:300],
+            # ostatnie ramki wystarczą, żeby wiedzieć GDZIE stanął cykl;
+            # pełny traceback tylko rozdymałby klucz o powtarzalny prolog
+            "slad": [
+                f"{Path(r.filename).name}:{r.lineno} w {r.name}"
+                for r in ramki[-5:]
+            ],
+        })
+        supa.put_key(KLUCZ_AWARII, lista[-AWARIE_ILE:])
+        print(f"Ślad awarii zapisany do '{KLUCZ_AWARII}' "
+              f"({len(lista[-AWARIE_ILE:])} wpisów w historii)",
+              file=sys.stderr, flush=True)
+    except Exception as ex:  # noqa: BLE001
+        print(f"Nie udało się zapisać śladu awarii: {ex!r}",
+              file=sys.stderr, flush=True)
 
 
 def main():
@@ -73,8 +142,9 @@ def main():
                 "dane NIE trafiły do Supabase"
             )
         print(f"[{stamp}] OK", flush=True)
-    except Exception:
+    except Exception as ex:
         print(f"[{stamp}] BŁĄD:\n{traceback.format_exc()}", file=sys.stderr, flush=True)
+        _zapisz_slad_awarii(stamp, (time.monotonic() - t0) / 60, ex)
         sys.exit(1)
 
 

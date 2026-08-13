@@ -601,6 +601,21 @@ Legenda: `[x]` zrobione · `[~]` w toku / obejście · `[ ]` otwarte
   sprawdzić, czy frontend po błędzie nie podstawia po cichu danych demo.
   **Migracji 0004 nie wykonywać ponownie w ciemno** — produkcja zachowuje się
   tak, jakby była aktywna (anon widzi dokładnie 14 kluczy z allowlisty).
+- [~] **Cykl pada bez śladu — ŚLAD WDROŻONY 13.08, PRZYCZYNA OTWARTA.**
+  Zmierzone na 16 kolejnych przebiegach: **2 × failure** (#916 po 37,6 min,
+  #909 po 31 min — oba w środku kroku „Przelicz okazje", nie na limicie)
+  i 3 × `cancelled`. Te ostatnie to NIE awaria: `concurrency` trzyma jeden
+  przebieg w kolejce, więc nadmiarowe tyknięcia crona są odrzucane zgodnie
+  z projektem. Padnięty cykl nie wypycha NICZEGO, więc każdy to godziny
+  nieświeżej strony.
+
+  Diagnoza ginęła w całości: traceback szedł wyłącznie na stderr, czyli do
+  logu Actions, a tego bez tokena nie da się pobrać (API bez uwierzytelnienia
+  oddaje status, nie treść). Od 13.08 cykl zapisuje ślad do klucza
+  `awarie_cyklu` (poza listą publiczną z migracji 0004, z maskowaniem
+  sekretów), a kontrola startowa czyta go jako **część 0**.
+  **Zostaje otwarte:** sama przyczyna padów — będzie widać po kilku awariach,
+  czy to jedno źródło, czy różne miejsca.
 - [ ] **Deploy nie jest blokowany testami** — Vercel wdrożył ~28 s przed
   końcem CI. Chroniony master, wymagane testy przed wdrożeniem, ręczna
   promocja albo feature flag.

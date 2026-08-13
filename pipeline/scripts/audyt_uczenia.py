@@ -543,6 +543,38 @@ def czesc5_bramy(settled: list[dict], R) -> None:
         print('      Przy „jeden segment" liczba mówi o nim, nie o bramie.')
 
 
+def czesc0_awarie(supa) -> None:
+    """CZY CYKL PADAŁ — pierwsza rzecz, na którą trzeba spojrzeć.
+
+    Cykl pada średnio raz na kilkanaście przebiegów, a padnięty NIE WYPYCHA
+    NICZEGO — czyli strona zostaje z danymi sprzed godzin. Do 13.08 diagnoza
+    ginęła razem z przebiegiem (traceback szedł tylko do logu Actions, a tego
+    bez tokena nie da się pobrać). Od tej wersji cykl zostawia ślad w bazie
+    i tu go czytamy.
+    """
+    awarie = supa.get_key("awarie_cyklu") or []
+    if not awarie:
+        print("0. AWARIE CYKLU: brak zapisanych — albo nic nie padło od "
+              "wdrożenia śladu (13.08), albo baza nie oddała listy\n")
+        return
+    print("=" * 78)
+    print(f"0. AWARIE CYKLU — {len(awarie)} zapisanych, najnowsze na dole")
+    print("=" * 78)
+    licznik: dict[str, int] = defaultdict(int)
+    for a in awarie[-8:]:
+        print(f"   {a.get('kiedy')}  po {a.get('minuty')} min  "
+              f"{a.get('wyjatek')}: {str(a.get('komunikat'))[:90]}")
+        for linia in (a.get("slad") or [])[-2:]:
+            print(f"      {linia}")
+    for a in awarie:
+        licznik[str(a.get("wyjatek"))] += 1
+    if len(awarie) > 1:
+        print("   powtarzalność: " + ", ".join(
+            f"{k} × {v}" for k, v in sorted(licznik.items(), key=lambda kv: -kv[1])
+        ))
+    print()
+
+
 def czesc6_drabinki(log: dict, R) -> None:
     """DRABINKA MA DWA SZCZEBLE — a rozliczaliśmy jeden.
 
@@ -615,6 +647,7 @@ def main() -> None:
     log = R._migruj_log(supa.get_key("typy_log") or {})
     settled = rozliczone(log, R)
     print(f"Księga: {len(log)} wpisów, rozliczonych w bieżącej epoce: {len(settled)}\n")
+    czesc0_awarie(supa)
     czesc1_strumienie(settled, R)
     czesc2_warstwy(log, R)
     czesc3_kalendarz(settled, log, R)
