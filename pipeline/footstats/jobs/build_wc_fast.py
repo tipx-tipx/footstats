@@ -2394,12 +2394,33 @@ def past_wc_event_ids(days_back: int = 25) -> list[int]:
 
 
 def group_prior_from_context(trend: statshub.StatshubTrend) -> counts.GroupPrior:
-    """Prior grupowy z ligowej średniej statshub (fallback, gdy mała próba)."""
+    """Prior grupowy z ligowej średniej statshub (fallback, gdy mała próba).
+
+    ⚑ JEDNOSTKI (naprawione 2026-08-13). Do dziś `base` była średnią liczbą
+    zdarzeń NA MECZ, a trafiała do pola `mean_per90`, czyli „na 90 minut".
+    Dla zawodnika grającego pełne mecze to jedno i to samo; dla rotacyjnego
+    prior był zaniżony proporcjonalnie do brakujących minut.
+
+    Zmierzone na siedmiu zawodnikach z realnymi typami (40 meczów każdy):
+    prior zaniżał o 17% (0,83), a że waży `pseudo/(pseudo+ESS)` ≈ 14%, do
+    posteriora przechodziło z tego 2,5%.
+
+    ⚑ CZEMU TO ROBIMY, SKORO EFEKT JEST MAŁY, a kierunek PRZECIWNY do luki
+    (prognozy są za wysokie, a ta poprawka je podnosi): bo to jest pomyłka
+    jednostek, nie parametr do strojenia. Zostawiona w kodzie fałszuje każdy
+    następny pomiar priora — a mierzyliśmy przy niej już dwa razy.
+    Wielkość korekty jest zresztą w granicach szumu, więc nie zmienia
+    selekcji; poprawia to, na czym stoją kolejne decyzje.
+    """
     la = trend.league_average
     # leagueAverage bywa w skali drużynowej dla części rynków — traktujemy
     # ostrożnie: prior o umiarkowanej sile, średnia z historii zawodnika.
-    played = [c for c, m in zip(trend.counts, trend.minutes) if m > 0]
-    base = float(np.mean(played)) if played else (la or 0.8)
+    zagrane = [(c, m) for c, m in zip(trend.counts, trend.minutes) if m > 0]
+    ekspozycja = sum(m for _, m in zagrane) / 90.0
+    if zagrane and ekspozycja > 0:
+        base = float(sum(c for c, _ in zagrane)) / ekspozycja
+    else:
+        base = float(la or 0.8)
     return counts.GroupPrior(mean_per90=max(base, 0.15), pseudo_matches=5.0)
 
 
