@@ -98,4 +98,13 @@ def _sieciowa_zapora(request, monkeypatch):
 
     monkeypatch.setattr(socket.socket, "connect", _connect)
     monkeypatch.setattr(socket, "create_connection", _create)
+
+    # BACKOFF PONOWIEŃ NIE OBOWIĄZUJE W TESTACH (2026-08-13). Zapora wyżej
+    # rzuca wyjątkiem, a `supa._z_ponowieniem` traktuje każdy wyjątek jak
+    # awarię sieci i odczekuje 2 + 8 s, zanim się podda. Zestaw urósł przez to
+    # z 8 do 78 sekund — sześć testów wołających Supabase przez zaślepki
+    # płaciło pełny backoff. Zerujemy SAM CZAS, nie liczbę prób: inaczej testy
+    # ponowień przestałyby pilnować tego, po co powstały.
+    from footstats import supa
+    monkeypatch.setattr(supa, "PRZERWY_S", (0, 0))
     yield

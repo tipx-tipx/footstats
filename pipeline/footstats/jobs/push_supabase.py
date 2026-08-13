@@ -39,6 +39,8 @@ def push() -> bool:
 
     from curl_cffi import requests
 
+    from .. import supa
+
     # Jeśli job zostawił manifest (_manifest.json = klucze faktycznie
     # zapisane W TYM uruchomieniu), pushujemy WYŁĄCZNIE te klucze. Bez tego
     # przy wczesnym przerwaniu cyklu (np. statshub padł w środku) pliki
@@ -66,8 +68,22 @@ def push() -> bool:
     if not rows:
         return False
 
-    # upsert (on_conflict=key) do PostgREST
-    r = requests.post(
+    # upsert (on_conflict=key) do PostgREST — JEDNYM żądaniem, celowo:
+    # strona ma zobaczyć komplet danych z tego samego cyklu albo nic. Podział
+    # na paczki zostawiałby ją w stanie mieszanym (świeże typy przy starym
+    # radarze), co jest gorsze niż jeden cykl opóźnienia.
+    #
+    # ⚑ PONOWIENIA I TIMEOUT (2026-08-13). Ten POST idzie po ~31 minutach
+    # liczenia i niesie ~4,9 MB, a miał `timeout=30` i ZERO ponowień. Jego
+    # porażka wraca do `cycle.py` jako False, tam podnosi RuntimeError i wywala
+    # cały job — czyli jedno mrugnięcie sieci na runnerze kasowało pół godziny
+    # pracy i zostawiało stronę z danymi sprzed godzin. Dwa `failure` z 13.08
+    # (po 31,0 i 37,6 min, oba przy zdrowym limicie 70 min) pasują dokładnie do
+    # tego momentu cyklu. Upsert jest idempotentny, więc ponowienie niczego
+    # nie zdubluje.
+    dane = json.dumps(rows)
+    print(f"Supabase: wysyłam {len(rows)} snapshotów, {len(dane) / 1e6:.2f} MB")
+    r = supa._z_ponowieniem("push snapshotów", lambda: requests.post(
         f"{url}/rest/v1/app_data?on_conflict=key",
         headers={
             "apikey": key,
@@ -75,10 +91,15 @@ def push() -> bool:
             "Content-Type": "application/json",
             "Prefer": "resolution=merge-duplicates",
         },
-        data=json.dumps(rows),
+        data=dane,
         impersonate="chrome124",
-        timeout=30,
-    )
+        # 30 s na ~4,9 MB to było ciasno: przy wolniejszej chwili runnera albo
+        # dłuższym zapisie JSONB po stronie bazy sam transfer potrafi to zjeść
+        timeout=120,
+    ))
+    if r is None:
+        print("Supabase push: brak odpowiedzi po ponowieniach", file=sys.stderr)
+        return False
     if r.status_code >= 300:
         print(f"Supabase push błąd {r.status_code}: {r.text[:200]}", file=sys.stderr)
         return False

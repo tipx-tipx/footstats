@@ -8,8 +8,57 @@ from __future__ import annotations
 
 import json
 import os
+import sys
+import time
 
 from curl_cffi import requests
+
+# PONOWIENIA (2026-08-13). Do dziś KAŻDE zapytanie do Supabase szło raz i tyle:
+# jedno mrugnięcie sieci na runnerze GitHuba kończyło się utratą całej pracy
+# cyklu, bo `push_supabase.push()` idzie na samym końcu, po ~31 minutach
+# liczenia, a jego porażka podnosi RuntimeError i wywala job.
+#
+# Zmierzone 13.08 na 16 przebiegach: dwa `failure` (po 31,0 i 37,6 min), oba
+# w środku kroku „Przelicz okazje" i oba przy ZDROWYM limicie 70 min. Czasy
+# padów pokrywają się z momentem, w którym cykl kończy liczyć i wysyła 4,87 MB
+# w jednym POST przy `timeout=30`.
+#
+# Wszystkie nasze zapytania są idempotentne (GET oraz upsert `on_conflict=key`),
+# więc ponowienie jest bezpieczne — nie zdublujemy zapisu.
+#
+# NIE ponawiamy 4xx poza 429: to błąd po naszej stronie (zły klucz, zły JSON)
+# i powtarzanie go tylko przedłuża job o kilka sekund, zanim padnie tak samo.
+PROBY_SIECI = 3
+PRZERWY_S = (2, 8)
+
+
+def _z_ponowieniem(opis: str, wywolanie):
+    """Wykonaj zapytanie, ponawiając przy awarii sieci i błędach 5xx/429.
+
+    Zwraca odpowiedź (także tę nieudaną, po wyczerpaniu prób) albo None, gdy
+    do końca leciały wyjątki. Każda ponowiona próba zostawia linię w logu —
+    cichy retry ukrywałby, że źródło zaczyna się chwiać.
+    """
+    odp = None
+    for numer in range(PROBY_SIECI):
+        try:
+            odp = wywolanie()
+            if odp.status_code < 500 and odp.status_code != 429:
+                return odp
+            powod = f"HTTP {odp.status_code}"
+        except Exception as ex:  # noqa: BLE001
+            odp = None
+            powod = type(ex).__name__
+        if numer < PROBY_SIECI - 1:
+            przerwa = PRZERWY_S[min(numer, len(PRZERWY_S) - 1)]
+            print(f"Supabase {opis}: {powod} — ponawiam za {przerwa} s "
+                  f"(próba {numer + 2}/{PROBY_SIECI})",
+                  file=sys.stderr, flush=True)
+            time.sleep(przerwa)
+        else:
+            print(f"Supabase {opis}: {powod} — wyczerpane {PROBY_SIECI} próby",
+                  file=sys.stderr, flush=True)
+    return odp
 
 
 def _conn() -> tuple[str, dict] | None:
@@ -41,11 +90,11 @@ def get_key_ok(key: str) -> tuple[object | None, bool]:
         return None, True
     url, headers = c
     try:
-        r = requests.get(
+        r = _z_ponowieniem(f"odczyt '{key}'", lambda: requests.get(
             f"{url}/rest/v1/app_data?select=payload&key=eq.{key}",
             headers=headers, impersonate="chrome124", timeout=30,
-        )
-        if r.status_code != 200:
+        ))
+        if r is None or r.status_code != 200:
             return None, False
         rows = r.json()
         return (rows[0]["payload"] if rows else None), True
@@ -127,12 +176,12 @@ def put_key(key: str, payload) -> bool:
         return False
     url, headers = c
     try:
-        r = requests.post(
+        r = _z_ponowieniem(f"zapis '{key}'", lambda: requests.post(
             f"{url}/rest/v1/app_data?on_conflict=key",
             headers={**headers, "Prefer": "resolution=merge-duplicates"},
             data=json.dumps([{"key": key, "payload": payload}]),
             impersonate="chrome124", timeout=60,
-        )
-        return r.status_code < 300
+        ))
+        return r is not None and r.status_code < 300
     except Exception:
         return False
