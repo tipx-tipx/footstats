@@ -321,11 +321,37 @@ Legenda: `[x]` zrobione · `[~]` w toku / obejście · `[ ]` otwarte
   ⚑ **Zmieniony JEDEN rynek.** `shots` i `sot` mają dziś optimum; przy
   `fouls_won` i `tackles` Brier poprawiał się o ułamek, ale bias się psuł.
 
-- [ ] **Profil sędziego nie działa — 69 sędziów w pamięci, ZERO z mnożnikiem.**
-  Znalezione przy okazji fauli 13.08: `czynniki.sedzia` wynosi 1,000 w każdym
-  rynku dyscyplinarnym (`team_cards` 3% powyżej 1,0, `match_cards` 2%, reszta
-  0%). Czyli `referee_factor` istnieje, jest wpięty i nic nie robi. Sędzia
-  ma sens akurat na faulach i kartkach — czyli tam, gdzie luka jest największa.
+- [x] **Sędzia praktycznie nie ruszał liczby — NAPRAWIONE 13.08.**
+  Objaw: `czynniki.sedzia` = 1,000 w każdym rynku dyscyplinarnym.
+  ⚑ Pierwsza diagnoza („profil nie powstaje") była BŁĘDNA — patrzyłem na cache
+  mundialowy. Ligowy ma 1064 mecze, 659 z policzonymi faulami i 333 arbitrów,
+  a mnożniki są sensowne (Marciniak 0,89, Juan Martínez 1,20, Rey Hilfer 0,77).
+
+  Prawdziwa przyczyna: **`MIN_MECZE_SEDZIA = 4`, a mediana arbitra to 2 mecze.**
+  Mnożnik był liczony i od razu zerowany — w logu cyklu widać to wprost
+  („faule ×1,021, 2 m.", „×1,288, 3 m.").
+
+  Zmierzone na 658 meczach (leave-one-out, profil wyłącznie z pozostałych
+  meczów arbitra, `shrink_factor` jak w produkcji):
+
+  ```
+  próg   pokrycie meczów   poprawa prognozy fauli
+   1          100%              +1,9%
+   2           75%              +1,9%
+   3           51%              +3,4%
+   4           29%              +3,5%   <- było
+  ```
+
+  Profil pomaga przy KAŻDYM progu, więc `shrink_factor` (przy dwóch meczach
+  zostawia ~20% surowego odchylenia) wystarcza jako ochrona przed szumem.
+  → `MIN_MECZE_SEDZIA = 2`, pokrycie 29% → 75%.
+
+  ⚑ **Liczba i zdanie rozdzielone.** Komentarz przy starym progu sam na to
+  wskazywał („Liczba była nieszkodliwa, zdanie już nie"): mnożnik wolno
+  stosować od 2 meczów, ale `MIN_MECZE_SEDZIA_OPIS = 4` pilnuje, żeby karta
+  nie nazwała arbitra „pobłażliwym" na dwóch meczach. Drabinki zostają na
+  progu opisowym — ich front pisze „nic tu nie zmieniamy", więc włączenie
+  mnożnika bez zmiany tego zdania zamieniłoby je w nieprawdę.
 
 ---
 

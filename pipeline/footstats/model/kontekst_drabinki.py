@@ -343,10 +343,17 @@ def mnoznik_sedziego(rynek: str, sedzia: dict | None) -> tuple[float, dict]:
     # ZA CHUDA PRÓBA TO NIE JEST TO SAMO CO ARBITER NEUTRALNY (2026-08-05).
     # Bez tego rozróżnienia karta pisała „X gwiżdże mniej niż przeciętny
     # arbiter (1 jego meczów w danych)" — zdanie o stylu sędziego postawione
-    # na jednym meczu. Po podniesieniu progu w `context.referee_factor` byłoby
-    # jeszcze gorzej: mnożnik wracałby 1,00, a zdanie zostawało. Patrz
-    # `context.MIN_MECZE_SEDZIA`.
-    if int(n or 0) < context.MIN_MECZE_SEDZIA:
+    # na jednym meczu.
+    #
+    # ⚑ DRABINKI ZOSTAJĄ NA PROGU OPISOWYM (2026-08-13). Główna ścieżka
+    # stosuje mnożnik już od dwóch meczów (`context.MIN_MECZE_SEDZIA`), bo
+    # zmierzono, że pomaga. Tutaj NIE, i to jest świadome: front drabinki
+    # (`RadarCard`) na `za_chuda_proba` pisze wprost „mamy za mało jego meczów
+    # […] więc nic tu nie zmieniamy". Włączenie mnożnika bez zmiany tego
+    # zdania zamieniłoby je w nieprawdę, a drabinki to dziś 4 karty — nie
+    # warto rozjeżdżać UI dla marginesu. Do wyrównania razem z przeglądem
+    # kart drabinkowych.
+    if int(n or 0) < context.MIN_MECZE_SEDZIA_OPIS:
         return 1.0, {"zrodlo": "za_chuda_proba", "sedzia": sedzia["sedzia"],
                      "mecze": int(n or 0)}
     m = context.referee_factor(float(surowy), n, market_is_disciplinary=True)

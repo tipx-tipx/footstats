@@ -107,7 +107,38 @@ def opponent_factor(
 # Próg stoi TUTAJ, a nie przy budowie karty, bo miejsc, które czytają ten
 # mnożnik, jest kilka (czynniki drużynowe, sumy meczowe, opis karty) i każde
 # musiałoby pamiętać o swoim warunku.
-MIN_MECZE_SEDZIA = 4
+#
+# ⚑ ROZDZIELONE NA DWA PROGI (2026-08-13). Komentarz wyżej sam wskazywał, że
+# to są dwie różne sprawy: „Liczba była nieszkodliwa, zdanie już nie". Trzymanie
+# ich pod jednym progiem kosztowało cały czynnik: mediana arbitra to DWA mecze,
+# więc mnożnik wynosił 1,000 na 71% spotkań — a sędzia liczy się dokładnie tam,
+# gdzie mamy największą lukę (faule i kartki).
+#
+# Zmierzone 13.08 na 658 rozegranych meczach z cache ligowego (leave-one-out,
+# profil arbitra wyłącznie z jego POZOSTAŁYCH meczów, `shrink_factor` jak
+# w produkcji). „Poprawa" = o ile spada średni błąd prognozy liczby fauli
+# w meczu wobec zwykłej średniej:
+#
+#     próg   pokrycie meczów   poprawa
+#      1          100%          +1,9%
+#      2           75%          +1,9%
+#      3           51%          +3,4%
+#      4           29%          +3,5%   <- było
+#
+# Profil pomaga przy KAŻDYM progu — czyli `shrink_factor` (przy dwóch meczach
+# zostawia ~20% surowego odchylenia) wystarcza jako ochrona przed szumem,
+# a twardy próg 4 tylko wycinał 71% meczów z czynnika, który działa.
+#
+# Przy jednym meczu też wychodzi na plus, ale mnożnik po shrinku to wtedy ~1,02
+# — kosmetyka, za to na karcie robi się z tego zdanie o stylu arbitra. Dwa to
+# najniższa próba, przy której liczba jeszcze coś znaczy.
+MIN_MECZE_SEDZIA = 2
+
+# ⚑ ZDANIE NA KARCIE MA WŁASNY, WYŻSZY PRÓG. Audyt 05.08: przy jednym meczu
+# i surowym ×0,63 shrink dawał 0,96 — liczba nieszkodliwa, ale karta pisała
+# „pobłażliwy arbiter" na podstawie JEDNEGO meczu. Mnożnik wolno stosować
+# wcześniej niż wolno o nim mówić.
+MIN_MECZE_SEDZIA_OPIS = 4
 
 
 def referee_factor(
@@ -117,14 +148,25 @@ def referee_factor(
 ) -> float:
     """Czynnik sędziego — tylko faule i kartki. Brak obsady = neutralnie.
 
-    Poniżej `MIN_MECZE_SEDZIA` zwraca DOKŁADNIE 1.0, więc typ nie dostaje ani
-    poprawki, ani zdania o arbitrze (karta pomija czynniki równe 1,00).
+    Poniżej `MIN_MECZE_SEDZIA` zwraca DOKŁADNIE 1.0. Powyżej mnożnik działa,
+    ale o arbitrze wolno PISAĆ dopiero od `MIN_MECZE_SEDZIA_OPIS` — patrz
+    `wolno_opisac_sedziego`.
     """
     if not market_is_disciplinary or referee_fouls_multiplier is None:
         return 1.0
     if int(sample_matches or 0) < MIN_MECZE_SEDZIA:
         return 1.0
     return cap(shrink_factor(referee_fouls_multiplier, sample_matches, 8.0), CAP_REFEREE)
+
+
+def wolno_opisac_sedziego(sample_matches: int) -> bool:
+    """Czy próba arbitra pozwala POWIEDZIEĆ o nim coś na karcie.
+
+    Osobno od `referee_factor`, bo liczba i zdanie mają różną cenę błędu:
+    mnożnik 1,02 z dwóch meczów jest nieszkodliwy, a „gwiżdże mniej niż
+    przeciętny arbiter" postawione na tej samej próbie — już nie.
+    """
+    return int(sample_matches or 0) >= MIN_MECZE_SEDZIA_OPIS
 
 
 # Ile meczów arbitra musi zebrać profil KARTKOWY, żeby wyprzeć ten z fauli.

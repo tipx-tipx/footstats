@@ -185,7 +185,13 @@ def _build_reasoning(
                 "mnoznik": round(ctx_factors.opponent, 2),
             }
         )
-    if abs(ctx_factors.referee - 1.0) > 0.02 and ctx.referee_name:
+    # ⚑ MNOŻNIK WOLNO STOSOWAĆ WCZEŚNIEJ, NIŻ WOLNO O NIM MÓWIĆ (2026-08-13).
+    # Od dziś arbiter rusza liczbę już od dwóch meczów (zmierzone: profil
+    # pomaga przy każdej próbie, a `shrink_factor` chroni przed szumem), ale
+    # zdanie „pobłażliwy" postawione na dwóch meczach byłoby tym samym błędem,
+    # który audyt 05.08 kazał naprawić. Patrz `context.wolno_opisac_sedziego`.
+    if (abs(ctx_factors.referee - 1.0) > 0.02 and ctx.referee_name
+            and context.wolno_opisac_sedziego(ctx.referee_sample_matches)):
         kier = "surowy" if ctx_factors.referee > 1 else "pobłażliwy"
         czynniki.append(
             {

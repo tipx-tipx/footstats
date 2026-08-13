@@ -98,6 +98,46 @@ def test_od_progu_mnoznik_zaczyna_dzialac():
     assert m > 1.0, "przy pełnej próbie arbiter ma prawo ruszyć liczbę"
 
 
+# --- LICZBA I ZDANIE MAJĄ RÓŻNE PROGI (2026-08-13) ------------------------
+#
+# Mediana arbitra to DWA mecze, więc próg 4 dla samego mnożnika zerował czynnik
+# na 71% spotkań. Zmierzone na 658 meczach (leave-one-out, profil wyłącznie
+# z pozostałych meczów arbitra): profil poprawia prognozę liczby fauli przy
+# KAŻDEJ próbie — +1,9% przy dwóch meczach, +3,5% przy czterech — a pokrycie
+# rośnie z 29% do 75%. `shrink_factor` wystarcza jako ochrona przed szumem.
+#
+# Ale zdanie „pobłażliwy arbiter" postawione na dwóch meczach to dokładnie
+# ten błąd, który audyt 05.08 kazał naprawić. Stąd dwa progi.
+
+def test_mnoznik_dziala_wczesniej_niz_wolno_o_nim_mowic():
+    assert context.MIN_MECZE_SEDZIA < context.MIN_MECZE_SEDZIA_OPIS, (
+        "mnożnik wolno stosować wcześniej, niż wolno opisać arbitra na karcie"
+    )
+
+
+def test_dwa_mecze_ruszaja_liczbe_ale_nie_daja_zdania():
+    m = context.referee_factor(1.55, 2, market_is_disciplinary=True)
+    assert m > 1.0, "przy dwóch meczach mnożnik ma już działać"
+    assert not context.wolno_opisac_sedziego(2), (
+        "…ale karta nie ma prawa nazwać arbitra surowym na tej próbie"
+    )
+
+
+def test_od_czterech_meczow_wolno_takze_opisac():
+    assert context.wolno_opisac_sedziego(context.MIN_MECZE_SEDZIA_OPIS)
+    assert context.wolno_opisac_sedziego(9)
+
+
+def test_mnoznik_z_dwoch_meczow_jest_ostrozny():
+    """`shrink_factor` ma zostawić z surowego odchylenia niewiele.
+
+    Przy surowym ×1,55 i dwóch meczach zostaje ~1,11 — czyli kierunek tak,
+    siła nie. To jest powód, dla którego twardy próg 4 był zbędny.
+    """
+    m = context.referee_factor(1.55, 2, market_is_disciplinary=True)
+    assert 1.0 < m < 1.20, m
+
+
 def test_chudy_profil_nie_udaje_arbitra_neutralnego():
     """Karta MUSI odróżnić „za mało danych" od „arbiter przeciętny".
 
