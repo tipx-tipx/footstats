@@ -632,6 +632,88 @@ def _uzupelnij_znak_id(log: dict) -> int:
 POZA_LISTA_POWODY = ("poza_lista_dnia", "rynek_ukryty", "leg_kuponu",
                      "dzien_zamkniety")
 
+# --- SKUTECZNOŚĆ LICZY ZAMROŻONĄ LISTĘ DNIA, NIE CAŁĄ KSIĘGĘ (2026-08-13) ---
+#
+# Zgłoszenie właściciela: „w Skuteczności tylko to, co się pojawia na stronie,
+# wszystko to, co jest w limicie".
+#
+# Do dziś do bilansu wchodził KAŻDY rekord bez `poza_publikacja`. Problem
+# w tym, że typ raz pokazany, który potem wypadł z listy — bo dzień się
+# domknął albo zmieniła się wersja kalibracji — takiego znacznika NIE dostaje.
+# Świadomie: `_dopisz_nowe` nigdy nie degraduje opublikowanego rekordu
+# („historii nie przepisujemy"), a `build_wc_fast` pomija wznowione przy
+# oznaczaniu. Obie zasady są słuszne i zostają.
+#
+# Skutek był taki, że bilans dnia opisywał coś innego niż lista. Zmierzone
+# 13.08 na produkcji: doba 13.08 miała 24 typy w zamrożonej liście,
+# a Skuteczność liczyła 146 rekordów (93 poprzeczki na stronie).
+#
+# Naprawa jest po stronie ODCZYTU, nie księgi: gdy dzień ma zamrożony skład,
+# do bilansu wchodzi dokładnie ten skład. Rekord w księdze zostaje nietknięty
+# i dalej się rozlicza oraz uczy model — przenosi się tylko do licznika
+# „policzone na próbę", tak jak wszystko inne, czego user nie widział.
+#
+# Dzień BEZ zamrożonego składu (sprzed wdrożenia listy dnia) liczy się jak
+# dotąd — nie ma podstawy, żeby cokolwiek z niego odsiewać.
+LISTA_DNIA_KLUCZ = "lista_dnia"
+GODZINA_DOMKNIECIA_LISTY = 6
+
+
+def _doba_produktowa(ts, godzina: int = GODZINA_DOMKNIECIA_LISTY) -> str:
+    """Doba PRODUKTOWA („YYYY-MM-DD"), 6:00 -> 6:00.
+
+    Kopia `build_wc_fast.dzien_listy` — świadoma, bo import w tę stronę
+    byłby cykliczny (`build_wc_fast` importuje `rozliczanie`). Pilnuje jej
+    `test_skutecznosc_lista_dnia.py`.
+    """
+    if not ts:
+        return ""
+    d = _lokalnie(ts) if "_lokalnie" in globals() else None
+    if d is None:
+        import datetime as _d
+        d = _d.datetime.fromtimestamp(int(ts), STREFA) if STREFA else \
+            _d.datetime.fromtimestamp(int(ts))
+    if d.hour < godzina:
+        import datetime as _d
+        d -= _d.timedelta(days=1)
+    return d.strftime("%Y-%m-%d")
+
+
+def _klucz_listy(r: dict) -> str:
+    """Klucz w zamrożonej liście dnia (`build_wc_fast._klucz_publikacji`).
+
+    BEZ sufiksu `zrodlo` — lista dnia zapisuje klucze publikacji, a te go
+    nie niosą.
+    """
+    podmiot = rotowire._norm(str(r.get("podmiot") or ""))
+    return (f"{r.get('mecz_id')}:{podmiot}:{r.get('rynek_kod')}"
+            f":{r.get('linia')}:{r.get('strona')}")
+
+
+def wczytaj_liste_dnia() -> dict[str, set]:
+    """Zamrożone składy dni: {dzień: zbiór kluczy publikacji}."""
+    man = supa.get_key(LISTA_DNIA_KLUCZ) or {}
+    out: dict[str, set] = {}
+    for dzien, wpis in (man or {}).items():
+        klucze = wpis.get("klucze") if isinstance(wpis, dict) else wpis
+        if klucze:
+            out[str(dzien)] = set(klucze)
+    return out
+
+
+def poza_zamrozona_lista(r: dict, lista_dnia: dict[str, set] | None) -> bool:
+    """Czy typ wypadł z zamrożonego składu swojego dnia.
+
+    False także wtedy, gdy dzień nie ma zamrożonego składu — wtedy nie ma
+    czego porównywać i rekord liczy się jak dotąd.
+    """
+    if not lista_dnia:
+        return False
+    klucze = lista_dnia.get(_doba_produktowa(r.get("kickoff_ts")))
+    if not klucze:
+        return False
+    return _klucz_listy(r) not in klucze
+
 
 def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
     for b in value_bets:
@@ -4366,6 +4448,8 @@ def skutecznosc_strumieni(log: dict, dni: int = 21) -> dict[str, dict]:
     naprawdę trafia lepiej niż „solidny", zamiast wierzyć progom.
     """
     out: dict[str, dict] = {}
+    # zamrożone składy dni — wczytane RAZ, nie per strumień i nie per typ
+    _lista_dnia = wczytaj_liste_dnia()
     for nazwa in STRUMIENIE:
         w_strumieniu = [
             r for r in log.values()
@@ -4377,8 +4461,15 @@ def skutecznosc_strumieni(log: dict, dni: int = 21) -> dict[str, dict]:
             and _z_biezacej_epoki(r) and not _z_martwej_epoki(r)
             and _strumien(r) == nazwa
         ]
-        settled = [r for r in w_strumieniu if not r.get("poza_publikacja")]
-        poza = [r for r in w_strumieniu if r.get("poza_publikacja")]
+        # ⚑ BILANS OPISUJE LISTĘ, KTÓRĄ USER WIDZIAŁ — patrz
+        # `poza_zamrozona_lista`. Typ bez znacznika, którego nie ma
+        # w zamrożonym składzie dnia, schodzi do „policzonych na próbę".
+        settled = [r for r in w_strumieniu
+                   if not r.get("poza_publikacja")
+                   and not poza_zamrozona_lista(r, _lista_dnia)]
+        poza = [r for r in w_strumieniu
+                if r.get("poza_publikacja")
+                or poza_zamrozona_lista(r, _lista_dnia)]
         okazje = [r for r in settled if not r.get("sugestia") and r.get("kurs")]
         trafione = sum(1 for r in settled if r["wynik"] == "wygrany")
         roi = sum(_zwrot_typu(r) - 1.0 for r in okazje)
