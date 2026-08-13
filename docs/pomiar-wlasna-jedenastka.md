@@ -128,6 +128,60 @@ typy publikujemy wcześniej, więc wartość jest mała.
 
 ---
 
+---
+
+## 6. Kompleksowy przegląd źródeł — dopisane 13.08
+
+Sprawdzone **tym samym klientem, którym chodzi pipeline** (`curl_cffi`), bo
+liczy się nie to, czy strona istnieje, tylko czy odpowie naszemu botowi
+w chmurze. Sofascore jest tu przestrogą: działa z domowego PC, w chmurze nie.
+
+| źródło | dostęp | składy | kontuzje | nasze ligi |
+|---|---|---|---|---|
+| **SportsGambler** | **HTTP 200, bez klucza** | **przewidywane, 3–10 dni przed** | osobna sekcja | **wszystkie** |
+| statshub (mamy) | mamy | 2 ze 119 przed meczem | brak endpointu | — |
+| 365Scores (mamy) | mamy | brak przed meczem | **Missing/Doubtful, 55% meczów** | tak |
+| Rotowire (mamy) | mamy | 50 drużyn | odcięte świadomie | Europa Zach. + MLS |
+| Sofascore (mamy) | **blokuje IP serwerowni** | tak, ale w chmurze wypada | nie | tak |
+| TheSportsDB | HTTP 200, klucz „3" | `lookuplineup` zwraca pustkę | nie | — |
+| BSD / bzzoiro | HTTP 401, klucz darmowy | oficjalne 1 h przed | `unavailable_players` | tylko top Europa |
+| API-Football | HTTP 403, klucz płatny/free 100/dzień | 20–40 min przed | `/injuries` | tak |
+| Sportmonks | płatne od €29/mc | **expected lineups** (algorytmiczne) | tak | 2200+ lig |
+
+### SportsGambler — endpoint i pokrycie
+
+Składy nie są w HTML listy: siedzą za `reply_click(ID)`, które dociąga je
+z **`/lineups/lineups-load2.php?id=<ID>`** (zwykły GET, ~13 kB HTML,
+22 nazwiska w `class="…name…"`, formacja, etykieta `Predicted`/`Confirmed`).
+
+Pokrycie policzone 13.08 — **1206 meczów ze składem**:
+
+```
+Brasileirão A  50   Liga Profesional 55   MLS         100   Liga MX      100
+Brasileirão B  40   Libertadores    100   Sudamericana 100  Kolumbia     100
+Ekstraklasa    24   Allsvenskan      48   Eliteserien   47  Superliga     22
+Chile          40   Urugwaj         100   Veikkausliiga 100  LM/LE/LK  40/40/100
+```
+
+To jest **dokładnie ta luka**, której nie zamykało żadne z naszych źródeł:
+Ameryka Płd., Skandynawia i Ekstraklasa.
+
+### ⚑ Czego jeszcze NIE wiemy — i czemu to jest teraz najważniejsze
+
+**Trafność prognozy SportsGambler nie jest zmierzona.** Pierwsze podejście
+dało 92,5% (10,2 z 11) na 28 przypadkach, ale **wszystkie miały etykietę
+`Confirmed`** — czyli mierzyliśmy, czy umiemy sparować nazwiska z już
+ogłoszonym składem, a nie czy prognoza była trafna. Po meczu serwis podmienia
+etykietę i pokazuje skład faktyczny, więc wstecz tego policzyć się NIE DA.
+
+Pierwsze podejście dało też 68,8% przy parowaniu meczów wyłącznie po nazwie
+drużyny — to była pomyłka: porównywało prognozę na jeden mecz ze składem
+z innego. Dopasowanie po dacie (±36 h) podniosło wynik do 92,5%.
+
+Snapshot 730 prognoz zapisany w `docs/pomiar/` — pomiar zamyka się po
+rozegraniu tych meczów. **Próg decyzyjny: wyraźnie powyżej 68,6%**, bo tyle
+daje własna jedenastka, którą odrzuciliśmy.
+
 ## Czego NIE robić
 
 * **Nie budować własnej przewidywanej jedenastki** — zmierzone na dwóch
