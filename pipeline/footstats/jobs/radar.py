@@ -215,8 +215,27 @@ MIN_KURS_SCORE = 1.55
 # kartę startującą od 2,40 przy podobnej przewadze. Wartość w punktach
 # przewagi — 0,015 to tyle, co półtora punktu procentowego edge, czyli premia
 # realna, ale nie przebijająca wyraźnie lepszej karty.
+#
+# ⚑ GÓRNA GRANICA 1,90 -> 1,70 (2026-08-13). Okno powoływało się na tabelę
+# wyżej, a tamta tabela mówi „1,70–2,00: trafia 23,5%, zwrot −56,1%" — czyli
+# premia obejmowała połowę NAJGORSZEGO pasma w całej zakładce. Sprawdzone
+# ponownie na 94 rozliczeniach bieżącej epoki, z podziałem na połowy próby
+# (próg stawiamy na LUKĘ, bo ROI w tych wycinkach zmienia znak):
+#
+#     pasmo        n   deklaruje  trafia    luka     I poł.   II poł.
+#     1,55–1,70   16     62,3%    62,5%    +0,2 pp   +2,9     -1,8
+#     1,70–1,90   15     55,6%    26,7%   -28,9 pp  -27,0    -32,7
+#     1,90+       53     44,6%    34,0%   -10,7 pp   -8,5    -13,1
+#
+# Pasmo 1,55–1,70 jest skalibrowane CO DO PUNKTU i stabilnie — dokładnie jak
+# mówiła pierwotna nota. Pasmo 1,70–1,90 jest nie tylko najgorsze, ale gorsze
+# niż to, co ZOSTAJE poza oknem, więc premia działała przeciwko sobie.
+# Oba pasma są zdominowane przez ten sam rynek (`shots`, 12 z 15 i 12 z 16),
+# więc to nie jest efekt składu rynków. Bez `fouls_committed` bez zmian.
+#
+# To zmiana KOLEJNOŚCI, nie bramy — żadna karta przez to nie znika.
 OKNO_CENY_PREF_OD = 1.55
-OKNO_CENY_PREF_DO = 1.90
+OKNO_CENY_PREF_DO = 1.70
 BONUS_OKNA_CENY = 0.015
 MIN_PROBA_SCORE = 8         # min. występów w próbie (było 5 — za krótkie
                             # serie udawały pewniaki: 3/5 = "60%")
