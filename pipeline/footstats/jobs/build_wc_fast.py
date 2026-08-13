@@ -2393,34 +2393,95 @@ def past_wc_event_ids(days_back: int = 25) -> list[int]:
     return [ev["id"] for ev in past_wc_events(days_back)]
 
 
-def group_prior_from_context(trend: statshub.StatshubTrend) -> counts.GroupPrior:
-    """Prior grupowy z ligowej średniej statshub (fallback, gdy mała próba).
+def srednie_grupowe(trends: list) -> dict[str, float]:
+    """Średnia per-90 KAŻDEGO RYNKU, policzona ze wszystkich zawodników cyklu.
 
-    ⚑ JEDNOSTKI (naprawione 2026-08-13). Do dziś `base` była średnią liczbą
-    zdarzeń NA MECZ, a trafiała do pola `mean_per90`, czyli „na 90 minut".
-    Dla zawodnika grającego pełne mecze to jedno i to samo; dla rotacyjnego
-    prior był zaniżony proporcjonalnie do brakujących minut.
+    To jest „grupa porównawcza" z nagłówka `model/counts.py` — bez niej prior
+    nie ma do czego ściągać (patrz `group_prior_from_context`).
 
-    Zmierzone na siedmiu zawodnikach z realnymi typami (40 meczów każdy):
-    prior zaniżał o 17% (0,83), a że waży `pseudo/(pseudo+ESS)` ≈ 14%, do
-    posteriora przechodziło z tego 2,5%.
-
-    ⚑ CZEMU TO ROBIMY, SKORO EFEKT JEST MAŁY, a kierunek PRZECIWNY do luki
-    (prognozy są za wysokie, a ta poprawka je podnosi): bo to jest pomyłka
-    jednostek, nie parametr do strojenia. Zostawiona w kodzie fałszuje każdy
-    następny pomiar priora — a mierzyliśmy przy niej już dwa razy.
-    Wielkość korekty jest zresztą w granicach szumu, więc nie zmienia
-    selekcji; poprawia to, na czym stoją kolejne decyzje.
+    Liczona z sum, nie ze średniej średnich: zawodnik z jednym meczem nie może
+    ważyć tyle samo co ten z czterdziestoma.
     """
-    la = trend.league_average
-    # leagueAverage bywa w skali drużynowej dla części rynków — traktujemy
-    # ostrożnie: prior o umiarkowanej sile, średnia z historii zawodnika.
+    zd: dict[str, float] = {}
+    ex: dict[str, float] = {}
+    for t in trends:
+        mk = getattr(t, "market_code", None)
+        if not mk:
+            continue
+        for c, m in zip(getattr(t, "counts", []) or [],
+                        getattr(t, "minutes", []) or []):
+            if m and m > 0:
+                zd[mk] = zd.get(mk, 0.0) + float(c)
+                ex[mk] = ex.get(mk, 0.0) + float(m) / 90.0
+    return {mk: zd[mk] / ex[mk] for mk in zd if ex.get(mk, 0.0) > 0}
+
+
+# Ile zawodników musi mieć grupa, żeby jej średnia była wiarygodnym priorem.
+# Poniżej wracamy do historii samego zawodnika — lepiej nie ściągać wcale
+# niż ściągać do średniej z trzech przypadkowych osób.
+MIN_GRUPY_DO_PRIORU = 8
+
+
+def group_prior_from_context(
+    trend: statshub.StatshubTrend,
+    srednie: dict[str, float] | None = None,
+    liczebnosc: dict[str, int] | None = None,
+) -> counts.GroupPrior:
+    """Prior grupowy: średnia GRUPY PORÓWNAWCZEJ, do której ściągamy zawodnika.
+
+    ⚑ PRIOR ŚCIĄGAŁ ZAWODNIKA DO NIEGO SAMEGO (naprawione 2026-08-13).
+    `model/counts.py` obiecuje w nagłówku „prior pochodzi z grupy porównawczej
+    — zawodnik z małą próbą jest ściągany do średniej grupy". Ta funkcja
+    wpisywała tam ŚREDNIĄ TEGO SAMEGO ZAWODNIKA, więc prior nie ściągał do
+    niczego zewnętrznego. Bez ściągania do populacji wysoka estymata zostaje
+    wysoka — a to jest dokładnie mechanizm, przez który typy powstają tam,
+    gdzie liczba wyszła za wysoko (patrz docs/pomiar-skad-luka-deklaracji.md).
+
+    Zmierzone (1284 obserwacje na rynek, walidacja czasowa, średnia grupy
+    z INNYCH zawodników, ta sama siła pseudo=5):
+
+        rynek      wariant        Brier all   Brier góra20%   bias góra20%
+        shots      własna (było)    0,1784       0,2000          1,09
+                   GRUPOWA          0,1782       0,1944          0,95
+        sot        własna           0,1438       0,2418          1,18
+                   GRUPOWA          0,1426       0,2357          0,99
+        fouls      własna           0,1801       0,2580          1,24
+                   GRUPOWA          0,1758       0,2412          1,07
+        tackles    własna           0,1734       0,2608          1,16
+                   GRUPOWA          0,1697       0,2404          0,98
+
+    Prior grupowy wygrywa w KAŻDYM rynku i w obu miarach, a bias na górze
+    rozkładu — czyli tam, gdzie realnie typujemy — schodzi praktycznie do
+    jedności. Wariant mieszany 50/50 wypadał dokładnie pośrodku, co
+    potwierdza, że działa ten mechanizm, a nie przypadek.
+
+    ⚑ JEDNOSTKI (ta sama naprawa, 2026-08-13): `base` była średnią liczbą
+    zdarzeń NA MECZ, a trafiała do pola `mean_per90`. Dla grającego pełne
+    mecze to to samo, dla rotacyjnego prior był zaniżony o ~17%.
+
+    `srednie` — mapa rynek -> średnia per-90 grupy (patrz `srednie_grupowe`).
+    Brak mapy albo zbyt mała grupa = zachowanie sprzed zmiany, czyli historia
+    samego zawodnika. To świadomy fallback: lepiej nie ściągać wcale niż
+    ściągać do średniej z kilku przypadkowych osób.
+    """
     zagrane = [(c, m) for c, m in zip(trend.counts, trend.minutes) if m > 0]
     ekspozycja = sum(m for _, m in zagrane) / 90.0
-    if zagrane and ekspozycja > 0:
-        base = float(sum(c for c, _ in zagrane)) / ekspozycja
+    wlasna = (float(sum(c for c, _ in zagrane)) / ekspozycja
+              if zagrane and ekspozycja > 0 else None)
+
+    mk = getattr(trend, "market_code", None)
+    grupowa = (srednie or {}).get(mk) if mk else None
+    if grupowa is not None and liczebnosc is not None:
+        if int(liczebnosc.get(mk, 0)) < MIN_GRUPY_DO_PRIORU:
+            grupowa = None
+
+    if grupowa is not None and grupowa > 0:
+        base = float(grupowa)
+    elif wlasna is not None:
+        base = wlasna
     else:
-        base = float(la or 0.8)
+        # leagueAverage bywa w skali drużynowej dla części rynków — ostatnia deska
+        base = float(trend.league_average or 0.8)
     return counts.GroupPrior(mean_per90=max(base, 0.15), pseudo_matches=5.0)
 
 
@@ -3145,6 +3206,8 @@ def score_from_trend(
     player_style=None,
     opponent_style=None,
     liga: bool = False,
+    srednie_grupy: dict[str, float] | None = None,
+    licznosc_grupy: dict[str, int] | None = None,
 ):
     """Zbuduj PlayerHistory z recentGames i policz predykcję (bez kursów).
 
@@ -3192,7 +3255,7 @@ def score_from_trend(
     if kp is not None:
         prior, hist.likelihood_mask = kp
     else:
-        prior = group_prior_from_context(trend)
+        prior = group_prior_from_context(trend, srednie_grupy, licznosc_grupy)
     sh_pred = trend.in_predicted_lineup if predicted_available else None
     if lineup_confirmed:
         official, predicted = trend.in_predicted_lineup, None
@@ -4576,6 +4639,31 @@ def _main_impl(tryb=None):
     if trendy_z_oferty:
         trends = list(trends) + trendy_z_oferty
 
+    # GRUPA PORÓWNAWCZA DLA PRIORA — liczona RAZ, z kompletu trendów cyklu
+    # (razem z tymi z oferty, bo inaczej rynki zawodnicze dołożone 07.08
+    # miałyby prior z węższej populacji niż ta, w której konkurują).
+    # Bez tej mapy prior ściągałby zawodnika do jego własnej średniej, czyli
+    # do niczego — patrz `group_prior_from_context`.
+    _srednie_grupy = srednie_grupowe(trends)
+    _licznosc_grupy: dict[str, int] = {}
+    for _t in trends:
+        _mk = getattr(_t, "market_code", None)
+        if _mk and any(m > 0 for m in (getattr(_t, "minutes", []) or [])):
+            _licznosc_grupy[_mk] = _licznosc_grupy.get(_mk, 0) + 1
+    if _srednie_grupy:
+        _opis = ", ".join(
+            f"{mk} {sr:.2f}/90 (n={_licznosc_grupy.get(mk, 0)})"
+            for mk, sr in sorted(_srednie_grupy.items(),
+                                 key=lambda kv: -_licznosc_grupy.get(kv[0], 0))[:6]
+        )
+        print(f"Prior grupowy — do czego ściągamy zawodnika: {_opis}")
+        _slabe = [mk for mk in _srednie_grupy
+                  if _licznosc_grupy.get(mk, 0) < MIN_GRUPY_DO_PRIORU]
+        if _slabe:
+            print(f"   {len(_slabe)} rynków ma grupę mniejszą niż "
+                  f"{MIN_GRUPY_DO_PRIORU} zawodników — tam prior zostaje na "
+                  f"historii samego zawodnika")
+
     for tr in trends:
         if (tr.player_id, tr.market_code) in seen_player_market:
             continue
@@ -4681,6 +4769,8 @@ def _main_impl(tryb=None):
             player_style=pstyle,
             opponent_style=ostyle,
             liga=tryb is not None,
+            srednie_grupy=_srednie_grupy,
+            licznosc_grupy=_licznosc_grupy,
         )
         if built is None:
             _odrzuc(mid, tr, "za_malo_historii",

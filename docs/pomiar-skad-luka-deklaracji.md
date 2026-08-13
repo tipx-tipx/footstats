@@ -91,6 +91,49 @@ przy 20 bias spada do 0,85, czyli λ zaczyna być zaniżana.
 
 ---
 
+## ⚑ ZNALEZIONA PRZYCZYNA: prior ściągał zawodnika DO NIEGO SAMEGO
+
+`model/counts.py` obiecuje w nagłówku: *„Prior (alpha0, beta0) pochodzi
+z grupy porównawczej (pozycja × rola × liga) — empiryczny Bayes: zawodnik
+z małą próbą jest »ściągany« do średniej grupy"*.
+
+`build_wc_fast.group_prior_from_context` wpisywała w `mean_per90` **średnią
+tego samego zawodnika**. Prior nie ściągał więc do niczego zewnętrznego —
+a bez ściągania do populacji wysoka estymata zostaje wysoka. To jest dokładnie
+mechanizm klątwy zwycięzcy opisany wyżej, tyle że wprost w kodzie.
+
+Pomiar (1284 obserwacje na rynek, walidacja czasowa, średnia grupy liczona
+z **innych** zawodników, ta sama siła `pseudo = 5`, wspólna linia i wspólny
+zbiór górny dla obu wariantów):
+
+| rynek | wariant | Brier all | Brier góra 20% | bias góra 20% |
+|---|---|---|---|---|
+| shots | własna (było) | 0,1784 | 0,2000 | **1,09** |
+| | **grupowa** | 0,1782 | **0,1944** | **0,95** |
+| sot | własna | 0,1438 | 0,2418 | **1,18** |
+| | **grupowa** | 0,1426 | **0,2357** | **0,99** |
+| fouls_committed | własna | 0,1801 | 0,2580 | **1,24** |
+| | **grupowa** | 0,1758 | **0,2412** | **1,07** |
+| tackles | własna | 0,1734 | 0,2608 | **1,16** |
+| | **grupowa** | 0,1697 | **0,2404** | **0,98** |
+
+**Prior grupowy wygrywa w każdym rynku i w obu miarach**, a bias na górze
+rozkładu — czyli tam, gdzie realnie powstają typy — schodzi praktycznie do
+jedności. Wariant mieszany 50/50 wypadał konsekwentnie pośrodku, co
+potwierdza, że działa ten mechanizm, a nie przypadek.
+
+⚑ **Pułapka pomiarowa, która złapała pierwszą wersję tego testu:** linia
+liczona jako mediana λ **osobno w każdym wariancie** sprawia, że każdy jest
+oceniany na innej linii i Briery przestają być porównywalne (wychodziło
+0,098 wobec 0,196 dla `shots`, czyli dwukrotna „przewaga" wariantu gorszego).
+Linia musi pochodzić z **faktycznych** wartości i być wspólna.
+
+Wdrożone 13.08: `srednie_grupowe()` liczy średnią per-90 każdego rynku raz na
+cykl z kompletu trendów, `group_prior_from_context` przyjmuje ją jako grupę
+porównawczą. Grupa mniejsza niż `MIN_GRUPY_DO_PRIORU = 8` zawodników wraca do
+historii samego zawodnika — lepiej nie ściągać wcale niż do średniej z kilku
+przypadkowych osób. Pilnuje `tests/test_prior_grupowy.py` (10 testów).
+
 ## Co zostało NAPRAWIONE (2026-08-13)
 
 **Pomyłka jednostek w priorze zawodniczym.** `group_prior_from_context`
