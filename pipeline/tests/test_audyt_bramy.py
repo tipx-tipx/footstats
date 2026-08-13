@@ -102,6 +102,68 @@ def test_brama_zdejmujaca_lepsze_dalej_krzyczy(capsys):
     assert "kwarantanna_rynku" in out
 
 
+def _typ_seg(wynik: str, rynek: str, strona: str, kurs: float = 2.0,
+             poza: str | None = None) -> dict:
+    r = {
+        "wynik": wynik, "kurs": kurs, "p_model": 0.5,
+        "ekran": "druzyny", "rynek_kod": rynek, "strona": strona, "wersje": {},
+    }
+    if poza:
+        r["poza_publikacja"] = poza
+    return r
+
+
+def test_w_obrebie_segmentu_odwraca_wniosek_z_calosci():
+    """Brama trafiająca w słaby segment wygląda źle, choć w tym segmencie
+    zdejmuje LEPSZE — to jest właśnie powrót do średniej."""
+    audyt = _audyt()
+    # segment A jest po prostu słaby: publikowane trafiają 20%
+    pub = ([_typ_seg("przegrany", "team_corners", "ponizej")] * 16
+           + [_typ_seg("wygrany", "team_corners", "ponizej")] * 4)
+    # brama zdejmuje z TEGO SAMEGO segmentu typy, które trafiają 80%
+    zdjete = ([_typ_seg("wygrany", "team_corners", "ponizej", poza="kw")] * 16
+              + [_typ_seg("przegrany", "team_corners", "ponizej", poza="kw")] * 4)
+
+    wynik = audyt._w_obrebie_segmentu(zdjete, pub)
+    assert wynik is not None
+    roznica, roznica_luki, ile, udzial = wynik
+
+    assert roznica > 0 and roznica_luki > 0, (
+        "w obrębie segmentu brama zdejmowała lepsze — tak wygląda powrót "
+        "do średniej"
+    )
+    assert ile == 1
+    assert udzial == pytest.approx(1.0), (
+        "jeden segment to 100% wagi — bez tej liczby wniosek udaje ogólny"
+    )
+
+
+def test_w_obrebie_segmentu_liczy_udzial_najwiekszego():
+    """Udział największego segmentu ma odróżnić wniosek ogólny od jednego
+    wycinka — 13.08 kwarantanna strony miała 75% wagi w jednym segmencie."""
+    audyt = _audyt()
+    pub = ([_typ_seg("wygrany", "team_corners", "ponizej")] * 30
+           + [_typ_seg("wygrany", "team_goals", "powyzej")] * 10)
+    zdjete = ([_typ_seg("przegrany", "team_corners", "ponizej", poza="kw")] * 30
+              + [_typ_seg("przegrany", "team_goals", "powyzej", poza="kw")] * 10)
+
+    roznica, _luka, ile, udzial = audyt._w_obrebie_segmentu(zdjete, pub)
+
+    assert ile == 2
+    assert udzial == pytest.approx(0.75), "30 z 40 jednostek wagi"
+    assert roznica < 0, "zdjęte przegrywają wszędzie — brama odróżniała"
+
+
+def test_w_obrebie_segmentu_bez_pary_zwraca_none():
+    """Segment bez publikowanego odpowiednika nie ma z czym się porównać —
+    lepiej nie odpowiedzieć niż odpowiedzieć bzdurą."""
+    audyt = _audyt()
+    pub = [_typ_seg("wygrany", "team_goals", "powyzej")] * 20
+    zdjete = [_typ_seg("przegrany", "team_corners", "ponizej", poza="kw")] * 20
+
+    assert audyt._w_obrebie_segmentu(zdjete, pub) is None
+
+
 def test_strumien_bez_publikowanych_nie_wywraca_odniesienia():
     """Gdy strumień bramy nie ma ANI JEDNEGO publikowanego — pomijamy go,
     zamiast liczyć zero i zaniżać odniesienie."""

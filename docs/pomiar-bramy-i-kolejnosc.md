@@ -230,9 +230,65 @@ zdejmująca gorsze nie krzyczy, zdejmująca lepsze — krzyczy dalej).
 dokumentu). Przy poprawnym odniesieniu `kwarantanna_strony` zdejmowała
 materiał **gorszy** od publikowanego (−4,3% wobec −1,9%), a nie lepszy —
 argument za zdjęciem jej z listy był słabszy, niż wyglądał. `kwarantanna_rynku`
-broni się dalej (+3,4% wobec +1,0%). Decyzja zostaje na produkcji do rozstrzygnięcia
-przez właściciela — zmiana ma dopiero jeden dzień rozliczeń, więc dziś nic
-nie potwierdzi ani nie obali jej skutku.
+broni się dalej (+3,4% wobec +1,0%).
+
+---
+
+## 6. Kwarantanna strony zmierzona porządnie — dane NIE rozstrzygają
+
+Porównanie „zdjęte wobec całej strony" miesza dwie rzeczy: efekt **bramy**
+i efekt **segmentu**. Kwarantanna z definicji wstrzymuje segment po serii
+pecha, więc trafia w słabe segmenty niezależnie od tego, czy potrafi cokolwiek
+przewidzieć. Jedyne pytanie, które ma treść, brzmi: **czy ten sam segment
+wypada gorzej w czasie wstrzymania niż poza nim.**
+
+Odpowiedź na to pytanie jest **przeciwna** do surowej tabeli:
+
+```
+kwarantanna_strony     wobec całej strony:   -4,3% vs -1,9%   „zdejmowała gorsze"
+                       w obrębie segmentu:   luka +2,2 pp, ROI +16,1%  „lepsze"
+```
+
+**Ale ta druga liczba też nie jest wnioskiem** — 75% jej wagi to jeden
+segment. Rozbicie:
+
+| segment | zdjęte n | ROI | publikowane n | ROI | ROI przed wstrzymaniem |
+|---|---|---|---|---|---|
+| team_corners\|ponizej | 153 | **+7,6%** | 188 | −14,5% | **−38,9%** (40 rozl.) |
+| team_goals\|powyzej | 28 | −26,6% | 81 | −28,7% | −15,5% |
+| team_shots\|ponizej | 27 | −26,5% | 13 | −48,9% | −14,0% |
+| shots\|powyzej | 11 | −51,0% | 11 | +22,5% | −24,1% |
+
+Największy segment pokazuje mechanizm **powrotu do średniej** wprost: −38,9%
+na 40 rozliczeniach przed wstrzymaniem, +7,6% na 153 typach zdjętych w jego
+trakcie. Brama złapała odbicie, nie słabość. W trzech pozostałych segmentach
+brama miała rację (segment tracił dalej), ale próby są rzędu 11–28, czyli szum.
+
+**Wniosek: przy czterech segmentach i jednym ważącym 75% dane nie pozwalają
+rozstrzygnąć, czy kwarantanna strony odróżnia.** Decyzja z 14.08 (nie zdejmuje
+z listy) zostaje — jest zgodna z zasadą „nic nie blokujemy" i nie ma dowodu,
+że szkodzi. Do ponownego pomiaru, gdy segmentów z próbą po obu stronach
+będzie kilkanaście.
+
+### Co ten sam pomiar mówi o pozostałych bramach
+
+```
+                       luka      ROI    segmentów   największy
+rozjazd_z_rynkiem     -4,9 pp   +0,7%       8          38%     zdejmuje gorsze
+kwarantanna_strony    +2,2 pp  +16,1%       4          75%     nie rozstrzyga
+poza_lista_dnia       +0,9 pp   +3,1%       5          51%     zdejmuje lepsze
+kwarantanna_rynku     +7,4 pp  +17,3%       3          50%     zdejmuje lepsze
+leg_kuponu           -20,3 pp  -18,0%       1         100%     nie rozstrzyga
+```
+
+⚑ **Okno zgody (`rozjazd_z_rynkiem`) jest tu jedyną bramą z szeroką podstawą**
+— osiem segmentów, największy 38% — i w obrębie segmentów zdejmuje materiał
+**gorzej wyceniony** (luka −4,9 pp). To niezależne potwierdzenie decyzji
+z części 5: granica 16 pp zostaje. Zwrot jest przy tym płaski (+0,7%), co jest
+spójne z resztą projektu: ROI w takich wycinkach to szum, luka jest stabilna.
+
+Porównanie liczy się teraz samo w każdej kontroli startowej
+(`audyt_uczenia._w_obrebie_segmentu`, sekcja „TO SAMO W OBRĘBIE SEGMENTU").
 
 ---
 

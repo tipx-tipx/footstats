@@ -390,6 +390,66 @@ def _odniesienie_skladem(grp: list[dict], pub_wg: dict[str, list], R) -> float:
     return licznik / mianownik if mianownik else 0.0
 
 
+def _w_obrebie_segmentu(
+    grp: list[dict], pub: list[dict],
+) -> tuple[float, int, float] | None:
+    """Ta sama różnica, ale liczona WEWNĄTRZ segmentu (rynek|strona).
+
+    ⚑ DRUGA POŁOWA TEJ SAMEJ PUŁAPKI, co w `_odniesienie_skladem`. Bramy nie
+    wybierają losowo: kwarantanna wstrzymuje segment po serii pecha, czyli
+    dokładnie wtedy, gdy ten i tak wraca do średniej. Porównanie „zdjęte wobec
+    całej strony" miesza więc efekt BRAMY z efektem SEGMENTU i nie odpowiada
+    na jedyne pytanie, które ma znaczenie: czy ten sam segment wypada gorzej
+    w czasie wstrzymania niż poza nim.
+
+    Zmierzone 13.08 na kwarantannie strony — oba porównania dają PRZECIWNE
+    odpowiedzi, więc to nie jest różnica akademicka:
+
+        wobec strony:        -4,3% wobec -1,9%    „brama zdejmowała gorsze"
+        w obrębie segmentu:  +14,3%               „brama zdejmowała lepsze"
+
+    Mechanizm widać wprost na największym segmencie: `team_corners|ponizej`
+    miał ROI -38,9% na 40 rozliczeniach przed wstrzymaniem i +7,6% na 153
+    typach zdjętych w jego trakcie. Brama złapała odbicie, nie słabość.
+
+    ⚑ ZWRACAMY TEŻ UDZIAŁ NAJWIĘKSZEGO SEGMENTU, bo bez niego ta liczba kłamie
+    równie łatwo jak tamta: tamte +14,3% to w 70% jeden segment, a w trzech
+    pozostałych brama miała rację (próby 11-28, czyli szum).
+
+    ⚑ ZWRACAMY OBIE RÓŻNICE — ROI I LUKĘ. ROI zmienia znak między połowami
+    próby (dlatego progi w tym repo stoją na luce, patrz OKNO_ZGODY_MAX),
+    więc sama różnica zwrotu potrafi tu powiedzieć „brama nie odróżnia", gdy
+    brama odróżnia bardzo dobrze — tyle że po deklaracji, nie po kasie.
+
+    Zwraca (różnica ROI, różnica luki w pp, ile segmentów, udział
+    największego) albo None, gdy żaden segment nie ma próby po obu stronach.
+    """
+    zd_seg: dict[str, list] = defaultdict(list)
+    pub_seg: dict[str, list] = defaultdict(list)
+    for r in grp:
+        zd_seg[f"{r.get('rynek_kod')}|{r.get('strona')}"].append(r)
+    for r in pub:
+        pub_seg[f"{r.get('rynek_kod')}|{r.get('strona')}"].append(r)
+
+    MIN_PO_STRONIE = 10
+    sumy = sumy_luk = wagi = 0.0
+    najwieksza = 0.0
+    ile = 0
+    for s, z in zd_seg.items():
+        p = pub_seg.get(s) or []
+        if len(z) < MIN_PO_STRONIE or len(p) < MIN_PO_STRONIE:
+            continue
+        waga = float(min(len(z), len(p)))
+        sumy += waga * (_roi(z) - _roi(p))
+        sumy_luk += waga * (_staty(z)[3] - _staty(p)[3]) * 100
+        wagi += waga
+        najwieksza = max(najwieksza, waga)
+        ile += 1
+    if not wagi:
+        return None
+    return sumy / wagi, sumy_luk / wagi, ile, najwieksza / wagi
+
+
 def czesc5_bramy(settled: list[dict], R) -> None:
     """ILE PIENIĘDZY ZDEJMUJĄ BRAMY — czyli czy w ogóle się opłacają.
 
@@ -451,6 +511,36 @@ def czesc5_bramy(settled: list[dict], R) -> None:
         print()
         print("   Żadna brama nie zdejmuje materiału lepszego niż publikowany"
               " — porównanie na tym samym składzie strumieni.")
+
+    # TO SAMO PYTANIE, ZADANE UCZCIWIEJ — patrz `_w_obrebie_segmentu`.
+    # Wiersze wyżej porównują brama-vs-strona; tu ten sam segment porównuje się
+    # sam ze sobą, w czasie zdejmowania i poza nim. Gdy obie liczby mają
+    # przeciwne znaki, rozstrzyga TA, a tamta mówi tylko, że brama trafiła
+    # w słaby segment (co wiemy, bo po to jest).
+    print()
+    print("   TO SAMO W OBRĘBIE SEGMENTU (ten sam rynek|strona, zdjęte vs"
+          " publikowane):")
+    cokolwiek = False
+    for powod, grp in sorted(grupy.items(), key=lambda kv: -len(kv[1])):
+        if len(grp) < 25:
+            continue
+        wynik = _w_obrebie_segmentu(grp, pub)
+        if wynik is None:
+            print(f"      {powod:<24} brak segmentu z próbą po obu stronach")
+            continue
+        cokolwiek = True
+        roznica, roznica_luki, ile, udzial = wynik
+        # o kierunku rozstrzyga LUKA — ROI w tych wycinkach zmienia znak
+        kierunek = ("zdejmuje LEPSZE" if roznica_luki > 0 else "zdejmuje gorsze")
+        ostrzez = "  ⚑ jeden segment" if udzial >= 0.6 else ""
+        print(f"      {powod:<24} luka {roznica_luki:>+5.1f} pp   "
+              f"ROI {roznica:>+6.1%}   {kierunek:<15}"
+              f" ({ile} segm., naj. {udzial:.0%}){ostrzez}")
+    if cokolwiek:
+        print("      Dodatnia luka = brama zdejmowała typy lepiej wycenione niż"
+              " to, co zostawało")
+        print("      w tym samym segmencie, czyli łapała powrót do średniej.")
+        print('      Przy „jeden segment" liczba mówi o nim, nie o bramie.')
 
 
 def main() -> None:
