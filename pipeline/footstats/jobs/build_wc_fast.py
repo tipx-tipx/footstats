@@ -2449,6 +2449,48 @@ MIN_GRUPY_DO_PRIORU = 8
 SILA_PRIORU_RYNKU = {"fouls_committed": 25.0}
 SILA_PRIORU_DOMYSLNA = 5.0
 
+# --- TO SAMO DLA RYNKÓW DRUŻYNOWYCH (2026-08-13) --------------------------
+#
+# Ścieżka drużynowa ma własny prior — średnią LIGI (`lg_mean`) — i ściągała do
+# niej z siłą 4,0 dla WSZYSTKICH rynków naraz. Zmierzone na banku ligowym
+# (1677 meczów, walidacja czasowa, prognoza wyłącznie z meczów wcześniejszych),
+# osobno NA GÓRZE ROZKŁADU, czyli tam, gdzie realnie powstają typy:
+#
+#   rynek     dziś deklaruje   realnie    LUKA      po naprawie   podaż typów
+#   corners      71,2%          52,3%   -18,9 pp    -7,6 (15)    19,0% -> 3,7%
+#   sot          80,1%          68,8%   -11,4 pp    -3,8 (15)    49,4% -> 47,8%
+#   gole         57,8%          46,3%   -11,5 pp    -4,1 (15)     2,2% -> 0,0%
+#   shots        82,9%          72,5%   -10,4 pp    -1,3 (15)    45,3% -> 38,7%
+#   fouls        72,4%          66,7%    -5,7 pp    -1,0  (8)    20,7% -> 11,5%
+#   kartki       70,9%          66,7%    -4,2 pp    -0,7  (8)    23,0% -> 15,7%
+#
+# ⚑ TO JEST WIĘKSZOŚĆ LUKI -12 pp, którą produkt niósł od tygodni. Nie brakowało
+# cech ani lepszego rozkładu — model po prostu za mocno wierzył historii
+# drużyny w rynkach, w których ta historia niewiele znaczy.
+#
+# Siły dobrane pomiarem, per rynek, kryterium: Brier NA GÓRZE rozkładu.
+# Przy 8 rynki dyscyplinarne trafiają w zero (-0,7 i -1,0 pp), przy 15
+# przereagowują na plus (+2,4 i +4,0) — stąd dwie różne wartości.
+#
+# ⚑ CENA ZAAKCEPTOWANA ŚWIADOMIE (decyzja właściciela 13.08): podaż typów
+# spada o 20-30%, rożne najmocniej. To NIE jest wycinanie typów progiem —
+# te typy przestają powstawać, bo model przestaje zawyżać ich szansę.
+# Ta sama sytuacja co przy naprawie znaku kalibracji 11.08, gdzie `team_goals`
+# zeszło z 89,2% na 60,4% i typy zniknęły — i było to poprawne.
+#
+# `match_*` i `wiecej_*` ZOSTAJĄ na 4,0, bo ich nie mierzono. `match_corners`
+# jest dziś w kwarantannie z lukĄ podobnego rzędu (hit 52% vs p 81%), więc
+# to naturalny kolejny kandydat — ale własnym pomiarem, nie przez analogię.
+SILA_PRIORU_DRUZYNY = {
+    "team_cards": 8.0,
+    "team_fouls": 8.0,
+    "team_shots": 15.0,
+    "team_sot": 15.0,
+    "team_corners": 15.0,
+    "team_goals": 15.0,
+}
+SILA_PRIORU_DRUZYNY_DOMYSLNA = 4.0
+
 
 def group_prior_from_context(
     trend: statshub.StatshubTrend,
@@ -5884,7 +5926,9 @@ def _main_impl(tryb=None):
             if lg_mean is None:
                 lg_mean = float(np.mean(tt.counts))
             prior_t = counts.GroupPrior(
-                mean_per90=max(lg_mean, 0.5), pseudo_matches=4.0
+                mean_per90=max(lg_mean, 0.5),
+                pseudo_matches=SILA_PRIORU_DRUZYNY.get(
+                    tt.market_code, SILA_PRIORU_DRUZYNY_DOMYSLNA),
             )
             now_t = int(time.time())
             # ⚑ TWARDY SUFIT WIEKU HISTORII (2026-08-11).

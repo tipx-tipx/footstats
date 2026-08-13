@@ -205,6 +205,51 @@ Model traktuje wszystkie tak samo pewnie. Siła ściągania per rynek
 `team_corners` jest naturalnym kolejnym kandydatem, ale wymaga własnego
 pomiaru na ścieżce drużynowej, która ma inny prior niż zawodnicza.
 
+---
+
+## 8. ⚑ WIĘKSZOŚĆ LUKI TO ZA SŁABY PRIOR DRUŻYNOWY — naprawione 13.08
+
+Ścieżka drużynowa ma własny prior: średnią LIGI (`lg_mean`), do której ściągała
+z siłą **4,0 dla wszystkich rynków naraz**. Zmierzone na banku ligowym (1677
+meczów, walidacja czasowa) **na górze rozkładu**, czyli tam, gdzie powstają typy:
+
+| rynek | deklarowało | realnie | luka | po naprawie | podaż typów |
+|---|---|---|---|---|---|
+| corners | 71,2% | 52,3% | **−18,9 pp** | −7,6 (siła 15) | 19,0% → 3,7% |
+| sot | 80,1% | 68,8% | −11,4 pp | −3,8 (15) | 49,4% → 47,8% |
+| gole | 57,8% | 46,3% | −11,5 pp | −4,1 (15) | 2,2% → 0,0% |
+| shots | 82,9% | 72,5% | −10,4 pp | −1,3 (15) | 45,3% → 38,7% |
+| fouls | 72,4% | 66,7% | −5,7 pp | −1,0 (8) | 20,7% → 11,5% |
+| kartki | 70,9% | 66,7% | −4,2 pp | −0,7 (8) | 23,0% → 15,7% |
+
+**To jest ta sama luka −12 pp, którą produkt niósł od tygodni.** Nie brakowało
+cech (część 7) ani lepszego rozkładu (część 2) — model za mocno wierzył
+historii drużyny w rynkach, w których ta historia niewiele znaczy.
+
+Zgadza się to z przewidywalnością rynków: `team_corners` ma korelację 0,095,
+czyli historia wnosi 0,3% ponad średnią ligi — a model ściągał ją do tej
+średniej najsłabiej, jak się dało.
+
+### Dlaczego dwie różne siły
+
+Rynki dyscyplinarne (kartki, faule) trafiają w zero przy **8**; przy 15
+przereagowują na plus (+2,4 i +4,0 pp). Strzałowe i rożne potrzebują **15**.
+Jedna wartość dla wszystkich „dla porządku" popsułaby połowę rynków —
+ta sama zasada co przy rynkach zawodniczych.
+
+`match_*` i `wiecej_*` **zostają na 4,0**, bo ich nie mierzono.
+`match_corners` ma dziś lukę podobnego rzędu (hit 52% przy p 81%) i jest
+naturalnym kolejnym kandydatem — ale własnym pomiarem, nie przez analogię.
+
+### Cena, zaakceptowana świadomie
+
+Podaż typów spada o 20–30%, rożne najmocniej (19% → 3,7%). **To nie jest
+wycinanie typów progiem** — te typy przestają powstawać, bo model przestaje
+zawyżać ich szansę. Ta sama sytuacja co przy naprawie znaku kalibracji 11.08,
+gdzie `team_goals` zeszło z 89,2% na 60,4% i typy zniknęły; było to poprawne.
+
+Decyzja właściciela z 13.08: pełna naprawa, siła per rynek.
+
 ## Jak to odtworzyć
 
 Skrypty pomiarowe (jednorazowe, katalog roboczy sesji): dyspersja Pearsona,
