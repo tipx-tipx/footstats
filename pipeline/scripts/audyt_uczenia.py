@@ -356,7 +356,41 @@ def czesc4_czynniki(vb: list[dict]) -> None:
     print("Powód bywa niewinny (rynek go nie używa) albo nie — patrz raport.")
 
 
-def czesc5_bramy(settled: list[dict]) -> None:
+def _odniesienie_skladem(grp: list[dict], pub_wg: dict[str, list], R) -> float:
+    """ROI publikowanych o TAKIM SAMYM składzie strumieni co `grp`.
+
+    ⚑ NAPRAWA 13.08 — TA TABELA PORÓWNYWAŁA JABŁKA Z GRUSZKAMI I RAZ JUŻ
+    ZMIENIŁA PRZEZ TO PRODUKT. Odniesieniem było „wszystko pokazane", czyli
+    zbiór z 94 drabinkami o ROI −25,5%, a bramy niżej nie zdejmują drabinek
+    ANI JEDNEJ (0% w każdej grupie — drabinki mają własne progi). Odniesienie
+    było więc zaniżone o 2,3 pp (−4,2% zamiast −1,9%) i dwie bramy wychodziły
+    na „zdejmujące lepszy materiał", choć zdejmowały gorszy:
+
+        rozjazd_z_rynkiem   −2,4%  wobec −4,2% (całość)  ale −1,9% (bez drabinek)
+        kwarantanna_strony  −4,3%  wobec −4,2% (całość)  ale −1,9% (bez drabinek)
+
+    Ta pierwsza to okno zgody — brama, którą pomiar z 12.08 rekomendował
+    rozluźnić WŁAŚNIE na tej podstawie (patrz OKNO_ZGODY_MAX w betting.py).
+
+    Ważymy udziałem strumieni, a nie odsiewamy drabinek na sztywno: gdy
+    drabinki dorobią się własnych bram, porównanie ma dalej być uczciwe.
+    """
+    if not grp:
+        return 0.0
+    wagi: dict[str, int] = defaultdict(int)
+    for r in grp:
+        wagi[R._strumien(r)] += 1
+    licznik = mianownik = 0.0
+    for strumien, waga in wagi.items():
+        pub_s = pub_wg.get(strumien) or []
+        if not pub_s:
+            continue          # ten strumień nie ma publikowanych — pomijamy
+        licznik += waga * _roi(pub_s)
+        mianownik += waga
+    return licznik / mianownik if mianownik else 0.0
+
+
+def czesc5_bramy(settled: list[dict], R) -> None:
     """ILE PIENIĘDZY ZDEJMUJĄ BRAMY — czyli czy w ogóle się opłacają.
 
     Typ zdjęty bramą nie znika: rozlicza się „w tle" i uczy model, więc znamy
@@ -368,6 +402,9 @@ def czesc5_bramy(settled: list[dict]) -> None:
 
     Bez tej tabeli takie rzeczy wychodzą raz na miesiąc, przy okazji.
     Z nią widać je w każdej kontroli startowej.
+
+    KAŻDA BRAMA MA WŁASNE ODNIESIENIE, dopasowane składem strumieni —
+    patrz `_odniesienie_skladem`, gdzie opisane jest, co bez tego wyszło.
     """
     print()
     print("=" * 78)
@@ -377,27 +414,43 @@ def czesc5_bramy(settled: list[dict]) -> None:
     if not pub:
         print("   brak rozliczeń publikowanych — nie ma do czego porównywać")
         return
-    _naglowek_tabeli("co się stało", szer=22)
-    _wiersz("POKAZANE NA STRONIE", pub, szer=22)
+    pub_wg: dict[str, list] = defaultdict(list)
+    for r in pub:
+        pub_wg[R._strumien(r)].append(r)
+    # 26 znaków, bo przy 22 nazwy bram ucinały się do „kwarantanna_st",
+    # „kwarantanna_ry" i „kwarantanna_ka" — trzy różne bramy nie do odróżnienia
+    # w tabeli, na której podejmuje się decyzje o produkcie
+    _naglowek_tabeli("co się stało", szer=26)
+    _wiersz("POKAZANE NA STRONIE", pub, szer=26)
+    # rozbicie odniesienia — bez niego nie widać, że całość ciągnie w dół
+    # strumień, którego bramy niżej w ogóle nie dotyczą
+    for kod in ("pewniaki", "druzyny", "drabinki"):
+        grp = pub_wg.get(kod) or []
+        if grp and len(grp) != len(pub):
+            _wiersz(f"   w tym {NAZWY_STRUMIENI[kod].lower()}", grp, szer=26)
     print()
     grupy: dict[str, list] = defaultdict(list)
     for r in settled:
         if r.get("poza_publikacja"):
             grupy[str(r["poza_publikacja"])].append(r)
-    roi_pub = _roi(pub)
     lepsze = []
     for powod, grp in sorted(grupy.items(), key=lambda kv: -len(kv[1])):
-        _wiersz(f"zdjęte: {powod}", grp, szer=22)
-        if len(grp) >= 25 and _roi(grp) > roi_pub:
-            lepsze.append((powod, len(grp), _roi(grp)))
+        _wiersz(f"zdjęte: {powod}", grp, szer=26)
+        odn = _odniesienie_skladem(grp, pub_wg, R)
+        if len(grp) >= 25 and _roi(grp) > odn:
+            lepsze.append((powod, len(grp), _roi(grp), odn))
     if lepsze:
         print()
         print("   ⚑ BRAMY, KTÓRE ZDEJMUJĄ MATERIAŁ LEPSZY NIŻ PUBLIKOWANY:")
-        for powod, n, roi in lepsze:
+        for powod, n, roi, odn in lepsze:
             print(f"      {powod:<24} n={n:>4}  ROI {roi:>6.1%} "
-                  f"wobec {roi_pub:>6.1%} na stronie")
+                  f"wobec {odn:>6.1%} na tym samym materiale")
         print("      (bramy wybierają nielosowo — to sygnał do pomiaru,")
         print("       nie dowód; patrz docs/pomiar-bramy-i-kolejnosc.md)")
+    else:
+        print()
+        print("   Żadna brama nie zdejmuje materiału lepszego niż publikowany"
+              " — porównanie na tym samym składzie strumieni.")
 
 
 def main() -> None:
@@ -419,7 +472,7 @@ def main() -> None:
     czesc2_warstwy(log, R)
     czesc3_kalendarz(settled, log, R)
     czesc4_czynniki(supa.get_key("value_bets") or [])
-    czesc5_bramy(settled)
+    czesc5_bramy(settled, R)
 
 
 if __name__ == "__main__":

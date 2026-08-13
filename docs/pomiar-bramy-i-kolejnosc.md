@@ -188,7 +188,51 @@ Symulacja: 274 typy wracają, zwrot całości −3,3% wobec −3,5% dziś — cz
 „nic nie blokujemy", nie o zysk. Przy limicie 12 typów na dobę te typy są
 materiałem dla kolejności, a nie zalewem listy.
 
-**Nie wdrożone** — czeka na decyzję właściciela.
+### ⚑ REKOMENDACJA WYCOFANA — sprawdzenie 13.08 przed wdrożeniem
+
+Powtórzenie pomiaru na próbie większej o ~500 rozliczeń (1951 typów modelu)
+**odwróciło przesłankę**. Granica 16 pp zostaje, nic nie zmieniamy.
+
+| rozjazd | n | luka | ROI | luka starsze / nowsze |
+|---|---|---|---|---|
+| 8–12 pp | 271 | −9,6 pp | −4,9% | |
+| **12–16 pp** (koniec okna) | 651 | **−8,8 pp** | +1,6% | −12,3 / −6,1 |
+| 16–20 pp | 486 | **−19,3 pp** | −11,2% | −19,3 / −19,4 |
+| 20–30 pp | 421 | **−16,4 pp** | +1,5% | −12,4 / −19,7 |
+
+Luka za granicą jest **dwa razy głębsza** i trzyma się w obu połowach próby.
+Kontrola po paśmie kursu daje to samo w **każdym** paśmie (16–30 pp: −15,0 /
+−17,5 / −20,4 pp wobec −8,4 / −8,6 / −13,8 pp w oknie) — 12.08 wychodziło
+odwrotnie i to była główna podstawa rekomendacji. Na najczystszym cięciu
+(typy opublikowane po naprawie znaku i priorze): 12–16 pp luka **+0,6 pp**
+przy ROI +15,7%, 16–20 pp luka **−21,9 pp** przy −20,3%.
+
+**Skąd wzięła się tamta rekomendacja — usterka pomiarowa w części 5.**
+Tabela „co zdejmują bramy" porównywała każdą bramę z ROI **wszystkiego**, co
+publikowane. W tym zbiorze siedzi 94 drabinki o ROI −25,5%, a żadna z tych
+bram nie zdejmuje ani jednej drabinki (0% w każdej grupie — drabinki mają
+własne progi). Odniesienie było zaniżone o 2,3 pp:
+
+```
+                      ROI     wobec całości (-4,2%)   wobec tego samego materiału
+rozjazd_z_rynkiem    -2,4%    „lepsze niż strona"      -1,9%  -> zdejmuje GORSZE
+kwarantanna_strony   -4,3%     ~równo                  -1,9%  -> zdejmuje GORSZE
+poza_lista_dnia      +4,2%    lepsze                   -2,0%  -> nadal lepsze
+kwarantanna_rynku    +3,4%    lepsze                   +1,0%  -> nadal lepsze
+```
+
+Naprawione 13.08: `audyt_uczenia._odniesienie_skladem` liczy odniesienie
+ważone składem strumieni danej bramy, tabela pokazuje rozbicie publikowanych
+per strumień, a `tests/test_audyt_bramy.py` pilnuje obu kierunków (brama
+zdejmująca gorsze nie krzyczy, zdejmująca lepsze — krzyczy dalej).
+
+⚑ **To dotyczy także decyzji z 14.08 o kwarantannach** (część 1 tego
+dokumentu). Przy poprawnym odniesieniu `kwarantanna_strony` zdejmowała
+materiał **gorszy** od publikowanego (−4,3% wobec −1,9%), a nie lepszy —
+argument za zdjęciem jej z listy był słabszy, niż wyglądał. `kwarantanna_rynku`
+broni się dalej (+3,4% wobec +1,0%). Decyzja zostaje na produkcji do rozstrzygnięcia
+przez właściciela — zmiana ma dopiero jeden dzień rozliczeń, więc dziś nic
+nie potwierdzi ani nie obali jej skutku.
 
 ---
 

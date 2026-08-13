@@ -646,8 +646,37 @@ MAX_RELATIVE_DIVERGENCE = 1.9       # p_model / p_rynku > 1.9x = podejrzane (lon
 #
 # Powód, dla którego to w ogóle mierzyliśmy: ta brama zjadała 54 z 86 gotowych
 # kandydatów jednego cyklu — dwie trzecie całego głodu typów na stronie.
+#
+# --- CZWARTY POMIAR (2026-08-13, 1951 rozliczeń typów modelu) -----------------
+# ⚑ GRANICA 16 ZOSTAJE. Rekomendacja z 12.08, żeby podnieść ją do 30 pp, jest
+# WYCOFANA — na próbie większej o ~500 rozliczeń jej przesłanka się odwróciła.
+#
+#   rozjazd        n    luka      ROI       starsza / nowsza połowa (luka)
+#   8-12 pp      271   -9,6     -4,9%
+#   12-16 pp     651   -8,8     +1,6%        -12,3 / -6,1
+#   16-20 pp     486  -19,3    -11,2%        -19,3 / -19,4   <- stabilnie złe
+#   20-30 pp     421  -16,4     +1,5%        -12,4 / -19,7
+#
+# Luka za granicą 16 pp jest DWA RAZY większa niż w oknie i trzyma się w obu
+# połowach próby. Kontrola po paśmie kursu daje to samo w KAŻDYM paśmie
+# (16-30 pp: luka -15,0 / -17,5 / -20,4 wobec -8,4 / -8,6 / -13,8 w oknie) —
+# 12.08 wychodziło odwrotnie i to była podstawa tamtej rekomendacji.
+# Najczystsze cięcie, typy opublikowane po naprawie znaku i priorze (12.08):
+# 12-16 pp luka +0,6 pp przy ROI +15,7%, 16-20 pp luka -21,9 pp przy -20,3%.
+#
+# ⚑ SKĄD SIĘ WZIĘŁA TAMTA REKOMENDACJA: część 5 kontroli startowej pokazywała
+# tę bramę jako „zdejmującą materiał lepszy niż publikowany" (-2,4% wobec
+# -4,2%), ale odniesieniem było WSZYSTKO publikowane — razem z drabinkami
+# (ROI -25,5%), których ta brama nie dotyczy ani w jednym przypadku. Na tym
+# samym materiale strona ma -1,9%, czyli brama zdejmuje GORSZE. Odniesienie
+# naprawione 13.08 (`audyt_uczenia._odniesienie_skladem`, test
+# `test_audyt_bramy.py`) i brama zniknęła z alarmu.
+#
+# Progu nie ruszamy też w drugą stronę (16 -> 12): pasmo 12-16 pp ma dziś
+# najlepszy wynik z dużych przedziałów, a jego luka jest najpłytsza.
 OKNO_ZGODY_MIN = 0.00   # p_model musi być co najmniej na poziomie ceny rynku
-OKNO_ZGODY_MAX = 0.16   # ...i najwyżej 16 pp nad nią (2026-08-04, było 0.12)
+OKNO_ZGODY_MAX = 0.16   # ...i najwyżej 16 pp nad nią (2026-08-04, było 0.12;
+                        # potwierdzone 13.08 na 1951 rozliczeniach)
 
 
 def w_oknie_zgody(p_model: float, kurs: float) -> bool:
