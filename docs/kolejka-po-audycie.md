@@ -554,6 +554,24 @@ Legenda: `[x]` zrobione · `[~]` w toku / obejście · `[ ]` otwarte
   „deklaracja przed / po / faktycznie". Decyzja po ~25 rozliczeniach
   (`KOREKTA_DRABINEK_MIN_N`), nie wcześniej — zdjęcie korekty PODNOSI szanse
   drugiego szczebla, a ten strumień już dziś przeszacowuje o 15 pp.
+- [~] **Klasy kart nie niosą informacji — etykieta ZDJĘTA ZE STRONY 13.08.**
+  `PROG_KLASY` było w kodzie opisane jako założenie do skalibrowania
+  z rozliczeń. Pierwszy pomiar (94 rozliczenia): „solidny" trafia 38,6%,
+  „mocny" 36,8%, „top" 0,0% (n=3), a deklaracja rośnie z klasą — czyli rośnie
+  sama luka. Korelacja przewagi z trafieniem **−0,084**; karty z najniższą
+  przewagą są skalibrowane (luka −0,3 pp), z najwyższą rozjeżdżają się
+  o −27,6 pp. Decyzja właściciela: plakietka schodzi z karty, klasa **dalej
+  się liczy i zapisuje**, więc pomiar biegnie. Wraca, gdy któraś klasa realnie
+  trafia lepiej. Liczby: `docs/pomiar-szczeble-drabinek.md`.
+  **Zostaje otwarte:** znaleźć cechę, która faktycznie porządkuje karty —
+  dzisiejsze kryterium (przewaga) tego nie robi.
+- [x] **Premia za okno ceny obejmowała najgorsze pasmo — POPRAWIONE 13.08.**
+  `OKNO_CENY_PREF_DO` 1,90 → 1,70. Okno powoływało się na tabelę rozliczeń
+  w `radar.py`, a ta mówiła „1,70–2,00: trafia 23,5%, zwrot −56,1%".
+  Sprawdzone ponownie na 94 rozliczeniach, próg z LUKI, obie połowy próby
+  zgodne: 1,55–1,70 luka **+0,2 pp** (skalibrowane co do punktu), 1,70–1,90
+  luka **−28,9 pp** — gorzej niż to, co zostaje POZA oknem (−10,7 pp).
+  Zmiana kolejności, nie bramy.
 - [ ] **Routing kart**: pierwszy < 1,45 i drugi < 2,20 → „wysoka szansa";
   pierwszy ≥ 1,45 → drabinka; pierwszy 1,20–1,45 z drugim ≥ 2,20 przy
   pokryciu ≥ 50% → drabinka (najciekawszy typ karty).

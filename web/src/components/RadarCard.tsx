@@ -44,26 +44,8 @@ const uKogo = (bukmacher?: string | null) =>
  * innego – o ile nasza szansa bije cenę bukmachera – więc mówi to wprost.
  * `opis` jedzie NA STRONĘ, do rozwinięcia, a nie do dymka.
  */
-const KLASY: Record<
-  string,
-  { label: string; badge: string; opis: string }
-> = {
-  top: {
-    label: "największa przewaga dziś",
-    badge: "bg-data-green text-white",
-    opis: "Ze wszystkich dzisiejszych kart ta ma najwyższą przewagę nad kursem – po uwzględnieniu rywala, sędziego i przewidywanego przebiegu meczu. To nie jest gwarancja, tylko najlepsze, co dziś mamy.",
-  },
-  mocny: {
-    label: "wyraźna przewaga",
-    badge: "bg-data-green-wash text-data-green-ink",
-    opis: "Nasza szansa wyraźnie bije cenę bukmachera, choć to nie jest czubek dzisiejszej stawki.",
-  },
-  solidny: {
-    label: "niewielka przewaga",
-    badge: "border border-hairline bg-paper text-muted",
-    opis: "Przewaga nad kursem jest dodatnia, ale skromna. Karta przeszła nasze progi jakości i na tym koniec – nie obiecujemy tu nic więcej.",
-  },
-};
+// ⚑ SAME ETYKIETY ZDJĘTE 2026-08-13 — powód i liczby przy `const klasa`
+// w komponencie karty. Backend liczy klasę dalej, więc pomiar biegnie.
 
 /**
  * NA CZYM STOI KARTA (backend: radar._kategoria_karty). Osobna oś od klasy
@@ -1154,12 +1136,26 @@ export const RadarCard = memo(function RadarCard({
   const reduced = useReducedMotion();
   const sygnal = sygnalInfo(w);
   const opis = opisSygnalu(w);
-  // „solidny" bez plakietki: etykieta na każdej karcie przestaje cokolwiek
-  // znaczyć, a lista i tak jest posortowana po jakości
-  const klasa =
-    w.ocena?.klasa && w.ocena.klasa !== "solidny"
-      ? KLASY[w.ocena.klasa]
-      : null;
+  // ⚑ KLASA KARTY ZDJĘTA Z INTERFEJSU (2026-08-13, decyzja właściciela).
+  //
+  // Etykieta stała na przewadze nad kursem i mówiła wprost „nasza szansa
+  // wyraźnie bije cenę bukmachera". Pierwszy pomiar na 94 rozliczeniach
+  // pokazał, że prowadzi klienta dokładnie odwrotnie, niż obiecuje:
+  //
+  //     solidny („niewielka przewaga")   n=70   trafia 38,6%   luka -11,1 pp
+  //     mocny   („wyraźna przewaga")     n=19   trafia 36,8%   luka -24,1 pp
+  //     top     („największa dziś")      n= 3   trafia  0,0%   luka -49,4 pp
+  //
+  // Korelacja przewagi z trafieniem: −0,08. Karty z NAJNIŻSZĄ przewagą są
+  // skalibrowane (luka −0,3 pp), z najwyższą rozjeżdżają się o −27,6 pp —
+  // ten sam wzorzec, co w reszcie produktu (model psuje się proporcjonalnie
+  // do tego, jak bardzo nie zgadza się z kursem).
+  //
+  // Klasa DALEJ się liczy i zapisuje w księdze (`radar._klasa_karty`,
+  // stempel przy publikacji), więc pomiar biegnie bez przerwy — znika
+  // wyłącznie obietnica, która nie ma pokrycia. Wraca, gdy któraś klasa
+  // realnie trafia lepiej od pozostałych; teksty do przywrócenia są
+  // w historii tego pliku. Patrz docs/pomiar-szczeble-drabinek.md.
   // „analiza" bez paska i plakietki – to stan domyślny, a etykieta na każdej
   // karcie przestaje cokolwiek znaczyć (ta sama zasada co przy „solidny")
   const kat =
@@ -1181,7 +1177,6 @@ export const RadarCard = memo(function RadarCard({
           badge: "bg-data-red-wash text-data-red-ink",
         }
       : null,
-    klasa ? { label: klasa.label, badge: klasa.badge } : null,
     w.ocena?.powod_wejscia === "seria"
       ? { label: "mocna seria", badge: "bg-paper text-ink-soft" }
       : null,
@@ -1466,20 +1461,11 @@ export const RadarCard = memo(function RadarCard({
                           były dymkami przy plakietkach. Dymek nie działa na
                           telefonie, a bez tych zdań etykiety typu „lepsza
                           cena" są dla postronnej osoby zgadywanką. */}
-                      {(klasa ||
-                        kat ||
+                      {(kat ||
                         w.ocena?.powod_wejscia === "seria" ||
                         w.ocena?.powod_wejscia === "pokrycie" ||
                         w.xi === true) && (
                         <ul className="mt-2 space-y-1.5 text-[12px] leading-relaxed text-muted">
-                          {klasa && (
-                            <li>
-                              <span className="font-medium text-ink-soft">
-                                {klasa.label}:
-                              </span>{" "}
-                              {klasa.opis}
-                            </li>
-                          )}
                           {kat && (
                             <li>
                               <span className="font-medium text-ink-soft">

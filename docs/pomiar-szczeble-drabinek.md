@@ -100,6 +100,46 @@ z kolejki: „zdjąć korektę strumienia z drugiego szczebla".
 Odczyt: `rozliczanie.pomiar_szczebli_drabinek` oraz **część 6 kontroli
 startowej** (`pipeline/scripts/audyt_uczenia.py`).
 
+## Klasy kart — etykieta zdjęta ze strony (13.08)
+
+Klasa („top" / „mocny" / „solidny") liczy się z przewagi nad kursem
+(`radar._klasa_karty`) i mówiła userowi wprost: *„Nasza szansa wyraźnie bije
+cenę bukmachera"*. Pierwszy pomiar tej etykiety, 94 rozliczenia:
+
+```
+klasa                                n   deklaruje  trafia    luka      ROI
+solidny („niewielka przewaga")      70     49,7%    38,6%   -11,1    -21,3%
+mocny   („wyraźna przewaga")        19     60,9%    36,8%   -24,1    -33,4%
+top     („największa przewaga dziś") 3     49,4%     0,0%   -49,4   -100,0%
+```
+
+Deklaracja rośnie z klasą (49,7 → 60,9%), trafienia **nie** — więc rośnie sama
+luka. Kwintyle przewagi mówią to samo, tylko ostrzej:
+
+```
+przewaga (edge)          n   deklaruje  trafia    luka      ROI
+-0,275..-0,030          18     44,7%    44,4%    -0,3    -10,4%   <- skalibrowane
+-0,029..+0,025          18     47,5%    33,3%   -14,2    -32,4%
++0,025..+0,039          18     46,6%    22,2%   -24,3    -44,2%
++0,041..+0,063          18     61,1%    55,6%    -5,5     +3,1%
++0,064..+0,108          22     59,4%    31,8%   -27,6    -40,4%
+```
+
+Korelacja przewagi z trafieniem: **−0,084**. Karty, którym przypisujemy
+najmniejszą przewagę, są skalibrowane co do punktu; te z największą rozjeżdżają
+się o −27,6 pp. To ten sam wzorzec, co w reszcie produktu: model jest dobrze
+skalibrowany tam, gdzie zgadza się z kursem, i psuje się proporcjonalnie do
+tego, jak bardzo się z nim nie zgadza.
+
+**Decyzja właściciela: plakietka schodzi z karty do czasu pomiaru.** Klasa
+dalej się liczy i zapisuje w księdze, więc pomiar biegnie bez przerwy — znika
+wyłącznie obietnica, której nie potwierdzają rozliczenia. Sprawdzone na żywej
+karcie z klasą „mocny" (Sami Ouaissa): przed zmianą nagłówek niósł „wyraźna
+przewaga", po zmianie zostają „druga poprzeczka 54%" i „przebił w 7 z 10
+meczów" — czyli liczby, nie ocena. Reszta karty bez zmian, audyt 390 px czysty.
+
+Etykieta wraca, gdy któraś klasa realnie trafia lepiej od pozostałych.
+
 ## Czego z tego jeszcze NIE wiadomo
 
 * Czy 31% jest zaniżone — retrospektywne 58% pochodzi z innej populacji.
