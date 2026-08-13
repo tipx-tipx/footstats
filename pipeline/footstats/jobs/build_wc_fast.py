@@ -7674,6 +7674,58 @@ def _main_impl(tryb=None):
             ),
             "klasa": ocena.get("klasa"),
             "edge": ocena.get("edge"),
+            "szczebel": 1,
+        })
+
+    # DRUGI SZCZEBEL KAŻDEJ KARTY — POMIAR (2026-08-13). Karta pokazuje go
+    # userowi i uśrednia jego przewagę przy wyborze nagłówka (`_oceń_karte`),
+    # a mimo to nigdy nie miał ANI JEDNEGO rozliczenia: księga zapisywała sam
+    # hero. Zdanie, na którym stoi cała zakładka („drugi szczebel często siada
+    # i jest głównym celem"), było więc nieweryfikowalne — przy strumieniu
+    # o ROI −25% to najdroższa biała plama, jaką mamy.
+    #
+    # Idzie tą samą ścieżką co pomiar progu pokrycia: `odrzucony`, czyli poza
+    # Skutecznością, poza kalibracją i poza korektą strumienia. NIC się przez
+    # to nie zmienia userowi ani modelowi — dochodzi wyłącznie wiedza.
+    # `p_model` to liczba pokazana na karcie (po ścięciu), a `p_over_raw`
+    # w rachunku ta sama szansa PRZED korektą strumienia: dopiero obie wobec
+    # wyniku rozstrzygną, czy deltę zmierzoną na hero wolno nakładać niżej.
+    drugie_szczeble = 0
+    for w in radar_wpisy:
+        h = w.get("hero") or {}
+        # linia bywa zerem tylko teoretycznie (drabinki idą po x,5), ale
+        # `not 0` gubiłoby ją po cichu — dlatego wprost `is None`
+        if not h.get("rynek_kod") or h.get("drugi_linia") is None \
+                or not h.get("drugi_kurs") or h.get("drugi_p") is None:
+            continue
+        p_baz2, kor2 = h.get("drugi_p_bazowe"), h.get("drugi_korekta")
+        drugie_szczeble += 1
+        drabinki_typy.append({
+            "mecz_id": w["mecz_id"], "mecz": w["mecz"],
+            "kickoff_ts": w["kickoff_ts"],
+            "podmiot_id": w.get("podmiot_id") or 0,
+            "podmiot": w["podmiot"],
+            "rynek_kod": h["rynek_kod"],
+            "rynek": h.get("rynek") or h["rynek_kod"],
+            "linia": h["drugi_linia"], "strona": "powyzej",
+            "kurs": h["drugi_kurs"], "bukmacher": "Superbet",
+            "p_model": h["drugi_p"],
+            "pewnosc": None, "sugestia": False,
+            "zrodlo": rozliczanie.ZRODLO_DRABINKA,
+            "rachunek": betting.stempel_rachunku(
+                p_over_raw=(
+                    round(float(p_baz2) * float(kor2), 4)
+                    if p_baz2 is not None and kor2 is not None else None
+                ),
+                kal_strumien=rozliczanie.betting.delta_globalna(
+                    korekta_strumieni.get("drabinki")
+                ),
+                p_over_final=h["drugi_p"],
+            ),
+            "klasa": (w.get("ocena") or {}).get("klasa"),
+            "szczebel": 2,
+            "odrzucony": True,
+            "odrzucenie_powod": rozliczanie.POWOD_POMIARU_DRUGIEGO,
         })
 
     # TYPY POMIAROWE DRABINEK: szczeble odrzucone WYŁĄCZNIE progiem pokrycia
@@ -7698,6 +7750,15 @@ def _main_impl(tryb=None):
             "odrzucony": True,
             "odrzucenie_powod": rozliczanie.POWOD_POMIARU_POKRYCIA,
         })
+
+    # ile z opublikowanych kart oddało swój drugi szczebel do pomiaru. Karta
+    # bez drugiego szczebla nie ma prawa powstać (brama z 08.08), więc liczba
+    # istotnie mniejsza od liczby kart znaczy, że któraś ścieżka gubi pola
+    # `drugi_*` — i lepiej to zobaczyć w logu niż po tygodniu w pustym pomiarze
+    if radar_wpisy:
+        print(f"Drabinki — drugi szczebel do pomiaru: {drugie_szczeble} "
+              f"z {len(radar_wpisy)} kart (rozlicza się w tle, poza "
+              f"Skutecznością i poza uczeniem)")
 
     # RAPORT POKRYCIA (liga): parowanie z build_league + to, co dołożył
     # silnik — luka jest mierzona i zapisywana co cykl, nie ignorowana.

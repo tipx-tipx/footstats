@@ -543,6 +543,63 @@ def czesc5_bramy(settled: list[dict], R) -> None:
         print('      Przy „jeden segment" liczba mówi o nim, nie o bramie.')
 
 
+def czesc6_drabinki(log: dict, R) -> None:
+    """DRABINKA MA DWA SZCZEBLE — a rozliczaliśmy jeden.
+
+    Zakładka stoi na zdaniu usera „drugi szczebel bardzo często siada i jest
+    jakby głównym celem". Ocena karty uśrednia przewagę OBU szczebli, więc ta
+    liczba współdecyduje o kolejności — a do 13.08 nie miała ani jednego
+    rozliczenia. Od tej wersji drugi szczebel idzie do księgi jako typ
+    pomiarowy (poza Skutecznością i poza uczeniem) i tu widać jego wynik.
+    """
+    print()
+    print("=" * 78)
+    print("6. DRABINKI — PIERWSZY SZCZEBEL WOBEC DRUGIEGO")
+    print("=" * 78)
+    p = R.pomiar_szczebli_drabinek(log)
+    if not p["hero"]["n"] and not p["drugi"]["n"]:
+        print("   brak rozliczonych drabinek w bieżącej epoce")
+        return
+    print(f"{'poziom':<26}{'n':>5}{'deklaruje':>11}{'trafia':>9}"
+          f"{'luka':>8}{'ROI':>9}")
+    for kod, nazwa in (("hero", "pierwszy (nagłówek)"),
+                       ("drugi", "drugi (cel polowania)")):
+        s = p[kod]
+        if not s["n"]:
+            print(f"   {nazwa:<23}{0:>5}   — brak rozliczeń")
+            continue
+        luka = (s["hit"] - (s["sr_p"] or 0)) * 100
+        print(f"   {nazwa:<23}{s['n']:>5}{s['sr_p']:>10.1%}{s['hit']:>9.1%}"
+              f"{luka:>+8.1f}{(s['roi'] or 0):>9.1%}")
+
+    par = p["pary"]
+    if par["n"]:
+        print(f"\n   KARTY Z OBOMA SZCZEBLAMI ROZLICZONYMI: {par['n']}")
+        print(f"      weszły oba (upolowany cel)   {par['oba']:>4}"
+              f"   {par['udzial_oba']:.0%}")
+        print(f"      wszedł tylko pierwszy        {par['tylko_hero']:>4}")
+        if par["niespojne"]:
+            print(f"      ⚑ NIESPÓJNE: {par['niespojne']} — wyższy szczebel "
+                  f"wszedł, niższy nie.")
+            print("        To arytmetycznie niemożliwe: błąd rozliczania, "
+                  "nie wynik modelu.")
+    else:
+        print("\n   Żadna karta nie ma jeszcze rozliczonych OBU szczebli.")
+
+    k = p["korekta_strumienia"]
+    if k["n"]:
+        print("\n   CZY KOREKTĘ STRUMIENIA WOLNO NAKŁADAĆ NA DRUGI SZCZEBEL")
+        print("   (delta jest zmierzona na szczeblach pierwszych — patrz "
+              "kolejka po audycie)")
+        print(f"      deklaracja PRZED ścięciem   {k['deklaracja_przed']:.1%}")
+        print(f"      deklaracja PO ścięciu       {k['deklaracja_po']:.1%}"
+              "   <- to pokazuje karta")
+        print(f"      faktycznie weszło           {k['faktycznie']:.1%}")
+        if p["drugi"]["n"] < p["min_n"]:
+            print(f"      (n={p['drugi']['n']} przy progu {p['min_n']} — "
+                  "za mało na wniosek, liczba ma rosnąć)")
+
+
 def main() -> None:
     try:
         from dotenv import load_dotenv
@@ -563,6 +620,7 @@ def main() -> None:
     czesc3_kalendarz(settled, log, R)
     czesc4_czynniki(supa.get_key("value_bets") or [])
     czesc5_bramy(settled, R)
+    czesc6_drabinki(log, R)
 
 
 if __name__ == "__main__":

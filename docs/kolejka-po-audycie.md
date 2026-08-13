@@ -526,12 +526,34 @@ Legenda: `[x]` zrobione · `[~]` w toku / obejście · `[ ]` otwarte
 
 ## Drabinki
 
-- [ ] **Każdy wyświetlany szczebel zapisywany i rozliczany osobno** (dziś
-  tylko hero), potem ciągły posterior Beta–Binomial albo jeden model rozkładu
-  liczby zdarzeń. Przejście „Wilson przy 7 obserwacjach → surowy procent przy
-  8" tworzyłoby arbitralny skok — nie robić tego w tej postaci.
-- [ ] **Zdjąć korektę strumienia z drugiego szczebla** — jest zmierzona na
-  pierwszych szczeblach, a stosowana do drugich.
+- [~] **Każdy wyświetlany szczebel zapisywany i rozliczany osobno.**
+  ZROBIONE 13.08 DLA DRUGIEGO SZCZEBLA — czyli dla tego, na którym stoi cała
+  zakładka. Do tej pory księga znała wyłącznie `hero`, więc zdanie usera
+  („drugi szczebel bardzo często siada i jest głównym celem") nie miało **ani
+  jednego rozliczenia**, choć jego przewaga współdecyduje o kolejności kart
+  (`_oceń_karte` uśrednia oba szczeble). Przy strumieniu o ROI −25,5% to była
+  najdroższa biała plama produktu.
+
+  Drugi szczebel idzie teraz do księgi jako typ **pomiarowy** (`odrzucony`
+  + `odrzucenie_powod = drugi_szczebel`): rozlicza się w tle, poza
+  Skutecznością, poza kalibracją i poza korektą strumienia — userowi ani
+  modelowi nie zmienia się nic, dochodzi wyłącznie wiedza. Rekord niesie
+  stempel `szczebel` (1 = hero, 2 = drugi) oraz w `rachunku` szansę **przed**
+  korektą strumienia. Odczyt: `rozliczanie.pomiar_szczebli_drabinek`
+  i część 6 kontroli startowej.
+
+  Zostaje otwarte: szczeble od trzeciego w górę (na kartach są rzadkie),
+  a potem ciągły posterior Beta–Binomial albo jeden model rozkładu liczby
+  zdarzeń. Przejście „Wilson przy 7 obserwacjach → surowy procent przy 8"
+  tworzyłoby arbitralny skok — nie robić tego w tej postaci.
+- [~] **Zdjąć korektę strumienia z drugiego szczebla** — jest zmierzona na
+  pierwszych szczeblach, a stosowana do drugich. **NIE ROBIMY TEGO NA ŚLEPO:**
+  od 13.08 księga zapisuje przy każdym drugim szczeblu obie liczby (przed
+  ścięciem i po nim) przy tej samej prawdzie, więc pytanie jest wreszcie
+  rozstrzygalne pomiarem. Część 6 kontroli startowej pokazuje trójkę
+  „deklaracja przed / po / faktycznie". Decyzja po ~25 rozliczeniach
+  (`KOREKTA_DRABINEK_MIN_N`), nie wcześniej — zdjęcie korekty PODNOSI szanse
+  drugiego szczebla, a ten strumień już dziś przeszacowuje o 15 pp.
 - [ ] **Routing kart**: pierwszy < 1,45 i drugi < 2,20 → „wysoka szansa";
   pierwszy ≥ 1,45 → drabinka; pierwszy 1,20–1,45 z drugim ≥ 2,20 przy
   pokryciu ≥ 50% → drabinka (najciekawszy typ karty).

@@ -897,6 +897,14 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
             **({"zrodlo": b["zrodlo"]} if b.get("zrodlo") else {}),
             **({"klasa": b["klasa"]} if b.get("klasa") else {}),
             **({"edge": b["edge"]} if b.get("edge") is not None else {}),
+            # KTÓRY SZCZEBEL DRABINKI (2026-08-13): 1 = ten z nagłówka karty
+            # (`hero`), 2 = drugi szczebel, czyli cel polowania. Do dziś księga
+            # znała wyłącznie hero, więc zdanie „drugi szczebel bardzo często
+            # siada", na którym stoi cała zakładka, nie miało ANI JEDNEGO
+            # rozliczenia — a strumień drabinek ma ROI −25%. Bez stempla nie da
+            # się rozdzielić wstecz, który poziom karty traci.
+            **({"szczebel": int(b["szczebel"])}
+               if isinstance(b.get("szczebel"), int) else {}),
             "opublikowano_ts": int(time.time()),
             # WERSJE ZAMROŻONE PRZY TYPIE (2026-08-01) — model / kalibracja /
             # polityka selekcji / dane. Bez tego każdy pomiar na tym logu
@@ -4703,6 +4711,134 @@ def ostrzezenia_trendu(uczenie: dict[str, dict]) -> list[str]:
 # publikacją, poza Skutecznością i poza korektą strumienia. Ta funkcja
 # zestawia obie grupy — dopiero ona odpowiada, czy próg jest w dobrym miejscu.
 POWOD_POMIARU_POKRYCIA = "pokrycie_pod_progiem"
+# DRUGI SZCZEBEL KARTY jako typ pomiarowy (2026-08-13) — patrz
+# `pomiar_szczebli_drabinek`. Ta sama mechanika co przy progu pokrycia:
+# rozlicza się w tle, poza Skutecznością i poza korektą strumienia.
+POWOD_POMIARU_DRUGIEGO = "drugi_szczebel"
+
+
+def _stat_drabinek(grp: list[dict]) -> dict:
+    """n / trafione / hit / średnie deklarowane p / ROI dla grupy rekordów."""
+    n = len(grp)
+    z_kursem = [r for r in grp if r.get("kurs") and float(r["kurs"]) > 1.0]
+    traf = sum(1 for r in grp if r["wynik"] == "wygrany")
+    return {
+        "n": n,
+        "trafione": traf,
+        "hit": round(traf / n, 3) if n else None,
+        "sr_p": (
+            round(sum(float(r["p_model"] or 0) for r in grp) / n, 3)
+            if n else None
+        ),
+        "roi": (
+            round(sum(
+                (float(r["kurs"]) - 1.0) if r["wynik"] == "wygrany"
+                else -1.0 for r in z_kursem
+            ) / len(z_kursem), 3) if z_kursem else None
+        ),
+    }
+
+
+def _p_przed_strumieniem(r: dict) -> float | None:
+    """Szansa szczebla PRZED korektą strumienia — z rachunku publikacji."""
+    rach = r.get("rachunek")
+    if isinstance(rach, dict) and isinstance(rach.get("p_over_raw"), (int, float)):
+        return float(rach["p_over_raw"])
+    return None
+
+
+def pomiar_szczebli_drabinek(log: dict) -> dict:
+    """PIERWSZY szczebel karty (hero) wobec DRUGIEGO — osobno rozliczane.
+
+    Zakładka Drabinki stoi na zdaniu usera „drugi szczebel bardzo często siada
+    i jest jakby głównym celem, żeby go upolować". Do 13.08 księga zapisywała
+    wyłącznie hero, więc to zdanie nie miało ani jednego rozliczenia, a cała
+    ocena karty (`_oceń_karte` uśrednia przewagę OBU szczebli) opierała się na
+    liczbie, której nikt nigdy nie sprawdził.
+
+    Zwraca `{"hero": …, "drugi": …, "pary": …, "korekta_strumienia": …}`:
+
+      * `hero` / `drugi` — statystyki obu poziomów (patrz `_stat_drabinek`),
+      * `pary` — karty, w których rozliczone są OBA szczeble; `oba` liczy te,
+        gdzie wszedł także drugi. To jedyna liczba odpowiadająca wprost na
+        „jak często udaje się upolować cel", bo grupy niezależne mieszałyby
+        karty z różnych dni i różnych rynków,
+      * `korekta_strumienia` — deklaracja drugiego szczebla PRZED i PO ścięciu
+        wspólną deltą, obie wobec tej samej częstości trafień. Kolejka pyta,
+        czy korektę zmierzoną na hero wolno nakładać na drugi szczebel; ta
+        para liczb jest odpowiedzią, gdy uzbiera się próba.
+
+    `min_n` w wyniku mówi wprost, od ilu rozliczeń warto to czytać — bez tego
+    pierwsze trzy karty wyglądają jak wniosek.
+    """
+    dr = [
+        r for r in log.values()
+        if r.get("wynik") in ("wygrany", "przegrany")
+        and r.get("zrodlo") == ZRODLO_DRABINKA
+        and _z_biezacej_epoki(r) and not _z_martwej_epoki(r)
+    ]
+    drugie = [r for r in dr if r.get("szczebel") == 2]
+    # hero: stempel 1 albo rekord bez stempla, ale NIE pomiarowy spod progu
+    # pokrycia — tamten mierzy zupełnie co innego i ma własną funkcję
+    hero = [
+        r for r in dr
+        if r.get("szczebel") != 2
+        and r.get("odrzucenie_powod") != POWOD_POMIARU_POKRYCIA
+    ]
+
+    # PARY: ten sam mecz, ten sam zawodnik, ten sam rynek. Drugi szczebel jest
+    # wyżej z definicji, więc jego wejście implikuje wejście pierwszego —
+    # rozjazd w tej relacji znaczy błąd rozliczenia, nie ciekawy wynik.
+    def _para(r: dict) -> tuple:
+        return (r.get("mecz_id"), rotowire._norm(str(r.get("podmiot") or "")),
+                r.get("rynek_kod"))
+
+    po_parze: dict[tuple, dict] = {}
+    for r in hero:
+        po_parze.setdefault(_para(r), {})["hero"] = r
+    for r in drugie:
+        po_parze.setdefault(_para(r), {})["drugi"] = r
+    pelne = [v for v in po_parze.values() if "hero" in v and "drugi" in v]
+    oba = sum(1 for v in pelne
+              if v["hero"]["wynik"] == "wygrany"
+              and v["drugi"]["wynik"] == "wygrany")
+    tylko_hero = sum(1 for v in pelne
+                     if v["hero"]["wynik"] == "wygrany"
+                     and v["drugi"]["wynik"] != "wygrany")
+    niespojne = sum(1 for v in pelne
+                    if v["drugi"]["wynik"] == "wygrany"
+                    and v["hero"]["wynik"] != "wygrany")
+
+    surowe = [p for p in (_p_przed_strumieniem(r) for r in drugie)
+              if p is not None]
+    traf_drugie = sum(1 for r in drugie if r["wynik"] == "wygrany")
+    return {
+        "hero": _stat_drabinek(hero),
+        "drugi": _stat_drabinek(drugie),
+        "pary": {
+            "n": len(pelne),
+            "oba": oba,
+            "tylko_hero": tylko_hero,
+            # rozliczenie, w którym wyższy szczebel wszedł, a niższy nie —
+            # arytmetycznie niemożliwe, więc alarm o rozliczaniu, nie o modelu
+            "niespojne": niespojne,
+            "udzial_oba": round(oba / len(pelne), 3) if pelne else None,
+        },
+        "korekta_strumienia": {
+            "n": len(surowe),
+            "deklaracja_przed": (
+                round(sum(surowe) / len(surowe), 3) if surowe else None
+            ),
+            "deklaracja_po": (
+                round(sum(float(r["p_model"] or 0) for r in drugie)
+                      / len(drugie), 3) if drugie else None
+            ),
+            "faktycznie": (
+                round(traf_drugie / len(drugie), 3) if drugie else None
+            ),
+        },
+        "min_n": KOREKTA_DRABINEK_MIN_N,
+    }
 
 
 def pomiar_progu_drabinek(log: dict) -> dict:
@@ -4722,34 +4858,18 @@ def pomiar_progu_drabinek(log: dict) -> dict:
       * gdy wychodzi gorzej, wniosek jest słabszy — część różnicy może
         pochodzić z luźniejszej bramy przewagi, nie z samego pokrycia.
     """
-    def _stat(grp: list[dict]) -> dict:
-        n = len(grp)
-        z_kursem = [r for r in grp if r.get("kurs") and float(r["kurs"]) > 1.0]
-        traf = sum(1 for r in grp if r["wynik"] == "wygrany")
-        return {
-            "n": n,
-            "trafione": traf,
-            "hit": round(traf / n, 3) if n else None,
-            "sr_p": (
-                round(sum(float(r["p_model"] or 0) for r in grp) / n, 3)
-                if n else None
-            ),
-            "roi": (
-                round(sum(
-                    (float(r["kurs"]) - 1.0) if r["wynik"] == "wygrany"
-                    else -1.0 for r in z_kursem
-                ) / len(z_kursem), 3) if z_kursem else None
-            ),
-        }
-
     dr = [
         r for r in log.values()
         if r.get("wynik") in ("wygrany", "przegrany")
         and r.get("zrodlo") == ZRODLO_DRABINKA
     ]
     return {
-        "opublikowane": _stat([r for r in dr if not r.get("odrzucony")]),
-        "pod_progiem": _stat([
+        # drugi szczebel (`szczebel == 2`) jest też `odrzucony`, ale mierzy co
+        # innego i ma własną funkcję — do żadnej z tych grup nie należy
+        "opublikowane": _stat_drabinek([
+            r for r in dr if not r.get("odrzucony") and r.get("szczebel") != 2
+        ]),
+        "pod_progiem": _stat_drabinek([
             r for r in dr
             if r.get("odrzucony")
             and r.get("odrzucenie_powod") == POWOD_POMIARU_POKRYCIA

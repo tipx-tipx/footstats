@@ -1330,6 +1330,16 @@ def _oceń_karte(
                 # drugi szczebel; karta ma go pokazać zamiast samego procentu
                 "drugi_traf": pok_nast.get("traf"),
                 "drugi_z": pok_nast.get("z"),
+                # SKŁADNIKI SZANSY DRUGIEGO SZCZEBLA, PRZED korektą strumienia
+                # (2026-08-13). Korekta jest zmierzona na szczeblach HERO,
+                # a nakładana na każdy szczebel drabinki — patrz
+                # `_z_korekta_strumienia` w budowie drabinki. Bez tych dwóch
+                # liczb w księdze pytanie „czy drugi szczebel wolno ścinać tą
+                # samą deltą" zostaje nierozstrzygalne wstecz: rozliczenie zna
+                # tylko liczbę PO ścięciu. Z nimi da się po kilkudziesięciu
+                # rozliczeniach porównać obie deklaracje z tą samą prawdą.
+                "drugi_p_bazowe": (nast or {}).get("p_bazowe"),
+                "drugi_korekta": (nast or {}).get("korekta"),
             }
             # OCENA KARTY LICZY SIĘ Z PARY SZCZEBLI, nie z jednej linii
             # (2026-08-08). Dotąd wygrywała karta z najlepszą pojedynczą linią,
