@@ -31,15 +31,35 @@ KEYS = ["value_bets", "matches", "players", "calibration", "meta", "kupony",
         "pokrycie_liga"]
 
 
+def _upsert(url: str, key: str, dane: str, opis: str):
+    """Jeden upsert do PostgREST, z ponowieniami. Zwraca odpowiedź albo None.
+
+    `timeout` klienta jest tu ZAPASEM, nie mechanizmem: pad z 13.08 przyszedł
+    po 18 sekundach jako 57014 z Postgresa, więc to baza pilnuje czasu, nie my.
+    """
+    from curl_cffi import requests
+
+    from .. import supa
+
+    return supa._z_ponowieniem(opis, lambda: requests.post(
+        f"{url}/rest/v1/app_data?on_conflict=key",
+        headers={
+            "apikey": key,
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json",
+            "Prefer": "resolution=merge-duplicates",
+        },
+        data=dane,
+        impersonate="chrome124",
+        timeout=120,
+    ))
+
+
 def push() -> bool:
     url = os.environ.get("SUPABASE_URL", "").rstrip("/")
     key = os.environ.get("SUPABASE_SERVICE_KEY", "")
     if not url or not key:
         return False
-
-    from curl_cffi import requests
-
-    from .. import supa
 
     # Jeśli job zostawił manifest (_manifest.json = klucze faktycznie
     # zapisane W TYM uruchomieniu), pushujemy WYŁĄCZNIE te klucze. Bez tego
@@ -68,41 +88,51 @@ def push() -> bool:
     if not rows:
         return False
 
-    # upsert (on_conflict=key) do PostgREST — JEDNYM żądaniem, celowo:
-    # strona ma zobaczyć komplet danych z tego samego cyklu albo nic. Podział
-    # na paczki zostawiałby ją w stanie mieszanym (świeże typy przy starym
-    # radarze), co jest gorsze niż jeden cykl opóźnienia.
+    # ⚑ DLACZEGO NAJPIERW JEDNYM ŻĄDANIEM, A DOPIERO POTEM PO JEDNYM
+    # (2026-08-13, POTWIERDZONE LOGIEM przebiegu #909):
     #
-    # ⚑ PONOWIENIA I TIMEOUT (2026-08-13). Ten POST idzie po ~31 minutach
-    # liczenia i niesie ~4,9 MB, a miał `timeout=30` i ZERO ponowień. Jego
-    # porażka wraca do `cycle.py` jako False, tam podnosi RuntimeError i wywala
-    # cały job — czyli jedno mrugnięcie sieci na runnerze kasowało pół godziny
-    # pracy i zostawiało stronę z danymi sprzed godzin. Dwa `failure` z 13.08
-    # (po 31,0 i 37,6 min, oba przy zdrowym limicie 70 min) pasują dokładnie do
-    # tego momentu cyklu. Upsert jest idempotentny, więc ponowienie niczego
-    # nie zdubluje.
+    #     Supabase push błąd 500: {"code":"57014",
+    #       "message":"canceling statement due to statement timeout"}
+    #     [stoper] wysyłka do Supabase: 0.3 min | CAŁY CYKL 31.0 min
+    #     RuntimeError: push_supabase.push() zwrócił False …
+    #
+    # To NIE był timeout po naszej stronie: wysyłka trwała 18 sekund przy
+    # limicie klienta 30 s. To POSTGRES przerwał własne zapytanie (57014),
+    # bo jeden upsert 14 kluczy waży ~4,9 MB (samo `players` to 2,9 MB)
+    # i ociera się o `statement_timeout` bazy. Pad wraca do `cycle.py`, tam
+    # podnosi RuntimeError i wywala cały job — czyli ~31 minut liczenia idzie
+    # do kosza, a strona zostaje z danymi sprzed godzin.
+    #
+    # Zbiorczy zapis ZOSTAJE jako pierwsze podejście, bo daje stronie komplet
+    # danych z jednego cyklu (żadnych świeżych typów przy starym radarze).
+    # Ale gdy baza go nie przyjmie, lepiej dowieźć klucze POJEDYNCZO niż nie
+    # dowieźć nic: każdy upsert jest wtedy kilkanaście razy mniejszy i mieści
+    # się w limicie z zapasem. Stan mieszany jest gorszy od kompletnego —
+    # ale wyraźnie lepszy od zera, bo dziś zerem kończył się cały cykl.
     dane = json.dumps(rows)
     print(f"Supabase: wysyłam {len(rows)} snapshotów, {len(dane) / 1e6:.2f} MB")
-    r = supa._z_ponowieniem("push snapshotów", lambda: requests.post(
-        f"{url}/rest/v1/app_data?on_conflict=key",
-        headers={
-            "apikey": key,
-            "Authorization": f"Bearer {key}",
-            "Content-Type": "application/json",
-            "Prefer": "resolution=merge-duplicates",
-        },
-        data=dane,
-        impersonate="chrome124",
-        # 30 s na ~4,9 MB to było ciasno: przy wolniejszej chwili runnera albo
-        # dłuższym zapisie JSONB po stronie bazy sam transfer potrafi to zjeść
-        timeout=120,
-    ))
-    if r is None:
-        print("Supabase push: brak odpowiedzi po ponowieniach", file=sys.stderr)
+    r = _upsert(url, key, dane, "push snapshotów")
+    if r is not None and r.status_code < 300:
+        print(f"Supabase: wypchnięto {len(rows)} snapshotów.")
+        return True
+
+    powod = "brak odpowiedzi" if r is None else f"{r.status_code}: {r.text[:200]}"
+    print(f"Supabase push zbiorczy nie przeszedł ({powod}) — "
+          "dosyłam po jednym kluczu", file=sys.stderr)
+    udane, nieudane = [], []
+    for wiersz in sorted(rows, key=lambda w: len(json.dumps(w))):
+        odp = _upsert(url, key, json.dumps([wiersz]), f"push '{wiersz['key']}'")
+        (udane if odp is not None and odp.status_code < 300
+         else nieudane).append(wiersz["key"])
+    if nieudane:
+        # świadomie False: część kluczy jest świeża, część nie, a `cycle.py`
+        # ma z tego zrobić awarię — inaczej rozjazd danych przeszedłby cicho
+        print(f"Supabase: dowiezione {len(udane)}, NIEDOWIEZIONE {len(nieudane)}: "
+              f"{', '.join(nieudane)}", file=sys.stderr)
         return False
-    if r.status_code >= 300:
-        print(f"Supabase push błąd {r.status_code}: {r.text[:200]}", file=sys.stderr)
-        return False
+    print(f"Supabase: wypchnięto {len(udane)} snapshotów po jednym "
+          "(zbiorczy zapis nie przeszedł)")
+    return True
     print(f"Supabase: wypchnięto {len(rows)} snapshotów.")
     return True
 

@@ -614,8 +614,30 @@ Legenda: `[x]` zrobione · `[~]` w toku / obejście · `[ ]` otwarte
   oddaje status, nie treść). Od 13.08 cykl zapisuje ślad do klucza
   `awarie_cyklu` (poza listą publiczną z migracji 0004, z maskowaniem
   sekretów), a kontrola startowa czyta go jako **część 0**.
-  **Zostaje otwarte:** sama przyczyna padów — będzie widać po kilku awariach,
-  czy to jedno źródło, czy różne miejsca.
+
+  ⚑ **PRZYCZYNA USTALONA 13.08 z logu przebiegu #909** (właściciel podesłał
+  log ręcznie):
+
+  ```
+  Supabase push błąd 500: {"code":"57014",
+    "message":"canceling statement due to statement timeout"}
+  [stoper] wysyłka do Supabase: 0.3 min | CAŁY CYKL 31.0 min
+  RuntimeError: push_supabase.push() zwrócił False …
+  ```
+
+  To **NIE był timeout po naszej stronie**: wysyłka trwała 18 s przy limicie
+  klienta 30 s. **Postgres przerwał własne zapytanie** — jeden upsert 14 kluczy
+  waży ~4,9 MB (samo `players` 2,9 MB) i ociera się o `statement_timeout` bazy.
+  Pad wraca do `cycle.py` jako `RuntimeError` i wywala cały job, więc ~31 minut
+  liczenia idzie do kosza.
+
+  → **Naprawione:** zbiorczy zapis zostaje pierwszym podejściem (komplet danych
+  z jednego cyklu), a gdy baza go nie przyjmie, klucze idą **pojedynczo** —
+  każdy upsert jest wtedy kilkanaście razy mniejszy. Częściowe dowiezienie
+  dalej zwraca `False`, żeby rozjazd danych nie przeszedł cicho.
+  **Alternatywa, gdyby wracało:** podnieść `statement_timeout` dla roli
+  `service_role` migracją SQL (do wklejenia ręcznie, jak 0004) albo odchudzić
+  `players`. Nie robimy tego dziś — najpierw sprawdzamy, czy dosyłanie wystarczy.
 - [ ] **Deploy nie jest blokowany testami** — Vercel wdrożył ~28 s przed
   końcem CI. Chroniony master, wymagane testy przed wdrożeniem, ręczna
   promocja albo feature flag.
