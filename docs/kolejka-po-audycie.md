@@ -224,12 +224,43 @@ Legenda: `[x]` zrobione · `[~]` w toku / obejście · `[ ]` otwarte
   rozstrzygnięciu SportsGamblera — jeśli tamten wejdzie, kontuzjowany i tak
   wypadnie z przewidywanej jedenastki i zostanie wąski margines
   (rozróżnienie „na ławce" od „nie ma go wcale").
-- [ ] **Nieużywane pola statshuba** — 49 pól, używamy 5. Dla rożnych liczymy
-  szóstym najlepszym predyktorem (strzały z pola karnego +0,145 kontra rożne
-  +0,082 na 536 parach). **Największa rezerwa jakości, zero dodatkowych
-  zapytań.** UWAGA: `opponentStatistics` jest już czytane
-  (`profil_druzyn.py`) — wcześniejszy zapis w `docs/zrodla-danych.md` był
-  nieaktualny.
+- [x] **Nieużywane pola statshuba — ZMIERZONE 13.08, REZERWY NIE MA.**
+  Teza audytu („największa rezerwa jakości") sprawdzona na obu poziomach.
+
+  **Zawodnicy** (1023 obserwacje na rynek, walidacja czasowa, 35 kandydatów):
+  w KAŻDYM rynku najlepszym predyktorem jest historia tego samego rynku.
+  Najlepszy obcy kandydat to `duelLost` dla fauli, +0,003 — szum.
+
+  ```
+  rynek             baza (historia rynku)   najlepszy obcy
+  shots                    0,344            onTargetScoringAttempt  -0,009
+  sot                      0,293            shots                   -0,002
+  fouls_committed          0,198            duelLost                +0,003
+  fouls_won                0,333            foulInvolvements        -0,011
+  tackles                  0,274            interceptionWon         -0,038
+  ```
+
+  **Drużyny — rożne** (961 obserwacji, bank ligowy 1677 meczów): tu obcy
+  predyktor faktycznie bije bazę **w korelacji** — `possession` 0,141 wobec
+  0,095 dla historii rożnych. Ale w realnym błędzie prognozy to nic:
+
+  ```
+  model                    błąd (out-of-sample)   poprawa
+  sama średnia ligi              2,406
+  historia rożnych (DZIŚ)        2,398             +0,3%
+  samo posiadanie                2,393             +0,2%
+  rożne + posiadanie             2,389             +0,4%   (kontrola: +0,9%)
+  ```
+
+  ⚑ **Najważniejsze z tego pomiaru:** historia rożnych bije zwykłą średnią
+  ligi o **0,3%**. Cały model rożnych na poziomie drużyny wnosi prawie nic
+  ponad „w meczu jest ~5 rożnych" — a deklaruje 77% przy 58% trafień.
+  To nie jest problem doboru cech, tylko tego, że rynek jest nieprzewidywalny,
+  a model o tym nie wie. Patrz `docs/pomiar-skad-luka-deklaracji.md`.
+
+  „Strzałów z pola karnego" z tezy audytu **nie mamy** — bank ma
+  `shots_outside` (spoza pola, 65% pokrycia).
+  UWAGA: `opponentStatistics` jest już czytane (`profil_druzyn.py`).
 - [ ] **Budżet: pamięć historii między cyklami** (zwolni 60–70%), priorytet
   po terminarzu, backoff na 429, cache negatywny.
 - [ ] **Minimalny budżet eksploracyjny** dla lig i rynków spoza bieżącej

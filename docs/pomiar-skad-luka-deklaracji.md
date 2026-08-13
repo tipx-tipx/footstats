@@ -166,6 +166,45 @@ Pilnuje `tests/test_prior_jednostki.py` (7 testów).
    `shots` wychodził na 2,03 przy 17 rekordach i −12,5 pp przy 114. **Zawsze
    sprawdzać, ile rekordów w ogóle ma `lambda`** (dziś 1144 z 2045).
 
+---
+
+## 7. Ile w ogóle da się przewidzieć — dopisane 13.08
+
+Przy okazji sprawdzania 49 pól statshuba wyszła liczba, która porządkuje
+wszystkie pozostałe. **Rożne drużyny są praktycznie nieprzewidywalne**:
+
+```
+model                      błąd prognozy (out-of-sample)   poprawa
+sama średnia ligi                    2,406
+historia rożnych (DZIŚ)              2,398                  +0,3%
+samo posiadanie                      2,393                  +0,2%
+rożne + posiadanie                   2,389                  +0,4%
+```
+
+Cały model rożnych na poziomie drużyny wnosi **0,3% ponad stwierdzenie
+„w meczu jest około pięciu rożnych"**. A deklaruje na tym rynku 77% przy
+58% trafień — stąd `team_corners` w kwarantannie.
+
+⚑ **To nie jest problem doboru cech.** Sprawdzono 8 kandydatów z banku
+i 35 pól zawodniczych; najlepszy obcy predyktor rożnych (`possession`) bije
+bazę w korelacji o połowę (0,141 wobec 0,095), a w błędzie prognozy o 0,4%.
+Przy tak słabym sygnale korelacja rośnie, a decyzje się nie zmieniają.
+
+**Wniosek dla modelu:** różnica między rynkami nie polega na tym, że jednym
+brakuje cech, tylko że jedne da się przewidzieć, a drugich nie:
+
+```
+przewidywalność (korelacja historii z następnym meczem)
+   shots            0,567     fouls_won        0,481
+   sot              0,492     tackles          0,436
+   fouls_committed  0,282     rożne drużyny    0,095
+```
+
+Model traktuje wszystkie tak samo pewnie. Siła ściągania per rynek
+(wdrożona 13.08 dla fauli) jest odpowiedzią na to samo pytanie —
+`team_corners` jest naturalnym kolejnym kandydatem, ale wymaga własnego
+pomiaru na ścieżce drużynowej, która ma inny prior niż zawodnicza.
+
 ## Jak to odtworzyć
 
 Skrypty pomiarowe (jednorazowe, katalog roboczy sesji): dyspersja Pearsona,
