@@ -188,18 +188,42 @@ Legenda: `[x]` zrobione · `[~]` w toku / obejście · `[ ]` otwarte
   procedura: `utid` z `event/by-date`, `comp365` z `/search/?query=`,
   weryfikacja liczby gier w `fixtures`/`results` PRZED dopisaniem.
 
-- [ ] **Diagnoza składów — zrobiona, wynik zmienia priorytet.** statshub
-  oddaje przewidywane XI dla **1 z 12** sprawdzonych meczów (endpoint działa —
-  Lyon 22 zawodników — po prostu nie ma danych dla naszych lig). Sofascore
-  jest jedynym realnym źródłem, ale kod ostrzega, że **blokuje IP serwerowni**,
-  więc w chmurze wypada; 13 składów z dry-runu to wynik LOKALNY.
-  → wniosek: dla Ameryki Płd. i Skandynawii nikt nie poda nam składów.
-  Jedyna droga to własny skład przewidywany z rotacji minut.
-- [ ] **Sofascore jako główne źródło składów** (dziś 13 z 307 meczów) —
-  najpierw diagnoza, czy to limit budżetu, czy coś innego.
-- [ ] **365Scores jako drugie źródło składów** (ma `lineups`, jest wpięte do
-  rozliczeń).
-- [ ] **Skład zastępczy z rotacji minut**, gdy nikt nie podaje XI.
+- [x] **Diagnoza składów — POTWIERDZONA I ROZSZERZONA 13.08.** Pomiar na
+  oknie 48 h: statshub oficjalny **0 ze 119**, przewidywany **2 ze 119**,
+  Rotowire pokrywa +5, 365Scores nie ma pola `lineups` przed gwizdkiem,
+  Sofascore blokuje IP serwerowni. **112 ze 119 meczów (94%) jedzie na samej
+  historii.** Pełny przegląd dziewięciu źródeł:
+  `docs/pomiar-wlasna-jedenastka.md`.
+- [x] **Sofascore jako główne źródło składów — ODRZUCONE.** Potwierdzone
+  empirycznie: działa z domowego PC, w chmurze blokuje IP serwerowni. To nie
+  jest limit budżetu.
+- [x] **365Scores jako drugie źródło składów — ODRZUCONE JAKO ŹRÓDŁO SKŁADU.**
+  Sprawdzone 13.08: `game/?gameId=` przed meczem NIE ma pola `lineups` (jest
+  dopiero po gwizdku). ⚑ Ma za to **listę nieobecnych**: `Missing` 57,
+  `Doubtful` 9 na 40 meczów (55% meczów), każdy rekord z `injury.reason`.
+  To jedyne działające w chmurze źródło do `injured_or_suspended` — patrz
+  osobna pozycja niżej.
+- [x] **Skład zastępczy z rotacji minut — ZMIERZONY I ODRZUCONY 13.08.**
+  Walidacja wsteczna: trafia 68,6% (7,5 z 11) wobec 85–90% prognoz medialnych,
+  a wpięty jako `predicted_started` **pogarsza Briera o 20%**. Model już
+  wyciska z historii wszystko; ograniczenie „startuje dokładnie 11" nie wnosi
+  nic (0,0%). Nie wracać bez NOWEGO ŹRÓDŁA, nie z nowym sposobem liczenia.
+- [ ] ⚑ **SportsGambler jako źródło składów — ZNALEZIONE, CZEKA NA POMIAR.**
+  Przewidywane XI **3–10 dni przed meczem**, HTTP 200 bez klucza, endpoint
+  `/lineups/lineups-load2.php?id=<ID>`. **1206 meczów ze składem w 18
+  rozgrywkach** — Brazylia A i B, Liga Profesional, MLS, Liga MX,
+  Libertadores, Sudamericana, Kolumbia, Urugwaj, Chile, Ekstraklasa,
+  Allsvenskan, Eliteserien, Superliga, Veikkausliiga, LM/LE/LK. Czyli
+  dokładnie ta luka, której nie zamyka żadne nasze źródło.
+  **Snapshot 730 prognoz zapisany** (`docs/pomiar/`), pomiar zamyka się po
+  rozegraniu tych meczów. Próg: wyraźnie powyżej 68,6%.
+- [ ] **Kontuzje i zawieszenia z 365Scores** — `injured_or_suspended`
+  (`engine.py`) zeruje minuty w modelu i **w produkcji nikt go nigdy nie
+  ustawia**; jedyne `True` jest w teście. Źródło działa w chmurze, parowanie
+  po nazwisku istnieje (`scores365.resolve_player_key`). ⚑ Robić **po**
+  rozstrzygnięciu SportsGamblera — jeśli tamten wejdzie, kontuzjowany i tak
+  wypadnie z przewidywanej jedenastki i zostanie wąski margines
+  (rozróżnienie „na ławce" od „nie ma go wcale").
 - [ ] **Nieużywane pola statshuba** — 49 pól, używamy 5. Dla rożnych liczymy
   szóstym najlepszym predyktorem (strzały z pola karnego +0,145 kontra rożne
   +0,082 na 536 parach). **Największa rezerwa jakości, zero dodatkowych
@@ -245,9 +269,63 @@ Legenda: `[x]` zrobione · `[~]` w toku / obejście · `[ ]` otwarte
   delty.** Objaw: przed naprawą znaku wszystkie duże rynki drużynowe
   siedziały dokładnie na dolnym capie. Obejście: mapa zamrożona. Teraz jest
   stempel `kal_rynek`, więc przebudowa ma na czym stanąć.
-- [ ] **Naddyspersja per rynek** — rożne (1,55) i strzały (1,88) są
-  nad-dyspersyjne, gole (0,94) i kartki (0,86) **pod**-dyspersyjne. Jedna
-  zmiana rozkładu na wszystkie rynki byłaby błędem.
+- [x] **Naddyspersja per rynek — ZMIERZONA I ODRZUCONA 13.08.** Rozrzut jest
+  realny i większy, niż zakładał audyt (Pearson wobec przewidywania:
+  `team_corners` 1,81, `team_shots` 1,75, `shots` 2,38, `team_cards` 0,69,
+  `fouls_committed` 0,77 — przy modelu zakładającym 1,00). **Ale wpływ na
+  deklarację to 0–2 pp**, bo linie stoją blisko średniej, a dyspersja rusza
+  ogony, nie środek: symulacja NB o tej samej średniej dała `team_corners`
+  +0,0 pp, `team_shots` −1,7 pp, `match_cards` +0,6 pp. Przy luce −12 pp to
+  nie jest przyczyna. ⚑ Liczyć Pearsonem WOBEC PRZEWIDYWANIA — surowa
+  wariancja miesza różnice między zawodnikami z szumem meczowym i zawyża
+  (2,57 wobec 1,75 dla `team_shots`).
+
+- [x] ⚑ **PRZYCZYNA LUKI ZNALEZIONA I NAPRAWIONA 13.08** (`ed4c306`) — to jest
+  odpowiedź na pytanie, którego dotyczyła większość tego bloku. Model liczy
+  poprawnie (bias 1,00 na wszystkich meczach), **zawyża selekcja**: na górnych
+  25% rozkładu λ bias to 1,13, na górnych 5% już 1,46, a dolne 25% jest
+  NIEdoszacowane (0,87). Powód siedział wprost w kodzie — `group_prior_from_context`
+  ściągała zawodnika do JEGO WŁASNEJ średniej zamiast do grupy porównawczej,
+  więc prior nie ściągał do niczego. Po naprawie bias na górze schodzi do
+  0,95–1,07, Brier lepszy o 2,5–7,8% w każdym z czterech rynków.
+  Pełny rozbiór siedmiu sprawdzonych mechanizmów:
+  `docs/pomiar-skad-luka-deklaracji.md`.
+  → **Do rozważenia (wymaga własnego pomiaru):** grupa per (rynek × pozycja)
+  zamiast samego rynku — wspólna średnia 1,61/90 zawyża obrońcę i zaniża
+  napastnika.
+
+- [x] **Faule zawodnicze wyceniane dwukrotnie za wysoko — NAPRAWIONE 13.08.**
+  Model deklarował ~51% na „powyżej 1,5 faula", a realnie to **25,8%**
+  (1220 meczów naszych zawodników: średnio 0,98 faula na mecz, 41% meczów
+  bez ani jednego).
+
+  Sprawdzone i ODRZUCONE po drodze: usterka rozliczania (ten sam rozkład zer
+  w innych strumieniach), mnożnik sędziego (wynosi 1,000 — patrz osobne
+  znalezisko niżej), kształt rozkładu (wariancja/średnia 1,24, Poisson pasuje
+  do 4 pp).
+
+  Przyczyna: **model wierzył historii fauli tak samo mocno jak historii
+  strzałów**, a to najmniej powtarzalny rynek, jaki mamy:
+
+  ```
+  korelacja historii z następnym meczem (1023 obserwacje, walidacja czasowa)
+     shots           0,567  (R² 0,32)
+     sot             0,492  (R² 0,24)
+     fouls_won       0,481  (R² 0,23)
+     tackles         0,436  (R² 0,19)
+     fouls_committed 0,282  (R² 0,08)   <- historia mówi prawie nic
+  ```
+
+  → `SILA_PRIORU_RYNKU = {"fouls_committed": 25.0}` (reszta zostaje na 5,0).
+  Zmierzone: Brier na górze rozkładu 0,2361 → 0,2304, bias 1,09 → 0,98.
+  ⚑ **Zmieniony JEDEN rynek.** `shots` i `sot` mają dziś optimum; przy
+  `fouls_won` i `tackles` Brier poprawiał się o ułamek, ale bias się psuł.
+
+- [ ] **Profil sędziego nie działa — 69 sędziów w pamięci, ZERO z mnożnikiem.**
+  Znalezione przy okazji fauli 13.08: `czynniki.sedzia` wynosi 1,000 w każdym
+  rynku dyscyplinarnym (`team_cards` 3% powyżej 1,0, `match_cards` 2%, reszta
+  0%). Czyli `referee_factor` istnieje, jest wpięty i nic nie robi. Sędzia
+  ma sens akurat na faulach i kartkach — czyli tam, gdzie luka jest największa.
 
 ---
 

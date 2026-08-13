@@ -102,17 +102,62 @@ def test_jednostki_per90_takze_przy_grupie():
     assert build_wc_fast.group_prior_from_context(tr).mean_per90 == pytest.approx(4.0)
 
 
-def test_sila_prioru_bez_zmian():
-    """Naprawa dotyczy TEGO, DO CZEGO ściągamy — nie tego, jak mocno.
+def test_sila_prioru_domyslna_dla_wiekszosci_rynkow():
+    """Siła 5,0 jest zmierzona i dla większości rynków optymalna.
 
-    Siła 5,0 została osobno zmierzona (1284 obserwacje): Brier 0,1782 przy
-    pseudo=5 wobec 0,1769 przy 2 i 0,1885 przy 20. Zmiana wymaga własnego
-    pomiaru, nie jest efektem ubocznym tej poprawki.
+    1284 obserwacje, walidacja czasowa: `shots` ma przy 5,0 bias 0,97,
+    `sot` 0,99. Zmiana wymaga własnego pomiaru per rynek.
     """
     tr = _Trend(counts=[2.0], minutes=[90.0])
     srednie, licz = _grupa(shots=(2.0, 40))
     assert build_wc_fast.group_prior_from_context(
         tr, srednie, licz).pseudo_matches == 5.0
+
+
+# --- siła ściągania zależna od rynku ---
+
+def test_faule_sciagane_mocniej_bo_historia_ich_nie_przewiduje():
+    """Historia fauli tłumaczy 8% następnego meczu (korelacja 0,282).
+
+    Przy sile 5,0 model deklarował ~51% na „powyżej 1,5 faula" przy realnych
+    25,8%. Pomiar (1283 obserwacje): pseudo 25 daje Brier 0,2304 i bias 0,98,
+    wobec 0,2361 i 1,09 przy pięciu.
+    """
+    tr = _Trend(counts=[3.0] * 10, minutes=[90.0] * 10,
+                market_code="fouls_committed")
+    srednie, licz = _grupa(fouls_committed=(1.2, 40))
+    prior = build_wc_fast.group_prior_from_context(tr, srednie, licz)
+    assert prior.pseudo_matches == 25.0
+    assert prior.mean_per90 == pytest.approx(1.2)
+
+
+def test_mocniejsze_sciaganie_tylko_gdy_JEST_do_czego():
+    """Bez grupy silniejszy prior ściągałby zawodnika do niego samego.
+
+    Przy fallbacku na własną historię `mean_per90` to średnia tego zawodnika,
+    więc podnoszenie siły nic nie zmienia — poza tym, że wygląda, jakby coś
+    robiło. Zostaje wartość domyślna.
+    """
+    tr = _Trend(counts=[3.0] * 10, minutes=[90.0] * 10,
+                market_code="fouls_committed")
+    assert build_wc_fast.group_prior_from_context(tr).pseudo_matches == 5.0
+    srednie, licz = _grupa(fouls_committed=(1.2, 3))   # grupa za mała
+    assert build_wc_fast.group_prior_from_context(
+        tr, srednie, licz).pseudo_matches == 5.0
+
+
+def test_pozostale_rynki_bez_zmiany_sily():
+    """⚑ Zmieniamy JEDEN rynek, nie wszystkie „dla porządku".
+
+    Przy `fouls_won` (2) i `tackles` (8) Brier poprawiał się o ułamek, ale
+    bias się psuł: 1,01 -> 1,11 i 0,96 -> 0,90. Zmiana kompletu stałych
+    pogorszyłaby trzy rynki, żeby poprawić jeden.
+    """
+    for mk in ("shots", "sot", "fouls_won", "tackles"):
+        tr = _Trend(counts=[2.0], minutes=[90.0], market_code=mk)
+        srednie, licz = {mk: 1.5}, {mk: 40}
+        assert build_wc_fast.group_prior_from_context(
+            tr, srednie, licz).pseudo_matches == 5.0, mk
 
 
 def test_podloga_dziala_takze_dla_grupy():

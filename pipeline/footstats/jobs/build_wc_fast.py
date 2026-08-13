@@ -2421,6 +2421,34 @@ def srednie_grupowe(trends: list) -> dict[str, float]:
 # niż ściągać do średniej z trzech przypadkowych osób.
 MIN_GRUPY_DO_PRIORU = 8
 
+# ILE WIERZYĆ HISTORII ZAWODNIKA — osobno dla rynku, który się nie powtarza.
+#
+# Rynki różnią się tym, jak bardzo przeszłość zawodnika mówi cokolwiek o jego
+# następnym meczu. Zmierzone 13.08 (1023 obserwacje na rynek, walidacja
+# czasowa — korelacja między prognozą z historii a tym, co faktycznie padło):
+#
+#     shots            0,567   (R² 0,32)   historia mówi sporo
+#     sot              0,492   (R² 0,24)
+#     fouls_won        0,481   (R² 0,23)
+#     tackles          0,436   (R² 0,19)
+#     fouls_committed  0,282   (R² 0,08)   historia mówi prawie nic
+#
+# Model wierzył wszystkim tak samo (5,0). Przy faulach kończyło się to
+# deklaracją ~51% na „powyżej 1,5", przy realnych 25,8% — dwukrotnie za dużo.
+#
+# Dobrane pomiarem, nie wzorem (1283 obserwacje, wspólna linia, prior grupowy,
+# kryterium: Brier na GÓRZE rozkładu, gdzie powstają typy):
+#
+#     fouls_committed   pseudo 5 -> Brier 0,2361, bias 1,09
+#                       pseudo 25 -> Brier 0,2304, bias 0,98
+#
+# ⚑ ZMIENIAMY TYLKO TEN JEDEN RYNEK. `shots` i `sot` mają dziś optimum
+# (bias 0,97 i 0,99). Przy `fouls_won` (2) i `tackles` (8) Brier poprawia się
+# o ułamek, ale bias się PSUJE — 1,01 -> 1,11 i 0,96 -> 0,90. Zmiana wszystkich
+# stałych naraz „dla porządku" pogorszyłaby trzy rynki, żeby poprawić jeden.
+SILA_PRIORU_RYNKU = {"fouls_committed": 25.0}
+SILA_PRIORU_DOMYSLNA = 5.0
+
 
 def group_prior_from_context(
     trend: statshub.StatshubTrend,
@@ -2482,7 +2510,14 @@ def group_prior_from_context(
     else:
         # leagueAverage bywa w skali drużynowej dla części rynków — ostatnia deska
         base = float(trend.league_average or 0.8)
-    return counts.GroupPrior(mean_per90=max(base, 0.15), pseudo_matches=5.0)
+
+    # ⚑ SIŁA ŚCIĄGANIA ZALEŻY OD RYNKU (patrz `SILA_PRIORU_RYNKU`) — ale tylko
+    # wtedy, gdy jest do czego ściągać. Przy fallbacku na własną historię
+    # mocniejszy prior nic nie robi (ściągałby zawodnika do niego samego),
+    # a przy średniej ligi byłby ściąganiem do liczby w innej skali.
+    sila = (SILA_PRIORU_RYNKU.get(mk, SILA_PRIORU_DOMYSLNA)
+            if (grupowa is not None and grupowa > 0) else SILA_PRIORU_DOMYSLNA)
+    return counts.GroupPrior(mean_per90=max(base, 0.15), pseudo_matches=sila)
 
 
 # nowe wpisy sędziowskie per cykl (game_referee + pełne staty per mecz) —
