@@ -48,7 +48,7 @@ def test_wersje_w_ksiedze_widzi_tylko_zywe_publikowane():
         "e": _rec(mecz_id=5, sugestia=True),            # sugestia
     }
     out = B.wersje_w_ksiedze(log)
-    assert list(out.values()) == ["2026-07-31-stara"], (
+    assert list(out.values()) == [(None, "2026-07-31-stara")], (
         "tylko żywy, publikowany typ może kolidować — reszty user nie widział"
     )
 
@@ -60,15 +60,55 @@ def test_typ_z_kolizja_wersji_nie_wraca_na_liste(monkeypatch):
     wersje_log = B.wersje_w_ksiedze({"k": stary})
     swiezy = _rec(p_model=0.8325)          # ten sam zakład, nowy rachunek
     klucz = B._klucz_publikacji(swiezy)
-    assert wersje_log.get(klucz) == "2026-07-31-stara"
-    assert wersje_log[klucz] != betting.WERSJA_KALIBRACJI
+    assert wersje_log.get(klucz) == (None, "2026-07-31-stara")
+    assert wersje_log[klucz][1] != betting.WERSJA_KALIBRACJI
+
+
+def test_kolizja_lapie_takze_sam_rachunek_p():
+    """⚑ 2026-08-14: naprawa priora zmieniła `p`, a kalibracji nie ruszyła —
+    brama patrząca na samą kalibrację przepuściła 257 typów sprzed naprawy."""
+    stary = {**_rec(p_model=0.869),
+             "wersje": {"model": "2026-08-11-orientacja-over",
+                        "kalibracja": betting.WERSJA_KALIBRACJI}}
+    wersje_log = B.wersje_w_ksiedze({"k": stary})
+    klucz = B._klucz_publikacji(stary)
+    w_model, w_kal = wersje_log[klucz]
+    assert w_kal == betting.WERSJA_KALIBRACJI, "kalibracja się zgadza…"
+    assert w_model != betting.WERSJA_MODELU, "…a rachunek `p` już nie"
+
+
+def test_stempel_spozniony_o_dobe_nie_liczy_sie_jako_kolizja():
+    """Rekord opublikowany PO wdrożeniu naprawy priora, ale ostemplowany starą
+    wersją (podbiliśmy ją dobę później), opisuje BIEŻĄCY rachunek."""
+    spozniony = {**_rec(opublikowano_ts=R.NAPRAWA_PRIORA_TS + 3600),
+                 "wersje": {"model": "2026-08-11-orientacja-over",
+                            "kalibracja": betting.WERSJA_KALIBRACJI}}
+    klucz = B._klucz_publikacji(spozniony)
+    w_model, _ = B.wersje_w_ksiedze({"k": spozniony})[klucz]
+    assert w_model == betting.WERSJA_MODELU
+
+    sprzed = {**_rec(opublikowano_ts=R.NAPRAWA_PRIORA_TS - 3600),
+              "wersje": {"model": "2026-08-11-orientacja-over",
+                         "kalibracja": betting.WERSJA_KALIBRACJI}}
+    w_model2, _ = B.wersje_w_ksiedze({"k": sprzed})[B._klucz_publikacji(sprzed)]
+    assert w_model2 == "2026-08-11-orientacja-over"
+
+
+def test_wersja_modelu_rekordu_nie_rusza_innych_wersji():
+    """Poprawka dotyczy JEDNEJ wersji. Rekord sprzed wersjonowania zostaje
+    bez wersji, a starsze stemple nie awansują przez sam czas publikacji."""
+    assert R.wersja_modelu_rekordu({"opublikowano_ts": R.NAPRAWA_PRIORA_TS + 1}) is None
+    starszy = {"wersje": {"model": "2026-07-31-korekta-znaku"},
+               "opublikowano_ts": R.NAPRAWA_PRIORA_TS + 1}
+    assert R.wersja_modelu_rekordu(starszy) == "2026-07-31-korekta-znaku"
 
 
 def test_brak_kolizji_gdy_wersje_zgodne():
     zgodny = _rec()
     wersje_log = B.wersje_w_ksiedze({"k": zgodny})
     klucz = B._klucz_publikacji(zgodny)
-    assert wersje_log[klucz] == betting.WERSJA_KALIBRACJI
+    assert wersje_log[klucz] == (betting.WERSJA_MODELU,
+                                 betting.WERSJA_KALIBRACJI)
 
 
 # --- 2. ZAMROŻONA KALIBRACJA: FAIL-CLOSED -----------------------------------

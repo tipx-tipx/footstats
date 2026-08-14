@@ -8,6 +8,7 @@ a przy zerze typów mecz wypadał nawet z `matches`.
 import time
 
 from footstats.jobs import build_wc_fast as B
+from footstats.jobs import rozliczanie as R
 from footstats.model import betting
 
 
@@ -160,6 +161,75 @@ def test_typ_z_obcej_wersji_kalibracji_nie_wraca_na_liste(monkeypatch):
     bez = _wpis_logu()
     bez.pop("wersje")
     out2, wzn2 = B.scal_z_publikacjami([], {}, typy_log={"k": bez})
+    assert wzn2 == 0 and out2 == []
+
+
+def test_typ_z_obcego_rachunku_p_tez_nie_wraca(monkeypatch):
+    """⚑ 2026-08-14. Naprawa priora zmieniła `p`, kalibracji nie ruszyła —
+    reguła patrząca na samą kalibrację wznawiała typy z zawyżoną liczbą.
+    Zmierzone: 70 z 88 typów na stronie pochodziło sprzed naprawy.
+    """
+    magazyn: dict = {}
+    _stub_supa(monkeypatch, magazyn)
+    stary = _wpis_logu(
+        wersje={**betting.wersje_publikacji(),
+                "model": "2026-08-11-orientacja-over"},
+        opublikowano_ts=R.NAPRAWA_PRIORA_TS - 3600,
+    )
+    out, wzn = B.scal_z_publikacjami([], {}, typy_log={"k": stary})
+    assert wzn == 0 and out == [], "kalibracja się zgadza, ale rachunek `p` nie"
+
+
+def test_typ_ze_spoznionym_stemplem_wraca_normalnie(monkeypatch):
+    """Przez dobę produkcja liczyła nowym priorem, stemplując go starą wersją.
+    Taki typ opisuje BIEŻĄCY rachunek i ma prawo wrócić na listę."""
+    magazyn: dict = {}
+    _stub_supa(monkeypatch, magazyn)
+    spozniony = _wpis_logu(
+        wersje={**betting.wersje_publikacji(),
+                "model": "2026-08-11-orientacja-over"},
+        opublikowano_ts=R.NAPRAWA_PRIORA_TS + 3600,
+    )
+    out, wzn = B.scal_z_publikacjami([], {}, typy_log={"k": spozniony})
+    assert wzn == 1 and len(out) == 1
+
+
+def test_rejestr_tez_wstrzymuje_wznowienie_z_obcego_rachunku(monkeypatch):
+    """Druga droga wznowień — rejestr publikacji — ma tę samą regułę."""
+    magazyn: dict = {}
+    _stub_supa(monkeypatch, magazyn)
+    out, _ = B.scal_z_publikacjami([_bet()], {1: {"id": 1}})
+    assert len(out) == 1, "cykl, w którym typ powstał, nie jest wznowieniem"
+    # rejestr stempluje wersję sam (patrz `scal_z_publikacjami`), więc wpis
+    # sprzed naprawy priora odtwarzamy tu tak, jak leży dziś na produkcji
+    for wpis in magazyn[B.PUBLIKACJE_KLUCZ].values():
+        wpis["opublikowano_ts"] = R.NAPRAWA_PRIORA_TS - 3600
+        wpis["bet"]["wersje"]["model"] = "2026-08-11-orientacja-over"
+    out2, wzn2 = B.scal_z_publikacjami([], {1: {"id": 1}})
+    assert wzn2 == 0 and out2 == []
+
+
+def test_ogloszona_doba_dokancza_dzien_mimo_wersji(monkeypatch):
+    """⚑ decyzja właściciela 14.08. Doba domknięta o 6:00 jest OGŁOSZONA i idzie
+    do końca w swoim składzie — inaczej podbicie wersji kasuje dzisiejszą stronę
+    w środku dnia, a domknięta doba nie ma się czym uzupełnić (zmierzone:
+    15 z 15 typów doby 14.08). Dni otwarte reguła obowiązuje normalnie."""
+    magazyn: dict = {}
+    _stub_supa(monkeypatch, magazyn)
+    stary = _wpis_logu(
+        wersje={**betting.wersje_publikacji(),
+                "model": "2026-08-11-orientacja-over"},
+        opublikowano_ts=R.NAPRAWA_PRIORA_TS - 3600,
+    )
+    dzien = B.dzien_listy(stary["kickoff_ts"])
+    zamkniete = {dzien: {B._klucz_publikacji(stary)}}
+    out, wzn = B.scal_z_publikacjami([], {}, typy_log={"k": stary},
+                                     zamkniete=zamkniete)
+    assert wzn == 1 and len(out) == 1, "typ z ogłoszonej listy dokańcza dzień"
+
+    # ten sam typ w dobie, której nie ogłosiliśmy — schodzi
+    out2, wzn2 = B.scal_z_publikacjami([], {}, typy_log={"k": stary},
+                                       zamkniete={dzien: {"inny:klucz"}})
     assert wzn2 == 0 and out2 == []
 
 

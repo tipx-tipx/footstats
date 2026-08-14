@@ -346,7 +346,23 @@ def ekran_typu(b: dict) -> str:
 # znak — `team_corners` 0,70-0,85 idzie z +0,443 na −0,588 — więc rekordy
 # sprzed tej chwili znowu opisują inny produkt. Rachunek `p` bez zmian, stąd
 # `WERSJA_MODELU` stoi.
-WERSJA_MODELU = "2026-08-11-orientacja-over"
+# ⚑ 2026-08-13: PRIOR ŚCIĄGA DO GRUPY, NIE DO SIEBIE SAMEGO. Cztery zmiany
+# tego dnia ruszyły sam rachunek `p`, a nie warstwę uczenia nad nim:
+#   ed4c306  prior zawodnika ściąga do średniej 4600 zawodników, nie do
+#            średniej tego samego zawodnika (czyli wcześniej do niczego),
+#   4cf577e  prior drużynowy ściąga do średniej ligi siłą 8 (kartki, faule)
+#            i 15 (strzały, celne, rożne, gole) zamiast 4 dla wszystkiego,
+#   765d7cc  prior liczy się na 90 minut, nie na mecz,
+#   c5b6cc9  faulom wierzymy 5× słabiej.
+# Skutek zmierzony na banku ligowym: luka na górze rozkładu, czyli tam, gdzie
+# powstają typy, spada z −18,9 do −7,6 pp (rożne) i z −11,5 do −4,1 (gole),
+# a podaż typów maleje o 20-30%. To jest INNY PRODUKT niż 12.08 i rekordów
+# nie wolno mieszać w żadnym pomiarze prognozy.
+# ⚑ Wersję podbito dopiero 14.08, przy kontroli startowej — przez dobę
+# produkcja liczyła nowym rachunkiem, stemplując go starą wersją. Rekordy
+# z tej doby rozpoznaje `rozliczanie.wersja_modelu_rekordu` po czasie
+# publikacji; historii nie przepisujemy wstecz.
+WERSJA_MODELU = "2026-08-13-prior-grupowy"
 WERSJA_KALIBRACJI = "2026-08-12-prior-przedzialu"
 WERSJA_POLITYKI = "2026-08-01-podloga-kursu"
 WERSJA_DANYCH = "2026-07-27-liga-klubowa"

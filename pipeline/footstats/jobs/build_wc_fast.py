@@ -441,6 +441,7 @@ def scal_z_publikacjami(
     value_bets: list[dict], matches_out: dict, teraz: int | None = None,
     typy_log: dict | None = None, liga_by_mid: dict | None = None,
     policzone_w_cyklu: list[dict] | None = None,
+    zamkniete: dict[str, set] | None = None,
 ) -> tuple[list[dict], int]:
     """Lista typów = wszystko, co OPUBLIKOWANE i czeka na gwizdek.
 
@@ -530,6 +531,7 @@ def scal_z_publikacjami(
     _skasowane_po_gwizdku = 0
     _skasowane_bez_daty = 0
     _wznow_obca_wersja = 0   # patrz reguła wersji przy wznawianiu, niżej
+    _wznow_ogloszona_doba = 0   # wpuszczone mimo wersji — `na_ogloszonej_liscie`
     for k, rec in list(rej.items()):
         ts_k = int(rec.get("kickoff_ts") or 0)
         # brak kickoffu traktujemy jak po gwizdku: wpis bez daty nigdy by nie
@@ -565,10 +567,28 @@ def scal_z_publikacjami(
         # Rekord zostaje w rejestrze i w księdze — rozliczy się i policzy jako
         # V1, tylko nie wraca na LISTĘ REKOMENDACJI. To jest różnica między
         # „usuwamy historię" a „przestajemy to polecać".
-        _w_bet = (bet.get("wersje") or {}).get("kalibracja")
-        if _w_bet != betting.WERSJA_KALIBRACJI:
-            _wznow_obca_wersja += 1
-            continue
+        #
+        # ⚑ TO SAMO DOTYCZY RACHUNKU `p`, NIE TYLKO KALIBRACJI (2026-08-14).
+        # Naprawa priora z 13.08 zmieniła `p`, a kalibracji nie ruszyła — więc
+        # ta reguła jej nie zobaczyła i wznawiała typy z liczbą, o której z
+        # pomiaru wiadomo, że jest zawyżona (na górze rozkładu −18,9 pp na
+        # rożnych, −11,5 na golach). Zmierzone przy kontroli startowej: 70 z 88
+        # typów na stronie pochodziło sprzed naprawy, najstarszy z 10.08.
+        #
+        # Wyjątek: doba OGŁOSZONA dokańcza swój dzień — patrz
+        # `na_ogloszonej_liscie`.
+        _wersje_bet = bet.get("wersje") or {}
+        _model_bet = rozliczanie.wersja_modelu_rekordu(
+            {"wersje": _wersje_bet,
+             "opublikowano_ts": rec.get("opublikowano_ts")}
+        )
+        if (_wersje_bet.get("kalibracja") != betting.WERSJA_KALIBRACJI
+                or (_model_bet and _model_bet != betting.WERSJA_MODELU)):
+            if na_ogloszonej_liscie(bet, zamkniete):
+                _wznow_ogloszona_doba += 1
+            else:
+                _wznow_obca_wersja += 1
+                continue
         bet["wznowiony"] = True
         bet["opublikowano_ts"] = rec.get("opublikowano_ts")
         # CENA ZAMROŻONA, tak jak obiecuje karta. Rejestr odświeżał `bet`
@@ -660,10 +680,16 @@ def scal_z_publikacjami(
             continue                      # po gwizdku
         # ta sama reguła wersji co przy rejestrze wyżej — księga jest DRUGIM
         # źródłem wznowień, więc bez tego typ V1 wracałby na listę tędy
-        if (rec.get("wersje") or {}).get("kalibracja") \
-                != betting.WERSJA_KALIBRACJI:
-            _wznow_obca_wersja += 1
-            continue
+        # (od 14.08 obie wersje: kalibracja I rachunek `p`)
+        _model_rec = rozliczanie.wersja_modelu_rekordu(rec)
+        if ((rec.get("wersje") or {}).get("kalibracja")
+                != betting.WERSJA_KALIBRACJI
+                or (_model_rec and _model_rec != betting.WERSJA_MODELU)):
+            if na_ogloszonej_liscie(rec, zamkniete):
+                _wznow_ogloszona_doba += 1
+            else:
+                _wznow_obca_wersja += 1
+                continue
         k = _klucz_publikacji(rec)
         if k in odtworzone:
             continue
@@ -777,8 +803,14 @@ def scal_z_publikacjami(
         # NIE „zniknęły" — zostają w rejestrze i w księdze, rozliczą się
         # i policzą jako swoja wersja. Przestają tylko być rekomendacją.
         print(f"Wznowienia wstrzymane przez wersję: {_wznow_obca_wersja} typów "
-              f"policzonych inną kalibracją niż {betting.WERSJA_KALIBRACJI} "
-              "— zostają w księdze, nie wracają na listę")
+              f"policzonych innym rachunkiem niż {betting.WERSJA_MODELU} / "
+              f"{betting.WERSJA_KALIBRACJI} — zostają w księdze, nie wracają "
+              "na listę")
+    if _wznow_ogloszona_doba:
+        # licznik przy wyjątku, nie cisza ([[ciche-odrzucenia-zasada]])
+        print(f"Ogłoszona doba dokańcza dzień: {_wznow_ogloszona_doba} typów "
+              "wróciło mimo innej wersji, bo stoją w zamrożonej liście dnia "
+              "(nowe typy tej doby i tak nie wejdą)")
     return out, wznowione + z_logu
 
 
@@ -1029,6 +1061,32 @@ def wczytaj_zamkniete(manifest: dict | None) -> dict[str, set]:
         if isinstance(wpis, dict) and wpis.get("zamkniete_ts"):
             out[dzien] = set(wpis.get("klucze") or [])
     return out
+
+
+def na_ogloszonej_liscie(b: dict, zamkniete: dict[str, set] | None) -> bool:
+    """Czy ten zakład stoi w składzie doby, którą już ogłosiliśmy.
+
+    ⚑ ZAMROŻONA LISTA MA PIERWSZEŃSTWO PRZED REGUŁĄ WERSJI (2026-08-14,
+    decyzja właściciela). Kolizja wersji zdejmuje typy policzone rachunkiem,
+    którego już nie używamy — ale doba domknięta o 6:00 jest OGŁOSZONA i ma
+    dojść do końca w składzie, który klient zobaczył rano. Bez tego wyjątku
+    każde podbicie wersji kasowało dzisiejszą stronę w środku dnia: zmierzone
+    przy tej zmianie — 15 z 15 typów doby 14.08 schodziło, a domknięta doba
+    nie ma się czym uzupełnić, więc strona zostawała bez ani jednego typu na
+    dziś aż do 6:00 następnego dnia.
+
+    Ryzyko jest po drugiej stronie i jest MNIEJSZE: typ z ogłoszonej listy
+    wraca z zamrożonym `bet`, czyli pokazuje dokładnie tę liczbę, po której
+    rozliczy go księga. Rozjazd karta-księga — powód, dla którego brama
+    powstała — tu nie zachodzi. Zostaje to, że przez kilkanaście godzin
+    polecamy szansę policzoną starym rachunkiem.
+
+    Dni JESZCZE OTWARTE reguła obowiązuje normalnie: tam typ ze starego
+    rachunku po prostu ustępuje miejsca policzonemu na nowo.
+    """
+    dzien = dzien_listy(b.get("kickoff_ts"))
+    klucze = (zamkniete or {}).get(dzien)
+    return bool(klucze) and _klucz_publikacji(b) in klucze
 
 
 def domknij_dni(
@@ -1335,8 +1393,8 @@ def czynniki_pary(h_n: dict, a_n: dict, nazwa_bazy: str, rho: float) -> list[dic
     return czynniki
 
 
-def wersje_w_ksiedze(log: dict) -> dict[str, str]:
-    """Z ZAMROŻONEJ księgi: jaką wersją kalibracji policzono NIEROZLICZONY typ.
+def wersje_w_ksiedze(log: dict) -> dict[str, tuple[str | None, str | None]]:
+    """Z ZAMROŻONEJ księgi: jakim RACHUNKIEM policzono NIEROZLICZONY typ.
 
     ⚑ ROZJAZD KARTA–KSIĘGA (znaleziony audytem 2026-08-11, potwierdzony na
     danych). `rozliczanie._dopisz_nowe` przy istniejącym kluczu aktualizuje
@@ -1355,19 +1413,31 @@ def wersje_w_ksiedze(log: dict) -> dict[str, str]:
     zostać nietknięty i rozliczyć się jako historia tego, co naprawdę stało
     na stronie. Kolizja wygasa sama, gdy tamten typ przejdzie swój mecz.
 
-    Zwraca {klucz_publikacji: wersja_kalibracji}; tylko typy NIEROZLICZONE
-    i tylko te, które faktycznie były na liście (odrzucone i tło nie kolidują
-    — user ich nie widział, ta sama zasada co w `linie_opublikowane`).
+    ⚑ BRAMA PATRZY NA MODEL I KALIBRACJĘ (2026-08-14). Do dziś porównywała samą
+    `wersje.kalibracja`, więc widziała tylko połowę rachunku. Zmierzone przy
+    kontroli startowej: naprawa priora z 13.08 zmieniła `p` (podaż typów −23%,
+    luka na górze rozkładu −18,9 → −7,6 pp na rożnych), kalibracji nie ruszyła
+    — i **257 typów sprzed naprawy wróciło na stronę** z zamrożoną, zawyżoną
+    liczbą, najstarszy z 10.08. Dokładnie ten rozjazd, dla którego bramę
+    zbudowano, tyle że drugą drogą.
+
+    Zwraca {klucz_publikacji: (wersja_modelu, wersja_kalibracji)}; tylko typy
+    NIEROZLICZONE i tylko te, które faktycznie były na liście (odrzucone i tło
+    nie kolidują — user ich nie widział, ta sama zasada co w
+    `linie_opublikowane`).
     """
-    out: dict[str, str] = {}
+    out: dict[str, tuple[str | None, str | None]] = {}
     for r in (log or {}).values():
         if r.get("wynik") is not None or r.get("sugestia"):
             continue
         if r.get("odrzucony") or r.get("poza_publikacja"):
             continue
-        w = (r.get("wersje") or {}).get("kalibracja")
-        if w:
-            out[_klucz_publikacji(r)] = w
+        w = r.get("wersje") or {}
+        # model czytamy przez `wersja_modelu_rekordu`, bo stempel bywa
+        # spóźniony o dobę względem wdrożenia — patrz nota w rozliczanie.py
+        if w.get("model") or w.get("kalibracja"):
+            out[_klucz_publikacji(r)] = (rozliczanie.wersja_modelu_rekordu(r),
+                                         w.get("kalibracja"))
     return out
 
 
@@ -6963,6 +7033,16 @@ def _main_impl(tryb=None):
         linie_log = {}
         wersje_log = {}
         print(f"Spójność kierunku: log niedostępny ({e}) — tylko bieżąca pula")
+
+    # LISTA DNIA: raz ogłoszona, do końca dnia się nie zmienia. Manifest trzyma
+    # skład każdej domkniętej doby produktowej — nieudany odczyt traktujemy jak
+    # „brak domknięć" i NIE zapisujemy go z powrotem, żeby jeden timeout nie
+    # skasował dnia (ta sama zasada co przy rejestrze publikacji,
+    # [[supabase-read-modify-write]]).
+    # ⚑ Odczyt stoi TU, bo manifestu potrzebują trzy rzeczy w tej kolejności:
+    # brama kolizji wersji, reguła wznawiania i sama selekcja listy.
+    _manifest_raw, _manifest_ok = supa.get_key_ok(LISTA_DNIA_KLUCZ)
+    _zamkniete = wczytaj_zamkniete(_manifest_raw if _manifest_ok else None)
     legi_pool = filtr_spojnosci_kierunku(legi_pool, kierunki_log)
     if len(legi_pool) < n_przed_sp:
         print(f"Spójność kierunku: usunięto {n_przed_sp - len(legi_pool)} "
@@ -7287,19 +7367,30 @@ def _main_impl(tryb=None):
     # `_urealnij_do_pokazania`, więc typ nie zdąży trafić na listę.
     if wersje_log:
         _zostaja, _kolizje = [], []
+        _ile_model = 0
         for b in value_bets:
             w_ksiegi = wersje_log.get(_klucz_publikacji(b))
-            if w_ksiegi and w_ksiegi != betting.WERSJA_KALIBRACJI:
+            if not w_ksiegi:
+                _zostaja.append(b)
+                continue
+            w_model, w_kal = w_ksiegi
+            kolizja_modelu = bool(w_model) and w_model != betting.WERSJA_MODELU
+            kolizja_kal = bool(w_kal) and w_kal != betting.WERSJA_KALIBRACJI
+            # ogłoszona doba dokańcza dzień — patrz `na_ogloszonej_liscie`
+            if ((kolizja_modelu or kolizja_kal)
+                    and not na_ogloszonej_liscie(b, _zamkniete)):
                 _kolizje.append({**b, "poza_publikacja": "kolizja_wersji"})
+                _ile_model += int(kolizja_modelu and not kolizja_kal)
             else:
                 _zostaja.append(b)
         if _kolizje:
             value_bets[:] = _zostaja
             typy_poza_publikacja.extend(_kolizje)
             print(f"Kolizja wersji: {len(_kolizje)} typów ma w księdze rekord "
-                  f"policzony inną kalibracją niż {betting.WERSJA_KALIBRACJI} "
-                  "— nie wracają na listę, bo karta i rozliczenie mówiłyby co "
-                  "innego (rekord w księdze zostaje nietknięty)")
+                  f"policzony innym rachunkiem niż {betting.WERSJA_MODELU} / "
+                  f"{betting.WERSJA_KALIBRACJI} (w tym {_ile_model} na samym "
+                  "modelu) — nie wracają na listę, bo karta i rozliczenie "
+                  "mówiłyby co innego (rekord w księdze zostaje nietknięty)")
             print(f"Limit poprzeczek zakładu: zdjęto {len(_nadmiar)} "
                   f"(zakład ma już {MAX_POPRZECZEK_ZAKLADU} wystawione)")
 
@@ -7904,6 +7995,7 @@ def _main_impl(tryb=None):
         # typy zdjęte bramami są policzone z pełnym rachunkiem — karta
         # wznowiona z księgi może z niego skorzystać (patrz `_dolóż_rentgen`)
         policzone_w_cyklu=typy_poza_publikacja,
+        zamkniete=_zamkniete,
     )
 
     # TYP WZNOWIONY TEŻ JEST LEGIEM (naprawa 2026-07-30, zgłoszenie usera:
@@ -8114,13 +8206,7 @@ def _main_impl(tryb=None):
     # „opublikowanych" w oknie ostatniego cyklu nie było na stronie, a księga
     # trzymała 154 typy „na liście" wobec 20 w `value_bets`. Typów WZNOWIONYCH
     # `wybierz_liste_publikowana` nie zdejmuje w ogóle (patrz tam).
-    # LISTA DNIA: raz ogłoszona, do końca dnia się nie zmienia. Manifest
-    # trzyma skład każdej domkniętej doby produktowej — nieudany odczyt
-    # traktujemy jak „brak domknięć" i NIE zapisujemy go z powrotem, żeby
-    # jeden timeout nie skasował dnia (ta sama zasada co przy rejestrze
-    # publikacji, [[supabase-read-modify-write]]).
-    _manifest_raw, _manifest_ok = supa.get_key_ok(LISTA_DNIA_KLUCZ)
-    _zamkniete = wczytaj_zamkniete(_manifest_raw if _manifest_ok else None)
+    # manifest listy dnia odczytany wyżej, przed scaleniem publikacji
     if _zamkniete:
         print("Lista dnia — domknięte: " + ", ".join(
             f"{d} ({len(k)} typów)" for d, k in sorted(_zamkniete.items())))

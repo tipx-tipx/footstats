@@ -2381,6 +2381,44 @@ def _z_biezacej_epoki(r: dict) -> bool:
     return epoka(r) == EPOKA_BIEZACA
 
 
+# --- STEMPEL MODELU SPÓŹNIONY O DOBĘ (2026-08-14) ---------------------------
+#
+# Naprawa priora weszła na produkcję 13.08 o 15:06 (betting.WERSJA_MODELU,
+# nota z tego dnia), ale samą WERSJĘ podbito dopiero przy kontroli startowej
+# 14.08. Przez tę dobę cykl liczył NOWYM rachunkiem i stemplował go STARĄ
+# wersją — zmierzone na księdze: 115 rozliczeń drużynowych.
+#
+# Bez rozpoznania po czasie te 115 rekordów zaliczyłoby się do poprzedniego
+# produktu i zapowiedziana ocena naprawy („po ~100 rozliczeniach, paired
+# Brier") zaczynałaby zbieranie próby od zera. Rozpoznajemy więc tak samo jak
+# `epoka()` rozpoznaje rekordy sprzed wersjonowania: po tym, co o rekordzie
+# wiadomo skądinąd, a nie po stemplu, którego wtedy nie było.
+#
+# Granica jest ostrożna w JEDNĄ stronę: 17:00 zamiast 15:06, bo cykl podnosi
+# kod dopiero przy następnym przebiegu (co ~1-1,5 h, patrz cron w Actions).
+# Typy z okna 15:06-17:00 zostają przy starej wersji — wolimy stracić 37
+# rekordów z próby niż wpuścić do niej stary rachunek.
+NAPRAWA_PRIORA_TS = int(
+    datetime(2026, 8, 13, 17, 0, tzinfo=ZoneInfo("Europe/Warsaw")).timestamp()
+)
+_WERSJA_PRZED_PRIOREM = "2026-08-11-orientacja-over"
+
+
+def wersja_modelu_rekordu(r: dict) -> str | None:
+    """Jakim RACHUNKIEM `p` policzono ten typ — z poprawką na spóźniony stempel.
+
+    Zwraca to samo co `r["wersje"]["model"]`, poza jednym wyjątkiem opisanym
+    wyżej: rekord ostemplowany wersją sprzed naprawy priora, ale opublikowany
+    już po jej wdrożeniu, dostaje wersję bieżącą. `None` = rekord sprzed
+    wersjonowania, tak jak było.
+    """
+    stempel = (r.get("wersje") or {}).get("model")
+    if (stempel == _WERSJA_PRZED_PRIOREM
+            and (r.get("opublikowano_ts") or 0) >= NAPRAWA_PRIORA_TS):
+        return betting.WERSJA_MODELU
+    return stempel
+
+
 def korekta_strumienia(log: dict | None = None) -> dict[str, float]:
     """Delta logitowa per strumień: o ile ściągnąć szanse, żeby deklaracja
     zgadzała się z trafieniami. Zwraca {"pewniaki": -0.42, "druzyny": -0.11}.
@@ -2542,9 +2580,17 @@ def sklad_wersji_okna(log: dict | None = None) -> dict[str, dict]:
             continue
         ile = sum(1 for r in grp
                   if (r.get("wersje") or {}).get("kalibracja") == biezaca)
+        # RACHUNEK `p` osobno od kalibracji (2026-08-14). Warstwa uczy się na
+        # obu, a rozjeżdżają się niezależnie: 13.08 zmienił się sam prior,
+        # kalibracja stała. Licznik na samą kalibrację pokazywał wtedy 100%
+        # bieżącej wersji, choć połowa okna liczyła się innym rachunkiem.
+        ile_m = sum(1 for r in grp
+                    if wersja_modelu_rekordu(r) == betting.WERSJA_MODELU)
         out[strumien] = {
             "n": len(grp), "biezaca": ile,
             "udzial": round(ile / len(grp), 3),
+            "biezacy_model": ile_m,
+            "udzial_modelu": round(ile_m / len(grp), 3),
         }
     return out
 
@@ -2552,14 +2598,18 @@ def sklad_wersji_okna(log: dict | None = None) -> dict[str, dict]:
 def zdanie_skladu_wersji(sklad: dict[str, dict] | None = None) -> str:
     """Jedno zdanie do logu cyklu — patrz `sklad_wersji_okna`."""
     sklad = sklad if sklad is not None else sklad_wersji_okna()
-    czesci = []
+    czesci, czesci_m = [], []
     for strumien, s in sorted(sklad.items()):
         if not s["n"]:
             czesci.append(f"{strumien}: brak rozliczeń")
             continue
         czesci.append(f"{strumien}: {s['biezaca']}/{s['n']} ({s['udzial']:.0%})")
+        czesci_m.append(f"{strumien}: {s.get('biezacy_model', 0)}/{s['n']} "
+                        f"({s.get('udzial_modelu', 0):.0%})")
     return ("Korekta strumienia — ile z okna liczy BIEŻĄCA wersja: "
-            + ", ".join(czesci))
+            + ", ".join(czesci)
+            + ("; ten sam rachunek `p`: " + ", ".join(czesci_m)
+               if czesci_m else ""))
 
 
 def ostrzezenia_prob(proby: dict[str, dict] | None = None) -> list[str]:
