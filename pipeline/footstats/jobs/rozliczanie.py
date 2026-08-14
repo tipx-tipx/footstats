@@ -832,6 +832,16 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
             # objął zawodników, drabinki i rynki match_*/wiecej_*.
             **({"rachunek": b["rachunek"]}
                if isinstance(b.get("rachunek"), dict) and b["rachunek"] else {}),
+            # NA JAKIEJ PODSTAWIE TEN TYP WSZEDŁ NA LISTĘ I W JAKIEJ STANĄŁ
+            # KOLEJNOŚCI (2026-08-14). `moc` to liczba z `build_wc_fast.moc_listy`,
+            # `kandydatow` — ilu typów model dorobił się w tym meczu PRZED
+            # bramami. Tego drugiego nie da się odtworzyć wstecz: księga zna
+            # tylko to, co przez bramy przeszło. Bez stempla pytania „czy
+            # dzisiejsze kryterium porządkuje" i „czy nowe jest lepsze"
+            # zostają bez odpowiedzi, tak samo jak przed stemplem `lambda`.
+            **({"kolejnosc": b["kolejnosc"]}
+               if isinstance(b.get("kolejnosc"), dict) and b["kolejnosc"]
+               else {}),
             # historia predykcji typów DRUŻYNOWYCH — patrz kalibracja_tau.py
             **({"kal_tau": b["kal_tau"]} if b.get("kal_tau") else {}),
             # KOREKTA STRUMIENIA użyta przy publikacji — bez tego stempla

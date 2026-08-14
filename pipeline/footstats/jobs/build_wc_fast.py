@@ -8619,6 +8619,28 @@ def _main_impl(tryb=None):
         if not _b.get("liga"):
             _b["liga"] = (matches_out.get(_b.get("mecz_id")) or {}).get("liga", "")
 
+    # ⚑ STEMPEL KOLEJNOŚCI (2026-08-14) — bez niego kryterium listy jest
+    # NIEMIERZALNE WSTECZ.
+    #
+    # `moc_listy` decyduje o dwóch rzeczach naraz: kto WCHODZI na listę dnia
+    # (przy limicie 12 na dobę) i w jakiej kolejności stoi. Za formułą stoi
+    # pomiar (tercje 419 rozliczeń: góra +0,6%, dół −11,6%), ale sama liczba
+    # nigdzie nie zostawała — a jej głównego składnika, BOGACTWA MATERIAŁU
+    # MECZU, nie da się odtworzyć po fakcie: liczy się z puli PRZED bramami,
+    # a księga zna tylko to, co przez nie przeszło.
+    #
+    # Bez stempla nie odpowiemy ani na „czy dzisiejsze kryterium porządkuje",
+    # ani na „czy nowe jest lepsze od starego" — a to drugie pytanie stoi
+    # otwarte także przy drabinkach, gdzie ranking wciąż jedzie na przewadze
+    # o korelacji −0,084 z trafieniem.
+    #
+    # JEDEN SŁOWNIK, nie dwa pola — każde osobne pole musiałoby przejść przez
+    # trzy białe listy (`rec_pewniaka`, `_dopisz_nowe`, `_kupon_leg_do_logu`),
+    # co jest udokumentowaną pułapką tego repo (patrz `betting.stempel_rachunku`).
+    for _b in value_bets:
+        _ile = _kandydatow_w_meczu.get(_b.get("mecz_id"), 0)
+        _b["kolejnosc"] = {"moc": moc_listy(_b, _ile), "kandydatow": _ile}
+
     # publikacja kuponów idzie przez log (zamrożenie/anulowanie/rozliczenie)
     # wewnątrz _rozlicz_i_zapisz — kupony.json to aktywne kupony z logu
     _rozlicz_i_zapisz(value_bets, kupony_list, niedostepni,

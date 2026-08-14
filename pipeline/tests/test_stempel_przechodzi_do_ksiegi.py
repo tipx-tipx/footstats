@@ -71,6 +71,26 @@ def test_pusty_rachunek_nie_zasmieca_ksiegi():
     assert "rachunek" not in leg
 
 
+def test_kolejnosc_dojezdza_do_ksiegi():
+    """⚑ 2026-08-14. `moc_listy` decyduje, kto WCHODZI na listę dnia i w jakiej
+    stoi kolejności, ale jej głównego składnika — ilu kandydatów model dorobił
+    się w meczu PRZED bramami — nie da się odtworzyć wstecz, bo księga zna
+    tylko to, co przez bramy przeszło."""
+    log: dict = {}
+    kolejnosc = {"moc": 1.0234, "kandydatow": 17}
+    R._dopisz_nowe(log, [_typ(kolejnosc=dict(kolejnosc))])
+    rec = next(iter(log.values()))
+    assert rec.get("kolejnosc") == kolejnosc, (
+        "stempel kolejności zginął w `_dopisz_nowe` — sprawdź białą listę pól"
+    )
+
+
+def test_pusta_kolejnosc_nie_zasmieca_ksiegi():
+    log: dict = {}
+    R._dopisz_nowe(log, [_typ(kolejnosc={})])
+    assert "kolejnosc" not in next(iter(log.values()))
+
+
 def test_stempel_przezywa_odrodzenie_typu():
     """Typ spoza listy dnia rodzi się od nowa przy prawdziwej publikacji —
     z ceną i stemplami z TAMTEJ chwili. Nowy rachunek ma zastąpić stary."""

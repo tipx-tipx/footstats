@@ -652,6 +652,111 @@ def czesc6_drabinki(log: dict, R) -> None:
                   "za mało na wniosek, liczba ma rosnąć)")
 
 
+def _tercje(grp: list[dict], miara) -> list[list[dict]]:
+    """Trzy równe koszyki wg podanej miary, od najsłabszego do najmocniejszego."""
+    z_miara = [(miara(r), r) for r in grp]
+    z_miara = [(m, r) for m, r in z_miara if m is not None]
+    z_miara.sort(key=lambda x: x[0])
+    n = len(z_miara)
+    if n < 30:
+        return []
+    k = n // 3
+    return [[r for _m, r in z_miara[:k]],
+            [r for _m, r in z_miara[k:2 * k]],
+            [r for _m, r in z_miara[2 * k:]]]
+
+
+def czesc7_kolejnosc(settled: list[dict], R) -> None:
+    """CZY KRYTERIUM LISTY W OGÓLE PORZĄDKUJE — i czy inne robi to lepiej.
+
+    `moc_listy` (szansa × √kurs, plus premia za bogaty mecz) decyduje o DWÓCH
+    rzeczach naraz: kto wchodzi na listę dnia przy limicie 12 i w jakiej stoi
+    kolejności. Za formułą stoi pomiar z 14.08 (tercje 419 rozliczeń: góra
+    +0,6%, dół −11,6%), ale to była JEDNA próba i jedna formuła — a pytanie
+    „czy da się lepiej" wisi otwarte, tak samo jak przy rankingu drabinek,
+    gdzie przewaga ma korelację −0,084 z trafieniem.
+
+    Tabela liczy tercje dla kilku kandydatów naraz, na typach POKAZANYCH
+    klientowi. Miara jest dobra wtedy, gdy jej górna tercja zarabia więcej niż
+    dolna — i gdy ta różnica przewyższa własny szum obu tercji.
+
+    ⚑ Premii za bogaty mecz NIE da się odtworzyć wstecz (liczy się z puli
+    przed bramami), więc kolumna „moc" to część formuły bez premii. Pełna
+    liczba jedzie do księgi ze stemplem `kolejnosc` od 14.08 — gdy uzbiera się
+    próba, ta sama tabela pokaże ją osobno.
+    """
+    print("=" * 78)
+    print("7. CZY KOLEJNOŚĆ LISTY PORZĄDKUJE TYPY")
+    print("=" * 78)
+    pokazane = [r for r in settled
+                if not r.get("odrzucony") and not r.get("poza_publikacja")
+                and r.get("kurs") and r.get("p_model")]
+    if len(pokazane) < 90:
+        print(f"   za mało pokazanych rozliczeń ({len(pokazane)}) na tercje")
+        return
+
+    def _moc(r):
+        return float(r["p_model"]) * (float(r["kurs"]) ** 0.5)
+
+    def _szansa(r):
+        return float(r["p_model"])
+
+    def _wartosc(r):
+        return float(r["p_model"]) * float(r["kurs"]) - 1.0
+
+    def _kurs(r):
+        return float(r["kurs"])
+
+    def _moc_stemplowana(r):
+        k = r.get("kolejnosc")
+        return (k or {}).get("moc") if isinstance(k, dict) else None
+
+    miary = [
+        ("moc listy (p×√kurs)", _moc),
+        ("sama szansa", _szansa),
+        ("sama wartość (p×kurs−1)", _wartosc),
+        ("sam kurs", _kurs),
+        ("moc ZE STEMPLA (z premią)", _moc_stemplowana),
+    ]
+    print(f"   {'miara':<28}{'dolna tercja':>16}{'środkowa':>14}"
+          f"{'górna':>14}{'góra−dół':>11}")
+    for nazwa, miara in miary:
+        koszyki = _tercje(pokazane, miara)
+        if not koszyki:
+            ile = sum(1 for r in pokazane if miara(r) is not None)
+            print(f"   {nazwa:<28} — za mało danych ({ile})")
+            continue
+        roi = [_staty(k)[4] for k in koszyki]
+        szum = [_staty(k)[5] for k in koszyki]
+        rozn = (roi[2] - roi[0]) * 100
+        # szum różnicy dwóch tercji — bez niego „+12 pp" na 40 typach wygląda
+        # tak samo jak na 400 (ta sama zasada co w alarmie trendu)
+        szum_r = ((szum[0] ** 2 + szum[2] ** 2) ** 0.5) * 100
+        znak = "⚑ PORZĄDKUJE" if rozn > 2 * szum_r else (
+            "⚑ ODWRÓCONA" if rozn < -2 * szum_r else "w szumie")
+        print(f"   {nazwa:<28}{roi[0]:>15.1%}{roi[1]:>14.1%}{roi[2]:>14.1%}"
+              f"{rozn:>10.1f} pp   {znak}")
+    print(f"   (na {len(pokazane)} pokazanych rozliczeniach; „porządkuje\" = "
+          "różnica przewyższa dwa szumy)")
+
+    ze_stemplem = sum(1 for r in pokazane if isinstance(r.get("kolejnosc"), dict))
+    print(f"\n   STEMPEL `kolejnosc` ma {ze_stemplem} z {len(pokazane)} "
+          "pokazanych rozliczeń (wszedł 14.08, rośnie z dnia na dzień)")
+    bogate = [r for r in pokazane
+              if isinstance(r.get("kolejnosc"), dict)
+              and (r["kolejnosc"].get("kandydatow") or 0) >= 10]
+    ubogie = [r for r in pokazane
+              if isinstance(r.get("kolejnosc"), dict)
+              and 0 < (r["kolejnosc"].get("kandydatow") or 0) < 10]
+    if len(bogate) >= 25 and len(ubogie) >= 25:
+        print("   PREMIA ZA BOGATY MECZ — czy nadal ma pokrycie:")
+        for etykieta, grp in (("mecz 10+ kandydatów", bogate),
+                              ("mecz 1–9 kandydatów", ubogie)):
+            n, dekl, traf, luka, roi, szum = _staty(grp)
+            print(f"      {etykieta:<24}{n:>5}  luka {luka*100:>6.1f} pp"
+                  f"  ROI {roi:>7.1%}  (szum {szum*100:.1f})")
+
+
 def main() -> None:
     try:
         from dotenv import load_dotenv
@@ -674,6 +779,7 @@ def main() -> None:
     czesc4_czynniki(supa.get_key("value_bets") or [])
     czesc5_bramy(settled, R)
     czesc6_drabinki(log, R)
+    czesc7_kolejnosc(settled, R)
 
 
 if __name__ == "__main__":
