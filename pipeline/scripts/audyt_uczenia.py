@@ -276,10 +276,30 @@ def czesc3_kalendarz(settled: list[dict], log: dict, R) -> None:
                     except Exception:
                         dni.append("??")
                 roi = p.get("roi")
+                # NA ILU MECZACH STOI PACZKA (2026-08-14) — patrz nota
+                # w `raport_uczenia`. Jeden mecz potrafi dać 40 rozliczeń,
+                # a wynik w jego obrębie jest silnie zgodny, więc paczka
+                # z trzech meczów nie mówi tego, co paczka z trzydziestu.
+                mecze = p.get("meczow")
+                najw = p.get("najwiekszy_mecz") or 0
+                opis_mecze = ""
+                if mecze:
+                    udzial = najw / max(p.get("n") or 1, 1)
+                    opis_mecze = f"   {mecze:>2} mecz." + (
+                        f"  ⚑ największy {udzial:.0%} paczki"
+                        if udzial >= 0.25 else "")
                 print(f"      {od} ({dni[0]}) – {do} ({dni[1]})"
                       f"   n={p.get('n'):>3}"
                       f"   luka {p.get('luka', 0) * 100:+6.1f} pp"
-                      f"   ROI {(f'{roi:+.1%}' if roi is not None else '   —'):>8}")
+                      f"   ROI {(f'{roi:+.1%}' if roi is not None else '   —'):>8}"
+                      f"{opis_mecze}")
+            # OSTRZEŻENIE PRZY SAMYM ALARMIE, nie tylko w tabeli: trzy ostatnie
+            # paczki to okno alarmu z części 2.
+            okno = paczki[-3:]
+            mecze_okna = sum(p.get("meczow") or 0 for p in okno)
+            if okno and mecze_okna and mecze_okna <= 12:
+                print(f"      ⚑ CAŁE OKNO ALARMU TO {mecze_okna} MECZÓW — "
+                      "luka z tego okna opisuje kilka wieczorów, nie model")
     except Exception as e:
         print(f"   BŁĄD: {e}")
 

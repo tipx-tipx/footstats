@@ -4655,11 +4655,24 @@ def raport_uczenia(
             traf = sum(1 for r in grp if r["wynik"] == "wygrany")
             hit = traf / len(grp)
             sr_p = sum(float(r["p_model"]) for r in grp) / len(grp)
+            # NA ILU MECZACH STOI TA PACZKA (2026-08-14). Paczka to 40
+            # ROZLICZEŃ, a jeden mecz potrafi ich dać czterdzieści — 14.08
+            # okno alarmu drużyn (120 rozliczeń) to były CZTERY mecze z jednej
+            # nocy, z czego jeden dawał 33% okna. Wynik w obrębie meczu jest
+            # silnie zgodny (rożne albo padają, albo nie — dla wszystkich
+            # typów naraz), więc „luka pogłębiła się o 11,5 pp przy szumie
+            # 6,0" opisywało wtedy trzy mecze, a nie sto dwadzieścia
+            # niezależnych obserwacji. Bez tej liczby alarm nie ma jak
+            # powiedzieć, że jest zrobiony z jednego wieczoru.
+            mecze_paczki = Counter(r.get("mecz_id") for r in grp)
             paczki.append({
                 # ta sama doba co w kalendarzu Skuteczności (patrz `dzien_pl`)
                 "od": dzien_pl(grp[0].get("kickoff_ts")),
                 "do": dzien_pl(grp[-1].get("kickoff_ts")),
                 "n": len(grp), "trafione": traf,
+                "meczow": len(mecze_paczki),
+                "najwiekszy_mecz": (mecze_paczki.most_common(1)[0][1]
+                                    if mecze_paczki else 0),
                 "hit": round(hit, 3),
                 "deklaracja": round(sr_p, 3),
                 "luka": round(hit - sr_p, 3),
