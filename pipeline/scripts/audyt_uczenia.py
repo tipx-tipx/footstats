@@ -769,7 +769,23 @@ def main() -> None:
     if not os.environ.get("SUPABASE_URL"):
         print("Brak SUPABASE_URL — audyt potrzebuje księgi z chmury.")
         return
-    log = R._migruj_log(supa.get_key("typy_log") or {})
+    # ⚑ PADNIĘTY ODCZYT NIE MOŻE WYGLĄDAĆ JAK PUSTA KSIĘGA (2026-08-14).
+    # `get_key` zwraca None i przy pustym kluczu, i przy awarii — więc audyt
+    # drukował wtedy „Księga: 0 wpisów" i komplet zer w każdej części, co
+    # czyta się jak stan produktu, a nie jak nieudane zapytanie. Złapane przy
+    # awarii Supabase (us-east-2): pomiar okna czytał 2446 rozliczeń, a audyt
+    # uruchomiony minutę później pokazywał same zera. To ta sama zasada co
+    # [[ciche-odrzucenia-zasada]], tylko po stronie narzędzia pomiarowego.
+    surowy, odczyt_ok = supa.get_key_ok("typy_log")
+    if not odczyt_ok:
+        print("NIE UDAŁO SIĘ ODCZYTAĆ KSIĘGI z Supabase — audyt PRZERWANY.\n"
+              "To nie znaczy, że księga jest pusta: zera we wszystkich\n"
+              "częściach byłyby wtedy fałszywe. Spróbuj ponownie za chwilę.")
+        return
+    log = R._migruj_log(surowy or {})
+    if not log:
+        print("Księga jest PUSTA, a odczyt się udał — to stan produktu, "
+              "nie awaria połączenia.")
     settled = rozliczone(log, R)
     print(f"Księga: {len(log)} wpisów, rozliczonych w bieżącej epoce: {len(settled)}\n")
     czesc0_awarie(supa)

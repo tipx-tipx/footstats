@@ -140,19 +140,22 @@ def main() -> None:
         return
 
     wyniki = defaultdict(lambda: {"brier": [], "ll": [], "delty": [],
-                                  "n": [], "mecze": []})
-    baza = {"brier": [], "ll": []}
+                                  "n": [], "mecze": [], "brier_pkt": []})
+    baza = {"brier": [], "ll": [], "brier_pkt": []}
     punkty = 0
     for i in range(START, len(druzyny) - TEST, KROK):
         hist, test = druzyny[:i], druzyny[i:i + TEST]
         sur_test = R.w_orientacji_over(
             [{**r, "p_model": R._p_surowe(r)} for r in test])
         punkty += 1
+        _pkt = []
         for r in sur_test:
             p = min(max(float(r["p_model"]), 1e-6), 1 - 1e-6)
             y = 1.0 if r["wynik"] == "wygrany" else 0.0
             baza["brier"].append((p - y) ** 2)
             baza["ll"].append(-(y * math.log(p) + (1 - y) * math.log(1 - p)))
+            _pkt.append((p - y) ** 2)
+        baza["brier_pkt"].append(sum(_pkt) / max(len(_pkt), 1))
         for nazwa, (wybierz, wazyc) in WARIANTY.items():
             b, n, mecze = delta(hist, wybierz, wazyc, R)
             if b is None:
@@ -161,6 +164,7 @@ def main() -> None:
             w["delty"].append(b)
             w["n"].append(n)
             w["mecze"].append(mecze)
+            _pkt = []
             for r in sur_test:
                 p0 = min(max(float(r["p_model"]), 1e-6), 1 - 1e-6)
                 p = min(max(_sig(R._logit(p0) + b), 1e-6), 1 - 1e-6)
@@ -168,6 +172,11 @@ def main() -> None:
                 w["brier"].append((p - y) ** 2)
                 w["ll"].append(
                     -(y * math.log(p) + (1 - y) * math.log(1 - p)))
+                _pkt.append((p - y) ** 2)
+            # ŚREDNIA PER PUNKT WALIDACJI, nie per obserwacja — bo obserwacje
+            # w jednym punkcie siedzą w tych samych meczach i nie są od siebie
+            # niezależne. To ta sama poprawka, o którą chodzi w całym pomiarze.
+            w["brier_pkt"].append(sum(_pkt) / max(len(_pkt), 1))
 
     print(f"\nWALIDACJA CZASOWA — {punkty} punktów, każdy oceniany na "
           f"{TEST} następnych rozliczeniach\n")
@@ -189,6 +198,40 @@ def main() -> None:
         print(f"{nazwa:<28}{br:>9.4f}{(br - b0) / b0 * 100:>8.1f}%{ll:>10.4f}"
               f"{sum(skoki) / max(len(skoki), 1):>12.3f}"
               f"{median(w['n']):>8.0f}{median(w['mecze']):>8.0f}")
+
+    # CZY RÓŻNICA W OGÓLE WYCHODZI POZA SZUM (2026-08-14). Różnice w Brierze
+    # są rzędu 0,001 — bez testu parowanego każda z nich wygląda jak wynik.
+    # Parujemy PUNKTAMI walidacji (te same mecze po obu stronach), a nie
+    # obserwacjami, bo obserwacje z jednego punktu siedzą w tych samych
+    # meczach.
+    odniesienie = next(iter(WARIANTY))
+    baza_pkt = wyniki[odniesienie]["brier_pkt"]
+    if baza_pkt:
+        print(f"\nTEST PAROWANY wobec „{odniesienie}\" "
+              f"(różnica per punkt walidacji, {len(baza_pkt)} punktów):")
+        print(f"   {'wariant':<28}{'Δ Brier':>10}{'szum':>9}"
+              f"{'wygrywa w':>12}   werdykt")
+        for nazwa in WARIANTY:
+            if nazwa == odniesienie:
+                continue
+            w = wyniki[nazwa]["brier_pkt"]
+            if len(w) != len(baza_pkt):
+                print(f"   {nazwa:<28} — nieporównywalna liczba punktów")
+                continue
+            roz = [w[j] - baza_pkt[j] for j in range(len(w))]
+            sr = sum(roz) / len(roz)
+            war = sum((x - sr) ** 2 for x in roz) / max(len(roz) - 1, 1)
+            se = (war / len(roz)) ** 0.5
+            lepiej = sum(1 for x in roz if x < 0)
+            if sr + 2 * se < 0:
+                werdykt = "⚑ LEPSZY poza szumem"
+            elif sr - 2 * se > 0:
+                werdykt = "⚑ GORSZY poza szumem"
+            else:
+                werdykt = "w szumie — nie zmieniać"
+            print(f"   {nazwa:<28}{sr:>+10.5f}{se:>9.5f}"
+                  f"{lepiej:>7}/{len(roz):<4}   {werdykt}")
+        print("   (ujemna Δ = niższy Brier = lepsza prognoza)")
 
     print("\nCO KTÓRY WARIANT MÓWI DZIŚ:")
     for nazwa, (wybierz, wazyc) in WARIANTY.items():
