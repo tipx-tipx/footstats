@@ -1,0 +1,578 @@
+{
+ "15235422": {
+  "mecz": "Fluminense – Palmeiras",
+  "liga": "Brasileirão Série A",
+  "kraj": "Brazil",
+  "dom_traf": 8,
+  "wyj_traf": 9,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "15235428": {
+  "mecz": "Athletico PR – Bragantino",
+  "liga": "Brasileirão Série A",
+  "kraj": "Brazil",
+  "dom_traf": 11,
+  "wyj_traf": 5,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "15235424": {
+  "mecz": "São Paulo – Coritiba",
+  "liga": "Brasileirão Série A",
+  "kraj": "Brazil",
+  "dom_traf": 8,
+  "wyj_traf": 9,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "16667393": {
+  "mecz": "Racing Club – Banfield",
+  "liga": "Liga Profesional de Fútbol",
+  "kraj": "Argentina",
+  "dom_traf": 10,
+  "wyj_traf": 3,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "16667389": {
+  "mecz": "Aldosivi – Tigre",
+  "liga": "Liga Profesional de Fútbol",
+  "kraj": "Argentina",
+  "dom_traf": 7,
+  "wyj_traf": 5,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "16671559": {
+  "mecz": "Estudiantes – Gimnasia",
+  "liga": "Liga Profesional de Fútbol",
+  "kraj": "Argentina",
+  "dom_traf": 7,
+  "wyj_traf": 8,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "16667396": {
+  "mecz": "Belgrano – Ind. Rivadavia",
+  "liga": "Liga Profesional de Fútbol",
+  "kraj": "Argentina",
+  "dom_traf": 10,
+  "wyj_traf": 4,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "16671563": {
+  "mecz": "Platense – Boca Juniors",
+  "liga": "Liga Profesional de Fútbol",
+  "kraj": "Argentina",
+  "dom_traf": 6,
+  "wyj_traf": 9,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "16390259": {
+  "mecz": "FC Orenburg – Lok. Moscow",
+  "liga": "Russian Premier League",
+  "kraj": "Russia",
+  "dom_traf": 9,
+  "wyj_traf": 7,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "16434339": {
+  "mecz": "Braunschweig – Bochum",
+  "liga": "2. Bundesliga",
+  "kraj": "Germany",
+  "dom_traf": 8,
+  "wyj_traf": 8,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "16434338": {
+  "mecz": "Holstein Kiel – St. Pauli",
+  "liga": "2. Bundesliga",
+  "kraj": "Germany",
+  "dom_traf": 11,
+  "wyj_traf": 11,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "15260882": {
+  "mecz": "Rosenborg – Viking",
+  "liga": "Eliteserien",
+  "kraj": "Norway",
+  "dom_traf": 10,
+  "wyj_traf": 5,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "15272493": {
+  "mecz": "Elfsborg – Vasteras",
+  "liga": "Allsvenskan",
+  "kraj": "Sweden",
+  "dom_traf": 11,
+  "wyj_traf": 10,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "16392095": {
+  "mecz": "LASK – Ried",
+  "liga": "Austrian Bundesliga",
+  "kraj": "Austria",
+  "dom_traf": 9,
+  "wyj_traf": 8,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "16316787": {
+  "mecz": "Telstar – Sp. Rotterdam",
+  "liga": "Eredivisie",
+  "kraj": "Netherlands",
+  "dom_traf": 9,
+  "wyj_traf": 9,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "16418272": {
+  "mecz": "Real Sociedad B – Castellón",
+  "liga": "LaLiga 2",
+  "kraj": "Spain",
+  "dom_traf": 7,
+  "wyj_traf": 8,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "16483638": {
+  "mecz": "Galatasaray – Corum",
+  "liga": "Trendyol Süper Lig",
+  "kraj": "Turkey",
+  "dom_traf": 8,
+  "wyj_traf": 8,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "16361879": {
+  "mecz": "Cercle Brugge – Sint-Truiden",
+  "liga": "Pro League",
+  "kraj": "Belgium",
+  "dom_traf": 10,
+  "wyj_traf": 11,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "16391133": {
+  "mecz": "Wolverhampton – Blackburn",
+  "liga": "Championship",
+  "kraj": "England",
+  "dom_traf": 9,
+  "wyj_traf": 7,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "16450754": {
+  "mecz": "Sporting – Vitória",
+  "liga": "Liga Portugal Betclic",
+  "kraj": "Portugal",
+  "dom_traf": 9,
+  "wyj_traf": 9,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "16390265": {
+  "mecz": "Rodina – Togliatti",
+  "liga": "Russian Premier League",
+  "kraj": "Russia",
+  "dom_traf": 7,
+  "wyj_traf": 7,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "16434341": {
+  "mecz": "Greuther Furth – Nurnberg",
+  "liga": "2. Bundesliga",
+  "kraj": "Germany",
+  "dom_traf": 9,
+  "wyj_traf": 11,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "16434333": {
+  "mecz": "Hertha BSC – Heidenheim",
+  "liga": "2. Bundesliga",
+  "kraj": "Germany",
+  "dom_traf": 10,
+  "wyj_traf": 11,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "16434340": {
+  "mecz": "Osnabruck – Magdeburg",
+  "liga": "2. Bundesliga",
+  "kraj": "Germany",
+  "dom_traf": 10,
+  "wyj_traf": 8,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "15272495": {
+  "mecz": "Mjallby – Sirius",
+  "liga": "Allsvenskan",
+  "kraj": "Sweden",
+  "dom_traf": 6,
+  "wyj_traf": 9,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "16391136": {
+  "mecz": "Bristol City – Millwall",
+  "liga": "Championship",
+  "kraj": "England",
+  "dom_traf": 8,
+  "wyj_traf": 10,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "16391139": {
+  "mecz": "Norwich – West Brom",
+  "liga": "Championship",
+  "kraj": "England",
+  "dom_traf": 9,
+  "wyj_traf": 9,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "16391141": {
+  "mecz": "Stoke – Swansea",
+  "liga": "Championship",
+  "kraj": "England",
+  "dom_traf": 10,
+  "wyj_traf": 8,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "16361880": {
+  "mecz": "Union S-G – Zulte Waregem",
+  "liga": "Pro League",
+  "kraj": "Belgium",
+  "dom_traf": 7,
+  "wyj_traf": 10,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "16316769": {
+  "mecz": "Willem II – NEC Nijmegen",
+  "liga": "Eredivisie",
+  "kraj": "Netherlands",
+  "dom_traf": 10,
+  "wyj_traf": 8,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "16450745": {
+  "mecz": "Alverca – Estrela",
+  "liga": "Liga Portugal Betclic",
+  "kraj": "Portugal",
+  "dom_traf": 11,
+  "wyj_traf": 8,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "16392091": {
+  "mecz": "A. Lustenau – Wolfsberger",
+  "liga": "Austrian Bundesliga",
+  "kraj": "Austria",
+  "dom_traf": 8,
+  "wyj_traf": 10,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "16418265": {
+  "mecz": "Andorra – Ceuta",
+  "liga": "LaLiga 2",
+  "kraj": "Spain",
+  "dom_traf": 6,
+  "wyj_traf": 6,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "16390303": {
+  "mecz": "Rostov – Rubin Kazan",
+  "liga": "Russian Premier League",
+  "kraj": "Russia",
+  "dom_traf": 8,
+  "wyj_traf": 8,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "16483708": {
+  "mecz": "Konyaspor – Rizespor",
+  "liga": "Trendyol Süper Lig",
+  "kraj": "Turkey",
+  "dom_traf": 4,
+  "wyj_traf": 7,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "16361881": {
+  "mecz": "Kortrijk – Royal Antwerp",
+  "liga": "Pro League",
+  "kraj": "Belgium",
+  "dom_traf": 11,
+  "wyj_traf": 10,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "16316791": {
+  "mecz": "Utrecht – AZ Alkmaar",
+  "liga": "Eredivisie",
+  "kraj": "Netherlands",
+  "dom_traf": 8,
+  "wyj_traf": 11,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "16418273": {
+  "mecz": "Real Oviedo – Granada",
+  "liga": "LaLiga 2",
+  "kraj": "Spain",
+  "dom_traf": 6,
+  "wyj_traf": 7,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "16390273": {
+  "mecz": "Krasnodar – Akhmat Grozny",
+  "liga": "Russian Premier League",
+  "kraj": "Russia",
+  "dom_traf": 8,
+  "wyj_traf": 8,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "16434328": {
+  "mecz": "Kaiserslautern – Karlsruher",
+  "liga": "2. Bundesliga",
+  "kraj": "Germany",
+  "dom_traf": 11,
+  "wyj_traf": 11,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "16483633": {
+  "mecz": "Gaziantep – Alanyaspor",
+  "liga": "Trendyol Süper Lig",
+  "kraj": "Turkey",
+  "dom_traf": 6,
+  "wyj_traf": 5,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "16483632": {
+  "mecz": "Genclerbirligi – Fenerbahce",
+  "liga": "Trendyol Süper Lig",
+  "kraj": "Turkey",
+  "dom_traf": 7,
+  "wyj_traf": 5,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "16361883": {
+  "mecz": "Genk – Westerlo",
+  "liga": "Pro League",
+  "kraj": "Belgium",
+  "dom_traf": 10,
+  "wyj_traf": 9,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "16316778": {
+  "mecz": "Fortuna Sittard – Cambuur",
+  "liga": "Eredivisie",
+  "kraj": "Netherlands",
+  "dom_traf": 11,
+  "wyj_traf": 9,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "16421052": {
+  "mecz": "Sevilla – Rayo Vallecano",
+  "liga": "LaLiga",
+  "kraj": "Spain",
+  "dom_traf": 10,
+  "wyj_traf": 9,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "16418271": {
+  "mecz": "Mallorca – Real Valladolid",
+  "liga": "LaLiga 2",
+  "kraj": "Spain",
+  "dom_traf": 9,
+  "wyj_traf": 4,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "16450753": {
+  "mecz": "Rio Ave – Porto",
+  "liga": "Liga Portugal Betclic",
+  "kraj": "Portugal",
+  "dom_traf": 9,
+  "wyj_traf": 10,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "16317954": {
+  "mecz": "Atlante – Toluca",
+  "liga": "Liga MX, Apertura",
+  "kraj": "Mexico",
+  "dom_traf": 9,
+  "wyj_traf": 7,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "15171638": {
+  "mecz": "Charlotte FC – Columbus Crew",
+  "liga": "MLS",
+  "kraj": "USA",
+  "dom_traf": 7,
+  "wyj_traf": 5,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "15171637": {
+  "mecz": "CF Montréal – D.C. United",
+  "liga": "MLS",
+  "kraj": "USA",
+  "dom_traf": 5,
+  "wyj_traf": 8,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "15171639": {
+  "mecz": "Orlando City – FC Cincinnati",
+  "liga": "MLS",
+  "kraj": "USA",
+  "dom_traf": 7,
+  "wyj_traf": 10,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "15171640": {
+  "mecz": "Toronto FC – NE Revolution",
+  "liga": "MLS",
+  "kraj": "USA",
+  "dom_traf": 8,
+  "wyj_traf": 10,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "15171644": {
+  "mecz": "Houston Dynamo – LA Galaxy",
+  "liga": "MLS",
+  "kraj": "USA",
+  "dom_traf": 7,
+  "wyj_traf": 10,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "16317953": {
+  "mecz": "Monterrey – Juárez",
+  "liga": "Liga MX, Apertura",
+  "kraj": "Mexico",
+  "dom_traf": 8,
+  "wyj_traf": 6,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "15171646": {
+  "mecz": "Los Angeles FC – San Diego",
+  "liga": "MLS",
+  "kraj": "USA",
+  "dom_traf": 6,
+  "wyj_traf": 9,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "16317952": {
+  "mecz": "Atlas – Tigres",
+  "liga": "Liga MX, Apertura",
+  "kraj": "Mexico",
+  "dom_traf": 7,
+  "wyj_traf": 9,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "16316788": {
+  "mecz": "Den Haag – Groningen",
+  "liga": "Eredivisie",
+  "kraj": "Netherlands",
+  "dom_traf": 8,
+  "wyj_traf": 11,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "16361884": {
+  "mecz": "Beveren – Anderlecht",
+  "liga": "Pro League",
+  "kraj": "Belgium",
+  "dom_traf": 10,
+  "wyj_traf": 8,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "16434337": {
+  "mecz": "A. Bielefeld – Cottbus",
+  "liga": "2. Bundesliga",
+  "kraj": "Germany",
+  "dom_traf": 8,
+  "wyj_traf": 7,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "16434331": {
+  "mecz": "Hannover 96 – Wolfsburg",
+  "liga": "2. Bundesliga",
+  "kraj": "Germany",
+  "dom_traf": 8,
+  "wyj_traf": 7,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "16434336": {
+  "mecz": "D. Dresden – Darmstadt",
+  "liga": "2. Bundesliga",
+  "kraj": "Germany",
+  "dom_traf": 10,
+  "wyj_traf": 9,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "15272489": {
+  "mecz": "Djurgarden – AIK",
+  "liga": "Allsvenskan",
+  "kraj": "Sweden",
+  "dom_traf": 11,
+  "wyj_traf": 8,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "15272494": {
+  "mecz": "Brommapojkarna – Orgryte",
+  "liga": "Allsvenskan",
+  "kraj": "Sweden",
+  "dom_traf": 8,
+  "wyj_traf": 8,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ },
+ "15272496": {
+  "mecz": "Degerfors – IFK Goteborg",
+  "liga": "Allsvenskan",
+  "kraj": "Sweden",
+  "dom_traf": 10,
+  "wyj_traf": 9,
+  "dom_prog": 11,
+  "wyj_prog": 11
+ }
+}
