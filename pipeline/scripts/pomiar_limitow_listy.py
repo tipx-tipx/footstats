@@ -187,6 +187,163 @@ def main() -> None:
                 ponad_rynek += 1
         print(f"   {d:<13}{len(grp):>7}{ponad_dzien:>10}{ponad_rynek:>15}")
 
+    # --- STABILNOŚĆ W CZASIE: to jest ten test, który obalił okno zgody
+    #
+    # 12.08 rekomendacja „okno 16 → 30 pp" wyglądała mocno na całej próbie,
+    # a rozpadła się, gdy podzielić ją na połowy — ROI zmieniało ZNAK.
+    # Stabilna okazała się dopiero LUKA. Ten sam sprawdzian robimy tutaj,
+    # ZANIM cokolwiek wejdzie do kodu.
+    print("\n" + "=" * 78)
+    print("STABILNOŚĆ: TO SAMO W OBU POŁOWACH PRÓBY (dzieli data meczu)")
+    print("=" * 78)
+    po_czasie = sorted(widziane, key=lambda r: r.get("kickoff_ts") or 0)
+    polowa = len(po_czasie) // 2
+    granica = po_czasie[polowa].get("kickoff_ts")
+    print(f"   granica: {datetime.fromtimestamp(granica, R.STREFA):%d.%m %H:%M}"
+          f"   ({polowa} + {len(po_czasie) - polowa} rozliczeń)")
+    for nazwa, limit, klucz in (
+        ("LIMIT NA RYNEK|STRONĘ", B.LISTA_PER_RYNEK,
+         lambda r: (R._doba_produktowa(r.get("kickoff_ts")),
+                    r.get("rynek_kod"), r.get("strona"))),
+        ("LIMIT NA MECZ", B.LISTA_PER_MECZ,
+         lambda r: (R._doba_produktowa(r.get("kickoff_ts")),
+                    r.get("mecz_id"))),
+        ("LIMIT DZIENNY", B.LISTA_CAP,
+         lambda r: (R._doba_produktowa(r.get("kickoff_ts")),)),
+    ):
+        print(f"\n{nazwa}  (limit {limit})")
+        print(f"   {'połowa':<12}{'w lim.':>8}{'luka':>8}{'ROI':>8}"
+              f"{'ponad':>8}{'luka':>8}{'ROI':>8}   {'różnica luki'}")
+        for etykieta, zbior in (
+            ("wcześniejsza", po_czasie[:polowa]),
+            ("późniejsza", po_czasie[polowa:]),
+        ):
+            koszyki: dict[tuple, list[dict]] = defaultdict(list)
+            for r in zbior:
+                koszyki[klucz(r)].append(r)
+            a, b = [], []
+            for _k, grp in koszyki.items():
+                grp.sort(key=lambda r: r.get("opublikowano_ts") or 0)
+                for i, r in enumerate(grp):
+                    (a if i < limit else b).append(r)
+            na, _, _, luka_a, roi_a, _ = _staty(a)
+            nb, _, _, luka_b, roi_b, _ = _staty(b)
+            if not nb:
+                print(f"   {etykieta:<12}{na:>8}{luka_a*100:>+7.1f}"
+                      f"{roi_a:>8.1%}{0:>8}   — brak typów ponad limitem")
+                continue
+            print(f"   {etykieta:<12}{na:>8}{luka_a*100:>+7.1f}{roi_a:>8.1%}"
+                  f"{nb:>8}{luka_b*100:>+7.1f}{roi_b:>8.1%}"
+                  f"{(luka_b-luka_a)*100:>+11.1f} pp")
+        print("   (wniosek wolno wyciągać TYLKO wtedy, gdy znak jest ten sam "
+              "w obu połowach — patrz okno zgody 12.08)")
+
+    # --- TO SAMO PO EPOKACH PRODUKTU, nie po połowie próby
+    #
+    # Podział „na pół" wypada 06.08, czyli PRZED naprawą znaku kalibracji
+    # (11.08) i przed naprawą priora (13.08). Pierwsza połowa opisuje więc
+    # produkt, którego już nie ma — a to jest dokładnie ta pułapka, która dwa
+    # razy dała zły wniosek ([[wersjonowanie-i-martwe-epoki]]). Sprawdzamy
+    # osobno każdy reżim.
+    print("\n" + "=" * 78)
+    print("TO SAMO PO EPOKACH PRODUKTU (mecze wg doby produktowej)")
+    print("=" * 78)
+    EPOKI = (
+        ("do naprawy znaku (< 11.08)", "0000-00-00", "2026-08-11"),
+        ("po znaku, przed priorem", "2026-08-11", "2026-08-13"),
+        ("po naprawie priora (>= 13.08)", "2026-08-13", "9999-99-99"),
+    )
+    for nazwa, limit, klucz in (
+        ("LIMIT NA RYNEK|STRONĘ", B.LISTA_PER_RYNEK,
+         lambda r: (R._doba_produktowa(r.get("kickoff_ts")),
+                    r.get("rynek_kod"), r.get("strona"))),
+        ("LIMIT NA MECZ", B.LISTA_PER_MECZ,
+         lambda r: (R._doba_produktowa(r.get("kickoff_ts")),
+                    r.get("mecz_id"))),
+    ):
+        print(f"\n{nazwa}  (limit {limit})")
+        print(f"   {'epoka':<32}{'w lim.':>8}{'luka':>8}{'ponad':>8}"
+              f"{'luka':>8}   {'różnica luki'}")
+        for etyk, od, do in EPOKI:
+            zbior = [r for r in widziane
+                     if od <= R._doba_produktowa(r.get("kickoff_ts")) < do]
+            koszyki: dict[tuple, list[dict]] = defaultdict(list)
+            for r in zbior:
+                koszyki[klucz(r)].append(r)
+            a, b = [], []
+            for _k, grp in koszyki.items():
+                grp.sort(key=lambda r: r.get("opublikowano_ts") or 0)
+                for i, r in enumerate(grp):
+                    (a if i < limit else b).append(r)
+            na, _, _, luka_a, _, _ = _staty(a)
+            nb, _, _, luka_b, _, _ = _staty(b)
+            if na < 20 or nb < 20:
+                print(f"   {etyk:<32}{na:>8}{'':>8}{nb:>8}"
+                      f"   — za mała próba na wniosek")
+                continue
+            print(f"   {etyk:<32}{na:>8}{luka_a*100:>+7.1f}{nb:>8}"
+                  f"{luka_b*100:>+7.1f}{(luka_b-luka_a)*100:>+13.1f} pp")
+
+    # --- SYMULACJA NAPRAWY: co realnie zostanie na liście
+    print("\n" + "=" * 78)
+    print("SYMULACJA NAPRAWY — jak wyglądałaby lista przy limicie SKUMULOWANYM")
+    print("=" * 78)
+    def _symuluj(zbior: list[dict], tylko_rynek: bool
+                 ) -> tuple[list[dict], list[dict]]:
+        """Kto zostaje na liście, gdy limit liczy się SKUMULOWANIE na dobę."""
+        per_doba_sym: dict[str, list[dict]] = defaultdict(list)
+        for r in zbior:
+            per_doba_sym[R._doba_produktowa(r.get("kickoff_ts"))].append(r)
+        zostaje, odpada = [], []
+        for _d, grp in per_doba_sym.items():
+            grp = sorted(grp, key=lambda r: r.get("opublikowano_ts") or 0)
+            z_rynku: dict[tuple, int] = defaultdict(int)
+            z_meczu: dict[int, int] = defaultdict(int)
+            for r in grp:
+                kr = (r.get("rynek_kod"), r.get("strona"))
+                km = r.get("mecz_id")
+                poza = z_rynku[kr] >= B.LISTA_PER_RYNEK or (
+                    not tylko_rynek and z_meczu[km] >= B.LISTA_PER_MECZ)
+                if poza:
+                    odpada.append(r)
+                    continue
+                z_rynku[kr] += 1
+                z_meczu[km] += 1
+                zostaje.append(r)
+        return zostaje, odpada
+
+    for etyk_okres, zbior in (
+        ("CAŁA EPOKA", widziane),
+        ("TYLKO PO NAPRAWIE ZNAKU (mecze od 11.08)",
+         [r for r in widziane
+          if R._doba_produktowa(r.get("kickoff_ts")) >= "2026-08-11"]),
+    ):
+        for etyk_wariant, tylko_rynek in (
+            ("rynek + mecz", False), ("SAM limit na rynek", True),
+        ):
+            zostaje, odpada = _symuluj(zbior, tylko_rynek)
+            n_z, _, traf_z, luka_z, roi_z, szum_z = _staty(zostaje)
+            n_o, _, traf_o, luka_o, roi_o, _ = _staty(odpada)
+            n_w, _, traf_w, luka_w, roi_w, _ = _staty(zbior)
+            if n_o < 10:
+                continue
+            print(f"\n   {etyk_okres} — wariant: {etyk_wariant}")
+            print(f"   {'':<22}{'n':>6}{'trafia':>9}{'luka':>8}{'ROI':>9}"
+                  f"{'bilans 10 zł/typ':>20}")
+            print(f"   {'dziś':<22}{n_w:>6}{traf_w:>9.1%}"
+                  f"{luka_w*100:>+7.1f}{roi_w:>9.1%}{roi_w*n_w*10:>+17.0f} zł")
+            print(f"   {'po naprawie':<22}{n_z:>6}{traf_z:>9.1%}"
+                  f"{luka_z*100:>+7.1f}{roi_z:>9.1%}{roi_z*n_z*10:>+17.0f} zł")
+            print(f"   {'odcięte':<22}{n_o:>6}{traf_o:>9.1%}"
+                  f"{luka_o*100:>+7.1f}{roi_o:>9.1%}{roi_o*n_o*10:>+17.0f} zł")
+            print(f"   lista traci {n_o/max(n_w,1):.0%} typów, bilans "
+                  f"{(roi_z*n_z - roi_w*n_w)*10:+.0f} zł, "
+                  f"szum ROI po naprawie ±{szum_z*100:.1f} pp")
+    print("\n   ⚑ To jest liczone NA TEJ SAMEJ próbie, na której regułę")
+    print("   dobrano — czyli dopasowanie do przeszłości, nie prognoza.")
+    print("   Wniosek wolno wyciągać tylko wtedy, gdy zgadza się ze")
+    print("   STABILNOŚCIĄ i EPOKAMI wyżej.")
+
     # --- KONTROLA SEGMENTU: czy to nie mówi o RYNKU zamiast o limicie
     #
     # „Ponad limit na rynek" z definicji zbiera typy z rynków, które danego
