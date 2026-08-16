@@ -5131,6 +5131,25 @@ def _main_impl(tryb=None):
                     "sugestia": False,
                     "odrzucony": True,
                     "odrzucenie_powod": od.get("powod"),
+                    # TYP POMIAROWY TEŻ MUSI MIEĆ SWÓJ RACHUNEK (2026-08-16).
+                    # Te rekordy to DWIE TRZECIE próby zawodniczej (92 ze 170
+                    # rozliczeń) — bez nich diagnoza strumienia liczy się na
+                    # 77 typach zamiast 170 i nic z niej nie widać. `lambda`
+                    # z tego samego powodu: pasmo tuż nad progiem λ jest
+                    # jedynym miejscem, gdzie da się ten próg kiedykolwiek
+                    # ocenić (poniżej progu księga ma zero rozliczeń).
+                    "lambda": sm.lam,
+                    "rachunek": betting.stempel_rachunku(
+                        p_over_raw=sm.p_over_raw,
+                        kal_rynek=betting.delta_dla_p(
+                            bias_map.get(mk), sm.p_over_raw
+                        ) if sm.p_over_raw is not None else None,
+                        kal_strumien=betting.delta_dla_p(
+                            korekta_strumieni.get("pewniaki", 0.0),
+                            sm.p_over_raw,
+                        ) if sm.p_over_raw is not None else None,
+                        p_over_final=sm.p_over,
+                    ),
                 })
             # pula pewniaków pod kupony: wysoka szansa + rozsądny kurs,
             # bez wymogu value, ale z TYMI SAMYMI bezpiecznikami rozbieżności
@@ -5421,6 +5440,25 @@ def _main_impl(tryb=None):
                 "ci": [sm.ci_low, sm.ci_high],
                 "oczekiwane_minuty": sm.expected_minutes, "lambda": sm.lam,
                 "rozklad": dist, "czynniki": sm.factors, "uzasadnienie": sm.reasoning,
+                # NA CZYM STOI TA LICZBA (2026-08-16) — stempel `rachunek`
+                # objął 12.08 legi puli, drużyny, `match_*`, `wiecej_*`
+                # i drabinki, ale TĘ ścieżkę pominął. Zmierzone przy diagnozie
+                # strumienia zawodniczego: rekordy drużynowe miały 1105
+                # stempli `kal_rynek`, zawodnicze — ZERO, więc rachunku typu
+                # zawodniczego nie dało się odtworzyć wstecz i pomiar tego
+                # strumienia stał na ośmiu rekordach (z puli kuponów).
+                # Kalibracja BYŁA nakładana — silnik dostaje deltę łączną
+                # przez `_bias_z_korekta` — brakowało wyłącznie zapisu.
+                "rachunek": betting.stempel_rachunku(
+                    p_over_raw=sm.p_over_raw,
+                    kal_rynek=betting.delta_dla_p(
+                        bias_map.get(mk), sm.p_over_raw
+                    ) if sm.p_over_raw is not None else None,
+                    kal_strumien=betting.delta_dla_p(
+                        korekta_strumieni.get("pewniaki", 0.0), sm.p_over_raw,
+                    ) if sm.p_over_raw is not None else None,
+                    p_over_final=sm.p_over,
+                ),
             }
             # brama jakości (liga): okazja na starych danych nie wchodzi do
             # publikacji, rozlicza się i uczy kalibrację w tle. To samo dotyczy
@@ -8637,7 +8675,22 @@ def _main_impl(tryb=None):
     # JEDEN SŁOWNIK, nie dwa pola — każde osobne pole musiałoby przejść przez
     # trzy białe listy (`rec_pewniaka`, `_dopisz_nowe`, `_kupon_leg_do_logu`),
     # co jest udokumentowaną pułapką tego repo (patrz `betting.stempel_rachunku`).
-    for _b in value_bets:
+    #
+    # ⚑ STEMPLUJEMY TAKŻE TYPY ZDJĘTE BRAMAMI (2026-08-16). Do dziś pętla szła
+    # po samym `value_bets`, a ten jest wyżej PRZYCINANY o typy zdjęte bramą
+    # wyświetlania (patrz `value_bets = _zostaja`) — więc stempel omijał
+    # wszystko, co brama wycięła. Zmierzone przy kontroli startowej: stempel
+    # miało 8 z 33 typów doby 16.08 i ZERO typów `poza_publikacja`.
+    #
+    # To jest dokładnie ta próba, której pytanie „czy kryterium listy
+    # porządkuje" potrzebuje najbardziej: bez zdjętych nie da się porównać
+    # kolejności tego, co pokazaliśmy, z kolejnością tego, co wycięliśmy —
+    # a to samo porównanie zdecydowało 13.08 o kwarantannach.
+    # Wznowionych to nie dotyczy i dotyczyć nie może: ich rekord jest w księdze
+    # od wcześniej, a `_dopisz_nowe` nie dopisuje nowych pól do rekordów, które
+    # już istnieją („historii nie przepisujemy"). Ich pokrycie rośnie samo,
+    # w miarę jak stare typy wygasają.
+    for _b in value_bets + typy_poza_publikacja:
         _ile = _kandydatow_w_meczu.get(_b.get("mecz_id"), 0)
         _b["kolejnosc"] = {"moc": moc_listy(_b, _ile), "kandydatow": _ile}
 
