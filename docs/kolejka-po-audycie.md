@@ -449,9 +449,23 @@ Legenda: `[x]` zrobione · `[~]` w toku / obejście · `[ ]` otwarte
   pól nie dopisuje. Część 7 kontroli startowej będzie miała próbę ~4× później,
   niż zakładano przy wdrożeniu 14.08.
 
-- [ ] **80 typów po gwizdku bez rozliczenia**, w tym 24 × `team_corners`
-  (13.08: 22, 11.08: 18). Zamkną się jako „zwrot" po terminie — czyli tyle
-  typów nie powie nam nic o modelu.
+- [ ] **Typy, które nigdy nie dostają wyniku — `team_corners` na czele.**
+  Doprecyzowane 16.08. Mechanizm DZIAŁA: `TERMIN_BRAK_DANYCH_S` = 7 dni, po
+  nich typ zamyka się jako „zwrot". Z 300 typów po gwizdku bez wyniku mediana
+  wieku to 2,9 dnia, a tylko 9 przekroczyło termin — czyli większość po
+  prostu czeka.
+
+  ⚑ **Problem jest w tym, ile z nich czeka NA DARMO:** podsumowanie produktu
+  pokazuje **156 typów zamkniętych bez rozstrzygnięcia, z czego 73 BYŁY NA
+  STRONIE**. Rozkład: `team_corners` 56, `shots` 24, `fouls_won` 17,
+  `team_goals` 13, `fouls_committed` 11, `tackles` 8.
+
+  Trop do sprawdzenia: **270 z 300 oczekujących nie ma stempla `liga`**
+  (najstarsze to norweskie mecze HamKam – Aalesunds z 09.08). Stempel wszedł
+  03.08, więc jego brak przy meczach z 09–16.08 sugeruje mecze spoza rejestru
+  rozgrywek — a dla nich 365Scores nie ma jak oddać wyniku i zostaje wyłącznie
+  fallback statshuba. Zacząć od sprawdzenia, czy te mecze w ogóle są
+  w `comp365`, zanim ruszy się cokolwiek w samym rozliczaniu.
 
 ---
 
