@@ -572,6 +572,10 @@ class ValueAssessment:
     confidence_score: float
     risk: str
     rank_score: float
+    # delta korekty strony nałożona na `model_prob` (2026-08-16). Zero znaczy
+    # „ta para nie ma jeszcze pomiaru", a nie „zmierzono i wyszło zero" —
+    # rozróżnienie kosztowało nas już raz cały pomiar (`brak_kursu`).
+    kal_strony: float = 0.0
 
 
 # Minimalne progi publikacji okazji
@@ -939,6 +943,28 @@ def widelki_druzynowe_blisko(odd: float, p: float, p_ostrozne: float) -> bool:
     )
 
 
+def delta_strony(korekta: dict | None, rynek_kod: str | None, side: str) -> float:
+    """Delta logitowa dla pary (rynek, strona) — 0,0 gdy nie ma pomiaru.
+
+    Klucz jest tym samym napisem co w kwarantannach i pomiarach bram
+    (`rynek|strona`), żeby dało się je zestawiać bez tłumaczenia.
+    """
+    if not korekta or not rynek_kod:
+        return 0.0
+    try:
+        return float(korekta.get(f"{rynek_kod}|{side}") or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _z_delta(p: float, d: float) -> float:
+    """p po nałożeniu delty logitowej (0,0 = bez zmian)."""
+    if not d:
+        return float(p)
+    x = min(max(float(p), 1e-6), 1.0 - 1e-6)
+    return 1.0 / (1.0 + math.exp(-(math.log(x / (1.0 - x)) + d)))
+
+
 def assess(
     p_model_over: float,
     over_odds: float | None,
@@ -948,6 +974,8 @@ def assess(
     is_prob_market: bool = False,
     odrzucone_out: list | None = None,
     tryb: str | None = None,
+    korekta_strony: dict | None = None,
+    rynek_kod: str | None = None,
 ) -> list[ValueAssessment]:
     """Oceń obie strony rynku. Zwraca tylko strony przechodzące progi.
 
@@ -984,6 +1012,17 @@ def assess(
     ):
         if implied is None or odds is None:
             continue
+        # ⚑ KOREKTA STRONY ZAKŁADU (2026-08-16) — jedyna warstwa uczenia
+        # nakładana na `p` TEJ strony, a nie na `p_over`. Musi wejść TUTAJ,
+        # przed `edge_pp` i `ev`, bo inaczej poprawiłaby liczbę na karcie,
+        # a selekcja dalej wybierałaby po szansie zawyżonej.
+        #
+        # Delta na `p_over` jest transferem między stronami: ściągając jedną,
+        # podnosi drugą. A zmierzone 16.08 przeszacowanie dotyczy OBU stron
+        # (poniżej −3,5 pp, powyżej −14,7 pp), więc jedną liczbą nie da się
+        # tego naprawić — patrz `rozliczanie.korekta_strony`.
+        d_strony = delta_strony(korekta_strony, rynek_kod, side)
+        p_model = _z_delta(p_model, d_strony)
         edge_pp = (p_model - implied) * 100.0
         # EV PO PODATKU (2026-07-31). `edge_pp` zostaje bez podatku celowo:
         # to porównanie dwóch szans (modelu i rynku), a nie zysk — podatek
@@ -1042,6 +1081,7 @@ def assess(
                 confidence_score=round(score, 1),
                 risk=risk,
                 rank_score=round(rank, 3),
+                kal_strony=round(d_strony, 4),
             )
         )
     return results

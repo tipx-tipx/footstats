@@ -249,6 +249,7 @@ def score_player_market(
     market_calibrated: bool = False,
     card_conversion: float | None = None,
     market_bias: float | dict = 1.0,
+    korekta_strony: dict | None = None,
 ) -> ScoredMarket:
     """Pełny scoring jednego rynku zawodnika dla jednego meczu.
 
@@ -398,6 +399,9 @@ def score_player_market(
         p_over, over_odds, under_odds, conf_inputs, lam,
         is_prob_market=(market_code == "yellow_card"),
         odrzucone_out=odrzucone_przy_progu,
+        # korekta strony wchodzi PRZED bramami — patrz nota w `betting.assess`
+        korekta_strony=korekta_strony,
+        rynek_kod=market_code,
     )
 
     return ScoredMarket(

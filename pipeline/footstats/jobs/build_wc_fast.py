@@ -4035,6 +4035,30 @@ def _main_impl(tryb=None):
     except Exception as e:
         diagnostyka.cichy("cykl", "sklad_wersji_okna", e)
 
+    # ⚑ KOREKTA STRONY ZAKŁADU (2026-08-16) — jedyna warstwa nakładana na `p`
+    # WYBRANEJ strony, a nie na `p_over`. Powód i liczby: nota przy
+    # `rozliczanie.KOREKTA_STRONY_OKNO` oraz `docs/warstwy-uczenia-szkodza.md`.
+    # Skrót: delta na `p_over` jest transferem między stronami, a przeszacowane
+    # są obie (poniżej −3,5 pp, powyżej −14,7 pp).
+    korekta_stron: dict[str, float] = {}
+    with rozliczanie.warstwa_uczenia("korekta_strony") as _w:
+        korekta_stron = rozliczanie.korekta_strony(_ksiega)
+        _w.opisz(
+            n=len(korekta_stron),
+            opis=(", ".join(f"{k} {v:+.2f}" for k, v in
+                            sorted(korekta_stron.items(), key=lambda x: x[1])[:6])
+                  or "za mała próba — strony bez korekty"),
+        )
+    if korekta_stron:
+        print("Korekta strony (Δlogit na p wybranego zakładu): " + ", ".join(
+            f"{k} {v:+.2f}" for k, v in
+            sorted(korekta_stron.items(), key=lambda x: x[1])))
+    # ILU TYPÓW REALNIE DOTKNĘŁA — warstwa bez licznika działa po cichu, a to
+    # jest dokładnie ta klasa błędu, którą zbiera [[ciche-odrzucenia-zasada]].
+    # Wznowione typy niosą `p` zamrożone przy publikacji, więc korekta ich NIE
+    # dotyczy; licznik mówi, ile z bieżącego przeliczenia przez nią przeszło.
+    _licznik_korekty_stron: Counter = Counter()
+
     # ILE PRZEDZIAŁÓW TO POMIAR, A ILE PRZYBLIŻENIE (2026-08-05).
     # Przedział bez własnej próby dostaje wartość globalną rynku i do dziś
     # wyglądał w raporcie identycznie jak zmierzony — cztery liczby w rzędzie
@@ -5109,7 +5133,9 @@ def _main_impl(tryb=None):
             sm = score_player_market(mk, l, hist, prior, ctx,
                                      over_odd, under_odd,
                                      market_calibrated=True,
-                                     market_bias=_bias_z_korekta(mk, "pewniaki"))
+                                     market_bias=_bias_z_korekta(mk, "pewniaki"),
+                                     # patrz nota przy `korekta_stron` wyżej
+                                     korekta_strony=korekta_stron)
             # POMIAR PROGÓW: odrzucenia tuż przy progu (betting.NEAR_*) —
             # rozliczą się w tle poza kalibracją/skutecznością/UI
             for od in sm.odrzucone:
@@ -5438,6 +5464,9 @@ def _main_impl(tryb=None):
                 "pewnosc": a.confidence, "pewnosc_score": a.confidence_score,
                 "ryzyko": a.risk, "rank_score": a.rank_score,
                 "ci": [sm.ci_low, sm.ci_high],
+                # delta korekty strony, którą `betting.assess` nałożył na
+                # `a.model_prob` — stempel jest warunkiem mierzalności warstwy
+                "kal_strony": round(float(getattr(a, "kal_strony", 0.0) or 0.0), 4),
                 "oczekiwane_minuty": sm.expected_minutes, "lambda": sm.lam,
                 "rozklad": dist, "czynniki": sm.factors, "uzasadnienie": sm.reasoning,
                 # NA CZYM STOI TA LICZBA (2026-08-16) — stempel `rachunek`
@@ -6328,6 +6357,27 @@ def _main_impl(tryb=None):
                     # Od 2026-07-30 stosowana do „powyżej", a „poniżej" jest
                     # jej LUSTREM; nie dokładamy jej drugi raz do wybranej
                     # strony, bo to łamało tożsamość p_under = 1 − p_over.
+                    #
+                    # ⚑ KOREKTA STRONY (2026-08-16) — TA jest nakładana na
+                    # wybraną stronę i właśnie dlatego istnieje. Delta na
+                    # `p_over` jest transferem: ściągając „powyżej", podnosi
+                    # „poniżej". A przeszacowane są OBIE strony (zmierzone:
+                    # poniżej −3,5 pp, powyżej −14,7 pp), więc jedną liczbą
+                    # nie da się tego naprawić — `rozliczanie.korekta_strony`.
+                    #
+                    # Wchodzi PRZED widełkami, oknem zgody i wartością, bo
+                    # inaczej poprawiłaby liczbę na karcie, a selekcja dalej
+                    # wybierałaby po szansie zawyżonej.
+                    _d_strony_t = betting.delta_strony(
+                        korekta_stron, tt.market_code, strona_t
+                    )
+                    if _d_strony_t:
+                        p_t = betting._z_delta(p_t, _d_strony_t)
+                        lo_t = betting._z_delta(lo_t, _d_strony_t)
+                        hi_t = betting._z_delta(hi_t, _d_strony_t)
+                        _licznik_korekty_stron[
+                            f"{tt.market_code}|{strona_t}"
+                        ] += 1
                     implied_t = betting.implied_prob_one_sided(odd_t)
                     # jak po stronie zawodniczej: decyduje p ostrożne
                     p_dec_t = (p_t + lo_t) / 2.0
@@ -6494,6 +6544,11 @@ def _main_impl(tryb=None):
                         "rynek": MARKET_NAMES_PL[tt.market_code],
                         "linia": l_t, "strona": strona_t, "kurs": odd_t,
                         "bukmacher": "Superbet", "p_model": round(p_t, 4),
+                        # delta korekty strony nałożona wyżej — bez stempla
+                        # warstwa byłaby niemierzalna wstecz, a to jest
+                        # dokładnie ten błąd, który zostawił nas 16.08 z
+                        # ośmioma rekordami do diagnozy strumienia
+                        "kal_strony": round(_d_strony_t, 4),
                         "ev_pct": round(betting.ev_brutto_pct(p_t, odd_t), 1),
                         "ev_netto": round(betting.ev_pct(p_t, odd_t), 1),
                         "tryb_podatku": betting.tryb_podatku("Superbet"),
@@ -8390,6 +8445,17 @@ def _main_impl(tryb=None):
         print(f"Kolejność listy: {_bogate} typów z meczów, o których model ma "
               f"dużo do powiedzenia ({PROG_BOGATEGO_MECZU}+ kandydatów w "
               f"meczu) — premia {PREMIA_BOGATEGO_MECZU:.2f} w „polecanych”")
+    if _licznik_korekty_stron:
+        print("Korekta strony dotknęła: "
+              + ", ".join(f"{k} {n}" for k, n in
+                          _licznik_korekty_stron.most_common(8))
+              + f" (razem {sum(_licznik_korekty_stron.values())} wycen "
+              "z bieżącego przeliczenia; wznowione mają `p` zamrożone)")
+    elif korekta_stron:
+        print("Korekta strony: policzona dla "
+              f"{len(korekta_stron)} stron rynku, ale ANI JEDNA wycena "
+              "z tego przebiegu jej nie użyła — sprawdź, czy typy nie są "
+              "same wznowieniami")
     _wstrzymane = sum(1 for b in lista_pub if b.get("rynek_wstrzymany"))
     if _wstrzymane:
         print(f"Rynki wstrzymane: {_wstrzymane} typów na liście pochodzi "

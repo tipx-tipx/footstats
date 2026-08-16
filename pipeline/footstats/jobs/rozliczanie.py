@@ -28,7 +28,7 @@ import contextlib
 import json
 import math
 import time
-from collections import Counter
+from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -106,6 +106,7 @@ WARSTWY_KRYTYCZNE = frozenset({"korekta_strumienia", "szansa_pokazywana"})
 # celowe, bo warstwa spoza rejestru może paść niezauważona.
 WARSTWY_UCZENIA = (
     "korekta_strumienia",
+    "korekta_strony",
     "szansa_pokazywana",
     "kwarantanna_rynkow",
     "kwarantanna_kategorii",
@@ -123,6 +124,7 @@ WARSTWY_UCZENIA = (
 # z niewłaściwą nazwą jest gorsza niż liczba bez nazwy.
 JEDNOSTKI_WARSTW = {
     "korekta_strumienia": ("rozliczenie", "rozliczenia", "rozliczeń"),
+    "korekta_strony": ("strona rynku", "strony rynku", "stron rynku"),
     "szansa_pokazywana": ("strumień", "strumienie", "strumieni"),
     "kwarantanna_rynkow": ("rynek", "rynki", "rynków"),
     "kwarantanna_kategorii": ("powód", "powody", "powodów"),
@@ -859,6 +861,15 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
             # rozwiązaną dla `p` TEGO typu — dokładnie tę, którą nałożono.
             **({"kal_strumien": _delta_stempla(b)}
                if _KOREKTA_CYKLU.get(_strumien(b)) else {}),
+            # DELTA KOREKTY STRONY (2026-08-16) — jedyna warstwa nałożona na
+            # `p` WYBRANEGO zakładu, więc jej stempel jest osobny od
+            # `kal_strumien` (tamten opisuje deltę na `p_over`). Bez tego pola
+            # `korekta_strony` uczyłaby się na własnym efekcie i oscylowała —
+            # ta sama pułapka, która trzyma `compute_bias_full` na zamrożonej
+            # mapie.
+            **({"kal_strony": round(float(b["kal_strony"]), 4)}
+               if isinstance(b.get("kal_strony"), (int, float))
+               and b.get("kal_strony") else {}),
             # WKŁAD KAŻDEJ ZALEŻNOŚCI, ZAMROŻONY PRZY PUBLIKACJI (2026-08-07).
             #
             # Do dziś księga zapisywała sam WYNIK rachunku (`p_model`), więc po
@@ -2122,6 +2133,47 @@ KOREKTA_STRUMIENIA_CAP = (-1.05, 0.20)
 # po drodze, ile typów kosztuje uczciwość, i można się zatrzymać.
 KOREKTA_STRUMIENIA_TLUMIENIE = 0.5
 
+# --- KOREKTA STRONY ZAKŁADU (2026-08-16) -----------------------------------
+#
+# ⚑ PO CO OSOBNA WARSTWA, SKORO MAMY JUŻ DWIE.
+#
+# Kalibracja rynku i korekta strumienia nakładają delty na `p_over`, a
+# „poniżej" powstaje dopiero jako `1 − p_over`. Taka delta jest TRANSFEREM
+# między stronami, nie redukcją: ściągnięcie `p_over` automatycznie PODNOSI
+# `p` typu „poniżej". Jedną liczbą nie da się obniżyć obu stron naraz.
+#
+# A obie są przeszacowane. Zmierzone 16.08 na 1197 rekordach drużynowych ze
+# stemplem `rachunek`, na `p` SUROWYM (przed obiema warstwami):
+#
+#     poniżej   n=813   deklaruje 57,9%   trafia 54,5%   luka  −3,5 pp
+#     powyżej   n=384   deklaruje 54,8%   trafia 40,1%   luka −14,7 pp
+#     delta potrzebna: poniżej −0,165, powyżej −0,654
+#
+# Skutek dzisiejszej architektury: korekta strumienia (−0,4 na `p_over`)
+# pomaga stronie „powyżej", ale psuje „poniżej" — a to 2/3 publikowanych
+# typów. Zmierzone na tych samych rekordach: „poniżej" luka −4,1 pp przed
+# warstwami, −10,7 pp po nich. Pełny opis: `docs/warstwy-uczenia-szkodza.md`.
+#
+# Ta warstwa działa INACZEJ niż tamte dwie i to jest cały sens:
+#   * uczy się i nakłada na `p` WYBRANEGO ZAKŁADU, nie na `p_over`;
+#   * ma osobną deltę dla każdej pary (RYNEK, STRONA) — to ta sama jednostka
+#     decyzji, którą wymusiły kwarantanny;
+#   * wchodzi w `betting.assess`, czyli PRZED liczeniem wartości i przed
+#     bramami — inaczej poprawiłaby liczbę na karcie, a nie selekcję.
+#
+# ⚑ Uczymy na `rachunek.p_over_raw` (stempel od 12.08), czyli na liczbie
+# sprzed WSZYSTKICH warstw. Dzięki temu warstwa nie widzi własnego efektu
+# i nie ma się z czym oscylować — w odróżnieniu od `compute_bias_full`,
+# które uczy się na `p_model` z własną deltą w środku.
+KOREKTA_STRONY_OKNO = 300      # ostatnie N rozliczeń pary (rynek, strona)
+KOREKTA_STRONY_MIN_N = 30      # poniżej — para jedzie na delcie rynku
+KOREKTA_STRONY_MIN_N_RYNEK = 60  # ...a bez tego rynek nie ma własnej delty
+KOREKTA_STRONY_CAP = (-1.20, 0.30)
+# Ta sama ostrożność co przy korekcie strumienia: bierzemy POŁOWĘ zmierzonej
+# reszty. Warstwa dochodzi do pełnej wartości przez kilka cykli, a po drodze
+# widać, ile typów kosztuje uczciwość.
+KOREKTA_STRONY_TLUMIENIE = 0.5
+
 # PRZEDZIAŁY SZANSY W KOREKCIE STRUMIENIA (2026-07-31).
 #
 # Do dziś korekta była JEDNĄ liczbą na strumień. Pomiar na 536 rozliczeniach
@@ -2427,6 +2479,121 @@ def wersja_modelu_rekordu(r: dict) -> str | None:
             and (r.get("opublikowano_ts") or 0) >= NAPRAWA_PRIORA_TS):
         return betting.WERSJA_MODELU
     return stempel
+
+
+def _p_typu_przed_ta_warstwa(r: dict) -> float | None:
+    """`p` WYBRANEGO ZAKŁADU sprzed TEJ warstwy — czyli po wszystkich innych.
+
+    ⚑ UCZYMY TAM, GDZIE NAKŁADAMY (2026-08-16). Pierwsza wersja uczyła się na
+    `rachunek.p_over_raw`, czyli na `p` sprzed WSZYSTKICH warstw, a nakładała
+    deltę na `p` już przez nie przetworzone. Test out-of-sample złapał tę
+    niespójność: delta była liczona dla innej liczby niż ta, którą poprawia,
+    więc nakładałaby korektę drugi raz.
+
+    Teraz punktem odniesienia jest `p_model` (to, co realnie poszło na stronę)
+    po zdjęciu WŁASNEJ delty ze stempla `kal_strony`. Dzięki temu warstwa
+    mierzy „ile jeszcze brakuje po wszystkim" i nie widzi własnego efektu —
+    to samo zabezpieczenie, które `korekta_strumienia` ma w `_p_surowe`.
+
+    Rekord bez `p_model` zwraca None (nie zgadujemy).
+    """
+    p = r.get("p_model")
+    if p is None:
+        return None
+    try:
+        p = float(p)
+    except (TypeError, ValueError):
+        return None
+    d = _delta_strony_zapisana(r)
+    if not d:
+        return p
+    x = min(max(p, 1e-6), 1.0 - 1e-6)
+    return 1.0 / (1.0 + math.exp(-(math.log(x / (1.0 - x)) - d)))
+
+
+def korekta_strony(log: dict | None = None) -> dict[str, float]:
+    """Delta logitowa na `p` WYBRANEGO ZAKŁADU, osobno per (rynek, strona).
+
+    Zwraca {"team_corners|ponizej": -0.165, "team_sot|powyzej": -0.65, ...}.
+    Klucz jest tym samym napisem, którego używają kwarantanny i pomiary bram,
+    więc da się je zestawiać bez tłumaczenia.
+
+    ⚑ CZEMU TO NIE JEST TRZECIA KOPIA TEGO SAMEGO: pełne uzasadnienie i liczby
+    przy `KOREKTA_STRONY_OKNO`. Skrót: tamte dwie warstwy nakładają deltę na
+    `p_over`, więc naprawiając jedną stronę psują drugą — a przeszacowane są
+    obie. Ta liczy się i nakłada na stronie, którą naprawdę publikujemy.
+
+    Para bez własnej próby (< MIN_N) dziedziczy deltę swojego RYNKU, a rynek
+    bez próby (< MIN_N_RYNEK) nie dostaje nic — cisza znaczy „nie wiemy",
+    nie „zero" ([[ciche-odrzucenia-zasada]]).
+    """
+    if log is None:
+        log = _migruj_log(supa.get_key("typy_log") or {})
+    settled = [
+        r for r in log.values()
+        if r.get("wynik") in ("wygrany", "przegrany")
+        and not r.get("sugestia")
+        and r.get("rynek_kod") not in RYNKI_OSOBNE
+        and r.get("strona") in ("powyzej", "ponizej")
+        and r.get("p_model")
+        and _z_modelu(r)
+        and _z_biezacej_epoki(r) and not _z_martwej_epoki(r)
+        # ⚑ typy POMIAROWE też uczą — to dwie trzecie próby zawodniczej,
+        # a odrzucenie przy progu nie zmienia tego, czy zdarzenie zaszło
+        and _p_typu_przed_ta_warstwa(r) is not None
+    ]
+    if not settled:
+        return {}
+
+    def _delta(grp: list[dict]) -> float | None:
+        """Delta sprowadzająca surowe `p` typu do zmierzonej częstości."""
+        if not grp:
+            return None
+        b = _bias_logit(
+            [{**r, "p_model": _p_typu_przed_ta_warstwa(r)} for r in grp]
+        )
+        juz = [_delta_strony_zapisana(r) for r in grp]
+        srednia_juz = sum(juz) / len(juz)
+        b = srednia_juz + KOREKTA_STRONY_TLUMIENIE * (b - srednia_juz)
+        return max(KOREKTA_STRONY_CAP[0], min(KOREKTA_STRONY_CAP[1], b))
+
+    po_rynku: dict[str, list[dict]] = defaultdict(list)
+    po_parze: dict[str, list[dict]] = defaultdict(list)
+    for r in sorted(settled, key=lambda r: r.get("kickoff_ts") or 0):
+        po_rynku[r["rynek_kod"]].append(r)
+        po_parze[f'{r["rynek_kod"]}|{r["strona"]}'].append(r)
+
+    delty_rynkow: dict[str, float] = {}
+    for mk, grp in po_rynku.items():
+        okno = grp[-KOREKTA_STRONY_OKNO:]
+        if len(okno) >= KOREKTA_STRONY_MIN_N_RYNEK:
+            d = _delta(okno)
+            if d is not None:
+                delty_rynkow[mk] = d
+
+    out: dict[str, float] = {}
+    for klucz, grp in po_parze.items():
+        mk = klucz.split("|", 1)[0]
+        okno = grp[-KOREKTA_STRONY_OKNO:]
+        if len(okno) >= KOREKTA_STRONY_MIN_N:
+            d = _delta(okno)
+        else:
+            d = delty_rynkow.get(mk)
+        if d is None:
+            continue
+        # strona idealnie skalibrowana ma MILCZEĆ — patrz `korekta_strumienia`
+        if abs(d) < 0.02:
+            continue
+        out[klucz] = round(d, 3)
+    return out
+
+
+def _delta_strony_zapisana(r: dict) -> float:
+    """Stempel `kal_strony` rekordu jako liczba (0,0 = nie było warstwy)."""
+    try:
+        return float(r.get("kal_strony") or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
 
 
 def korekta_strumienia(log: dict | None = None) -> dict[str, float]:
