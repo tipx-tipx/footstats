@@ -118,6 +118,73 @@ Karty pokażą liczby **niższe o ~6 pp** i to będzie poprawne — dokładnie j
 przy ściąganiu do ceny 12.08. Podaż typów spadnie, bo część przestanie mieć
 dodatnią wartość: to jest cel, nie skutek uboczny.
 
+---
+
+# ⚑⚑⚑ DIAGNOZA (dopisane 16.08 wieczorem) — PRZYCZYNA JEST W ARCHITEKTURZE
+
+Właściciel wybrał „najpierw diagnoza". Zrobiona — i **obala pierwszą hipotezę
+z tego dokumentu**. Warstwy nie są policzone odwrotnie. Problem jest głębszy.
+
+## 1. Obie strony zakładu przeszacowują
+
+Na surowym `p` (przed warstwami), 1197 rekordów drużynowych ze stemplem:
+
+```
+strona      n     deklaruje   trafia     luka
+poniżej   813       57,9%     54,5%     -3,5 pp
+powyżej   384       54,8%     40,1%    -14,7 pp
+```
+
+Delta potrzebna, żeby każdą stronę sprowadzić do prawdy:
+
+```
+poniżej   -0,165
+powyżej   -0,654
+```
+
+## 2. Jedna delta na `p_over` NIE MOŻE tego naprawić — to TRANSFER, nie redukcja
+
+Obie warstwy nakładają deltę na `p_over`, a „poniżej" powstaje jako
+`1 − p_over`. Więc **ściągnięcie `p_over` automatycznie PODNOSI `p` typu
+„poniżej"**. Jedną liczbą nie da się obniżyć obu stron naraz — można tylko
+przesuwać masę z jednej na drugą.
+
+Nasza korekta strumienia (−0,4 na `p_over`) robi dokładnie to:
+
+```
+„powyżej":  p_over ↓  ->  p typu ↓   ✓ w dobrą stronę (potrzeba -0,654)
+„poniżej":  p_over ↓  ->  p typu ↑   ✗ w złą (potrzeba -0,165, dostaje +0,4)
+```
+
+I to widać w liczbach: „poniżej" PRZED −4,1 pp → PO −10,7 pp. Pogorszenie
+o 6,6 pp, czyli dokładnie tyle, ile wynosi nałożona delta. **Ponieważ 2/3
+publikowanych typów to „poniżej", wypadkowa jest szkodliwa** — mimo że sama
+korekta jest w orientacji `p_over` policzona POPRAWNIE.
+
+⚑ Sprawdzone i **odrzucone** po drodze (nie wracać):
+* orientacja `w_orientacji_over` — wdrożona i używana przez obie warstwy;
+* naddyspersja rozkładu — test out-of-sample (φ z I połowy na II) dał
+  poprawę Briera 0,2411 → 0,2396, czyli w granicach szumu;
+* `_p_surowe` odejmuje tylko jedną z dwóch delt — to PRAWDA i było
+  naprawione, ale naprawa **wzmacnia** korektę (−0,382 → −0,514), więc
+  bez zmiany architektury POGŁĘBIA problem „poniżej". Zmiana wycofana.
+
+## 3. Właściwa naprawa: korekta per (RYNEK, STRONA), nałożona na `p` TYPU
+
+To jest ten sam wniosek, który wyszedł już przy kwarantannach: **jednostką
+decyzji jest (rynek, strona), nie sam rynek**. Warstwa uczenia musi:
+
+* uczyć się na `p` WYBRANEGO ZAKŁADU (jak `szansa_pokazywana`), nie na
+  `p_over`;
+* mieć osobną deltę dla „powyżej" i „poniżej" w każdym rynku;
+* być uczona na `rachunek.p_over_raw`, czyli liczbie sprzed wszystkich warstw
+  (mamy ją w stemplu od 12.08, a od dziś także przy typach zawodniczych
+  i pomiarowych).
+
+Spodziewany efekt: luka „powyżej" −14,7 → ~0, „poniżej" −3,5 → ~0. Deklaracja
+spadnie z 62,9% do ~50%, ale **będzie prawdziwa** — a wartość zakładu i
+kolejność listy przestaną stać na liczbie zawyżonej o 6 pp.
+
 ## Krok 2 — dopiero potem diagnoza
 
 Dlaczego kalibracja wychodzi dodatnia, skoro model przeszacowuje. Kandydaci:
