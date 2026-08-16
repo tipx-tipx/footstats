@@ -4477,7 +4477,17 @@ def skutecznosc_per_dzien(
         agg["poza_n"] += 1
         if r.get("wynik") == "wygrany":
             agg["poza_trafione"] += 1
-        agg["typy"].append(_typ_dnia(r))
+        t = _typ_dnia(r)
+        # KAŻDY TYP W KOSZYKU „POZA" MA MIEĆ POWÓD (2026-08-16). Typ, który
+        # wypadł z zamrożonego składu dnia, nie dostaje znacznika w księdze
+        # („historii nie przepisujemy"), więc do UI szedł bez etykiety: nie
+        # liczył się do bilansu, a na liście dnia wyglądał jak zwykły typ.
+        # Klientowi `okrojDlaKlienta` wycina typy z tym polem, czyli bez
+        # etykiety widziałby w rozwinięciu dnia zakład, którego na ogłoszonej
+        # liście nie było. To ta sama zasada co [[ciche-odrzucenia-zasada]].
+        if not t.get("poza_publikacja"):
+            t["poza_publikacja"] = "poza_lista_dnia"
+        agg["typy"].append(t)
     # sam licznik, BEZ dokładania do listy typów: wiersz „nie wiemy, jak
     # poszło" nie ma czego pokazać w kolumnie wyniku i tylko rozmywałby dzień
     for r in braki or []:
@@ -4502,7 +4512,8 @@ def skutecznosc_per_dzien(
 STRUMIENIE = ("pewniaki", "druzyny", "drabinki")
 
 
-def skutecznosc_strumieni(log: dict, dni: int = 21) -> dict[str, dict]:
+def skutecznosc_strumieni(log: dict, dni: int = 21,
+                          lista_dnia: dict[str, set] | None = None) -> dict[str, dict]:
     """Skuteczność rozbita na strumienie: pewniaki / drużyny / drabinki.
 
     Jeden wspólny licznik mówił o wszystkim naraz i o niczym konkretnie:
@@ -4516,8 +4527,11 @@ def skutecznosc_strumieni(log: dict, dni: int = 21) -> dict[str, dict]:
     naprawdę trafia lepiej niż „solidny", zamiast wierzyć progom.
     """
     out: dict[str, dict] = {}
-    # zamrożone składy dni — wczytane RAZ, nie per strumień i nie per typ
-    _lista_dnia = wczytaj_liste_dnia()
+    # zamrożone składy dni — wczytane RAZ, nie per strumień i nie per typ.
+    # Payload Skuteczności podaje je gotowe, żeby widok zbiorczy i zakładki
+    # strumieni liczyły z DOKŁADNIE tego samego składu (i żeby nie robić
+    # drugiego odczytu Supabase w tym samym przebiegu).
+    _lista_dnia = lista_dnia if lista_dnia is not None else wczytaj_liste_dnia()
     for nazwa in STRUMIENIE:
         w_strumieniu = [
             r for r in log.values()
@@ -5551,11 +5565,31 @@ def rozlicz(
     # ani ROI — uczą się w tle (typy_log/kalibracja), ale nie są pokazywane.
     # Typy POMIAROWE (odrzucone przy progu) też zostają poza wszystkim —
     # nigdy nie były opublikowane, mierzy je tylko diagnostyka kategorii.
+    #
+    # ⚑ WIDOK ZBIORCZY LICZY TĘ SAMĄ LISTĘ CO ZAKŁADKI STRUMIENI (2026-08-16).
+    # Filtr zamrożonej listy dnia wszedł 13.08 (`poza_zamrozona_lista`), ale
+    # tylko do `skutecznosc_strumieni` — domyślna zakładka „wszystko" dalej
+    # liczyła całą księgę. Zmierzone przy kontroli startowej 16.08:
+    #
+    #     widok zbiorczy   1307 typów   bilans −205,72 j.
+    #     zamrożone listy   860 typów   bilans −120,52 j.
+    #     13.08:  183 typy / −39,46 j.  wobec  22 typy / −0,55 j. na liście
+    #
+    # Czyli produkt pokazywał stratę o 85 jednostek większą od tej, którą
+    # poniosła lista dnia, i robił to na typach, które z ogłoszonego składu
+    # wypadły (zamknięta doba, zmiana wersji). To ta sama naprawa co 13.08,
+    # dokończona po stronie widoku zbiorczego — historii nie ruszamy, typ
+    # dalej rozlicza się i uczy model, przenosi się tylko do „policzonych
+    # na próbę" (`poza_pub`), dokładnie jak w strumieniach.
+    _lista_dnia = wczytaj_liste_dnia()
     settled = [
         r for r in log.values()
         if r.get("wynik") in ("wygrany", "przegrany")
         and r.get("rynek_kod") not in RYNKI_OSOBNE
         and not r.get("odrzucony")
+        # nie stał w ogłoszonym składzie dnia — bilans ma opisywać listę,
+        # którą user zobaczył rano, a nie wszystko, co przeszło przez księgę
+        and not poza_zamrozona_lista(r, _lista_dnia)
         # typy spoza publikacji uczą kalibrację, ale nie liczą się do
         # pokazywanej skuteczności — user ich nie widział, nie mógł zagrać
         and not r.get("poza_publikacja")
@@ -5579,14 +5613,17 @@ def rozlicz(
     ]
     okazje = [r for r in settled if not r["sugestia"] and r.get("kurs")]
     roi = sum(_zwrot_typu(r) - 1.0 for r in okazje)
-    # typy poza publikacją (kwarantanna/limit meczu): w Skuteczności widoczne
-    # z oznaczeniem (pełna transparentność), ale poza licznikami trafień/ROI
+    # typy poza publikacją (kwarantanna/limit meczu) ORAZ te, które wypadły
+    # z zamrożonego składu dnia: w Skuteczności widoczne z oznaczeniem (pełna
+    # transparentność), ale poza licznikami trafień/ROI — user ich na
+    # ogłoszonej liście nie miał
     poza_pub = [
         r for r in log.values()
         if r.get("wynik") in ("wygrany", "przegrany")
         and r.get("rynek_kod") not in RYNKI_OSOBNE
         and not r.get("odrzucony")
-        and r.get("poza_publikacja")
+        and (r.get("poza_publikacja")
+             or poza_zamrozona_lista(r, _lista_dnia))
         and _z_modelu(r)
         and _z_biezacej_epoki(r) and not _z_martwej_epoki(r)
     ]
@@ -5624,7 +5661,7 @@ def rozlicz(
     )
     # ...i to samo rozbite na strumienie (pewniaki / drużyny / drabinki),
     # bo „skuteczność" bez podziału mieszała trzy różne produkty
-    strumienie = skutecznosc_strumieni(log)
+    strumienie = skutecznosc_strumieni(log, lista_dnia=_lista_dnia)
     for nazwa, s in strumienie.items():
         p_s = s["podsumowanie"]
         if p_s["rozliczone"]:

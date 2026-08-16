@@ -117,3 +117,86 @@ def test_wczytaj_liste_dnia_przyjmuje_oba_ksztalty(monkeypatch):
     assert out["2026-08-12"] == {"a", "b"}
     assert out["2026-08-13"] == {"c"}
     assert "2026-08-14" not in out, "pusty skład to brak składu"
+
+
+# --- WIDOK ZBIORCZY liczy to samo, co zakładki strumieni (2026-08-16) ---
+#
+# Filtr wszedł 13.08 tylko do `skutecznosc_strumieni`, a domyślna zakładka
+# Skuteczności („wszystko") czytała `skutecznosc_dzienna` liczoną z całej
+# księgi. Zmierzone na produkcji 16.08: 1307 typów i −205,72 j. wobec 860
+# typów i −120,52 j. na zamrożonych składach; dla 13.08 — 183 typy wobec 22.
+
+def _rec_druzynowy(podmiot="Flamengo", wynik="przegrany", kurs=2.0):
+    t = _typ(podmiot=podmiot, ts=_ts("2026-08-13", 20))
+    return {
+        **t, "mecz": "Flamengo – Cruzeiro", "podmiot_id": 101,
+        "rynek": "Rzuty rożne drużyny", "kurs": kurs, "p_model": 0.6,
+        "sugestia": False, "wynik": wynik, "opublikowano_ts": 1,
+        "epoka": R.EPOKA_BIEZACA, "ekran": "druzyny",
+        "rozliczono_ts": _ts("2026-08-13", 22),
+    }
+
+
+def _payload_skutecznosci(monkeypatch, log, lista_dnia):
+    store = {"typy_log": log, "lista_dnia": lista_dnia}
+    monkeypatch.setattr(R.supa, "get_key", lambda k: store.get(k))
+    monkeypatch.setattr(R.supa, "get_key_ok",
+                        lambda k: (store.get(k), True))
+    monkeypatch.setattr(R.supa, "put_key",
+                        lambda k, v: store.__setitem__(k, v) or True)
+    monkeypatch.setattr(R.supa, "put_key_bezpiecznie",
+                        lambda k, v, **kw: store.__setitem__(k, v) or True)
+    # rozliczanie nie ma tu nic do zrobienia (rekordy już mają `wynik`),
+    # ale bez tych zaślepek doszłoby do sieci — patrz conftest
+    monkeypatch.setattr(R, "_snapshot_zamkniecia", lambda *a, **k: None)
+    return R.rozlicz([], [])
+
+
+def test_widok_zbiorczy_pomija_typy_spoza_zamrozonej_listy(monkeypatch):
+    na_liscie = _rec_druzynowy(podmiot="Flamengo", wynik="wygrany")
+    spoza = _rec_druzynowy(podmiot="Cruzeiro", wynik="przegrany")
+    log = {R._klucz(na_liscie): na_liscie, R._klucz(spoza): spoza}
+    lista = {"2026-08-13": {"klucze": [B._klucz_publikacji(na_liscie)],
+                            "zamkniete_ts": _ts("2026-08-13", 6)}}
+    out = _payload_skutecznosci(monkeypatch, log, lista)
+
+    pods = out["podsumowanie"]
+    assert pods["rozliczone"] == 1, "do bilansu wchodzi tylko skład dnia"
+    assert pods["trafione"] == 1
+    dzien = next(d for d in out["skutecznosc_dzienna"]
+                 if d["dzien"] == "2026-08-13")
+    assert dzien["okazje"] == 1
+    assert dzien["poza_n"] == 1, "typ spoza składu ma być POLICZONY NA PRÓBĘ"
+
+    # etykieta jest warunkiem tego, żeby `okrojDlaKlienta` wyciął ten wiersz
+    # z rozwinięcia dnia — bez niej klient widziałby typ, którego na
+    # ogłoszonej liście nie było, i to bez żadnego oznaczenia
+    poza_wiersz = next(t for t in dzien["typy"] if t["podmiot"] == "Cruzeiro")
+    assert poza_wiersz["poza_publikacja"] == "poza_lista_dnia"
+    na_liscie_wiersz = next(t for t in dzien["typy"]
+                            if t["podmiot"] == "Flamengo")
+    assert not na_liscie_wiersz["poza_publikacja"]
+
+
+def test_widok_zbiorczy_i_strumienie_licza_to_samo(monkeypatch):
+    """Sedno: obie zakładki Skuteczności muszą podawać tę samą liczbę."""
+    na_liscie = _rec_druzynowy(podmiot="Flamengo", wynik="wygrany")
+    spoza = _rec_druzynowy(podmiot="Cruzeiro", wynik="przegrany")
+    log = {R._klucz(na_liscie): na_liscie, R._klucz(spoza): spoza}
+    lista = {"2026-08-13": {"klucze": [B._klucz_publikacji(na_liscie)],
+                            "zamkniete_ts": _ts("2026-08-13", 6)}}
+    out = _payload_skutecznosci(monkeypatch, log, lista)
+
+    zbiorczo = out["podsumowanie"]["rozliczone"]
+    strumienie = sum(s["podsumowanie"]["rozliczone"]
+                     for s in out["skutecznosc_strumienie"].values())
+    assert zbiorczo == strumienie == 1
+
+
+def test_dzien_bez_zamrozonego_skladu_liczy_wszystko(monkeypatch):
+    """Doby sprzed listy dnia zostają nietknięte — nie ma czego porównywać."""
+    a = _rec_druzynowy(podmiot="Flamengo", wynik="wygrany")
+    b = _rec_druzynowy(podmiot="Cruzeiro", wynik="przegrany")
+    log = {R._klucz(a): a, R._klucz(b): b}
+    out = _payload_skutecznosci(monkeypatch, log, {})
+    assert out["podsumowanie"]["rozliczone"] == 2
