@@ -97,3 +97,53 @@ ale powstałe typy kierować do księgi jako POMIAROWE (poza publikacją) —
 rozliczają się i uczą model, klient ich nie widzi. Po ~100 rozliczeniach
 będzie wiadomo, czy strumień zawodniczy nadaje się do pokazania. To ta sama
 metoda, którą 13.08 zastosowano do drugiego szczebla drabinek.
+
+---
+
+# ⚑⚑ CZĘŚĆ 2: „STRUMIEŃ ZAWODNICZY JEST ZŁY" TO NIEPRAWDA
+
+Decyzja właściciela 16.08: przed dokładaniem materiału zająć się jakością
+strumienia (ROI −16,0%, luka −16,3 pp). Pomiar mówi, że **nie ma czego
+naprawiać po stronie zawodniczej** — problemem jest STRONA zakładu.
+
+Na rozliczeniach bieżącej epoki (typy pomiarowe wliczone, bo dają trzykrotnie
+większą próbę: 170 zamiast 77):
+
+```
+                       n   deklaruje   trafia     luka      ROI    szum
+pewniaki / powyżej   170     52,3%     41,8%    -10,5    -15,1%     3,8
+pewniaki / poniżej     0     — NIE ISTNIEJE
+drużyny  / powyżej  1197     64,2%     47,6%    -16,6    -12,0%     1,4
+drużyny  / poniżej  3255     67,1%     54,0%    -13,1     -3,1%     0,9
+```
+
+**Zawodnicy są LEPIEJ skalibrowani niż drużyny po tej samej stronie**
+(−10,5 pp wobec −16,6 pp), a różnica ROI mieści się w szumie. Strumień
+zawodniczy nie jest zepsuty — jest w **100% po stronie „powyżej"**, czyli
+tej, która traci wszędzie.
+
+Powód jest strukturalny, nie nasz: bukmacherzy kwotują propsy zawodnicze
+wyłącznie jako „over". Widać to i u Superbeta, i w pamięci Betclica
+(`{"over": 1.82}` — same over, żadnego „under"). Potwierdza to też kontrola
+startowa: **cztery rynki, które biją cenę, to wszystko strony „poniżej"**
+(`team_sot|ponizej`, `match_sot|ponizej`, `team_fouls|ponizej`,
+`match_cards|ponizej`).
+
+## Co z tego wynika
+
+1. **Nie ma osobnego zadania „popraw jakość strumienia zawodniczego".**
+   Jest jedno zadanie: nauczyć się bić kurs po stronie „powyżej" — i ono
+   dotyczy całego produktu, nie zawodników.
+2. **To wzmacnia decyzję o niewpinaniu Betclica.** Jego oferta zawodnicza to
+   same „over", czyli potrojenie materiału dokładnie po tej stronie, po
+   której przegrywamy — i to niezależnie od tego, czy zawodnicy są dobrze
+   wycenieni (a są, lepiej niż drużyny).
+3. **Typy pomiarowe działają i są niedoceniane.** 92 ze 170 rozliczeń
+   zawodniczych to typy odrzucone przy progu, rozliczane w tle. Bez nich
+   próba byłaby o dwie trzecie mniejsza i ten wniosek nie byłby możliwy.
+
+⚑ Przy okazji: typy zawodnicze **nie mają ani jednego stempla `kal_rynek`**
+(drużynowe mają 1105). Kalibracja jest nakładana — `_bias_z_korekta(mk,
+"pewniaki")` wchodzi do `score_player_market` — ale nie jest stemplowana,
+więc rachunku zawodniczego nie da się odtworzyć wstecz. To luka w POMIARZE,
+nie w działaniu.
