@@ -208,15 +208,25 @@ Legenda: `[x]` zrobione · `[~]` w toku / obejście · `[ ]` otwarte
   a wpięty jako `predicted_started` **pogarsza Briera o 20%**. Model już
   wyciska z historii wszystko; ograniczenie „startuje dokładnie 11" nie wnosi
   nic (0,0%). Nie wracać bez NOWEGO ŹRÓDŁA, nie z nowym sposobem liczenia.
-- [ ] ⚑ **SportsGambler jako źródło składów — ZNALEZIONE, CZEKA NA POMIAR.**
+- [x] ⚑ **SportsGambler jako źródło składów — ZMIERZONY 16.08, PRÓG POBITY.**
   Przewidywane XI **3–10 dni przed meczem**, HTTP 200 bez klucza, endpoint
-  `/lineups/lineups-load2.php?id=<ID>`. **1206 meczów ze składem w 18
-  rozgrywkach** — Brazylia A i B, Liga Profesional, MLS, Liga MX,
-  Libertadores, Sudamericana, Kolumbia, Urugwaj, Chile, Ekstraklasa,
-  Allsvenskan, Eliteserien, Superliga, Veikkausliiga, LM/LE/LK. Czyli
-  dokładnie ta luka, której nie zamyka żadne nasze źródło.
-  **Snapshot 730 prognoz zapisany** (`docs/pomiar/`), pomiar zamyka się po
-  rozegraniu tych meczów. Próg: wyraźnie powyżej 68,6%.
+  `/lineups/lineups-load2.php?id=<ID>`, 1206 meczów w 18 rozgrywkach.
+  **Wynik: 75,6% na 64 meczach i 1408 pozycjach składu** (szum 1,1 pp) wobec
+  progu 68,6% — bije o 7 pp, sześć razy własny szum.
+  Pełne liczby: `docs/pomiar-sklady-sportsgambler.md`.
+
+  ⚑ **Dwa zastrzeżenia, bez których ta liczba wprowadza w błąd:**
+  1. **Rozkład per liga jest odwrotny do naszych potrzeb** — Belgia 87,3%,
+     Holandia 85,5%, 2. Bundesliga 84,8%, ale **Argentyna 62,7%**, LaLiga2
+     60,2%, Turcja 56,8%. Argentyna jest PONIŻEJ progu, a to dla niej
+     głównie tego źródła szukaliśmy. Próby per liga to 3–9 meczów, więc
+     sygnał, nie wyrok — **dobić próbę po 18.08** (103 mecze ze snapshotu
+     były wtedy nierozegrane, narzędzie wznawia się samo).
+  2. **To NIE odblokowuje strumienia zawodniczego** —
+     `docs/pomiar-lejek-zawodniczy.md`. Składy blokują 17% par, a
+     `poza_skladem` znaczy „skład ZNANY i zawodnika nie ma", więc więcej
+     wiedzy o składach = WIĘCEJ blokad. SG poprawi JAKOŚĆ typów
+     zawodniczych, nie ich liczbę.
 - [ ] **Kontuzje i zawieszenia z 365Scores** — `injured_or_suspended`
   (`engine.py`) zeruje minuty w modelu i **w produkcji nikt go nigdy nie
   ustawia**; jedyne `True` jest w teście. Źródło działa w chmurze, parowanie
@@ -383,6 +393,65 @@ Legenda: `[x]` zrobione · `[~]` w toku / obejście · `[ ]` otwarte
   nie nazwała arbitra „pobłażliwym" na dwóch meczach. Drabinki zostają na
   progu opisowym — ich front pisze „nic tu nie zmieniamy", więc włączenie
   mnożnika bez zmiany tego zdania zamieniłoby je w nieprawdę.
+
+---
+
+## ⚑ Otwarte po sesji 16.08 — cztery pytania zamknięte, jedno otwarte
+
+- [x] **Limity różnorodności NIE trzymają, ale naprawa NIE MA POKRYCIA.**
+  Doba zbudowana w całości pod limitami ma 8 typów z jednego rynku przy
+  limicie 4; log cyklu mówi to wprost („w tym 96 pokazanych wcześniej — te
+  wchodzą poza limitem", 96 z 99). Mechanizm: liczniki zerują się co cykl,
+  a typ raz pokazany wraca bezwarunkowo, więc każde chwilowe zniknięcie typu
+  trwale poszerza listę.
+  → **Naprawy nie robimy.** Pomiar (`docs/pomiar-limitow-listy.md`,
+  narzędzie `scripts/pomiar_limitow_listy.py`): znak odwraca się między
+  połowami próby, a symulacja na dzisiejszym produkcie daje **−55 zł**
+  (odcięte typy mają ROI +10,4%, LEPSZY od zostających). Liczba „+282 zł"
+  z całej epoki pochodzi z produktu sprzed naprawy znaku kalibracji —
+  **nie cytować**. Wrócić po ~100 rozliczeniach z epoki po 13.08 (dziś jest
+  ich OSIEM ponad limitem rynkowym).
+  ⚑ Zostaje sprawa PORZĄDKU: kod deklaruje gwarancję różnorodności, której
+  nie dowozi (55% strony to dwa rynki). Do decyzji właściciela — bez
+  obietnicy zysku, z listą krótszą o ~30%.
+
+- [x] **Próg λ ≥ 0,35 — luzowanie POGORSZY.** Luka rośnie monotonicznie, gdy
+  λ spada: 0–1 → −15,1 pp, 2–4 → −13,2, 8+ → −12,1 (na rozliczeniach ze
+  stemplem `lambda`). ⚑ Poniżej progu księga ma ZERO rozliczeń, więc to
+  ekstrapolacja z pasm NAD progiem — mechanizm typów pomiarowych
+  (`odrzucone_pomiar`) obejmuje cztery progi z `betting`, ale NIE λ i NIE
+  progu profilu.
+
+- [x] **„Strumień zawodniczy jest zły" — NIEPRAWDA.** Na 170 rozliczeniach
+  (z typami pomiarowymi; bez nich jest ich 77) zawodnicy mają lukę −10,5 pp
+  wobec −16,6 pp drużyn **po tej samej stronie**. Strumień nie jest zepsuty —
+  stoi w 100% po stronie „powyżej", bo bukmacherzy kwotują propsy zawodnicze
+  wyłącznie jako „over" (Superbet i Betclic tak samo).
+  → **Nie ma zadania „popraw strumień zawodniczy".**
+
+- [ ] ⚑⚑ **GŁÓWNE PYTANIE PRODUKTU: strona „powyżej".** Wszystkie cztery
+  rynki, które biją cenę, to strony „poniżej". „Powyżej" traci w każdym
+  strumieniu: drużyny −12,0%, zawodnicy −15,1%. Dopóki tego nie ruszymy,
+  każde dokładanie materiału po stronie „over" mnoży stratę — dotyczy to
+  oferty zawodniczej Betclica (10 087 par, 3× więcej niż Superbet, same
+  „over"), którą **świadomie ZOSTAWIAMY niewpiętą** (decyzja 16.08).
+  Powiązane: `docs/czy-model-mysli.md`, asymetria powyżej/poniżej.
+
+- [ ] **Typy zawodnicze nie mają ANI JEDNEGO stempla `kal_rynek`**
+  (drużynowe mają 1105). Kalibracja jest nakładana — `_bias_z_korekta(mk,
+  "pewniaki")` wchodzi do `score_player_market` — ale nie jest stemplowana,
+  więc rachunku zawodniczego nie da się odtworzyć wstecz. Luka w POMIARZE,
+  nie w działaniu; blokuje następną diagnozę tego strumienia.
+
+- [ ] **Stempel `kolejnosc` dociera do ~25% typów na stronie** (8 z 33 dla
+  doby 16.08) i do ZERA typów zdjętych bramami — pętla stemplująca idzie po
+  `value_bets` już przyciętym o zdjęte, a wznowionym `_dopisz_nowe` nowych
+  pól nie dopisuje. Część 7 kontroli startowej będzie miała próbę ~4× później,
+  niż zakładano przy wdrożeniu 14.08.
+
+- [ ] **80 typów po gwizdku bez rozliczenia**, w tym 24 × `team_corners`
+  (13.08: 22, 11.08: 18). Zamkną się jako „zwrot" po terminie — czyli tyle
+  typów nie powie nam nic o modelu.
 
 ---
 
