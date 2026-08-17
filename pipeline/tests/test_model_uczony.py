@@ -423,3 +423,112 @@ def test_druga_liczba_nie_wchodzi_do_zadnej_bramy():
         assert wzor not in zrodlo, (
             f"druga liczba wchodzi do decyzji przez `{wzor}` — najpierw pomiar"
         )
+
+
+# --- ZAWODNICY: ten sam model, offset minut -------------------------------
+#
+# Zmierzone 17.08 na 260 rozliczonych typach zawodniczych: luka −12,5 pp
+# (produkcja) wobec −6,7 pp (model), Brier 0,2305 wobec 0,2263.
+
+def _seria_zaw(n=20, tempo=2.0, minuty=90.0, poz="ST", malejaco=True):
+    """Seria jak w banku: tempo `tempo` zdarzeń na 90 minut."""
+    czasy = [1000 + i for i in range(n)]
+    counts = [tempo * minuty / 90.0 for _ in range(n)]
+    seria = {
+        "counts": counts, "minutes": [minuty] * n, "timestamps": czasy,
+        "started": [True] * n, "game_positions": [poz] * n,
+        "league_average": 1.5, "opponent_average": 1.6, "is_home": True,
+        "market_code": "shots", "player_id": 7,
+    }
+    if malejaco:            # bank trzyma serie od najnowszej
+        for k in ("counts", "minutes", "timestamps", "started", "game_positions"):
+            seria[k] = list(reversed(seria[k]))
+    return seria
+
+
+def test_bank_trzyma_serie_malejaco_i_model_to_wie():
+    """⚑ Odwrotna kolejność = model uczyłby się na przyszłości."""
+    rosnaco = _seria_zaw(n=10, malejaco=False)
+    malejaco = _seria_zaw(n=10, malejaco=True)
+    a = U.cechy_zawodnika(rosnaco, do_ts=99999)
+    b = U.cechy_zawodnika(malejaco, do_ts=99999)
+    assert a is not None and b is not None
+    assert abs(a["t6"] - b["t6"]) < 1e-9, "kolejność serii nie może zmieniać cech"
+
+
+def test_cechy_zawodnika_licza_tempo_na_90_minut():
+    """Zawodnik grający 45 minut z jednym strzałem ma tempo 2, nie 1."""
+    pol = _seria_zaw(n=12, tempo=2.0, minuty=45.0)
+    pelne = _seria_zaw(n=12, tempo=2.0, minuty=90.0)
+    c1 = U.cechy_zawodnika(pol, do_ts=99999)
+    c2 = U.cechy_zawodnika(pelne, do_ts=99999)
+    assert abs(c1["t6"] - 2.0) < 1e-6 and abs(c2["t6"] - 2.0) < 1e-6
+    assert c1["min6"] == 45.0 and c2["min6"] == 90.0
+
+
+def test_krotkie_wejscia_nie_licza_sie_do_tempa():
+    """5 minut z jednym strzałem dałoby tempo 18 na 90 minut."""
+    seria = _seria_zaw(n=12, tempo=2.0, minuty=5.0)
+    assert U.cechy_zawodnika(seria, do_ts=99999) is None
+
+
+def test_cechy_zawodnika_widza_tylko_przeszlosc():
+    seria = _seria_zaw(n=20, malejaco=True)
+    wczesniej = U.cechy_zawodnika(seria, do_ts=1005)
+    pozniej = U.cechy_zawodnika(seria, do_ts=99999)
+    assert wczesniej["n_hist"] < pozniej["n_hist"]
+
+
+def test_pozycja_wchodzi_jako_grupa():
+    assert U.grupa_pozycji("ST") == "FWD"
+    assert U.grupa_pozycji("RCB") == "DEF"
+    assert U.grupa_pozycji("LCM") == "MID"
+    assert U.grupa_pozycji("G") == "GK"
+    assert U.grupa_pozycji(None) == "NIE"
+
+
+def test_offset_minut_skaluje_lambde():
+    """λ ma być proporcjonalna do minut — na tym stoi cały model zawodniczy."""
+    lib = {f"{i}:shots": _seria_zaw(n=20, tempo=2.0 + (i % 3))
+           for i in range(120)}
+    for k, v in lib.items():
+        v["player_id"] = k.split(":")[0]
+    wiersze = U.wiersze_zawodnicze(lib)["shots"]
+    wagi = U.trenuj_rynek_zaw(wiersze)
+    assert wagi is not None
+    cechy = U.cechy_zawodnika(_seria_zaw(n=20, tempo=2.0), do_ts=99999)
+    lam90 = U.lam_zaw(wagi, cechy, oczekiwane_minuty=90.0)
+    lam45 = U.lam_zaw(wagi, cechy, oczekiwane_minuty=45.0)
+    assert abs(lam45 / lam90 - 0.5) < 1e-6, "połowa minut = połowa zdarzeń"
+
+
+def test_prognoza_zawodnika_daje_komplet_albo_nic():
+    lib = {f"{i}:shots": _seria_zaw(n=20, tempo=1.5 + (i % 4) * 0.5)
+           for i in range(120)}
+    for k, v in lib.items():
+        v["player_id"] = k.split(":")[0]
+    wagi = {"rynki_zaw": U.trenuj_zawodnikow(lib)}
+    assert "shots" in wagi["rynki_zaw"]
+    seria = _seria_zaw(n=20, tempo=2.0)
+    out = U.prognoza_zawodnika(wagi, seria, "shots", 1.5, "powyzej",
+                               oczekiwane_minuty=80.0, do_ts=99999)
+    assert set(out) == {"p", "lam", "r_nb", "odl", "min"}
+    assert out["min"] == 80.0
+    # rynek, którego wagi nie znają
+    assert U.prognoza_zawodnika(wagi, seria, "tackles", 1.5, "powyzej") is None
+    # seria bez historii
+    assert U.prognoza_zawodnika(wagi, _seria_zaw(n=2), "shots", 1.5,
+                                "powyzej") is None
+
+
+def test_trening_obejmuje_oba_strumienie():
+    """Jedna wersja modelu dla drużyn i zawodników — nie dwa światy."""
+    mag = _magazyn(n=40)
+    lib = {f"{i}:shots": _seria_zaw(n=20, tempo=1.5 + (i % 4) * 0.5)
+           for i in range(120)}
+    for k, v in lib.items():
+        v["player_id"] = k.split(":")[0]
+    wagi = U.trenuj(mag, lib=lib)
+    assert wagi["wersja"] == U.WERSJA_MODELU_UCZONEGO
+    assert "shots" in (wagi.get("rynki_zaw") or {})
+    assert "zawodnicz" in U.zdanie_stanu(wagi)

@@ -4131,6 +4131,38 @@ def _main_impl(tryb=None):
         diagnostyka.cichy("cykl", "model_uczony_wagi", e)
         _wagi_modelu, _ctx_modelu = {}, {}
 
+    def _prognoza_uczonego_zaw(tr, rynek: str, linia: float, strona: str,
+                               oczek_min, ts_meczu) -> dict | None:
+        """Druga liczba dla typu ZAWODNICZEGO — z jego własnej serii trendu.
+
+        Historia jedzie z obiektu, który cykl i tak ma w pamięci, więc nie ma
+        po co czytać banku drugi raz. Kształt musi być ten sam co w banku, bo
+        `uczony.cechy_zawodnika` liczy cechy JEDNĄ drogą dla treningu
+        i produkcji.
+        """
+        if not _wagi_modelu or not (_wagi_modelu.get("rynki_zaw") or {}):
+            return None
+        try:
+            seria = {
+                "counts": list(getattr(tr, "counts", []) or []),
+                "minutes": list(getattr(tr, "minutes", []) or []),
+                "timestamps": list(getattr(tr, "timestamps", []) or []),
+                "started": list(getattr(tr, "started", []) or []),
+                "game_positions": list(getattr(tr, "game_positions", []) or []),
+                "league_average": getattr(tr, "league_average", None),
+                "opponent_average": getattr(tr, "opponent_average", None),
+                "is_home": bool(getattr(tr, "is_home", False)),
+            }
+            out = uczony.prognoza_zawodnika(
+                _wagi_modelu, seria, rynek, linia, strona,
+                oczekiwane_minuty=oczek_min, do_ts=ts_meczu,
+            )
+        except Exception as e:                                 # noqa: BLE001
+            diagnostyka.cichy("cykl", "model_uczony_zawodnik", e)
+            return None
+        _licznik_uczonego["zaw_policzone" if out else "zaw_bez_pokrycia"] += 1
+        return out
+
     def _prognoza_uczonego(rynek: str, team_id, opp_id, dom: int,
                            liga, linia: float, strona: str, ts_meczu) -> dict | None:
         """Druga liczba przy typie — albo None, gdy model nie ma pokrycia."""
@@ -5231,6 +5263,8 @@ def _main_impl(tryb=None):
                     or len(odrzucone_pomiar) >= ODRZUCONE_POMIAR_MAX
                 ):
                     continue
+                _pu_zaw_pomiar = _prognoza_uczonego_zaw(
+                    tr, mk, l, "powyzej", sm.expected_minutes, ts)
                 odrzucone_pomiar.append({
                     "id": 0, "mecz_id": mid, "mecz": match_label,
                     "kickoff_ts": ts, "podmiot_typ": "zawodnik",
@@ -5244,6 +5278,10 @@ def _main_impl(tryb=None):
                     # się na własnym efekcie
                     **({"kal_strony": od["kal_strony"]}
                        if od.get("kal_strony") else {}),
+                    # ...i druga liczba z modelu uczonego (typy pomiarowe są
+                    # najlepszą próbą do porównania dwóch rachunków, bo nie
+                    # przeszły selekcji)
+                    **({"p_uczony": _pu_zaw_pomiar} if _pu_zaw_pomiar else {}),
                     "pewnosc": "wysoka" if (sm.ci_high - sm.ci_low) <= 0.18
                     else "srednia",
                     "sugestia": False,
@@ -5289,6 +5327,8 @@ def _main_impl(tryb=None):
                 # jedna szansa", 13.08, różnica wynosiła wtedy ~10 pp).
                 # Delta wchodzi PRZED bramami puli, tak samo jak w `assess`
                 # i w pętli drużynowej.
+                _pu_zaw = _prognoza_uczonego_zaw(
+                    tr, mk, l, side_pl, sm.expected_minutes, ts)
                 _d_strony_p = betting.delta_strony(korekta_stron, mk, side_pl)
                 if _d_strony_p:
                     p_side = betting._z_delta(p_side, _d_strony_p)
@@ -5413,6 +5453,8 @@ def _main_impl(tryb=None):
                         # delta korekty strony nałożona na `p_side` wyżej —
                         # stempel jedzie razem z liczbą (2026-08-17)
                         "kal_strony": round(_d_strony_p, 4),
+                        # druga liczba: model uczony na tempie na 90 minut
+                        **({"p_uczony": _pu_zaw} if _pu_zaw else {}),
                         "ev_pct": ev_pct_leg, "ev_netto": ev_netto_leg,
                         "ev_uk": ev_uk_leg, "kurs_ref": kurs_ref_leg,
                         # ta sama formuła co w value_bets (spójne z pewnosc_score
@@ -8633,8 +8675,11 @@ def _main_impl(tryb=None):
     if _licznik_uczonego:
         _ile_u = _licznik_uczonego.get("policzone", 0)
         _brak_u = _licznik_uczonego.get("bez_pokrycia", 0)
-        print(f"Model uczony (druga liczba, NIE na stronie): {_ile_u} wycen "
-              f"policzonych, {_brak_u} bez pokrycia w magazynie")
+        _ile_z = _licznik_uczonego.get("zaw_policzone", 0)
+        _brak_z = _licznik_uczonego.get("zaw_bez_pokrycia", 0)
+        print(f"Model uczony (druga liczba, NIE na stronie): drużyny "
+              f"{_ile_u} policzonych / {_brak_u} bez pokrycia, zawodnicy "
+              f"{_ile_z} / {_brak_z}")
     elif _wagi_modelu:
         print("Model uczony: wagi są, ale ANI JEDNA wycena go nie zapytała — "
               "szukaj w ścieżce drużynowej, nie w wagach")

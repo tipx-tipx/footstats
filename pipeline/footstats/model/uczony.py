@@ -320,14 +320,20 @@ def macierz(wiersze: list[dict], sch: dict) -> np.ndarray:
 
 
 def _irls(X: np.ndarray, y: np.ndarray, ridge: float = RIDGE,
-          iteracji: int = 30) -> np.ndarray:
-    """Regresja Poissona metodą Newtona z karą L2 (stała bez kary)."""
+          iteracji: int = 30, offset: np.ndarray | None = None) -> np.ndarray:
+    """Regresja Poissona metodą Newtona z karą L2 (stała bez kary).
+
+    `offset` to znany z góry składnik `log λ`, którego nie szacujemy — przy
+    zawodnikach jest to `log(minuty/90)`. Bez niego model próbowałby
+    wytłumaczyć cechami to, że ktoś raz zagrał 20, a raz 90 minut.
+    """
+    off = np.zeros(len(y)) if offset is None else np.asarray(offset, dtype=float)
     beta = np.zeros(X.shape[1])
     beta[0] = math.log(max(float(y.mean()), 1e-3))
     kara = np.eye(X.shape[1]) * float(ridge)
     kara[0, 0] = 0.0
     for _ in range(iteracji):
-        mu = np.exp(np.clip(X @ beta, -8.0, 8.0))
+        mu = np.exp(np.clip(off + X @ beta, -8.0, 8.0))
         grad = X.T @ (y - mu) - kara @ beta
         H = (X * mu[:, None]).T @ X + kara
         try:
@@ -398,20 +404,27 @@ def trenuj_rynek(wiersze: list[dict], ridge: float = RIDGE) -> dict | None:
     }
 
 
-def trenuj(mag: dict, ridge: float = RIDGE) -> dict:
-    """Wagi wszystkich rynków + metryczka do zapisania w Supabase."""
-    wiersze = wiersze_treningowe(mag)
+def trenuj(mag: dict, ridge: float = RIDGE, lib: dict | None = None) -> dict:
+    """Wagi wszystkich rynków + metryczka do zapisania w Supabase.
+
+    `mag` to magazyn drużynowy, `lib` — bank trendów zawodniczych. Oba
+    strumienie idą jednym modelem i jedną wersją, żeby nie powtórzyła się
+    historia, w której jeden rynek jechał na innym zestawie warstw niż resztа.
+    """
     rynki = {}
-    for rynek, grp in sorted(wiersze.items()):
+    for rynek, grp in sorted(wiersze_treningowe(mag).items()):
         w = trenuj_rynek(grp, ridge)
         if w is not None:
             rynki[rynek] = w
-    return {
+    out = {
         "wersja": WERSJA_MODELU_UCZONEGO,
         "trenowano_ts": int(time.time()),
         "ridge": float(ridge),
         "rynki": rynki,
     }
+    if lib:
+        out["rynki_zaw"] = trenuj_zawodnikow(lib, ridge)
+    return out
 
 
 # ---------------------------------------------------------------- predykcja --
@@ -562,13 +575,269 @@ def dopuszczony(kurs: float | None, lambda_: float | None,
 # ------------------------------------------------------------------ pomiary --
 def zdanie_stanu(wagi: dict | None) -> str:
     """Jedna linia do logu cyklu — wagi bez licznika są nieodróżnialne od braku."""
-    if not wagi or not (wagi.get("rynki") or {}):
+    r = (wagi or {}).get("rynki") or {}
+    zaw = (wagi or {}).get("rynki_zaw") or {}
+    if not r and not zaw:
         return ("Model uczony: BRAK WAG — cykl liczy starą formułą "
                 "(uruchom scripts/trenuj_model.py)")
-    r = wagi["rynki"]
-    naj = ", ".join(
-        f"{k.replace('team_', '')} n={v['n']}" for k, v in sorted(r.items())
-    )
-    wiek = (int(time.time()) - int(wagi.get("trenowano_ts") or 0)) / 3600.0
-    return (f"Model uczony: wersja {wagi.get('wersja')}, {len(r)} rynków "
-            f"({naj}), wagi sprzed {wiek:.0f} h")
+    wiek = (int(time.time()) - int((wagi or {}).get("trenowano_ts") or 0)) / 3600.0
+    czesci = []
+    if r:
+        czesci.append(f"{len(r)} drużynowych (" + ", ".join(
+            f"{k.replace('team_', '')} n={v['n']}" for k, v in sorted(r.items())
+        ) + ")")
+    else:
+        # ⚑ brak jednego strumienia nie może wyglądać jak brak wag ani jak
+        # komplet — cykl liczyłby wtedy drużyny starą formułą po cichu
+        czesci.append("⚑ ZERO drużynowych")
+    if zaw:
+        czesci.append(f"{len(zaw)} zawodniczych ({', '.join(sorted(zaw))})")
+    else:
+        czesci.append("⚑ ZERO zawodniczych")
+    return (f"Model uczony: wersja {(wagi or {}).get('wersja')}, "
+            + ", ".join(czesci) + f", wagi sprzed {wiek:.0f} h")
+
+
+# ===========================================================================
+# ZAWODNICY — ten sam model, trzy różnice
+# ===========================================================================
+#
+# ⚑ MINUTY. Zawodnik grający 60 minut ma inną szansę niż grający 90, więc model
+# uczy się TEMPA na 90 minut: `log λ = log(minuty/90) + β·cechy`. Offset nie
+# jest szacowany — jest znany. Bez niego model próbowałby wytłumaczyć cechami
+# to, że ktoś raz zagrał 20, a raz pełny mecz.
+#
+# ⚑ POZYCJA. Napastnik strzela więcej niż obrońca, a pozycja zmienia się
+# z meczu na mecz (bank trzyma `game_positions` per mecz). Wchodzi jako trzy
+# grupy, DEF jako odniesienie.
+#
+# ⚑ ŹRÓDŁO. Nie magazyn drużynowy, a bank `trend_lib` (176 718 obserwacji,
+# 4997 serii). Ten istniał od dawna i właśnie dlatego strumień zawodniczy się
+# POPRAWIAŁ, gdy drużynowy się psuł ([[model-nie-ma-pamieci-druzyn]]).
+#
+# Zmierzone 17.08 na 260 rozliczonych typach zawodniczych (model widział tylko
+# historię sprzed meczu, minuty z oczekiwanych):
+#
+#                        deklaruje   weszło    luka      Brier   log-loss
+#     DZIŚ (produkcja)     49,4%    36,9%   −12,5 pp   0,2305    0,6559
+#     MODEL UCZONY         43,6%    36,9%    −6,7 pp   0,2263    0,6494
+#
+# Czego się nauczył: strzały — własne tempo +0,52, napastnik +0,45, środkowy
+# +0,29; faule — tempo +0,42, środkowy +0,15; odbiory — napastnik −0,16.
+# Minuty mają współczynnik UJEMNY (−0,09…−0,14): kto gra pełne mecze, ma niższe
+# tempo na 90 minut, bo to częściej obrońcy i gracze bez rotacji.
+
+# Rynki zawodnicze, które bank realnie niesie (reszta ma zero serii).
+CELE_ZAW = ("shots", "sot", "fouls_committed", "fouls_won", "tackles")
+# Mecz krótszy niż to nic nie mówi o tempie: 5 minut z jednym strzałem dałoby
+# tempo 18 na 90 minut.
+MIN_MINUT_ZAW = 15.0
+CECHY_LOG_ZAW = ["t3", "t6", "t12", "min6", "liga", "opp"]
+CECHY_LIN_ZAW = ["dom", "udzial_startow"]
+GRUPY_POZYCJI = ("DEF", "MID", "FWD")     # DEF = odniesienie, bez kolumny
+_POZ_MAPA = {
+    "G": "GK",
+    "D": "DEF", "CB": "DEF", "LB": "DEF", "RB": "DEF", "LWB": "DEF", "RWB": "DEF",
+    "M": "MID", "CM": "MID", "DM": "MID", "AM": "MID", "LM": "MID", "RM": "MID",
+    "F": "FWD", "ST": "FWD", "CF": "FWD", "LW": "FWD", "RW": "FWD",
+}
+
+
+def grupa_pozycji(poz) -> str:
+    """Pozycja z feedu na jedną z trzech grup (`NIE` = nie wiemy)."""
+    p = str(poz or "").upper().strip()
+    if not p:
+        return "NIE"
+    if p in _POZ_MAPA:
+        return _POZ_MAPA[p]
+    for ostatnia, grupa in (("G", "GK"), ("B", "DEF"), ("D", "DEF"),
+                            ("M", "MID"), ("W", "FWD"), ("F", "FWD"),
+                            ("S", "FWD"), ("T", "FWD")):
+        if p.endswith(ostatnia):
+            return grupa
+    return "NIE"
+
+
+def _chronologicznie(czasy: list) -> list[int]:
+    """Indeksy serii od najstarszego. ⚑ Bank trzyma je MALEJĄCO."""
+    n = len(czasy)
+    idx = list(range(n))
+    if n > 1 and (czasy[0] or 0) > (czasy[-1] or 0):
+        idx = idx[::-1]
+    return idx
+
+
+def cechy_zawodnika(seria: dict, do_ts: int | None = None,
+                    oczekiwane_minuty: float | None = None) -> dict | None:
+    """Cechy zawodnika z jego serii w banku — tylko z meczów sprzed `do_ts`.
+
+    ⚑ JEDNA FUNKCJA DLA TRENINGU I PRODUKCJI (jak przy drużynach). W treningu
+    `do_ts` to czas meczu, którego wynik jest celem; w produkcji — godzina
+    nadchodzącego meczu.
+    """
+    counts = seria.get("counts") or []
+    minuty = seria.get("minutes") or []
+    czasy = seria.get("timestamps") or []
+    n = min(len(counts), len(minuty), len(czasy))
+    if n < MIN_HISTORII:
+        return None
+    prog = int(do_ts) if do_ts else int(time.time())
+    idx = [j for j in _chronologicznie(czasy[:n]) if int(czasy[j] or 0) < prog]
+    tempa = [float(counts[j] or 0) / float(minuty[j]) * 90.0
+             for j in idx if float(minuty[j] or 0) >= MIN_MINUT_ZAW]
+    if len(tempa) < MIN_HISTORII:
+        return None
+    min_hist = [float(minuty[j] or 0) for j in idx]
+    started = seria.get("started") or []
+    ostatnie = idx[-10:]
+    pozycje = seria.get("game_positions") or []
+    poz = grupa_pozycji(
+        pozycje[idx[-1]] if idx and idx[-1] < len(pozycje) else None)
+    return {
+        "t3": _sr(tempa[-3:]), "t6": _sr(tempa[-6:]), "t12": _sr(tempa[-12:]),
+        "min6": (float(oczekiwane_minuty) if oczekiwane_minuty
+                 else (_sr(min_hist[-6:]) or 90.0)),
+        "udzial_startow": (
+            sum(1 for j in ostatnie if j < len(started) and started[j])
+            / max(len(ostatnie), 1)
+        ),
+        "liga": float(seria.get("league_average") or 0) or None,
+        "opp": float(seria.get("opponent_average") or 0) or None,
+        "dom": 1 if seria.get("is_home") else 0,
+        "poz": poz,
+        "n_hist": len(tempa),
+    }
+
+
+def wiersze_zawodnicze(lib: dict) -> dict[str, list[dict]]:
+    """{rynek: wiersze} z banku — cel, minuty i cechy z przeszłości."""
+    out: dict[str, list[dict]] = defaultdict(list)
+    for _, seria in (lib or {}).items():
+        if not isinstance(seria, dict):
+            continue
+        mk = str(seria.get("market_code") or "")
+        if mk not in CELE_ZAW:
+            continue
+        counts = seria.get("counts") or []
+        minuty = seria.get("minutes") or []
+        czasy = seria.get("timestamps") or []
+        n = min(len(counts), len(minuty), len(czasy))
+        if n < MIN_HISTORII + 1:
+            continue
+        for i in _chronologicznie(czasy[:n]):
+            m_i = float(minuty[i] or 0)
+            if m_i < MIN_MINUT_ZAW:
+                continue
+            c = cechy_zawodnika(seria, do_ts=int(czasy[i] or 0))
+            if c is None:
+                continue
+            out[mk].append({**c, "y": float(counts[i] or 0), "minuty": m_i,
+                            "t": int(czasy[i] or 0),
+                            "gracz": str(seria.get("player_id") or "")})
+    return dict(out)
+
+
+def schemat_zaw(wiersze: list[dict]) -> dict:
+    uzyte, med = [], {}
+    for c in CECHY_LOG_ZAW:
+        sur = np.array([w.get(c) if w.get(c) is not None else np.nan
+                        for w in wiersze], dtype=float)
+        if np.isnan(sur).all():
+            continue
+        uzyte.append(c)
+        med[c] = float(np.nanmedian(sur))
+    return {"log": uzyte, "med": med}
+
+
+def nazwy_cech_zaw(sch: dict) -> list[str]:
+    return (["const"] + [f"log_{c}" for c in sch["log"]] + list(CECHY_LIN_ZAW)
+            + [f"poz_{p}" for p in GRUPY_POZYCJI[1:]])
+
+
+def macierz_zaw(wiersze: list[dict], sch: dict) -> np.ndarray:
+    n = len(wiersze)
+    kol = [np.ones(n)]
+    for c in sch["log"]:
+        sur = np.array([w.get(c) if w.get(c) is not None else np.nan
+                        for w in wiersze], dtype=float)
+        sur[np.isnan(sur)] = sch["med"][c]
+        kol.append(np.log(np.maximum(sur, 0.0) + 0.1))
+    for c in CECHY_LIN_ZAW:
+        kol.append(np.array([float(w.get(c) or 0) for w in wiersze]))
+    for p in GRUPY_POZYCJI[1:]:
+        kol.append(np.array([1.0 if w.get("poz") == p else 0.0 for w in wiersze]))
+    return np.column_stack(kol)
+
+
+def trenuj_rynek_zaw(wiersze: list[dict], ridge: float = RIDGE) -> dict | None:
+    """Wagi jednego rynku zawodniczego albo None, gdy próba za mała."""
+    if len(wiersze) < MIN_WIERSZY_RYNKU:
+        return None
+    sch = schemat_zaw(wiersze)
+    X = macierz_zaw(wiersze, sch)
+    y = np.array([w["y"] for w in wiersze], dtype=float)
+    off = np.log(np.maximum(
+        np.array([w["minuty"] for w in wiersze], dtype=float), 1.0) / 90.0)
+    beta = _irls(X, y, ridge, offset=off)
+    mu = np.exp(np.clip(off + X @ beta, -8.0, 8.0))
+    r = kształt_nb(y, mu)
+    return {
+        "beta": [round(float(b), 6) for b in beta],
+        "cechy": nazwy_cech_zaw(sch),
+        "log": sch["log"], "med": {k: round(v, 4) for k, v in sch["med"].items()},
+        "n": len(wiersze),
+        "sr_y": round(float(y.mean()), 4),
+        "naddyspersja": round(naddyspersja(y, mu), 4),
+        "r_nb": round(r, 3) if r is not None else None,
+        "od": int(min(w.get("t") or 0 for w in wiersze)),
+        "do": int(max(w.get("t") or 0 for w in wiersze)),
+    }
+
+
+def trenuj_zawodnikow(lib: dict, ridge: float = RIDGE) -> dict:
+    """Wagi rynków zawodniczych z banku trendów."""
+    out = {}
+    for rynek, grp in sorted(wiersze_zawodnicze(lib).items()):
+        w = trenuj_rynek_zaw(grp, ridge)
+        if w is not None:
+            out[rynek] = w
+    return out
+
+
+def lam_zaw(wagi_rynku: dict, cechy: dict,
+            oczekiwane_minuty: float | None = None) -> float | None:
+    """Oczekiwana liczba zdarzeń zawodnika, przeskalowana o minuty."""
+    if not wagi_rynku or not cechy:
+        return None
+    sch = {"log": wagi_rynku.get("log") or [], "med": wagi_rynku.get("med") or {}}
+    X = macierz_zaw([cechy], sch)
+    beta = np.array(wagi_rynku.get("beta") or [], dtype=float)
+    if X.shape[1] != beta.shape[0]:
+        return None       # rozjazd schematu z wagami — cisza, nie zgadywanie
+    minuty = float(oczekiwane_minuty or cechy.get("min6") or 90.0)
+    off = math.log(max(minuty, 1.0) / 90.0)
+    return float(np.exp(np.clip(off + X @ beta, -8.0, 8.0))[0])
+
+
+def prognoza_zawodnika(wagi: dict | None, seria: dict, rynek: str,
+                       linia: float, strona: str,
+                       oczekiwane_minuty: float | None = None,
+                       do_ts: int | None = None) -> dict | None:
+    """Pełna prognoza dla zakładu zawodniczego — albo None, gdy nie wiemy."""
+    wr = ((wagi or {}).get("rynki_zaw") or {}).get(rynek)
+    if not wr or not seria:
+        return None
+    cechy = cechy_zawodnika(seria, do_ts=do_ts,
+                            oczekiwane_minuty=oczekiwane_minuty)
+    if cechy is None:
+        return None
+    lm = lam_zaw(wr, cechy, oczekiwane_minuty)
+    if lm is None:
+        return None
+    p = p_strony(lm, linia, strona, wr.get("r_nb"))
+    if p is None:
+        return None
+    return {"p": round(float(p), 4), "lam": round(float(lm), 3),
+            "r_nb": wr.get("r_nb"),
+            "odl": round(abs(float(linia) - float(lm)), 2),
+            "min": round(float(oczekiwane_minuty or cechy.get("min6") or 90.0), 1)}

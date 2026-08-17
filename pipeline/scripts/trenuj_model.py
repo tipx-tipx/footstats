@@ -48,24 +48,33 @@ def main() -> None:
     if not st.get("meczow"):
         return
 
-    wagi = U.trenuj(mag)
+    # bank trendów zawodniczych — ten sam model, offset minut (patrz sekcja
+    # ZAWODNICY w `uczony.py`). Brak banku nie przerywa treningu drużynowego.
+    lib = supa.get_key("trend_lib") or {}
+    print(f"Bank trendów zawodniczych: {len(lib)} serii")
+
+    wagi = U.trenuj(mag, lib=lib)
     rynki = wagi.get("rynki") or {}
     if not rynki:
         print("⚑ ŻADEN rynek nie zebrał progu próby — wagi nie powstały.")
         return
 
-    print(f"\nwytrenowane rynki: {len(rynki)}")
-    print(f"{'rynek':<16}{'wierszy':>9}{'śr. zdarzeń':>13}"
-          f"{'naddyspersja':>14}{'cech':>6}")
-    for rynek, w in sorted(rynki.items()):
-        print(f"{rynek:<16}{w['n']:>9}{w['sr_y']:>13.2f}"
-              f"{w['naddyspersja']:>14.2f}{len(w['cechy']):>6}")
+    zaw = wagi.get("rynki_zaw") or {}
+    print(f"\nwytrenowane rynki: {len(rynki)} drużynowych, "
+          f"{len(zaw)} zawodniczych")
+    print(f"{'rynek':<20}{'wierszy':>9}{'śr. zdarzeń':>13}"
+          f"{'naddyspersja':>14}{'r_nb':>9}{'cech':>6}")
+    for rynek, w in sorted(rynki.items()) + sorted(zaw.items()):
+        r_nb = w.get("r_nb")
+        opis_r = f"{r_nb:.1f}" if r_nb else "—"
+        print(f"{rynek:<20}{w['n']:>9}{w['sr_y']:>13.2f}"
+              f"{w['naddyspersja']:>14.2f}{opis_r:>9}{len(w['cechy']):>6}")
 
     # NAJWIĘKSZE WSPÓŁCZYNNIKI — jedyny sposób, żeby zobaczyć, CZEGO model się
     # nauczył. Bez tego wagi są czarną skrzynką, a pytanie „czy model myśli
     # logicznie" zostaje bez odpowiedzi.
     print("\nCZEGO MODEL SIĘ NAUCZYŁ (5 najmocniejszych cech per rynek):")
-    for rynek, w in sorted(rynki.items()):
+    for rynek, w in sorted(rynki.items()) + sorted(zaw.items()):
         pary = sorted(zip(w["cechy"], w["beta"]),
                       key=lambda kv: -abs(kv[1]))
         opis = ", ".join(f"{n} {b:+.2f}" for n, b in pary[:5] if n != "const")
