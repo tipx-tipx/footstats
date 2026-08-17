@@ -129,3 +129,69 @@ daje pierwszy dodatni margines w historii projektu.
 5. Widełki przeliczone na liczbach modelu — osobne dla półki „wysoka szansa"
    i „value", bo to dwie różne obietnice.
 6. Zawodnicy i drabinki przechodzą na ten sam silnik (decyzja właściciela).
+
+---
+
+# 9. WIDEŁKI NA LICZBACH MODELU — pomiar 2026-08-17, część 2
+
+Cel produktu ustalony przez właściciela: **trafność w obu zakładkach**
+(„wysoka szansa" i „wyższe kursy"). Podatek i margines nad ceną zostają
+miarami jakości modelu, ale nie decydują o widełkach. Wprost:
+„zależy nam na trafialności typów, zarówno wysoka szansa jak i value"
+oraz „chcę wyższe kursy realnie przeanalizowane przez model, bez zbędnych
+widełek".
+
+## Czy sortowanie po szansie modelu podnosi trafność w pasmie kursu
+
+| pasmo kursu | n | trafność | top 50% modelu | top 25% modelu | top 25% DZIŚ |
+|---|---|---|---|---|---|
+| 1,20–1,50 | 1163 | 71,7% | 74,9% | 73,8% | 76,2% |
+| 1,50–1,80 | 825 | 60,8% | 64,1% | 66,5% | 65,5% |
+| 1,80–2,20 | 865 | 46,5% | 50,2% | 50,9% | 48,6% |
+| 2,20–3,00 | 739 | 36,4% | 33,6% | **31,0%** | 41,3% |
+| 3,00+ | 800 | 25,5% | 25,8% | 26,0% | 25,0% |
+
+## ⚑ GDZIE MODEL PRZESTAJE PORZĄDKOWAĆ: KURS 2,20
+
+Wąskie pasma, górna tercja szansy modelu kontra dolna:
+
+| pasmo | n | średnia | górna tercja | dolna tercja | różnica |
+|---|---|---|---|---|---|
+| 2,00–2,20 | 357 | 41,2% | 42,9% | 38,7% | **+4,2 pp** |
+| 2,20–2,40 | 235 | 38,7% | 38,5% | 41,0% | −2,6 pp |
+| 2,40–2,80 | 360 | 37,8% | 30,8% | 46,7% | **−15,8 pp** |
+| 2,80–3,50 | 421 | 30,6% | 28,6% | 34,3% | −5,7 pp |
+| 3,50+ | 523 | 22,4% | 21,3% | 21,8% | −0,6 pp |
+
+**Powyżej 2,20 nasze typy są ANTY-SYGNAŁEM.** Przy 2,40–2,80 typy z najwyższą
+szansą modelu trafiają 30,8%, a z najniższą 46,7% — lepiej byłoby grać
+odwrotnie. To nie jest widełka wymyślona przy biurku: to granica, za którą
+model sam pokazuje brak pokrycia.
+
+## Proponowane widełki: cztery liczby, żadnych progów wartości
+
+```
+PÓŁKA „WYSOKA SZANSA"   kurs 1,20–1,80   15 typów/dobę   trafność ~73%
+PÓŁKA „WYŻSZE KURSY"    kurs 1,80–2,20    6 typów/dobę   trafność ~53%
+```
+
+Kolejność w obu: szansa modelu. Bez wartości, bez EV, bez progów szansy.
+
+Zmierzone (dane jak wyżej, 22 dni):
+
+| zakres | limit | n | średni kurs | trafność | margines |
+|---|---|---|---|---|---|
+| 1,20–1,80 | 10/d | 222 | 1,28 | 72,5% | −5,8 pp |
+| 1,20–1,80 | 15/d | 333 | 1,29 | 73,3% | −4,8 pp |
+| 1,20–1,80 | 20/d | 444 | 1,30 | 74,1% | −3,5 pp |
+| 1,80–2,20 | 4/d | 88 | 1,93 | 53,4% | +1,5 pp |
+| 1,80–2,20 | 6/d | 133 | 1,93 | 53,4% | +1,3 pp |
+| 1,80–2,20 | 12/d | 266 | 1,93 | 51,5% | −0,3 pp |
+
+## ⚑ DO ZBADANIA: model jest ZBYT PEWNY na samej górze rozkładu
+
+Na półce wysokiej szansy **top 6 typów trafia 71,4%, a top 20 — 74,1%**.
+Sortowanie po szansie powinno dawać odwrotnie. Wygląda na nieliniowość przy
+p → 0,9 (model za pewny przy skrajnych deklaracjach) i prawdopodobnie da się
+to naprawić jedną kalibracją izotoniczną — ale trzeba to najpierw zmierzyć,
+a nie założyć. To samo zjawisko może stać za odwróceniem powyżej kursu 2,20.
