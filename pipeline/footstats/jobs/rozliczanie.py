@@ -504,6 +504,11 @@ def _kupon_leg_do_logu(l: dict) -> dict:
         # dokładnie taki, jak przy braku stempla w `rec_pewniaka`: korekta
         # naliczana drugi raz w każdym cyklu.
         **({"kal_strony": l["kal_strony"]} if l.get("kal_strony") else {}),
+        # ...i druga liczba z modelu uczonego (2026-08-17) — leg kuponu bywa
+        # jedynym rekordem typu w księdze, a to on ma domknąć porównanie
+        # dwóch rachunków
+        **({"p_uczony": l["p_uczony"]}
+           if isinstance(l.get("p_uczony"), dict) and l["p_uczony"] else {}),
     }
 
 
@@ -882,6 +887,12 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
             **({"kal_strony": round(float(b["kal_strony"]), 4)}
                if isinstance(b.get("kal_strony"), (int, float))
                and b.get("kal_strony") else {}),
+            # DRUGA LICZBA: model uczony liczony obok starego rachunku
+            # (2026-08-17). Nie wpływa na nic w produkcie — jest wyłącznie po
+            # to, żeby po ~100 rozliczeniach porównać oba rachunki paired
+            # Brierem na ŻYWYCH meczach, a nie na backteście.
+            **({"p_uczony": b["p_uczony"]}
+               if isinstance(b.get("p_uczony"), dict) and b["p_uczony"] else {}),
             # WKŁAD KAŻDEJ ZALEŻNOŚCI, ZAMROŻONY PRZY PUBLIKACJI (2026-08-07).
             #
             # Do dziś księga zapisywała sam WYNIK rachunku (`p_model`), więc po

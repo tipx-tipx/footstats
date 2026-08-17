@@ -329,3 +329,97 @@ def test_polki_maja_limity_i_granice():
         "trafia 30,8%, a dolna 46,7%"
     )
     assert U.POLKI["wyzsze_kursy"]["zasieg"] is None
+
+
+# --- druga liczba w cyklu: model liczy OBOK starego rachunku --------------
+
+def test_kontekst_liczy_te_same_cechy_co_pojedyncze_wywolanie():
+    """Kontekst istnieje dla szybkości, nie może zmieniać liczb."""
+    mag = _magazyn(n=30)
+    ctx = U.przygotuj(mag)
+    a = U.cechy_z_kontekstu(ctx, 10, "team_corners", 99, 1, 1, do_ts=99999)
+    b = U.cechy_na_mecz(mag, 10, "team_corners", 99, 1, 1, do_ts=99999)
+    assert a == b
+
+
+def test_prognoza_daje_komplet_albo_nic():
+    mag = _magazyn(n=40)
+    wagi = {"rynki": {"team_corners": U.trenuj_rynek(
+        U.wiersze_treningowe(mag)["team_corners"] * 30)}}
+    ctx = U.przygotuj(mag)
+    out = U.prognoza(wagi, ctx, 10, "team_corners", 99, 1, 1,
+                     linia=5.5, strona="powyzej", do_ts=99999)
+    assert set(out) == {"p", "lam", "r_nb", "odl"}
+    assert 0.0 < out["p"] < 1.0 and out["lam"] > 0
+    assert out["odl"] == round(abs(5.5 - out["lam"]), 2)
+    # strony sumują się do jedynki także po drodze przez `prognoza`
+    pod = U.prognoza(wagi, ctx, 10, "team_corners", 99, 1, 1,
+                     linia=5.5, strona="ponizej", do_ts=99999)
+    assert abs(out["p"] + pod["p"] - 1.0) < 2e-4
+
+
+def test_prognoza_milczy_bez_wag_i_bez_historii():
+    mag = _magazyn(n=40)
+    ctx = U.przygotuj(mag)
+    assert U.prognoza(None, ctx, 10, "team_corners", 99, 1, 1, 5.5,
+                      "powyzej") is None
+    assert U.prognoza({"rynki": {}}, ctx, 10, "team_corners", 99, 1, 1, 5.5,
+                      "powyzej") is None
+    wagi = {"rynki": {"team_corners": U.trenuj_rynek(
+        U.wiersze_treningowe(mag)["team_corners"] * 30)}}
+    # drużyna, której magazyn nie zna
+    assert U.prognoza(wagi, ctx, 777777, "team_corners", 99, 1, 1, 5.5,
+                      "powyzej") is None
+
+
+def test_stempel_drugiej_liczby_jedzie_wszystkimi_drogami():
+    """`p_uczony` musi przejść przez każdą białą listę pól po drodze.
+
+    To ta sama pułapka, która 16–17.08 zatrzymała stempel `kal_strony`
+    na czterech listach naraz.
+    """
+    import inspect
+
+    from footstats.jobs import build_wc_fast as B
+    from footstats.jobs import rozliczanie as R
+
+    assert "p_uczony" in B._STEMPLE_PUBLIKACJI, "wznowiony typ gubiłby drugą liczbę"
+
+    zrodlo = inspect.getsource(B)
+    i = zrodlo.index('"rank_score": round(_atrakcyjnosc(b), 4)')
+    assert '"p_uczony"' in zrodlo[i:i + 2500], "biała lista `rec_pewniaka`"
+
+    rec = R._kupon_leg_do_logu({
+        "mecz_id": 1, "mecz": "A – B", "kickoff_ts": 1, "podmiot": "A",
+        "rynek": "Rożne", "rynek_kod": "team_corners", "linia": 4.5,
+        "strona": "ponizej", "kurs": 1.85, "p_model": 0.55,
+        "p_uczony": {"p": 0.51, "lam": 4.2, "r_nb": 9.4, "odl": 0.3},
+    })
+    assert rec.get("p_uczony", {}).get("p") == 0.51
+
+    log: dict = {}
+    R._dopisz_nowe(log, [{
+        "mecz_id": 1, "mecz": "A – B", "kickoff_ts": 2,
+        "podmiot_id": 5, "podmiot": "A", "podmiot_typ": "druzyna",
+        "rynek_kod": "team_corners", "rynek": "Rożne", "linia": 4.5,
+        "strona": "ponizej", "kurs": 1.85, "p_model": 0.55,
+        "pewnosc": "wysoka",
+        "p_uczony": {"p": 0.49, "lam": 4.4, "r_nb": 9.4, "odl": 0.1},
+    }])
+    assert next(iter(log.values())).get("p_uczony", {}).get("p") == 0.49
+
+
+def test_druga_liczba_nie_wchodzi_do_zadnej_bramy():
+    """Model liczy OBOK — jedno przeoczenie i nowy rachunek zmienia produkt
+    przed pomiarem, czyli dokładnie to, czego mamy nie robić."""
+    import inspect
+
+    from footstats.jobs import build_wc_fast as B
+
+    zrodlo = inspect.getsource(B)
+    # `p_uczony` może być wyłącznie ZAPISYWANE, nigdy czytane do decyzji
+    for wzor in ('if _pu["p"', 'p_uczony"]["p"] >', 'p_uczony")["p"] >',
+                 '_pu["p"] >', '_pu["p"] <'):
+        assert wzor not in zrodlo, (
+            f"druga liczba wchodzi do decyzji przez `{wzor}` — najpierw pomiar"
+        )

@@ -199,10 +199,20 @@ def wiersze_treningowe(mag: dict) -> dict[str, list[dict]]:
     return dict(out)
 
 
-def cechy_na_mecz(mag: dict, team_id: int | str, rynek: str,
-                  opp_id: int | str | None, dom: int, liga: int | None,
-                  do_ts: int | None = None,
-                  liga_sr: dict | None = None) -> dict | None:
+def przygotuj(mag: dict) -> dict:
+    """Kontekst liczony RAZ na cykl: serie meczów i średnie ligowe.
+
+    ⚑ BEZ TEGO CYKL BY KLĘKAŁ. `cechy_na_mecz` przelicza cały magazyn (289
+    drużyn) przy każdym wywołaniu, a cykl pyta o ~240 drużyn × 6 rynków, czyli
+    1400 razy na przebieg. Kontekst zamienia to na jedno przeliczenie.
+    """
+    serie = _serie(mag)
+    return {"serie": serie, "liga_sr": srednie_ligowe(serie)}
+
+
+def cechy_z_kontekstu(ctx: dict, team_id: int | str, rynek: str,
+                      opp_id: int | str | None, dom: int, liga: int | None,
+                      do_ts: int | None = None) -> dict | None:
     """Cechy dla NADCHODZĄCEGO meczu — to samo, co w treningu, tą samą drogą.
 
     ⚑ JEDNA FUNKCJA CECH DLA TRENINGU I PRODUKCJI. Gdyby produkcja liczyła je
@@ -210,20 +220,59 @@ def cechy_na_mecz(mag: dict, team_id: int | str, rynek: str,
     których się uczył, i nikt by tego nie zauważył — a to najdroższa klasa
     błędu w tym repo (patrz kopia konfiguracji we froncie,
     [[kupony-przebudowa-domknieta]]).
+
+    `do_ts` to godzina meczu: historia liczy się WYŁĄCZNIE z meczów
+    wcześniejszych, dokładnie jak przy treningu.
     """
     kod = RYNEK_NA_KOD.get(rynek)
     if kod is None:
         return None
-    serie = _serie(mag)
+    serie = ctx.get("serie") or {}
     prog = int(do_ts or time.time())
     hist = [h for h in serie.get(str(team_id), []) if int(h.get("t") or 0) < prog]
     if len(hist) < MIN_HISTORII:
         return None
     opp_hist = [h for h in serie.get(str(opp_id), []) if int(h.get("t") or 0) < prog]
-    if liga_sr is None:
-        liga_sr = srednie_ligowe(serie)
     return cechy_wiersza(kod, hist, opp_hist, int(dom),
-                         liga_sr.get((liga, kod)))
+                         (ctx.get("liga_sr") or {}).get((liga, kod)))
+
+
+def cechy_na_mecz(mag: dict, team_id: int | str, rynek: str,
+                  opp_id: int | str | None, dom: int, liga: int | None,
+                  do_ts: int | None = None,
+                  liga_sr: dict | None = None) -> dict | None:
+    """Wygodna nakładka na `cechy_z_kontekstu` — przelicza magazyn za każdym
+    razem, więc do jednorazowych pomiarów, NIE do cyklu."""
+    ctx = przygotuj(mag)
+    if liga_sr is not None:
+        ctx["liga_sr"] = liga_sr
+    return cechy_z_kontekstu(ctx, team_id, rynek, opp_id, dom, liga, do_ts)
+
+
+def prognoza(wagi: dict | None, ctx: dict, team_id: int | str, rynek: str,
+             opp_id: int | str | None, dom: int, liga: int | None,
+             linia: float, strona: str,
+             do_ts: int | None = None) -> dict | None:
+    """Pełna prognoza modelu dla jednego zakładu — albo None, gdy nie wiemy.
+
+    Zwraca `{"p", "lam", "r_nb", "odl"}`. `odl` to odległość linii od λ, czyli
+    to, na czym stoi reguła zasięgu (patrz `MAX_ODLEGLOSC_LINII`).
+    """
+    wr = ((wagi or {}).get("rynki") or {}).get(rynek)
+    if not wr or not ctx:
+        return None
+    cechy = cechy_z_kontekstu(ctx, team_id, rynek, opp_id, dom, liga, do_ts)
+    if cechy is None:
+        return None
+    lm = lam(wr, cechy)
+    if lm is None:
+        return None
+    p = p_strony(lm, linia, strona, wr.get("r_nb"))
+    if p is None:
+        return None
+    return {"p": round(float(p), 4), "lam": round(float(lm), 3),
+            "r_nb": wr.get("r_nb"),
+            "odl": round(abs(float(linia) - float(lm)), 2)}
 
 
 # ------------------------------------------------------------------ trening --

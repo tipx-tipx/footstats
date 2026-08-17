@@ -37,12 +37,12 @@ from ..engine import (
 )
 from ..model import (
     betting, context, counts, koncesje, kupony, matchup, matchup_lite,
-    profil_druzyn, styl, tempo,
+    profil_druzyn, styl, tempo, uczony,
 )
 from ..sources import (
     betclic, eloratings, rotowire, scores365, sofascore, statshub, superbet,
 )
-from . import radar, rozliczanie
+from . import magazyn_druzyn, radar, rozliczanie
 from .build_demo import MARKET_NAMES_PL, WEB_DATA_DIR, line_for_lambda
 
 # KURSY GŁÓWNE: Superbet i Betclic (drugi dołożony 2026-08-08, decyzja usera).
@@ -226,6 +226,7 @@ _STEMPLE_PUBLIKACJI = (
     "kal_rynek",       # delta kalibracji rynku
     "kal_tau",         # historia predykcji rynków drużynowych
     "kolejnosc",       # moc listy + bogactwo materiału meczu
+    "p_uczony",        # druga liczba: model uczony (szansa, λ, odległość linii)
     "lambda",          # przewidywana liczba zdarzeń (próg λ)
     "ess",             # efektywna liczba meczów własnej historii
     "udzial_priora",   # ile prognozy pochodzi ze średniej rozgrywek
@@ -4094,6 +4095,57 @@ def _main_impl(tryb=None):
     # dotyczy; licznik mówi, ile z bieżącego przeliczenia przez nią przeszło.
     _licznik_korekty_stron: Counter = Counter()
 
+    # ⚑⚑ MODEL UCZONY LICZY OBOK STAREGO RACHUNKU (2026-08-17).
+    #
+    # Nowa liczba NIE idzie na stronę i nie rusza żadnej bramy — ląduje w
+    # księdze jako stempel `p_uczony`. Po ~100 rozliczeniach da się porównać
+    # oba rachunki paired Brierem NA ŻYWYCH MECZACH, a nie na backteście, i
+    # dopiero wtedy przełączyć stronę (kolejność ustalona z właścicielem
+    # 17.08: „nowy obok starego, warstwy schodzą po jednej z dowodem").
+    #
+    # Zmierzone w backteście na 4470 typach (`docs/model-uczony-pomiar.md`):
+    # luka deklaracji −14,4 pp wobec −0,9 pp, Brier 0,2429 wobec 0,2276.
+    #
+    # Magazyn czytamy RAZ i przygotowujemy kontekst RAZ — bez tego cykl
+    # przeliczałby 289 drużyn przy każdym z ~1400 pytań na przebieg.
+    _wagi_modelu: dict = {}
+    _ctx_modelu: dict = {}
+    _licznik_uczonego: Counter = Counter()
+    try:
+        _wagi_modelu = supa.get_key(uczony.KLUCZ_WAG) or {}
+        print(uczony.zdanie_stanu(_wagi_modelu))
+        if (_wagi_modelu.get("rynki") or {}):
+            _mag_uczony = magazyn_druzyn.wczytaj()
+            _braki_mag = magazyn_druzyn.braki(_mag_uczony)
+            if _braki_mag:
+                # niepełny magazyn dałby prognozy z niepełnej historii, czyli
+                # liczby nieodróżnialne od dobrych — lepiej cisza
+                print(f"Model uczony: magazyn niepełny (szardy {_braki_mag}) — "
+                      "prognoz w tym cyklu nie liczymy")
+                _wagi_modelu = {}
+            else:
+                _st_mag = magazyn_druzyn.statystyki(_mag_uczony)
+                print(magazyn_druzyn.zdanie_stanu(_st_mag))
+                _ctx_modelu = uczony.przygotuj(_mag_uczony)
+    except Exception as e:                                     # noqa: BLE001
+        diagnostyka.cichy("cykl", "model_uczony_wagi", e)
+        _wagi_modelu, _ctx_modelu = {}, {}
+
+    def _prognoza_uczonego(rynek: str, team_id, opp_id, dom: int,
+                           liga, linia: float, strona: str, ts_meczu) -> dict | None:
+        """Druga liczba przy typie — albo None, gdy model nie ma pokrycia."""
+        if not _wagi_modelu or not _ctx_modelu:
+            return None
+        try:
+            out = uczony.prognoza(_wagi_modelu, _ctx_modelu, team_id, rynek,
+                                  opp_id, dom, liga, linia, strona,
+                                  do_ts=ts_meczu)
+        except Exception as e:                                 # noqa: BLE001
+            diagnostyka.cichy("cykl", "model_uczony_prognoza", e)
+            return None
+        _licznik_uczonego["policzone" if out else "bez_pokrycia"] += 1
+        return out
+
     # ILE PRZEDZIAŁÓW TO POMIAR, A ILE PRZYBLIŻENIE (2026-08-05).
     # Przedział bez własnej próby dostaje wartość globalną rynku i do dziś
     # wyglądał w raporcie identycznie jak zmierzony — cztery liczby w rzędzie
@@ -6460,6 +6512,11 @@ def _main_impl(tryb=None):
                             and pomiar_druzyn < ODRZUCONE_POMIAR_DRUZYN_MAX
                         ):
                             pomiar_druzyn += 1
+                            _pu_pomiar = _prognoza_uczonego(
+                                tt.market_code, tt.team_id, tt.opponent_id,
+                                1 if tt.is_home else 0, tt.league_id or None,
+                                l_t, strona_t, ts,
+                            )
                             odrzucone_pomiar.append({
                                 "id": 0, "mecz_id": mid, "mecz": match_label,
                                 "kickoff_ts": ts, "podmiot_typ": "druzyna",
@@ -6486,6 +6543,10 @@ def _main_impl(tryb=None):
                                 # samo jak publikowany, więc bez stempla
                                 # warstwa policzyłaby swoją deltę drugi raz.
                                 "kal_strony": round(_d_strony_t, 4),
+                                # ...i druga liczba z modelu uczonego: typy
+                                # pomiarowe są najlepszą próbą do porównania
+                                # dwóch rachunków, bo nie przeszły selekcji
+                                **({"p_uczony": _pu_pomiar} if _pu_pomiar else {}),
                             })
                         continue
                     if (hi_t - lo_t) > 0.35:
@@ -6595,6 +6656,16 @@ def _main_impl(tryb=None):
                                     + ("sprzyja" if f_script > 1 else "nie sprzyja"),
                             "mnoznik": round(f_script, 2),
                         })
+                    # DRUGA LICZBA: model uczony, liczony obok starego rachunku
+                    # i NIE wchodzący do żadnej bramy (patrz nota przy
+                    # `_prognoza_uczonego`). Zapisujemy komplet, żeby dało się
+                    # potem odtworzyć, na czym stała: szansa, λ i odległość
+                    # linii od λ, na której stoi reguła zasięgu.
+                    _pu = _prognoza_uczonego(
+                        tt.market_code, tt.team_id, tt.opponent_id,
+                        1 if tt.is_home else 0, tt.league_id or None,
+                        l_t, strona_t, ts,
+                    )
                     legi_pool.append({
                         "id": 0, "mecz_id": mid, "mecz": match_label,
                         "kickoff_ts": ts, "podmiot_id": tt.team_id,
@@ -6605,6 +6676,7 @@ def _main_impl(tryb=None):
                         "rynek": MARKET_NAMES_PL[tt.market_code],
                         "linia": l_t, "strona": strona_t, "kurs": odd_t,
                         "bukmacher": "Superbet", "p_model": round(p_t, 4),
+                        **({"p_uczony": _pu} if _pu else {}),
                         # delta korekty strony nałożona wyżej — bez stempla
                         # warstwa byłaby niemierzalna wstecz, a to jest
                         # dokładnie ten błąd, który zostawił nas 16.08 z
@@ -7476,6 +7548,10 @@ def _main_impl(tryb=None):
             # −1,2). Ta sama pułapka, która trzyma `compute_bias_full` na
             # zamrożonej mapie.
             **({"kal_strony": b["kal_strony"]} if b.get("kal_strony") else {}),
+            # DRUGA LICZBA z modelu uczonego (2026-08-17) — nie idzie na kartę,
+            # jedzie do księgi, żeby dało się porównać oba rachunki na żywych
+            # meczach zamiast na backteście
+            **({"p_uczony": b["p_uczony"]} if b.get("p_uczony") else {}),
             **({"rachunek": b["rachunek"]} if b.get("rachunek") else {}),
             **({"kal_tau": b["kal_tau"]} if b.get("kal_tau") else {}),
             "czynniki": b.get("czynniki", {}),
@@ -8554,6 +8630,14 @@ def _main_impl(tryb=None):
         print(f"Kolejność listy: {_bogate} typów z meczów, o których model ma "
               f"dużo do powiedzenia ({PROG_BOGATEGO_MECZU}+ kandydatów w "
               f"meczu) — premia {PREMIA_BOGATEGO_MECZU:.2f} w „polecanych”")
+    if _licznik_uczonego:
+        _ile_u = _licznik_uczonego.get("policzone", 0)
+        _brak_u = _licznik_uczonego.get("bez_pokrycia", 0)
+        print(f"Model uczony (druga liczba, NIE na stronie): {_ile_u} wycen "
+              f"policzonych, {_brak_u} bez pokrycia w magazynie")
+    elif _wagi_modelu:
+        print("Model uczony: wagi są, ale ANI JEDNA wycena go nie zapytała — "
+              "szukaj w ścieżce drużynowej, nie w wagach")
     if _licznik_korekty_stron:
         print("Korekta strony dotknęła: "
               + ", ".join(f"{k} {n}" for k, n in
