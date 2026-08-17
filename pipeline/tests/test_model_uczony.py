@@ -269,3 +269,63 @@ def test_brak_rywala_to_jedna_flaga():
     c2 = U.cechy_na_mecz(mag, 10, "team_corners", opp_id=99, dom=1, liga=1,
                          do_ts=99999)
     assert c2["brak_rywala"] == 0.0
+
+
+# --- zasięg modelu i widełki półek ----------------------------------------
+#
+# Zmierzone 17.08 na 4470 typach: luka deklaracji wobec odległości linii od λ
+# wynosi −0,3 pp przy 0–1, ale −15,5 pp przy 4+. Trzy procent typów niesie całą
+# lukę na górze rozkładu. Kalibracja tego NIE naprawia (krzywa Platta wyszła
+# b ≈ 1,00, Brier nawet gorszy) — problem jest lokalny, w ogonie.
+
+def test_zasieg_odcina_skrajny_ogon():
+    """Linia daleka od λ to obszar, w którym model zgaduje."""
+    assert U.w_zasiegu(5.0, 4.5) and U.w_zasiegu(5.0, 6.5)
+    assert U.w_zasiegu(5.0, 7.5), "dokładnie 2,5 jeszcze wchodzi"
+    assert not U.w_zasiegu(5.0, 8.5), "3,5 od λ to już ogon"
+    assert not U.w_zasiegu(4.0, 8.5)
+    assert not U.w_zasiegu(None, 4.5), "brak λ to nie „w zasięgu”"
+
+
+def test_polki_dziela_typy_po_kursie():
+    assert U.polka_dla(1.45) == "wysoka_szansa"
+    assert U.polka_dla(1.79) == "wysoka_szansa"
+    assert U.polka_dla(1.80) == "wyzsze_kursy"
+    assert U.polka_dla(2.19) == "wyzsze_kursy"
+    assert U.polka_dla(2.25) is None, "powyżej 2,20 model jest anty-sygnałem"
+    assert U.polka_dla(1.10) is None
+    assert U.polka_dla(None) is None
+
+
+def test_regula_zasiegu_tylko_na_polce_pewniakow():
+    """⚑ Na wyższych kursach zasięg POGARSZA wynik (53,4% → 48,9%).
+
+    Wysoki kurs to z definicji zdarzenie rzadkie, czyli linia daleka od λ —
+    odcinanie takich typów wycięłoby z tej półki właśnie to, po co istnieje.
+    """
+    # pewniak z linią daleko od λ — odpada
+    ok, powod = U.dopuszczony(1.45, lambda_=4.0, linia=8.5)
+    assert not ok and powod == "linia_poza_zasiegiem_modelu"
+    # ten sam układ na półce wyższych kursów — wchodzi
+    ok2, powod2 = U.dopuszczony(1.95, lambda_=4.0, linia=8.5)
+    assert ok2 and powod2 is None
+    # pewniak z linią blisko λ — wchodzi
+    ok3, _ = U.dopuszczony(1.45, lambda_=4.0, linia=5.5)
+    assert ok3
+
+
+def test_kurs_poza_polkami_ma_powod():
+    ok, powod = U.dopuszczony(3.20, lambda_=4.0, linia=4.5)
+    assert not ok and powod == "kurs_poza_polkami"
+
+
+def test_polki_maja_limity_i_granice():
+    """Cztery liczby całych widełek — bez progów wartości i EV."""
+    assert set(U.POLKI) == {"wysoka_szansa", "wyzsze_kursy"}
+    assert U.POLKI["wysoka_szansa"]["limit_dobowy"] == 15
+    assert U.POLKI["wyzsze_kursy"]["limit_dobowy"] == 6
+    assert U.POLKI["wyzsze_kursy"]["kurs_max"] == 2.20, (
+        "granica 2,20 ma pokrycie w pomiarze: wyżej górna tercja szansy "
+        "trafia 30,8%, a dolna 46,7%"
+    )
+    assert U.POLKI["wyzsze_kursy"]["zasieg"] is None

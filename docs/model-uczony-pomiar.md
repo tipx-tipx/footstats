@@ -195,3 +195,66 @@ Sortowanie po szansie powinno dawać odwrotnie. Wygląda na nieliniowość przy
 p → 0,9 (model za pewny przy skrajnych deklaracjach) i prawdopodobnie da się
 to naprawić jedną kalibracją izotoniczną — ale trzeba to najpierw zmierzyć,
 a nie założyć. To samo zjawisko może stać za odwróceniem powyżej kursu 2,20.
+
+---
+
+# 10. KALIBRACJA NIE POMAGA, ZASIĘG POMAGA — pomiar 2026-08-17, część 3
+
+## Kalibracja: wynik NEGATYWNY (nie wracać bez nowego pomysłu)
+
+Krzywa Platta `logit(p_kal) = a + b·logit(p_over)`, jedna na rynek (żeby suma
+stron została 1), uczona **out-of-fold** na 18 tys. par z syntetycznych linii
+wokół λ (model z pierwszych 70% czasu przewidywał pozostałe 30%).
+
+| rynek | par | a | b | Brier przed | po |
+|---|---|---|---|---|---|
+| team_cards | 14962 | −0,017 | 1,027 | 0,1252 | 0,1252 |
+| team_corners | 18932 | +0,002 | 1,014 | 0,1676 | 0,1676 |
+| team_fouls | 18576 | −0,043 | 1,022 | 0,2001 | 0,2000 |
+| team_goals | 14128 | +0,134 | 1,050 | 0,1220 | 0,1216 |
+| team_shots | 18664 | +0,098 | 1,000 | 0,2190 | 0,2185 |
+| team_sot | 18502 | +0,092 | 0,983 | 0,1560 | 0,1557 |
+
+Na realnych typach **pogorszyła wynik**: Brier 0,2276 → 0,2284, log-loss
+0,6504 → 0,6526. Góra rozkładu została taka sama (−10,3 pp przy p 0,80–0,90).
+
+**Dlaczego:** `b ≈ 1,00` znaczy, że w typowym zakresie model jest już dobrze
+skalibrowany, więc jedna krzywa nie ma czego naprawiać. Błąd jest LOKALNY —
+siedzi w skrajnym ogonie, którego syntetyczne linie (λ±3,5) prawie nie
+dotykają.
+
+## ⚑ GDZIE MODEL MA POKRYCIE: |linia − λ| ≤ 2,5
+
+| \|linia − λ\| | n | udział | deklaruje | trafia | luka | Brier |
+|---|---|---|---|---|---|---|
+| 0–1 | 2730 | 61% | 50,8% | 50,5% | −0,3 pp | 0,2328 |
+| 1–2 | 1182 | 26% | 50,8% | 49,6% | −1,2 pp | 0,2242 |
+| 2–3 | 423 | 9% | 53,4% | 52,2% | −1,1 pp | 0,2081 |
+| 3–4 | 95 | 2% | 65,0% | 60,0% | −5,0 pp | 0,1870 |
+| 4+ | 40 | 1% | 85,5% | 70,0% | **−15,5 pp** | 0,2804 |
+
+**Trzy procent typów niesie całą lukę na górze rozkładu.** Model liczy λ
+poprawnie; myli się dopiero tam, gdzie szansa bierze się ze skrajnego ogona
+(„poniżej 8,5 rożnych" przy λ = 4 deklaruje 85%, wchodzi 70%).
+
+## Odcięcie działa RÓŻNIE na obu półkach
+
+| półka | limit | bez odcięcia | \|linia−λ\| ≤ 2,5 |
+|---|---|---|---|
+| wysoka szansa (1,20–1,80) | 333 | 73,3% | **75,1%** |
+| wyższe kursy (1,80–2,20) | 88 | 53,4% | **48,9%** |
+
+Na pewniakach odcięcie dodaje +1,8 pp trafności i zmniejsza lukę o połowę
+(−11,3 → −6,0 pp). Na wyższych kursach **szkodzi**: wysoki kurs to z definicji
+zdarzenie rzadkie, czyli linia daleka od λ — odcinanie wycięłoby z tej półki
+dokładnie to, po co ona istnieje.
+
+**Wdrożone tak:** reguła zasięgu należy do PÓŁKI, nie do modelu
+(`uczony.POLKI`, `uczony.dopuszczony`). Cztery liczby całych widełek:
+
+```
+wysoka szansa   kurs 1,20–1,80   15 typów/dobę   |linia−λ| ≤ 2,5
+wyższe kursy    kurs 1,80–2,20    6 typów/dobę   bez reguły zasięgu
+```
+
+Kolejność w obu: szansa modelu. Bez progów wartości, bez EV.

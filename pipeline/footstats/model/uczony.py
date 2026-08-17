@@ -422,6 +422,94 @@ def p_strony(lambda_: float | None, linia: float, strona: str,
     return p if strona == "powyzej" else 1.0 - p
 
 
+# ------------------------------------------------------- zasięg i widełki ----
+#
+# ⚑ GDZIE MODEL MA POKRYCIE, A GDZIE ZGADUJE (zmierzone 2026-08-17 na 4470
+# rozliczonych typach). Luka deklaracji wobec odległości linii od λ:
+#
+#     |linia − λ|    n      udział   deklaruje   trafia    luka
+#     0–1          2730      61%      50,8%     50,5%    −0,3 pp
+#     1–2          1182      26%      50,8%     49,6%    −1,2 pp
+#     2–3           423       9%      53,4%     52,2%    −1,1 pp
+#     3–4            95       2%      65,0%     60,0%    −5,0 pp
+#     4+             40       1%      85,5%     70,0%   −15,5 pp
+#
+# Trzy procent typów niesie CAŁĄ lukę na górze rozkładu. Model liczy λ
+# poprawnie — myli się dopiero w skrajnym ogonie, gdzie „poniżej 8,5 rożnych"
+# przy λ = 4 deklaruje 85%, a wchodzi 70%.
+#
+# ⚑ PRÓBOWAŁEM TEGO KALIBRACJĄ I NIE DZIAŁA (nie wracać bez nowego pomysłu).
+# Krzywa Platta uczona out-of-fold na 18 tys. par syntetycznych linii wyszła
+# b ≈ 1,00–1,05, Brier bez zmian, a na realnych typach nawet gorzej
+# (0,2276 → 0,2284). Powód: w typowym zakresie model jest dobrze skalibrowany,
+# więc jedna krzywa nie ma czego naprawiać — problem jest LOKALNY, w ogonie.
+# Zamiast jedenastej warstwy: nie gramy tam, gdzie nie mamy pokrycia.
+MAX_ODLEGLOSC_LINII = 2.5
+
+
+def w_zasiegu(lambda_: float | None, linia: float,
+              max_odl: float = MAX_ODLEGLOSC_LINII) -> bool:
+    """Czy linia leży na tyle blisko λ, żeby model miał tam pokrycie."""
+    if lambda_ is None:
+        return False
+    return abs(float(linia) - float(lambda_)) <= float(max_odl)
+
+
+# WIDEŁKI PÓŁEK — cztery liczby i jedno kryterium kolejności (szansa modelu).
+# Decyzja właściciela 17.08: „wyższe kursy realnie przeanalizowane przez model,
+# bez zbędnych widełek", cel to TRAFNOŚĆ w obu zakładkach.
+#
+# Zmierzone (4470 typów, 22 dni):
+#   wysoka szansa, limit 15/d, z regułą zasięgu   trafność 75,1%
+#   wyższe kursy,  limit  6/d, BEZ reguły         trafność 53,4%, kurs 1,93
+#
+# ⚑ GÓRNE 2,20 NIE JEST WIDEŁKĄ Z BIURKA. Powyżej model jest ANTY-SYGNAŁEM:
+# przy kursach 2,40–2,80 typy z najwyższą szansą trafiają 30,8%, a z najniższą
+# 46,7% (górna tercja wobec dolnej, n=360). Bez tej granicy zakładka „wyższe
+# kursy" pokazywałaby najpewniejsze typy o trafności 31%.
+#
+# ⚑ REGUŁA ZASIĘGU DOTYCZY TYLKO PÓŁKI PEWNIAKÓW. Na wyższych kursach
+# POGARSZA wynik (53,4% → 48,9%), bo wysoki kurs to z definicji zdarzenie
+# rzadkie, czyli linia daleka od λ. To reguła jednej półki, nie modelu.
+POLKI = {
+    "wysoka_szansa": {
+        "kurs_min": 1.20, "kurs_max": 1.80,
+        "limit_dobowy": 15, "zasieg": MAX_ODLEGLOSC_LINII,
+    },
+    "wyzsze_kursy": {
+        "kurs_min": 1.80, "kurs_max": 2.20,
+        "limit_dobowy": 6, "zasieg": None,
+    },
+}
+
+
+def polka_dla(kurs: float | None) -> str | None:
+    """Na której półce stoi typ o tym kursie (None = poza zakresem produktu)."""
+    if not kurs:
+        return None
+    k = float(kurs)
+    for nazwa, p in POLKI.items():
+        if p["kurs_min"] <= k < p["kurs_max"]:
+            return nazwa
+    return None
+
+
+def dopuszczony(kurs: float | None, lambda_: float | None,
+                linia: float) -> tuple[bool, str | None]:
+    """Czy typ wchodzi na którąkolwiek półkę. Zwraca (czy, powód odrzucenia).
+
+    Powód jest zwracany zawsze, gdy typ odpada — cichych odrzuceń nie ma
+    ([[ciche-odrzucenia-zasada]]).
+    """
+    polka = polka_dla(kurs)
+    if polka is None:
+        return False, "kurs_poza_polkami"
+    zasieg = POLKI[polka]["zasieg"]
+    if zasieg is not None and not w_zasiegu(lambda_, linia, zasieg):
+        return False, "linia_poza_zasiegiem_modelu"
+    return True, None
+
+
 # ------------------------------------------------------------------ pomiary --
 def zdanie_stanu(wagi: dict | None) -> str:
     """Jedna linia do logu cyklu — wagi bez licznika są nieodróżnialne od braku."""
