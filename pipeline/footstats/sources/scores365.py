@@ -71,8 +71,37 @@ PROG_DOGRYWKI_MIN = 110.0
 _SLOWA_DOGRYWKI = ("aet", "a.e.t", "after extra", "extra time",
                    "after penalties", "penalties", " et", "et ")
 
+# ⚑ KARNE PO 90 MINUTACH TO NIE DOGRYWKA (2026-08-17). Ani `gameTime`, ani
+# status tego NIE rozstrzygają: Leagues Cup bije karne OD RAZU po regulaminowym
+# czasie, a 365Scores podaje wtedy `gameTime = 120,0` i „After Penalties"
+# dokładnie tak samo jak puchary UEFA po prawdziwej dogrywce. Słowo
+# „penalties" w `_SLOWA_DOGRYWKI` blokowało więc mecze rozegrane w 90 minutach.
+#
+# Zmierzone na 11 wiszących meczach: 5 z nich (78 typów, w tym 26 pokazanych
+# klientowi) dogrywki NIE MIAŁO — potwierdzone niezależnie sumą połów
+# w statystykach (1. połowa + 2. połowa = całość, czyli po 90. minucie nie
+# doszło ani jedno zdarzenie).
+#
+# `game.stages` mówi to wprost i jest w każdej odpowiedzi (mecz ligowy ma
+# 7 Halftime / 9 End of 90 Minutes / 1 Current):
+#     karne po 90 min   ->  7 Halftime, 9 End of 90 Minutes, 11 Penalties
+#     prawdziwa dogrywka->  7 Halftime, 9 End of 90 Minutes, 10 Extra Time, [11]
+ETAP_DOGRYWKI_ID = 10
+
 
 def _zapamietaj_et(game_id: int, game: dict) -> None:
+    etapy = game.get("stages")
+    if isinstance(etapy, list) and etapy:
+        _et_cache[game_id] = any(
+            e.get("id") == ETAP_DOGRYWKI_ID
+            or "extra time" in str(e.get("name") or "").lower()
+            for e in etapy
+            if isinstance(e, dict)
+        )
+        return
+    # ZAPAS — gdy 365 nie poda etapów. Zostaje stara, ostrożniejsza reguła:
+    # przy braku wiedzy wolimy NIE rozliczyć (zwrot) niż rozliczyć rynek
+    # 90-minutowy statystyką ze 120 minut, bo rozliczenie jest nieodwracalne.
     try:
         gt = float(game.get("gameTime") or 0)
     except (TypeError, ValueError):

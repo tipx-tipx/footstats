@@ -99,6 +99,61 @@ def test_status_ended_nie_wpada_na_slowie_et():
     assert _et(7, gameTime=95.0, shortStatusText="Ended", statusText="Ended") is False
 
 
+# --- KARNE PO 90 MINUTACH TO NIE DOGRYWKA (2026-08-17) ----------------------
+
+_ETAPY_90 = [{"id": 7, "name": "Halftime"},
+             {"id": 9, "name": "End of 90 Minutes"},
+             {"id": 1, "name": "Current"}]
+_ETAPY_KARNE = [{"id": 7, "name": "Halftime"},
+                {"id": 9, "name": "End of 90 Minutes"},
+                {"id": 11, "name": "Penalties"}]
+_ETAPY_DOGRYWKA = [{"id": 7, "name": "Halftime"},
+                   {"id": 9, "name": "End of 90 Minutes"},
+                   {"id": 10, "name": "Extra Time"},
+                   {"id": 11, "name": "Penalties"}]
+
+
+def test_karne_po_regulaminowym_czasie_to_nie_dogrywka():
+    """Club América – Austin FC (Leagues Cup, 13.08): 365 podaje `gameTime
+    120` i „After Penalties", a mecz trwał 90 minut — karne poszły od razu
+    po regulaminowym czasie. Statystyki są więc dobre do rynków 90-minutowych.
+    Na 17.08 wisiało tak 78 typów z pięciu meczów Leagues Cup.
+    """
+    assert _et(10, gameTime=120.0, shortStatusText="After Penalties",
+               statusText="After Penalties", stages=_ETAPY_KARNE) is False
+
+
+def test_prawdziwa_dogrywka_poznawana_po_etapie():
+    """Austria Wien – Beitar (elim. Ligi Konferencji) ma ten sam status
+    „After Penalties", ale w etapach jest Extra Time — tu blokada zostaje."""
+    assert _et(11, gameTime=120.0, shortStatusText="After Penalties",
+               statusText="After Penalties", stages=_ETAPY_DOGRYWKA) is True
+    # ...i bez karnych, samo „After ET" (Bodø/Glimt – Union SG)
+    assert _et(12, gameTime=120.0, shortStatusText="After ET",
+               stages=_ETAPY_DOGRYWKA[:3]) is True
+
+
+def test_etapy_maja_pierwszenstwo_przed_minutami_i_statusem():
+    """Gdy 365 poda etapy, decydują one — `gameTime` bywa myłące w obie
+    strony (120 przy meczu 90-minutowym, 98 przy doliczonym czasie)."""
+    assert _et(13, gameTime=130.0, shortStatusText="After Penalties",
+               stages=_ETAPY_KARNE) is False
+    assert _et(14, gameTime=90.0, shortStatusText="Ended",
+               stages=_ETAPY_DOGRYWKA) is True
+
+
+def test_mecz_ligowy_bez_dogrywki():
+    assert _et(15, gameTime=90.0, shortStatusText="Ended",
+               stages=_ETAPY_90) is False
+
+
+def test_brak_etapow_wraca_do_starej_reguly():
+    """Zapas dla odpowiedzi bez `stages` — przy braku wiedzy zostaje
+    ostrożna reguła minut i statusu (lepiej zwrot niż złe rozliczenie)."""
+    assert _et(16, gameTime=130.0, shortStatusText="After Penalties") is True
+    assert _et(17, gameTime=98.0, shortStatusText="Ended", stages=[]) is False
+
+
 # --- DOPASOWANIE NAZWY DRUŻYNY (2026-07-30) --------------------------------
 
 
