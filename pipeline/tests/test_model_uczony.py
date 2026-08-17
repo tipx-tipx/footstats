@@ -585,3 +585,108 @@ def test_druga_liczba_drabinki_nie_wchodzi_do_oceny_karty():
     # ...i do progów wyboru szczebla
     assert "p_uczony" not in zr[zr.index("MIN_P_SZCZEBLA"):
                                 zr.index("MIN_P_SZCZEBLA") + 400]
+
+
+# --- SUMY MECZOWE: cel liczony wprost, nie splotem ------------------------
+#
+# Zmierzone 17.08 na 900 typach `match_*`: luka −10,2 pp → +1,5 pp,
+# Brier 0,2232 → 0,2173. ⚑ ALE NIE NA KAŻDYM RYNKU — kartki i celne meczowe
+# wychodzą GORZEJ (model tam zaniża), więc przełączanie musi patrzeć per rynek.
+
+def _mecz_sum(ts, cor=6, cor_opp=4, dom=1, opp=99, ev=None):
+    return {"t": ts, "e": ev if ev is not None else ts, "o": opp, "h": dom,
+            "l": 1, "g": 2, "gp": 1,
+            "s": {"cor": cor, "pos": 55}, "sp": {"cor": cor_opp, "pos": 45}}
+
+
+def _mag_sum(n=30):
+    """Gospodarz 10 (6 rożnych), gość 99 (4) — suma w meczu 10."""
+    return {
+        "10": {"m": [_mecz_sum(1000 + i, cor=6, cor_opp=4, dom=1, opp=99,
+                               ev=5000 + i) for i in range(n)]},
+        "99": {"m": [_mecz_sum(1000 + i, cor=4, cor_opp=6, dom=0, opp=10,
+                               ev=5000 + i) for i in range(n)]},
+    }
+
+
+def test_suma_liczy_sie_z_obu_stron_meczu():
+    mag = _mag_sum(n=20)
+    wiersze = U.wiersze_sum(mag)["match_corners"]
+    assert wiersze, "brak wierszy sumy"
+    assert wiersze[-1]["y"] == 10.0, "6 + 4 = 10 rożnych w meczu"
+    assert wiersze[-1]["gosp6"] == 6.0 and wiersze[-1]["gosc6"] == 4.0
+    assert wiersze[-1]["suma6"] == 10.0
+
+
+def test_mecz_liczony_RAZ_a_nie_dwa_razy():
+    """⚑ Każdy mecz jest w magazynie z perspektywy OBU drużyn."""
+    mag = _mag_sum(n=20)
+    wiersze = U.wiersze_sum(mag)["match_corners"]
+    ile_gospodarza = len([m for m in mag["10"]["m"]
+                          if int(m.get("h") or 0) == 1])
+    assert len(wiersze) <= ile_gospodarza, (
+        "ta sama suma weszła do treningu podwójnie"
+    )
+    # kontrola: identyfikatory meczów bez powtórzeń
+    assert len({w["t"] for w in wiersze}) == len(wiersze)
+
+
+def test_suma_wymaga_historii_obu_druzyn():
+    mag = _mag_sum(n=20)
+    mag["99"]["m"] = mag["99"]["m"][:2]        # gość prawie bez historii
+    assert not U.wiersze_sum(mag).get("match_corners")
+
+
+def test_prognoza_sumy_bierze_lige_z_historii():
+    """Średnia ligowa to najmocniejsza cecha tego modelu — nie wolno jej zgubić."""
+    mag = _mag_sum(n=40)
+    wagi = {"rynki_sum": {"match_corners": U.trenuj_rynek_sum(
+        U.wiersze_sum(mag)["match_corners"] * 30)}}
+    ctx = U.przygotuj_sumy(mag)
+    assert ctx.get("liga_sr_sum"), "kontekst sum bez średnich ligowych"
+    z_liga = U.prognoza_sumy(wagi, ctx, 10, 99, 1, "match_corners", 9.5,
+                             "powyzej", do_ts=99999)
+    bez_ligi = U.prognoza_sumy(wagi, ctx, 10, 99, None, "match_corners", 9.5,
+                               "powyzej", do_ts=99999)
+    assert z_liga is not None and bez_ligi is not None
+    assert abs(z_liga["p"] - bez_ligi["p"]) < 1e-9, (
+        "brak ligi ma być uzupełniony z historii gospodarza, nie medianą"
+    )
+
+
+def test_prognoza_sumy_milczy_bez_druzyny():
+    mag = _mag_sum(n=40)
+    wagi = {"rynki_sum": {"match_corners": U.trenuj_rynek_sum(
+        U.wiersze_sum(mag)["match_corners"] * 30)}}
+    ctx = U.przygotuj_sumy(mag)
+    assert U.prognoza_sumy(wagi, ctx, 10, 777777, 1, "match_corners", 9.5,
+                           "powyzej", do_ts=99999) is None
+    assert U.prognoza_sumy({}, ctx, 10, 99, 1, "match_corners", 9.5,
+                           "powyzej") is None
+
+
+def test_trening_obejmuje_trzy_grupy_rynkow():
+    """`trenuj` zawsze zwraca klucz sum, a stan raportuje trzy grupy osobno."""
+    mag = _mag_sum(n=40)
+    wagi = U.trenuj(mag)
+    assert "rynki_sum" in wagi, "brak grupy sum w wyniku treningu"
+    # ta próba jest za mała na wagi ŻADNEJ grupy (36 wierszy przy progu 500),
+    # więc stan mówi wprost „BRAK WAG" — cisza znaczy „nie wiemy"
+    assert "BRAK WAG" in U.zdanie_stanu(wagi)
+
+    # gdy jedna grupa jest, a sum brak — musi to być widoczne osobno
+    assert "ZERO sum meczowych" in U.zdanie_stanu({
+        "wersja": "test", "trenowano_ts": 1,
+        "rynki": {"team_corners": {"n": 900}},
+    })
+
+    # ...a przy wagach obu grup stan wymienia je osobno
+    stan = U.zdanie_stanu({
+        "wersja": "test", "trenowano_ts": 1,
+        "rynki": {"team_corners": {"n": 900}},
+        "rynki_sum": {"match_corners": {"n": 600}},
+        "rynki_zaw": {"shots": {"n": 5000}},
+    })
+    assert "1 sum meczowych" in stan
+    assert "1 drużynowych" in stan and "1 zawodniczych" in stan
+    assert "ZERO" not in stan

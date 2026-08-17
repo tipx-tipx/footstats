@@ -60,11 +60,13 @@ def main() -> None:
         return
 
     zaw = wagi.get("rynki_zaw") or {}
+    sumy = wagi.get("rynki_sum") or {}
     print(f"\nwytrenowane rynki: {len(rynki)} drużynowych, "
-          f"{len(zaw)} zawodniczych")
+          f"{len(sumy)} sum meczowych, {len(zaw)} zawodniczych")
     print(f"{'rynek':<20}{'wierszy':>9}{'śr. zdarzeń':>13}"
           f"{'naddyspersja':>14}{'r_nb':>9}{'cech':>6}")
-    for rynek, w in sorted(rynki.items()) + sorted(zaw.items()):
+    for rynek, w in (sorted(rynki.items()) + sorted(sumy.items())
+                     + sorted(zaw.items())):
         r_nb = w.get("r_nb")
         opis_r = f"{r_nb:.1f}" if r_nb else "—"
         print(f"{rynek:<20}{w['n']:>9}{w['sr_y']:>13.2f}"
@@ -74,7 +76,8 @@ def main() -> None:
     # nauczył. Bez tego wagi są czarną skrzynką, a pytanie „czy model myśli
     # logicznie" zostaje bez odpowiedzi.
     print("\nCZEGO MODEL SIĘ NAUCZYŁ (5 najmocniejszych cech per rynek):")
-    for rynek, w in sorted(rynki.items()) + sorted(zaw.items()):
+    for rynek, w in (sorted(rynki.items()) + sorted(sumy.items())
+                     + sorted(zaw.items())):
         pary = sorted(zip(w["cechy"], w["beta"]),
                       key=lambda kv: -abs(kv[1]))
         opis = ", ".join(f"{n} {b:+.2f}" for n, b in pary[:5] if n != "const")

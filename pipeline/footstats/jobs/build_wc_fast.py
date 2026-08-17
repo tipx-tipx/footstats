@@ -4126,10 +4126,32 @@ def _main_impl(tryb=None):
             else:
                 _st_mag = magazyn_druzyn.statystyki(_mag_uczony)
                 print(magazyn_druzyn.zdanie_stanu(_st_mag))
-                _ctx_modelu = uczony.przygotuj(_mag_uczony)
+                _ctx_modelu = uczony.przygotuj_sumy(_mag_uczony)
     except Exception as e:                                     # noqa: BLE001
         diagnostyka.cichy("cykl", "model_uczony_wagi", e)
         _wagi_modelu, _ctx_modelu = {}, {}
+
+    def _prognoza_uczonego_sumy(rynek: str, gosp_id, gosc_id, liga,
+                                linia: float, strona: str,
+                                ts_meczu) -> dict | None:
+        """Druga liczba dla SUMY MECZOWEJ — model uczony wprost na sumie.
+
+        Suma nie jest splotem dwóch rozkładów drużynowych: zdarzenia drużyn są
+        skorelowane (rożne −0,127), a magazyn ma w każdym rekordzie liczby obu
+        stron, więc sumy da się nauczyć bezpośrednio. Szczegóły i liczby:
+        sekcja SUMY MECZOWE w `uczony.py`.
+        """
+        if not _wagi_modelu or not (_wagi_modelu.get("rynki_sum") or {}):
+            return None
+        try:
+            out = uczony.prognoza_sumy(_wagi_modelu, _ctx_modelu, gosp_id,
+                                       gosc_id, liga, rynek, linia, strona,
+                                       do_ts=ts_meczu)
+        except Exception as e:                                 # noqa: BLE001
+            diagnostyka.cichy("cykl", "model_uczony_suma", e)
+            return None
+        _licznik_uczonego["sumy_policzone" if out else "sumy_bez_pokrycia"] += 1
+        return out
 
     def _prognoza_uczonego_zaw(tr, rynek: str, linia: float, strona: str,
                                oczek_min, ts_meczu) -> dict | None:
@@ -7135,6 +7157,14 @@ def _main_impl(tryb=None):
                         # więc jedna delta na `p_over` nie może naprawić obu
                         # (patrz nota przy `rozliczanie.korekta_strony`).
                         # Warstwy na `p_over` wyżej komplementarność zachowują.
+                        # liga: `None` znaczy „weź z historii gospodarza"
+                        # (patrz `uczony.prognoza_sumy`) — ta ścieżka nie ma
+                        # pod ręką id rozgrywek, a liga drużyny wynika z jej
+                        # własnych meczów
+                        _pu_s = _prognoza_uczonego_sumy(
+                            kod_s, h_n["team_id"], a_n["team_id"], None,
+                            float(linia_s), strona_s, ts_n,
+                        )
                         _d_strony_s = betting.delta_strony(
                             korekta_stron, kod_s, strona_s
                         )
@@ -7207,6 +7237,8 @@ def _main_impl(tryb=None):
                             # jedzie z liczbą, inaczej warstwa naliczy ją
                             # drugi raz (2026-08-17)
                             "kal_strony": round(_d_strony_s, 4),
+                            # druga liczba: model uczony wprost na sumie meczu
+                            **({"p_uczony": _pu_s} if _pu_s else {}),
                             "p_rynku": betting.implied_prob_one_sided(
                                 float(kurs_s)),
                             "fair_kurs": round(1.0 / max(p_s, 1e-6), 3),
@@ -8686,9 +8718,11 @@ def _main_impl(tryb=None):
         _brak_u = _licznik_uczonego.get("bez_pokrycia", 0)
         _ile_z = _licznik_uczonego.get("zaw_policzone", 0)
         _brak_z = _licznik_uczonego.get("zaw_bez_pokrycia", 0)
+        _ile_s = _licznik_uczonego.get("sumy_policzone", 0)
+        _brak_s = _licznik_uczonego.get("sumy_bez_pokrycia", 0)
         print(f"Model uczony (druga liczba, NIE na stronie): drużyny "
-              f"{_ile_u} policzonych / {_brak_u} bez pokrycia, zawodnicy "
-              f"{_ile_z} / {_brak_z}")
+              f"{_ile_u} policzonych / {_brak_u} bez pokrycia, sumy meczowe "
+              f"{_ile_s} / {_brak_s}, zawodnicy {_ile_z} / {_brak_z}")
     elif _wagi_modelu:
         print("Model uczony: wagi są, ale ANI JEDNA wycena go nie zapytała — "
               "szukaj w ścieżce drużynowej, nie w wagach")

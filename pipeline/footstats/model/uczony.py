@@ -422,6 +422,7 @@ def trenuj(mag: dict, ridge: float = RIDGE, lib: dict | None = None) -> dict:
         "ridge": float(ridge),
         "rynki": rynki,
     }
+    out["rynki_sum"] = trenuj_sumy(mag, ridge)
     if lib:
         out["rynki_zaw"] = trenuj_zawodnikow(lib, ridge)
     return out
@@ -577,7 +578,11 @@ def zdanie_stanu(wagi: dict | None) -> str:
     """Jedna linia do logu cyklu — wagi bez licznika są nieodróżnialne od braku."""
     r = (wagi or {}).get("rynki") or {}
     zaw = (wagi or {}).get("rynki_zaw") or {}
-    if not r and not zaw:
+    # ⚑ WARUNEK MUSI ZNAĆ WSZYSTKIE GRUPY. Dwa razy z rzędu (zawodnicy 17.08,
+    # potem sumy) dopisanie nowej grupy zostawiało tu stary warunek, więc log
+    # mówił „BRAK WAG", choć wagi były — i nikt by nie sprawdził, czy cykl
+    # liczy nowym rachunkiem. Test na to jest.
+    if not r and not zaw and not ((wagi or {}).get("rynki_sum") or {}):
         return ("Model uczony: BRAK WAG — cykl liczy starą formułą "
                 "(uruchom scripts/trenuj_model.py)")
     wiek = (int(time.time()) - int((wagi or {}).get("trenowano_ts") or 0)) / 3600.0
@@ -594,6 +599,9 @@ def zdanie_stanu(wagi: dict | None) -> str:
         czesci.append(f"{len(zaw)} zawodniczych ({', '.join(sorted(zaw))})")
     else:
         czesci.append("⚑ ZERO zawodniczych")
+    sumy = (wagi or {}).get("rynki_sum") or {}
+    czesci.append(f"{len(sumy)} sum meczowych" if sumy
+                  else "⚑ ZERO sum meczowych")
     return (f"Model uczony: wersja {(wagi or {}).get('wersja')}, "
             + ", ".join(czesci) + f", wagi sprzed {wiek:.0f} h")
 
@@ -841,3 +849,219 @@ def prognoza_zawodnika(wagi: dict | None, seria: dict, rynek: str,
             "r_nb": wr.get("r_nb"),
             "odl": round(abs(float(linia) - float(lm)), 2),
             "min": round(float(oczekiwane_minuty or cechy.get("min6") or 90.0), 1)}
+
+
+# ===========================================================================
+# SUMY MECZOWE — cel liczony BEZPOŚREDNIO, nie splotem dwóch drużyn
+# ===========================================================================
+#
+# ⚑ DLACZEGO NIE SPLOT. Sumę można by policzyć jako Poisson(λ_gosp + λ_gość)
+# z modelu drużynowego, ale to zakłada NIEZALEŻNOŚĆ zdarzeń obu drużyn, a ona
+# nie istnieje: korelacja rożnych między drużynami jest zmierzona i wynosi
+# −0,127 ([[korelacja-druzyn]]). Magazyn ma w każdym rekordzie statystyki
+# NASZE (`s`) i RYWALA (`sp`) z tego samego meczu, więc suma jest po prostu
+# w danych i można się jej nauczyć wprost.
+#
+# ⚑ KAŻDY MECZ JEST W MAGAZYNIE DWA RAZY (raz z perspektywy każdej drużyny).
+# Wiersz budujemy tylko z perspektywy GOSPODARZA i deduplikujemy po `event_id`
+# — bez tego ta sama suma wchodziłaby do treningu podwójnie.
+#
+# Zmierzone 17.08 na 900 rozliczonych typach `match_*`:
+#
+#                        deklaruje   weszło    luka      Brier   log-loss
+#     DZIŚ (produkcja)     65,5%    55,3%   −10,2 pp   0,2232    0,6401
+#     MODEL UCZONY         53,8%    55,3%    +1,5 pp   0,2173    0,6237
+#
+# ⚑⚑ ALE NIE NA KAŻDYM RYNKU — przy przełączaniu patrzeć PER RYNEK:
+#
+#     match_corners  n=459   luka −11,5 → +0,4   Brier 0,2188 → 0,2054  lepszy
+#     match_shots    n= 81   luka −28,6 → −16,9  Brier 0,2936 → 0,2490  lepszy
+#     match_cards    n=201   luka  −5,1 → +6,5   Brier 0,2074 → 0,2213  GORSZY
+#     match_sot      n=124   luka  −3,7 → +7,3   Brier 0,2187 → 0,2259  GORSZY
+#
+# Na kartkach i celnych meczowych model ZANIŻA — odwrotnie niż wszędzie
+# indziej. Globalna średnia to ukrywa, więc decyzja o przełączeniu tych dwóch
+# rynków musi mieć własny pomiar.
+
+CELE_SUM = {"cor": "match_corners", "sh": "match_shots", "sot": "match_sot",
+            "crd": "match_cards", "fol": "match_fouls"}
+RYNEK_SUM_NA_KOD = {v: k for k, v in CELE_SUM.items()}
+CECHY_LOG_SUM = ["suma6", "suma12", "gosp6", "gosc6", "kon_gosp", "kon_gosc",
+                 "liga"]
+MIN_WIERSZY_SUMY = 500     # rynków sum jest mniej niż drużynowych (mecz ≠ para)
+
+
+def _suma_meczu(m: dict, kod: str) -> float | None:
+    a = (m.get("s") or {}).get(kod)
+    b = (m.get("sp") or {}).get(kod)
+    if a is None or b is None:
+        return None
+    return float(a) + float(b)
+
+
+def srednie_ligowe_sum(serie: dict[str, list], min_n: int = 20) -> dict:
+    """{(liga, kod): średnia SUMY} — liczona z perspektywy gospodarza."""
+    zbior: dict = defaultdict(list)
+    for mecze in serie.values():
+        for m in mecze:
+            if int(m.get("h") or 0) != 1:
+                continue
+            for kod in CELE_SUM:
+                v = _suma_meczu(m, kod)
+                if v is not None:
+                    zbior[(m.get("l"), kod)].append(v)
+    return {k: float(np.mean(v)) for k, v in zbior.items() if len(v) >= min_n}
+
+
+def cechy_sumy(kod: str, hist_gosp: list[dict], hist_gosc: list[dict],
+               liga_sr: float | None) -> dict | None:
+    """Cechy sumy meczowej — z historii OBU drużyn, tylko sprzed meczu."""
+    sumy_g = [v for v in (_suma_meczu(h, kod) for h in hist_gosp) if v is not None]
+    sumy_a = [v for v in (_suma_meczu(h, kod) for h in hist_gosc) if v is not None]
+    if len(sumy_g) < MIN_HISTORII or len(sumy_a) < MIN_HISTORII:
+        return None
+    return {
+        # ile pada W MECZACH obu drużyn — to jest istota tego rynku
+        "suma6": _sr(sumy_g[-6:] + sumy_a[-6:]),
+        "suma12": _sr(sumy_g[-12:] + sumy_a[-12:]),
+        # ile notuje każda z nich i ile dopuszcza
+        "gosp6": _sr([(h.get("s") or {}).get(kod) for h in hist_gosp[-6:]]),
+        "gosc6": _sr([(h.get("s") or {}).get(kod) for h in hist_gosc[-6:]]),
+        "kon_gosp": _sr([(h.get("sp") or {}).get(kod) for h in hist_gosp[-6:]]),
+        "kon_gosc": _sr([(h.get("sp") or {}).get(kod) for h in hist_gosc[-6:]]),
+        "liga": liga_sr,
+    }
+
+
+def wiersze_sum(mag: dict) -> dict[str, list[dict]]:
+    """{rynek sumy: wiersze} — jeden wiersz na MECZ, nie na parę (mecz, drużyna)."""
+    serie = _serie(mag)
+    liga_sr = srednie_ligowe_sum(serie)
+    out: dict[str, list[dict]] = defaultdict(list)
+    widziane: set = set()
+    for _tid, mecze in serie.items():
+        for i, m in enumerate(mecze):
+            if int(m.get("h") or 0) != 1 or i < MIN_HISTORII:
+                continue
+            ev = m.get("e")
+            if ev in widziane:
+                continue
+            widziane.add(ev)
+            czas = int(m.get("t") or 0)
+            hist_g = mecze[:i]
+            hist_a = [h for h in serie.get(str(m.get("o")), [])
+                      if int(h.get("t") or 0) < czas]
+            if len(hist_a) < MIN_HISTORII:
+                continue
+            for kod, rynek in CELE_SUM.items():
+                y = _suma_meczu(m, kod)
+                if y is None:
+                    continue
+                c = cechy_sumy(kod, hist_g, hist_a,
+                               liga_sr.get((m.get("l"), kod)))
+                if c is None:
+                    continue
+                out[rynek].append({**c, "y": y, "t": czas})
+    return dict(out)
+
+
+def schemat_sum(wiersze: list[dict]) -> dict:
+    uzyte, med = [], {}
+    for c in CECHY_LOG_SUM:
+        sur = np.array([w.get(c) if w.get(c) is not None else np.nan
+                        for w in wiersze], dtype=float)
+        if np.isnan(sur).all():
+            continue
+        uzyte.append(c)
+        med[c] = float(np.nanmedian(sur))
+    return {"log": uzyte, "med": med}
+
+
+def nazwy_cech_sum(sch: dict) -> list[str]:
+    return ["const"] + [f"log_{c}" for c in sch["log"]]
+
+
+def macierz_sum(wiersze: list[dict], sch: dict) -> np.ndarray:
+    kol = [np.ones(len(wiersze))]
+    for c in sch["log"]:
+        sur = np.array([w.get(c) if w.get(c) is not None else np.nan
+                        for w in wiersze], dtype=float)
+        sur[np.isnan(sur)] = sch["med"][c]
+        kol.append(np.log(np.maximum(sur, 0.0) + 0.5))
+    return np.column_stack(kol)
+
+
+def trenuj_rynek_sum(wiersze: list[dict], ridge: float = RIDGE) -> dict | None:
+    if len(wiersze) < MIN_WIERSZY_SUMY:
+        return None
+    sch = schemat_sum(wiersze)
+    X = macierz_sum(wiersze, sch)
+    y = np.array([w["y"] for w in wiersze], dtype=float)
+    beta = _irls(X, y, ridge)
+    mu = np.exp(np.clip(X @ beta, -8.0, 8.0))
+    r = kształt_nb(y, mu)
+    return {
+        "beta": [round(float(b), 6) for b in beta],
+        "cechy": nazwy_cech_sum(sch),
+        "log": sch["log"], "med": {k: round(v, 4) for k, v in sch["med"].items()},
+        "n": len(wiersze),
+        "sr_y": round(float(y.mean()), 4),
+        "naddyspersja": round(naddyspersja(y, mu), 4),
+        "r_nb": round(r, 3) if r is not None else None,
+        "od": int(min(w.get("t") or 0 for w in wiersze)),
+        "do": int(max(w.get("t") or 0 for w in wiersze)),
+    }
+
+
+def trenuj_sumy(mag: dict, ridge: float = RIDGE) -> dict:
+    out = {}
+    for rynek, grp in sorted(wiersze_sum(mag).items()):
+        w = trenuj_rynek_sum(grp, ridge)
+        if w is not None:
+            out[rynek] = w
+    return out
+
+
+def przygotuj_sumy(mag: dict, ctx: dict | None = None) -> dict:
+    """Kontekst sum — dokłada średnie ligowe SUM do kontekstu drużynowego."""
+    ctx = dict(ctx or przygotuj(mag))
+    ctx["liga_sr_sum"] = srednie_ligowe_sum(ctx["serie"])
+    return ctx
+
+
+def prognoza_sumy(wagi: dict | None, ctx: dict, gospodarz_id, gosc_id,
+                  liga, rynek: str, linia: float, strona: str,
+                  do_ts: int | None = None) -> dict | None:
+    """Prognoza sumy meczowej — albo None, gdy którejś drużyny nie znamy."""
+    wr = ((wagi or {}).get("rynki_sum") or {}).get(rynek)
+    kod = RYNEK_SUM_NA_KOD.get(rynek)
+    if not wr or not kod or not ctx:
+        return None
+    serie = ctx.get("serie") or {}
+    prog = int(do_ts or time.time())
+    hist_g = [h for h in serie.get(str(gospodarz_id), [])
+              if int(h.get("t") or 0) < prog]
+    hist_a = [h for h in serie.get(str(gosc_id), [])
+              if int(h.get("t") or 0) < prog]
+    # ⚑ LIGA Z HISTORII, GDY WOŁAJĄCY JEJ NIE ZNA. Ścieżka sum meczowych nie ma
+    # pod ręką id rozgrywek, a średnia ligowa jest najmocniejszą cechą tego
+    # modelu (log_liga +0,36…+0,77). Bez tego fallbacku wchodziłaby mediana
+    # WSZYSTKICH lig, czyli liczba z innego poziomu rozgrywek.
+    if liga is None and hist_g:
+        liga = hist_g[-1].get("l")
+    cechy = cechy_sumy(kod, hist_g, hist_a,
+                       (ctx.get("liga_sr_sum") or {}).get((liga, kod)))
+    if cechy is None:
+        return None
+    sch = {"log": wr.get("log") or [], "med": wr.get("med") or {}}
+    X = macierz_sum([cechy], sch)
+    beta = np.array(wr.get("beta") or [], dtype=float)
+    if X.shape[1] != beta.shape[0]:
+        return None
+    lm = float(np.exp(np.clip(X @ beta, -8.0, 8.0))[0])
+    p = p_strony(lm, linia, strona, wr.get("r_nb"))
+    if p is None:
+        return None
+    return {"p": round(float(p), 4), "lam": round(lm, 3),
+            "r_nb": wr.get("r_nb"),
+            "odl": round(abs(float(linia) - lm), 2)}
