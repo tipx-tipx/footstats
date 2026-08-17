@@ -3,7 +3,7 @@
 from footstats import rozgrywki
 
 
-def test_zakres_druzynowy_dokladnie_19_rozgrywek():
+def test_zakres_druzynowy_dokladnie_21_rozgrywek():
     """Europa (top 5 + Ekstraklasa + puchary) + Ameryka Płd. + Skandynawia.
 
     Rozszerzone 2026-07-27: rynki drużynowe to jedyny dochodowy produkt, więc
@@ -17,9 +17,15 @@ def test_zakres_druzynowy_dokladnie_19_rozgrywek():
     największej liczbie meczów" to była największa pojedyncza blokada podaży.
     Obie dołożone rozgrywki mają POTWIERDZONE `comp365` (patrz test niżej);
     South African Premier Division czeka na identyfikator.
+
+    Rozszerzone 2026-08-17 o Eredivisie i MLS — obie były wymienione już
+    w uzasadnieniu z 11.08 i wtedy NIE dopisane, więc typy drużynowe na tych
+    ligach powstawały i wisiały nierozliczone (Ajax – Heerenveen, Feyenoord –
+    Go Ahead, Orlando – Cincinnati, CF Montréal – DC United i inne).
+    Liga MX świadomie poza zakresem — decyzja właściciela.
     """
     druzynowe = [p for p in rozgrywki.PROFILE.values() if p.druzynowe]
-    assert len(druzynowe) == 19
+    assert len(druzynowe) == 21
     nazwy = {p.nazwa for p in druzynowe}
     assert nazwy == {
         # Europa (zakres pierwotny 2026-07-20)
@@ -32,6 +38,9 @@ def test_zakres_druzynowy_dokladnie_19_rozgrywek():
         "Allsvenskan", "Superettan", "Eliteserien", "Superliga",
         # dołożone 2026-08-11 pod podaż typów
         "Leagues Cup", "CONMEBOL Libertadores",
+        # dołożone 2026-08-17 — typy tam powstawały, ale nie miały jak
+        # się rozliczyć
+        "Eredivisie", "MLS",
     }
 
 
@@ -48,7 +57,13 @@ def test_nowe_ligi_maja_obie_polowki_pary_id():
             # 2026-08-11: id z wyszukiwarki 365 (`/search/?query=`),
             # sprawdzone na realnych meczach — Leagues Cup 18 gier
             # w fixtures i results, Libertadores 15 i 33
-            13783: 7242, 384: 102}
+            13783: 7242, 384: 102,
+            # 2026-08-17: utid z `uniqueTournamentId` w statshub /event/{id}
+            # (ten sam na czterech meczach każdej ligi), comp365 sprawdzone
+            # nazwami drużyn. ⚑ Wyszukiwarka 365 daje na „Eredivisie" DWIE
+            # rozgrywki: 57 to piłka nożna, 5765 to SIATKÓWKA (Orion Stars,
+            # Lycurgus) — sama nazwa nie wystarcza do potwierdzenia pary.
+            37: 57, 242: 104}
     for utid, comp in PARY.items():
         p = rozgrywki.profil(utid)
         assert p is not None and p.druzynowe, f"utid {utid} poza zakresem"

@@ -129,6 +129,33 @@ PROFILE: dict[int, ProfilRozgrywek] = {
                         comp365=(7242,)),
         ProfilRozgrywek(384, "CONMEBOL Libertadores", "Ameryka Płd.",
                         druzynowe=True, comp365=(102,)),
+        # --- HOLANDIA I MLS (2026-08-17) ---
+        #
+        # Obie były wymienione WYŻEJ, w uzasadnieniu rozszerzenia z 11.08,
+        # jako rozgrywki „z porządnym pokryciem danych" — i obu wtedy nie
+        # dopisano. Skutek widać w księdze: typy drużynowe na tych ligach
+        # POWSTAJĄ (oferta idzie od bukmachera, nie od rejestru), ale nie mają
+        # jak się rozliczyć, bo rozliczanie szuka meczu wyłącznie w `comp365`
+        # rozgrywek z zakresu. Zmierzone 17.08 na wiszących: Ajax – Heerenveen,
+        # Feyenoord – Go Ahead, Excelsior – PSV, Twente – PEC Zwolle,
+        # Orlando – Cincinnati, CF Montréal – DC United, San Jose – St. Louis,
+        # Atlanta United – NY Red Bulls.
+        #
+        # ⚑ PUŁAPKA PRZY WERYFIKACJI: wyszukiwarka 365 na „Eredivisie" oddaje
+        # DWIE rozgrywki o tej samej nazwie — 57 to piłka nożna (Ajax,
+        # Feyenoord, PSV), a 5765 to SIATKÓWKA (Orion Stars, Lycurgus,
+        # Draisma Dynamo). Sama nazwa nie wystarcza, dlatego obie pary
+        # sprawdzone nazwami drużyn na realnych meczach:
+        #     Eredivisie  comp365=57   utid=37   4 nasze mecze odnalezione
+        #     MLS         comp365=104  utid=242  4 nasze mecze odnalezione
+        # `utid` odczytany z `uniqueTournamentId` w statshub `/event/{id}`,
+        # ten sam dla wszystkich czterech meczów każdej ligi.
+        #
+        # Liga MX świadomie POZA zakresem (decyzja właściciela 17.08).
+        ProfilRozgrywek(37, "Eredivisie", "Holandia", druzynowe=True,
+                        comp365=(57,)),
+        ProfilRozgrywek(242, "MLS", "Ameryka Płn.", druzynowe=True,
+                        comp365=(104,)),
     )
 }
 
