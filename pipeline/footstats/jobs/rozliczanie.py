@@ -483,6 +483,12 @@ def _kupon_leg_do_logu(l: dict) -> dict:
         "miekka_linia": l.get("miekka_linia"),
         "xi_sygnal": l.get("xi_sygnal"),
         "kal_tau": l.get("kal_tau"),
+        # STEMPEL KOLEJNOŚCI (2026-08-17) — leg kuponu bywa pierwszym
+        # rekordem typu w księdze, a rekord, który rodzi się bez stempla,
+        # zostaje bez niego także po awansie na listę (`_dopisz_nowe` nowych
+        # pól nie dopisuje). Zmierzone: 0% legów miało `kolejnosc`.
+        **({"kolejnosc": l["kolejnosc"]}
+           if isinstance(l.get("kolejnosc"), dict) and l["kolejnosc"] else {}),
         # na czym stała prognoza — patrz stempel w `_dopisz_nowe`
         "ess": l.get("ess"), "udzial_priora": l.get("udzial_priora"),
         # ...i cały rachunek (betting.stempel_rachunku). Leg kuponu to
@@ -1015,7 +1021,15 @@ def _gid_365_z_druzyny(rec: dict, teams: list[str], cache: dict) -> int | None:
             cache["_mapa_druzyn"] = scores365.competitor_ids_z_rozgrywek(
                 rozgrywki.comp365_druzynowe()
             )
-        except Exception:
+        except Exception as e:
+            # ⚑ TO NIE MOŻE BYĆ CICHE (2026-08-17). Ta mapa jest JEDYNĄ drogą
+            # do meczu starszego niż ostatnia kolejka (`/games/results` głębiej
+            # nie sięga), więc jej brak oznacza, że wszystkie starsze typy
+            # w tym przebiegu nie mają jak się rozliczyć — i po siedmiu dniach
+            # znikną jako „zwrot". Pusta mapa siedzi potem w cache do końca
+            # przebiegu, więc jedna nieudana próba kosztuje CAŁY cykl.
+            # Do 17.08 wyjątek był łykany bez śladu ([[ciche-odrzucenia-zasada]]).
+            diagnostyka.cichy("rozliczanie", "mapa_druzyn_365", e)
             cache["_mapa_druzyn"] = {}
     mapa = cache["_mapa_druzyn"]
     if not mapa:
@@ -5591,6 +5605,43 @@ def rozlicz(
             rec["clv_pct"] = round(
                 (rec["kurs"] / rec["kurs_zamkniecia"] - 1.0) * 100.0, 1
             )
+
+    # ⚑ ILE TYPÓW CZEKA NA DANE I DLACZEGO (2026-08-17).
+    #
+    # Typ, którego nie umiemy zamknąć, po siedmiu dniach idzie na „zwrot" —
+    # czyli znika z pomiaru bez śladu, choć klient go widział. Do dziś nikt
+    # nie wiedział, ile ich jest: zmierzone jednorazowo 17.08 — 343 typy,
+    # z tego 201 POKAZANYCH na stronie, najstarszy z 11.08. Rozbicie przyczyn
+    # (na próbie 20 meczów): 142 typy po dogrywce (świadomie pomijane, bo
+    # statystyki obejmują 120 minut), 32 na dopasowaniu nazwy drużyny
+    # (naprawione tego dnia), 15 bez meczu u źródła.
+    #
+    # Ta linia ma to pokazywać W KAŻDYM cyklu, żeby narastająca kolejka nie
+    # była znowu odkryciem po tygodniu ([[ciche-odrzucenia-zasada]]).
+    _czekaja = [
+        r for r in log.values()
+        if not r.get("wynik") and r.get("kickoff_ts")
+        and now - int(r["kickoff_ts"]) > MECZ_KONIEC_PO_S
+    ]
+    if _czekaja:
+        _bez_gid = sum(
+            1 for r in _czekaja
+            if r.get("mecz_id") in cache_365 and cache_365[r["mecz_id"]] is None
+        )
+        _pokazane = sum(
+            1 for r in _czekaja
+            if not r.get("odrzucony") and not r.get("poza_publikacja")
+        )
+        _dni = max(
+            (now - int(r["kickoff_ts"])) / 86400.0 for r in _czekaja
+        )
+        print(
+            f"Typy czekające na dane: {len(_czekaja)} "
+            f"(pokazanych na stronie: {_pokazane}, "
+            f"bez meczu u źródła: {_bez_gid}, "
+            f"najstarszy {_dni:.1f} dnia; termin zwrotu "
+            f"{TERMIN_BRAK_DANYCH_S // 86400} dni)"
+        )
 
     # rewizja WSTECZ: legi przegrane przed wdrożeniem superzmiany (albo gdy
     # danych o zmianie jeszcze nie było) — każdy rekord sprawdzamy raz

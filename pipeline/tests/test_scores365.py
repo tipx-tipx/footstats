@@ -146,3 +146,42 @@ def test_resolve_team_key_samo_fc_to_za_malo():
 def test_resolve_team_key_dokladny_napis_ma_pierwszenstwo():
     assert s365.resolve_team_key(
         {"bohemians", "bohemian fc"}, "Bohemian FC") == "bohemian fc"
+
+
+# --- NAZWY, KTÓRE GUBIŁY ROZLICZENIA (zmierzone 2026-08-17) --------------
+#
+# Diagnoza 20 meczów z wiszącymi typami: mecz znaleziony u źródła, statystyki
+# pobrane, drużyna NIEDOPASOWANA — 32 typy w pięciu meczach czekały na dane,
+# które leżały gotowe. Rozkład: FC København 9, Olympique Lyonnais 11,
+# CD Guadalajara 8, HamKam 4.
+
+def test_ten_sam_klub_inny_podzial_na_slowa():
+    """„HamKam" u nas, „Ham-Kam" u źródła — zbiory słów nie mają nic wspólnego."""
+    assert s365.resolve_team_key(
+        {"brann", "ham-kam"}, "HamKam") == "ham-kam"
+    assert s365.resolve_team_key(
+        {"brann", "ham-kam"}, "SK Brann") == "brann"
+
+
+def test_aliasy_z_realnych_wiszacych_typow():
+    """København/Copenhagen i Guadalajara/Chivas nie mają wspólnego tokenu."""
+    assert s365.resolve_team_key(
+        {"fc copenhagen", "randers fc"}, "FC København") == "fc copenhagen"
+    assert s365.resolve_team_key(
+        {"chivas", "seattle sounders"}, "CD Guadalajara") == "chivas"
+    assert s365.resolve_team_key(
+        {"lyon", "sparta praha"}, "Olympique Lyonnais") == "lyon"
+
+
+def test_deportivo_nie_jest_tozsamoscia_klubu():
+    """⚑ Najgorsza klasa błędu: rozliczyć typ statystyką INNEGO klubu.
+
+    Docstring `resolve_team_key` obiecuje to od początku, ale bez odsiania
+    „deportivo" wspólny token dawał jednoznaczne maksimum i dopasowanie
+    wychodziło — bez śladu, a rozliczenie jest nieodwracalne.
+    """
+    assert s365.resolve_team_key(
+        {"deportivo recoleta", "boca juniors"}, "Deportivo Riestra") is None
+    # ...a prawdziwe dopasowanie dalej działa
+    assert s365.resolve_team_key(
+        {"defensa y justicia", "riestra"}, "Deportivo Riestra") == "riestra"

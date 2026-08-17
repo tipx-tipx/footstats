@@ -211,6 +211,28 @@ def _klucz_publikacji(b: dict) -> str:
             f":{b.get('rynek_kod')}:{b.get('linia')}:{b.get('strona')}")
 
 
+# NA CZYM STAŁA LICZBA W CHWILI PUBLIKACJI — komplet stempli, które muszą
+# jechać razem z `p_model`, gdziekolwiek ten `p_model` się przenosi.
+#
+# ⚑ Lista jest JEDNA i celowo w jednym miejscu. Repo ma udokumentowaną
+# pułapkę „białych list pól": każdy stempel osobno musi przejść przez
+# `rec_pewniaka`, `_dopisz_nowe`, `_kupon_leg_do_logu` i `_typ_z_logu` —
+# a pole pominięte w którejkolwiek ginie po cichu i wychodzi to dopiero
+# przy diagnozie warstwy, tygodnie później (`kal_strony`, 16-17.08).
+_STEMPLE_PUBLIKACJI = (
+    "rachunek",        # p_over_raw / kal_rynek / kal_strumien / p_over_final
+    "kal_strony",      # delta korekty strony (na `p` wybranego zakładu)
+    "kal_strumien",    # delta korekty strumienia (na `p_over`)
+    "kal_rynek",       # delta kalibracji rynku
+    "kal_tau",         # historia predykcji rynków drużynowych
+    "kolejnosc",       # moc listy + bogactwo materiału meczu
+    "lambda",          # przewidywana liczba zdarzeń (próg λ)
+    "ess",             # efektywna liczba meczów własnej historii
+    "udzial_priora",   # ile prognozy pochodzi ze średniej rozgrywek
+    "liga",            # rozgrywki (poziom bywa zupełnie inny)
+)
+
+
 def _typ_z_logu(rec: dict) -> dict:
     """Karta typu odtworzona z KSIĘGI ROZLICZEŃ — uboższa, ale prawdziwa.
 
@@ -275,13 +297,19 @@ def _typ_z_logu(rec: dict) -> dict:
         "rotacja": bool(rec.get("rotacja")),
         "miekka_linia": bool(rec.get("miekka_linia")),
         "opublikowano_ts": rec.get("opublikowano_ts"),
-        # DELTA KOREKTY STRONY JEDZIE Z TYPEM (2026-08-17). `p_model` wyżej
-        # jest zamrożone przy publikacji, czyli NIESIE tę deltę — a rekord
-        # wznowionego typu bywa zakładany w księdze od nowa (odrodzenie spoza
-        # listy dnia, patrz `rozliczanie._dopisz_nowe`). Bez tego pola taki
-        # rekord wraca do księgi bez stempla, choć jego liczba jest po
-        # korekcie: warstwa zdjęłaby wtedy zero i naliczyła deltę drugi raz.
-        **({"kal_strony": rec["kal_strony"]} if rec.get("kal_strony") else {}),
+        # ⚑ WSZYSTKIE STEMPLE PUBLIKACJI JADĄ Z TYPEM (2026-08-17).
+        #
+        # `p_model` wyżej jest zamrożone przy publikacji, czyli NIESIE
+        # w sobie wszystkie nałożone wtedy delty. A rekord wznowionego typu
+        # bywa w księdze zakładany OD NOWA: odrodzenie typu spoza listy dnia
+        # usuwa stary wpis i tworzy go z tej wyceny (`rozliczanie._dopisz_nowe`,
+        # nota „ODRODZENIE TYPU SPOZA LISTY DNIA"). Wszystko, czego nie ma
+        # w tym słowniku, przepada — a wtedy rekord mówi „liczba bez warstw",
+        # choć liczba jest po warstwach. Uczenie zdejmuje wtedy złą deltę.
+        #
+        # Zmierzone 17.08: 2636 z 7877 rekordów księgi miało `rachunek`, ale
+        # ani jeden wznowiony typ nie wnosił go z powrotem.
+        **{p: rec[p] for p in _STEMPLE_PUBLIKACJI if rec.get(p) is not None},
         "wznowiony": True, "uproszczony": True,
     }
 
@@ -8837,7 +8865,28 @@ def _main_impl(tryb=None):
     # od wcześniej, a `_dopisz_nowe` nie dopisuje nowych pól do rekordów, które
     # już istnieją („historii nie przepisujemy"). Ich pokrycie rośnie samo,
     # w miarę jak stare typy wygasają.
-    for _b in value_bets + typy_poza_publikacja:
+    #
+    # ⚑⚑ STEMPLUJEMY WSZYSTKIE CZTERY DROGI DO KSIĘGI (2026-08-17). Poprawka
+    # z 16.08 objęła `value_bets` i typy zdjęte bramami, ale rekord w księdze
+    # rodzi się jeszcze z DWÓCH innych list — i to one tłumaczyły dziurę
+    # w pokryciu. Zmierzone na rekordach powstałych po wdrożeniu stempla:
+    #
+    #     typy pomiarowe (odrzucone przy progu)   257 rekordów    0% stempla
+    #     legi kuponów                              4 rekordy     0%
+    #     POKAZANE na stronie                     140 rekordów   19%   <- skutek
+    #     zdjęte bramami                          489 rekordów   22-51%
+    #
+    # Te 19% u pokazanych to nie osobna usterka: rekord rodzi się często jako
+    # typ pomiarowy albo leg kuponu, a POTEM awansuje (`_dopisz_nowe` zdejmuje
+    # `odrzucony`/`poza_publikacja`, ale nowych pól nie dopisuje). Awans bez
+    # stempla u narodzin zostaje bez stempla na zawsze.
+    #
+    # ⚑ Stempel dopisujemy WYŁĄCZNIE przy narodzinach, nigdy po fakcie —
+    # `moc_listy` liczy się z `p` bieżącego przeliczenia, a rekord w księdze
+    # trzyma `p` z chwili publikacji. Dopisanie późniejszej mocy do starego `p`
+    # byłoby stemplem o czymś innym, niż mówi.
+    for _b in (value_bets + typy_poza_publikacja
+               + odrzucone_pomiar + legi_pool_pub):
         _ile = _kandydatow_w_meczu.get(_b.get("mecz_id"), 0)
         _b["kolejnosc"] = {"moc": moc_listy(_b, _ile), "kandydatow": _ile}
 

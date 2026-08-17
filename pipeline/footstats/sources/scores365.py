@@ -422,6 +422,15 @@ _SZUM_NAZWY_KLUBU = frozenset({
     "fc", "cf", "ac", "sc", "kf", "fk", "sk", "cd", "ca", "afc", "cfc",
     "club", "de", "del", "da", "do", "y", "e", "i", "the", "if", "ik",
     "sv", "vf", "vfb", "us", "as", "ss", "ssc", "cs", "rc", "sd",
+    # ⚑ „DEPORTIVO" TO NIE TOŻSAMOŚĆ, TO „SPORTOWY" (dopięte 2026-08-17).
+    # Docstring `resolve_team_key` od początku obiecuje, że „Deportivo Riestra"
+    # nie zostanie rozliczone statystyką „Deportivo Recoleta" — a bez tego
+    # wpisu obietnica nie miała pokrycia: wspólny token „deportivo" dawał
+    # JEDNOZNACZNE maksimum, więc dopasowanie wychodziło i nie zostawiało
+    # śladu. Rozliczenie jest nieodwracalne, więc to najgorsza możliwa klasa
+    # cichego błędu ([[bledy-rozliczania]]). Klubów, których cała tożsamość
+    # to samo „deportivo", nie ma.
+    "deportivo", "dep", "depor",
 })
 
 # NAZWY, KTÓRYCH ŻADNA REGUŁA NIE POŁĄCZY — bo to po prostu inne słowa.
@@ -430,9 +439,28 @@ _SZUM_NAZWY_KLUBU = frozenset({
 # to ręczna decyzja, że dwie nazwy oznaczają ten sam klub. Zmierzone koszty
 # braku tej listy: 4 typy z „Lech Poznań – AGF" i 3 z „Lyngby – AGF"
 # zamknięte jako „brak danych źródła", choć statystyki meczu były u źródła.
+#
+# ⚑ ROZSZERZONA 17.08 o cztery pary zmierzone na wiszących typach. Diagnoza
+# 20 meczów z nierozliczonymi typami: 32 typy w 5 meczach ginęły WYŁĄCZNIE
+# na nazwie, przy pełnych statystykach u źródła (mecz znaleziony, statystyki
+# pobrane, dopasowanie drużyny puste):
+#
+#     FC København        u źródła „fc copenhagen"    9 typów (dwa mecze)
+#     CD Guadalajara      u źródła „chivas"           8 typów
+#     Olympique Lyonnais  u źródła „lyon"            11 typów
+#     Pumas UNAM          u źródła „pumas"            — łapie już zbiór słów
+#
+# „Kopenhaga" to ten sam przypadek co AGF: København i Copenhagen nie mają
+# wspólnego tokenu i mieć nie będą. „Chivas" to przydomek klubu.
 _ALIASY_KLUBU: dict[str, frozenset[str]] = {
     "agf": frozenset({"aarhus"}),
     "aarhus": frozenset({"agf"}),
+    "kobenhavn": frozenset({"copenhagen"}),
+    "copenhagen": frozenset({"kobenhavn"}),
+    "guadalajara": frozenset({"chivas"}),
+    "chivas": frozenset({"guadalajara"}),
+    "lyonnais": frozenset({"lyon"}),
+    "lyon": frozenset({"lyonnais"}),
 }
 
 
@@ -529,6 +557,17 @@ def resolve_team_key(all_keys: set[str], team_name: str) -> str | None:
     tokeny = _tokeny_tozsamosci(p)
     if not tokeny:
         return None
+    # ⚑ TA SAMA NAZWA, INNY PODZIAŁ NA SŁOWA (2026-08-17). „HamKam" u nas,
+    # „Ham-Kam" u źródła — zbiory słów nie mają nic wspólnego ({hamkam} wobec
+    # {ham, kam}), rdzenie też nie, więc typ czekał na dane, które leżały
+    # gotowe. Sklejamy tokeny w jeden napis (po sortowaniu, żeby kolejność nie
+    # miała znaczenia) i wymagamy JEDNOZNACZNEGO trafienia — kandydatami są
+    # tylko dwie drużyny tego meczu, więc zlepek nie ma jak trafić w obcy klub.
+    zlep = "".join(sorted(tokeny))
+    zgodne = [k for k in all_keys
+              if "".join(sorted(_tokeny_tozsamosci(k))) == zlep]
+    if len(zgodne) == 1:
+        return zgodne[0]
     warianty = (
         (tokeny, lambda t: t),
         ({_rdzen(t) for t in tokeny}, _rdzen),

@@ -113,3 +113,70 @@ def test_stempel_zaokragla_do_czterech_miejsc():
                                  kal_strumien=-0.4, p_over_final=0.5)
     assert s["p_over_raw"] == 0.6235
     assert s["kal_rynek"] == 0.1235
+
+
+# --- DROGA STEMPLA PRZEZ CZTERY BIAŁE LISTY (2026-08-17) -----------------
+#
+# Stempel jest wart tyle, ile jego pokrycie. Zmierzone na rekordach księgi
+# powstałych po wdrożeniu stempla `kolejnosc` (14.08):
+#
+#     typy pomiarowe   257 rekordów    0% stempla
+#     legi kuponów       4 rekordy     0%
+#     POKAZANE          140 rekordów  19%
+#
+# Te 19% u pokazanych to skutek dwóch zer wyżej: rekord rodzi się często jako
+# typ pomiarowy albo leg kuponu i dopiero potem awansuje na listę, a
+# `_dopisz_nowe` przy awansie nowych pól nie dopisuje („historii nie
+# przepisujemy"). Rekord bez stempla u narodzin zostaje bez niego na zawsze.
+
+def test_wznowiony_typ_niesie_komplet_stempli():
+    """Odrodzenie typu spoza listy dnia zakłada rekord OD NOWA z tej wyceny."""
+    from footstats.jobs import build_wc_fast as B
+
+    rec = {
+        "mecz_id": 1, "mecz": "A – B", "kickoff_ts": 1,
+        "podmiot_id": 5, "podmiot": "A", "podmiot_typ": "druzyna",
+        "rynek_kod": "team_corners", "rynek": "Rożne", "linia": 4.5,
+        "strona": "ponizej", "kurs": 1.85, "p_model": 0.55,
+        "pewnosc": "wysoka",
+        "rachunek": {"p_over_raw": 0.4, "p_over_final": 0.45},
+        "kal_strony": -0.196, "kal_strumien": -0.4, "kal_rynek": 0.22,
+        "kolejnosc": {"moc": 0.74, "kandydatow": 9},
+        "lambda": 4.2, "ess": 10.3, "udzial_priora": 0.28, "liga": "Ekstraklasa",
+    }
+    typ = B._typ_z_logu(rec)
+    braki = [p for p in B._STEMPLE_PUBLIKACJI if typ.get(p) != rec.get(p)]
+    assert not braki, (
+        f"wznowiony typ gubi stemple: {braki} — po odrodzeniu rekord mówi, "
+        "że liczba jest bez warstw, choć `p_model` jest po warstwach"
+    )
+
+
+def test_stempel_kolejnosci_obejmuje_wszystkie_drogi_do_ksiegi():
+    """Cztery listy, z których rodzi się rekord — cztery, nie dwie."""
+    import inspect
+
+    from footstats.jobs import build_wc_fast as B
+
+    zrodlo = inspect.getsource(B)
+    i = zrodlo.index('_b["kolejnosc"] = {"moc"')
+    petla = zrodlo[max(0, i - 400):i]
+    for lista in ("value_bets", "typy_poza_publikacja",
+                  "odrzucone_pomiar", "legi_pool_pub"):
+        assert lista in petla, (
+            f"pętla stemplująca omija `{lista}` — rekordy stamtąd rodzą się "
+            "bez `kolejnosc` i zostają bez niego także po awansie na listę"
+        )
+
+
+def test_leg_kuponu_niesie_kolejnosc():
+    """Leg bywa PIERWSZYM rekordem typu w księdze."""
+    from footstats.jobs import rozliczanie as R
+
+    rec = R._kupon_leg_do_logu({
+        "mecz_id": 1, "mecz": "A – B", "kickoff_ts": 1, "podmiot": "A",
+        "rynek": "Rożne", "rynek_kod": "team_corners", "linia": 4.5,
+        "strona": "ponizej", "kurs": 1.85, "p_model": 0.55,
+        "kolejnosc": {"moc": 0.74, "kandydatow": 9},
+    })
+    assert rec.get("kolejnosc") == {"moc": 0.74, "kandydatow": 9}
