@@ -1082,6 +1082,10 @@ def _gid_365(rec: dict, cache: dict) -> int | None:
       1. napis w napis — najtańsze, zostaje jako pierwsze podejście,
       2. `scores365.ta_sama_druzyna` w oknie ±3 h wokół gwizdka, OBIE strony
          i wymóg JEDNOZNACZNOŚCI (dokładnie jeden mecz w oknie pasuje),
+     2b. JEDNA strona ostro (po tej samej roli) + wspólny człon drugiej,
+         dalej w oknie ±3 h i dalej z wymogiem jednoznaczności — bo „RB
+         Bragantino" i „Red Bull Bragantino" to ten sam klub, a zbiory słów
+         tego nie widzą (2026-08-17: 66 typów w jednym meczu Brasileirão),
       3. endpoint PER DRUŻYNA — jako jedyny sięga w głąb sezonu; ten per
          rozgrywki oddaje wyłącznie ostatnią kolejkę, więc mecz sprzed dwóch
          kolejek przestawał istnieć i typ czekał na dane, których nikt już
@@ -1127,6 +1131,37 @@ def _gid_365(rec: dict, cache: dict) -> int | None:
             if abs(g["ts"] - rec["kickoff_ts"]) < 3 * 3600
             and scores365.ta_sama_druzyna(g["home"], home)
             and scores365.ta_sama_druzyna(g["away"], away)
+        }
+        if len(pasujace) == 1:
+            gid = next(iter(pasujace))
+    if gid is None:
+        # ⚑ STOPIEŃ 2b: JEDNA STRONA OSTRO, DRUGA NA POTWIERDZENIE (2026-08-17).
+        # Athletico – Red Bull Bragantino (Brasileirão): 66 typów wisiało po
+        # gwizdku, choć mecz LEŻAŁ W PULI. Gospodarz pasował („athletico" ⊆
+        # „athletico paranaense"), ale gość już nie — u źródła „RB Bragantino",
+        # u nas „Red Bull Bragantino", a to ani równe, ani zawierające się
+        # zbiory słów. Stopień 2 wymaga OBU stron naraz, więc cały mecz przepadał.
+        #
+        # Trzy warunki naraz, każdy potrzebny:
+        #   * jedna strona dopasowana OSTRO (`ta_sama_druzyna`) i po TEJ SAMEJ
+        #     roli — gospodarz z gospodarzem, gość z gościem (kolejność mamy
+        #     z nazwy meczu). Bez roli „Estudiantes" trafiałoby w cudzy mecz,
+        #   * druga strona ma wspólny człon nazwy — słabo, ale niepusto,
+        #   * JEDNOZNACZNOŚĆ na całym oknie ±3 h, jak wyżej.
+        #
+        # Bezpieczeństwo stoi na tej samej zasadzie co `_gid_365_z_druzyny`:
+        # jedna drużyna nie gra dwóch meczów naraz, więc drużyna + godzina
+        # identyfikują mecz. Wspólny człon drugiej strony jest asekuracją na
+        # wypadek nazwy jednoczłonowej („Athletico", „Santos").
+        pasujace = {
+            g["id"] for g in cache["_wyniki"]
+            if abs(g["ts"] - rec["kickoff_ts"]) < 3 * 3600
+            and (
+                (scores365.ta_sama_druzyna(g["home"], home)
+                 and scores365.maja_wspolny_czlon(g["away"], away))
+                or (scores365.ta_sama_druzyna(g["away"], away)
+                    and scores365.maja_wspolny_czlon(g["home"], home))
+            )
         }
         if len(pasujace) == 1:
             gid = next(iter(pasujace))

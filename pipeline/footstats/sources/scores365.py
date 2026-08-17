@@ -549,6 +549,25 @@ def ta_sama_druzyna(a: str, b: str) -> bool:
     return False
 
 
+def maja_wspolny_czlon(a: str, b: str) -> bool:
+    """Czy nazwy mają choć jedno wspólne słowo tożsamości (albo jego rdzeń).
+
+    ⚑ REGUŁA SŁABA — NIE WOLNO jej używać samodzielnie do szukania meczu.
+    „Deportivo Riestra" i „Deportivo Recoleta" mają wspólne „deportivo", więc
+    sama w sobie wskazałaby inny klub ([[parowanie-nazw-druzyn]]).
+
+    Jedyne zastosowanie: POTWIERDZENIE drugiej strony meczu, którego pierwszą
+    stronę dopasowała już ostra `ta_sama_druzyna` w oknie ±3 h — patrz
+    `rozliczanie._gid_365`. Powód: „Red Bull Bragantino" u nas i „RB
+    Bragantino" u źródła nie mają równych ani zawierających się zbiorów słów
+    ({red, bull, bragantino} wobec {rb, bragantino}), a to ten sam klub.
+    """
+    ta, tb = _tokeny_tozsamosci(a), _tokeny_tozsamosci(b)
+    if not ta or not tb:
+        return False
+    return bool(ta & tb) or bool({_rdzen(t) for t in ta} & {_rdzen(t) for t in tb})
+
+
 def resolve_team_key(all_keys: set[str], team_name: str) -> str | None:
     """Klucz drużyny w statystykach meczu — po ZBIORACH SŁÓW, nie podobieństwie.
 

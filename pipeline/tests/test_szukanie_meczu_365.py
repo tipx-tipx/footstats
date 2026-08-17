@@ -77,6 +77,62 @@ def test_nie_bierze_sasiada_o_podobnej_nazwie(monkeypatch):
     assert rozliczanie._gid_365(rec, {}) is None
 
 
+# --- JEDNA STRONA OSTRO, DRUGA NA POTWIERDZENIE (2026-08-17) ---------------
+
+
+def test_znajduje_gdy_jedna_strona_zapisana_skrotem(monkeypatch):
+    """Athletico – Red Bull Bragantino: 66 typów wisiało po gwizdku, choć mecz
+    leżał w puli. Gospodarz pasował („athletico" ⊆ „athletico paranaense"),
+    ale gość nie: u źródła „RB Bragantino", u nas „Red Bull Bragantino" —
+    zbiory słów ani równe, ani zawierające się. Stopień 2 wymaga OBU stron.
+    """
+    ts = int(time.time()) - 20 * 3600
+    _bez_sieci(monkeypatch, gry=[
+        _gra(4700001, ts, "athletico paranaense", "rb bragantino"),
+    ])
+    rec = _rec("Athletico – Red Bull Bragantino", ts)
+    assert rozliczanie._gid_365(rec, {}) == 4700001
+
+
+def test_jedna_strona_nie_wystarczy_bez_wspolnego_czlonu(monkeypatch):
+    """Gość zgadza się co do joty, gospodarz to INNY klub z tego samego miasta.
+
+    Bez potwierdzenia drugiej strony samo „Barracas Central" o tej godzinie
+    wskazałoby mecz Recoleta i zamknęło typ cudzym wynikiem — nieodwracalnie.
+    """
+    ts = int(time.time()) - 20 * 3600
+    _bez_sieci(monkeypatch, gry=[
+        _gra(9, ts, "deportivo recoleta", "barracas central"),
+    ])
+    rec = _rec("Deportivo Riestra – Barracas Central", ts)
+    assert rozliczanie._gid_365(rec, {}) is None
+
+
+def test_jedna_strona_wymaga_jednoznacznosci(monkeypatch):
+    """Dwa mecze w oknie pasujące po jednej stronie = brak dopasowania."""
+    ts = int(time.time()) - 20 * 3600
+    _bez_sieci(monkeypatch, gry=[
+        _gra(1, ts, "athletico paranaense", "rb bragantino"),
+        _gra(2, ts + 900, "athletico paranaense b", "rb bragantino sub20"),
+    ])
+    rec = _rec("Athletico – Red Bull Bragantino", ts)
+    assert rozliczanie._gid_365(rec, {}) is None
+
+
+def test_role_druzyn_musza_sie_zgadzac(monkeypatch):
+    """Gospodarz porównuje się z gospodarzem, gość z gościem.
+
+    Bez tego nazwa jednoczłonowa trafiałaby w mecz tej samej drużyny granej
+    na wyjeździe — a statystyki przypisalibyśmy odwrotnym stronom.
+    """
+    ts = int(time.time()) - 20 * 3600
+    _bez_sieci(monkeypatch, gry=[
+        _gra(7, ts, "rb bragantino", "athletico paranaense"),
+    ])
+    rec = _rec("Athletico – Red Bull Bragantino", ts)
+    assert rozliczanie._gid_365(rec, {}) is None
+
+
 def test_zapas_siega_glebiej_niz_ostatnia_kolejka(monkeypatch):
     """Endpoint per rozgrywki oddaje tylko ostatnią kolejkę.
 
