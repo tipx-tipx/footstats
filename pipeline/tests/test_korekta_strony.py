@@ -189,3 +189,122 @@ def test_warstwa_jest_w_rejestrze():
     """Warstwa spoza rejestru może paść niezauważona — patrz nota tam."""
     assert "korekta_strony" in R.WARSTWY_UCZENIA
     assert "korekta_strony" in R.JEDNOSTKI_WARSTW
+
+
+# --- droga stempla: gdzie pole ginęło do 17.08 ---------------------------
+#
+# ⚑ ZMIERZONE NA PRODUKCJI 17.08, dobę po wdrożeniu warstwy: rejestr cyklu
+# pokazywał `korekta_strony OK, n=22`, delta była realnie nakładana na typy
+# drużynowe (team_cards|powyzej −0,499 przy delcie −0,497), a stempla NIE
+# MIAŁ ANI JEDEN z 302 typów zapisanych po wdrożeniu. Pole ustawiało się
+# w legu i ginęło na białych listach po drodze. Skutek nie jest kosmetyczny:
+# warstwa uczy się na `p_model` po zdjęciu WŁASNEJ delty, więc bez stempla
+# zdejmuje zero i nakłada korektę drugi raz w każdym cyklu.
+#
+# Testy niżej pilnują KAŻDEGO ogniwa tej drogi osobno. Trzy z nich czytają
+# źródło, bo warunki siedzą w środku funkcji na kilka tysięcy linii, której
+# nie da się zawołać bez całego cyklu (ten sam chwyt co w `test_publikacje`).
+
+def test_leg_kuponu_niesie_delte_strony():
+    """Rekord urodzony z lega bywa jedynym śladem po typie."""
+    rec = R._kupon_leg_do_logu({
+        "mecz_id": 1, "mecz": "A – B", "kickoff_ts": 1, "podmiot": "A",
+        "rynek": "Rożne", "rynek_kod": "team_corners", "linia": 4.5,
+        "strona": "ponizej", "kurs": 1.85, "p_model": 0.55,
+        "kal_strony": -0.211,
+    })
+    assert rec.get("kal_strony") == -0.211
+
+
+def test_biala_lista_publikacji_przenosi_delte():
+    """`rec_pewniaka`: co nie jest tu wymienione, ginie w drodze na stronę."""
+    import inspect
+    from footstats.jobs import build_wc_fast as B
+
+    zrodlo = inspect.getsource(B)
+    i = zrodlo.index('"rank_score": round(_atrakcyjnosc(b), 4)')
+    blok = zrodlo[i:i + 2500]
+    assert '"kal_strony"' in blok, (
+        "biała lista `rec_pewniaka` znowu gubi deltę korekty strony — "
+        "warstwa przestanie widzieć własny efekt i naliczy ją drugi raz"
+    )
+
+
+def test_wznowiony_typ_niesie_delte_strony():
+    """Wznowienie niesie `p` zamrożone Z deltą, więc i stempel musi jechać.
+
+    Rekord wznowionego typu bywa zakładany w księdze OD NOWA — odrodzenie
+    typu spoza listy dnia usuwa stary wpis (`_dopisz_nowe`). Bez stempla
+    taki rekord wraca z liczbą po korekcie i zerową deltą.
+    """
+    from footstats.jobs import build_wc_fast as B
+
+    typ = B._typ_z_logu({
+        "mecz_id": 1, "mecz": "A – B", "kickoff_ts": 1,
+        "podmiot_id": 5, "podmiot": "A", "podmiot_typ": "druzyna",
+        "rynek_kod": "team_corners", "rynek": "Rożne", "linia": 4.5,
+        "strona": "ponizej", "kurs": 1.85, "p_model": 0.55,
+        "kal_strony": -0.196, "pewnosc": "wysoka",
+    })
+    assert typ.get("kal_strony") == -0.196
+
+
+def test_typy_pomiarowe_niosa_delte_strony():
+    """Typy pomiarowe uczą warstwę na równi z publikowanymi.
+
+    Dwie trzecie próby zawodniczej to odrzucenia przy progu — rekord bez
+    stempla zaniża zdjętą deltę w całej grupie.
+    """
+    import inspect
+    from footstats.jobs import build_wc_fast as B
+
+    zrodlo = inspect.getsource(B)
+    szt = zrodlo.count("odrzucone_pomiar.append(")
+    assert szt >= 2, "zmieniła się liczba ścieżek pomiarowych — sprawdź test"
+    for i in range(szt):
+        start = -1
+        for _ in range(i + 1):
+            start = zrodlo.index("odrzucone_pomiar.append(", start + 1)
+        blok = zrodlo[start:start + 2200]
+        assert '"kal_strony"' in blok, (
+            f"{i + 1}. ścieżka typów pomiarowych nie stempluje delty strony"
+        )
+
+
+def test_pula_zawodnicza_liczy_p_ta_sama_delta_co_okazja():
+    """Jeden zakład — jedna szansa (naprawa `4b132e5` z 13.08).
+
+    Okazja zawodnicza jedzie z `assess`, które nakłada deltę na `p` wybranej
+    strony. Pula liczyła `p` wprost z `sm.p_over`, czyli sprzed tej warstwy,
+    więc ten sam zakład miał od 16.08 dwie różne szanse: jedną na karcie,
+    drugą w legu kuponu.
+    """
+    import inspect
+    from footstats.jobs import build_wc_fast as B
+
+    zrodlo = inspect.getsource(B)
+    i = zrodlo.index("p_side = sm.p_over if side_key")
+    blok = zrodlo[i:i + 1200]
+    assert "delta_strony(korekta_stron" in blok, (
+        "pula zawodnicza znowu liczy `p` sprzed korekty strony — leg kuponu "
+        "i karta pokażą różne szanse dla tego samego zakładu"
+    )
+    assert "_z_delta(p_side" in blok
+
+
+def test_ta_sama_formula_w_puli_i_w_assess():
+    """Formuła nakładania delty musi być JEDNA — inaczej liczby się rozjadą."""
+    conf = betting.ConfidenceInputs(
+        effective_matches=10.0, minutes_certainty=0.9, ci_width=0.10,
+        context_magnitude=0.05, market_calibrated=True, is_rare_market=False,
+    )
+    kor = {"shots|powyzej": -0.25}
+    res = betting.assess(0.62, 1.85, 3.20, conf, lam=2.0,
+                         korekta_strony=kor, rynek_kod="shots")
+    a = next((x for x in res if x.side == "powyzej"), None)
+    assert a is not None, "przy tym kursie strona ma przechodzić progi"
+    z_puli = betting._z_delta(0.62, betting.delta_strony(kor, "shots", "powyzej"))
+    assert abs(a.model_prob - round(z_puli, 4)) < 1e-4, (
+        "pula i `assess` liczą deltę inaczej — to wraca do dwóch szans "
+        "dla jednego zakładu"
+    )

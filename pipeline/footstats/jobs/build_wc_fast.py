@@ -275,6 +275,13 @@ def _typ_z_logu(rec: dict) -> dict:
         "rotacja": bool(rec.get("rotacja")),
         "miekka_linia": bool(rec.get("miekka_linia")),
         "opublikowano_ts": rec.get("opublikowano_ts"),
+        # DELTA KOREKTY STRONY JEDZIE Z TYPEM (2026-08-17). `p_model` wyżej
+        # jest zamrożone przy publikacji, czyli NIESIE tę deltę — a rekord
+        # wznowionego typu bywa zakładany w księdze od nowa (odrodzenie spoza
+        # listy dnia, patrz `rozliczanie._dopisz_nowe`). Bez tego pola taki
+        # rekord wraca do księgi bez stempla, choć jego liczba jest po
+        # korekcie: warstwa zdjęłaby wtedy zero i naliczyła deltę drugi raz.
+        **({"kal_strony": rec["kal_strony"]} if rec.get("kal_strony") else {}),
         "wznowiony": True, "uproszczony": True,
     }
 
@@ -5152,6 +5159,11 @@ def _main_impl(tryb=None):
                     "linia": l, "strona": "powyzej",
                     "kurs": od.get("odds"), "bukmacher": "Superbet",
                     "p_model": od.get("p_model"),
+                    # `p_model` z `assess` jest po korekcie strony — stempel
+                    # jedzie razem z liczbą (2026-08-17), inaczej warstwa uczy
+                    # się na własnym efekcie
+                    **({"kal_strony": od["kal_strony"]}
+                       if od.get("kal_strony") else {}),
                     "pewnosc": "wysoka" if (sm.ci_high - sm.ci_low) <= 0.18
                     else "srednia",
                     "sugestia": False,
@@ -5188,6 +5200,19 @@ def _main_impl(tryb=None):
                     continue
                 odd = sv[0]
                 p_side = sm.p_over if side_key == "over" else 1.0 - sm.p_over
+                # ⚑ TA SAMA SZANSA W PULI CO NA LIŚCIE (2026-08-17).
+                # `assess` nakłada korektę strony na `p` WYBRANEJ strony, więc
+                # okazja zawodnicza jedzie z nią, a pula liczyła `p` wprost
+                # z `sm.p_over`, czyli sprzed tej warstwy. Ten sam zakład miał
+                # od 16.08 dwie różne szanse: jedną na karcie, drugą w legu
+                # kuponu — czyli regresję naprawy `4b132e5` („jeden zakład —
+                # jedna szansa", 13.08, różnica wynosiła wtedy ~10 pp).
+                # Delta wchodzi PRZED bramami puli, tak samo jak w `assess`
+                # i w pętli drużynowej.
+                _d_strony_p = betting.delta_strony(korekta_stron, mk, side_pl)
+                if _d_strony_p:
+                    p_side = betting._z_delta(p_side, _d_strony_p)
+                    _licznik_korekty_stron[f"{mk}|{side_pl}"] += 1
                 implied = betting.implied_prob_one_sided(odd)
                 # pełne pokrycie p_model (PRZED filtrami puli/okazji) — do STS
                 model_pokrycie.append({
@@ -5305,6 +5330,9 @@ def _main_impl(tryb=None):
                         "rynek_kod": mk, "rynek": MARKET_NAMES_PL[mk], "linia": l,
                         "strona": side_pl, "kurs": odd,
                         "bukmacher": sv[1], "p_model": round(p_side, 4),
+                        # delta korekty strony nałożona na `p_side` wyżej —
+                        # stempel jedzie razem z liczbą (2026-08-17)
+                        "kal_strony": round(_d_strony_p, 4),
                         "ev_pct": ev_pct_leg, "ev_netto": ev_netto_leg,
                         "ev_uk": ev_uk_leg, "kurs_ref": kurs_ref_leg,
                         # ta sama formuła co w value_bets (spójne z pewnosc_score
@@ -6425,6 +6453,11 @@ def _main_impl(tryb=None):
                                 "sugestia": False,
                                 "odrzucony": True,
                                 "odrzucenie_powod": powod_w,
+                                # delta korekty strony jest już W `p_t` powyżej
+                                # (2026-08-17). Typ pomiarowy uczy warstwę tak
+                                # samo jak publikowany, więc bez stempla
+                                # warstwa policzyłaby swoją deltę drugi raz.
+                                "kal_strony": round(_d_strony_t, 4),
                             })
                         continue
                     if (hi_t - lo_t) > 0.35:
@@ -6941,6 +6974,33 @@ def _main_impl(tryb=None):
                         if not kurs_s or float(kurs_s) <= 1.0:
                             continue
                         kurs_s = float(kurs_s)
+                        # ⚑ KOREKTA STRONY DLA SUM MECZOWYCH (2026-08-17).
+                        # Warstwa weszła 16.08 i liczyła delty także dla
+                        # `match_*`, ale TA ścieżka ich nie dostawała — czyli
+                        # znów jeden rynek jechał na innym zestawie warstw niż
+                        # reszta, dokładnie jak przed 12.08. Zmierzone 0 na
+                        # produkcji: 50 typów `match_corners`, 19 `match_cards`
+                        # i 9 `match_sot` z zerową deltą.
+                        #
+                        # Test out-of-sample (delty z I połowy, sprawdzone na
+                        # II, 409 rozliczeń w teście):
+                        #     dziś             luka -9,1 pp   Brier 0,2303
+                        #     + korekta strony luka -5,0 pp   Brier 0,2257
+                        #
+                        # ⚑ Po tej korekcie „poniżej" NIE jest już dokładnym
+                        # dopełnieniem „powyżej" na tym rynku — i to jest sens
+                        # warstwy, nie usterka: przeszacowane są OBIE strony,
+                        # więc jedna delta na `p_over` nie może naprawić obu
+                        # (patrz nota przy `rozliczanie.korekta_strony`).
+                        # Warstwy na `p_over` wyżej komplementarność zachowują.
+                        _d_strony_s = betting.delta_strony(
+                            korekta_stron, kod_s, strona_s
+                        )
+                        if _d_strony_s:
+                            p_s = betting._z_delta(p_s, _d_strony_s)
+                            _licznik_korekty_stron[
+                                f"{kod_s}|{strona_s}"
+                            ] += 1
                         ev_s = betting.ev_brutto_pct(p_s, kurs_s)
                         if ev_s < betting.MIN_EV_PCT:
                             continue
@@ -6958,6 +7018,12 @@ def _main_impl(tryb=None):
                             lo_s, hi_s = lo_o_s, hi_o_s
                         else:
                             lo_s, hi_s = 1.0 - hi_o_s, 1.0 - lo_o_s
+                        if _d_strony_s:
+                            # przedział musi jechać w tej samej skali co `p`,
+                            # inaczej brama „p ostrożne" rozwadnia korektę
+                            # (ta sama poprawka co w pętli drużynowej, 27.07)
+                            lo_s = betting._z_delta(lo_s, _d_strony_s)
+                            hi_s = betting._z_delta(hi_s, _d_strony_s)
                         if hi_s - lo_s > betting.MAX_CI_WIDTH:
                             odpadki_nowe["suma: szeroki przedzial"] += 1
                             continue
@@ -6995,6 +7061,10 @@ def _main_impl(tryb=None):
                             "linia": float(linia_s), "strona": strona_s,
                             "kurs": float(kurs_s), "bukmacher": "Superbet",
                             "p_model": round(p_s, 4),
+                            # delta korekty strony nałożona wyżej — stempel
+                            # jedzie z liczbą, inaczej warstwa naliczy ją
+                            # drugi raz (2026-08-17)
+                            "kal_strony": round(_d_strony_s, 4),
                             "p_rynku": betting.implied_prob_one_sided(
                                 float(kurs_s)),
                             "fair_kurs": round(1.0 / max(p_s, 1e-6), 3),
@@ -7367,6 +7437,17 @@ def _main_impl(tryb=None):
                if b.get("udzial_priora") is not None else {}),
             **({"kal_rynek": b["kal_rynek"]}
                if b.get("kal_rynek") is not None else {}),
+            # ⚑ DELTA KOREKTY STRONY (dopięte 2026-08-17). Warstwa weszła
+            # 16.08 i pole było ustawiane w legu, ale TU go nie wymieniono —
+            # więc ginęło dokładnie tak, jak ostrzega komentarz wyżej: żaden
+            # z 302 typów zapisanych po wdrożeniu nie miał stempla.
+            # To nie jest brak kosmetyczny. `korekta_strony` uczy się na
+            # `p_model` PO ZDJĘCIU WŁASNEJ delty ze stempla — bez stempla
+            # zdejmuje zero, czyli liczy deltę od nowa na już ściągniętej
+            # liczbie i nakłada ją DRUGI RAZ w każdym cyklu (dryf do capa
+            # −1,2). Ta sama pułapka, która trzyma `compute_bias_full` na
+            # zamrożonej mapie.
+            **({"kal_strony": b["kal_strony"]} if b.get("kal_strony") else {}),
             **({"rachunek": b["rachunek"]} if b.get("rachunek") else {}),
             **({"kal_tau": b["kal_tau"]} if b.get("kal_tau") else {}),
             "czynniki": b.get("czynniki", {}),

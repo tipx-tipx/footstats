@@ -1058,6 +1058,11 @@ def assess(
                 odrzucone_out.append({
                     "side": side, "powod": powody[0][0],
                     "p_model": round(p_model, 4),
+                    # `p_model` wyżej jest JUŻ po korekcie strony, więc delta
+                    # musi jechać razem z nim (2026-08-17): typ pomiarowy uczy
+                    # `korekta_strony` na równi z publikowanym, a bez stempla
+                    # warstwa nie potrafi zdjąć własnego efektu.
+                    "kal_strony": round(d_strony, 4),
                     "implied": round(implied, 4), "odds": odds,
                     "ev_pct": round(ev, 2),
                     "ev_netto": round(ev_netto, 2),

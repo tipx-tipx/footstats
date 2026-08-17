@@ -492,6 +492,12 @@ def _kupon_leg_do_logu(l: dict) -> dict:
         # stempla cały strumień kuponowy byłby dla pomiaru ślepy.
         **({"rachunek": l["rachunek"]}
            if isinstance(l.get("rachunek"), dict) and l["rachunek"] else {}),
+        # ...oraz delta korekty strony (2026-08-17). Bez niej warstwa nie
+        # widzi własnego efektu na rekordach urodzonych z lega — a to bywa
+        # jedyny ślad po typie, który nie wszedł na listę. Skutek byłby
+        # dokładnie taki, jak przy braku stempla w `rec_pewniaka`: korekta
+        # naliczana drugi raz w każdym cyklu.
+        **({"kal_strony": l["kal_strony"]} if l.get("kal_strony") else {}),
     }
 
 
@@ -2161,11 +2167,25 @@ KOREKTA_STRUMIENIA_TLUMIENIE = 0.5
 #   * wchodzi w `betting.assess`, czyli PRZED liczeniem wartości i przed
 #     bramami — inaczej poprawiłaby liczbę na karcie, a nie selekcję.
 #
-# ⚑ Uczymy na `rachunek.p_over_raw` (stempel od 12.08), czyli na liczbie
-# sprzed WSZYSTKICH warstw. Dzięki temu warstwa nie widzi własnego efektu
-# i nie ma się z czym oscylować — w odróżnieniu od `compute_bias_full`,
-# które uczy się na `p_model` z własną deltą w środku.
+# ⚑ UCZYMY TAM, GDZIE NAKŁADAMY: na `p_model` po zdjęciu WŁASNEJ delty ze
+# stempla `kal_strony` (patrz `_p_typu_przed_ta_warstwa`). Pierwsza wersja
+# liczyła to na `rachunek.p_over_raw`, czyli na liczbie sprzed wszystkich
+# warstw — a nakładała deltę na `p` już przez nie przetworzone, więc korekta
+# wchodziłaby dwa razy. Test out-of-sample to złapał.
+#
+# ⚑ CAŁA TA KONSTRUKCJA STOI NA STEMPLU. Bez `kal_strony` w rekordzie warstwa
+# zdejmuje zero, czyli liczy deltę od nowa na liczbie, którą sama już
+# ściągnęła, i nakłada ją drugi raz w każdym cyklu — dryf do capa. Zmierzone
+# 17.08: 0 z 302 typów zapisanych po wdrożeniu miało stempel, bo pole ginęło
+# na białych listach pól (`rec_pewniaka`, `_kupon_leg_do_logu`, `_typ_z_logu`,
+# typy pomiarowe). Czujnik siedzi w części 2 `audyt_uczenia.py` — pokazuje
+# udział rozliczeń ze stemplem obok każdej pary.
 KOREKTA_STRONY_OKNO = 300      # ostatnie N rozliczeń pary (rynek, strona)
+# Od kiedy typ MÓGŁ dostać deltę (wdrożenie warstwy, commit 0c56f16).
+# Rozliczenia starszych typów nie mają stempla i mieć go nie mogą — bez tej
+# granicy czujnik pokrycia świeciłby fałszywym alarmem przez cały czas,
+# aż okno 300 się wymieni.
+KOREKTA_STRONY_WDROZONA_TS = 1786899780   # 2026-08-16 19:03 czasu polskiego
 KOREKTA_STRONY_MIN_N = 30      # poniżej — para jedzie na delcie rynku
 KOREKTA_STRONY_MIN_N_RYNEK = 60  # ...a bez tego rynek nie ma własnej delty
 KOREKTA_STRONY_CAP = (-1.20, 0.30)

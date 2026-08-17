@@ -99,6 +99,36 @@ def rozliczone(log: dict, R) -> list[dict]:
     ]
 
 
+def settled_do_stempla(log: dict, R) -> list[dict]:
+    """Rozliczenia, NA KTÓRYCH uczy się `korekta_strony` — jej własne okno.
+
+    Te same filtry i to samo okno co w `rozliczanie.korekta_strony`, bo
+    pytanie „ile z nich niesie stempel" ma sens tylko na tym zbiorze.
+    Rozliczenie spoza okna nie wpływa już na deltę.
+    """
+    kandydaci = [
+        r for r in log.values()
+        if r.get("wynik") in ("wygrany", "przegrany")
+        and not r.get("sugestia")
+        and r.get("rynek_kod") not in R.RYNKI_OSOBNE
+        and r.get("strona") in ("powyzej", "ponizej")
+        and r.get("p_model")
+        and R._z_modelu(r)
+        and R._z_biezacej_epoki(r) and not R._z_martwej_epoki(r)
+        # ...i opublikowany PO wdrożeniu warstwy. Starszy typ stempla mieć
+        # nie mógł, więc liczony do pokrycia zamieniłby czujnik w stałą
+        # czerwoną lampkę na kilka tygodni (okno to 300 rozliczeń na parę).
+        and float(r.get("opublikowano_ts") or 0) >= R.KOREKTA_STRONY_WDROZONA_TS
+    ]
+    po_parze: dict[str, list[dict]] = defaultdict(list)
+    for r in sorted(kandydaci, key=lambda r: r.get("kickoff_ts") or 0):
+        po_parze[f'{r["rynek_kod"]}|{r["strona"]}'].append(r)
+    out: list[dict] = []
+    for grp in po_parze.values():
+        out.extend(grp[-R.KOREKTA_STRONY_OKNO:])
+    return out
+
+
 def czesc1_strumienie(settled: list[dict], R) -> None:
     print("=" * 78)
     print("1. CZY KAŻDY STRUMIEŃ MA Z CZEGO SIĘ UCZYĆ")
@@ -148,6 +178,47 @@ def czesc2_warstwy(log: dict, R) -> None:
                       f"   (+{len(biny)} przedziałów)")
             else:
                 print(f"   {NAZWY_STRUMIENI.get(k, k):<12} {v:+.3f}")
+    except Exception as e:
+        print(f"   BŁĄD: {e}")
+
+    # ⚑ KOREKTA STRONY ZAKŁADU — z POKRYCIEM STEMPLEM (dopięte 2026-08-17).
+    # Warstwa weszła 16.08 i audytu nie widziała wcale, a to ona najbardziej
+    # go potrzebuje: uczy się na `p_model` po zdjęciu WŁASNEJ delty ze stempla
+    # `kal_strony`. Gdy stempel nie dojeżdża (a nie dojeżdżał — 0 z 302 typów
+    # zapisanych po wdrożeniu), warstwa zdejmuje zero, liczy deltę od nowa na
+    # już ściągniętej liczbie i nakłada ją drugi raz w każdym cyklu. Sama
+    # tabela delt tego NIE POKAŻE — dlatego obok każdej pary stoi udział
+    # rozliczeń ze stemplem.
+    print("\nKOREKTA STRONY ZAKŁADU (Δlogit na p WYBRANEGO zakładu):")
+    try:
+        kor_s = R.korekta_strony(log)
+        if not kor_s:
+            print("   PUSTA — żadna para (rynek, strona) nie zebrała progu "
+                  f"{R.KOREKTA_STRONY_MIN_N} / rynek {R.KOREKTA_STRONY_MIN_N_RYNEK}")
+        # ile rozliczeń, z których warstwa się uczy, niesie stempel własnej delty
+        ze_stemplem: dict[str, list[int]] = {}
+        for r in settled_do_stempla(log, R):
+            k = f'{r.get("rynek_kod")}|{r.get("strona")}'
+            para = ze_stemplem.setdefault(k, [0, 0])
+            para[1] += 1
+            if r.get("kal_strony") is not None:
+                para[0] += 1
+        for k, v in sorted(kor_s.items(), key=lambda x: x[1]):
+            ma, ile = ze_stemplem.get(k, (0, 0))
+            udzial = f"{ma}/{ile}" if ile else "brak rozliczeń od wdrożenia"
+            alarm = ""
+            if ile and ma == 0:
+                alarm = "  ⚑ BEZ STEMPLA — delta naliczy się DRUGI RAZ"
+            elif ile and ma < ile // 2:
+                alarm = "  ⚑ stempel u mniejszości rozliczeń"
+            print(f"   {k:<28} {v:+.3f}   stempel {udzial}{alarm}")
+        braki = sum(1 for k in kor_s
+                    if ze_stemplem.get(k, (0, 0))[1]
+                    and ze_stemplem.get(k, (0, 0))[0] == 0)
+        if braki:
+            print(f"   ⚑⚑ {braki} z {len(kor_s)} par uczy się na rozliczeniach "
+                  "BEZ stempla własnej delty — patrz białe listy pól "
+                  "(`rec_pewniaka`, `_kupon_leg_do_logu`, typy pomiarowe)")
     except Exception as e:
         print(f"   BŁĄD: {e}")
 

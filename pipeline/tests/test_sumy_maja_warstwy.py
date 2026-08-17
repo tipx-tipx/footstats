@@ -80,6 +80,45 @@ def test_korekta_realnie_rusza_liczbe():
     assert abs(apply_bias(_dodaj_delte(BIAS, KOREKTA), p_sur) - p_sur) > 0.05
 
 
+def test_suma_dostaje_korekte_strony():
+    """⚑ SUMY MECZOWE PRZECHODZĄ TEŻ PRZEZ KOREKTĘ STRONY (2026-08-17).
+
+    Warstwa `korekta_strony` weszła 16.08 i liczyła delty również dla
+    `match_*`, ale ta ścieżka ich nie dostawała — czyli znów jeden rynek
+    jechał na innym zestawie warstw niż reszta, dokładnie ten błąd, który
+    naprawiano 12.08. Zmierzone na produkcji 17.08: 50 typów `match_corners`,
+    19 `match_cards`, 9 `match_sot` z zerową deltą.
+
+    Test out-of-sample, 409 rozliczeń w teście:
+        dziś              luka -9,1 pp   Brier 0,2303
+        + korekta strony  luka -5,0 pp   Brier 0,2257
+
+    Delta wchodzi PRZED bramą EV i przed widełkami, na `p` wybranej strony —
+    inaczej poprawiałaby liczbę na karcie, a selekcja dalej wybierałaby po
+    szansie zawyżonej.
+    """
+    import inspect
+
+    from footstats.jobs import build_wc_fast as B
+
+    zrodlo = inspect.getsource(B)
+    i = zrodlo.index('kod_s = "match_" + baza_n')
+    blok = zrodlo[i:i + 13000]
+    assert "delta_strony(" in blok and "korekta_stron" in blok, (
+        "ścieżka sum meczowych znowu omija korektę strony"
+    )
+    # ...i to PRZED bramą EV, nie po niej
+    j = blok.index("delta_strony(")
+    k = blok.index("if ev_s < betting.MIN_EV_PCT")
+    assert j < k, (
+        "korekta strony wchodzi po bramie EV — wtedy poprawia tylko liczbę "
+        "na karcie, a selekcja jedzie po szansie zawyżonej"
+    )
+    assert '"kal_strony": round(_d_strony_s, 4)' in blok, (
+        "typ sumy meczowej bez stempla delty — warstwa naliczy ją drugi raz"
+    )
+
+
 def test_kto_wiecej_nie_dostaje_delty():
     """„Kto więcej" to TRÓJMIAN — delta na jedną nogę rozerwałaby sumę do 1.
 
