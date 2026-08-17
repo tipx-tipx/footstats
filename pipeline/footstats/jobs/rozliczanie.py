@@ -536,6 +536,69 @@ def _delta_stempla(b: dict) -> float:
 
 
 POWOD_BRAK_DANYCH = "brak danych źródła"
+POWOD_MECZ_ODWOLANY = "mecz przełożony lub odwołany"
+
+# Statusy statshub, po których meczu w tym terminie NIE BYŁO i nie będzie.
+# `suspended` i `interrupted` świadomie POZA listą — mecz przerwany bywa
+# dokończony i wtedy statystyki dochodzą normalnie.
+_STATUSY_BEZ_MECZU = ("postponed", "canceled", "cancelled", "abandoned")
+# Bezpiecznik kosztu: tyle meczów pytamy o status w jednym przebiegu.
+LIMIT_PYTAN_O_STATUS = 40
+
+
+def _zamknij_odwolane_mecze(log: dict, now: int) -> None:
+    """Typ na mecz, którego NIE BYŁO, zamyka się od razu — nie po tygodniu.
+
+    ⚑ ZNALEZIONE 17.08. Celta Vigo – Osasuna: typy powstały 12.08 na mecz
+    z 16.08, mecz został PRZEŁOŻONY, a w całym kodzie nie było ani jednego
+    miejsca rozpoznającego przełożenie. Skutek: typ wisiał klientowi na
+    stronie do gwizdka, którego nie było, przez siedem dni ciągnął się
+    w „typach czekających na dane", a potem zamykał się jako „brak danych
+    źródła" — czyli w statystyce nie do odróżnienia od meczu, którego
+    statystyk nie umieliśmy pobrać.
+
+    Pytamy RAZ na mecz i stemplujemy rekordy (`status_zrodla_spr`), żeby nie
+    dokładać zapytania w każdym cyklu. Stempel stawiamy wyłącznie przy
+    statusie OSTATECZNYM — dla `notstarted` (mecz się opóźnia) pytamy dalej.
+
+    Nie rusza `mecze_przyszle`: mecz przełożony NA NOWY TERMIN i ponownie
+    typowany zamknie się tu jako zwrot dla starego wpisu, a nowy typ ma
+    własny `mecz_id` i własny kickoff.
+    """
+    czekaja: dict[int, list[dict]] = {}
+    for rec in log.values():
+        if rec.get("wynik") or not rec.get("kickoff_ts"):
+            continue
+        if now - int(rec["kickoff_ts"]) < MECZ_KONIEC_PO_S:
+            continue
+        if rec.get("status_zrodla_spr") or not rec.get("mecz_id"):
+            continue
+        czekaja.setdefault(int(rec["mecz_id"]), []).append(rec)
+    if not czekaja:
+        return
+    pominiete = max(0, len(czekaja) - LIMIT_PYTAN_O_STATUS)
+    zamkniete = 0
+    mecze = 0
+    for mid in list(czekaja)[:LIMIT_PYTAN_O_STATUS]:
+        st = statshub.status_meczu(mid)
+        if st is None:
+            continue
+        if st in _STATUSY_BEZ_MECZU:
+            for rec in czekaja[mid]:
+                rec.update(wynik="zwrot", faktyczna=None, rozliczono_ts=now,
+                           powod=POWOD_MECZ_ODWOLANY, status_zrodla_spr=True)
+            zamkniete += len(czekaja[mid])
+            mecze += 1
+        elif st == "finished":
+            for rec in czekaja[mid]:
+                rec["status_zrodla_spr"] = True
+    if zamkniete or pominiete:
+        print(
+            f"Mecze, których nie było: {mecze} meczów, {zamkniete} typów "
+            f"zamkniętych jako zwrot"
+            + (f"; meczów niesprawdzonych w tym przebiegu: {pominiete}"
+               if pominiete else "")
+        )
 
 
 def _nierozstrzygniete(log: dict) -> dict:
@@ -5379,6 +5442,8 @@ def rozlicz(
                 mecze_przyszle.add(l["mecz"])
 
     _snapshot_zamkniecia(log, value_bets, kupony_list or [], now)
+    # mecz, którego nie było, zamykamy ZANIM zaczniemy szukać jego statystyk
+    _zamknij_odwolane_mecze(log, now)
 
     for rec in log.values():
         if rec.get("wynik") or now - rec["kickoff_ts"] < MECZ_KONIEC_PO_S:

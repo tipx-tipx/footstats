@@ -43,6 +43,14 @@ STATTYPE_MAP = {
 }
 
 
+# Odstęp między ponowieniami (rośnie z próbą: 1× i 2×). Wyciągnięte do stałej
+# 2026-08-17, żeby testy mogły wyzerować SAM CZAS, nie liczbę prób — dokładnie
+# jak `supa.PRZERWY_S`. Bez tego zestaw płacił 9 s za każdy mecz, o którego
+# status pytamy przez zaślepioną sieć (zapora z conftest rzuca wyjątkiem,
+# a każdy wyjątek wygląda tu jak awaria źródła).
+PAUZA_PONOWIENIA_S = 3
+
+
 def _get(url: str, timeout: int = 25, retries: int = 3) -> dict:
     """GET z retry — statshub bywa chwilowo wolny/niedostępny (zwłaszcza z chmury)."""
     import time as _t
@@ -55,7 +63,7 @@ def _get(url: str, timeout: int = 25, retries: int = 3) -> dict:
             return r.json()
         except Exception as e:  # timeout, 5xx, itp.
             last = e
-            _t.sleep(3 * (attempt + 1))
+            _t.sleep(PAUZA_PONOWIENIA_S * (attempt + 1))
     raise last
 
 
@@ -773,6 +781,35 @@ def fetch_event_result(event_id: int) -> dict | None:
         "away_goals": float(ag),
         "extra_time": bool(extra),
     }
+
+
+def status_meczu(event_id: int) -> str | None:
+    """Status meczu u źródła: `finished`, `notstarted`, `postponed`, `canceled`.
+
+    ⚑ PO CO OSOBNO OD `fetch_event_result` (2026-08-17). Tamta zwraca None
+    ZARÓWNO dla meczu przełożonego, jak i dla meczu, którego statystyki po
+    prostu jeszcze nie doszły — a to dwie zupełnie różne sytuacje. Druga mija
+    sama w kolejnym cyklu, pierwsza NIE MINIE NIGDY: meczu nie było, więc typ
+    czeka do siedmiodniowego terminu i dopiero wtedy zamyka się jako „brak
+    danych źródła", choć od początku wiadomo było, że danych nie będzie.
+
+    Zmierzone 17.08: 14 typów na dwóch przełożonych meczach (Celta Vigo –
+    Osasuna, Independiente Santa Fe – River Plate), 5 z nich klient widział
+    na stronie. Do tego dnia w całym kodzie nie było ani jednego miejsca,
+    które rozpoznawałoby przełożenie.
+    """
+    try:
+        d = _get(f"{BASE}/event/{event_id}")
+    except Exception as e:
+        # status meczu — bez niego typ czeka na dane, których może nie być
+        diagnostyka.cichy("statshub", "status_meczu", e)
+        return None
+    root = d.get("data", d) or {}
+    ev = root.get("events")
+    ev = (ev[0] if isinstance(ev, list) and ev else ev) or {}
+    if not isinstance(ev, dict):
+        return None
+    return str(ev.get("status") or "").lower() or None
 
 
 def player_shots_from_shotmap(event_id: int) -> dict[str, dict] | None:

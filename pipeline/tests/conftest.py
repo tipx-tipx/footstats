@@ -107,4 +107,11 @@ def _sieciowa_zapora(request, monkeypatch):
     # ponowień przestałyby pilnować tego, po co powstały.
     from footstats import supa
     monkeypatch.setattr(supa, "PRZERWY_S", (0, 0))
+    # TO SAMO DLA ŹRÓDEŁ (2026-08-17). `statshub._get` ponawia trzy razy ze snem
+    # 3 i 6 s, więc każdy mecz, o którego status pyta rozliczanie przez
+    # zaślepioną sieć, kosztował zestaw 9 sekund — 13 s urosło do 5 minut.
+    # Zerujemy sam odstęp; liczba prób zostaje, żeby testy ponowień dalej miały
+    # czego pilnować.
+    from footstats.sources import statshub
+    monkeypatch.setattr(statshub, "PAUZA_PONOWIENIA_S", 0)
     yield
