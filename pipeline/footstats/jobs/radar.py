@@ -40,7 +40,9 @@ from ..model import context as context_mod
 from ..model import counts as counts_mod
 from ..model import kontekst_drabinki as kd
 from ..model import tempo as tempo_mod
+from ..model import uczony
 from ..sources import betclic, statshub, superbet
+from .. import diagnostyka
 
 # --- progi detektorów ---
 OKNO_TRANSFER = 15          # ile ostatnich meczów historii patrzymy na ligi
@@ -819,6 +821,7 @@ def _rynki_wpisu(
     korekta_logit: float = 0.0,
     diag: Counter | None = None,
     zrodla: dict[str, dict[str, str]] | None = None,
+    wagi_modelu: dict | None = None,
 ) -> list[dict]:
     """Sekcja `rynki` wpisu: przycięta drabinka kursów + pokrycie linii
     w ostatnich występach + forma i PEŁNY kontekst meczu per rynek.
@@ -900,6 +903,41 @@ def _rynki_wpisu(
                 "linia": linia, "kurs": kurs,
                 "p_model": round(p, 3) if p is not None else None,
             }
+            # ⚑ DRUGA LICZBA Z MODELU UCZONEGO (2026-08-17) — liczona OBOK
+            # rachunku drabinki i nie wpływająca na wybór ani kolejność kart.
+            # Drabinki stoją na pokryciu Wilsona przemnożonym przez mnożniki
+            # kontekstu, czyli na jeszcze innym rachunku niż silnik zawodniczy
+            # — a to właśnie ta klasa różnic kosztowała nas najwięcej
+            # (jeden strumień, jeden zestaw warstw, patrz
+            # [[model-nie-ma-pamieci-druzyn]]). Stempel pozwoli porównać oba
+            # na TYCH SAMYCH szczeblach, po rozliczeniu.
+            if wagi_modelu and tr is not None:
+                try:
+                    _pu = uczony.prognoza_zawodnika(
+                        wagi_modelu,
+                        {
+                            "counts": list(tr.counts or []),
+                            "minutes": list(tr.minutes or []),
+                            "timestamps": list(tr.timestamps or []),
+                            "started": list(tr.started or []),
+                            "game_positions": list(tr.game_positions or []),
+                            "league_average": tr.league_average,
+                            "opponent_average": tr.opponent_average,
+                            "is_home": bool(tr.is_home),
+                        },
+                        mk, linia, "powyzej",
+                        oczekiwane_minuty=minuty_proj,
+                        do_ts=teraz or None,
+                    )
+                except Exception as e:                          # noqa: BLE001
+                    diagnostyka.cichy("radar", "model_uczony", e)
+                    _pu = None
+                if _pu:
+                    szczebel["p_uczony"] = _pu
+                    if diag is not None:
+                        diag["model_uczony_policzony"] += 1
+                elif diag is not None:
+                    diag["model_uczony_bez_pokrycia"] += 1
             # u kogo ta cena jest do wzięcia — zapisujemy tylko wtedy, gdy to
             # NIE Superbet, więc front ma domyślną nazwę i nie musi jej znać
             _kto = ((zrodla or {}).get(mk) or {}).get(str(linia)) \
@@ -1320,6 +1358,9 @@ def _oceń_karte(
                 "p_final": p_final,
                 "p_bazowe": s.get("p_bazowe"),
                 "korekta": s.get("korekta"),
+                # druga liczba z modelu uczonego dla TEGO szczebla — biała
+                # lista pól karty, bez tego stempel ginie po drodze
+                **({"p_uczony": s["p_uczony"]} if s.get("p_uczony") else {}),
                 # NA CZYM STOI TA LINIA — CZTERY różne dowody, cztery nazwy.
                 # Kolejność od najmocniejszego: własna przewaga, mocna seria,
                 # różnica między cennikami, a na końcu samo pokrycie.
@@ -1359,6 +1400,12 @@ def _oceń_karte(
                 # rozliczeniach porównać obie deklaracje z tą samą prawdą.
                 "drugi_p_bazowe": (nast or {}).get("p_bazowe"),
                 "drugi_korekta": (nast or {}).get("korekta"),
+                # DRUGA LICZBA z modelu uczonego dla OBU szczebli (2026-08-17).
+                # Hero niesie ją pod `p_uczony` (kopiowane ze szczebla niżej),
+                # a następnik pod `drugi_p_uczony` — bez tego drugi szczebel
+                # byłby jedynym miejscem produktu bez porównania rachunków,
+                # a to on jest „celem polowania" na karcie.
+                "drugi_p_uczony": (nast or {}).get("p_uczony"),
             }
             # OCENA KARTY LICZY SIĘ Z PARY SZCZEBLI, nie z jednej linii
             # (2026-08-08). Dotąd wygrywała karta z najlepszą pojedynczą linią,
@@ -1770,6 +1817,7 @@ def zbuduj(
     pomiar_out: list | None = None,
     bc_cache: dict[int, dict] | None = None,
     zrodla_grid: dict[int, dict] | None = None,
+    wagi_modelu: dict | None = None,
 ) -> list[dict]:
     """Złóż wpisy radaru/drabinek ze zbiorów, które cykl i tak ma w pamięci.
 
@@ -1932,6 +1980,7 @@ def zbuduj(
                 korekta_logit=korekta_logit,
                 diag=diag_drabinki,
                 zrodla=((zrodla_grid or {}).get(mid) or {}).get(pid),
+                wagi_modelu=wagi_modelu,
             )
             if not rynki:
                 continue  # same puste drabinki (kursy-szum) = nie ma karty
@@ -2113,6 +2162,7 @@ def zbuduj(
                     teraz=teraz,
                     korekta_logit=korekta_logit,
                     diag=diag_drabinki,
+                    wagi_modelu=wagi_modelu,
                 ),
             })
 

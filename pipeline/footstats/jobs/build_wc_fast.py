@@ -7994,6 +7994,9 @@ def _main_impl(tryb=None):
             zrodla_grid=zrodla_grid,
             # w tle (patrz radar.NEAR_POKRYCIA)
             pomiar_out=pomiar_drabinek,
+            # DRUGA LICZBA na szczeblach drabinki — model uczony liczy obok
+            # rachunku drabinki i nie wpływa na wybór kart (2026-08-17)
+            wagi_modelu=_wagi_modelu,
         )
         radar_padl = False
     except Exception as ex:
@@ -8065,6 +8068,10 @@ def _main_impl(tryb=None):
             "p_model": h.get("p_final") or 0.0,
             "pewnosc": None, "sugestia": False,
             "zrodlo": rozliczanie.ZRODLO_DRABINKA,
+            # druga liczba z modelu uczonego (2026-08-17) — drabinka ma własny
+            # rachunek (pokrycie Wilsona × kontekst), więc dopiero ten stempel
+            # pozwoli porównać oba na tych samych szczeblach
+            **({"p_uczony": h["p_uczony"]} if h.get("p_uczony") else {}),
             # RACHUNEK DRABINKI (2026-08-12). Inny niż w reszcie produktu i tak
             # ma zostać: `p` bierze się z pokrycia linii (Wilson) przemnożonego
             # przez kontekst meczu, a nie z p_over silnika. Kalibracji RYNKU
@@ -8123,6 +8130,8 @@ def _main_impl(tryb=None):
             "p_model": h["drugi_p"],
             "pewnosc": None, "sugestia": False,
             "zrodlo": rozliczanie.ZRODLO_DRABINKA,
+            **({"p_uczony": h["drugi_p_uczony"]}
+               if h.get("drugi_p_uczony") else {}),
             "rachunek": betting.stempel_rachunku(
                 p_over_raw=(
                     round(float(p_baz2) * float(kor2), 4)

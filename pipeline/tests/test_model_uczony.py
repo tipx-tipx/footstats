@@ -532,3 +532,56 @@ def test_trening_obejmuje_oba_strumienie():
     assert wagi["wersja"] == U.WERSJA_MODELU_UCZONEGO
     assert "shots" in (wagi.get("rynki_zaw") or {})
     assert "zawodnicz" in U.zdanie_stanu(wagi)
+
+
+# --- DRABINKI: druga liczba na obu szczeblach -----------------------------
+#
+# Drabinki mają WŁASNY rachunek (pokrycie Wilsona × mnożniki kontekstu), inny
+# niż silnik zawodniczy i inny niż drużynowy. To dokładnie ta klasa różnic,
+# która kosztowała najwięcej — więc i one dostają drugą liczbę do porównania.
+
+def test_szczebel_drabinki_niesie_druga_liczbe():
+    """Stempel musi przejść: szczebel → hero → rekord księgi."""
+    import inspect
+
+    from footstats.jobs import build_wc_fast as B
+    from footstats.jobs import radar
+
+    zr = inspect.getsource(radar)
+    # 1. szczebel dostaje prognozę
+    i = zr.index('szczebel = {')
+    assert "prognoza_zawodnika" in zr[i:i + 2500], (
+        "szczeble drabinki nie pytają modelu uczonego"
+    )
+    # 2. hero kopiuje ją ze szczebla i niesie następnik osobno
+    j = zr.index('"p_final": p_final,')
+    assert '"p_uczony"' in zr[j:j + 900], "hero gubi drugą liczbę szczebla"
+    assert '"drugi_p_uczony"' in zr, "następnik bez drugiej liczby"
+
+    # 3. oba rekordy księgi ją przenoszą
+    zb = inspect.getsource(B)
+    k = zb.index('"p_model": h.get("p_final") or 0.0,')
+    assert '"p_uczony"' in zb[k:k + 700], "rekord hero gubi drugą liczbę"
+    m = zb.index('"p_model": h["drugi_p"],')
+    assert 'drugi_p_uczony' in zb[m:m + 700], (
+        "rekord drugiego szczebla gubi drugą liczbę"
+    )
+
+
+def test_druga_liczba_drabinki_nie_wchodzi_do_oceny_karty():
+    """Kolejność kart stoi na przewadze drabinki — model liczy OBOK."""
+    import inspect
+
+    from footstats.jobs import radar
+
+    zr = inspect.getsource(radar)
+    # sam rachunek oceny: od porównania szczebli do premii za okno ceny
+    i = zr.index("if nast is not None and p_nast is not None:")
+    j = zr.index("ocena += BONUS_OKNA_CENY")
+    rachunek = zr[i:j]
+    assert "p_uczony" not in rachunek, (
+        "druga liczba weszła do oceny karty — najpierw pomiar, potem decyzje"
+    )
+    # ...i do progów wyboru szczebla
+    assert "p_uczony" not in zr[zr.index("MIN_P_SZCZEBLA"):
+                                zr.index("MIN_P_SZCZEBLA") + 400]
