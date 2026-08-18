@@ -233,6 +233,40 @@ def stempel_kompletny(stempel: dict | None) -> bool:
     """Czy z tego stempla da się odtworzyć rachunek typu."""
     return bool(stempel) and all(k in stempel for k in STEMPEL_KOMPLET)
 
+# ---------------------------------------------------------------------------
+# RYNKI WYCOFANE Z PRODUKTU — jedno źródło prawdy (2026-08-18)
+# ---------------------------------------------------------------------------
+#
+# Rynek trafia tutaj, gdy UMIEMY go wycenić, ale NIE UMIEMY go zamknąć. To nie
+# to samo co kwarantanna (ta patrzy na wynik finansowy i sama się cofa) —
+# wycofanie jest decyzją o braku źródła i cofa je wyłącznie człowiek.
+#
+# `tackles` (odbiory), decyzja właściciela 18.08. Zmierzone tego dnia na
+# księdze 8530 wpisów: rynek domyka się w 36,9% (84 typy, 34 otwarte), przy
+# `team_corners` 81,5% i `shots` 74,1%. Przyczyna nie jest usterką — 365Scores
+# odbiorów NIE ODDAJE (`tackles` nie ma w `MARKETY_365_STATY`), więc zostaje
+# bank `trend_lib` ze 165 parami `:tackles` i fallback Sofascore z workera
+# domowego. Z 32 wiszących typów LIB: 31 to brak pary zawodnik:rynek w banku,
+# 1 rozjazd czasu, ZERO takich, gdzie bank ma wartość, a rozliczanie jej nie
+# bierze. Nie ma czego naprawiać w kodzie — brakuje danych.
+#
+# Skutek dla klienta był realny: typ, którego nie umiemy zamknąć, po siedmiu
+# dniach idzie na zwrot i znika z pomiaru, choć user go widział. To łamie
+# zasadę z `rozliczanie.py`: NIE PUBLIKUJEMY RYNKU, KTÓREGO NIE POTRAFIMY
+# ZAMKNĄĆ.
+#
+# ⚑ CO ZOSTAJE: wycena, model, matchup i kalibracja nadal ten rynek znają —
+# usuwamy go z PRODUKTU, nie z maszynerii. Typy już opublikowane rozliczą się
+# normalnie; wycofanie zdejmuje je z listy, kart i puli kuponów, więc nowych
+# nie przybędzie. Dzięki temu decyzja jest odwracalna jedną linijką.
+RYNKI_WYCOFANE: frozenset[str] = frozenset({"tackles"})
+
+
+def rynek_wycofany(rynek_kod) -> bool:
+    """Czy rynek jest wycofany z produktu (patrz RYNKI_WYCOFANE)."""
+    return str(rynek_kod or "") in RYNKI_WYCOFANE
+
+
 # pokrewne rynki dzielą błąd modelu i korelują przez tempo meczu — wspólna
 # mapa dla kalibracji (rozliczanie) i dywersyfikacji kuponów (kupony)
 RODZINY_RYNKOW = {

@@ -921,6 +921,122 @@ def game_scores(game_id: int) -> dict[str, float]:
     return out
 
 
+# ---------------------------------------------------------------------------
+# REGULAMINOWY CZAS PRZY MECZU Z DOGRYWKĄ (2026-08-18)
+# ---------------------------------------------------------------------------
+#
+# ZAKŁAD LICZY SIĘ Z 90 MINUT — dogrywka do niego NIE WCHODZI, tak jak u
+# bukmachera. Do dziś mecz z dogrywką po prostu nie rozliczał się wcale:
+# `game/stats/` podaje sumy za 120 minut, więc rynek 90-minutowy zamykał się
+# po tygodniu jako zwrot. Zmierzone 18.08: 66 typów wisiało na sześciu meczach
+# kwalifikacji europejskich.
+#
+# CZEGO NIE DA SIĘ ODZYSKAĆ: `game/stats/` NIE MA rozbicia na części meczu
+# (sprawdzone — 88 statystyk, ani jednego pola `stageId`/`period`). Rożnych,
+# strzałów i fauli po 90 minucie nie odróżnimy od tych z dogrywki i tyle.
+#
+# CO DA SIĘ ODZYSKAĆ, i to dokładnie: `game.stages` niesie WYNIK NA KONIEC 90
+# MINUT osobnym wpisem (id 9 „End of 90 Minutes"), a `game.events` mają
+# `stageId` przy każdym zdarzeniu. Etapy: 7 = I połowa, 9 = II połowa,
+# 10 = dogrywka, 11 = karne. Potwierdzone arytmetycznie na dwóch meczach
+# (Austria Wien–Beitar: gole z etapów 7 i 9 to 1+2, przy wyniku 1:2 po 90').
+ETAP_PIERWSZA_POLOWA_ID = 7
+ETAP_KONIEC_90_ID = 9
+ETAPY_REGULAMINOWE = (ETAP_PIERWSZA_POLOWA_ID, ETAP_KONIEC_90_ID)
+
+_scores90_cache: dict[int, dict[str, float]] = {}
+_cards90_cache: dict[int, dict[str, float]] = {}
+
+
+def _nazwy_stron(game: dict) -> dict[str, str]:
+    """{'home'/'away': znormalizowana nazwa} oraz {competitorId: nazwa}."""
+    out: dict[str, str] = {}
+    for strona, pole in (("home", "homeCompetitor"), ("away", "awayCompetitor")):
+        c = game.get(pole) or {}
+        nm = _norm(str(c.get("name") or ""))
+        if nm:
+            out[strona] = nm
+            if c.get("id") is not None:
+                out[str(int(c["id"]))] = nm
+    return out
+
+
+def game_scores_90(game_id: int) -> dict[str, float]:
+    """Gole drużyn PO 90 MINUTACH: {znormalizowana nazwa: gole}.
+
+    Czyta etap `id = 9` („End of 90 Minutes"), którego wynik jest skumulowany
+    od początku meczu — czyli dokładnie tym, czym rozlicza się zakład.
+    Pusty słownik, gdy 365 tego etapu nie poda (mecz przerwany, dane niepełne)
+    — wtedy NIE ZGADUJEMY, bo rozliczenie jest nieodwracalne.
+    """
+    if game_id in _scores90_cache:
+        return _scores90_cache[game_id]
+    try:
+        game = _get(f"{BASE}/game/?{Q}&gameId={game_id}").get("game", {})
+    except Exception:
+        return {}
+    _zapamietaj_et(game_id, game)
+    nazwy = _nazwy_stron(game)
+    out: dict[str, float] = {}
+    for e in game.get("stages") or []:
+        if not isinstance(e, dict) or e.get("id") != ETAP_KONIEC_90_ID:
+            continue
+        h, a = e.get("homeCompetitorScore"), e.get("awayCompetitorScore")
+        if h is None or a is None:
+            break
+        if nazwy.get("home"):
+            out[nazwy["home"]] = float(h)
+        if nazwy.get("away"):
+            out[nazwy["away"]] = float(a)
+        break
+    _scores90_cache[game_id] = out
+    return out
+
+
+def game_team_cards_90(game_id: int) -> dict[str, float]:
+    """Kartki drużyn W REGULAMINOWYM CZASIE: {znormalizowana nazwa: kartki}.
+
+    Liczone ze zdarzeń o `stageId` z ETAPY_REGULAMINOWE. Suma żółtych i
+    czerwonych — ta sama konwencja co `game_team_stats` (`kartki` = żółte +
+    czerwone), żeby obie drogi dawały tę samą liczbę.
+
+    Pusty słownik, gdy mecz nie ma ANI JEDNEGO zdarzenia regulaminowego —
+    „zero kartek" i „brak danych o zdarzeniach" muszą zostać rozróżnialne,
+    bo rozliczenie jest nieodwracalne.
+    """
+    if game_id in _cards90_cache:
+        return _cards90_cache[game_id]
+    try:
+        game = _get(f"{BASE}/game/?{Q}&gameId={game_id}").get("game", {})
+    except Exception:
+        return {}
+    _zapamietaj_et(game_id, game)
+    zdarzenia = game.get("events") or []
+    if not zdarzenia:
+        return {}
+    nazwy = _nazwy_stron(game)
+    out: dict[str, float] = {nazwy[s]: 0.0 for s in ("home", "away") if nazwy.get(s)}
+    if not out:
+        return {}
+    widziano_regulaminowe = False
+    for e in zdarzenia:
+        if not isinstance(e, dict) or e.get("stageId") not in ETAPY_REGULAMINOWE:
+            continue
+        widziano_regulaminowe = True
+        typ = e.get("eventType")
+        nazwa_typu = str((typ or {}).get("name") if isinstance(typ, dict) else typ or "")
+        if nazwa_typu.strip().lower() not in ("yellow card", "red card"):
+            continue
+        cid = e.get("competitorId")
+        nm = nazwy.get(str(int(cid))) if cid is not None else None
+        if nm:
+            out[nm] = out.get(nm, 0.0) + 1.0
+    if not widziano_regulaminowe:
+        return {}
+    _cards90_cache[game_id] = out
+    return out
+
+
 _team_stats_cache: dict[int, dict] = {}
 
 

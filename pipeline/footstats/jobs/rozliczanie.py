@@ -253,6 +253,21 @@ MARKETY_DRUZYNOWE = {
     "team_goals": "gole",
 }
 
+# ⚑ RYNKI, KTÓRE UMIEMY ODCZYTAĆ Z REGULAMINOWEGO CZASU MIMO DOGRYWKI
+# (2026-08-18). Zakład liczy 90 minut, więc dogrywka NIE POWINNA go zawieszać
+# — a do dziś zawieszała każdy rynek drużynowy, bo `game/stats/` podaje sumy
+# za 120 minut. Te dwa da się odzyskać dokładnie:
+#   * `team_goals`  — `game.stages` ma osobny wpis „End of 90 Minutes" (id 9)
+#     z wynikiem skumulowanym do 90. minuty,
+#   * `team_cards`  — `game.events` mają `stageId` przy każdym zdarzeniu,
+#     więc żółte i czerwone z etapów 7 i 9 to komplet kartek regulaminowych.
+# Reszta (rożne, strzały, celne, faule) ZOSTAJE nierozliczalna: sprawdzone
+# 18.08 — endpoint statystyk nie ma ANI JEDNEGO pola dzielącego na okresy.
+#
+# Kontrola poprawności przed wdrożeniem: na siedmiu meczach BEZ dogrywki obie
+# nowe drogi dały wynik identyczny ze starą (7/7 gole, 7/7 kartki).
+MARKETY_DRUZYNOWE_90 = {"team_goals", "team_cards"}
+
 # --- DWA NOWE RODZAJE ZAKŁADU (2026-07-30): NAJPIERW ROZLICZANIE ---
 #
 # Kolejność jest celowa. Cała ta sesja to były błędy rozliczeń — typy, których
@@ -5503,7 +5518,27 @@ def rozlicz(
         if mk in MARKETY_DRUZYNOWE:
             gid_t = _gid_365(rec, cache_365)
             wartosc_t = None
-            if gid_t is not None and not scores365.after_extra_time(gid_t):
+            _po_dogrywce = (
+                gid_t is not None and scores365.after_extra_time(gid_t)
+            )
+            if _po_dogrywce and mk in MARKETY_DRUZYNOWE_90:
+                # DOGRYWKA NIE ZAWIESZA ZAKŁADU — czytamy regulaminowy czas
+                # (patrz MARKETY_DRUZYNOWE_90). Pusty wynik znaczy „365 nie
+                # podało etapów/zdarzeń", nie „zero" — wtedy typ czeka dalej.
+                try:
+                    _dane_90 = (
+                        scores365.game_scores_90(gid_t) if mk == "team_goals"
+                        else scores365.game_team_cards_90(gid_t)
+                    )
+                except Exception:
+                    _dane_90 = None
+                if _dane_90:
+                    _kt90 = scores365.resolve_team_key(
+                        set(_dane_90), str(rec["podmiot"])
+                    )
+                    if _kt90:
+                        wartosc_t = float(_dane_90[_kt90])
+            if gid_t is not None and not _po_dogrywce:
                 # DOPASOWANIE NAZWY DRUŻYNY PO ZBIORACH SŁÓW, nie po
                 # identycznym napisie (poprawka 2026-07-30). 365Scores nazywa
                 # kluby inaczej niż my („qarabag" / „qarabag agdam",

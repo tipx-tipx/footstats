@@ -139,6 +139,30 @@ def _dump(name: str, obj) -> None:
         _generated_this_run.add(name[:-5])
 
 
+def _bez_wycofanych_rynkow(w: dict) -> dict | None:
+    """Karta zawodnika bez rynków WYCOFANYCH (betting.RYNKI_WYCOFANE).
+
+    Zwraca `None`, gdy po zdjęciu nie zostaje nic do pokazania — karta bez
+    ani jednego rynku to sam nagłówek, a hero z wycofanego rynku byłby
+    nagłówkiem obiecującym typ, którego nie umiemy zamknąć.
+    """
+    rynki = w.get("rynki") or []
+    zostaja = [r for r in rynki
+               if not betting.rynek_wycofany(r.get("rynek_kod"))]
+    if len(zostaja) == len(rynki) and not betting.rynek_wycofany(
+        (w.get("hero") or {}).get("rynek_kod")
+    ):
+        return w                      # nic do zdjęcia — karta bez zmian
+    if not zostaja:
+        return None
+    w = {**w, "rynki": zostaja}
+    if betting.rynek_wycofany((w.get("hero") or {}).get("rynek_kod")):
+        # hero padł razem z rynkiem — karta bez nagłówka nie ma sensu, a
+        # wyboru nowego nie da się tu zrobić uczciwie (score liczy radar)
+        return None
+    return w
+
+
 def _rozlicz_i_zapisz(
     value_bets: list[dict],
     kupony_list: list[dict],
@@ -7783,6 +7807,11 @@ def _main_impl(tryb=None):
     odpadki_legow: Counter = Counter()
 
     def _leg_dopuszczalny(b: dict) -> bool:
+        # rynek wycofany (betting.RYNKI_WYCOFANE) — leg, którego nie umiemy
+        # zamknąć, zawiesiłby CAŁY kupon, nie tylko siebie
+        if betting.rynek_wycofany(b.get("rynek_kod")):
+            odpadki_legow["rynek_wycofany"] += 1
+            return False
         if not b.get("kurs"):
             odpadki_legow["brak_kursu"] += 1
             return False
@@ -8051,6 +8080,18 @@ def _main_impl(tryb=None):
     if not radar_padl:
         # karta raz pokazana zostaje do gwizdka — ta sama zasada co przy typach
         radar_wpisy = scal_karty_z_publikacjami(radar_wpisy)
+        # RYNEK WYCOFANY schodzi też z KART — i to PO scaleniu z publikacjami,
+        # bo inaczej wróciłby tą samą drogą co wznowiony typ
+        # ([[wznowione-karty-omijaly-bramy]]). Karta bez ani jednego rynku
+        # nie ma czego pokazać, więc znika w całości.
+        _kart_przed = len(radar_wpisy)
+        radar_wpisy = [
+            w for w in (
+                _bez_wycofanych_rynkow(w) for w in radar_wpisy
+            ) if w is not None
+        ]
+        if _kart_przed != len(radar_wpisy):
+            print(f"Rynki wycofane: karty {_kart_przed} → {len(radar_wpisy)}")
         _dump("radar.json", {
             "wygenerowano_ts": int(time.time()),
             "wpisy": radar_wpisy,
@@ -8449,6 +8490,7 @@ def _main_impl(tryb=None):
     do_pokazania = []
     zdjete = 0
     poza_kursem = 0
+    wycofane_typy = 0
     # POWÓD ZDJĘCIA PER TYP — księga musi wiedzieć, że tego typu user NIE
     # widział (2026-08-01). Do dziś `_rozlicz_i_zapisz` dostawał surowe
     # `value_bets`, czyli listę SPRZED bram wyświetlania, więc typ zdjęty tutaj
@@ -8456,6 +8498,15 @@ def _main_impl(tryb=None):
     # od razu urosła: typ po 1,05 nie trafia na stronę, a wpadał do statystyki.
     zdjete_klucze: dict[str, str] = {}
     for b in value_bets_pub:
+        # RYNEK WYCOFANY — nie umiemy go ZAMKNĄĆ, więc nie wolno go pokazywać
+        # (patrz betting.RYNKI_WYCOFANE). Stoi PRZED podłogą kursu, bo nie jest
+        # progiem jakości: żaden kurs ani żadna wartość go nie odblokuje.
+        # Łapie także typy WZNOWIONE — pętla idzie po `value_bets_pub`, czyli
+        # po świeżych RAZEM z odtworzonymi z rejestru i księgi.
+        if betting.rynek_wycofany(b.get("rynek_kod")):
+            wycofane_typy += 1
+            zdjete_klucze[_klucz_publikacji(b)] = "rynek_wycofany"
+            continue
         if not b.get("sugestia") and not betting.kurs_w_widelkach(b.get("kurs")):
             poza_kursem += 1
             zdjete_klucze[_klucz_publikacji(b)] = "kurs_poza_widelkami"
@@ -8473,6 +8524,10 @@ def _main_impl(tryb=None):
         # Patrz `rozliczanie.waga_sciagania`.
         u = _sciagnij_karte_do_ceny(u)
         do_pokazania.append({k: v for k, v in u.items() if k != "kal_tau"})
+    if wycofane_typy:
+        print(f"Rynki wycofane: {wycofane_typy} typów zdjętych, bo rynku nie "
+              f"umiemy ZAMKNĄĆ ({', '.join(sorted(betting.RYNKI_WYCOFANE))}) "
+              f"— nie wchodzą też do księgi, kart ani puli kuponów")
     if poza_kursem:
         print(f"Zdjęte przez podłogę kursu: {poza_kursem} typów poza "
               f"{betting.MIN_ODDS}–{betting.MAX_ODDS} (głównie wznowione "
@@ -8943,14 +8998,29 @@ def _main_impl(tryb=None):
     # i uczy kalibrację, ale nie liczy się do Skuteczności. Typów WZNOWIONYCH
     # to nie dotyczy: one były pokazane wcześniej i ich rekord w księdze jest
     # uczciwy taki, jaki jest — historii nie przepisujemy.
+    # ⚑ RYNEK WYCOFANY NIE WCHODZI NAWET DO KSIĘGI (2026-08-18). Pozostałe
+    # bramy wyświetlania zdejmują typ ze strony, ale zostawiają go w logu:
+    # rozlicza się w tle i uczy kalibrację. Przy rynku WYCOFANYM to bez sensu
+    # i wręcz szkodliwe — wycofujemy go właśnie dlatego, że w większości
+    # przypadków NIE MA GO CZYM ZAMKNĄĆ, więc rekord dołożyłby się do kolejki
+    # „typy czekające na dane" i po siedmiu dniach poszedł na zwrot. Zmierzone
+    # 18.08: 18 z 19 niewyjaśnionych wiszących typów to były odbiory.
+    _wycofane_z_ksiegi = 0
     if zdjete_klucze:
         _zostaja, _zdjete_swieze = [], []
         for b in value_bets:
             powod_zdjecia = zdjete_klucze.get(_klucz_publikacji(b))
+            if powod_zdjecia == "rynek_wycofany":
+                _wycofane_z_ksiegi += 1
+                continue
             if powod_zdjecia and not b.get("wznowiony"):
                 _zdjete_swieze.append({**b, "poza_publikacja": powod_zdjecia})
             else:
                 _zostaja.append(b)
+        if _wycofane_z_ksiegi:
+            value_bets = _zostaja
+            print(f"Rynki wycofane: {_wycofane_z_ksiegi} świeżych typów NIE "
+                  f"trafiło do księgi (nie ma ich czym rozliczyć)")
         if _zdjete_swieze:
             value_bets = _zostaja
             typy_poza_publikacja.extend(_zdjete_swieze)

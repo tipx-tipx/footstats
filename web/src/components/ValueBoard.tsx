@@ -26,7 +26,6 @@ const RYNKI_FILTRY: { kod: string; label: string }[] = [
   { kod: "sot", label: "Strzały celne" },
   { kod: "fouls_committed", label: "Faule" },
   { kod: "fouls_won", label: "Faule wywalczone" },
-  { kod: "tackles", label: "Odbiory" },
   { kod: "interceptions", label: "Przechwyty" },
   { kod: "shots_outside_box", label: "Zza pola karnego" },
   { kod: "fh_shots", label: "Strzały 1. połowa" },
