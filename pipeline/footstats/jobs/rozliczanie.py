@@ -1060,6 +1060,26 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
             # się rozdzielić wstecz, który poziom karty traci.
             **({"szczebel": int(b["szczebel"])}
                if isinstance(b.get("szczebel"), int) else {}),
+            # ⚑⚑ CHARAKTERYSTYKA DRABINKI (2026-08-18) — CZWARTA biała lista
+            # na drodze tych pól, po `_charakter_drabinki`, `_STEMPLE_PUBLIKACJI`
+            # i `_POLA_LEGA`. Bez niej stempel powstaje i ginie tutaj.
+            #
+            # Zgłoszenie właściciela: „musimy patrzeć na pokrycia, na
+            # charakterystykę i dobierać takie drabinki, które mają sens".
+            # Zmierzone 18.08: na 171 rozliczeniach drabinkowych pola
+            # `matchup`, `xi_sygnal`, `rotacja`, `pewnosc`, `miekka_linia` były
+            # PUSTE w 171 na 171 rekordów — więc pytanie „które drabinki mają
+            # sens" było wprost NIEROZSTRZYGALNE, a analiza mogła dotyczyć
+            # tylko gołej szansy wobec ceny.
+            **{
+                _p: b[_p] for _p in (
+                    "pokrycie", "pokrycie_traf", "pokrycie_z",
+                    "p_bazowe", "korekta",
+                    "minuty_sr6", "udzial_startow",
+                    "rodzaj_karty", "kategoria_karty", "klasa_karty",
+                    "pozycja", "xi",
+                ) if b.get(_p) is not None
+            },
             "opublikowano_ts": int(time.time()),
             # WERSJE ZAMROŻONE PRZY TYPIE (2026-08-01) — model / kalibracja /
             # polityka selekcji / dane. Bez tego każdy pomiar na tym logu

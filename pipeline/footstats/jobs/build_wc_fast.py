@@ -8296,6 +8296,51 @@ def _main_impl(tryb=None):
     # to, co user widzi w nagłówku. Rozliczają się jak typy modelu, ale
     # w osobnym strumieniu skuteczności (rozliczanie._strumien), bo ich
     # prawdopodobieństwo pochodzi z innego estymatora niż silnik.
+    # ⚑⚑ CHARAKTERYSTYKA DRABINKI DO KSIĘGI (2026-08-18).
+    #
+    # Zgłoszenie właściciela: „musimy patrzeć na pokrycia, na charakterystykę
+    # i dobierać takie drabinki, które mają sens — to nie tylko matematyka".
+    # Ma rację, a przy próbie odpowiedzi okazało się, że NIE DA SIĘ: księga
+    # drabinek nie zapisywała ANI JEDNEJ cechy jakościowej. Zmierzone tego dnia
+    # na 171 rozliczeniach — `matchup`, `matchup_styl`, `xi_sygnal`, `rotacja`,
+    # `pewnosc`, `miekka_linia` były PUSTE w 171 na 171 rekordów, choć karta
+    # wszystkie te rzeczy liczy. Analiza mogła więc dotyczyć wyłącznie gołych
+    # liczb (szansa vs cena) i szukania progu, czyli dokładnie tego, co
+    # właściciel słusznie skrytykował.
+    #
+    # Bez tych pól każda przyszła diagnoza drabinek zaczyna się od zera.
+    # Same stemple — ZERO wpływu na wycenę, selekcję i to, co widzi klient.
+    def _charakter_drabinki(w: dict, h: dict, drugi: bool = False) -> dict:
+        """Na czym stała ta drabinka — pokrycie, próba, minuty, kontekst."""
+        pref = "drugi_" if drugi else ""
+        pok_t = h.get(f"{pref}traf")
+        pok_z = h.get(f"{pref}z")
+        out: dict = {}
+        if pok_t is not None and pok_z:
+            out["pokrycie_traf"] = int(pok_t)
+            out["pokrycie_z"] = int(pok_z)
+            # udział — bez niego każdy pomiar musi dzielić samodzielnie,
+            # a 7/10 i 14/20 to dla progu ta sama liczba przy innej pewności
+            out["pokrycie"] = round(int(pok_t) / int(pok_z), 3)
+        for pole, klucz in ((f"{pref}p_bazowe", "p_bazowe"),
+                            (f"{pref}korekta", "korekta")):
+            if h.get(pole) is not None:
+                out[klucz] = round(float(h[pole]), 4)
+        # cechy KARTY (nie szczebla) — te same dla obu poziomów. Nazwy pól
+        # sprawdzone na żywym dumpie radaru, nie zgadnięte: karta niesie
+        # `minuty_sr6` i `udzial_startow`, NIE `oczekiwane_minuty`.
+        for pole, klucz in (("minuty_sr6", "minuty_sr6"),
+                            ("udzial_startow", "udzial_startow"),
+                            ("rodzaj", "rodzaj_karty"),
+                            ("kategoria", "kategoria_karty"),
+                            ("pozycja", "pozycja"),
+                            ("xi", "xi")):
+            if w.get(pole) is not None:
+                out[klucz] = w[pole]
+        if (w.get("ocena") or {}).get("klasa"):
+            out["klasa_karty"] = w["ocena"]["klasa"]
+        return out
+
     drabinki_typy = []
     for w in radar_wpisy:
         h = w.get("hero") or {}
@@ -8341,6 +8386,8 @@ def _main_impl(tryb=None):
             "klasa": ocena.get("klasa"),
             "edge": ocena.get("edge"),
             "szczebel": 1,
+            # na czym stała ta drabinka — patrz `_charakter_drabinki`
+            **_charakter_drabinki(w, h),
         })
 
     # DRUGI SZCZEBEL KAŻDEJ KARTY — POMIAR (2026-08-13). Karta pokazuje go
@@ -8392,6 +8439,11 @@ def _main_impl(tryb=None):
             ),
             "klasa": (w.get("ocena") or {}).get("klasa"),
             "szczebel": 2,
+            # ⚑ TU JEST NAJDROŻSZA BIAŁA PLAMA. Zmierzone 18.08: drugi szczebel
+            # trafia 18,2% (n=22) wobec 57,9% na pierwszym (n=19), ROI −47,2%
+            # wobec −5,3%. Bez charakterystyki nie wiadomo, CZY to wina progu
+            # pokrycia, wysokości linii, czy minut.
+            **_charakter_drabinki(w, h, drugi=True),
             "odrzucony": True,
             "odrzucenie_powod": rozliczanie.POWOD_POMIARU_DRUGIEGO,
         })
