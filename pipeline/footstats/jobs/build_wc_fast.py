@@ -4286,6 +4286,16 @@ def _main_impl(tryb=None):
         bo inaczej karta mówiłaby „szansa 58%, kurs 1,70, wartość +21%",
         czyli trzy liczby, z których dwie zaprzeczają trzeciej.
         """
+        # ⚑⚑ NIE RUSZAMY LICZBY MODELU (2026-08-18). Ta warstwa mierzy, o ile
+        # STARY rachunek przeszacowuje po selekcji, i o tyle ściąga liczbę
+        # pokazywaną. Delta jest duża — zmierzone: drużyny −0,63 logitu, co
+        # z uczciwych 51% modelu robi na karcie 36%, a razem z nią przewraca
+        # kurs uczciwy, przewagę i wartość.
+        #
+        # Typ policzony modelem NIE PRZESZACOWUJE (luka −0,7 pp), więc nie ma
+        # tu czego urealniać. Patrz `uczony.ZRODLO_SZANSY`.
+        if str(b.get("zrodlo_p") or "") == "uczony":
+            return b
         d = korekta_pokazywana.get(rozliczanie._strumien(b), 0.0)
         if not d or b.get("sugestia") or not b.get("p_model"):
             return b
@@ -4312,6 +4322,13 @@ def _main_impl(tryb=None):
     # Waga liczona z rozliczeń raz na cykl; brak próby = karta bez zmian.
     _waga_karty = None
     _marza_karty = rozliczanie.MARZA_SCIAGANIA_DOMYSLNA
+    # ⚑ MUSZĄ ISTNIEĆ PRZED BLOKIEM. `warstwa_uczenia` to warstwa NIEKRYTYCZNA
+    # — połyka wyjątek i leci dalej, więc zmienne przypisane wewnątrz mogą nie
+    # powstać. Bez tych dwóch linii padnięta warstwa kładłaby CAŁY cykl na
+    # NameError kilka linii niżej, czyli awaria poboczna przewracałaby produkt
+    # (dokładnie ten wzorzec opisuje nota przy WARSTWY_KRYTYCZNE).
+    _waga_karty_uczony = None
+    _marza_karty_uczony = rozliczanie.MARZA_SCIAGANIA_DOMYSLNA
     with rozliczanie.warstwa_uczenia("sciaganie_karty") as _w:
         # NAJPIERW CENA, POTEM WAGA. Do jakiej ceny ściągamy, wynika z
         # rozliczeń (`marza_sciagania`) — dopóki brała się ze stałej 7%,
@@ -4319,10 +4336,29 @@ def _main_impl(tryb=None):
         # i wychodziła ujemna przy KAŻDYM typie.
         _marza_karty = rozliczanie.marza_sciagania(_ksiega)
         _waga_karty = rozliczanie.waga_sciagania(_ksiega, _marza_karty)
+        # ⚑⚑ OSOBNA WAGA DLA MODELU UCZONEGO (2026-08-18). `w` odpowiada na
+        # pytanie „ile NASZEJ liczby warto zostawić obok ceny", a to zależy od
+        # tego, CZYJA to liczba. Na starym rachunku wyszło w = 0,05, czyli
+        # karta pokazywała w 95% cenę bukmachera — i słusznie, skoro tamten
+        # rachunek zawyżał o 14 pp. Model ma lukę −0,7 pp, więc jego waga to
+        # INNY pomiar; użycie tamtej byłoby zgadywaniem pod cudzy błąd.
+        #
+        # Dopóki model nie ma własnej próby (WAGA_SCIAGANIA_MIN_N), waga jest
+        # None, a to znaczy „karta pokazuje liczbę BEZ ZMIAN" — czyli uczciwą
+        # liczbę modelu. To jest właściwe domyślne zachowanie: nie ściągamy
+        # do ceny liczby, o której nie zmierzyliśmy, że tego wymaga.
+        _marza_karty_uczony = rozliczanie.marza_sciagania(_ksiega, "uczony")
+        _waga_karty_uczony = rozliczanie.waga_sciagania(
+            _ksiega, _marza_karty_uczony, "uczony"
+        )
         _w.opisz(n=(1 if _waga_karty else 0),
                  opis=(f"w={_waga_karty:.2f} (nasza liczba) / "
                        f"{1 - _waga_karty:.2f} (cena minus {_marza_karty:.1%})"
                        if _waga_karty else "za mała próba — karta bez zmian"))
+    print("Ściąganie karty do ceny — model uczony: " + (
+        f"w={_waga_karty_uczony:.2f} (własny pomiar na {_marza_karty_uczony:.1%})"
+        if _waga_karty_uczony else
+        "brak własnej próby — karta pokazuje LICZBĘ MODELU bez ściągania"))
     if _waga_karty:
         print(f"Szansa na karcie ściągana do ceny: w={_waga_karty:.2f} "
               f"naszej liczby, reszta z kursu po zdjęciu zmierzonej marży "
@@ -4337,11 +4373,16 @@ def _main_impl(tryb=None):
         kurs 1,70, wartość +21%" — trzech liczb, z których dwie zaprzeczają
         trzeciej, pilnujemy w całym produkcie.
         """
-        if (not _waga_karty or u.get("sugestia") or not u.get("kurs")
+        # karta liczona MODELEM ma własną wagę i własną marżę — patrz nota
+        # przy `_waga_karty_uczony`
+        _z_modelu_karta = str(u.get("zrodlo_p") or "") == "uczony"
+        _w_k = _waga_karty_uczony if _z_modelu_karta else _waga_karty
+        _m_k = _marza_karty_uczony if _z_modelu_karta else _marza_karty
+        if (not _w_k or u.get("sugestia") or not u.get("kurs")
                 or not u.get("p_model")):
             return u
         p = rozliczanie.sciagnij_do_ceny(float(u["p_model"]), float(u["kurs"]),
-                                         _waga_karty, _marza_karty)
+                                         _w_k, _m_k)
         out = {**u, "p_model": round(p, 4), "p_sciagniete": True,
                "fair_kurs": round(1.0 / max(p, 1e-6), 3)}
         if u.get("p_rynku") is not None:
@@ -4354,8 +4395,8 @@ def _main_impl(tryb=None):
             # marża idzie do stempla razem z wagą — bez niej rachunku karty
             # nie da się odtworzyć, bo `p_pokazane` zależy od OBU liczb
             out["rachunek"] = {**u["rachunek"], "p_pokazane": round(p, 4),
-                               "waga_sciagania": round(float(_waga_karty), 2),
-                               "marza_sciagania": round(float(_marza_karty), 4)}
+                               "waga_sciagania": round(float(_w_k), 2),
+                               "marza_sciagania": round(float(_m_k), 4)}
         return out
 
     # Korekta strumienia drużynowego NIE jest już stosowana po wyborze strony

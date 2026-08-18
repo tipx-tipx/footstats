@@ -3320,7 +3320,8 @@ def szansa_pokazywana(
         and r.get("p_model")
         and not _z_martwej_epoki(r)   # patrz komentarz przy `_z_martwej_epoki`
         and _z_biezacej_epoki(r)      # mundial uczy tylko mundial
-    ]
+        and _stary_rachunek(r)        # patrz `_stary_rachunek` — dwa rachunki
+    ]                                 # w jednej próbie dają średnią z niczego
     out: dict[str, float] = {}
     for strumien in STRUMIENIE:
         grp = sorted(
@@ -3494,14 +3495,26 @@ MARZA_SCIAGANIA_SHRINK_N0 = 200  # siła ciągnięcia do domyślnej przy małej 
 MARZA_SCIAGANIA_SUFIT = 0.10     # wyżej niż to znaczyłoby błąd danych, nie marżę
 
 
-def _proba_ceny(log: dict | None = None) -> list[tuple[float, float, float]]:
+def _proba_ceny(log: dict | None = None,
+                rachunek: str = "stary") -> list[tuple[float, float, float]]:
     """(p_model, kurs, wynik) z rozliczeń, na których uczy się ściąganie karty.
 
     Jedna próba dla marży i dla wagi — inaczej waga dobrałaby się pod inną
     skalę ceny, niż ta, do której faktycznie ściągamy.
+
+    ⚑⚑ SEGMENTOWANE PO RACHUNKU (2026-08-18). Waga `w` odpowiada na pytanie
+    „ile NASZEJ liczby warto zostawić obok ceny" — a to zależy od tego, CZYJA
+    to liczba. Zmierzone na starym rachunku wyszło `w = 0,05`, czyli karta
+    pokazywała w 95% cenę bukmachera; nic dziwnego, skoro stary rachunek
+    zawyżał o 14 pp. Model uczony ma lukę −0,7 pp, więc jego waga jest INNYM
+    pomiarem i mieszanie obu prób dałoby liczbę nieprawdziwą dla żadnego z nich.
+
+    `rachunek="stary"` — typy starej maszynerii (domyślnie; tak liczy się waga
+    dla nich). `"uczony"` — typy policzone modelem.
     """
     if log is None:
         log = _migruj_log(supa.get_key("typy_log") or {})
+    chce_uczony = rachunek == "uczony"
     dane = []
     for r in log.values():
         if r.get("wynik") not in ("wygrany", "przegrany"):
@@ -3512,18 +3525,21 @@ def _proba_ceny(log: dict | None = None) -> list[tuple[float, float, float]]:
             continue
         if not _z_biezacej_epoki(r):
             continue
+        if (not _stary_rachunek(r)) != chce_uczony:
+            continue
         dane.append((float(r["p_model"]), float(r["kurs"]),
                      1.0 if r["wynik"] == "wygrany" else 0.0))
     return dane
 
 
-def marza_sciagania(log: dict | None = None) -> float:
+def marza_sciagania(log: dict | None = None,
+                    rachunek: str = "stary") -> float:
     """O ile cena bukmachera jest zawyżona wobec realnych trafień.
 
     Zwraca marżę jednostronną z rozliczeń, ściągniętą do domyślnej przy małej
     próbie. Przy braku danych zwraca domyślną, czyli zachowanie sprzed pomiaru.
     """
-    dane = _proba_ceny(log)
+    dane = _proba_ceny(log, rachunek)
     if not dane:
         return MARZA_SCIAGANIA_DOMYSLNA
     n = len(dane)
@@ -3541,7 +3557,8 @@ def marza_sciagania(log: dict | None = None) -> float:
 
 
 def waga_sciagania(log: dict | None = None,
-                   marza: float | None = None) -> float | None:
+                   marza: float | None = None,
+                   rachunek: str = "stary") -> float | None:
     """Ile NASZEJ liczby zostaje w szansie pokazywanej na karcie.
 
     Zwraca `w` z przedziału [PODLOGA, 1] albo None, gdy próba jest za mała —
@@ -3552,10 +3569,10 @@ def waga_sciagania(log: dict | None = None,
     ściągnięta w tym cyklu.
     """
     if marza is None:
-        marza = marza_sciagania(log)
+        marza = marza_sciagania(log, rachunek)
     dane = [
         (p, betting.implied_prob_one_sided(kurs, marza), y)
-        for p, kurs, y in _proba_ceny(log)
+        for p, kurs, y in _proba_ceny(log, rachunek)
     ]
     if len(dane) < WAGA_SCIAGANIA_MIN_N:
         return None

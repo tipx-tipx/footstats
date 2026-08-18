@@ -84,3 +84,54 @@ def test_warstwy_ucza_sie_wylacznie_na_starym_rachunku():
     assert R._stary_rachunek({"zrodlo_p": "stary_bez_pokrycia"})
     # rekordy sprzed 18.08 nie mają stempla i są z definicji stare
     assert R._stary_rachunek({})
+
+
+# --- WARSTWY WYŚWIETLANIA NIE RUSZAJĄ LICZBY MODELU ------------------------
+
+def test_proba_ceny_nie_miesza_dwoch_rachunkow():
+    """Waga ściągania odpowiada na pytanie „ile NASZEJ liczby zostawić obok
+    ceny" — a to zależy od tego, CZYJA to liczba. Na starym rachunku wyszło
+    w=0,05 (karta w 95% pokazywała cenę), bo tamten zawyżał o 14 pp. Model ma
+    lukę −0,7 pp, więc to INNY pomiar."""
+    from footstats.jobs import rozliczanie as R
+
+    log = {
+        "a": {"wynik": "wygrany", "kurs": 1.8, "p_model": 0.70,
+              "zrodlo_p": "stary", "kickoff_ts": 1_787_000_000},
+        "b": {"wynik": "przegrany", "kurs": 2.0, "p_model": 0.52,
+              "zrodlo_p": "uczony", "kickoff_ts": 1_787_000_000},
+        "c": {"wynik": "wygrany", "kurs": 1.6, "p_model": 0.66,
+              "kickoff_ts": 1_787_000_000},          # sprzed stempla = stary
+    }
+    stary = R._proba_ceny(log, "stary")
+    uczony = R._proba_ceny(log, "uczony")
+    assert {round(p, 2) for p, _, _ in stary} == {0.70, 0.66}
+    assert {round(p, 2) for p, _, _ in uczony} == {0.52}
+    assert not (set(stary) & set(uczony)), "próby nie mogą się przecinać"
+
+
+def test_urealnienie_pokazywanej_szansy_omija_model():
+    """Delta jest duża (drużyny −0,63 logitu): z uczciwych 51% modelu robi na
+    karcie 36%, a razem z nią przewraca kurs uczciwy, przewagę i wartość."""
+    import inspect
+    from footstats.jobs import build_wc_fast as B
+
+    zrodlo = inspect.getsource(B)
+    i = zrodlo.index("def _urealnij_do_pokazania")
+    blok = zrodlo[i:i + 1600]
+    assert 'zrodlo_p' in blok and '"uczony"' in blok, (
+        "warstwa `szansa_pokazywana` znowu ściąga liczbę modelu — a model "
+        "nie przeszacowuje, więc nie ma tu czego urealniać"
+    )
+
+
+def test_sciaganie_karty_ma_osobna_wage_dla_modelu():
+    import inspect
+    from footstats.jobs import build_wc_fast as B
+
+    zrodlo = inspect.getsource(B)
+    i = zrodlo.index("def _sciagnij_karte_do_ceny")
+    blok = zrodlo[i:i + 1400]
+    assert "_waga_karty_uczony" in blok, (
+        "karta liczona modelem używa wagi zmierzonej na STARYM rachunku"
+    )
