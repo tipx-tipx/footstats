@@ -250,6 +250,7 @@ def score_player_market(
     card_conversion: float | None = None,
     market_bias: float | dict = 1.0,
     korekta_strony: dict | None = None,
+    p_over_zewnetrzne: float | None = None,
 ) -> ScoredMarket:
     """Pełny scoring jednego rynku zawodnika dla jednego meczu.
 
@@ -350,11 +351,24 @@ def score_player_market(
     # w `ScoredMarket`. Musi być brane TU, bo niżej `p_over` jest nadpisywane
     # w miejscu i pierwotna liczba przepada.
     p_over_surowe = float(p_over)
+    # ⚑⚑ SZANSA Z MODELU UCZONEGO WCHODZI TUTAJ (2026-08-18), czyli PRZED
+    # `betting.assess`. To jest cała różnica między „poprawiamy liczbę na
+    # karcie" a „poprawiamy SELEKCJĘ": bramy, wartość i kolejność liczą się
+    # z `p_over`, więc podmiana za nimi zmieniłaby wyłącznie napis.
+    #
+    # Model idzie SUROWY — poniżej wyłączamy kalibrację, bo uczyła się błędu
+    # STAREGO rachunku (zawyżanie o ~14 pp) i na uczciwej liczbie ściągnęłaby
+    # ją poniżej prawdy. Patrz `uczony.ZRODLO_SZANSY`.
+    z_modelu = p_over_zewnetrzne is not None
+    if z_modelu:
+        p_over = float(np.clip(float(p_over_zewnetrzne), 1e-4, 1.0 - 1e-4))
     # samokalibracja z rozliczeń: nowy format = delta logitowa
     # (p' = sigmoid(logit(p)+b), równa korekta w całej skali), stary = mnożnik
     bias = _select_bias(market_bias, p_over)
     logit_mode = isinstance(market_bias, dict) and bool(market_bias.get("logit"))
     neutral = (abs(bias) < 1e-9) if logit_mode else (bias == 1.0)
+    if z_modelu:
+        neutral = True          # model uczony NIE przechodzi przez kalibrację
 
     def _kalibruj(x: float) -> float:
         x = float(np.clip(x, 1e-4, 1.0 - 1e-4))
@@ -377,6 +391,11 @@ def score_player_market(
     ci_low, ci_high = counts.p_over_credible_interval(
         posterior, mm.expected_minutes, cf.combined, line
     )
+    if z_modelu:
+        # model nie oddaje przedziału; szerokość niesie niepewność PRÓBY
+        # (ile meczów, jak świeżych) i ta nie zmienia się od zmiany rachunku
+        _pol = max((ci_high - ci_low) / 2.0, 0.0)
+        ci_low, ci_high = max(0.0, p_over - _pol), min(1.0, p_over + _pol)
     if not neutral:
         # CI w tej samej skali co skalibrowane p — karta pokazuje spójne liczby
         ci_low, ci_high = _kalibruj(ci_low), _kalibruj(ci_high)

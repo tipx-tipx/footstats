@@ -284,7 +284,10 @@ def test_pula_zawodnicza_liczy_p_ta_sama_delta_co_okazja():
 
     zrodlo = inspect.getsource(B)
     i = zrodlo.index("p_side = sm.p_over if side_key")
-    blok = zrodlo[i:i + 1200]
+    # okno 1200 -> 2400 (2026-08-18): między wyborem strony a korektą doszedł
+    # blok przełączenia źródła szansy (`uczony.ZRODLO_SZANSY`). Niezmiennik
+    # jest ten sam — korekta MA być liczona w tym samym miejscu co `p` puli.
+    blok = zrodlo[i:i + 2400]
     assert "delta_strony(korekta_stron" in blok, (
         "pula zawodnicza znowu liczy `p` sprzed korekty strony — leg kuponu "
         "i karta pokażą różne szanse dla tego samego zakładu"

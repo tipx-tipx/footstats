@@ -400,6 +400,25 @@ def _z_modelu(r: dict) -> bool:
     return not r.get("zrodlo")
 
 
+def _stary_rachunek(r: dict) -> bool:
+    """Czy `p_model` tego typu pochodzi ze STAREJ maszynerii.
+
+    ⚑ PO CO TO ISTNIEJE (2026-08-18). Warstwy uczenia mierzą JEDNO: o ile
+    rachunek zawyża, i o tyle ściągają. Od przełączenia części strumieni na
+    model uczony (`uczony.ZRODLO_SZANSY`) księga trzyma DWA różne rachunki —
+    stary, który zawyża o ~14 pp, i model, którego luka jest bliska zeru.
+    Policzone razem dałyby średnią z dwóch światów: dla drabinek (które
+    ZOSTAJĄ na warstwach) korekta byłaby za słaba, bo rozwodniona typami,
+    które korekty nie potrzebują.
+
+    To ta sama klasa błędu co pomiar bez filtra epoki, który w tym repo DWA
+    RAZY dał zły wniosek ([[wersjonowanie-i-martwe-epoki]]).
+
+    Rekordy sprzed 18.08 nie mają stempla `zrodlo_p` i są z definicji stare.
+    """
+    return str(r.get("zrodlo_p") or "") != "uczony"
+
+
 def _strumien(r: dict) -> str:
     """Strumień skuteczności typu: pewniaki / druzyny / drabinki.
 
@@ -524,6 +543,13 @@ def _kupon_leg_do_logu(l: dict) -> dict:
         # dwóch rachunków
         **({"p_uczony": l["p_uczony"]}
            if isinstance(l.get("p_uczony"), dict) and l["p_uczony"] else {}),
+        # ⚑ KTÓRY RACHUNEK POSZEDŁ NA STRONĘ (2026-08-18). Bez tego pola nie
+        # da się odróżnić typu policzonego modelem od typu, który spadł na
+        # stary rachunek przez brak pokrycia — a wtedy pomiar przełączenia
+        # miesza dwa rachunki i wychodzi średnia z niczego.
+        **({"zrodlo_p": l["zrodlo_p"]} if l.get("zrodlo_p") else {}),
+        **({"p_stary": l["p_stary"]}
+           if isinstance(l.get("p_stary"), (int, float)) else {}),
     }
 
 
@@ -971,6 +997,13 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
             # Brierem na ŻYWYCH meczach, a nie na backteście.
             **({"p_uczony": b["p_uczony"]}
                if isinstance(b.get("p_uczony"), dict) and b["p_uczony"] else {}),
+            # ⚑ ŹRÓDŁO SZANSY (2026-08-18) — patrz `uczony.ZRODLO_SZANSY`.
+            # Od przełączenia `p_model` bywa liczbą MODELU, więc bez tego
+            # stempla księga nie wie, czym mierzy, a `p_stary` jest jedynym
+            # zachowanym punktem odniesienia do porównania parowanego.
+            **({"zrodlo_p": b["zrodlo_p"]} if b.get("zrodlo_p") else {}),
+            **({"p_stary": round(float(b["p_stary"]), 4)}
+               if isinstance(b.get("p_stary"), (int, float)) else {}),
             # WKŁAD KAŻDEJ ZALEŻNOŚCI, ZAMROŻONY PRZY PUBLIKACJI (2026-08-07).
             #
             # Do dziś księga zapisywała sam WYNIK rachunku (`p_model`), więc po
@@ -2776,6 +2809,8 @@ def korekta_strumienia(log: dict | None = None) -> dict[str, float]:
         # typy modelu ORAZ drabinki — każdy mierzony na SWOICH rozliczeniach,
         # nigdy wymieszany (pętla niżej rozdziela je po strumieniu)
         and (_z_modelu(r) or r.get("zrodlo") == ZRODLO_DRABINKA)
+        # ...i WYŁĄCZNIE stary rachunek — patrz `_stary_rachunek`
+        and _stary_rachunek(r)
     ]
     out: dict[str, float] = {}
     for strumien in STRUMIENIE:
@@ -2849,6 +2884,8 @@ def proby_strumieni(log: dict | None = None) -> dict[str, dict]:
         and not _z_martwej_epoki(r)
         and _z_biezacej_epoki(r)
         and (_z_modelu(r) or r.get("zrodlo") == ZRODLO_DRABINKA)
+        # ...i WYŁĄCZNIE stary rachunek — patrz `_stary_rachunek`
+        and _stary_rachunek(r)
     ]
     out: dict[str, dict] = {}
     for strumien in STRUMIENIE:
@@ -2903,6 +2940,8 @@ def sklad_wersji_okna(log: dict | None = None) -> dict[str, dict]:
         and not _z_martwej_epoki(r)
         and _z_biezacej_epoki(r)
         and (_z_modelu(r) or r.get("zrodlo") == ZRODLO_DRABINKA)
+        # ...i WYŁĄCZNIE stary rachunek — patrz `_stary_rachunek`
+        and _stary_rachunek(r)
     ]
     out: dict[str, dict] = {}
     for strumien in STRUMIENIE:

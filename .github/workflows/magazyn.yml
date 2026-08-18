@@ -31,7 +31,12 @@ concurrency:
 jobs:
   magazyn:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # 18.08: magazyn urósł z 309 do 1299 drużyn (dołożone kluby
+    # z nadchodzącego terminarza — patrz nota w backfillu). Przebieg
+    # zmierzony lokalnie: 19 min na 1314 drużynach. Po zawężeniu do
+    # zakresu drużynowego wraca w okolice 6 min, ale zapas zostaje —
+    # zabity job nie zapisuje nic, a magazyn jest teraz podstawą wyceny.
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
 

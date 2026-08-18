@@ -1468,7 +1468,18 @@ def _sezony_wpisu(player_sezon: dict | None, pid: int | None) -> list[dict]:
         return []
     rec = player_sezon.get(str(pid)) or player_sezon.get(int(pid)) or {}
     sez = rec.get("sezony") or []
-    return sez[:MAX_SEZONOW_WPISU]
+    # ⚑ RYNEK WYCOFANY ZNIKA TAKŻE Z SEZONÓW (decyzja właściciela 18.08:
+    # „zdejmij odbiory całkowicie"). Sekcja `sezony` to średnie opisowe,
+    # a nie zakład — ale karta pokazuje je pod tą samą etykietą co rynki
+    # („odbiory 0,94 na 90 min"), więc zostawienie ich znaczyłoby, że rynek
+    # wycofany dalej jest na stronie. Patrz `betting.RYNKI_WYCOFANE`.
+    return [
+        {**s,
+         **{pole: {k: v for k, v in (s.get(pole) or {}).items()
+                   if not betting.rynek_wycofany(k)}
+            for pole in ("na90", "na_mecz") if isinstance(s.get(pole), dict)}}
+        for s in sez[:MAX_SEZONOW_WPISU]
+    ]
 
 
 # Do ilu procent różnicy uznajemy, że dwa cenniki MÓWIĄ TO SAMO. Poniżej tego

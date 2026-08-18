@@ -45,8 +45,47 @@ def main() -> None:
     wszystkie = "--wszystkie" in sys.argv
     prof = (supa.get_key("druzyny_profil") or {}).get("druzyny") or {}
     ids = [int(t) for t in prof]
+
+    # ⚑⚑ DRUŻYNY Z NADCHODZĄCEGO TERMINARZA, NIE TYLKO TE, KTÓRE JUŻ GRAŁY
+    # (2026-08-18). `druzyny_profil` rotuje klub po 90 dniach bez meczu
+    # (profil_druzyn.ROTACJA_DNI), a przerwa letnia w Ligue 1, Serie A
+    # i La Liga trwa dokładnie tyle. Skutek zmierzony 18.08 na dry-runie:
+    # profil i magazyn były w idealnej synchronizacji (310 vs 309), a MIMO TO
+    # 18 klubów z rozpoczynającego się sezonu — Marseille, Sevilla, Lens,
+    # Parma, Genoa, Udinese — nie było w ŻADNYM z nich. Model nie miał dla
+    # nich pokrycia, więc ich typy spadały na stary rachunek: 931 z 4300
+    # wycen drużynowych, czyli 22%.
+    #
+    # To jest samonapędzające się: klub bez profilu nie trafia do magazynu,
+    # a bez magazynu model go nie liczy — i nic tego nie przerywa poza
+    # przypadkiem, w którym profil zdąży się odbudować z rozegranych meczów.
+    # Terminarz wie o meczu ZANIM się odbędzie i to jest właściwe źródło.
+    # ⚑ TYLKO ZAKRES DRUŻYNOWY. Terminarz obejmuje WSZYSTKIE rozgrywki
+    # statshuba, a rynki drużynowe liczymy dla 21 z nich (`rozgrywki`).
+    # Pytanie o resztę kosztuje jedno zapytanie HTTP na drużynę i nic nie daje:
+    # zmierzone 18.08 — bez tego filtra lista urosła do 1314 drużyn, a przebieg
+    # do 19 minut przy limicie zadania 25 (`magazyn.yml`). Margines był za
+    # cienki i kurczyłby się z każdym tygodniem.
+    z_terminarza: set[int] = set()
+    try:
+        from footstats.jobs import build_league as BL
+        for m in BL.upcoming_events(days=7):
+            if not getattr(m, "druzynowe", False):
+                continue
+            for pole in ("home_id", "away_id"):
+                v = getattr(m, pole, None)
+                if v:
+                    z_terminarza.add(int(v))
+    except Exception as e:  # noqa: BLE001
+        print(f"   (terminarz pominięty: {type(e).__name__}: {e})")
+    nowe_z_terminarza = sorted(z_terminarza - {int(x) for x in ids})
+    if nowe_z_terminarza:
+        print(f"Z terminarza dochodzi {len(nowe_z_terminarza)} drużyn, "
+              "o które profil by nie zapytał (świeży sezon po przerwie)")
+        ids = ids + nowe_z_terminarza
+
     if not ids:
-        print("`druzyny_profil` puste — nie wiem, o które drużyny pytać.")
+        print("Ani profil, ani terminarz nie dały drużyn — nie wiem, o co pytać.")
         return
     if not wszystkie:
         ids = ids[:PROBNIE]

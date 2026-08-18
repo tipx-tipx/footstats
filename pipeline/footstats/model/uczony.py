@@ -51,6 +51,81 @@ from collections import defaultdict
 import numpy as np
 
 WERSJA_MODELU_UCZONEGO = "2026-08-17-uczony-1"
+
+# ---------------------------------------------------------------------------
+# CO IDZIE NA STRONĘ — PRZEŁĄCZNIK ŹRÓDŁA SZANSY (2026-08-18)
+# ---------------------------------------------------------------------------
+#
+# Decyzja właściciela 18.08: przełączamy na model uczony OD RAZU, bez czekania
+# na próg 100 sparowanych rozliczeń — „obecny model i tak nie działa".
+#
+# DOWÓD, NA KTÓRYM TO STOI (powtórzony 18.08 na 4794 typach, wagi trenowane
+# wyłącznie na meczach starszych niż testowe):
+#
+#     luka deklaracji   −14,3 pp  ->  −1,0 pp
+#     Brier              0,2437   ->   0,2280
+#     log-loss           0,6943   ->   0,6513
+#     lepszy na WSZYSTKICH sześciu rynkach drużynowych
+#
+# ⚑⚑ MODEL IDZIE SUROWY, BEZ WARSTW KALIBRACYJNYCH — I TO NIE JEST SKRÓT.
+# Warstwy (`kal_rynek`, `kal_strumien`, `korekta_strony`) uczą się z rozliczeń,
+# O ILE MODEL ZAWYŻA, i o tyle ściągają. Są dopasowane do STAREGO rachunku,
+# który zawyża o 14 pp. Nałożone na liczbę, która już nie zawyża, ściągnęłyby
+# ją poniżej prawdy — czyli przełączenie źródła BEZ zdjęcia warstw dałoby
+# wynik GORSZY niż przed zmianą. Backtest wyżej mierzył model SUROWY i taki
+# wygrał, więc taki idzie na stronę.
+#
+# ⚑ DRABINKI ZOSTAJĄ NA STARYM (decyzja właściciela 18.08). Mają własną
+# korektę, własny pomiar drugiego szczebla i wymagają osobnej roboty modelowej
+# — patrz [[PLAN-do-29-08]]. Model liczy im drugą liczbę od 17.08, ale strona
+# jej nie używa.
+#
+# POWRÓT: zmienić wartość na "stary" i wypchnąć. Nie trzeba rewertować ani
+# jednego commita — obie liczby są stemplowane w księdze niezależnie od tego,
+# która poszła na stronę (patrz `stempel_zrodla`).
+ZRODLO_SZANSY: dict[str, str] = {
+    "druzyny":   "uczony",     # 93% produkcji
+    "pewniaki":  "uczony",     # zawodnicy
+    "sumy":      "uczony",     # sumy meczowe i „kto więcej"
+    "drabinki":  "stary",      # ⚑ decyzja właściciela — osobna robota modelowa
+}
+
+
+def na_stronie(strumien: str) -> bool:
+    """Czy TEN strumień liczy stronę modelem uczonym."""
+    return ZRODLO_SZANSY.get(str(strumien or ""), "stary") == "uczony"
+
+
+def wybierz_szanse(
+    strumien: str, p_stary: float, p_uczony: dict | None,
+) -> tuple[float, str]:
+    """Która liczba idzie na stronę. Zwraca (p, źródło).
+
+    Model bez pokrycia (za krótka historia drużyny) NIE jest błędem — wtedy
+    zostaje stary rachunek, a stempel mówi „stary_bez_pokrycia", żeby dało się
+    policzyć, jak często to się zdarza. Cichy fallback byłby tu najgorszy
+    z możliwych: strona pokazywałaby mieszankę dwóch rachunków, a pomiar
+    przypisywałby wszystko modelowi.
+    """
+    if not na_stronie(strumien):
+        return float(p_stary), "stary"
+    if not isinstance(p_uczony, dict) or p_uczony.get("p") is None:
+        return float(p_stary), "stary_bez_pokrycia"
+    return float(p_uczony["p"]), "uczony"
+
+
+def stempel_zrodla(p_stary: float, p_uczony: dict | None, zrodlo: str) -> dict:
+    """Komplet do księgi: OBIE liczby plus informacja, która poszła na stronę.
+
+    ⚑ Stemplujemy obie ZAWSZE, niezależnie od przełącznika. To jest jedyny
+    sposób, żeby za dwa tygodnie dało się odpowiedzieć na pytanie „czy to
+    działa" bez odtwarzania backtestu — i warunek postawiony przez właściciela
+    przy zatwierdzaniu przełączenia.
+    """
+    out = {"zrodlo_p": zrodlo, "p_stary": round(float(p_stary), 4)}
+    if isinstance(p_uczony, dict) and p_uczony.get("p") is not None:
+        out["p_uczony"] = p_uczony
+    return out
 KLUCZ_WAG = "model_wagi"
 
 # ------------------------------------------------------------------- cele ----
@@ -171,9 +246,43 @@ def cechy_wiersza(kod: str, hist: list[dict], opp_hist: list[dict],
     }
 
 
-def wiersze_treningowe(mag: dict) -> dict[str, list[dict]]:
-    """{rynek: wiersze} — cel + cechy, po jednym wierszu na (mecz, drużyna)."""
+def _ligi_zakresu() -> set:
+    """Rozgrywki, dla których LICZYMY rynki drużynowe (jedyne, na których
+    warto trenować — patrz `wiersze_treningowe`)."""
+    try:
+        from .. import rozgrywki
+        return set(rozgrywki.PROFILE.keys())
+    except Exception:                                          # noqa: BLE001
+        return set()
+
+
+def wiersze_treningowe(mag: dict, tylko_zakres: bool = True) -> dict[str, list[dict]]:
+    """{rynek: wiersze} — cel + cechy, po jednym wierszu na (mecz, drużyna).
+
+    ⚑⚑ TRENUJEMY WYŁĄCZNIE NA ROZGRYWKACH, KTÓRE WYCENIAMY (2026-08-18).
+    Magazyn urósł 18.08 z 309 do 1299 drużyn, bo backfill zaczął pytać też
+    o kluby z nadchodzącego terminarza ([[magazyn-gubil-top-ligi]]). Terminarz
+    obejmuje WSZYSTKIE rozgrywki statshuba, więc do magazynu weszło 177 lig,
+    a rynki drużynowe liczymy dla 21 — zmierzone: tylko 26,1% meczów magazynu
+    było „nasze".
+
+    ZMIERZONE, nie założone (ten sam zbiór testowy, dwa treningi):
+
+        A. cały magazyn, 177 lig, 221 765 wierszy
+           luka −0,9 pp   Brier 0,2287   selekcja: trafia 56,9%, margines −2,0 pp
+        B. tylko zakres, 21 rozgrywek, 57 256 wierszy
+           luka −0,7 pp   Brier 0,2279   selekcja: trafia 58,2%, margines −0,7 pp
+
+    Mniejsza próba wygrywa NA KAŻDEJ MIERZE. To spójne z krzywą uczenia
+    zmierzoną tego samego dnia: poczwórna próba treningowa poprawia dewiancję
+    o 0,4%, czyli model jest danymi NASYCONY — a wtedy dokładanie obcego
+    rozkładu może już tylko szkodzić.
+
+    Historia klubu spoza zakresu ZOSTAJE w magazynie i dalej służy jako profil
+    RYWALA (koncesje) — wycinamy ją z treningu, nie z danych.
+    """
     serie = _serie(mag)
+    zakres = _ligi_zakresu() if tylko_zakres else set()
     liga_sr = srednie_ligowe(serie)
     out: dict[str, list[dict]] = defaultdict(list)
     for tid, mecze in serie.items():
@@ -187,6 +296,8 @@ def wiersze_treningowe(mag: dict) -> dict[str, list[dict]]:
                 h for h in serie.get(str(m.get("o")), [])
                 if int(h.get("t") or 0) < czas
             ]
+            if zakres and m.get("l") not in zakres:
+                continue        # mecz spoza zakresu drużynowego — patrz wyżej
             for kod, rynek in CELE.items():
                 y = _wartosc(m, kod)
                 if y is None:

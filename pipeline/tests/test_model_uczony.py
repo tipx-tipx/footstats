@@ -20,7 +20,11 @@ import numpy as np
 from footstats.model import uczony as U
 
 
-def _mecz(ts, cor=6, cor_opp=4, dom=1, opp=99, liga=1, gole=2):
+# ⚑ liga=17 to Premier League — MUSI być rozgrywką z zakresu drużynowego
+# (`rozgrywki.PROFILE`), bo od 18.08 trening bierze WYŁĄCZNIE mecze
+# z zakresu ([[magazyn-gubil-top-ligi]]). Fixture z ligą spoza zakresu
+# dawałby zero wierszy i testy mierzyłyby pustkę zamiast modelu.
+def _mecz(ts, cor=6, cor_opp=4, dom=1, opp=99, liga=17, gole=2):
     return {"t": ts, "e": ts, "o": opp, "h": dom, "l": liga, "g": gole, "gp": 1,
             "s": {"cor": cor, "pos": 55, "crs": 8, "f3": 100},
             "sp": {"cor": cor_opp, "pos": 45, "crs": 5, "f3": 80}}
@@ -85,7 +89,9 @@ def test_koncesje_rywala_ida_z_jego_meczow():
 def test_cechy_produkcyjne_to_te_same_cechy():
     """Predykcja dla nadchodzącego meczu liczy się tą samą funkcją co trening."""
     mag = _magazyn(n=20)
-    c = U.cechy_na_mecz(mag, 10, "team_corners", opp_id=99, dom=1, liga=1,
+    # liga MUSI być ta sama co w magazynie (17), inaczej średnia ligowa
+    # wychodzi None i test porównuje dwie różne rozgrywki
+    c = U.cechy_na_mecz(mag, 10, "team_corners", opp_id=99, dom=1, liga=17,
                         do_ts=99999)
     assert c is not None
     # wiersz treningowy z tą samą historią: ostatni mecz drużyny 10 u siebie
@@ -595,7 +601,7 @@ def test_druga_liczba_drabinki_nie_wchodzi_do_oceny_karty():
 
 def _mecz_sum(ts, cor=6, cor_opp=4, dom=1, opp=99, ev=None):
     return {"t": ts, "e": ev if ev is not None else ts, "o": opp, "h": dom,
-            "l": 1, "g": 2, "gp": 1,
+            "l": 17, "g": 2, "gp": 1,
             "s": {"cor": cor, "pos": 55}, "sp": {"cor": cor_opp, "pos": 45}}
 
 
@@ -690,3 +696,33 @@ def test_trening_obejmuje_trzy_grupy_rynkow():
     assert "1 sum meczowych" in stan
     assert "1 drużynowych" in stan and "1 zawodniczych" in stan
     assert "ZERO" not in stan
+
+
+# --- TRENING TYLKO NA ROZGRYWKACH, KTÓRE WYCENIAMY (2026-08-18) -------------
+
+def test_trening_pomija_mecze_spoza_zakresu_druzynowego():
+    """Magazyn trzyma 177 lig (backfill pyta o kluby z całego terminarza),
+    a rynki drużynowe liczymy dla 21. Trening na obcym rozkładzie POGARSZA
+    model — zmierzone na tym samym zbiorze testowym:
+
+        cały magazyn (221 765 wierszy)  Brier 0,2287  margines −2,0 pp
+        tylko zakres  (57 256 wierszy)  Brier 0,2279  margines −0,7 pp
+
+    Mniejsza próba wygrywa na każdej mierze. Kto zdejmie ten filtr, musi
+    najpierw powtórzyć ten pomiar.
+    """
+    from footstats import rozgrywki
+    assert 17 in rozgrywki.PROFILE, "17 = Premier League, kotwica tego testu"
+    OBCA = max(rozgrywki.PROFILE) + 10_000
+    assert OBCA not in rozgrywki.PROFILE
+
+    mag = _magazyn(n=20)                       # liga 17 — w zakresie
+    assert U.wiersze_treningowe(mag)["team_corners"], "zakres ma dawać wiersze"
+
+    # ta sama historia, ale rozgrywki spoza zakresu -> zero wierszy
+    obcy = {tid: {"m": [{**m, "l": OBCA} for m in rec["m"]]}
+            for tid, rec in mag.items()}
+    assert not U.wiersze_treningowe(obcy).get("team_corners")
+
+    # ...chyba że ktoś ŚWIADOMIE wyłączy filtr (do pomiarów, nie do produkcji)
+    assert U.wiersze_treningowe(obcy, tylko_zakres=False)["team_corners"]

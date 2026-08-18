@@ -37,7 +37,7 @@ from ..engine import (
 )
 from ..model import (
     betting, context, counts, koncesje, kupony, matchup, matchup_lite,
-    profil_druzyn, styl, tempo, uczony,
+    minutes as minutes_mod, profil_druzyn, styl, tempo, uczony,
 )
 from ..sources import (
     betclic, eloratings, rotowire, scores365, sofascore, statshub, superbet,
@@ -251,6 +251,12 @@ _STEMPLE_PUBLIKACJI = (
     "kal_tau",         # historia predykcji rynków drużynowych
     "kolejnosc",       # moc listy + bogactwo materiału meczu
     "p_uczony",        # druga liczba: model uczony (szansa, λ, odległość linii)
+    # ⚑ PRZEŁĄCZENIE ŹRÓDŁA (2026-08-18) — OBA pola muszą przetrwać wznowienie,
+    # inaczej typ odtworzony z księgi wygląda, jakby nigdy nie był liczony
+    # modelem, i kontrola przełączenia liczyłaby zaniżone pokrycie. To ta sama
+    # klasa błędu co [[wersja-modelu-i-brama-kolizji]] i stempel `kolejnosc`.
+    "zrodlo_p",        # który rachunek poszedł NA STRONĘ
+    "p_stary",         # liczba starej maszynerii, zachowana do porównania
     "lambda",          # przewidywana liczba zdarzeń (próg λ)
     "ess",             # efektywna liczba meczów własnej historii
     "udzial_priora",   # ile prognozy pochodzi ze średniej rozgrywek
@@ -4135,6 +4141,10 @@ def _main_impl(tryb=None):
     _wagi_modelu: dict = {}
     _ctx_modelu: dict = {}
     _licznik_uczonego: Counter = Counter()
+    # ⚑ CZUJNIK PRZEŁĄCZENIA: ile wycen poszło którym rachunkiem. Bez niego
+    # „model na stronie" byłoby deklaracją, a nie faktem — a dokładnie tego
+    # właściciel zażądał przy zatwierdzaniu ([[PLAN-do-29-08]], zadanie 1).
+    _licznik_zrodla: Counter = Counter()
     try:
         _wagi_modelu = supa.get_key(uczony.KLUCZ_WAG) or {}
         print(uczony.zdanie_stanu(_wagi_modelu))
@@ -5295,12 +5305,44 @@ def _main_impl(tryb=None):
         for l, slot in sorted(merged.items()):
             over_odd = slot.get("over", (None,))[0]
             under_odd = slot.get("under", (None,))[0]
+            # ⚑⚑ PRZEŁĄCZENIE ŹRÓDŁA (2026-08-18) — liczba modelu wchodzi DO
+            # silnika, nie za nim, więc bramy i kolejność liczą się z niej.
+            # Prognoza jest dla strony „powyżej", bo `p_over` jest w silniku
+            # liczbą bazową, a „poniżej" powstaje z niej jako dopełnienie.
+            #
+            # ⚑ MINUTY LICZYMY TĄ SAMĄ DROGĄ CO SILNIK, nie zostawiamy modelowi
+            # jego zapasu (`min6`, własna średnia z 6 meczów). Model uczony jest
+            # trenowany na tempie na 90 minut i skaluje je offsetem minut, więc
+            # licząc mu je z samej historii wyrzucilibyśmy CAŁY sygnał ze
+            # składów — a to jest jedna z lepszych części starego silnika
+            # i nie ma powodu jej tracić przy przełączaniu rachunku.
+            _mm_zaw = minutes_mod.estimate_minutes(
+                recent_started=hist.started,
+                recent_minutes=hist.minutes,
+                days_ago=hist.days_ago,
+                injured_or_suspended=ctx.injured_or_suspended,
+                official_started=ctx.official_started,
+                predicted_started=ctx.predicted_started,
+            )
+            _pu_over = _prognoza_uczonego_zaw(
+                tr, mk, l, "powyzej", _mm_zaw.expected_minutes, ts)
+            _p_zew = None
+            if uczony.na_stronie("pewniaki"):
+                if _pu_over and _pu_over.get("p") is not None:
+                    _p_zew = float(_pu_over["p"])
+                    _licznik_zrodla["pewniaki:uczony"] += 1
+                else:
+                    _licznik_zrodla["pewniaki:stary_bez_pokrycia"] += 1
             sm = score_player_market(mk, l, hist, prior, ctx,
                                      over_odd, under_odd,
                                      market_calibrated=True,
                                      market_bias=_bias_z_korekta(mk, "pewniaki"),
                                      # patrz nota przy `korekta_stron` wyżej
-                                     korekta_strony=korekta_stron)
+                                     korekta_strony=(
+                                         None if _p_zew is not None
+                                         else korekta_stron
+                                     ),
+                                     p_over_zewnetrzne=_p_zew)
             # POMIAR PROGÓW: odrzucenia tuż przy progu (betting.NEAR_*) —
             # rozliczą się w tle poza kalibracją/skutecznością/UI
             for od in sm.odrzucone:
@@ -5309,8 +5351,8 @@ def _main_impl(tryb=None):
                     or len(odrzucone_pomiar) >= ODRZUCONE_POMIAR_MAX
                 ):
                     continue
-                _pu_zaw_pomiar = _prognoza_uczonego_zaw(
-                    tr, mk, l, "powyzej", sm.expected_minutes, ts)
+                # ta sama prognoza co przy przełączeniu — policzona wyżej
+                _pu_zaw_pomiar = _pu_over
                 odrzucone_pomiar.append({
                     "id": 0, "mecz_id": mid, "mecz": match_label,
                     "kickoff_ts": ts, "podmiot_typ": "zawodnik",
@@ -5375,7 +5417,19 @@ def _main_impl(tryb=None):
                 # i w pętli drużynowej.
                 _pu_zaw = _prognoza_uczonego_zaw(
                     tr, mk, l, side_pl, sm.expected_minutes, ts)
-                _d_strony_p = betting.delta_strony(korekta_stron, mk, side_pl)
+                # ⚑ ŹRÓDŁO SZANSY (2026-08-18). `sm.p_over` jest już liczbą
+                # MODELU, gdy silnik dostał `p_over_zewnetrzne` — tu tylko
+                # nazywamy rachunek i pilnujemy, żeby warstwa go nie ruszyła.
+                _zrodlo_p_zaw = (
+                    "uczony" if _p_zew is not None
+                    else ("stary_bez_pokrycia"
+                          if uczony.na_stronie("pewniaki") else "stary")
+                )
+                _p_stary_zaw = p_side
+                _d_strony_p = (
+                    0.0 if _zrodlo_p_zaw == "uczony"
+                    else betting.delta_strony(korekta_stron, mk, side_pl)
+                )
                 if _d_strony_p:
                     p_side = betting._z_delta(p_side, _d_strony_p)
                     _licznik_korekty_stron[f"{mk}|{side_pl}"] += 1
@@ -5500,7 +5554,9 @@ def _main_impl(tryb=None):
                         # stempel jedzie razem z liczbą (2026-08-17)
                         "kal_strony": round(_d_strony_p, 4),
                         # druga liczba: model uczony na tempie na 90 minut
-                        **({"p_uczony": _pu_zaw} if _pu_zaw else {}),
+                        **uczony.stempel_zrodla(
+                            _p_stary_zaw, _pu_zaw, _zrodlo_p_zaw
+                        ),
                         "ev_pct": ev_pct_leg, "ev_netto": ev_netto_leg,
                         "ev_uk": ev_uk_leg, "kurs_ref": kurs_ref_leg,
                         # ta sama formuła co w value_bets (spójne z pewnosc_score
@@ -5586,6 +5642,25 @@ def _main_impl(tryb=None):
             side_key = "over" if a.side == "powyzej" else "under"
             kurs_wziety, book = slot[side_key]
             vb_id += 1
+            # ⚑ ŹRÓDŁO SZANSY DLA OKAZJI (2026-08-18). Warunek MUSI być ten sam
+            # co w pętli linii wyżej, inaczej stempel mówiłby co innego niż
+            # rachunek, którym typ policzono.
+            #
+            # `sm.p_over_raw` to surowe `p_over` STAREGO silnika — zapamiętane
+            # ZANIM model je podmienił (patrz `p_over_surowe` w engine.py).
+            # Tu jest dokładnie właściwą liczbą odniesienia, bo publikujemy
+            # wyłącznie „powyżej" (underów nie gramy), a to jest strona,
+            # w której `p_over` mierzy ten sam zakład.
+            _pu_okazji = _prognoza_uczonego_zaw(
+                tr, mk, l, a.side, sm.expected_minutes, ts)
+            _zrodlo_okazji = (
+                "stary" if not uczony.na_stronie("pewniaki")
+                else ("uczony"
+                      if _pu_okazji and _pu_okazji.get("p") is not None
+                      else "stary_bez_pokrycia")
+            )
+            _p_stary_okazji = float(sm.p_over_raw if sm.p_over_raw is not None
+                                    else a.model_prob)
             dist = counts.predict_match(
                 counts.fit_posterior(
                     np.array(hist.counts), np.array(hist.minutes),
@@ -5645,6 +5720,13 @@ def _main_impl(tryb=None):
                 "kurs_ref": kurs_ref,
                 "kurs_novig": kurs_novig, "ev_uk": ev_uk,
                 "p_model": a.model_prob, "p_rynku": a.implied_prob,
+                # ⚑ ŹRÓDŁO SZANSY (2026-08-18) — okazja zawodnicza to rekord,
+                # który realnie idzie na stronę, więc bez tego stempla kontrola
+                # przełączenia liczyłaby cały ten strumień jako „bez stempla"
+                # i wyglądałoby to na nieudane przełączenie
+                **uczony.stempel_zrodla(
+                    _p_stary_okazji, _pu_okazji, _zrodlo_okazji
+                ),
                 "fair_kurs": a.fair_odds, "edge_pp": a.edge_pp, "ev_pct": a.ev_pct,
                 "ev_netto": a.ev_netto, "tryb_podatku": a.tryb_podatku,
                 "matchup": float(sm.factors.get("rywal", 1.0) or 1.0) >= 1.12,
@@ -6549,6 +6631,34 @@ def _main_impl(tryb=None):
                         p_t, lo_t, hi_t = p_over_t, lo_o, hi_o
                     else:
                         p_t, lo_t, hi_t = 1.0 - p_over_t, 1.0 - hi_o, 1.0 - lo_o
+                    # ⚑⚑ PRZEŁĄCZENIE ŹRÓDŁA SZANSY (2026-08-18) — patrz
+                    # `uczony.ZRODLO_SZANSY`. Model wchodzi TUTAJ, czyli PRZED
+                    # widełkami, oknem zgody i wartością, bo inaczej poprawiłby
+                    # liczbę na karcie, a selekcja dalej wybierałaby po starej.
+                    #
+                    # Liczba modelu jest SUROWA: mija kalibrację rynku
+                    # (`_bias_t_pelny` weszła w `p_over_t`, którego tu już nie
+                    # używamy) i mija korektę strony niżej. Warstwy są
+                    # dopasowane do rachunku zawyżającego o 14 pp — nałożone na
+                    # uczciwą liczbę ściągnęłyby ją poniżej prawdy.
+                    _pu = _prognoza_uczonego(
+                        tt.market_code, tt.team_id, tt.opponent_id,
+                        1 if tt.is_home else 0, tt.league_id or None,
+                        l_t, strona_t, ts,
+                    )
+                    _p_stary_t = p_t
+                    p_t, _zrodlo_t = uczony.wybierz_szanse("druzyny", p_t, _pu)
+                    _licznik_zrodla[f"druzyny:{_zrodlo_t}"] += 1
+                    if _zrodlo_t == "uczony":
+                        # MODEL NIE ODDAJE PRZEDZIAŁU, więc zachowujemy
+                        # SZEROKOŚĆ starego i przesuwamy go na nowe centrum.
+                        # Szerokość niesie niepewność próby (ile meczów, jak
+                        # świeżych) i ta się nie zmienia od zmiany rachunku;
+                        # zerowanie przedziału otworzyłoby bramę `p_dec`, bo
+                        # ona liczy (p + lo) / 2.
+                        _pol_t = max((hi_t - lo_t) / 2.0, 0.0)
+                        lo_t = max(0.0, p_t - _pol_t)
+                        hi_t = min(1.0, p_t + _pol_t)
                     # KOREKTA STRUMIENIA — patrz `_p_over_t_kor` wyżej.
                     # Od 2026-07-30 stosowana do „powyżej", a „poniżej" jest
                     # jej LUSTREM; nie dokładamy jej drugi raz do wybranej
@@ -6564,8 +6674,13 @@ def _main_impl(tryb=None):
                     # Wchodzi PRZED widełkami, oknem zgody i wartością, bo
                     # inaczej poprawiłaby liczbę na karcie, a selekcja dalej
                     # wybierałaby po szansie zawyżonej.
-                    _d_strony_t = betting.delta_strony(
-                        korekta_stron, tt.market_code, strona_t
+                    # warstwa uczy się błędu STAREGO rachunku — na liczbie
+                    # modelu jest nie tylko zbędna, ale szkodliwa
+                    _d_strony_t = (
+                        0.0 if _zrodlo_t == "uczony"
+                        else betting.delta_strony(
+                            korekta_stron, tt.market_code, strona_t
+                        )
                     )
                     if _d_strony_t:
                         p_t = betting._z_delta(p_t, _d_strony_t)
@@ -6600,11 +6715,9 @@ def _main_impl(tryb=None):
                             and pomiar_druzyn < ODRZUCONE_POMIAR_DRUZYN_MAX
                         ):
                             pomiar_druzyn += 1
-                            _pu_pomiar = _prognoza_uczonego(
-                                tt.market_code, tt.team_id, tt.opponent_id,
-                                1 if tt.is_home else 0, tt.league_id or None,
-                                l_t, strona_t, ts,
-                            )
+                            # ta sama prognoza co przy przełączeniu źródła —
+                            # policzona wyżej, tu tylko przepisana
+                            _pu_pomiar = _pu
                             odrzucone_pomiar.append({
                                 "id": 0, "mecz_id": mid, "mecz": match_label,
                                 "kickoff_ts": ts, "podmiot_typ": "druzyna",
@@ -6631,10 +6744,12 @@ def _main_impl(tryb=None):
                                 # samo jak publikowany, więc bez stempla
                                 # warstwa policzyłaby swoją deltę drugi raz.
                                 "kal_strony": round(_d_strony_t, 4),
-                                # ...i druga liczba z modelu uczonego: typy
-                                # pomiarowe są najlepszą próbą do porównania
-                                # dwóch rachunków, bo nie przeszły selekcji
-                                **({"p_uczony": _pu_pomiar} if _pu_pomiar else {}),
+                                # ...i OBIE liczby: typy pomiarowe są najlepszą
+                                # próbą do porównania rachunków, bo nie przeszły
+                                # selekcji
+                                **uczony.stempel_zrodla(
+                                    _p_stary_t, _pu_pomiar, _zrodlo_t
+                                ),
                             })
                         continue
                     if (hi_t - lo_t) > 0.35:
@@ -6749,11 +6864,8 @@ def _main_impl(tryb=None):
                     # `_prognoza_uczonego`). Zapisujemy komplet, żeby dało się
                     # potem odtworzyć, na czym stała: szansa, λ i odległość
                     # linii od λ, na której stoi reguła zasięgu.
-                    _pu = _prognoza_uczonego(
-                        tt.market_code, tt.team_id, tt.opponent_id,
-                        1 if tt.is_home else 0, tt.league_id or None,
-                        l_t, strona_t, ts,
-                    )
+                    # `_pu` policzone WYŻEJ, przy przełączeniu źródła —
+                    # drugie wywołanie liczyłoby to samo i podwajało licznik
                     legi_pool.append({
                         "id": 0, "mecz_id": mid, "mecz": match_label,
                         "kickoff_ts": ts, "podmiot_id": tt.team_id,
@@ -6764,7 +6876,10 @@ def _main_impl(tryb=None):
                         "rynek": MARKET_NAMES_PL[tt.market_code],
                         "linia": l_t, "strona": strona_t, "kurs": odd_t,
                         "bukmacher": "Superbet", "p_model": round(p_t, 4),
-                        **({"p_uczony": _pu} if _pu else {}),
+                        # OBIE liczby zawsze, niezależnie od przełącznika —
+                        # inaczej za dwa tygodnie nie da się odpowiedzieć,
+                        # czy przełączenie pomogło (`uczony.stempel_zrodla`)
+                        **uczony.stempel_zrodla(_p_stary_t, _pu, _zrodlo_t),
                         # delta korekty strony nałożona wyżej — bez stempla
                         # warstwa byłaby niemierzalna wstecz, a to jest
                         # dokładnie ten błąd, który zostawił nas 16.08 z
@@ -7189,8 +7304,19 @@ def _main_impl(tryb=None):
                             kod_s, h_n["team_id"], a_n["team_id"], None,
                             float(linia_s), strona_s, ts_n,
                         )
-                        _d_strony_s = betting.delta_strony(
-                            korekta_stron, kod_s, strona_s
+                        # ⚑⚑ PRZEŁĄCZENIE ŹRÓDŁA (2026-08-18) — przed bramami
+                        # jakości niżej, więc zmienia SELEKCJĘ, nie napis.
+                        _p_stary_s = p_s
+                        p_s, _zrodlo_s = uczony.wybierz_szanse(
+                            "sumy", p_s, _pu_s
+                        )
+                        _licznik_zrodla[f"sumy:{_zrodlo_s}"] += 1
+                        # warstwa uczy się błędu STAREGO rachunku
+                        _d_strony_s = (
+                            0.0 if _zrodlo_s == "uczony"
+                            else betting.delta_strony(
+                                korekta_stron, kod_s, strona_s
+                            )
                         )
                         if _d_strony_s:
                             p_s = betting._z_delta(p_s, _d_strony_s)
@@ -7214,6 +7340,12 @@ def _main_impl(tryb=None):
                             lo_s, hi_s = lo_o_s, hi_o_s
                         else:
                             lo_s, hi_s = 1.0 - hi_o_s, 1.0 - lo_o_s
+                        if _zrodlo_s == "uczony":
+                            # model nie oddaje przedziału — zachowujemy
+                            # SZEROKOŚĆ (niepewność próby) i przesuwamy centrum
+                            _pol_s = max((hi_s - lo_s) / 2.0, 0.0)
+                            lo_s = max(0.0, p_s - _pol_s)
+                            hi_s = min(1.0, p_s + _pol_s)
                         if _d_strony_s:
                             # przedział musi jechać w tej samej skali co `p`,
                             # inaczej brama „p ostrożne" rozwadnia korektę
@@ -7262,7 +7394,9 @@ def _main_impl(tryb=None):
                             # drugi raz (2026-08-17)
                             "kal_strony": round(_d_strony_s, 4),
                             # druga liczba: model uczony wprost na sumie meczu
-                            **({"p_uczony": _pu_s} if _pu_s else {}),
+                            **uczony.stempel_zrodla(
+                                _p_stary_s, _pu_s, _zrodlo_s
+                            ),
                             "p_rynku": betting.implied_prob_one_sided(
                                 float(kurs_s)),
                             "fair_kurs": round(1.0 / max(p_s, 1e-6), 3),
@@ -8781,6 +8915,46 @@ def _main_impl(tryb=None):
     elif _wagi_modelu:
         print("Model uczony: wagi są, ale ANI JEDNA wycena go nie zapytała — "
               "szukaj w ścieżce drużynowej, nie w wagach")
+    # ⚑⚑ CZUJNIK PRZEŁĄCZENIA ŹRÓDŁA (2026-08-18) — warunek postawiony przez
+    # właściciela: „żeby za dwa tygodnie nie okazało się, że coś nie działało".
+    #
+    # Trzy rzeczy naraz, bo każda po osobna może kłamać:
+    #   1. KTÓRY rachunek poszedł na stronę i w ilu wycenach,
+    #   2. czy model nie wypada po cichu na brak pokrycia (fallback na stary),
+    #   3. czy wagi nie są przeterminowane (job treningowy padł, a cykl jedzie
+    #      dalej na starych — dokładnie tak wyglądałoby „model się nie uczy").
+    _deklarowane = {s for s, z in uczony.ZRODLO_SZANSY.items() if z == "uczony"}
+    if _licznik_zrodla:
+        print("Źródło szansy na stronie: " + ", ".join(
+            f"{k} {v}" for k, v in sorted(_licznik_zrodla.items())))
+        for _strum in sorted(_deklarowane):
+            _ok = _licznik_zrodla.get(f"{_strum}:uczony", 0)
+            _fb = _licznik_zrodla.get(f"{_strum}:stary_bez_pokrycia", 0)
+            _raz = _ok + _fb
+            if not _raz:
+                continue
+            if _ok == 0:
+                print(f"⚑⚑ {_strum}: przełącznik mówi UCZONY, ale ANI JEDNA "
+                      f"wycena nim nie poszła ({_fb} spadło na stary przez "
+                      "brak pokrycia) — model NIE JEST na stronie")
+            elif _ok / _raz < 0.90:
+                print(f"⚑ {_strum}: modelem policzone {_ok/_raz:.0%} wycen "
+                      f"({_fb} spadło na stary przez brak pokrycia) — "
+                      "strona pokazuje MIESZANKĘ dwóch rachunków")
+    elif _deklarowane:
+        print(f"⚑⚑ Przełącznik deklaruje model uczony dla "
+              f"{', '.join(sorted(_deklarowane))}, ale licznik źródła jest "
+              "PUSTY — żadna wycena nie przeszła tą drogą w tym przebiegu")
+    _tren_ts = float((_wagi_modelu or {}).get("trenowano_ts") or 0)
+    if _deklarowane and _tren_ts:
+        _wiek_h = (time.time() - _tren_ts) / 3600.0
+        if _wiek_h > 48:
+            print(f"⚑⚑ WAGI MODELU MAJĄ {_wiek_h:.0f} h — job treningowy "
+                  "(model.yml, 6:50) nie doszedł od dwóch dób. Strona liczy "
+                  "modelem, który przestał się uczyć.")
+        elif _wiek_h > 26:
+            print(f"⚑ Wagi modelu sprzed {_wiek_h:.0f} h — jeden przebieg "
+                  "treningu wypadł, jeszcze nie alarm")
     if _licznik_korekty_stron:
         print("Korekta strony dotknęła: "
               + ", ".join(f"{k} {n}" for k, n in
@@ -8844,6 +9018,10 @@ def _main_impl(tryb=None):
         # ufać przeglądarce), więc leg bez rachunku wchodziłby do księgi
         # uboższy niż ten sam typ opublikowany normalnie.
         "rachunek",
+        # źródło szansy i liczba starego rachunku — leg wchodzi do księgi tą
+        # drogą, więc bez nich kupony byłyby jedynym miejscem w systemie bez
+        # informacji, którym rachunkiem policzono zakład (2026-08-18)
+        "zrodlo_p", "p_stary", "p_uczony",
     )
     # ⚑ JEDEN ZAKŁAD — JEDNA SZANSA NA EKRANIE (2026-08-13).
     #

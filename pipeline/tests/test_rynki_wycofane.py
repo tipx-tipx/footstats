@@ -49,3 +49,38 @@ def test_wycofany_rynek_nie_wchodzi_do_rodzin_kuponu_jako_zywy():
     # z PRODUKTU, nie z kodu; ta asercja pilnuje, żeby ktoś nie "posprzątał"
     # mapy rodzin i nie wysypał kalibracji rynków defensywnych
     assert betting.RODZINY_RYNKOW["tackles"] == "defensywa"
+
+
+def test_sezony_na_karcie_tez_traca_wycofany_rynek():
+    """Decyzja właściciela 18.08: „zdejmij odbiory całkowicie".
+
+    Sekcja `sezony` to średnie OPISOWE, nie zakład — ale karta pokazuje je pod
+    tą samą etykietą co rynki („odbiory 0,94 na 90 min"), więc zostawienie ich
+    znaczyłoby, że rynek wycofany dalej jest na stronie.
+    """
+    from footstats.jobs import radar as R
+
+    cache = {"77": {"sezony": [
+        {"rok": "2026", "minuty": 900,
+         "na90": {"shots": 2.2, "tackles": 0.9, "sot": 0.8},
+         "na_mecz": {"shots": 1.6, "tackles": 0.7, "sot": 0.6}},
+    ]}}
+    out = R._sezony_wpisu(cache, 77)
+    assert out, "sekcja sezonów ma zostać, tylko bez wycofanego rynku"
+    assert "tackles" not in out[0]["na90"]
+    assert "tackles" not in out[0]["na_mecz"]
+    # reszta statystyk NIETKNIĘTA — wycinamy rynek, nie sekcję
+    assert out[0]["na90"]["shots"] == 2.2 and out[0]["na90"]["sot"] == 0.8
+    assert out[0]["rok"] == "2026" and out[0]["minuty"] == 900
+    # wejście nietknięte (nie mutujemy cache workera)
+    assert "tackles" in cache["77"]["sezony"][0]["na90"]
+
+
+def test_etykiety_historyczne_zostaja():
+    """Wycofanie NIE JEST kasowaniem historii. Typy na odbiory rozliczone
+    wcześniej muszą się dalej poprawnie wyświetlać w Skuteczności, więc
+    mapy nazw rynków ZOSTAJĄ — tu pilnujemy, żeby ktoś ich nie „posprzątał"."""
+    from footstats.jobs import rozliczanie as R
+    assert "tackles" in R.MARKETY_LIB, (
+        "bez tego rozliczanie nie zamknie typów sprzed wycofania"
+    )
