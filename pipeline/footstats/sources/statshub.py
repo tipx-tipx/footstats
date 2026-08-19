@@ -483,6 +483,35 @@ TEAM_PERF_MAP = {
 
 # Ile meczów historii bierzemy dla DRUŻYNY. Bez parametru API oddaje 10 —
 # ta sama pułapka co przy zawodnikach (patrz PERF_LIMIT).
+#
+# ⚑⚑ NIE PODNOSIĆ DO 80. SPRAWDZONE 19.08 I ZAMKNIĘTE — oba kryteria odbioru
+# wypadły nie „trochę poniżej progu", tylko o rzędy wielkości.
+#
+# Hipoteza brzmiała: mamy ~1 sezon, więc model nie odróżnia „taka jest zawsze"
+# od „jest w formie"; drugi sezon dałby bazę odniesienia. Zmierzone NAJPIERW
+# na danych, które już mamy — magazyn trzyma 40 meczów na drużynę (89% drużyn
+# ma 40-41), a najdłuższe okno modelu to `w12`, więc połowa historii i tak
+# leżała nieużywana. Dewiancja OOS na 63 766 wierszach, split czasowy:
+#
+#     dziś (w6, w12, trend)          1,4033
+#     + baza 24 mecze                1,4022   -0,07%
+#     + baza 40 meczów               1,4043   +0,08%   (gorzej)
+#     + 40 + trend sezonowy          1,4043   +0,08%
+#
+# Próg odbioru wynosił -2,0%. KONTROLA NEGATYWNA mówi, że pomiar nie jest
+# ślepy: sama stała +11,80%, bez `opp12` +1,89%, bez `liga` +0,24%.
+#
+# Drugie kryterium („wraca >= 200 kandydatów odrzucanych na wieku historii")
+# jest STRUKTURALNIE nieosiągalne, nie tylko niespełnione: brama bierze
+# 20 najnowszych meczów i odcina starsze niż 548 dni, a feed oddaje najnowsze
+# — więc mecz nr 41+ jest ZE STARSZEJ części osi i tym bardziej odpada.
+# Policzone: z 1299 drużyn 54 pada na tej bramie, ratowalnych głębszym
+# pobraniem 0.
+#
+# ⚑ PRZY OKAZJI, WAŻNIEJSZE NIŻ SAM WERDYKT: własna forma drużyny prawie nic
+# nie wnosi (bez `w6` dewiancja rośnie o 0,00%), a najwięcej wnosi PROFIL
+# RYWALA (`opp12`, +1,89%). Jeśli szukać rezerwy w cechach, to po stronie
+# rywala i kontekstu meczu, nie w głębszej historii własnej.
 TEAM_PERF_LIMIT = 40
 
 
