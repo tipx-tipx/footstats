@@ -15,11 +15,14 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const tu = dirname(fileURLToPath(import.meta.url));
-const SQL = join(tu, "..", "..", "supabase", "migrations", "0004_app_data_rls.sql");
+const SQL = join(tu, "..", "..", "supabase", "migrations", "0005_app_data_czesci.sql");
 const DATA_TS = join(tu, "..", "src", "lib", "data.ts");
 
 function kluczeZSql(tekst) {
-  const m = tekst.match(/using\s*\(\s*key\s+in\s*\(([\s\S]*?)\)\s*\)/i);
+  // Wyrażenie w `using (...)` bywa opakowane (0005 obcina sufiks `__czNN`,
+  // zanim porówna nazwę z listą), więc nie przywiązujemy się do jego kształtu
+  // — bierzemy literały z bloku `in ( ... )`.
+  const m = tekst.match(/using\s*\([\s\S]*?in\s*\(([\s\S]*?)\)\s*\)/i);
   if (!m) throw new Error("nie znalazłem listy kluczy w polityce RLS");
   return [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]);
 }

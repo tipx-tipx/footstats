@@ -115,6 +115,65 @@ const BUNDLE_KEYS = [
 const LAZY_TTL_MS = 60_000;
 const lazyCache = new Map<string, { ts: number; dane: Promise<unknown> }>();
 
+/**
+ * KLUCZ ROZBITY NA CZĘŚCI (od 2026-08-19).
+ *
+ * Pipeline nie zapisuje już kluczy cięższych niż ~4 MB w całości: baza
+ * przerywa taki upsert (57014 przy 14 MB, `players` ma 9,1 MB i wywalał cały
+ * cykl). Zamiast tego pod głównym kluczem leży marker `{"__czesci": n}`,
+ * a dane siedzą w `<klucz>__cz00`, `<klucz>__cz01`… — szczegóły w
+ * `pipeline/footstats/supa.py`, sekcja SZARDY.
+ *
+ * Tu robimy odwrotność: po markerze poznajemy, że trzeba dociągnąć resztę
+ * (jedno zapytanie `like`, nie n zapytań) i sklejamy w tej samej kolejności.
+ * Kształt kawałka jest ten sam co całości, więc tablice zszywamy po kolei,
+ * a obiekty scalamy.
+ */
+type MarkerCzesci = { __czesci: number };
+
+function czyMarker(payload: unknown): payload is MarkerCzesci {
+  return (
+    typeof payload === "object" &&
+    payload !== null &&
+    typeof (payload as MarkerCzesci).__czesci === "number"
+  );
+}
+
+async function sklejCzesci<T>(key: string, ile: number, fallback: T): Promise<T> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/app_data?select=key,payload&key=like.${key}__cz*`,
+    {
+      headers: {
+        apikey: SUPABASE_ANON!,
+        Authorization: `Bearer ${SUPABASE_ANON}`,
+      },
+      next: { revalidate: 60 },
+    },
+  );
+  if (!res.ok) return fallback;
+  const rows: { key: string; payload: unknown }[] = await res.json();
+  const mapa = new Map(rows.map((r) => [r.key, r.payload]));
+  const czesci = Array.from({ length: ile }, (_, i) =>
+    mapa.get(`${key}__cz${String(i).padStart(2, "0")}`),
+  );
+  if (czesci.some((cz) => cz === undefined)) {
+    // NIEKOMPLET TO NIE „TROCHĘ MNIEJ DANYCH": sklejona połowa zawodników
+    // wygląda na stronie dokładnie jak komplet, tylko bez połowy kart.
+    // Najczęstsza przyczyna to niewklejona migracja 0005 — wtedy RLS
+    // przepuszcza marker, ale już nie części.
+    console.error(
+      `[data] '${key}': marker mówi o ${ile} częściach, doszło ` +
+        `${czesci.filter((cz) => cz !== undefined).length}. ` +
+        "Czy migracja 0005 (RLS dla '__czNN') jest wgrana?",
+    );
+    return fallback;
+  }
+  if (Array.isArray(czesci[0])) {
+    return (czesci as unknown[][]).flat() as T;
+  }
+  return Object.assign({}, ...(czesci as object[])) as T;
+}
+
 async function fetchKlucz<T>(key: string, fallback: T): Promise<T> {
   if (!SUPABASE_URL || !SUPABASE_ANON) return fallback;
   const cached = lazyCache.get(key);
@@ -137,7 +196,11 @@ async function fetchKlucz<T>(key: string, fallback: T): Promise<T> {
       );
       if (!res.ok) return fallback;
       const rows: { payload: unknown }[] = await res.json();
-      return (rows[0]?.payload ?? fallback) as T;
+      const payload = rows[0]?.payload;
+      if (czyMarker(payload)) {
+        return await sklejCzesci<T>(key, payload.__czesci, fallback);
+      }
+      return (payload ?? fallback) as T;
     } catch {
       return fallback;
     }
@@ -204,7 +267,22 @@ async function fetchBundle(): Promise<Bundle> {
     );
     if (!res.ok) return tylkoNadchodzace(LOCAL);
     const rows: { key: keyof Bundle; payload: unknown }[] = await res.json();
-    const map = Object.fromEntries(rows.map((r) => [r.key, r.payload]));
+    const map: Record<string, unknown> = Object.fromEntries(
+      rows.map((r) => [r.key, r.payload]),
+    );
+    // klucz bazowy też może kiedyś przekroczyć próg i przyjechać jako marker
+    // (patrz `sklejCzesci`) — bez tego wpadłby cicho na fallback demo
+    await Promise.all(
+      Object.entries(map)
+        .filter(([, payload]) => czyMarker(payload))
+        .map(async ([klucz, payload]) => {
+          map[klucz] = await sklejCzesci(
+            klucz,
+            (payload as MarkerCzesci).__czesci,
+            undefined,
+          );
+        }),
+    );
     return tylkoNadchodzace({
       value_bets: (map.value_bets ?? LOCAL.value_bets) as ValueBet[],
       matches: (map.matches ?? LOCAL.matches) as Mecz[],

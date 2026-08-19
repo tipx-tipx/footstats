@@ -97,7 +97,29 @@ def get_key_ok(key: str) -> tuple[object | None, bool]:
         if r is None or r.status_code != 200:
             return None, False
         rows = r.json()
-        return (rows[0]["payload"] if rows else None), True
+        payload = rows[0]["payload"] if rows else None
+        n = ile_czesci(payload)
+        if n is None:
+            return payload, True
+
+        # klucz szardowany: dociągamy kawałki jednym zapytaniem i sklejamy.
+        # BRAK CHOĆ JEDNEGO KAWAŁKA TO AWARIA, NIE PUSTKA — inaczej wołający
+        # dopisałby świeże wpisy do połowy historii i zapisał to jako całość
+        rc = _z_ponowieniem(f"odczyt części '{key}'", lambda: requests.get(
+            f"{url}/rest/v1/app_data?select=key,payload&key=like.{key}__cz*",
+            headers=headers, impersonate="chrome124", timeout=60,
+        ))
+        if rc is None or rc.status_code != 200:
+            return None, False
+        mapa = {w["key"]: w["payload"] for w in rc.json()}
+        czesci = [mapa.get(klucz_czesci(key, i)) for i in range(n)]
+        if any(cz is None for cz in czesci):
+            braki = [i for i, cz in enumerate(czesci) if cz is None]
+            print(f"Odczyt '{key}': marker mówi o {n} częściach, brakuje "
+                  f"{len(braki)} ({braki[:5]}) — traktuję jak padnięty odczyt",
+                  file=sys.stderr, flush=True)
+            return None, False
+        return sklej_czesci(czesci), True
     except Exception:
         return None, False
 
@@ -169,19 +191,197 @@ def put_key_bezpiecznie(
     return put_key(key, payload)
 
 
+# ------------------------------------------------------------ SZARDY ---------
+# ⚑ DLACZEGO DUŻY KLUCZ IDZIE W KAWAŁKACH (2026-08-19, zmierzone na żywej bazie)
+#
+# Zapis do `app_data` kosztuje tym więcej, im większy payload, i rośnie
+# SZYBCIEJ NIŻ LINIOWO — pomiar upsertów tej samej struktury:
+#
+#      2 MB → 2,3 s     8 MB →  7,8 s     12 MB → 34,8 s
+#      4 MB → 5,1 s    10 MB → 23,2 s     14 MB → 500 (57014 statement timeout)
+#
+# Powyżej ~12 MB Postgres przerywa własne zapytanie, a między 8 a 12 MB wynik
+# zależy od obciążenia bazy — czyli zapis „czasem przechodzi". Tak właśnie
+# zachowywały się nasze trzy najcięższe klucze: `trend_lib` (14,0 MB),
+# `typy_log` (12,4 MB) i `players` (9,1 MB) — w logach cyklu zostawiały serie
+# „wyczerpane 3 próby", a `players` wywalał cały job po 36 minutach liczenia
+# ([[cykl-pada-losowo-co-kilkanascie]]).
+#
+# Dzielimy więc payload na części po ~3 MB pod kluczami `<klucz>__cz00`,
+# `<klucz>__cz01`… Pod GŁÓWNYM kluczem zostaje mały marker `{"__czesci": n}`,
+# po którym czytelnik poznaje, że ma dociągnąć resztę. Ten sam pomysł co
+# magazyn drużyn (`hd_0..hd_9`), tylko PRZEZROCZYSTY: `put_key`/`get_key_ok`
+# dzielą i sklejają same, a wołający o niczym nie wie.
+#
+# KOLEJNOŚĆ ZAPISU JEST CZĘŚCIĄ BEZPIECZEŃSTWA: najpierw wszystkie części,
+# marker DOPIERO na końcu. Gdy któraś część nie dojdzie, marker nie powstaje
+# i pod głównym kluczem zostaje POPRZEDNIA, spójna wersja — czytelnik nigdy
+# nie dostanie połowy nowych danych sklejonej z połową starych.
+PROG_SZARDU = 4_000_000      # powyżej tej wagi zapis idzie w kawałkach
+CEL_CZESCI = 3_000_000       # docelowa waga jednego kawałka
+MARKER_CZESCI = "__czesci"
+
+
+def klucz_czesci(key: str, nr: int) -> str:
+    return f"{key}__cz{int(nr):02d}"
+
+
+def ile_czesci(payload) -> int | None:
+    """Ile kawałków ma ten payload, jeśli to marker szardów (inaczej None)."""
+    if isinstance(payload, dict) and isinstance(payload.get(MARKER_CZESCI), int):
+        return payload[MARKER_CZESCI]
+    return None
+
+
+def _potnij(payload) -> list | None:
+    """Podziel payload na kawałki po ~CEL_CZESCI. None = nie da się dzielić.
+
+    Tniemy po elementach najwyższego poziomu, więc kawałek ma ZAWSZE ten sam
+    kształt co całość (słownik → słowniki, lista → listy) i sklejenie nie
+    wymaga wiedzy o zawartości.
+
+    ⚑ JEDEN GRUBY ELEMENT TEŻ MUSI SIĘ PODZIELIĆ. Kopia księgi typów to
+    `{"ts": …, "log": {12 MB}}` — dwa elementy najwyższego poziomu, z czego
+    jeden waży tyle, co całość. Podział „po wierzchu" dałby kawałek równy
+    oryginałowi i zapis padłby dokładnie tak samo. Dlatego element cięższy
+    od limitu tniemy REKURENCYJNIE i owijamy podkawałki z powrotem w jego
+    klucz; `sklej_czesci` scala takie słowniki w głąb.
+    """
+    if isinstance(payload, dict):
+        elementy = list(payload.items())
+        pusty, dodaj = dict, lambda cz, e: cz.__setitem__(e[0], e[1])
+    elif isinstance(payload, list):
+        elementy = payload
+        pusty, dodaj = list, lambda cz, e: cz.append(e)
+    else:
+        return None
+    czesci, biezaca, waga_biezacej = [], pusty(), 0
+    for element in elementy:
+        w = len(json.dumps(element, ensure_ascii=False))
+        if w > CEL_CZESCI:
+            wnetrze = element[1] if isinstance(payload, dict) else element
+            podkawalki = _potnij(wnetrze) if w > CEL_CZESCI else None
+            if podkawalki and len(podkawalki) > 1:
+                if waga_biezacej:
+                    czesci.append(biezaca)
+                    biezaca, waga_biezacej = pusty(), 0
+                for pod in podkawalki:
+                    czesci.append({element[0]: pod} if isinstance(payload, dict)
+                                  else [pod])
+                continue
+        if waga_biezacej and waga_biezacej + w > CEL_CZESCI:
+            czesci.append(biezaca)
+            biezaca, waga_biezacej = pusty(), 0
+        dodaj(biezaca, element)
+        waga_biezacej += w
+    if waga_biezacej or not czesci:
+        czesci.append(biezaca)
+    return czesci
+
+
+def sklej_czesci(czesci: list):
+    """Odwrotność `_potnij` — z kawałków robi z powrotem całość."""
+    if czesci and isinstance(czesci[0], list):
+        calosc: list = []
+        for cz in czesci:
+            calosc.extend(cz or [])
+        return calosc
+    scalony: dict = {}
+    for cz in czesci:
+        _scal_w_glab(scalony, cz or {})
+    return scalony
+
+
+def _scal_w_glab(cel: dict, dolozenie: dict) -> None:
+    """Scal słowniki, wchodząc do środka — patrz rekurencja w `_potnij`."""
+    for k, v in dolozenie.items():
+        if isinstance(v, dict) and isinstance(cel.get(k), dict):
+            _scal_w_glab(cel[k], v)
+        elif isinstance(v, list) and isinstance(cel.get(k), list):
+            cel[k].extend(v)
+        else:
+            cel[k] = v
+
+
+def _spis_czesci(url: str, headers: dict, key: str) -> list[str] | None:
+    """Nazwy kluczy-kawałków leżących teraz w bazie (None = odczyt padł)."""
+    r = _z_ponowieniem(f"spis części '{key}'", lambda: requests.get(
+        f"{url}/rest/v1/app_data?select=key&key=like.{key}__cz*",
+        headers=headers, impersonate="chrome124", timeout=30,
+    ))
+    if r is None or r.status_code != 200:
+        return None
+    try:
+        return [w["key"] for w in r.json()]
+    except Exception:
+        return None
+
+
+def _wyslij(url: str, headers: dict, key: str, payload) -> bool:
+    """Jeden upsert, bez dzielenia — wspólny spód całości i kawałka."""
+    r = _z_ponowieniem(f"zapis '{key}'", lambda: requests.post(
+        f"{url}/rest/v1/app_data?on_conflict=key",
+        headers={**headers, "Prefer": "resolution=merge-duplicates"},
+        data=json.dumps([{"key": key, "payload": payload}]),
+        impersonate="chrome124", timeout=120,
+    ))
+    return r is not None and r.status_code < 300
+
+
+def _posprzataj_czesci(url: str, headers: dict, key: str, zostawiam: int):
+    """Usuń kawałki, których nowy zapis już nie używa.
+
+    Osierocony kawałek niczego nie psuje (marker mówi, ilu szukać), ale
+    zostaje w bazie na zawsze — po kilku takich cyklach `app_data` puchnie
+    od danych, których nikt nie czyta.
+    """
+    sa = _spis_czesci(url, headers, key)
+    if sa is None:
+        return
+    chciane = {klucz_czesci(key, i) for i in range(zostawiam)}
+    for nazwa in sa:
+        if nazwa in chciane:
+            continue
+        _z_ponowieniem(f"kasowanie '{nazwa}'", lambda n=nazwa: requests.delete(
+            f"{url}/rest/v1/app_data?key=eq.{n}",
+            headers=headers, impersonate="chrome124", timeout=30,
+        ))
+
+
 def put_key(key: str, payload) -> bool:
-    """Upsert payloadu pod klucz. True = zapisano."""
+    """Upsert payloadu pod klucz. True = zapisano.
+
+    Payload cięższy niż `PROG_SZARDU` jedzie w kawałkach — patrz SZARDY wyżej.
+    """
     c = _conn()
     if c is None:
         return False
     url, headers = c
     try:
-        r = _z_ponowieniem(f"zapis '{key}'", lambda: requests.post(
-            f"{url}/rest/v1/app_data?on_conflict=key",
-            headers={**headers, "Prefer": "resolution=merge-duplicates"},
-            data=json.dumps([{"key": key, "payload": payload}]),
-            impersonate="chrome124", timeout=60,
-        ))
-        return r is not None and r.status_code < 300
+        waga_calosci = len(json.dumps(payload, ensure_ascii=False))
+        if waga_calosci <= PROG_SZARDU:
+            if not _wyslij(url, headers, key, payload):
+                return False
+            # klucz mógł być wcześniej szardowany i właśnie schudł — wtedy
+            # kawałki muszą zniknąć, inaczej zostaną w bazie bez czytelnika
+            _posprzataj_czesci(url, headers, key, 0)
+            return True
+
+        czesci = _potnij(payload)
+        if czesci is None:      # payload nie do podziału (liczba, napis)
+            return _wyslij(url, headers, key, payload)
+        print(f"Supabase zapis '{key}': {waga_calosci / 1e6:.1f} MB — dzielę "
+              f"na {len(czesci)} części (limit zapisu bazy)", flush=True)
+        for nr, cz in enumerate(czesci):
+            if not _wyslij(url, headers, klucz_czesci(key, nr), cz):
+                print(f"Supabase zapis '{key}': część {nr} nie doszła — "
+                      "zostawiam pod kluczem poprzednią wersję",
+                      file=sys.stderr, flush=True)
+                return False
+        # marker DOPIERO teraz: do tej chwili pod `key` leży spójna starszyzna
+        if not _wyslij(url, headers, key, {MARKER_CZESCI: len(czesci)}):
+            return False
+        _posprzataj_czesci(url, headers, key, len(czesci))
+        return True
     except Exception:
         return False
