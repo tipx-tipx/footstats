@@ -840,6 +840,25 @@ def poza_zamrozona_lista(r: dict, lista_dnia: dict[str, set] | None) -> bool:
 
 def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
     for b in value_bets:
+        # ⚑ RYNEK WYCOFANY NIE WCHODZI DO KSIĘGI ŻADNĄ DROGĄ (2026-08-19).
+        #
+        # Brama z 18.08 stanęła na ścieżce PUBLIKACJI (`zdjete_klucze` w
+        # `build_wc_fast`), więc zatrzymywała typy, które mogłyby trafić na
+        # stronę. Ale typ POMIAROWY — odrzucony przy progu (`ev_ponizej_progu`,
+        # `niska_pewnosc`) albo drabinkowy spod progu pokrycia — idzie do
+        # księgi INNĄ drogą, prosto stąd, i tamtej bramy nie mijał.
+        #
+        # Zmierzone 19.08, dobę po wycofaniu odbiorów: 14 nowych typów
+        # `tackles` w księdze, wszystkie z `odrzucony=True`. Skutek jest
+        # dokładnie ten, przed którym wycofanie miało chronić — 25 z 73
+        # „typów czekających na dane" (34%) to odbiory, których NIE MA CZYM
+        # ZAMKNĄĆ, bo 365Scores ich nie oddaje. Wiszą do siedmiodniowego
+        # terminu zwrotu, a w tym czasie co cykl dochodzą nowe.
+        #
+        # Rekordów, które już są w księdze, NIE RUSZAMY: historii nie
+        # przepisujemy, a rozliczanie i tak domknie je zwrotem.
+        if betting.rynek_wycofany(b.get("rynek_kod")):
+            continue
         k = _klucz(b)
         # ODRODZENIE TYPU SPOZA LISTY DNIA (2026-08-06). Typ odcięty selekcją
         # listy (`poza_lista_dnia`/`rynek_ukryty`) nigdy nie był na stronie,

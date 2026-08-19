@@ -84,3 +84,57 @@ def test_etykiety_historyczne_zostaja():
     assert "tackles" in R.MARKETY_LIB, (
         "bez tego rozliczanie nie zamknie typów sprzed wycofania"
     )
+
+
+def _rec(*, mk: str, **kw) -> dict:
+    """Rekord w kształcie, jakiego wymaga `_dopisz_nowe` (patrz jego biała
+    lista pól) — ten sam wzorzec co w `test_drabinki_rozliczanie`."""
+    return {"mecz_id": 1, "mecz": "A – B", "kickoff_ts": 1_800_000_000,
+            "podmiot_id": 7, "podmiot": f"Gracz {mk}", "rynek_kod": mk,
+            "rynek": mk, "linia": 1.5, "strona": "powyzej", "kurs": 1.9,
+            "p_model": 0.6, "sugestia": False, **kw}
+
+
+def test_typ_POMIAROWY_na_wycofanym_rynku_tez_nie_wchodzi_do_ksiegi():
+    """PIĄTY KANAŁ, znaleziony 19.08 przy weryfikacji wdrożenia.
+
+    Brama z 18.08 stanęła na ścieżce PUBLIKACJI, więc zatrzymywała typy, które
+    mogłyby trafić na stronę. Ale typ POMIAROWY — odrzucony przy progu
+    (`ev_ponizej_progu`, `niska_pewnosc`) albo drabinkowy spod progu pokrycia —
+    idzie do księgi prosto przez `_dopisz_nowe` i tamtej bramy nie mijał.
+
+    Zmierzone dobę po wycofaniu: 14 nowych `tackles` w księdze, wszystkie
+    `odrzucony=True`, a 25 z 73 „typów czekających na dane" (34%) to odbiory,
+    których NIE MA CZYM ZAMKNĄĆ.
+    """
+    from footstats.jobs import rozliczanie as R
+
+    log: dict = {}
+    R._dopisz_nowe(log, [
+        _rec(mk="tackles", odrzucony=True, odrzucenie_powod="ev_ponizej_progu"),
+        _rec(mk="shots", odrzucony=True, odrzucenie_powod="ev_ponizej_progu"),
+    ])
+    rynki = {v.get("rynek_kod") for v in log.values()}
+    assert "tackles" not in rynki, (
+        "typ pomiarowy na wycofanym rynku wisi potem jako „czekający na dane”"
+    )
+    assert "shots" in rynki, "pozostałe rynki mają wchodzić normalnie"
+
+
+def test_wycofany_rynek_nie_wchodzi_do_ksiegi_takze_jako_opublikowany():
+    from footstats.jobs import rozliczanie as R
+
+    log: dict = {}
+    R._dopisz_nowe(log, [_rec(mk="tackles")])
+    assert log == {}
+
+
+def test_historia_wycofanego_rynku_zostaje_w_ksiedze():
+    """Wycofanie NIE JEST kasowaniem historii: rekord sprzed zmiany ma zostać,
+    żeby rozliczanie mogło go domknąć wynikiem albo zwrotem."""
+    from footstats.jobs import rozliczanie as R
+
+    stary = _rec(mk="tackles", wynik=None)
+    log = {R._klucz(stary): dict(stary)}
+    R._dopisz_nowe(log, [dict(stary)])
+    assert len(log) == 1, "istniejący rekord ma zostać nietknięty"
