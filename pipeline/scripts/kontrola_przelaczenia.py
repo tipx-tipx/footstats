@@ -156,6 +156,16 @@ def main() -> None:
     print("\n" + "=" * 78)
     print("PORÓWNANIE PAROWANE — ten sam typ, oba rachunki")
     print("=" * 78)
+    # ⚑⚑ TU BYŁ FAŁSZYWY ALARM (naprawione 19.08). Do dziś werdykt zapadał na
+    # SAMYM ZNAKU różnicy Brier: `bu > bs` → „MODEL GORSZY, rozważ powrót".
+    # Zmierzone tego dnia na 32 rozliczeniach: różnica +0,0031 przy błędzie
+    # standardowym ±0,0176, czyli REMIS — a narzędzie zalecało cofnięcie
+    # przełącznika. Test znaków wychodził wtedy 16:16.
+    #
+    # Różnica jest SPAROWANA (ten sam typ niesie obie wyceny, wynik meczu się
+    # skraca), więc jej błąd liczymy z odchylenia różnic, nie z wariancji
+    # dwóch Brierów osobno. To jedyny sposób, żeby odróżnić „model gorszy"
+    # od „za mało danych, żeby cokolwiek powiedzieć".
     pary = [r for r in swieze
             if r.get("wynik") in ("wygrany", "przegrany")
             and r.get("p_stary") and isinstance(r.get("p_uczony"), dict)
@@ -164,13 +174,69 @@ def main() -> None:
         print(f"   {len(pary)} sparowanych — za mało (próg 30).")
         return
     y = [1.0 if r["wynik"] == "wygrany" else 0.0 for r in pary]
-    bs = _brier([(float(r["p_stary"]), yy) for r, yy in zip(pary, y)])
-    bu = _brier([(float(r["p_uczony"]["p"]), yy) for r, yy in zip(pary, y)])
-    print(f"   n = {len(pary)}   Brier stary {bs:.4f}   model {bu:.4f}   "
-          f"{bu - bs:+.4f}")
-    print("   " + ("✓ model lepszy — przełączenie się broni"
-                   if bu < bs else
-                   "⚑ MODEL GORSZY — rozważ powrót (uczony.ZRODLO_SZANSY)"))
+    st = [float(r["p_stary"]) for r in pary]
+    uc = [float(r["p_uczony"]["p"]) for r in pary]
+    bs = _brier(list(zip(st, y)))
+    bu = _brier(list(zip(uc, y)))
+    n = len(pary)
+    # różnice per typ: dodatnia = model gorszy na TYM typie
+    d = [(u - yy) ** 2 - (s - yy) ** 2 for s, u, yy in zip(st, uc, y)]
+    sr = sum(d) / n
+    war = sum((x - sr) ** 2 for x in d) / max(n - 1, 1)
+    se = math.sqrt(war / n)
+    print(f"   n = {n}   Brier stary {bs:.4f}   model {bu:.4f}   {bu - bs:+.4f}")
+    print(f"   błąd standardowy RÓŻNICY (parowany): ±{se:.4f}")
+    print(f"   95% przedział: [{sr - 1.96 * se:+.4f}, {sr + 1.96 * se:+.4f}]")
+    lepszy = sum(1 for x in d if x < 0)
+    gorszy = sum(1 for x in d if x > 0)
+    print(f"   test znaków: model lepszy na {lepszy}, gorszy na {gorszy} typach")
+    if sr - 1.96 * se > 0:
+        print("   ⚑ MODEL ISTOTNIE GORSZY — rozważ powrót (uczony.ZRODLO_SZANSY)")
+    elif sr + 1.96 * se < 0:
+        print("   ✓ MODEL ISTOTNIE LEPSZY — przełączenie się broni")
+    else:
+        print("   → NIEROZSTRZYGNIĘTE: przedział obejmuje zero. NIE cofać "
+              "przełącznika na tej podstawie.")
+        if sr:
+            trzeba = (1.96 * math.sqrt(war) / abs(sr)) ** 2
+            print(f"     (żeby rozstrzygnąć różnicę TEJ wielkości, potrzeba "
+                  f"~{trzeba:.0f} rozliczeń)")
+
+    # ⚑ TEST OSTRZEJSZY NIŻ BRIER, dostępny OD RAZU. Brier jest zdominowany
+    # przez wariancję wyniku, więc mikroskopijne różnice wycen toną w szumie
+    # (19.08: do rozstrzygnięcia trzeba było ~4000 rozliczeń). Ale model idzie
+    # SUROWY, bez warstw ściągających, więc deklaruje wyraźnie więcej niż
+    # stary rachunek — a to daje ostry, jednoznaczny sprawdzian: jeśli model
+    # jest uczciwy, trafność musi wyjść W POBLIŻU jego deklaracji.
+    print()
+    dekl = sum(uc) / n
+    traf = sum(y) / n
+    se_t = math.sqrt(max(traf * (1 - traf), 1e-9) / n)
+    print(f"   deklaracja modelu {dekl:.1%} wobec trafności {traf:.1%} "
+          f"(±{se_t * 196:.1f} pp)")
+    print(f"   dla porównania stary rachunek deklarował {sum(st) / n:.1%}")
+    # ⚑ „MIEŚCI SIĘ W SZUMIE" TO NIE TO SAMO CO „UCZCIWA". Przy 32 rozliczeniach
+    # błąd wynosi ±17 pp, więc w szumie mieści się DOSŁOWNIE WSZYSTKO — także
+    # luka −12 pp, której na pewno nie chcemy nazwać uczciwą liczbą. Werdykt
+    # „uczciwa" wolno postawić dopiero wtedy, gdy próba jest na tyle duża, że
+    # pomiar odróżniłby lukę większą niż próg odbioru (5 pp z planu).
+    PROG_ODBIORU_PP = 5.0
+    luka = (traf - dekl) * 100
+    blad_pp = 2 * se_t * 100
+    if blad_pp > PROG_ODBIORU_PP:
+        print(f"   → luka {luka:+.1f} pp, ale błąd ±{blad_pp:.1f} pp jest "
+              f"WIĘKSZY niż próg odbioru {PROG_ODBIORU_PP:.0f} pp —")
+        print("     przy tej próbie pomiar nie odróżni modelu uczciwego od "
+              "przeszacowującego.")
+        print("     To znaczy ZA MAŁO DANYCH, a nie „w porządku”.")
+        trzeba = max(traf * (1 - traf), 1e-9) / ((PROG_ODBIORU_PP / 196) ** 2)
+        print(f"     (na werdykt potrzeba ~{trzeba:.0f} rozliczeń)")
+    elif abs(luka) <= blad_pp:
+        print(f"   ✓ luka {luka:+.1f} pp w szumie przy błędzie ±{blad_pp:.1f} pp "
+              "— liczba modelu jest UCZCIWA")
+    else:
+        print(f"   ⚑ luka {luka:+.1f} pp poza szumem (±{blad_pp:.1f}) — model "
+              f"{'PRZESZACOWUJE' if luka < 0 else 'niedoszacowuje'}")
 
 
 if __name__ == "__main__":
