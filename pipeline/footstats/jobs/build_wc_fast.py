@@ -938,7 +938,16 @@ def przytnij_rejestr_do_listy(lista_pub: list[dict], teraz: int) -> int:
 # pod kreską (−10,5% przy 10/dzień wobec −15,1% dziś). Limit ma porządkować
 # produkt; poprawa zwrotu jest hipotezą do sprawdzenia na nowych danych,
 # nie deklaracją.
-LISTA_CAP = 12
+# ⚑ OD 2026-08-20 TO SUFIT GLOBALNY, a nie jedyny limit: dobę dzielą PÓŁKI
+# (`uczony.POLKI`), każda z własnym budżetem — 15 na „wysoką szansę" i 6 na
+# „wyższe kursy". Suma jest tu wyliczana, a nie wpisana, żeby zmiana widełek
+# nie zostawiła sufitu w tyle (ta sama klasa błędu co przecieki limitów
+# z 14.08: deklarowane 20, realna mediana 67).
+#
+# Sufit zostaje mimo półek, bo wznowione typy spoza widełek (kurs > 2,20 —
+# pokazane, zanim półki weszły) idą poza licznikami półek i bez wspólnego
+# dachu doba mogłaby puchnąć bez końca.
+LISTA_CAP = sum(int(p["limit_dobowy"]) for p in uczony.POLKI.values())
 # 3, nie 2: mecze bogate w typy są naszym najlepszym materiałem (luka
 # deklaracji −2,1 pp przy 20+ kandydatach wobec −21,7 pp przy kilku), ale
 # przy budżecie 12 pięć typów z jednego meczu to 40% listy.
@@ -1038,6 +1047,29 @@ def wybierz_liste_publikowana(
     z_rynku: dict = {}
     z_pasma: dict = {}
     z_rodziny: dict = {}
+    # ⚑⚑ PÓŁKI ZAMIAST JEDNEGO LIMITU DOBOWEGO (2026-08-20, zadanie 5 planu).
+    #
+    # Do dziś `LISTA_CAP` był jedną liczbą na dobę, więc obie zakładki
+    # („wysoka szansa" i „wyższe kursy") pokazywały TĘ SAMĄ listę, tylko
+    # inaczej posortowaną — a miały nieść dwie różne obietnice.
+    #
+    # Zmierzone 20.08 na 3560 rozliczonych kandydatach, podział czasowy
+    # (reguła oceniana na okresie, którego przy wyborze nie widziała):
+    #
+    #   dziś: jedna lista, top 12          12,0 typu/d   trafność 70,6%  kurs 1,47
+    #   wysoka szansa 1,20–1,80, po szansie 15,0 typu/d   trafność 74,7%  kurs 1,26
+    #   wyższe kursy 1,80–2,0/2,2, po mocy  5,5 typu/d   trafność 55,4%  kurs 1,89
+    #
+    # Liczby zgadzają się z pomiarem zapisanym przy `uczony.POLKI` (75,1%
+    # i 53,4%), zrobionym niezależnie 17.08 na innej próbie.
+    #
+    # ⚑ SUFIT JEST PER STRUMIEŃ (`uczony.KURS_MAX_PODMIOTU`): 2,00 dla drużyn,
+    # 2,20 dla zawodników — wytyczna właściciela. Powyżej model jest
+    # ANTY-SYGNAŁEM: przy kursach 2,40–2,80 typy z najwyższą szansą trafiają
+    # 30,8%, a z najniższą 46,7% (n=360, pomiar 17.08).
+    #
+    # ⚑ DRABINKI TĘDY NIE IDĄ — mają własny ekran i cel 1,5–6.
+    z_polki: dict = {}
     z_dnia: dict = {}
     z_zawodnika: dict = {}
     lista_pub: list[dict] = []
@@ -1096,8 +1128,22 @@ def wybierz_liste_publikowana(
             (dzien, rotowire._norm(str(b.get("podmiot") or "")))
             if b.get("podmiot_typ") == "zawodnik" else None
         )
+        # PÓŁKA TEGO TYPU — decyduje o limicie i o zakładce. Typ spoza widełek
+        # nie jest cicho gubiony: dostaje powód, żeby dało się policzyć, ile
+        # i czego odpada ([[ciche-odrzucenia-zasada]]).
+        _polka = uczony.polka_dla(b.get("kurs"), b.get("podmiot_typ"))
+        if _polka is None:
+            if not b.get("wznowiony"):
+                zdjete.setdefault(_klucz_publikacji(b), "kurs_poza_polkami")
+                continue
+        else:
+            b["polka"] = _polka
+        _polka_klucz = (dzien, _polka)
+        _polka_limit = (uczony.POLKI[_polka]["limit_dobowy"]
+                        if _polka else LISTA_CAP)
         if not b.get("wznowiony"):
-            if (z_dnia.get(dzien, 0) >= LISTA_CAP
+            if (z_polki.get(_polka_klucz, 0) >= _polka_limit
+                    or z_dnia.get(dzien, 0) >= LISTA_CAP
                     or z_meczu.get(mecz, 0) >= LISTA_PER_MECZ
                     or z_rynku.get(rynek, 0) >= LISTA_PER_RYNEK
                     or z_pasma.get(pasmo, 0) >= LISTA_PER_PASMO
@@ -1107,6 +1153,7 @@ def wybierz_liste_publikowana(
                 zdjete.setdefault(_klucz_publikacji(b), "poza_lista_dnia")
                 continue
         z_dnia[dzien] = z_dnia.get(dzien, 0) + 1
+        z_polki[_polka_klucz] = z_polki.get(_polka_klucz, 0) + 1
         z_meczu[mecz] = z_meczu.get(mecz, 0) + 1
         z_rynku[rynek] = z_rynku.get(rynek, 0) + 1
         z_pasma[pasmo] = z_pasma.get(pasmo, 0) + 1
@@ -8862,7 +8909,33 @@ def _main_impl(tryb=None):
         # „tragicznie niewchodzącego" (`_ukryte` wyżej) i dalej jest raportowana
         # w logu cyklu. Zmienił się jej zakres: z układania kolejności na
         # wskazywanie, czego model jeszcze nie umie.
+        #
+        # ⚑⚑ KLUCZ ZALEŻY OD PÓŁKI (2026-08-20). Półki mają różne cele, więc
+        # różne kryteria — jedna miara dla obu była kompromisem, który nie
+        # służył żadnej.
+        #
+        # Zmierzone na 3560 rozliczonych kandydatach, podział czasowy
+        # (klucz oceniony na okresie, którego przy wyborze nie widział):
+        #
+        #   półka                    po mocy p×√kurs   po szansie modelu
+        #   wysoka szansa 1,20–1,80       71,6%             74,7%   <- +3,1
+        #   wyższe kursy 1,80–2,0/2,2     55,4%             53,0%   <- gorzej
+        #
+        # Na pewniakach szansa wygrywa, bo `√kurs` w mocy podbija droższe
+        # typy z tej samej półki, a te trafiają rzadziej. Na półce wyższych
+        # kursów pasmo jest tak wąskie, że oba klucze dają prawie to samo
+        # (różnica mieści się w błędzie ±5,5 pp) — zostaje moc, bo ma za sobą
+        # dłuższy pomiar i premię za bogactwo materiału meczu.
+        #
+        # ⚑ CZEGO TA ZMIANA NIE ROBI: nie miesza półek. Każda ma własny
+        # licznik (`z_polki`), więc klucz układa kolejność WEWNĄTRZ półki.
+        # Między półkami skale są nieporównywalne i to jest bez znaczenia dla
+        # składu — ale wpływa na to, która półka wcześniej zajmie miejsca
+        # w limitach różnorodności (mecz/rynek/rodzina). Gdyby to kiedyś
+        # zaczęło przeszkadzać, sortować trzeba per półka, nie jedną listą.
         ma_rachunek = bool(b.get("czynniki")) and (b.get("ci") or [None])[0] is not None
+        if uczony.polka_dla(b.get("kurs"), b.get("podmiot_typ")) == "wysoka_szansa":
+            return (float(b.get("p_model") or 0.0), ma_rachunek)
         return (moc_listy(b, _kandydatow_w_meczu.get(b.get("mecz_id"), 0)),
                 ma_rachunek)
 
@@ -8893,6 +8966,18 @@ def _main_impl(tryb=None):
               f"kandydatów (na KAŻDĄ dobę produktową max {LISTA_CAP}, "
               f"{LISTA_PER_MECZ}/mecz, {LISTA_PER_RYNEK}/rynek, "
               f"{LISTA_PER_RODZINA}/rodzinę); reszta zostaje w puli kuponów")
+    # ⚑ CZUJNIK PÓŁEK (2026-08-20) — bez niego nie widać, czy podział na dwie
+    # zakładki działa, ani ile produktu zjada sufit kursu. Jedna linia w logu
+    # cyklu, bo to jest pierwsze miejsce, w którym patrzy się po wdrożeniu.
+    _wg_polki = Counter(
+        str(b.get("polka") or "poza_polkami") for b in lista_pub
+        if not b.get("sugestia")
+    )
+    _poza = sum(1 for _p in _zdjete_selekcja.values() if _p == "kurs_poza_polkami")
+    print("Półki listy dnia: " + ", ".join(
+        f"{k} {v}/{uczony.POLKI[k]['limit_dobowy'] if k in uczony.POLKI else '—'}"
+        for k, v in sorted(_wg_polki.items())
+    ) + f" | poza widełkami (kurs > sufitu): {_poza}")
     if _z_dnia:
         print("Lista wg doby produktowej (6:00→6:00): " + ", ".join(
             f"{d} {n}" for d, n in sorted(_z_dnia.items()))

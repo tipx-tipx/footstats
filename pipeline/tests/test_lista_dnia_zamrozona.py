@@ -16,8 +16,11 @@ Trzy rzeczy naraz (decyzja właściciela 2026-08-14):
 
 import datetime as dt
 
+import pytest
+
 from footstats.jobs import build_wc_fast as B
 from footstats.jobs import rozliczanie
+from footstats.model import uczony as U
 
 STREFA = rozliczanie.STREFA
 
@@ -45,7 +48,12 @@ def _typ(mecz_id=1, kickoff=None, p=0.7, kurs=1.8, **kw):
 RYNKI = ["team_corners", "team_goals", "team_cards", "team_fouls",
          "team_sot", "team_shots", "match_corners", "match_cards"]
 # po jednym kursie z każdego pasma PASMA_CENY
-KURSY = [1.25, 1.45, 1.75, 2.10, 2.60, 4.00]
+# ⚑ WSZYSTKIE WEWNĄTRZ PÓŁEK (2026-08-20). Do dziś lista brała każdy kurs,
+# więc testy limitu mogły używać 2,60 i 4,00. Odkąd dobę dzielą półki
+# (`uczony.POLKI`, sufit 2,00/2,20 per strumień), taki typ odpada na
+# widełkach i test limitu mierzyłby widełki zamiast limitu. Odrzucenie
+# spoza półek ma własny test niżej.
+KURSY = [1.25, 1.45, 1.60, 1.75, 1.85, 1.95]
 
 
 def _rozne(ile: int, od: int = 1, **kw) -> list[dict]:
@@ -90,14 +98,22 @@ def _klucz(b):
     return (B.moc_listy(b, 0), True)
 
 
-def test_limit_dnia_obowiazuje():
-    lista, zdjete, z_dnia = B.wybierz_liste_publikowana(_rozne(29), _klucz)
+@pytest.fixture
+def bez_roznorodnosci(monkeypatch):
+    """Izoluje sam limit doby — gwarancje różnorodności poza zasięg."""
+    for nazwa in ("LISTA_PER_MECZ", "LISTA_PER_RYNEK", "LISTA_PER_PASMO",
+                  "LISTA_PER_RODZINA"):
+        monkeypatch.setattr(B, nazwa, 999)
+
+
+def test_limit_dnia_obowiazuje(bez_roznorodnosci):
+    lista, zdjete, z_dnia = B.wybierz_liste_publikowana(_rozne(36), _klucz)
     assert len(lista) == B.LISTA_CAP
     assert z_dnia["2026-08-14"] == B.LISTA_CAP
     assert all(p == "poza_lista_dnia" for p in zdjete.values())
 
 
-def test_wznowione_zajmuja_miejsca_zamiast_je_omijac():
+def test_wznowione_zajmuja_miejsca_zamiast_je_omijac(bez_roznorodnosci):
     """NAPRAWA PRZECIEKU: wznowione idą pierwsze, więc limit ich obejmuje.
 
     Wcześniej mocny nowy typ wchodził przed wznowionymi (sortowanie po sile),
@@ -129,9 +145,9 @@ def test_limit_na_mecz():
     assert len(lista) == B.LISTA_PER_MECZ
 
 
-def test_limity_licza_sie_osobno_na_kazda_dobe():
-    dzis = _rozne(29, od=1, kickoff=_ts("2026-08-14", 20))
-    jutro = _rozne(29, od=100, kickoff=_ts("2026-08-15", 20))
+def test_limity_licza_sie_osobno_na_kazda_dobe(bez_roznorodnosci):
+    dzis = _rozne(36, od=1, kickoff=_ts("2026-08-14", 20))
+    jutro = _rozne(36, od=100, kickoff=_ts("2026-08-15", 20))
     _, _, z_dnia = B.wybierz_liste_publikowana(dzis + jutro, _klucz)
     assert z_dnia == {"2026-08-14": B.LISTA_CAP, "2026-08-15": B.LISTA_CAP}
 
@@ -143,8 +159,8 @@ def test_mecz_nocny_liczy_sie_do_doby_poprzedniej():
     assert set(z_dnia) == {"2026-08-14"}      # wszystko to JEDNA doba produktowa
 
 
-def test_sugestia_nie_zajmuje_miejsca():
-    kand = _rozne(29) + [_typ(mecz_id=999, sugestia=True)]
+def test_sugestia_nie_zajmuje_miejsca(bez_roznorodnosci):
+    kand = _rozne(36) + [_typ(mecz_id=999, sugestia=True)]
     lista, _, _ = B.wybierz_liste_publikowana(kand, _klucz)
     assert any(b.get("sugestia") for b in lista)
     assert sum(1 for b in lista if not b.get("sugestia")) == B.LISTA_CAP
@@ -164,7 +180,7 @@ def test_dzien_domkniety_nie_przyjmuje_nowych():
 
 def test_dzien_domkniety_wpuszcza_swoj_komplet_ponad_limit():
     """Skład ogłoszony wraca w całości, nawet gdyby limit był dziś mniejszy."""
-    typy = [_typ(mecz_id=i) for i in range(1, 20)]
+    typy = [_typ(mecz_id=i) for i in range(1, 26)]
     zamkniete = {"2026-08-14": {B._klucz_publikacji(b) for b in typy}}
     lista, zdjete, z_dnia = B.wybierz_liste_publikowana(
         typy, _klucz, zamkniete=zamkniete)
@@ -237,3 +253,73 @@ def test_manifest_nie_rosnie_w_nieskonczonosc():
     out = B.przytnij_manifest(m, _ts("2026-08-14", 12))
     assert "2026-08-01" not in out
     assert "2026-08-14" in out
+
+
+def test_typ_spoza_polek_odpada_z_powodem(bez_roznorodnosci):
+    """⚑ 2026-08-20. Powyżej sufitu strumienia model jest ANTY-SYGNAŁEM —
+    przy kursach 2,40–2,80 typy z najwyższą szansą trafiają 30,8%, a te
+    z najniższą 46,7% (n=360). Taki typ nie wchodzi na listę, ale musi
+    zostawić powód: cichych odrzuceń nie ma."""
+    w_polce = _typ(mecz_id=1, kurs=1.75)
+    za_drogi = _typ(mecz_id=2, kurs=2.60, p=0.99)
+    lista, zdjete, _ = B.wybierz_liste_publikowana([w_polce, za_drogi], _klucz)
+    assert [b["mecz_id"] for b in lista] == [1]
+    assert zdjete[B._klucz_publikacji(za_drogi)] == "kurs_poza_polkami"
+
+
+def test_sufit_jest_per_strumien(bez_roznorodnosci):
+    """Drużyny do 2,00, zawodnicy do 2,20 — wytyczna właściciela 20.08."""
+    druzyna = _typ(mecz_id=1, kurs=2.10, podmiot_typ="druzyna")
+    zawodnik = _typ(mecz_id=2, kurs=2.10, podmiot_typ="zawodnik")
+    lista, zdjete, _ = B.wybierz_liste_publikowana([druzyna, zawodnik], _klucz)
+    assert [b["mecz_id"] for b in lista] == [2], (
+        "kurs 2,10 mieści się zawodnikowi (sufit 2,20), ale nie drużynie (2,00)"
+    )
+    assert zdjete[B._klucz_publikacji(druzyna)] == "kurs_poza_polkami"
+
+
+def test_polki_maja_wlasne_budzety(bez_roznorodnosci):
+    """Doba dzieli się na półki: 15 pewniaków i 6 wyższych kursów.
+
+    Bez tego obie zakładki pokazywały tę samą listę inaczej posortowaną —
+    to jest sedno zadania 5 planu.
+    """
+    pewniaki = [_typ(mecz_id=i, kurs=1.40, p=0.80) for i in range(1, 30)]
+    wyzsze = [_typ(mecz_id=100 + i, kurs=2.00, p=0.55) for i in range(1, 30)]
+    lista, _zdjete, z_dnia = B.wybierz_liste_publikowana(
+        pewniaki + wyzsze, _klucz)
+    ile_pewniakow = sum(1 for b in lista if float(b["kurs"]) < 1.80)
+    ile_wyzszych = sum(1 for b in lista if float(b["kurs"]) >= 1.80)
+    assert ile_pewniakow == U.POLKI["wysoka_szansa"]["limit_dobowy"]
+    assert ile_wyzszych == U.POLKI["wyzsze_kursy"]["limit_dobowy"]
+    assert z_dnia["2026-08-14"] == B.LISTA_CAP
+
+
+def test_polka_pewniakow_wybiera_po_szansie_nie_po_mocy(bez_roznorodnosci):
+    """⚑ 2026-08-20. `moc_listy` to p × √kurs, więc w obrębie jednej półki
+    podbija typy DROŻSZE — a te trafiają rzadziej.
+
+    Zmierzone na 3560 kandydatach (podział czasowy, klucz oceniony na
+    okresie, którego nie widział): półka pewniaków po mocy 71,6%,
+    po szansie modelu 74,7%.
+
+    Test odtwarza sytuację wprost: pewniejszy typ po niższym kursie ma
+    wygrać z mniej pewnym po wyższym, choć `moc_listy` woli tego drugiego.
+    """
+    pewny = _typ(mecz_id=1, kurs=1.25, p=0.82)
+    drozszy = _typ(mecz_id=2, kurs=1.75, p=0.70)
+    assert B.moc_listy(drozszy, 0) > B.moc_listy(pewny, 0), (
+        "założenie testu: moc faworyzuje droższy typ"
+    )
+    kolejnosc = sorted([drozszy, pewny],
+                       key=lambda b: -float(b.get("p_model") or 0.0))
+    assert kolejnosc[0] is pewny
+
+
+def test_wyzsze_kursy_zostaja_na_mocy():
+    """Na wąskim paśmie 1,80–2,00 szansa NIE pomaga (53,0% wobec 55,4%),
+    więc ta półka zostaje na mierze z dłuższym pomiarem za sobą."""
+    assert U.POLKI["wyzsze_kursy"]["kurs_max"] - \
+        U.POLKI["wyzsze_kursy"]["kurs_min"] <= 0.45, (
+        "pasmo wyższych kursów urosło — przemierzyć, czy klucz nadal właściwy"
+    )

@@ -657,11 +657,35 @@ POLKI = {
 }
 
 
-def polka_dla(kurs: float | None) -> str | None:
-    """Na której półce stoi typ o tym kursie (None = poza zakresem produktu)."""
+# ⚑ SUFIT KURSU PER STRUMIEŃ — wytyczna właściciela 2026-08-20.
+#
+# Drużynowe i zawodnicze mają różny materiał, więc różny sufit: 2,00 dla
+# drużyn, 2,20 dla zawodników. To jest OSTRZEJSZE niż wspólne 2,20 wyżej
+# i celowo — pomiar z 17.08 pokazał, że powyżej 2,20 model jest ANTY-SYGNAŁEM,
+# a granica dla drużyn wypada niżej.
+#
+# ⚑ DRABINKI NIE PODLEGAJĄ TEMU SUFITOWI. Stoją na innym rachunku (pokrycie
+# Wilsona × mnożniki kontekstu), mają własny ekran i własny cel — kursy
+# 1,5–6 (decyzja właściciela). Sufit dotyczy LISTY DNIA, nie produktu.
+KURS_MAX_PODMIOTU = {"druzyna": 2.00, "zawodnik": 2.20}
+
+
+def sufit_kursu(podmiot_typ: str | None) -> float:
+    """Najwyższy kurs, jaki ten strumień może pokazać na liście dnia."""
+    return KURS_MAX_PODMIOTU.get(str(podmiot_typ or ""), 2.20)
+
+
+def polka_dla(kurs: float | None, podmiot_typ: str | None = None) -> str | None:
+    """Na której półce stoi typ o tym kursie (None = poza zakresem produktu).
+
+    `podmiot_typ` nakłada dodatkowy sufit strumienia (`KURS_MAX_PODMIOTU`).
+    Bez niego działa jak dotąd — wspólne widełki z `POLKI`.
+    """
     if not kurs:
         return None
     k = float(kurs)
+    if podmiot_typ is not None and k > sufit_kursu(podmiot_typ):
+        return None
     for nazwa, p in POLKI.items():
         if p["kurs_min"] <= k < p["kurs_max"]:
             return nazwa
@@ -669,13 +693,14 @@ def polka_dla(kurs: float | None) -> str | None:
 
 
 def dopuszczony(kurs: float | None, lambda_: float | None,
-                linia: float) -> tuple[bool, str | None]:
+                linia: float,
+                podmiot_typ: str | None = None) -> tuple[bool, str | None]:
     """Czy typ wchodzi na którąkolwiek półkę. Zwraca (czy, powód odrzucenia).
 
     Powód jest zwracany zawsze, gdy typ odpada — cichych odrzuceń nie ma
     ([[ciche-odrzucenia-zasada]]).
     """
-    polka = polka_dla(kurs)
+    polka = polka_dla(kurs, podmiot_typ)
     if polka is None:
         return False, "kurs_poza_polkami"
     zasieg = POLKI[polka]["zasieg"]

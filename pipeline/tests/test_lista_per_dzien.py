@@ -10,6 +10,7 @@ import time
 import pytest
 
 from footstats.jobs import build_wc_fast as B
+from footstats.model import uczony as U
 from footstats.jobs import rozliczanie as R
 
 DZIEN = 86400
@@ -46,12 +47,15 @@ def bez_roznorodnosci(monkeypatch):
 
 def test_kazdy_dzien_ma_wlasna_dwudziestke(bez_roznorodnosci):
     # mecz_id unikalny w obrębie dnia — jeden mecz nie gra dwa razy
+    # ⚑ kursy 1,20–1,49 to JEDNA półka (pewniaki), więc limitem doby jest jej
+    # budżet, nie sufit globalny — patrz `uczony.POLKI` (wpięte 2026-08-20)
     kand = [_typ(kickoff=k, mecz_id=1000 * d + i, kurs=1.2 + i / 100)
             for d, k in enumerate((JUTRO, POJUTRZE)) for i in range(30)]
+    limit = U.POLKI["wysoka_szansa"]["limit_dobowy"]
     lista, zdjete, per_dzien = B.wybierz_liste_publikowana(kand, _klucz)
-    assert len(lista) == 2 * B.LISTA_CAP
-    assert sorted(per_dzien.values()) == [B.LISTA_CAP, B.LISTA_CAP]
-    assert len(zdjete) == 2 * (30 - B.LISTA_CAP)
+    assert len(lista) == 2 * limit
+    assert sorted(per_dzien.values()) == [limit, limit]
+    assert len(zdjete) == 2 * (30 - limit)
     assert set(zdjete.values()) == {"poza_lista_dnia"}
 
 
@@ -214,12 +218,13 @@ def test_rynek_ukryty_schodzi_takze_pokazanemu_ale_bez_znacznika():
 
 
 def test_sugestia_nie_liczy_sie_do_limitu(bez_roznorodnosci):
-    kand = [_typ(mecz_id=i, kurs=1.2 + i / 100) for i in range(B.LISTA_CAP)]
+    limit = U.POLKI["wysoka_szansa"]["limit_dobowy"]
+    kand = [_typ(mecz_id=i, kurs=1.2 + i / 100) for i in range(limit)]
     sugestia = _typ(mecz_id=99, rynek="team_goals", sugestia=True)
     lista, _z, per_dzien = B.wybierz_liste_publikowana(
         kand + [sugestia], _klucz)
     assert sugestia in lista
-    assert per_dzien[R.dzien_pl(JUTRO)] == B.LISTA_CAP
+    assert per_dzien[R.dzien_pl(JUTRO)] == limit
 
 
 def test_pusta_lista_nie_wybucha():
