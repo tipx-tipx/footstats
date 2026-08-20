@@ -40,6 +40,41 @@ def _brier(pary):
     return sum((p - y) ** 2 for p, y in pary) / max(len(pary), 1)
 
 
+def _p_uczonego(r):
+    v = r.get("p_uczony")
+    if isinstance(v, dict) and v.get("p") is not None:
+        return float(v["p"])
+    return None
+
+
+def _liczony_modelem(r) -> tuple[bool, bool]:
+    """Czy TEN typ pokazał liczbę modelu. Zwraca (tak, rozpoznany_zapasowo).
+
+    ⚑ ROZPOZNANIE ZAPASOWE (2026-08-20). Do 20.08 biała lista `rec_pewniaka`
+    w `build_wc_fast` nie przepuszczała stempla `zrodlo_p`, więc 79% typów
+    modelu weszło do księgi bez niego. Sam stempel naprawiony, ale rekordu
+    raz zapisanego nie przepisujemy (`_dopisz_nowe` nowych pól nie dopisuje),
+    więc te 1187 rekordów zostaje bez stempla NA ZAWSZE.
+
+    Bez tego rozpoznania czujnik liczyłby lukę na 200 z 688 rozliczeń — i to
+    nie na losowym wycinku, tylko na rynkach MECZOWYCH (bo one szły inną
+    ścieżką). Zmierzone: pokazywał wtedy −4,7 pp zamiast −7,1 pp.
+
+    Kryterium: liczba pokazana zgadza się z liczbą modelu do trzeciego
+    miejsca. Przypadkowa zgodność jest pomijalna, a rozbieżność ma tu
+    konkretne znaczenie — typ, który spadł na stary rachunek przez brak
+    pokrycia (tam liczbę rusza kalibracja rynku i korekta strony).
+    """
+    if r.get("zrodlo_p") == "uczony":
+        return True, False
+    if r.get("zrodlo_p"):
+        return False, False
+    pu, pm = _p_uczonego(r), r.get("p_model")
+    if pu is None or pm is None:
+        return False, False
+    return abs(float(pm) - pu) <= 0.002, True
+
+
 def main() -> None:
     try:
         from dotenv import load_dotenv
@@ -89,6 +124,16 @@ def main() -> None:
     print("=" * 78)
     udzial = n_uczony / n_razem
     print(f"   modelem policzone: {n_uczony}/{n_razem} = {udzial:.1%}")
+    # ⚑ ten udział liczy się TYLKO wśród typów ze stemplem. Gdy stempel gubi
+    # się po drodze (patrz `_liczony_modelem`), zdanie „strona liczy jednym
+    # rachunkiem" opisuje wycinek, a nie produkt — dlatego mówimy wprost,
+    # jak duży jest ten wycinek.
+    _bez = len(swieze) - n_razem
+    if _bez:
+        _odz = sum(1 for r in swieze if _liczony_modelem(r) == (True, True))
+        print(f"   ⚑ {_bez} typów bez stempla — z nich {_odz} pokazuje liczbę "
+              f"modelu (rozpoznane po zgodności). Udział wyżej opisuje "
+              f"{n_razem} z {len(swieze)} typów, nie całość.")
     if udzial < 0.90:
         print(f"   ⚑ {n_fallback} typów spadło na stary rachunek przez brak "
               "pokrycia modelu — strona pokazuje MIESZANKĘ dwóch rachunków. "
@@ -96,12 +141,20 @@ def main() -> None:
     else:
         print("   ✓ strona liczy jednym rachunkiem")
 
-    rozliczone = [r for r in swieze
-                  if r.get("wynik") in ("wygrany", "przegrany")
-                  and r.get("zrodlo_p") == "uczony" and r.get("p_model")]
+    _rozl = [r for r in swieze if r.get("wynik") in ("wygrany", "przegrany")]
+    rozliczone, _zapas = [], 0
+    for _r in _rozl:
+        _tak, _z = _liczony_modelem(_r)
+        if _tak and _r.get("p_model"):
+            rozliczone.append(_r)
+            _zapas += 1 if _z else 0
     print("\n" + "=" * 78)
     print("3. CZY LICZBA JEST UCZCIWA (luka = trafność − deklaracja)")
     print("=" * 78)
+    if _zapas:
+        print(f"   ⚑ {_zapas} z {len(rozliczone)} rozliczeń rozpoznano po "
+              "ZGODNOŚCI liczby, nie po stemplu — to rekordy sprzed naprawy "
+              "białej listy `rec_pewniaka` (20.08). Nowe typy mają stempel.")
     if len(rozliczone) < 30:
         print(f"   rozliczeń modelem: {len(rozliczone)} — za mało na werdykt "
               "(próg 30). Wróć za dzień.")

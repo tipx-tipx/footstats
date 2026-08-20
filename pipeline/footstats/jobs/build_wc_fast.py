@@ -7825,6 +7825,32 @@ def _main_impl(tryb=None):
             # jedzie do księgi, żeby dało się porównać oba rachunki na żywych
             # meczach zamiast na backteście
             **({"p_uczony": b["p_uczony"]} if b.get("p_uczony") else {}),
+            # ⚑⚑ KTÓRY RACHUNEK POSZEDŁ NA STRONĘ (dopięte 2026-08-20).
+            # Przy przełączeniu 18.08 stempel dopięto do TRZECH białych list
+            # (`_dopisz_nowe`, `_kupon_leg_do_logu`, `legi_pool`), a TĘ
+            # przeoczono — dokładnie tak, jak ostrzega komentarz wyżej i jak
+            # zdarzyło się dobę wcześniej przy `kal_strony`. Tędy idzie 79%
+            # typów, więc skutki były dwa i oba zmierzone 20.08:
+            #
+            #  1. Czujnik przełączenia widział 200 z 688 rozliczeń modelu,
+            #     a że wycinek ze stemplem to w większości rynki MECZOWE
+            #     (produkcja jest drużynowa), pokazywał lukę −4,7 pp zamiast
+            #     prawdziwych −7,1 i margines +0,1 pp zamiast −1,4.
+            #  2. Warstwy karty (`_urealnij_do_pokazania`,
+            #     `_sciagnij_karte_do_ceny`) rozpoznają typ modelu WYŁĄCZNIE
+            #     po tym polu, więc bez niego traktowały go jak stary
+            #     rachunek: urealniały deltą strumienia (drużyny −0,63
+            #     logitu) i ściągały wagą `w=0,05` do ceny z marżą 5,79%,
+            #     zamiast zostawić go w spokoju. Model ma na to własny
+            #     pomiar — `w=0,40` przy marży 3,45% na 688 rozliczeniach.
+            #
+            # ⚑ To NIE jest pole kosmetyczne: wpięcie zmienia liczbę na
+            # karcie. Patrz `waga_sciagania(log, "uczony")` — od 688 rozliczeń
+            # model ma własną próbę i warstwa może policzyć własną deltę
+            # zamiast pożyczać cudzą albo nie robić nic.
+            **({"zrodlo_p": b["zrodlo_p"]} if b.get("zrodlo_p") else {}),
+            **({"p_stary": round(float(b["p_stary"]), 4)}
+               if isinstance(b.get("p_stary"), (int, float)) else {}),
             **({"rachunek": b["rachunek"]} if b.get("rachunek") else {}),
             **({"kal_tau": b["kal_tau"]} if b.get("kal_tau") else {}),
             "czynniki": b.get("czynniki", {}),
