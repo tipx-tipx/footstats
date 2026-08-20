@@ -122,7 +122,12 @@ export function ValueBoard({
   radarWpisy?: RadarWpis[];
   zawodnicy: Zawodnik[];
   initialMatchId?: number;
-  initialRodzaj?: "pewniaki" | "value" | "radar" | "wszystko";
+  initialRodzaj?:
+    | "pewniaki"
+    | "wyzsze_kursy"
+    | "value"
+    | "radar"
+    | "wszystko";
   /** znacznik serwera (s) – wartość startowa dla zegara przeglądarki */
   teraz: number;
 }) {
@@ -146,7 +151,7 @@ export function ValueBoard({
   // domyślny sort = ranking silnika ("Polecane") – samo p_model wynosiłoby
   // na górę zawsze linie 0,5 gwiazd i chowało typy kontekstowe (matchup)
   const [rodzaj, setRodzaj] = useState<
-    "pewniaki" | "value" | "radar" | "wszystko"
+    "pewniaki" | "wyzsze_kursy" | "value" | "radar" | "wszystko"
   >(
     // Zakładka „Wszystko" USUNIĘTA (decyzja usera 2026-08-01): dublowała
     // pozostałe, a przy zawodnikach w kwarantannie pokazywała to samo co
@@ -259,8 +264,20 @@ export function ValueBoard({
   }, [stsGeneratedTs]);
 
   const liczbaValueSts = stsAlerty.length;
+  // PÓŁKI LISTY DNIA (backend `uczony.POLKI`, wpięte 2026-08-20). Doba dzieli
+  // się na dwa budżety: 15 typów o kursach 1,20–1,80 i 6 o kursach 1,80–2,20.
+  //
+  // ⚑ ODPORNIE NA BRAK POLA. Typy sprzed wdrożenia nie mają `polka`, a lista
+  // niesie też wznowione sprzed tygodnia — dla nich zostaje stara flaga
+  // `pewniak`, żeby zakładka nie zgubiła typu, który user już widział.
+  const wWysokiejSzansie = (b: ValueBet) =>
+    b.polka ? b.polka === "wysoka_szansa" : !!b.pewniak;
   const liczbaPewniakow = useMemo(
-    () => bets.filter((b) => b.pewniak).length,
+    () => bets.filter(wWysokiejSzansie).length,
+    [bets],
+  );
+  const liczbaWyzszychKursow = useMemo(
+    () => bets.filter((b) => b.polka === "wyzsze_kursy").length,
     [bets],
   );
 
@@ -279,7 +296,8 @@ export function ValueBoard({
   const liczbaPerRynek = useMemo(() => {
     const m = new Map<string, number>();
     for (const b of bets) {
-      if (rodzaj === "pewniaki" && !b.pewniak) continue;
+      if (rodzaj === "pewniaki" && !wWysokiejSzansie(b)) continue;
+      if (rodzaj === "wyzsze_kursy" && b.polka !== "wyzsze_kursy") continue;
       let kod = b.rynek_kod;
       if (b.rynek_kod.startsWith("team_")) kod = "druzyny";
       else if (!GLOWNE_KODY.has(b.rynek_kod)) kod = "inne";
@@ -313,7 +331,9 @@ export function ValueBoard({
         b.rynek_kod !== rynek
       )
         return false;
-      if (rodzaj === "pewniaki" && !b.pewniak) return false;
+      if (rodzaj === "pewniaki" && !wWysokiejSzansie(b)) return false;
+      if (rodzaj === "wyzsze_kursy" && b.polka !== "wyzsze_kursy")
+        return false;
       if (pewnosc === "wysoka" && b.pewnosc !== "wysoka") return false;
       if (pewnosc === "srednia" && b.pewnosc === "niska") return false;
       if (meczId !== undefined && b.mecz_id !== meczId) return false;
@@ -383,6 +403,11 @@ export function ValueBoard({
       // resztą produktu, która mówi o szansach. Kod zakładki zostaje
       // („pewniaki" jedzie w adresie i w backendzie), zmienia się etykieta.
       ["pewniaki", "Wysokie szanse", liczbaPewniakow],
+      // ⚑ DRUGA PÓŁKA (2026-08-20, zadanie 5 planu). Do dziś „Wysokie szanse"
+      // i „value" pokazywały tę samą listę inaczej posortowaną — dwie
+      // zakładki, jedna obietnica. Teraz każda ma własny budżet doby i własne
+      // widełki kursu, więc różnią się SKŁADEM, nie kolejnością.
+      ["wyzsze_kursy", "Wyższe kursy", liczbaWyzszychKursow],
       ["value", "Lepszy kurs w STS", liczbaValueSts],
       ["radar", "Drabinki", radarNajlepsze.length],
     ] as const
@@ -393,8 +418,10 @@ export function ValueBoard({
     // zawodnicze potrafią stać puste, a pusta zakładka wygląda jak awaria).
     // Wyjątek: gdy user właśnie na niej stoi – inaczej zniknęłaby mu spod
     // palców przy odświeżeniu danych.
+    // ...oraz „Wyższe kursy": do pierwszego cyklu po wdrożeniu półek żaden
+    // typ nie ma jeszcze pola `polka`, więc zakładka byłaby pusta.
     ([kod, , liczba]) =>
-      (kod !== "value" && kod !== "pewniaki") ||
+      (kod !== "value" && kod !== "pewniaki" && kod !== "wyzsze_kursy") ||
       (liczba ?? 0) > 0 ||
       rodzaj === kod,
   );

@@ -105,6 +105,18 @@ export interface ValueBet {
   sugestia?: boolean;           // true = brak kursu, tylko podpowiedź modelu
   /** true = top typ meczu z pełnego skanu (wysoka szansa, bez wymogu value) */
   pewniak?: boolean;
+  /**
+   * PÓŁKA LISTY DNIA – którą obietnicę niesie ten typ (backend: `uczony.POLKI`,
+   * wpięte 2026-08-20). Doba dzieli się na dwa budżety zamiast jednego:
+   *
+   *   wysoka_szansa   kursy 1,20–1,80, 15 typów/dobę, wybierane PO SZANSIE
+   *   wyzsze_kursy    kursy 1,80–2,00 (drużyny) / 2,20 (zawodnicy), 6 typów
+   *
+   * Do 20.08 obie zakładki pokazywały TĘ SAMĄ listę inaczej posortowaną –
+   * stąd to pole. Puste na typach sprzed wdrożenia, więc front musi umieć
+   * bez niego (patrz filtr „Wysokie szanse" w ValueBoard).
+   */
+  polka?: "wysoka_szansa" | "wyzsze_kursy";
   /** true = perełka na wyższej linii (>= 1,5) przy wciąż solidnej szansie */
   wyzsza_linia?: boolean;
   /** true = profil rywala wyraźnie sprzyja (koncesje per rynek × pozycja) */

@@ -162,6 +162,7 @@ export default async function OkazjePage({
         initialMatchId={mecz ? Number(mecz) : undefined}
         initialRodzaj={
           rodzaj === "pewniaki" ||
+          rodzaj === "wyzsze_kursy" ||
           rodzaj === "value" ||
           rodzaj === "radar" ||
           rodzaj === "wszystko"
