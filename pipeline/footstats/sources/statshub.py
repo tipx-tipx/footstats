@@ -49,21 +49,48 @@ STATTYPE_MAP = {
 # status pytamy przez zaślepioną sieć (zapora z conftest rzuca wyjątkiem,
 # a każdy wyjątek wygląda tu jak awaria źródła).
 PAUZA_PONOWIENIA_S = 3
+# ⚑⚑ ODCIĘCIE ZA NADMIAR ZAPYTAŃ TO NIE JEST „chwilowo wolny" (2026-08-20).
+#
+# Do dziś 429 leciał tą samą ścieżką co timeout i 5xx: pauza 3 s, potem 6 s,
+# potem poddajemy się — a wtedy `_main_impl` łapie wyjątek i POMIJA CAŁY
+# CYKL („statshub chwilowo niedostępny — dane bez zmian"). Czyli jedno
+# odcięcie kosztuje komplet typów, drabinek i kuponów na godzinę.
+#
+# Źródło odblokowuje się po MINUTACH, nie sekundach, więc trzysekundowa pauza
+# gwarantowała porażkę wszystkich trzech prób. Zmierzone tego dnia lokalnie
+# po serii dry-runów: 429 i cykl pusty w 0,8 min.
+#
+# ⚑ To zabezpieczenie jest warunkiem podniesienia budżetów odkrywania
+# (`MAX_WYSZUKAN_ODKRYC` 700 → 1400): większy budżet to większa szansa na
+# odcięcie, więc najpierw musi istnieć droga wyjścia.
+PAUZA_ODCIECIA_S = 25
 
 
 def _get(url: str, timeout: int = 25, retries: int = 3) -> dict:
-    """GET z retry — statshub bywa chwilowo wolny/niedostępny (zwłaszcza z chmury)."""
+    """GET z retry — statshub bywa chwilowo wolny/niedostępny (zwłaszcza z chmury).
+
+    Odcięcie (429/403) dostaje WŁASNY, dłuższy backoff i licznik — patrz nota
+    przy `PAUZA_ODCIECIA_S`.
+    """
     import time as _t
 
     last = None
     for attempt in range(retries):
+        odciecie = False
         try:
             r = requests.get(url, impersonate="chrome124", timeout=timeout, headers=HEADERS)
+            odciecie = getattr(r, "status_code", None) in (403, 429)
             r.raise_for_status()
             return r.json()
         except Exception as e:  # timeout, 5xx, itp.
             last = e
-            _t.sleep(PAUZA_PONOWIENIA_S * (attempt + 1))
+            if odciecie:
+                # licznik idzie do raportu cyklu — bez niego odcięcie widać
+                # dopiero po tym, jak strona pół dnia pokazuje stare dane
+                diagnostyka.cichy("statshub", "odciecie_429", e)
+                _t.sleep(PAUZA_ODCIECIA_S * (attempt + 1))
+            else:
+                _t.sleep(PAUZA_PONOWIENIA_S * (attempt + 1))
     raise last
 
 

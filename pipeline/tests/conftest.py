@@ -114,4 +114,8 @@ def _sieciowa_zapora(request, monkeypatch):
     # czego pilnować.
     from footstats.sources import statshub
     monkeypatch.setattr(statshub, "PAUZA_PONOWIENIA_S", 0)
+    # ...i pauza ODCIĘCIA (2026-08-20). Jest z założenia DŁUGA (25 s × próba),
+    # bo źródło odblokowuje się po minutach — w zestawie zerujemy sam czas,
+    # liczba prób i licznik zostają, żeby test miał czego pilnować.
+    monkeypatch.setattr(statshub, "PAUZA_ODCIECIA_S", 0)
     yield
