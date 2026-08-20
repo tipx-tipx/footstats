@@ -165,3 +165,78 @@ def test_mecz_bez_oferty_zawodniczej_pomijany():
         debiutanci=lambda *a, **k: wywolania.append(1) or [],
     )
     assert wywolania == []
+
+
+# --- BUDŻETY: czas, nie sztywna liczba (2026-08-20) ---------------------------
+
+def test_budzet_czasu_przerywa_odkrywanie():
+    """⚑ Dry-run 20.08 dnia pucharowego: „220 zawodników, 677 zapytań, BUDŻET
+    WYCZERPANY" — oba sufity dobiły do końca, więc nie dało się powiedzieć,
+    ilu zawodników jeszcze czekało w ofercie.
+
+    Sufity zostają jako bezpiecznik, ale o przerwaniu decyduje BUDŻET CZASU:
+    liczba dobra dla spokojnego wtorku obcina czwartek pucharowy, a cyklu nie
+    wolno wywalić w żadnym z nich. Ten test pilnuje, żeby budżet czasu nie
+    wrócił do bycia stałą liczbą.
+    """
+    players_out, odds_grid = {}, {}
+    mecze = [(m, (1, 2), 100 + m, {1: "A", 2: "B"}) for m in range(40)]
+    sb_cache = {
+        m: _sb({f"gracz {m}": {"shots": {0.5: {"over": 2.0}}}})
+        for m in range(40)
+    }
+
+    def _wolny_debiutant(sb_odds, znane, team_ids, licznik, **kw):
+        licznik[0] += 1
+        return []
+
+    n_gr, _ = B.odkryj_zawodnikow_z_oferty(
+        mecze, sb_cache, players_out, odds_grid, _forma,
+        budzet_s=0.0,                       # budżet wyczerpany od pierwszego meczu
+        debiutanci=_wolny_debiutant,
+    )
+    assert n_gr == 0, "budżet czasu nie przerwał odkrywania"
+
+
+def test_sufity_maja_zapas_na_dzien_pucharowy():
+    """Zmierzone 20.08: 62 mecze w oknie 36 h, 220 odkrytych zawodników przy
+    suficie 220 i 677 zapytań przy suficie 700 — OBA na styk.
+
+    Podniesienie samego `DOCIAG_MAX` (pierwsza ściana lejka) nic by nie dało,
+    bo kandydaci stanęliby tutaj. Sufity mają mieć zapas nad zmierzonym dnem.
+    """
+    assert B.MAX_ODKRYC_CYKL >= 400, (
+        "sufit odkryć bez zapasu — dzień pucharowy znów obetnie lejek"
+    )
+    assert B.MAX_WYSZUKAN_ODKRYC >= 1200
+    assert B.BUDZET_ODKRYWANIA_S > 0, (
+        "budżet czasu to jedyne, co chroni cykl przed przekroczeniem limitu"
+    )
+
+
+def test_odkrywanie_jest_przed_radarem():
+    """⚑⚑⚑ KOLEJNOŚĆ ETAPÓW TO NIE KOSMETYKA (2026-08-20).
+
+    Do 20.08 `odkryj_zawodnikow_z_oferty` stało ~390 linii PO `radar.zbuduj`.
+    Zmierzone na dry-runie: 251 zawodników odkrytych kosztem 247 sekund i 759
+    zapytań, a jedynym użyciem `odds_grid` po tej linii był dump do
+    `odds_superbet.json` (tabela pokryć). Czyli ani jeden odkryty zawodnik
+    nie mógł dostać drabinki — karty powstawały wcześniej.
+
+    `odds_grid` nie przeżywa cyklu (powstaje pusty), więc nie było nawet
+    pociechy „zadziała w następnym przebiegu".
+
+    Test jest STRUKTURALNY, bo kolejność w funkcji na 9000 linii jest
+    niewidoczna dla testu jednostkowego, a jej odwrócenie nic nie wywala —
+    po prostu po cichu zabiera drabinkom cały strumień kandydatów.
+    """
+    from pathlib import Path
+    zrodlo = (Path(__file__).resolve().parent.parent
+              / "footstats" / "jobs" / "build_wc_fast.py").read_text(encoding="utf-8")
+    i_odkrycie = zrodlo.index("odkryj_zawodnikow_z_oferty(\n            _do_odkrycia")
+    i_radar = zrodlo.index("radar_wpisy = radar.zbuduj(")
+    assert i_odkrycie < i_radar, (
+        "odkrywanie zawodników wróciło ZA radar — odkryci zawodnicy nie "
+        "trafią do drabinek w tym cyklu, a odds_grid nie przeżywa do "
+        "następnego (patrz nota w tym teście)"
+    )

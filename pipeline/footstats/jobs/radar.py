@@ -1902,24 +1902,48 @@ def zbuduj(
     # kwotował kolejnej linii, czy myśmy ją ucięli progiem. To rozróżnienie
     # decyduje, który próg ruszyć, gdy kart jest za mało.
     diag_drabinki: Counter = Counter()
+    # ⚑⚑ RENTGEN LEJKA (2026-08-20). Do dziś radar liczył WYŁĄCZNIE to, gdzie
+    # ginie drugi szczebel — czyli sam koniec drogi. Etapy wcześniejsze (mecz →
+    # oferta → zawodnik → historia → pokrycie) nie miały ani jednego licznika,
+    # więc na pytanie „czemu nie ma karty na tego zawodnika" nie dało się
+    # odpowiedzieć inaczej niż zgadywaniem — i wracaliśmy do tematu co kilka
+    # dni.
+    #
+    # Zgłoszenie właściciela 20.08 (Mickels, Sabah FK): konkurencja wystawiła
+    # drabinkę na strzały, my nie mieliśmy tego zawodnika NIGDZIE — ani na
+    # karcie, ani wśród 15 130 odrzuceń. Bez tych liczników jedyną drogą do
+    # przyczyny było czytanie kodu ścieżka po ścieżce.
+    #
+    # Zasada jest ta sama co przy typach: [[ciche-odrzucenia-zasada]] — licznik
+    # przy KAŻDEJ bramie, próg w jednostce decyzji.
+    lejek: Counter = Counter()
+    lejek["1_meczow_z_oferta"] = len(odds_grid)
+    lejek["2_par_zawodnik_rynek"] = sum(len(g) for g in odds_grid.values())
     for mid, gracze in odds_grid.items():
         meta = events_meta.get(mid)
         if not meta:
+            lejek["3_odpadl_mecz_bez_meta"] += 1
             continue
         # ZAPAS NA OBSTAWIENIE: nowa karta nie powstaje tuż przed gwizdkiem.
         # Karta już opublikowana wraca z rejestru (scal_karty_z_publikacjami)
         # i zostaje do końca — chodzi wyłącznie o to, żeby nic NOWEGO nie
         # wskakiwało na listę w ostatniej chwili (zgłoszenie: Club Necaxa).
         if margines_startu_s and (meta.get("ts") or 0) <= teraz + margines_startu_s:
+            lejek["4_odpadl_mecz_za_blisko_gwizdka"] += 1
             continue
         for pid, drabinki in gracze.items():
             # POZA SKŁADEM: znamy jedenastkę i jego w niej nie ma. Karta na
             # takiego zawodnika to zakład o to, że wejdzie z ławki — a cała
             # analiza pod spodem liczy z minut, których nie zagra.
             if (mid, pid) in poza_skladem:
+                lejek["5_odpadl_zawodnik_poza_skladem"] += 1
                 continue
             trendy_mk = trendy_pm.get((mid, pid))
             if not trendy_mk:
+                # ⚑ TU ZGINĄŁ MICKELS. Bukmacher go kwotuje, my nie mamy
+                # historii — bo albo statshub jej nie oddał, albo nie
+                # zapytaliśmy (mecz poza budżetem `DOCIAG_MAX`).
+                lejek["6_odpadl_zawodnik_bez_historii"] += 1
                 continue
             tr_ref = max(trendy_mk.values(), key=lambda t: len(t.counts))
             # ŚWIEŻOŚĆ PRÓBY: dotąd pilnowały jej tylko detektory transferu
@@ -1931,6 +1955,7 @@ def zbuduj(
                 not grane_ref
                 or teraz - grane_ref[0][2] > MAX_DNI_SWIEZOSC * 86400
             ):
+                lejek["7_odpadla_historia_niesw" + "ieza"] += 1
                 continue
             liga_dr, utidy_dr = konsensus.get(
                 tr_ref.team_id or -1, (None, set())
@@ -1994,6 +2019,7 @@ def zbuduj(
                 wagi_modelu=wagi_modelu,
             )
             if not rynki:
+                lejek["8_odpadly_puste_drabinki"] += 1
                 continue  # same puste drabinki (kursy-szum) = nie ma karty
             wpis = {
                 "minuty_sr6": minuty_sr6,
@@ -2261,6 +2287,14 @@ def zbuduj(
     # gwarantowanego slotu — słaby mecz nie dostaje nic (decyzja usera:
     # „tylko najlepsze, nie randomowe"). Wcześniejszy round-robin dawał
     # kartę każdemu meczowi, także takiemu z ujemną przewagą.
+    # ⚑ RENTGEN — jedna linia, cała droga od oferty do kandydata. Czytać
+    # od lewej: pierwsza liczba, która spada nieproporcjonalnie, wskazuje
+    # bramę do naprawy.
+    lejek["9_kandydatow_do_oceny"] = len(wpisy)
+    print("Drabinki — LEJEK: " + " | ".join(
+        f"{k.split('_', 1)[1].replace('_', ' ')}: {v}"
+        for k, v in sorted(lejek.items()) if v
+    ))
     if powody_odpadniecia:
         print("Drabinki — kandydaci odrzuceni: " + ", ".join(
             f"{k}={v}" for k, v in powody_odpadniecia.most_common()

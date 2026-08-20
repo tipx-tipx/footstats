@@ -2325,10 +2325,27 @@ def dopelnij_oferte_zawodnicza(
 # drużynowym sufit 160 pokrywa komplet z zapasem.
 MAX_TEAM_PERF_CYKL = 160
 
-MAX_ODKRYC_CYKL = 220       # ilu zawodników odkrywamy na cykl (globalnie)
+# ⚑⚑ DRUGA ŚCIANA LEJKA DRABINEK (zmierzone 2026-08-20).
+#
+# Dry-run dnia pucharowego: „Odkrywanie z oferty: 220 zawodników (541 wpisów
+# kursów, 677 zapytań), BUDŻET WYCZERPANY". Oba sufity dobiły do końca —
+# czyli nie wiemy, ilu zawodników jeszcze CZEKAŁO w ofercie.
+#
+# ⚑ Podniesienie samego `DOCIAG_MAX` (pierwsza ściana) NIC BY NIE DAŁO:
+# więcej meczów z ofertą to więcej kandydatów, a ci i tak stanęliby tutaj.
+# Dlatego obie bramy dostają zapas W TYM SAMYM commicie.
+#
+# Sufity zostają jako bezpiecznik, ale o przerwaniu decyduje BUDŻET CZASU —
+# tak jak przy dociąganiu oferty. Powód ten sam: liczba dobra dla wtorku
+# obcina czwartek pucharowy, a cyklu nie wolno wywalić w żadnym z nich.
+MAX_ODKRYC_CYKL = 420       # ilu zawodników odkrywamy na cykl (globalnie)
 MAX_ODKRYC_MECZ = 6         # ...i ilu z jednego meczu W JEDNEJ RUNDZIE
-MAX_WYSZUKAN_ODKRYC = 700   # sufit zapytań wyszukiwarki (statshub bez limitu,
+MAX_WYSZUKAN_ODKRYC = 1400  # sufit zapytań wyszukiwarki (statshub bez limitu,
 #                             to próg grzeczności i czasu cyklu)
+# Budżet czasu na CAŁE odkrywanie. Dry-run 20.08: silnik 35,4 min przy limicie
+# cyklu 50 min, więc zapas jest — ale dzielimy go świadomie, a nie zużywamy
+# do końca. Po przekroczeniu etap kończy się w połowie i MELDUJE to w logu.
+BUDZET_ODKRYWANIA_S = 240
 RUNDY_ODKRYWANIA = 3        # ile razy przemiatamy listę meczów
 
 
@@ -2341,6 +2358,7 @@ def odkryj_zawodnikow_z_oferty(
     budzet: int = MAX_ODKRYC_CYKL,
     maks_na_mecz: int = MAX_ODKRYC_MECZ,
     budzet_wyszukan: int = MAX_WYSZUKAN_ODKRYC,
+    budzet_s: float = BUDZET_ODKRYWANIA_S,
     rundy: int = RUNDY_ODKRYWANIA,
     debiutanci=None,
     fetch_performance=None,
@@ -2373,6 +2391,7 @@ def odkryj_zawodnikow_z_oferty(
     fetch_performance = fetch_performance or statshub.fetch_player_performance
     trendy = trendy_z_performance or statshub.trendy_z_performance
     licznik = [0]                 # budżet wyszukiwarki, wspólny dla meczów
+    _t0_odkryc = time.monotonic()
     n_graczy = n_kursow = 0
     sm_cache: dict[int, list] = {}
     juz_odkryci: set[tuple[int, int]] = set()
@@ -2391,7 +2410,8 @@ def odkryj_zawodnikow_z_oferty(
     for mid, team_ids, _ts, nazwy_druzyn in [
         m for _runda in range(rundy) for m in kolejka
     ]:
-        if n_graczy >= budzet or licznik[0] >= budzet_wyszukan:
+        if (n_graczy >= budzet or licznik[0] >= budzet_wyszukan
+                or time.monotonic() - _t0_odkryc > budzet_s):
             break
         sb_odds = sb_cache.get(mid) or {}
         if not (sb_odds.get("players") or {}):
@@ -2466,9 +2486,16 @@ def odkryj_zawodnikow_z_oferty(
                     odds_grid.setdefault(mid, {}).setdefault(int(pid), {})[mk] = over
                     n_kursow += 1
     if n_graczy or licznik[0]:
-        print(f"Odkrywanie z oferty: {n_graczy} zawodników spoza feedu propsów "
-              f"({n_kursow} wpisów kursów, {licznik[0]} zapytań wyszukiwarki)"
-              + (", budżet wyczerpany" if n_graczy >= budzet else ""))
+        _ile_s = time.monotonic() - _t0_odkryc
+        # KTÓRY budżet się skończył — bez tego „wyczerpany" nie mówi, co
+        # podnieść, i diagnoza zaczyna się od czytania kodu
+        _co = ("zawodnicy" if n_graczy >= budzet
+               else "zapytania" if licznik[0] >= budzet_wyszukan
+               else "czas" if _ile_s > budzet_s else None)
+        print(f"Odkrywanie z oferty: {n_graczy}/{budzet} zawodników spoza feedu "
+              f"propsów ({n_kursow} wpisów kursów, {licznik[0]}/{budzet_wyszukan} "
+              f"zapytań wyszukiwarki) w {_ile_s:.0f} s"
+              + (f" — ⚑ BUDŻET WYCZERPANY: {_co}" if _co else " — komplet"))
     return n_graczy, n_kursow
 
 
@@ -8214,9 +8241,40 @@ def _main_impl(tryb=None):
     # że Superbet kursy MA. Dociągamy dla najbliższych sparowanych meczów.
     try:
         DOCIAG_OKNO_S = 36 * 3600   # mecze w tym oknie przed kickoffem
-        DOCIAG_MAX = 20             # limit grzecznościowy zapytań na cykl
+        # ⚑⚑ BUDŻET CZASU, NIE LICZBY MECZÓW (2026-08-20).
+        #
+        # `DOCIAG_MAX = 20` był stałą dobraną, gdy dzień miał kilkanaście
+        # meczów. Zmierzone 20.08 na dry-runie dnia pucharowego: 62 mecze
+        # w oknie, obsłużone 20, **42 bez żadnej oferty** — a bez oferty nie
+        # odpala ani `odkryj_zawodnikow_z_oferty`, ani ścieżka debiutantów,
+        # więc na tych meczach nie powstanie ANI JEDNA drabinka. Tak zginął
+        # Mickels (Sabah FK, 19.08): Superbet go kwotował, my o mecz nie
+        # zapytaliśmy.
+        #
+        # Sztywny licznik jest zły w obie strony: w spokojny wtorek zostawia
+        # budżet niewykorzystany, w czwartek pucharowy obcina połowę dnia.
+        # Budżet CZASOWY sam się dopasowuje — i, co ważniejsze, nie może
+        # wywalić cyklu, bo zna swój sufit w sekundach.
+        #
+        # 150 s przy interwale 1,5 s między zapytaniami (`superbet._get`) to
+        # ~100 meczów. Dry-run 20.08: silnik 35,4 min przy limicie cyklu 50,
+        # więc zapas jest, ale nie jest nieskończony — stąd budżet, nie „wszystkie".
+        DOCIAG_BUDZET_S = 150
+        DOCIAG_SUFIT = 120          # bezpiecznik, gdyby źródło odpowiadało od ręki
         dociagniete = 0
+        # ⚑⚑ ILE MECZÓW ZOSTAJE BEZ OFERTY (2026-08-20). Ta pętla ma limit,
+        # a limit NIGDZIE nie meldował, ilu meczów nie obsłużył — więc dzień
+        # pucharowy wyglądał identycznie jak spokojny wtorek.
+        #
+        # Zmierzone 20.08: 64 mecze w oknie 36 h, limit 20, czyli 44 mecze na
+        # cykl bez pobranej oferty. To jest PIERWSZA ściana lejka drabinek:
+        # bez kursów meczu nie odpali ani `odkryj_zawodnikow_z_oferty`, ani
+        # ścieżka debiutantów, więc zawodnik kwotowany przez Superbet nie ma
+        # jak zaistnieć (zgłoszenie: Mickels, Sabah FK, 19.08).
+        pominietych_d = 0
         teraz_d = int(time.time())
+        _t0_dociag = time.monotonic()
+        _wyczerpany_czas = False
         for e in sorted(wszystkie_ev,
                         key=lambda e: int(e.get("timeStartTimestamp") or 0)):
             mid_d = e["id"]
@@ -8225,8 +8283,11 @@ def _main_impl(tryb=None):
                 continue
             if not (0 <= ts_d - teraz_d <= DOCIAG_OKNO_S):
                 continue
-            if dociagniete >= DOCIAG_MAX:
-                break
+            if (dociagniete >= DOCIAG_SUFIT
+                    or time.monotonic() - _t0_dociag > DOCIAG_BUDZET_S):
+                _wyczerpany_czas = True
+                pominietych_d += 1
+                continue
             if tryb:
                 sb_ev = tryb.sb_ev_by_mid.get(mid_d)
             elif sb_events:
@@ -8250,11 +8311,52 @@ def _main_impl(tryb=None):
                 # dociągnięcie kursów do puli kuponów — bez niego leg wypada
                 diagnostyka.cichy("cykl", "dociagniecie_kursow", e)
                 continue
-        if dociagniete:
+        if dociagniete or pominietych_d:
+            _ile_s = time.monotonic() - _t0_dociag
             print(f"Kursy Superbet dociągnięte dla {dociagniete} meczów "
-                  f"bez trendów (ścieżka debiutantów)")
+                  f"bez trendów (ścieżka debiutantów) w {_ile_s:.0f} s"
+                  + (f" — ⚑ {pominietych_d} meczów w oknie "
+                     f"{DOCIAG_OKNO_S//3600} h ZOSTAŁO BEZ OFERTY "
+                     f"({'budżet czasu' if _wyczerpany_czas else 'sufit'} "
+                     f"{DOCIAG_BUDZET_S} s); tam nie powstanie żadna drabinka"
+                     if pominietych_d else " — komplet okna"))
     except Exception as ex:
         print(f"Dociąg kursów pominięty ({ex})")
+    # ⚑⚑⚑ ODKRYWANIE MUSI BYĆ PRZED RADAREM (przeniesione 2026-08-20).
+    #
+    # Do dziś ten blok stał ~390 linii NIŻEJ — czyli PO `radar.zbuduj`. Skutek
+    # zmierzony na dry-runie: 251 zawodników odkrytych kosztem 247 sekund
+    # i 759 zapytań, a `odds_grid` po tej linii ma już tylko JEDNO użycie —
+    # dump do `odds_superbet.json` (tabela TOP POKRYCIA). Ani jeden odkryty
+    # zawodnik nie mógł dostać drabinki: karty były zbudowane wcześniej.
+    #
+    # `odds_grid` NIE przeżywa cyklu (powstaje pusty), więc nie było też
+    # „zadziała w następnym przebiegu" — ta praca szła w całości w tabelkę.
+    #
+    # To jest właściwa przyczyna zgłoszenia z 20.08 (Mickels, Sabah FK):
+    # zawodnik kwotowany przez bukmachera, bez feedu propsów, mógł zostać
+    # odkryty — ale odkrycie przychodziło po fakcie.
+    #
+    # Zależności są gotowe dużo wcześniej (`ev_by_id` 4650, `_forma_z_trendu`
+    # 4668, `team_name` 3979, `sb_cache` napełniony tuż wyżej), więc to jest
+    # przeniesienie, nie przepisanie.
+    _do_odkrycia = []
+    for _mid, _sb in sb_cache.items():
+        if not (_sb or {}).get("players"):
+            continue
+        _ev = ev_by_id.get(_mid) or {}
+        _h, _a = _ev.get("homeTeamId"), _ev.get("awayTeamId")
+        if not (_h and _a):
+            continue
+        _do_odkrycia.append((
+            _mid, (int(_h), int(_a)),
+            int(_ev.get("timeStartTimestamp") or 0),
+            {int(_h): team_name.get(_h, ""), int(_a): team_name.get(_a, "")},
+        ))
+    if _do_odkrycia:
+        odkryj_zawodnikow_z_oferty(
+            _do_odkrycia, sb_cache, players_out, odds_grid, _forma_z_trendu,
+        )
     pomiar_drabinek: list[dict] = []
     try:
         events_meta_radar = {
@@ -8639,28 +8741,6 @@ def _main_impl(tryb=None):
     # TERMINARZ POKAZUJE KAŻDY PRZEANALIZOWANY MECZ — patrz `domknij_terminarz`.
     # Przemiatamy zakres DRUŻYNOWY, czyli dokładnie ten, który zakładka Mecze
     # i tak pokazuje domyślnie.
-    # ...a teraz mecze, w których feed propsów milczy CAŁKOWICIE — tam nie ma
-    # kogo wzbogacać, więc zawodników trzeba odkryć wprost z oferty bukmachera
-    # (patrz odkryj_zawodnikow_z_oferty). To domyka tabelę pokryć na
-    # kwalifikacjach pucharów, gdzie kursy są, a feedu nie ma.
-    _do_odkrycia = []
-    for _mid, _sb in sb_cache.items():
-        if not (_sb or {}).get("players"):
-            continue
-        _ev = ev_by_id.get(_mid) or {}
-        _h, _a = _ev.get("homeTeamId"), _ev.get("awayTeamId")
-        if not (_h and _a):
-            continue
-        _do_odkrycia.append((
-            _mid, (int(_h), int(_a)),
-            int(_ev.get("timeStartTimestamp") or 0),
-            {int(_h): team_name.get(_h, ""), int(_a): team_name.get(_a, "")},
-        ))
-    if _do_odkrycia:
-        odkryj_zawodnikow_z_oferty(
-            _do_odkrycia, sb_cache, players_out, odds_grid, _forma_z_trendu,
-        )
-
     mids_z_danymi = set(matches_out)
     # „mamy kursy" = bukmacher kwotuje na ten mecz cokolwiek, co umiemy wycenić:
     # rynek drużynowy albo propsy zawodnicze. Mecz spoza `sb_cache` to mecz,
