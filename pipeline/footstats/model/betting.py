@@ -924,6 +924,55 @@ NEAR_WIDELKI_P = 0.08       # szansa do 8 pp poniżej progu
 NEAR_WIDELKI_EV = 0.04      # wartość na p ostrożnym do 4 pp pod zerem
 
 
+# ⚑⚑⚑⚑ PASMO PEWNIAKÓW NIE PODLEGA BRAMOM WARTOŚCI (2026-08-21).
+#
+# Bramy wartości pytają „czy na tym zarobimy". To był właściwy filtr, dopóki
+# celem produktu był zysk. Właściciel zmienił cel 20.08 na TRAFNOŚĆ
+# ([[cel-produktu-to-trafnosc]]) i od tego dnia te bramy pracują PRZECIWKO
+# celowi, bo tanie typy mają ujemną wartość Z DEFINICJI.
+#
+# Warunek `p_ostrozne * odd >= 1` przy kursie 1,25 żąda szansy ponad 80%,
+# a CAŁE to pasmo trafia 77,6% (n=863). Brama wymaga więc więcej, niż pasmo
+# jest w stanie dać, i wycina je systematycznie — nie dlatego, że typy są
+# słabe, tylko dlatego, że są tanie.
+#
+# ZMIERZONE 21.08 na 8993 rozliczeniach — bramy NIE ODRÓŻNIAJĄ dobrych typów
+# od słabych w tym paśmie:
+#
+#     brama                 odrzuconych   ich trafność   pokazywane w paśmie
+#     wartosc_ujemna            488          67,0%             ~66%
+#     ujemna_po_korekcie        224          62,9%
+#     ev_ponizej_progu          129          63,6%
+#
+# Jedyne, co realnie robią, to obcinają 62% podaży w paśmie o najwyższej
+# trafności. Symulacja listy dnia z podziałem czasowym: 76,6% -> 78,1% po
+# zdjęciu, przy tej samej liczbie typów (pula rośnie 201 -> 255 na dobę).
+#
+# ⚑ ZOSTAJE PRÓG SZANSY (`p >= p_min`). Zdejmujemy wyłącznie warunek
+# PIENIĘŻNY — kontrola jakości typu jest nietknięta.
+#
+# ⚑ POWYŻEJ 1,80 BRAMY ZOSTAJĄ: tam obietnicą zakładki „Wyższe kursy" jest
+# wartość, nie trafność ([[polki-wpiete-zadanie-5]]), a na drogich typach
+# `ev_ponizej_progu` faktycznie odróżnia (odrzucone trafiają 37,8%).
+KURS_MAX_BEZ_BRAM_WARTOSCI = 1.80
+
+
+def bramy_wartosci_dotycza(odd: float | None) -> bool:
+    """Czy typ o tym kursie podlega bramom wartości (patrz nota wyżej).
+
+    JEDNO ŹRÓDŁO PRAWDY dla wszystkich trzech bram — świadomie, bo dziś
+    trzykrotnie kosztowało nas to, że ta sama reguła była wpięta w kilku
+    ścieżkach i jedna zostawała w tyle ([[wznowione-omijaly-bramy]]).
+    """
+    try:
+        k = float(odd)
+    except (TypeError, ValueError):
+        return True          # nie wiemy = brama DZIAŁA (bezpieczna strona)
+    if k <= 0:
+        return True
+    return k >= KURS_MAX_BEZ_BRAM_WARTOSCI
+
+
 def widelki_druzynowe_ok(odd: float, p: float, p_ostrozne: float) -> bool:
     """Czy typ drużynowy przechodzi bramę kurs×szansa (patrz WIDELKI_DRUZYNOWE).
 
@@ -940,8 +989,10 @@ def widelki_druzynowe_ok(odd: float, p: float, p_ostrozne: float) -> bool:
     opłacalności (1/1,92 i 1/2,38) — po podatku te same definicje dają
     0,59 i 0,48, więc przeliczenie ich ZAOSTRZA bramę, a nie luzuje.
     """
+    _wartosc = bramy_wartosci_dotycza(odd)
     return any(
-        lo <= odd <= hi and p >= p_min and p_ostrozne * odd - 1.0 >= 0.0
+        lo <= odd <= hi and p >= p_min
+        and (not _wartosc or p_ostrozne * odd - 1.0 >= 0.0)
         for lo, hi, p_min in WIDELKI_DRUZYNOWE
     )
 
@@ -1067,7 +1118,7 @@ def assess(
         # bramki publikacji — każda z parą (odrzuca?, czy TUŻ przy progu?);
         # komentarze przy stałych MAX_* wyżej tłumaczą intuicje
         powody: list[tuple[str, bool]] = []
-        if ev < min_ev:
+        if ev < min_ev and bramy_wartosci_dotycza(odds):
             powody.append(("ev_ponizej_progu", ev >= min_ev - NEAR_EV_PP))
         if score < MIN_CONFIDENCE_SCORE:
             powody.append(

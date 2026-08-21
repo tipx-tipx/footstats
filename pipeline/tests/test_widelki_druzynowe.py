@@ -22,21 +22,56 @@ def _stara_brama(odd, p, p_ostrozne):
     return pewny or perelka
 
 
-def test_rozdzielenie_nie_zmienilo_ani_jednej_decyzji():
-    """Siatka po całej przestrzeni kurs × szansa — decyzja musi być identyczna."""
+def test_powyzej_pasma_pewniakow_decyzja_bez_zmian():
+    """Siatka kurs × szansa POWYŻEJ 1,80 — tam brama ma działać jak zawsze.
+
+    ⚑ 2026-08-21 pasmo pewniaków przestało podlegać bramom wartości
+    (`betting.bramy_wartosci_dotycza`), więc porównanie ze starą bramą ma
+    sens wyłącznie nad progiem. Nad nim NIC nie wolno ruszyć: obietnicą
+    zakładki „Wyższe kursy" jest wartość, nie trafność.
+    """
     sprawdzonych = 0
     for i in range(0, 71):
         odd = 1.0 + i * 0.1                     # 1,0 .. 8,0
+        if odd < betting.KURS_MAX_BEZ_BRAM_WARTOSCI:
+            continue
         for j in range(0, 21):
-            p = j * 0.05                        # 0 .. 1
-            for ubytek in (0.0, 0.05, 0.15):    # p ostrożne poniżej p
+            p = j * 0.05
+            for ubytek in (0.0, 0.05, 0.15):
                 p_ostr = max(0.0, p - ubytek)
                 assert (
                     betting.widelki_druzynowe_ok(odd, p, p_ostr)
                     == _stara_brama(odd, p, p_ostr)
                 ), f"rozjazd przy kurs={odd:.2f} p={p:.2f} p_ostr={p_ostr:.2f}"
                 sprawdzonych += 1
-    assert sprawdzonych > 4000
+    assert sprawdzonych > 2000
+
+
+def test_ponizej_progu_znika_TYLKO_warunek_wartosci():
+    """W paśmie pewniaków zdejmujemy warunek PIENIĘŻNY, nie próg szansy.
+
+    Powód: `p_ostrozne * kurs >= 1` przy kursie 1,25 żąda ponad 80% szansy,
+    a całe to pasmo trafia 77,6% (n=863) — brama wymaga więcej, niż pasmo
+    może dać, więc wycinała je systematycznie. Zmierzone 21.08 na 8993
+    rozliczeniach: odrzucone przez nią typy trafiały 67,0%, przepuszczone
+    ~66% — nie odróżniała ([[cel-produktu-to-trafnosc]]).
+    """
+    # tani typ z DOBRĄ szansą: dawniej odpadał (0,74 × 1,25 = 0,93 < 1)
+    assert betting.widelki_druzynowe_ok(1.25, 0.78, 0.74)
+    assert not _stara_brama(1.25, 0.78, 0.74)
+    # ...ale próg szansy ZOSTAJE: słaby typ odpada tak samo jak wcześniej
+    assert not betting.widelki_druzynowe_ok(1.25, 0.40, 0.38)
+    assert not _stara_brama(1.25, 0.40, 0.38)
+    # granica: 1,80 należy już do pasma, w którym brama działa
+    assert betting.bramy_wartosci_dotycza(1.80)
+    assert not betting.bramy_wartosci_dotycza(1.79)
+
+
+def test_bramy_wartosci_dotycza_odporne_na_smieci():
+    """Wołane na surowym polu z oferty — brak kursu ma znaczyć „brama działa",
+    a nie „przepuść wszystko"."""
+    assert betting.bramy_wartosci_dotycza(None)
+    assert betting.bramy_wartosci_dotycza("nie-liczba")
 
 
 def test_powod_wskazuje_najbardziej_zewnetrzny_warunek():
