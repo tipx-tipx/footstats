@@ -2509,6 +2509,16 @@ def odkryj_zawodnikow_z_oferty(
         _co = ("zawodnicy" if n_graczy >= budzet
                else "zapytania" if licznik[0] >= budzet_wyszukan
                else "czas" if _ile_s > budzet_s else None)
+        # ⚑ do meta, nie tylko do logu — patrz `diagnostyka.zapisz_rentgen`.
+        # Bez tego „który budżet padł" żyje tyle, co log Actions, a to jest
+        # pierwsza liczba, od której zaczyna się decyzja o progach drabinek.
+        diagnostyka.zapisz_rentgen("budzet_odkrywania", {
+            "zawodnicy": n_graczy, "zawodnicy_budzet": budzet,
+            "wpisy_kursow": n_kursow,
+            "zapytania": licznik[0], "zapytania_budzet": budzet_wyszukan,
+            "sekundy": round(_ile_s), "sekundy_budzet": budzet_s,
+            "wyczerpany": _co or "",
+        })
         print(f"Odkrywanie z oferty: {n_graczy}/{budzet} zawodników spoza feedu "
               f"propsów ({n_kursow} wpisów kursów, {licznik[0]}/{budzet_wyszukan} "
               f"zapytań wyszukiwarki) w {_ile_s:.0f} s"
@@ -8330,6 +8340,17 @@ def _main_impl(tryb=None):
                 continue
         if dociagniete or pominietych_d:
             _ile_s = time.monotonic() - _t0_dociag
+            # ⚑ do meta — `pominietych_d` to mecze, w których NIE POWSTANIE
+            # ŻADNA DRABINKA, czyli sufit całego lejka. Patrz
+            # `diagnostyka.zapisz_rentgen`.
+            diagnostyka.zapisz_rentgen("budzet_dociagu_kursow", {
+                "dociagniete": dociagniete,
+                "bez_oferty": pominietych_d,
+                "okno_h": DOCIAG_OKNO_S // 3600,
+                "sekundy": round(_ile_s), "sekundy_budzet": DOCIAG_BUDZET_S,
+                "wyczerpany": "czas" if _wyczerpany_czas else (
+                    "sufit" if pominietych_d else ""),
+            })
             print(f"Kursy Superbet dociągnięte dla {dociagniete} meczów "
                   f"bez trendów (ścieżka debiutantów) w {_ile_s:.0f} s"
                   + (f" — ⚑ {pominietych_d} meczów w oknie "
@@ -9698,6 +9719,13 @@ def _main_impl(tryb=None):
         # W meta, a nie tylko w logu, bo log GitHub Actions znika po kilku
         # dniach, a to jest jedyny ślad po danych, które przepadły.
         "ciche_bledy": diagnostyka.raport(),
+        # RENTGEN TEGO PRZEBIEGU — lejek drabinek, stan budżetów, powody
+        # odrzucenia kandydatów. Ta sama racja co przy `ciche_bledy` wyżej:
+        # log Actions znika po kilku dniach, a `/actions/runs/{id}/logs`
+        # wymaga praw admina do repo (403 nawet dla repo publicznego). Bez
+        # tego jedyne liczby, na których wolno ruszać progi drabinek, są
+        # nieosiągalne dla następnej sesji — sprawdzone boleśnie 21.08.
+        "rentgen": diagnostyka.rentgen(),
     })
     # CO PRZEPADŁO PO CICHU — jedna linia na koniec przebiegu. Do 04.08 nie
     # było tego widać w ogóle: 79 miejsc łapało wyjątek i szło dalej, więc

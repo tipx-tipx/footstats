@@ -2269,12 +2269,14 @@ def zbuduj(
         pomiar_kandydaci.sort(key=lambda s: -s["edge"])
         if pomiar_out is not None:
             pomiar_out.extend(pomiar_kandydaci[:MAX_POMIAROW_CYKLU])
+    diagnostyka.zapisz_rentgen("drabinki_przewaga", statystyki_przewagi)
     if statystyki_przewagi:
         # rozkład tego, co odpada na braku przewagi — materiał pod decyzję
         # o drugiej ścieżce wejścia (mocna seria zamiast przewagi)
         print("Drabinki — odrzucone na przewadze wg jakości: " + ", ".join(
             f"{k}={v}" for k, v in statystyki_przewagi.most_common()
         ))
+    diagnostyka.zapisz_rentgen("drabinki_pomiar_progu", powody_pomiaru)
     if powody_pomiaru:
         # PUSTY POMIAR TO TEŻ WYNIK: bez tej linijki „zero typów pomiarowych"
         # wygląda tak samo jak „bukmacher nie kwotuje takich linii", a to
@@ -2291,14 +2293,24 @@ def zbuduj(
     # od lewej: pierwsza liczba, która spada nieproporcjonalnie, wskazuje
     # bramę do naprawy.
     lejek["9_kandydatow_do_oceny"] = len(wpisy)
+    # ⚑ RENTGEN PRZEŻYWA CYKL (2026-08-21). `print` idzie do logu Actions,
+    # który znika po kilku dniach i wymaga tokena admina — a to są jedyne
+    # liczby, na których wolno ruszać progi drabinek. Patrz
+    # `diagnostyka.zapisz_rentgen`.
+    diagnostyka.zapisz_rentgen("drabinki_lejek", lejek)
     print("Drabinki — LEJEK: " + " | ".join(
         f"{k.split('_', 1)[1].replace('_', ' ')}: {v}"
         for k, v in sorted(lejek.items()) if v
     ))
+    diagnostyka.zapisz_rentgen(
+        "drabinki_kandydaci_odrzuceni",
+        {**powody_odpadniecia, "_przeszlo": len(ocenione)},
+    )
     if powody_odpadniecia:
         print("Drabinki — kandydaci odrzuceni: " + ", ".join(
             f"{k}={v}" for k, v in powody_odpadniecia.most_common()
         ) + f" (przeszło: {len(ocenione)})")
+    diagnostyka.zapisz_rentgen("drabinki_drugi_szczebel", diag_drabinki)
     if diag_drabinki:
         # dlaczego drabinka skończyła się na pierwszym szczeblu — cztery różne
         # przyczyny, cztery różne lekarstwa (patrz komentarz przy diag_drabinki)

@@ -55,3 +55,38 @@ def test_czysty_przebieg_nic_nie_pisze(capsys):
     diagnostyka.reset()
     diagnostyka.wypisz()
     assert capsys.readouterr().out == ""
+
+
+# --------------------------------------------------------------- rentgen
+
+def test_rentgen_przezywa_do_meta():
+    """⚑ 2026-08-21. Lejek drabinek istniał tylko jako `print` w logu Actions,
+    który znika po kilku dniach, a `/actions/runs/{id}/logs` wymaga praw
+    admina do repo (403 nawet dla repo publicznego). Sesja 21.08 nie mogła
+    przez to odczytać produkcyjnych liczb i musiała liczyć je dry-runem, który
+    widzi połowę meczów. Rozkład ma trafiać do meta, tak jak `ciche_bledy`."""
+    from collections import Counter
+
+    diagnostyka.reset()
+    diagnostyka.zapisz_rentgen("drabinki_lejek", Counter({"par": 1457}))
+    diagnostyka.zapisz_rentgen("budzet_odkrywania", {"wyczerpany": "czas"})
+    r = diagnostyka.rentgen()
+    assert r["drabinki_lejek"] == {"par": 1457}
+    assert r["budzet_odkrywania"]["wyczerpany"] == "czas"
+
+
+def test_rentgen_pomija_pusty_rozklad():
+    """Pusty rozkład to brak pomiaru, nie pomiar równy zeru — w meta nie ma
+    po co trzymać pustych kluczy."""
+    diagnostyka.reset()
+    diagnostyka.zapisz_rentgen("nic", {})
+    assert diagnostyka.rentgen() == {}
+
+
+def test_reset_czysci_takze_rentgen():
+    """Cykl woła `reset` na starcie; rozkład z poprzedniego przebiegu nie może
+    udawać bieżącego — to ta sama pułapka co przy licznikach cichych błędów."""
+    diagnostyka.reset()
+    diagnostyka.zapisz_rentgen("drabinki_lejek", {"par": 1})
+    diagnostyka.reset()
+    assert diagnostyka.rentgen() == {}

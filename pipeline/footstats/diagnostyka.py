@@ -53,10 +53,47 @@ def cichy(modul: str, powod: str, blad: BaseException | None = None) -> None:
             _pierwszy[klucz] = blad.__class__.__name__
 
 
+# RENTGEN PRZEBIEGU: nazwa pomiaru -> liczby {klucz: wartość}. To NIE są
+# błędy, tylko rozkłady, które i tak liczymy i drukujemy — lejek drabinek,
+# stan budżetów, powody odrzucenia kandydatów.
+_rentgen: dict[str, dict] = {}
+
+
+def zapisz_rentgen(nazwa: str, dane: dict) -> None:
+    """Odłóż rozkład tego przebiegu do meta (obok `print` do logu).
+
+    PO CO (2026-08-21). Rentgen lejka drabinek istniał WYŁĄCZNIE jako `print`
+    w logu GitHub Actions — a ten znika po kilku dniach i wymaga tokena
+    z prawami admina do repo (`/actions/runs/{id}/logs` oddaje 403 nawet dla
+    repo publicznego). Skutek: sesja 21.08 nie mogła odczytać PRODUKCYJNYCH
+    liczb lejka i musiała liczyć je dry-runem lokalnym, który widzi połowę
+    meczów, bo wszystkie trzy budżety padają tam na czasie łącza. Czyli
+    jedyne liczby, na których wolno ruszać progi drabinek, były niedostępne
+    dokładnie wtedy, gdy były potrzebne.
+
+    To ten sam wniosek, który zapadł 04.08 dla cichych błędów i jest tam
+    zapisany wprost („w meta, a nie tylko w logu, bo log GitHub Actions
+    znika po kilku dniach") — tyle że rentgen powstał później i tego kroku
+    nie dostał.
+
+    CZEGO TO NIE ROBI: nie liczy niczego nowego i nie zmienia zachowania.
+    Bierze rozkład, który już powstał na potrzeby `print`, i odkłada go tam,
+    gdzie przeżyje do następnej sesji.
+    """
+    if dane:
+        _rentgen[nazwa] = {str(k): v for k, v in dane.items()}
+
+
+def rentgen() -> dict[str, dict]:
+    """Wszystkie rozkłady tego przebiegu — do zapisania w meta cyklu."""
+    return dict(_rentgen)
+
+
 def reset() -> None:
     """Wyzeruj przed przebiegiem (cykl woła to na starcie)."""
     _licznik.clear()
     _pierwszy.clear()
+    _rentgen.clear()
 
 
 def raport() -> dict[str, int]:
