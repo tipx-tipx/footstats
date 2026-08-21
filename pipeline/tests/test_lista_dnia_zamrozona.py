@@ -189,6 +189,41 @@ def test_dzien_domkniety_wpuszcza_swoj_komplet_ponad_limit():
     assert z_dnia["2026-08-14"] == len(typy)
 
 
+def test_dzien_domkniety_tez_nadaje_polke():
+    """⚑ REGRESJA 2026-08-21 — półka gubiła się na dobie, którą widzi klient.
+
+    Nadanie `polka` stało ZA `continue` gałęzi domknięcia, więc typ z doby
+    domkniętej szedł na stronę bez tego pola. Zmierzone na produkcji z 21.08:
+    wszystkie 17 typów dzisiejszej doby bez `polka`, przez co cztery typy
+    o kursach 1,83–2,00 nie trafiły do zakładki „Wyższe kursy" (front wymaga
+    tam `polka === "wyzsze_kursy"` bez odwrotu), a siedem typów z widełek
+    pewniaków wypadło z „Wysokich szans", bo ratunkowa flaga `pewniak`
+    obejmuje tylko część z nich.
+
+    Domknięta doba to dokładnie ta, na którą klient dziś patrzy — pole musi
+    tam być tak samo jak w dobie otwartej.
+    """
+    pewniak = _typ(mecz_id=1, kurs=1.40)
+    wyzszy = _typ(mecz_id=2, kurs=1.90, rynek_kod="team_goals")
+    zamkniete = {"2026-08-14": {B._klucz_publikacji(b)
+                                for b in (pewniak, wyzszy)}}
+    lista, _, _ = B.wybierz_liste_publikowana(
+        [pewniak, wyzszy], _klucz, zamkniete=zamkniete)
+    assert len(lista) == 2
+    wg_meczu = {b["mecz_id"]: b.get("polka") for b in lista}
+    assert wg_meczu == {1: "wysoka_szansa", 2: "wyzsze_kursy"}
+
+
+def test_dzien_domkniety_nie_nadaje_polki_spoza_widelek():
+    """Typ powyżej sufitu strumienia zostaje BEZ półki, także w domkniętej
+    dobie — inaczej zakładka pewniaków pokazywałaby kurs 2,45."""
+    drogi = _typ(mecz_id=1, kurs=2.45)
+    zamkniete = {"2026-08-14": {B._klucz_publikacji(drogi)}}
+    lista, _, _ = B.wybierz_liste_publikowana(
+        [drogi], _klucz, zamkniete=zamkniete)
+    assert len(lista) == 1 and lista[0].get("polka") is None
+
+
 def test_dzien_otwarty_dziala_normalnie_gdy_inny_jest_zamkniety():
     dzis = _typ(mecz_id=1, kickoff=_ts("2026-08-14", 20))
     jutro = _typ(mecz_id=2, kickoff=_ts("2026-08-15", 20))

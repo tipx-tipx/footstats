@@ -270,8 +270,20 @@ export function ValueBoard({
   // ⚑ ODPORNIE NA BRAK POLA. Typy sprzed wdrożenia nie mają `polka`, a lista
   // niesie też wznowione sprzed tygodnia — dla nich zostaje stara flaga
   // `pewniak`, żeby zakładka nie zgubiła typu, który user już widział.
+  //
+  // ⚑ ...ALE FLAGA NIE MOŻE AWANSOWAĆ TYPU SPOZA WIDEŁEK (naprawa 2026-08-21).
+  // `pewniak` powstała, zanim doba dzieliła się na półki, i nie zna sufitu
+  // kursu (2,00 dla drużyn, 2,20 dla zawodników). Zmierzone na produkcji
+  // z 21.08: osiem wznowionych typów o kursach 2,12–2,60 stało w zakładce
+  // „Wysokie szanse" — czyli dokładnie odwrotnie, niż ta zakładka obiecuje.
+  // Po naprawie backendu (`wybierz_liste_publikowana` nadaje półkę także
+  // w dobie domkniętej) brak `polka` znaczy już tylko jedno: typ jest POZA
+  // produktem półkowym. Wtedy zostaje w zakładce ze wszystkimi typami.
+  const KURS_MAX_PEWNIAKA = 1.8;
   const wWysokiejSzansie = (b: ValueBet) =>
-    b.polka ? b.polka === "wysoka_szansa" : !!b.pewniak;
+    b.polka
+      ? b.polka === "wysoka_szansa"
+      : !!b.pewniak && (b.kurs ?? 0) < KURS_MAX_PEWNIAKA;
   const liczbaPewniakow = useMemo(
     () => bets.filter(wWysokiejSzansie).length,
     [bets],

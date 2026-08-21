@@ -1109,6 +1109,27 @@ def wybierz_liste_publikowana(
         # 41% typów to mecze grane nad ranem, a one należą do dnia, w którym
         # człowiek je obstawia, nie do daty w kalendarzu.
         dzien = dzien_listy(b.get("kickoff_ts"))
+        # PÓŁKA TEGO TYPU — decyduje o limicie i o ZAKŁADCE na stronie. Typ
+        # spoza widełek nie jest cicho gubiony: bramę i powód ma niżej
+        # ([[ciche-odrzucenia-zasada]]).
+        #
+        # ⚑ NADANIE STOI TU, PRZED ROZGAŁĘZIENIEM NA DOBĘ DOMKNIĘTĄ (naprawa
+        # 2026-08-21). Do tej pory pole ustawiał dopiero blok bram niżej, za
+        # `continue` domknięcia — a doba domknięta jest dokładnie tą, którą
+        # klient ogląda DZIŚ. Skutek zmierzony na produkcji z 21.08: wszystkie
+        # 17 typów dzisiejszej doby poszło na stronę BEZ `polka`, więc cztery
+        # typy o kursach 1,83–2,00 nie trafiły do zakładki „Wyższe kursy"
+        # (front wymaga tam `polka === "wyzsze_kursy"`, bez odwrotu), a siedem
+        # typów z widełek pewniaków zniknęło z „Wysokich szans", bo ratunkowa
+        # flaga `pewniak` obejmuje tylko część z nich.
+        #
+        # To ta sama klasa błędu co [[wznowione-omijaly-bramy]] i
+        # [[stempel-zrodla-uciekal-biala-lista]]: NOWE POLE WPIĘTE W JEDNEJ
+        # ŚCIEŻCE, gdy wejść na listę jest kilka. Dopinać przy każdym `append`
+        # do `lista_pub`, nie przy jednym.
+        _polka = uczony.polka_dla(b.get("kurs"), b.get("podmiot_typ"))
+        if _polka:
+            b["polka"] = _polka
         if dzien in zamkniete:
             # dzień domknięty: skład jest już ogłoszony i się nie zmienia
             if _klucz_publikacji(b) not in zamkniete[dzien]:
@@ -1128,16 +1149,12 @@ def wybierz_liste_publikowana(
             (dzien, rotowire._norm(str(b.get("podmiot") or "")))
             if b.get("podmiot_typ") == "zawodnik" else None
         )
-        # PÓŁKA TEGO TYPU — decyduje o limicie i o zakładce. Typ spoza widełek
-        # nie jest cicho gubiony: dostaje powód, żeby dało się policzyć, ile
-        # i czego odpada ([[ciche-odrzucenia-zasada]]).
-        _polka = uczony.polka_dla(b.get("kurs"), b.get("podmiot_typ"))
-        if _polka is None:
-            if not b.get("wznowiony"):
-                zdjete.setdefault(_klucz_publikacji(b), "kurs_poza_polkami")
-                continue
-        else:
-            b["polka"] = _polka
+        # BRAMA WIDEŁEK — `_polka` policzona wyżej, przy `dzien`. Typ spoza
+        # widełek nie jest cicho gubiony: dostaje powód, żeby dało się
+        # policzyć, ile i czego odpada ([[ciche-odrzucenia-zasada]]).
+        if _polka is None and not b.get("wznowiony"):
+            zdjete.setdefault(_klucz_publikacji(b), "kurs_poza_polkami")
+            continue
         _polka_klucz = (dzien, _polka)
         _polka_limit = (uczony.POLKI[_polka]["limit_dobowy"]
                         if _polka else LISTA_CAP)
