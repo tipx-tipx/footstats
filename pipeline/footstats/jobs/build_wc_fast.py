@@ -228,6 +228,77 @@ PUBLIKACJE_KLUCZ = "publikacje_typy"
 # Profil drużyn (ile notują, ile dopuszczają) pamiętany między cyklami —
 # patrz `model/profil_druzyn.py` i użycie przy czynniku rywala.
 PROFIL_DRUZYN_KLUCZ = "druzyny_profil"
+# KTÓRE LIGI SUPERBET W OGÓLE KWOTUJE — pamięć między cyklami (2026-08-21).
+# Pętla dociągu ma budżet 150 s i sortowała mecze po GODZINIE KICKOFFU, więc
+# Championship dostawał ten sam priorytet co Ekstraklasa. Zmierzone na
+# `matches` z 21.08 (pole `propsy_superbet` równe **0**, czyli PYTALIŚMY
+# i oferty nie ma — nie mylić z `None`):
+#
+#     Championship  12 meczów / 0 oferty    MLS         15/15
+#     J1 League      9 / 0                  Ekstraklasa   7/7
+#     League One     5 / 0                  Eredivisie    6/6
+#     + 8 kolejnych lig                     Pro League    6/6
+#     razem 11 lig, 61 meczów, ~30 w oknie 36 h
+#
+# Przy ~2 s na mecz to ~40% budżetu wydane na ligi, o których wiadomo, że nic
+# nie dadzą — a każdy mecz BEZ oferty to mecz, w którym nie powstanie ANI
+# JEDNA drabinka ([[swiezosc-w-meczach-nie-w-dniach]], sekcja o ścianach).
+OFERTA_LIG_KLUCZ = "oferta_lig"
+# ⚑ ZANIK, NIE SAM SUFIT (poprawione po teście 21.08). Pierwsza wersja miała
+# tylko sufit 50 obserwacji i test `test_liga_ktora_zaczela_kwotowac_odzyskuje
+# _priorytet` pokazał, że to ZA WOLNO: liga z historią 0/50, która zaczęła
+# kwotować, po 30 trafieniach z rzędu wciąż stała na 0,44 — czyli poniżej ligi
+# NIEZNANEJ (0,5). A skoro stoi niżej, pytamy o nią na końcu, więc rzadko się
+# uczymy — dokładnie ta pętla samopodtrzymująca się, przed którą ostrzega
+# komentarz przy `OFERTA_LIG_KLUCZ` i [[magazyn-gubil-top-ligi]].
+#
+# Zanik geometryczny gasi starą historię przy KAŻDYM pomiarze tej ligi, więc
+# stan ustala się na ~5x liczbę meczów z cyklu i mapa nadąża za zmianą oferty.
+# Sufit zostaje jako drugi bezpiecznik.
+OFERTA_LIG_ZANIK = 0.8
+OFERTA_LIG_PAMIEC = 50
+
+
+def szansa_oferty_ligi(mapa: dict, utid) -> float:
+    """Jak często ta liga kwotuje zawodników (0..1). Nieznana = 0,5.
+
+    ⚑ WYGŁADZANIE LAPLACE'A ROBI TU CAŁĄ ROBOTĘ. Liga NIEZNANA dostaje 0,5,
+    czyli więcej niż udokumentowane zero (0/12 → 0,07) i mniej niż
+    potwierdzona oferta (15/15 → 0,94). Dzięki temu nowa liga wchodzi do
+    próbkowania SAMA i nie trzeba pilnować żadnej listy ręcznie — a liga
+    z zerem nie jest zablokowana na zawsze, tylko odsunięta na koniec.
+    """
+    try:
+        para = (mapa or {}).get(str(int(utid or 0)))
+    except (TypeError, ValueError):
+        return 0.5
+    if not para:
+        return 0.5
+    z_oferta, razem = (list(para) + [0, 0])[:2]
+    try:
+        return (float(z_oferta) + 1.0) / (float(razem) + 2.0)
+    except (TypeError, ValueError):
+        return 0.5
+
+
+def scal_oferte_lig(stara: dict, swieza: dict,
+                    sufit: int = OFERTA_LIG_PAMIEC,
+                    zanik: float = OFERTA_LIG_ZANIK) -> dict:
+    """Dolicz obserwacje z tego cyklu, gasząc starą historię TEJ ligi.
+
+    Gaśnie tylko liga, którą w tym cyklu zmierzyliśmy — liga, o którą nie
+    pytaliśmy, zachowuje stan (inaczej brak pytania sam kasowałby wiedzę).
+    """
+    out = dict(stara or {})
+    for lid, para in (swieza or {}).items():
+        z_now, r_now = (list(para) + [0, 0])[:2]
+        z_ma, r_ma = (list(out.get(lid) or [0, 0]) + [0, 0])[:2]
+        z = float(z_ma) * zanik + float(z_now)
+        r = float(r_ma) * zanik + float(r_now)
+        if r > sufit:
+            z, r = z * sufit / r, float(sufit)
+        out[lid] = [round(z, 2), round(r, 2)]
+    return out
 
 
 def _klucz_publikacji(b: dict) -> str:
@@ -8308,8 +8379,30 @@ def _main_impl(tryb=None):
         teraz_d = int(time.time())
         _t0_dociag = time.monotonic()
         _wyczerpany_czas = False
-        for e in sorted(wszystkie_ev,
-                        key=lambda e: int(e.get("timeStartTimestamp") or 0)):
+        # KOLEJNOŚĆ, NIE FILTR (patrz `OFERTA_LIG_KLUCZ`). Liga bez oferty
+        # dziś może zacząć kwotować jutro — puchary, nowy sezon, zmiana
+        # umowy — więc twarda blokada byłaby pułapką samopodtrzymującą się:
+        # nie pytamy, więc nie wiemy, więc dalej nie pytamy (dokładnie ta
+        # pętla co w [[magazyn-gubil-top-ligi]]).
+        #
+        # Wygładzanie Laplace'a robi tu całą robotę: liga NIEZNANA dostaje
+        # 0,5, czyli więcej niż udokumentowane zero (0/12 → 0,07) i mniej
+        # niż potwierdzona oferta (15/15 → 0,94). Nowa liga wchodzi więc do
+        # próbkowania sama, bez żadnej listy do ręcznego pilnowania.
+        _oferta_lig: dict = {}
+        try:
+            _oferta_lig = supa.get_key(OFERTA_LIG_KLUCZ) or {}
+        except Exception as ex:                                # noqa: BLE001
+            diagnostyka.cichy("cykl", "oferta_lig_odczyt", ex)
+
+        _swiezo_lig: dict = {}
+        for e in sorted(
+            wszystkie_ev,
+            key=lambda e: (
+                -szansa_oferty_ligi(_oferta_lig, e.get("uniqueTournamentId")),
+                int(e.get("timeStartTimestamp") or 0),
+            ),
+        ):
             mid_d = e["id"]
             ts_d = int(e.get("timeStartTimestamp") or 0)
             if mid_d in sb_cache:
@@ -8340,10 +8433,31 @@ def _main_impl(tryb=None):
                     sb_ev["eventId"], parts[0], parts[1]
                 )
                 dociagniete += 1
+                # czy ta liga w ogóle kwotuje zawodników — materiał do
+                # kolejności w NASTĘPNYM cyklu
+                _lid = str(int(e.get("uniqueTournamentId") or 0))
+                _para = _swiezo_lig.setdefault(_lid, [0, 0])
+                _para[1] += 1
+                if (sb_cache[mid_d] or {}).get("players"):
+                    _para[0] += 1
             except Exception as e:
                 # dociągnięcie kursów do puli kuponów — bez niego leg wypada
                 diagnostyka.cichy("cykl", "dociagniecie_kursow", e)
                 continue
+        if _swiezo_lig:
+            _scalone = scal_oferte_lig(_oferta_lig, _swiezo_lig)
+            try:
+                supa.put_key(OFERTA_LIG_KLUCZ, _scalone)
+            except Exception as ex:                            # noqa: BLE001
+                diagnostyka.cichy("cykl", "oferta_lig_zapis", ex)
+            _bez = sum(1 for v in _scalone.values()
+                       if float((list(v) + [0, 0])[1]) >= 4
+                       and float((list(v) + [0, 0])[0]) == 0)
+            diagnostyka.zapisz_rentgen("kolejnosc_dociagu", {
+                "lig_znanych": len(_scalone),
+                "lig_bez_oferty": _bez,
+                "lig_zmierzonych_w_tym_cyklu": len(_swiezo_lig),
+            })
         if dociagniete or pominietych_d:
             _ile_s = time.monotonic() - _t0_dociag
             # ⚑ do meta — `pominietych_d` to mecze, w których NIE POWSTANIE

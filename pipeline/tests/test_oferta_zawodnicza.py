@@ -198,3 +198,62 @@ def test_zawodnik_bez_pary_u_bukmachera_nie_kosztuje_zapytania():
     )
 
     assert (n_rynkow, n_kursow, zapytania) == (0, 0, [])
+
+
+# ------------------------------------------- kolejność dociągu kursów (21.08)
+
+def test_liga_bez_oferty_idzie_na_koniec_ale_nie_znika():
+    """⚑ 2026-08-21. Pętla dociągu ma budżet 150 s i sortowała mecze po
+    GODZINIE KICKOFFU, więc Championship dostawał ten sam priorytet co
+    Ekstraklasa. Zmierzone: 11 lig z udokumentowanym ZEREM oferty (pole
+    `propsy_superbet` == 0, czyli pytaliśmy) — 61 meczów, ~30 w oknie 36 h,
+    czyli ~40% budżetu na mecze, w których nie powstanie żadna drabinka.
+    """
+    from footstats.jobs.build_wc_fast import szansa_oferty_ligi as sz
+
+    mapa = {"1": [0, 12], "2": [15, 15]}
+    assert sz(mapa, 2) > sz(mapa, 999) > sz(mapa, 1), (
+        "kolejność ma być: potwierdzona oferta > nieznana > udokumentowane zero"
+    )
+    # ⚑ liga z zerem NIE jest zablokowana — dostaje dodatnią wagę, więc gdy
+    # budżet zostanie, i tak o nią zapytamy (inaczej byłaby to pętla
+    # samopodtrzymująca się: nie pytamy -> nie wiemy -> nie pytamy)
+    assert sz(mapa, 1) > 0.0
+
+
+def test_nieznana_liga_wchodzi_do_probkowania_sama():
+    """Nowa liga (puchary, nowy sezon) nie wymaga żadnej listy ręcznej."""
+    from footstats.jobs.build_wc_fast import szansa_oferty_ligi as sz
+
+    assert sz({}, 7) == 0.5
+    assert sz({"7": []}, 7) == 0.5
+    assert sz(None, 7) == 0.5
+    assert sz({"7": [0, 12]}, None) == 0.5      # brak utid = nieznana
+
+
+def test_scalanie_oferty_lig_gasi_stara_historie():
+    """Zanik + sufit: stara historia tej ligi traci wagę przy każdym pomiarze,
+    a pamięć nie rośnie w nieskończoność."""
+    from footstats.jobs.build_wc_fast import scal_oferte_lig as sc
+
+    assert sc({}, {"1": [3, 4]}) == {"1": [3.0, 4.0]}
+    # 40/40 gaśnie do 32/32, plus 5/20 = 37/52 -> przycięte do sufitu 50
+    out = sc({"1": [40, 40]}, {"1": [5, 20]})
+    assert out["1"][1] == 50.0
+    assert abs(out["1"][0] / out["1"][1] - 37.0 / 52.0) < 0.01
+    # liga, o którą NIE pytaliśmy, zachowuje stan — brak pytania nie kasuje wiedzy
+    assert sc({"9": [4, 8]}, {"1": [1, 1]})["9"] == [4, 8]
+
+
+def test_liga_ktora_zaczela_kwotowac_odzyskuje_priorytet():
+    """Scenariusz, dla którego sufit pamięci w ogóle istnieje: liga miała zero
+    przez tygodnie, po czym zaczęła kwotować. Ma wrócić do gry, a nie czekać,
+    aż przegłosuje ją stara historia."""
+    from footstats.jobs.build_wc_fast import scal_oferte_lig as sc
+    from footstats.jobs.build_wc_fast import szansa_oferty_ligi as sz
+
+    mapa = {"1": [0, 50]}
+    assert sz(mapa, 1) < 0.05
+    for _ in range(6):                      # sześć cykli po pięć meczów
+        mapa = sc(mapa, {"1": [5, 5]})
+    assert sz(mapa, 1) > 0.5, "po serii trafień liga ma wrócić przed nieznane"
