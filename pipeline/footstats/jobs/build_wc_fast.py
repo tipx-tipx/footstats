@@ -4241,6 +4241,8 @@ def _main_impl(tryb=None):
     # przeliczałby 289 drużyn przy każdym z ~1400 pytań na przebieg.
     _wagi_modelu: dict = {}
     _ctx_modelu: dict = {}
+    # pusty = radar spada na próg kalendarzowy, czyli zachowanie sprzed 21.08
+    _kalendarz_druzyn: dict = {}
     _licznik_uczonego: Counter = Counter()
     # ⚑ CZUJNIK PRZEŁĄCZENIA: ile wycen poszło którym rachunkiem. Bez niego
     # „model na stronie" byłoby deklaracją, a nie faktem — a dokładnie tego
@@ -4262,6 +4264,10 @@ def _main_impl(tryb=None):
                 _st_mag = magazyn_druzyn.statystyki(_mag_uczony)
                 print(magazyn_druzyn.zdanie_stanu(_st_mag))
                 _ctx_modelu = uczony.przygotuj_sumy(_mag_uczony)
+                # KIEDY DRUŻYNA GRAŁA — do bramy świeżości drabinek. Magazyn
+                # jest już wczytany, więc to zero dodatkowych zapytań i zero
+                # sekund budżetu (patrz magazyn_druzyn.kalendarz_druzyn).
+                _kalendarz_druzyn = magazyn_druzyn.kalendarz_druzyn(_mag_uczony)
     except Exception as e:                                     # noqa: BLE001
         diagnostyka.cichy("cykl", "model_uczony_wagi", e)
         _wagi_modelu, _ctx_modelu = {}, {}
@@ -8446,6 +8452,10 @@ def _main_impl(tryb=None):
             # DRUGA LICZBA na szczeblach drabinki — model uczony liczy obok
             # rachunku drabinki i nie wpływa na wybór kart (2026-08-17)
             wagi_modelu=_wagi_modelu,
+            # ŚWIEŻOŚĆ HISTORII LICZONA W MECZACH DRUŻYNY, nie w dniach —
+            # próg kalendarzowy odrzucał w sierpniu 46 z 98 zawodników
+            # z przewidywanego składu (patrz radar.MAX_OPUSZCZONYCH_MECZOW)
+            kalendarz_druzyn=_kalendarz_druzyn,
         )
         radar_padl = False
     except Exception as ex:

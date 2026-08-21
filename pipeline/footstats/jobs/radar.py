@@ -43,6 +43,7 @@ from ..model import tempo as tempo_mod
 from ..model import uczony
 from ..sources import betclic, statshub, superbet
 from .. import diagnostyka
+from . import magazyn_druzyn
 
 # --- progi detektorów ---
 OKNO_TRANSFER = 15          # ile ostatnich meczów historii patrzymy na ligi
@@ -51,6 +52,25 @@ MAX_MECZE_W_NOWEJ = 3       # tyle meczów w lidze drużyny to wciąż „nowy"
 MIN_MECZE_W_STAREJ = 6      # tyle meczów w innej lidze potwierdza przeszłość
 OKNO_GRAL_PRZECIW = 8       # mecz PRZECIW obecnej drużynie w tylu ostatnich
 MAX_DNI_SWIEZOSC = 60       # ostatni występ dawniej = nieaktualna historia
+# ⚑⚑ ILE MECZÓW DRUŻYNY WOLNO OPUŚCIĆ (2026-08-21) — właściwa miara
+# świeżości tam, gdzie znamy kalendarz drużyny; `MAX_DNI_SWIEZOSC` zostaje
+# wyłącznie jako zapas dla drużyn spoza magazynu.
+#
+# POWÓD: kalendarz jest złą miarą na przełomie sezonów. Przerwa letnia trwa
+# ~75 dni, czyli DŁUŻEJ niż próg 60, więc w sierpniu odpadał każdy, kto nie
+# zdążył jeszcze zagrać w nowych rozgrywkach. Zmierzone na 407 zawodnikach
+# z 30 nadchodzących meczów: reguła kalendarzowa odrzucała 195 (47,9%),
+# w tym **46 z 98 zawodników z PRZEWIDYWANEGO SKŁADU** na najbliższy mecz.
+# Ta reguła odrzuca 76 (18,7%), w tym 4 z 98.
+#
+# ⚑ TO NIE JEST LUZOWANIE PROGU. Zawodnik, który opuścił 6+ kolejnych meczów
+# swojej drużyny, odpada nadal — także wtedy, gdy kalendarzowo wygląda
+# świeżo (grał 20 dni temu, ale drużyna zagrała od tego czasu osiem razy).
+# Stara reguła takiego PRZEPUSZCZAŁA.
+#
+# 5 to około pięciu-sześciu tygodni ligi. Z odzyskanych 120 zawodników
+# 94 opuściło najwyżej DWA mecze, więc próg ma zapas i nie stoi na krawędzi.
+MAX_OPUSZCZONYCH_MECZOW = 5
 
 OKNO_FORMY = 6              # seria liczona z tylu OSTATNICH rozegranych
 MIN_GIER_FORMA = 12         # łącznie rozegranych, żeby była baza porównania
@@ -1829,6 +1849,7 @@ def zbuduj(
     bc_cache: dict[int, dict] | None = None,
     zrodla_grid: dict[int, dict] | None = None,
     wagi_modelu: dict | None = None,
+    kalendarz_druzyn: dict[int, list[int]] | None = None,
 ) -> list[dict]:
     """Złóż wpisy radaru/drabinek ze zbiorów, które cykl i tak ma w pamięci.
 
@@ -1951,12 +1972,28 @@ def zbuduj(
             # sprzed pół roku — dla zawodnika po kontuzji albo poza rotacją
             # „trafił 8/10" opisuje kogoś, kto już tak nie gra.
             grane_ref = _grane(tr_ref)
-            if (
-                not grane_ref
-                or teraz - grane_ref[0][2] > MAX_DNI_SWIEZOSC * 86400
-            ):
+            if not grane_ref:
                 lejek["7_odpadla_historia_niesw" + "ieza"] += 1
                 continue
+            # ŚWIEŻOŚĆ: liczona w MECZACH DRUŻYNY, gdy znamy jej kalendarz
+            # (patrz `MAX_OPUSZCZONYCH_MECZOW`). Kalendarzowy próg zostaje
+            # tylko dla drużyn spoza magazynu — tam nie mamy czym policzyć
+            # lepiej, a zupełny brak bramy wpuściłby historię sprzed lat.
+            _opuscil = magazyn_druzyn.opuszczone_mecze(
+                kalendarz_druzyn or {}, tr_ref.team_id, grane_ref[0][2]
+            )
+            if _opuscil is None:
+                if teraz - grane_ref[0][2] > MAX_DNI_SWIEZOSC * 86400:
+                    lejek["7_odpadla_historia_niesw" + "ieza"] += 1
+                    lejek["7a_w_tym_bez_kalendarza_druzyny"] += 1
+                    continue
+            elif _opuscil > MAX_OPUSZCZONYCH_MECZOW:
+                lejek["7_odpadla_historia_niesw" + "ieza"] += 1
+                continue
+            elif teraz - grane_ref[0][2] > MAX_DNI_SWIEZOSC * 86400:
+                # przeszedł WYŁĄCZNIE dzięki nowej mierze — licznik pokaże,
+                # ile materiału odzyskała zmiana i czy te karty trafiają
+                lejek["7b_odzyskane_nowa_miara_swiezosci"] += 1
             liga_dr, utidy_dr = konsensus.get(
                 tr_ref.team_id or -1, (None, set())
             )

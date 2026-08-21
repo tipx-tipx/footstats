@@ -228,6 +228,67 @@ def pobierz_i_dopisz(mag: dict, team_id: int) -> int:
     return dopisz(mag, team_id, statshub.fetch_team_performance(team_id))
 
 
+def kalendarz_druzyn(mag: dict) -> dict[int, list[int]]:
+    """{team_id: [znaczniki czasu meczów, od najnowszych]} — kiedy DRUŻYNA grała.
+
+    PO CO (2026-08-21). Radar odsiewał nieaktualną historię zawodnika po
+    KALENDARZU (`MAX_DNI_SWIEZOSC = 60`), a to jest zła miara na przełomie
+    sezonów. Przerwa letnia trwa ~75 dni, czyli DŁUŻEJ niż próg, więc
+    w sierpniu odpadał każdy, kto nie zdążył jeszcze zagrać w nowych
+    rozgrywkach — także zawodnik z kompletem 40 meczów w bazie, wpisany do
+    przewidywanego składu na najbliższy mecz.
+
+    Zmierzone tego dnia na 407 zawodnikach z 30 nadchodzących meczów:
+
+        reguła kalendarzowa (>60 dni)   odrzuca 195 (47,9%), w tym 46 z 98
+                                        zawodników z przewidywanego składu
+        reguła w meczach drużyny (>5)   odrzuca  76 (18,7%), w tym  4 z 98
+
+    Odzyskanych 120, z czego 94 opuściło najwyżej DWA mecze swojej drużyny,
+    a 42 zagra w najbliższym — to nie jest luzowanie progu, tylko zamiana
+    miary na taką, która mierzy to, o co chodziło: „czy on jeszcze gra".
+
+    Ta sama klasa błędu co [[magazyn-gubil-top-ligi]] — próg kalendarzowy
+    zderzony z przerwą sezonową, która trwa tyle samo.
+
+    Bierzemy z magazynu, bo ten i tak jest wczytywany co cykl: zero
+    dodatkowych zapytań i zero sekund budżetu, który w lejku drabinek jest
+    wąskim gardłem ([[rentgen-lejka-w-meta]]).
+    """
+    out: dict[int, list[int]] = {}
+    for tid, rec in (mag or {}).items():
+        if tid == "_braki":
+            continue
+        try:
+            klucz = int(tid)
+        except (TypeError, ValueError):
+            continue
+        ts = sorted(
+            (int(x["t"]) for x in (rec or {}).get("m") or []
+             if isinstance(x, dict) and x.get("t")),
+            reverse=True,
+        )
+        if ts:
+            out[klucz] = ts
+    return out
+
+
+def opuszczone_mecze(kalendarz: dict[int, list[int]], team_id, od_ts: int) -> int | None:
+    """Ile meczów drużyny odbyło się PO `od_ts` (None = nie wiemy).
+
+    `None` znaczy „brak pokrycia w magazynie" i wołający MUSI to odróżnić od
+    zera — inaczej drużyna spoza magazynu wyglądałaby jak taka, której
+    zawodnik niczego nie opuścił ([[ciche-odrzucenia-zasada]]).
+    """
+    try:
+        ts = kalendarz.get(int(team_id))
+    except (TypeError, ValueError):
+        return None
+    if not ts:
+        return None
+    return sum(1 for t in ts if t > od_ts)
+
+
 # ------------------------------------------------------------------ pomiary --
 def statystyki(mag: dict) -> dict:
     """Ile obserwacji magazyn realnie niesie — do logu cyklu i audytu."""

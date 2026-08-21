@@ -111,3 +111,31 @@ def test_statystyki_licza_obserwacje():
 def test_puste_magazyn_krzyczy():
     """Magazyn bez licznika jest nieodróżnialny od pustego."""
     assert "PUSTY" in M.zdanie_stanu(M.statystyki({}))
+
+
+# ---------------------------------------------- kalendarz meczów drużyny
+
+def test_kalendarz_druzyn_od_najnowszych():
+    mag = {"10": {"m": [{"t": 100}, {"t": 300}, {"t": 200}]},
+           "_braki": {"szardy": [3]}}
+    assert M.kalendarz_druzyn(mag) == {10: [300, 200, 100]}
+
+
+def test_kalendarz_pomija_rekordy_bez_daty():
+    mag = {"10": {"m": [{"t": 100}, {"brak": 1}, {"t": None}]}}
+    assert M.kalendarz_druzyn(mag) == {10: [100]}
+
+
+def test_opuszczone_mecze_liczy_po_dacie():
+    kal = {10: [500, 400, 300, 200]}
+    assert M.opuszczone_mecze(kal, 10, 250) == 3
+    assert M.opuszczone_mecze(kal, 10, 500) == 0
+
+
+def test_brak_druzyny_to_NONE_a_nie_zero():
+    """⚑ Zero znaczy „niczego nie opuścił" i PRZEPUSZCZA kartę. Drużyna spoza
+    magazynu nie może wyglądać tak samo — wołający ma spaść na próg
+    kalendarzowy ([[ciche-odrzucenia-zasada]])."""
+    assert M.opuszczone_mecze({}, 10, 250) is None
+    assert M.opuszczone_mecze({10: []}, 10, 250) is None
+    assert M.opuszczone_mecze({10: [1]}, None, 250) is None

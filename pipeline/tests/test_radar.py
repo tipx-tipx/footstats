@@ -555,6 +555,53 @@ def test_karta_nie_powstaje_na_nieswiezej_historii():
     assert radar.zbuduj(**_pod_karte(trends=[stary, kolega])) == []
 
 
+def test_przerwa_letnia_nie_jest_nieswiezoscia():
+    """⚑⚑ REGRESJA 2026-08-21 — próg kalendarzowy wycinał połowę materiału.
+
+    Zawodnik rozegrał pełny sezon, ostatni mecz przed przerwą letnią, a jego
+    drużyna od tego czasu NIE ZAGRAŁA ani razu. Kalendarzowo wygląda na
+    nieaktualnego (80 dni), faktycznie nie opuścił niczego i zagra w sobotę.
+
+    Zmierzone na 407 zawodnikach z 30 nadchodzących meczów: stara reguła
+    odrzucała 195 (47,9%), w tym **46 z 98 z przewidywanego składu**.
+    """
+    dawno = radar.MAX_DNI_SWIEZOSC + 20
+    gracz = _trend(player_id=1, counts=SIEDEM_Z_DZIESIECIU,
+                   dni_wstecz_start=dawno)
+    kolega = _trend(player_id=7, counts=[1] * 12, dni_wstecz_start=dawno)
+    # drużyna też nie grała — jej ostatni mecz to ten sam dzień
+    kalendarz = {100: [TERAZ - dawno * DZIEN]}
+    wpisy = radar.zbuduj(**_pod_karte(
+        trends=[gracz, kolega], kalendarz_druzyn=kalendarz))
+    assert len(wpisy) == 1, "zawodnik bez opuszczonego meczu ma przejść"
+
+
+def test_wypadl_ze_skladu_odpada_mimo_swiezego_kalendarza():
+    """Odwrotny przypadek, którego STARA reguła nie łapała.
+
+    Ostatni występ 20 dni temu — kalendarzowo świeżo — ale drużyna zagrała
+    od tego czasu osiem meczów i w żadnym go nie było. To jest dokładnie
+    ten, kogo brama miała odsiewać.
+    """
+    gracz = _trend(player_id=1, counts=SIEDEM_Z_DZIESIECIU, dni_wstecz_start=20)
+    kolega = _trend(player_id=7, counts=[1] * 12, dni_wstecz_start=20)
+    kalendarz = {100: [TERAZ - d * DZIEN for d in range(1, 19, 2)]}  # 9 meczów
+    assert radar.zbuduj(**_pod_karte(
+        trends=[gracz, kolega], kalendarz_druzyn=kalendarz)) == []
+
+
+def test_bez_kalendarza_druzyny_zostaje_prog_kalendarzowy():
+    """Drużyna spoza magazynu: nie mamy czym policzyć lepiej, więc zostaje
+    zachowanie sprzed 21.08 — a nie brak bramy."""
+    stary = _trend(player_id=1, counts=SIEDEM_Z_DZIESIECIU,
+                   dni_wstecz_start=radar.MAX_DNI_SWIEZOSC + 10)
+    kolega = _trend(player_id=7, counts=[1] * 12)
+    assert radar.zbuduj(**_pod_karte(
+        trends=[stary, kolega], kalendarz_druzyn={})) == []
+    assert radar.zbuduj(**_pod_karte(
+        trends=[stary, kolega], kalendarz_druzyn=None)) == []
+
+
 def test_karta_nie_powstaje_tuz_przed_gwizdkiem():
     """Zapas na obstawienie: nic NOWEGO na 20 minut przed meczem."""
     meta = {999: {"label": "Klub – Rywal", "ts": TERAZ + 20 * 60,
