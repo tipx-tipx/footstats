@@ -825,3 +825,37 @@ def test_wszystkie_trzy_strumienie_stempluja_sciagniecie():
     for nazwa in ("prognoza", "prognoza_zawodnika", "prognoza_sumy"):
         src = inspect.getsource(getattr(U, nazwa))
         assert "wycena(" in src, f"{nazwa} nie idzie przez wspólną wycenę"
+
+
+def test_prognoza_sumy_daje_komplet_albo_nic():
+    """SUMY MECZOWE — KONTRAKT PÓL, którego pozostałe testy sum nie sprawdzają.
+
+    Sumy mają już testy (liga z historii, brak drużyny, brak wag), ale żaden
+    nie pilnuje ZESTAWU zwracanych pól — a to on gwarantuje, że stempel
+    dojedzie do księgi. Drużyny i zawodnicy taki test mają; ta ścieżka go nie
+    miała i przy wdrażaniu ściągania λ (23.08) trzeba było weryfikować ją
+    ręcznie na produkcyjnych wagach.
+    """
+    mag = _mag_sum(n=40)
+    # wierszy z jednego fixture jest za mało na regresję — ten sam zabieg
+    # co w `test_prognoza_sumy_bierze_lige_z_historii`
+    wagi = {"rynki_sum": {"match_corners": U.trenuj_rynek_sum(
+        U.wiersze_sum(mag)["match_corners"] * 30)}}
+    rynek = "match_corners"
+    ctx = U.przygotuj_sumy(mag)
+
+    out = U.prognoza_sumy(wagi, ctx, 10, 99, None, rynek, 9.5, "powyzej",
+                          do_ts=99999)
+    assert set(out) == {"p", "lam", "r_nb", "odl", "sciag"}
+    assert out["sciag"] == U.SCIAGANIE_LAMBDY_DO_LINII
+
+    # obie strony jednej λ nadal sumują się do jedynki
+    pod = U.prognoza_sumy(wagi, ctx, 10, 99, None, rynek, 9.5, "ponizej",
+                          do_ts=99999)
+    assert abs(out["p"] + pod["p"] - 1.0) < 1e-3
+
+    # brak wag / nieznany rynek / brak kontekstu = cisza, nie zgadywanie
+    assert U.prognoza_sumy(None, ctx, 10, 99, None, rynek, 9.5, "powyzej") is None
+    assert U.prognoza_sumy(wagi, ctx, 10, 99, None, "nie_ma_takiego", 9.5,
+                           "powyzej") is None
+    assert U.prognoza_sumy(wagi, {}, 10, 99, None, rynek, 9.5, "powyzej") is None
