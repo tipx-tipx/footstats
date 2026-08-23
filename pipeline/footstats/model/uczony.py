@@ -366,8 +366,10 @@ def prognoza(wagi: dict | None, ctx: dict, team_id: int | str, rynek: str,
              do_ts: int | None = None) -> dict | None:
     """Pełna prognoza modelu dla jednego zakładu — albo None, gdy nie wiemy.
 
-    Zwraca `{"p", "lam", "r_nb", "odl"}`. `odl` to odległość linii od λ, czyli
-    to, na czym stoi reguła zasięgu (patrz `MAX_ODLEGLOSC_LINII`).
+    Zwraca to, co `wycena()`: `{"p", "lam", "r_nb", "odl", "sciag"}`. `odl` to
+    odległość linii od SUROWEJ λ, czyli to, na czym stoi reguła zasięgu
+    (patrz `MAX_ODLEGLOSC_LINII`); `sciag` mówi, jaką siłą ściągnięto λ przy
+    liczeniu `p`.
     """
     wr = ((wagi or {}).get("rynki") or {}).get(rynek)
     if not wr or not ctx:
@@ -378,12 +380,7 @@ def prognoza(wagi: dict | None, ctx: dict, team_id: int | str, rynek: str,
     lm = lam(wr, cechy)
     if lm is None:
         return None
-    p = p_strony(lm, linia, strona, wr.get("r_nb"))
-    if p is None:
-        return None
-    return {"p": round(float(p), 4), "lam": round(float(lm), 3),
-            "r_nb": wr.get("r_nb"),
-            "odl": round(abs(float(linia) - float(lm)), 2)}
+    return wycena(lm, linia, strona, wr.get("r_nb"))
 
 
 # ------------------------------------------------------------------ trening --
@@ -589,11 +586,108 @@ def p_powyzej(lambda_: float | None, linia: float,
 
 def p_strony(lambda_: float | None, linia: float, strona: str,
              r_nb: float | None = None) -> float | None:
-    """Szansa WYBRANEJ strony zakładu — jedna λ, dwie strony, suma równa 1."""
+    """Szansa WYBRANEJ strony zakładu — jedna λ, dwie strony, suma równa 1.
+
+    ⚑ To jest CZYSTY ROZKŁAD, bez polityki — dostajesz dokładnie tę λ, którą
+    podałeś. Wycena zakładu idzie przez `wycena()` niżej i to ona ściąga λ.
+    Nie wołać tej funkcji wprost do wyceny typu (pilnuje tego test
+    `test_wycena_jest_jedyna_droga_do_szansy`).
+    """
     p = p_powyzej(lambda_, linia, r_nb)
     if p is None:
         return None
     return p if strona == "powyzej" else 1.0 - p
+
+
+# ⚑⚑⚑⚑ MODEL ZA MOCNO UFA WŁASNYM ODCHYLENIOM (2026-08-23).
+#
+# Zmierzone na 3003 rozliczeniach modelu uczonego: λ jest ZAWYŻONA o 13% tam,
+# gdzie gramy „powyżej" (iloraz faktyczna/λ = 0,869), i ZANIŻONA o 5% przy
+# „poniżej" (1,050). To nie jest wada strony ani skali λ — w TYM SAMYM rynku
+# i tym samym paśmie λ strony i tak się rozjeżdżają, w 9 z 9 sprawdzonych
+# przypadków:
+#
+#     rynek           pasmo λ   „poniżej"   „powyżej"   różnica
+#     team_corners      3–5       1,072       0,715      +0,357
+#     team_corners      5–8       1,219       0,821      +0,399
+#     team_sot          3–5       1,089       0,778      +0,311
+#     team_goals        1–2       1,164       0,889      +0,274
+#
+# MECHANIZM: λ ma duży rozrzut błędu, a wybór strony ten rozrzut SELEKCJONUJE.
+# Gdy λ wypadnie przypadkiem za wysoko — gramy „powyżej" i zdarzeń jest mniej.
+# Gdy za nisko — gramy „poniżej" i jest ich więcej. Model nie myli się w jedną
+# stronę; myli się w tę, którą właśnie obstawiliśmy. Lekarstwem nie jest
+# korekta po stronie (przestrzeliwuje, patrz niżej), tylko mniejsze zaufanie
+# do samego odchylenia.
+#
+# ZYSK BRIER wobec stanu sprzed zmiany, każdy wycinek próby osobno:
+#
+#     wycinek              w=0,90   w=0,80   w=0,70   w=0,60
+#     CAŁOŚĆ (3003)       -0,0015  -0,0025  -0,0030  -0,0029
+#     I połowa            -0,0021  -0,0039  -0,0051  -0,0057
+#     II połowa           -0,0009  -0,0012  -0,0010  -0,0001
+#     pierwsza trzecia    -0,0018  -0,0031  -0,0039  -0,0041
+#     środkowa trzecia    -0,0013  -0,0022  -0,0025  -0,0022
+#     ostatnia trzecia    -0,0014  -0,0023  -0,0027  -0,0024
+#
+# Znak trzyma WSZĘDZIE. Luka deklaracji spada z −7,2 do −5,0 pp; na „powyżej"
+# z −10,1 do −7,7 pp, a „poniżej" zostaje nietknięte (+0,0003, czyli zero).
+# Przy mocniejszym ściąganiu „poniżej" zaczyna tracić (w=0,6: +0,0027), więc
+# 0,80 jest wartością BEZPIECZNĄ, a nie optymalną na papierze.
+#
+# ⚑ CZEGO NIE ROBIĆ: ściągania do ŚREDNIEJ RYNKU zamiast do linii. Zmierzone
+# na tej samej próbie, baza z I połowy: Brier 0,2267 → 0,2360 przy w=0,5.
+# Baza własna nie zastępuje linii. Nie wracać bez nowego pomysłu.
+#
+# ⚑ NIEROZSTRZYGNIĘTE: efekt na TRAFNOŚĆ półki. Model ma 6 dób produkcji,
+# wymiana po ściągnięciu dotyczy 5–8 typów i wynik siedzi w zerze. Poprawa
+# kalibracji jest pewna, zysk trafności NIE JEST udowodniony — nie cytować.
+SCIAGANIE_LAMBDY_DO_LINII = 0.80   # 1,0 = wyłączone; powrót jedną wartością
+
+
+def lambda_do_wyceny(lambda_: float | None, linia: float,
+                     sila: float | None = None) -> float | None:
+    """λ po ściągnięciu do linii — `linia + w·(λ − linia)`.
+
+    `sila = 1,0` zwraca λ bez zmian i tak wygląda wyłączenie warstwy.
+    """
+    if lambda_ is None:
+        return None
+    w = SCIAGANIE_LAMBDY_DO_LINII if sila is None else float(sila)
+    lam_ = float(lambda_)
+    if w >= 1.0:
+        return lam_
+    return max(float(linia) + w * (lam_ - float(linia)), 1e-6)
+
+
+def wycena(lambda_: float | None, linia: float, strona: str,
+           r_nb: float | None = None) -> dict | None:
+    """JEDYNA droga od λ do szansy zakładu — wspólna dla wszystkich strumieni.
+
+    Zwraca `{"p", "lam", "r_nb", "odl", "sciag"}` albo None, gdy nie wiemy.
+
+    ⚑ DLACZEGO JEDNA FUNKCJA, A NIE TRZY WYWOŁANIA. Drużyny, zawodnicy i sumy
+    liczyły to samo w trzech miejscach oddalonych o setki linii. Dokładnie ten
+    układ kosztował nas już dwa razy cichy rozjazd — `ujemna_po_korekcie`
+    z dwoma wejściami i `kal_strony`, której stempel nie dojeżdżał czterema
+    białymi listami. Nowa ścieżka wyceny ma tędy przechodzić albo nie istnieć.
+    Test `test_wycena_jest_jedyna_droga_do_szansy` pilnuje, że nikt nie zawoła
+    `p_strony` z pominięciem tej funkcji.
+    ⚑ `lam` i `odl` zostają liczone na SUROWEJ λ — świadomie. `odl` niesie
+    regułę zasięgu (`MAX_ODLEGLOSC_LINII`), która pyta „czy model ma tu
+    pokrycie". Liczona po ściągnięciu zmalałaby o jedną piątą i po cichu
+    rozluźniła bramę, czyli zmieniła PODAŻ przy okazji zmiany kalibracji —
+    a tego nikt nie mierzył. Jedna zmiana naraz.
+    """
+    if lambda_ is None:
+        return None
+    lam_ = float(lambda_)
+    p = p_strony(lambda_do_wyceny(lam_, linia), linia, strona, r_nb)
+    if p is None:
+        return None
+    return {"p": round(float(p), 4), "lam": round(lam_, 3), "r_nb": r_nb,
+            "odl": round(abs(float(linia) - lam_), 2),
+            "sciag": SCIAGANIE_LAMBDY_DO_LINII}
 
 
 # ------------------------------------------------------- zasięg i widełki ----
@@ -978,13 +1072,11 @@ def prognoza_zawodnika(wagi: dict | None, seria: dict, rynek: str,
     lm = lam_zaw(wr, cechy, oczekiwane_minuty)
     if lm is None:
         return None
-    p = p_strony(lm, linia, strona, wr.get("r_nb"))
-    if p is None:
+    out = wycena(lm, linia, strona, wr.get("r_nb"))
+    if out is None:
         return None
-    return {"p": round(float(p), 4), "lam": round(float(lm), 3),
-            "r_nb": wr.get("r_nb"),
-            "odl": round(abs(float(linia) - float(lm)), 2),
-            "min": round(float(oczekiwane_minuty or cechy.get("min6") or 90.0), 1)}
+    out["min"] = round(float(oczekiwane_minuty or cechy.get("min6") or 90.0), 1)
+    return out
 
 
 # ===========================================================================
@@ -1195,9 +1287,4 @@ def prognoza_sumy(wagi: dict | None, ctx: dict, gospodarz_id, gosc_id,
     if X.shape[1] != beta.shape[0]:
         return None
     lm = float(np.exp(np.clip(X @ beta, -8.0, 8.0))[0])
-    p = p_strony(lm, linia, strona, wr.get("r_nb"))
-    if p is None:
-        return None
-    return {"p": round(float(p), 4), "lam": round(lm, 3),
-            "r_nb": wr.get("r_nb"),
-            "odl": round(abs(float(linia) - lm), 2)}
+    return wycena(lm, linia, strona, wr.get("r_nb"))

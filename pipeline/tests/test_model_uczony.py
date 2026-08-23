@@ -355,7 +355,7 @@ def test_prognoza_daje_komplet_albo_nic():
     ctx = U.przygotuj(mag)
     out = U.prognoza(wagi, ctx, 10, "team_corners", 99, 1, 1,
                      linia=5.5, strona="powyzej", do_ts=99999)
-    assert set(out) == {"p", "lam", "r_nb", "odl"}
+    assert set(out) == {"p", "lam", "r_nb", "odl", "sciag"}
     assert 0.0 < out["p"] < 1.0 and out["lam"] > 0
     assert out["odl"] == round(abs(5.5 - out["lam"]), 2)
     # strony sumują się do jedynki także po drodze przez `prognoza`
@@ -518,7 +518,7 @@ def test_prognoza_zawodnika_daje_komplet_albo_nic():
     seria = _seria_zaw(n=20, tempo=2.0)
     out = U.prognoza_zawodnika(wagi, seria, "shots", 1.5, "powyzej",
                                oczekiwane_minuty=80.0, do_ts=99999)
-    assert set(out) == {"p", "lam", "r_nb", "odl", "min"}
+    assert set(out) == {"p", "lam", "r_nb", "odl", "min", "sciag"}
     assert out["min"] == 80.0
     # rynek, którego wagi nie znają
     assert U.prognoza_zawodnika(wagi, seria, "tackles", 1.5, "powyzej") is None
@@ -726,3 +726,102 @@ def test_trening_pomija_mecze_spoza_zakresu_druzynowego():
 
     # ...chyba że ktoś ŚWIADOMIE wyłączy filtr (do pomiarów, nie do produkcji)
     assert U.wiersze_treningowe(obcy, tylko_zakres=False)["team_corners"]
+
+
+# --- ściąganie λ do linii: model za mocno ufa własnym odchyleniom ----------
+#
+# Zmierzone 23.08 na 3003 rozliczeniach: λ zawyżona o 13% tam, gdzie gramy
+# „powyżej", zaniżona o 5% przy „poniżej" — w TYM SAMYM rynku i paśmie λ,
+# 9 z 9 przypadków. Pełne liczby i odrzucone warianty: nota przy
+# `SCIAGANIE_LAMBDY_DO_LINII`.
+
+def test_sciaganie_przy_sile_jeden_nie_rusza_lambdy():
+    """Przełącznik powrotu: 1,0 ma oddawać λ co do bitu, bez żadnej ścieżki.
+
+    To jest warunek postawiony przy zatwierdzaniu — cofnięcie ma być zmianą
+    jednej wartości, a nie rewertowaniem commita.
+    """
+    for lam_ in (0.4, 1.0, 5.5, 13.2):
+        for linia in (0.5, 4.5, 12.5):
+            assert U.lambda_do_wyceny(lam_, linia, sila=1.0) == lam_
+
+
+def test_sciaganie_zbliza_lambde_do_linii_z_obu_stron():
+    """Ściągamy odchylenie, nie kierunek — λ nie może przeskoczyć linii."""
+    # λ powyżej linii — ma zejść, ale zostać powyżej
+    assert 4.5 < U.lambda_do_wyceny(6.5, 4.5, sila=0.8) < 6.5
+    # λ poniżej linii — ma podejść, ale zostać poniżej
+    assert 2.0 < U.lambda_do_wyceny(2.0, 4.5, sila=0.8) < 4.5
+    # dokładna arytmetyka: linia + w·(λ − linia)
+    assert abs(U.lambda_do_wyceny(6.5, 4.5, sila=0.5) - 5.5) < 1e-9
+    # λ nigdy nie schodzi do zera ani poniżej
+    assert U.lambda_do_wyceny(0.01, 0.5, sila=0.0) > 0.0
+
+
+def test_sciaganie_ciagnie_szanse_w_strone_ceny_symetrycznie():
+    """Skutek na `p`: obie strony schodzą ku 50%, bo λ zbliża się do linii."""
+    surowe_o = U.p_strony(7.0, 4.5, "powyzej")
+    po_o = U.wycena(7.0, 4.5, "powyzej")["p"]
+    assert po_o < surowe_o, 'powyzej przy wysokiej lambdzie ma zejsc'
+    surowe_u = U.p_strony(2.0, 4.5, "ponizej")
+    po_u = U.wycena(2.0, 4.5, "ponizej")["p"]
+    assert po_u < surowe_u, 'ponizej przy niskiej lambdzie tez ma zejsc'
+
+
+def test_wycena_stempluje_sile_i_zachowuje_surowa_lambde():
+    """Bez stempla za dwa tygodnie nie da się odpowiedzieć „czy zadziałało".
+
+    ⚑ `lam` i `odl` MUSZĄ zostać na surowej λ — `odl` niesie regułę zasięgu,
+    a liczona po ściągnięciu zmalałaby o jedną piątą i po cichu rozluźniła
+    bramę, czyli zmieniła podaż przy okazji zmiany kalibracji.
+    """
+    w = U.wycena(7.0, 4.5, "powyzej")
+    assert w["sciag"] == U.SCIAGANIE_LAMBDY_DO_LINII
+    assert w["lam"] == 7.0, "stempel ma nieść λ SUROWĄ, nie ściągniętą"
+    assert w["odl"] == 2.5, "odległość liczona od surowej λ — brama zasięgu"
+    assert U.w_zasiegu(w["lam"], 4.5), "ta sama λ, ta sama decyzja bramy"
+
+
+def test_wycena_bez_lambdy_nie_zgaduje():
+    assert U.wycena(None, 4.5, "powyzej") is None
+
+
+def test_strony_sumuja_sie_do_jedynki_takze_po_sciagnieciu():
+    """Jedna λ, dwie strony — ściąganie nie może tego złamać."""
+    for lam_ in (1.2, 5.5, 11.0):
+        for r in (None, 6.0):
+            o = U.wycena(lam_, 4.5, "powyzej", r_nb=r)["p"]
+            u = U.wycena(lam_, 4.5, "ponizej", r_nb=r)["p"]
+            assert abs(o + u - 1.0) < 1e-3
+
+
+def test_wycena_jest_jedyna_droga_do_szansy():
+    """STRAŻNIK: nowa ścieżka wyceny ma iść przez `wycena`, albo nie istnieć.
+
+    Drużyny, zawodnicy i sumy liczyły to samo w trzech miejscach oddalonych
+    o setki linii. Ten układ kosztował nas już dwa ciche rozjazdy
+    (`ujemna_po_korekcie` z dwoma wejściami, `kal_strony` bez stempla), więc
+    tu jest zamknięty na klucz: `p_strony` wolno wołać wyłącznie z wnętrza
+    `wycena`, gdzie λ jest ściągana.
+    """
+    import inspect
+    zrodlo = inspect.getsource(U)
+    wolania = [l.strip() for l in zrodlo.splitlines()
+               if "p_strony(" in l and not l.strip().startswith(("#", "*", '"'))
+               and "def p_strony" not in l]
+    assert len(wolania) == 1, (
+        "p_strony wołane poza `wycena` — ta ścieżka ominie ściąganie λ "
+        f"i stempel `sciag`: {wolania}")
+    assert "lambda_do_wyceny" in wolania[0], wolania[0]
+
+
+def test_wszystkie_trzy_strumienie_stempluja_sciagniecie():
+    """Drużyny, zawodnicy i sumy — komplet, bo brak stempla to cichy fałsz.
+
+    Nie sprawdzam tu liczb, tylko że KAŻDA ścieżka przechodzi przez wspólną
+    wycenę. Dopisanie czwartego strumienia bez stempla ma ten test wywalić.
+    """
+    import inspect
+    for nazwa in ("prognoza", "prognoza_zawodnika", "prognoza_sumy"):
+        src = inspect.getsource(getattr(U, nazwa))
+        assert "wycena(" in src, f"{nazwa} nie idzie przez wspólną wycenę"

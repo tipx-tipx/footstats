@@ -321,7 +321,10 @@ _STEMPLE_PUBLIKACJI = (
     "kal_rynek",       # delta kalibracji rynku
     "kal_tau",         # historia predykcji rynków drużynowych
     "kolejnosc",       # moc listy + bogactwo materiału meczu
-    "p_uczony",        # druga liczba: model uczony (szansa, λ, odległość linii)
+    # ⚑ `sciag` (siła ściągnięcia λ do linii, 2026-08-23) jedzie WEWNĄTRZ tego
+    # dictu i właśnie dlatego tam siedzi, a nie jako osobne pole: kanał
+    # `p_uczony` jest już przetestowany na wszystkich czterech białych listach.
+    "p_uczony",        # druga liczba: model uczony (szansa, λ, odległość, sciag)
     # ⚑ PRZEŁĄCZENIE ŹRÓDŁA (2026-08-18) — OBA pola muszą przetrwać wznowienie,
     # inaczej typ odtworzony z księgi wygląda, jakby nigdy nie był liczony
     # modelem, i kontrola przełączenia liczyłaby zaniżone pokrycie. To ta sama
