@@ -112,16 +112,27 @@ def test_proba_ceny_nie_miesza_dwoch_rachunkow():
 
 def test_urealnienie_pokazywanej_szansy_omija_model():
     """Delta jest duża (drużyny −0,63 logitu): z uczciwych 51% modelu robi na
-    karcie 36%, a razem z nią przewraca kurs uczciwy, przewagę i wartość."""
+    karcie 36%, a razem z nią przewraca kurs uczciwy, przewagę i wartość.
+
+    ⚑ POWÓD SIĘ ZMIENIŁ, WARUNEK ZOSTAJE (23.08). Pierwotnie stało tu „model
+    nie przeszacowuje (−0,7 pp)" — produkcja pokazała −7,2 pp, więc to było
+    fałszywe. Wyłączenie zostaje z innego powodu: przeszacowanie modelu
+    naprawiamy u źródła (`uczony.SCIAGANIE_LAMBDY_DO_LINII`), a delta tej
+    warstwy jest uczona na STARYM rachunku, więc ściągałaby tę samą wadę
+    drugi raz, liczbą z innej maszynerii.
+    """
     import inspect
     from footstats.jobs import build_wc_fast as B
 
     zrodlo = inspect.getsource(B)
     i = zrodlo.index("def _urealnij_do_pokazania")
-    blok = zrodlo[i:i + 1600]
+    # okno musi objąć notę nad warunkiem — bez zapasu test pada przy każdym
+    # dopisaniu komentarza, a nie przy zmianie zachowania (tak było 23.08)
+    blok = zrodlo[i:i + 3000]
     assert 'zrodlo_p' in blok and '"uczony"' in blok, (
         "warstwa `szansa_pokazywana` znowu ściąga liczbę modelu — a model "
-        "nie przeszacowuje, więc nie ma tu czego urealniać"
+        "jest już ściągany u źródła, więc to byłaby druga korekta tej samej "
+        "wady, w dodatku deltą uczoną na starym rachunku"
     )
 
 

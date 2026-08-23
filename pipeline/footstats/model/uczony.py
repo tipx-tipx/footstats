@@ -711,13 +711,45 @@ def wycena(lambda_: float | None, linia: float, strona: str,
 # b ≈ 1,00–1,05, Brier bez zmian, a na realnych typach nawet gorzej
 # (0,2276 → 0,2284). Powód: w typowym zakresie model jest dobrze skalibrowany,
 # więc jedna krzywa nie ma czego naprawiać — problem jest LOKALNY, w ogonie.
-# Zamiast jedenastej warstwy: nie gramy tam, gdzie nie mamy pokrycia.
+#
+# ⚑⚑⚑⚑ TA REGUŁA JEST MARTWA I MA TAKA ZOSTAĆ (sprawdzone 2026-08-23).
+#
+# `w_zasiegu` i `dopuszczony` NIE SĄ wołane z pipeline'u — pipeline bierze
+# z `POLKI` wyłącznie `limit_dobowy`. Zdanie „nie gramy tam, gdzie nie mamy
+# pokrycia", które stało tu wcześniej, opisywało regułę bez odbiorcy.
+#
+# Sprawdziłem, czy podłączyć — NIE. Tabela wyżej mierzy LUKĘ i jest
+# prawdziwa: kalibracja w ogonie faktycznie się sypie. Ale celem produktu
+# jest od 20.08 TRAFNOŚĆ ([[cel-produktu-to-trafnosc]]), a w tej mierze ogon
+# jest NAJLEPSZY, nie najgorszy (księga, 3334 rozliczenia modelu):
+#
+#     |linia − λ|    n      udział   deklaruje   trafia    luka
+#     0–1          2125     63,7%     55,1%     48,0%    −7,1 pp
+#     1–2           842     25,3%     67,6%     61,0%    −6,6 pp
+#     2–2,5         164      4,9%     74,7%     64,0%   −10,7 pp
+#     2,5–3         109      3,3%     75,3%     69,7%    −5,6 pp
+#     3–4            69      2,1%     79,0%     65,2%   −13,8 pp
+#     4+             25      0,7%     84,7%     68,0%   −16,7 pp
+#
+# Trafność ROŚNIE z odległością. Symulacja półki: próg 2,5 daje 0,0 / −1,0 /
+# −0,7 pp przy limitach 12/15/20, a próg 1,5 już −6,0 / −6,7 / −7,1 pp.
+# Podłączenie bramy wycięłoby pasmo o najwyższej trafności — dokładnie ten
+# sam błąd co bramy wartości ([[bramy-wartosci-vs-cel-trafnosci]]): filtr
+# dobrany pod inną miarę niż cel.
+#
+# ⚑ Kto chce to podłączyć, musi najpierw pokazać, że cel wrócił do ZYSKU.
+# Stałą i funkcje zostawiam, bo niosą ten pomiar i `POLKI` się do nich
+# odwołują — ale to jest wiedza, nie brama.
 MAX_ODLEGLOSC_LINII = 2.5
 
 
 def w_zasiegu(lambda_: float | None, linia: float,
               max_odl: float = MAX_ODLEGLOSC_LINII) -> bool:
-    """Czy linia leży na tyle blisko λ, żeby model miał tam pokrycie."""
+    """Czy linia leży blisko λ. ⚑ NIE JEST BRAMĄ — patrz nota wyżej.
+
+    Nic w produkcji tego nie woła i tak ma zostać: pasmo, które ta reguła
+    odcina, trafia LEPIEJ niż pasmo, które przepuszcza.
+    """
     if lambda_ is None:
         return False
     return abs(float(linia) - float(lambda_)) <= float(max_odl)
@@ -736,9 +768,12 @@ def w_zasiegu(lambda_: float | None, linia: float,
 # 46,7% (górna tercja wobec dolnej, n=360). Bez tej granicy zakładka „wyższe
 # kursy" pokazywałaby najpewniejsze typy o trafności 31%.
 #
-# ⚑ REGUŁA ZASIĘGU DOTYCZY TYLKO PÓŁKI PEWNIAKÓW. Na wyższych kursach
-# POGARSZA wynik (53,4% → 48,9%), bo wysoki kurs to z definicji zdarzenie
-# rzadkie, czyli linia daleka od λ. To reguła jednej półki, nie modelu.
+# ⚑ POLE `zasieg` NIE MA ODBIORCY (sprawdzone 23.08). Pipeline czyta stąd sam
+# `limit_dobowy`; `dopuszczony()`, które jako jedyne patrzy na `zasieg`, nie
+# jest wołane znikąd. Liczba 75,1% wyżej opisuje więc symulację z regułą,
+# a nie to, co robi produkt — i tak ma zostać, bo na księdze reguła
+# POGARSZA trafność półki (pełny pomiar przy `MAX_ODLEGLOSC_LINII`).
+# Zostawiam pole, żeby nie udawać, że tej symulacji nie było.
 POLKI = {
     "wysoka_szansa": {
         "kurs_min": 1.20, "kurs_max": 1.80,

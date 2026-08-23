@@ -4473,8 +4473,18 @@ def _main_impl(tryb=None):
         # z uczciwych 51% modelu robi na karcie 36%, a razem z nią przewraca
         # kurs uczciwy, przewagę i wartość.
         #
-        # Typ policzony modelem NIE PRZESZACOWUJE (luka −0,7 pp), więc nie ma
-        # tu czego urealniać. Patrz `uczony.ZRODLO_SZANSY`.
+        # ⚑ UZASADNIENIE Z 18.08 SIĘ NIE POTWIERDZIŁO. Stało tu „typ policzony
+        # modelem NIE PRZESZACOWUJE (luka −0,7 pp)" — to była obietnica
+        # z backtestu. Produkcja (23.08, 3003 rozliczenia): luka −7,2 pp,
+        # a na stronie „powyżej" −10,2 pp ([[model-uczony-przeszacowuje-powyzej]]).
+        #
+        # Wyłączenie ZOSTAJE mimo to, ale już jako decyzja, nie jako fakt:
+        # przeszacowanie modelu naprawiamy U ŹRÓDŁA, ściągając λ do linii
+        # (`uczony.SCIAGANIE_LAMBDY_DO_LINII`, 23.08 — luka schodzi do −5,0 pp).
+        # Dołożenie tu drugiej korekty na wyjściu ściągałoby tę samą wadę
+        # dwa razy, a delta tej warstwy jest uczona na STARYM rachunku, więc
+        # opisuje inną maszynerię. Kartę modelu ściąga do ceny osobna warstwa
+        # niżej (`_sciagnij_karte_do_ceny`, własna waga `_waga_karty_uczony`).
         if str(b.get("zrodlo_p") or "") == "uczony":
             return b
         d = korekta_pokazywana.get(rozliczanie._strumien(b), 0.0)
