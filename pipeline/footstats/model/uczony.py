@@ -1268,7 +1268,89 @@ def prognoza_zawodnika(wagi: dict | None, seria: dict, rynek: str,
     if out is None:
         return None
     out["min"] = round(float(oczekiwane_minuty or cechy.get("min6") or 90.0), 1)
+    pkw = pokrycie_zawodnika(seria, linia, do_ts)
+    if pkw is not None:
+        out["pkw"] = round(float(pkw), 3)
+        out["pkn"] = meczow_w_pokryciu_zaw(seria, do_ts)
+        p_mix, pokr = zmieszaj_z_pokryciem(out["p"], pkw, None, strona,
+                                           waga=WAGA_POKRYCIA_ZAW)
+        if pokr is not None:
+            out["p_bez_pokrycia"] = round(float(out["p"]), 4)
+            out["p"] = p_mix
+            out["pokr"] = round(float(pokr), 3)
     return out
+
+
+# ------------------------------------ POKRYCIE U ZAWODNIKÓW (24.08) ---------
+#
+# ⚑⚑ ZMIERZONE 24.08 I ODRZUCONE — WAGA ZOSTAJE ZEROWA. Nie sprawdzać drugi raz.
+#
+# Kryterium ustalone PRZED pomiarem: Brier lepszy o >= 2% out-of-sample, waga
+# dobrana na I połowie próby. Wynik na 658 rozliczeniach zawodniczych:
+#
+#   sygnał                  AUC     górna 1/3   dolna 1/3
+#   pokrycie zawodnika     0,556      56,0%       43,1%    (+12,8 pp)
+#   szansa modelu          0,576      58,3%       44,0%    (+14,2 pp)
+#
+#   waga dobrana na I połowie: 0,2  ->  na II połowie -0,26% przy progu -2,0%
+#
+# ⚑ POKRYCIE ZAWODNICZE DZIAŁA SAMO (AUC 0,556, wyraźnie lepiej niż u drużyn,
+# gdzie własne pokrycie dawało 0,499) — ale NIE DODAJE NIC PONAD MODEL, bo
+# model zawodniczy uczy się z TEGO SAMEGO banku i już tę informację niesie.
+# To jest inna sytuacja niż u drużyn: tam sygnał niósł RYWAL, którego cechy
+# modelu opisywały tylko średnią, a nie częstość przekroczeń tej linii.
+#
+# Kod zostaje wpięty i STEMPLUJE `pkw`/`pkn` mimo zerowej wagi — dzięki temu
+# karta może pokazać „przekroczył w 7 z 10", a księga zbiera próbę na wypadek,
+# gdyby model zawodniczy się zmienił. Włączać wyłącznie po ponownym pomiarze
+# `scripts/pomiar_pokrycia_zaw.py`, na NOWEJ próbie.
+#
+# ⚑ POKRYCIE LICZY SIĘ TYLKO Z MECZÓW REALNIE ROZEGRANYCH (>= `MIN_MINUT_ZAW`).
+# Dwadzieścia minut na boisku to inny zakład niż pełne 90, a pokrycie liczone
+# razem z takimi meczami zaniża się samo i myliłoby „słaby zawodnik" z „mało
+# grał". Ta sama poprawka, którą model stosuje przy `tempa`.
+WAGA_POKRYCIA_ZAW = 0.0
+
+
+def _mecze_zawodnika(seria: dict | None, do_ts: int | None,
+                     n: int = OKNO_POKRYCIA) -> list[float]:
+    """Liczby zdarzeń z `n` ostatnich meczów, w których zawodnik realnie grał.
+
+    Jedno miejsce decydujące, CO wchodzi do pokrycia — licznik i mianownik nie
+    mogą się rozjechać.
+    """
+    if not isinstance(seria, dict):
+        return []
+    counts = seria.get("counts") or []
+    minuty = seria.get("minutes") or []
+    czasy = seria.get("timestamps") or []
+    k = min(len(counts), len(minuty), len(czasy))
+    if k < MIN_MECZOW_POKRYCIA:
+        return []
+    prog = int(do_ts) if do_ts else int(time.time())
+    idx = [j for j in range(k)
+           if int(czasy[j] or 0) < prog
+           and float(minuty[j] or 0) >= MIN_MINUT_ZAW]
+    idx.sort(key=lambda j: int(czasy[j] or 0))
+    return [float(counts[j] or 0) for j in idx[-int(n):]]
+
+
+def pokrycie_zawodnika(seria: dict | None, linia: float,
+                       do_ts: int | None = None,
+                       n: int = OKNO_POKRYCIA) -> float | None:
+    """W ilu z `n` ostatnich rozegranych meczów zawodnik przekroczył `linię`."""
+    if linia is None:
+        return None
+    wart = _mecze_zawodnika(seria, do_ts, n)
+    if len(wart) < MIN_MECZOW_POKRYCIA:
+        return None
+    return sum(1 for w in wart if w > float(linia)) / len(wart)
+
+
+def meczow_w_pokryciu_zaw(seria: dict | None, do_ts: int | None = None,
+                          n: int = OKNO_POKRYCIA) -> int:
+    """Mianownik dla karty — ile meczów realnie stoi za pokryciem."""
+    return len(_mecze_zawodnika(seria, do_ts, n))
 
 
 # ===========================================================================

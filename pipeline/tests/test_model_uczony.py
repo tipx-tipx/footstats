@@ -525,7 +525,13 @@ def test_prognoza_zawodnika_daje_komplet_albo_nic():
     seria = _seria_zaw(n=20, tempo=2.0)
     out = U.prognoza_zawodnika(wagi, seria, "shots", 1.5, "powyzej",
                                oczekiwane_minuty=80.0, do_ts=99999)
-    assert set(out) == {"p", "lam", "r_nb", "odl", "min", "sciag"}
+    # ⚑ POKRYCIE JEST STEMPLOWANE NAWET GDY WYŁĄCZONE (2026-08-24). `pkw`/`pkn`
+    # dochodzą zawsze, `pokr`/`p_bez_pokrycia` dopiero gdy waga > 0 — dzięki
+    # temu księga zbiera próbę do pomiaru, ZANIM cokolwiek włączymy.
+    obowiazkowe = {"p", "lam", "r_nb", "odl", "min", "sciag"}
+    dozwolone = obowiazkowe | {"pkw", "pkn", "pokr", "p_bez_pokrycia"}
+    assert obowiazkowe <= set(out) <= dozwolone
+    assert "pokr" not in out, "waga zawodnicza jest zerowa — nie wolno mieszać"
     assert out["min"] == 80.0
     # rynek, którego wagi nie znają
     assert U.prognoza_zawodnika(wagi, seria, "tackles", 1.5, "powyzej") is None
@@ -940,3 +946,54 @@ def test_mianownik_i_pokrycie_licza_z_tego_samego_okna():
     hist = [{"t": i, "s": {"cor": i}} for i in range(1, 21)]
     assert U.meczow_w_pokryciu(hist, "cor") == U.OKNO_POKRYCIA
     assert U.pokrycie_linii(hist, "cor", 15.5) == 5 / 10   # 16..20 z ostatnich 10
+
+
+# --- POKRYCIE U ZAWODNIKÓW (2026-08-24, wpięte ale WYŁĄCZONE) --------------
+#
+# ⚑ Helper nazwany `_seria_pokrycia`, NIE `_seria_zaw` — ta druga już istnieje
+# w tym pliku i ma inną sygnaturę. Kolizja nazw wywróciła pięć cudzych testów
+# przy pierwszym podejściu.
+
+def _seria_pokrycia(counts, minuty=None, czasy=None):
+    n = len(counts)
+    return {"counts": list(counts),
+            "minutes": list(minuty or [90.0] * n),
+            "timestamps": list(czasy or [1000 + i for i in range(n)])}
+
+
+def test_pokrycie_zawodnika_liczy_przekroczenia():
+    s = _seria_pokrycia([3, 1, 4, 2, 5, 0])
+    assert U.pokrycie_zawodnika(s, 2.5, do_ts=99999) == 3 / 6      # 3, 4, 5
+
+
+def test_pokrycie_zawodnika_pomija_mecze_bez_gry():
+    """⚑ Dwadzieścia minut na boisku to inny zakład niż pełne 90. Mecz poniżej
+    progu minut nie może zaniżać pokrycia, bo myliliśmy by „słaby zawodnik"
+    z „mało grał"."""
+    s = _seria_pokrycia([3, 0, 4, 0, 5, 4, 6],
+                        minuty=[90, 5, 90, 8, 90, 90, 90])
+    assert U.meczow_w_pokryciu_zaw(s, do_ts=99999) == 5            # dwa odpadają
+    assert U.pokrycie_zawodnika(s, 2.5, do_ts=99999) == 1.0        # 3, 4, 5, 4, 6
+
+
+def test_pokrycie_zawodnika_nie_zaglada_w_przyszlosc():
+    """Mecz późniejszy niż `do_ts` nie może wpłynąć na pokrycie — wyciek
+    z przyszłości daje świetny pomiar i bezużyteczny model."""
+    s = _seria_pokrycia([1, 1, 1, 1, 1, 9],
+                        czasy=[10, 20, 30, 40, 50, 60])
+    assert U.pokrycie_zawodnika(s, 4.5, do_ts=55) == 0.0           # dziewiątki nie widać
+    assert U.pokrycie_zawodnika(s, 4.5, do_ts=99) == 1 / 6         # teraz widać
+
+
+def test_pokrycie_zawodnika_milczy_przy_krotkiej_historii():
+    assert U.pokrycie_zawodnika(_seria_pokrycia([3, 4]), 2.5, do_ts=99999) is None
+    assert U.pokrycie_zawodnika(None, 2.5) is None
+
+
+def test_pokrycie_zawodnicze_jest_WYLACZONE_do_czasu_pomiaru():
+    """⚑ U drużyn pokrycie WŁASNE nie porządkowało nic (AUC 0,499) — cały
+    sygnał niósł rywal, którego zawodnicy nie mają. Waga zostaje na zerze,
+    dopóki pomiar nie pokaże >= 2% poprawy out-of-sample."""
+    assert U.WAGA_POKRYCIA_ZAW == 0.0
+    assert U.zmieszaj_z_pokryciem(0.6, 0.9, None, "powyzej",
+                                  waga=U.WAGA_POKRYCIA_ZAW) == (0.6, None)
