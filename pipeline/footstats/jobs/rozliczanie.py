@@ -2470,10 +2470,20 @@ KOREKTA_DRABINEK_CAP = (-0.40, 0.20)
 # WYŁĄCZNIE tak, jak robi to `_p_surowe` niżej — to nie jest drobiazg
 # metodologiczny, tylko różnica między „zdejmujemy warstwy" a „zostawiamy".
 #
-# ⚑ `kal_rynek` jako jedyna wypada ujemnie na całości (oba półokresy: -1,97%
-# i -0,08%), ale na typach modelu POMAGA (+3,17%). Ta niespójność jest OTWARTA
-# i ma własny trop: [[kalibracja-odwrocony-znak]]. Nie zdejmować jej „przy
-# okazji" — wymaga osobnego pomiaru.
+# ⚑ `kal_rynek` — NIESPÓJNOŚĆ WYJAŚNIONA TEGO SAMEGO DNIA. Wyglądała na jedyną
+# ujemną warstwę (-0,90% na całości), ale po rozbiciu na rachunek, który liczył
+# typ, obraz jest czysty:
+#
+#   na MODELU uczonym    n=1471   +3,17%   POMAGA
+#   na STARYM rachunku   n=2013   -3,56%   SZKODZI  (tercje -4,83 / -0,77 / -4,97)
+#
+# Całość wyszła ujemnie, bo MIESZAŁA DWA RACHUNKI — a od 18.08 trzy z czterech
+# strumieni liczą modelem, więc warstwa działa dobrze wszędzie tam, gdzie dziś
+# realnie decyduje. Ujemna połowa opisuje typy sprzed przełączenia.
+#
+# ZOSTAJE BEZ ZMIAN. Gdyby drabinki (jedyny strumień wciąż na starym rachunku)
+# miały kiedyś przejść na model, ten pomiar trzeba powtórzyć — ale osobno dla
+# nich, nie na wymieszanej próbie.
 #
 # ⚑ ZASTRZEŻENIE UCZCIWE: mierzymy, czy warstwa poprawiła KALIBRACJĘ tego, co
 # wyszło. Nie mówi to, jak wyglądałby model dostrojony od początku bez warstw —
