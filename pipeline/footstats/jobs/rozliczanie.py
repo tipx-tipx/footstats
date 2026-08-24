@@ -2446,6 +2446,39 @@ KOREKTA_PRZEDZIAL_MIN_N = 20
 KOREKTA_DRABINEK_MIN_N = 25
 KOREKTA_DRABINEK_CAP = (-0.40, 0.20)
 
+# --- ZADANIE 2 PLANU (ZDJĘCIE WARSTW) — ZMIERZONE 24.08 I ODRZUCONE ---------
+#
+# ⚑⚑ WARSTWY ZOSTAJĄ. Plan z 18.08 zakładał, że po przełączeniu na model uczony
+# korekty poprawiają liczbę, która już NIE KŁAMIE, czyli ją psują. Zmierzone na
+# 8691 rozliczeniach — jest DOKŁADNIE ODWROTNIE, a na modelu uczonym warstwy
+# pomagają MOCNIEJ niż na starym rachunku:
+#
+#   warstwa          n      z warstwą   bez niej    zmiana Briera
+#   kal_strumien   8528       0,24177    0,25224      +4,33%   (bez niej gorzej)
+#   kal_strony      308       0,25092    0,26731      +6,53%
+#   kal_rynek      3484       0,24787    0,24563      -0,90%   <- jedyna ujemna
+#   komplet        8691       0,24232    0,24866      +2,61%
+#
+#   TYLKO typy modelu uczonego (tam warstwy miały być zbędne):
+#   kal_strumien   3545       0,23706    0,26197     +10,50%
+#   komplet        3558       0,23741    0,26327     +10,89%
+#
+# ⚑ PUŁAPKA, KTÓRA PRZY TYM POMIARZE KOSZTOWAŁA PIERWSZY, BŁĘDNY WYNIK:
+# odejmowanie delty WPROST od `p_model` dawało +26…+49% i wyglądało, jakby
+# warstwy były zbawienne. Delta jest w LOGICIE i nakładana na `p_over`, więc
+# dla typów „poniżej" proste odejmowanie ma złą skalę i zły znak. Odwracać
+# WYŁĄCZNIE tak, jak robi to `_p_surowe` niżej — to nie jest drobiazg
+# metodologiczny, tylko różnica między „zdejmujemy warstwy" a „zostawiamy".
+#
+# ⚑ `kal_rynek` jako jedyna wypada ujemnie na całości (oba półokresy: -1,97%
+# i -0,08%), ale na typach modelu POMAGA (+3,17%). Ta niespójność jest OTWARTA
+# i ma własny trop: [[kalibracja-odwrocony-znak]]. Nie zdejmować jej „przy
+# okazji" — wymaga osobnego pomiaru.
+#
+# ⚑ ZASTRZEŻENIE UCZCIWE: mierzymy, czy warstwa poprawiła KALIBRACJĘ tego, co
+# wyszło. Nie mówi to, jak wyglądałby model dostrojony od początku bez warstw —
+# tego z księgi wyczytać się nie da.
+#
 # ustawiane raz na cykl przez build_wc_fast (patrz `ustaw_korekte_strumienia`)
 # — potrzebne, żeby zapisać przy typie deltę, z jaką został opublikowany
 _KOREKTA_CYKLU: dict[str, float] = {}
