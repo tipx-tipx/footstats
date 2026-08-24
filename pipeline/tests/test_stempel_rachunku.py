@@ -160,7 +160,11 @@ def test_stempel_kolejnosci_obejmuje_wszystkie_drogi_do_ksiegi():
 
     zrodlo = inspect.getsource(B)
     i = zrodlo.index('_b["kolejnosc"] = {"moc"')
-    petla = zrodlo[max(0, i - 400):i]
+    # ⚑ OKNO Z ZAPASEM. Przy 400 znakach ten test przewracał się przy DOPISANIU
+    # KOMENTARZA nad przypisaniem, a nie przy zmianie zachowania (2026-08-24,
+    # druga taka pułapka po teście warstwy urealniania). Ma pilnować tego, że
+    # pętla obejmuje cztery listy — i tylko tego.
+    petla = zrodlo[max(0, i - 2000):i]
     for lista in ("value_bets", "typy_poza_publikacja",
                   "odrzucone_pomiar", "legi_pool_pub"):
         assert lista in petla, (

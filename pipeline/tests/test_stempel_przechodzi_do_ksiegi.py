@@ -85,6 +85,21 @@ def test_kolejnosc_dojezdza_do_ksiegi():
     )
 
 
+def test_polka_dojezdza_do_ksiegi_w_kolejnosci():
+    """⚑ 2026-08-24. Półki wpięto 20.08, front ma osobne zakładki — a w księdze
+    było 0 z 14 232 rekordów z polem `polka`, więc skuteczności półek nie dało
+    się policzyć. Jedzie W SŁOWNIKU `kolejnosc`, bo osobne pole musiałoby
+    przejść przez trzy białe listy."""
+    log: dict = {}
+    kolejnosc = {"moc": 1.1, "kandydatow": 9, "polka": "wysoka_szansa"}
+    R._dopisz_nowe(log, [_typ(kolejnosc=dict(kolejnosc))])
+    rec = next(iter(log.values()))
+    assert rec.get("kolejnosc", {}).get("polka") == "wysoka_szansa", (
+        "stempel półki zginął w drodze do księgi — bez niego nie odpowiemy, "
+        "czy półka pewniaków faktycznie trafia lepiej niż wyższe kursy"
+    )
+
+
 def test_pusta_kolejnosc_nie_zasmieca_ksiegi():
     log: dict = {}
     R._dopisz_nowe(log, [_typ(kolejnosc={})])

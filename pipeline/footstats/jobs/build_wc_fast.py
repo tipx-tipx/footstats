@@ -9774,10 +9774,23 @@ def _main_impl(tryb=None):
     # `moc_listy` liczy się z `p` bieżącego przeliczenia, a rekord w księdze
     # trzyma `p` z chwili publikacji. Dopisanie późniejszej mocy do starego `p`
     # byłoby stemplem o czymś innym, niż mówi.
+    # ⚑ PÓŁKA JEDZIE W TYM SAMYM SŁOWNIKU (2026-08-24). Półki wpięto 20.08
+    # i front ma osobne zakładki, ale pole `polka` nie było na żadnej z trzech
+    # białych list — w księdze było 0 z 14 232 rekordów z tą wartością, czyli
+    # skuteczności półek NIE DAŁO SIĘ policzyć. Produkt robił rozróżnienie,
+    # którego nie zapisywał — ta sama klasa błędu co przy `zrodlo_p`.
+    #
+    # Dlatego DO TEGO słownika, a nie osobnym polem: `kolejnosc` przechodzi
+    # już wszystkie cztery drogi do księgi, osobne pole trzeba by wpinać
+    # w trzech miejscach — udokumentowana pułapka tego repo (patrz wyżej).
+    #
+    # ⚑ Działa OD TERAZ w przód. Rekordów sprzed 24.08 nie da się odtworzyć:
+    # `_dopisz_nowe` nie dopisuje pól do rekordów, które już istnieją.
     for _b in (value_bets + typy_poza_publikacja
                + odrzucone_pomiar + legi_pool_pub):
         _ile = _kandydatow_w_meczu.get(_b.get("mecz_id"), 0)
-        _b["kolejnosc"] = {"moc": moc_listy(_b, _ile), "kandydatow": _ile}
+        _b["kolejnosc"] = {"moc": moc_listy(_b, _ile), "kandydatow": _ile,
+                           **({"polka": _b["polka"]} if _b.get("polka") else {})}
 
     # publikacja kuponów idzie przez log (zamrożenie/anulowanie/rozliczenie)
     # wewnątrz _rozlicz_i_zapisz — kupony.json to aktywne kupony z logu
