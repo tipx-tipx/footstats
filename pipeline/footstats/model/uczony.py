@@ -360,16 +360,107 @@ def cechy_na_mecz(mag: dict, team_id: int | str, rynek: str,
     return cechy_z_kontekstu(ctx, team_id, rynek, opp_id, dom, liga, do_ts)
 
 
+# ------------------------------------------------- POKRYCIE LINII (24.08) ----
+#
+# ⚑ CZYM SIĘ RÓŻNI OD TEGO, CO MODEL JUŻ MA. Cechy modelu to ŚREDNIE (`w6`,
+# `w12`, `opp12`): „ta drużyna notuje zwykle 5,2 rożnego". Pokrycie odpowiada
+# na inne pytanie: „w ilu z ostatnich 10 meczów przekroczyła DOKŁADNIE TĘ
+# linię". Drużyna ze średnią 5,2 może mieć przy linii 4,5 pokrycie 8/10 albo
+# 4/10 — zależnie od tego, jak równo gra. Średnia tej różnicy nie niesie,
+# a to ona jest miarą pewności (wskazał to właściciel 24.08).
+#
+# Zmierzone tego dnia na 6175 rozliczeniach. Pokrycia liczone WYŁĄCZNIE
+# z meczów sprzed kickoffu, więc bez zaglądania w przyszłość; AUC liczone
+# W OBRĘBIE PASMA KURSU, bo inaczej mierzy się cennik, nie jakość typu:
+#
+#   sygnał                   AUC    górna 1/3   dolna 1/3
+#   pokrycie WŁASNE         0,499     60,2%       59,8%    <- nie porządkuje NIC
+#   pokrycie RYWALA         0,517     61,1%       57,4%    <- bije model
+#   szansa modelu           0,515     59,8%       56,7%
+#
+# ⚑ WŁASNE POKRYCIE SAMO NIE DAJE NIC, RYWALA OWSZEM — ta sama asymetria, którą
+# pokazał trening (`w6` prawie bez wpływu, `opp12` najwięcej). W mieszance
+# zostają oba, bo Brier z obydwoma wychodzi lepiej niż z samym rywalem.
+#
+# BRIER — kryterium wpięcia ustalone PRZED pomiarem (poprawa >= 2% OOS):
+#
+#   sam model                                    0,24172
+#   60% model + 40% pokrycie                     0,23606   -2,34%
+#   OUT-OF-SAMPLE (waga z I połowy, ocena na II)            -2,09%  <- SPEŁNIONE
+#
+#   wszystkie sześć rynków w plusie: gole -3,10%, rożne -2,56%, faule -1,96%,
+#   kartki -1,63%, strzały -1,22%, celne -0,42%
+#
+# ⚑ POWRÓT JEDNĄ WARTOŚCIĄ: `WAGA_POKRYCIA = 0.0` wyłącza mieszankę i model
+# wraca do zachowania sprzed 24.08. Nie trzeba rewertować commitów.
+WAGA_POKRYCIA = 0.40      # ile waży pokrycie wobec modelu (0,0 = wyłączone)
+OKNO_POKRYCIA = 10        # z ilu ostatnich meczów liczymy pokrycie
+MIN_MECZOW_POKRYCIA = 5   # poniżej tylu pokrycie jest szumem, nie liczymy go
+
+
+def pokrycie_linii(hist: list[dict], kod: str, linia: float,
+                   n: int = OKNO_POKRYCIA, wlasne: bool = True) -> float | None:
+    """W ilu z `n` ostatnich meczów padło WIĘCEJ niż `linia`.
+
+    `wlasne=False` czyta stronę RYWALA tamtych meczów (`sp`), czyli ile ta
+    drużyna DOPUSZCZAŁA — koncesje zmierzone, nie przybliżane.
+
+    Zwraca None, gdy historii jest za mało — cisza znaczy „nie wiemy", nie
+    „zero" ([[ciche-odrzucenia-zasada]]).
+    """
+    if not hist or linia is None:
+        return None
+    wart = [_wartosc(h, kod, wlasne) for h in hist[-int(n):]]
+    wart = [w for w in wart if w is not None]
+    if len(wart) < MIN_MECZOW_POKRYCIA:
+        return None
+    return sum(1 for w in wart if float(w) > float(linia)) / len(wart)
+
+
+def _pokrycie_po_stronie(pokr: float | None, strona: str) -> float | None:
+    """Pokrycie przeliczone na STRONĘ zakładu — „poniżej" to dopełnienie."""
+    if pokr is None:
+        return None
+    return float(pokr) if strona == "powyzej" else 1.0 - float(pokr)
+
+
+def zmieszaj_z_pokryciem(p: float, pk_wlasne: float | None,
+                         pk_rywala: float | None, strona: str,
+                         waga: float | None = None) -> tuple[float, float | None]:
+    """Miesza szansę modelu z pokryciem. Zwraca (p po zmieszaniu, pokrycie).
+
+    Gdy żadne pokrycie się nie policzyło, oddaje `p` bez zmian — model działa
+    jak dotąd, a nie dostaje po cichu wartości zastępczej.
+    """
+    w = WAGA_POKRYCIA if waga is None else float(waga)
+    if w <= 0:
+        return float(p), None
+    czesci = [x for x in (_pokrycie_po_stronie(pk_wlasne, strona),
+                          _pokrycie_po_stronie(pk_rywala, strona)) if x is not None]
+    if not czesci:
+        return float(p), None
+    pokr = sum(czesci) / len(czesci)
+    return max(0.01, min(0.99, (1.0 - w) * float(p) + w * pokr)), pokr
+
+
 def prognoza(wagi: dict | None, ctx: dict, team_id: int | str, rynek: str,
              opp_id: int | str | None, dom: int, liga: int | None,
              linia: float, strona: str,
              do_ts: int | None = None) -> dict | None:
     """Pełna prognoza modelu dla jednego zakładu — albo None, gdy nie wiemy.
 
-    Zwraca to, co `wycena()`: `{"p", "lam", "r_nb", "odl", "sciag"}`. `odl` to
-    odległość linii od SUROWEJ λ, czyli to, na czym stoi reguła zasięgu
-    (patrz `MAX_ODLEGLOSC_LINII`); `sciag` mówi, jaką siłą ściągnięto λ przy
-    liczeniu `p`.
+    Zwraca to, co `wycena()`: `{"p", "lam", "r_nb", "odl", "sciag"}`, a od
+    24.08 także `pkw` / `pkr` (pokrycie własne i rywala, SUROWE — przed
+    przełożeniem na stronę), `pokr` (to, co realnie weszło do mieszanki)
+    i `p_bez_pokrycia`. `odl` to odległość linii od SUROWEJ λ, czyli to, na
+    czym stoi reguła zasięgu (patrz `MAX_ODLEGLOSC_LINII`); `sciag` mówi, jaką
+    siłą ściągnięto λ przy liczeniu `p`.
+
+    ⚑ SUROWE POKRYCIA IDĄ W WYNIKU CELOWO. Zasada z 24.08: nic nie wchodzi do
+    produktu, jeśli nie zapisujemy tego, na czym stoi — nie wyniku mnożenia,
+    tylko liczb, z których powstał. Bez tego za dwa tygodnie nie da się
+    odpowiedzieć, czy mieszanka pomogła, tak samo jak nie dało się tego zrobić
+    dla dziewięciu z jedenastu warstw korekt.
     """
     wr = ((wagi or {}).get("rynki") or {}).get(rynek)
     if not wr or not ctx:
@@ -380,7 +471,28 @@ def prognoza(wagi: dict | None, ctx: dict, team_id: int | str, rynek: str,
     lm = lam(wr, cechy)
     if lm is None:
         return None
-    return wycena(lm, linia, strona, wr.get("r_nb"))
+    out = wycena(lm, linia, strona, wr.get("r_nb"))
+    kod = RYNEK_NA_KOD.get(rynek)
+    if not out or out.get("p") is None or kod is None:
+        return out
+    # ta sama droga do historii co w cechach — jedno źródło prawdy o tym,
+    # które mecze wolno widzieć (patrz nota przy `cechy_z_kontekstu`)
+    serie = ctx.get("serie") or {}
+    prog = int(do_ts or time.time())
+    hist = [h for h in serie.get(str(team_id), []) if int(h.get("t") or 0) < prog]
+    opp_hist = [h for h in serie.get(str(opp_id), []) if int(h.get("t") or 0) < prog]
+    pkw = pokrycie_linii(hist, kod, linia, wlasne=True)
+    pkr = pokrycie_linii(opp_hist, kod, linia, wlasne=False)
+    p_mix, pokr = zmieszaj_z_pokryciem(out["p"], pkw, pkr, strona)
+    out["p_bez_pokrycia"] = round(float(out["p"]), 4)
+    out["p"] = p_mix
+    if pkw is not None:
+        out["pkw"] = round(float(pkw), 3)
+    if pkr is not None:
+        out["pkr"] = round(float(pkr), 3)
+    if pokr is not None:
+        out["pokr"] = round(float(pokr), 3)
+    return out
 
 
 # ------------------------------------------------------------------ trening --

@@ -355,7 +355,13 @@ def test_prognoza_daje_komplet_albo_nic():
     ctx = U.przygotuj(mag)
     out = U.prognoza(wagi, ctx, 10, "team_corners", 99, 1, 1,
                      linia=5.5, strona="powyzej", do_ts=99999)
-    assert set(out) == {"p", "lam", "r_nb", "odl", "sciag"}
+    # ⚑ POLA POKRYCIA SĄ OPCJONALNE, RESZTA OBOWIĄZKOWA (2026-08-24). Pokrycie
+    # liczy się tylko wtedy, gdy historii starczy — brak pola znaczy „nie
+    # wiemy", nie „zero". Kontrakt pilnuje więc obu stron: komplet obowiązkowy
+    # ma być zawsze, a niczego spoza listy nie wolno dorzucić po cichu.
+    obowiazkowe = {"p", "lam", "r_nb", "odl", "sciag"}
+    dozwolone = obowiazkowe | {"pkw", "pkr", "pokr", "p_bez_pokrycia"}
+    assert obowiazkowe <= set(out) <= dozwolone
     assert 0.0 < out["p"] < 1.0 and out["lam"] > 0
     assert out["odl"] == round(abs(5.5 - out["lam"]), 2)
     # strony sumują się do jedynki także po drodze przez `prognoza`
@@ -859,3 +865,59 @@ def test_prognoza_sumy_daje_komplet_albo_nic():
     assert U.prognoza_sumy(wagi, ctx, 10, 99, None, "nie_ma_takiego", 9.5,
                            "powyzej") is None
     assert U.prognoza_sumy(wagi, {}, 10, 99, None, rynek, 9.5, "powyzej") is None
+
+
+# --- POKRYCIE LINII (2026-08-24) -------------------------------------------
+#
+# Wskazanie właściciela: model liczy ŚREDNIE, a miarą pewności jest to, ile
+# razy drużyna faktycznie przekroczyła TĘ linię — i ile jej rywal DOPUSZCZA.
+# Zmierzone przed wpięciem: pokrycie rywala bije model (AUC 0,517 vs 0,515),
+# Brier mieszanki −2,09% out-of-sample. Szczegóły przy `WAGA_POKRYCIA`.
+
+def test_pokrycie_liczy_czestosc_przekroczen():
+    hist = [{"t": i, "s": {"cor": v}} for i, v in enumerate([6, 3, 7, 5, 2])]
+    assert U.pokrycie_linii(hist, "cor", 4.5) == 0.6      # 6, 7, 5 > 4,5
+    assert U.pokrycie_linii(hist, "cor", 9.5) == 0.0
+
+
+def test_pokrycie_rywala_czyta_koncesje():
+    """`wlasne=False` bierze stronę RYWALA tamtych meczów — ile DOPUSZCZAŁ."""
+    hist = [{"t": i, "s": {"cor": 0}, "sp": {"cor": v}}
+            for i, v in enumerate([8, 6, 9, 5, 7])]
+    assert U.pokrycie_linii(hist, "cor", 4.5, wlasne=False) == 1.0
+    assert U.pokrycie_linii(hist, "cor", 4.5, wlasne=True) == 0.0
+
+
+def test_pokrycie_milczy_gdy_za_malo_historii():
+    """Cisza znaczy „nie wiemy", nie „zero" — inaczej model dostałby po cichu
+    wartość zastępczą i nikt by tego nie zauważył."""
+    hist = [{"t": i, "s": {"cor": 6}} for i in range(3)]
+    assert U.pokrycie_linii(hist, "cor", 4.5) is None
+    assert U.pokrycie_linii([], "cor", 4.5) is None
+
+
+def test_mieszanka_zachowuje_sume_stron():
+    """p(powyżej) + p(poniżej) = 1 także po zmieszaniu z pokryciem.
+
+    Gdyby mieszanka psuła tę sumę, obie strony tej samej linii deklarowałyby
+    szanse, które się nie domykają — a na tym stoi cała wycena."""
+    for p, pw, pr in ((0.60, 0.60, 1.00), (0.35, 0.20, 0.40), (0.80, 0.90, 0.70)):
+        gora, _ = U.zmieszaj_z_pokryciem(p, pw, pr, "powyzej")
+        dol, _ = U.zmieszaj_z_pokryciem(1 - p, pw, pr, "ponizej")
+        assert abs(gora + dol - 1.0) < 1e-9
+
+
+def test_waga_zero_wylacza_mieszanke():
+    """Powrót jedną wartością — warunek postawiony przy wpinaniu."""
+    assert U.zmieszaj_z_pokryciem(0.6, 0.9, 0.9, "powyzej", waga=0.0) == (0.6, None)
+
+
+def test_brak_pokrycia_nie_rusza_szansy():
+    assert U.zmieszaj_z_pokryciem(0.6, None, None, "powyzej") == (0.6, None)
+
+
+def test_jedno_pokrycie_wystarczy():
+    """Gdy rywal jest nieznany, własne pokrycie i tak wchodzi — połowa sygnału
+    jest lepsza niż żadna."""
+    p, pokr = U.zmieszaj_z_pokryciem(0.5, 1.0, None, "powyzej")
+    assert pokr == 1.0 and p > 0.5

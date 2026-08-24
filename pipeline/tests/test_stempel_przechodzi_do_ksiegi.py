@@ -176,3 +176,29 @@ def test_stempel_przezywa_odrodzenie_typu():
         "po odrodzeniu w księdze został stempel z cyklu, w którym typu "
         "nikt nie widział"
     )
+
+
+def test_pokrycia_dojezdzaja_do_ksiegi_w_p_uczonym():
+    """⚑ 2026-08-24. Pokrycie własne i rywala to liczby, NA KTÓRYCH stoi szansa
+    modelu — a zasada z tego dnia brzmi: nic nie wchodzi do produktu, jeśli nie
+    zapisujemy surowego śladu, nie wyniku mnożenia.
+
+    Jadą wewnątrz `p_uczony`, więc żadna z trzech białych list ich nie okrawa —
+    ta sama sztuczka co przy `kolejnosc`. Ten test pilnuje, że tak zostanie:
+    bez niego za dwa tygodnie nie dałoby się odpowiedzieć, czy mieszanka
+    z pokryciem pomogła, tak samo jak nie da się tego dla dziewięciu z jedenastu
+    warstw korekt."""
+    log: dict = {}
+    pu = {"p": 0.68, "lam": 5.6, "odl": 1.1, "sciag": 0.8,
+          "pkw": 0.6, "pkr": 0.9, "pokr": 0.75, "p_bez_pokrycia": 0.6}
+    R._dopisz_nowe(log, [_typ(p_uczony=dict(pu))])
+    rec = next(iter(log.values()))
+    assert rec.get("p_uczony", {}).get("pkw") == 0.6, (
+        "pokrycie własne zginęło w drodze do księgi"
+    )
+    assert rec.get("p_uczony", {}).get("pkr") == 0.9, (
+        "pokrycie rywala zginęło — a to ono niesie sygnał (AUC 0,517)"
+    )
+    assert rec["p_uczony"]["p_bez_pokrycia"] == 0.6, (
+        "bez szansy SPRZED zmieszania nie da się zmierzyć, co dała mieszanka"
+    )
