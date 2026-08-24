@@ -1025,6 +1025,43 @@ NEAR_WIDELKI_EV = 0.04      # wartość na p ostrożnym do 4 pp pod zerem
 # `ev_ponizej_progu` faktycznie odróżnia (odrzucone trafiają 37,8%).
 KURS_MAX_BEZ_BRAM_WARTOSCI = 1.80
 
+# --- `ujemna_po_korekcie` ZDJĘTA CAŁKOWICIE (2026-08-24) --------------------
+#
+# ⚑ Z TRZECH BRAM WARTOŚCI TA JEDNA NIE ODRÓŻNIA — i jako jedyna zostaje
+# zdjęta także powyżej 1,80. Zmierzone na WŁAŚCIWEJ próbie, czyli wyłącznie
+# tam, gdzie brama realnie działa (kursy >= 1,80; niższe pasma opisują stan
+# sprzed 21.08 i mieszanie ich dawało inny wynik):
+#
+#   zdjęte przez bramę    n= 314   trafia 48,4%
+#   przepuszczone         n=2565   trafia 41,7%
+#   różnica                                +6,7 pp  +-3,0   <- zdejmuje LEPSZE
+#     1,80-2,20   zdjęte 201 (53,2%)  wobec 1289 (48,3%)   +5,0 pp
+#     2,20-3,00   zdjęte 111 (39,6%)  wobec  945 (37,1%)   +2,5 pp
+#
+# `ev_ponizej_progu` ZOSTAJE nietknięta — na tych samych typach odróżnia
+# poprawnie (odrzucone trafiają 37,8%). Zdejmujemy JEDNĄ bramę, nie klasę.
+#
+# ⚑ DLACZEGO TA WYPADA INACZEJ NIŻ TAMTA: `ev_ponizej_progu` pyta, czy typ ma
+# dość wartości, i mierzy to na liczbie SPRZED urealnienia. Ta pyta, czy po
+# ściągnięciu szansy do ceny zostało cokolwiek na plusie — a ściąganie jest
+# celowe i dotyka najmocniej typów NAJPEWNIEJSZYCH. Brama karała więc typ za
+# to, że model był co do niego ostrożny, czyli dokładnie odwrotnie do celu.
+#
+# ⚑ POWRÓT JEDNĄ WARTOŚCIĄ: `True` przywraca bramę w całości.
+BRAMA_UJEMNA_PO_KOREKCIE = False
+
+
+def brama_ujemnej_wartosci_dziala(odd: float | None) -> bool:
+    """Czy zdejmujemy typ, któremu po urealnieniu wyszła ujemna wartość.
+
+    Osobna funkcja, nie `and` w miejscu użycia — bo ta reguła jest wpięta
+    w DWÓCH ścieżkach publikacji, a w tym repo rozjazd między ścieżkami
+    kosztował już trzy razy ([[wznowione-omijaly-bramy]]).
+    """
+    if not BRAMA_UJEMNA_PO_KOREKCIE:
+        return False
+    return bramy_wartosci_dotycza(odd)
+
 
 def bramy_wartosci_dotycza(odd: float | None) -> bool:
     """Czy typ o tym kursie podlega bramom wartości (patrz nota wyżej).

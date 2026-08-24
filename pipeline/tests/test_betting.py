@@ -178,3 +178,34 @@ def test_okno_zgody_siega_zmierzonego_klifu():
         assert not betting.w_oknie_zgody(*pp(ile)), ile
     # dolna granica bez zmian: pod ceną rynku nie ma czego odzyskiwać
     assert not betting.w_oknie_zgody(*pp(-0.5))
+
+
+# --- `ujemna_po_korekcie` ZDJĘTA (2026-08-24) -------------------------------
+
+def test_brama_ujemnej_wartosci_jest_zdjeta():
+    """⚑ Z trzech bram wartości ta jedna NIE ODRÓŻNIA: zdejmowała typy lepsze
+    o 6,7 pp ±3,0 (n=314 wobec 2565, kursy >= 1,80, czyli tam gdzie działała).
+
+    Karała typ za to, że model był co do niego OSTROŻNY — ściąganie szansy do
+    ceny dotyka najmocniej typów najpewniejszych, więc to im wychodziła ujemna
+    wartość. Dokładnie odwrotnie do celu produktu."""
+    for kurs in (1.25, 1.60, 1.85, 2.40, 5.00, None):
+        assert betting.brama_ujemnej_wartosci_dziala(kurs) is False
+
+
+def test_pozostale_bramy_wartosci_nietkniete():
+    """Zdejmujemy JEDNĄ bramę, nie klasę. `ev_ponizej_progu` na tych samych
+    typach odróżnia poprawnie (odrzucone trafiają 37,8%)."""
+    assert betting.bramy_wartosci_dotycza(2.00) is True
+    assert betting.bramy_wartosci_dotycza(1.50) is False
+
+
+def test_powrot_bramy_jedna_wartoscia():
+    """Warunek postawiony przy każdej zmianie modelu: cofnięcie bez rewertu."""
+    stare = betting.BRAMA_UJEMNA_PO_KOREKCIE
+    try:
+        betting.BRAMA_UJEMNA_PO_KOREKCIE = True
+        assert betting.brama_ujemnej_wartosci_dziala(2.00) is True
+        assert betting.brama_ujemnej_wartosci_dziala(1.50) is False
+    finally:
+        betting.BRAMA_UJEMNA_PO_KOREKCIE = stare

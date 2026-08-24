@@ -8075,7 +8075,7 @@ def _main_impl(tryb=None):
             # `wybierz_liste_publikowana`. Pasmo pewniaków omija ją tak samo
             # ([[cel-produktu-to-trafnosc]]); gdyby warunek stał tylko tam,
             # połowa typów wypadałaby tutaj i wyglądało by to na brak podaży.
-            if (betting.bramy_wartosci_dotycza(b.get("kurs"))
+            if (betting.brama_ujemnej_wartosci_dziala(b.get("kurs"))
                     and (_urealnij_do_pokazania(b).get("ev_pct") or 0.0) < 0.0):
                 odpadle.append(b)
         if odpadle:
@@ -9076,7 +9076,7 @@ def _main_impl(tryb=None):
         # `betting.bramy_wartosci_dotycza`. Tani typ ma ujemną wartość
         # z definicji, a celem produktu jest trafność, nie zysk.
         if (not u.get("sugestia") and u.get("kurs")
-                and betting.bramy_wartosci_dotycza(u.get("kurs"))
+                and betting.brama_ujemnej_wartosci_dziala(u.get("kurs"))
                 and (u.get("ev_pct") or 0.0) < 0.0):
             zdjete += 1
             zdjete_klucze[_klucz_publikacji(b)] = "ujemna_po_korekcie"
