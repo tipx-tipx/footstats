@@ -91,7 +91,8 @@ def test_polka_dojezdza_do_ksiegi_w_kolejnosci():
     się policzyć. Jedzie W SŁOWNIKU `kolejnosc`, bo osobne pole musiałoby
     przejść przez trzy białe listy."""
     log: dict = {}
-    kolejnosc = {"moc": 1.1, "kandydatow": 9, "polka": "wysoka_szansa"}
+    kolejnosc = {"moc": 1.1, "kandydatow": 9, "polka": "wysoka_szansa",
+                 "wzn": 1}
     R._dopisz_nowe(log, [_typ(kolejnosc=dict(kolejnosc))])
     rec = next(iter(log.values()))
     assert rec.get("kolejnosc", {}).get("polka") == "wysoka_szansa", (
@@ -202,3 +203,20 @@ def test_pokrycia_dojezdzaja_do_ksiegi_w_p_uczonym():
     assert rec["p_uczony"]["p_bez_pokrycia"] == 0.6, (
         "bez szansy SPRZED zmieszania nie da się zmierzyć, co dała mieszanka"
     )
+
+
+def test_wznowienie_dojezdza_do_ksiegi():
+    """⚑ 2026-08-24. Pole `wznowiony` miało w księdze None we WSZYSTKICH 9303
+    rekordach. Wznowione typy jako jedyne omijają limity listy dnia, więc bez
+    tego stempla nie da się odpowiedzieć, ile doba ma wznowień ani czy trafiają
+    gorzej — a to na nie zrzucano puchnięcie doby."""
+    log: dict = {}
+    R._dopisz_nowe(log, [_typ(kolejnosc={"moc": 0.9, "kandydatow": 4, "wzn": 1})])
+    rec = next(iter(log.values()))
+    assert rec.get("kolejnosc", {}).get("wzn") == 1
+
+
+def test_typ_swiezy_nie_dostaje_znacznika_wznowienia():
+    log: dict = {}
+    R._dopisz_nowe(log, [_typ(kolejnosc={"moc": 0.9, "kandydatow": 4})])
+    assert "wzn" not in next(iter(log.values())).get("kolejnosc", {})

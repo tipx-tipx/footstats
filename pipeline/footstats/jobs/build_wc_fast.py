@@ -9790,7 +9790,16 @@ def _main_impl(tryb=None):
                + odrzucone_pomiar + legi_pool_pub):
         _ile = _kandydatow_w_meczu.get(_b.get("mecz_id"), 0)
         _b["kolejnosc"] = {"moc": moc_listy(_b, _ile), "kandydatow": _ile,
-                           **({"polka": _b["polka"]} if _b.get("polka") else {})}
+                           **({"polka": _b["polka"]} if _b.get("polka") else {}),
+                           # ⚑ WZNOWIENIE TEŻ NIE DOJEŻDŻAŁO (2026-08-24, ta
+                           # sama klasa błędu co `polka` tego samego dnia).
+                           # W księdze pole `wznowiony` miało wartość None we
+                           # WSZYSTKICH 9303 rekordach, więc nie dało się
+                           # odpowiedzieć ani „ile doba ma wznowień", ani „czy
+                           # wznowione trafiają gorzej" — a to one jako jedyne
+                           # omijają limity listy dnia (patrz `wybierz_liste_
+                           # publikowana`) i to na nie zrzucano puchnięcie doby.
+                           **({"wzn": 1} if _b.get("wznowiony") else {})}
 
     # publikacja kuponów idzie przez log (zamrożenie/anulowanie/rozliczenie)
     # wewnątrz _rozlicz_i_zapisz — kupony.json to aktywne kupony z logu

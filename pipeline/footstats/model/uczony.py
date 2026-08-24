@@ -1309,6 +1309,22 @@ def prognoza_zawodnika(wagi: dict | None, seria: dict, rynek: str,
 # Dwadzieścia minut na boisku to inny zakład niż pełne 90, a pokrycie liczone
 # razem z takimi meczami zaniża się samo i myliłoby „słaby zawodnik" z „mało
 # grał". Ta sama poprawka, którą model stosuje przy `tempa`.
+# ⚑ SUMY MECZOWE — TEŻ ZMIERZONE 24.08 I ODRZUCONE. Pokrycie sumy (ile razy
+# suma OBU drużyn przekroczyła linię, liczona z `s`+`sp` w magazynie) policzyło
+# się dla 1681 z 1691 typów (99%), ale poprawa Briera wyszła poniżej progu:
+#
+#   sygnał                  AUC     górna 1/3   dolna 1/3
+#   pokrycie sumy          0,545      58,6%       51,3%    (+7,3 pp)
+#   szansa modelu          0,558      58,8%       49,3%    (+9,5 pp)
+#
+#   waga dobrana na I połowie: 0,6  ->  na II połowie -0,75% przy progu -2,0%
+#
+# ⚑ Poprawa JEST i jest konsekwentna (każda waga od 0,2 do 0,6 daje minus na
+# obu połowach, najlepsza 0,4 daje -0,95%) — tylko za mała. Progu NIE zmieniamy
+# po zobaczeniu wyniku: był ustalony przed pomiarem i to jest jedyne, co go
+# broni przed dopasowaniem do tego, co akurat wyszło. Wracać z NOWĄ próbą,
+# nie z nowym progiem.
+
 WAGA_POKRYCIA_ZAW = 0.0
 
 
