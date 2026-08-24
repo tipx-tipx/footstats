@@ -728,9 +728,78 @@ MAX_RELATIVE_DIVERGENCE = 1.9       # p_model / p_rynku > 1.9x = podejrzane (lon
 #
 # Progu nie ruszamy też w drugą stronę (16 -> 12): pasmo 12-16 pp ma dziś
 # najlepszy wynik z dużych przedziałów, a jego luka jest najpłytsza.
-OKNO_ZGODY_MIN = 0.00   # p_model musi być co najmniej na poziomie ceny rynku
+# --- PIĄTY POMIAR (2026-08-24, 9303 rozliczenia) — PIERWSZY NA TRAFNOŚCI ------
+#
+# ⚑⚑ CZTERY POMIARY WYŻEJ MIERZYŁY LUKĘ I ROI. Cel produktu zmienił się 20.08
+# na TRAFNOŚĆ ([[cel-produktu-to-trafnosc]]), więc obie granice przemierzone od
+# nowa — właściwą miarą jest teraz odsetek wejść, nie to, o ile model kłamie
+# ani ile zarabia.
+#
+# Powód, dla którego tu wróciliśmy: po zdjęciu bram wartości (a220da8) ta brama
+# została NAJWIĘKSZYM wąskim gardłem produktu — 4 odrzucenia na cykl przed
+# zmianą, 158 po niej (105/dobę dolna granica, 53/dobę górna).
+#
+# Miara: różnica TRAFNOŚCI wobec okna, ważona składem CEN odrzuconego pasma.
+# Bez kontroli ceny obie granice wyglądają inaczej, niż są: materiał spod dolnej
+# granicy ma 35,3% typów poniżej kursu 1,45 wobec 23,8% w oknie, więc surowe
+# porównanie miesza jakość typu ze składem cennika.
+#
+#   pasmo            n   trafia   deklaruje    luka    TRAFNOŚĆ vs okno
+#   poniżej ceny   597    54,4%       55,5%    -1,0         -8,0 pp
+#   okno 0-16     6576    55,5%       64,4%    -8,9          (odniesienie)
+#   16-20 pp      1297    50,4%       69,4%   -19,0         -2,8 pp
+#   20-26 pp       817    55,0%       73,6%   -18,6         +0,6 pp
+#
+# ⚑ DOLNA GRANICA ZOSTAJE — i NIE z powodu, dla którego ją postawiono. Komentarz
+# obok mówił „p musi być co najmniej na poziomie ceny", czyli uzasadniał ją
+# WARTOŚCIĄ (typ poniżej ceny ma ujemne ev z definicji). To jest dokładnie ten
+# rodzaj uzasadnienia, który po 20.08 jest podejrzany i który przy przeglądzie
+# „progów dobranych pod ROI" poleciałby pierwszy. Otóż nie — broni się NA
+# TRAFNOŚCI, mocniej niż cokolwiek innego w tym pliku:
+#   -8,0 pp ważone, znak w KAŻDYM z 4 pasm kursu (-10,0 / -6,5 / -9,5 / -6,2),
+#   w każdej tercji próby (-13,0 / -4,1 / -8,3), w obu strumieniach (drużyny
+#   -5,6, zawodnicy -7,7) i po wyrzuceniu największego segmentu (-5,8).
+# ⚑ Zastrzeżenie uczciwe: to pasmo ma pokrycie rozliczeń 74,5% wobec 89,9%
+#   w oknie — powstało po 20.08 i część meczów jeszcze nie spadła.
+# ⚑ Dodatkowo granica jest dla LISTY DNIA bezkosztowa: w symulacji niżej jej
+#   zdjęcie nie zmienia składu ANI O JEDEN typ, bo półka sortuje po szansie,
+#   a te typy mają ją z definicji niższą niż cena.
+#
+# ⚑⚑ GÓRNA GRANICA ZOSTAJE, ale z BRAKU POKRYCIA, nie z siły dowodu.
+# Na trafności odróżnia SŁABO (-1,6 pp ważone) i nie ma tam klifu: 8-12 daje
+# +1,1 pp, 12-16 +0,4 pp, 16-20 -2,8 pp, 20-26 +0,6 pp; tercje -0,4 / -1,9 /
+# -4,9 pp. Klif widać WYŁĄCZNIE na luce — i tam jest ostry oraz stabilny
+# (różnica luki -7,6 / -9,1 / -14,3 pp w tych samych tercjach), czyli cztery
+# pomiary wyżej mierzyły dobrze to, o co wówczas pytaliśmy. Typ z rozjazdem 16-22 pp deklaruje 71,0%, a wchodzi
+# w 52,2% — kłamie o sobie dwa razy mocniej niż typ z okna, a wchodzi niemal
+# tak samo często.
+#
+# Sprawdzone SYMULACJĄ LISTY DNIA (odtworzone półki, limity różnorodności
+# i sortowanie; limit półki pewniaków wiąże w 23 z 34 dób, mediana 39
+# kandydatów na 15 miejsc — więc symulacja realnie testuje wypychanie):
+#
+#   okno 16 -> 22 pp   trafność listy 61,5% -> 64,1%   podaż 340 -> 354
+#   pomiar SPAROWANY   weszły 256 (64,5%) | wypadły 242 (60,7%)   +3,7 pp +-4,3
+#   tercje             +5,7 / -12,7 / +14,6 pp   <- ZNAK SIĘ ODWRACA
+#   same drużyny       +1,4 pp +-4,4             <- 93% produkcji, czyli zero
+#
+# Poluzowanie wymieniłoby 242 z 340 typów listy (71%) dla efektu, który nie
+# trzyma znaku między tercjami, a na głównym strumieniu jest nieodróżnialny od
+# zera. Za mało, żeby przebudować produkt — i dokładnie tyle, ile trzeba, żeby
+# nie wracać do tego bez nowej próby.
+#
+# ⚑⚑⚑ PIĄTY RAZ WZORZEC „filtr pod jedną miarę, cel w drugiej" — i PIERWSZY
+# raz, w którym NIE zdejmujemy. Bramy wartości, selekcja po stronie i zasięg
+# wycinały pasmo NAJLEPSZE w trafności, więc szkodziły. Ta granica wycina pasmo
+# NEUTRALNE w trafności, więc tylko nie pomaga. „Wzorzec występuje" nie jest
+# tym samym co „zdejmujemy” — rozstrzyga pomiar celu, nie rozpoznanie wzorca.
+#
+# Pomiar odtwarza `scripts/pomiar_okna_zgody.py` (obie granice + symulacja).
+OKNO_ZGODY_MIN = 0.00   # ⚑ NIE jest progiem „pod wartość" mimo brzmienia — broni
+                        # się trafnością: -8,0 pp (piąty pomiar, 24.08)
 OKNO_ZGODY_MAX = 0.16   # ...i najwyżej 16 pp nad nią (2026-08-04, było 0.12;
-                        # potwierdzone 13.08 na 1951 rozliczeniach)
+                        # potwierdzone 13.08 na 1951 rozliczeniach; przemierzone
+                        # 24.08 na trafności — zostaje z braku pokrycia na zmianę)
 
 
 def w_oknie_zgody(p_model: float, kurs: float) -> bool:
