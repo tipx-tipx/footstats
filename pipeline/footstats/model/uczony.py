@@ -393,6 +393,27 @@ def cechy_na_mecz(mag: dict, team_id: int | str, rynek: str,
 #
 # ⚑ POWRÓT JEDNĄ WARTOŚCIĄ: `WAGA_POKRYCIA = 0.0` wyłącza mieszankę i model
 # wraca do zachowania sprzed 24.08. Nie trzeba rewertować commitów.
+# ⚑ OBIE LICZBY DOBRANE OUT-OF-SAMPLE (24.08) — nie stroić ich od nowa bez
+# nowej próby. Wagi dobierane na I połowie, oceniane na II; dobieranie na
+# całości dałoby najlepszą liczbę i bezużyteczny wynik.
+#
+#   waga (okno 10)   I połowa   II połowa   vs sam model na II
+#   0,00              0,24288    0,24276          —
+#   0,30              0,23628    0,23821       -1,87%
+#   0,40              0,23566    0,23755       -2,15%   <- wybrana na I połowie
+#   0,50              0,23582    0,23730       -2,25%
+#   0,70              0,23853    0,23808       -1,93%
+#
+#   okno (waga 0,40)   I połowa   II połowa
+#   5                   0,23732    0,24084
+#   10                  0,23566    0,23755   <- wybrane
+#   20                  0,23457    0,23712      lepsze o 0,18%, czyli szum
+#   30                  0,23413    0,23724
+#
+# Okno 20 wypada minimalnie lepiej, ale różnica jest poniżej progu istotności,
+# a kosztuje świeżość: mecz sprzed dwudziestu kolejek to często inny skład.
+# Krzywa wagi jest płaska między 0,40 a 0,60 — czyli wynik nie stoi na
+# szczęśliwym trafieniu w jedną wartość.
 WAGA_POKRYCIA = 0.40      # ile waży pokrycie wobec modelu (0,0 = wyłączone)
 OKNO_POKRYCIA = 10        # z ilu ostatnich meczów liczymy pokrycie
 MIN_MECZOW_POKRYCIA = 5   # poniżej tylu pokrycie jest szumem, nie liczymy go
