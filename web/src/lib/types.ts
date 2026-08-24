@@ -117,6 +117,29 @@ export interface ValueBet {
    * bez niego (patrz filtr „Wysokie szanse" w ValueBoard).
    */
   polka?: "wysoka_szansa" | "wyzsze_kursy";
+  /**
+   * MODEL UCZONY — druga liczba, liczona z 649 tys. obserwacji meczowych.
+   * Front bierze stąd wyłącznie POKRYCIA, bo to jedyne pole, które da się
+   * pokazać po ludzku: „przekroczył tę linię w 8 z 10 ostatnich meczów".
+   *
+   * `pkw` — ile razy DRUŻYNA przekroczyła tę linię (ułamek z 10 meczów)
+   * `pkr` — ile razy RYWAL DOPUŚCIŁ powyżej niej; to on niesie sygnał
+   *         (zmierzone 24.08: AUC 0,517 wobec 0,499 dla pokrycia własnego)
+   *
+   * Puste na typach sprzed 24.08 i na rynkach spoza magazynu drużynowego
+   * (zawodnicy, sumy meczowe) — karta musi umieć bez nich.
+   */
+  p_uczony?: {
+    p?: number;
+    lam?: number;
+    pkw?: number;
+    /** ile meczów stoi za `pkw` — MIANOWNIK, nie zgadujemy go z okna */
+    pkn?: number;
+    pkr?: number;
+    pkrn?: number;
+    pokr?: number;
+    p_bez_pokrycia?: number;
+  };
   /** true = perełka na wyższej linii (>= 1,5) przy wciąż solidnej szansie */
   wyzsza_linia?: boolean;
   /** true = profil rywala wyraźnie sprzyja (koncesje per rynek × pozycja) */

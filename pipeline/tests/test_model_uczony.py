@@ -360,7 +360,8 @@ def test_prognoza_daje_komplet_albo_nic():
     # wiemy", nie „zero". Kontrakt pilnuje więc obu stron: komplet obowiązkowy
     # ma być zawsze, a niczego spoza listy nie wolno dorzucić po cichu.
     obowiazkowe = {"p", "lam", "r_nb", "odl", "sciag"}
-    dozwolone = obowiazkowe | {"pkw", "pkr", "pokr", "p_bez_pokrycia"}
+    dozwolone = obowiazkowe | {"pkw", "pkr", "pkn", "pkrn", "pokr",
+                               "p_bez_pokrycia"}
     assert obowiazkowe <= set(out) <= dozwolone
     assert 0.0 < out["p"] < 1.0 and out["lam"] > 0
     assert out["odl"] == round(abs(5.5 - out["lam"]), 2)
@@ -921,3 +922,21 @@ def test_jedno_pokrycie_wystarczy():
     jest lepsza niż żadna."""
     p, pokr = U.zmieszaj_z_pokryciem(0.5, 1.0, None, "powyzej")
     assert pokr == 1.0 and p > 0.5
+
+
+def test_mianownik_pokrycia_liczy_tylko_mecze_z_danymi():
+    """⚑ Karta pokazuje „w 8 z 10 ostatnich". Gdy źródło nie podało statystyki
+    w części meczów, mianownik MUSI zmaleć — inaczej pokazalibyśmy klientowi
+    zdanie nieprawdziwe."""
+    hist = [{"t": 1, "s": {"cor": 6}}, {"t": 2, "s": {}},
+            {"t": 3, "s": {"cor": 7}}, {"t": 4, "s": {"cor": 2}},
+            {"t": 5, "s": {"cor": 5}}, {"t": 6, "s": {"cor": 1}}]
+    assert U.meczow_w_pokryciu(hist, "cor") == 5          # mecz nr 2 bez danych
+    assert U.pokrycie_linii(hist, "cor", 4.5) == 3 / 5    # 6, 7, 5
+
+
+def test_mianownik_i_pokrycie_licza_z_tego_samego_okna():
+    """Licznik i mianownik nie mogą się rozjechać — jedno źródło wartości."""
+    hist = [{"t": i, "s": {"cor": i}} for i in range(1, 21)]
+    assert U.meczow_w_pokryciu(hist, "cor") == U.OKNO_POKRYCIA
+    assert U.pokrycie_linii(hist, "cor", 15.5) == 5 / 10   # 16..20 z ostatnich 10

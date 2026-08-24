@@ -398,6 +398,17 @@ OKNO_POKRYCIA = 10        # z ilu ostatnich meczów liczymy pokrycie
 MIN_MECZOW_POKRYCIA = 5   # poniżej tylu pokrycie jest szumem, nie liczymy go
 
 
+def _wartosci_okna(hist: list[dict] | None, kod: str, n: int,
+                   wlasne: bool) -> list[float]:
+    """Liczby z `n` ostatnich meczów, z pominięciem tych, których źródło nie dało.
+
+    Jedno miejsce, w którym decyduje się, CO wchodzi do pokrycia — żeby licznik
+    i mianownik nie mogły się rozjechać.
+    """
+    wart = [_wartosc(h, kod, wlasne) for h in (hist or [])[-int(n):]]
+    return [float(w) for w in wart if w is not None]
+
+
 def pokrycie_linii(hist: list[dict], kod: str, linia: float,
                    n: int = OKNO_POKRYCIA, wlasne: bool = True) -> float | None:
     """W ilu z `n` ostatnich meczów padło WIĘCEJ niż `linia`.
@@ -410,11 +421,22 @@ def pokrycie_linii(hist: list[dict], kod: str, linia: float,
     """
     if not hist or linia is None:
         return None
-    wart = [_wartosc(h, kod, wlasne) for h in hist[-int(n):]]
-    wart = [w for w in wart if w is not None]
+    wart = _wartosci_okna(hist, kod, n, wlasne)
     if len(wart) < MIN_MECZOW_POKRYCIA:
         return None
-    return sum(1 for w in wart if float(w) > float(linia)) / len(wart)
+    return sum(1 for w in wart if w > float(linia)) / len(wart)
+
+
+def meczow_w_pokryciu(hist: list[dict] | None, kod: str,
+                      n: int = OKNO_POKRYCIA, wlasne: bool = True) -> int:
+    """Ile meczów realnie stoi za pokryciem — MIANOWNIK dla karty.
+
+    ⚑ Karta pokazuje „przekroczył w 8 z 10 ostatnich". Bez tej liczby
+    mianownik trzeba by zgadywać z okna (10) — a gdy źródło nie podało
+    statystyki w części meczów, byłoby to zdanie NIEPRAWDZIWE pokazane
+    klientowi. Liczymy dokładnie to, na czym pokrycie stoi.
+    """
+    return len(_wartosci_okna(hist, kod, n, wlasne))
 
 
 def _pokrycie_po_stronie(pokr: float | None, strona: str) -> float | None:
@@ -488,8 +510,10 @@ def prognoza(wagi: dict | None, ctx: dict, team_id: int | str, rynek: str,
     out["p"] = p_mix
     if pkw is not None:
         out["pkw"] = round(float(pkw), 3)
+        out["pkn"] = meczow_w_pokryciu(hist, kod, wlasne=True)
     if pkr is not None:
         out["pkr"] = round(float(pkr), 3)
+        out["pkrn"] = meczow_w_pokryciu(opp_hist, kod, wlasne=False)
     if pokr is not None:
         out["pokr"] = round(float(pokr), 3)
     return out

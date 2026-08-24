@@ -755,6 +755,67 @@ function skadTaLiczba(
  */
 const PROG_ROZJAZDU = 0.12;
 
+/**
+ * ILE RAZY TO SIĘ ZDARZYŁO — pokrycie tej linii, drużyny i rywala.
+ *
+ * Najtwardsze zdanie w karcie: nie „szansa 74%", tylko „przekroczył w 8 z 10
+ * ostatnich meczów, a rywal dopuszczał powyżej w 7 z 10". Klient sprawdzi to
+ * sam w dowolnym serwisie, i o to chodzi — liczba, którą da się zweryfikować,
+ * buduje zaufanie inaczej niż procent z modelu.
+ *
+ * ⚑ MIANOWNIK IDZIE Z BACKENDU (`pkn`, `pkrn`), nie z założenia „okno to 10".
+ * Gdy źródło nie podało statystyki w części meczów, pokrycie liczy się
+ * z mniejszej liczby — i karta ma o tym mówić prawdę.
+ *
+ * ⚑ To pokrycie realnie WESZŁO do naszej szansy (waży 40%, patrz
+ * `uczony.WAGA_POKRYCIA`), więc karta nie pokazuje ciekawostki obok liczby,
+ * tylko jeden ze składników, z których ta liczba powstała.
+ *
+ * Puste dla rynków spoza magazynu drużynowego (zawodnicy, sumy meczowe)
+ * i dla typów sprzed 24.08 — wtedy krok po prostu nie istnieje.
+ */
+function PokrycieLinii({ bet }: { bet: ValueBet }) {
+  const pu = bet.p_uczony;
+  const pkw = pu?.pkw;
+  const pkr = pu?.pkr;
+  if (pkw == null && pkr == null) return null;
+
+  const ponizej = bet.strona === "ponizej";
+  // pokrycie jest liczone dla „powyżej"; przy „poniżej" liczy się dopełnienie
+  const naStrone = (v: number) => (ponizej ? 1 - v : v);
+  const ile = (v: number, n: number) => Math.round(naStrone(v) * n);
+  const nW = pu?.pkn ?? 10;
+  const nR = pu?.pkrn ?? 10;
+  const czasownik = ponizej ? "zeszła poniżej niej" : "przekroczyła tę linię";
+  const czasownikR = ponizej ? "schodzili poniżej" : "wychodzili powyżej";
+
+  return (
+    <Krok kod="pokrycie" tytul="ile razy tak było">
+      <p className="text-sm leading-relaxed text-ink-soft">
+        {pkw != null && (
+          <>
+            Ta drużyna {czasownik} w{" "}
+            <span className="font-data font-semibold text-ink">
+              {ile(pkw, nW)} z {nW}
+            </span>{" "}
+            ostatnich meczów.
+          </>
+        )}
+        {pkr != null && (
+          <>
+            {pkw != null ? " " : ""}
+            Rywale jej przeciwnika {czasownikR} w{" "}
+            <span className="font-data font-semibold text-ink">
+              {ile(pkr, nR)} z {nR}
+            </span>{" "}
+            jego spotkań.
+          </>
+        )}
+      </p>
+    </Krok>
+  );
+}
+
 function RozjazdZHistoria({
   bet,
   okna,
@@ -956,6 +1017,13 @@ export function SzczegolyTypu({
                     </p>
                   </Krok>
                 )}
+
+                {/* ILE RAZY TO SIĘ ZDARZYŁO (2026-08-24, wskazanie właściciela).
+                    Najkonkretniejsze zdanie w całej karcie: nie procent
+                    z modelu, tylko policzone mecze. Stoi PRZED listą meczów,
+                    bo jest jej podsumowaniem — czytelnik dostaje wniosek,
+                    a szczegóły zaraz pod nim. */}
+                <PokrycieLinii bet={bet} />
 
                 {/* FAKTY PRZED KOREKTAMI, HISTORIA OTWARTA (2026-08-06,
                     układ „historia sercem" zaakceptowany na drabinkach):
