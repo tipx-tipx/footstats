@@ -22,7 +22,6 @@ export default async function OkazjePage({
   const { mecz, rodzaj } = await searchParams;
   const [
     wszystkieBets,
-    zawodnicy,
     meta,
     stsValue,
     kuponDnia,
@@ -30,7 +29,6 @@ export default async function OkazjePage({
     radar,
   ] = await Promise.all([
     getValueBets(),
-    getZawodnicy(),
     getMeta(),
     getStsValue(),
     getKuponDnia(),
@@ -46,6 +44,20 @@ export default async function OkazjePage({
     (b) => b.podmiot_typ === "druzyna" && !b.sugestia,
   );
   const druzynoweN = druzynowe.length;
+
+  // ⚑ ZAWODNICY DOCIĄGANI WARUNKOWO (2026-08-25). Ten klucz waży 4,6 MB, z
+  // czego 91% to historia meczowa (`forma`), a strona używa z niego WYŁĄCZNIE
+  // zawodników, którzy mają dziś typ — poniżej, w `zawodnicyLite`. Gdy typów
+  // zawodniczych nie ma (a strumień zawodniczy potrafi stać całymi dniami),
+  // pobieraliśmy komplet po to, żeby wyfiltrować z niego pustą listę.
+  //
+  // Przy każdym oknie ISR i przy każdej instancji był to najcięższy pojedynczy
+  // transfer w całym produkcie — jedna z pozycji, które wyczerpały miesięczny
+  // limit Supabase (402 „exceed_egress_quota", 25.08).
+  //
+  // Kosztem jest jeden round-trip sekwencyjnie zamiast równolegle, ale PONOSIMY
+  // GO TYLKO WTEDY, GDY DANE SĄ FAKTYCZNIE POTRZEBNE.
+  const zawodnicy = bets.length > 0 ? await getZawodnicy() : [];
 
   // ODCHUDZENIE payloadu: ValueBoard/BetCard czytają z zawodnika wyłącznie
   // forma[rynek_kod] typu – a pełna baza (każdy zawodnik × wszystkie rynki
