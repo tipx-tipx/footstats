@@ -79,6 +79,27 @@ const SUPABASE_ANON =
   process.env.SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 /**
+ * JAK CZĘSTO ODŚWIEŻAMY DANE Z SUPABASE (2026-08-25).
+ *
+ * Było 60 s, co nie miało pokrycia w niczym: pipeline dowozi nowy snapshot
+ * raz na cykl, a cron GitHuba mimo deklarowanych 15 minut odpala go realnie
+ * co ~1–1,5 h. Odświeżanie co minutę danych zmieniających się co godzinę to
+ * był czysty transfer — i to on wyczerpał miesięczny limit Supabase (402
+ * „exceed_egress_quota", 25.08), zatrzymując zarówno stronę, jak i cykl.
+ *
+ * DLACZEGO AKURAT PÓŁ GODZINY. `tylkoNadchodzace` odcina mecze po gwizdku,
+ * licząc „teraz" w chwili renderu, więc samo to okno byłoby zarazem
+ * opóźnieniem, z jakim rozpoczęty mecz znika z tablicy. Ale odcięcie ma DRUGĄ
+ * linię po stronie klienta (`useTeraz` w `ValueBoard` i `DruzynyTablica`):
+ * przeglądarka zna prawdziwą godzinę i chowa to, czego nie da się już
+ * obstawić, niezależnie od tego, jak stary jest HTML z cache. Dlatego okno
+ * może być spokojnie dłuższe niż odstęp gwizdków — górnym ograniczeniem jest
+ * tempo cyklu (~1–1,5 h), a nie świeżość odcięcia.
+ */
+const ODSWIEZANIE_S = 1800;
+
+
+/**
  * Klucze app_data, które web faktycznie czyta (pola Bundle). MUSI być filtrem
  * w zapytaniu: tabela trzyma też wewnętrzne dane pipeline'u (trend_lib 5,3 MB,
  * styl_bank_liga 2,6 MB, logi rozliczeń...), które rosną z czasem – bez filtra
@@ -112,7 +133,7 @@ const BUNDLE_KEYS = [
  * Klucze leniwe celowo NIE przechodzą przez `tylkoNadchodzace` — ten filtr
  * dotyczy wyłącznie kluczy bazowych (typy, mecze, pula legów, radar, STS).
  */
-const LAZY_TTL_MS = 60_000;
+const LAZY_TTL_MS = ODSWIEZANIE_S * 1000;
 const lazyCache = new Map<string, { ts: number; dane: Promise<unknown> }>();
 
 /**
@@ -140,21 +161,42 @@ function czyMarker(payload: unknown): payload is MarkerCzesci {
 }
 
 async function sklejCzesci<T>(key: string, ile: number, fallback: T): Promise<T> {
-  const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/app_data?select=key,payload&key=like.${key}__cz*`,
-    {
-      headers: {
-        apikey: SUPABASE_ANON!,
-        Authorization: `Bearer ${SUPABASE_ANON}`,
-      },
-      next: { revalidate: 60 },
-    },
-  );
-  if (!res.ok) return fallback;
-  const rows: { key: string; payload: unknown }[] = await res.json();
-  const mapa = new Map(rows.map((r) => [r.key, r.payload]));
-  const czesci = Array.from({ length: ile }, (_, i) =>
-    mapa.get(`${key}__cz${String(i).padStart(2, "0")}`),
+  // ⚑ KAŻDA CZĘŚĆ OSOBNYM ZAPYTANIEM (2026-08-25). To nie kosmetyka, tylko
+  // jedyny sposób, żeby ciężki klucz w ogóle trafił do Data Cache Next.
+  //
+  // Do dziś szło jedno zapytanie `like`, które oddawało WSZYSTKIE części
+  // naraz — dla `players` to 4,6 MB w jednej odpowiedzi, czyli ponad limit
+  // 2 MB Data Cache. Next taką odpowiedź cicho odrzuca (ostrzeżenie w logu
+  // wygląda kosmetycznie), więc cache nie powstaje i pełne 4,6 MB leci do
+  // Supabase przy KAŻDYM renderze. Przy 189 podstronach meczu, z których
+  // każda ma własne okno ISR, to była główna pozycja rachunku za transfer,
+  // który 25.08 zatrzymał projekt na 402 „exceed_egress_quota".
+  //
+  // Pobrane osobno, części mieszczą się w limicie (pipeline tnie po ~1,5 MB,
+  // patrz `supa.CEL_CZESCI`) i każda cache'uje się z osobna. Data Cache jest
+  // wspólny dla całej aplikacji i kluczowany po URL-u, więc te 189 tras dzieli
+  // teraz JEDEN pobór na okno `revalidate`, zamiast mnożyć go przez rendery.
+  const czesci = await Promise.all(
+    Array.from({ length: ile }, async (_, i) => {
+      const nazwa = `${key}__cz${String(i).padStart(2, "0")}`;
+      try {
+        const res = await fetch(
+          `${SUPABASE_URL}/rest/v1/app_data?select=payload&key=eq.${nazwa}`,
+          {
+            headers: {
+              apikey: SUPABASE_ANON!,
+              Authorization: `Bearer ${SUPABASE_ANON}`,
+            },
+            next: { revalidate: ODSWIEZANIE_S },
+          },
+        );
+        if (!res.ok) return undefined;
+        const rows: { payload: unknown }[] = await res.json();
+        return rows[0]?.payload;
+      } catch {
+        return undefined;
+      }
+    }),
   );
   if (czesci.some((cz) => cz === undefined)) {
     // NIEKOMPLET TO NIE „TROCHĘ MNIEJ DANYCH": sklejona połowa zawodników
@@ -191,7 +233,7 @@ async function fetchKlucz<T>(key: string, fallback: T): Promise<T> {
           },
           // to samo co przy bundlu: revalidate, NIGDY no-store — patrz
           // komentarz w `fetchBundle` (incydent 2026-07-21)
-          next: { revalidate: 60 },
+          next: { revalidate: ODSWIEZANIE_S },
         },
       );
       if (!res.ok) return fallback;
@@ -262,7 +304,7 @@ async function fetchBundle(): Promise<Bundle> {
         // do data cache Next i tak się nie udaje (payload ~14 MB > limit
         // 2 MB, ostrzeżenie w logach jest kosmetyczne) – realny cache
         // robi loadBundle niżej, w pamięci instancji.
-        next: { revalidate: 60 },
+        next: { revalidate: ODSWIEZANIE_S },
       },
     );
     if (!res.ok) return tylkoNadchodzace(LOCAL);

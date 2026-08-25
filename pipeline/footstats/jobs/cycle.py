@@ -146,6 +146,19 @@ def main():
         print(f"[{stamp}] BŁĄD:\n{traceback.format_exc()}", file=sys.stderr, flush=True)
         _zapisz_slad_awarii(stamp, (time.monotonic() - t0) / 60, ex)
         sys.exit(1)
+    finally:
+        # ⚑ RAPORT TRANSFERU LECI ZAWSZE, TAKŻE PRZY PADZIE (2026-08-25).
+        # Właśnie pad jest momentem, w którym ta liczba jest najbardziej
+        # potrzebna: 25.08 Supabase odciął projekt na `exceed_egress_quota`
+        # i nie było czym pokazać, który klucz zjada transfer. Przy odcięciu
+        # bajty są śmieciowe (189 B na odpowiedź), ale KROTNOŚĆ odczytów
+        # zostaje prawdziwa — i to ona pokazuje klucz ciągnięty wielokrotnie
+        # w jednym cyklu.
+        try:
+            from .. import supa
+            print(supa.raport_egress(), flush=True)
+        except Exception:  # noqa: BLE001
+            pass
 
 
 if __name__ == "__main__":

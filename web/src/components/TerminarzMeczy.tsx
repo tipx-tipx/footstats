@@ -113,7 +113,15 @@ function WierszMeczu({
         : "bez typów";
   return (
     <li>
+      {/* ⚑ prefetch WYŁĄCZONY (2026-08-25). Next domyślnie prefetchuje każdy
+          link, który wejdzie w viewport — przy terminarzu na 189 meczów to
+          setki renderów podstrony meczu bez czyjegokolwiek wejścia, a KAŻDY
+          taki render ciągnął z Supabase pełną listę zawodników i cały rejestr
+          odrzuceń. To była jedna z pozycji, które wyczerpały limit transferu
+          (402 „exceed_egress_quota"). Wejście w mecz jest o tyle wolniejsze,
+          o ile trwa render — sama lista działa tak samo. */}
       <Link
+        prefetch={false}
         href={`/mecze/${m.id}`}
         className="group -mx-3 flex items-stretch gap-x-4 rounded-(--radius-control) px-3 transition-colors hover:bg-brand-wash/30 sm:gap-x-6"
       >

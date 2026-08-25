@@ -61,6 +61,60 @@ def _z_ponowieniem(opis: str, wywolanie):
     return odp
 
 
+# ------------------------------------------------------- LICZNIK TRANSFERU ---
+# ⚑ DLACZEGO MIERZYMY POBRANE BAJTY (2026-08-25). Projekt stanął na 402
+# „exceed_egress_quota": Supabase odciął CAŁY ruch z kluczem — odczyty i zapisy
+# naraz — bo miesięczny transfer wyszedł poza plan. Z logu cyklu nie dało się
+# powiedzieć, co ten transfer zjada: `get_key_ok` przy nie-200 zwraca
+# `(None, False)` bez śladu, więc widać było tylko kaskadę „odczyt PADŁ".
+#
+# Liczy się wyłącznie strona ODCZYTU: egress to bajty, które baza WYSYŁA do
+# nas. Nasze POST-y obciążają wejście, a tego Supabase nie limituje — dlatego
+# licznik siedzi tylko na GET-ach.
+#
+# ⚑ ZLICZAMY TAKŻE ODCZYTY NIEUDANE. Przy odcięciu każda odpowiedź waży 189
+# bajtów, więc same bajty nic nie powiedzą — ale KROTNOŚĆ zostaje prawdziwa,
+# a to ona pokazuje klucz ciągnięty kilkanaście razy w jednym cyklu.
+_egress: dict[str, list[int]] = {}
+
+
+def _zlicz(key: str, r) -> None:
+    """Dopisz jeden odczyt klucza do licznika transferu."""
+    poz = _egress.setdefault(key, [0, 0])
+    poz[0] += 1
+    try:
+        if r is not None:
+            poz[1] += len(r.content)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def raport_egress(ile: int = 12) -> str:
+    """Rozkład pobranych bajtów po kluczach — najcięższe na górze."""
+    if not _egress:
+        return "Transfer z Supabase: brak odczytów w tym przebiegu."
+    poz = sorted(_egress.items(), key=lambda x: -x[1][1])
+    suma = sum(w[1] for _, w in poz)
+    razem = sum(w[0] for _, w in poz)
+    linie = [f"Transfer z Supabase (odczyty): {suma / 1e6:.1f} MB "
+             f"w {razem} zapytaniach, {len(poz)} kluczy"]
+    for nazwa, (ile_razy, bajty) in poz[:ile]:
+        na_odczyt = (f"  ({bajty / ile_razy / 1e6:.2f} MB/odczyt)"
+                     if ile_razy > 1 else "")
+        linie.append(f"   {nazwa:<28} {bajty / 1e6:7.2f} MB  x{ile_razy}"
+                     + na_odczyt)
+    if len(poz) > ile:
+        reszta = sum(w[1] for _, w in poz[ile:])
+        linie.append(f"   … {len(poz) - ile} lżejszych kluczy, razem "
+                     f"{reszta / 1e6:.2f} MB")
+    return "\n".join(linie)
+
+
+def egress_surowy() -> dict[str, list[int]]:
+    """Licznik do rentgenu w `meta` — logi Actions wymagają praw admina."""
+    return {k: list(v) for k, v in _egress.items()}
+
+
 def _conn() -> tuple[str, dict] | None:
     url = os.environ.get("SUPABASE_URL", "").rstrip("/")
     key = os.environ.get("SUPABASE_SERVICE_KEY", "")
@@ -94,6 +148,7 @@ def get_key_ok(key: str) -> tuple[object | None, bool]:
             f"{url}/rest/v1/app_data?select=payload&key=eq.{key}",
             headers=headers, impersonate="chrome124", timeout=30,
         ))
+        _zlicz(key, r)
         if r is None or r.status_code != 200:
             return None, False
         rows = r.json()
@@ -109,6 +164,7 @@ def get_key_ok(key: str) -> tuple[object | None, bool]:
             f"{url}/rest/v1/app_data?select=key,payload&key=like.{key}__cz*",
             headers=headers, impersonate="chrome124", timeout=60,
         ))
+        _zlicz(f"{key} (części)", rc)
         if rc is None or rc.status_code != 200:
             return None, False
         mapa = {w["key"]: w["payload"] for w in rc.json()}
@@ -217,8 +273,19 @@ def put_key_bezpiecznie(
 # marker DOPIERO na końcu. Gdy któraś część nie dojdzie, marker nie powstaje
 # i pod głównym kluczem zostaje POPRZEDNIA, spójna wersja — czytelnik nigdy
 # nie dostanie połowy nowych danych sklejonej z połową starych.
-PROG_SZARDU = 4_000_000      # powyżej tej wagi zapis idzie w kawałkach
-CEL_CZESCI = 3_000_000       # docelowa waga jednego kawałka
+# ⚑ PROGI OBNIŻONE 2026-08-25 — DECYDUJE O NICH CACHE FRONTU, NIE BAZA.
+# Do dziś progi pilnowały tylko tego, żeby upsert nie padł na `statement
+# timeout` (stąd 4 MB / 3 MB). Ale te same części czyta potem strona, a Next
+# odmawia wpisania do Data Cache odpowiedzi cięższej niż 2 MB — wtedy każdy
+# render idzie po dane do Supabase od nowa. `players` (4,6 MB) był tak
+# pobierany przy KAŻDYM z renderów 189 podstron meczu i to on wyczerpał
+# miesięczny limit transferu (402 „exceed_egress_quota").
+#
+# Część ~1,2 MB mieści się w limicie z zapasem na narzut PostgREST
+# (opakowanie w tablicę, escaping), więc każda cache'uje się osobno —
+# patrz `sklejCzesci` w `web/src/lib/data.ts`, które pobiera je pojedynczo.
+PROG_SZARDU = 1_500_000      # powyżej tej wagi zapis idzie w kawałkach
+CEL_CZESCI = 1_200_000       # docelowa waga jednego kawałka
 MARKER_CZESCI = "__czesci"
 
 
@@ -309,6 +376,7 @@ def _spis_czesci(url: str, headers: dict, key: str) -> list[str] | None:
         f"{url}/rest/v1/app_data?select=key&key=like.{key}__cz*",
         headers=headers, impersonate="chrome124", timeout=30,
     ))
+    _zlicz(f"{key} (spis części)", r)
     if r is None or r.status_code != 200:
         return None
     try:

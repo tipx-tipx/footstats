@@ -9,7 +9,13 @@ import { getMeta } from "@/lib/data";
 // przekracza limit 2 MB Data Cache, więc revalidate:60 z fetchu nie obniża
 // interwału trasy. Ustawiony tu, na poziomie segmentu, działa niezależnie
 // od cache'owalności fetchu (Cache Components wyłączony => stary model).
-export const revalidate = 60;
+//
+// ⚑ 60 s -> 1800 s (2026-08-25). Musi iść w parze z `ODSWIEZANIE_S` w
+// `lib/data.ts`: to okno segmentu decyduje, jak często trasa w ogóle się
+// przelicza, a każde przeliczenie to pobranie danych z Supabase. Minutowe
+// okno przy 189 podstronach meczu wyczerpało miesięczny limit transferu
+// (402 „exceed_egress_quota") i zatrzymało produkt.
+export const revalidate = 1800;
 
 /**
  * Chrome aplikacji (Nav + kolumna treści + stopka) – WYŁĄCZNIE dla stron
