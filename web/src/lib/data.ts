@@ -98,6 +98,26 @@ const SUPABASE_ANON =
  */
 const ODSWIEZANIE_S = 1800;
 
+/**
+ * OKNA ROZDZIELONE WEDŁUG TEGO, JAK SZYBKO DANE SIĘ STARZEJĄ (2026-08-25).
+ *
+ * Kusiło, żeby po prostu wydłużyć wszystko do godziny — ale klucze nie są
+ * równe. W `players` siedzi `xi`, czyli „zawodnik w pierwszym składzie";
+ * składy potwierdzają się na ok. godzinę przed meczem, a pokazują je
+ * `RadarCard` i TOP POKRYCIA. Za długie okno = nieaktualny skład na karcie.
+ * Dlatego `players` dostaje godzinę, a nie więcej.
+ *
+ * `odrzucenia` (rejestr „czemu ta para nie dostała typu") i `typy_wyniki`
+ * (statystyki modelu, kalibracja) starzeją się wolno — nikt nie zauważy
+ * trzech godzin, a to razem 2,8 MB, czyli druga co do wagi pozycja rachunku
+ * za transfer.
+ *
+ * Bundle z typami i meczami zostaje na `ODSWIEZANIE_S` — świeżości listy
+ * dnia NIE ruszamy.
+ */
+const ODSWIEZANIE_SKLADY_S = 3600;
+const ODSWIEZANIE_WOLNE_S = 10800;
+
 
 /**
  * Klucze app_data, które web faktycznie czyta (pola Bundle). MUSI być filtrem
@@ -133,7 +153,6 @@ const BUNDLE_KEYS = [
  * Klucze leniwe celowo NIE przechodzą przez `tylkoNadchodzace` — ten filtr
  * dotyczy wyłącznie kluczy bazowych (typy, mecze, pula legów, radar, STS).
  */
-const LAZY_TTL_MS = ODSWIEZANIE_S * 1000;
 const lazyCache = new Map<string, { ts: number; dane: Promise<unknown> }>();
 
 /**
@@ -160,7 +179,12 @@ function czyMarker(payload: unknown): payload is MarkerCzesci {
   );
 }
 
-async function sklejCzesci<T>(key: string, ile: number, fallback: T): Promise<T> {
+async function sklejCzesci<T>(
+  key: string,
+  ile: number,
+  fallback: T,
+  oknoS: number,
+): Promise<T> {
   // ⚑ KAŻDA CZĘŚĆ OSOBNYM ZAPYTANIEM (2026-08-25). To nie kosmetyka, tylko
   // jedyny sposób, żeby ciężki klucz w ogóle trafił do Data Cache Next.
   //
@@ -187,7 +211,7 @@ async function sklejCzesci<T>(key: string, ile: number, fallback: T): Promise<T>
               apikey: SUPABASE_ANON!,
               Authorization: `Bearer ${SUPABASE_ANON}`,
             },
-            next: { revalidate: ODSWIEZANIE_S },
+            next: { revalidate: oknoS },
           },
         );
         if (!res.ok) return undefined;
@@ -216,10 +240,14 @@ async function sklejCzesci<T>(key: string, ile: number, fallback: T): Promise<T>
   return Object.assign({}, ...(czesci as object[])) as T;
 }
 
-async function fetchKlucz<T>(key: string, fallback: T): Promise<T> {
+async function fetchKlucz<T>(
+  key: string,
+  fallback: T,
+  oknoS: number = ODSWIEZANIE_S,
+): Promise<T> {
   if (!SUPABASE_URL || !SUPABASE_ANON) return fallback;
   const cached = lazyCache.get(key);
-  if (cached && Date.now() - cached.ts < LAZY_TTL_MS) {
+  if (cached && Date.now() - cached.ts < oknoS * 1000) {
     return cached.dane as Promise<T>;
   }
   const dane = (async () => {
@@ -233,14 +261,14 @@ async function fetchKlucz<T>(key: string, fallback: T): Promise<T> {
           },
           // to samo co przy bundlu: revalidate, NIGDY no-store — patrz
           // komentarz w `fetchBundle` (incydent 2026-07-21)
-          next: { revalidate: ODSWIEZANIE_S },
+          next: { revalidate: oknoS },
         },
       );
       if (!res.ok) return fallback;
       const rows: { payload: unknown }[] = await res.json();
       const payload = rows[0]?.payload;
       if (czyMarker(payload)) {
-        return await sklejCzesci<T>(key, payload.__czesci, fallback);
+        return await sklejCzesci<T>(key, payload.__czesci, fallback, oknoS);
       }
       return (payload ?? fallback) as T;
     } catch {
@@ -322,6 +350,8 @@ async function fetchBundle(): Promise<Bundle> {
             klucz,
             (payload as MarkerCzesci).__czesci,
             undefined,
+            // klucz bazowy = ten sam rytm co reszta bundla (typy, mecze)
+            ODSWIEZANIE_S,
           );
         }),
     );
@@ -382,14 +412,18 @@ export async function getMecze(): Promise<Mecz[]> {
 
 /** Rejestr odrzuceń: czemu para (zawodnik, rynek) nie dostała typu. */
 export async function getOdrzucenia(meczId?: number): Promise<Odrzucenie[]> {
-  const wszystkie = await fetchKlucz<Odrzucenie[]>("odrzucenia", LOCAL.odrzucenia);
+  const wszystkie = await fetchKlucz<Odrzucenie[]>(
+    "odrzucenia",
+    LOCAL.odrzucenia,
+    ODSWIEZANIE_WOLNE_S,
+  );
   return meczId == null
     ? wszystkie
     : wszystkie.filter((o) => o.mecz_id === meczId);
 }
 
 export async function getZawodnicy(): Promise<Zawodnik[]> {
-  return fetchKlucz<Zawodnik[]>("players", LOCAL.players);
+  return fetchKlucz<Zawodnik[]>("players", LOCAL.players, ODSWIEZANIE_SKLADY_S);
 }
 
 /** Forma drużyn z typami drużynowymi (karta typu na /druzyny). */
@@ -433,7 +467,11 @@ export async function getKuponDnia(): Promise<Kupon | undefined> {
 }
 
 export async function getTypyWyniki(): Promise<TypyWyniki> {
-  return fetchKlucz<TypyWyniki>("typy_wyniki", LOCAL.typy_wyniki);
+  return fetchKlucz<TypyWyniki>(
+    "typy_wyniki",
+    LOCAL.typy_wyniki,
+    ODSWIEZANIE_WOLNE_S,
+  );
 }
 
 export async function getOddsSuperbet(): Promise<OddsSuperbet> {
