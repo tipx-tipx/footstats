@@ -43,6 +43,8 @@ def _z_ponowieniem(opis: str, wywolanie):
     for numer in range(PROBY_SIECI):
         try:
             odp = wywolanie()
+            if odp.status_code == 402:
+                _zapamietaj_odciecie(odp)
             if odp.status_code < 500 and odp.status_code != 429:
                 return odp
             powod = f"HTTP {odp.status_code}"
@@ -59,6 +61,76 @@ def _z_ponowieniem(opis: str, wywolanie):
             print(f"Supabase {opis}: {powod} — wyczerpane {PROBY_SIECI} próby",
                   file=sys.stderr, flush=True)
     return odp
+
+
+# ------------------------------------------------------ ODCIĘCIE PROJEKTU ---
+# ⚑ HTTP 402 TO NIE JEST AWARIA KODU (2026-08-28). Gdy miesięczny limit
+# transferu się wyczerpie, Supabase odcina CAŁY projekt: każde zapytanie
+# z kluczem — odczyt i zapis — wraca jako 402 „exceed_egress_quota". Od
+# 25.08 znaczyło to czerwony cykl co godzinę i tyle samo maili „workflow
+# failed", w których nie było czego naprawiać: kod jest sprawny, płatny
+# jest dostęp do bazy.
+#
+# Czerwony job musi znaczyć „coś do naprawienia w kodzie". Dlatego odcięcie
+# rozpoznajemy po komunikacie i kończymy job ZIELONO, ale z ostrzeżeniem
+# (`::warning::` widać w podsumowaniu przebiegu w Actions). Każdy inny błąd
+# dalej wywala job na czerwono, czyli sygnał zostaje tam, gdzie ma być.
+#
+# Straż stoi na POCZĄTKU joba, a nie tylko w łapaniu wyjątku: cykl liczył
+# przez 38 minut, żeby dopiero na wysyłce dowiedzieć się, że nie ma dokąd
+# wysyłać.
+ODCIECIE_ZNACZNIK = "exceed_egress_quota"
+_odciecie: str | None = None
+
+
+def _zapamietaj_odciecie(r) -> None:
+    """Zapisz komunikat Supabase o odcięciu projektu (HTTP 402)."""
+    global _odciecie
+    try:
+        powod = str((r.json() or {}).get("message") or "").strip()
+    except Exception:  # noqa: BLE001
+        powod = ""
+    _odciecie = powod or "HTTP 402 — projekt odcięty przez Supabase"
+
+
+def odciecie_projektu() -> str | None:
+    """Komunikat, jeśli w tym przebiegu Supabase odciął projekt; inaczej None."""
+    return _odciecie
+
+
+def zbadaj_odciecie() -> str | None:
+    """Jedno lekkie zapytanie sprawdzające, czy projekt nie jest odcięty.
+
+    Przy odcięciu odpowiedź waży ~190 bajtów, więc sama kontrola nie ma jak
+    pogłębić problemu. W trybie lokalnym (brak sekretów) nie pyta o nic.
+    """
+    c = _conn()
+    if c is None:
+        return None
+    url, headers = c
+    _z_ponowieniem("kontrola dostępu", lambda: requests.get(
+        f"{url}/rest/v1/app_data?select=key&limit=1",
+        headers=headers, impersonate="chrome124", timeout=20,
+    ))
+    return _odciecie
+
+
+def straz_odciecia(job: str, *, badaj: bool = True) -> None:
+    """Zakończ job zielono z ostrzeżeniem, gdy Supabase odciął projekt.
+
+    `badaj=False` dla wywołań z łapania wyjątku — tam wiemy już z przebiegu,
+    czy padło na 402, i nie ma po co dokładać zapytania.
+    """
+    powod = zbadaj_odciecie() if badaj else odciecie_projektu()
+    if not powod:
+        return
+    print(f"::warning title=Supabase odciął projekt (402)::{job}: {powod}",
+          flush=True)
+    print(f"[{job}] Supabase odciął projekt (402 {ODCIECIE_ZNACZNIK}) — "
+          "nie ma z czego czytać ani dokąd pisać. Kończę bez pracy; to nie "
+          "jest błąd kodu, tylko limit transferu do zdjęcia w panelu Supabase.",
+          flush=True)
+    sys.exit(0)
 
 
 # ------------------------------------------------------- LICZNIK TRANSFERU ---

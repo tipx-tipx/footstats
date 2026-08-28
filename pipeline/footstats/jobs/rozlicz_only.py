@@ -46,6 +46,9 @@ def main() -> None:
         print(f"[{stamp}] Brak sekretów Supabase — nie ma czego rozliczać, koniec.",
               flush=True)
         return
+    # przy odciętym projekcie (402) nie ma czego rozliczać ani gdzie zapisać
+    # — patrz `supa.straz_odciecia`
+    supa.straz_odciecia("rozliczanie")
     try:
         wyniki = rozliczanie.rozlicz([], [])
         # TEN SAM KLUCZ PISZE TEŻ DUŻY CYKL — i musi go pisać tak samo.
@@ -107,6 +110,7 @@ def main() -> None:
             )
         print(f"[{stamp}] OK", flush=True)
     except Exception:
+        supa.straz_odciecia("rozliczanie", badaj=False)
         print(f"[{stamp}] BŁĄD:\n{traceback.format_exc()}", file=sys.stderr,
               flush=True)
         sys.exit(1)

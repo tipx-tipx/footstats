@@ -71,6 +71,7 @@ def _mecze_w_zakresie(matches, teraz: int) -> dict[int, int]:
 
 def main() -> int:
     load_dotenv(".env")
+    supa.straz_odciecia("betclic")
     teraz = int(time.time())
     matches = supa.get_key("matches")
     if not matches:

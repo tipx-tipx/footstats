@@ -35,6 +35,8 @@ def main() -> None:
         print("Brak SUPABASE_URL — magazyn i wagi siedzą w chmurze.")
         return
 
+    supa.straz_odciecia("trening")
+
     pokaz = "--pokaz" in sys.argv
 
     mag = M.wczytaj()

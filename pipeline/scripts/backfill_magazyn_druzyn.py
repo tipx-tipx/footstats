@@ -42,6 +42,8 @@ def main() -> None:
         print("Brak SUPABASE_URL — magazyn siedzi w chmurze.")
         return
 
+    supa.straz_odciecia("magazyn")
+
     wszystkie = "--wszystkie" in sys.argv
     prof = (supa.get_key("druzyny_profil") or {}).get("druzyny") or {}
     ids = [int(t) for t in prof]

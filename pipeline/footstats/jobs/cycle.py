@@ -114,6 +114,11 @@ def main():
     # Zabity przebieg nie wypycha nic, więc każda taka śmierć to godzina
     # nieświeżej strony; bez pomiaru podnoszenie limitu jest zgadywaniem.
     t0 = time.monotonic()
+    # ⚑ NAJPIERW SPRAWDŹ, CZY JEST DOKĄD PISAĆ (2026-08-28). Przy odciętym
+    # projekcie (402) cykl liczył pełne 38 minut, żeby dopiero na wysyłce
+    # zginąć na czerwono — a mail „workflow failed" nie miał czego naprawiać.
+    from .. import supa as _supa
+    _supa.straz_odciecia("cykl")
     try:
         if MODE == "ms2026":
             from . import build_wc_fast
@@ -143,6 +148,9 @@ def main():
             )
         print(f"[{stamp}] OK", flush=True)
     except Exception as ex:
+        # odcięcie mogło zacząć się W TRAKCIE przebiegu — wtedy też kończymy
+        # zielono z ostrzeżeniem, zamiast wołać o naprawę sprawnego kodu
+        _supa.straz_odciecia("cykl", badaj=False)
         print(f"[{stamp}] BŁĄD:\n{traceback.format_exc()}", file=sys.stderr, flush=True)
         _zapisz_slad_awarii(stamp, (time.monotonic() - t0) / 60, ex)
         sys.exit(1)
