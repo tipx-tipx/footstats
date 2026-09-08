@@ -29,7 +29,7 @@ PARTIA = 25          # co ile drużyn zapisujemy stan
 PROBNIE = 10         # ile drużyn bez `--wszystkie`
 
 
-def main() -> None:
+def _main() -> None:
     try:
         from dotenv import load_dotenv
         load_dotenv(Path(__file__).resolve().parent.parent / ".env")
@@ -140,6 +140,15 @@ def main() -> None:
         print("   pokrycie pól (ile meczów ma daną statystykę):")
         for kod, n in sorted(st["pola"].items(), key=lambda kv: -kv[1]):
             print(f"      {kod:<6}{n:>7}  ({n / st['meczow']:.0%})")
+
+
+def main() -> None:
+    """Jak `_main`, ale zawsze drukuje licznik transferu z Supabase."""
+    from footstats import supa
+    try:
+        return _main()
+    finally:
+        print(supa.raport_egress(), flush=True)
 
 
 if __name__ == "__main__":

@@ -69,7 +69,7 @@ def _mecze_w_zakresie(matches, teraz: int) -> dict[int, int]:
     return out
 
 
-def main() -> int:
+def _main() -> int:
     load_dotenv(".env")
     supa.straz_odciecia("betclic")
     teraz = int(time.time())
@@ -170,6 +170,14 @@ def main() -> int:
         print("UWAGA: zapis oferty Betclica NIE POWIÓDŁ SIĘ")
         return 1
     return 0
+
+
+def main() -> int:
+    """Jak `_main`, ale zawsze drukuje licznik transferu z Supabase."""
+    try:
+        return _main()
+    finally:
+        print(supa.raport_egress(), flush=True)
 
 
 if __name__ == "__main__":

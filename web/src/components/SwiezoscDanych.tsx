@@ -31,6 +31,15 @@ import { useEffect, useState } from "react";
 /** Powyżej tylu minut kurs mógł się realnie ruszyć — patrz pomiar wyżej. */
 const PROG_OSTRZEZENIA_MIN = 240;
 
+/**
+ * TRZECI STAN (2026-09-08): źródło stoi. Gdy Supabase odcina projekt
+ * (limit transferu, HTTP 402), front spada na dane awaryjne z repo i przez
+ * pięć dni nikt nie zauważył, że typy się nie tworzą. „kursy sprzed 300
+ * godzin – sprawdź przed zakładem" udaje, że to kwestia kursu; nie jest.
+ * Powyżej doby mówimy wprost, że dane się nie odświeżają.
+ */
+const PROG_AWARII_MIN = 24 * 60;
+
 /** „sprzed godziny", „sprzed 5 godzin" — po „sprzed" idzie dopełniacz. */
 function odmienGodziny(n: number): string {
   return n === 1 ? "godziny" : "godzin";
@@ -55,6 +64,19 @@ export function SwiezoscDanych({ wygenerowanoTs }: { wygenerowanoTs: number }) {
     minute: "2-digit",
     timeZone: "Europe/Warsaw",
   }).format(new Date(wygenerowanoTs * 1000));
+
+  if (m >= PROG_AWARII_MIN) {
+    const dni = Math.max(1, Math.floor(m / 1440));
+    return (
+      <span
+        title="Nasze źródło danych nie odpowiada. Typy i wyniki poniżej pochodzą sprzed przerwy – nowe pojawią się, gdy tylko wróci."
+        className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-data-red-wash px-2.5 py-1 text-[11px] font-medium text-data-red-ink"
+      >
+        <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-data-red" />
+        dane sprzed {dni} {dni === 1 ? "dnia" : "dni"} – nie odświeżają się
+      </span>
+    );
+  }
 
   if (m >= PROG_OSTRZEZENIA_MIN) {
     const godz = Math.round(m / 60);

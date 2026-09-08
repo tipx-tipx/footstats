@@ -114,6 +114,10 @@ def main() -> None:
         print(f"[{stamp}] BŁĄD:\n{traceback.format_exc()}", file=sys.stderr,
               flush=True)
         sys.exit(1)
+    finally:
+        # licznik transferu w KAŻDYM jobie — ten chodzi co 20 min i do 08.09
+        # był jedynym, który nie mówił, ile czyta (patrz supa._pamiec)
+        print(supa.raport_egress(), flush=True)
 
 
 if __name__ == "__main__":

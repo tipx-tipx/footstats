@@ -21,7 +21,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 
-def main() -> None:
+def _main() -> None:
     try:
         from dotenv import load_dotenv
         load_dotenv(Path(__file__).resolve().parent.parent / ".env")
@@ -93,6 +93,15 @@ def main() -> None:
         print(f"\nzapisano `{U.KLUCZ_WAG}` — {U.zdanie_stanu(wagi)}")
     else:
         print("\n⚑ ZAPIS WAG SIĘ NIE UDAŁ — w chmurze zostają poprzednie")
+
+
+def main() -> None:
+    """Jak `_main`, ale zawsze drukuje licznik transferu z Supabase."""
+    from footstats import supa
+    try:
+        return _main()
+    finally:
+        print(supa.raport_egress(), flush=True)
 
 
 if __name__ == "__main__":

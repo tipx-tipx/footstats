@@ -115,8 +115,26 @@ def zbadaj_odciecie() -> str | None:
     return _odciecie
 
 
+# ⚑ RAZ NA DOBĘ ODCIĘCIE MA KRZYCZEĆ (2026-09-08). Zielony job z ostrzeżeniem
+# (28.08) sprawił, że drugie odcięcie od 04.09 przez PIĘĆ DNI nikt nie
+# zauważył — GitHub wysyła mail tylko o czerwonym przebiegu. Dlatego przebiegi
+# w tym oknie UTC kończą się czerwono; reszta doby dalej zielono, żeby skrzynka
+# nie tonęła w 150 mailach dziennie. 6:00 UTC = 8:00 czasu polskiego.
+ALARM_ODCIECIA_UTC = (6, 0, 6, 30)   # (od_godz, od_min, do_godz, do_min)
+
+
+def _w_oknie_alarmu(teraz=None) -> bool:
+    t = teraz if teraz is not None else time.gmtime()
+    od_h, od_m, do_h, do_m = ALARM_ODCIECIA_UTC
+    minuta = t.tm_hour * 60 + t.tm_min
+    return od_h * 60 + od_m <= minuta < do_h * 60 + do_m
+
+
 def straz_odciecia(job: str, *, badaj: bool = True) -> None:
-    """Zakończ job zielono z ostrzeżeniem, gdy Supabase odciął projekt.
+    """Zakończ job z ostrzeżeniem, gdy Supabase odciął projekt.
+
+    Zielono przez większość doby, CZERWONO w oknie `ALARM_ODCIECIA_UTC` —
+    żeby raz dziennie przyszedł mail, że produkt stoi.
 
     `badaj=False` dla wywołań z łapania wyjątku — tam wiemy już z przebiegu,
     czy padło na 402, i nie ma po co dokładać zapytania.
@@ -124,13 +142,19 @@ def straz_odciecia(job: str, *, badaj: bool = True) -> None:
     powod = zbadaj_odciecie() if badaj else odciecie_projektu()
     if not powod:
         return
-    print(f"::warning title=Supabase odciął projekt (402)::{job}: {powod}",
+    alarm = _w_oknie_alarmu()
+    poziom = "error" if alarm else "warning"
+    print(f"::{poziom} title=Supabase odciął projekt (402)::{job}: {powod}",
           flush=True)
     print(f"[{job}] Supabase odciął projekt (402 {ODCIECIE_ZNACZNIK}) — "
           "nie ma z czego czytać ani dokąd pisać. Kończę bez pracy; to nie "
           "jest błąd kodu, tylko limit transferu do zdjęcia w panelu Supabase.",
           flush=True)
-    sys.exit(0)
+    if alarm:
+        print(f"[{job}] DZIENNY ALARM: przebieg kończy się CZERWONO, żeby "
+              "właściciel dostał mail. Produkt nie tworzy typów ani nie "
+              "rozlicza od chwili odcięcia.", flush=True)
+    sys.exit(1 if alarm else 0)
 
 
 # ------------------------------------------------------- LICZNIK TRANSFERU ---
@@ -179,7 +203,50 @@ def raport_egress(ile: int = 12) -> str:
         reszta = sum(w[1] for _, w in poz[ile:])
         linie.append(f"   … {len(poz) - ile} lżejszych kluczy, razem "
                      f"{reszta / 1e6:.2f} MB")
+    if raport_pamieci():
+        linie.append("   " + raport_pamieci())
     return "\n".join(linie)
+
+
+# ⚑⚑⚑ PAMIĘĆ ODCZYTÓW W OBRĘBIE JEDNEGO PROCESU (2026-09-08).
+#
+# Zmierzone w logu cyklu 01.09: 476 MB odczytów na JEDEN cykl, z czego
+# `typy_log` 22,9 MB × 14 razy = 320 MB — czternaście warstw uczenia czytało
+# tę samą księgę osobno. Przy ~25 cyklach dziennie to ~10 GB/dobę wobec
+# limitu Free 5 GB/MIESIĄC; projekt został odcięty (402) drugi raz w cztery
+# dni po odblokowaniu. Front naprawiony 25.08 nie miał tu nic do rzeczy.
+#
+# Zasada: `get_key` (odczyt TYLKO do czytania — patrz jego docstring) oddaje
+# kopię z pamięci procesu, jeśli klucz był już w tym przebiegu pobrany.
+# `get_key_ok` (odczyt PRZED zapisem) ZAWSZE idzie do bazy i odświeża pamięć,
+# a `put_key` po udanym zapisie podmienia wpis — więc „przeczytaj, dopisz,
+# zapisz" widzi stan bieżący, a czytacze dostają snapshot z tego przebiegu.
+# Kopia (json.loads z zapamiętanego tekstu), nie ten sam obiekt: `_migruj_log`
+# i warstwy modyfikują rekordy w miejscu.
+_pamiec: dict[str, str | None] = {}
+_z_pamieci: dict[str, list[int]] = {}
+
+
+def wyczysc_pamiec() -> None:
+    """Testy i skrypty, które chcą świeżego odczytu w tym samym procesie."""
+    _pamiec.clear()
+    _z_pamieci.clear()
+
+
+def _zapamietaj(key: str, payload) -> None:
+    try:
+        _pamiec[key] = None if payload is None else json.dumps(payload, ensure_ascii=False)
+    except Exception:  # noqa: BLE001
+        _pamiec.pop(key, None)
+
+
+def raport_pamieci() -> str:
+    if not _z_pamieci:
+        return ""
+    razem = sum(v[0] for v in _z_pamieci.values())
+    bajty = sum(v[1] for v in _z_pamieci.values())
+    return (f"Odczyty z pamięci procesu (zaoszczędzony transfer): {razem} "
+            f"× {bajty / 1e6:.1f} MB")
 
 
 def egress_surowy() -> dict[str, list[int]]:
@@ -227,6 +294,7 @@ def get_key_ok(key: str) -> tuple[object | None, bool]:
         payload = rows[0]["payload"] if rows else None
         n = ile_czesci(payload)
         if n is None:
+            _zapamietaj(key, payload)
             return payload, True
 
         # klucz szardowany: dociągamy kawałki jednym zapytaniem i sklejamy.
@@ -247,7 +315,9 @@ def get_key_ok(key: str) -> tuple[object | None, bool]:
                   f"{len(braki)} ({braki[:5]}) — traktuję jak padnięty odczyt",
                   file=sys.stderr, flush=True)
             return None, False
-        return sklej_czesci(czesci), True
+        calosc = sklej_czesci(czesci)
+        _zapamietaj(key, calosc)
+        return calosc, True
     except Exception:
         return None, False
 
@@ -258,6 +328,12 @@ def get_key(key: str):
     Do odczytów, które tylko CZYTAJĄ. Jeśli zamierzasz zapisać wynik z
     powrotem pod ten sam klucz, użyj `get_key_ok` albo `put_key_bezpiecznie`.
     """
+    if key in _pamiec:
+        tekst = _pamiec[key]
+        poz = _z_pamieci.setdefault(key, [0, 0])
+        poz[0] += 1
+        poz[1] += len(tekst or "")
+        return None if tekst is None else json.loads(tekst)
     return get_key_ok(key)[0]
 
 
@@ -493,6 +569,14 @@ def put_key(key: str, payload) -> bool:
 
     Payload cięższy niż `PROG_SZARDU` jedzie w kawałkach — patrz SZARDY wyżej.
     """
+    _pamiec.pop(key, None)
+    ok = _put_key(key, payload)
+    if ok:
+        _zapamietaj(key, payload)
+    return ok
+
+
+def _put_key(key: str, payload) -> bool:
     c = _conn()
     if c is None:
         return False
