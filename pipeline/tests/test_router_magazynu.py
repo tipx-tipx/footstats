@@ -159,10 +159,24 @@ def test_niezarejestrowany_backend_nie_schodzi_na_supabase(monkeypatch, _bez_sup
     Odczyt stamtąd cofnąłby produkt o kilka dni, a zapis zgubiłby wszystko,
     co przyszło po migracji. Awaria jest tu bezpieczniejsza niż cichy powrót.
     """
-    monkeypatch.setitem(supa.MAGAZYN, "typy_log", "repo")   # nic nie zarejestrowane
+    # nazwa spoza `_AUTO_MAGAZYNY` — takiego magazynu nikt nie podepnie sam
+    monkeypatch.setitem(supa.MAGAZYN, "typy_log", "magazyn-ktorego-nie-ma")
 
     assert supa.get_key_ok("typy_log") == (None, False)
     assert supa.put_key("typy_log", {"x": 1}) is False
+
+
+def test_magazyn_repo_podpina_sie_sam(monkeypatch, _bez_supabase):
+    """Sześć jobów i rosnąca liczba skryptów — nikt nie ma pamiętać o podpięciu.
+
+    Bez tego nowy job cicho czytałby Supabase (nieaktualną wersję) albo
+    wywalał się na braku backendu.
+    """
+    from footstats import magazyn_repo
+    monkeypatch.setitem(supa.MAGAZYN, "typy_log", "repo")
+
+    supa.get_key_ok("typy_log")
+    assert supa._BACKENDY.get("repo") is magazyn_repo
 
 
 # ---------------------------------------------------------------------------

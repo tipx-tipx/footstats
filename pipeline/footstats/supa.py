@@ -294,6 +294,24 @@ def zarejestruj_backend(nazwa: str, backend) -> None:
 
 BRAK_BACKENDU = object()   # wpis w MAGAZYN jest, backendu nie ma = AWARIA
 
+# Magazyny podpinane SAME przy pierwszym użyciu. Alternatywą było wołanie
+# `podepnij()` na starcie każdego jobu — a jobów jest sześć i łatwo o nowy,
+# w którym ktoś tego nie doda. Zapomniane podpięcie znaczyłoby awarię klucza
+# (albo, gdyby spadało na Supabase, cichy odczyt nieaktualnej wersji).
+_AUTO_MAGAZYNY = {"repo": "footstats.magazyn_repo"}
+
+
+def _podepnij_automatycznie(nazwa: str) -> None:
+    sciezka = _AUTO_MAGAZYNY.get(nazwa)
+    if not sciezka:
+        return
+    try:
+        import importlib
+        _BACKENDY[nazwa] = importlib.import_module(sciezka)
+    except Exception as ex:  # noqa: BLE001
+        print(f"Magazyn '{nazwa}' nie daje się zaimportować: {ex!r}",
+              file=sys.stderr, flush=True)
+
 
 def _backend(key: str):
     """Backend dla klucza, None gdy klucz mieszka w Supabase.
@@ -303,6 +321,8 @@ def _backend(key: str):
     nazwa = MAGAZYN.get(key)
     if not nazwa:
         return None
+    if nazwa not in _BACKENDY:
+        _podepnij_automatycznie(nazwa)
     b = _BACKENDY.get(nazwa)
     if b is None:
         # ⚑ NIE spadamy cicho na Supabase. Klucz jest już przeniesiony, więc
