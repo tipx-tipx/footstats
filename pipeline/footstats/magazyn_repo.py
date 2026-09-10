@@ -73,6 +73,11 @@ def _naglowki(token: str, accept: str = "application/vnd.github+json") -> dict:
         "Authorization": f"Bearer {token}",
         "Accept": accept,
         "X-GitHub-Api-Version": "2022-11-28",
+        # ⚑ BEZ TEGO KAŻDE ŻĄDANIE WRACA JAKO 403 (2026-09-10). GitHub wymaga
+        # `User-Agent`, a `curl_cffi` bez `impersonate` go nie wysyła — treść
+        # odpowiedzi mówi wprost „Request forbidden by administrative rules",
+        # co przy zwykłym patrzeniu na sam kod 403 wygląda jak zły token.
+        "User-Agent": "footstats-magazyn",
     }
 
 

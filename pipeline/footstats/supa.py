@@ -272,7 +272,22 @@ def egress_surowy() -> dict[str, list[int]]:
 #
 # ⚑ PUSTY `MAGAZYN` = ZACHOWANIE DOKŁADNIE JAK PRZED ZMIANĄ. Przeprowadzka
 # klucza to dopisanie jednej linijki, a cofnięcie — skasowanie jej.
-MAGAZYN: dict[str, str] = {}
+#
+# PRZEPROWADZONE 10.09.2026 (etap 3). Dane wgrane z kopii `ratuj_baze.py`
+# i potwierdzone odczytem — `wsyp_do_magazynu.py` czyta każdy klucz z powrotem
+# i porównuje z tym, co wysłał. Stan w Supabase ZOSTAJE nietknięty jako zapas;
+# skasować go dopiero po dobie zielonych cykli.
+#
+# ⚑ ŻADNEGO Z TYCH KLUCZY NIE CZYTA FRONT (patrz `BUNDLE_KEYS` w
+# `web/src/lib/data.ts`) — dlatego przeprowadzka nie dotyka strony.
+MAGAZYN: dict[str, str] = {
+    "trend_lib": "repo",          # 47 MB w 39 częściach — największy pożeracz
+    "styl_bank_liga": "repo",
+    "styl_bank": "repo",
+    "typy_log_kopia": "repo",
+    "typy_log": "repo",           # najgorętszy: pisany z cyklu I z rozliczania
+    **{f"hd_{i}": "repo" for i in range(10)},   # magazyn historii drużyn
+}
 
 # nazwa backendu -> obiekt z `pobierz(key) -> (payload, ok)` i
 # `zapisz(key, payload) -> bool`. Kontrakt `pobierz` jest TAKI SAM jak

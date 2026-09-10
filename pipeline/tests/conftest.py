@@ -56,6 +56,11 @@ def pytest_configure(config):
         "siec: test celowo wychodzi do internetu (domyślnie sieć jest "
         "zablokowana — patrz tests/conftest.py)",
     )
+    config.addinivalue_line(
+        "markers",
+        "magazyn_produkcyjny: test patrzy na PRAWDZIWY supa.MAGAZYN "
+        "(domyślnie testy dostają pusty — patrz tests/conftest.py)",
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -118,4 +123,30 @@ def _sieciowa_zapora(request, monkeypatch):
     # bo źródło odblokowuje się po minutach — w zestawie zerujemy sam czas,
     # liczba prób i licznik zostają, żeby test miał czego pilnować.
     monkeypatch.setattr(statshub, "PAUZA_ODCIECIA_S", 0)
+    yield
+
+
+@pytest.fixture(autouse=True)
+def _magazyny_domyslnie_wylaczone(request, monkeypatch):
+    """`supa.MAGAZYN` jest w testach PUSTY, o ile test nie ustawi go sam.
+
+    PO CO TO ISTNIEJE (2026-09-10). Od etapu 3 część kluczy mieszka poza
+    Supabase, a `MAGAZYN` w kodzie produkcyjnym wymienia je z nazwy. Testy
+    mechaniki Supabase (szardy, bezpieczniki) używają tych samych nazw jako
+    przykładowych — i po przełączeniu zaczęły trafiać do magazynu zamiast do
+    swojej zaślepki, choć badają coś zupełnie innego.
+
+    Test ma sprawdzać MECHANIKĘ, nie dzisiejszą listę przeniesionych kluczy:
+    inaczej każda kolejna przeprowadzka wywracałaby losowe testy, a ich
+    autorzy nie mieliby pojęcia dlaczego. Testy magazynu ustawiają `MAGAZYN`
+    jawnie i ta atrapa im nie przeszkadza.
+
+    Osobno pilnujemy tego, że produkcyjny `MAGAZYN` jest sensowny — patrz
+    `test_magazyn_konfiguracja.py`.
+    """
+    from footstats import supa
+    if request.node.get_closest_marker("magazyn_produkcyjny"):
+        yield
+        return
+    monkeypatch.setattr(supa, "MAGAZYN", {})
     yield

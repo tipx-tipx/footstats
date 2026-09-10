@@ -263,3 +263,13 @@ def test_puste_repo_dostaje_pierwszy_commit(gh):
     api.get, api.post, api.put = _get, _post, _put
     assert mr.zapisz("typy_log", {"x": 1}) is True
     assert api.slad[:3] == ["zaloz-release", "pierwszy-commit", "zaloz-release"]
+
+
+def test_naglowki_maja_user_agent():
+    """GitHub odrzuca 403 kazde zadanie bez `User-Agent` (2026-09-10).
+
+    `curl_cffi` bez `impersonate` go nie wysyla, a odpowiedz brzmi
+    „Request forbidden by administrative rules" — po samym kodzie 403
+    wyglada to na zly token i mozna szukac godzinami nie tam.
+    """
+    assert mr._naglowki("x").get("User-Agent")
