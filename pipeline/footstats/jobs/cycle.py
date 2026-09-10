@@ -165,6 +165,10 @@ def main():
         try:
             from .. import supa
             print(supa.raport_egress(), flush=True)
+            # ile ruchu zdjęliśmy z limitu, przenosząc klucze poza Supabase
+            poza = supa.raport_poza_supabase()
+            if poza:
+                print(poza, flush=True)
         except Exception:  # noqa: BLE001
             pass
 

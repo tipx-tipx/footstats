@@ -254,6 +254,84 @@ def egress_surowy() -> dict[str, list[int]]:
     return {k: list(v) for k, v in _egress.items()}
 
 
+# ---------------------------------------------------------- MAGAZYNY --------
+# ⚑ DLACZEGO KLUCZ MOŻE MIESZKAĆ POZA SUPABASE (2026-09-10)
+#
+# Supabase był używany jako PAMIĘĆ ROBOCZA pipeline'u, a nie jako baza frontu.
+# `typy_log` (25 MB), `trend_lib` (47 MB), `styl_bank_liga` (21 MB),
+# `typy_log_kopia` (22 MB) i magazyn drużyn `hd_0..hd_9` czyta i pisze WYŁĄCZNIE
+# pipeline — front nie tyka ich ani razu (patrz `BUNDLE_KEYS` w
+# `web/src/lib/data.ts`). Mimo to jechały przez sieć do 70 razy na dobę
+# (25 cykli + 72 przebiegi `rozlicz_only`) i to one, a nie strona, wyczerpały
+# limit transferu Free — dwa razy: 25.08 i 04.09.
+#
+# Zamiast przepisywać 131 wywołań `get_key`/`put_key` rozsianych po pipelinie
+# (74 z nich siedzą w `rozliczanie.py` i `build_wc_fast.py`), podmieniamy sam
+# TRANSPORT wewnątrz tego modułu. Wołający o niczym nie wie, API się nie zmienia,
+# a testy — które mockują `_conn` i `requests` — zostają nietknięte.
+#
+# ⚑ PUSTY `MAGAZYN` = ZACHOWANIE DOKŁADNIE JAK PRZED ZMIANĄ. Przeprowadzka
+# klucza to dopisanie jednej linijki, a cofnięcie — skasowanie jej.
+MAGAZYN: dict[str, str] = {}
+
+# nazwa backendu -> obiekt z `pobierz(key) -> (payload, ok)` i
+# `zapisz(key, payload) -> bool`. Kontrakt `pobierz` jest TAKI SAM jak
+# `get_key_ok`: brak klucza to `(None, True)`, awaria to `(None, False)` —
+# i to rozróżnienie jest tu najważniejszą rzeczą do zaimplementowania.
+# Backend, który myli te dwa przypadki, pozwoli wołającemu dopisać garść
+# świeżych wpisów do pustki i zapisać to jako całą historię.
+_BACKENDY: dict[str, object] = {}
+
+# ruch, który NIE poszedł przez Supabase — osobno, żeby `raport_egress`
+# pokazywał, ile transferu realnie zdjęliśmy z limitu
+_ruch_poza: dict[str, list[int]] = {}
+
+
+def zarejestruj_backend(nazwa: str, backend) -> None:
+    """Podłącz magazyn pod nazwę używaną w `MAGAZYN`."""
+    _BACKENDY[nazwa] = backend
+
+
+BRAK_BACKENDU = object()   # wpis w MAGAZYN jest, backendu nie ma = AWARIA
+
+
+def _backend(key: str):
+    """Backend dla klucza, None gdy klucz mieszka w Supabase.
+
+    Trzeci przypadek — `BRAK_BACKENDU` — to konfiguracja niespójna z kodem.
+    """
+    nazwa = MAGAZYN.get(key)
+    if not nazwa:
+        return None
+    b = _BACKENDY.get(nazwa)
+    if b is None:
+        # ⚑ NIE spadamy cicho na Supabase. Klucz jest już przeniesiony, więc
+        # w bazie leży nieaktualna wersja: odczyt stamtąd cofnąłby produkt
+        # o kilka dni, a zapis zgubiłby wszystko, co przyszło po migracji.
+        # Awaria jest tu bezpieczniejsza niż nieświeże dane.
+        print(f"Klucz '{key}' wskazuje na magazyn '{nazwa}', którego NIE MA "
+              "w rejestrze — traktuję jak niedostępny, NIE schodzę na Supabase",
+              file=sys.stderr, flush=True)
+        return BRAK_BACKENDU
+    return b
+
+
+def _zlicz_poza(nazwa: str, key: str, bajty: int) -> None:
+    poz = _ruch_poza.setdefault(f"{key} [{nazwa}]", [0, 0])
+    poz[0] += 1
+    poz[1] += max(int(bajty or 0), 0)
+
+
+def raport_poza_supabase() -> str:
+    """Ile transferu przeszło magazynami spoza Supabase (nie liczy się do limitu)."""
+    if not _ruch_poza:
+        return ""
+    razem = sum(v[0] for v in _ruch_poza.values())
+    bajty = sum(v[1] for v in _ruch_poza.values())
+    return (f"Transfer poza Supabase (nie liczy się do limitu): "
+            f"{bajty / 1e6:.1f} MB w {razem} operacjach")
+
+
 def _conn() -> tuple[str, dict] | None:
     url = os.environ.get("SUPABASE_URL", "").rstrip("/")
     key = os.environ.get("SUPABASE_SERVICE_KEY", "")
@@ -278,6 +356,18 @@ def get_key_ok(key: str) -> tuple[object | None, bool]:
 
     Tryb lokalny (brak env) też jest `True`: nie ma czego stracić.
     """
+    b = _backend(key)
+    if b is BRAK_BACKENDU:
+        return None, False
+    if b is not None:
+        payload, ok = b.pobierz(key)
+        if ok:
+            # ta sama pamięć procesu co przy Supabase — `get_key` ma działać
+            # identycznie niezależnie od tego, gdzie klucz mieszka
+            _zapamietaj(key, payload)
+            _zlicz_poza(MAGAZYN[key], key, len(_pamiec.get(key) or ""))
+        return payload, ok
+
     c = _conn()
     if c is None:
         return None, True
@@ -577,6 +667,19 @@ def put_key(key: str, payload) -> bool:
 
 
 def _put_key(key: str, payload) -> bool:
+    b = _backend(key)
+    if b is BRAK_BACKENDU:
+        return False
+    if b is not None:
+        ok = b.zapisz(key, payload)
+        if ok:
+            try:
+                _zlicz_poza(MAGAZYN[key], key,
+                            len(json.dumps(payload, ensure_ascii=False)))
+            except Exception:  # noqa: BLE001
+                pass
+        return ok
+
     c = _conn()
     if c is None:
         return False

@@ -118,6 +118,9 @@ def main() -> None:
         # licznik transferu w KAŻDYM jobie — ten chodzi co 20 min i do 08.09
         # był jedynym, który nie mówił, ile czyta (patrz supa._pamiec)
         print(supa.raport_egress(), flush=True)
+        poza = supa.raport_poza_supabase()
+        if poza:
+            print(poza, flush=True)
 
 
 if __name__ == "__main__":
