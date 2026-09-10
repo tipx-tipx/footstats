@@ -65,6 +65,19 @@ def _konf() -> tuple[str, str, str] | None:
     token = os.environ.get("STAN_TOKEN", "").strip()
     if not repo or not token:
         return None
+    # ⚑ BACKSLASH ZAMIAST UKOŚNIKA (2026-09-10, kosztowało jeden cykl).
+    # `tipx-tipx\footstats-stan` sklejało się w URL nie do trafienia, więc
+    # magazyn meldował awarię i rozliczanie ODMÓWIŁO pracy (słusznie — ale
+    # przyczyna była literówką w zmiennej, nie usterką). Na Windowsie to
+    # pomyłka, która wróci; normalizujemy zamiast liczyć na czujność.
+    # Obcinamy też pełny adres wklejony z paska przeglądarki.
+    repo = repo.replace("\\", "/").strip("/")
+    for przedrostek in ("https://github.com/", "http://github.com/", "github.com/"):
+        if repo.lower().startswith(przedrostek):
+            repo = repo[len(przedrostek):]
+            break
+    if repo.endswith(".git"):
+        repo = repo[:-4]
     return repo, token, os.environ.get("STAN_TAG", "stan").strip() or "stan"
 
 

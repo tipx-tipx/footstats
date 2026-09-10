@@ -273,3 +273,23 @@ def test_naglowki_maja_user_agent():
     wyglada to na zly token i mozna szukac godzinami nie tam.
     """
     assert mr._naglowki("x").get("User-Agent")
+
+
+@pytest.mark.parametrize("wpisane", [
+    "tipx-tipx/footstats-stan",
+    r"tipx-tipx\footstats-stan",             # backslash — realna wpadka 10.09
+    "https://github.com/tipx-tipx/footstats-stan",
+    "github.com/tipx-tipx/footstats-stan",
+    "https://github.com/tipx-tipx/footstats-stan.git",
+    "/tipx-tipx/footstats-stan/",
+])
+def test_nazwa_repo_jest_normalizowana(monkeypatch, wpisane):
+    """STAN_REPO wpisuje czlowiek w panelu GitHuba — i wpisze roznie.
+
+    10.09 backslash sklejal sie w URL nie do trafienia: magazyn meldowal
+    awarie, rozliczanie ODMAWIALO pracy (slusznie), a przyczyna byla
+    literowka w zmiennej. Kod ma to znosic, nie czujnosc.
+    """
+    monkeypatch.setenv("STAN_REPO", wpisane)
+    monkeypatch.setenv("STAN_TOKEN", "x")
+    assert mr._konf()[0] == "tipx-tipx/footstats-stan"
