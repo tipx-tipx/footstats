@@ -230,3 +230,36 @@ def test_przez_router_supa(gh, monkeypatch):
 
     assert supa.get_key("typy_log") == {"z_repo": 1}
     supa.wyczysc_pamiec()
+
+
+def test_puste_repo_dostaje_pierwszy_commit(gh):
+    """Świeże repo nie ma commita, więc tag nie ma na czym wisieć (422).
+
+    Pierwsze uruchomienie na nowym repo musi się samo z tego wygrzebać —
+    to najgorszy moment na nieczytelny błąd.
+    """
+    api = gh()
+    stan = {"pusto": True}
+
+    def _get(url, **kw):
+        if "/releases/tags/" in url:
+            return _Odp(404)
+        raise AssertionError(url)
+
+    def _post(url, data=None, **kw):
+        if url.endswith("/releases"):
+            api.slad.append("zaloz-release")
+            if stan["pusto"]:
+                return _Odp(422, {"message": "Published releases must have a valid tag"})
+            return _Odp(201, {"id": 7, "assets": []})
+        return _GitHub.post(api, url, data=data, **kw)
+
+    def _put(url, **kw):
+        assert url.endswith("/contents/README.md")
+        api.slad.append("pierwszy-commit")
+        stan["pusto"] = False
+        return _Odp(201, {})
+
+    api.get, api.post, api.put = _get, _post, _put
+    assert mr.zapisz("typy_log", {"x": 1}) is True
+    assert api.slad[:3] == ["zaloz-release", "pierwszy-commit", "zaloz-release"]

@@ -120,6 +120,54 @@ def wyczysc_pamiec() -> None:
     _release_id = None
 
 
+OPIS_RELEASE = ("Magazyn stanu roboczego pipeline'u. Zarządzany przez "
+                "`pipeline/footstats/magazyn_repo.py` — nie edytować ręcznie. "
+                "Każdy zapis to nowy asset z sygnaturą czasu; najświeższy jest "
+                "obowiązujący, starsze to kopie zapasowe.")
+
+
+def _zaloz_release(repo: str, token: str, tag: str):
+    """Release pod nasze assety.
+
+    ⚑ ŚWIEŻO ZAŁOŻONE REPO JEST PUSTE, a tag musi na czymś wisieć — GitHub
+    odrzuca wtedy release z 422 („Published releases must have a valid tag").
+    Dlatego przy 422 zakładamy pierwszy commit (README) i próbujemy raz jeszcze.
+    Bez tego pierwsze uruchomienie na nowym repo padałoby bez zrozumiałego
+    powodu, a to jest dokładnie ten moment, w którym nikt nie ma cierpliwości.
+    """
+    def _post():
+        return requests.post(
+            f"{API}/repos/{repo}/releases",
+            headers=_naglowki(token), timeout=30,
+            json={"tag_name": tag, "name": "Stan pipeline'u",
+                  "body": OPIS_RELEASE, "draft": False, "prerelease": False},
+        )
+
+    r = _z_ponowieniem("zalozenie release", _post)
+    if r is not None and r.status_code < 300:
+        return r
+    if r is None or r.status_code != 422:
+        return None
+
+    print("Magazyn repo: repozytorium jest puste — zakładam pierwszy commit",
+          flush=True)
+    import base64
+    tresc = base64.b64encode(
+        ("# Stan pipeline'u footstats\n\n"
+         "Magazyn danych roboczych. Zawartość jest w **Releases**, nie w "
+         "drzewie plików.\n\nNie edytować ręcznie — pisze tu "
+         "`pipeline/footstats/magazyn_repo.py`.\n").encode("utf-8")
+    ).decode("ascii")
+    z = _z_ponowieniem("pierwszy commit", lambda: requests.put(
+        f"{API}/repos/{repo}/contents/README.md",
+        headers=_naglowki(token), timeout=30,
+        json={"message": "Magazyn stanu pipeline'u", "content": tresc},
+    ))
+    if z is None or z.status_code >= 300:
+        return None
+    return _z_ponowieniem("zalozenie release (po inicjalizacji)", _post)
+
+
 def _release(repo: str, token: str, tag: str) -> tuple[int, list[dict]] | None:
     """(id release'u, assety). Release zakładamy sami, gdy go nie ma."""
     global _spis, _release_id
@@ -133,16 +181,8 @@ def _release(repo: str, token: str, tag: str) -> tuple[int, list[dict]] | None:
     if r is None:
         return None
     if r.status_code == 404:
-        r = _z_ponowieniem("zalozenie release", lambda: requests.post(
-            f"{API}/repos/{repo}/releases",
-            headers=_naglowki(token), timeout=30,
-            json={"tag_name": tag, "name": "Stan pipeline'u",
-                  "body": "Magazyn stanu roboczego. Zarządzany przez "
-                          "`pipeline/footstats/magazyn_repo.py` — nie edytować "
-                          "ręcznie.",
-                  "draft": False, "prerelease": False},
-        ))
-        if r is None or r.status_code >= 300:
+        r = _zaloz_release(repo, token, tag)
+        if r is None:
             return None
     elif r.status_code != 200:
         return None
