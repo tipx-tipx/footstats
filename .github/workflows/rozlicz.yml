@@ -43,4 +43,8 @@ jobs:
           PYTHONIOENCODING: utf-8
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          # magazyn stanu pipeline'u (prywatne repo) — bez tego job PADNIE
+          # w produkcji zamiast czytac pusto: patrz magazyn_repo._w_produkcji
+          STAN_REPO: ${{ vars.STAN_REPO }}
+          STAN_TOKEN: ${{ secrets.STAN_TOKEN }}
         run: python -m footstats.jobs.rozlicz_only

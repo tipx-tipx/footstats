@@ -146,6 +146,10 @@ def main():
                 "push_supabase.push() zwrócił False mimo ustawionych sekretów — "
                 "dane NIE trafiły do Supabase"
             )
+        # dopiero po udanym przebiegu: przekroczony budzet to regresja
+        # do naprawienia, wiec ma byc widoczna jako CZERWONY job
+        from .. import supa as _s
+        _s.straz_budzetu("cykl")
         print(f"[{stamp}] OK", flush=True)
     except Exception as ex:
         # odcięcie mogło zacząć się W TRAKCIE przebiegu — wtedy też kończymy
@@ -169,6 +173,9 @@ def main():
             poza = supa.raport_poza_supabase()
             if poza:
                 print(poza, flush=True)
+            # regresja transferu ma krzyczec ZANIM limit padnie — licznik
+            # sam z siebie nikogo nie obudzil ani 25.08, ani 04.09
+            supa.straz_budzetu('cykl', podnies=False)
         except Exception:  # noqa: BLE001
             pass
 

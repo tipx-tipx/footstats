@@ -357,6 +357,54 @@ def _zlicz_poza(nazwa: str, key: str, bajty: int) -> None:
     poz[1] += max(int(bajty or 0), 0)
 
 
+# ------------------------------------------------------- BUDŻET TRANSFERU ---
+# ⚑ DLACZEGO PRÓG, A NIE SAM LICZNIK (2026-09-10, po dwóch spaleniach limitu)
+#
+# Licznik istnieje od 25.08 i za każdym razem mówił prawdę — tyle że nikt na
+# niego nie patrzył, dopóki projekt nie padł. 04.09 straż odcięcia kończyła
+# joby ZIELONO, więc awaria stała pięć dni niezauważona.
+#
+# Liczby: limit Free to 5 GB/mies. = ~170 MB/dobę, a przy ~40 przebiegach
+# (cykl + rozliczanie + betclic) wychodzi ok. 4 MB na przebieg. Po etapie 3
+# pipeline czyta najwyżej 9,62 MB (i to gdyby sięgnął po WSZYSTKIE pozostałe
+# klucze naraz, bez pamięci procesu), więc:
+#   * 15 MB  = wyraźnie powyżej normy, coś zaczęło czytać za dużo → ostrzeżenie,
+#   * 40 MB  = czterokrotność normy, przy tym tempie limit pada w kilka dni
+#              → job na CZERWONO, bo to jest regresja do naprawienia w kodzie.
+#
+# Progi są PER PRZEBIEG, nie dobowe: każdy job to osobny proces i nie ma gdzie
+# trzymać wspólnego licznika, a regresja i tak objawia się w pojedynczym cyklu.
+OSTRZEZENIE_PRZEBIEGU_MB = 15.0
+ALARM_PRZEBIEGU_MB = 40.0
+
+
+class PrzekroczonyBudzet(RuntimeError):
+    """Jeden przebieg przeczytał tyle, że przy tym tempie limit padnie."""
+
+
+def straz_budzetu(job: str, *, podnies: bool = True) -> float:
+    """Sprawdź, ile ten przebieg przeczytał z Supabase. Zwraca MB.
+
+    `podnies=False` dla wołających, którzy chcą samej liczby (testy, raporty).
+    """
+    mb = sum(w[1] for w in _egress.values()) / 1e6
+    if mb >= ALARM_PRZEBIEGU_MB:
+        tresc = (f"⚑⚑ TRANSFER POZA NORMĄ: {job} przeczytał {mb:.1f} MB "
+                 f"z Supabase (próg alarmu {ALARM_PRZEBIEGU_MB:.0f} MB). "
+                 f"Przy ~40 przebiegach na dobę to {mb * 40 / 1000:.1f} GB/dobę "
+                 f"wobec limitu 5 GB/MIESIĄC — limit padnie w kilka dni. "
+                 f"Rozkład po kluczach wyżej.")
+        print(tresc, file=sys.stderr, flush=True)
+        if podnies:
+            raise PrzekroczonyBudzet(tresc)
+    elif mb >= OSTRZEZENIE_PRZEBIEGU_MB:
+        print(f"⚑ Uwaga: {job} przeczytał {mb:.1f} MB z Supabase "
+              f"(zwykle poniżej {OSTRZEZENIE_PRZEBIEGU_MB:.0f} MB). "
+              "Sprawdź, czy któryś klucz nie wrócił do bazy.",
+              file=sys.stderr, flush=True)
+    return mb
+
+
 def raport_poza_supabase() -> str:
     """Ile transferu przeszło magazynami spoza Supabase (nie liczy się do limitu)."""
     if not _ruch_poza:

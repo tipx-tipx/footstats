@@ -121,6 +121,7 @@ def main() -> None:
         poza = supa.raport_poza_supabase()
         if poza:
             print(poza, flush=True)
+        supa.straz_budzetu('rozliczanie', podnies=False)
 
 
 if __name__ == "__main__":
