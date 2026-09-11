@@ -15,7 +15,8 @@
     "test:opis": "node --experimental-strip-types --no-warnings scripts/test-opis-zakladu.mjs",
     "test:klucze": "node --experimental-strip-types --no-warnings scripts/test-klucze-rls.mjs",
     "zrzuty": "node scripts/zrzuty.mjs",
-    "audyt": "node scripts/audyt-mobile.mjs"
+    "audyt": "node scripts/audyt-mobile.mjs",
+    "test:sklejanie": "node --experimental-strip-types --no-warnings scripts/test-sklejanie-czesci.mjs"
   },
   "dependencies": {
     "framer-motion": "^12.42.2",

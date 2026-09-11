@@ -23,6 +23,8 @@ import druzynyFormaLocal from "@/data/demo/druzyny_forma.json";
 import radarLocal from "@/data/demo/radar.json";
 import pokrycieLocal from "@/data/demo/pokrycie_liga.json";
 
+import { scalWGlab } from "./sklejanie";
+
 import type {
   DruzynaForma,
   Kalibracja,
@@ -237,7 +239,11 @@ async function sklejCzesci<T>(
   if (Array.isArray(czesci[0])) {
     return (czesci as unknown[][]).flat() as T;
   }
-  return Object.assign({}, ...(czesci as object[])) as T;
+  const scalony: Record<string, unknown> = {};
+  for (const cz of czesci as Record<string, unknown>[]) {
+    scalWGlab(scalony, cz ?? {});
+  }
+  return scalony as T;
 }
 
 async function fetchKlucz<T>(
