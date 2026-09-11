@@ -4346,6 +4346,13 @@ def _main_impl(tryb=None):
     # „model na stronie" byłoby deklaracją, a nie faktem — a dokładnie tego
     # właściciel zażądał przy zatwierdzaniu ([[PLAN-do-29-08]], zadanie 1).
     _licznik_zrodla: Counter = Counter()
+    # ⚑ STAN MAGAZYNU ZAPISUJEMY NA KOŃCU, NIE TU (2026-09-11). Wczytanie wag
+    # dzieje się PRZED `diagnostyka.reset()`, więc `zapisz_rentgen` wywołane
+    # w tym miejscu było czyszczone i do `meta` nie docierało nic — sprawdzone
+    # na produkcji: `model_pokrycie` (zapis po resecie) był, `magazyn_druzyn`
+    # (zapis przed) nie. Trzymamy więc liczby i odkładamy je razem z resztą
+    # rentgenu przy licznikach źródła szansy.
+    _stan_magazynu: dict = {}
     try:
         _wagi_modelu = supa.get_key(uczony.KLUCZ_WAG) or {}
         print(uczony.zdanie_stanu(_wagi_modelu))
@@ -4361,15 +4368,13 @@ def _main_impl(tryb=None):
             else:
                 _st_mag = magazyn_druzyn.statystyki(_mag_uczony)
                 print(magazyn_druzyn.zdanie_stanu(_st_mag))
-                # ⚑ STAN MAGAZYNU DO META, NIE TYLKO DO LOGU (2026-09-11).
-                # Po przeprowadzce magazynu do prywatnego repo nie da się go
-                # odczytać z sesji bez tokenu, a to on decyduje, czy model ma
-                # pokrycie. Bez tej linii „ile drużyn i meczów naprawdę wczytał
-                # cykl" było widoczne wyłącznie w logu Actions — czyli tam,
-                # gdzie nie zaglądamy przy diagnozie.
-                diagnostyka.zapisz_rentgen("magazyn_druzyn", {
+                # STAN MAGAZYNU DO META (2026-09-11) — odkładany na koniec
+                # przebiegu, patrz `_stan_magazynu`. Po przeprowadzce magazynu
+                # do prywatnego repo nie da się go odczytać z sesji bez tokenu,
+                # a to on decyduje, czy model ma pokrycie.
+                _stan_magazynu = {
                     k: v for k, v in _st_mag.items() if k != "pola"
-                })
+                }
                 _ctx_modelu = uczony.przygotuj_sumy(_mag_uczony)
                 # KIEDY DRUŻYNA GRAŁA — do bramy świeżości drabinek. Magazyn
                 # jest już wczytany, więc to zero dodatkowych zapytań i zero
@@ -9479,6 +9484,7 @@ def _main_impl(tryb=None):
     # 21.08: liczba, na której podejmujemy decyzje, musi być W META.
     diagnostyka.zapisz_rentgen("model_zrodlo_szansy", dict(_licznik_zrodla))
     diagnostyka.zapisz_rentgen("model_pokrycie", dict(_licznik_uczonego))
+    diagnostyka.zapisz_rentgen("magazyn_druzyn", _stan_magazynu)
     if _licznik_zrodla:
         print("Źródło szansy na stronie: " + ", ".join(
             f"{k} {v}" for k, v in sorted(_licznik_zrodla.items())))
