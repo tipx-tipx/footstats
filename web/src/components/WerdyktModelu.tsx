@@ -1,7 +1,7 @@
 "use client";
 
 import { useStawka } from "./useStawka";
-import { fmtProc, fmtU } from "@/lib/format";
+import { dataPl, fmtProc, fmtU } from "@/lib/format";
 import { OSTATNIA_ZMIANA } from "@/lib/zmiany";
 
 /**
@@ -27,13 +27,6 @@ import { OSTATNIA_ZMIANA } from "@/lib/zmiany";
  */
 
 /** "2026-07-26" → "26 lipca" (południe lokalne, żeby strefa nie cofała daty). */
-function dataPl(dzien: string): string {
-  return new Date(`${dzien}T12:00:00`).toLocaleDateString("pl-PL", {
-    day: "numeric",
-    month: "long",
-  });
-}
-
 /**
  * Data dnia w nagłówku: „6 sierpnia".
  *
@@ -366,10 +359,19 @@ export function WerdyktModelu({
       {pelnyWglad && OSTATNIA_ZMIANA && d.wstrzymane.length > 0 && (
         <p className="border-t border-hairline px-5 py-4 text-xs leading-relaxed text-muted sm:px-6">
           <strong className="font-semibold text-ink">Co z tym robimy:</strong>{" "}
-          od {dataPl(OSTATNIA_ZMIANA.od)} {OSTATNIA_ZMIANA.opis} Wstrzymane
-          właśnie {d.wstrzymane.length === 1 ? "jest" : "są"}:{" "}
-          {d.wstrzymane.join(", ")} – nie publikujemy stamtąd typów, dopóki nie
-          przestaną tracić.{" "}
+          od {dataPl(OSTATNIA_ZMIANA.od)} {OSTATNIA_ZMIANA.opis}{" "}
+          {/* ⚑ TO ZDANIE OBIECYWAŁO BLOKADĘ, KTÓREJ NIE MA (2026-09-11).
+              Mówiło „nie publikujemy stamtąd typów", a kwarantanna przestała
+              zdejmować typy z listy 14.08 – typy z tych rynków normalnie
+              wchodziły na listę dnia obok tego zdania. Co robi naprawdę:
+              ostrzeżenie na karcie, koniec kolejności „polecane", zakaz
+              wejścia do kuponu. */}
+          Na oku mamy: {d.wstrzymane.join(", ")} – te typy wciąż pokazujemy, ale
+          z ostrzeżeniem na karcie, na końcu kolejności i{" "}
+          <strong className="font-semibold text-ink">
+            nie wpuszczamy ich do kuponów
+          </strong>
+          .{" "}
           {d.dniPoZmianie > 0
             ? `Dni po zmianie: ${d.dniPoZmianie} – na ocenę wciąż za mało.`
             : "Nowe zasady nie mają jeszcze ani jednego rozliczenia."}
