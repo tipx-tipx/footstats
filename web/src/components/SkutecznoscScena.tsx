@@ -10,7 +10,7 @@ import { RaportUczenia } from "./skutecznosc/RaportUczenia";
 import { StanWarstw } from "./skutecznosc/StanWarstw";
 import { TypyDnia } from "./skutecznosc/TypyDnia";
 import { WerdyktModelu, type WerdyktDane } from "./WerdyktModelu";
-import { fmtProc } from "@/lib/format";
+import { dataPl, fmtProc } from "@/lib/format";
 import type {
   Meta,
   SkutecznoscDnia,
@@ -409,6 +409,36 @@ export function SkutecznoscScena({
       {werdykt && (
         <div className="max-w-3xl">
           <WerdyktModelu d={werdykt} pelnyWglad={pelnyWglad} />
+        </div>
+      )}
+
+      {/* OD KIEDY LICZYMY — pierwsze zdanie, które czytelnik ma zobaczyć.
+          Data startu weszła 11.09, bo dni sprzed niej nie mają zapisanego
+          składu listy dnia: ich bilans liczył się z księgi, razem z typami
+          policzonymi tylko w tle (doba 20.08 miała w Skuteczności 165 typów
+          przy limicie 21 na dobę). Bez tego zdania zniknięcie kilku tysięcy
+          rozliczeń wygląda jak awaria, a nie jak decyzja. */}
+      {typy.podsumowanie?.start_statystyk && (
+        <div className="mt-4 max-w-3xl rounded-(--radius-control) border border-hairline bg-card-soft px-4 py-3">
+          <p className="text-xs leading-relaxed text-muted">
+            <strong className="font-semibold text-ink">
+              Liczymy od {dataPl(typy.podsumowanie.start_statystyk)}
+            </strong>{" "}
+            – od tego dnia zapisujemy skład ogłoszonej listy, więc każda liczba
+            niżej opisuje dokładnie te typy, które były na stronie.
+            {(typy.podsumowanie.przed_startem_n ?? 0) > 0 && (
+              <>
+                {" "}
+                Starsze{" "}
+                <span className="font-data font-semibold text-ink">
+                  {typy.podsumowanie.przed_startem_n}
+                </span>{" "}
+                rozliczeń zostaje w pamięci modelu – uczy się z nich dalej,
+                ale nie liczymy ich do wyniku, bo dla tamtych dni nie da się
+                już odtworzyć, co dokładnie pokazywaliśmy.
+              </>
+            )}
+          </p>
         </div>
       )}
 

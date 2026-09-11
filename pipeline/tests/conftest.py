@@ -61,6 +61,11 @@ def pytest_configure(config):
         "magazyn_produkcyjny: test patrzy na PRAWDZIWY supa.MAGAZYN "
         "(domyślnie testy dostają pusty — patrz tests/conftest.py)",
     )
+    config.addinivalue_line(
+        "markers",
+        "data_startu: test sam ustawia rozliczanie.START_STATYSTYK "
+        "(domyślnie w testach jest wyłączona — patrz tests/conftest.py)",
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -149,4 +154,30 @@ def _magazyny_domyslnie_wylaczone(request, monkeypatch):
         yield
         return
     monkeypatch.setattr(supa, "MAGAZYN", {})
+    yield
+
+
+@pytest.fixture(autouse=True)
+def _bez_daty_startu_statystyk(request, monkeypatch):
+    """`rozliczanie.START_STATYSTYK` jest w testach WYŁĄCZONA.
+
+    PO CO TO ISTNIEJE (2026-09-11). Produkt liczy pokazywane statystyki od
+    ustalonej daty — dni sprzed niej nie mają zapisanego składu listy dnia,
+    więc nie da się o nich powiedzieć, co stało na stronie. Testy Skuteczności
+    operują na fikcyjnych dniach (13 sierpnia i podobne) i badają MECHANIKĘ:
+    zamrożony skład, znaczniki, zgodność widoku zbiorczego ze strumieniami.
+
+    Gdyby data startu obowiązywała i tutaj, każde jej przesunięcie wywracałoby
+    kilkanaście testów, których przedmiotem nie jest data — i autor zmiany
+    musiałby przepisywać fikcyjne kalendarze zamiast czytać, co się zepsuło.
+    To ta sama zasada co przy `MAGAZYN` wyżej.
+
+    Sama datę startu pilnuje `test_start_statystyk.py`, który ustawia ją
+    jawnie.
+    """
+    from footstats.jobs import rozliczanie
+    if request.node.get_closest_marker("data_startu"):
+        yield
+        return
+    monkeypatch.setattr(rozliczanie, "START_STATYSTYK", None)
     yield

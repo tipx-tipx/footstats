@@ -1059,6 +1059,18 @@ export interface TypyWyniki {
     trafione: number;
     roi_flat: number;
     okazje_rozliczone: number;
+    /**
+     * OD KIEDY LICZYMY POKAZYWANE STATYSTYKI (2026-09-11).
+     *
+     * Dni sprzed tej daty nie mają zapisanego składu listy dnia, więc nie da
+     * się o nich powiedzieć, co naprawdę stało na stronie — ich bilans liczył
+     * się z księgi, razem z typami policzonymi tylko w tle (doba 20.08: 165
+     * typów przy limicie 21 na dobę). `przed_startem_n` mówi, ile rozliczeń
+     * zostało po tamtej stronie: data startu nie może być cichym odrzuceniem
+     * kilku tysięcy rekordów. `null` = liczymy całą księgę, jak przed zmianą.
+     */
+    start_statystyk?: string | null;
+    przed_startem_n?: number;
     /** średnie CLV rozliczonych typów (dodatnie = bierzemy kursy lepsze niż zamknięcie) */
     clv_sr_pct?: number | null;
     clv_n?: number;

@@ -2707,6 +2707,41 @@ def _z_martwej_epoki(r: dict) -> bool:
 EPOKA_BIEZACA = "liga"
 
 
+# --- OD KIEDY LICZYMY TO, CO POKAZUJEMY (2026-09-11) ------------------------
+#
+# Zgłoszenie właściciela: „w rozliczeniach mają się pokazywać tylko typy, które
+# były pokazywane na stronie; typy w tle mają być w tle". Filtr zamrożonej
+# listy dnia to zapewnia — ale tylko dla dni, które mają zapisany skład,
+# a zapisy zaczęły przeżywać dłużej niż cztery doby dopiero 11.09
+# (`build_wc_fast.RETENCJA_MANIFESTU_DNI`). Starszych manifestów NIE MA i nie
+# da się ich odtworzyć: dla tamtych dni „co było na stronie" jest bezpowrotnie
+# nie do ustalenia, a bilans liczy się z księgi, czyli z tłem.
+#
+# Dlatego produkt ma DATĘ STARTU. Werdykt, kalendarz i krzywa liczą wyłącznie
+# dni od niej — czyli wyłącznie dni, dla których wiemy, co ogłosiliśmy.
+#
+# ⚑ CZEGO TO NIE RUSZA: uczenia. Warstwy korekt, kalibracja i trening modelu
+# dalej czytają CAŁĄ księgę — one potrzebują próby, a nie „tego, co user
+# widział". Reset widoku i reset pamięci to dwie różne rzeczy i tylko pierwsza
+# jest tu zrobiona. Korekta strony uczy się na 300 rozliczeniach PARY
+# (rynek, strona), więc wyzerowanie księgi uciszyłoby ją na tygodnie.
+#
+# Typy sprzed startu nie są kasowane ani ukrywane bez liczby: podsumowanie
+# niesie `przed_startem_n`, żeby nie było cichego odrzucenia
+# ([[ciche-odrzucenia-zasada]]).
+#
+# None = licz wszystko (zachowanie sprzed 11.09). Cofnięcie to jedna linia.
+START_STATYSTYK: str | None = "2026-09-11"
+
+
+def w_oknie_statystyk(r: dict) -> bool:
+    """Czy ten rekord ma prawo wejść do POKAZYWANYCH liczb."""
+    if not START_STATYSTYK:
+        return True
+    dzien = dzien_pl(r.get("kickoff_ts"))
+    return bool(dzien) and dzien >= START_STATYSTYK
+
+
 def _kraje_reprezentacji() -> set[str]:
     """Nazwy reprezentacji (PL i EN) — import leniwy, bo to źródło, nie model."""
     global _KRAJE_CACHE
@@ -5048,6 +5083,8 @@ def skutecznosc_strumieni(log: dict, dni: int = 21,
             # tylko obecny produkt — patrz komentarz przy `settled`
             # w budowie payloadu Skuteczności
             and _z_biezacej_epoki(r) and not _z_martwej_epoki(r)
+            # pokazywane liczby liczą się od daty startu (patrz W_OKNIE...)
+            and w_oknie_statystyk(r)
             and _strumien(r) == nazwa
         ]
         # ⚑ BILANS OPISUJE LISTĘ, KTÓRĄ USER WIDZIAŁ — patrz
@@ -6170,6 +6207,10 @@ def rozlicz(
         # w `raport_uczenia` (patrz tam) — pytanie „jak nam idzie" ma dotyczyć
         # tego, co dziś sprzedajemy.
         and _z_biezacej_epoki(r) and not _z_martwej_epoki(r)
+        # OD DATY STARTU — dni sprzed niej nie mają zapisanego składu, więc
+        # nie da się o nich powiedzieć, co było na stronie (patrz
+        # `START_STATYSTYK`)
+        and w_oknie_statystyk(r)
     ]
     okazje = [r for r in settled if not r["sugestia"] and r.get("kurs")]
     roi = sum(_zwrot_typu(r) - 1.0 for r in okazje)
@@ -6185,6 +6226,7 @@ def rozlicz(
         and not opublikowany(r, _lista_dnia)
         and _z_modelu(r)
         and _z_biezacej_epoki(r) and not _z_martwej_epoki(r)
+        and w_oknie_statystyk(r)
     ]
 
     def _po_rynku(recs: list[dict]) -> list[dict]:
@@ -6306,6 +6348,21 @@ def rozlicz(
             "trafione": sum(1 for r in settled if r["wynik"] == "wygrany"),
             "roi_flat": round(roi, 2),
             "okazje_rozliczone": len(okazje),
+            # OD KIEDY LICZYMY i ILE ZOSTAŁO PRZED TĄ DATĄ. Bez tej liczby
+            # data startu byłaby cichym odrzuceniem kilku tysięcy rozliczeń
+            # ([[ciche-odrzucenia-zasada]]); z nią strona może powiedzieć
+            # wprost: „liczymy od 11 września, wcześniejsze 2643 typy zostają
+            # w archiwum modelu".
+            "start_statystyk": START_STATYSTYK,
+            "przed_startem_n": (
+                sum(1 for r in log.values()
+                    if r.get("wynik") in ("wygrany", "przegrany")
+                    and r.get("rynek_kod") not in RYNKI_OSOBNE
+                    and not r.get("odrzucony") and _z_modelu(r)
+                    and _z_biezacej_epoki(r) and not _z_martwej_epoki(r)
+                    and not w_oknie_statystyk(r))
+                if START_STATYSTYK else 0
+            ),
             # CLV: dodatnie = braliśmy kursy lepsze niż zamknięcie rynku
             "clv_sr_pct": (
                 round(sum(r["clv_pct"] for r in z_clv) / len(z_clv), 1)

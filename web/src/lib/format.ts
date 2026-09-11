@@ -76,6 +76,21 @@ export function fmtDzien(dzien: string, dlugo = false): string {
   }).format(new Date(`${dzien}T12:00:00`));
 }
 
+/**
+ * Data bez dnia tygodnia („11 września") — do zdań w tekście.
+ *
+ * Ta sama treść co `fmtDzien`, ale bez „czwartek": w zdaniu „liczymy od
+ * 11 września" dzień tygodnia jest szumem. Siedziała jako kopia w
+ * `WerdyktModelu`, dopóki nie okazała się potrzebna w drugim miejscu
+ * (2026-09-11).
+ */
+export function dataPl(dzien: string): string {
+  return new Intl.DateTimeFormat("pl-PL", {
+    day: "numeric",
+    month: "long",
+  }).format(new Date(`${dzien}T12:00:00`));
+}
+
 /** Sama godzina kickoffu ("20:15") w czasie polskim. */
 export function fmtGodzina(ts: number): string {
   return new Date(ts * 1000).toLocaleTimeString("pl-PL", {
