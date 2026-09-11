@@ -6256,6 +6256,12 @@ def rozlicz(
         r for r in log.values()
         if r.get("wynik") == "zwrot" and r.get("powod") == POWOD_BRAK_DANYCH
         and r.get("rynek_kod") not in RYNKI_OSOBNE and not r.get("odrzucony")
+        # ⚑ TEŻ OD DATY STARTU (2026-09-11). Bez tego dzień sprzed startu
+        # WRACAŁ do kalendarza przez sam licznik braków: `skutecznosc_per_dzien`
+        # zakłada dzień dla każdego rekordu, także takiego, który do żadnej
+        # liczby nie wchodzi. Zmierzone po wdrożeniu: werdykt liczył 7 typów
+        # z 11.09, a kalendarz pokazywał 04.09, 03.09, 02.09, 01.09, 31.08…
+        and w_oknie_statystyk(r)
     ]
     skutecznosc_dzienna = skutecznosc_per_dzien(
         settled, poza=poza_pub, braki=_braki_dni,
@@ -6354,11 +6360,17 @@ def rozlicz(
             # wprost: „liczymy od 11 września, wcześniejsze 2643 typy zostają
             # w archiwum modelu".
             "start_statystyk": START_STATYSTYK,
+            # ⚑ TA SAMA DEFINICJA CO `rozliczone` WYŻEJ, tylko po drugiej
+            # stronie daty. Pierwsza wersja pomijała warunek `opublikowany`
+            # i liczyła całą księgę — na produkcji dała 11 754 wobec 2643,
+            # które user znał z werdyktu. Liczba, która ma tłumaczyć zniknięcie
+            # dorobku, nie może być inna niż ten dorobek.
             "przed_startem_n": (
                 sum(1 for r in log.values()
                     if r.get("wynik") in ("wygrany", "przegrany")
                     and r.get("rynek_kod") not in RYNKI_OSOBNE
                     and not r.get("odrzucony") and _z_modelu(r)
+                    and opublikowany(r, _lista_dnia)
                     and _z_biezacej_epoki(r) and not _z_martwej_epoki(r)
                     and not w_oknie_statystyk(r))
                 if START_STATYSTYK else 0

@@ -151,3 +151,60 @@ def test_warstwy_uczenia_czytaja_cala_ksiege(monkeypatch):
     out = _payload(monkeypatch, log)
     assert out["podsumowanie"]["rozliczone"] == 0, "widok jest pusty..."
     assert out["podsumowanie"]["przed_startem_n"] == 60, "...a księga pełna"
+
+
+# --- LUKI ZŁAPANE NA PRODUKCJI PO WDROŻENIU (2026-09-11) -------------------
+#
+# Data startu weszła i werdykt liczył poprawnie 7 typów z 11.09 — ale dwie
+# rzeczy jej nie widziały. Oba testy wyżej przechodziły, bo żaden nie miał
+# rekordu „zwrot bez danych" ani nie sprawdzał, CO liczy `przed_startem_n`.
+
+def _rec_zwrot(dzien: str, podmiot="Santos"):
+    r = _rec(dzien, podmiot=podmiot, wynik="zwrot")
+    r["powod"] = R.POWOD_BRAK_DANYCH
+    return r
+
+
+def test_dzien_sprzed_startu_nie_wraca_przez_licznik_brakow(monkeypatch):
+    """⚑ Dzień sprzed startu WRACAŁ do kalendarza przez sam licznik braków.
+
+    `skutecznosc_per_dzien` zakłada dzień dla KAŻDEGO przekazanego rekordu,
+    także takiego, który nie wchodzi do żadnej liczby. Na produkcji werdykt
+    pokazywał 7 typów z 11.09, a kalendarz obok: 04.09, 03.09, 02.09, 01.09,
+    31.08 — dni istniejące wyłącznie dlatego, że miały nierozstrzygnięte typy.
+    """
+    monkeypatch.setattr(R, "START_STATYSTYK", START)
+    log = {}
+    dobry = _rec(START, podmiot="Flamengo")
+    log[R._klucz(dobry)] = dobry
+    for dzien in ("2026-09-04", "2026-09-03", "2026-08-31"):
+        z = _rec_zwrot(dzien, podmiot=f"Klub {dzien}")
+        z["mecz_id"] = 500 + int(dzien[-2:])
+        log[R._klucz(z)] = z
+
+    out = _payload(monkeypatch, log)
+    dni = [d["dzien"] for d in out["skutecznosc_dzienna"]]
+    assert dni == [START], f"w kalendarzu nie ma prawa być dni sprzed startu: {dni}"
+
+
+def test_przed_startem_liczy_to_samo_co_werdykt(monkeypatch):
+    """⚑ `przed_startem_n` musi liczyć TO SAMO co `rozliczone`, tylko przed datą.
+
+    Pierwsza wersja pomijała warunek `opublikowany` i liczyła całą księgę:
+    na produkcji dała 11 754 wobec 2643, które user znał z werdyktu. Liczba,
+    która tłumaczy zniknięcie dorobku, nie może być inna niż ten dorobek.
+    """
+    monkeypatch.setattr(R, "START_STATYSTYK", START)
+    log = {}
+    ze_strony = _rec("2026-08-20", podmiot="Cruzeiro")
+    log[R._klucz(ze_strony)] = ze_strony
+    w_tle = _rec("2026-08-20", podmiot="Santos")
+    w_tle["poza_publikacja"] = "poza_lista_dnia"   # nigdy nie był na stronie
+    w_tle["mecz_id"] = 77
+    log[R._klucz(w_tle)] = w_tle
+
+    out = _payload(monkeypatch, log)
+    assert out["podsumowanie"]["przed_startem_n"] == 1, (
+        "typ z tła nie był w werdykcie przed zmianą, więc nie może się "
+        "doliczać do tego, co „zostało w pamięci modelu"
+    )
