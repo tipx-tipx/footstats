@@ -200,3 +200,80 @@ def test_dzien_bez_zamrozonego_skladu_liczy_wszystko(monkeypatch):
     log = {R._klucz(a): a, R._klucz(b): b}
     out = _payload_skutecznosci(monkeypatch, log, {})
     assert out["podsumowanie"]["rozliczone"] == 2
+
+
+# --- SKŁAD DNIA ROZSTRZYGA W OBIE STRONY (2026-09-11) -----------------------
+#
+# Zgłoszenie usera: „chodzi mi o te typy z 10.09, które BYŁY pokazane na
+# stronie". Doba 10.09 miała ogłoszony skład 13 typów, a Skuteczność
+# pokazywała dla niej ZERO okazji: 7 z tych 13 leżało w księdze pod
+# znacznikiem sprzed publikacji (`leg_kuponu` 4, `za_pozno`, `rynek_ukryty`,
+# `rozjazd_z_rynkiem`). Znacznik bywa starszy niż publikacja — rekord rodzi
+# się np. jako leg kuponu, a dopiero kolejny cykl wpuszcza typ na listę;
+# awans zdejmuje wtedy znacznik, ale tylko gdy ten cykl dowiezie księgę.
+#
+# Filtr działał więc wyłącznie na niekorzyść: odsiewał to, czego w składzie
+# nie ma, ale nie wpuszczał tego, co w składzie JEST.
+
+def test_typ_ze_skladu_liczy_sie_mimo_starego_znacznika():
+    t = {**_typ(), "poza_publikacja": "leg_kuponu"}
+    lista = {"2026-08-13": {B._klucz_publikacji(t)}}
+    assert R.opublikowany(t, lista) is True
+
+
+def test_typ_spoza_skladu_nie_liczy_sie_mimo_braku_znacznika():
+    t = _typ(podmiot="Cruzeiro")
+    lista = {"2026-08-13": {B._klucz_publikacji(_typ(podmiot="Flamengo"))}}
+    assert R.opublikowany(t, lista) is False
+
+
+def test_dzien_bez_skladu_decyduje_znacznikiem():
+    """Doby sprzed listy dnia działają dokładnie jak dotąd."""
+    assert R.opublikowany(_typ(), {}) is True
+    assert R.opublikowany({**_typ(), "poza_publikacja": "rynek_ukryty"}, {}) is False
+    assert R.opublikowany({**_typ(), "poza_publikacja": "leg_kuponu"}, None) is False
+
+
+def test_pusty_sklad_nie_awansuje_typu_ze_znacznikiem():
+    """Nieudany zapis manifestu nie może wpuścić do bilansu czegokolwiek."""
+    t = {**_typ(), "poza_publikacja": "leg_kuponu"}
+    assert R.opublikowany(t, {"2026-08-13": set()}) is False
+
+
+def test_znacznik_sprzed_publikacji_wchodzi_do_bilansu_dnia(monkeypatch):
+    """Sedno zgłoszenia, na pełnym payloadzie Skuteczności."""
+    ze_skladu = {**_rec_druzynowy(podmiot="Flamengo", wynik="wygrany"),
+                 "poza_publikacja": "leg_kuponu"}
+    spoza = _rec_druzynowy(podmiot="Cruzeiro", wynik="przegrany")
+    log = {R._klucz(ze_skladu): ze_skladu, R._klucz(spoza): spoza}
+    lista = {"2026-08-13": {"klucze": [B._klucz_publikacji(ze_skladu)],
+                            "zamkniete_ts": _ts("2026-08-13", 6)}}
+    out = _payload_skutecznosci(monkeypatch, log, lista)
+
+    pods = out["podsumowanie"]
+    assert pods["rozliczone"] == 1, "typ z ogłoszonego składu JEST w bilansie"
+    assert pods["trafione"] == 1
+    dzien = next(d for d in out["skutecznosc_dzienna"]
+                 if d["dzien"] == "2026-08-13")
+    assert dzien["okazje"] == 1
+    assert dzien["poza_n"] == 1, "spoza składu nadal idzie na próbę"
+
+    # ⚑ i nie może zostać podpisany „na próbę" — inaczej ten sam typ byłby
+    # w bilansie, a na liście z etykietą; u klienta zniknąłby zupełnie,
+    # bo `okrojDlaKlienta` wycina wiersze z tym polem
+    wiersz = next(t for t in dzien["typy"] if t["podmiot"] == "Flamengo")
+    assert not wiersz.get("poza_publikacja")
+
+
+def test_strumienie_tez_wpuszczaja_typ_ze_skladu(monkeypatch):
+    """Obie zakładki Skuteczności muszą dalej podawać tę samą liczbę."""
+    ze_skladu = {**_rec_druzynowy(podmiot="Flamengo", wynik="wygrany"),
+                 "poza_publikacja": "za_pozno"}
+    log = {R._klucz(ze_skladu): ze_skladu}
+    lista = {"2026-08-13": {"klucze": [B._klucz_publikacji(ze_skladu)],
+                            "zamkniete_ts": _ts("2026-08-13", 6)}}
+    out = _payload_skutecznosci(monkeypatch, log, lista)
+    zbiorczo = out["podsumowanie"]["rozliczone"]
+    strumienie = sum(s["podsumowanie"]["rozliczone"]
+                     for s in out["skutecznosc_strumienie"].values())
+    assert zbiorczo == strumienie == 1

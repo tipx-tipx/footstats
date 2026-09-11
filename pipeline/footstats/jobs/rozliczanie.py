@@ -838,6 +838,39 @@ def poza_zamrozona_lista(r: dict, lista_dnia: dict[str, set] | None) -> bool:
     return _klucz_listy(r) not in klucze
 
 
+def opublikowany(r: dict, lista_dnia: dict[str, set] | None) -> bool:
+    """Czy user widział ten typ na ogłoszonej liście dnia.
+
+    ⚑ ZAMROŻONY SKŁAD ROZSTRZYGA W OBIE STRONY (2026-09-11, zgłoszenie usera:
+    „chodzi mi o te typy z 10.09, które BYŁY pokazane na stronie").
+
+    Do dziś skład działał wyłącznie na NIEKORZYŚĆ: typ bez znacznika, którego
+    w składzie nie ma, schodził do „policzonych na próbę" — ale typ, który
+    w składzie JEST, a w księdze nosi stary znacznik `poza_publikacja`, dalej
+    liczył się jak niepokazany. A znacznik bywa starszy niż publikacja: rekord
+    rodzi się np. jako leg kuponu albo odpada na `za_pozno`, a dopiero kolejny
+    cykl wpuszcza go na listę. Awans (`_dopisz_nowe`) zdejmuje wtedy znacznik,
+    ale tylko jeśli ten cykl w ogóle dowiezie księgę — gdy padnie na wysyłce
+    albo typ już nie wróci (mecz ruszył), w księdze zostaje znacznik sprzed
+    publikacji.
+
+    Zmierzone na produkcji 11.09: doba 10.09 miała ogłoszony skład 13 typów,
+    a Skuteczność pokazywała dla niej ZERO okazji — 7 z tych 13 leżało pod
+    znacznikami `leg_kuponu` (4), `za_pozno`, `rynek_ukryty`,
+    `rozjazd_z_rynkiem`. Dzień, który user widział na stronie, wyglądał
+    w produkcie jak dzień bez ani jednego typu.
+
+    Księgi NIE ruszamy (historii nie przepisujemy) — jak przy poprzedniej
+    naprawie tej samej klasy, decyduje ODCZYT: dla dnia z ogłoszonym składem
+    źródłem prawdy jest skład, a nie znacznik.
+    """
+    if lista_dnia:
+        klucze = lista_dnia.get(_doba_produktowa(r.get("kickoff_ts")))
+        if klucze:
+            return _klucz_listy(r) in klucze
+    return not r.get("poza_publikacja")
+
+
 def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
     for b in value_bets:
         # ⚑ RYNEK WYCOFANY NIE WCHODZI DO KSIĘGI ŻADNĄ DROGĄ (2026-08-19).
@@ -4934,7 +4967,18 @@ def skutecznosc_per_dzien(
         if not r.get("sugestia") and r.get("kurs"):
             agg["okazje"] += 1
             agg["_zwrot_j"] += _zwrot_typu(r)
-        agg["typy"].append(_typ_dnia(r))
+        t = _typ_dnia(r)
+        # ⚑ ZNACZNIK SPRZED PUBLIKACJI NIE MOŻE ZOSTAĆ NA TYPIE, KTÓRY LICZY
+        # SIĘ DO BILANSU (2026-09-11). Typ z ogłoszonego składu dnia bywa
+        # w księdze podpisany starym `poza_publikacja` (patrz `opublikowany`).
+        # Gdyby znacznik jechał dalej, ten sam typ byłby w bilansie, a na
+        # liście miałby etykietę „na próbę" — a u klienta zniknąłby zupełnie,
+        # bo `okrojDlaKlienta` wycina typy z tym polem, i suma na jego ekranie
+        # przestałaby się zgadzać z listą.
+        # (kasujemy WARTOŚĆ, nie pole — payload dnia ma stały kształt)
+        if t.get("poza_publikacja"):
+            t["poza_publikacja"] = None
+        agg["typy"].append(t)
     for r in poza or []:
         agg = _agg(r)
         agg["poza_n"] += 1
@@ -5009,12 +5053,8 @@ def skutecznosc_strumieni(log: dict, dni: int = 21,
         # ⚑ BILANS OPISUJE LISTĘ, KTÓRĄ USER WIDZIAŁ — patrz
         # `poza_zamrozona_lista`. Typ bez znacznika, którego nie ma
         # w zamrożonym składzie dnia, schodzi do „policzonych na próbę".
-        settled = [r for r in w_strumieniu
-                   if not r.get("poza_publikacja")
-                   and not poza_zamrozona_lista(r, _lista_dnia)]
-        poza = [r for r in w_strumieniu
-                if r.get("poza_publikacja")
-                or poza_zamrozona_lista(r, _lista_dnia)]
+        settled = [r for r in w_strumieniu if opublikowany(r, _lista_dnia)]
+        poza = [r for r in w_strumieniu if not opublikowany(r, _lista_dnia)]
         okazje = [r for r in settled if not r.get("sugestia") and r.get("kurs")]
         trafione = sum(1 for r in settled if r["wynik"] == "wygrany")
         roi = sum(_zwrot_typu(r) - 1.0 for r in okazje)
@@ -6109,12 +6149,10 @@ def rozlicz(
         if r.get("wynik") in ("wygrany", "przegrany")
         and r.get("rynek_kod") not in RYNKI_OSOBNE
         and not r.get("odrzucony")
-        # nie stał w ogłoszonym składzie dnia — bilans ma opisywać listę,
-        # którą user zobaczył rano, a nie wszystko, co przeszło przez księgę
-        and not poza_zamrozona_lista(r, _lista_dnia)
-        # typy spoza publikacji uczą kalibrację, ale nie liczą się do
-        # pokazywanej skuteczności — user ich nie widział, nie mógł zagrać
-        and not r.get("poza_publikacja")
+        # BILANS OPISUJE LISTĘ, KTÓRĄ USER ZOBACZYŁ — dla dnia z ogłoszonym
+        # składem rozstrzyga skład (w obie strony), dla starszych dni znacznik
+        # `poza_publikacja`; patrz `opublikowany`
+        and opublikowany(r, _lista_dnia)
         # drabinki mają WŁASNY strumień (skutecznosc_strumienie) — doliczenie
         # ich tutaj zmieniłoby wstecz znaczenie liczb modelu, na których stoi
         # kalibracja, kalendarz i wykresy
@@ -6144,8 +6182,7 @@ def rozlicz(
         if r.get("wynik") in ("wygrany", "przegrany")
         and r.get("rynek_kod") not in RYNKI_OSOBNE
         and not r.get("odrzucony")
-        and (r.get("poza_publikacja")
-             or poza_zamrozona_lista(r, _lista_dnia))
+        and not opublikowany(r, _lista_dnia)
         and _z_modelu(r)
         and _z_biezacej_epoki(r) and not _z_martwej_epoki(r)
     ]
