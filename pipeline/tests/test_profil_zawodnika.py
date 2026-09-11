@@ -38,10 +38,36 @@ def test_rynek_niszowy_z_matchupem_ma_lagodniejszy_prog():
 
 
 def test_wartosc_ujemna_przy_szansie_ostroznej():
-    """Najciekawszy przypadek: kurs i szansa w normie, a typ i tak wypada —
-    bo o publikacji decyduje szansa OSTROŻNA (średnia p i dolnej granicy)."""
+    """Kurs i szansa w normie, a typ i tak wypada — bo o publikacji decyduje
+    szansa OSTROŻNA (średnia p i dolnej granicy).
+
+    ⚑ TYLKO OD KURSU 1,80 (2026-09-11). Niżej warunek pieniężny nie działa,
+    bo tani typ ma ujemną wartość z definicji — patrz
+    `betting.wartosc_zawodnicza_ok`.
+    """
     assert betting.powod_profilu_zawodnika(
-        1.60, 0.60, 0.55) == "wartosc_ujemna_przy_ostroznym"
+        2.00, 0.45, 0.45) == "wartosc_ujemna_przy_ostroznym"
+
+
+def test_tani_typ_nie_wypada_na_wartosci():
+    """⚑ SEDNO NAPRAWY Z 11.09: ten warunek wycinał 1823 kandydatury na cykl.
+
+    Decyzja z 24.08 zdjęła bramy wartości poniżej kursu 1,80, ale ścieżka
+    zawodnicza miała warunek przepisany ręcznie w trzech miejscach i nie
+    zobaczyła tej zmiany. Kurs 1,60 przy ostrożnej szansie 0,55 daje wartość
+    −12% i DO 11.09 wypadał, mimo że trafność w tym paśmie jest najwyższa
+    w produkcie.
+    """
+    assert betting.wartosc_zawodnicza_ok(1.60, 0.55) is True
+    assert betting.powod_profilu_zawodnika(1.60, 0.60, 0.55) == "profil_ok"
+
+
+def test_granica_1_80_jest_ta_sama_co_u_druzyn():
+    """Jedno źródło prawdy: `bramy_wartosci_dotycza`, nie druga kopia progu."""
+    assert betting.wartosc_zawodnicza_ok(1.79, 0.10) is True
+    assert betting.wartosc_zawodnicza_ok(1.80, 0.10) is False
+    assert betting.wartosc_zawodnicza_ok(
+        betting.KURS_MAX_BEZ_BRAM_WARTOSCI, 0.99) is True
 
 
 def test_typ_ktory_przechodzi_nie_ma_powodu():

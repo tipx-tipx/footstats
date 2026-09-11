@@ -878,6 +878,37 @@ PROFIL_PERELKA_MIN_P = 0.42
 PROFIL_NISZOWA_MIN_P = 0.40         # rynek niszowy + sprzyjający profil rywala
 
 
+def wartosc_zawodnicza_ok(odd: float, p_dec: float) -> bool:
+    """Czy typ ZAWODNICZY przechodzi warunek pieniężny profilu.
+
+    ⚑ DOKOŃCZENIE DECYZJI Z 24.08 (2026-09-11). Bramy wartości zostały wtedy
+    zdjęte poniżej kursu 1,80, bo tani typ ma ujemną wartość Z DEFINICJI:
+    `p_dec` to szansa ŚCIĄGNIĘTA (średnia z punktowej i dolnej granicy CI),
+    więc `p_dec × kurs − 1` przy kursie 1,3 jest ujemne niemal zawsze,
+    niezależnie od jakości typu. Brama wycinała więc podaż w paśmie
+    o najwyższej trafności, nie odróżniając dobrych typów od słabych
+    ([[bramy-wartosci-vs-cel-trafnosci]]), a cel produktu to TRAFNOŚĆ
+    ([[cel-produktu-to-trafnosc]]).
+
+    Wpięte było jednak TYLKO w ścieżce drużynowej (`widelki_druzynowe`) i w
+    `ev_ponizej_progu`. Ścieżka zawodnicza miała ten warunek przepisany
+    ręcznie w TRZECH miejscach (pewny / perełka / niszowa) i żadne z nich go
+    nie widziało — czyli dokładnie ten rozjazd między ścieżkami, który w tym
+    repo kosztował już trzy razy ([[wznowione-omijaly-bramy]],
+    [[stempel-zrodla-uciekal-biala-lista]]).
+
+    Zmierzone na produkcji 11.09 z rejestru odrzuceń: warunek wyciął
+    1823 kandydatury zawodnicze w jednym cyklu — w strumieniu, który miał
+    wtedy CZTERY typy na całej stronie (z 61).
+
+    ⚑ POWYŻEJ 1,80 WARUNEK ZOSTAJE: tam obietnicą zakładki „Wyższe kursy"
+    jest wartość, nie trafność (patrz `KURS_MAX_BEZ_BRAM_WARTOSCI`).
+    """
+    if not bramy_wartosci_dotycza(odd):
+        return True
+    return p_dec * float(odd) - 1.0 >= 0.0
+
+
 def powod_profilu_zawodnika(
     odd: float, p_side: float, p_dec: float,
     rzadki: bool = False, matchup: bool = False,
@@ -906,7 +937,9 @@ def powod_profilu_zawodnika(
     )
     if p_side < prog:
         return "szansa_za_niska"
-    if p_dec * odd - 1.0 < 0.0:
+    # ten sam warunek co w bramie — inaczej diagnostyka pokazywałaby powód,
+    # którego selekcja już nie stosuje (patrz `wartosc_zawodnicza_ok`)
+    if not wartosc_zawodnicza_ok(odd, p_dec):
         return "wartosc_ujemna_przy_ostroznym"
     return "profil_ok"
 
