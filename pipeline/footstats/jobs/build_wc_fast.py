@@ -4361,6 +4361,15 @@ def _main_impl(tryb=None):
             else:
                 _st_mag = magazyn_druzyn.statystyki(_mag_uczony)
                 print(magazyn_druzyn.zdanie_stanu(_st_mag))
+                # ⚑ STAN MAGAZYNU DO META, NIE TYLKO DO LOGU (2026-09-11).
+                # Po przeprowadzce magazynu do prywatnego repo nie da się go
+                # odczytać z sesji bez tokenu, a to on decyduje, czy model ma
+                # pokrycie. Bez tej linii „ile drużyn i meczów naprawdę wczytał
+                # cykl" było widoczne wyłącznie w logu Actions — czyli tam,
+                # gdzie nie zaglądamy przy diagnozie.
+                diagnostyka.zapisz_rentgen("magazyn_druzyn", {
+                    k: v for k, v in _st_mag.items() if k != "pola"
+                })
                 _ctx_modelu = uczony.przygotuj_sumy(_mag_uczony)
                 # KIEDY DRUŻYNA GRAŁA — do bramy świeżości drabinek. Magazyn
                 # jest już wczytany, więc to zero dodatkowych zapytań i zero
@@ -4389,7 +4398,18 @@ def _main_impl(tryb=None):
         except Exception as e:                                 # noqa: BLE001
             diagnostyka.cichy("cykl", "model_uczony_suma", e)
             return None
-        _licznik_uczonego["sumy_policzone" if out else "sumy_bez_pokrycia"] += 1
+        if out:
+            _licznik_uczonego["sumy_policzone"] += 1
+        else:
+            _licznik_uczonego["sumy_bez_pokrycia"] += 1
+            try:
+                _licznik_uczonego[
+                    "sumy_bez_pokrycia:" + uczony.powod_braku_sumy(
+                        _wagi_modelu, _ctx_modelu, gosp_id, gosc_id,
+                        rynek, ts_meczu)
+                ] += 1
+            except Exception as e:                             # noqa: BLE001
+                diagnostyka.cichy("cykl", "powod_braku_sumy", e)
         return out
 
     def _prognoza_uczonego_zaw(tr, rynek: str, linia: float, strona: str,
@@ -4436,7 +4456,23 @@ def _main_impl(tryb=None):
         except Exception as e:                                 # noqa: BLE001
             diagnostyka.cichy("cykl", "model_uczony_prognoza", e)
             return None
-        _licznik_uczonego["policzone" if out else "bez_pokrycia"] += 1
+        if out:
+            _licznik_uczonego["policzone"] += 1
+        else:
+            # ⚑ POWÓD, NIE SAMA LICZBA (2026-09-11). „bez_pokrycia" nie dało
+            # się zdiagnozować: 27 z 61 typów na stronie wracało na stary
+            # rachunek, a te same typy policzone lokalnie wychodziły dobrze.
+            # Bez powodu przy liczniku nie wiadomo, czy to pusty magazyn,
+            # za krótka historia, czy brak statystyki — trzy różne naprawy.
+            _licznik_uczonego["bez_pokrycia"] += 1
+            try:
+                _licznik_uczonego[
+                    "bez_pokrycia:" + uczony.powod_braku(
+                        _wagi_modelu, _ctx_modelu, team_id, rynek,
+                        opp_id, dom, liga, ts_meczu)
+                ] += 1
+            except Exception as e:                             # noqa: BLE001
+                diagnostyka.cichy("cykl", "powod_braku", e)
         return out
 
     # ILE PRZEDZIAŁÓW TO POMIAR, A ILE PRZYBLIŻENIE (2026-08-05).
@@ -5557,6 +5593,7 @@ def _main_impl(tryb=None):
         n_pool_przed = len(legi_pool)
         prof_ok = ci_fail = div_fail = False
         powod_profilu: str | None = None   # patrz `_KOLEJNOSC_PROFILU`
+        _kurs_profilu: float | None = None  # cena tej właśnie linii — do rejestru
         hist_krotka = len(tr.counts) < 5
         for l, slot in sorted(merged.items()):
             over_odd = slot.get("over", (None,))[0]
@@ -5723,16 +5760,23 @@ def _main_impl(tryb=None):
                 # korekta goni własny ogon. Dolna granica karze wprost to,
                 # co selekcja premiuje: szerokie, niepewne oszacowania.
                 p_dec = (p_side + sm.ci_low) / 2.0 if sm.ci_low is not None else p_side
+                # ⚑ WARUNEK PIENIĘŻNY PRZEZ JEDNĄ FUNKCJĘ (2026-09-11).
+                # Był przepisany ręcznie w tych trzech miejscach i dlatego
+                # przegapił zdjęcie bram wartości poniżej kursu 1,80 z 24.08
+                # — wycinał 1823 kandydatury zawodnicze na cykl w strumieniu,
+                # który miał 4 typy na stronie. Patrz
+                # `betting.wartosc_zawodnicza_ok`.
+                _wartosc_ok = betting.wartosc_zawodnicza_ok(odd, p_dec)
                 pewny = (
                     betting.MIN_ODDS <= odd <= betting.PROFIL_PEWNY_MAX_ODDS
                     and p_side >= betting.PROFIL_PEWNY_MIN_P
-                    and p_dec * odd - 1.0 >= 0.0
+                    and _wartosc_ok
                 )
                 perelka = (
                     betting.PROFIL_PERELKA_ODDS[0] <= odd
                     <= betting.PROFIL_PERELKA_ODDS[1]
                     and p_side >= betting.PROFIL_PERELKA_MIN_P
-                    and p_dec * odd - 1.0 >= 0.0
+                    and _wartosc_ok
                 )
                 # furtka kontekstowa: rynki niszowe (spalone / głową / celne
                 # zza pola) prawie nigdy nie przechodzą zwykłych progów, a to
@@ -5746,7 +5790,7 @@ def _main_impl(tryb=None):
                     and betting.PROFIL_PERELKA_ODDS[0] <= odd
                     <= betting.PROFIL_PERELKA_ODDS[1]
                     and p_side >= betting.PROFIL_NISZOWA_MIN_P
-                    and p_dec * odd - 1.0 >= 0.0
+                    and _wartosc_ok
                 )
                 if not (pewny or perelka or niszowa):
                     # KTÓRY warunek uciął — patrz `powod_profilu_zawodnika`.
@@ -5761,6 +5805,7 @@ def _main_impl(tryb=None):
                         powod_profilu or "", 0
                     ):
                         powod_profilu = _p
+                        _kurs_profilu = odd
                 # typ kontekstowy (matchup): profil rywala wyraźnie sprzyja —
                 # model może rozejść się z rynkiem mocniej niż zwykle, bo zna
                 # kontekst, którego kurs mógł nie wycenić (weryfikują rozliczenia)
@@ -5881,7 +5926,16 @@ def _main_impl(tryb=None):
                         betting.POWODY_PROFILU_PL.get(
                             powod_profilu or "",
                             "kwotowane linie nie łączą sensownego kursu z szansą",
-                        ))
+                        )
+                        # ⚑ KURS W SZCZEGÓLE (2026-09-11). Bez niego nie dało
+                        # się policzyć, ile z 1823 odrzuceń „na wartości"
+                        # leżało w paśmie, w którym bramy wartości już nie
+                        # obowiązują — a to była kluczowa liczba przy diagnozie
+                        # strumienia zawodniczego. Rejestr ma odpowiadać na
+                        # pytanie „czemu nie ma typu", a bez ceny odpowiada
+                        # w połowie.
+                        + (f" (kurs {_kurs_profilu:.2f})".replace(".", ",")
+                           if _kurs_profilu else ""))
             elif hist_krotka:
                 _odrzuc(mid, tr, "krotka_historia",
                         f"tylko {len(tr.counts)} meczów w historii (potrzeba 5)")
@@ -9417,6 +9471,14 @@ def _main_impl(tryb=None):
     #   3. czy wagi nie są przeterminowane (job treningowy padł, a cykl jedzie
     #      dalej na starych — dokładnie tak wyglądałoby „model się nie uczy").
     _deklarowane = {s for s, z in uczony.ZRODLO_SZANSY.items() if z == "uczony"}
+    # ⚑ TEN CZUJNIK ISTNIAŁ TYLKO W LOGU (2026-09-11). Ostrzeżenie „strona
+    # pokazuje MIESZANKĘ dwóch rachunków" stało w logu Actions, którego nie da
+    # się odczytać bez praw admina i który znika po kilku dniach — więc fakt,
+    # że 44% wycen spadało na stary rachunek, wyszedł dopiero z ręcznego
+    # zliczenia typów w bazie. Ten sam wniosek co przy rentgenie drabinek
+    # 21.08: liczba, na której podejmujemy decyzje, musi być W META.
+    diagnostyka.zapisz_rentgen("model_zrodlo_szansy", dict(_licznik_zrodla))
+    diagnostyka.zapisz_rentgen("model_pokrycie", dict(_licznik_uczonego))
     if _licznik_zrodla:
         print("Źródło szansy na stronie: " + ", ".join(
             f"{k} {v}" for k, v in sorted(_licznik_zrodla.items())))

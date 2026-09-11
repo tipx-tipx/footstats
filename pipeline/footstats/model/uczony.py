@@ -486,6 +486,46 @@ def zmieszaj_z_pokryciem(p: float, pk_wlasne: float | None,
     return max(0.01, min(0.99, (1.0 - w) * float(p) + w * pokr)), pokr
 
 
+def powod_braku(wagi: dict | None, ctx: dict, team_id: int | str, rynek: str,
+                opp_id: int | str | None = None, dom: int = 0,
+                liga: int | None = None, do_ts: int | None = None) -> str:
+    """DLACZEGO `prognoza` nie dała liczby — jedno słowo do licznika.
+
+    ⚑ POWSTAŁO, BO „BEZ POKRYCIA" NIE DAŁO SIĘ ZDIAGNOZOWAĆ (2026-09-11).
+    Na produkcji 27 z 61 typów na stronie wracało na stary rachunek ze
+    stemplem `stary_bez_pokrycia`, a te same typy policzone lokalnie na kopii
+    magazynu wychodziły bez problemu (Werder `team_corners` p=0,73). Bez
+    powodu zapisanego przy liczniku różnicy nie da się znaleźć: „model nie
+    policzył" może znaczyć brak wag rynku, brak drużyny w magazynie, za krótką
+    historię albo brak statystyki w tej historii, a to CZTERY różne naprawy.
+
+    Wołane WYŁĄCZNIE wtedy, gdy prognoza zwróciła None, więc koszt jest zerowy
+    w ścieżce, która się udała.
+    """
+    if not wagi:
+        return "brak_wag"
+    if not ctx:
+        return "brak_kontekstu"
+    if not ((wagi.get("rynki") or {}).get(rynek)):
+        return "rynek_nietrenowany"
+    kod = RYNEK_NA_KOD.get(rynek)
+    if kod is None:
+        return "rynek_nieznany"
+    serie = ctx.get("serie") or {}
+    klucz = str(team_id)
+    if klucz not in serie:
+        return "druzyny_nie_ma_w_magazynie"
+    prog = int(do_ts or time.time())
+    hist = [h for h in serie.get(klucz, []) if int(h.get("t") or 0) < prog]
+    if len(hist) < MIN_HISTORII:
+        return f"historia_{len(hist)}_z_{MIN_HISTORII}"
+    # historia jest, więc brakuje SAMEJ STATYSTYKI w tych meczach — np. źródło
+    # nie podało rożnych. To inna dziura niż pusty magazyn i inna naprawa.
+    if _sr([_wartosc(h, kod) for h in hist[-6:]]) is None:
+        return f"brak_statystyki_{kod}"
+    return "inne"
+
+
 def prognoza(wagi: dict | None, ctx: dict, team_id: int | str, rynek: str,
              opp_id: int | str | None, dom: int, liga: int | None,
              linia: float, strona: str,
@@ -1545,6 +1585,32 @@ def przygotuj_sumy(mag: dict, ctx: dict | None = None) -> dict:
     ctx = dict(ctx or przygotuj(mag))
     ctx["liga_sr_sum"] = srednie_ligowe_sum(ctx["serie"])
     return ctx
+
+
+def powod_braku_sumy(wagi: dict | None, ctx: dict, gospodarz_id, gosc_id,
+                     rynek: str, do_ts: int | None = None) -> str:
+    """To samo co `powod_braku`, dla sum meczowych (patrz tam)."""
+    if not wagi:
+        return "brak_wag"
+    if not ctx:
+        return "brak_kontekstu"
+    if not ((wagi.get("rynki_sum") or {}).get(rynek)):
+        return "rynek_nietrenowany"
+    kod = RYNEK_SUM_NA_KOD.get(rynek)
+    if kod is None:
+        return "rynek_nieznany"
+    serie = ctx.get("serie") or {}
+    prog = int(do_ts or time.time())
+    braki = [nazwa for nazwa, tid in (("gospodarz", gospodarz_id), ("gosc", gosc_id))
+             if str(tid) not in serie]
+    if braki:
+        return "nie_ma_w_magazynie_" + "_".join(braki)
+    for nazwa, tid in (("gospodarz", gospodarz_id), ("gosc", gosc_id)):
+        hist = [h for h in serie.get(str(tid), []) if int(h.get("t") or 0) < prog]
+        sumy = [v for v in (_suma_meczu(h, kod) for h in hist) if v is not None]
+        if len(sumy) < MIN_HISTORII:
+            return f"{nazwa}_sumy_{len(sumy)}_z_{MIN_HISTORII}"
+    return "inne"
 
 
 def prognoza_sumy(wagi: dict | None, ctx: dict, gospodarz_id, gosc_id,

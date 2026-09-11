@@ -997,3 +997,77 @@ def test_pokrycie_zawodnicze_jest_WYLACZONE_do_czasu_pomiaru():
     assert U.WAGA_POKRYCIA_ZAW == 0.0
     assert U.zmieszaj_z_pokryciem(0.6, 0.9, None, "powyzej",
                                   waga=U.WAGA_POKRYCIA_ZAW) == (0.6, None)
+
+
+# --- 5. DLACZEGO model nie policzył (2026-09-11) ---------------------------
+#
+# Na produkcji 27 z 61 typów stojących na stronie wracało na stary rachunek ze
+# stemplem `stary_bez_pokrycia`, a te same typy policzone lokalnie na kopii
+# magazynu wychodziły bez problemu (Werder `team_corners` p=0,73). Licznik
+# mówił TYLKO „bez pokrycia", a to może znaczyć cztery różne rzeczy i cztery
+# różne naprawy. Stąd `powod_braku`: jedno słowo do rentgenu, liczone dopiero
+# wtedy, gdy prognozy nie ma.
+
+def _wagi_dla(mag, rynek="team_corners"):
+    # ×30, bo `trenuj_rynek` nie tyka rynku poniżej MIN_WIERSZY_RYNKU — tak
+    # samo robią testy prognozy wyżej
+    return {"rynki": {rynek: U.trenuj_rynek(
+        U.wiersze_treningowe(mag)[rynek] * 30)}}
+
+
+def test_powod_braku_rozpoznaje_pusty_magazyn():
+    mag = _magazyn(n=20)
+    ctx = U.przygotuj_sumy(mag)
+    # drużyny 777 nie ma w magazynie w ogóle
+    assert U.powod_braku(_wagi_dla(mag), ctx, 777, "team_corners",
+                         99, 1, 17) == "druzyny_nie_ma_w_magazynie"
+
+
+def test_powod_braku_rozpoznaje_krotka_historie():
+    mag = _magazyn(n=2)
+    ctx = U.przygotuj_sumy(mag)
+    powod = U.powod_braku({"rynki": {"team_corners": {"w": {}, "log": []}}},
+                          ctx, 10, "team_corners", 99, 1, 17)
+    assert powod.startswith("historia_"), powod
+    assert powod.endswith(f"_z_{U.MIN_HISTORII}")
+
+
+def test_powod_braku_rozpoznaje_nietrenowany_rynek():
+    mag = _magazyn(n=20)
+    ctx = U.przygotuj_sumy(mag)
+    assert U.powod_braku({"rynki": {}}, ctx, 10, "team_corners",
+                         99, 1, 17) == "rynek_nietrenowany"
+    assert U.powod_braku(None, ctx, 10, "team_corners") == "brak_wag"
+    assert U.powod_braku({"rynki": {"team_corners": {}}}, {}, 10,
+                         "team_corners") == "brak_kontekstu"
+
+
+def test_powod_braku_rozpoznaje_brak_samej_statystyki():
+    """Historia JEST, ale źródło nie podało tej statystyki — inna naprawa."""
+    mag = _magazyn(n=20)
+    for m in mag["10"]["m"]:
+        m["s"].pop("cor", None)
+    ctx = U.przygotuj_sumy(mag)
+    powod = U.powod_braku({"rynki": {"team_corners": {"w": {}, "log": []}}},
+                          ctx, 10, "team_corners", 99, 1, 17)
+    assert powod == "brak_statystyki_cor", powod
+
+
+def test_powod_braku_milczy_gdy_prognoza_jest_mozliwa():
+    """Gdy wszystko jest na miejscu, powód to „inne" — a nie fałszywy alarm."""
+    mag = _magazyn(n=40)
+    ctx = U.przygotuj(mag)
+    wagi = _wagi_dla(mag)
+    assert U.prognoza(wagi, ctx, 10, "team_corners", 99, 1, 1, 5.5,
+                      "powyzej") is not None
+    assert U.powod_braku(wagi, ctx, 10, "team_corners", 99, 1, 1) == "inne"
+
+
+def test_powod_braku_sumy_wskazuje_ktora_druzyne():
+    mag = _magazyn(n=20)
+    ctx = U.przygotuj_sumy(mag)
+    wagi = {"rynki_sum": {"match_corners": {"w": {}, "log": []}}}
+    powod = U.powod_braku_sumy(wagi, ctx, 10, 777, "match_corners")
+    assert powod == "nie_ma_w_magazynie_gosc", powod
+    powod = U.powod_braku_sumy(wagi, ctx, 888, 777, "match_corners")
+    assert powod == "nie_ma_w_magazynie_gospodarz_gosc", powod
