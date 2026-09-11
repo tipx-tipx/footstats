@@ -282,11 +282,13 @@ def test_wczytaj_zamkniete_pomija_dni_bez_stempla():
 
 
 def test_manifest_nie_rosnie_w_nieskonczonosc():
-    m = {"2026-08-01": {"zamkniete_ts": 1, "klucze": []},
+    # granica to RETENCJA_MANIFESTU_DNI (30) — okno Skuteczności z zapasem
+    m = {"2026-06-01": {"zamkniete_ts": 1, "klucze": []},
          "2026-08-13": {"zamkniete_ts": 1, "klucze": []},
          "2026-08-14": {"zamkniete_ts": 1, "klucze": []}}
     out = B.przytnij_manifest(m, _ts("2026-08-14", 12))
-    assert "2026-08-01" not in out
+    assert "2026-06-01" not in out
+    assert "2026-08-13" in out
     assert "2026-08-14" in out
 
 
@@ -358,3 +360,31 @@ def test_wyzsze_kursy_zostaja_na_mocy():
         U.POLKI["wyzsze_kursy"]["kurs_min"] <= 0.45, (
         "pasmo wyższych kursów urosło — przemierzyć, czy klucz nadal właściwy"
     )
+
+
+# --- OKNO MANIFESTU vs OKNO SKUTECZNOŚCI (2026-09-11) -----------------------
+#
+# Manifest trzymał 4 doby, a Skuteczność pokazuje 21 dni. Dzień bez
+# zamrożonego składu nie ma czego porównać, więc wracał do liczenia CAŁEJ
+# księgi — łącznie z typami, które stały na stronie przez jeden cykl
+# otwartego dnia i wypadły z ogłoszonego składu. Naprawa z 13.08 żyła więc
+# cztery doby. Zmierzone na produkcji: 20.08 miał 165 typów w bilansie przy
+# limicie 21 na dobę.
+
+def test_manifest_pokrywa_okno_skutecznosci():
+    """Okno manifestu nie może być krótsze niż to, co pokazuje Skuteczność."""
+    from footstats.jobs import rozliczanie as R
+    import inspect
+    okno_ui = inspect.signature(R.skutecznosc_per_dzien).parameters["dni"].default
+    assert B.RETENCJA_MANIFESTU_DNI >= okno_ui, (
+        "dzień widoczny w Skuteczności musi mieć swój zamrożony skład"
+    )
+
+
+def test_manifest_trzyma_dzien_sprzed_trzech_tygodni():
+    m = {"2026-08-21": {"zamkniete_ts": 1, "klucze": ["a"]},
+         "2026-09-10": {"zamkniete_ts": 1, "klucze": ["b"]}}
+    out = B.przytnij_manifest(m, _ts("2026-09-11", 12))
+    assert "2026-08-21" in out, "21 dni wstecz wciąż jest w oknie Skuteczności"
+    assert "2026-09-10" in out
+

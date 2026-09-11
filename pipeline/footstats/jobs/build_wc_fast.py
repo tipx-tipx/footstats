@@ -1341,8 +1341,32 @@ def domknij_dni(
     return manifest, swiezo
 
 
+# ⚑ OKNO MANIFESTU MUSI POKRYWAĆ OKNO SKUTECZNOŚCI (2026-09-11).
+#
+# Manifest był przycinany do 4 dni wstecz, a Skuteczność pokazuje 21 dni
+# (`rozliczanie.skutecznosc_per_dzien`, parametr `dni`) i liczy bilans z całej
+# epoki. Dla dnia BEZ zamrożonego składu filtr z 13.08 nie ma czego porównać
+# i przepuszcza wszystko, co w księdze nie ma znacznika — a znacznika nie
+# dostaje typ, który STAŁ na liście w otwartym dniu i wypadł z niej w kolejnym
+# cyklu („historii nie przepisujemy", patrz `_dopisz_nowe`).
+#
+# Skutek: naprawa „Skuteczność liczy listę, nie księgę" żyła dokładnie cztery
+# doby, a potem dzień po cichu wracał do liczenia księgi. Zmierzone 11.09 na
+# produkcji — dni z limitem 21 typów na dobę:
+#
+#     20.08   165 typów w bilansie        23.08   137        22.08   102
+#     05.09    50                         04.09    39        03.09    37
+#
+# Zgłoszenie usera: „w rozliczeniach mają się pokazywać tylko typy, które były
+# pokazywane na stronie; typy w tle mają być w tle".
+#
+# 30 dni = okno Skuteczności (21) z zapasem na przerwy w cyklu. Koszt to
+# ~30 × 21 kluczy w jednym kluczu Supabase, czyli kilkadziesiąt kB.
+RETENCJA_MANIFESTU_DNI = 30
+
+
 def przytnij_manifest(manifest: dict | None, teraz: int,
-                      dni_wstecz: int = 4) -> dict:
+                      dni_wstecz: int = RETENCJA_MANIFESTU_DNI) -> dict:
     """Zostaw tylko dni, które jeszcze mogą być komuś potrzebne."""
     granica = dzien_listy(teraz - dni_wstecz * 86400)
     return {d: w for d, w in (manifest or {}).items() if d >= granica}
