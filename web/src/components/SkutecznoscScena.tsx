@@ -19,6 +19,7 @@ import type {
   TypRozliczony,
   TypyWyniki,
 } from "@/lib/types";
+import { maCoPokazacDnia } from "@/lib/dzienSkutecznosci";
 import { poZmianie } from "@/lib/zmiany";
 
 /**
@@ -275,8 +276,10 @@ export function SkutecznoscScena({
    * dokładnie tym samym zbiorze i nawigacja strzałkami nie trafia w pustkę.
    */
   const dniZTypami = useMemo(
-    () => dni.filter((d) => d.rozliczone > 0),
-    [dni],
+    // dzień, w którym NIC nie weszło na listę, też ma tu być — inaczej jego
+    // typy nie mają na stronie żadnej ścieżki (patrz `maCoPokazacDnia`)
+    () => dni.filter((d) => maCoPokazacDnia(d, pelnyWglad)),
+    [dni, pelnyWglad],
   );
 
   /**

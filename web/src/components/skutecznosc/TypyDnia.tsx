@@ -153,7 +153,16 @@ export function TypyDnia({
   // Typy „na próbę" nie były na stronie i mają własne podsumowanie zdaniem
   // niżej – ZWINIĘTE domyślnie, bo potrafią zająć połowę listy (zmierzone
   // 2026-08-01: 27 z 60 ostatnich rozliczeń).
+  //
+  // ⚑ WYJĄTEK: DZIEŃ, W KTÓRYM NIC NIE WESZŁO NA LISTĘ (2026-09-11). Wtedy
+  // próbne są JEDYNĄ treścią dnia, a zwinięte dawały panel z nagłówkiem
+  // i pustą tabelą — czyli dokładnie to, o co pytał user („gdzie są typy
+  // z 10 września?!"). Wymuszamy je WYLICZENIEM, nie stanem początkowym:
+  // panel nie jest odmontowywany przy przejściu strzałkami, więc stan
+  // z pierwszego dnia zostałby na kolejnych.
+  const nicNieOgloszone = dzien.rozliczone === 0 && (dzien.poza_n ?? 0) > 0;
   const [pokazNaProbe, setPokazNaProbe] = useState(false);
+  const probneWidoczne = pokazNaProbe || nicNieOgloszone;
   // `?? []` w ciele komponentu tworzyłoby nową tablicę co render i unieważniało
   // useMemo niżej przy każdym przerysowaniu
   // typy z INNEJ zakładki (poziom 2) też schodzą pod przycisk – inaczej lista
@@ -163,11 +172,11 @@ export function TypyDnia({
     () =>
       (dzien.typy ?? []).filter((t) => {
         const p = poziomTypu(t, wybor);
-        if (p === 3) return pelnyWglad && pokazNaProbe;
+        if (p === 3) return pelnyWglad && probneWidoczne;
         if (p === 2) return pokazInne;
         return true;
       }),
-    [dzien.typy, pelnyWglad, pokazNaProbe, pokazInne, wybor],
+    [dzien.typy, pelnyWglad, probneWidoczne, pokazInne, wybor],
   );
   // ile jest poziomu 2 (niezależnie od tego, czy rozwinięte)
   const innaZakladka = useMemo(
@@ -202,6 +211,7 @@ export function TypyDnia({
     ? Math.round((dzien.trafione / dzien.rozliczone) * 100)
     : 0;
 
+
   return (
     <div className="rounded-(--radius-card) border border-hairline bg-card p-4 shadow-(--shadow-card) sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
@@ -212,11 +222,24 @@ export function TypyDnia({
           {/* bilans dnia to widok pełny — użytkownik czyta ten sam dzień
               w typach, tak jak resztę zakładki (06.08) */}
           <p className="mt-0.5 text-xs text-muted">
-            <span className="font-data font-semibold text-ink">
-              {dzien.trafione}/{dzien.rozliczone}
-            </span>{" "}
-            weszło ({proc}%)
-            {pelnyWglad && (
+            {nicNieOgloszone ? (
+              <>
+                <span className="font-semibold text-ink">
+                  nic nie było na liście dnia
+                </span>{" "}
+                – wszystkie {dzien.poza_n}{" "}
+                {odmien(dzien.poza_n!, "typ", "typy", "typów")} z tego dnia
+                policzyliśmy tylko na próbę (weszło {dzien.poza_trafione ?? 0})
+              </>
+            ) : (
+              <>
+                <span className="font-data font-semibold text-ink">
+                  {dzien.trafione}/{dzien.rozliczone}
+                </span>{" "}
+                weszło ({proc}%)
+              </>
+            )}
+            {pelnyWglad && !nicNieOgloszone && (
               <>
                 {" "}· bilans{" "}
                 <span
@@ -309,17 +332,21 @@ export function TypyDnia({
 
       {pelnyWglad && (dzien.poza_n ?? 0) > 0 && (
         <p className="mt-3 text-xs leading-relaxed text-faint">
-          Poza tym {dzien.poza_n}{" "}
+          {nicNieOgloszone ? "Te" : "Poza tym"} {dzien.poza_n}{" "}
           {dzien.poza_n === 1 ? "typ policzył się" : "typów policzyło się"}{" "}
           tylko na próbę (weszło {dzien.poza_trafione ?? 0}). Nie było ich na
           stronie, więc nie liczymy ich do bilansu wyżej.{" "}
-          <button
-            onClick={() => setPokazNaProbe((v) => !v)}
-            aria-expanded={pokazNaProbe}
-            className="font-semibold text-brand underline underline-offset-2 hover:text-brand-deep"
-          >
-            {pokazNaProbe ? "Ukryj je" : "Pokaż je na liście"}
-          </button>
+          {/* przy dniu bez publikacji ukrycie dałoby pustą tabelę, więc
+              przełącznika tam nie ma — próbne SĄ treścią tego dnia */}
+          {!nicNieOgloszone && (
+            <button
+              onClick={() => setPokazNaProbe((v) => !v)}
+              aria-expanded={pokazNaProbe}
+              className="font-semibold text-brand underline underline-offset-2 hover:text-brand-deep"
+            >
+              {pokazNaProbe ? "Ukryj je" : "Pokaż je na liście"}
+            </button>
+          )}
         </p>
       )}
 

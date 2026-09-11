@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 
 import { useBilans } from "./useBilans";
+import { maCoPokazacDnia } from "@/lib/dzienSkutecznosci";
 import type { SkutecznoscDnia } from "@/lib/types";
 import { OSTATNIA_ZMIANA, poZmianie } from "@/lib/zmiany";
 
@@ -50,22 +51,26 @@ export function KalendarzWynikow({
 }) {
   // `pisz`, nie `bilans` – zmienna `bilans` niżej trzyma sumę miesiąca
   const { bilans: pisz } = useBilans(pelnyWglad);
+  const maCoPokazac = useCallback(
+    (d: SkutecznoscDnia) => maCoPokazacDnia(d, pelnyWglad),
+    [pelnyWglad],
+  );
   const mapa = useMemo(() => {
     const m = new Map<string, SkutecznoscDnia>();
-    for (const d of dni) if (d.rozliczone > 0) m.set(d.dzien, d);
+    for (const d of dni) if (maCoPokazac(d)) m.set(d.dzien, d);
     return m;
-  }, [dni]);
+  }, [dni, maCoPokazac]);
 
   const miesiace = useMemo(() => {
     const zbior = new Set<number>();
     for (const d of wszystkieDni ?? dni) {
-      if (d.rozliczone > 0) {
+      if (maCoPokazac(d)) {
         const [r, m] = rozbijDate(d.dzien);
         zbior.add(r * 12 + m);
       }
     }
     return [...zbior].sort((a, b) => a - b);
-  }, [wszystkieDni, dni]);
+  }, [wszystkieDni, dni, maCoPokazac]);
 
   /**
    * Pokazywany miesiąc NIE JEST osobnym stanem – wynika z otwartego dnia.
@@ -217,11 +222,17 @@ export function KalendarzWynikow({
           // W widoku pełnym kolor mówi o bilansie dnia, w widoku użytkownika
           // o tym, czy weszła większość typów — inaczej kafelek byłby
           // czerwony przy 5 na 8 trafionych i przeczył własnej liczbie.
+          // ⚑ DZIEŃ BEZ ANI JEDNEJ PUBLIKACJI TEŻ MA KAFELEK (2026-09-11).
+          // 10.09 wyparował ze strony w całości: 80 typów, wszystkie z bramą
+          // na karku, więc `rozliczone` = 0 i dzień wypadał z każdego filtru.
+          // To było ciche odrzucenie CAŁEGO DNIA — zamiast tego kafelek stoi
+          // wyblakły, z liczbą typów „na próbę", i daje się kliknąć.
+          const tylkoProbne = k.rozliczone === 0 && (k.poza_n ?? 0) > 0;
           const udanyDzien = k.rozliczone > 0 && k.trafione * 2 >= k.rozliczone;
-          const zysk = pelnyWglad ? k.roi_flat > 0.005 : udanyDzien;
-          const strata = pelnyWglad
-            ? k.roi_flat < -0.005
-            : k.rozliczone > 0 && !udanyDzien;
+          const zysk = !tylkoProbne && (pelnyWglad ? k.roi_flat > 0.005 : udanyDzien);
+          const strata =
+            !tylkoProbne &&
+            (pelnyWglad ? k.roi_flat < -0.005 : k.rozliczone > 0 && !udanyDzien);
           const swiezy = poZmianie(k.dzien);
           const aktywny = wybrany === k.dzien;
           return (
@@ -229,8 +240,12 @@ export function KalendarzWynikow({
               key={i}
               onClick={() => onWybierz?.(k.dzien)}
               aria-pressed={aktywny}
-              title={`${k.dzien}: weszło ${k.trafione} z ${k.rozliczone}${
-                pelnyWglad ? ` · bilans ${pisz(k.roi_flat)}` : ""
+              title={`${k.dzien}: ${
+                tylkoProbne
+                  ? `nic nie było na liście dnia – ${k.poza_trafione ?? 0} z ${k.poza_n} typów na próbę`
+                  : `weszło ${k.trafione} z ${k.rozliczone}${
+                      pelnyWglad ? ` · bilans ${pisz(k.roi_flat)}` : ""
+                    }`
               }${
                 swiezy ? "" : " · typy sprzed zmiany zasad"
               } – kliknij, żeby zobaczyć ten dzień`}
@@ -252,9 +267,11 @@ export function KalendarzWynikow({
               {/* kafelek ma ~40 px: w widoku pełnym bilans, w widoku
                   użytkownika liczba trafionych typów tego dnia */}
               <span className="font-data text-[11px] font-semibold leading-none">
-                {pelnyWglad
-                  ? pisz(k.roi_flat, true)
-                  : `${k.trafione}/${k.rozliczone}`}
+                {tylkoProbne
+                  ? "próba"
+                  : pelnyWglad
+                    ? pisz(k.roi_flat, true)
+                    : `${k.trafione}/${k.rozliczone}`}
               </span>
             </button>
           );
