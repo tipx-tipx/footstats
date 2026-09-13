@@ -42,6 +42,8 @@ const NIEZADEKLAROWANA_KUCHNIA = [
   // rozliczane w tle po to, żeby sprawdzić własny próg. Klientowi zewnętrznemu
   // pokazywałoby to skuteczność czegoś, czego nie mógł zagrać.
   "prog_drabinek",
+  // kontrola produktu (2026-09-13) – nasza lista usterek, nie produkt
+  "kontrola",
 ] as const;
 
 /**

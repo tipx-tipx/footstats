@@ -1052,7 +1052,21 @@ export interface UczenieStrumienia {
 }
 
 /** Skuteczność realnych typów (log rozliczany automatycznie po meczach). */
+/** Jedno sprawdzenie kontroli produktu (`rozliczanie.kontrola_produktu`). */
+export interface SprawdzenieKontroli {
+  kod: string;
+  ok: boolean;
+  liczba: number | null;
+  opis: string;
+}
+
 export interface TypyWyniki {
+  /**
+   * CZY LICZBY SIĘ ZGADZAJĄ (2026-09-13) – liczone po każdym rozliczeniu:
+   * typy ze strony bez zapisu, zaległe rozliczenia, zwroty „bez danych”,
+   * zapis „co było na stronie”, świeżość wag modelu. Wyłącznie dla admina.
+   */
+  kontrola?: { policzono_ts: number; sprawdzenia: SprawdzenieKontroli[] };
   podsumowanie: {
     opublikowane: number;
     rozliczone: number;

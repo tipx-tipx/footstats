@@ -677,6 +677,76 @@ def _nierozstrzygniete(log: dict, lista_dnia: dict[str, set] | None = None,
     }
 
 
+# ⚑⚑ KONTROLA PRODUKTU (2026-09-13, zgłoszenie właściciela: „mam dość").
+#
+# Każda usterka ostatnich tygodni była odkrywana przez właściciela, patrzącego
+# na stronę: Drabinki liczone jako „próby" od 11.09, 21 typów ze strony bez
+# rekordu w księdze od przeprowadzki 10.09, faule zawodników ginące na zwrotach.
+# Wszystkie dawały się wykryć prostą regułą na danych, które mamy w każdym
+# przebiegu. Ta funkcja je sprawdza i ląduje w `typy_wyniki.kontrola`
+# (panel admina w Skuteczności; klientowi wycinane).
+KONTROLA_ZALEGLOSC_H = 48          # mecz ze strony bez wyniku dłużej = alarm
+KONTROLA_BEZ_DANYCH_MAX = 0.10     # udział zwrotów „brak danych" wśród pokazanych
+KONTROLA_WAGI_MAX_H = 30           # nocny trening + zapas
+
+
+def kontrola_produktu(log: dict, pokazane: dict | None, now: int,
+                      wagi_ts: float | None) -> dict:
+    """Sześć sprawdzeń: {"policzono_ts", "sprawdzenia": [{kod, ok, liczba, opis}]}.
+
+    Cykl żyje sprawdza FRONT (po `meta.wygenerowano_ts`), bo job rozliczania
+    nie wie, kiedy cykl ostatnio doszedł — tu zostaje pięć pozostałych.
+    """
+    out: list[dict] = []
+
+    def dodaj(kod: str, ok: bool, liczba, opis: str) -> None:
+        out.append({"kod": kod, "ok": bool(ok), "liczba": liczba, "opis": opis})
+
+    klucze = (pokazane or {}).get("klucze") or {}
+    dodaj("zapis_pokazanych", bool(pokazane and pokazane.get("od_ts")),
+          len(klucze),
+          f"zapisanych typów ze strony: {len(klucze)}" if pokazane
+          else "brak zapisu „co było na stronie” — Skuteczność liczy po staremu")
+
+    tydzien = now - 7 * 86400
+    bez_rekordu = sorted(k for k, ko in klucze.items()
+                         if ko >= tydzien and ko <= now and k not in log)
+    dodaj("strona_bez_rekordu", not bez_rekordu, len(bez_rekordu),
+          "każdy typ ze strony ma zapis do rozliczenia" if not bez_rekordu
+          else f"{len(bez_rekordu)} typów ze strony NIE ROZLICZY SIĘ nigdy, "
+               f"np. {', '.join(bez_rekordu[:3])}")
+
+    zalegle = [
+        k for k, ko in klucze.items()
+        if k in log and log[k].get("wynik") is None
+        and now - ko > KONTROLA_ZALEGLOSC_H * 3600
+    ]
+    dodaj("zaleglosc_rozliczen", not zalegle, len(zalegle),
+          "brak zaległych rozliczeń" if not zalegle
+          else f"{len(zalegle)} typów ze strony czeka na wynik ponad "
+               f"{KONTROLA_ZALEGLOSC_H} h od meczu")
+
+    # ⚑ OKNO 7–14 DNI WSTECZ, nie ostatnie 7: zwrot „brak danych" zapada
+    # dopiero po `TERMIN_BRAK_DANYCH_S`, więc w świeższych meczach go nie ma
+    # z definicji i sprawdzenie świeciłoby zielono zawsze
+    od, do = now - 7 * 86400 - TERMIN_BRAK_DANYCH_S, now - TERMIN_BRAK_DANYCH_S
+    rozliczone = [log[k] for k, ko in klucze.items()
+                  if k in log and od <= ko < do and log[k].get("wynik")]
+    braki = [r for r in rozliczone if r.get("powod") == POWOD_BRAK_DANYCH]
+    udzial = len(braki) / len(rozliczone) if rozliczone else 0.0
+    dodaj("bez_danych", udzial <= KONTROLA_BEZ_DANYCH_MAX, len(braki),
+          f"zamknięte bez danych: {len(braki)} z {len(rozliczone)} "
+          f"rozliczonych typów ze strony z meczów sprzed 7–14 dni ({udzial:.0%})")
+
+    wiek_h = (now - wagi_ts) / 3600.0 if wagi_ts else None
+    dodaj("wagi_modelu", wiek_h is not None and wiek_h <= KONTROLA_WAGI_MAX_H,
+          round(wiek_h, 1) if wiek_h is not None else None,
+          f"model trenowany {wiek_h:.0f} h temu" if wiek_h is not None
+          else "brak wag modelu — nocny trening nie zapisał wyniku")
+
+    return {"policzono_ts": now, "sprawdzenia": out}
+
+
 def _uzupelnij_ekrany(log: dict) -> int:
     """Dopisz `ekran` rekordom sprzed wprowadzenia stempla (2026-08-02).
 
@@ -6475,6 +6545,15 @@ def rozlicz(
             f" (ROI {pp['roi']})"
         )
 
+    try:
+        _wagi_ts = float((supa.get_key("model_wagi") or {}).get("trenowano_ts") or 0) or None
+    except Exception:
+        _wagi_ts = None
+    _kontrola = kontrola_produktu(log, _na_stronie, now, _wagi_ts)
+    for _spr in _kontrola["sprawdzenia"]:
+        if not _spr["ok"]:
+            print(f"⚑ KONTROLA [{_spr['kod']}]: {_spr['opis']}")
+
     ostatnie = sorted(
         settled + poza_pub + [
             r for r in log.values()
@@ -6575,6 +6654,8 @@ def rozlicz(
         # ta sama skuteczność rozbita na strumienie: pewniaki / drużyny /
         # drabinki (każdy z własnym ROI i listą dni)
         "skutecznosc_strumienie": strumienie,
+        # czy liczby się zgadzają — patrz `kontrola_produktu`
+        "kontrola": _kontrola,
         # pomiar progu pokrycia drabinek (opublikowane vs tuż pod progiem) —
         # jedyna droga do odpowiedzi, czy 0,5 to dobra liczba
         "prog_drabinek": prog_drabinek,

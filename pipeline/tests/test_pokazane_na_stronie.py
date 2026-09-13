@@ -110,3 +110,49 @@ def test_nieudany_odczyt_nie_nadpisuje_zapisu(monkeypatch):
     monkeypatch.setattr(B.supa, "put_key", lambda k, v: zapisy.append(v) or True)
     B.zapisz_pokazane([_typ()], [], [], TERAZ)
     assert zapisy == []
+
+
+# --- KONTROLA PRODUKTU ------------------------------------------------------
+
+def _spr(wynik, kod):
+    return next(s for s in wynik["sprawdzenia"] if s["kod"] == kod)
+
+
+def test_kontrola_wszystko_zielone():
+    now = TERAZ + 10 * 86400
+    typ = _typ(ts=now - 72 * 3600, wynik="wygrany")
+    log = {R._klucz(typ): typ}
+    stan = {"od_ts": TERAZ, "klucze": {R._klucz(typ): typ["kickoff_ts"]}}
+    k = R.kontrola_produktu(log, stan, now, wagi_ts=now - 5 * 3600)
+    assert all(s["ok"] for s in k["sprawdzenia"]), k
+
+
+def test_kontrola_lapie_typ_ze_strony_bez_rekordu_i_zaleglosc():
+    now = TERAZ + 10 * 86400
+    zalegly = _typ(ts=now - 72 * 3600, wynik=None)
+    zgubiony = _typ(podmiot="Vasco", ts=now - 24 * 3600)
+    log = {R._klucz(zalegly): zalegly}
+    stan = {"od_ts": TERAZ, "klucze": {R._klucz(zalegly): zalegly["kickoff_ts"],
+                                       R._klucz(zgubiony): zgubiony["kickoff_ts"]}}
+    k = R.kontrola_produktu(log, stan, now, wagi_ts=None)
+    assert not _spr(k, "strona_bez_rekordu")["ok"]
+    assert _spr(k, "strona_bez_rekordu")["liczba"] == 1
+    assert not _spr(k, "zaleglosc_rozliczen")["ok"]
+    assert not _spr(k, "wagi_modelu")["ok"]
+
+
+def test_kontrola_alarm_przy_duzym_udziale_zwrotow_bez_danych():
+    now = TERAZ + 10 * 86400
+    log, klucze = {}, {}
+    for i in range(10):
+        t = _typ(podmiot=f"Z{i}", ts=now - 8 * 86400, wynik="zwrot" if i < 2 else "wygrany",
+                 powod=R.POWOD_BRAK_DANYCH if i < 2 else None)
+        log[R._klucz(t)] = t
+        klucze[R._klucz(t)] = t["kickoff_ts"]
+    k = R.kontrola_produktu(log, {"od_ts": TERAZ, "klucze": klucze}, now, now)
+    assert not _spr(k, "bez_danych")["ok"]          # 20% > 10%
+
+
+def test_kontrola_bez_zapisu_pokazanych():
+    k = R.kontrola_produktu({}, None, TERAZ, TERAZ)
+    assert not _spr(k, "zapis_pokazanych")["ok"]

@@ -1,5 +1,6 @@
 import { CalibrationChart } from "@/components/CalibrationChart";
 import { KuponHistoriaCard } from "@/components/KuponHistoriaCard";
+import { KontrolaProduktu } from "@/components/skutecznosc/KontrolaProduktu";
 import { PageHeader } from "@/components/PageHeader";
 import { PrzelacznikWidoku } from "@/components/PrzelacznikWidoku";
 import { Reveal } from "@/components/Reveal";
@@ -285,6 +286,16 @@ export default async function ModelPage({
           )
         }
       />
+
+      {/* KONTROLA PRODUKTU — tylko admin i nie w podglądzie „jak klient” */}
+      {pelnyWglad && typy.kontrola && (
+        <div className="mt-7">
+          <KontrolaProduktu
+            kontrola={typy.kontrola}
+            wygenerowanoTs={meta.wygenerowano_ts}
+          />
+        </div>
+      )}
 
       {pods && pods.rozliczone === 0 ? (
         <p className="mt-7 max-w-3xl rounded-(--radius-card) border border-hairline bg-card px-4 py-3.5 text-sm text-muted shadow-(--shadow-card)">
