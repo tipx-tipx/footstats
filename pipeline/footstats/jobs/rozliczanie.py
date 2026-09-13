@@ -5644,6 +5644,77 @@ def _statshub_strzaly(event_id: int, cache: dict) -> dict | None:
     return r
 
 
+# ⚑⚑ HISTORIA ZAWODNIKA ZE STATSHUB JAKO ŹRÓDŁO ROZLICZENIA (2026-09-13).
+#
+# Typy zawodników w ligach, których 365Scores nie obsługuje (Saudi Pro League,
+# Serie B, Championship…), nie miały w chmurze ani fauli, ani minut — bank
+# trendów zna tylko mecze z propsami, a Sofascore wymaga domowego workera.
+# Po siedmiu dniach szły na „zwrot, brak danych". Zmierzone 13.09 na typach
+# 25.08–05.09: faule popełnione domykały się w 60%, wywalczone w 61%.
+#
+# `player/{id}/performance` oddaje mecz po meczu minuty, faule, strzały
+# i celne — w każdej lidze, po TYM SAMYM numerze zawodnika i meczu, którego
+# używa księga. Walidacja 13.09:
+#   * zasięg: z 120 typów zamkniętych bez danych 70 da się rozliczyć,
+#     19 okazuje się „nie zagrał" (0 minut), 9 to dogrywki, 22 brak meczu;
+#   * zgodność z 365 na 144 rozliczonych typach: ten sam wynik zakładu
+#     w 141 (98%) — faule wywalczone 15/15, strzały 62/63, celne 20/21,
+#     faule popełnione 44/45.
+#
+# Dlatego to OSTATNIE źródło przed zwrotem (po 365, banku i shotmapie), tylko
+# dla czterech zwalidowanych rynków i tylko w meczu bez dogrywki.
+POLA_PERF_ROZLICZENIA = {
+    "shots": "shots",
+    "sot": "onTargetScoringAttempt",
+    "fouls_committed": "fouls",
+    "fouls_won": "wasFouled",
+}
+# jedno zapytanie na zawodnika na przebieg; typy czekają na dane do 7 dni
+# i są pytane w każdym przebiegu, więc bez sufitu przebieg mógłby puchnąć
+BUDZET_PERF_NA_PRZEBIEG = 150
+PERF_ZERO_MINUT_PO_S = 6 * 3600
+
+
+def _perf_w_meczu(rec: dict, cache: dict, budzet: list[int]) -> dict | None:
+    """Wiersz statystyk zawodnika z TEGO meczu z historii statshub albo None."""
+    pid = rec.get("podmiot_id")
+    if not isinstance(pid, int) or pid <= 0 or not rec.get("mecz_id"):
+        return None
+    if pid not in cache:
+        if budzet[0] <= 0:
+            return None                  # spróbujemy w kolejnym przebiegu
+        budzet[0] -= 1
+        try:
+            cache[pid] = statshub.fetch_player_performance(pid, limit=20)
+        except Exception as e:
+            diagnostyka.cichy("statshub", "performance_rozliczenie", e)
+            cache[pid] = None
+    for wiersz in cache[pid] or []:
+        ev = statshub._pierwszy(wiersz.get("events"))
+        ps = statshub._pierwszy(wiersz.get("player_statistics_event"))
+        if int(ev.get("id") or ps.get("eventId") or 0) == int(rec["mecz_id"]):
+            return ps
+    return None
+
+
+def _wartosc_z_perf(rec: dict, ps: dict | None, cache_sh: dict) -> float | None:
+    """Statystyka rynku z wiersza historii — tylko w meczu BEZ dogrywki.
+
+    Historia obejmuje cały mecz, a zakład regularny czas; mecz, którego końca
+    nie da się potwierdzić (brak wyniku), też czeka.
+    """
+    pole = POLA_PERF_ROZLICZENIA.get(rec.get("rynek_kod"))
+    if ps is None or pole is None or not ps.get("minutesPlayed"):
+        return None
+    v = ps.get(pole)
+    if v is None:
+        return None
+    sr = _statshub_wynik(rec["mecz_id"], cache_sh)
+    if sr is None or sr["extra_time"]:
+        return None
+    return float(v)
+
+
 def _sofa_gracz(sofa: dict, rec: dict) -> tuple[dict | None, dict | None]:
     """Staty zawodnika z cache Sofascore (`sofa_results`, worker domowy) —
     dopasowanie po nazwisku. Zwraca (staty_lub_None, wpis_meczu_lub_None)."""
@@ -5719,6 +5790,9 @@ def rozlicz(
     cache_365: dict = {}
     cache_sh: dict = {}      # wyniki meczów statshub (fallback egzotyki)
     cache_sh_sm: dict = {}   # shotmapy statshub (fallback strzałów egzotyki)
+    cache_perf: dict = {}    # historia zawodników statshub (patrz POLA_PERF_ROZLICZENIA)
+    budzet_perf = [BUDZET_PERF_NA_PRZEBIEG]
+    rozliczone_z_perf = Counter()
     # mecze przełożone: jeśli mecz wciąż figuruje w nadchodzących typach,
     # deadline braku danych nie może zamknąć jego legów jako zwrot
     mecze_przyszle = {
@@ -5904,6 +5978,20 @@ def rozlicz(
             minuty = float(staty[pkey].get("minutes", 0)) if pkey else 0.0
         if minuty is None:
             minuty = _minuty_z_banku(rec, lib)
+        # historia zawodnika statshub — tylko gdy 365 nie zna meczu, bo tam
+        # minuty już są; wiersz meczu z 0 minut to „nie zagrał"
+        ps_perf = None
+        if not staty and mk in POLA_PERF_ROZLICZENIA:
+            ps_perf = _perf_w_meczu(rec, cache_perf, budzet_perf)
+        # ⚑ „NIE ZAGRAŁ" JEST NIEODWRACALNY — zero minut bierzemy z historii
+        # dopiero, gdy mecz jest potwierdzenie skończony i minęło kilka godzin
+        # (świeży wiersz bywa niewypełniony, a pusty = 0 dałby fałszywy zwrot)
+        if (minuty is None and ps_perf is not None
+                and now - rec["kickoff_ts"] > PERF_ZERO_MINUT_PO_S
+                and _statshub_wynik(rec["mecz_id"], cache_sh) is not None):
+            minuty = float(ps_perf.get("minutesPlayed") or 0)
+            if minuty <= 0:
+                rozliczone_z_perf["nie_zagral"] += 1
         if minuty is None:
             # FALLBACK egzotyki (Warstwa 2): minuty z cache Sofascore
             pg, _e = _sofa_gracz(sofa, rec)
@@ -5964,6 +6052,10 @@ def rozlicz(
                         if skey is not None:
                             wartosc = float(normed[skey][mk])
             if wartosc is None and mk in ("shots", "sot"):
+                wartosc = _wartosc_z_perf(rec, ps_perf, cache_sh)
+                if wartosc is not None:
+                    rozliczone_z_perf[mk] += 1
+            if wartosc is None and mk in ("shots", "sot"):
                 # FALLBACK egzotyki (Warstwa 2): strzały z cache Sofascore
                 # (worker domowy) — np. liga bez shotmapy statshub.
                 pg, e_sofa = _sofa_gracz(sofa, rec)
@@ -5986,6 +6078,10 @@ def rozlicz(
                 wartosc = float(w) if w is not None else None
             if wartosc is None:
                 wartosc = _wartosc_z_banku(rec, lib)
+            if wartosc is None and mk in POLA_PERF_ROZLICZENIA:
+                wartosc = _wartosc_z_perf(rec, ps_perf, cache_sh)
+                if wartosc is not None:
+                    rozliczone_z_perf[mk] += 1
             if wartosc is None:
                 # FALLBACK egzotyki (Warstwa 2): faule/odbiory/przechwyty z
                 # cache Sofascore (worker domowy) — jedyne źródło tych rynków
@@ -6037,6 +6133,11 @@ def rozlicz(
     #
     # Ta linia ma to pokazywać W KAŻDYM cyklu, żeby narastająca kolejka nie
     # była znowu odkryciem po tygodniu ([[ciche-odrzucenia-zasada]]).
+    if rozliczone_z_perf:
+        print("Rozliczone z historii zawodników statshub (365 nie znało meczu): "
+              + ", ".join(f"{k} {v}" for k, v in rozliczone_z_perf.most_common())
+              + f" | zapytań {BUDZET_PERF_NA_PRZEBIEG - budzet_perf[0]}"
+              f"/{BUDZET_PERF_NA_PRZEBIEG}")
     _czekaja = [
         r for r in log.values()
         if not r.get("wynik") and r.get("kickoff_ts")

@@ -59,6 +59,9 @@ def _przygotuj(monkeypatch, rec, trendy=None):
     # sieciową w conftest.py
     monkeypatch.setattr(statshub, "fetch_event_result", lambda eid: None)
     monkeypatch.setattr(statshub, "player_shots_from_shotmap", lambda eid: None)
+    # historia zawodnika (źródło rozliczenia od 2026-09-13) — też sieć
+    monkeypatch.setattr(statshub, "fetch_player_performance",
+                        lambda pid, limit=20: [])
     monkeypatch.setattr(
         rozliczanie, "_snapshot_zamkniecia", lambda *a, **k: None
     )
