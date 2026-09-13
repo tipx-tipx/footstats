@@ -424,8 +424,8 @@ export function SkutecznoscScena({
             <strong className="font-semibold text-ink">
               Liczymy od {dataPl(typy.podsumowanie.start_statystyk)}
             </strong>{" "}
-            – od tego dnia zapisujemy skład ogłoszonej listy, więc każda liczba
-            niżej opisuje dokładnie te typy, które były na stronie.
+            – od tego dnia zapisujemy wszystko, co pojawiło się na stronie, więc
+            każda liczba niżej opisuje dokładnie te typy, które widziałeś.
             {(typy.podsumowanie.przed_startem_n ?? 0) > 0 && (
               <>
                 {" "}

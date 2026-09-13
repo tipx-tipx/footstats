@@ -6,7 +6,7 @@ import { Reveal } from "@/components/Reveal";
 import { SkutecznoscScena } from "@/components/SkutecznoscScena";
 import { getKalibracja, getMeta, getTypyWyniki } from "@/lib/data";
 import { bezTla, okrojDlaKlienta } from "@/lib/okrojDlaKlienta";
-import { fmtU } from "@/lib/format";
+import { dataPl, fmtU } from "@/lib/format";
 import { czyPelnyWglad, czytajRole } from "@/lib/rola";
 
 export const metadata = { title: "Skuteczność modelu – FootStats" };
@@ -288,8 +288,13 @@ export default async function ModelPage({
 
       {pods && pods.rozliczone === 0 ? (
         <p className="mt-7 max-w-3xl rounded-(--radius-card) border border-hairline bg-card px-4 py-3.5 text-sm text-muted shadow-(--shadow-card)">
-          Mamy już zapisane {pods.opublikowane} pokazanych typów. Pierwsze
-          wyniki pojawią się tu same, gdy skończą się najbliższe mecze.
+          {/* bez `opublikowane`: to licznik całej księgi (13.09: 3669),
+              a nie typów liczonych od daty startu */}
+          {pods.start_statystyk
+            ? `Liczymy od ${dataPl(pods.start_statystyk)}. `
+            : ""}
+          Pierwsze wyniki pojawią się tu same, gdy skończą się mecze z typami,
+          które były na stronie.
         </p>
       ) : (
         <Reveal className="mt-7">

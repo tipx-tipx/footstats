@@ -642,7 +642,8 @@ def _zamknij_odwolane_mecze(log: dict, now: int) -> None:
         )
 
 
-def _nierozstrzygniete(log: dict) -> dict:
+def _nierozstrzygniete(log: dict, lista_dnia: dict[str, set] | None = None,
+                       pokazane: dict | None = None) -> dict:
     """Typy zamknięte jako „zwrot" z braku danych — i ile z nich BYŁO na stronie.
 
     Rozliczony rekord jest zamrożony, więc takie zamknięcie jest nieodwracalne:
@@ -653,9 +654,14 @@ def _nierozstrzygniete(log: dict) -> dict:
     Rozbicie po rynku pokazuje OD RAZU, gdzie jest dziura: 50 rożnych
     drużynowych i 5 sum meczowych to inna diagnoza niż 12 fauli wywalczonych.
     """
+    # ⚑ TYLKO TO, CO BYŁO NA STRONIE, I OD DATY STARTU (2026-09-13). Licznik
+    # stoi w Skuteczności, a liczył całą księgę razem z tłem (13.09: 928
+    # typów) — dokładnie to, czego właściciel nie chce tam widzieć.
     braki = [
         r for r in (log or {}).values()
         if r.get("wynik") == "zwrot" and r.get("powod") == POWOD_BRAK_DANYCH
+        and not r.get("odrzucony") and w_oknie_statystyk(r)
+        and opublikowany(r, lista_dnia, pokazane)
     ]
     per_rynek: Counter = Counter(str(r.get("rynek_kod") or "?") for r in braki)
     return {
@@ -2777,7 +2783,11 @@ EPOKA_BIEZACA = "liga"
 # ([[ciche-odrzucenia-zasada]]).
 #
 # None = licz wszystko (zachowanie sprzed 11.09). Cofnięcie to jedna linia.
-START_STATYSTYK: str | None = "2026-09-11"
+# ⚑ 14.09 (2026-09-13, decyzja właściciela „zacznijmy od zera"): pierwszy
+# PEŁNY dzień zapisu `pokazane_na_stronie` (ruszył 13.09 wieczorem). Dni
+# 11–13.09 liczyły się składem dnia — bez podziału kart Drabinek na widoczne
+# i bez 21 typów, które nie mają rekordu w księdze.
+START_STATYSTYK: str | None = "2026-09-14"
 
 
 def w_oknie_statystyk(r: dict) -> bool:
@@ -6313,6 +6323,8 @@ def rozlicz(
         # liczby nie wchodzi. Zmierzone po wdrożeniu: werdykt liczył 7 typów
         # z 11.09, a kalendarz pokazywał 04.09, 03.09, 02.09, 01.09, 31.08…
         and w_oknie_statystyk(r)
+        # ...i tylko typy ze strony (2026-09-13) — licznik dnia nie liczy tła
+        and opublikowany(r, _lista_dnia, _na_stronie)
     ]
     skutecznosc_dzienna = skutecznosc_per_dzien(
         settled, poza=poza_pub, braki=_braki_dni,
@@ -6368,6 +6380,9 @@ def rozlicz(
             if r.get("wynik") == "zwrot"
             and r.get("rynek_kod") not in RYNKI_OSOBNE
             and not r.get("odrzucony")
+            # zwroty też tylko ze strony i od daty startu (2026-09-13) — bez
+            # tego pasek wyników na stronie głównej dociągał tło
+            and w_oknie_statystyk(r) and opublikowany(r, _lista_dnia, _na_stronie)
         ],
         key=lambda r: -(r.get("rozliczono_ts") or 0),
     )[:60]
@@ -6450,7 +6465,7 @@ def rozlicz(
             # który mówi „tego nie wiemy" zamiast „to nie weszło", a różnica
             # jest zasadnicza: przy 115 sztukach to nie zaokrąglenie, tylko
             # jedna piąta wszystkiego, co kiedykolwiek pokazaliśmy.
-            "nierozstrzygniete": _nierozstrzygniete(log),
+            "nierozstrzygniete": _nierozstrzygniete(log, _lista_dnia, _na_stronie),
         },
         "po_rynku": po_rynku,
         "ostatnie": ostatnie,
