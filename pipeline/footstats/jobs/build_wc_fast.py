@@ -666,6 +666,10 @@ def scal_z_publikacjami(
     }
 
     out = list(value_bets)
+    swieze_po_kluczu: dict[str, list[dict]] = {}
+    for b in value_bets:
+        swieze_po_kluczu.setdefault(_klucz_publikacji(b), []).append(b)
+    pokazane_przeliczone = 0
     wznowione = 0
     odtworzone = set(biezace)
     _skasowane_po_gwizdku = 0
@@ -685,6 +689,21 @@ def scal_z_publikacjami(
             del rej[k]           # mecz się zaczął — typ żyje dalej w typy_log
             continue
         if k in biezace:
+            # POLICZONY OD NOWA, ALE POKAZANY WCZEŚNIEJ — patrz `juz_pokazany`.
+            # Wpis z tego cyklu ma `opublikowano_ts == teraz`; starszy znaczy,
+            # że typ przeszedł już przez listę w którymś poprzednim cyklu.
+            if int(rec.get("opublikowano_ts") or teraz) < teraz:
+                for b_sw in swieze_po_kluczu.get(k, []):
+                    b_sw["pokazany_wczesniej"] = True
+                    b_sw["opublikowano_ts"] = rec.get("opublikowano_ts")
+                    # cena z pierwszej publikacji — po niej rozliczy go księga
+                    if kurs_ksiegi.get(k) and b_sw.get("kurs") != kurs_ksiegi[k]:
+                        b_sw["kurs"] = kurs_ksiegi[k]
+                        p_sw = float(b_sw.get("p_model") or 0.0)
+                        b_sw["ev_pct"] = round(betting.ev_brutto_pct(p_sw, b_sw["kurs"]), 1)
+                        b_sw["ev_netto"] = round(betting.ev_pct(
+                            p_sw, b_sw["kurs"], b_sw.get("tryb_podatku")), 1)
+                    pokazane_przeliczone += 1
             continue
         bet = dict(rec.get("bet") or {})
         if not bet:
@@ -935,6 +954,9 @@ def scal_z_publikacjami(
         print(f"Terminarz: {bez_ligi} meczów bez nazwy rozgrywek "
               "(spoza bieżącego zakresu — pokażą się bez etykiety)")
 
+    if pokazane_przeliczone:
+        print(f"Publikacje: {pokazane_przeliczone} typów pokazanych wcześniej "
+              "policzono od nowa — zostają na stronie z ceną z publikacji")
     if wznowione or z_logu:
         print(f"Publikacje: wznowiono {wznowione} typów z rejestru"
               + (f" + {z_logu} z księgi rozliczeń" if z_logu else "")
@@ -1032,6 +1054,21 @@ def przytnij_rejestr_do_listy(lista_pub: list[dict], teraz: int) -> int:
 LISTA_CAP = sum(int(p["limit_dobowy"]) for p in uczony.POLKI.values())
 
 
+def juz_pokazany(b: dict) -> bool:
+    """Czy typ stał już na stronie — wtedy zostaje do gwizdka, poza limitami.
+
+    ⚑ DWIE DROGI, NIE JEDNA (2026-09-13). `wznowiony` dostaje wyłącznie typ,
+    którego bieżący cykl NIE policzył — wraca z rejestru. Typ pokazany
+    wcześniej, a policzony w tym cyklu od nowa, był traktowany jak NOWA
+    kandydatura: walczył o miejsce w limicie i przegrywał z mocniejszymi.
+    Zmierzone 13.09: ze 117 typów pokazanych na mecze przyszłe tylko 56 miało
+    ochronę, 51 zniknęło ze strony przed meczem (ok. 35 przez limit). Wypchnięty
+    typ wracał potem jako wznowiony PONAD limit — stąd 37 typów doby 13.09.
+    Drugą drogę znakuje `scal_z_publikacjami` flagą `pokazany_wczesniej`.
+    """
+    return bool(b.get("wznowiony") or b.get("pokazany_wczesniej"))
+
+
 def strumien_listy(b: dict) -> str:
     """Drużyny i zawodnicy mają OSOBNE limity listy dnia (patrz `LISTA_CAP`)."""
     return "zawodnik" if b.get("podmiot_typ") == "zawodnik" else "druzyna"
@@ -1126,8 +1163,9 @@ def wybierz_liste_publikowana(
        w niej stoi. Nowy typ na ten dzień dostaje `dzien_zamkniety` i żyje
        dalej w puli kuponów oraz w rozliczeniach w tle.
 
-    Wyjątkiem zostaje rynek UKRYTY do dopracowania: schodzi ze strony także
-    wtedy, gdy był pokazany, i dalej rozlicza się w księdze.
+    Rynek UKRYTY do dopracowania zdejmuje wyłącznie NOWE wejścia. Do 13.09
+    zdejmował też typy już pokazane — zmienione po zgłoszeniu o typach
+    znikających przed meczem (patrz `juz_pokazany`).
     """
     zamkniete = zamkniete or {}
     z_meczu: dict = {}
@@ -1181,7 +1219,7 @@ def wybierz_liste_publikowana(
     # dwa przebiegi, bo `klucz_sortowania` bywa krotką (przewaga, kurs, …),
     # a sort w Pythonie jest stabilny: siła układa kolejność WEWNĄTRZ grup
     kolejnosc = sorted(kandydaci, key=klucz_sortowania, reverse=True)
-    kolejnosc.sort(key=lambda b: 0 if b.get("wznowiony") else 1)
+    kolejnosc.sort(key=lambda b: 0 if juz_pokazany(b) else 1)
     for b in kolejnosc:
         if b.get("sugestia"):
             lista_pub.append(b)      # sugestia nie jest zakładem, nie liczy się
@@ -1189,9 +1227,13 @@ def wybierz_liste_publikowana(
         # rynek ukryty do czasu dopracowania — zostaje w puli kuponów i dalej
         # rozlicza się w księdze, więc ma jak udowodnić poprawę; świeży typ
         # dostaje znacznik, żeby księga wiedziała, że NIE był na stronie
-        if f'{b.get("rynek_kod")}|{b.get("strona")}' in ukryte:
-            if not b.get("wznowiony"):
-                zdjete.setdefault(_klucz_publikacji(b), "rynek_ukryty")
+        # ⚑ TYP JUŻ POKAZANY ZOSTAJE (2026-09-13, zgłoszenie właściciela
+        # o typach znikających przed meczem). Do dziś ukrycie rynku zdejmowało
+        # także typy, które user widział i mógł zagrać; teraz dotyczy tylko
+        # nowych wejść — zgodnie z zasadą „raz pokazany zostaje do gwizdka".
+        if (f'{b.get("rynek_kod")}|{b.get("strona")}' in ukryte
+                and not juz_pokazany(b)):
+            zdjete.setdefault(_klucz_publikacji(b), "rynek_ukryty")
             continue
         # DOBA PRODUKTOWA (6:00 -> 6:00), nie kalendarzowa — patrz `dzien_listy`.
         # 41% typów to mecze grane nad ranem, a one należą do dnia, w którym
@@ -1223,7 +1265,7 @@ def wybierz_liste_publikowana(
         if dzien in zamkniete:
             # dzień domknięty: skład jest już ogłoszony i się nie zmienia
             if _klucz_publikacji(b) not in zamkniete[dzien]:
-                if not b.get("wznowiony"):
+                if not juz_pokazany(b):
                     zdjete.setdefault(_klucz_publikacji(b), "dzien_zamkniety")
                 continue
             lista_pub.append(b)
@@ -1243,13 +1285,13 @@ def wybierz_liste_publikowana(
         # BRAMA WIDEŁEK — `_polka` policzona wyżej, przy `dzien`. Typ spoza
         # widełek nie jest cicho gubiony: dostaje powód, żeby dało się
         # policzyć, ile i czego odpada ([[ciche-odrzucenia-zasada]]).
-        if _polka is None and not b.get("wznowiony"):
+        if _polka is None and not juz_pokazany(b):
             zdjete.setdefault(_klucz_publikacji(b), "kurs_poza_polkami")
             continue
         _polka_klucz = (dzien, _str, _polka)
         _polka_limit = (uczony.POLKI[_polka]["limit_dobowy"]
                         if _polka else LISTA_CAP)
-        if not b.get("wznowiony"):
+        if not juz_pokazany(b):
             if (z_polki.get(_polka_klucz, 0) >= _polka_limit
                     or z_strumienia.get(doba_str, 0) >= LISTA_CAP
                     or z_meczu.get(mecz, 0) >= LISTA_PER_MECZ
@@ -9855,7 +9897,7 @@ def _main_impl(tryb=None):
             if powod_zdjecia == "rynek_wycofany":
                 _wycofane_z_ksiegi += 1
                 continue
-            if powod_zdjecia and not b.get("wznowiony"):
+            if powod_zdjecia and not juz_pokazany(b):
                 _zdjete_swieze.append({**b, "poza_publikacja": powod_zdjecia})
             else:
                 _zostaja.append(b)

@@ -517,3 +517,56 @@ def test_zero_swiezych_kart_i_tak_przelicza_wznowione():
         "zapis radaru znowu zależy od tego, ile kart przeszło bramy — "
         "wtedy przy zerze na stronie zostaje poprzedni radar")
     assert "radar_padl = True" in przed
+
+
+# --- TYP POKAZANY WCZEŚNIEJ, A POLICZONY OD NOWA (2026-09-13) ---------------
+#
+# Zgłoszenie: typy znikały ze strony przed meczem. `wznowiony` dostawał tylko
+# typ, którego cykl NIE policzył; policzony od nowa walczył o miejsce jak nowy.
+
+def test_przeliczony_typ_pokazany_wczesniej_dostaje_ochrone_i_cene(monkeypatch):
+    magazyn: dict = {}
+    _stub_supa(monkeypatch, magazyn)
+    bet = {**_bet(kurs=1.23, kickoff_ts=10_000), "p_model": 0.8}
+    ksiega = {R._klucz(bet): {**bet, "wynik": None}}
+    B.scal_z_publikacjami([bet], {1: {"id": 1}}, teraz=1000, typy_log=ksiega)
+    swiezy = {**bet, "kurs": 1.40}
+    out, _ = B.scal_z_publikacjami([swiezy], {1: {"id": 1}}, teraz=2000,
+                                   typy_log=ksiega)
+    assert out[0]["pokazany_wczesniej"] is True
+    assert out[0]["kurs"] == 1.23            # cena z publikacji, nie bieżąca
+    assert out[0]["opublikowano_ts"] == 1000
+    assert B.juz_pokazany(out[0])
+
+
+def test_nowy_typ_z_tego_cyklu_nie_jest_pokazany_wczesniej(monkeypatch):
+    magazyn: dict = {}
+    _stub_supa(monkeypatch, magazyn)
+    out, _ = B.scal_z_publikacjami([_bet(kickoff_ts=10_000)], {1: {"id": 1}},
+                                   teraz=1000)
+    assert not B.juz_pokazany(out[0])
+
+
+def test_pokazany_wczesniej_nie_wypada_przez_limit_ani_ukrycie(monkeypatch):
+    for nazwa in ("LISTA_PER_MECZ", "LISTA_PER_RYNEK", "LISTA_PER_PASMO",
+                  "LISTA_PER_RODZINA"):
+        monkeypatch.setattr(B, nazwa, 999)
+    jutro = int(time.time()) + 86400
+    def typ(i, kurs, **kw):
+        return {"mecz_id": 100 + i, "podmiot": f"D{i}", "podmiot_typ": "druzyna",
+                "rynek_kod": "team_corners", "linia": 4.5, "strona": "ponizej",
+                "kurs": kurs, "kickoff_ts": jutro, "p_model": 0.7, **kw}
+    # 30 mocnych nowych i jeden słabszy, który stał już na stronie
+    kand = [typ(i, 1.5 + i / 1000) for i in range(30)]
+    stary = typ(99, 1.21, pokazany_wczesniej=True)
+    ukryty = typ(98, 1.22, rynek_kod="team_goals", strona="powyzej",
+                 pokazany_wczesniej=True)
+    lista, zdjete, _ = B.wybierz_liste_publikowana(
+        kand + [stary, ukryty], lambda b: (float(b["kurs"]),),
+        ukryte={"team_goals|powyzej"})
+    klucze = {B._klucz_publikacji(b) for b in lista}
+    assert B._klucz_publikacji(stary) in klucze
+    assert B._klucz_publikacji(ukryty) in klucze
+    # nowe dostają tylko to, co zostało w limicie półki
+    nowe = [b for b in lista if not B.juz_pokazany(b)]
+    assert len(nowe) == 15 - 2

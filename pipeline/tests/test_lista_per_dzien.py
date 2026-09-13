@@ -206,14 +206,15 @@ def test_pokazany_z_wczoraj_nie_wypada_przez_dzisiejsza_fale(bez_roznorodnosci):
 
 # --- rynek ukryty i sugestie ---
 
-def test_rynek_ukryty_schodzi_takze_pokazanemu_ale_bez_znacznika():
-    """Rynek w kwarantannie schodzi ze strony (decyzja 01.08), ale wznowionemu
-    typowi nie dopisujemy znacznika — on JUŻ był policzony jako pokazany."""
+def test_rynek_ukryty_zdejmuje_tylko_nowe_wejscia():
+    """Od 2026-09-13 ukrycie rynku NIE zdejmuje typu już pokazanego (wcześniej,
+    od 01.08, zdejmowało) — zgłoszenie o typach znikających przed meczem,
+    zasada „raz pokazany zostaje do gwizdka". Nowy typ dalej schodzi."""
     swiezy = _typ(mecz_id=1)
     pokazany = _typ(mecz_id=2, wznowiony=True)
     lista, zdjete, _p = B.wybierz_liste_publikowana(
         [swiezy, pokazany], _klucz, ukryte={"team_corners|ponizej"})
-    assert lista == []
+    assert lista == [pokazany]
     assert zdjete == {B._klucz_publikacji(swiezy): "rynek_ukryty"}
 
 
