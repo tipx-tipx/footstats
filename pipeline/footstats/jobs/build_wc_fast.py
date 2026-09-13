@@ -1372,6 +1372,85 @@ def przytnij_manifest(manifest: dict | None, teraz: int,
     return {d: w for d, w in (manifest or {}).items() if d >= granica}
 
 
+# ILE KART DRABINEK WIDZI USER — musi się zgadzać z `DRABINKI_MAX`
+# w `web/src/components/ValueBoard.tsx` (front bierze dziesięć najlepszych
+# wg `ocena.miejsce` spośród meczów przed gwizdkiem). Reszta kart z radaru
+# rozlicza się w tle.
+DRABINKI_NA_STRONIE = 10
+# ile trzymamy wstecz — okno Skuteczności (21 dni) z zapasem, jak manifest
+RETENCJA_POKAZANYCH_DNI = 30
+
+
+def klucze_pokazane(lista_pub: list[dict], radar_wpisy: list[dict],
+                    drabinki_typy: list[dict], teraz: int) -> dict[str, int]:
+    """Klucze KSIĘGI typów, które ten cykl wystawił na stronę -> kickoff.
+
+    Typy modelu: cała `lista_pub` (to jest `value_bets.json`) bez sugestii.
+    Drabinki: pierwszy szczebel dziesięciu kart, które pokazuje front.
+    """
+    out: dict[str, int] = {}
+    for b in lista_pub:
+        if b.get("sugestia") or not b.get("kurs"):
+            continue
+        out[rozliczanie._klucz(b)] = int(b.get("kickoff_ts") or 0)
+    widoczne = sorted(
+        (w for w in radar_wpisy if int(w.get("kickoff_ts") or 0) > teraz),
+        key=lambda w: (w.get("ocena") or {}).get("miejsce") or 9999,
+    )[:DRABINKI_NA_STRONIE]
+    karty = {
+        (w.get("mecz_id"), rotowire._norm(str(w.get("podmiot") or "")),
+         (w.get("hero") or {}).get("rynek_kod"), (w.get("hero") or {}).get("linia"))
+        for w in widoczne
+    }
+    for t in drabinki_typy:
+        if t.get("odrzucony") or t.get("szczebel", 1) != 1:
+            continue
+        if (t.get("mecz_id"), rotowire._norm(str(t.get("podmiot") or "")),
+                t.get("rynek_kod"), t.get("linia")) in karty:
+            out[rozliczanie._klucz(t)] = int(t.get("kickoff_ts") or 0)
+    return out
+
+
+def dopisz_pokazane(stan: dict | None, nowe: dict[str, int], teraz: int,
+                    dni_wstecz: int = RETENCJA_POKAZANYCH_DNI) -> dict:
+    """Suma ze wszystkich cykli: klucz raz pokazany nie znika do końca okna.
+
+    `od_ts` to chwila pierwszego zapisu — mecze wcześniejsze liczą się po
+    staremu, bo o nich zapis nic nie wie (patrz `rozliczanie.opublikowany`).
+    """
+    stan = dict(stan or {})
+    granica = teraz - dni_wstecz * 86400
+    klucze = {k: v for k, v in (stan.get("klucze") or {}).items() if v >= granica}
+    for k, v in nowe.items():
+        klucze.setdefault(k, v)
+    return {"od_ts": int(stan.get("od_ts") or teraz), "klucze": klucze}
+
+
+def zapisz_pokazane(lista_pub: list[dict], radar_wpisy: list[dict],
+                    drabinki_typy: list[dict], teraz: int) -> None:
+    """Dopisz do Supabase to, co ten cykl wystawił na stronę."""
+    stary, ok = supa.get_key_ok(rozliczanie.POKAZANE_KLUCZ)
+    if not ok:
+        # bez odczytu nie nadpisujemy — garść kluczy z jednego cyklu zastąpiłaby
+        # całą historię, a Skuteczność uznałaby resztę za niepokazaną
+        print("UWAGA: odczyt zapisu „pokazane na stronie” PADŁ — pomijam "
+              "dopisanie w tym cyklu")
+        return
+    nowe = klucze_pokazane(lista_pub, radar_wpisy, drabinki_typy, teraz)
+    stan = dopisz_pokazane(stary if isinstance(stary, dict) else None, nowe, teraz)
+    przybylo = len(set(stan["klucze"]) - set((stary or {}).get("klucze") or {}))
+    if stan == stary:
+        return
+    if _dry_run():
+        print(f"[dry-run] pokazane na stronie: +{przybylo} (razem {len(stan['klucze'])})")
+    elif supa.put_key(rozliczanie.POKAZANE_KLUCZ, stan):
+        print(f"Pokazane na stronie: +{przybylo} kluczy (razem "
+              f"{len(stan['klucze'])}) — z tego liczy się Skuteczność")
+    else:
+        print("UWAGA: zapis „pokazane na stronie” NIE POWIÓDŁ SIĘ — typy z tego "
+              "cyklu dopiszą się w następnym, jeśli dalej będą na stronie")
+
+
 PUBLIKACJE_KART_KLUCZ = "publikacje_karty"
 
 
@@ -9533,6 +9612,11 @@ def _main_impl(tryb=None):
               f"z rynków/stron ze słabszą serią — od 14.08 wchodzą normalnie, "
               f"z etykietą na karcie i na końcu kolejności; do kuponów nie")
     _dump("value_bets.json", lista_pub)
+    # CO POSZŁO NA STRONĘ — jedyne źródło prawdy Skuteczności (patrz
+    # `rozliczanie.POKAZANE_KLUCZ`). Stoi ZA dumpem, bo zapisujemy to, co
+    # właśnie wysłaliśmy, a nie to, co zamierzaliśmy.
+    zapisz_pokazane(lista_pub, [] if radar_padl else radar_wpisy,
+                    drabinki_typy, int(time.time()))
     _dump("matches.json", list(matches_out.values()))
     _dump("players.json", list(players_out.values()))
     _dump("druzyny_forma.json", scal_forme_druzyn(druzyny_forma, lista_pub))
@@ -9892,6 +9976,27 @@ def _main_impl(tryb=None):
                            # omijają limity listy dnia (patrz `wybierz_liste_
                            # publikowana`) i to na nie zrzucano puchnięcie doby.
                            **({"wzn": 1} if _b.get("wznowiony") else {})}
+
+    # ⚑ TYP NA STRONIE BEZ REKORDU W KSIĘDZE (2026-09-13). Księga dostaje
+    # wyłącznie świeże przeliczenie, a wznowiony typ ma rekord „od wcześniej"
+    # — tylko że nie zawsze. Zmierzone 13.09: 21 typów z ogłoszonych składów
+    # 10–13.09 i 3 typy stojące wtedy na stronie NIE MIAŁY rekordu wcale (wszystkie
+    # opublikowane 10.09 15:16–16:01, w oknie przeprowadzki księgi do magazynu),
+    # więc nigdy by się nie rozliczyły i zniknęłyby ze Skuteczności. Dopisujemy
+    # je z ceną zamrożoną przy publikacji — tylko przy UDANYM odczycie księgi,
+    # bo przy padniętym każdy typ wyglądałby na brakujący.
+    if _ok_log:
+        _w_ksiedze = {rozliczanie._klucz(r) for r in (log_do_siatki or {}).values()}
+        _surowe = {_klucz_publikacji(b): b for b in value_bets_pub}
+        _bez_rekordu = [
+            _surowe.get(_klucz_publikacji(b), b) for b in lista_pub
+            if b.get("wznowiony") and not b.get("sugestia")
+            and rozliczanie._klucz(b) not in _w_ksiedze
+        ]
+        if _bez_rekordu:
+            value_bets = list(value_bets) + _bez_rekordu
+            print(f"Księga: dopisano {len(_bez_rekordu)} typów stojących na "
+                  "stronie bez rekordu (inaczej nigdy by się nie rozliczyły)")
 
     # publikacja kuponów idzie przez log (zamrożenie/anulowanie/rozliczenie)
     # wewnątrz _rozlicz_i_zapisz — kupony.json to aktywne kupony z logu

@@ -5,7 +5,7 @@ import { PrzelacznikWidoku } from "@/components/PrzelacznikWidoku";
 import { Reveal } from "@/components/Reveal";
 import { SkutecznoscScena } from "@/components/SkutecznoscScena";
 import { getKalibracja, getMeta, getTypyWyniki } from "@/lib/data";
-import { okrojDlaKlienta } from "@/lib/okrojDlaKlienta";
+import { bezTla, okrojDlaKlienta } from "@/lib/okrojDlaKlienta";
 import { fmtU } from "@/lib/format";
 import { czyPelnyWglad, czytajRole } from "@/lib/rola";
 
@@ -59,7 +59,13 @@ export default async function ModelPage({
   // UKRYCIE W INTERFEJSIE TO ZA MAŁO: scena jest komponentem klienckim, więc
   // wszystko, co dostanie w propsach, ląduje w źródle strony – nawet jeśli
   // nic tego nie renderuje. Kuchnię modelu wycinamy z DANYCH, nie z widoku.
-  const typy = pelnyWglad ? typySurowe : okrojDlaKlienta(typySurowe);
+  //
+  // ⚑ TYPY W TLE NIE MAJĄ WSTĘPU DO SKUTECZNOŚCI — TAKŻE U ADMINA (2026-09-13).
+  // Decyzja właściciela: „mają być tylko te typy, które pojawiają się realnie
+  // na stronie, reszta ma być w tle". Zdania i listy „na próbę" (12.09: 1655
+  // typów przy 18 pokazanych) wyglądały jak typy z sufitu. W księdze
+  // i w uczeniu zostają bez zmian — znikają wyłącznie z tego widoku.
+  const typy = pelnyWglad ? bezTla(typySurowe) : okrojDlaKlienta(typySurowe);
   // TO SAMO DOTYCZY `meta`: stan warstw uczenia to czysta kuchnia (nazwy
   // warstw, treść wyjątków, rozmiary prób). Scena dostaje `meta` w propsach
   // niezależnie od roli, więc wycinamy tutaj, a nie w widoku.

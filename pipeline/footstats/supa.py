@@ -286,6 +286,9 @@ MAGAZYN: dict[str, str] = {
     "styl_bank": "repo",
     "typy_log_kopia": "repo",
     "typy_log": "repo",           # najgorętszy: pisany z cyklu I z rozliczania
+    # co poszło na stronę (2026-09-13) — czyta go tylko pipeline, a cykl
+    # i rozliczanie ciągną go kilkadziesiąt razy na dobę
+    "pokazane_na_stronie": "repo",
     **{f"hd_{i}": "repo" for i in range(10)},   # magazyn historii drużyn
 }
 

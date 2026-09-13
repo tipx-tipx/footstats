@@ -51,9 +51,14 @@ const EKRAN_STRUMIENIA: Record<string, Ekran> = {
 
 export function poziomTypu(t: TypRozliczony, wybor: string): Poziom {
   if (t.poza_publikacja) return 3;
-  if (!t.ekran) return 1;
-  if (wybor === "wszystko") return t.ekran === "poza_lista" ? 2 : 1;
-  return t.ekran === EKRAN_STRUMIENIA[wybor] ? 1 : 2;
+  // ⚑ POZIOM 2 WYŁĄCZONY (2026-09-13). Od zapisu „pokazane na stronie”
+  // backend wpuszcza do bilansu WYŁĄCZNIE typy, które stały na stronie,
+  // a stempel `ekran` jest starszy niż półki: typ zawodnika z „Wyższych
+  // kursów” nosi `poza_lista`, więc chował się pod „nie na tej zakładce”
+  // (12.09: 3 z 5 typów zawodniczych). Strumień i tak wybiera backend.
+  void wybor;
+  void EKRAN_STRUMIENIA;
+  return 1;
 }
 
 /** Czemu ten wiersz jest przygaszony – jedno zdanie, bez żargonu. */

@@ -44,16 +44,16 @@ const NIEZADEKLAROWANA_KUCHNIA = [
   "prog_drabinek",
 ] as const;
 
-export function okrojDlaKlienta(typy: TypyWyniki): TypyWyniki {
+/**
+ * Skuteczność BEZ TYPÓW W TLE — dla każdej roli (decyzja właściciela
+ * 2026-09-13: „mają być tylko typy, które pojawiają się realnie na stronie,
+ * reszta ma być w tle"). Kuchnię modelu admin dalej widzi; znikają wyłącznie
+ * typy, których nie było na stronie.
+ */
+export function bezTla(typy: TypyWyniki): TypyWyniki {
   const strumienie = typy.skutecznosc_strumienie;
-  const out: TypyWyniki = {
+  return {
     ...typy,
-    po_rynku: [],
-    epoki_per_rynek: undefined,
-    // raport uczenia mówi to samo co tabela rynków, tylko w czasie:
-    // „obiecywaliśmy 71%, weszło 58%". Dla nas najważniejsza diagnostyka,
-    // dla klienta zewnętrznego argument przeciwko produktowi.
-    raport_uczenia: undefined,
     ostatnie: (typy.ostatnie ?? []).filter((t) => !t.poza_publikacja),
     skutecznosc_dzienna: bezProbnych(typy.skutecznosc_dzienna ?? []),
     skutecznosc_strumienie: strumienie
@@ -68,6 +68,18 @@ export function okrojDlaKlienta(typy: TypyWyniki): TypyWyniki {
           ]),
         )
       : undefined,
+  };
+}
+
+export function okrojDlaKlienta(typy: TypyWyniki): TypyWyniki {
+  const out: TypyWyniki = {
+    ...bezTla(typy),
+    po_rynku: [],
+    epoki_per_rynek: undefined,
+    // raport uczenia mówi to samo co tabela rynków, tylko w czasie:
+    // „obiecywaliśmy 71%, weszło 58%". Dla nas najważniejsza diagnostyka,
+    // dla klienta zewnętrznego argument przeciwko produktowi.
+    raport_uczenia: undefined,
   };
   const luzny = out as unknown as Record<string, unknown>;
   for (const pole of NIEZADEKLAROWANA_KUCHNIA) delete luzny[pole];

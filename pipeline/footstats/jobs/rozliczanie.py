@@ -838,8 +838,46 @@ def poza_zamrozona_lista(r: dict, lista_dnia: dict[str, set] | None) -> bool:
     return _klucz_listy(r) not in klucze
 
 
-def opublikowany(r: dict, lista_dnia: dict[str, set] | None) -> bool:
-    """Czy user widział ten typ na ogłoszonej liście dnia.
+# ⚑⚑⚑ POKAZANE NA STRONIE — JEDYNE ŹRÓDŁO PRAWDY SKUTECZNOŚCI (2026-09-13).
+#
+# Zgłoszenie właściciela: „w Skuteczności mają być tylko typy, które realnie
+# pojawiły się na stronie w zakładkach Zawodnicy i Drużyny, reszta ma być
+# w tle". Skład listy dnia (manifest z 6:00) okazał się złym świadkiem
+# i gubił w obie strony. Zmierzone na produkcji 13.09:
+#
+#   * DRABINKI NIGDY nie stoją w składzie listy dnia (mają własną ścieżkę),
+#     więc od 11.09 KAŻDA karta z zakładki Drabinki szła do „prób" — strumień
+#     drabinek miał 0 rozliczeń i 24 „próby", choć karty były na stronie;
+#   * typ pokazany na liście kilka dni przed swoją dobą, a zdjęty przed 6:00,
+#     w składzie nie stoi — rejestr publikacji dowodzi 12 takich na dobę 13.09;
+#   * na liście liczyliśmy „próby" w setkach (12.09: 1655), co w widoku
+#     wyglądało jak typy z sufitu.
+#
+# Dlatego cykl zapisuje teraz WPROST, co poszło na stronę (`value_bets.json`
+# i dziesięć kart Drabinek, które widzi front), jako sumę ze wszystkich
+# cykli — klucz raz pokazany nie znika. Dla meczów od `od_ts` rozstrzyga
+# wyłącznie ten zapis; starsze liczą się po staremu (skład + znacznik).
+POKAZANE_KLUCZ = "pokazane_na_stronie"
+
+
+def wczytaj_pokazane() -> dict | None:
+    """`{"od_ts": int, "klucze": {klucz_ksiegi: kickoff_ts}}` albo None.
+
+    None także przy nieudanym odczycie — wtedy odczyt wraca do starej reguły
+    zamiast uznać, że NIC nie było na stronie.
+    """
+    stan, ok = supa.get_key_ok(POKAZANE_KLUCZ)
+    if not ok or not isinstance(stan, dict) or not stan.get("od_ts"):
+        return None
+    return stan
+
+
+def opublikowany(r: dict, lista_dnia: dict[str, set] | None,
+                 pokazane: dict | None = None) -> bool:
+    """Czy user widział ten typ na stronie.
+
+    Dla meczów objętych zapisem `pokazane_na_stronie` decyduje wyłącznie ten
+    zapis (patrz `POKAZANE_KLUCZ`). Niżej reguła dla dni sprzed niego.
 
     ⚑ ZAMROŻONY SKŁAD ROZSTRZYGA W OBIE STRONY (2026-09-11, zgłoszenie usera:
     „chodzi mi o te typy z 10.09, które BYŁY pokazane na stronie").
@@ -863,7 +901,15 @@ def opublikowany(r: dict, lista_dnia: dict[str, set] | None) -> bool:
     Księgi NIE ruszamy (historii nie przepisujemy) — jak przy poprzedniej
     naprawie tej samej klasy, decyduje ODCZYT: dla dnia z ogłoszonym składem
     źródłem prawdy jest skład, a nie znacznik.
+
+    ⚑ DRABINKI TYLKO PO ZNACZNIKU (2026-09-13). Karta Drabinek nie przechodzi
+    przez listę dnia, więc skład jej nie zna — porównanie ze składem zsyłało
+    do „prób" każdą kartę, która stała na stronie.
     """
+    if pokazane and int(r.get("kickoff_ts") or 0) >= int(pokazane["od_ts"]):
+        return _klucz(r) in (pokazane.get("klucze") or {})
+    if r.get("zrodlo") == ZRODLO_DRABINKA:
+        return not r.get("poza_publikacja")
     if lista_dnia:
         klucze = lista_dnia.get(_doba_produktowa(r.get("kickoff_ts")))
         if klucze:
@@ -5055,7 +5101,8 @@ STRUMIENIE = ("pewniaki", "druzyny", "drabinki")
 
 
 def skutecznosc_strumieni(log: dict, dni: int = 21,
-                          lista_dnia: dict[str, set] | None = None) -> dict[str, dict]:
+                          lista_dnia: dict[str, set] | None = None,
+                          pokazane: dict | None = None) -> dict[str, dict]:
     """Skuteczność rozbita na strumienie: pewniaki / drużyny / drabinki.
 
     Jeden wspólny licznik mówił o wszystkim naraz i o niczym konkretnie:
@@ -5074,6 +5121,7 @@ def skutecznosc_strumieni(log: dict, dni: int = 21,
     # strumieni liczyły z DOKŁADNIE tego samego składu (i żeby nie robić
     # drugiego odczytu Supabase w tym samym przebiegu).
     _lista_dnia = lista_dnia if lista_dnia is not None else wczytaj_liste_dnia()
+    _na_stronie = pokazane if pokazane is not None else wczytaj_pokazane()
     for nazwa in STRUMIENIE:
         w_strumieniu = [
             r for r in log.values()
@@ -5090,8 +5138,8 @@ def skutecznosc_strumieni(log: dict, dni: int = 21,
         # ⚑ BILANS OPISUJE LISTĘ, KTÓRĄ USER WIDZIAŁ — patrz
         # `poza_zamrozona_lista`. Typ bez znacznika, którego nie ma
         # w zamrożonym składzie dnia, schodzi do „policzonych na próbę".
-        settled = [r for r in w_strumieniu if opublikowany(r, _lista_dnia)]
-        poza = [r for r in w_strumieniu if not opublikowany(r, _lista_dnia)]
+        settled = [r for r in w_strumieniu if opublikowany(r, _lista_dnia, _na_stronie)]
+        poza = [r for r in w_strumieniu if not opublikowany(r, _lista_dnia, _na_stronie)]
         okazje = [r for r in settled if not r.get("sugestia") and r.get("kurs")]
         trafione = sum(1 for r in settled if r["wynik"] == "wygrany")
         roi = sum(_zwrot_typu(r) - 1.0 for r in okazje)
@@ -6181,6 +6229,8 @@ def rozlicz(
     # dalej rozlicza się i uczy model, przenosi się tylko do „policzonych
     # na próbę" (`poza_pub`), dokładnie jak w strumieniach.
     _lista_dnia = wczytaj_liste_dnia()
+    # co REALNIE poszło na stronę — patrz `POKAZANE_KLUCZ`
+    _na_stronie = wczytaj_pokazane()
     settled = [
         r for r in log.values()
         if r.get("wynik") in ("wygrany", "przegrany")
@@ -6189,11 +6239,11 @@ def rozlicz(
         # BILANS OPISUJE LISTĘ, KTÓRĄ USER ZOBACZYŁ — dla dnia z ogłoszonym
         # składem rozstrzyga skład (w obie strony), dla starszych dni znacznik
         # `poza_publikacja`; patrz `opublikowany`
-        and opublikowany(r, _lista_dnia)
-        # drabinki mają WŁASNY strumień (skutecznosc_strumienie) — doliczenie
-        # ich tutaj zmieniłoby wstecz znaczenie liczb modelu, na których stoi
-        # kalibracja, kalendarz i wykresy
-        and _z_modelu(r)
+        and opublikowany(r, _lista_dnia, _na_stronie)
+        # ⚑ DRABINKI TEŻ (2026-09-13, decyzja właściciela: „w Skuteczności
+        # wszystko, co realnie było na stronie"). Do dziś widok „Wszystko"
+        # pomijał karty Drabinek, choć stoją w zakładce Zawodnicy. Tabela
+        # rynków (`po_rynku`) zostaje przy samym modelu — patrz niżej.
         # TYLKO OBECNY PRODUKT (2026-08-06). Skuteczność mieszała mistrzostwa
         # świata z ligą, czyli dwa różne silniki, dwa różne zakresy drużyn
         # i produkt sprzed zmiany zasad selekcji. Zmierzone tego dnia:
@@ -6223,8 +6273,7 @@ def rozlicz(
         if r.get("wynik") in ("wygrany", "przegrany")
         and r.get("rynek_kod") not in RYNKI_OSOBNE
         and not r.get("odrzucony")
-        and not opublikowany(r, _lista_dnia)
-        and _z_modelu(r)
+        and not opublikowany(r, _lista_dnia, _na_stronie)
         and _z_biezacej_epoki(r) and not _z_martwej_epoki(r)
         and w_oknie_statystyk(r)
     ]
@@ -6246,7 +6295,9 @@ def rozlicz(
             })
         return out
 
-    po_rynku = _po_rynku(settled)
+    # sam model: drabinki mają inny rachunek szansy, a ta tabela porównuje
+    # deklarację silnika z wynikiem
+    po_rynku = _po_rynku([r for r in settled if _z_modelu(r)])
 
     # skuteczność DZIEŃ PO DNIU (realne typy, bez rynków osobnych) — z listą
     # typów danego dnia (co siadło); zasila przełącznik dnia na Skuteczności
@@ -6268,7 +6319,8 @@ def rozlicz(
     )
     # ...i to samo rozbite na strumienie (pewniaki / drużyny / drabinki),
     # bo „skuteczność" bez podziału mieszała trzy różne produkty
-    strumienie = skutecznosc_strumieni(log, lista_dnia=_lista_dnia)
+    strumienie = skutecznosc_strumieni(log, lista_dnia=_lista_dnia,
+                                        pokazane=_na_stronie)
     for nazwa, s in strumienie.items():
         p_s = s["podsumowanie"]
         if p_s["rozliczone"]:
@@ -6369,8 +6421,8 @@ def rozlicz(
                 sum(1 for r in log.values()
                     if r.get("wynik") in ("wygrany", "przegrany")
                     and r.get("rynek_kod") not in RYNKI_OSOBNE
-                    and not r.get("odrzucony") and _z_modelu(r)
-                    and opublikowany(r, _lista_dnia)
+                    and not r.get("odrzucony")
+                    and opublikowany(r, _lista_dnia, _na_stronie)
                     and _z_biezacej_epoki(r) and not _z_martwej_epoki(r)
                     and not w_oknie_statystyk(r))
                 if START_STATYSTYK else 0
