@@ -229,3 +229,57 @@ def test_sugestia_nie_liczy_sie_do_limitu(bez_roznorodnosci):
 
 def test_pusta_lista_nie_wybucha():
     assert B.wybierz_liste_publikowana([], _klucz) == ([], {}, {})
+
+
+# --- DRUŻYNY I ZAWODNICY MAJĄ OSOBNE LIMITY (2026-09-13) ---------------------
+#
+# Decyzja właściciela: „21 osobno na drużyny i 21 na zawodników, nie mają się
+# kanibalizować". Do 13.09 liczniki doby były wspólne.
+
+def _zaw(i, kickoff=JUTRO, kurs=1.3, **kw):
+    return _typ(kickoff=kickoff, mecz_id=5000 + i, rynek="shots",
+                strona="powyzej", kurs=kurs, linia=0.5,
+                podmiot=f"Zawodnik {i}", podmiot_typ="zawodnik", **kw)
+
+
+def _dru(i, kickoff=JUTRO, kurs=1.3, **kw):
+    return _typ(kickoff=kickoff, mecz_id=1 + i, kurs=kurs,
+                podmiot_typ="druzyna", **kw)
+
+
+def test_druzynowe_nie_zabieraja_miejsc_zawodnikom(bez_roznorodnosci):
+    # drużynowe są mocniejsze w sortowaniu (droższe) i jest ich dużo więcej
+    kand = ([_dru(i, kurs=1.5 + i / 1000) for i in range(40)]
+            + [_zaw(i, kurs=1.2 + i / 1000) for i in range(40)])
+    lista, _, _ = B.wybierz_liste_publikowana(kand, _klucz)
+    polka = U.POLKI["wysoka_szansa"]["limit_dobowy"]
+    assert sum(1 for b in lista if b["podmiot_typ"] == "druzyna") == polka
+    assert sum(1 for b in lista if b["podmiot_typ"] == "zawodnik") == polka
+
+
+def test_kazdy_strumien_ma_pelne_21_na_dobe(bez_roznorodnosci):
+    wys = U.POLKI["wysoka_szansa"]["limit_dobowy"]
+    wyz = U.POLKI["wyzsze_kursy"]["limit_dobowy"]
+    kand = []
+    for f in (_dru, _zaw):
+        kand += [f(i, kurs=1.3) for i in range(30)]
+        kand += [f(100 + i, kurs=1.9) for i in range(30)]
+    lista, _, per_dzien = B.wybierz_liste_publikowana(kand, _klucz)
+    for typ in ("druzyna", "zawodnik"):
+        n = sum(1 for b in lista if b["podmiot_typ"] == typ)
+        assert n == wys + wyz == B.LISTA_CAP
+    assert list(per_dzien.values()) == [2 * B.LISTA_CAP]
+
+
+def test_limit_meczu_osobny_dla_druzyn_i_zawodnikow():
+    # ten sam mecz: drużynowe wypełniają swój limit meczu, zawodnik dalej wchodzi
+    mecz = 77
+    kand = [_typ(mecz_id=mecz, rynek=r, strona="ponizej", kurs=1.5,
+                 podmiot_typ="druzyna", podmiot=f"D{i}")
+            for i, r in enumerate(("team_corners", "team_goals", "team_cards",
+                                    "team_fouls", "team_shots"))]
+    kand.append(_typ(mecz_id=mecz, rynek="shots", strona="powyzej", kurs=1.3,
+                     linia=0.5, podmiot="Zawodnik X", podmiot_typ="zawodnik"))
+    lista, _, _ = B.wybierz_liste_publikowana(kand, _klucz)
+    assert sum(1 for b in lista if b["podmiot_typ"] == "druzyna") == B.LISTA_PER_MECZ
+    assert any(b["podmiot_typ"] == "zawodnik" for b in lista)

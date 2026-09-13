@@ -1021,7 +1021,20 @@ def przytnij_rejestr_do_listy(lista_pub: list[dict], teraz: int) -> int:
 # Sufit zostaje mimo półek, bo wznowione typy spoza widełek (kurs > 2,20 —
 # pokazane, zanim półki weszły) idą poza licznikami półek i bez wspólnego
 # dachu doba mogłaby puchnąć bez końca.
+#
+# ⚑⚑ LIMIT JEST OSOBNO DLA DRUŻYN I DLA ZAWODNIKÓW (2026-09-13, decyzja
+# właściciela: „21 osobno na drużyny i 21 na zawodników, nie mają się
+# kanibalizować"). Do dziś wszystkie liczniki doby były wspólne, więc typy
+# drużynowe — liczniejsze i z wyższą szansą — zajmowały miejsca zawodnikom:
+# 12.09 na liście stało 5 typów zawodniczych na 25, 13.09 — 8 na 37.
+# `LISTA_CAP` i półki (15 + 6) obowiązują teraz PER STRUMIEŃ, podobnie limity
+# meczu, rynku, pasma i rodziny. Drabinki tędy nie idą (własne 10 kart).
 LISTA_CAP = sum(int(p["limit_dobowy"]) for p in uczony.POLKI.values())
+
+
+def strumien_listy(b: dict) -> str:
+    """Drużyny i zawodnicy mają OSOBNE limity listy dnia (patrz `LISTA_CAP`)."""
+    return "zawodnik" if b.get("podmiot_typ") == "zawodnik" else "druzyna"
 # 3, nie 2: mecze bogate w typy są naszym najlepszym materiałem (luka
 # deklaracji −2,1 pp przy 20+ kandydatach wobec −21,7 pp przy kilku), ale
 # przy budżecie 12 pięć typów z jednego meczu to 40% listy.
@@ -1144,7 +1157,8 @@ def wybierz_liste_publikowana(
     #
     # ⚑ DRABINKI TĘDY NIE IDĄ — mają własny ekran i cel 1,5–6.
     z_polki: dict = {}
-    z_dnia: dict = {}
+    z_dnia: dict = {}          # wszystkie typy doby — do logu i meta
+    z_strumienia: dict = {}    # (doba, drużyna/zawodnik) — to jest limit
     z_zawodnika: dict = {}
     lista_pub: list[dict] = []
     zdjete: dict = {}
@@ -1204,6 +1218,8 @@ def wybierz_liste_publikowana(
         _polka = uczony.polka_dla(b.get("kurs"), b.get("podmiot_typ"))
         if _polka:
             b["polka"] = _polka
+        # osobne liczniki dla drużyn i zawodników — patrz `LISTA_CAP`
+        _str = strumien_listy(b)
         if dzien in zamkniete:
             # dzień domknięty: skład jest już ogłoszony i się nie zmienia
             if _klucz_publikacji(b) not in zamkniete[dzien]:
@@ -1213,10 +1229,11 @@ def wybierz_liste_publikowana(
             lista_pub.append(b)
             z_dnia[dzien] = z_dnia.get(dzien, 0) + 1
             continue
-        mecz = (dzien, b.get("mecz_id"))
-        rynek = (dzien, b.get("rynek_kod"), b.get("strona"))
-        pasmo = (dzien, _pasmo_kursu(b.get("kurs")))
-        rodzina = (dzien, _rodzina_statystyki(b.get("rynek_kod")))
+        doba_str = (dzien, _str)
+        mecz = (dzien, _str, b.get("mecz_id"))
+        rynek = (dzien, _str, b.get("rynek_kod"), b.get("strona"))
+        pasmo = (dzien, _str, _pasmo_kursu(b.get("kurs")))
+        rodzina = (dzien, _str, _rodzina_statystyki(b.get("rynek_kod")))
         # jeden typ na ZAWODNIKA w dniu (patrz LISTA_PER_ZAWODNIKA); drużyny
         # zostają poza tym licznikiem — u nich rynki nie są tak skorelowane
         zawodnik = (
@@ -1229,12 +1246,12 @@ def wybierz_liste_publikowana(
         if _polka is None and not b.get("wznowiony"):
             zdjete.setdefault(_klucz_publikacji(b), "kurs_poza_polkami")
             continue
-        _polka_klucz = (dzien, _polka)
+        _polka_klucz = (dzien, _str, _polka)
         _polka_limit = (uczony.POLKI[_polka]["limit_dobowy"]
                         if _polka else LISTA_CAP)
         if not b.get("wznowiony"):
             if (z_polki.get(_polka_klucz, 0) >= _polka_limit
-                    or z_dnia.get(dzien, 0) >= LISTA_CAP
+                    or z_strumienia.get(doba_str, 0) >= LISTA_CAP
                     or z_meczu.get(mecz, 0) >= LISTA_PER_MECZ
                     or z_rynku.get(rynek, 0) >= LISTA_PER_RYNEK
                     or z_pasma.get(pasmo, 0) >= LISTA_PER_PASMO
@@ -1244,6 +1261,7 @@ def wybierz_liste_publikowana(
                 zdjete.setdefault(_klucz_publikacji(b), "poza_lista_dnia")
                 continue
         z_dnia[dzien] = z_dnia.get(dzien, 0) + 1
+        z_strumienia[doba_str] = z_strumienia.get(doba_str, 0) + 1
         z_polki[_polka_klucz] = z_polki.get(_polka_klucz, 0) + 1
         z_meczu[mecz] = z_meczu.get(mecz, 0) + 1
         z_rynku[rynek] = z_rynku.get(rynek, 0) + 1
@@ -9390,7 +9408,8 @@ def _main_impl(tryb=None):
     _pokazane_wracaja = sum(1 for b in lista_pub if b.get("wznowiony"))
     if len(do_pokazania) > len(lista_pub):
         print(f"Lista publikowana: {len(lista_pub)} z {len(do_pokazania)} "
-              f"kandydatów (na KAŻDĄ dobę produktową max {LISTA_CAP}, "
+              f"kandydatów (na KAŻDĄ dobę produktową max {LISTA_CAP} drużynowych "
+              f"i osobno {LISTA_CAP} zawodniczych, "
               f"{LISTA_PER_MECZ}/mecz, {LISTA_PER_RYNEK}/rynek, "
               f"{LISTA_PER_RODZINA}/rodzinę); reszta zostaje w puli kuponów")
     # ⚑ CZUJNIK PÓŁEK (2026-08-20) — bez niego nie widać, czy podział na dwie
