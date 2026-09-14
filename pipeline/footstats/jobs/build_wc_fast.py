@@ -40,7 +40,8 @@ from ..model import (
     minutes as minutes_mod, profil_druzyn, styl, tempo, uczony,
 )
 from ..sources import (
-    betclic, eloratings, rotowire, scores365, sofascore, statshub, superbet,
+    betclic, eloratings, rotowire, scores365, sofascore, sportsgambler, statshub,
+    superbet,
 )
 from . import magazyn_druzyn, radar, rozliczanie
 from .build_demo import MARKET_NAMES_PL, WEB_DATA_DIR, line_for_lambda
@@ -5093,6 +5094,40 @@ def _main_impl(tryb=None):
     except Exception as e:
         roto = {}
         print(f"Rotowire niedostępny: {e}")
+    # ⚑ SPORTSGAMBLER — drugie źródło składów (2026-09-14). Rotowire to Europa
+    # Zachodnia + MLS; SportsGambler dokłada Skandynawię, Turcję, Portugalię,
+    # Belgię, Holandię, Amerykę Płd., zaplecza (~60 rozgrywek; bez Ekstraklasy).
+    # Pomiar 16.08: 75,6% trafności składu. Typ bez sygnału składu kończy się
+    # zwrotem w 24%, z ogłoszonym w 5% — to jest dźwignia zwrotów. Wynik idzie
+    # do tej samej mapy `roto`, więc reszta cyklu (predicted_status,
+    # is_confirmed, niedostepni) nie wie, skąd skład przyszedł.
+    try:
+        _sg_pamiec_raw, _sg_ok = supa.get_key_ok("sg_sklady")
+        _sg_nasze = [
+            {"klucz": e["id"],
+             "home": team_name.get(e.get("homeTeamId"), ""),
+             "away": team_name.get(e.get("awayTeamId"), ""),
+             "kickoff_ts": int(e.get("timeStartTimestamp") or 0)}
+            for e in wszystkie_ev
+        ]
+        _sg_mapa, _sg_pamiec, _sg_lic = sportsgambler.fetch_predicted_lineups(
+            _sg_nasze, _sg_pamiec_raw if _sg_ok else {},
+        )
+        _sg_nowe = sportsgambler.dolacz_do_rotowire(roto, _sg_mapa)
+        print(f"SportsGambler: lista {_sg_lic['lista']} meczów, naszych sparowanych "
+              f"{_sg_lic['sparowane']}, składy pobrane {_sg_lic['pobrane']} / "
+              f"z pamięci {_sg_lic['z_pamieci']} / puste {_sg_lic['puste']} / "
+              f"błędy {_sg_lic['bledy']}; drużyn {len(_sg_mapa)} "
+              f"(ogłoszonych {_sg_lic['ogloszone']}), dołożone do Rotowire: {_sg_nowe}"
+              + (f" — ⚑ BUDŻET WYCZERPANY: {_sg_lic['wyczerpany']}"
+                 if _sg_lic.get("wyczerpany") else ""))
+        diagnostyka.zapisz_rentgen("sklady_sportsgambler", {
+            **_sg_lic, "druzyn": len(_sg_mapa), "dolozone": _sg_nowe})
+        if _sg_ok and not _dry_run():
+            supa.put_key_bezpiecznie("sg_sklady", _sg_pamiec)
+    except Exception as e:                                     # noqa: BLE001
+        print(f"SportsGambler niedostępny ({type(e).__name__}: {e}) — składy "
+              "tylko z Rotowire i statshub")
 
     # składy: potwierdzone (event.lineupConfirmed) i przewidywane (czy statshub
     # w ogóle wystawił przewidywany skład dla danego meczu)
