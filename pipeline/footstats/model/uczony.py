@@ -1118,8 +1118,17 @@ def zdanie_stanu(wagi: dict | None) -> str:
 # Minuty mają współczynnik UJEMNY (−0,09…−0,14): kto gra pełne mecze, ma niższe
 # tempo na 90 minut, bo to częściej obrońcy i gracze bez rotacji.
 
-# Rynki zawodnicze, które bank realnie niesie (reszta ma zero serii).
-CELE_ZAW = ("shots", "sot", "fouls_committed", "fouls_won", "tackles")
+# Rynki zawodnicze, które bank realnie niesie.
+# ⚑ 2026-09-14: dołożone zza pola, celne zza pola, głową, celne głową i spalone.
+# Do tego dnia bank miał „zero serii" tych rynków nie dlatego, że danych nie
+# ma, tylko dlatego, że zapis banku szedł PRZED ich utworzeniem (365Scores
+# i mapy strzałów statshub) — patrz `build_wc_fast._bank_lib`. Eksperci BET
+# EKIPY grają zza pola najczęściej ze wszystkiego (22 z 45 typów Miłosza);
+# u nas te rynki jechały starym rachunkiem bez pokrycia (565 wycen/cykl).
+# Odbiory zostają w celach dla treningu, choć rynek jest WYCOFANY z produktu.
+CELE_ZAW = ("shots", "sot", "fouls_committed", "fouls_won", "tackles",
+            "shots_outside_box", "sot_outside_box", "headed_shots",
+            "headed_sot", "offsides")
 # Mecz krótszy niż to nic nie mówi o tempie: 5 minut z jednym strzałem dałoby
 # tempo 18 na 90 minut.
 MIN_MINUT_ZAW = 15.0

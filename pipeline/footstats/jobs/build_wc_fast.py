@@ -4004,6 +4004,8 @@ def _main_impl(tryb=None):
     # do oznaczania "kadra vs klub" w formie zawodnika
     nt_ts: dict[str, set] = {}
     bank_recs: dict = {}
+    _bank_lib: dict | None = None
+    _bank_merge = None
     try:
         # 1) trwała biblioteka z Supabase (przeżywa kasowanie propsów przez statshub)
         stored = load_trend_lib()
@@ -4034,8 +4036,18 @@ def _main_impl(tryb=None):
         bank_recs = {
             f"{t.player_id}:{t.market_code}": asdict(t) for t in lib.values()
         }
-        if not _dry_run():
-            save_trend_lib(bank_recs)
+        # ⚑ ZAPIS BANKU DOPIERO PO WSZYSTKICH ŹRÓDŁACH SERII (2026-09-14).
+        # Do dziś bank szedł do magazynu TUTAJ — zanim powstały serie z 365Scores
+        # (pełne staty +2974, mapy strzałów +1068 na cykl) i z dopełniania oferty
+        # (mapy strzałów statshub, budżet 400/cykl WYCZERPANY co przebieg). Skutek
+        # zmierzony 14.09: bank niósł DOKŁADNIE pięć rynków (strzały, celne, faule,
+        # faule wywalczone, odbiory), a zza pola, głową i spalone rodziły się
+        # i ginęły w każdym cyklu — model uczony nie miał na czym ich trenować,
+        # 565 wycen na cykl jechało starym rachunkiem, a budżet map strzałów
+        # co cykl pobierał od nowa tych samych zawodników. Zapis idzie teraz
+        # niżej, po `dopelnij_oferte_zawodnicza` (patrz `_zapisz_bank_po_zrodlach`).
+        _bank_lib = lib
+        _bank_merge = _merge
 
         # 3) przepnij najświeższe trendy z biblioteki na KAŻDY nadchodzący
         #    mecz, którego żywy feed nie pokrywa w danym (zawodnik, rynek) —
@@ -5421,6 +5433,31 @@ def _main_impl(tryb=None):
     if trendy_z_oferty:
         trends = list(trends) + trendy_z_oferty
 
+    # zapis banku po WSZYSTKICH źródłach (statshub, 365Scores, dopełnianie
+    # oferty) — uzasadnienie przy `_bank_lib` wyżej. Przepięte z banku trendy
+    # (ten sam timestamp) nadpisują wpis wariantem z nadchodzącym meczem, tak
+    # jak dotąd robiły to żywe trendy.
+    if _bank_lib is not None and _bank_merge is not None:
+        try:
+            _n_przed = len(_bank_lib)
+            for _t in trends:
+                _bank_merge(_t)
+            _rynki_banku: dict[str, int] = {}
+            for _t in _bank_lib.values():
+                _rynki_banku[_t.market_code] = _rynki_banku.get(_t.market_code, 0) + 1
+            print(f"Bank historii: {len(_bank_lib)} serii (+{len(_bank_lib) - _n_przed} "
+                  f"w tym cyklu), rynków {len(_rynki_banku)}: "
+                  + ", ".join(f"{k} {v}" for k, v in sorted(
+                      _rynki_banku.items(), key=lambda kv: -kv[1])))
+            if not _dry_run():
+                save_trend_lib({
+                    f"{_t.player_id}:{_t.market_code}": asdict(_t)
+                    for _t in _bank_lib.values()
+                })
+        except Exception as e:
+            print(f"Bank historii — zapis po źródłach padł ({e}); "
+                  "bank zostaje w stanie z poprzedniego cyklu")
+
     # GRUPA PORÓWNAWCZA DLA PRIORA — liczona RAZ, z kompletu trendów cyklu
     # (razem z tymi z oferty, bo inaczej rynki zawodnicze dołożone 07.08
     # miałyby prior z węższej populacji niż ta, w której konkurują).
@@ -5717,7 +5754,7 @@ def _main_impl(tryb=None):
 
         if not merged:
             _odrzuc(mid, tr, "brak_kursu",
-                    "Superbet nie kwotuje tego rynku dla zawodnika")
+                    "ani Superbet, ani Betclic nie kwotują tego rynku dla zawodnika")
             continue  # brak realnego kursu — nie tworzymy okazji
 
         # 1a: samospójność siatki linii Superbetu (line shopping bez
