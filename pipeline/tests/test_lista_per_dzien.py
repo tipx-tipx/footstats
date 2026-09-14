@@ -250,7 +250,7 @@ def _dru(i, kickoff=JUTRO, kurs=1.3, **kw):
 
 def test_druzynowe_nie_zabieraja_miejsc_zawodnikom(bez_roznorodnosci):
     # drużynowe są mocniejsze w sortowaniu (droższe) i jest ich dużo więcej
-    kand = ([_dru(i, kurs=1.5 + i / 1000) for i in range(40)]
+    kand = ([_dru(i, kurs=1.3 + i / 1000) for i in range(40)]
             + [_zaw(i, kurs=1.2 + i / 1000) for i in range(40)])
     lista, _, _ = B.wybierz_liste_publikowana(kand, _klucz)
     polka = U.POLKI["wysoka_szansa"]["limit_dobowy"]
@@ -275,7 +275,7 @@ def test_kazdy_strumien_ma_pelne_21_na_dobe(bez_roznorodnosci):
 def test_limit_meczu_osobny_dla_druzyn_i_zawodnikow():
     # ten sam mecz: drużynowe wypełniają swój limit meczu, zawodnik dalej wchodzi
     mecz = 77
-    kand = [_typ(mecz_id=mecz, rynek=r, strona="ponizej", kurs=1.5,
+    kand = [_typ(mecz_id=mecz, rynek=r, strona="ponizej", kurs=1.4,
                  podmiot_typ="druzyna", podmiot=f"D{i}")
             for i, r in enumerate(("team_corners", "team_goals", "team_cards",
                                     "team_fouls", "team_shots"))]

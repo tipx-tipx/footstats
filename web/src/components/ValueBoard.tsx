@@ -265,7 +265,7 @@ export function ValueBoard({
 
   const liczbaValueSts = stsAlerty.length;
   // PÓŁKI LISTY DNIA (backend `uczony.POLKI`, wpięte 2026-08-20). Doba dzieli
-  // się na dwa budżety: 15 typów o kursach 1,20–1,80 i 6 o kursach 1,80–2,20.
+  // się na dwa budżety: 18 typów o kursach 1,20–1,80 (drużyny do 1,45) i 3 o kursach 1,80–2,20.
   //
   // ⚑ ODPORNIE NA BRAK POLA. Typy sprzed wdrożenia nie mają `polka`, a lista
   // niesie też wznowione sprzed tygodnia — dla nich zostaje stara flaga

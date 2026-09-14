@@ -53,7 +53,10 @@ RYNKI = ["team_corners", "team_goals", "team_cards", "team_fouls",
 # (`uczony.POLKI`, sufit 2,00/2,20 per strumień), taki typ odpada na
 # widełkach i test limitu mierzyłby widełki zamiast limitu. Odrzucenie
 # spoza półek ma własny test niżej.
-KURSY = [1.25, 1.45, 1.60, 1.75, 1.85, 1.95]
+# ⚑ 2026-09-14: pewniaki DRUŻYNOWE do 1,45 (`uczony.KURS_MAX_PEWNIAKA`),
+# półki 18 + 3 — kursy pewniaków muszą mieścić się w nowym suficie, a na
+# półkę wyższych kursów przypada 1 z 6 (limit 3 z 21).
+KURSY = [1.25, 1.30, 1.35, 1.40, 1.45, 1.95]
 
 
 def _rozne(ile: int, od: int = 1, **kw) -> list[dict]:
@@ -297,7 +300,7 @@ def test_typ_spoza_polek_odpada_z_powodem(bez_roznorodnosci):
     przy kursach 2,40–2,80 typy z najwyższą szansą trafiają 30,8%, a te
     z najniższą 46,7% (n=360). Taki typ nie wchodzi na listę, ale musi
     zostawić powód: cichych odrzuceń nie ma."""
-    w_polce = _typ(mecz_id=1, kurs=1.75)
+    w_polce = _typ(mecz_id=1, kurs=1.40)
     za_drogi = _typ(mecz_id=2, kurs=2.60, p=0.99)
     lista, zdjete, _ = B.wybierz_liste_publikowana([w_polce, za_drogi], _klucz)
     assert [b["mecz_id"] for b in lista] == [1]

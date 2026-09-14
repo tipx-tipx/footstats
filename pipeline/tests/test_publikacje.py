@@ -10,6 +10,7 @@ import time
 from footstats.jobs import build_wc_fast as B
 from footstats.jobs import rozliczanie as R
 from footstats.model import betting
+from footstats.model import uczony as U
 
 
 def _bet(mecz_id=1, podmiot="GKS Katowice", linia=6.5, kurs=1.23,
@@ -557,7 +558,7 @@ def test_pokazany_wczesniej_nie_wypada_przez_limit_ani_ukrycie(monkeypatch):
                 "rynek_kod": "team_corners", "linia": 4.5, "strona": "ponizej",
                 "kurs": kurs, "kickoff_ts": jutro, "p_model": 0.7, **kw}
     # 30 mocnych nowych i jeden słabszy, który stał już na stronie
-    kand = [typ(i, 1.5 + i / 1000) for i in range(30)]
+    kand = [typ(i, 1.3 + i / 1000) for i in range(30)]
     stary = typ(99, 1.21, pokazany_wczesniej=True)
     ukryty = typ(98, 1.22, rynek_kod="team_goals", strona="powyzej",
                  pokazany_wczesniej=True)
@@ -569,4 +570,4 @@ def test_pokazany_wczesniej_nie_wypada_przez_limit_ani_ukrycie(monkeypatch):
     assert B._klucz_publikacji(ukryty) in klucze
     # nowe dostają tylko to, co zostało w limicie półki
     nowe = [b for b in lista if not B.juz_pokazany(b)]
-    assert len(nowe) == 15 - 2
+    assert len(nowe) == U.POLKI["wysoka_szansa"]["limit_dobowy"] - 2

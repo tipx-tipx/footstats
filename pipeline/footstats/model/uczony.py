@@ -839,7 +839,12 @@ def p_strony(lambda_: float | None, linia: float, strona: str,
 # ⚑ NIEROZSTRZYGNIĘTE: efekt na TRAFNOŚĆ półki. Model ma 6 dób produkcji,
 # wymiana po ściągnięciu dotyczy 5–8 typów i wynik siedzi w zerze. Poprawa
 # kalibracji jest pewna, zysk trafności NIE JEST udowodniony — nie cytować.
-SCIAGANIE_LAMBDY_DO_LINII = 0.80   # 1,0 = wyłączone; powrót jedną wartością
+# ⚑ 0,80 → 0,60 (2026-09-14): na 6798 rozliczeniach drużynowych modelu
+# uczonego nachylenie (fakt−linia)~(λ−linia) po ściągnięciu 0,80 nadal
+# 0,59–0,88, Brier kandydatów OOS 0,2305 → 0,2293 przy 0,60, 0,2322 przy 0,40.
+# Trafności listy NIE zmienia (symulacja 24 dób) — to porządek w liczbie,
+# nie naprawa.
+SCIAGANIE_LAMBDY_DO_LINII = 0.60   # 1,0 = wyłączone; powrót jedną wartością
 
 
 def lambda_do_wyceny(lambda_: float | None, linia: float,
@@ -971,16 +976,28 @@ def w_zasiegu(lambda_: float | None, linia: float,
 # a nie to, co robi produkt — i tak ma zostać, bo na księdze reguła
 # POGARSZA trafność półki (pełny pomiar przy `MAX_ODLEGLOSC_LINII`).
 # Zostawiam pole, żeby nie udawać, że tej symulacji nie było.
+# ⚑ 2026-09-14, decyzja właściciela po pomiarze „czy model się uczy":
+# żadna reguła wyboru nie zmienia trafności listy poza szumem (72–75% przy
+# każdej), bo kurs porządkuje typy lepiej niż model. Jedyną dźwignią
+# trafności jest PRÓG KURSU (pomiar 20.08: do 1,45 → 76,5%, do 1,30 → 78,6%).
+# Stąd: pewniaki drużynowe do 1,45 (`KURS_MAX_PEWNIAKA`), półka wyższych
+# kursów (trafia 55%, ściąga średnią doby o ~5 pp) z 6 do 3, a zwolnione
+# miejsca idą do pewniaków (15 → 18), żeby podaż 21 została.
+# Zawodnicy zostają na 1,80: 33 z 63 ich typów na liście stoi w 1,45–1,80,
+# sufit 1,45 zostawiłby osobny limit 21 w połowie pusty.
 POLKI = {
     "wysoka_szansa": {
         "kurs_min": 1.20, "kurs_max": 1.80,
-        "limit_dobowy": 15, "zasieg": MAX_ODLEGLOSC_LINII,
+        "limit_dobowy": 18, "zasieg": MAX_ODLEGLOSC_LINII,
     },
     "wyzsze_kursy": {
         "kurs_min": 1.80, "kurs_max": 2.20,
-        "limit_dobowy": 6, "zasieg": None,
+        "limit_dobowy": 3, "zasieg": None,
     },
 }
+
+# Sufit pewniaków PER STRUMIEŃ (patrz nota wyżej). Brak wpisu = widełki półki.
+KURS_MAX_PEWNIAKA = {"druzyna": 1.45}
 
 
 # ⚑ SUFIT KURSU PER STRUMIEŃ — wytyczna właściciela 2026-08-20.
@@ -1014,6 +1031,10 @@ def polka_dla(kurs: float | None, podmiot_typ: str | None = None) -> str | None:
         return None
     for nazwa, p in POLKI.items():
         if p["kurs_min"] <= k < p["kurs_max"]:
+            if nazwa == "wysoka_szansa" and podmiot_typ is not None:
+                sufit = KURS_MAX_PEWNIAKA.get(str(podmiot_typ))
+                if sufit is not None and k > sufit:
+                    return None
             return nazwa
     return None
 
