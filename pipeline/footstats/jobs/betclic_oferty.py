@@ -43,6 +43,10 @@ BUDZET_S = float(os.getenv("BETCLIC_BUDZET_S", "1200"))
 # Jak daleko w przód pobieramy. Dalsze mecze i tak nie mają jeszcze pełnej
 # oferty, a zajęłyby miejsce najbliższym.
 HORYZONT_S = 4 * 86400
+# Mecze BEZ propsów Superbetu pytamy dopiero w oknie 48 h przed gwizdkiem:
+# Betclic dokłada propsy bliżej meczu, a pierwszy przebieg po zdjęciu odsiewu
+# (14.09) spalił budżet na 9 pustych meczów z 10 (≈2 min każdy).
+HORYZONT_BEZ_SB_S = 48 * 3600
 
 
 def _mecze_w_zakresie(matches, teraz: int) -> dict[int, int]:
@@ -108,7 +112,9 @@ def _main() -> int:
                         SWIEZOSC_BETCLIC_S, OKNO_ODSWIEZENIA_BC_S)
     _sb = _z_propsami_superbetu(matches)
     do_pobrania = sorted(
-        ((mid, ts) for mid, ts in kolejnosc.items() if mid not in mamy),
+        ((mid, ts) for mid, ts in kolejnosc.items()
+         if mid not in mamy
+         and (mid in _sb or ts - teraz <= HORYZONT_BEZ_SB_S)),
         key=lambda kv: (kv[0] not in _sb, kv[1]),
     )
     print(f"Betclic: {len(kolejnosc)} meczów w zakresie, {len(mamy)} już w pamięci, "
@@ -166,9 +172,13 @@ def _main() -> int:
             continue
         gracze = paczka.get("players") or {}
         if not gracze:
-            # pustego wyniku NIE zapamiętujemy: zamroziłby mecz na dobę, a
-            # Betclic bywa po prostu spóźniony z ofertą
+            # ⚑ 2026-09-14: pusty wynik ZAPAMIĘTUJEMY, ale na krótko
+            # (`PUSTA_SWIEZOSC_BC_S` = 6 h w cyklu, nie dobę): pierwszy przebieg
+            # po zdjęciu odsiewu Superbetu pobrał 10 meczów w 1200 s, 9 pustych,
+            # i następna godzina pytałaby o te same. Spóźniona oferta Betclica
+            # dostaje kolejną szansę po 6 h.
             puste += 1
+            pamiec[str(mid)] = {"ts": int(time.time()), "players": {}}
             continue
         pamiec[str(mid)] = {"ts": int(time.time()), "players": gracze}
         pobrane += 1
@@ -182,7 +192,7 @@ def _main() -> int:
     }
     print(f"Betclic: pobrane {pobrane}, bez oferty {puste}, błędy {bledy}; "
           f"w pamięci {len(pamiec)} meczów, rynków {len(rynki)}")
-    if pobrane and not supa.put_key_bezpiecznie(BETCLIC_KLUCZ, pamiec):
+    if (pobrane or puste) and not supa.put_key_bezpiecznie(BETCLIC_KLUCZ, pamiec):
         print("UWAGA: zapis oferty Betclica NIE POWIÓDŁ SIĘ")
         return 1
     return 0

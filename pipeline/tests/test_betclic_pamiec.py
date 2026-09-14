@@ -35,12 +35,16 @@ def test_przeterminowana_oferta_nie_wraca():
     assert B.bc_z_pamieci(kol, stara, TERAZ) == {}
 
 
-def test_wpis_bez_zawodnikow_nie_liczy_sie_jako_pokrycie():
-    """Mecz, w którym Betclic nie kwotował nikogo, ma być pytany ponownie —
-    inaczej pusty strzał zamroziłby go na godzinę."""
+def test_wpis_bez_zawodnikow_liczy_sie_jako_pokrycie_tylko_przez_6h():
+    """⚑ Zmiana zasady 2026-09-14. Do dziś pusty wpis był pytany ponownie
+    od razu („zamroziłby mecz"). Po zdjęciu odsiewu Superbetu pusty strzał
+    kosztuje ≈2 min i było ich 9 na 10 — więc pusty wpis liczy się jako
+    sprawdzony przez PUSTA_SWIEZOSC_BC_S, a potem wraca do kolejki."""
     kol = {101: TERAZ + 3 * GODZINA}
-    pusty = {"101": {"ts": TERAZ - 60, "players": {}}}
-    assert B.bc_z_pamieci(kol, pusty, TERAZ) == {}
+    swiezy = {"101": {"ts": TERAZ - 60, "players": {}}}
+    assert B.bc_z_pamieci(kol, swiezy, TERAZ) == {101: {"players": {}, "ts": TERAZ - 60}}
+    stary = {"101": {"ts": TERAZ - B.PUSTA_SWIEZOSC_BC_S - 1, "players": {}}}
+    assert B.bc_z_pamieci(kol, stary, TERAZ) == {}
 
 
 def test_pamiec_z_innego_cyklu_nie_wywraca_sie_na_kluczach_tekstowych():
@@ -162,3 +166,20 @@ def test_pamiec_nie_puchnie_ponad_sufit():
     assert len(out) == B.MAX_MECZOW_W_PAMIECI_BC
     # zostają NAJŚWIEŻSZE
     assert "0" in out and str(n - 1) not in out
+
+
+# --- 2026-09-14: „bez oferty" też jest wiedzą ------------------------------
+
+def test_pusty_wynik_liczy_sie_jako_sprawdzony_przez_szesc_godzin():
+    """Pierwszy przebieg joba po zdjęciu odsiewu Superbetu: 9 z 10 pobranych
+    meczów bez oferty, ≈2 min każdy, i żaden nie zapamiętany — następna
+    godzina pytałaby o te same. Pusty wpis blokuje ponowne pytanie przez
+    PUSTA_SWIEZOSC_BC_S, potem pytamy znowu (Betclic dokłada propsy bliżej
+    gwizdka)."""
+    kol = {1: TERAZ + 30 * GODZINA}
+    swiezy_pusty = {"1": {"ts": TERAZ - GODZINA, "players": {}}}
+    assert B.bc_z_pamieci(kol, swiezy_pusty, TERAZ) == {
+        1: {"players": {}, "ts": TERAZ - GODZINA}}
+    assert B.bc_do_pobrania(kol, B.bc_z_pamieci(kol, swiezy_pusty, TERAZ), {}) == []
+    stary_pusty = {"1": {"ts": TERAZ - B.PUSTA_SWIEZOSC_BC_S - 1, "players": {}}}
+    assert B.bc_z_pamieci(kol, stary_pusty, TERAZ) == {}

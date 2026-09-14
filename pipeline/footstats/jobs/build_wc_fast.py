@@ -96,6 +96,13 @@ BETCLIC_KLUCZ = "betclic_oferty"
 # ten sam budżet wydany na mecze JESZCZE NIEZNANE daje dużo więcej, a pełne
 # pokrycie robi się po dwóch–trzech cyklach zamiast nigdy.
 SWIEZOSC_BETCLIC_S = 24 * 3600
+# ⚑ Mecz, o który zapytaliśmy i Betclic NIE MIAŁ oferty, też jest wiedzą
+# (2026-09-14). Pierwszy przebieg joba po zdjęciu odsiewu Superbetu: 101 do
+# pobrania, pobrane 10 w 1200 s (≈2 min na mecz), z tego 9 BEZ oferty — i nic
+# z tego nie zostało w pamięci, więc następna godzina zaczynałaby od tych
+# samych pustych meczów. Pusty wpis żyje krócej niż pełny, bo Betclic dokłada
+# propsy bliżej gwizdka — po tym czasie pytamy ponownie.
+PUSTA_SWIEZOSC_BC_S = 6 * 3600
 # ...z JEDNYM wyjątkiem: mecz tuż przed gwizdkiem odświeżamy raz, choćby
 # oferta była zapamiętana. To okno, w którym user realnie stawia i w którym
 # znane są składy — a pokazanie ceny, której już nie ma, boli bardziej niż
@@ -2223,9 +2230,14 @@ def bc_z_pamieci(
     out: dict[int, dict] = {}
     for mid, kickoff in kolejnosc.items():
         zap = (pamiec or {}).get(str(mid))
-        if not zap or not zap.get("players"):
+        if not zap:
             continue
         zapisano = int(zap.get("ts") or 0)
+        if not zap.get("players"):
+            # „bez oferty" — liczy się jako sprawdzone przez PUSTA_SWIEZOSC_BC_S
+            if teraz - zapisano <= PUSTA_SWIEZOSC_BC_S:
+                out[mid] = {"players": {}, "ts": zapisano}
+            continue
         if teraz - zapisano > swiezosc_s:
             continue
         # mecz wszedł w okno przedmeczowe PO tym, jak zapamiętaliśmy ofertę

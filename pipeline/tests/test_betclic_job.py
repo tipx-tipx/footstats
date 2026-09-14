@@ -107,3 +107,19 @@ def test_jeden_zepsuty_mecz_nie_zabija_przebiegu(monkeypatch):
 
     assert J.main() == 0
     assert list(zapisy[J.BETCLIC_KLUCZ]) == ["2"]
+
+
+def test_mecze_bez_propsow_superbetu_tylko_w_oknie_48h():
+    """Mecz bez propsów SB za 3 dni czeka; ten sam z propsami SB wchodzi od razu."""
+    daleko = TERAZ + 3 * 24 * GODZINA
+    matches = [_mecz(1, daleko, propsy=25), _mecz(2, daleko, propsy=0),
+               _mecz(3, TERAZ + 20 * GODZINA, propsy=0)]
+    kolejnosc = J._mecze_w_zakresie(matches, TERAZ)
+    assert set(kolejnosc) == {1, 2, 3}
+    _sb = J._z_propsami_superbetu(matches)
+    do_pobrania = sorted(
+        ((mid, ts) for mid, ts in kolejnosc.items()
+         if mid in _sb or ts - TERAZ <= J.HORYZONT_BEZ_SB_S),
+        key=lambda kv: (kv[0] not in _sb, kv[1]),
+    )
+    assert [m for m, _ in do_pobrania] == [1, 3]
