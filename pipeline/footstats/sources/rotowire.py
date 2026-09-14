@@ -37,14 +37,21 @@ _BAZA = "https://www.rotowire.com/soccer/lineups.php"
 # zostaje Sofascore. Lista kodów poniżej to te ligi Rotowire, które faktycznie
 # przecinają się z naszym terminarzem; nieznany kod oddaje pustą stronę, więc
 # nadmiar w tej liście kosztuje jedno zapytanie, a nie awarię.
+# ⚑ KODY SPRAWDZONE NA ŻYWO 2026-09-14: cztery z ośmiu były ZMYŚLONE.
+# `LALIGA`, `SERIEA`, `BUNDESLIGA`, `LIGUE1` oddawały 0 bloków składu (strona
+# nie zna takich kodów), a `LIGA`, `SERI`, `BUND`, `FRAN` — 20/13/9/9 meczów.
+# Przez to Rotowire realnie działał tylko dla Anglii, MLS i pucharów, a log
+# „przewidywane składy 50 drużyn" wyglądał zdrowo. Lista kodów strony:
+# BUND EPL FRAN LIGA LMX MLS SERI UCL UEL (grep `league=` w HTML).
 LIGI = (
     "EPL",          # Premier League
-    "LALIGA",       # La Liga
-    "SERIEA",       # Serie A
-    "BUNDESLIGA",
-    "LIGUE1",
+    "LIGA",         # La Liga
+    "SERI",         # Serie A
+    "BUND",         # Bundesliga
+    "FRAN",         # Ligue 1
     "MLS",
-    "UCL",          # Liga Mistrzów (u nas kwalifikacje)
+    "LMX",          # Liga MX
+    "UCL",          # Liga Mistrzów
     "UEL",          # Liga Europy
 )
 

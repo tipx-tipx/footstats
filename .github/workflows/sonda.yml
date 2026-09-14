@@ -1,0 +1,29 @@
+name: FootStats — sonda źródeł (ręcznie)
+
+# Jednorazowy test z chmury: czy dane źródło odpowiada z IP GitHub Actions.
+# Sofascore blokuje IP serwerowni, STS daje 403 z Cloudflare — zanim wepniemy
+# nowe źródło do cyklu, sprawdzamy TUTAJ, nie w produkcji. Wynik w logu.
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "Adres do sprawdzenia"
+        required: true
+        default: "https://www.sportsgambler.com/lineups/football/"
+
+jobs:
+  sonda:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Zapytanie z chmury
+        run: |
+          set +e
+          for i in 1 2; do
+            code=$(curl -s -o /tmp/odp.html -w "%{http_code}" -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/124" -L "${{ github.event.inputs.url }}")
+            size=$(wc -c < /tmp/odp.html)
+            echo "próba $i: HTTP $code, $size bajtów"
+            grep -o -i "predicted lineup\|confirmed lineup\|cloudflare\|just a moment\|access denied" /tmp/odp.html | sort | uniq -c | head -5
+            sleep 3
+          done
