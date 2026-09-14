@@ -23,12 +23,14 @@ def test_bierzemy_tylko_mecze_przed_gwizdkiem():
     assert set(J._mecze_w_zakresie(matches, TERAZ)) == {1}
 
 
-def test_pomijamy_mecze_bez_propsow_superbetu():
-    """Ten sam filtr co w cyklu: rozkład jest zerojedynkowy (70 ze 140 meczów
-    ma 0 propsów), a mecz bez nich kosztuje 30–40 s i zwraca zero."""
+def test_mecze_bez_propsow_superbetu_tez_wchodza_ale_po_tych_z_propsami():
+    """⚑ 2026-09-14: odsiew z 08.08 („Superbet 0 = Betclic 0") był fałszywy —
+    zmierzone na żywo: Midtjylland–Brøndby SB 0 propsów, Betclic 49 zawodników.
+    Mecze bez propsów SB wchodzą, ale pobieramy je PO tych z propsami."""
     matches = [_mecz(1, TERAZ + GODZINA, propsy=25),
                _mecz(2, TERAZ + GODZINA, propsy=0)]
-    assert set(J._mecze_w_zakresie(matches, TERAZ)) == {1}
+    assert set(J._mecze_w_zakresie(matches, TERAZ)) == {1, 2}
+    assert J._z_propsami_superbetu(matches) == {1}
 
 
 def test_pomijamy_mecze_za_daleko_w_przod():

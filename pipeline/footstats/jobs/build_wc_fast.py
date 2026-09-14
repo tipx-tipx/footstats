@@ -104,7 +104,10 @@ SWIEZOSC_BETCLIC_S = 24 * 3600
 OKNO_ODSWIEZENIA_BC_S = 6 * 3600
 # Ile meczów maksymalnie trzymamy w pamięci między cyklami (bezpiecznik
 # objętości klucza — jedna paczka to ~30 kB przy 60 kwotowanych zawodnikach).
-MAX_MECZOW_W_PAMIECI_BC = 80
+# ⚑ 80 → 200 (2026-09-14): pamięć obejmuje teraz także mecze BEZ propsów
+# Superbetu (Betclic kwotuje tam ~50 zawodników — zmierzone 14.09 na
+# Midtjylland–Brøndby i América–Pasto), a okno 4 dni to ~130 meczów.
+MAX_MECZOW_W_PAMIECI_BC = 200
 
 SH_BASE = "https://www.statshub.com/api"
 SH_HEADERS = {"Accept": "application/json", "Referer": "https://www.statshub.com/"}
@@ -2271,12 +2274,18 @@ def bc_do_pobrania(
         140 meczów ma 0, reszta od razu 20+). Takie zapytanie kosztuje 30–40 s
         i zwraca zero — to była połowa spalonego budżetu.
     """
+    # ⚑ 2026-09-14: odsiew „Superbet nie kwotuje = Betclic też nie" ZDJĘTY.
+    # Założenie z 08.08 sprawdzone na żywo: Midtjylland–Brøndby (Superbet 0
+    # propsów) — Betclic 49 zawodników × 3 rynki; América–Pasto — 53. Eksperci
+    # BET EKIPY biorą z Betclica Szwecję, Norwegię, Danię, Rumunię, Arabię
+    # ([[czytanie-discorda-i-x-przez-chrome]]). Mecze z propsami Superbetu
+    # idą PIERWSZE (tam dwa cenniki do line-shoppingu), reszta po kickoffie.
+    def _ma_sb(mid: int) -> bool:
+        return len(((sb_cache or {}).get(mid) or {}).get("players") or {}) > 0
     do_pobrania = [
-        (mid, ts) for mid, ts in kolejnosc.items()
-        if mid not in juz_mamy
-        and len(((sb_cache or {}).get(mid) or {}).get("players") or {}) > 0
+        (mid, ts) for mid, ts in kolejnosc.items() if mid not in juz_mamy
     ]
-    do_pobrania.sort(key=lambda kv: kv[1])
+    do_pobrania.sort(key=lambda kv: (not _ma_sb(kv[0]), kv[1]))
     return do_pobrania
 
 
@@ -2617,8 +2626,19 @@ def odkryj_zawodnikow_z_oferty(
     debiutanci=None,
     fetch_performance=None,
     trendy_z_performance=None,
+    oferty_extra: dict[int, dict] | None = None,
+    trends_out: list | None = None,
 ) -> tuple[int, int]:
     """Zawodnicy, o których wiemy WYŁĄCZNIE stąd, że bukmacher ich kwotuje.
+
+    ⚑ 2026-09-14: `oferty_extra` (Betclic) — odkrywamy też z jego oferty,
+    bo w meczach bez propsów Superbetu Betclic kwotuje ~50 zawodników;
+    `trends_out` — historia odkrytych idzie DO SILNIKA I DO BANKU, nie tylko
+    do tabeli pokryć. Do tego dnia 188 odkrytych na cykl (rentgen
+    `budzet_odkrywania`) zasilało wyłącznie `players_out`/`odds_grid`, a te
+    nie przeżywają cyklu — zawodnik kwotowany, ale nieznany feedowi propsów,
+    NIGDY nie mógł dostać typu w strumieniu pewniaków. Dla drabinek ten sam
+    błąd (kolejność) naprawiono 20.08 ([[drabinki-odkrywanie-po-fakcie]]).
 
     ZGŁOSZENIE USERA 2026-08-03: „w wielu meczach nie ma tabel pokryć ani
     kursów". `dopelnij_oferte_zawodnicza` odwróciło już kolejność (oferta →
@@ -2668,6 +2688,17 @@ def odkryj_zawodnikow_z_oferty(
                 or time.monotonic() - _t0_odkryc > budzet_s):
             break
         sb_odds = sb_cache.get(mid) or {}
+        bc_odds = (oferty_extra or {}).get(mid) or {}
+        if bc_odds.get("players"):
+            # oba cenniki normalizują nazwiska tym samym `superbet.norm_name`,
+            # więc suma po kluczu nie dubluje zawodnika; przy wspólnym kluczu
+            # rynki się sumują (Superbet nadpisuje wspólne linie)
+            _pl = {}
+            for _k, _v in (bc_odds.get("players") or {}).items():
+                _pl[_k] = dict(_v or {})
+            for _k, _v in (sb_odds.get("players") or {}).items():
+                _pl.setdefault(_k, {}).update(_v or {})
+            sb_odds = {**bc_odds, **sb_odds, "players": _pl}
         if not (sb_odds.get("players") or {}):
             continue
         znane = [
@@ -2724,6 +2755,28 @@ def odkryj_zawodnikow_z_oferty(
                 "minuty_lacznie": 0, "forma": {}, "xi": False,
             })
             rec["forma"].update(forma)
+            if trends_out is not None:
+                _tid = profil.get("team_id")
+                _opp = 0
+                if _tid in team_ids:
+                    _opp = team_ids[1] if _tid == team_ids[0] else team_ids[0]
+                for mk in forma:
+                    _s = swieze.get(mk)
+                    if _s is None:
+                        continue
+                    try:
+                        trends_out.append(dc_replace(
+                            _s, event_id=int(mid), team_id=_tid,
+                            team_name=druzyna,
+                            opponent_id=_opp,
+                            opponent_name=nazwy_druzyn.get(_opp, ""),
+                            is_home=(_tid == team_ids[0]),
+                            in_predicted_lineup=False, line=0.0,
+                            opponent_average=None, opponent_rank=None,
+                            league_average=None, ref_odds=[],
+                        ))
+                    except (TypeError, ValueError):
+                        continue
             rec["minuty_lacznie"] = max(
                 rec.get("minuty_lacznie") or 0,
                 int(sum(next(iter(swieze.values())).minutes)) if swieze else 0,
@@ -5433,8 +5486,50 @@ def _main_impl(tryb=None):
     if trendy_z_oferty:
         trends = list(trends) + trendy_z_oferty
 
+    # ⚑⚑⚑ ODKRYWANIE PRZED PEWNIAKAMI I PRZED ZAPISEM BANKU (2026-09-14).
+    #
+    # 20.08 blok przeniesiono sprzed dumpu tabeli PRZED radar (drabinki dostały
+    # odkrytych). Ale stał nadal ~3000 linii PO pętli pewniaków, a historia
+    # odkrytych nie szła ani do `trends`, ani do banku — czyli 188 zawodników
+    # na cykl (rentgen `budzet_odkrywania`) nigdy nie mogło dostać typu
+    # w strumieniu pewniaków, także w następnym cyklu. Sparta–Lyon: 66
+    # kwotowanych, zero w silniku. Teraz: odkrycie → `trends` → scoring
+    # pewniaków w TYM cyklu, a zapis banku niżej zapamiętuje ich historię,
+    # więc kolejne cykle nie płacą za nich budżetem odkrywania.
+    #
+    # Zależności są gotowe: `ev_by_id`, `team_name`, `players_out`, `odds_grid`,
+    # `sb_cache`, `bc_cache` (tuż wyżej). Test strukturalny pilnuje kolejności.
+    _do_odkrycia = []
+    for _mid in sorted(set(sb_cache) | set(bc_cache)):
+        _ma = ((sb_cache.get(_mid) or {}).get("players")
+               or (bc_cache.get(_mid) or {}).get("players"))
+        if not _ma:
+            continue
+        _ev = ev_by_id.get(_mid) or {}
+        _h, _a = _ev.get("homeTeamId"), _ev.get("awayTeamId")
+        if not (_h and _a):
+            continue
+        _do_odkrycia.append((
+            _mid, (int(_h), int(_a)),
+            int(_ev.get("timeStartTimestamp") or 0),
+            {int(_h): team_name.get(_h, ""), int(_a): team_name.get(_a, "")},
+        ))
+    _odkryte_trendy: list = []
+    if _do_odkrycia:
+        try:
+            odkryj_zawodnikow_z_oferty(
+                _do_odkrycia, sb_cache, players_out, odds_grid, _forma_z_trendu,
+                oferty_extra=bc_cache, trends_out=_odkryte_trendy,
+            )
+        except Exception as e:                                 # noqa: BLE001
+            print(f"Odkrywanie z oferty padło ({e}) — bez odkrytych w tym cyklu")
+    if _odkryte_trendy:
+        trends = list(trends) + _odkryte_trendy
+        print(f"Odkrywanie z oferty: {len(_odkryte_trendy)} trendów odkrytych "
+              "zawodników poszło DO SILNIKA TYPÓW i do banku")
+
     # zapis banku po WSZYSTKICH źródłach (statshub, 365Scores, dopełnianie
-    # oferty) — uzasadnienie przy `_bank_lib` wyżej. Przepięte z banku trendy
+    # oferty, ODKRYWANIE z oferty) — uzasadnienie przy `_bank_lib` wyżej. Przepięte z banku trendy
     # (ten sam timestamp) nadpisują wpis wariantem z nadchodzącym meczem, tak
     # jak dotąd robiły to żywe trendy.
     if _bank_lib is not None and _bank_merge is not None:
@@ -8757,41 +8852,6 @@ def _main_impl(tryb=None):
                      if pominietych_d else " — komplet okna"))
     except Exception as ex:
         print(f"Dociąg kursów pominięty ({ex})")
-    # ⚑⚑⚑ ODKRYWANIE MUSI BYĆ PRZED RADAREM (przeniesione 2026-08-20).
-    #
-    # Do dziś ten blok stał ~390 linii NIŻEJ — czyli PO `radar.zbuduj`. Skutek
-    # zmierzony na dry-runie: 251 zawodników odkrytych kosztem 247 sekund
-    # i 759 zapytań, a `odds_grid` po tej linii ma już tylko JEDNO użycie —
-    # dump do `odds_superbet.json` (tabela TOP POKRYCIA). Ani jeden odkryty
-    # zawodnik nie mógł dostać drabinki: karty były zbudowane wcześniej.
-    #
-    # `odds_grid` NIE przeżywa cyklu (powstaje pusty), więc nie było też
-    # „zadziała w następnym przebiegu" — ta praca szła w całości w tabelkę.
-    #
-    # To jest właściwa przyczyna zgłoszenia z 20.08 (Mickels, Sabah FK):
-    # zawodnik kwotowany przez bukmachera, bez feedu propsów, mógł zostać
-    # odkryty — ale odkrycie przychodziło po fakcie.
-    #
-    # Zależności są gotowe dużo wcześniej (`ev_by_id` 4650, `_forma_z_trendu`
-    # 4668, `team_name` 3979, `sb_cache` napełniony tuż wyżej), więc to jest
-    # przeniesienie, nie przepisanie.
-    _do_odkrycia = []
-    for _mid, _sb in sb_cache.items():
-        if not (_sb or {}).get("players"):
-            continue
-        _ev = ev_by_id.get(_mid) or {}
-        _h, _a = _ev.get("homeTeamId"), _ev.get("awayTeamId")
-        if not (_h and _a):
-            continue
-        _do_odkrycia.append((
-            _mid, (int(_h), int(_a)),
-            int(_ev.get("timeStartTimestamp") or 0),
-            {int(_h): team_name.get(_h, ""), int(_a): team_name.get(_a, "")},
-        ))
-    if _do_odkrycia:
-        odkryj_zawodnikow_z_oferty(
-            _do_odkrycia, sb_cache, players_out, odds_grid, _forma_z_trendu,
-        )
     pomiar_drabinek: list[dict] = []
     try:
         events_meta_radar = {

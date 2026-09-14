@@ -63,9 +63,24 @@ def _mecze_w_zakresie(matches, teraz: int) -> dict[int, int]:
             continue
         if not mid or kick <= teraz or kick - teraz > HORYZONT_S:
             continue
-        if (m.get("propsy_superbet") or 0) <= 0:
-            continue
+        # ⚑ 2026-09-14: odsiew „bez propsów Superbetu" ZDJĘTY — założenie z 08.08
+        # sprawdzone na żywo i fałszywe (Midtjylland–Brøndby: SB 0, Betclic 49
+        # zawodników × 3 rynki). Kolejność pobierania: najpierw mecze z propsami
+        # Superbetu (`_z_propsami_superbetu`), potem reszta po kickoffie.
         out[mid] = kick
+    return out
+
+
+def _z_propsami_superbetu(matches) -> set[int]:
+    """Mecze, w których Superbet kwotuje zawodników — te pytamy PIERWSZE."""
+    lista = matches if isinstance(matches, list) else list((matches or {}).values())
+    out: set[int] = set()
+    for m in lista:
+        try:
+            if int(m.get("propsy_superbet") or 0) > 0:
+                out.add(int(m.get("id")))
+        except (TypeError, ValueError):
+            continue
     return out
 
 
@@ -79,7 +94,7 @@ def _main() -> int:
         return 0
     kolejnosc = _mecze_w_zakresie(matches, teraz)
     if not kolejnosc:
-        print("Betclic: brak meczów w zakresie (przed gwizdkiem, z propsami)")
+        print("Betclic: brak meczów w zakresie (przed gwizdkiem, do 4 dni)")
         return 0
 
     pamiec_raw, odczyt_ok = supa.get_key_ok(BETCLIC_KLUCZ)
@@ -91,9 +106,10 @@ def _main() -> int:
     pamiec = dict(pamiec_raw or {})
     mamy = bc_z_pamieci(kolejnosc, pamiec, teraz,
                         SWIEZOSC_BETCLIC_S, OKNO_ODSWIEZENIA_BC_S)
+    _sb = _z_propsami_superbetu(matches)
     do_pobrania = sorted(
         ((mid, ts) for mid, ts in kolejnosc.items() if mid not in mamy),
-        key=lambda kv: kv[1],
+        key=lambda kv: (kv[0] not in _sb, kv[1]),
     )
     print(f"Betclic: {len(kolejnosc)} meczów w zakresie, {len(mamy)} już w pamięci, "
           f"{len(do_pobrania)} do pobrania (budżet {BUDZET_S:.0f} s)")

@@ -109,10 +109,13 @@ def test_w_oknie_przedmeczowym_odswiezamy_tylko_raz():
 
 # --- 2. kogo w ogóle pytamy ---
 
-def test_pytamy_tylko_o_mecze_z_propsami_superbetu():
-    kol = {1: TERAZ + GODZINA, 2: TERAZ + 2 * GODZINA}
+def test_mecze_z_propsami_superbetu_ida_pierwsze_ale_reszta_tez():
+    """⚑ 2026-09-14: bez odsiewu „SB 0 = BC 0" (fałszywy, zmierzony na żywo);
+    mecz z propsami Superbetu wyprzedza wcześniejszy mecz bez nich."""
+    kol = {1: TERAZ + 3 * GODZINA, 2: TERAZ + GODZINA}
     sb = {1: {"players": {"a": {}}}, 2: {"players": {}}}
-    assert B.bc_do_pobrania(kol, {}, sb) == [(1, TERAZ + GODZINA)]
+    assert B.bc_do_pobrania(kol, {}, sb) == [(1, TERAZ + 3 * GODZINA),
+                                             (2, TERAZ + GODZINA)]
 
 
 def test_mecz_juz_w_pamieci_nie_jest_pobierany_ponownie():
@@ -150,11 +153,12 @@ def test_mecz_spoza_biezacego_zakresu_zostaje():
 
 
 def test_pamiec_nie_puchnie_ponad_sufit():
-    kol = {i: TERAZ + GODZINA for i in range(200)}
+    n = B.MAX_MECZOW_W_PAMIECI_BC + 100
+    kol = {i: TERAZ + GODZINA for i in range(n)}
     duza = {}
-    for i in range(200):
+    for i in range(n):
         duza.update(_pamiec(i, TERAZ - i))
     out = B.bc_rotuj_pamiec(duza, kol, TERAZ)
     assert len(out) == B.MAX_MECZOW_W_PAMIECI_BC
     # zostają NAJŚWIEŻSZE
-    assert "0" in out and "199" not in out
+    assert "0" in out and str(n - 1) not in out

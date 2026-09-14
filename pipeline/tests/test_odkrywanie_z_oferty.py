@@ -233,10 +233,70 @@ def test_odkrywanie_jest_przed_radarem():
     from pathlib import Path
     zrodlo = (Path(__file__).resolve().parent.parent
               / "footstats" / "jobs" / "build_wc_fast.py").read_text(encoding="utf-8")
-    i_odkrycie = zrodlo.index("odkryj_zawodnikow_z_oferty(\n            _do_odkrycia")
+    i_odkrycie = zrodlo.index("odkryj_zawodnikow_z_oferty(\n                _do_odkrycia")
     i_radar = zrodlo.index("radar_wpisy = radar.zbuduj(")
     assert i_odkrycie < i_radar, (
         "odkrywanie zawodników wróciło ZA radar — odkryci zawodnicy nie "
         "trafią do drabinek w tym cyklu, a odds_grid nie przeżywa do "
         "następnego (patrz nota w tym teście)"
     )
+
+
+# --- 2026-09-14: odkryci idą DO SILNIKA i przed pewniaków ------------------
+
+def test_odkrywanie_jest_przed_pewniakami_i_zapisem_banku():
+    """⚑⚑⚑ Ten sam błąd co 20.08, drugi strumień. Odkrywanie stało ~3000 linii
+    PO pętli pewniaków, a historia odkrytych nie szła do `trends` ani do banku:
+    188 zawodników na cykl zasilało wyłącznie tabelę pokryć. Sparta–Lyon:
+    66 kwotowanych, zero w silniku."""
+    from pathlib import Path
+    zrodlo = (Path(__file__).resolve().parent.parent
+              / "footstats" / "jobs" / "build_wc_fast.py").read_text(encoding="utf-8")
+    i_odkrycie = zrodlo.index("odkryj_zawodnikow_z_oferty(\n                _do_odkrycia")
+    i_srednie = zrodlo.index("_srednie_grupy = srednie_grupowe(trends)")
+    i_bank = zrodlo.index("_bank_merge(_t)")
+    i_pewniaki = zrodlo.index("# --- PEWNIAKI: najlepszy typ")
+    assert i_odkrycie < i_bank < i_srednie < i_pewniaki, (
+        "odkrywanie musi stać przed zapisem banku, średnimi grup i pewniakami"
+    )
+
+
+def test_odkryty_zawodnik_daje_trend_do_silnika_z_kontekstem_meczu():
+    from dataclasses import dataclass, field
+
+    @dataclass
+    class T:
+        counts: list
+        minutes: list
+        event_id: int = 0
+        team_id: int | None = None
+        team_name: str = ""
+        opponent_id: int = 0
+        opponent_name: str = ""
+        is_home: bool = False
+        in_predicted_lineup: bool = False
+        line: float = 0.5
+        opponent_average: float | None = 1.0
+        opponent_rank: int | None = 1
+        league_average: float | None = 1.0
+        ref_odds: list = field(default_factory=list)
+
+    players_out, odds_grid, out = {}, {}, []
+    bc = {5: {"players": {"duah manu": {"shots": {0.5: {"over": 1.9}}}}}}
+    n_gr, _ = B.odkryj_zawodnikow_z_oferty(
+        [(5, (1, 2), 100, {1: "Sparta", 2: "Lyon"})],
+        {}, players_out, odds_grid, _forma,
+        debiutanci=_stub_debiutanci([{
+            "klucz_sb": "duah manu", "nazwa": "Manu Duah",
+            "profil": {"id": 77, "team_id": 2, "position": "F"},
+        }]),
+        fetch_performance=lambda pid: [{"x": 1}],
+        trendy_z_performance=lambda *a, **k: {"shots": T([1, 2, 0], [90, 90, 90])},
+        oferty_extra=bc, trends_out=out,
+    )
+    assert n_gr == 1, "oferta TYLKO Betclica też odkrywa"
+    assert len(out) == 1
+    t = out[0]
+    assert (t.event_id, t.team_id, t.opponent_id, t.is_home) == (5, 2, 1, False)
+    assert t.opponent_name == "Sparta" and t.team_name == "Lyon"
+    assert t.opponent_average is None and t.line == 0.0
