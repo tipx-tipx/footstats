@@ -736,6 +736,8 @@ def _leg_dict(b: dict) -> dict:
         # też best-per-side publikowaną okazją) są na zawsze "bezkategoriowe"
         # w diagnostyce miękkich linii / sygnałów XI / marży UK.
         "xi_sygnal": b.get("xi_sygnal"),
+        "gral_w_ostatnim": b.get("gral_w_ostatnim"),
+        "udzial_startow": b.get("udzial_startow"),
         "kurs_ref": b.get("kurs_ref"),
         # realna przewaga lega — do UI (dlaczego ten leg) i scoringu wartości
         "ev_uk": b.get("ev_uk"),

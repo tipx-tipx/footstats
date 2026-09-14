@@ -551,17 +551,103 @@ def _grane(tr: statshub.StatshubTrend) -> list[tuple[float, float, int]]:
     ]
 
 
-def udzial_startow(tr: statshub.StatshubTrend, okno: int = OKNO_STARTOW) -> float | None:
+# Ten sam mecz u dwóch źródeł (statshub / 365Scores / magazyn) ma znacznik
+# czasu z dokładnością do godziny–dwóch (strefa, przesunięcie gwizdka);
+# dwa mecze JEDNEJ drużyny nigdy nie dzielą mniej niż doba.
+TOLERANCJA_MECZU_S = 4 * 3600
+# tyle meczów drużyny wystarczy, żeby udział startów coś znaczył — mniej niż
+# w starej mierze (5), bo tu każdy mecz jest rozstrzygnięty („był w XI" albo
+# „nie było go"), a nie tylko „zagrał ileś minut"
+MIN_MECZOW_DRUZYNY = 3
+
+
+def dopelnij_meczami_druzyny(
+    tr: statshub.StatshubTrend, kalendarz: dict[int, list[int]] | None,
+    teraz: int, okno: int = OKNO_STARTOW,
+) -> tuple[list[bool], list[float], list[int]] | None:
+    """Historia zawodnika DOPEŁNIONA meczami drużyny, w których nie zagrał.
+
+    ⚑ PO CO (2026-09-14, zgłoszenie właściciela: karta na zawodnika Como,
+    „który nigdy nie wychodzi w podstawowym składzie"). Feed zawodnika ma
+    tylko mecze, w których ZAGRAŁ. Rezerwowy z trzema występami po 70 minut
+    w sezonie wyglądał więc jak etatowy starter: `started` = 3/3, udział
+    startów 100%, model minut liczył mu 80 minut. Docstring modelu minut
+    od początku wymagał „historii ostatnich meczów drużyny (uwzględniając
+    mecze, w których zawodnik NIE zagrał)" — ale nikt mu jej nie dawał.
+
+    Zwraca (started, minutes, timestamps) dla ostatnich `okno` ROZEGRANYCH
+    meczów drużyny (od najnowszego); mecz bez występu → (False, 0.0, ts).
+    None = nie znamy kalendarza tej drużyny (magazyn jej nie ma) — wołający
+    MUSI wtedy wrócić do starej miary, nie udawać zera.
+    """
+    if not kalendarz or tr.team_id is None:
+        return None
+    try:
+        ts_dr = kalendarz.get(int(tr.team_id)) or []
+    except (TypeError, ValueError):
+        return None
+    # rozegrane = zaczęły się ponad 3 h temu (magazyn ma też mecze przyszłe
+    # dopisane z terminarza, bez statystyk)
+    rozegrane = sorted((t for t in ts_dr if t <= teraz - 3 * 3600), reverse=True)[:okno]
+    if not rozegrane:
+        return None
+    wystepy = [
+        (int(ts), bool(st), float(m or 0.0))
+        for ts, st, m in zip(tr.timestamps, tr.started, tr.minutes) if ts
+    ]
+    started: list[bool] = []
+    minuty: list[float] = []
+    kiedy: list[int] = []
+    for t in rozegrane:
+        traf = min((w for w in wystepy if abs(w[0] - t) <= TOLERANCJA_MECZU_S),
+                   key=lambda w: abs(w[0] - t), default=None)
+        started.append(traf[1] if traf else False)
+        minuty.append(traf[2] if traf else 0.0)
+        kiedy.append(t)
+    return started, minuty, kiedy
+
+
+def udzial_startow(
+    tr: statshub.StatshubTrend, okno: int = OKNO_STARTOW,
+    kalendarz: dict[int, list[int]] | None = None, teraz: int | None = None,
+) -> float | None:
     """Jaka część ostatnich meczów DRUŻYNY zaczynał w pierwszym składzie.
 
-    Liczymy z pełnej historii (nie tylko z meczów, w których zagrał), bo
-    dopiero ona odróżnia „gra co tydzień od pierwszej minuty" od „raz na
-    trzy kolejki wchodzi i robi 90 minut". None = za krótka historia.
+    Z kalendarzem drużyny (magazyn) liczymy naprawdę względem JEJ meczów:
+    mecz, w którym go nie było, to mecz bez startu. Bez kalendarza zostaje
+    stara miara z samych występów — a ta myli rezerwowego z tytularnym
+    (patrz `dopelnij_meczami_druzyny`). None = za krótka historia.
     """
+    if kalendarz and teraz is not None:
+        dop = dopelnij_meczami_druzyny(tr, kalendarz, teraz, okno)
+        if dop and len(dop[0]) >= MIN_MECZOW_DRUZYNY:
+            return sum(1 for st in dop[0] if st) / len(dop[0])
     n = min(len(tr.started), len(tr.minutes), okno)
     if n < 5:
         return None
     return sum(1 for i in range(n) if tr.started[i]) / n
+
+
+def gral_w_ostatnim_meczu(
+    tr: statshub.StatshubTrend, kalendarz: dict[int, list[int]] | None,
+    teraz: int, ostatni_ts: int | None = None,
+) -> bool | None:
+    """Czy zagrał (choć minutę) w OSTATNIM rozegranym meczu swojej drużyny.
+
+    Najprostszy sygnał „jest w rotacji", gdy składu jeszcze nie ma — lista
+    dnia (6:00) używa go jako drugiego szczebla po ogłoszonym/przewidywanym
+    XI. `ostatni_ts` = ostatni mecz drużyny znany skądinąd (z feedu), gdy
+    magazyn jej nie ma. None = nie wiemy, kiedy drużyna grała.
+    """
+    dop = dopelnij_meczami_druzyny(tr, kalendarz, teraz, okno=1)
+    if dop:
+        return dop[1][0] > 0
+    if not ostatni_ts:
+        return None
+    return any(
+        ts and abs(int(ts) - int(ostatni_ts)) <= TOLERANCJA_MECZU_S and (m or 0) > 0
+        for ts, m in zip(tr.timestamps, tr.minutes)
+    )
 
 
 def liga_konsensus(
@@ -2063,7 +2149,10 @@ def zbuduj(
                 # ile z ostatnich meczów zaczynał w pierwszym składzie —
                 # brama karty i konkret na karcie („gra od pierwszej minuty
                 # w 9 z 10 ostatnich"), zamiast samej średniej minut
-                "udzial_startow": udzial_startow(tr_ref),
+                # ⚑ względem MECZÓW DRUŻYNY, gdy znamy jej kalendarz —
+                # rezerwowy z trzema pełnymi występami nie jest starterem
+                "udzial_startow": udzial_startow(
+                    tr_ref, kalendarz=kalendarz_druzyn, teraz=teraz),
                 "rodzaj": (
                     "transfer" if transfer else
                     "forma" if forma else "drabinka"

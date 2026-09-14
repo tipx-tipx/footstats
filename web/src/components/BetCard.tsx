@@ -144,6 +144,36 @@ function odznakiPrzewagi(bet: ValueBet): {
       tone: "amber",
     });
   }
+  // SYGNAŁ SKŁADU (2026-09-14): zawodnik dostaje typ tylko, gdy wiemy, że
+  // zagra – klient ma widzieć, na czym to stoi. Kolejność szczebli jak
+  // w pipeline (priorytet_skladu): ogłoszony XI > przewidywany > grał ostatnio.
+  if (bet.podmiot_typ === "zawodnik") {
+    if (bet.xi_sygnal === "official") {
+      o.push({
+        znak: "✓",
+        label: "w składzie",
+        opis: "Skład na ten mecz jest już ogłoszony i zawodnik wychodzi w pierwszej jedenastce",
+        tone: "brand",
+      });
+    } else if (bet.xi_sygnal === "predicted") {
+      o.push({
+        znak: "≈",
+        label: "przewidywany skład",
+        opis: "Według przewidywanych składów (Rotowire / SportsGambler) wychodzi w pierwszej jedenastce – ogłoszenie składu może to jeszcze zmienić",
+        tone: "brand",
+      });
+    } else if (bet.gral_w_ostatnim) {
+      o.push({
+        znak: "◔",
+        label: "grał ostatnio",
+        opis: "Składu na ten mecz jeszcze nie ma, ale wystąpił w ostatnim meczu swojej drużyny" +
+          (typeof bet.udzial_startow === "number"
+            ? ` (w pierwszym składzie w ${Math.round(bet.udzial_startow * 100)}% jej ostatnich meczów)`
+            : ""),
+        tone: "amber",
+      });
+    }
+  }
   if (bet.swieze_sklady) {
     o.push({
       znak: "◷",

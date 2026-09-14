@@ -516,6 +516,8 @@ def _kupon_leg_do_logu(l: dict) -> dict:
         "wyzsza_linia": l.get("wyzsza_linia"),
         "miekka_linia": l.get("miekka_linia"),
         "xi_sygnal": l.get("xi_sygnal"),
+        "gral_w_ostatnim": l.get("gral_w_ostatnim"),
+        "udzial_startow": l.get("udzial_startow"),
         "kal_tau": l.get("kal_tau"),
         # STEMPEL KOLEJNOŚCI (2026-08-17) — leg kuponu bywa pierwszym
         # rekordem typu w księdze, a rekord, który rodzi się bez stempla,
@@ -1206,6 +1208,10 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
             "miekka_linia": bool(b.get("miekka_linia")),
             # sygnał składu przy publikacji — do kalibracji p_start z rozliczeń
             "xi_sygnal": b.get("xi_sygnal"),
+            # rotacja (2026-09-14): „grał w ostatnim meczu drużyny" i udział
+            # startów względem JEJ meczów — do pomiaru zwrotów per szczebel
+            "gral_w_ostatnim": b.get("gral_w_ostatnim"),
+            "udzial_startow": b.get("udzial_startow"),
             # POMIAR PROGÓW: typ odrzucony tuż przy progu (betting.NEAR_*) —
             # rozlicza się w tle, POZA kalibracją/skutecznością/UI; diagnostyka
             # porównuje jego hit-rate z przepuszczonymi (kategoria

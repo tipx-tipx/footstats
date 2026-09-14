@@ -1143,11 +1143,37 @@ def _pasmo_kursu(kurs) -> str:
     return "?"
 
 
+def priorytet_skladu(b: dict) -> int:
+    """Szczebel pewności, że zawodnik ZAGRA — układa zawodników na liście.
+
+    ⚑ 2026-09-14, decyzja właściciela: typ bez sygnału składu kończy się
+    zwrotem w 24%, z ogłoszonym XI w 5%. Lista o 6:00 ma być pełna, ale
+    najpierw wchodzą ci, o których wiemy najwięcej:
+      3 — XI ogłoszone, 2 — XI przewidywane (Rotowire / SportsGambler /
+      statshub), 1 — grał w ostatnim meczu swojej drużyny, 0 — nic.
+    Drużyny dostają stałą (mają osobne liczniki, kolejność bez zmian).
+    """
+    if b.get("podmiot_typ") != "zawodnik":
+        return 3
+    xi = b.get("xi_sygnal")
+    if xi == "official":
+        return 3
+    if xi == "predicted":
+        return 2
+    return 1 if b.get("gral_w_ostatnim") else 0
+
+
 def wybierz_liste_publikowana(
     kandydaci: list[dict], klucz_sortowania, ukryte=frozenset(),
     zamkniete: dict[str, set] | None = None,
+    dolozone: dict[str, list[str]] | None = None,
 ) -> tuple[list[dict], dict, dict]:
     """Które typy staną na stronie. Zwraca (lista, zdjęte, ile na dzień).
+
+    `dolozone` (opcjonalny słownik wyjściowy) — {dzień: [klucze]} typów
+    zawodniczych DOŁOŻONYCH do domkniętej doby, bo dostały OGŁOSZONE XI
+    (patrz gałąź `dzien in zamkniete`); cykl dopisuje je do manifestu,
+    żeby Skuteczność je liczyła.
 
     TRZY ZASADY:
 
@@ -1230,7 +1256,15 @@ def wybierz_liste_publikowana(
     # dwa przebiegi, bo `klucz_sortowania` bywa krotką (przewaga, kurs, …),
     # a sort w Pythonie jest stabilny: siła układa kolejność WEWNĄTRZ grup
     kolejnosc = sorted(kandydaci, key=klucz_sortowania, reverse=True)
-    kolejnosc.sort(key=lambda b: 0 if juz_pokazany(b) else 1)
+    # ⚑ SKŁAD PRZED SIŁĄ (2026-09-14): wśród nowych zawodniczych najpierw
+    # ogłoszone XI, potem przewidywane, potem „grał w ostatnim meczu" —
+    # dopiero wewnątrz szczebla siła. Sort stabilny, więc kolejność z klucza
+    # zostaje wewnątrz szczebla; drużyny mają stałą, więc nic się nie zmienia.
+    kolejnosc.sort(key=lambda b: -priorytet_skladu(b))
+    # typy z ogłoszonej listy dnia idą PRZED wszystkim, żeby liczniki doby
+    # domkniętej były pełne, zanim rozważymy dołożenie kogoś z ogłoszonym XI
+    kolejnosc.sort(key=lambda b: 0 if (juz_pokazany(b)
+                                      or na_ogloszonej_liscie(b, zamkniete)) else 1)
     for b in kolejnosc:
         if b.get("sugestia"):
             lista_pub.append(b)      # sugestia nie jest zakładem, nie liczy się
@@ -1273,15 +1307,6 @@ def wybierz_liste_publikowana(
             b["polka"] = _polka
         # osobne liczniki dla drużyn i zawodników — patrz `LISTA_CAP`
         _str = strumien_listy(b)
-        if dzien in zamkniete:
-            # dzień domknięty: skład jest już ogłoszony i się nie zmienia
-            if _klucz_publikacji(b) not in zamkniete[dzien]:
-                if not juz_pokazany(b):
-                    zdjete.setdefault(_klucz_publikacji(b), "dzien_zamkniety")
-                continue
-            lista_pub.append(b)
-            z_dnia[dzien] = z_dnia.get(dzien, 0) + 1
-            continue
         doba_str = (dzien, _str)
         mecz = (dzien, _str, b.get("mecz_id"))
         rynek = (dzien, _str, b.get("rynek_kod"), b.get("strona"))
@@ -1293,15 +1318,56 @@ def wybierz_liste_publikowana(
             (dzien, rotowire._norm(str(b.get("podmiot") or "")))
             if b.get("podmiot_typ") == "zawodnik" else None
         )
+        _polka_klucz = (dzien, _str, _polka)
+        _polka_limit = (uczony.POLKI[_polka]["limit_dobowy"]
+                        if _polka else LISTA_CAP)
+        if dzien in zamkniete:
+            # dzień domknięty: skład jest ogłoszony i drużynowa połowa się nie
+            # zmienia. ⚑ ZAWODNICZA POŁOWA DOKŁADA (2026-09-14, decyzja
+            # właściciela): typ zawodniczy, który po 6:00 dostał OGŁOSZONE XI,
+            # wchodzi na wolne miejsce doby (do limitu 21 / 3 na mecz /
+            # 1 na zawodnika). To jedyny wyjątek od zamrożenia i tylko
+            # w górę: nic z ogłoszonej listy nie schodzi. Klucz idzie do
+            # `dolozone`, a cykl dopisuje go do manifestu.
+            _k = _klucz_publikacji(b)
+            if _k in zamkniete[dzien]:
+                lista_pub.append(b)
+            elif juz_pokazany(b):
+                continue
+            elif (dolozone is not None and _str == "zawodnik"
+                    and b.get("xi_sygnal") == "official" and _polka
+                    and z_strumienia.get(doba_str, 0) < LISTA_CAP
+                    and z_polki.get(_polka_klucz, 0) < _polka_limit
+                    and z_meczu.get(mecz, 0) < LISTA_PER_MECZ
+                    and z_zawodnika.get(zawodnik, 0) < LISTA_PER_ZAWODNIKA):
+                b["dolozony_po_domknieciu"] = True
+                dolozone.setdefault(dzien, []).append(_k)
+                lista_pub.append(b)
+            else:
+                zdjete.setdefault(_k, "dzien_zamkniety")
+                continue
+            z_dnia[dzien] = z_dnia.get(dzien, 0) + 1
+            z_strumienia[doba_str] = z_strumienia.get(doba_str, 0) + 1
+            z_polki[_polka_klucz] = z_polki.get(_polka_klucz, 0) + 1
+            z_meczu[mecz] = z_meczu.get(mecz, 0) + 1
+            if zawodnik is not None:
+                z_zawodnika[zawodnik] = z_zawodnika.get(zawodnik, 0) + 1
+            continue
+        # ⚑ ZAWODNIK BEZ ŻADNEGO SYGNAŁU, ŻE ZAGRA (2026-09-14): ani XI
+        # (ogłoszone/przewidywane), ani występu w ostatnim meczu drużyny —
+        # nie wchodzi. Zwroty biorą się właśnie stąd (24% vs 5%). `None`
+        # (nie wiemy, kiedy drużyna grała) NIE jest dowodem — przepuszczamy.
+        if (_str == "zawodnik" and not juz_pokazany(b)
+                and b.get("xi_sygnal") not in ("official", "predicted")
+                and b.get("gral_w_ostatnim") is False):
+            zdjete.setdefault(_klucz_publikacji(b), "bez_sygnalu_skladu")
+            continue
         # BRAMA WIDEŁEK — `_polka` policzona wyżej, przy `dzien`. Typ spoza
         # widełek nie jest cicho gubiony: dostaje powód, żeby dało się
         # policzyć, ile i czego odpada ([[ciche-odrzucenia-zasada]]).
         if _polka is None and not juz_pokazany(b):
             zdjete.setdefault(_klucz_publikacji(b), "kurs_poza_polkami")
             continue
-        _polka_klucz = (dzien, _str, _polka)
-        _polka_limit = (uczony.POLKI[_polka]["limit_dobowy"]
-                        if _polka else LISTA_CAP)
         if not juz_pokazany(b):
             if (z_polki.get(_polka_klucz, 0) >= _polka_limit
                     or z_strumienia.get(doba_str, 0) >= LISTA_CAP
@@ -1410,6 +1476,26 @@ def domknij_dni(
         }
         swiezo.append(dzien)
     return manifest, swiezo
+
+
+def dopisz_dolozone(manifest: dict, dolozone: dict[str, list[str]] | None) -> int:
+    """Dopisz do domkniętych dób klucze dołożone po domknięciu; ile nowych.
+
+    Tylko do dób JUŻ domkniętych (z `zamkniete_ts`) — dla otwartej doby
+    `wybierz_liste_publikowana` niczego nie dokłada, więc wpis nie może
+    powstać tu jako pusta skorupa bez znacznika.
+    """
+    n = 0
+    for dzien, klucze in (dolozone or {}).items():
+        wpis = manifest.get(dzien)
+        if not (isinstance(wpis, dict) and wpis.get("zamkniete_ts")):
+            continue
+        stare = set(wpis.get("klucze") or [])
+        nowe = set(klucze) - stare
+        if nowe:
+            wpis["klucze"] = sorted(stare | nowe)
+            n += len(nowe)
+    return n
 
 
 # ⚑ OKNO MANIFESTU MUSI POKRYWAĆ OKNO SKUTECZNOŚCI (2026-09-11).
@@ -5739,6 +5825,19 @@ def _main_impl(tryb=None):
             continue
         prior, ctx = built
         mk = tr.market_code
+        # ⚑ MECZE DRUŻYNY, W KTÓRYCH NIE ZAGRAŁ (2026-09-14). Feed zawodnika
+        # ma tylko jego występy, więc rezerwowy z trzema pełnymi meczami
+        # wyglądał jak starter (p_start 100%). Kalendarz drużyny z magazynu
+        # dopełnia historię meczami bez występu — model minut dostaje to,
+        # czego jego docstring wymagał od początku. Intensywność (counts)
+        # zostaje z meczów rozegranych.
+        _teraz_p = int(time.time())
+        _dop_dr = radar.dopelnij_meczami_druzyny(tr, _kalendarz_druzyn, _teraz_p)
+        if _dop_dr:
+            hist.historia_druzyny = (
+                _dop_dr[0], _dop_dr[1],
+                [max((_teraz_p - _ts_d) / 86400.0, 0.0) for _ts_d in _dop_dr[2]],
+            )
         # BRAMA JAKOŚCI (liga): typ tylko przy świeżej próbie. W MŚ nie ma
         # sensu (turniej sam jest oknem świeżości), w lidze historia bywa
         # w całości sprzed pauzy/kontuzji/transferu.
@@ -5781,6 +5880,24 @@ def _main_impl(tryb=None):
             "official" if ctx.official_started
             else "predicted" if ctx.predicted_started else None
         )
+        # ⚑ REGULARNOŚĆ STARTÓW W OBECNYM KLUBIE (2026-09-14). Bez sygnału
+        # składu typ stoi na założeniu „wyjdzie w XI" — sprawdzamy je
+        # względem MECZÓW DRUŻYNY: kto nie zaczynał w ≥ 60% jej ostatnich
+        # meczów, ten bez XI nie dostaje typu (ta sama brama co w drabinkach,
+        # `radar.MIN_UDZIAL_STARTOW`). Oba pola jadą do typu: lista dnia
+        # (6:00) układa nimi zawodników, gdy składów jeszcze nie ma.
+        udzial_klub = radar.udzial_startow(
+            tr, kalendarz=_kalendarz_druzyn, teraz=_teraz_p)
+        gral_w_ostatnim = radar.gral_w_ostatnim_meczu(
+            tr, _kalendarz_druzyn, _teraz_p,
+            ostatni_ts=ostatni_mecz_druzyny.get(tr.team_id or -1))
+        if (xi_sygnal is None and udzial_klub is not None
+                and udzial_klub < radar.MIN_UDZIAL_STARTOW):
+            _n_dr = len(_dop_dr[0]) if _dop_dr else min(len(tr.started), radar.OKNO_STARTOW)
+            _odrzuc(mid, tr, "rzadko_w_pierwszym_skladzie",
+                    f"w pierwszym składzie w {round(udzial_klub * _n_dr)} z {_n_dr} "
+                    "ostatnich meczów drużyny, a składu na ten mecz jeszcze nie ma")
+            continue
 
         probe = score_player_market(mk, 0.5, hist, prior, ctx, None, None,
                                     market_calibrated=True,
@@ -6195,6 +6312,8 @@ def _main_impl(tryb=None):
                             and abs(float(sm.factors.get("matchup", 1.0) or 1.0) - 1.0) >= 0.05
                         ),
                         "xi_sygnal": xi_sygnal,
+                        "udzial_startow": udzial_klub,
+                        "gral_w_ostatnim": gral_w_ostatnim,
                         "swieze_sklady": mid in swieze_mids,
                         # brama jakości (liga): ostatni występ dawniej niż
                         # STARE_DANE_S -> typ nie wchodzi do publikacji ani
@@ -6368,6 +6487,7 @@ def _main_impl(tryb=None):
                     and abs(float(sm.factors.get("matchup", 1.0) or 1.0) - 1.0) >= 0.05
                 ),
                 "rotacja": rotacja, "xi_sygnal": xi_sygnal,
+                "udzial_startow": udzial_klub, "gral_w_ostatnim": gral_w_ostatnim,
                 "miekka_linia": odstaje_zewn or miekka_a,
                 "kurs_oczekiwany": (
                     kurs_novig if odstaje_zewn else (oczek_a if miekka_a else None)
@@ -7526,6 +7646,7 @@ def _main_impl(tryb=None):
                         "matchup": bool(f_opp >= 1.12),
                         "matchup_styl": bool(f_styl_t >= 1.08),
                         "rotacja": False, "xi_sygnal": None,
+                        "udzial_startow": None, "gral_w_ostatnim": None,
                         "swieze_sklady": mid in swieze_mids,
                         "stare_dane": stare_t,
                         "miekka_linia": False, "kurs_oczekiwany": None,
@@ -8376,6 +8497,8 @@ def _main_impl(tryb=None):
             "miekka_linia": bool(b.get("miekka_linia")),
             "kurs_oczekiwany": b.get("kurs_oczekiwany"),
             "xi_sygnal": b.get("xi_sygnal"),
+            "udzial_startow": b.get("udzial_startow"),
+            "gral_w_ostatnim": b.get("gral_w_ostatnim"),
             "kurs": b["kurs"], "bukmacher": b["bukmacher"],
             "p_model": b["p_model"], "p_rynku": None,
             "fair_kurs": round(1.0 / max(b["p_model"], 1e-6), 2),
@@ -9586,9 +9709,14 @@ def _main_impl(tryb=None):
     elif not _manifest_ok:
         print("UWAGA: nie udało się odczytać manifestu listy dnia — ten cykl "
               "pracuje bez domknięć (nie nadpisujemy go)")
+    _dolozone_po_domknieciu: dict[str, list[str]] = {}
     lista_pub, _zdjete_selekcja, _z_dnia = wybierz_liste_publikowana(
         do_pokazania, _klucz_listy, _ukryte, zamkniete=_zamkniete,
+        dolozone=_dolozone_po_domknieciu,
     )
+    if _dolozone_po_domknieciu:
+        print("Lista dnia — DOŁOŻONE po domknięciu (ogłoszone XI): " + ", ".join(
+            f"{d} +{len(k)}" for d, k in sorted(_dolozone_po_domknieciu.items())))
     for _k, _powod in _zdjete_selekcja.items():
         zdjete_klucze.setdefault(_k, _powod)
     _pokazane_wracaja = sum(1 for b in lista_pub if b.get("wznowiony"))
@@ -9621,17 +9749,25 @@ def _main_impl(tryb=None):
     if _manifest_ok:
         _manifest_out, _swiezo_domkniete = domknij_dni(
             lista_pub, _manifest_raw, _teraz_publikacji)
-        if _swiezo_domkniete:
+        # dołożone po domknięciu wchodzą do manifestu — inaczej następny cykl
+        # zdjąłby je jako „dzien_zamkniety", a Skuteczność by ich nie liczyła
+        _dopisane_manifest = dopisz_dolozone(_manifest_out, _dolozone_po_domknieciu)
+        if _swiezo_domkniete or _dopisane_manifest:
             _manifest_out = przytnij_manifest(_manifest_out, _teraz_publikacji)
             _zamkniete_meta = _manifest_out
             if _dry_run():
-                print(f"[dry-run] domknęłoby listę dnia: "
-                      f"{', '.join(_swiezo_domkniete)}")
+                print(f"[dry-run] zapisałoby manifest listy dnia: domknięte "
+                      f"{', '.join(_swiezo_domkniete) or '—'}, dołożone "
+                      f"{_dopisane_manifest}")
             elif supa.put_key(LISTA_DNIA_KLUCZ, _manifest_out):
-                print("Lista dnia DOMKNIĘTA: " + ", ".join(
-                    f"{d} — {len(_manifest_out[d]['klucze'])} typów"
-                    for d in _swiezo_domkniete)
-                    + " (od teraz skład się nie zmienia)")
+                if _swiezo_domkniete:
+                    print("Lista dnia DOMKNIĘTA: " + ", ".join(
+                        f"{d} — {len(_manifest_out[d]['klucze'])} typów"
+                        for d in _swiezo_domkniete)
+                        + " (od teraz skład się nie zmienia)")
+                if _dopisane_manifest:
+                    print(f"Lista dnia: {_dopisane_manifest} typów zawodniczych "
+                          "z ogłoszonym XI dopisanych do domkniętej doby")
             else:
                 print("UWAGA: domknięcia listy dnia NIE UDAŁO SIĘ zapisać — "
                       "lista pozostaje otwarta do następnego cyklu")
@@ -9847,6 +9983,9 @@ def _main_impl(tryb=None):
         # plamą w diagnostyce miękkich linii/sygnałów XI/marży UK (patrz
         # kupony.py:_leg_dict i rozliczanie.py:rozlicz, ten sam fix)
         "wyzsza_linia", "xi_sygnal", "kurs_ref",
+        # sygnały rotacji zawodnika (2026-09-14) — lista dnia układa nimi
+        # zawodników; muszą dojść do księgi, żeby dało się zmierzyć zwroty
+        "udzial_startow", "gral_w_ostatnim",
         # pewnosc — do filtrowania w GeneratorKuponu jak backendowy styl "value"
         "pewnosc",
         # podmiot_typ — generator oznacza legi DRUŻYNOWE (gole/rożne/kartki

@@ -69,6 +69,12 @@ class PlayerHistory:
     # sprzed turnieju, ujęty już w priorze klubowym (bez podwójnego liczenia).
     # Model minut zawsze korzysta z PEŁNEJ historii. None = wszystkie True.
     likelihood_mask: list[bool] | None = None
+    # ⚑ HISTORIA MECZÓW DRUŻYNY (2026-09-14): (started, minutes, days_ago)
+    # dla ostatnich meczów DRUŻYNY, z meczami bez występu jako (False, 0).
+    # Tylko dla modelu minut — intensywność (counts) liczy się dalej z meczów
+    # rozegranych. None = nie znamy kalendarzu drużyny, model minut bierze
+    # historię występów (i myli rezerwowego z tytularnym).
+    historia_druzyny: tuple[list[bool], list[float], list[float]] | None = None
 
 
 @dataclass
@@ -280,10 +286,11 @@ def score_player_market(
     )
 
     # 2) model minut
+    _hd = history.historia_druzyny
     mm = minutes_mod.estimate_minutes(
-        recent_started=history.started,
-        recent_minutes=history.minutes,
-        days_ago=history.days_ago,
+        recent_started=_hd[0] if _hd else history.started,
+        recent_minutes=_hd[1] if _hd else history.minutes,
+        days_ago=_hd[2] if _hd else history.days_ago,
         injured_or_suspended=ctx.injured_or_suspended,
         official_started=ctx.official_started,
         predicted_started=ctx.predicted_started,

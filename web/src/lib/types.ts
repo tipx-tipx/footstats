@@ -146,6 +146,12 @@ export interface ValueBet {
   matchup?: boolean;
   /** true = wraca do XI po dłuższej przerwie – linie rynku bywają niedograne */
   rotacja?: boolean;
+  /** sygnał składu przy publikacji: „official" | „predicted" | null */
+  xi_sygnal?: string | null;
+  /** zawodnik zagrał w ostatnim meczu swojej drużyny (null = nie wiemy) */
+  gral_w_ostatnim?: boolean | null;
+  /** udział startów w ostatnich meczach DRUŻYNY, 0–1 (mecz bez występu = bez startu) */
+  udzial_startow?: number | null;
   /** true = składy potwierdzono <45 min temu – kurs mógł nie zdążyć zareagować */
   swieze_sklady?: boolean;
   /** true = linia płaci >=12% ponad kurs wynikający z RESZTY siatki Superbetu */
@@ -587,6 +593,10 @@ export interface LegPool {
   oczekiwane_minuty?: number | null;
   wyzsza_linia?: boolean;
   xi_sygnal?: string | null;
+  /** zawodnik zagrał w ostatnim meczu swojej drużyny (null = nie wiemy) */
+  gral_w_ostatnim?: boolean | null;
+  /** udział startów w ostatnich meczach DRUŻYNY, 0–1 (mecz bez występu = bez startu) */
+  udzial_startow?: number | null;
   kurs_ref?: number | null;
   pewnosc?: "wysoka" | "srednia";
   /** przedział wiarygodności szansy [dół, góra] – szerokość steruje
