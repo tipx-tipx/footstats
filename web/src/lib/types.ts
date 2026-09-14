@@ -139,6 +139,10 @@ export interface ValueBet {
     pkrn?: number;
     pokr?: number;
     p_bez_pokrycia?: number;
+    /** koncesja rywala względem normy ligi (1,27 = o 27% więcej), z 10
+     *  ostatnich meczów rywala — TA liczba weszła do szansy (od 14.09) */
+    rywal?: number;
+    p_bez_rywala?: number;
   };
   /** true = perełka na wyższej linii (>= 1,5) przy wciąż solidnej szansie */
   wyzsza_linia?: boolean;
@@ -602,6 +606,25 @@ export interface LegPool {
   /** przedział wiarygodności szansy [dół, góra] – szerokość steruje
    * zaufaniem do p_model przy składaniu kuponu (kuponBuilder.wagaModelu) */
   ci?: number[];
+}
+
+/** Wiersz ekranu „Rywale": ile rywal dopuszcza w nadchodzącym meczu, per grupa pozycji. */
+export interface RywalProfil {
+  stosunek: number;
+  per90: number;
+  norma: number;
+  n: number;
+}
+export interface Rywal {
+  mecz_id: number;
+  kickoff_ts: number;
+  rywal_id: number;
+  rywal: string;
+  przeciw_id: number;
+  przeciw: string;
+  rynek_kod: string;
+  max_stosunek: number;
+  grupy: Partial<Record<"DEF" | "MID" | "FWD", RywalProfil>>;
 }
 
 export interface Mecz {

@@ -4158,6 +4158,7 @@ def _main_impl(tryb=None):
     bank_recs: dict = {}
     _bank_lib: dict | None = None
     _bank_merge = None
+    _tabela_rywali: dict | None = None     # koncesje rywali z banku (uczony)
     try:
         # 1) trwała biblioteka z Supabase (przeżywa kasowanie propsów przez statshub)
         stored = load_trend_lib()
@@ -4200,6 +4201,17 @@ def _main_impl(tryb=None):
         # niżej, po `dopelnij_oferte_zawodnicza` (patrz `_zapisz_bank_po_zrodlach`).
         _bank_lib = lib
         _bank_merge = _merge
+        # ⚑ KONCESJE RYWALI DLA MODELU UCZONEGO (2026-09-14) — z banku, który
+        # i tak jest w pamięci; ta sama tabela, którą trening liczy z tego
+        # samego banku (patrz `uczony.CECHY_LOG_ZAW`).
+        try:
+            _tabela_rywali = uczony.tabela_rywali(lib)
+            print(f"Profil rywali (model uczony): "
+                  f"{len({k[0] for k in _tabela_rywali['prof']})} drużyn, "
+                  f"{len(_tabela_rywali['prof'])} profili rywal×rynek×grupa")
+        except Exception as e:                                 # noqa: BLE001
+            diagnostyka.cichy("cykl", "tabela_rywali", e)
+            _tabela_rywali = None
 
         # 3) przepnij najświeższe trendy z biblioteki na KAŻDY nadchodzący
         #    mecz, którego żywy feed nie pokrywa w danym (zawodnik, rynek) —
@@ -4741,10 +4753,14 @@ def _main_impl(tryb=None):
                 "league_average": getattr(tr, "league_average", None),
                 "opponent_average": getattr(tr, "opponent_average", None),
                 "is_home": bool(getattr(tr, "is_home", False)),
+                "opponent_id": getattr(tr, "opponent_id", None),
+                "position": getattr(tr, "position", None),
+                "market_code": rynek,
             }
             out = uczony.prognoza_zawodnika(
                 _wagi_modelu, seria, rynek, linia, strona,
                 oczekiwane_minuty=oczek_min, do_ts=ts_meczu,
+                tabela_rywali=_tabela_rywali,
             )
         except Exception as e:                                 # noqa: BLE001
             diagnostyka.cichy("cykl", "model_uczony_zawodnik", e)
@@ -9077,6 +9093,7 @@ def _main_impl(tryb=None):
             # próg kalendarzowy odrzucał w sierpniu 46 z 98 zawodników
             # z przewidywanego składu (patrz radar.MAX_OPUSZCZONYCH_MECZOW)
             kalendarz_druzyn=_kalendarz_druzyn,
+            tabela_rywali=_tabela_rywali,
         )
         radar_padl = False
     except Exception as ex:
@@ -9961,6 +9978,21 @@ def _main_impl(tryb=None):
     _dump("matches.json", list(matches_out.values()))
     _dump("players.json", list(players_out.values()))
     _dump("druzyny_forma.json", scal_forme_druzyn(druzyny_forma, lista_pub))
+    # EKRAN „RYWALE" (2026-09-14): kto w nadchodzących meczach dopuszcza
+    # najwięcej — sposób szukania podpatrzony u ekspertów (od rywala do
+    # zawodnika). Te same liczby, które model ma w cesze `rywal`.
+    try:
+        _rywale = uczony.ranking_rywali(
+            _tabela_rywali,
+            [(e["id"], e.get("homeTeamId"), e.get("awayTeamId"),
+              int(e.get("timeStartTimestamp") or 0)) for e in wszystkie_ev],
+            team_name, int(time.time()), wagi=_wagi_modelu,
+        )
+        _dump("rywale.json", _rywale)
+        print(f"Rywale: {len(_rywale)} wierszy (mecz × rywal × rynek) na "
+              f"{len({r['mecz_id'] for r in _rywale})} meczów w 3 dni")
+    except Exception as e:                                     # noqa: BLE001
+        diagnostyka.cichy("cykl", "rywale_json", e)
     _dump("odds_superbet.json", odds_grid)   # siatka kursów do TOP POKRYCIA
     _dump("odrzucenia.json", odrzucenia_out)  # "czemu nie ma typu" per mecz
     print(f"Rejestr odrzuceń: {len(odrzucenia_out)} wpisów, "

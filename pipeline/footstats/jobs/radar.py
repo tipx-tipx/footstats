@@ -928,6 +928,7 @@ def _rynki_wpisu(
     diag: Counter | None = None,
     zrodla: dict[str, dict[str, str]] | None = None,
     wagi_modelu: dict | None = None,
+    tabela_rywali: dict | None = None,
 ) -> list[dict]:
     """Sekcja `rynki` wpisu: przycięta drabinka kursów + pokrycie linii
     w ostatnich występach + forma i PEŁNY kontekst meczu per rynek.
@@ -1030,10 +1031,14 @@ def _rynki_wpisu(
                             "league_average": tr.league_average,
                             "opponent_average": tr.opponent_average,
                             "is_home": bool(tr.is_home),
+                            "opponent_id": tr.opponent_id,
+                            "position": tr.position,
+                            "market_code": mk,
                         },
                         mk, linia, "powyzej",
                         oczekiwane_minuty=minuty_proj,
                         do_ts=teraz or None,
+                        tabela_rywali=tabela_rywali,
                     )
                 except Exception as e:                          # noqa: BLE001
                     diagnostyka.cichy("radar", "model_uczony", e)
@@ -1936,6 +1941,7 @@ def zbuduj(
     zrodla_grid: dict[int, dict] | None = None,
     wagi_modelu: dict | None = None,
     kalendarz_druzyn: dict[int, list[int]] | None = None,
+    tabela_rywali: dict | None = None,
 ) -> list[dict]:
     """Złóż wpisy radaru/drabinek ze zbiorów, które cykl i tak ma w pamięci.
 
@@ -2140,6 +2146,7 @@ def zbuduj(
                 diag=diag_drabinki,
                 zrodla=((zrodla_grid or {}).get(mid) or {}).get(pid),
                 wagi_modelu=wagi_modelu,
+                tabela_rywali=tabela_rywali,
             )
             if not rynki:
                 lejek["8_odpadly_puste_drabinki"] += 1
@@ -2326,6 +2333,7 @@ def zbuduj(
                     korekta_logit=korekta_logit,
                     diag=diag_drabinki,
                     wagi_modelu=wagi_modelu,
+                    tabela_rywali=tabela_rywali,
                 ),
             })
 

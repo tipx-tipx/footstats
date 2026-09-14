@@ -846,6 +846,32 @@ function PokrycieLinii({ bet }: { bet: ValueBet }) {
   );
 }
 
+/**
+ * CO DOPUSZCZA RYWAL (2026-09-14). Dla zawodnika: ile rywal dopuszczał
+ * zawodnikom tej formacji na tym rynku w 10 ostatnich meczach względem
+ * normy ligi. Ta liczba WESZŁA do szansy (cecha `rywal` modelu uczonego),
+ * więc karta pokazuje składnik, nie ciekawostkę. Pełny ranking: /rywale.
+ */
+function ProfilRywala({ bet }: { bet: ValueBet }) {
+  const r = bet.p_uczony?.rywal;
+  if (r == null || bet.podmiot_typ !== "zawodnik") return null;
+  const pct = Math.round((r - 1) * 100);
+  if (Math.abs(pct) < 3) return null; // ~przeciętnie: nie ma czego pisać
+  const kier = pct > 0 ? "więcej" : "mniej";
+  return (
+    <Krok kod="rywal">
+      <p className="text-sm leading-relaxed text-ink-soft">
+        {bet.przeciwnik} dopuszcza w tej statystyce o{" "}
+        <span className="font-data font-semibold text-ink">
+          {Math.abs(pct)}% {kier}
+        </span>{" "}
+        niż przeciętna drużyna w lidze (zawodnicy tej formacji, 10 ostatnich
+        meczów rywala). To już jest wliczone w naszą szansę.
+      </p>
+    </Krok>
+  );
+}
+
 function RozjazdZHistoria({
   bet,
   okna,
@@ -1054,6 +1080,7 @@ export function SzczegolyTypu({
                     bo jest jej podsumowaniem — czytelnik dostaje wniosek,
                     a szczegóły zaraz pod nim. */}
                 <PokrycieLinii bet={bet} />
+                <ProfilRywala bet={bet} />
 
                 {/* FAKTY PRZED KOREKTAMI, HISTORIA OTWARTA (2026-08-06,
                     układ „historia sercem" zaakceptowany na drabinkach):

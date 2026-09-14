@@ -27,7 +27,7 @@ import { useState } from "react";
  * o zakładzie, jedzie do `SzczegolyTechniczne` – zwiniętej z domysłu.
  */
 
-export type KrokKod = "skad" | "zmiana" | "ostatnio" | "pokrycie" | "przewaga";
+export type KrokKod = "skad" | "zmiana" | "ostatnio" | "pokrycie" | "rywal" | "przewaga";
 
 export const KROK_TYTUL: Record<KrokKod, string> = {
   skad: "skąd ta liczba",
@@ -36,6 +36,9 @@ export const KROK_TYTUL: Record<KrokKod, string> = {
   // pokrycie poprzeczek doszło 2026-08-06 (przebudowa na życzenie usera):
   // fakty z historii mają stać PRZED naszymi korektami i ceną
   pokrycie: "pokrycie poprzeczek",
+  // koncesje rywala z 10 ostatnich meczów (2026-09-14) — składnik szansy
+  // zawodnika, pokazywany tak, jak eksperci uzasadniają typ
+  rywal: "co dopuszcza rywal",
   przewaga: "gdzie jest przewaga",
 };
 

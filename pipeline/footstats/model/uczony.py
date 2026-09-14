@@ -44,6 +44,7 @@ a cykl tylko mnoży macierze.
 
 from __future__ import annotations
 
+import bisect
 import math
 import time
 from collections import defaultdict
@@ -1132,7 +1133,23 @@ CELE_ZAW = ("shots", "sot", "fouls_committed", "fouls_won", "tackles",
 # Mecz krótszy niż to nic nie mówi o tempie: 5 minut z jednym strzałem dałoby
 # tempo 18 na 90 minut.
 MIN_MINUT_ZAW = 15.0
-CECHY_LOG_ZAW = ["t3", "t6", "t12", "min6", "liga", "opp"]
+# ⚑ `rywal` ZAMIAST `opp` (2026-09-14). `opp` brał `opponent_average` z feedu
+# statshub — jedną liczbę na CAŁĄ serię (nadchodzący rywal), którą trening
+# przyklejał do każdego historycznego meczu. Model uczył się jej ze szumu:
+# wagi produkcyjne log_opp wynosiły +0,013 / +0,017 / −0,002 / −0,048 / −0,011,
+# czyli zawodnik nie miał rywala w rachunku. `rywal` to koncesja liczona PER
+# MECZ z banku: ile ten rywal dopuszczał zawodnikom tej grupy pozycji na tym
+# rynku w ostatnich `OKNO_RYWALA` meczach PRZED danym meczem, względem normy
+# ligi do tej chwili. Ta sama funkcja w treningu (rywal meczu i) i w produkcji
+# (rywal nadchodzący). Pomiar 14.09 (bank 70/30, test = najnowsze 30%): znak
+# dodatni w 5/5 rynków (β +0,13…+0,20), Brier OOS −0,12…−0,43%. Na typach
+# PUBLIKOWANYCH efekt jest w szumie (AUC w pasmach kursu 0,50) — bukmacher ma
+# rywala w cenie. Wpięte jako naprawa usterki, nie jako dźwignia trafności;
+# `p_bez_rywala` w `p_uczony` pozwala to sprawdzić na księdze.
+CECHY_LOG_ZAW = ["t3", "t6", "t12", "min6", "liga", "rywal"]
+OKNO_RYWALA = 10          # ostatnich meczów rywala
+MIN_MECZY_RYWALA = 4      # mniej = brak profilu (None → mediana w macierzy)
+TOLERANCJA_MECZU_S = 4 * 3600
 CECHY_LIN_ZAW = ["dom", "udzial_startow"]
 GRUPY_POZYCJI = ("DEF", "MID", "FWD")     # DEF = odniesienie, bez kolumny
 _POZ_MAPA = {
@@ -1167,9 +1184,153 @@ def _chronologicznie(czasy: list) -> list[int]:
     return idx
 
 
+def tabela_rywali(lib: dict) -> dict:
+    """Koncesje rywali z banku: {(rywal, rynek, grupa): (ts↑, Σc, Σmin)} + normy.
+
+    Sumy są skumulowane, więc okno „ostatnie N meczów przed t" to dwie
+    różnice. Obserwacja = jeden zawodnik-mecz (≥ 20 minut); mecz rywala
+    to suma obserwacji wszystkich zawodników tej grupy w tym meczu.
+    """
+    obs: dict = defaultdict(lambda: defaultdict(lambda: [0.0, 0.0]))
+    norm: dict = defaultdict(lambda: defaultdict(lambda: [0.0, 0.0]))
+    for seria in (lib or {}).values():
+        if not isinstance(seria, dict):
+            continue
+        mk = str(seria.get("market_code") or "")
+        if mk not in CELE_ZAW:
+            continue
+        counts = seria.get("counts") or []
+        minuty = seria.get("minutes") or []
+        czasy = seria.get("timestamps") or []
+        rywale = seria.get("game_opponent_ids") or []
+        pozycje = seria.get("game_positions") or []
+        for i in range(min(len(counts), len(minuty), len(czasy), len(rywale))):
+            m = float(minuty[i] or 0)
+            if m < 20.0 or not czasy[i] or not rywale[i]:
+                continue
+            grp = grupa_pozycji(pozycje[i] if i < len(pozycje) and pozycje[i]
+                                else seria.get("position"))
+            if grp in ("NIE", "GK"):
+                continue
+            c = float(counts[i] or 0)
+            o = obs[(int(rywale[i]), mk, grp)][int(czasy[i])]
+            o[0] += c; o[1] += m
+            nn = norm[(mk, grp)][int(czasy[i])]
+            nn[0] += c; nn[1] += m
+
+    def _skum(d):
+        ts = sorted(d)
+        return (ts, np.cumsum([d[t][0] for t in ts]), np.cumsum([d[t][1] for t in ts]))
+
+    return {"prof": {k: _skum(d) for k, d in obs.items()},
+            "norma": {k: _skum(d) for k, d in norm.items()}}
+
+
+def profil_rywala(tabela: dict | None, rywal_id, rynek: str, grupa: str,
+                  do_ts: int, okno: int = OKNO_RYWALA) -> dict | None:
+    """Ile rywal dopuszczał tej grupie na tym rynku (ostatnie `okno` meczów
+    PRZED `do_ts`): `{"stosunek", "per90", "norma", "n"}` albo None.
+
+    `per90` = zdarzenia na 90 minut JEDNEGO zawodnika tej grupy (suma zdarzeń
+    wszystkich zawodników grupy / suma ich minut · 90), `norma` — to samo dla
+    całego banku do tej chwili, `stosunek` = per90 / norma.
+    """
+    if not tabela or not rywal_id or grupa in ("NIE", "GK", ""):
+        return None
+    try:
+        p = tabela["prof"].get((int(rywal_id), rynek, grupa))
+    except (TypeError, ValueError):
+        return None
+    if not p:
+        return None
+    ts, cc, cm = p
+    j = bisect.bisect_left(ts, int(do_ts) - TOLERANCJA_MECZU_S)
+    if j < MIN_MECZY_RYWALA:
+        return None
+    lo = j - min(okno, j)
+    c = float(cc[j - 1] - (cc[lo - 1] if lo else 0.0))
+    m = float(cm[j - 1] - (cm[lo - 1] if lo else 0.0))
+    n = tabela["norma"].get((rynek, grupa))
+    if not n or m <= 0:
+        return None
+    nts, nc, nm = n
+    jn = bisect.bisect_left(nts, int(do_ts) - TOLERANCJA_MECZU_S)
+    if jn < 1 or nm[jn - 1] <= 0 or nc[jn - 1] <= 0:
+        return None
+    norma = float(nc[jn - 1]) / float(nm[jn - 1]) * 90.0
+    per90 = c / m * 90.0
+    return {"stosunek": per90 / norma, "per90": per90, "norma": norma, "n": j - lo}
+
+
+def koncesja_rywala(tabela: dict | None, rywal_id, rynek: str, grupa: str,
+                    do_ts: int, okno: int = OKNO_RYWALA) -> float | None:
+    """Stosunek koncesji rywala do normy (patrz `profil_rywala`); None = brak."""
+    pr = profil_rywala(tabela, rywal_id, rynek, grupa, do_ts, okno)
+    return None if pr is None else pr["stosunek"]
+
+
+GRUPY_PL = {"DEF": "obrońcy", "MID": "pomocnicy", "FWD": "napastnicy"}
+HORYZONT_RANKINGU_RYWALI_S = 3 * 86400
+
+
+def ranking_rywali(tabela: dict | None, mecze: list, team_name: dict,
+                   teraz: int, wagi: dict | None = None,
+                   horyzont_s: int = HORYZONT_RANKINGU_RYWALI_S) -> list[dict]:
+    """Ekran „Rywale": kto w nadchodzących meczach dopuszcza najwięcej.
+
+    Tak szukają eksperci („ta drużyna fauluje najwięcej w lidze, więc
+    skrzydłowy rywala..."): od RYWALA do zawodnika, nie odwrotnie. Wiersz =
+    (mecz, rywal, rynek) z profilem per grupa pozycji. Rynki tylko te, które
+    model zna (`wagi["rynki_zaw"]`), żeby ekran nie obiecywał więcej niż
+    rachunek; bez wag — wszystkie z `CELE_ZAW`.
+
+    `mecze` — [(mecz_id, gospodarz_id, gość_id, kickoff_ts)]. Liczby są
+    liczone NA GWIZDEK (profil z meczów sprzed niego), więc ta sama tabela,
+    co w rachunku typu — ekran i karta mówią jedno.
+    """
+    if not tabela:
+        return []
+    rynki = sorted(((wagi or {}).get("rynki_zaw") or {}).keys()) or list(CELE_ZAW)
+    out: list[dict] = []
+    for mecz_id, gosp, gosc, ko in mecze:
+        ko = int(ko or 0)
+        if not (teraz - 3 * 3600 <= ko <= teraz + horyzont_s):
+            continue
+        for rywal, przeciw in ((gosp, gosc), (gosc, gosp)):
+            for rynek in rynki:
+                grupy = {}
+                for grupa in GRUPY_POZYCJI:
+                    pr = profil_rywala(tabela, rywal, rynek, grupa, ko)
+                    if pr is not None:
+                        grupy[grupa] = {"stosunek": round(pr["stosunek"], 3),
+                                        "per90": round(pr["per90"], 2),
+                                        "norma": round(pr["norma"], 2),
+                                        "n": int(pr["n"])}
+                if not grupy:
+                    continue
+                out.append({
+                    "mecz_id": mecz_id, "kickoff_ts": ko,
+                    "rywal_id": rywal, "rywal": team_name.get(rywal, "") or str(rywal),
+                    "przeciw_id": przeciw,
+                    "przeciw": team_name.get(przeciw, "") or str(przeciw),
+                    "rynek_kod": rynek,
+                    "max_stosunek": round(max(g["stosunek"] for g in grupy.values()), 3),
+                    "grupy": grupy,
+                })
+    out.sort(key=lambda r: -r["max_stosunek"])
+    return out
+
+
 def cechy_zawodnika(seria: dict, do_ts: int | None = None,
-                    oczekiwane_minuty: float | None = None) -> dict | None:
+                    oczekiwane_minuty: float | None = None,
+                    tabela_rywali: dict | None = None,
+                    rywal_id=None) -> dict | None:
     """Cechy zawodnika z jego serii w banku — tylko z meczów sprzed `do_ts`.
+
+    `tabela_rywali` + `rywal_id` — koncesja rywala per mecz (patrz
+    `CECHY_LOG_ZAW`); bez nich cecha `rywal` jest None (mediana = 1,0, czyli
+    neutralnie). `rywal_id` domyślnie z `seria["opponent_id"]` (produkcja);
+    trening podaje rywala KAŻDEGO meczu z `game_opponent_ids`.
 
     ⚑ JEDNA FUNKCJA DLA TRENINGU I PRODUKCJI (jak przy drużynach). W treningu
     `do_ts` to czas meczu, którego wynik jest celem; w produkcji — godzina
@@ -1192,7 +1353,12 @@ def cechy_zawodnika(seria: dict, do_ts: int | None = None,
     ostatnie = idx[-10:]
     pozycje = seria.get("game_positions") or []
     poz = grupa_pozycji(
-        pozycje[idx[-1]] if idx and idx[-1] < len(pozycje) else None)
+        (pozycje[idx[-1]] if idx and idx[-1] < len(pozycje) and pozycje[idx[-1]]
+         else None) or seria.get("position"))
+    rywal = koncesja_rywala(
+        tabela_rywali, rywal_id if rywal_id is not None else seria.get("opponent_id"),
+        str(seria.get("market_code") or ""), poz, prog,
+    ) if tabela_rywali else None
     return {
         "t3": _sr(tempa[-3:]), "t6": _sr(tempa[-6:]), "t12": _sr(tempa[-12:]),
         "min6": (float(oczekiwane_minuty) if oczekiwane_minuty
@@ -1202,16 +1368,19 @@ def cechy_zawodnika(seria: dict, do_ts: int | None = None,
             / max(len(ostatnie), 1)
         ),
         "liga": float(seria.get("league_average") or 0) or None,
-        "opp": float(seria.get("opponent_average") or 0) or None,
+        "rywal": rywal,
         "dom": 1 if seria.get("is_home") else 0,
         "poz": poz,
         "n_hist": len(tempa),
     }
 
 
-def wiersze_zawodnicze(lib: dict) -> dict[str, list[dict]]:
+def wiersze_zawodnicze(lib: dict, tabela: dict | None = None
+                       ) -> dict[str, list[dict]]:
     """{rynek: wiersze} z banku — cel, minuty i cechy z przeszłości."""
     out: dict[str, list[dict]] = defaultdict(list)
+    if tabela is None:
+        tabela = tabela_rywali(lib)
     for _, seria in (lib or {}).items():
         if not isinstance(seria, dict):
             continue
@@ -1221,6 +1390,7 @@ def wiersze_zawodnicze(lib: dict) -> dict[str, list[dict]]:
         counts = seria.get("counts") or []
         minuty = seria.get("minutes") or []
         czasy = seria.get("timestamps") or []
+        rywale = seria.get("game_opponent_ids") or []
         n = min(len(counts), len(minuty), len(czasy))
         if n < MIN_HISTORII + 1:
             continue
@@ -1228,7 +1398,10 @@ def wiersze_zawodnicze(lib: dict) -> dict[str, list[dict]]:
             m_i = float(minuty[i] or 0)
             if m_i < MIN_MINUT_ZAW:
                 continue
-            c = cechy_zawodnika(seria, do_ts=int(czasy[i] or 0))
+            # rywal TEGO meczu (nie nadchodzący) — to jest cała naprawa
+            c = cechy_zawodnika(seria, do_ts=int(czasy[i] or 0),
+                                tabela_rywali=tabela,
+                                rywal_id=(rywale[i] if i < len(rywale) else None) or 0)
             if c is None:
                 continue
             out[mk].append({**c, "y": float(counts[i] or 0), "minuty": m_i,
@@ -1322,13 +1495,22 @@ def lam_zaw(wagi_rynku: dict, cechy: dict,
 def prognoza_zawodnika(wagi: dict | None, seria: dict, rynek: str,
                        linia: float, strona: str,
                        oczekiwane_minuty: float | None = None,
-                       do_ts: int | None = None) -> dict | None:
-    """Pełna prognoza dla zakładu zawodniczego — albo None, gdy nie wiemy."""
+                       do_ts: int | None = None,
+                       tabela_rywali: dict | None = None) -> dict | None:
+    """Pełna prognoza dla zakładu zawodniczego — albo None, gdy nie wiemy.
+
+    `tabela_rywali` (z `tabela_rywali(bank)`) włącza cechę `rywal` dla
+    nadchodzącego rywala (`seria["opponent_id"]`); stempel `rywal` (stosunek
+    do normy) i `p_bez_rywala` idą do księgi, żeby dało się zmierzyć, co ta
+    cecha robi na PUBLIKOWANYCH typach (pomiar 14.09: w szumie).
+    """
     wr = ((wagi or {}).get("rynki_zaw") or {}).get(rynek)
     if not wr or not seria:
         return None
+    seria = {**seria, "market_code": seria.get("market_code") or rynek}
     cechy = cechy_zawodnika(seria, do_ts=do_ts,
-                            oczekiwane_minuty=oczekiwane_minuty)
+                            oczekiwane_minuty=oczekiwane_minuty,
+                            tabela_rywali=tabela_rywali)
     if cechy is None:
         return None
     lm = lam_zaw(wr, cechy, oczekiwane_minuty)
@@ -1338,6 +1520,12 @@ def prognoza_zawodnika(wagi: dict | None, seria: dict, rynek: str,
     if out is None:
         return None
     out["min"] = round(float(oczekiwane_minuty or cechy.get("min6") or 90.0), 1)
+    if cechy.get("rywal") is not None and "rywal" in (wr.get("log") or []):
+        lm0 = lam_zaw(wr, {**cechy, "rywal": None}, oczekiwane_minuty)
+        w0 = wycena(lm0, linia, strona, wr.get("r_nb")) if lm0 else None
+        if w0 is not None:
+            out["rywal"] = round(float(cechy["rywal"]), 3)
+            out["p_bez_rywala"] = w0["p"]
     pkw = pokrycie_zawodnika(seria, linia, do_ts)
     if pkw is not None:
         out["pkw"] = round(float(pkw), 3)
