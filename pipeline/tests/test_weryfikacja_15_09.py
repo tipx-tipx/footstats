@@ -323,3 +323,14 @@ def test_model_uczony_przeczacy_zeruje_wartosc_rozjazdu():
     # lepsza cena 1,72 = 58%; model widzi 50% -> to tańszy buk się myli
     assert radar.wartosc_rozjazdu(_szczebel_roz(1.40, 1.72, p_uczony=0.50)) == 0.0
     assert radar.wartosc_rozjazdu(_szczebel_roz(1.40, 1.72, p_uczony=0.60)) > 0.07
+
+
+# --- 9. zawodnicy bez ściągania λ do linii ---
+
+def test_wysoki_szczebel_zawodnika_bez_sztucznego_podbicia():
+    """λ 1,5 strzału, linia 2,5 („3+"): ściąganie 0,6 podnosiło szansę."""
+    from footstats.model import uczony as U
+    zaw = U.wycena(1.5, 2.5, "powyzej", 12.0, sila=U.SCIAGANIE_LAMBDY_ZAW)
+    druz = U.wycena(1.5, 2.5, "powyzej", 12.0)
+    assert U.SCIAGANIE_LAMBDY_ZAW == 1.0 and zaw["sciag"] == 1.0
+    assert zaw["p"] < druz["p"]

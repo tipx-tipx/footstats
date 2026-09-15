@@ -846,6 +846,21 @@ def p_strony(lambda_: float | None, linia: float, strona: str,
 # Trafności listy NIE zmienia (symulacja 24 dób) — to porządek w liczbie,
 # nie naprawa.
 SCIAGANIE_LAMBDY_DO_LINII = 0.60   # 1,0 = wyłączone; powrót jedną wartością
+# ⚑ ZAWODNICY BEZ ŚCIĄGANIA (2026-09-15). 0,60 dobrano na rynkach DRUŻYNOWYCH,
+# gdzie linia leży blisko λ. U zawodników linia drabinki bywa daleko NAD λ
+# („3+ strzały" przy λ 1,5) i ściągnięcie λ w stronę linii PODNOSI szansę
+# każdego wysokiego szczebla — stąd pozorna „wartość" na kursach 2,5+.
+# Zmierzone na dwóch niezależnych próbach, znak ten sam:
+#   * księga, 4868 rozliczonych kandydatów zawodniczych „powyżej":
+#       kurs 2,5–4: deklaracja 38,8% (0,6) / 35,7% (1,0), trafia 21,2%, cena 30,7%
+#       kurs 4+:    deklaracja 28,3% (0,6) / 17,7% (1,0), trafia 11,9%, cena 19,3%
+#       AUC modelu ponad cenę 0,353 → 0,499
+#   * 188 szczebli ekspertów BET EKIPA rozliczonych naszymi danymi:
+#       AUC ponad cenę 0,478 → 0,639, Brier 0,1758 → 0,1695;
+#       „model ponad cenę" przy 1,0: 40,7% trafień przy cenie 27,1% (n=81)
+# Stempel `p_sciag` (liczba przy 0,60) jedzie obok do księgi — porównanie na
+# nowych rozliczeniach rozstrzygnie, czy zostaje.
+SCIAGANIE_LAMBDY_ZAW = 1.0
 
 
 def lambda_do_wyceny(lambda_: float | None, linia: float,
@@ -864,7 +879,7 @@ def lambda_do_wyceny(lambda_: float | None, linia: float,
 
 
 def wycena(lambda_: float | None, linia: float, strona: str,
-           r_nb: float | None = None) -> dict | None:
+           r_nb: float | None = None, sila: float | None = None) -> dict | None:
     """JEDYNA droga od λ do szansy zakładu — wspólna dla wszystkich strumieni.
 
     Zwraca `{"p", "lam", "r_nb", "odl", "sciag"}` albo None, gdy nie wiemy.
@@ -885,12 +900,13 @@ def wycena(lambda_: float | None, linia: float, strona: str,
     if lambda_ is None:
         return None
     lam_ = float(lambda_)
-    p = p_strony(lambda_do_wyceny(lam_, linia), linia, strona, r_nb)
+    w = SCIAGANIE_LAMBDY_DO_LINII if sila is None else float(sila)
+    p = p_strony(lambda_do_wyceny(lam_, linia, w), linia, strona, r_nb)
     if p is None:
         return None
     return {"p": round(float(p), 4), "lam": round(lam_, 3), "r_nb": r_nb,
             "odl": round(abs(float(linia) - lam_), 2),
-            "sciag": SCIAGANIE_LAMBDY_DO_LINII}
+            "sciag": w}
 
 
 # ------------------------------------------------------- zasięg i widełki ----
@@ -1472,13 +1488,19 @@ def prognoza_zawodnika(wagi: dict | None, seria: dict, rynek: str,
     lm = lam_zaw(wr, cechy, oczekiwane_minuty)
     if lm is None:
         return None
-    out = wycena(lm, linia, strona, wr.get("r_nb"))
+    out = wycena(lm, linia, strona, wr.get("r_nb"), sila=SCIAGANIE_LAMBDY_ZAW)
     if out is None:
         return None
+    # liczba przy dawnym ściąganiu — pomiar obok (patrz SCIAGANIE_LAMBDY_ZAW)
+    if SCIAGANIE_LAMBDY_ZAW != SCIAGANIE_LAMBDY_DO_LINII:
+        _w06 = wycena(lm, linia, strona, wr.get("r_nb"))
+        if _w06 is not None:
+            out["p_sciag"] = _w06["p"]
     out["min"] = round(float(oczekiwane_minuty or cechy.get("min6") or 90.0), 1)
     if cechy.get("rywal") is not None and "rywal" in (wr.get("log") or []):
         lm0 = lam_zaw(wr, {**cechy, "rywal": None}, oczekiwane_minuty)
-        w0 = wycena(lm0, linia, strona, wr.get("r_nb")) if lm0 else None
+        w0 = (wycena(lm0, linia, strona, wr.get("r_nb"), sila=SCIAGANIE_LAMBDY_ZAW)
+              if lm0 else None)
         if w0 is not None:
             out["rywal"] = round(float(cechy["rywal"]), 3)
             out["p_bez_rywala"] = w0["p"]
