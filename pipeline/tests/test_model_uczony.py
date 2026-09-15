@@ -535,7 +535,8 @@ def test_prognoza_zawodnika_daje_komplet_albo_nic():
     # dochodzą zawsze, `pokr`/`p_bez_pokrycia` dopiero gdy waga > 0 — dzięki
     # temu księga zbiera próbę do pomiaru, ZANIM cokolwiek włączymy.
     obowiazkowe = {"p", "lam", "r_nb", "odl", "min", "sciag"}
-    dozwolone = obowiazkowe | {"pkw", "pkn", "pokr", "p_bez_pokrycia"}
+    # `p_sciag` — liczba przy dawnym ściąganiu λ (pomiar, 2026-09-15)
+    dozwolone = obowiazkowe | {"pkw", "pkn", "pokr", "p_bez_pokrycia", "p_sciag"}
     assert obowiazkowe <= set(out) <= dozwolone
     assert "pokr" not in out, "waga zawodnicza jest zerowa — nie wolno mieszać"
     assert out["min"] == 80.0
