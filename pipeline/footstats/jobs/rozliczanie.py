@@ -234,6 +234,9 @@ MARKETY_365 = {
     "shots_outside_box": "outside", "sot_outside_box": "sot_outside",
     "shots_blocked": "blocked", "shots_off_target": "off_target",
 }
+# rynki, które umie domknąć shotmapa statshub (`player_shots_from_shotmap`):
+# strzały i celne od zawsze, zza pola / głową od 2026-09-16 (patrz tam)
+RYNKI_SHOTMAPY = frozenset({"shots", "sot", *statshub.SHOTMAP_DERIVED})
 # rynki z pełnych statystyk meczowych 365Scores (lineups.members[].stats) —
 # dostępne od razu po meczu, bez czekania na odświeżenie banku trendów
 MARKETY_365_STATY = {"fouls_committed", "fouls_won", "interceptions", "offsides"}
@@ -5097,12 +5100,58 @@ def _typ_dnia(r: dict) -> dict:
         # wdrożenia mógł się do rekonstrukcji przyznać
         "ekran": r.get("ekran"),
         "ekran_odtworzony": r.get("ekran_odtworzony"),
+        # czemu zwrot („nie zagrał", „brak danych źródła", „mecz przełożony…")
+        # — bez tego wiersz zwrotu nic nie tłumaczy
+        "powod": r.get("powod"),
     }
+
+
+# typ ze strony bez wyniku tyle czasu po gwizdku = „czeka na dane" w Skuteczności
+# (mecz na pewno skończony; źródła bywają wolniejsze i pytamy je co przebieg)
+CZEKA_NA_DANE_PO_S = MECZ_KONIEC_PO_S
+
+
+def _zwroty_dnia(log: dict, lista_dnia, pokazane) -> list[dict]:
+    """Typy ze strony zamknięte jako „zwrot" — KAŻDY powód, nie tylko brak danych.
+
+    ⚑ ZWROT „NIE ZAGRAŁ" ZNIKAŁ BEZ ŚLADU (2026-09-16, zgłoszenie właściciela:
+    „zniknęły typy w rozliczeniach, na pewno Hellebrand w drabinkach z 15.09").
+    Karta Saki (Ipswich–Arsenal 15.09) zamknęła się jako „zwrot, nie zagrał",
+    a lista dnia znała tylko wygrane i przegrane; licznik `brak_danych_n`
+    liczył wyłącznie zwroty ze źródła. W starej księdze 22 z ~200 rozliczonych
+    kart drabinek to „nie zagrał" — jedna dziewiąta produktu bez żadnej ścieżki
+    na stronie. To ta sama zasada co [[ciche-odrzucenia-zasada]]: co stało na
+    stronie, ma mieć wiersz w Skuteczności, choćby z wynikiem „zwrot".
+    """
+    return [
+        r for r in log.values()
+        if r.get("wynik") == "zwrot"
+        and r.get("rynek_kod") not in RYNKI_OSOBNE and not r.get("odrzucony")
+        and _z_biezacej_epoki(r) and not _z_martwej_epoki(r)
+        and w_oknie_statystyk(r)
+        and opublikowany(r, lista_dnia, pokazane)
+    ]
+
+
+def _czekajace_dnia(log: dict, lista_dnia, pokazane, now: int) -> list[dict]:
+    """Typy ze strony po skończonym meczu, wciąż bez wyniku (źródło nie podało
+    jeszcze statystyk). Karta Hellebranda (Korona–Górnik 15.09) czekała tak
+    na 365Scores, którego Ekstraklasa nie ma — i w Skuteczności nie istniała."""
+    return [
+        r for r in log.values()
+        if r.get("wynik") is None
+        and int(r.get("kickoff_ts") or 0) + CZEKA_NA_DANE_PO_S < now
+        and r.get("rynek_kod") not in RYNKI_OSOBNE and not r.get("odrzucony")
+        and not r.get("sugestia")
+        and _z_biezacej_epoki(r) and not _z_martwej_epoki(r)
+        and w_oknie_statystyk(r)
+        and opublikowany(r, lista_dnia, pokazane)
+    ]
 
 
 def skutecznosc_per_dzien(
     settled: list[dict], dni: int = 21, poza: list[dict] | None = None,
-    braki: list[dict] | None = None,
+    braki: list[dict] | None = None, czekajace: list[dict] | None = None,
 ) -> list[dict]:
     """Skuteczność realnych typów pogrupowana po DNIU meczu (kickoff).
 
@@ -5128,6 +5177,7 @@ def skutecznosc_per_dzien(
             "dzien": d, "rozliczone": 0, "trafione": 0,
             "okazje": 0, "_zwrot_j": 0.0, "typy": [],
             "poza_n": 0, "poza_trafione": 0, "brak_danych_n": 0,
+            "zwrot_n": 0, "czeka_n": 0,
         })
 
     for r in settled:
@@ -5166,20 +5216,42 @@ def skutecznosc_per_dzien(
         if not t.get("poza_publikacja"):
             t["poza_publikacja"] = "poza_lista_dnia"
         agg["typy"].append(t)
-    # sam licznik, BEZ dokładania do listy typów: wiersz „nie wiemy, jak
-    # poszło" nie ma czego pokazać w kolumnie wyniku i tylko rozmywałby dzień
+    # ⚑ ZWROT DOSTAJE WIERSZ, NIE TYLKO LICZNIK (2026-09-16). Do dziś zwrot
+    # „brak danych" był samą liczbą, a zwrot „nie zagrał" nie istniał wcale —
+    # karta Saki z 15.09 (0 minut) zniknęła ze Skuteczności bez śladu, a
+    # właściciel zgłosił „zniknęły typy w rozliczeniach". Wiersz z wynikiem
+    # „zwrot" i powodem mówi wprost, co się stało; do trafień ani bilansu
+    # nadal NIE wchodzi (o zwrocie nie wiemy, czy wszedł). `brak_danych_n`
+    # zostaje jako licznik samych zwrotów ze źródła (patrz `_zwroty_dnia`).
     for r in braki or []:
-        _agg(r)["brak_danych_n"] += 1
+        agg = _agg(r)
+        agg["zwrot_n"] += 1
+        if r.get("powod") == POWOD_BRAK_DANYCH:
+            agg["brak_danych_n"] += 1
+        t = _typ_dnia(r)
+        if t.get("poza_publikacja"):
+            t["poza_publikacja"] = None
+        agg["typy"].append(t)
+    # typ ze strony po skończonym meczu, wciąż bez wyniku — „czeka na dane".
+    # Karta Hellebranda z 15.09 czekała tak na źródło, którego jej liga nie
+    # ma, i przez to nie było jej nigdzie (patrz `_czekajace_dnia`)
+    for r in czekajace or []:
+        agg = _agg(r)
+        agg["czeka_n"] += 1
+        t = _typ_dnia(r)
+        if t.get("poza_publikacja"):
+            t["poza_publikacja"] = None
+        agg["typy"].append(t)
     out = []
     for d in sorted(dzienne, reverse=True)[:dni]:
         agg = dzienne[d]
         agg["roi_flat"] = round(agg.pop("_zwrot_j") - agg["okazje"], 2)
         # publikowane przed typami poza publikacją; w obrębie grupy trafione
-        # na górze, potem po nazwie
+        # na górze, potem przegrane, na końcu zwroty i czekające, po nazwie
         agg["typy"].sort(
             key=lambda t: (
                 bool(t.get("poza_publikacja")),
-                t.get("wynik") != "wygrany",
+                {"wygrany": 0, "przegrany": 1, "zwrot": 2}.get(t.get("wynik"), 3),
                 str(t.get("podmiot")),
             )
         )
@@ -5192,7 +5264,8 @@ STRUMIENIE = ("pewniaki", "druzyny", "drabinki")
 
 def skutecznosc_strumieni(log: dict, dni: int = 21,
                           lista_dnia: dict[str, set] | None = None,
-                          pokazane: dict | None = None) -> dict[str, dict]:
+                          pokazane: dict | None = None,
+                          now: int | None = None) -> dict[str, dict]:
     """Skuteczność rozbita na strumienie: pewniaki / drużyny / drabinki.
 
     Jeden wspólny licznik mówił o wszystkim naraz i o niczym konkretnie:
@@ -5212,6 +5285,11 @@ def skutecznosc_strumieni(log: dict, dni: int = 21,
     # drugiego odczytu Supabase w tym samym przebiegu).
     _lista_dnia = lista_dnia if lista_dnia is not None else wczytaj_liste_dnia()
     _na_stronie = pokazane if pokazane is not None else wczytaj_pokazane()
+    _now = now if now is not None else int(time.time())
+    # zwroty i typy czekające na dane — te same reguły co w widoku zbiorczym
+    # (patrz `_zwroty_dnia` / `_czekajace_dnia`), rozdzielone po strumieniu
+    _zwroty = _zwroty_dnia(log, _lista_dnia, _na_stronie)
+    _czeka = _czekajace_dnia(log, _lista_dnia, _na_stronie, _now)
     for nazwa in STRUMIENIE:
         w_strumieniu = [
             r for r in log.values()
@@ -5234,7 +5312,11 @@ def skutecznosc_strumieni(log: dict, dni: int = 21,
         trafione = sum(1 for r in settled if r["wynik"] == "wygrany")
         roi = sum(_zwrot_typu(r) - 1.0 for r in okazje)
         rec: dict = {
-            "dni": skutecznosc_per_dzien(settled, dni=dni, poza=poza),
+            "dni": skutecznosc_per_dzien(
+                settled, dni=dni, poza=poza,
+                braki=[r for r in _zwroty if _strumien(r) == nazwa],
+                czekajace=[r for r in _czeka if _strumien(r) == nazwa],
+            ),
             "podsumowanie": {
                 "rozliczone": len(settled),
                 "trafione": trafione,
@@ -5785,7 +5867,15 @@ def _wartosc_z_perf(rec: dict, ps: dict | None, cache_sh: dict) -> float | None:
     Historia obejmuje cały mecz, a zakład regularny czas; mecz, którego końca
     nie da się potwierdzić (brak wyniku), też czeka.
     """
-    pole = POLA_PERF_ROZLICZENIA.get(rec.get("rynek_kod"))
+    mk = rec.get("rynek_kod")
+    pole = POLA_PERF_ROZLICZENIA.get(mk)
+    # rynek pochodny strzałów (zza pola, głową) historia nie rozbija — ale
+    # ZERO strzałów ogółem to zero w każdym podzbiorze; więcej niż zero
+    # zostawiamy shotmapie (2026-09-16)
+    if pole is None and mk in statshub.SHOTMAP_DERIVED:
+        pole = "shots"
+        if ps is not None and ps.get("minutesPlayed") and ps.get(pole) not in (0, 0.0):
+            return None
     if ps is None or pole is None or not ps.get("minutesPlayed"):
         return None
     v = ps.get(pole)
@@ -6063,7 +6153,8 @@ def rozlicz(
         # historia zawodnika statshub — tylko gdy 365 nie zna meczu, bo tam
         # minuty już są; wiersz meczu z 0 minut to „nie zagrał"
         ps_perf = None
-        if not staty and mk in POLA_PERF_ROZLICZENIA:
+        if not staty and (mk in POLA_PERF_ROZLICZENIA
+                          or mk in statshub.SHOTMAP_DERIVED):
             ps_perf = _perf_w_meczu(rec, cache_perf, budzet_perf)
         # ⚑ „NIE ZAGRAŁ" JEST NIEODWRACALNY — zero minut bierzemy z historii
         # dopiero, gdy mecz jest potwierdzenie skończony i minęło kilka godzin
@@ -6119,9 +6210,13 @@ def rozlicz(
                 # strzały/celne rozliczamy z banku trendów statshub
                 # (te same dane Opta, na których stoi scoring)
                 wartosc = _wartosc_z_banku(rec, lib)
-            if wartosc is None and mk in ("shots", "sot"):
+            if wartosc is None and mk in RYNKI_SHOTMAPY:
                 # shotmapa z otwartego API statshub. Tylko mecze bez dogrywki —
                 # shotmapa nie oddziela regularnego czasu.
+                # ⚑ TAKŻE ZZA POLA I GŁOWĄ (2026-09-16): te rynki miały tylko
+                # ścieżkę 365, więc w lidze bez 365 (Ekstraklasa: Hellebrand,
+                # Korona–Górnik 15.09) karta wisiała do zwrotu, choć shotmapa
+                # statshub — ta sama, z której powstała — była gotowa.
                 sr = _statshub_wynik(rec["mecz_id"], cache_sh)
                 if sr is not None and not sr["extra_time"]:
                     counts = _statshub_strzaly(rec["mecz_id"], cache_sh_sm)
@@ -6131,9 +6226,9 @@ def rozlicz(
                         # — dopasowujemy po nazwisku, jak ścieżka 365
                         normed = {scores365._norm(n): v for n, v in counts.items()}
                         skey = scores365.resolve_player_key(set(normed), rec["podmiot"])
-                        if skey is not None:
+                        if skey is not None and normed[skey].get(mk) is not None:
                             wartosc = float(normed[skey][mk])
-            if wartosc is None and mk in ("shots", "sot"):
+            if wartosc is None and mk in RYNKI_SHOTMAPY:
                 wartosc = _wartosc_z_perf(rec, ps_perf, cache_sh)
                 if wartosc is not None:
                     rozliczone_z_perf[mk] += 1
@@ -6496,26 +6591,23 @@ def rozlicz(
     # typów danego dnia (co siadło); zasila przełącznik dnia na Skuteczności
     # typy zamknięte bez rozstrzygnięcia — osobny licznik dnia, żeby dzień
     # z padniętym źródłem nie wyglądał jak dzień z małym terminarzem
-    _braki_dni = [
-        r for r in log.values()
-        if r.get("wynik") == "zwrot" and r.get("powod") == POWOD_BRAK_DANYCH
-        and r.get("rynek_kod") not in RYNKI_OSOBNE and not r.get("odrzucony")
-        # ⚑ TEŻ OD DATY STARTU (2026-09-11). Bez tego dzień sprzed startu
-        # WRACAŁ do kalendarza przez sam licznik braków: `skutecznosc_per_dzien`
-        # zakłada dzień dla każdego rekordu, także takiego, który do żadnej
-        # liczby nie wchodzi. Zmierzone po wdrożeniu: werdykt liczył 7 typów
-        # z 11.09, a kalendarz pokazywał 04.09, 03.09, 02.09, 01.09, 31.08…
-        and w_oknie_statystyk(r)
-        # ...i tylko typy ze strony (2026-09-13) — licznik dnia nie liczy tła
-        and opublikowany(r, _lista_dnia, _na_stronie)
-    ]
+    # ⚑ TEŻ OD DATY STARTU (2026-09-11). Bez tego dzień sprzed startu
+    # WRACAŁ do kalendarza przez sam licznik braków: `skutecznosc_per_dzien`
+    # zakłada dzień dla każdego rekordu, także takiego, który do żadnej
+    # liczby nie wchodzi. Zmierzone po wdrożeniu: werdykt liczył 7 typów
+    # z 11.09, a kalendarz pokazywał 04.09, 03.09, 02.09, 01.09, 31.08…
+    # ...i tylko typy ze strony (2026-09-13) — licznik dnia nie liczy tła.
+    # Od 16.09 KAŻDY zwrot ze strony (nie tylko „brak danych") i typy
+    # czekające na dane — patrz `_zwroty_dnia` / `_czekajace_dnia`.
+    _braki_dni = _zwroty_dnia(log, _lista_dnia, _na_stronie)
+    _czeka_dni = _czekajace_dnia(log, _lista_dnia, _na_stronie, now)
     skutecznosc_dzienna = skutecznosc_per_dzien(
-        settled, poza=poza_pub, braki=_braki_dni,
+        settled, poza=poza_pub, braki=_braki_dni, czekajace=_czeka_dni,
     )
     # ...i to samo rozbite na strumienie (pewniaki / drużyny / drabinki),
     # bo „skuteczność" bez podziału mieszała trzy różne produkty
     strumienie = skutecznosc_strumieni(log, lista_dnia=_lista_dnia,
-                                        pokazane=_na_stronie)
+                                        pokazane=_na_stronie, now=now)
     for nazwa, s in strumienie.items():
         p_s = s["podsumowanie"]
         if p_s["rozliczone"]:

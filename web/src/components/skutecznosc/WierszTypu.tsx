@@ -465,8 +465,24 @@ function WierszTypu({
             "✓ weszło"
           ) : przegral ? (
             "✗ nie"
+          ) : t.wynik === "zwrot" ? (
+            // ZWROT MA POWÓD (2026-09-16): „nie zagrał" to inna informacja niż
+            // „źródło nie podało danych" – bez niej wiersz mówił tylko „zwrot"
+            <span
+              className="text-faint"
+              title={t.powod ? `Zwrot: ${t.powod}` : "Zwrot"}
+            >
+              zwrot{t.powod === "nie zagrał" ? " · nie grał" : ""}
+            </span>
           ) : (
-            "zwrot"
+            // mecz skończony, wynik jeszcze nie przyszedł – typ NIE zniknął,
+            // czeka na dane (patrz rozliczanie._czekajace_dnia)
+            <span
+              className="text-faint"
+              title="Mecz się skończył, ale źródło nie podało jeszcze statystyk – rozliczymy, gdy przyjdą"
+            >
+              czeka na dane
+            </span>
           )}
         </td>
       </tr>

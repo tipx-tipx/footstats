@@ -891,10 +891,24 @@ def player_shots_from_shotmap(event_id: int) -> dict[str, dict] | None:
         name = s.get("playerName")
         if not name:
             continue
-        d = out.setdefault(str(name), {"shots": 0, "sot": 0})
+        # ⚑ RYNKI POCHODNE TĄ SAMĄ GEOMETRIĄ, KTÓRĄ ZBUDOWANO KARTĘ (2026-09-16).
+        # Drabinka „strzały zza pola karnego" Hellebranda (Korona–Górnik 15.09)
+        # wisiała nierozliczona, choć shotmapa meczu leżała gotowa: ścieżka
+        # rozliczania znała z shotmapy tylko `shots`/`sot`, a zza pola i głową
+        # czekały wyłącznie na 365Scores — którego Ekstraklasa nie ma. Po
+        # siedmiu dniach karta zeszłaby jako „zwrot, brak danych", czyli
+        # zniknęłaby ze Skuteczności bez śladu. Liczymy tu więc te same rynki,
+        # które `SHOTMAP_DERIVED` liczy do historii zawodnika (z x/y, bo flaga
+        # `isOutsideBox` kłamie — patrz komentarz przy `_poza_polem`).
+        d = out.setdefault(
+            str(name), {"shots": 0, "sot": 0, **{mk: 0 for mk in SHOTMAP_DERIVED}},
+        )
         d["shots"] += 1
         if str(s.get("result") or "").lower() in _SHOTMAP_CELNE:
             d["sot"] += 1
+        for mk, pasuje in SHOTMAP_DERIVED.items():
+            if pasuje(s):
+                d[mk] += 1
     return out
 
 

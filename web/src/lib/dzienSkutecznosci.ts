@@ -20,5 +20,12 @@ export function maCoPokazacDnia(
   d: SkutecznoscDnia,
   pelnyWglad: boolean | undefined,
 ): boolean {
-  return d.rozliczone > 0 || (!!pelnyWglad && (d.poza_n ?? 0) > 0);
+  // dzień z samymi zwrotami albo typami czekającymi na dane też ma co pokazać
+  // (2026-09-16) – inaczej karta Hellebranda z 15.09 nie miałaby kafelka
+  return (
+    d.rozliczone > 0 ||
+    (d.zwrot_n ?? 0) > 0 ||
+    (d.czeka_n ?? 0) > 0 ||
+    (!!pelnyWglad && (d.poza_n ?? 0) > 0)
+  );
 }

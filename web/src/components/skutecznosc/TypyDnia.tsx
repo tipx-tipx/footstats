@@ -315,6 +315,46 @@ export function TypyDnia({
         </p>
       )}
 
+      {/* ZWROT „NIE ZAGRAŁ" I TYP CZEKAJĄCY NA DANE TEŻ MAJĄ BYĆ WIDOCZNE
+          (2026-09-16, zgłoszenie właściciela: „zniknęły typy w rozliczeniach,
+          Hellebrand w drabinkach z 15.09"). Do tej pory taki typ nie miał
+          na stronie żadnego wiersza – stał na liście dnia, a po meczu
+          rozpływał się w powietrzu. Teraz jest w tabeli niżej z wynikiem
+          „zwrot" albo „czeka na dane"; ten akapit tłumaczy, czemu nie liczy
+          się do bilansu. */}
+      {((dzien.zwrot_n ?? 0) - (dzien.brak_danych_n ?? 0) > 0 ||
+        (dzien.czeka_n ?? 0) > 0) && (
+        <p className="mt-3 text-xs leading-relaxed text-faint">
+          {(dzien.zwrot_n ?? 0) - (dzien.brak_danych_n ?? 0) > 0 && (
+            <>
+              <span className="font-data font-semibold">
+                {(dzien.zwrot_n ?? 0) - (dzien.brak_danych_n ?? 0)}
+              </span>{" "}
+              {odmien(
+                (dzien.zwrot_n ?? 0) - (dzien.brak_danych_n ?? 0),
+                "typ z tego dnia to zwrot",
+                "typy z tego dnia to zwroty",
+                "typów z tego dnia to zwroty",
+              )}{" "}
+              (np. zawodnik nie wszedł na boisko) – stawka wraca, więc nie
+              liczą się ani do trafień, ani do bilansu.{" "}
+            </>
+          )}
+          {(dzien.czeka_n ?? 0) > 0 && (
+            <>
+              <span className="font-data font-semibold">{dzien.czeka_n}</span>{" "}
+              {odmien(
+                dzien.czeka_n!,
+                "typ czeka jeszcze",
+                "typy czekają jeszcze",
+                "typów czeka jeszcze",
+              )}{" "}
+              na statystyki z meczu – rozliczymy, gdy źródło je poda.
+            </>
+          )}
+        </p>
+      )}
+
       {/* ILE DOKŁADNIE, NIE „CZĘŚĆ" (2026-08-04). Zgłoszenie usera: „za chuj
           wczoraj nie było tych wszystkich typów w zakładce Drużyny". Miał
           rację i to zdanie mu to ukrywało: dla 3 sierpnia stempel był

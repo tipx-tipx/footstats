@@ -904,8 +904,11 @@ export interface TypRozliczony {
   tryb_podatku?: string;
   p_model: number;
   sugestia: boolean;
+  /** null w liście dnia = mecz skończony, a typ wciąż czeka na dane źródła */
   wynik: "wygrany" | "przegrany" | "zwrot" | null;
   faktyczna: number | null;
+  /** przy zwrocie: „nie zagrał", „brak danych źródła", „mecz przełożony…" */
+  powod?: string | null;
   /** ostatni kurs przed startem meczu (linia zamknięcia rynku) */
   kurs_zamkniecia?: number | null;
   /** CLV: o ile % kurs wzięty był lepszy od zamknięcia (dodatnie = bijemy rynek) */
@@ -974,6 +977,12 @@ export interface SkutecznoscDnia {
    *  w terminie, więc nie wiemy ani że weszły, ani że nie. Nie wchodzą do
    *  żadnego licznika – i właśnie dlatego muszą mieć własny */
   brak_danych_n?: number;
+  /** WSZYSTKIE zwroty ze strony tego dnia (brak danych, nie zagrał, mecz
+   *  przełożony) – od 16.09 każdy ma też wiersz w `typy` z `wynik: "zwrot"` */
+  zwrot_n?: number;
+  /** typy ze strony po skończonym meczu, wciąż bez wyniku (źródło nie podało
+   *  jeszcze statystyk) – w `typy` z `wynik: null` */
+  czeka_n?: number;
   /** realne typy tego dnia (co siadło / nie siadło) – trafione na górze,
    *  typy poza publikacją na końcu z oznaczeniem */
   typy?: TypRozliczony[];
