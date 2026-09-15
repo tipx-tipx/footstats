@@ -986,14 +986,19 @@ def w_zasiegu(lambda_: float | None, linia: float,
 # miejsca idą do pewniaków (15 → 18), żeby podaż 21 została.
 # Zawodnicy zostają na 1,80: 33 z 63 ich typów na liście stoi w 1,45–1,80,
 # sufit 1,45 zostawiłby osobny limit 21 w połowie pusty.
+# ⚑ 2026-09-15, decyzja właściciela: 15 wysokiej szansy + 5 wyższych kursów NA
+# DOBĘ, osobno dla drużyn i zawodników. Wyższe kursy trafiają ~55–58%, więc
+# 3 → 5 obniża średnią obu zakładek łącznie o ~1,5 pp — to świadomy wybór
+# (osobna podzakładka, osobna obietnica). Wybór w półkach: patrz
+# `build_wc_fast.szansa_z_ceną` (wysoka) i `moc_listy` (wyższe).
 POLKI = {
     "wysoka_szansa": {
         "kurs_min": 1.20, "kurs_max": 1.80,
-        "limit_dobowy": 18, "zasieg": MAX_ODLEGLOSC_LINII,
+        "limit_dobowy": 15, "zasieg": MAX_ODLEGLOSC_LINII,
     },
     "wyzsze_kursy": {
         "kurs_min": 1.80, "kurs_max": 2.20,
-        "limit_dobowy": 3, "zasieg": None,
+        "limit_dobowy": 5, "zasieg": None,
     },
 }
 

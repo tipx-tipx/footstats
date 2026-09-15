@@ -104,8 +104,8 @@ def _klucz(b):
 @pytest.fixture
 def bez_roznorodnosci(monkeypatch):
     """Izoluje sam limit doby — gwarancje różnorodności poza zasięg."""
-    for nazwa in ("LISTA_PER_MECZ", "LISTA_PER_RYNEK", "LISTA_PER_PASMO",
-                  "LISTA_PER_RODZINA"):
+    for nazwa in ("LISTA_PER_MECZ", "LISTA_PER_RODZINA",
+                  "LISTA_PER_RODZINA_ZAWODNIK"):
         monkeypatch.setattr(B, nazwa, 999)
 
 
@@ -122,11 +122,13 @@ def test_wznowione_zajmuja_miejsca_zamiast_je_omijac(bez_roznorodnosci):
     Wcześniej mocny nowy typ wchodził przed wznowionymi (sortowanie po sile),
     a one i tak dochodziły poza limitem — dzień rósł bez końca.
     """
-    ile_wzn = B.LISTA_CAP - 2
-    wznowione = _rozne(ile_wzn, od=1, p=0.5, wznowiony=True)
-    nowe = _rozne(10, od=100, p=0.95)                    # mocniejsze od tamtych
+    # jedna półka (kurs pewniaka), żeby limit był jedną liczbą
+    limit = U.POLKI["wysoka_szansa"]["limit_dobowy"]
+    ile_wzn = limit - 2
+    wznowione = _rozne(ile_wzn, od=1, p=0.5, kurs=1.3, wznowiony=True)
+    nowe = _rozne(10, od=100, p=0.95, kurs=1.3)          # mocniejsze od tamtych
     lista, _, _ = B.wybierz_liste_publikowana(wznowione + nowe, _klucz)
-    assert len(lista) == B.LISTA_CAP
+    assert len(lista) == limit
     # wszystkie wznowione muszą zostać — typ raz pokazany nie znika
     assert sum(1 for b in lista if b.get("wznowiony")) == ile_wzn
     # ...a nowe dobierają się tylko na to, co naprawdę zostało wolne

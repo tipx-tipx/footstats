@@ -328,10 +328,10 @@ def test_kurs_poza_polkami_ma_powod():
 def test_polki_maja_limity_i_granice():
     """Cztery liczby całych widełek — bez progów wartości i EV."""
     assert set(U.POLKI) == {"wysoka_szansa", "wyzsze_kursy"}
-    # 2026-09-14: 18 + 3 (było 15 + 6) — półka wyższych kursów trafia 55%
-    # i ściągała średnią doby; pewniaki drużynowe do 1,45.
-    assert U.POLKI["wysoka_szansa"]["limit_dobowy"] == 18
-    assert U.POLKI["wyzsze_kursy"]["limit_dobowy"] == 3
+    # 2026-09-15, decyzja właściciela: 15 + 5 na dobę (było 18 + 3);
+    # pewniaki drużynowe do 1,45.
+    assert U.POLKI["wysoka_szansa"]["limit_dobowy"] == 15
+    assert U.POLKI["wyzsze_kursy"]["limit_dobowy"] == 5
     assert U.KURS_MAX_PEWNIAKA == {"druzyna": 1.45}
     assert U.polka_dla(1.60, "druzyna") is None
     assert U.polka_dla(1.60, "zawodnik") == "wysoka_szansa"

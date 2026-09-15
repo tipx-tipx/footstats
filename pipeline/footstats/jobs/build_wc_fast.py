@@ -556,6 +556,29 @@ def moment_domkniecia(dzien: str, godzina: int = GODZINA_DOMKNIECIA) -> int:
     return int(d.timestamp())
 
 
+def szansa_z_ceną(b: dict) -> float:
+    """Kolejność półki WYSOKIEJ SZANSY: średnia szansy modelu i szansy z kursu.
+
+    ⚑ 2026-09-15, przy limitach 15 + 5. Symulacja na księdze 20.08–13.09
+    (drużyny, pewniaki do 1,45, 15 na dobę), każda miara na obu połowach okresu:
+
+        szansa modelu (dotąd)       74,8%   (72,5% / 77,1%)
+        kurs rosnąco                75,2%   (76,1% / 74,3%)
+        średnia model + kurs        75,9%   (75,4% / 76,4%)   <- stabilna
+        p × √kurs                   73,8%
+        przewaga p − 1/kurs         71,3%
+
+    Różnice mieszczą się w ±5 pp, więc to nie jest dźwignia — ale średnia
+    jest jedyną miarą równie dobrą w obu połowach, a kurs porządkuje typy
+    lepiej niż sam model ([[czy-model-sie-uczy-14-09]]). Szansa modelu PRZED
+    ściągnięciem do ceny (to ją mierzyła księga), inaczej kurs liczyłby się
+    dwa razy.
+    """
+    kurs = float(b.get("kurs") or 0.0)
+    p = float(b.get("p_przed_sciagnieciem") or b.get("p_model") or 0.0)
+    return round((p + (1.0 / kurs if kurs > 1.0 else 0.0)) / 2.0, 4)
+
+
 def moc_listy(b: dict, kandydatow_w_meczu: int) -> float:
     """Kolejność „polecane" — JEDNA miara dla wszystkich kanałów listy.
 
@@ -1106,25 +1129,21 @@ def strumien_listy(b: dict) -> str:
 # deklaracji −2,1 pp przy 20+ kandydatach wobec −21,7 pp przy kilku), ale
 # przy budżecie 12 pięć typów z jednego meczu to 40% listy.
 LISTA_PER_MECZ = 3
-LISTA_PER_RYNEK = 4
-# ...i tyle samo na przedział kursowy, żeby na liście były i tanie, i drogie
-# typy. Bez tego sortowanie po zmierzonej przewadze wypełniłoby listę samym
-# pasmem 3,0+ (dziś jedynym, które bije cenę), czyli tanie kursy zniknęłyby
-# po cichu, a tego user nie chce.
-LISTA_PER_PASMO = 4
-# ...i na RODZINĘ STATYSTYKI (2026-08-05, zgłoszenie usera „bez przesytu").
-#
-# `LISTA_PER_RYNEK` liczy pary (kod, strona) OSOBNO, a kartki mają dwa osobne
-# kody: `match_cards` i `team_cards`. Dla nas to różne rynki, dla patrzącego na
-# listę to dwa razy to samo słowo — więc w najgorszym razie kartki mogły zająć
-# 12 z 20 miejsc, nie łamiąc żadnego limitu. Zmierzone 05.08: 7 z 16 typów
-# drużynowych to kartki (44%), przy 3 + 3 + 1 rozbitych na trzy pary.
-#
-# UWAGA NA DIAGNOZĘ: to NIE jest główna przyczyna przesytu. Pula tego samego
-# cyklu ma 71% goli, a opublikowana lista 38% — limity dywersyfikują MOCNIEJ
-# niż źródło, a prawdziwym ograniczeniem jest podaż. Ten limit domyka wyłącznie
-# przypadek skrajny; zaostrzanie go skróciłoby listę, zamiast ją urozmaicić.
+# ⚑ LIMITY RYNKU (4) I PRZEDZIAŁU KURSU (4) ZDJĘTE (2026-09-15, decyzja
+# właściciela przy limitach 15 + 5 na dobę). Przedział kursu powstał, żeby
+# lista nie zwyrodniała w samo pasmo 3,0+ — ale od 20.08 widełki trzymają
+# półki, a pewniaki drużynowe (1,20–1,45) mieszczą się w DWÓCH przedziałach,
+# więc limit ucinał wysoką szansę do ~8 typów, a realnie do 4–5 na dobę
+# (produkcja 17–19.09: w 1,19–1,35 dokładnie 4, 3, 4). Symulacja na księdze
+# 20.08–13.09 (limity 15 + 5, drużyny): z przedziałem 6,9 typu/dobę i 71,7%,
+# bez niego 11,0 i 75,3%. Limit rynku przy żywym limicie rodziny nie zmieniał
+# NICZEGO (wynik identyczny co do typu) — różnorodność trzyma rodzina.
 LISTA_PER_RODZINA = 4
+# Zawodnicy mają z natury 2–3 rodziny (strzały, celne, faule), więc 4 cięło
+# im podaż o ~40% (symulacja: 5,6 → 9,5 typu/dobę bez limitu, trafność bez
+# zmian ~60%). 6 z 15 + 5 zostawia gwarancję „nie jeden rodzaj typów"
+# (największa rodzina ~49% zamiast 56% bez limitu) i oddaje 2,6 typu/dobę.
+LISTA_PER_RODZINA_ZAWODNIK = 6
 # ...i JEDEN TYP NA ZAWODNIKA W DNIU (2026-08-08, przy wpięciu oferty do
 # silnika; user: „żeby nie było kanibalizowania").
 #
@@ -1225,8 +1244,6 @@ def wybierz_liste_publikowana(
     """
     zamkniete = zamkniete or {}
     z_meczu: dict = {}
-    z_rynku: dict = {}
-    z_pasma: dict = {}
     z_rodziny: dict = {}
     # ⚑⚑ PÓŁKI ZAMIAST JEDNEGO LIMITU DOBOWEGO (2026-08-20, zadanie 5 planu).
     #
@@ -1328,8 +1345,6 @@ def wybierz_liste_publikowana(
         _str = strumien_listy(b)
         doba_str = (dzien, _str)
         mecz = (dzien, _str, b.get("mecz_id"))
-        rynek = (dzien, _str, b.get("rynek_kod"), b.get("strona"))
-        pasmo = (dzien, _str, _pasmo_kursu(b.get("kurs")))
         rodzina = (dzien, _str, _rodzina_statystyki(b.get("rynek_kod")))
         # jeden typ na ZAWODNIKA w dniu (patrz LISTA_PER_ZAWODNIKA); drużyny
         # zostają poza tym licznikiem — u nich rynki nie są tak skorelowane
@@ -1391,9 +1406,9 @@ def wybierz_liste_publikowana(
             if (z_polki.get(_polka_klucz, 0) >= _polka_limit
                     or z_strumienia.get(doba_str, 0) >= LISTA_CAP
                     or z_meczu.get(mecz, 0) >= LISTA_PER_MECZ
-                    or z_rynku.get(rynek, 0) >= LISTA_PER_RYNEK
-                    or z_pasma.get(pasmo, 0) >= LISTA_PER_PASMO
-                    or z_rodziny.get(rodzina, 0) >= LISTA_PER_RODZINA
+                    or z_rodziny.get(rodzina, 0) >= (
+                        LISTA_PER_RODZINA_ZAWODNIK if _str == "zawodnik"
+                        else LISTA_PER_RODZINA)
                     or (zawodnik is not None
                         and z_zawodnika.get(zawodnik, 0) >= LISTA_PER_ZAWODNIKA)):
                 zdjete.setdefault(_klucz_publikacji(b), "poza_lista_dnia")
@@ -1402,8 +1417,6 @@ def wybierz_liste_publikowana(
         z_strumienia[doba_str] = z_strumienia.get(doba_str, 0) + 1
         z_polki[_polka_klucz] = z_polki.get(_polka_klucz, 0) + 1
         z_meczu[mecz] = z_meczu.get(mecz, 0) + 1
-        z_rynku[rynek] = z_rynku.get(rynek, 0) + 1
-        z_pasma[pasmo] = z_pasma.get(pasmo, 0) + 1
         z_rodziny[rodzina] = z_rodziny.get(rodzina, 0) + 1
         if zawodnik is not None:
             z_zawodnika[zawodnik] = z_zawodnika.get(zawodnik, 0) + 1
@@ -4989,6 +5002,9 @@ def _main_impl(tryb=None):
         p = rozliczanie.sciagnij_do_ceny(float(u["p_model"]), float(u["kurs"]),
                                          _w_k, _m_k)
         out = {**u, "p_model": round(p, 4), "p_sciagniete": True,
+               # do kolejności listy (`szansa_z_ceną`) — kurs nie może
+               # liczyć się w niej dwa razy
+               "p_przed_sciagnieciem": float(u["p_model"]),
                "fair_kurs": round(1.0 / max(p, 1e-6), 3)}
         if u.get("p_rynku") is not None:
             out["edge_pp"] = round((p - float(u["p_rynku"])) * 100.0, 2)
@@ -9738,7 +9754,7 @@ def _main_impl(tryb=None):
         # zaczęło przeszkadzać, sortować trzeba per półka, nie jedną listą.
         ma_rachunek = bool(b.get("czynniki")) and (b.get("ci") or [None])[0] is not None
         if uczony.polka_dla(b.get("kurs"), b.get("podmiot_typ")) == "wysoka_szansa":
-            return (float(b.get("p_model") or 0.0), ma_rachunek)
+            return (szansa_z_ceną(b), ma_rachunek)
         return (moc_listy(b, _kandydatow_w_meczu.get(b.get("mecz_id"), 0)),
                 ma_rachunek)
 
@@ -9773,8 +9789,8 @@ def _main_impl(tryb=None):
         print(f"Lista publikowana: {len(lista_pub)} z {len(do_pokazania)} "
               f"kandydatów (na KAŻDĄ dobę produktową max {LISTA_CAP} drużynowych "
               f"i osobno {LISTA_CAP} zawodniczych, "
-              f"{LISTA_PER_MECZ}/mecz, {LISTA_PER_RYNEK}/rynek, "
-              f"{LISTA_PER_RODZINA}/rodzinę); reszta zostaje w puli kuponów")
+              f"{LISTA_PER_MECZ}/mecz, {LISTA_PER_RODZINA}/rodzinę drużyn, "
+              f"{LISTA_PER_RODZINA_ZAWODNIK}/rodzinę zawodników); reszta zostaje w puli kuponów")
     # ⚑ CZUJNIK PÓŁEK (2026-08-20) — bez niego nie widać, czy podział na dwie
     # zakładki działa, ani ile produktu zjada sufit kursu. Jedna linia w logu
     # cyklu, bo to jest pierwsze miejsce, w którym patrzy się po wdrożeniu.

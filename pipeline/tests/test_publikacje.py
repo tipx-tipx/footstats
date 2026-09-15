@@ -549,8 +549,8 @@ def test_nowy_typ_z_tego_cyklu_nie_jest_pokazany_wczesniej(monkeypatch):
 
 
 def test_pokazany_wczesniej_nie_wypada_przez_limit_ani_ukrycie(monkeypatch):
-    for nazwa in ("LISTA_PER_MECZ", "LISTA_PER_RYNEK", "LISTA_PER_PASMO",
-                  "LISTA_PER_RODZINA"):
+    for nazwa in ("LISTA_PER_MECZ", "LISTA_PER_RODZINA",
+                  "LISTA_PER_RODZINA_ZAWODNIK"):
         monkeypatch.setattr(B, nazwa, 999)
     jutro = int(time.time()) + 86400
     def typ(i, kurs, **kw):

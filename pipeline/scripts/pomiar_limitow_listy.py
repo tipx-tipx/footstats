@@ -39,6 +39,8 @@ CZYTA TYLKO — nie zapisuje nic.
 
 from __future__ import annotations
 
+# limit rynku zdjęty z produkcji 15.09 — pomiar odtwarza stan z 16.08
+LISTA_PER_RYNEK_HIST = 4
 import os
 import sys
 from collections import defaultdict
@@ -150,7 +152,7 @@ def main() -> None:
         for nazwa, limit, klucz in (
             ("LIMIT DZIENNY", B.LISTA_CAP,
              lambda r: (R._doba_produktowa(r.get("kickoff_ts")),)),
-            ("LIMIT NA RYNEK|STRONĘ", B.LISTA_PER_RYNEK,
+            ("LIMIT NA RYNEK|STRONĘ", LISTA_PER_RYNEK_HIST,
              lambda r: (R._doba_produktowa(r.get("kickoff_ts")),
                         r.get("rynek_kod"), r.get("strona"))),
             ("LIMIT NA MECZ", B.LISTA_PER_MECZ,
@@ -183,7 +185,7 @@ def main() -> None:
         for r in grp:
             k = (r.get("rynek_kod"), r.get("strona"))
             per_rynek[k] += 1
-            if per_rynek[k] > B.LISTA_PER_RYNEK:
+            if per_rynek[k] > LISTA_PER_RYNEK_HIST:
                 ponad_rynek += 1
         print(f"   {d:<13}{len(grp):>7}{ponad_dzien:>10}{ponad_rynek:>15}")
 
@@ -202,7 +204,7 @@ def main() -> None:
     print(f"   granica: {datetime.fromtimestamp(granica, R.STREFA):%d.%m %H:%M}"
           f"   ({polowa} + {len(po_czasie) - polowa} rozliczeń)")
     for nazwa, limit, klucz in (
-        ("LIMIT NA RYNEK|STRONĘ", B.LISTA_PER_RYNEK,
+        ("LIMIT NA RYNEK|STRONĘ", LISTA_PER_RYNEK_HIST,
          lambda r: (R._doba_produktowa(r.get("kickoff_ts")),
                     r.get("rynek_kod"), r.get("strona"))),
         ("LIMIT NA MECZ", B.LISTA_PER_MECZ,
@@ -254,7 +256,7 @@ def main() -> None:
         ("po naprawie priora (>= 13.08)", "2026-08-13", "9999-99-99"),
     )
     for nazwa, limit, klucz in (
-        ("LIMIT NA RYNEK|STRONĘ", B.LISTA_PER_RYNEK,
+        ("LIMIT NA RYNEK|STRONĘ", LISTA_PER_RYNEK_HIST,
          lambda r: (R._doba_produktowa(r.get("kickoff_ts")),
                     r.get("rynek_kod"), r.get("strona"))),
         ("LIMIT NA MECZ", B.LISTA_PER_MECZ,
@@ -302,7 +304,7 @@ def main() -> None:
             for r in grp:
                 kr = (r.get("rynek_kod"), r.get("strona"))
                 km = r.get("mecz_id")
-                poza = z_rynku[kr] >= B.LISTA_PER_RYNEK or (
+                poza = z_rynku[kr] >= LISTA_PER_RYNEK_HIST or (
                     not tylko_rynek and z_meczu[km] >= B.LISTA_PER_MECZ)
                 if poza:
                     odpada.append(r)
@@ -355,7 +357,7 @@ def main() -> None:
     print("TO SAMO W OBRĘBIE SEGMENTU (ten sam rynek|strona)")
     print("=" * 78)
     for nazwa, limit, klucz in (
-        ("LIMIT NA RYNEK|STRONĘ", B.LISTA_PER_RYNEK,
+        ("LIMIT NA RYNEK|STRONĘ", LISTA_PER_RYNEK_HIST,
          lambda r: (R._doba_produktowa(r.get("kickoff_ts")),
                     r.get("rynek_kod"), r.get("strona"))),
         ("LIMIT NA MECZ", B.LISTA_PER_MECZ,

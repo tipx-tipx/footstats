@@ -11,6 +11,7 @@ import { Wyrozniona } from "./Wyrozniona";
 import { fmtDataCzas } from "@/lib/format";
 import { grupujWarianty } from "@/lib/warianty";
 import { useTeraz } from "@/lib/useTeraz";
+import { etykietaDnia, kluczDnia } from "@/lib/doba";
 import type {
   Meta,
   Pewnosc,
@@ -144,6 +145,33 @@ export function ValueBoard({
     () => wszystkieRadar.filter((w) => w.kickoff_ts > teraz),
     [wszystkieRadar, teraz],
   );
+  // ⚑ LISTA NA DZIEŃ, NIE NA CAŁĄ ZAKŁADKĘ (2026-09-15, decyzja właściciela).
+  // Backend liczy limit osobno na każdą dobę produktową (15 wysokiej szansy
+  // + 5 wyższych kursów), a zakładka mieszała typy trzech dni w jednej
+  // liście — wyglądało to, jakby limit dotyczył całej strony albo nie działał.
+  // Wybrany dzień filtruje wszystko poniżej zakładek (liczniki, filtry,
+  // karty). Drabinki mają własny wybór i tego filtra nie dziedziczą.
+  const dniTypow = useMemo(
+    () => [...new Set(bets.map((b) => kluczDnia(b.kickoff_ts)))].sort(),
+    [bets],
+  );
+  const [dzienWybrany, setDzienWybrany] = useState<string | null>(null);
+  const dzien =
+    dzienWybrany && dniTypow.includes(dzienWybrany) ? dzienWybrany : dniTypow[0];
+  const betsDnia = useMemo(
+    () => bets.filter((b) => kluczDnia(b.kickoff_ts) === dzien),
+    [bets, dzien],
+  );
+  const pierwszyTsDnia = useMemo(() => {
+    const m = new Map<string, { ts: number; n: number }>();
+    for (const b of bets) {
+      const k = kluczDnia(b.kickoff_ts);
+      const w = m.get(k);
+      if (!w) m.set(k, { ts: b.kickoff_ts, n: 1 });
+      else m.set(k, { ts: Math.min(w.ts, b.kickoff_ts), n: w.n + 1 });
+    }
+    return m;
+  }, [bets]);
   const [rynek, setRynek] = useState("wszystkie");
   const [pewnosc, setPewnosc] = useState<Pewnosc | "kazda">("kazda");
   const [meczId, setMeczId] = useState<number | undefined>(initialMatchId);
@@ -265,7 +293,7 @@ export function ValueBoard({
 
   const liczbaValueSts = stsAlerty.length;
   // PÓŁKI LISTY DNIA (backend `uczony.POLKI`, wpięte 2026-08-20). Doba dzieli
-  // się na dwa budżety: 18 typów o kursach 1,20–1,80 (drużyny do 1,45) i 3 o kursach 1,80–2,20.
+  // się na dwa budżety: 15 typów o kursach 1,20–1,80 (drużyny do 1,45) i 5 o kursach 1,80–2,20.
   //
   // ⚑ ODPORNIE NA BRAK POLA. Typy sprzed wdrożenia nie mają `polka`, a lista
   // niesie też wznowione sprzed tygodnia — dla nich zostaje stara flaga
@@ -285,12 +313,12 @@ export function ValueBoard({
       ? b.polka === "wysoka_szansa"
       : !!b.pewniak && (b.kurs ?? 0) < KURS_MAX_PEWNIAKA;
   const liczbaPewniakow = useMemo(
-    () => bets.filter(wWysokiejSzansie).length,
-    [bets],
+    () => betsDnia.filter(wWysokiejSzansie).length,
+    [betsDnia],
   );
   const liczbaWyzszychKursow = useMemo(
-    () => bets.filter((b) => b.polka === "wyzsze_kursy").length,
-    [bets],
+    () => betsDnia.filter((b) => b.polka === "wyzsze_kursy").length,
+    [betsDnia],
   );
 
   const zawodnikById = useMemo(
@@ -300,14 +328,14 @@ export function ValueBoard({
 
   const mecze = useMemo(() => {
     const seen = new Map<number, string>();
-    for (const b of bets) if (!seen.has(b.mecz_id)) seen.set(b.mecz_id, b.mecz);
+    for (const b of betsDnia) if (!seen.has(b.mecz_id)) seen.set(b.mecz_id, b.mecz);
     return [...seen.entries()];
-  }, [bets]);
+  }, [betsDnia]);
 
   // liczba pozycji per rynek (przy aktywnym rodzaju) – do etykiet filtra
   const liczbaPerRynek = useMemo(() => {
     const m = new Map<string, number>();
-    for (const b of bets) {
+    for (const b of betsDnia) {
       if (rodzaj === "pewniaki" && !wWysokiejSzansie(b)) continue;
       if (rodzaj === "wyzsze_kursy" && b.polka !== "wyzsze_kursy") continue;
       let kod = b.rynek_kod;
@@ -317,7 +345,7 @@ export function ValueBoard({
       m.set("wszystkie", (m.get("wszystkie") ?? 0) + 1);
     }
     return m;
-  }, [bets, rodzaj]);
+  }, [betsDnia, rodzaj]);
 
   const wyczyscFiltry = () => {
     setRynek("wszystkie");
@@ -329,7 +357,7 @@ export function ValueBoard({
   const dostepneSorty = SORTOWANIA;
 
   const filtered = useMemo(() => {
-    const wynik = bets.filter((b) => {
+    const wynik = betsDnia.filter((b) => {
       if (rynek === "druzyny" && !b.rynek_kod.startsWith("team_")) return false;
       if (
         rynek === "inne" &&
@@ -367,7 +395,7 @@ export function ValueBoard({
         break;
     }
     return wynik;
-  }, [bets, rynek, pewnosc, meczId, rodzaj, sortuj]);
+  }, [betsDnia, rynek, pewnosc, meczId, rodzaj, sortuj]);
 
   // JEDNA KARTA NA TYP, NIE NA LINIĘ (2026-08-01, zgłoszenie usera). Trzy
   // karty „rożne poniżej 4,5 / 5,5 / 6,5" tej samej drużyny wyglądały jak trzy
@@ -395,11 +423,26 @@ export function ValueBoard({
       const h = window.location.hash;
       if (!/^#bet-\d+$/.test(h)) return;
       const el = document.querySelector(h);
-      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        return;
+      }
+      // karta z innego dnia niż wybrany: najpierw przełącz dzień, potem przewiń
+      const cel = wszystkieBets.find((b) => `#bet-${b.id}` === h);
+      if (cel) {
+        setDzienWybrany(kluczDnia(cel.kickoff_ts));
+        window.setTimeout(() => {
+          document
+            .querySelector(h)
+            ?.scrollIntoView({ behavior: "smooth", block: "center" });
+        }, 60);
+      }
     };
     scrollToHash();
     window.addEventListener("hashchange", scrollToHash);
     return () => window.removeEventListener("hashchange", scrollToHash);
+    // tylko przy wejściu i zmianie kotwicy — lista kart nie jest zależnością
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // zakładki "rodzaj": role=tab wymaga obsługi strzałek (WAI-ARIA Tabs) –
@@ -732,13 +775,60 @@ export function ValueBoard({
         </div>
       ) : (
         <>
+      {/* WYBÓR DNIA (2026-09-15) — patrz `dniTypow` wyżej. Kafelek mówi, ile
+          typów ma dany dzień; przy jednym dniu kafelka nie ma, bo nie ma
+          z czego wybierać. */}
+      {dniTypow.length > 1 && (
+        <div
+          role="group"
+          aria-label="Wybierz dzień"
+          className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pt-4 [scrollbar-width:none] sm:flex-wrap"
+        >
+          {dniTypow.map((k) => {
+            const w = pierwszyTsDnia.get(k)!;
+            const et = etykietaDnia(w.ts, teraz);
+            const aktywny = k === dzien;
+            return (
+              <button
+                key={k}
+                onClick={() => {
+                  setDzienWybrany(k);
+                  setMeczId(undefined);
+                  setLimit(25);
+                }}
+                aria-pressed={aktywny}
+                className={`shrink-0 rounded-(--radius-control) border px-3 py-1.5 text-left transition-colors ${
+                  aktywny
+                    ? "border-brand bg-brand-wash"
+                    : "border-hairline hover:border-hairline-strong"
+                }`}
+              >
+                <span
+                  className={`block text-[11px] font-semibold uppercase tracking-wide ${
+                    aktywny ? "text-brand-deep" : "text-ink"
+                  }`}
+                >
+                  {et.glowna}
+                </span>
+                <span
+                  className={`font-data block text-[10px] ${
+                    aktywny ? "text-brand-deep/80" : "text-faint"
+                  }`}
+                >
+                  {k.slice(8, 10)}.{k.slice(5, 7)} · {w.n}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
       {/* konsola filtrów: dopracowane dropdowny + żywy odczyt wyniku */}
       {malaLista && !filtryOtwarte ? (
         <div className="mb-6 flex items-baseline justify-between gap-3 pt-4">
           <span className="text-sm text-muted">
             {grupy.length === 1
-              ? "Dziś jedna pozycja w tym zestawieniu."
-              : `Dziś ${odmienPozycje(grupy.length)} w tym zestawieniu.`}
+              ? "Tego dnia jedna pozycja w tym zestawieniu."
+              : `Tego dnia ${odmienPozycje(grupy.length)} w tym zestawieniu.`}
           </span>
           {/* przy pustej liście filtrowanie nie ma czego filtrować — sam
               komunikat niżej tłumaczy, dlaczego jest pusto (06.08) */}

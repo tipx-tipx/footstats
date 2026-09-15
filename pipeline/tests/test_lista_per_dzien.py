@@ -38,8 +38,8 @@ def _klucz(b):
 @pytest.fixture
 def bez_roznorodnosci(monkeypatch):
     """Izoluje sam limit dnia — gwarancje różnorodności podniesione poza zasięg."""
-    for nazwa in ("LISTA_PER_MECZ", "LISTA_PER_RYNEK", "LISTA_PER_PASMO",
-                  "LISTA_PER_RODZINA"):
+    for nazwa in ("LISTA_PER_MECZ", "LISTA_PER_RODZINA",
+                  "LISTA_PER_RODZINA_ZAWODNIK"):
         monkeypatch.setattr(B, nazwa, 999)
 
 
@@ -59,12 +59,32 @@ def test_kazdy_dzien_ma_wlasna_dwudziestke(bez_roznorodnosci):
     assert set(zdjete.values()) == {"poza_lista_dnia"}
 
 
-def test_limit_rynku_liczy_sie_osobno_w_kazdym_dniu():
-    """Sześć rożnych na jutro nie zabiera miejsca rożnym na pojutrze."""
+def test_limit_rodziny_liczy_sie_osobno_w_kazdym_dniu():
+    """Rożne na jutro nie zabierają miejsca rożnym na pojutrze. Rodzina
+    (rożne, kartki…) trzyma różnorodność od 15.09, gdy zdjęto limit rynku."""
     kand = [_typ(kickoff=k, mecz_id=i, kurs=1.2 + i / 100)
             for k in (JUTRO, POJUTRZE) for i in range(8)]
     lista, _zdjete, _per = B.wybierz_liste_publikowana(kand, _klucz)
-    assert len(lista) == 2 * B.LISTA_PER_RYNEK
+    assert len(lista) == 2 * B.LISTA_PER_RODZINA
+
+
+def test_bez_limitu_przedzialu_kursu_polka_sie_wypelnia(monkeypatch):
+    """⚑ 15.09: pewniaki drużynowe 1,20–1,45 to dwa przedziały kursu, więc
+    limit „4 na przedział" ucinał wysoką szansę do 4–5 typów na dobę.
+    Piętnaście różnych rynków po 1,21–1,35 musi wejść w komplecie."""
+    monkeypatch.setattr(B, "LISTA_PER_RODZINA", 999)
+    rynki = [f"team_r{i}" for i in range(15)]
+    kand = [_typ(mecz_id=i, rynek=rynki[i], kurs=1.21 + i / 100) for i in range(15)]
+    lista, _z, _p = B.wybierz_liste_publikowana(kand, _klucz)
+    assert len(lista) == U.POLKI["wysoka_szansa"]["limit_dobowy"] == 15
+
+
+def test_zawodnicy_maja_luzniejszy_limit_rodziny():
+    """Zawodnicy mają 2–3 rodziny statystyk — 4 na rodzinę cięło im podaż."""
+    kand = [_typ(mecz_id=i, rynek="shots", kurs=1.3 + i / 100,
+                 podmiot=f"Z{i}", podmiot_typ="zawodnik") for i in range(10)]
+    lista, _z, _p = B.wybierz_liste_publikowana(kand, _klucz)
+    assert len(lista) == B.LISTA_PER_RODZINA_ZAWODNIK == 6
 
 
 def test_limit_meczu_takze_per_dzien():
@@ -180,10 +200,10 @@ def test_swiezy_typ_ustepuje_pokazanym_ale_ich_nie_wypycha(bez_roznorodnosci):
 
 
 def test_pokazane_licza_sie_do_limitu_swiezych():
-    """Sześć pokazanych rożnych wypełnia limit rynku — świeży rożny czeka,
+    """Pokazane rożne wypełniają limit rodziny — świeży rożny czeka,
     ale typ z innego rynku wchodzi."""
     pokazane = [_typ(mecz_id=i, kurs=2.5, wznowiony=True)
-                for i in range(B.LISTA_PER_RYNEK)]
+                for i in range(B.LISTA_PER_RODZINA)]
     swiezy_rozne = _typ(mecz_id=50, kurs=1.95)
     swiezy_gole = _typ(mecz_id=51, kurs=1.95, rynek="team_goals")
     lista, zdjete, _p = B.wybierz_liste_publikowana(
@@ -284,3 +304,14 @@ def test_limit_meczu_osobny_dla_druzyn_i_zawodnikow():
     lista, _, _ = B.wybierz_liste_publikowana(kand, _klucz)
     assert sum(1 for b in lista if b["podmiot_typ"] == "druzyna") == B.LISTA_PER_MECZ
     assert any(b["podmiot_typ"] == "zawodnik" for b in lista)
+
+
+def test_wysoka_szansa_ukladana_srednia_modelu_i_kursu():
+    """⚑ 15.09: przy tej samej szansie modelu wyżej stoi tańszy kurs, a szansa
+    brana jest sprzed ściągnięcia do ceny (kurs nie liczy się dwa razy)."""
+    tani = {"kurs": 1.25, "p_model": 0.78, "p_przed_sciagnieciem": 0.80}
+    drogi = {"kurs": 1.44, "p_model": 0.76, "p_przed_sciagnieciem": 0.80}
+    assert B.szansa_z_ceną(tani) > B.szansa_z_ceną(drogi)
+    assert B.szansa_z_ceną(tani) == round((0.80 + 1 / 1.25) / 2, 4)
+    # wznowiony typ bez pola — bierze zamrożoną szansę
+    assert B.szansa_z_ceną({"kurs": 2.0, "p_model": 0.6}) == 0.55
