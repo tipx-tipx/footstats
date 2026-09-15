@@ -839,11 +839,27 @@ def scal_z_publikacjami(
 
     z_logu = 0
     _rej_uzdrowione = 0
+    _z_logu_niepokazane = 0
+    # ⚑ KSIĘGA WZNAWIA TYLKO TO, CO STAŁO NA STRONIE (2026-09-15). Rekord bez
+    # znacznika `poza_publikacja` nie dowodzi, że typ był na liście: znacznik
+    # bywa zdjęty awansem albo nigdy nie nałożony. Wznowiony typ omija limity
+    # doby (`juz_pokazany`), więc taki rekord wchodził na stronę PONAD limit.
+    # Zmierzone 15.09: doba 15.09 miała 24 typy zawodnicze przy limicie 21,
+    # a nadwyżka to dokładnie 6 wznowień z księgi bez wpisu w rejestrze —
+    # w tym Hulk po 2,87 i Torro po 3,00, których żadna półka nie przyjmuje.
+    # Rozstrzyga zapis „pokazane na stronie" (ten sam, który liczy
+    # Skuteczność); przy padniętym odczycie — reguła jak dotąd.
+    _pokazane = rozliczanie.wczytaj_pokazane()
     for rec in (typy_log or {}).values():
         if rec.get("wynik") is not None or rec.get("sugestia"):
             continue                      # rozliczony albo bez kursu
         if rec.get("odrzucony") or rec.get("poza_publikacja"):
             continue                      # nigdy nie był na liście
+        if (_pokazane and int(rec.get("kickoff_ts") or 0) >= int(_pokazane["od_ts"])
+                and rozliczanie._klucz(rec) not in (_pokazane.get("klucze") or {})
+                and not na_ogloszonej_liscie(rec, zamkniete)):
+            _z_logu_niepokazane += 1
+            continue                      # w księdze, ale nie na stronie
         if rec.get("zrodlo"):
             continue                      # drabinki mają własną zakładkę i siatkę
         if int(rec.get("kickoff_ts") or 0) <= teraz:
@@ -972,6 +988,9 @@ def scal_z_publikacjami(
         print(f"Publikacje: wznowiono {wznowione} typów z rejestru"
               + (f" + {z_logu} z księgi rozliczeń" if z_logu else "")
               + f" (bieżące przeliczenie dało {len(value_bets)})")
+    if _z_logu_niepokazane:
+        print(f"Wznowienia z księgi: {_z_logu_niepokazane} rekordów bez śladu "
+              "na stronie NIE wróciło (zostają w księdze, rozliczą się w tle)")
     if _wznow_obca_wersja:
         # NIE „zniknęły" — zostają w rejestrze i w księdze, rozliczą się
         # i policzą jako swoja wersja. Przestają tylko być rekomendacją.
@@ -2335,6 +2354,13 @@ def bc_z_pamieci(
         # widzieliśmy — przy ofercie pamiętanej do doby „kurs_ts = teraz" byłby
         # po prostu nieprawdą (patrz `kurs_ts` w rozliczaniu)
         out[mid] = {"players": _linie_na_liczby(zap["players"]), "ts": zapisano}
+        # ⚑ NAZWISKA W ORYGINALE (2026-09-15). Klucz `norm_name` ma człony
+        # posortowane alfabetycznie, więc bez tej mapy odkrywanie pytało
+        # wyszukiwarkę o „luongo massimo" i „avest hidde ter" — 10 trafień
+        # na 30 w próbce, a 618 zapytań dawało 10 odkrytych zawodników na
+        # cykl zamiast ~190. Wpisy sprzed tej zmiany mapy nie mają.
+        if zap.get("player_names"):
+            out[mid]["player_names"] = dict(zap["player_names"])
     return out
 
 
@@ -2797,7 +2823,11 @@ def odkryj_zawodnikow_z_oferty(
                 _pl[_k] = dict(_v or {})
             for _k, _v in (sb_odds.get("players") or {}).items():
                 _pl.setdefault(_k, {}).update(_v or {})
-            sb_odds = {**bc_odds, **sb_odds, "players": _pl}
+            # nazwiska obu cenników razem — bez tego zawodnik znany tylko
+            # Betclicowi szedł do wyszukiwarki posortowanym kluczem
+            _nazwy = {**(bc_odds.get("player_names") or {}),
+                      **(sb_odds.get("player_names") or {})}
+            sb_odds = {**bc_odds, **sb_odds, "players": _pl, "player_names": _nazwy}
         if not (sb_odds.get("players") or {}):
             continue
         znane = [
@@ -5602,9 +5632,11 @@ def _main_impl(tryb=None):
                     if _paczka.get("players"):
                         bc_cache[_mid] = {
                             "players": _paczka["players"], "ts": _teraz_bc,
+                            "player_names": _paczka.get("player_names") or {},
                         }
                         _pamiec[str(_mid)] = {
                             "ts": _teraz_bc, "players": _paczka["players"],
+                            "player_names": _paczka.get("player_names") or {},
                         }
             _pamiec = bc_rotuj_pamiec(_pamiec, _kolejnosc_meczow, _teraz_bc)
             if bc_cache:
@@ -9978,21 +10010,6 @@ def _main_impl(tryb=None):
     _dump("matches.json", list(matches_out.values()))
     _dump("players.json", list(players_out.values()))
     _dump("druzyny_forma.json", scal_forme_druzyn(druzyny_forma, lista_pub))
-    # EKRAN „RYWALE" (2026-09-14): kto w nadchodzących meczach dopuszcza
-    # najwięcej — sposób szukania podpatrzony u ekspertów (od rywala do
-    # zawodnika). Te same liczby, które model ma w cesze `rywal`.
-    try:
-        _rywale = uczony.ranking_rywali(
-            _tabela_rywali,
-            [(e["id"], e.get("homeTeamId"), e.get("awayTeamId"),
-              int(e.get("timeStartTimestamp") or 0)) for e in wszystkie_ev],
-            team_name, int(time.time()), wagi=_wagi_modelu,
-        )
-        _dump("rywale.json", _rywale)
-        print(f"Rywale: {len(_rywale)} wierszy (mecz × rywal × rynek) na "
-              f"{len({r['mecz_id'] for r in _rywale})} meczów w 3 dni")
-    except Exception as e:                                     # noqa: BLE001
-        diagnostyka.cichy("cykl", "rywale_json", e)
     _dump("odds_superbet.json", odds_grid)   # siatka kursów do TOP POKRYCIA
     _dump("odrzucenia.json", odrzucenia_out)  # "czemu nie ma typu" per mecz
     print(f"Rejestr odrzuceń: {len(odrzucenia_out)} wpisów, "

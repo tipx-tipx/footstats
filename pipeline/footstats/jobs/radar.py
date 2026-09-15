@@ -559,6 +559,12 @@ TOLERANCJA_MECZU_S = 4 * 3600
 # w starej mierze (5), bo tu każdy mecz jest rozstrzygnięty („był w XI" albo
 # „nie było go"), a nie tylko „zagrał ileś minut"
 MIN_MECZOW_DRUZYNY = 3
+# Kalendarz drużyny, którego najnowszy rozegrany mecz jest o tyle starszy niż
+# najnowszy występ zawodnika, jest NIEAKTUALNY (magazyn nie odświeżył klubu)
+# i nie może rozstrzygać o startach — patrz `dopelnij_meczami_druzyny`.
+# 14 dni, bo przerwa reprezentacyjna daje do ~10 dni między ostatnim meczem
+# klubu a meczem kadry, a klub odświeżany co dobę nie ma luki większej niż 2.
+KALENDARZ_NIEAKTUALNY_S = 14 * 86400
 
 
 def dopelnij_meczami_druzyny(
@@ -595,6 +601,15 @@ def dopelnij_meczami_druzyny(
         (int(ts), bool(st), float(m or 0.0))
         for ts, st, m in zip(tr.timestamps, tr.started, tr.minutes) if ts
     ]
+    # ⚑ KALENDARZ STARSZY NIŻ WYSTĘPY = NIE ZNAMY KALENDARZA (2026-09-15).
+    # Magazyn odświeżał tylko kluby z zakresu drużynowego, więc reszta stała
+    # od 18.08. Okno 10 „ostatnich" meczów sięgało wtedy do poprzedniego
+    # sezonu, a świeże starty nie miały się z czym sparować — Tejon
+    # (Marítimo, 6/6 startów w sezonie) wychodził „2 z 10". Wołający wraca do
+    # starej miary, tak jak dla drużyny spoza magazynu.
+    ostatni_wystep = max((w[0] for w in wystepy if w[2] > 0), default=0)
+    if ostatni_wystep - rozegrane[0] > KALENDARZ_NIEAKTUALNY_S:
+        return None
     started: list[bool] = []
     minuty: list[float] = []
     kiedy: list[int] = []
@@ -854,9 +869,14 @@ def debiutanci_meczu(
         n_rynkow = sum(1 for mk, linie in rynki.items() if linie)
         if n_rynkow < min_rynkow:
             continue
-        kandydaci.append((n_rynkow, key))
+        kandydaci.append((key in names, n_rynkow, key))
     out = []
-    for n_rynkow, key in sorted(kandydaci, reverse=True):
+    # ⚑ NAJPIERW KANDYDACI Z NAZWISKIEM W ORYGINALE (2026-09-15). Bez niego
+    # zostaje klucz `norm_name` z członami posortowanymi alfabetycznie
+    # („luongo massimo"), a wyszukiwarka statshuba trafia nim co trzeci raz.
+    # Tacy kandydaci (stare wpisy pamięci Betclica) mieli najwięcej rynków,
+    # więc szli pierwsi i zjadali budżet: 618 zapytań, 10 odkrytych.
+    for _ma_nazwe, n_rynkow, key in sorted(kandydaci, reverse=True):
         if licznik_wyszukan[0] >= budzet_wyszukan:
             break
         if len(out) >= maks_kandydatow:

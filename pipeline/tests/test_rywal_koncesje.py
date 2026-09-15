@@ -141,19 +141,3 @@ def test_stare_wagi_z_cecha_opp_dalej_licza():
                                1.5, "powyzej", oczekiwane_minuty=90.0,
                                do_ts=T0 + 7 * DZIEN * 20)
     assert out and out["p"] is not None and "rywal" not in out
-
-
-def test_ranking_rywali_od_rywala_do_zawodnika():
-    """Ekran „Rywale": wiersz per (mecz, rywal, rynek), tylko mecze w 3 dni,
-    najwyższy stosunek na górze, nazwy z mapy drużyn."""
-    tab = U.tabela_rywali(_bank())
-    t_po = T0 + 7 * DZIEN * 12
-    mecze = [(1, 500, 600, t_po + 3600), (2, 700, 500, t_po + 5 * DZIEN)]
-    r = U.ranking_rywali(tab, mecze, {500: "Sito", 600: "Mur", 700: "Reszta"}, t_po)
-    assert [(x["rywal"], x["przeciw"]) for x in r] == [("Sito", "Mur"), ("Mur", "Sito")]
-    assert r[0]["rynek_kod"] == "fouls_won" and r[0]["max_stosunek"] > 1.3
-    assert r[0]["grupy"]["FWD"]["n"] == 4 and r[0]["grupy"]["FWD"]["per90"] == 3.0
-    assert "DEF" not in r[0]["grupy"]
-    assert U.ranking_rywali(None, mecze, {}, t_po) == []
-    # rynki ograniczone do tych, które model zna
-    assert U.ranking_rywali(tab, mecze, {}, t_po, wagi={"rynki_zaw": {"shots": {}}}) == []

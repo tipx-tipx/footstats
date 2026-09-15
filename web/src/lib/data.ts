@@ -36,7 +36,6 @@ import type {
   Odrzucenie,
   PokrycieLiga,
   Radar,
-  Rywal,
   StsValue,
   TypyWyniki,
   ValueBet,
@@ -415,11 +414,6 @@ export async function getValueBets(): Promise<ValueBet[]> {
 
 export async function getMecze(): Promise<Mecz[]> {
   return (await loadBundle()).matches;
-}
-
-/** Ekran „Rywale": koncesje rywali w nadchodzących meczach (klucz leniwy, mały). */
-export async function getRywale(): Promise<Rywal[]> {
-  return fetchKlucz<Rywal[]>("rywale", [], ODSWIEZANIE_S);
 }
 
 /** Rejestr odrzuceń: czemu para (zawodnik, rynek) nie dostała typu. */

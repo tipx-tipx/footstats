@@ -608,25 +608,6 @@ export interface LegPool {
   ci?: number[];
 }
 
-/** Wiersz ekranu „Rywale": ile rywal dopuszcza w nadchodzącym meczu, per grupa pozycji. */
-export interface RywalProfil {
-  stosunek: number;
-  per90: number;
-  norma: number;
-  n: number;
-}
-export interface Rywal {
-  mecz_id: number;
-  kickoff_ts: number;
-  rywal_id: number;
-  rywal: string;
-  przeciw_id: number;
-  przeciw: string;
-  rynek_kod: string;
-  max_stosunek: number;
-  grupy: Partial<Record<"DEF" | "MID" | "FWD", RywalProfil>>;
-}
-
 export interface Mecz {
   id: number;
   liga: string;

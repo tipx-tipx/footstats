@@ -1270,55 +1270,6 @@ def koncesja_rywala(tabela: dict | None, rywal_id, rynek: str, grupa: str,
 
 
 GRUPY_PL = {"DEF": "obrońcy", "MID": "pomocnicy", "FWD": "napastnicy"}
-HORYZONT_RANKINGU_RYWALI_S = 3 * 86400
-
-
-def ranking_rywali(tabela: dict | None, mecze: list, team_name: dict,
-                   teraz: int, wagi: dict | None = None,
-                   horyzont_s: int = HORYZONT_RANKINGU_RYWALI_S) -> list[dict]:
-    """Ekran „Rywale": kto w nadchodzących meczach dopuszcza najwięcej.
-
-    Tak szukają eksperci („ta drużyna fauluje najwięcej w lidze, więc
-    skrzydłowy rywala..."): od RYWALA do zawodnika, nie odwrotnie. Wiersz =
-    (mecz, rywal, rynek) z profilem per grupa pozycji. Rynki tylko te, które
-    model zna (`wagi["rynki_zaw"]`), żeby ekran nie obiecywał więcej niż
-    rachunek; bez wag — wszystkie z `CELE_ZAW`.
-
-    `mecze` — [(mecz_id, gospodarz_id, gość_id, kickoff_ts)]. Liczby są
-    liczone NA GWIZDEK (profil z meczów sprzed niego), więc ta sama tabela,
-    co w rachunku typu — ekran i karta mówią jedno.
-    """
-    if not tabela:
-        return []
-    rynki = sorted(((wagi or {}).get("rynki_zaw") or {}).keys()) or list(CELE_ZAW)
-    out: list[dict] = []
-    for mecz_id, gosp, gosc, ko in mecze:
-        ko = int(ko or 0)
-        if not (teraz - 3 * 3600 <= ko <= teraz + horyzont_s):
-            continue
-        for rywal, przeciw in ((gosp, gosc), (gosc, gosp)):
-            for rynek in rynki:
-                grupy = {}
-                for grupa in GRUPY_POZYCJI:
-                    pr = profil_rywala(tabela, rywal, rynek, grupa, ko)
-                    if pr is not None:
-                        grupy[grupa] = {"stosunek": round(pr["stosunek"], 3),
-                                        "per90": round(pr["per90"], 2),
-                                        "norma": round(pr["norma"], 2),
-                                        "n": int(pr["n"])}
-                if not grupy:
-                    continue
-                out.append({
-                    "mecz_id": mecz_id, "kickoff_ts": ko,
-                    "rywal_id": rywal, "rywal": team_name.get(rywal, "") or str(rywal),
-                    "przeciw_id": przeciw,
-                    "przeciw": team_name.get(przeciw, "") or str(przeciw),
-                    "rynek_kod": rynek,
-                    "max_stosunek": round(max(g["stosunek"] for g in grupy.values()), 3),
-                    "grupy": grupy,
-                })
-    out.sort(key=lambda r: -r["max_stosunek"])
-    return out
 
 
 def cechy_zawodnika(seria: dict, do_ts: int | None = None,

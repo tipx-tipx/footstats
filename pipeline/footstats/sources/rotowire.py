@@ -15,6 +15,7 @@ zgoda obu źródeł = mocny sygnał, spór = wracamy do historii minut.
 
 from __future__ import annotations
 
+import html
 import re
 import unicodedata
 
@@ -112,8 +113,12 @@ def fetch_predicted_lineups(include_tomorrow: bool = True) -> dict[str, dict]:
             continue
         ok_stron += 1
         for blok in r.text.split('class="lineup is-soccer"')[1:]:
+            # ⚑ ENCJE HTML (2026-09-15): nazwy przychodzą jako „Atl&eacute;tico
+            # Madrid", „1. FC K&ouml;ln" — bez rozkodowania klucz nie trafiał
+            # w naszą nazwę i 7 ze 142 drużyn (Atlético, Köln, Gladbach,
+            # Málaga, América, Juárez, San Luis) zostawało bez składu.
             teams = [
-                s.strip()
+                html.unescape(s).strip()
                 for s in re.findall(r"lineup__mteam[^>]*>\s*([^<]{2,40})", blok)
             ]
             lists = re.findall(r'lineup__list[^"]*"(.*?)</ul>', blok, re.S)
@@ -124,7 +129,7 @@ def fetch_predicted_lineups(include_tomorrow: bool = True) -> dict[str, dict]:
                 # tylko XI: zawodnicy przed separatorem sekcji kontuzji
                 xi_html = lst.split("lineup__title")[0]
                 players = {
-                    _norm(n) for n in re.findall(r'title="([^"]+)"', xi_html)
+                    _norm(html.unescape(n)) for n in re.findall(r'title="([^"]+)"', xi_html)
                 }
                 if players:
                     key = _norm(team)

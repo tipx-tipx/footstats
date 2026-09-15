@@ -617,6 +617,20 @@ def linia_i_strona(nazwa) -> tuple[float | None, str | None]:
     return float(m.group(1).replace(",", ".")), strona
 
 
+_STRONA_W_NAZWIE = re.compile(r"\s+(?=(?:powyżej|poniżej|ponad)\b)", re.IGNORECASE)
+
+
+def _osoba_z_nazwy_zakladu(nazwa: str) -> tuple[str, str]:
+    """„Kingsley Ehizibue Powyżej 0,5" -> („Kingsley Ehizibue", „Powyżej 0,5").
+
+    Bez słowa strony nie zgadujemy — pusta osoba, zakład wypada.
+    """
+    czesci = _STRONA_W_NAZWIE.split(nazwa or "", maxsplit=1)
+    if len(czesci) < 2:
+        return "", nazwa or ""
+    return czesci[0].strip(), (nazwa or "")[len(czesci[0]):].strip()
+
+
 def kursy_zawodnikow(id_meczu: int, tylko_statystyki: bool = True) -> dict:
     """Kursy zawodnicze Betclica w postaci gotowej do parowania.
 
@@ -638,6 +652,12 @@ def kursy_zawodnikow(id_meczu: int, tylko_statystyki: bool = True) -> dict:
         for g in d.get("gracze") or []:
             if g.get("id") and g.get("nazwa"):
                 gracze_id[int(g["id"])] = str(g["nazwa"])
+    druzyny_meczu = {
+        norm_name(_tekst(n))
+        for n in [d.get("nazwa") for d in oferta.get("druzyny") or []]
+        + [oferta.get("gospodarz"), oferta.get("gosc")]
+        if _tekst(n)
+    } - {""}
 
     out: dict[str, dict] = defaultdict(lambda: defaultdict(dict))
     nazwy: dict[str, str] = {}
@@ -655,12 +675,22 @@ def kursy_zawodnikow(id_meczu: int, tylko_statystyki: bool = True) -> dict:
             # zawodnicze mają PUSTE `player_ids`, więc sam identyfikator by
             # nie wystarczył.
             osoba = _tekst(z.get("podmiot"))
+            nazwa_zakladu = _tekst(z.get("nazwa"))
+            # ⚑ ETYKIETA GAŁĘZI BYWA NAZWĄ DRUŻYNY (2026-09-15). W kartkach
+            # i spalonych Betclic grupuje zakłady po klubie: `podmiot` =
+            # „Genoa", a zawodnik siedzi w nazwie zakładu („Kingsley Ehizibue
+            # Powyżej 0,5"). Brane dosłownie, wszyscy gracze klubu lądowali
+            # pod kluczem „genoa" i nadpisywali sobie linie — oba rynki
+            # zawodnicze u Betclica były martwe, a klucz-klub palił budżet
+            # wyszukiwarki w odkrywaniu.
+            if osoba and norm_name(osoba) in druzyny_meczu:
+                osoba, nazwa_zakladu = _osoba_z_nazwy_zakladu(nazwa_zakladu)
             if not osoba and z["gracze"]:
                 try:
                     osoba = gracze_id.get(int(z["gracze"][0]), "")
                 except (TypeError, ValueError):
                     osoba = ""
-            linia, strona = linia_i_strona(z["nazwa"])
+            linia, strona = linia_i_strona(nazwa_zakladu)
             if linia is None or not osoba:
                 continue
             klucz = norm_name(osoba)

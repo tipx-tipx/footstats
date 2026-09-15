@@ -850,7 +850,7 @@ function PokrycieLinii({ bet }: { bet: ValueBet }) {
  * CO DOPUSZCZA RYWAL (2026-09-14). Dla zawodnika: ile rywal dopuszczał
  * zawodnikom tej formacji na tym rynku w 10 ostatnich meczach względem
  * normy ligi. Ta liczba WESZŁA do szansy (cecha `rywal` modelu uczonego),
- * więc karta pokazuje składnik, nie ciekawostkę. Pełny ranking: /rywale.
+ * więc karta pokazuje składnik, nie ciekawostkę.
  */
 function ProfilRywala({ bet }: { bet: ValueBet }) {
   const r = bet.p_uczony?.rywal;

@@ -180,7 +180,11 @@ def _main() -> int:
             puste += 1
             pamiec[str(mid)] = {"ts": int(time.time()), "players": {}}
             continue
-        pamiec[str(mid)] = {"ts": int(time.time()), "players": gracze}
+        # nazwiska w oryginale jadą razem z ofertą: klucz `norm_name` ma człony
+        # POSORTOWANE („avest hidde ter"), a odkrywanie szuka nim w statshubie
+        # (patrz `build_wc_fast.odkryj_zawodnikow_z_oferty`)
+        pamiec[str(mid)] = {"ts": int(time.time()), "players": gracze,
+                            "player_names": paczka.get("player_names") or {}}
         pobrane += 1
 
     pamiec = bc_rotuj_pamiec(pamiec, kolejnosc, teraz, MAX_MECZOW_W_PAMIECI_BC)

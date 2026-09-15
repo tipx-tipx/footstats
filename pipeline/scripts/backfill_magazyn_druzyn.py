@@ -72,7 +72,17 @@ def _main() -> None:
     try:
         from footstats.jobs import build_league as BL
         for m in BL.upcoming_events(days=7):
-            if not getattr(m, "druzynowe", False):
+            # ⚑ TAKŻE MECZE Z KURSAMI SPOZA ZAKRESU DRUŻYNOWEGO (2026-09-15).
+            # Kalendarz z magazynu jest miarą „czy on gra" dla zawodników
+            # (`radar.dopelnij_meczami_druzyny`), a propsy zawodnicze mają
+            # też ligi bez rynków drużynowych. Ich kluby siedziały w magazynie
+            # z backfillu 18.08 i nikt ich nie odświeżał: zmierzone 15.09 —
+            # 911 drużyn z kursami na najbliższy tydzień poza zakresem, a brama
+            # `rzadko_w_pierwszym_skladzie` liczyła Martinowi Tejonowi
+            # (Marítimo, 6 startów z 6 w sezonie) „2 z 10", bo okno sięgało
+            # do marca. W próbce 171 odrzuconych z kursem 104 to etatowi
+            # starterzy.
+            if not (getattr(m, "druzynowe", False) or getattr(m, "has_odd", False)):
                 continue
             for pole in ("home_id", "away_id"):
                 v = getattr(m, pole, None)
