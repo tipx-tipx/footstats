@@ -5195,10 +5195,15 @@ def skutecznosc_per_dzien(
     do listy dnia z oznaczeniem i osobnych liczników (poza_n/poza_trafione),
     ale NIE wchodzą do trafień/ROI — user ich nie widział na liście typów.
 
-    `braki` = typy zamknięte jako „zwrot" bez danych ze źródła. Nie wchodzą
-    NIGDZIE poza własny licznik (`brak_danych_n`) — bo o nich nie wiemy nic:
-    ani że weszły, ani że nie. Bez tej liczby dzień, w którym źródło padło,
-    wygląda identycznie jak dzień, w którym po prostu było mniej meczów.
+    `braki` = typy ze strony zamknięte jako „zwrot" (od 16.09 KAŻDY powód:
+    brak danych źródła, nie zagrał, mecz przełożony). Dostają wiersz w liście
+    dnia z `wynik="zwrot"` i `powod` oraz licznik `zwrot_n`; zwroty ze źródła
+    liczą się dodatkowo w `brak_danych_n`. Do trafień/ROI NIE wchodzą — o nich
+    nie wiemy nic: ani że weszły, ani że nie. Bez tego dzień, w którym źródło
+    padło albo zawodnik nie wszedł, wyglądał jak dzień z mniejszym terminarzem.
+
+    `czekajace` = typy ze strony po skończonym meczu, wciąż bez wyniku —
+    wiersz z `wynik=None` i licznik `czeka_n` (patrz `_czekajace_dnia`).
     """
     dzienne: dict[str, dict] = {}
 
