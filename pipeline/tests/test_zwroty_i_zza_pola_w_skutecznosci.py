@@ -223,3 +223,76 @@ def test_czekajace_tylko_po_koncu_meczu(monkeypatch):
     }
     cz = rozliczanie._czekajace_dnia(log, None, None, now)
     assert [r["podmiot"] for r in cz] == ["Hellebrand"]
+
+
+# --- strażnicy na przyszłość ---------------------------------------------------
+
+def test_kazdy_rynek_zawodniczy_z_oferty_rozlicza_sie_bez_365():
+    """Hellebrand wisiał, bo `shots_outside_box` miał TYLKO ścieżkę 365Scores.
+
+    Ligi spoza 365 (Ekstraklasa, Championship, Saudi…) rozliczają się ze
+    statshuba (shotmapa, historia zawodnika, bank trendów) albo z workera
+    Sofascore. Każdy rynek, który bukmacher kwotuje, a my umiemy opublikować,
+    musi mieć tam drogę — inaczej w takiej lidze zawsze skończy jako „zwrot".
+    """
+    from footstats.jobs import sofa_worker
+    from footstats.sources import betclic, superbet
+
+    oferta = set(superbet.PLAYER_MARKET_MAP.values()) | {
+        mk for _, mk in betclic.WZORCE_RYNKOW
+    }
+    # kartki zawodnika: Betclic je kwotuje, ale silnik ich nie typuje (0 rekordów
+    # w księdze do 14.09) — gdy wejdą do produktu, trzeba im dać ścieżkę
+    oferta -= {"yellow_card"}
+    poza_365 = (
+        set(rozliczanie.RYNKI_SHOTMAPY)
+        | set(rozliczanie.MARKETY_LIB)
+        | set(rozliczanie.POLA_PERF_ROZLICZENIA)
+        | set(sofa_worker.MAP_SEZON.values())
+        | set(sofa_worker.RYNKI_ZAWODNIKA)
+    )
+    bez_drogi = sorted(oferta - poza_365)
+    assert not bez_drogi, f"rynki bez rozliczenia poza 365: {bez_drogi}"
+
+
+def test_rynki_pochodne_shotmapy_sa_w_rynkach_shotmapy():
+    for mk in statshub.SHOTMAP_DERIVED:
+        assert mk in rozliczanie.RYNKI_SHOTMAPY
+
+
+def test_kontrola_lapie_pokazany_typ_bez_wiersza(monkeypatch):
+    """`strona_bez_wiersza`: typ ze strony, który nie ma jak trafić do listy
+    dnia (odrzucony / brak rekordu / rynek osobny), ma świecić na czerwono."""
+    monkeypatch.setattr(rozliczanie, "START_STATYSTYK", "2026-09-14")
+    ko = 1789497000
+    now = ko + rozliczanie.MECZ_KONIEC_PO_S + 3600
+    zdrowy = _rec_dnia(podmiot="ok", kickoff_ts=ko)
+    odrzucony = _rec_dnia(podmiot="odrzucony", kickoff_ts=ko, odrzucony=True)
+    osobny = _rec_dnia(podmiot="osobny", kickoff_ts=ko, rynek_kod="shots_blocked")
+    log = {"k_ok": zdrowy, "k_odrz": odrzucony, "k_os": osobny}
+    stan = {"od_ts": ko - 86400, "klucze": {
+        "k_ok": ko, "k_odrz": ko, "k_os": ko, "k_brak": ko,
+        # mecz jeszcze trwa — nie liczy się
+        "k_trwa": now - 60,
+    }}
+    k = rozliczanie.kontrola_produktu(log, stan, now, wagi_ts=now)
+    s = next(x for x in k["sprawdzenia"] if x["kod"] == "strona_bez_wiersza")
+    assert not s["ok"] and s["liczba"] == 3
+    assert "odrzucony 1" in s["opis"] and "brak_rekordu 1" in s["opis"]
+    assert "rynek_osobny 1" in s["opis"]
+
+
+def test_kontrola_zielona_gdy_kazdy_typ_ma_wiersz(monkeypatch):
+    monkeypatch.setattr(rozliczanie, "START_STATYSTYK", "2026-09-14")
+    ko = 1789497000
+    now = ko + rozliczanie.MECZ_KONIEC_PO_S + 3600
+    log = {
+        "a": _rec_dnia(podmiot="wygrany", kickoff_ts=ko),
+        "b": _rec_dnia(podmiot="zwrot", kickoff_ts=ko, wynik="zwrot",
+                       powod="nie zagrał"),
+        "c": _rec_dnia(podmiot="czeka", kickoff_ts=ko, wynik=None),
+    }
+    stan = {"od_ts": ko - 86400, "klucze": {"a": ko, "b": ko, "c": ko}}
+    k = rozliczanie.kontrola_produktu(log, stan, now, wagi_ts=now)
+    s = next(x for x in k["sprawdzenia"] if x["kod"] == "strona_bez_wiersza")
+    assert s["ok"] and s["liczba"] == 0

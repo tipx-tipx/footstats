@@ -245,7 +245,13 @@ function Drabinka({
                                 : "text-data-amber-ink"
                           }`}
                         >
-                          {w ? "✓ weszło" : prz ? "✗ nie" : "zwrot"}
+                          {w
+                            ? "✓ weszło"
+                            : prz
+                              ? "✗ nie"
+                              : l.wynik === "zwrot"
+                                ? "zwrot"
+                                : "czeka"}
                         </span>
                       </div>
                     );

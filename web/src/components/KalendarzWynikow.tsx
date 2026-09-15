@@ -227,11 +227,19 @@ export function KalendarzWynikow({
           // na karku, więc `rozliczone` = 0 i dzień wypadał z każdego filtru.
           // To było ciche odrzucenie CAŁEGO DNIA — zamiast tego kafelek stoi
           // wyblakły, z liczbą typów „na próbę", i daje się kliknąć.
+          // dzień, w którym wszystko ze strony to zwroty albo typy czekające
+          // na dane (2026-09-16) – kafelek stoi, ale nie udaje wyniku
+          const tylkoZwroty =
+            k.rozliczone === 0 &&
+            (k.poza_n ?? 0) === 0 &&
+            (k.zwrot_n ?? 0) + (k.czeka_n ?? 0) > 0;
           const tylkoProbne = k.rozliczone === 0 && (k.poza_n ?? 0) > 0;
           const udanyDzien = k.rozliczone > 0 && k.trafione * 2 >= k.rozliczone;
-          const zysk = !tylkoProbne && (pelnyWglad ? k.roi_flat > 0.005 : udanyDzien);
+          const zysk =
+            !tylkoProbne && !tylkoZwroty && (pelnyWglad ? k.roi_flat > 0.005 : udanyDzien);
           const strata =
             !tylkoProbne &&
+            !tylkoZwroty &&
             (pelnyWglad ? k.roi_flat < -0.005 : k.rozliczone > 0 && !udanyDzien);
           const swiezy = poZmianie(k.dzien);
           const aktywny = wybrany === k.dzien;
@@ -241,7 +249,9 @@ export function KalendarzWynikow({
               onClick={() => onWybierz?.(k.dzien)}
               aria-pressed={aktywny}
               title={`${k.dzien}: ${
-                tylkoProbne
+                tylkoZwroty
+                  ? `bez rozstrzygnięcia – ${k.zwrot_n ?? 0} zwrotów, ${k.czeka_n ?? 0} czeka na dane`
+                  : tylkoProbne
                   ? `nic nie było na liście dnia – ${k.poza_trafione ?? 0} z ${k.poza_n} typów na próbę`
                   : `weszło ${k.trafione} z ${k.rozliczone}${
                       pelnyWglad ? ` · bilans ${pisz(k.roi_flat)}` : ""
@@ -267,7 +277,9 @@ export function KalendarzWynikow({
               {/* kafelek ma ~40 px: w widoku pełnym bilans, w widoku
                   użytkownika liczba trafionych typów tego dnia */}
               <span className="font-data text-[11px] font-semibold leading-none">
-                {tylkoProbne
+                {tylkoZwroty
+                  ? "zwrot"
+                  : tylkoProbne
                   ? "próba"
                   : pelnyWglad
                     ? pisz(k.roi_flat, true)

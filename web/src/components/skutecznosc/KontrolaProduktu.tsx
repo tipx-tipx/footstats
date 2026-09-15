@@ -21,6 +21,7 @@ const NAZWY: Record<string, string> = {
   zapis_pokazanych: "Zapis tego, co było na stronie",
   strona_bez_rekordu: "Typy ze strony mają zapis do rozliczenia",
   zaleglosc_rozliczen: "Rozliczenia na bieżąco",
+  strona_bez_wiersza: "Każdy typ ze strony ma wiersz w Skuteczności",
   bez_danych: "Typy ze strony zamykane z wynikiem",
   wagi_modelu: "Nocny trening modelu",
 };

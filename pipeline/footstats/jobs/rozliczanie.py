@@ -726,10 +726,41 @@ def kontrola_produktu(log: dict, pokazane: dict | None, now: int,
         if k in log and log[k].get("wynik") is None
         and now - ko > KONTROLA_ZALEGLOSC_H * 3600
     ]
+    # PO RYNKU, bo zaległość jednego rynku to inna diagnoza niż padnięte
+    # źródło: Hellebrand (zza pola, Ekstraklasa 15.09) wisiał, bo rynek nie
+    # miał ścieżki poza 365 — sama liczba tego nie mówiła
+    zalegle_rynki = Counter(str(log[k].get("rynek_kod") or "?") for k in zalegle)
     dodaj("zaleglosc_rozliczen", not zalegle, len(zalegle),
           "brak zaległych rozliczeń" if not zalegle
           else f"{len(zalegle)} typów ze strony czeka na wynik ponad "
-               f"{KONTROLA_ZALEGLOSC_H} h od meczu")
+               f"{KONTROLA_ZALEGLOSC_H} h od meczu: "
+               + ", ".join(f"{m} {n}" for m, n in zalegle_rynki.most_common(4)))
+
+    # ⚑ KAŻDY TYP ZE STRONY MA WIERSZ W SKUTECZNOŚCI (2026-09-16, zgłoszenie
+    # właściciela: „zniknęły typy w rozliczeniach — Hellebrand, drabinki
+    # 15.09"). Od tego dnia wygrana, przegrana, zwrot (każdy powód) i typ
+    # czekający na dane mają swój wiersz w liście dnia. Zostają cztery drogi,
+    # którymi pokazany typ może NIE mieć wiersza — i to sprawdzenie łapie
+    # każdą: brak rekordu, `odrzucony`, rynek osobny (`RYNKI_OSOBNE`), inna
+    # epoka. Okno: mecze skończone (po `MECZ_KONIEC_PO_S`) od daty startu.
+    bez_wiersza: Counter = Counter()
+    for k, ko in klucze.items():
+        if ko + MECZ_KONIEC_PO_S > now or not w_oknie_statystyk({"kickoff_ts": ko}):
+            continue
+        r = log.get(k)
+        if r is None:
+            bez_wiersza["brak_rekordu"] += 1
+        elif r.get("odrzucony"):
+            bez_wiersza["odrzucony"] += 1
+        elif r.get("rynek_kod") in RYNKI_OSOBNE:
+            bez_wiersza["rynek_osobny"] += 1
+        elif not _z_biezacej_epoki(r) or _z_martwej_epoki(r):
+            bez_wiersza["inna_epoka"] += 1
+    n_bw = sum(bez_wiersza.values())
+    dodaj("strona_bez_wiersza", n_bw == 0, n_bw,
+          "każdy typ ze strony ma wiersz w Skuteczności" if not n_bw
+          else f"{n_bw} typów ze strony NIE MA wiersza w Skuteczności: "
+               + ", ".join(f"{p} {n}" for p, n in bez_wiersza.most_common()))
 
     # ⚑ OKNO 7–14 DNI WSTECZ, nie ostatnie 7: zwrot „brak danych" zapada
     # dopiero po `TERMIN_BRAK_DANYCH_S`, więc w świeższych meczach go nie ma
