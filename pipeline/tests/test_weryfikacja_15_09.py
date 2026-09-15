@@ -12,6 +12,7 @@
    omijają limity doby (24 typy zawodnicze przy limicie 21).
 """
 import time
+from collections import Counter
 
 from footstats.jobs import build_wc_fast as B
 from footstats.jobs import radar
@@ -189,3 +190,80 @@ def test_ksiega_bez_zapisu_pokazanych_wznawia_jak_dotad(monkeypatch):
     out, wzn = B.scal_z_publikacjami(
         [], {}, typy_log={"a": _wpis(0.5, kickoff), "b": _wpis(1.5, kickoff)})
     assert wzn == 2
+
+
+# --- 6. Connell i Senesi: kalendarz z feedu, nieobecność, wznowione karty ---
+
+from footstats.jobs import magazyn_druzyn as MD
+
+
+def _kolega(pid, grane_dni, rywale, team_id=23, minuty=90.0):
+    return StatshubTrend(
+        player_id=pid, player_name=f"G{pid}", position="M", team_id=team_id,
+        team_name="Barnsley", opponent_id=9, opponent_name="Peterborough",
+        is_home=False, market_code="shots", line=0.5, in_predicted_lineup=False,
+        league_average=None, opponent_average=None, opponent_rank=None,
+        total_ranks=None, event_id=1, counts=[1.0] * len(grane_dni),
+        minutes=[minuty] * len(grane_dni),
+        timestamps=[TERAZ - d * DZIEN for d in grane_dni],
+        started=[True] * len(grane_dni), game_opponent_ids=list(rywale),
+    )
+
+
+def test_kalendarz_z_feedu_zna_mecze_bez_zawodnika():
+    """Connell grał do 22.08; koledzy grali dalej — te mecze są w feedzie."""
+    koledzy = [_kolega(p, [3, 10, 17], [101, 102, 103]) for p in range(1, 6)]
+    connell = _kolega(99, [24, 31], [104, 105])
+    kal = MD.kalendarz_z_feedu(koledzy + [connell])
+    assert len(kal[23]) == 3                       # 24 i 31 dni: tylko jeden gracz
+    assert radar.nie_gral_ostatnio(connell, kal, TERAZ) is True
+    assert radar.nie_gral_ostatnio(koledzy[0], kal, TERAZ) is False
+
+
+def test_mecze_kadry_nie_udaja_meczu_klubu():
+    """Ten sam dzień, różni rywale (różne reprezentacje) — to nie jest mecz klubu."""
+    kadra = [_kolega(p, [5], [900 + p]) for p in range(1, 8)]
+    klub = [_kolega(p, [2], [101]) for p in range(1, 8)]
+    kal = MD.kalendarz_z_feedu(kadra + klub)
+    assert kal[23] == [TERAZ - 2 * DZIEN]
+
+
+def test_scal_kalendarze_dokłada_tylko_brakujace():
+    out = MD.scal_kalendarze({23: [TERAZ - 40 * DZIEN]},
+                             {23: [TERAZ - 3 * DZIEN, TERAZ - 40 * DZIEN + 3600]})
+    assert out[23] == [TERAZ - 3 * DZIEN, TERAZ - 40 * DZIEN]
+
+
+def test_karta_bez_gry_w_ostatnich_meczach_odpada_chyba_ze_w_skladzie():
+    w = {"minuty_sr6": 88, "udzial_startow": 0.7, "nie_gral_ostatnio": True}
+    powody = Counter()
+    assert radar._oceń_karte(w, powody) == (0.0, None)
+    assert powody["nie_gral_w_ostatnich_meczach"] == 1
+
+
+def test_wznowiona_karta_zawodnika_ktory_nie_gra_schodzi(monkeypatch):
+    kickoff = int(time.time()) + 7200
+    karta = {"mecz_id": 1, "podmiot_id": 830659, "podmiot": "Marcos Senesi",
+             "kickoff_ts": kickoff, "hero": {"rynek_kod": "fouls_won", "linia": 0.5}}
+    magazyn = {B.PUBLIKACJE_KART_KLUCZ: {"k": {"wpis": karta, "kickoff_ts": kickoff,
+                                                "opublikowano_ts": 1}}}
+    _stub_supa(monkeypatch, magazyn)
+    monkeypatch.setattr(radar, "karta_ma_realny_drugi_szczebel", lambda w: True)
+    assert B.scal_karty_z_publikacjami([], wypadli={830659}) == []
+    magazyn[B.PUBLIKACJE_KART_KLUCZ]["k"]["wpis"] = {**karta, "xi": True}
+    assert len(B.scal_karty_z_publikacjami([], wypadli={830659})) == 1
+
+
+def test_po_transferze_okno_od_pierwszego_meczu_w_klubie():
+    """Trossard: pięć ostatnich meczów Beşiktaşu zagranych, wcześniejsze
+    występy w innym klubie (daty spoza kalendarza drużyny)."""
+    kal = {100: [TERAZ - d * DZIEN for d in (3, 10, 17, 24, 31, 38, 45, 52, 59, 66)]}
+    tr = _trend([3, 10, 17, 24, 31, 70, 77, 84])     # 70+ dni: stary klub
+    assert radar.udzial_startow(tr, kalendarz=kal, teraz=TERAZ) == 1.0
+    # ten sam obraz BEZ występów gdzie indziej = rezerwowy, który wszedł do składu
+    tr2 = _trend([3, 10, 17, 24, 31])
+    assert radar.udzial_startow(tr2, kalendarz=kal, teraz=TERAZ) == 0.5
+    # nowy zawodnik z jednym meczem na trzy dalej nie jest starterem
+    tr3 = _trend([3, 70, 77, 84])
+    kal3 = {100: [TERAZ - d * DZIEN for d in (3, 10, 17, 24)]}
+    assert radar.udzial_startow(tr3, kalendarz=kal3, teraz=TERAZ) < 0.6

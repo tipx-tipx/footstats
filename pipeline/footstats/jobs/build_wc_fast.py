@@ -1645,6 +1645,7 @@ PUBLIKACJE_KART_KLUCZ = "publikacje_karty"
 
 def scal_karty_z_publikacjami(
     wpisy: list[dict], teraz: int | None = None,
+    wypadli: set | None = None,
 ) -> list[dict]:
     """To samo co `scal_z_publikacjami`, ale dla kart drabinek.
 
@@ -1690,6 +1691,7 @@ def scal_karty_z_publikacjami(
     out = list(wpisy)
     wznowione = 0
     bez_drugiego = 0
+    nie_gra = 0
     nierozstrzygniete = 0
     for k, rec in list(rej.items()):
         # jak przy typach: karta bez kickoffu wygasa od razu, zamiast wracać
@@ -1701,6 +1703,14 @@ def scal_karty_z_publikacjami(
         if k in biezace or not rec.get("wpis"):
             continue
         w = dict(rec["wpis"])
+        # ⚑ ZAWODNIK, KTÓRY NIE GRA, SCHODZI TAKŻE Z KARTY WZNOWIONEJ
+        # (2026-09-15, Senesi: karta z 14.09 sprzed bramy składu, od transferu
+        # jeden mecz na pięć). Ten cykl policzył go na świeżym kalendarzu
+        # drużyny i odrzucił; wznowienie przywracało kartę z zamrożonym
+        # „100% startów". Ogłoszony skład (xi True) to przebija.
+        if wypadli and w.get("podmiot_id") in wypadli and w.get("xi") is not True:
+            nie_gra += 1
+            continue
         # brama struktury na wznowieniu (patrz nota w docstringu). Wpis
         # ZOSTAJE w rejestrze — zdejmujemy go z listy, nie z historii; sam
         # wyleci rotacją po gwizdku.
@@ -1716,11 +1726,12 @@ def scal_karty_z_publikacjami(
         wznowione += 1
     if not _dry_run() and odczyt_ok:
         supa.put_key(PUBLIKACJE_KART_KLUCZ, rej)
-    if wznowione or bez_drugiego:
+    if wznowione or bez_drugiego or nie_gra:
         # licznik przy bramie, nie cisza ([[ciche-odrzucenia-zasada]])
         print(f"Publikacje kart: wznowiono {wznowione} "
               f"(bieżące przeliczenie dało {len(wpisy)}), "
-              f"bez drugiego szczebla zdjęto {bez_drugiego}"
+              f"bez drugiego szczebla zdjęto {bez_drugiego}, "
+              f"zawodnik nie gra: {nie_gra}"
               + (f", bez zapisanej drabinki {nierozstrzygniete}"
                  if nierozstrzygniete else ""))
     out.sort(key=lambda w: (w.get("kickoff_ts") or 0, w.get("mecz_id") or 0))
@@ -5775,6 +5786,33 @@ def _main_impl(tryb=None):
                   f"{MIN_GRUPY_DO_PRIORU} zawodników — tam prior zostaje na "
                   f"historii samego zawodnika")
 
+    # ⚑ KALENDARZ DRUŻYN UZUPEŁNIONY FEEDEM (2026-09-15, zgłoszenie właściciela:
+    # Connell i Senesi w drabinkach, choć nie grają). Magazyn bywa nieaktualny
+    # dla klubów spoza zakresu drużynowego i po transferach — wtedy „ostatnie
+    # 10 meczów drużyny" sięgało do poprzedniego sezonu. Mecze, w których
+    # zagrali koledzy z drużyny, są w feedzie tego samego cyklu (pomiar
+    # progów przy `magazyn_druzyn.UDZIAL_GRACZY_MECZU_Z_FEEDU`). Ten sam słownik
+    # dostają pewniaki i drabinki.
+    try:
+        _kal_feed = magazyn_druzyn.kalendarz_z_feedu(trends)
+        _przed = sum(len(v) for v in _kalendarz_druzyn.values())
+        _kalendarz_druzyn = magazyn_druzyn.scal_kalendarze(_kalendarz_druzyn, _kal_feed)
+        print(f"Kalendarz drużyn: magazyn {_przed} meczów, z feedu {len(_kal_feed)} "
+              f"drużyn, po scaleniu {sum(len(v) for v in _kalendarz_druzyn.values())}")
+    except Exception as e:                                     # noqa: BLE001
+        diagnostyka.cichy("cykl", "kalendarz_z_feedu", e)
+    # zawodnicy, o których ten cykl WIE, że nie grają — zdejmują też wznowione
+    # karty drabinek (patrz `scal_karty_z_publikacjami`)
+    _wypadli_z_gry: set = set()
+    _teraz_kal = int(time.time())
+    for _t in trends:
+        if _t.player_id in _wypadli_z_gry or _t.in_predicted_lineup:
+            continue
+        _u = radar.udzial_startow(_t, kalendarz=_kalendarz_druzyn, teraz=_teraz_kal)
+        if ((_u is not None and _u < radar.MIN_UDZIAL_STARTOW)
+                or radar.nie_gral_ostatnio(_t, _kalendarz_druzyn, _teraz_kal) is True):
+            _wypadli_z_gry.add(_t.player_id)
+
     for tr in trends:
         if (tr.player_id, tr.market_code) in seen_player_market:
             continue
@@ -5961,6 +5999,14 @@ def _main_impl(tryb=None):
             _odrzuc(mid, tr, "rzadko_w_pierwszym_skladzie",
                     f"w pierwszym składzie w {round(udzial_klub * _n_dr)} z {_n_dr} "
                     "ostatnich meczów drużyny, a składu na ten mecz jeszcze nie ma")
+            _wypadli_z_gry.add(tr.player_id)
+            continue
+        if (xi_sygnal is None
+                and radar.nie_gral_ostatnio(tr, _kalendarz_druzyn, _teraz_p) is True):
+            _odrzuc(mid, tr, "nie_gral_w_ostatnich_meczach",
+                    f"nie zagrał ani minuty w {radar.OKNO_NIEOBECNOSCI} ostatnich "
+                    "meczach drużyny (kontuzja, odsunięcie albo transfer)")
+            _wypadli_z_gry.add(tr.player_id)
             continue
 
         probe = score_player_market(mk, 0.5, hist, prior, ctx, None, None,
@@ -9163,7 +9209,7 @@ def _main_impl(tryb=None):
     # przechodzą przez bramę i zapisujemy wynik, choćby był pusty.
     if not radar_padl:
         # karta raz pokazana zostaje do gwizdka — ta sama zasada co przy typach
-        radar_wpisy = scal_karty_z_publikacjami(radar_wpisy)
+        radar_wpisy = scal_karty_z_publikacjami(radar_wpisy, wypadli=_wypadli_z_gry)
         # RYNEK WYCOFANY schodzi też z KART — i to PO scaleniu z publikacjami,
         # bo inaczej wróciłby tą samą drogą co wznowiony typ
         # ([[wznowione-karty-omijaly-bramy]]). Karta bez ani jednego rynku

@@ -273,6 +273,89 @@ def kalendarz_druzyn(mag: dict) -> dict[int, list[int]]:
     return out
 
 
+# Kalendarz z feedu: mecz drużyny = ten sam rywal w oknie 4 h, w którym zagrała
+# co najmniej taka część zawodników tej drużyny znanych z feedu. Grupowanie po
+# rywalu odcina okno reprezentacyjne (koledzy grają w RÓŻNYCH kadrach).
+# Zmierzone 15.09 na 26 drużynach (392 mecze z terminarza statshuba, 150 dni):
+#
+#     próg udziału   czułość   ostatnie 5 meczów   fałszywe mecze
+#     0,5               8%          19%              0 z 31
+#     0,3              76%          92%              0 z 297   <- wybrany
+#     0,2              90%          95%              8 z 359
+#     0,0              92%          95%             24 z 385
+#
+# Fałszywy mecz jest groźniejszy od brakującego (zaniża starty każdemu, kto
+# w nim „nie zagrał"), a brakujący uzupełnia magazyn — stąd 0,3.
+UDZIAL_GRACZY_MECZU_Z_FEEDU = 0.3
+MIN_GRACZY_MECZU_Z_FEEDU = 3
+TOLERANCJA_S = 4 * 3600
+
+
+def kalendarz_z_feedu(trends: Iterable) -> dict[int, list[int]]:
+    """{team_id: [ts meczów, od najnowszych]} — z występów kolegów z drużyny.
+
+    ⚑ PO CO (2026-09-15, zgłoszenie właściciela: Luca Connell i Marcos Senesi
+    w drabinkach, choć nie wychodzą w składzie). Kalendarz z magazynu bywa
+    nieaktualny — magazyn odświeżał wyłącznie kluby z zakresu drużynowego,
+    a Barnsley czy klub po transferze stały od 18.08. Connell zagrał ostatni
+    raz 22.08, jego drużyna od tamtej pory rozegrała pięć meczów, a karta
+    liczyła mu 70% startów. Feed tego samego cyklu zna te mecze: grali w nich
+    koledzy z drużyny. Zero dodatkowych zapytań.
+
+    `trends` — StatshubTrend (lub cokolwiek z `team_id`, `player_id`,
+    `timestamps`, `minutes`, `game_opponent_ids`).
+    """
+    wystepy: dict[int, dict[int, set]] = {}     # team -> rywal -> {(ts, pid)}
+    gracze: dict[int, set] = {}
+    for t in trends:
+        tid = getattr(t, "team_id", None)
+        pid = getattr(t, "player_id", None)
+        if not tid or pid is None:
+            continue
+        gracze.setdefault(int(tid), set()).add(pid)
+        rywale = list(getattr(t, "game_opponent_ids", None) or [])
+        for i, (ts, m) in enumerate(zip(t.timestamps, t.minutes)):
+            if not ts or not (m or 0) > 0:
+                continue
+            ryw = rywale[i] if i < len(rywale) else 0
+            wystepy.setdefault(int(tid), {}).setdefault(int(ryw or 0), set()).add(
+                (int(ts), pid))
+    out: dict[int, list[int]] = {}
+    for tid, po_rywalu in wystepy.items():
+        prog = max(MIN_GRACZY_MECZU_Z_FEEDU,
+                   UDZIAL_GRACZY_MECZU_Z_FEEDU * len(gracze.get(tid) or ()))
+        mecze: list[int] = []
+        for ryw, zbior in po_rywalu.items():
+            if not ryw:
+                continue                   # bez rywala nie odróżnimy meczu kadry
+            punkty = sorted(zbior)
+            i = 0
+            while i < len(punkty):
+                j = i
+                while j + 1 < len(punkty) and punkty[j + 1][0] - punkty[i][0] <= TOLERANCJA_S:
+                    j += 1
+                grupa = punkty[i:j + 1]
+                if len({p for _, p in grupa}) >= prog:
+                    mecze.append(sorted(ts for ts, _ in grupa)[len(grupa) // 2])
+                i = j + 1
+        if mecze:
+            out[tid] = sorted(mecze, reverse=True)
+    return out
+
+
+def scal_kalendarze(glowny: dict[int, list[int]],
+                    dodatkowy: dict[int, list[int]]) -> dict[int, list[int]]:
+    """Magazyn + feed: mecz z feedu dochodzi, gdy magazyn nie ma meczu ±4 h."""
+    out = {k: list(v) for k, v in (glowny or {}).items()}
+    for tid, lista in (dodatkowy or {}).items():
+        znane = out.setdefault(tid, [])
+        for ts in lista:
+            if not any(abs(ts - z) <= TOLERANCJA_S for z in znane):
+                znane.append(ts)
+        znane.sort(reverse=True)
+    return out
+
+
 def opuszczone_mecze(kalendarz: dict[int, list[int]], team_id, od_ts: int) -> int | None:
     """Ile meczów drużyny odbyło się PO `od_ts` (None = nie wiemy).
 

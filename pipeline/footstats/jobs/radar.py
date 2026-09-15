@@ -610,6 +610,39 @@ def dopelnij_meczami_druzyny(
     ostatni_wystep = max((w[0] for w in wystepy if w[2] > 0), default=0)
     if ostatni_wystep - rozegrane[0] > KALENDARZ_NIEAKTUALNY_S:
         return None
+    # ⚑ PO TRANSFERZE OKNO ZACZYNA SIĘ OD PIERWSZEGO MECZU W NOWYM KLUBIE
+    # (2026-09-15). Trossard w Beşiktaşu: 83, 90, 84, 66, 62 minut w pięciu
+    # ostatnich meczach — a „udział startów" 0,5, bo pięć starszych meczów
+    # drużyny rozegrano, zanim przyszedł. Dowodem transferu są jego występy,
+    # których kalendarz tej drużyny nie zna, a które leżą PRZED pierwszym
+    # meczem w niej. Minimum `MIN_MECZOW_DRUZYNY` zostaje, więc nowy
+    # zawodnik z jednym występem na trzy mecze dalej jest rezerwowym.
+    def _w_kalendarzu(ts: int) -> bool:
+        return any(abs(ts - t) <= TOLERANCJA_MECZU_S for t in ts_dr)
+    # Idziemy od najnowszego występu wstecz: ciąg występów zgodnych z kalendarzem
+    # to gra w tym klubie, pierwszy występ SPOZA kalendarza kończy ciąg (inny
+    # klub albo kadra przed transferem). Pojedyncze stare zbieżności godzin
+    # (weekendowe gwizdki dwóch lig) nie przesuwają już początku okna.
+    # Ciąg „gdzie indziej" musi mieć co najmniej DWA występy z rzędu: kalendarz
+    # z feedu zna ~76% meczów drużyny, więc pojedynczy nieznany mecz pucharowy
+    # udawałby transfer i ścinał okno rezerwowemu (Leonel Flores, Boca).
+    pierwszy = None
+    gdzie_indziej = False
+    kolejne_obce = 0
+    for t in sorted((w[0] for w in wystepy if w[2] > 0), reverse=True):
+        if _w_kalendarzu(t):
+            if kolejne_obce:
+                break                      # pojedynczy obcy mecz — to nie transfer
+            pierwszy = t
+        else:
+            kolejne_obce += 1
+            if kolejne_obce >= 2 and pierwszy is not None:
+                gdzie_indziej = True
+                break
+    if (gdzie_indziej and pierwszy is not None
+            and pierwszy > rozegrane[-1] + TOLERANCJA_MECZU_S):
+        po = [t for t in rozegrane if t >= pierwszy - TOLERANCJA_MECZU_S]
+        rozegrane = rozegrane[:max(len(po), MIN_MECZOW_DRUZYNY)]
     started: list[bool] = []
     minuty: list[float] = []
     kiedy: list[int] = []
@@ -641,6 +674,26 @@ def udzial_startow(
     if n < 5:
         return None
     return sum(1 for i in range(n) if tr.started[i]) / n
+
+
+# Tyle ostatnich meczów drużyny bez ani minuty = zawodnik wypadł z gry
+# (kontuzja, odsunięcie, transfer). Brama niezależna od udziału startów:
+# etatowy starter po kontuzji ma dalej 7/10, a nie zagra.
+OKNO_NIEOBECNOSCI = 3
+
+
+def nie_gral_ostatnio(tr: statshub.StatshubTrend,
+                      kalendarz: dict[int, list[int]] | None, teraz: int,
+                      okno: int = OKNO_NIEOBECNOSCI) -> bool | None:
+    """Czy opuścił CAŁE `okno` ostatnich meczów drużyny (None = nie wiemy).
+
+    ⚑ 2026-09-15, zgłoszenie właściciela (Connell, Senesi w drabinkach).
+    Connell: ostatni występ 22.08, drużyna od tej pory pięć meczów bez niego.
+    """
+    dop = dopelnij_meczami_druzyny(tr, kalendarz, teraz, okno=okno)
+    if not dop or len(dop[1]) < okno:
+        return None
+    return all((m or 0) <= 0 for m in dop[1])
 
 
 def gral_w_ostatnim_meczu(
@@ -1294,9 +1347,14 @@ def _oceń_karte(
     # potrafi wyglądać dobrze u kogoś, kto raz zagrał 90 minut, a poza tym
     # siedzi. Cała analiza karty stoi na minutach, których rezerwowy nie dostanie.
     udzial = w.get("udzial_startow")
-    if udzial is not None and udzial < MIN_UDZIAL_STARTOW:
+    if udzial is not None and udzial < MIN_UDZIAL_STARTOW and w.get("xi") is not True:
         if powody is not None:
             powody["rzadko_w_pierwszym_skladzie"] += 1
+        return 0.0, None
+    # wypadł z gry w ostatnich meczach drużyny — ogłoszony skład to przebija
+    if w.get("nie_gral_ostatnio") is True and w.get("xi") is not True:
+        if powody is not None:
+            powody["nie_gral_w_ostatnich_meczach"] += 1
         return 0.0, None
     # -inf, nie 0: linia wpuszczona jako MOCNA SERIA ma prawo mieć ujemną
     # przewagę (patrz MIN_EDGE_SERII), więc próg 0,0 wycinałby dokładnie te
@@ -2180,6 +2238,8 @@ def zbuduj(
                 # rezerwowy z trzema pełnymi występami nie jest starterem
                 "udzial_startow": udzial_startow(
                     tr_ref, kalendarz=kalendarz_druzyn, teraz=teraz),
+                "nie_gral_ostatnio": nie_gral_ostatnio(
+                    tr_ref, kalendarz_druzyn, teraz),
                 "rodzaj": (
                     "transfer" if transfer else
                     "forma" if forma else "drabinka"
