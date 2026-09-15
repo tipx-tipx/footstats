@@ -1848,6 +1848,7 @@ def _dopnij_betclic(
     events_meta: dict[int, dict],
     paczki_bc: dict[int, dict] | None = None,
     podsumuj_karty: bool = True,
+    sb_cache: dict[int, dict] | None = None,
 ) -> None:
     """Dopnij do szczebli drugą cenę (Betclic) i rozjazd wobec Superbetu.
 
@@ -1931,6 +1932,19 @@ def _dopnij_betclic(
                     odpadki["zawodnika_brak_u_bc"] += 1
                     continue
                 trafil = False
+                # ⚑ CZYSTY SUPERBET, NIE SCALONA SIATKA (2026-09-15). Siatka
+                # kart (`linie_pelne`) niesie już WYŻSZY kurs z obu cenników
+                # (`build_wc_fast._scal_oferty_zawodnika`), więc porównanie jej
+                # z Betclikiem było porównaniem Betclica z samym sobą, gdy tylko
+                # Betclic płacił więcej. Zmierzone na radarze 15.09: 15 z 20
+                # porównań to fałszywe „0,0 pp", ani jednego „lepiej w Betclicu",
+                # 5 z 8 etykiet „rynek zgodny" nieprawdziwych — czyli value
+                # z rozjazdu działało tylko w jedną stronę.
+                rynki_sb = None
+                if sb_cache is not None:
+                    rynki_sb = superbet.znajdz_zawodnika(
+                        (sb_cache.get(mid) or {}).get("players") or {},
+                        w.get("podmiot") or "") or {}
                 for r in w.get("rynki") or []:
                     # nasza drabinka w kształcie porównywalnym z Betclikiem —
                     # rozjazdy liczy JEDNA funkcja (razem z bramą wspólnych
@@ -1940,14 +1954,24 @@ def _dopnij_betclic(
                     # — patrz `linie_pelne` w `_rynki_wpisu`. Bez tego karta
                     # jednoszczeblowa nigdy nie zbierze dwóch wspólnych linii,
                     # więc porównanie cen odpada zanim w ogóle spojrzy na ceny.
-                    nasze_linie = {
-                        float(l): {"over": kurs}
-                        for l, kurs in (r.get("linie_pelne") or {}).items()
-                        if kurs
-                    } or {
-                        float(s["linia"]): {"over": s.get("kurs")}
-                        for s in r.get("drabinka") or [] if s.get("kurs")
-                    }
+                    if rynki_sb is not None:
+                        nasze_linie = {
+                            float(l): {"over": (v or {}).get("over")}
+                            for l, v in (rynki_sb.get(r.get("rynek_kod")) or {}).items()
+                            if (v or {}).get("over")
+                        }
+                        if not nasze_linie:
+                            odpadki["rynku_brak_u_superbetu"] += 1
+                            continue
+                    else:
+                        nasze_linie = {
+                            float(l): {"over": kurs}
+                            for l, kurs in (r.get("linie_pelne") or {}).items()
+                            if kurs
+                        } or {
+                            float(s["linia"]): {"over": s.get("kurs")}
+                            for s in r.get("drabinka") or [] if s.get("kurs")
+                        }
                     bc_linie = rynki_bc.get(r.get("rynek_kod")) or {}
                     if not bc_linie:
                         odpadki["rynku_brak_u_bc"] += 1
@@ -1960,6 +1984,7 @@ def _dopnij_betclic(
                         if not r_oc:
                             continue
                         s["kurs_betclic"] = r_oc["betclic"]
+                        s["kurs_superbet"] = r_oc["superbet"]
                         s["rozjazd"] = r_oc
                         n_szczebli += 1
                         trafil = True
@@ -2451,7 +2476,7 @@ def zbuduj(
     # zostaje jak było, żeby nie palić budżetu czasu na setki kandydatów.
     if bc_cache:
         _dopnij_betclic(wpisy, events_meta, paczki_bc=bc_cache,
-                        podsumuj_karty=False)
+                        podsumuj_karty=False, sb_cache=sb_cache)
     ocenione = []
     powody_odpadniecia: Counter = Counter()
     pomiar_kandydaci: list[dict] = []
@@ -2610,7 +2635,7 @@ def zbuduj(
             w["kategoria"] = _kategoria_karty(w)
             w["profil_gry"] = _profil_gry(w)
     else:
-        _dopnij_betclic(wpisy, events_meta)
+        _dopnij_betclic(wpisy, events_meta, sb_cache=sb_cache)
     wpisy.sort(key=lambda w: (w["kickoff_ts"], w["mecz_id"], -w["_score"]))
     for i, w in enumerate(wpisy, start=1):
         w.pop("_score", None)

@@ -9294,6 +9294,30 @@ def _main_impl(tryb=None):
                 out[klucz] = w[pole]
         if (w.get("ocena") or {}).get("klasa"):
             out["klasa_karty"] = w["ocena"]["klasa"]
+        # ⚑ OBIE CENY I MIEJSCE KARTY (2026-09-15). Bez nich pytanie
+        # właściciela „czy value z rozjazdu Superbet/Betclic działa" było
+        # nierozstrzygalne: księga pisała `bukmacher=Superbet` w 837 z 837
+        # rekordów drabinek, bez kursu drugiego bukmachera i bez miejsca karty
+        # (czy stała w dziesiątce na stronie).
+        linia = h.get("drugi_linia") if drugi else h.get("linia")
+        for r in w.get("rynki") or []:
+            if r.get("rynek_kod") != h.get("rynek_kod"):
+                continue
+            for s in r.get("drabinka") or []:
+                if s.get("linia") != linia:
+                    continue
+                if s.get("kurs_superbet") is not None:
+                    out["kurs_superbet"] = s["kurs_superbet"]
+                if s.get("kurs_betclic") is not None:
+                    out["kurs_betclic"] = s["kurs_betclic"]
+                roz = s.get("rozjazd") or {}
+                if roz.get("roznica_pp") is not None:
+                    out["rozjazd_pp"] = roz["roznica_pp"]
+                    out["lepsza_cena"] = roz.get("gdzie")
+                if s.get("bukmacher"):
+                    out["bukmacher_szczebla"] = s["bukmacher"]
+        if (w.get("ocena") or {}).get("miejsce") is not None:
+            out["miejsce_karty"] = int(w["ocena"]["miejsce"])
         return out
 
     drabinki_typy = []

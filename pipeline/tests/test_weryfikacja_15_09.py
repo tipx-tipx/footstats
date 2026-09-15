@@ -267,3 +267,34 @@ def test_po_transferze_okno_od_pierwszego_meczu_w_klubie():
     tr3 = _trend([3, 70, 77, 84])
     kal3 = {100: [TERAZ - d * DZIEN for d in (3, 10, 17, 24)]}
     assert radar.udzial_startow(tr3, kalendarz=kal3, teraz=TERAZ) < 0.6
+
+
+# --- 7. porównanie Superbet/Betclic na czystych cennikach ---
+
+def _karta_sb_bc(linie_pelne):
+    return {
+        "mecz_id": 5, "podmiot": "Luca Connell",
+        "rynki": [{"rynek_kod": "shots", "linie_pelne": linie_pelne,
+                   "drabinka": [{"linia": 0.5, "kurs": 1.72},
+                                {"linia": 1.5, "kurs": 4.25}]}],
+    }
+
+
+def test_rozjazd_liczony_z_czystego_superbetu_widzi_wyzszy_betclic():
+    """Scalona siatka ma już wyższy kurs z obu — porównanie jej z Betclikiem
+    dawało 0,0 pp, gdy tylko Betclic płacił więcej (15 z 20 porównań 15.09)."""
+    w = _karta_sb_bc({"0.5": 1.72, "1.5": 4.25, "2.5": 9.0})
+    sb = {5: {"players": {"connell luca": {"shots": {
+        0.5: {"over": 1.40}, 1.5: {"over": 3.60}, 2.5: {"over": 8.0}}}}}}
+    bc = {5: {"players": {"connell luca": {"shots": {
+        0.5: {"over": 1.72}, 1.5: {"over": 4.25}, 2.5: {"over": 9.0}}}}}}
+    radar._dopnij_betclic([w], {5: {"home": "A", "away": "B", "ts": TERAZ}},
+                          paczki_bc=bc, podsumuj_karty=False, sb_cache=sb)
+    s0 = w["rynki"][0]["drabinka"][0]
+    assert s0["kurs_superbet"] == 1.40 and s0["kurs_betclic"] == 1.72
+    assert s0["rozjazd"]["gdzie"] == "betclic" and s0["rozjazd"]["roznica_pp"] > 10
+    # bez Superbetu nie ma porównania — zamiast fałszywego „rynek zgodny"
+    w2 = _karta_sb_bc({"0.5": 1.72, "1.5": 4.25})
+    radar._dopnij_betclic([w2], {5: {"home": "A", "away": "B", "ts": TERAZ}},
+                          paczki_bc=bc, podsumuj_karty=False, sb_cache={5: {"players": {}}})
+    assert "rozjazd" not in w2["rynki"][0]["drabinka"][0]

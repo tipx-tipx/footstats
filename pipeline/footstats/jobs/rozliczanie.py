@@ -1258,6 +1258,10 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
                     "minuty_sr6", "udzial_startow",
                     "rodzaj_karty", "kategoria_karty", "klasa_karty",
                     "pozycja", "xi",
+                    # obie ceny i miejsce karty (2026-09-15) — patrz
+                    # `_charakter_drabinki` w cyklu
+                    "kurs_superbet", "kurs_betclic", "rozjazd_pp",
+                    "lepsza_cena", "bukmacher_szczebla", "miejsce_karty",
                 ) if b.get(_p) is not None
             },
             "opublikowano_ts": int(time.time()),
