@@ -176,6 +176,14 @@ VALUE_MIN_P_HERO = 0.45
 # łatwiejsza niż warunek, na którym drugi szczebel w ogóle zostaje na karcie
 VALUE_MIN_P_DRUGI = 0.33
 MAX_KURS_SZCZEBLA = 12.0    # ...podobnie kurs powyżej tego progu
+# SZCZEBEL „ZA DROBNE" (2026-09-15, decyzja właściciela). Następna linia po
+# ostatnim szczeblu karty, pokazywana OBOK drabinki — bez naszej szansy i poza
+# wyborem karty. Typerzy grają ją jako „opcję dla odważnych" za symboliczną
+# stawkę (docs/analiza-typerow-betekipa.md: 3. szczebel ma 52 z 90 ich typów,
+# mediana kursu 7,50). Nasza księga: trzeci szczebel trafia 5,3% ±4,1 (6/113)
+# przy cenie ok. 19%, więc NIE obiecujemy szansy — pokazujemy kurs i historię,
+# a rekord idzie do księgi jako pomiar.
+MAX_KURS_ZA_DROBNE = 15.0
 # pierwszy szczebel drabinki od 1.65 (decyzja usera 2026-07-25): linie po
 # 1.2-1.5 to pewniaki bez value — drabinka ma zaczynać się od grywalnej ceny
 # ZEJŚCIE 1,65 -> 1,45 (2026-07-30) — wymuszone sufitem linii wyżej.
@@ -1189,6 +1197,23 @@ def _rynki_wpisu(
             diag["nastepnik_trafiony_mniej_niz_dwa_razy"] += 1
         if not drabinka:
             continue
+        za_drobne = None
+        if len(drabinka) >= 2:
+            _ost = float(drabinka[-1]["linia"])
+            for _l_s, _k in sorted(linie.items(), key=lambda kv: float(kv[0])):
+                _l = float(_l_s)
+                if _l <= _ost + 1e-9:
+                    continue
+                if _l <= _ost + 1.0 + 1e-9 and _k and float(_k) <= MAX_KURS_ZA_DROBNE:
+                    za_drobne = {"linia": _l, "kurs": _k}
+                    if okno:
+                        za_drobne["pokrycie"] = {
+                            "traf": sum(1 for c, _, _ in okno if c > _l),
+                            "z": len(okno)}
+                    _kto3 = ((zrodla or {}).get(mk) or {}).get(str(_l))                         or ((zrodla or {}).get(mk) or {}).get(_l_s)
+                    if _kto3:
+                        za_drobne["bukmacher"] = _kto3
+                break
         rec: dict = {
             "rynek_kod": mk,
             "rynek": nazwy_pl.get(mk, mk),
@@ -1206,6 +1231,7 @@ def _rynki_wpisu(
             # cenników (pełna lista) i co POKAZUJEMY userowi (przycięta
             # drabinka). Weryfikacja dostaje komplet dowodów, karta zostaje
             # krótka.
+            **({"za_drobne": za_drobne} if za_drobne else {}),
             "linie_pelne": {str(k): v for k, v in sorted(
                 ((float(l), kurs) for l, kurs in linie.items()),
             )},

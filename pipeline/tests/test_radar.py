@@ -914,3 +914,18 @@ def test_faule_nie_daja_kart_wcale():
     assert radar._oceń_karte(karta)[1] is None
     # ...a ten sam materiał na innym rynku kartę daje
     assert radar._oceń_karte(_karta_do_oceny(8, kurs=2.30))[1] is not None
+
+
+def test_szczebel_za_drobne_po_sufit_linii():
+    """⚑ 15.09: kolejna linia po ostatnim szczeblu karty jako opcja „za drobne"
+    — z kursem i historią, poza drabinką (sufit „3+" zostaje)."""
+    counts = [4, 3, 5, 2, 4, 3, 6, 4, 3, 5]
+    trendy = {"shots": _trend(market_code="shots", counts=counts)}
+    kursy = {"1.5": 1.7, "2.5": 2.2, "3.5": 3.4, "4.5": 5.0}
+    rynki = radar._rynki_wpisu({"shots": dict(kursy)}, trendy, {}, "Gracz 1", {},
+                               teraz=TERAZ, minuty_proj=85.0)
+    r = rynki[0]
+    assert max(s["linia"] for s in r["drabinka"]) == 2.5
+    zd = r.get("za_drobne")
+    assert zd and zd["linia"] == 3.5 and zd["kurs"] == 3.4
+    assert zd["pokrycie"]["z"] == 10

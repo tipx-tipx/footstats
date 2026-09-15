@@ -5480,6 +5480,8 @@ POWOD_POMIARU_POKRYCIA = "pokrycie_pod_progiem"
 # `pomiar_szczebli_drabinek`. Ta sama mechanika co przy progu pokrycia:
 # rozlicza się w tle, poza Skutecznością i poza korektą strumienia.
 POWOD_POMIARU_DRUGIEGO = "drugi_szczebel"
+# szczebel „za drobne" (2026-09-15) — trzeci, pokazywany bez szansy
+POWOD_POMIARU_TRZECIEGO = "trzeci_szczebel"
 
 
 def _stat_drabinek(grp: list[dict]) -> dict:

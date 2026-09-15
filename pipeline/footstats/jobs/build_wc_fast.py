@@ -9427,6 +9427,39 @@ def _main_impl(tryb=None):
             "odrzucenie_powod": rozliczanie.POWOD_POMIARU_DRUGIEGO,
         })
 
+    # SZCZEBEL „ZA DROBNE" JAKO POMIAR (2026-09-15) — patrz
+    # `radar.MAX_KURS_ZA_DROBNE`. Karta pokazuje go bez szansy, więc `p_model`
+    # to samo pokrycie z ostatnich meczów (jedyna liczba, jaką user widzi),
+    # a rekord jest pomiarowy: poza Skutecznością i korektą strumienia.
+    for w in radar_wpisy:
+        h = w.get("hero") or {}
+        r3 = next((r for r in w.get("rynki") or []
+                   if r.get("rynek_kod") == h.get("rynek_kod")), None)
+        zd = (r3 or {}).get("za_drobne") or {}
+        if not zd.get("kurs") or zd.get("linia") is None:
+            continue
+        pok = zd.get("pokrycie") or {}
+        drabinki_typy.append({
+            "mecz_id": w["mecz_id"], "mecz": w["mecz"],
+            "kickoff_ts": w["kickoff_ts"],
+            "podmiot_id": w.get("podmiot_id") or 0,
+            "podmiot": w["podmiot"],
+            "rynek_kod": h["rynek_kod"],
+            "rynek": h.get("rynek") or h["rynek_kod"],
+            "linia": zd["linia"], "strona": "powyzej",
+            "kurs": zd["kurs"], "bukmacher": zd.get("bukmacher") or "Superbet",
+            "p_model": (round(pok["traf"] / pok["z"], 3) if pok.get("z") else 0.0),
+            "pewnosc": None, "sugestia": False,
+            "zrodlo": rozliczanie.ZRODLO_DRABINKA,
+            "szczebel": 3,
+            **({"pokrycie_traf": int(pok["traf"]), "pokrycie_z": int(pok["z"])}
+               if pok.get("z") else {}),
+            **({"miejsce_karty": int((w.get("ocena") or {})["miejsce"])}
+               if (w.get("ocena") or {}).get("miejsce") is not None else {}),
+            "odrzucony": True,
+            "odrzucenie_powod": rozliczanie.POWOD_POMIARU_TRZECIEGO,
+        })
+
     # TYPY POMIAROWE DRABINEK: szczeble odrzucone WYŁĄCZNIE progiem pokrycia
     # (0,40–0,50). Idą do tej samej księgi z flagą `odrzucony`, więc rozliczą
     # się w tle, ale nie zobaczy ich ani user, ani skuteczność, ani korekta

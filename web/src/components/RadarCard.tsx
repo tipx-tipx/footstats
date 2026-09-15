@@ -337,6 +337,13 @@ function DrabinkaPasek({ w }: { w: RadarWpis }) {
   );
   const od = Math.max(0, Math.min(idxHero - 2, szczeble.length - 5));
   const widoczne = szczeble.slice(od, od + 5);
+  // „za drobne" dokładamy tylko, gdy ostatni szczebel drabinki jest na karcie —
+  // inaczej kafelek stałby obok szczebla, którego nie widać
+  const zaDrobne =
+    rynek?.za_drobne &&
+    widoczne[widoczne.length - 1]?.linia === szczeble[szczeble.length - 1]?.linia
+      ? rynek.za_drobne
+      : null;
 
   const ostatnie = (rynek?.ostatnie ?? []).slice(0, 10);
   const przebite = ostatnie.filter((x) => x > hero.linia).length;
@@ -407,6 +414,31 @@ function DrabinkaPasek({ w }: { w: RadarWpis }) {
                 </span>
               );
             })}
+            {/* ZA DROBNE (2026-09-15, decyzja właściciela): kolejny szczebel dla
+                odważnych, za symboliczną stawkę. BEZ naszej szansy — trzeci
+                szczebel trafia w rozliczeniach ok. 5%, więc zamiast liczby,
+                której nie umiemy uczciwie podać, stoi sama historia. */}
+            {zaDrobne && (
+              <span
+                className="flex w-[84px] flex-col items-center rounded-md border border-dashed border-hairline-strong px-1 py-2 text-center sm:w-[92px]"
+                title="Opcja za drobne: wyższa poprzeczka za symboliczną stawkę. Szansy nie podajemy – takie typy wchodzą rzadko."
+              >
+                <span className="font-data text-[12px] font-semibold text-ink-soft">
+                  {linLabel(zaDrobne.linia)}
+                </span>
+                <span className="font-data text-[13px] font-semibold tabular-nums text-ink-soft">
+                  {fmtKurs(zaDrobne.kurs)}
+                </span>
+                <span className="font-data text-[11px] tabular-nums text-faint">
+                  {zaDrobne.pokrycie
+                    ? `${zaDrobne.pokrycie.traf}/${zaDrobne.pokrycie.z}`
+                    : "–"}
+                </span>
+                <span className="mt-0.5 text-[9px] uppercase leading-tight tracking-tight text-faint">
+                  za drobne
+                </span>
+              </span>
+            )}
           </span>
 
           {ostatnie.length > 0 && (

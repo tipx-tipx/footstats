@@ -363,6 +363,16 @@ export interface RadarRynek {
   } | null;
   /** pełny wodospad kontekstu meczu użyty do policzenia p_final */
   kontekst?: RadarKontekst | null;
+  /**
+   * Szczebel „za drobne" (2026-09-15): następna linia po drabince, pokazywana
+   * bez naszej szansy — kurs i historia. Poza wyborem karty.
+   */
+  za_drobne?: {
+    linia: number;
+    kurs: number;
+    pokrycie?: { traf: number; z: number };
+    bukmacher?: string;
+  } | null;
 }
 
 /** Średnie CAŁEGO sezonu gracza (cache workera Sofascore, per liga+rok). */
