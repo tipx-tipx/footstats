@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""PREMIA ZA OKNO CENY nie ma prawa sięgać pasma, które traci najwięcej.
+"""PREMIA ZA OKNO CENY — zdjęta 15.09 (wartość 0), historia decyzji niżej.
 
 Ranking drabinek premiuje kartę startującą w paśmie, w którym drabinki realnie
 zarabiają (`OKNO_CENY_PREF_*`). Do 13.08 okno kończyło się na 1,90, powołując
@@ -28,13 +28,15 @@ def _score(kurs_hero, p_hero):
     return score
 
 
-def test_premia_dziala_w_oknie():
-    """Ta sama przewaga, dwie ceny: 1,65 jest w oknie, 1,80 już nie."""
-    # edge = p − 1/kurs; dobrane tak, by w obu kartach wynosił dokładnie 0,05
+def test_premia_zdjeta_ranking_nie_spycha_do_niskich_kursow():
+    """⚑ 15.09: na 142 pierwszych szczeblach od 13.08 pasma 1,55–1,70
+    i 1,70–1,90 leżą tak samo pod ceną (56% vs 59%, 50% vs 53%) — premia nie
+    ma pokrycia, a spychała 95 ze 142 kart do najniższych kursów. Ta sama
+    przewaga przy dwóch cenach daje tę samą ocenę."""
+    assert R.BONUS_OKNA_CENY == 0.0
     w_oknie = _score(1.65, round(1 / 1.65 + 0.05, 4))
     poza = _score(1.80, round(1 / 1.80 + 0.05, 4))
-    assert w_oknie > poza
-    assert round(w_oknie - poza, 4) == R.BONUS_OKNA_CENY
+    assert round(w_oknie - poza, 4) == 0.0
 
 
 def test_okno_nie_obejmuje_pasma_ktore_traci_najwiecej():

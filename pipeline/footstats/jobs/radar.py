@@ -264,9 +264,23 @@ MIN_KURS_SCORE = 1.55
 # więc to nie jest efekt składu rynków. Bez `fouls_committed` bez zmian.
 #
 # To zmiana KOLEJNOŚCI, nie bramy — żadna karta przez to nie znika.
+#
+# ⚑⚑ PREMIA ZDJĘTA (2026-09-15, decyzja właściciela po pomiarze). Na większej
+# próbie tabela z 13.08 się nie powtarza — 1. szczebel od 13.08 (księga):
+#
+#     pasmo        n   deklaruje  cena   trafia   zwrot
+#     1,55–1,70   95     55%      59%     56%     −11%
+#     1,70–1,90   34     50%      53%     50%     −12%
+#     1,90+       13     44%      44%     54%      +9%
+#
+# Oba pasma leżą tak samo pod ceną, więc „najgorsze pasmo" było szumem na 15
+# kartach, a premia spychała karty do najniższych kursów: 95 ze 142 pierwszych
+# szczebli startowało z 1,55–1,70. Eksperci BET EKIPA zaczynają drabinkę od
+# mediany 2,20. Stałe zostają (wartość 0), żeby test i powrót były jedną liczbą;
+# decyzja o minimum 1,8+ — po tygodniu rozliczeń po poprawkach z 15.09.
 OKNO_CENY_PREF_OD = 1.55
 OKNO_CENY_PREF_DO = 1.70
-BONUS_OKNA_CENY = 0.015
+BONUS_OKNA_CENY = 0.0
 MIN_PROBA_SCORE = 8         # min. występów w próbie (było 5 — za krótkie
                             # serie udawały pewniaki: 3/5 = "60%")
 # Surowe pokrycie linii. ZEJŚCIE 0.6 -> 0.5 (decyzja usera 2026-07-26):
