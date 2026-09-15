@@ -221,13 +221,21 @@ function Fakty({ w }: { w: RadarWpis }) {
   // POKAZUJEMY za to procent, bo user myśli w kursach – miara decyzji i liczba
   // na ekranie to dwie różne rzeczy. Cena Betclica nie znika przy niższej
   // różnicy: dalej stoi przy szczeblu jako „BC 1,82".
-  if (roz && (roz.roznica_pp ?? 0) >= 12) {
+  // ⚑ OBIE CENY WPROST (2026-09-15, właściciel: „ma być jasne na karcie, że
+  // chodzi o dużą różnicę kursów"). Sam „+23% u Betclica" wymagał domyślenia
+  // się, z czym porównujemy. Teraz chip mówi, kto płaci więcej i ile daje
+  // drugi — od 5 punktów szansy różnicy. Kolor bursztynowy tylko wtedy, gdy
+  // różnica realnie podniosła kartę w rankingu (backend: wartosc_rozjazdu).
+  if (roz && (roz.roznica_pp ?? 0) >= 5) {
+    const lepszyBuk = roz.gdzie === "betclic" ? "Betclic" : "Superbet";
+    const gorszyBuk = roz.gdzie === "betclic" ? "Superbet" : "Betclic";
+    const gorszyKurs = roz.gdzie === "betclic" ? roz.superbet : roz.betclic;
+    const liczySie = (w.hero?.wartosc_rozjazdu ?? 0) > 0.02;
     fakty.push({
-      // „gdzie" mówi, u KOGO jest lepsza cena — bez tego liczba wisi w próżni
-      tekst: `+${Math.round(roz.przewaga_pct)}% u ${
-        roz.gdzie === "betclic" ? "Betclica" : "Superbetu"
-      }`,
-      klasa: "bg-data-amber-wash text-data-amber-ink",
+      tekst: `${lepszyBuk} płaci ${fmtKurs(roz.lepszy)}, ${gorszyBuk} tylko ${fmtKurs(gorszyKurs)}`,
+      klasa: liczySie
+        ? "bg-data-amber-wash text-data-amber-ink"
+        : "bg-paper text-ink-soft border border-hairline",
     });
   }
   if (drugi?.p_final != null) {

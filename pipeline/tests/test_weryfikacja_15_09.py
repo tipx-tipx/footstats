@@ -298,3 +298,28 @@ def test_rozjazd_liczony_z_czystego_superbetu_widzi_wyzszy_betclic():
     radar._dopnij_betclic([w2], {5: {"home": "A", "away": "B", "ts": TERAZ}},
                           paczki_bc=bc, podsumuj_karty=False, sb_cache={5: {"players": {}}})
     assert "rozjazd" not in w2["rynki"][0]["drabinka"][0]
+
+
+# --- 8. różnica kursów w rankingu drabinek, z głową ---
+
+def _szczebel_roz(sb, bc, p_uczony=None):
+    s = {"rozjazd": {"superbet": sb, "betclic": bc, "lepszy": max(sb, bc),
+                     "gdzie": "superbet" if sb >= bc else "betclic"}}
+    if p_uczony is not None:
+        s["p_uczony"] = {"p": p_uczony}
+    return s
+
+
+def test_wartosc_rozjazdu_w_obie_strony():
+    # Superbet 1,40 (ok. 66% po marży), Betclic płaci 1,72 (58%)
+    w_bc = radar.wartosc_rozjazdu(_szczebel_roz(1.40, 1.72))
+    w_sb = radar.wartosc_rozjazdu(_szczebel_roz(1.72, 1.40))
+    assert w_bc == w_sb and w_bc > 0.07
+    assert radar.wartosc_rozjazdu(_szczebel_roz(1.70, 1.72)) == 0.0   # marża zjada
+    assert radar.wartosc_rozjazdu({}) == 0.0
+
+
+def test_model_uczony_przeczacy_zeruje_wartosc_rozjazdu():
+    # lepsza cena 1,72 = 58%; model widzi 50% -> to tańszy buk się myli
+    assert radar.wartosc_rozjazdu(_szczebel_roz(1.40, 1.72, p_uczony=0.50)) == 0.0
+    assert radar.wartosc_rozjazdu(_szczebel_roz(1.40, 1.72, p_uczony=0.60)) > 0.07

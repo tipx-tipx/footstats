@@ -407,6 +407,49 @@ PROG_POKRYCIA_HYBRYDY = 0.60
 # nie mogą stać w dwóch różnych miejscach. Osobna stała, żeby dało się stroić
 # wejście bez ruszania etykiety.
 MIN_ROZJAZD_WEJSCIA = 12.0
+# ⚑ RÓŻNICA KURSÓW W RANKINGU (2026-09-15, decyzja właściciela: „to już miało
+# być, dołóż od razu, z głową"). Do dziś rozjazd był wyłącznie przepustką
+# (hybryda) i etykietą, a karty ustawiała nasza przewaga — a ta dla drugiego
+# szczebla porządkuje trafienia na poziomie rzutu monetą (AUC 0,47–0,51,
+# księga 20.08–14.09), podczas gdy SAMA CENA porządkuje je lepiej (0,58).
+# Tak typują eksperci BET EKIPA: „reszta rynku wycenia na 1,30, a STS daje
+# 2,20" — wartość bierze się z tego, że jeden bukmacher się pomylił.
+#
+# WARTOŚĆ = szansa z OSTROŻNIEJSZEJ ceny (tańszej, po zdjęciu marży) minus
+# szansa zapłacona w LEPSZEJ cenie. Karta awansuje o nadwyżkę ponad próg.
+# Z GŁOWĄ, czyli trzy warunki, bez których rozjazd nie liczy się wcale:
+#   * obie drabinki muszą się zgadzać (`betclic.porownaj_drabinke` odrzuca
+#     przesunięte i niezgodne cenniki — inaczej „rozjazd" to dwa różne rynki),
+#   * model uczony NIE MOŻE przeczyć: jeśli widzi szansę niższą niż płaci
+#     lepsza cena, zakładamy, że to tańszy bukmacher się myli, nie drogi,
+#   * pozostałe bramy karty zostają (minuty, skład, pokrycie, drugi szczebel).
+# Efekt mierzymy stemplami w księdze (kurs_superbet/kurs_betclic/rozjazd_pp).
+PROG_WARTOSCI_ROZJAZDU = 0.02
+WAGA_WARTOSCI_ROZJAZDU = 1.0
+# ile model uczony może być poniżej ceny, zanim uznamy, że przeczy rozjazdowi
+TOLERANCJA_MODELU_ROZJAZDU = 0.02
+
+
+def wartosc_rozjazdu(szczebel: dict | None) -> float:
+    """Ile płaci lepsza cena ponad ostrożniejszą wycenę (0 = brak okazji).
+
+    Zero także wtedy, gdy model uczony widzi szansę niższą niż płaci lepsza
+    cena — patrz PROG_WARTOSCI_ROZJAZDU.
+    """
+    roz = (szczebel or {}).get("rozjazd") or {}
+    try:
+        sb, bc = float(roz.get("superbet") or 0), float(roz.get("betclic") or 0)
+    except (TypeError, ValueError):
+        return 0.0
+    if sb <= 1.0 or bc <= 1.0 or sb == bc:
+        return 0.0
+    lepszy, gorszy = max(sb, bc), min(sb, bc)
+    p_ostrozna = betting.implied_prob_one_sided(gorszy)
+    wartosc = p_ostrozna - 1.0 / lepszy
+    pu = ((szczebel or {}).get("p_uczony") or {}).get("p")
+    if pu is not None and float(pu) < 1.0 / lepszy - TOLERANCJA_MODELU_ROZJAZDU:
+        return 0.0
+    return max(0.0, round(wartosc, 4))
 # GÓRNA granica przewagi — brama zgody z rynkiem (pomiar 2026-07-27 na 336
 # rozliczonych typach modelu, patrz betting.OKNO_ZGODY_*): im mocniej nasza
 # szansa rozjeżdża się z ceną bukmachera, tym RZADZIEJ mamy rację.
@@ -1525,6 +1568,8 @@ def _oceń_karte(
                 and edge >= MIN_EDGE_SERII
                 and pokrycie >= PROG_POKRYCIA_HYBRYDY
                 and float(_roz.get("roznica_pp") or 0.0) >= MIN_ROZJAZD_WEJSCIA
+                # model uczony nie może przeczyć (patrz wartosc_rozjazdu)
+                and wartosc_rozjazdu(s) > 0.0
             )
             # ⚑ PRZEWAGA NIE JEST JUŻ BRAMĄ DLA KARTY (patrz BRAMA_PRZEWAGI).
             # Dla SZCZEBLA POMIAROWEGO zostaje — on nie trafia na stronę, tylko
@@ -1639,6 +1684,11 @@ def _oceń_karte(
             # zarabiają (patrz OKNO_CENY_PREF_*) — kolejność, nie brama
             if OKNO_CENY_PREF_OD <= s["kurs"] <= OKNO_CENY_PREF_DO:
                 ocena += BONUS_OKNA_CENY
+            # różnica kursów między bukmacherami — lepszy z pary szczebli
+            _w_roz = max(wartosc_rozjazdu(s), wartosc_rozjazdu(nast))
+            if _w_roz > PROG_WARTOSCI_ROZJAZDU:
+                ocena += WAGA_WARTOSCI_ROZJAZDU * (_w_roz - PROG_WARTOSCI_ROZJAZDU)
+            trafiony["wartosc_rozjazdu"] = round(_w_roz, 3)
             if pomiarowy:
                 if ocena > pomiar_score:
                     pomiar_score, pomiar_s = ocena, trafiony

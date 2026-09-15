@@ -455,6 +455,9 @@ export interface RadarWpis {
     bukmacher?: string | null;
     traf: number;
     z: number;
+    /** ile lepsza cena płaci ponad ostrożniejszą wycenę drugiego bukmachera
+     *  (0–1, backend `radar.wartosc_rozjazdu`); > 0,02 podnosi kartę w rankingu */
+    wartosc_rozjazdu?: number;
     /** przewaga nad kursem: p_final − 1/kurs */
     edge: number;
     p_final?: number | null;
