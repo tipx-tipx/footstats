@@ -5887,9 +5887,16 @@ def _main_impl(tryb=None):
             _wypadli_z_gry.add(_t.player_id)
 
     for tr in trends:
-        if (tr.player_id, tr.market_code) in seen_player_market:
+        # ⚑ KLUCZ Z MECZEM (2026-09-16). Dotąd (zawodnik, rynek) — a biblioteka
+        # banku przepina trend na KAŻDY nadchodzący mecz drużyny, więc klub
+        # z dwoma meczami w oknie (liga + puchar) dostawał typy tylko na ten
+        # przetworzony jako pierwszy; drugi mecz wypadał tu bez śladu (audyt
+        # 16.09: Athletic, Flamengo, Santos, Juventus — setki par z kursem bez
+        # wpisu). Dublet statshuba w TYM SAMYM meczu dalej odpada.
+        _klucz_sc = (getattr(tr, "event_id", None) or 0, tr.player_id, tr.market_code)
+        if _klucz_sc in seen_player_market:
             continue
-        seen_player_market.add((tr.player_id, tr.market_code))
+        seen_player_market.add(_klucz_sc)
         # mecz zawodnika: po jego drużynie i przeciwniku
         ev = next((e for e in events
                    if {e.get("homeTeamId"), e.get("awayTeamId")}
