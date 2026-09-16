@@ -30,7 +30,6 @@ def _etykiety_frontu() -> set[str]:
 
 def test_kazdy_powod_pipeline_ma_etykiete_na_froncie():
     powody = _powody_pipeline()
-    assert "bez_dowodu_miekkiej_linii" in powody, "wpis z audytu 16.09 zniknął z pętli"
     assert "rzadko_w_pierwszym_skladzie" in powody
     etykiety = _etykiety_frontu()
     # powody z widełek drużynowych front zna pod tymi samymi kodami; powody

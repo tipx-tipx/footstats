@@ -6559,27 +6559,18 @@ def _main_impl(tryb=None):
                 if fw_a else None
             )
             miekka_a = oczek_a is not None and kurs_wziety >= oczek_a * 1.12
-            if not odstaje_zewn and not miekka_a:
-                # ⚑ NAJWIĘKSZE CICHE WYJŚCIE LEJKA ZAWODNICZEGO (2026-09-16).
-                # Para przeszła WSZYSTKIE bramy modelu (profil, historia, skład,
-                # minuty) i weszła do puli, a tu wypadała bez śladu — audyt
-                # 16.09: 1167 par z kursem Superbetu bez wpisu w rejestrze,
-                # ~1000 z nich tędy. Rejestr ma odpowiadać „czemu nie ma typu",
-                # a to jest brama WARTOŚCI (dowód miękkiej linii), nie
-                # trafności — właściciel musi widzieć, ile na niej ginie.
-                # Gdy leg zostanie w puli kuponów, wpis zamieni się niżej na
-                # „tylko_w_puli" (patrz domknięcie rejestru).
-                _uk = (f"UK płaci uczciwie {kurs_novig:.2f}, wartość "
-                       f"{ev_uk:+.1f}% przy progu {PROG_EV_UK:.0f}%"
-                       if ev_uk is not None and kurs_novig
-                       else "brak konsensusu UK na tej linii")
-                _wewn = (f"własna siatka oczekuje {oczek_a:.2f} (miękka od "
-                         f"{oczek_a * 1.12:.2f})" if oczek_a
-                         else "za mało linii, by policzyć własną siatkę")
-                _odrzuc(mid, tr, "bez_dowodu_miekkiej_linii",
-                        (f"kurs {kurs_wziety:.2f} nie odstaje od rynku: "
-                         f"{_uk}; {_wewn}").replace(".", ","))
-                continue
+            # ⚑ DOWÓD MIĘKKIEJ LINII NIE JEST JUŻ BRAMĄ (decyzja właściciela
+            # 2026-09-16). Do dziś typ zawodniczy powstawał TYLKO, gdy Superbet
+            # płacił ≥ PROG_EV_UK ponad no-vig UK albo ≥ 12% ponad własną siatkę
+            # linii — czyli warunek WARTOŚCI, w jedną stronę, postawiony PO
+            # wszystkich bramach analizy. Audyt 16.09: ~1000 par na cykl
+            # przechodziło profil, historię, skład i minuty i ginęło tu bez
+            # śladu. Cel produktu to TRAFNOŚĆ ([[cel-produktu-to-trafnosc]]),
+            # a drabinki od 28.07 stoją na zasadzie „analiza pierwsza, cena
+            # drugą: dowód, nie przepustka" — lista dnia dostaje tę samą.
+            # Cena zostaje STEMPLEM: `miekka_linia` / `kurs_oczekiwany` jadą do
+            # księgi, a kategoria `miekka_linia` w rozliczeniach mierzy od
+            # pierwszego cyklu, czy typy z dowodem trafiają inaczej niż bez.
             rec_okazji = {
                 "id": vb_id, "mecz_id": mid, "mecz": match_label, "kickoff_ts": ts,
                 "podmiot_typ": "zawodnik", "podmiot_id": tr.player_id,

@@ -38,7 +38,8 @@ export const POWOD_LABEL: Record<string, string> = {
   rozjazd_z_rynkiem: "Model za daleko od kursu bukmachera",
   // audyt 16.09: ~1000 par zawodniczych na cykl przechodziło wszystkie bramy
   // modelu i ginęło bez śladu na dowodzie miękkiej linii (wartość vs UK
-  // albo vs własna siatka linii). Teraz mają wpis — i etykietę.
+  // albo vs własna siatka linii). Tego samego dnia brama zdjęta decyzją
+  // właściciela; etykieta zostaje dla dumpów z kilku cykli, które ją niosą.
   bez_dowodu_miekkiej_linii: "Kurs nie odstaje od rynku, brak dowodu miękkiej linii",
   kurs_lub_szansa_poza_widelkami: "Kurs i szansa nie składają się w grywalny typ",
   // ten sam warunek rozbity na trzy (2026-07-27) – dla rynków drużynowych to
