@@ -86,3 +86,13 @@ def test_przy_ciasnym_budzecie_pierwszy_idzie_ten_kto_gra(monkeypatch):
                 _trend("tackles", [200, 230], player_id=2)]
     B.odswiez_stare_trendy(calkiem_martwy + mieszany, TERAZ, budzet=1)
     assert wyw == [2]
+
+
+def test_budzet_idzie_najpierw_na_najblizszy_mecz(monkeypatch):
+    wyw: list = []
+    _podepnij(monkeypatch, wyw)
+    daleki = [_trend("shots", [2, 9, 16, 23], player_id=1), _trend("tackles", [200, 230], player_id=1)]
+    bliski = [_trend("shots", [2, 9, 16, 23], player_id=2), _trend("tackles", [200, 230], player_id=2)]
+    B.odswiez_stare_trendy(daleki + bliski, TERAZ, budzet=1,
+                           kickoff={1: TERAZ + 5 * DZIEN, 2: TERAZ + 3600})
+    assert wyw == [2]

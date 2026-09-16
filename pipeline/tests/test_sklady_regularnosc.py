@@ -234,3 +234,15 @@ def test_unia_wystepow_sklejona_po_zawodniku():
     assert set(slownik) == {1, 2}
     assert len(slownik[1].timestamps) == 2 and len(slownik[2].timestamps) == 2
     assert radar.polacz_wystepy([]) is None
+
+
+def test_okno_startow_nie_siega_zeszlego_sezonu():
+    """Golovin 16.09: 5 z 6 meczów od sierpnia, a brama widziała 5 z 10,
+    bo cztery mecze sprzed 120 dni liczyły się jak opuszczone."""
+    stare = [TERAZ - (130 + 7 * i) * DZIEN for i in range(4)]     # zeszły sezon
+    kal = {KLUB: [TERAZ - (1 + 7 * i) * DZIEN for i in range(6)] + stare}
+    tr = _trend([1, 8, 15, 22, 29])                                 # 5 z 6 nowych
+    assert radar.udzial_startow(tr, kalendarz=kal, teraz=TERAZ) == 5 / 6
+    # a gdy w oknie jest za mało meczów drużyny, wraca stara miara z występów
+    kal2 = {KLUB: [TERAZ - DZIEN, TERAZ - 8 * DZIEN] + stare}
+    assert radar.udzial_startow(tr, kalendarz=kal2, teraz=TERAZ) == 1.0

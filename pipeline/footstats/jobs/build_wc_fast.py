@@ -2118,6 +2118,9 @@ MAX_PERF_CYKL = 220                 # budżet zapytań /player/{id}/performance
 #   164 zawodników z martwą próbą (dry-run 2026-07-26); koszt ~0,26 s na
 #   zapytanie, więc pełne pokrycie to ~45 s w cyklu chodzącym co 30 min.
 
+MAX_PERF_BANK = 300                 # druga runda ratunku, po bibliotece banku
+#   (2026-09-16): kolejka po banku ma tysiące martwych trendów, budżet idzie
+#   najpierw na najbliższe mecze; ~0,26 s/zapytanie = ~80 s w cyklu.
 MAX_PERF_OFERTA = 900               # osobny budżet na dopełnianie OFERTY
 #   bukmachera (patrz dopelnij_oferte_zawodnicza). Płacimy tylko za
 #   zawodników z meczów, w których bukmacher realnie kwotuje zawodników —
@@ -2229,7 +2232,8 @@ def swiezosc_proby(
 
 
 def odswiez_stare_trendy(
-    trends: list, now: int, budzet: int = MAX_PERF_CYKL
+    trends: list, now: int, budzet: int = MAX_PERF_CYKL,
+    kickoff: dict[int, int] | None = None,
 ) -> tuple[int, int]:
     """Dociągnij prawdziwą historię zawodnikom, których feed propsów ma martwą.
 
@@ -2279,11 +2283,15 @@ def odswiez_stare_trendy(
         return 0, 0
     # kolejność przy ciasnym budżecie: najpierw zawodnicy, którzy MAJĄ żywy
     # rynek (grają — performance na pewno coś odda), potem ci z całkiem
-    # martwą próbą (często naprawdę nie grają); w obu grupach więksi najpierw,
-    # bo jedno zapytanie ratuje tam najwięcej kandydatów naraz
+    # martwą próbą (często naprawdę nie grają). W obu grupach: NAJBLIŻSZY
+    # kickoff pierwszy (log 16.09 13:02: po bibliotece banku kolejka miała
+    # 3727 zawodników, budżet uciął 3507 — bez priorytetu terminu ratowaliśmy
+    # mecze za pięć dni, a dzisiejsze szły na `za_stara_historia`), potem
+    # więksi najpierw, bo jedno zapytanie ratuje tam najwięcej kandydatów.
+    _kick = kickoff or {}
     kolejka = sorted(
         stare.items(),
-        key=lambda kv: (not ma_zywy[kv[0]], -len(kv[1])),
+        key=lambda kv: (not ma_zywy[kv[0]], _kick.get(kv[0], 1 << 40), -len(kv[1])),
     )[:budzet]
     n_mieszanych = sum(1 for pid in stare if ma_zywy[pid])
     n_graczy = n_trendow = 0
@@ -4351,7 +4359,14 @@ def _main_impl(tryb=None):
             # odbiory) powstają DOPIERO tutaj i szli na `za_stara_historia`
             # (847 par z kursem). Ratunek jest per rynek, więc żywe rynki nic
             # nie kosztują, a odratowani z pierwszej rundy już są świeży.
-            _odr_g, _odr_t = odswiez_stare_trendy(trends, int(time.time()))
+            _kick_ev = {e["id"]: int(e.get("timeStartTimestamp") or 0) for e in wszystkie_ev}
+            _kick_pid: dict[int, int] = {}
+            for _t in trends:
+                _k = _kick_ev.get(getattr(_t, "event_id", None))
+                if _k and (_t.player_id not in _kick_pid or _k < _kick_pid[_t.player_id]):
+                    _kick_pid[_t.player_id] = _k
+            _odr_g, _odr_t = odswiez_stare_trendy(
+                trends, int(time.time()), budzet=MAX_PERF_BANK, kickoff=_kick_pid)
             if _odr_g:
                 print(f"Biblioteka historii: ratunek per rynek odświeżył "
                       f"{_odr_g} zawodników ({_odr_t} trendów z banku)")

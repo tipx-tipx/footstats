@@ -625,6 +625,7 @@ TOLERANCJA_MECZU_S = 4 * 3600
 # w starej mierze (5), bo tu każdy mecz jest rozstrzygnięty („był w XI" albo
 # „nie było go"), a nie tylko „zagrał ileś minut"
 MIN_MECZOW_DRUZYNY = 3
+OKNO_STARTOW_S = 120 * 86400     # jak OKNO_SWIEZEJ_PROBY_S — nie liczymy zeszłego sezonu
 # Kalendarz drużyny, którego najnowszy rozegrany mecz jest o tyle starszy niż
 # najnowszy występ zawodnika, jest NIEAKTUALNY (magazyn nie odświeżył klubu)
 # i nie może rozstrzygać o startach — patrz `dopelnij_meczami_druzyny`.
@@ -660,7 +661,17 @@ def dopelnij_meczami_druzyny(
         return None
     # rozegrane = zaczęły się ponad 3 h temu (magazyn ma też mecze przyszłe
     # dopisane z terminarza, bez statystyk)
-    rozegrane = sorted((t for t in ts_dr if t <= teraz - 3 * 3600), reverse=True)[:okno]
+    # ⚑ OKNO STARTÓW NIE SIĘGA ZESZŁEGO SEZONU (2026-09-16). „Ostatnie 10
+    # meczów drużyny" po sześciu kolejkach nowego sezonu zahaczało o maj:
+    # Golovin (Monaco) grał 5 z 6 meczów od sierpnia, a brama widziała
+    # 5 z 10, bo trzy majowe mecze (kontuzja) i jeden z lipca liczyły się
+    # jak opuszczone. Okno to te same 120 dni, co świeżość próby zawodnika
+    # (`OKNO_SWIEZEJ_PROBY_S` w build_wc_fast) — minimum MIN_MECZOW_DRUZYNY
+    # zostaje, więc na starcie sezonu miara wraca do samych występów.
+    rozegrane = sorted(
+        (t for t in ts_dr if teraz - OKNO_STARTOW_S <= t <= teraz - 3 * 3600),
+        reverse=True,
+    )[:okno]
     if not rozegrane:
         return None
     wystepy = [
