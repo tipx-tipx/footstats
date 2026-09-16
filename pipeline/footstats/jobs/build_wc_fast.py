@@ -5825,12 +5825,22 @@ def _main_impl(tryb=None):
     # karty drabinek (patrz `scal_karty_z_publikacjami`)
     _wypadli_z_gry: set = set()
     _teraz_kal = int(time.time())
+    # ⚑ BRAMY SKŁADU LICZĄ Z UNII WYSTĘPÓW ZE WSZYSTKICH RYNKÓW (2026-09-16).
+    # Trend jednego rynku z feedu propsów zna tylko mecze, w których ten
+    # rynek kwotowano — „celne" Diera widziały 2 mecze sezonu, „strzały" 6,
+    # i ten sam starter raz przechodził, raz wylatywał jako „rzadko w XI"
+    # (451 par z kursem w audycie). Patrz `radar.polacz_wystepy`.
+    _wystepy_gracza = radar.wystepy_zawodnikow(trends)
+
+    def _wystepy(tr_w):
+        return _wystepy_gracza.get(tr_w.player_id) or tr_w
+
     for _t in trends:
         if _t.player_id in _wypadli_z_gry or _t.in_predicted_lineup:
             continue
-        _u = radar.udzial_startow(_t, kalendarz=_kalendarz_druzyn, teraz=_teraz_kal)
+        _u = radar.udzial_startow(_wystepy(_t), kalendarz=_kalendarz_druzyn, teraz=_teraz_kal)
         if ((_u is not None and _u < radar.MIN_UDZIAL_STARTOW)
-                or radar.nie_gral_ostatnio(_t, _kalendarz_druzyn, _teraz_kal) is True):
+                or radar.nie_gral_ostatnio(_wystepy(_t), _kalendarz_druzyn, _teraz_kal) is True):
             _wypadli_z_gry.add(_t.player_id)
 
     for tr in trends:
@@ -5954,7 +5964,7 @@ def _main_impl(tryb=None):
         # czego jego docstring wymagał od początku. Intensywność (counts)
         # zostaje z meczów rozegranych.
         _teraz_p = int(time.time())
-        _dop_dr = radar.dopelnij_meczami_druzyny(tr, _kalendarz_druzyn, _teraz_p)
+        _dop_dr = radar.dopelnij_meczami_druzyny(_wystepy(tr), _kalendarz_druzyn, _teraz_p)
         if _dop_dr:
             hist.historia_druzyny = (
                 _dop_dr[0], _dop_dr[1],
@@ -6009,9 +6019,9 @@ def _main_impl(tryb=None):
         # `radar.MIN_UDZIAL_STARTOW`). Oba pola jadą do typu: lista dnia
         # (6:00) układa nimi zawodników, gdy składów jeszcze nie ma.
         udzial_klub = radar.udzial_startow(
-            tr, kalendarz=_kalendarz_druzyn, teraz=_teraz_p)
+            _wystepy(tr), kalendarz=_kalendarz_druzyn, teraz=_teraz_p)
         gral_w_ostatnim = radar.gral_w_ostatnim_meczu(
-            tr, _kalendarz_druzyn, _teraz_p,
+            _wystepy(tr), _kalendarz_druzyn, _teraz_p,
             ostatni_ts=ostatni_mecz_druzyny.get(tr.team_id or -1))
         if (xi_sygnal is None and udzial_klub is not None
                 and udzial_klub < radar.MIN_UDZIAL_STARTOW):
@@ -6022,7 +6032,7 @@ def _main_impl(tryb=None):
             _wypadli_z_gry.add(tr.player_id)
             continue
         if (xi_sygnal is None
-                and radar.nie_gral_ostatnio(tr, _kalendarz_druzyn, _teraz_p) is True):
+                and radar.nie_gral_ostatnio(_wystepy(tr), _kalendarz_druzyn, _teraz_p) is True):
             _odrzuc(mid, tr, "nie_gral_w_ostatnich_meczach",
                     f"nie zagrał ani minuty w {radar.OKNO_NIEOBECNOSCI} ostatnich "
                     "meczach drużyny (kontuzja, odsunięcie albo transfer)")

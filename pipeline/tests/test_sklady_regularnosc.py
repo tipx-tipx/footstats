@@ -205,3 +205,32 @@ def test_dopisz_dolozone_tylko_do_domknietych_dob():
     assert manifest["2026-09-14"]["klucze"] == ["a", "b"]
     assert manifest["2026-09-15"] == {"klucze": ["z"]}
     assert "2026-09-16" not in manifest
+
+
+def _trend_rynku(mk, grane_dni, minuty=90):
+    tr = _trend(grane_dni, minuty=minuty)
+    tr.market_code = mk
+    return tr
+
+
+def test_udzial_startow_z_unii_rynkow_nie_z_jednego_feedu():
+    """Dier 16.09: „celne" z feedu znały 2 mecze sezonu, „strzały" 6 —
+    brama liczona na jednym rynku wyrzucała startera, który grał wszystko."""
+    celne = _trend_rynku("sot", [1, 8])                       # feed UK: 2 kwotowane
+    strzaly = _trend_rynku("shots", [1, 8, 15, 22, 29, 36])   # performance: komplet
+    assert radar.udzial_startow(celne, kalendarz=KALENDARZ, teraz=TERAZ) == 0.2
+    unia = radar.polacz_wystepy([celne, strzaly])
+    assert radar.udzial_startow(unia, kalendarz=KALENDARZ, teraz=TERAZ) == 0.6
+    # ten sam mecz w dwóch rynkach liczy się RAZ, a nie dwa razy
+    assert len(unia.timestamps) == 6
+    assert unia.market_code == "shots"            # baza = najdłuższa historia
+    assert radar.nie_gral_ostatnio(unia, KALENDARZ, TERAZ) is False
+
+
+def test_unia_wystepow_sklejona_po_zawodniku():
+    a = _trend_rynku("sot", [1, 8]); b = _trend_rynku("shots", [1, 15])
+    b.player_id = 2
+    slownik = radar.wystepy_zawodnikow([a, b])
+    assert set(slownik) == {1, 2}
+    assert len(slownik[1].timestamps) == 2 and len(slownik[2].timestamps) == 2
+    assert radar.polacz_wystepy([]) is None

@@ -32,6 +32,7 @@ import re
 import time
 import unicodedata
 from collections import Counter, defaultdict
+from dataclasses import replace as dc_replace
 
 import numpy as np
 
@@ -718,6 +719,70 @@ def dopelnij_meczami_druzyny(
         minuty.append(traf[2] if traf else 0.0)
         kiedy.append(t)
     return started, minuty, kiedy
+
+
+def polacz_wystepy(trendy: list) -> statshub.StatshubTrend | None:
+    """Jeden trend z WSZYSTKIMI występami zawodnika, zebranymi ze wszystkich
+    jego rynków — do bram składu (udział startów, „nie grał ostatnio").
+
+    ⚑ PO CO (2026-09-16, audyt lejka). Feed propsów daje historię rynku
+    TYLKO z meczów, w których bukmacherzy UK ten rynek kwotowali. Eric Dier
+    (Monaco): „celne" z feedu znały 2 mecze tego sezonu, „strzały" z
+    performance — wszystkie 6. Brama liczona na trendzie „celnych" widziała
+    2 z 10 meczów drużyny i wyrzucała starter, który nie opuścił ani jednego.
+    Zmierzone na parach z kursem Superbetu: 451 par „rzadko w XI", w których
+    unia rynków tego samego zawodnika ma ≥5 występów w 120 dniach.
+
+    Występ jest jeden, niezależnie od tego, ile rynków go zna: mecze sklejamy
+    po znaczniku czasu (tolerancja jak przy kalendarzu), start = którykolwiek
+    rynek mówi „start", minuty = najwięcej, co którykolwiek widział. Bazą
+    jest trend z najdłuższą historią, więc kontekst (drużyna, rywal, sygnał
+    składu) zostaje. Liczniki (`counts`) idą z bazy, a dla meczów spoza niej
+    zero — bramy składu ich nie czytają; do prognozy dalej idzie trend rynku.
+    """
+    trendy = [t for t in (trendy or []) if t is not None]
+    if not trendy:
+        return None
+    baza = max(trendy, key=lambda t: len(t.timestamps or []))
+    if len(trendy) == 1:
+        return baza
+    mecze: list[list] = []   # [ts, started, minutes, count]
+    for t in trendy:
+        n = min(len(t.timestamps or []), len(t.minutes or []))
+        st = list(t.started or [])
+        cn = list(t.counts or [])
+        for i in range(n):
+            ts = int(t.timestamps[i] or 0)
+            if not ts:
+                continue
+            m = float(t.minutes[i] or 0.0)
+            s = bool(st[i]) if i < len(st) else m >= 60.0
+            c = float(cn[i]) if (t is baza and i < len(cn)) else 0.0
+            traf = next((w for w in mecze if abs(w[0] - ts) <= TOLERANCJA_MECZU_S), None)
+            if traf is None:
+                mecze.append([ts, s, m, c])
+            else:
+                traf[1] = traf[1] or s
+                traf[2] = max(traf[2], m)
+                if t is baza:
+                    traf[3] = c
+    mecze.sort(key=lambda w: -w[0])
+    return dc_replace(
+        baza,
+        timestamps=[w[0] for w in mecze],
+        started=[w[1] for w in mecze],
+        minutes=[w[2] for w in mecze],
+        counts=[w[3] for w in mecze],
+    )
+
+
+def wystepy_zawodnikow(trends: list) -> dict[int, statshub.StatshubTrend]:
+    """{player_id: trend z unią występów} dla całej listy trendów cyklu."""
+    per: dict[int, list] = {}
+    for t in trends or []:
+        if t is not None and t.player_id:
+            per.setdefault(t.player_id, []).append(t)
+    return {pid: polacz_wystepy(ich) for pid, ich in per.items()}
 
 
 def udzial_startow(
@@ -2351,10 +2416,14 @@ def zbuduj(
                 # w 9 z 10 ostatnich"), zamiast samej średniej minut
                 # ⚑ względem MECZÓW DRUŻYNY, gdy znamy jej kalendarz —
                 # rezerwowy z trzema pełnymi występami nie jest starterem
+                # ⚑ z UNII występów ze wszystkich rynków (2026-09-16) — jeden
+                # rynek z feedu zna tylko mecze, które kwotowano
                 "udzial_startow": udzial_startow(
-                    tr_ref, kalendarz=kalendarz_druzyn, teraz=teraz),
+                    polacz_wystepy(list(trendy_mk.values())) or tr_ref,
+                    kalendarz=kalendarz_druzyn, teraz=teraz),
                 "nie_gral_ostatnio": nie_gral_ostatnio(
-                    tr_ref, kalendarz_druzyn, teraz),
+                    polacz_wystepy(list(trendy_mk.values())) or tr_ref,
+                    kalendarz_druzyn, teraz),
                 "rodzaj": (
                     "transfer" if transfer else
                     "forma" if forma else "drabinka"
