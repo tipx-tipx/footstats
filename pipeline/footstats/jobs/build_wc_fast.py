@@ -2237,20 +2237,39 @@ def odswiez_stare_trendy(
     for t in trends:
         if t.player_id:
             per_gracz.setdefault(t.player_id, []).append(t)
-    # ratujemy zawodnika, którego ŻADEN rynek nie ma świeżej próby — gdy choć
-    # jeden ma, historia z feedu żyje i nie ma czego podmieniać
-    stare = {
-        pid: ich for pid, ich in per_gracz.items()
-        if all(
-            swiezosc_proby(t.timestamps, t.minutes, now)[0] < MIN_MECZE_W_OKNIE
-            for t in ich
-        )
-    }
+    # ⚑ ŚWIEŻOŚĆ JEST PER RYNEK, NIE PER ZAWODNIK (2026-09-16). Feed propsów
+    # daje historię rynku TYLKO z meczów, w których bukmacherzy UK ten rynek
+    # kwotowali — strzały Wilsona (Brentford) miały mecz sprzed doby, a jego
+    # odbiory i faule „0 występów w 4 miesiącach", bo tych rynków nikt nie
+    # wystawiał od wiosny. Dotąd ratowaliśmy WYŁĄCZNIE zawodnika, którego
+    # żaden rynek nie miał świeżej próby, więc taki „mieszany" przechodził
+    # obok: audyt 16.09 — 847 par z kursem Superbetu (299 zawodników, którzy
+    # realnie grają) odrzuconych jako `za_stara_historia`. Ratujemy więc
+    # KAŻDY martwy trend, podmieniając tylko jego — rynki żywe zostają
+    # z feedu (mają dłuższą historię niż 10 meczów z performance).
+    # Rynki pochodne (zza pola / głową) i tak wymagają shotmap — te dalej
+    # omijamy (`continue` niżej), bo performance ich nie zna.
+    stare: dict[int, list] = {}
+    ma_zywy: dict[int, bool] = {}
+    for pid, ich in per_gracz.items():
+        martwe = [
+            t for t in ich
+            if swiezosc_proby(t.timestamps, t.minutes, now)[0] < MIN_MECZE_W_OKNIE
+        ]
+        if martwe:
+            stare[pid] = martwe
+            ma_zywy[pid] = len(martwe) < len(ich)
     if not stare:
         return 0, 0
-    # najpierw zawodnicy z największą liczbą rynków — jedno zapytanie ratuje
-    # tam najwięcej kandydatów naraz
-    kolejka = sorted(stare.items(), key=lambda kv: -len(kv[1]))[:budzet]
+    # kolejność przy ciasnym budżecie: najpierw zawodnicy, którzy MAJĄ żywy
+    # rynek (grają — performance na pewno coś odda), potem ci z całkiem
+    # martwą próbą (często naprawdę nie grają); w obu grupach więksi najpierw,
+    # bo jedno zapytanie ratuje tam najwięcej kandydatów naraz
+    kolejka = sorted(
+        stare.items(),
+        key=lambda kv: (not ma_zywy[kv[0]], -len(kv[1])),
+    )[:budzet]
+    n_mieszanych = sum(1 for pid in stare if ma_zywy[pid])
     n_graczy = n_trendow = 0
     for pid, ich in kolejka:
         try:
@@ -2287,7 +2306,8 @@ def odswiez_stare_trendy(
             n_trendow += podmienione
     pominieto = max(0, len(stare) - len(kolejka))
     print(f"Historia spoza feedu propsów: {len(stare)} zawodników z martwą "
-          f"próbą, odratowano {n_graczy} ({n_trendow} trendów)"
+          f"próbą (w tym {n_mieszanych} z żywym innym rynkiem), odratowano "
+          f"{n_graczy} ({n_trendow} trendów)"
           + (f", budżet uciął {pominieto}" if pominieto else ""))
     return n_graczy, n_trendow
 
