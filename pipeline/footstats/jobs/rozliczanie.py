@@ -1291,7 +1291,7 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
                     "p_bazowe", "korekta",
                     "minuty_sr6", "udzial_startow",
                     "rodzaj_karty", "kategoria_karty", "klasa_karty",
-                    "pozycja", "xi",
+                    "pozycja", "xi", "sito",
                     # obie ceny i miejsce karty (2026-09-15) — patrz
                     # `_charakter_drabinki` w cyklu
                     "kurs_superbet", "kurs_betclic", "rozjazd_pp",

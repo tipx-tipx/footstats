@@ -293,6 +293,32 @@ MIN_PROBA_SCORE = 8         # min. występów w próbie (było 5 — za krótkie
 # progu, a na braku przewagi tylko 4 — czyli lista była krótka nie dlatego,
 # że typy są słabe, tylko dlatego, że bramka pytała o złą rzecz.
 PROG_POKRYCIA_KARTY = 0.5
+
+# ⚑ SITO (2026-09-16, decyzja właściciela: „problemem nie jest wyszukiwarka,
+# tylko sito"). Pierwszy szczebel ma być NAJWYŻSZĄ linią, którą zawodnik
+# realnie pokrywa, a nie linią najhojniej wycenioną przez bukmachera. Pomiar
+# na księdze 20.08–14.09 (113 kart hero z pełnymi cechami) i na 51 typach
+# BET EKIPY rozliczonych naszymi danymi:
+#
+#     nasze karty                         n    trafia   cena
+#     pokrycie ≥0,7 & minuty ≥80          66    62,1%   60,6%
+#       … & kurs ≥1,8                      9    77,8%   53,2%
+#       … & p modelu ≥0,45 & kurs ≥1,8     7    85,7%   52,7%
+#     pokrycie 0,6–0,7                    17    41,2%   58,9%
+#     minuty <85                          56    44,6%   60,4%
+#     BET EKIPA: pokrycie10 ≥7            10    70,0%   48,3%
+#     BET EKIPA: pokrycie <7              41    39,0%   46,5%
+#
+# Dotychczasowy wybór po przewadze `p_final − 1/kurs` dawał 58% kart w paśmie
+# 1,55–1,80 i 53% trafień przy cenie 62% ([[drabinki-liczba-jest-odwrotna]]:
+# przewaga nad ceną porządkuje ODWROTNIE). Sito nie jest bramą — karta bez
+# linii sitowej dalej powstaje, ale w rankingu stoi ZA kartami sitowymi.
+PROG_POKRYCIA_SITA = 0.70    # 7 z 10 na wybranej linii
+MIN_MINUT_SITA = 80          # średnia z 6 ostatnich
+MIN_UDZIAL_SITA = 0.80       # startów w meczach drużyny (albo XI ogłoszone)
+MIN_P_MODELU_SITA = 0.45     # gdy silnik policzył tę linię
+MAX_KURS_SITA = 2.60         # powyżej: 2,6+ trafia 18% przy cenie 31%
+BONUS_SITA = 1.0             # w jednostkach przewagi — karta sitowa zawsze przed niesitową
 # PRÓG ZOSTAJE NA 0.5 mimo zgłoszenia „drabinki są randomowe" (2026-07-27).
 # Podniesienie go na 0.65 wycięłoby kartę, którą user wskazał jako DOBRĄ
 # (Marcel Regula, strzały 2,5 @2,05 przy pokryciu 6/10 = 0,60). Szum, o który
@@ -1519,6 +1545,7 @@ def _oceń_karte(
     # przewagę (patrz MIN_EDGE_SERII), więc próg 0,0 wycinałby dokładnie te
     # karty, dla których druga ścieżka powstała
     best_score, best_s = float("-inf"), None
+    best_klucz: tuple = (-1, 0.0, float("-inf"))
     pomiar_score, pomiar_s = float("-inf"), None
     lokalne: Counter = Counter()
     for r in w.get("rynki", []):
@@ -1779,11 +1806,28 @@ def _oceń_karte(
             if _w_roz > PROG_WARTOSCI_ROZJAZDU:
                 ocena += WAGA_WARTOSCI_ROZJAZDU * (_w_roz - PROG_WARTOSCI_ROZJAZDU)
             trafiony["wartosc_rozjazdu"] = round(_w_roz, 3)
+            # SITO — patrz nota przy PROG_POKRYCIA_SITA. W obrębie karty
+            # wygrywa NAJWYŻSZA linia sitowa (rosnąca linia = rosnący kurs,
+            # a sito pilnuje, że pokrycie tej linii jest realne), między
+            # kartami sitowa zawsze przed niesitową, dalej dotychczasowa ocena.
+            sito = (
+                not pomiarowy
+                and pokrycie >= PROG_POKRYCIA_SITA
+                and p["z"] >= MIN_PROBA_SCORE
+                and (w.get("minuty_sr6") or 0) >= MIN_MINUT_SITA
+                and (udzial is None or udzial >= MIN_UDZIAL_SITA
+                     or w.get("xi") is True)
+                and (p_mod is None or float(p_mod) >= MIN_P_MODELU_SITA)
+                and s["kurs"] <= MAX_KURS_SITA
+            )
+            trafiony["sito"] = sito
+            klucz =(1 if sito else 0, float(s["kurs"]) if sito else 0.0, ocena)
             if pomiarowy:
                 if ocena > pomiar_score:
                     pomiar_score, pomiar_s = ocena, trafiony
-            elif ocena > best_score:
-                best_score, best_s = ocena, trafiony
+            elif best_s is None or klucz > best_klucz:
+                best_klucz, best_s = klucz, trafiony
+                best_score = ocena + (BONUS_SITA if sito else 0.0)
     if pomiar_out is not None and pomiar_s is not None:
         pomiar_out.append(pomiar_s)
     if powody is not None and best_s is None:
@@ -2784,6 +2828,9 @@ def zbuduj(
             # Front pisze to wprost — karta bez przewagi nie ma prawa
             # wyglądać jak karta z przewagą.
             "powod_wejscia": hero.get("powod_wejscia") or "przewaga",
+            # SITO (2026-09-16): pokrycie ≥7/10 na tej linii, minuty ≥80,
+            # udział startów, szansa modelu — front pokazuje to zdaniem
+            "sito": bool(hero.get("sito")),
             "p_final": hero.get("p_final"),
             "p_bazowe": hero.get("p_bazowe"),
             "korekta": hero.get("korekta"),

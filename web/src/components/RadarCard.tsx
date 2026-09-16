@@ -1217,6 +1217,9 @@ export const RadarCard = memo(function RadarCard({
           badge: "bg-data-red-wash text-data-red-ink",
         }
       : null,
+    w.ocena?.sito
+      ? { label: "przez sito", badge: "bg-paper text-ink-soft" }
+      : null,
     w.ocena?.powod_wejscia === "seria"
       ? { label: "mocna seria", badge: "bg-paper text-ink-soft" }
       : null,
@@ -1502,10 +1505,23 @@ export const RadarCard = memo(function RadarCard({
                           telefonie, a bez tych zdań etykiety typu „lepsza
                           cena" są dla postronnej osoby zgadywanką. */}
                       {(kat ||
+                        w.ocena?.sito ||
                         w.ocena?.powod_wejscia === "seria" ||
                         w.ocena?.powod_wejscia === "pokrycie" ||
                         w.xi === true) && (
                         <ul className="mt-2 space-y-1.5 text-[12px] leading-relaxed text-muted">
+                          {w.ocena?.sito && (
+                            <li>
+                              <span className="font-medium text-ink-soft">
+                                przez sito:
+                              </span>{" "}
+                              to najwyższa linia, którą zawodnik realnie
+                              pokrywa – przebił ją w co najmniej 7 z 10
+                              ostatnich meczów, gra po 80+ minut i regularnie
+                              zaczyna, a nasz model nie mówi inaczej. Kurs
+                              jest tu dodatkiem, nie powodem.
+                            </li>
+                          )}
                           {kat && (
                             <li>
                               <span className="font-medium text-ink-soft">

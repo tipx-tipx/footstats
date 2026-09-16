@@ -929,3 +929,52 @@ def test_szczebel_za_drobne_po_sufit_linii():
     zd = r.get("za_drobne")
     assert zd and zd["linia"] == 3.5 and zd["kurs"] == 3.4
     assert zd["pokrycie"]["z"] == 10
+
+
+# --- SITO (2026-09-16): najwyższa linia, którą zawodnik realnie pokrywa -----
+
+def _karta_sitowa(minuty=85, udzial=0.9, xi=None, p_model=None):
+    """Trzy linie strzałów: 0,5 @1,30 (10/10), 1,5 @1,90 (8/10), 2,5 @2,50 (7/10),
+    3,5 @4,20 (3/10). Przewaga nad ceną jest największa na 1,5 — sito ma
+    wybrać 2,5, bo to najwyższa linia z pokryciem ≥7/10 i kursem ≤2,60."""
+    def s(linia, kurs, traf, p):
+        d = {"linia": linia, "kurs": kurs, "pokrycie": {"traf": traf, "z": 10},
+             "p_bazowe": p, "korekta": 1.0, "p_final": p}
+        if p_model is not None:
+            d["p_model"] = p_model
+        return d
+    return {
+        "minuty_sr6": minuty, "udzial_startow": udzial, "xi": xi,
+        "rynki": [{"rynek_kod": "shots", "rynek": "Strzały", "drabinka": [
+            # p_final trzyma się ceny (rozjazd ≤ MAX_ROZJAZD_KARTY), a następnik
+            # każdej linii ma pokrycie ≥ MIN_POKRYCIE_DRUGIEGO i p ≥ 0,25
+            s(0.5, 1.30, 10, 0.78), s(1.5, 1.90, 8, 0.58),
+            s(2.5, 2.50, 7, 0.45), s(3.5, 4.20, 5, 0.27),
+        ]}],
+    }
+
+
+def test_sito_wybiera_najwyzsza_pokryta_linie_nie_najhojniejsza():
+    score, hero = radar._oceń_karte(_karta_sitowa())
+    assert hero is not None and hero["linia"] == 2.5 and hero["kurs"] == 2.5
+    assert hero["sito"] is True
+    assert score > radar.BONUS_SITA          # karta sitowa stoi przed niesitowymi
+    # powód wejścia zostaje tym, czym był (przewaga/seria/pokrycie) — sito to osobna flaga
+    assert hero["powod_wejscia"] in ("przewaga", "seria", "pokrycie", "roznica_kursow")
+
+
+def test_bez_minut_sito_nie_dziala_i_wraca_wybor_po_przewadze():
+    score, hero = radar._oceń_karte(_karta_sitowa(minuty=70))
+    assert hero is not None and hero["sito"] is False
+    assert hero["linia"] == 1.5              # największa przewaga nad ceną
+    assert score < radar.BONUS_SITA
+
+
+def test_sito_szanuje_szanse_modelu_i_udzial_startow():
+    _s, hero = radar._oceń_karte(_karta_sitowa(p_model=0.30))
+    assert hero is not None and hero["sito"] is False
+    # udział 0,7 przechodzi bramę karty (0,6), ale nie sito (0,8) — chyba że XI ogłoszone
+    _s, hero = radar._oceń_karte(_karta_sitowa(udzial=0.7))
+    assert hero is not None and hero["sito"] is False
+    _s, hero = radar._oceń_karte(_karta_sitowa(udzial=0.7, xi=True))
+    assert hero is not None and hero["sito"] is True and hero["linia"] == 2.5

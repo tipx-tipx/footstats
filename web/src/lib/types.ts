@@ -486,6 +486,8 @@ export interface RadarWpis {
      * taka karta w ogóle nie mogła powstać i dostawała cudzą etykietę.
      */
     powod_wejscia?: "przewaga" | "seria" | "roznica_kursow" | "pokrycie";
+    /** sito 16.09: pokrycie ≥7/10 na tej linii, minuty ≥80, udział startów, szansa modelu */
+    sito?: boolean;
     p_final?: number | null;
     p_bazowe?: number | null;
     korekta?: number | null;

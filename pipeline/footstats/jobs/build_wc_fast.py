@@ -9384,6 +9384,10 @@ def _main_impl(tryb=None):
                 out[klucz] = w[pole]
         if (w.get("ocena") or {}).get("klasa"):
             out["klasa_karty"] = w["ocena"]["klasa"]
+        # SITO (2026-09-16) — czy hero przeszedł sito pokrycia/minut/modelu;
+        # księga porówna karty sitowe z niesitowymi (patrz radar.PROG_POKRYCIA_SITA)
+        if h.get("sito") is not None:
+            out["sito"] = bool(h["sito"])
         # ⚑ OBIE CENY I MIEJSCE KARTY (2026-09-15). Bez nich pytanie
         # właściciela „czy value z rozjazdu Superbet/Betclic działa" było
         # nierozstrzygalne: księga pisała `bukmacher=Superbet` w 837 z 837
