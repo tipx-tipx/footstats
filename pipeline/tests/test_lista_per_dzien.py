@@ -14,7 +14,12 @@ from footstats.model import uczony as U
 from footstats.jobs import rozliczanie as R
 
 DZIEN = 86400
-JUTRO = int(time.time()) + DZIEN
+# Południe JUTRZEJSZEGO dnia polskiego — nie „teraz + 24 h". Test uruchomiony
+# między 0:00 a 6:00 czasu polskiego (CI po nocnym pushu) dostawał kickoff
+# z tej samej szarej strefy, w której doba PRODUKTOWA (`dzien_listy`, odcięcie
+# o 6:00) i doba kalendarzowa (`dzien_pl`) wskazują RÓŻNE dni. W południe obie
+# definicje zawsze się zgadzają, więc wynik nie zależy od godziny uruchomienia.
+JUTRO = B.moment_domkniecia(R.dzien_pl(time.time() + DZIEN), godzina=12)
 POJUTRZE = JUTRO + DZIEN
 
 
