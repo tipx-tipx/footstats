@@ -19,7 +19,11 @@ def _powody_pipeline() -> set[str]:
     z_wywolan = set(re.findall(r'_odrzuc(?:_druzyne)?\(\s*\w+,\s*\w+,\s*"([a-z_]+)"', zrodlo))
     # domknięcie rejestru: `"powod": "tylko_w_puli"`
     z_domkniecia = set(re.findall(r'"powod":\s*"([a-z_]+)"', zrodlo))
-    return z_wywolan | z_domkniecia
+    # bramy wyświetlania dopisywane do rejestru dynamicznie — klucze słownika
+    blok = zrodlo.split("OPISY_ZDJECIA_PL = {", 1)[1].split("}", 1)[0]
+    z_bram = set(re.findall(r'^\s*"([a-z_]+)":', blok, flags=re.M))
+    assert z_bram, "słownik OPISY_ZDJECIA_PL pusty albo przeniesiony"
+    return z_wywolan | z_domkniecia | z_bram
 
 
 def _etykiety_frontu() -> set[str]:

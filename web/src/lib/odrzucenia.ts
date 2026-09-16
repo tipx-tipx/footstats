@@ -50,6 +50,15 @@ export const POWOD_LABEL: Record<string, string> = {
   wartosc_ujemna: "Przy ostrożnym liczeniu to nie wychodzi na plus",
   wartosc_ujemna_przy_ostroznym: "Przy ostrożnym liczeniu wychodzi na minus",
   poza_skladem: "Zawodnika nie ma w składzie na ten mecz",
+  // bramy WYŚWIETLANIA (wybór listy dnia) — od 16.09 w rejestrze; wcześniej
+  // typ zdjęty tutaj był w księdze, ale strona meczu o nim milczała
+  dzien_zamkniety: "Lista na ten dzień była już domknięta",
+  kurs_poza_polkami: "Kurs poza półkami listy dnia",
+  poza_lista_dnia: "Limit listy dnia wyczerpany",
+  rynek_ukryty: "Rynek chwilowo ukryty na stronie",
+  rynek_wycofany: "Rynku nie umiemy rozliczyć, więc go nie pokazujemy",
+  bez_sygnalu_skladu: "Brak sygnału, że zagra (skład nieznany, nie grał ostatnio)",
+  ujemna_po_korekcie: "Po urealnieniu szansy wartość wyszła ujemna",
   za_pozno: "Za blisko pierwszego gwizdka, żeby wystawić typ",
   limit_meczu: "Z tego meczu mamy już tyle typów, ile publikujemy",
   // brama uzasadnień (2026-08-05) — patrz betting.PROG_POLKI_PEWNE

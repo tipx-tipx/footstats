@@ -2088,6 +2088,22 @@ POWODY_WIDELEK_PL = {
     "wartosc_ujemna": "nie daje dodatniej wartości przy ostrożnym liczeniu",
 }
 
+# szczegóły dla typów zdjętych BRAMĄ WYŚWIETLANIA (po scoringu, przy wyborze
+# listy dnia) — od 2026-09-16 trafiają do rejestru „czemu nie ma typu".
+# Klucze = powody z `zdjete_klucze` / `wybierz_liste_publikowana`; każdy musi
+# mieć etykietę w web/src/lib/odrzucenia.ts (pilnuje test_powody_odrzucen_front).
+OPISY_ZDJECIA_PL = {
+    "dzien_zamkniety": "lista na ten dzień była już domknięta (6:00), typ policzony po domknięciu",
+    "kurs_poza_polkami": "kurs poza półkami listy dnia (wysoka szansa / wyższe kursy)",
+    "poza_lista_dnia": "limit listy dnia wyczerpany (15 + 5 na dobę, 3 na mecz, limit rodziny)",
+    "rynek_ukryty": "rynek chwilowo ukryty na stronie",
+    "rynek_wycofany": "rynku nie umiemy rozliczyć, więc nie pokazujemy typu",
+    "bez_sygnalu_skladu": "ani składu, ani występu w ostatnim meczu drużyny — nie wiemy, czy zagra",
+    "ujemna_po_korekcie": "po urealnieniu szansy wartość wyszła ujemna",
+    "kurs_poza_widelkami": "kurs poza widełkami, w jakich gramy",
+    "limit_meczu": "z tego meczu mamy już tyle typów, ile publikujemy",
+}
+
 # --- BRAMA EKSPOZYCJI: ile minut model spodziewa się po zawodniku ---
 # Typ na zawodnika, który przeciętnie gra pół meczu, jest zakładem o skład,
 # nie o statystykę. Rozliczenia 2026-07-27: przy NIEZNANYM składzie zawodnik
@@ -4327,6 +4343,18 @@ def _main_impl(tryb=None):
         if n_lib:
             print(f"Biblioteka historii ({len(lib)} trendów w banku): "
                   f"+{n_lib} przepiętych na nadchodzące mecze")
+            # ⚑ RATUNEK HISTORII TAKŻE DLA TRENDÓW Z BANKU (2026-09-16). Pierwszy
+            # ratunek (zaraz po feedzie) widzi tylko żywe trendy, a te z banku
+            # są z natury stare (bank pamięta rynki, których UK dziś nie
+            # kwotuje). Log 16.09 12:20: „242 zawodników z martwą próbą (w tym
+            # 0 z żywym innym rynkiem)" — czyli mieszani (żywe strzały, martwe
+            # odbiory) powstają DOPIERO tutaj i szli na `za_stara_historia`
+            # (847 par z kursem). Ratunek jest per rynek, więc żywe rynki nic
+            # nie kosztują, a odratowani z pierwszej rundy już są świeży.
+            _odr_g, _odr_t = odswiez_stare_trendy(trends, int(time.time()))
+            if _odr_g:
+                print(f"Biblioteka historii: ratunek per rynek odświeżył "
+                      f"{_odr_g} zawodników ({_odr_t} trendów z banku)")
 
         # 4) uzupełnij braki PER ZAWODNIK×RYNEK z pełnych statystyk meczowych
         #    365Scores (minuty, strzały, faule, faule na zawodniku, przechwyty,
@@ -10170,6 +10198,44 @@ def _main_impl(tryb=None):
     _dump("players.json", list(players_out.values()))
     _dump("druzyny_forma.json", scal_forme_druzyn(druzyny_forma, lista_pub))
     _dump("odds_superbet.json", odds_grid)   # siatka kursów do TOP POKRYCIA
+    # ⚑ DOMKNIĘCIE REJESTRU O BRAMY WYŚWIETLANIA (2026-09-16). Rejestr zamykał
+    # się PRZED wyborem listy dnia, więc typ zdjęty tam (dzień domknięty, kurs
+    # poza półkami, limit dnia, rynek ukryty/wycofany) był w księdze, ale na
+    # stronie meczu „czemu nie ma typu" milczał. Audyt 16.09: 975 par z kursem
+    # Superbetu bez wpisu w cyklu 12:20 — niemal w całości stąd (449 „poza
+    # publikacją" + 46 rynków wycofanych). Wpis dostaje każdy typ zdjęty bramą
+    # wyświetlania, którego para (mecz, podmiot, rynek) nie ma jeszcze wpisu
+    # ani typu na stronie.
+    _pokazane_kl = {_klucz_publikacji(b) for b in lista_pub}
+    _w_rejestrze = {
+        (r.get("mecz_id"), r.get("podmiot"), r.get("rynek_kod")) for r in odrzucenia_out
+    }
+    _dopisane_zdjete: Counter = Counter()
+    for b in value_bets_pub:
+        _kl_b = _klucz_publikacji(b)
+        _pw = zdjete_klucze.get(_kl_b)
+        if not _pw or _kl_b in _pokazane_kl:
+            continue
+        _para = (b.get("mecz_id"), b.get("podmiot"), b.get("rynek_kod"))
+        if _para in _w_rejestrze:
+            continue
+        _w_rejestrze.add(_para)
+        _dopisane_zdjete[_pw] += 1
+        odrzucenia_out.append({
+            "mecz_id": b.get("mecz_id"), "podmiot": b.get("podmiot"),
+            "druzyna": b.get("druzyna", ""),
+            "rynek_kod": b.get("rynek_kod"),
+            "rynek": MARKET_NAMES_PL.get(b.get("rynek_kod"), b.get("rynek_kod")),
+            "powod": _pw,
+            "szczegol": OPISY_ZDJECIA_PL.get(_pw, "typ zdjęty bramą wyświetlania")
+            + (f" ({STRONA_PL.get(b.get('strona'), b.get('strona'))} "
+               f"{b.get('linia')} @{float(b.get('kurs') or 0):.2f})".replace(".", ",")
+               if b.get("kurs") else ""),
+            **({"podmiot_typ": "druzyna"} if b.get("podmiot_typ") == "druzyna" else {}),
+        })
+    if _dopisane_zdjete:
+        print("Rejestr odrzuceń — dopisane bramy wyświetlania: " + ", ".join(
+            f"{k} {v}" for k, v in _dopisane_zdjete.most_common()))
     _dump("odrzucenia.json", odrzucenia_out)  # "czemu nie ma typu" per mecz
     print(f"Rejestr odrzuceń: {len(odrzucenia_out)} wpisów, "
           f"pomiar progów: {len(odrzucone_pomiar)} typów przy progu")
