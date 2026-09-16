@@ -22,6 +22,13 @@ export const POWOD_LABEL: Record<string, string> = {
   kwarantanna_kategorii: "Ten powód wejścia na listę jest chwilowo wstrzymany",
   stare_dane: "Zawodnik dawno nie grał, czekamy na świeże mecze",
   za_stara_historia: "Dane o zawodniku są nieaktualne",
+  historia_za_stara: "Za mało meczów drużyny z ostatnich 18 miesięcy",
+  // bramy składu z 14.09 — do 16.09 wypisywały się klientowi surową nazwą
+  // (20 921 wpisów w jednym cyklu); złapał to test_powody_odrzucen_front
+  rzadko_w_pierwszym_skladzie:
+    "Rzadko zaczyna w pierwszym składzie, a składu na ten mecz jeszcze nie ma",
+  nie_gral_w_ostatnich_meczach:
+    "Nie zagrał w ostatnich meczach drużyny (kontuzja, odsunięcie albo transfer)",
   brak_kursu: "Superbet nie kwotuje tego rynku",
   za_malo_zdarzen: "Model oczekuje za mało zdarzeń",
   za_malo_historii: "Za mało meczów w historii",
@@ -29,6 +36,10 @@ export const POWOD_LABEL: Record<string, string> = {
   krotka_historia: "Za krótka historia",
   chwiejna_predykcja: "Model sam nie jest pewny swojej liczby",
   rozjazd_z_rynkiem: "Model za daleko od kursu bukmachera",
+  // audyt 16.09: ~1000 par zawodniczych na cykl przechodziło wszystkie bramy
+  // modelu i ginęło bez śladu na dowodzie miękkiej linii (wartość vs UK
+  // albo vs własna siatka linii). Teraz mają wpis — i etykietę.
+  bez_dowodu_miekkiej_linii: "Kurs nie odstaje od rynku, brak dowodu miękkiej linii",
   kurs_lub_szansa_poza_widelkami: "Kurs i szansa nie składają się w grywalny typ",
   // ten sam warunek rozbity na trzy (2026-07-27) – dla rynków drużynowych to
   // najczęstszy powód braku typu, a jedna etykieta nie mówiła, co konkretnie

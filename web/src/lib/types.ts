@@ -551,6 +551,7 @@ export interface Odrzucenie {
     | "krotka_historia"
     | "chwiejna_predykcja"
     | "rozjazd_z_rynkiem"
+    | "bez_dowodu_miekkiej_linii"
     | "tylko_w_puli"
     | "kwarantanna_rynku"
     | "kwarantanna_kategorii"
