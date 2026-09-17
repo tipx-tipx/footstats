@@ -233,6 +233,13 @@ function Drabinka({
                         <span className="font-data whitespace-nowrap text-[12px] font-semibold text-ink-soft">
                           {STRONA_LABEL[l.strona] ?? l.strona} {fmtLinia(l.linia)}
                         </span>
+                        {/* drabinka: który to szczebel – hero liczy się do
+                            bilansu, 2. i 3. stoją tu tylko jako poprzeczki */}
+                        {(l.szczebel ?? 1) >= 2 && (
+                          <span className="mt-0.5 text-[9px] font-semibold uppercase tracking-wide text-faint">
+                            {l.szczebel}. szczebel
+                          </span>
+                        )}
                         <span className="font-data mt-0.5 text-[15px] font-bold leading-tight tabular-nums text-ink">
                           {l.kurs != null ? fmtKurs(l.kurs) : "–"}
                         </span>

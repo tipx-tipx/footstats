@@ -571,3 +571,28 @@ def test_pokazany_wczesniej_nie_wypada_przez_limit_ani_ukrycie(monkeypatch):
     # nowe dostają tylko to, co zostało w limicie półki
     nowe = [b for b in lista if not B.juz_pokazany(b)]
     assert len(nowe) == U.POLKI["wysoka_szansa"]["limit_dobowy"] - 2
+
+
+def test_wznowiona_karta_poza_sitem_schodzi_z_listy(monkeypatch):
+    """Sito (17.09) też dosięga wznowienia — inaczej karty 6/10 opublikowane
+    przed regułą wracałyby do gwizdka. Karta sitowa wraca ze stemplem."""
+    magazyn: dict = {}
+    _stub_supa(monkeypatch, magazyn)
+
+    def _z_wystepami(traf, ostatnie, pid):
+        k = _karta_z_drabinka(
+            [_szczebel(1.5, 1.7, 0.55, traf), _szczebel(2.5, 3.0, 0.40, 5)],
+            hero_linia=1.5, pid=pid,
+        )
+        k["rynki"][0]["ostatnie"] = ostatnie
+        k["rynki"][0]["minuty"] = [90] * 10
+        k["udzial_startow"] = 0.9
+        return k
+
+    sitowa = _z_wystepami(7, [2, 3, 2, 0, 2, 2, 1, 3, 0, 2], pid=1)   # 7/10, 4/5
+    slaba = _z_wystepami(6, [2, 3, 2, 0, 0, 2, 1, 3, 0, 2], pid=2)    # 6/10
+    B.scal_karty_z_publikacjami([sitowa, slaba])
+    out = B.scal_karty_z_publikacjami([])
+    assert [w["podmiot_id"] for w in out] == [1]
+    assert out[0]["wznowiony"] is True
+    assert out[0]["hero"]["sito"] is True and out[0]["ocena"]["sito"] is True

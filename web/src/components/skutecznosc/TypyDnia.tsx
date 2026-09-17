@@ -211,6 +211,12 @@ export function TypyDnia({
     () => new Set(widoczne.map(kluczZakladu)).size,
     [widoczne],
   );
+  // poprzeczki liczone w nagłówku – BEZ 2./3. szczebla drabinek, bo te nie
+  // wchodzą do `rozliczone` (patrz `szczebel2_n`)
+  const poprzeczek = useMemo(
+    () => widoczne.filter((t) => (t.szczebel ?? 1) <= 1).length,
+    [widoczne],
+  );
 
   const proc = dzien.rozliczone
     ? Math.round((dzien.trafione / dzien.rozliczone) * 100)
@@ -281,6 +287,29 @@ export function TypyDnia({
           />
         </div>
       </div>
+
+      {/* CAŁA DRABINKA, NIE TYLKO HERO (17.09, właściciel: „Openda – weszły
+          3 szczeble, a w Skuteczności jeden wiersz"). Szczeble 2 i 3 stoją
+          niżej w wierszu karty jako poprzeczki; tu ich własny wynik, bo do
+          liczby wyżej nie wchodzą – cel polowania trafia rzadziej i przy
+          innym kursie, wymieszany z hero psułby obie miary. */}
+      {((dzien.szczebel2_n ?? 0) > 0 || (dzien.szczebel3_n ?? 0) > 0) && (
+        <p className="mt-3 text-xs leading-relaxed text-faint">
+          Drabinki: liczba wyżej to pierwszy szczebel. Drugi szczebel wszedł{" "}
+          <span className="font-data font-semibold text-ink">
+            {dzien.szczebel2_trafione ?? 0} z {dzien.szczebel2_n ?? 0}
+          </span>
+          {(dzien.szczebel3_n ?? 0) > 0 && (
+            <>
+              , trzeci{" "}
+              <span className="font-data font-semibold text-ink">
+                {dzien.szczebel3_trafione ?? 0} z {dzien.szczebel3_n}
+              </span>
+            </>
+          )}{" "}
+          – obie poprzeczki widać w wierszu karty niżej.
+        </p>
+      )}
 
       {innaZakladka.length > 0 && (
         <p className="mt-3 text-xs leading-relaxed text-faint">
@@ -403,12 +432,12 @@ export function TypyDnia({
       {/* Ten akapit tłumaczy rozjazd DWÓCH NASZYCH SPOSOBÓW LICZENIA
           (poprzeczki vs zakłady). Dla użytkownika to wewnętrzna księgowość —
           na liście niżej i tak widzi jeden wiersz na zakład (06.08). */}
-      {pelnyWglad && widoczne.length > zakladow && (
+      {pelnyWglad && poprzeczek > zakladow && (
         <p className="mt-3 rounded-(--radius-control) border border-hairline bg-card-soft px-3.5 py-2.5 text-xs leading-relaxed text-muted">
           Wynik u góry liczy{" "}
           <span className="font-data font-semibold text-ink">
-            {widoczne.length}{" "}
-            {odmien(widoczne.length, "poprzeczkę", "poprzeczki", "poprzeczek")}
+            {poprzeczek}{" "}
+            {odmien(poprzeczek, "poprzeczkę", "poprzeczki", "poprzeczek")}
           </span>
           , ale to{" "}
           <span className="font-data font-semibold text-ink">

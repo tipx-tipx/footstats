@@ -123,3 +123,40 @@ def test_tryb_bez_podatku_liczy_sie_jak_dawniej():
         r["tryb_podatku"] = "bez_podatku"
     s = rozliczanie.skutecznosc_strumieni(log)
     assert s["pewniaki"]["podsumowanie"]["roi_flat"] == 1.0
+
+
+# --- CAŁA DRABINKA W SKUTECZNOŚCI (2026-09-17) ---
+
+def test_skutecznosc_pokazuje_cala_drabinke_ale_bilans_liczy_hero():
+    """Właściciel 17.09: „Openda – weszły 3 szczeble", a Skuteczność miała
+    jeden wiersz. Szczeble 2 i 3 wracają jako wiersze zakładu hero z własnymi
+    licznikami; do `rozliczone`/`trafione`/ROI wchodzi nadal tylko hero.
+    Szczebel bez hero na stronie zostaje pomiarem w tle."""
+    hero = _rec(zrodlo="drabinka", klasa="solidny", szczebel=1, ekran="drabinki")
+    drugi = _rec(zrodlo="drabinka", linia=2.5, kurs=3.2, wynik="przegrany",
+                 szczebel=2, odrzucony=True, ekran="drabinki",
+                 odrzucenie_powod=rozliczanie.POWOD_POMIARU_DRUGIEGO)
+    trzeci = _rec(zrodlo="drabinka", linia=3.5, kurs=6.0, wynik="wygrany",
+                  szczebel=3, odrzucony=True,
+                  odrzucenie_powod=rozliczanie.POWOD_POMIARU_TRZECIEGO)
+    sierota = _rec(zrodlo="drabinka", mecz_id=2, mecz="C – D", linia=2.5,
+                   kurs=3.0, szczebel=2, odrzucony=True,
+                   odrzucenie_powod=rozliczanie.POWOD_POMIARU_DRUGIEGO)
+    s = rozliczanie.skutecznosc_strumieni(_log([hero, drugi, trzeci, sierota]))
+    d = s["drabinki"]
+    assert d["podsumowanie"]["rozliczone"] == 1
+    assert d["podsumowanie"]["trafione"] == 1
+    assert d["podsumowanie"]["szczebel2_n"] == 1
+    assert d["podsumowanie"]["szczebel2_trafione"] == 0
+    assert d["podsumowanie"]["szczebel3_n"] == 1
+    assert d["podsumowanie"]["szczebel3_trafione"] == 1
+    (dzien,) = d["dni"]
+    assert dzien["rozliczone"] == 1 and dzien["trafione"] == 1
+    assert dzien["szczebel2_n"] == 1 and dzien["szczebel3_trafione"] == 1
+    typy = dzien["typy"]
+    assert sorted(t.get("szczebel") or 1 for t in typy) == [1, 2, 3]
+    # wiersze szczebli NIE są „na próbę" — klient je widzi w zakładzie hero
+    assert all(t["poza_publikacja"] is None for t in typy)
+    assert all(t["mecz"] == "A – B" for t in typy)      # sierota została w tle
+    # pozostałe strumienie nie dostają szczebli
+    assert "szczebel2_n" not in s["pewniaki"]["podsumowanie"]

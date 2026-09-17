@@ -1691,6 +1691,7 @@ def scal_karty_z_publikacjami(
     out = list(wpisy)
     wznowione = 0
     bez_drugiego = 0
+    poza_sitem = 0
     nie_gra = 0
     nierozstrzygniete = 0
     for k, rec in list(rej.items()):
@@ -1720,17 +1721,29 @@ def scal_karty_z_publikacjami(
             continue
         if ma_drugi is None:
             nierozstrzygniete += 1
+        # SITO TEŻ NA WZNOWIENIU (2026-09-17) — patrz `radar.karta_przez_sito`.
+        # Bez tego 5 kart 6/10 z 17.09 wracałoby do gwizdka mimo nowej reguły,
+        # a właściciel zobaczyłby „sito nie działa". Karta, która przeszła,
+        # dostaje stempel — front pisze „przez sito" tylko z niego.
+        przez_sito = radar.karta_przez_sito(w)
+        if przez_sito is False:
+            poza_sitem += 1
+            continue
+        if przez_sito is True:
+            w["hero"] = {**(w.get("hero") or {}), "sito": True}
+            w["ocena"] = {**(w.get("ocena") or {}), "sito": True}
         w["wznowiony"] = True
         w["opublikowano_ts"] = rec.get("opublikowano_ts")
         out.append(w)
         wznowione += 1
     if not _dry_run() and odczyt_ok:
         supa.put_key(PUBLIKACJE_KART_KLUCZ, rej)
-    if wznowione or bez_drugiego or nie_gra:
+    if wznowione or bez_drugiego or nie_gra or poza_sitem:
         # licznik przy bramie, nie cisza ([[ciche-odrzucenia-zasada]])
         print(f"Publikacje kart: wznowiono {wznowione} "
               f"(bieżące przeliczenie dało {len(wpisy)}), "
               f"bez drugiego szczebla zdjęto {bez_drugiego}, "
+              f"poza sitem zdjęto {poza_sitem}, "
               f"zawodnik nie gra: {nie_gra}"
               + (f", bez zapisanej drabinki {nierozstrzygniete}"
                  if nierozstrzygniete else ""))

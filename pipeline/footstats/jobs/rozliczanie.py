@@ -5134,7 +5134,46 @@ def _typ_dnia(r: dict) -> dict:
         # czemu zwrot („nie zagrał", „brak danych źródła", „mecz przełożony…")
         # — bez tego wiersz zwrotu nic nie tłumaczy
         "powod": r.get("powod"),
+        # SZCZEBEL DRABINKI (2026-09-17): 1/None = hero (liczy się do bilansu),
+        # 2 i 3 = cel polowania i „za drobne" — wiersz w tym samym zakładzie,
+        # osobne liczniki (`szczebel2_n`…), poza trafieniami/ROI hero
+        "szczebel": r.get("szczebel"),
     }
+
+
+def _szczeble_dnia(log: dict, hero: list[dict]) -> list[dict]:
+    """Drugi i trzeci szczebel kart, których HERO stał na stronie.
+
+    ⚑ DRABINKA W SKUTECZNOŚCI TO CAŁA DRABINKA (2026-09-17, właściciel:
+    Openda 16.09 — „weszły 3 szczeble", a Skuteczność pokazała jeden wiersz).
+    Szczeble 2 i 3 rozliczają się od 13.08 / 15.09 jako rekordy `odrzucony`
+    z powodem `drugi_szczebel` / `trzeci_szczebel` (pomiar w tle), więc
+    żadna lista dnia ich nie widziała. Tu wracają jako wiersze TEGO SAMEGO
+    zakładu (front zwija po meczu/rynku/zawodniku/stronie w jeden wiersz
+    z poprzeczkami), ale NIE wchodzą do trafień ani bilansu hero — cel
+    polowania trafia ~21% przy cenie ~30% i wymieszany z hero zamieniłby
+    Skuteczność drabinek w inną miarę. Liczą się w `szczebel2_n`/`szczebel3_n`.
+
+    Para = ten sam mecz, zawodnik i rynek co hero (jak w `pomiar_drugiego_
+    szczebla`); szczebel bez hero na stronie zostaje pomiarem w tle.
+    """
+    def _para(r: dict) -> tuple:
+        return (r.get("mecz_id"), rotowire._norm(str(r.get("podmiot") or "")),
+                r.get("rynek_kod"))
+
+    na_stronie = {_para(r) for r in hero}
+    if not na_stronie:
+        return []
+    return [
+        r for r in log.values()
+        if r.get("szczebel") in (2, 3)
+        and r.get("odrzucenie_powod") in (POWOD_POMIARU_DRUGIEGO,
+                                          POWOD_POMIARU_TRZECIEGO)
+        and r.get("wynik") in ("wygrany", "przegrany", "zwrot")
+        and _z_biezacej_epoki(r) and not _z_martwej_epoki(r)
+        and w_oknie_statystyk(r)
+        and _para(r) in na_stronie
+    ]
 
 
 # typ ze strony bez wyniku tyle czasu po gwizdku = „czeka na dane" w Skuteczności
@@ -5183,6 +5222,7 @@ def _czekajace_dnia(log: dict, lista_dnia, pokazane, now: int) -> list[dict]:
 def skutecznosc_per_dzien(
     settled: list[dict], dni: int = 21, poza: list[dict] | None = None,
     braki: list[dict] | None = None, czekajace: list[dict] | None = None,
+    szczeble: list[dict] | None = None,
 ) -> list[dict]:
     """Skuteczność realnych typów pogrupowana po DNIU meczu (kickoff).
 
@@ -5214,6 +5254,8 @@ def skutecznosc_per_dzien(
             "okazje": 0, "_zwrot_j": 0.0, "typy": [],
             "poza_n": 0, "poza_trafione": 0, "brak_danych_n": 0,
             "zwrot_n": 0, "czeka_n": 0,
+            "szczebel2_n": 0, "szczebel2_trafione": 0,
+            "szczebel3_n": 0, "szczebel3_trafione": 0,
         })
 
     for r in settled:
@@ -5271,6 +5313,18 @@ def skutecznosc_per_dzien(
     # typ ze strony po skończonym meczu, wciąż bez wyniku — „czeka na dane".
     # Karta Hellebranda z 15.09 czekała tak na źródło, którego jej liga nie
     # ma, i przez to nie było jej nigdzie (patrz `_czekajace_dnia`)
+    # DRUGI I TRZECI SZCZEBEL DRABINEK (2026-09-17) — patrz `_szczeble_dnia`:
+    # wiersz w zakładzie hero, własne liczniki, poza trafieniami/ROI
+    for r in szczeble or []:
+        agg = _agg(r)
+        nr = 2 if r.get("szczebel") == 2 else 3
+        if r.get("wynik") in ("wygrany", "przegrany"):
+            agg[f"szczebel{nr}_n"] += 1
+            if r.get("wynik") == "wygrany":
+                agg[f"szczebel{nr}_trafione"] += 1
+        t = _typ_dnia(r)
+        t["poza_publikacja"] = None
+        agg["typy"].append(t)
     for r in czekajace or []:
         agg = _agg(r)
         agg["czeka_n"] += 1
@@ -5347,11 +5401,17 @@ def skutecznosc_strumieni(log: dict, dni: int = 21,
         okazje = [r for r in settled if not r.get("sugestia") and r.get("kurs")]
         trafione = sum(1 for r in settled if r["wynik"] == "wygrany")
         roi = sum(_zwrot_typu(r) - 1.0 for r in okazje)
+        _braki_s = [r for r in _zwroty if _strumien(r) == nazwa]
+        _czeka_s = [r for r in _czeka if _strumien(r) == nazwa]
+        # cała drabinka w strumieniu drabinek — patrz `_szczeble_dnia`
+        _szczeble_s = (
+            _szczeble_dnia(log, settled + _braki_s + _czeka_s)
+            if nazwa == "drabinki" else []
+        )
         rec: dict = {
             "dni": skutecznosc_per_dzien(
-                settled, dni=dni, poza=poza,
-                braki=[r for r in _zwroty if _strumien(r) == nazwa],
-                czekajace=[r for r in _czeka if _strumien(r) == nazwa],
+                settled, dni=dni, poza=poza, braki=_braki_s,
+                czekajace=_czeka_s, szczeble=_szczeble_s,
             ),
             "podsumowanie": {
                 "rozliczone": len(settled),
@@ -5368,6 +5428,19 @@ def skutecznosc_strumieni(log: dict, dni: int = 21,
                 # poza rozwinięciem konkretnego dnia i wygląda na zgubioną.
                 "poza_n": len(poza),
                 "poza_trafione": sum(1 for r in poza if r["wynik"] == "wygrany"),
+                # 2. i 3. szczebel kart ze strony — osobno od hero
+                **({
+                    f"szczebel{nr}_{k}": v
+                    for nr in (2, 3)
+                    for k, v in (
+                        ("n", sum(1 for r in _szczeble_s
+                                  if r.get("szczebel") == nr
+                                  and r["wynik"] in ("wygrany", "przegrany"))),
+                        ("trafione", sum(1 for r in _szczeble_s
+                                         if r.get("szczebel") == nr
+                                         and r["wynik"] == "wygrany")),
+                    )
+                } if nazwa == "drabinki" else {}),
             },
         }
         klasy: dict[str, dict] = {}
@@ -6637,8 +6710,11 @@ def rozlicz(
     # czekające na dane — patrz `_zwroty_dnia` / `_czekajace_dnia`.
     _braki_dni = _zwroty_dnia(log, _lista_dnia, _na_stronie)
     _czeka_dni = _czekajace_dnia(log, _lista_dnia, _na_stronie, now)
+    # cała drabinka, nie tylko hero — patrz `_szczeble_dnia`
+    _szczeble_dni = _szczeble_dnia(log, settled + _braki_dni + _czeka_dni)
     skutecznosc_dzienna = skutecznosc_per_dzien(
         settled, poza=poza_pub, braki=_braki_dni, czekajace=_czeka_dni,
+        szczeble=_szczeble_dni,
     )
     # ...i to samo rozbite na strumienie (pewniaki / drużyny / drabinki),
     # bo „skuteczność" bez podziału mieszała trzy różne produkty

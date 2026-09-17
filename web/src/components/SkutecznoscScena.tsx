@@ -152,7 +152,10 @@ function strumienieZDni(
     const wDni = dni
       .map((d) => {
         const typy = (d.typy ?? []).filter((t) => strumienTypu(t) === k);
-        const publikowane = typy.filter((t) => !t.poza_publikacja);
+        // 2./3. szczebel drabinki stoi w wierszu, ale nie w bilansie hero
+        const publikowane = typy.filter(
+          (t) => !t.poza_publikacja && (t.szczebel ?? 1) <= 1,
+        );
         const zKursem = publikowane.filter((t) => t.kurs != null && !t.sugestia);
         return {
           dzien: d.dzien,

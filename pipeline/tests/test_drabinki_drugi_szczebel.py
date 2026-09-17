@@ -296,3 +296,56 @@ def test_brak_danych_to_nie_odmowa(karta):
     """`None`, nie `False` — brak pola nie dowodzi braku szczebla, a karta
     zdjęta z niewiedzy to ciche odrzucenie z fałszywej przesłanki."""
     assert R.karta_ma_realny_drugi_szczebel(karta) is None
+
+
+# --- SITO zadane karcie GOTOWEJ (wznowionej z rejestru), 2026-09-17 ---
+
+def _gotowa_sito(traf=7, ostatnie=None, minuty=None, xi=None, udzial=0.9,
+                 rywal=None, pokrycie5=None, krotkie=None):
+    """Karta w kształcie z rejestru: hero na 1,5 z drabinką 1,5 → 2,5 i
+    zapisanymi występami (`ostatnie` od najnowszego, jak na karcie)."""
+    s1 = _s(1.5, 0.55, traf)
+    if pokrycie5 is not None:
+        s1["pokrycie5"] = pokrycie5
+    r = {"rynek_kod": "shots", "drabinka": [s1, _s(2.5, 0.40, 5)],
+         "ostatnie": ostatnie if ostatnie is not None
+         else [2, 3, 2, 0, 2, 2, 1, 3, 0, 2],          # 7/10, ost. 5: 4/5
+         "minuty": minuty if minuty is not None else [90] * 10}
+    if rywal is not None:
+        r["kontekst"] = {"rywal": {"mnoznik": rywal}}
+    w = {"hero": {"rynek_kod": "shots", "linia": 1.5}, "rynki": [r],
+         "xi": xi, "udzial_startow": udzial}
+    if krotkie is not None:
+        w["krotkie_wystepy5"] = krotkie
+    return w
+
+
+def test_gotowa_karta_przez_sito_z_zapisanych_wystepow():
+    assert R.karta_przez_sito(_gotowa_sito()) is True
+    # 6/10 → nie; forma 3/5 (ost. 5: 2,3,0,0,2 → 2 z 5) → nie
+    assert R.karta_przez_sito(_gotowa_sito(traf=6)) is False
+    assert R.karta_przez_sito(
+        _gotowa_sito(ostatnie=[2, 3, 0, 0, 2, 2, 3, 3, 2, 2])) is False
+    # krótki występ w ostatnich 5 → nie, chyba że XI
+    assert R.karta_przez_sito(_gotowa_sito(minuty=[90, 45, 90, 90, 90] + [90] * 5)) is False
+    assert R.karta_przez_sito(_gotowa_sito(minuty=[90, 45, 90, 90, 90] + [90] * 5, xi=True)) is True
+    # rzadko w XI → nie, chyba że XI
+    assert R.karta_przez_sito(_gotowa_sito(udzial=0.5)) is False
+    assert R.karta_przez_sito(_gotowa_sito(udzial=0.5, xi=True)) is True
+    # hojny rywal luzuje formę do 3/5 (ost. 5: 2,3,0,0,2 → 2 z 5 nadal nie; 2,0,3,0,2 → 3 z 5 tak)
+    assert R.karta_przez_sito(
+        _gotowa_sito(ostatnie=[2, 0, 3, 0, 2, 2, 3, 3, 2, 2], rywal=1.2)) is True
+    assert R.karta_przez_sito(
+        _gotowa_sito(ostatnie=[2, 0, 3, 0, 2, 2, 3, 3, 2, 2])) is False
+
+
+def test_gotowa_karta_z_nowymi_polami_i_bez_danych():
+    # karta po 17.09 niesie pokrycie5/krotkie_wystepy5 — mają pierwszeństwo
+    assert R.karta_przez_sito(_gotowa_sito(
+        ostatnie=[0] * 10, pokrycie5={"traf": 5, "z": 5}, krotkie=0)) is True
+    assert R.karta_przez_sito(_gotowa_sito(krotkie=1)) is False
+    # bez zapisanych występów i minut nie ma z czego ocenić — to NIE odmowa
+    assert R.karta_przez_sito(_gotowa_sito(ostatnie=[])) is None
+    assert R.karta_przez_sito(_gotowa_sito(minuty=[])) is None
+    assert R.karta_przez_sito(_gotowa([_s(0.5, 0.66, 7), _s(1.5, 0.42, 6)])) is None
+    assert R.karta_przez_sito({"hero": {}}) is None

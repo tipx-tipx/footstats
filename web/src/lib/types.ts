@@ -935,6 +935,9 @@ export interface TypRozliczony {
   /** stempel ODTWORZONY wstecz dla rekordu sprzed wdrożenia – dzień z takimi
    *  typami ma się do rekonstrukcji przyznać, a nie udawać pewność */
   ekran_odtworzony?: boolean | null;
+  /** drabinki (17.09): 1/brak = hero (liczy się do bilansu), 2 = cel
+   *  polowania, 3 = „za drobne” – wiersz w tym samym zakładzie, poza bilansem */
+  szczebel?: number | null;
 }
 
 /** Kupon w historii: zamrożony przy publikacji, rozliczany z legów. */
@@ -993,6 +996,12 @@ export interface SkutecznoscDnia {
   /** realne typy tego dnia (co siadło / nie siadło) – trafione na górze,
    *  typy poza publikacją na końcu z oznaczeniem */
   typy?: TypRozliczony[];
+  /** drabinki (17.09): 2. i 3. szczebel kart ze strony – rozliczone osobno,
+   *  poza `rozliczone`/`trafione`/`roi_flat` (te liczą tylko hero) */
+  szczebel2_n?: number;
+  szczebel2_trafione?: number;
+  szczebel3_n?: number;
+  szczebel3_trafione?: number;
 }
 
 /** Strumień skuteczności – patrz rozliczanie._strumien. */

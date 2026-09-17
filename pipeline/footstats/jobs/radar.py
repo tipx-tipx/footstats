@@ -2140,6 +2140,72 @@ def karta_ma_realny_drugi_szczebel(w: dict) -> bool | None:
     return p_nast is not None and p_nast >= MIN_P_DRUGIEGO_SZCZEBLA
 
 
+def karta_przez_sito(w: dict) -> bool | None:
+    """Czy hero GOTOWEJ karty przechodzi sito — na zapisanych liczbach karty.
+
+    Ta sama reguła co w `_oceń_karte` (nota przy PROG_POKRYCIA_SITA), zadana
+    karcie wznowionej z rejestru publikacji. PO CO OSOBNO: karta wraca
+    z zamrożoną treścią i bez tej bramy każda reguła wprowadzona po jej
+    publikacji omija cały wznowiony strumień — dokładnie tak sito v1 z 16.09
+    nie dosięgło kart z 15.09, a wymóg drugiego szczebla kart z 07.08
+    (patrz `karta_ma_realny_drugi_szczebel`).
+
+    Karta sprzed 17.09 nie ma `pokrycie5` ani `krotkie_wystepy5`, ale niesie
+    `rynki[].ostatnie` (liczniki 10 ostatnich, od najnowszego) i `minuty`
+    — to te same liczby, z których powstało sito, więc liczymy z nich.
+    `None` = nie ma z czego ocenić i NIE jest odmową ([[ciche-odrzucenia-zasada]]).
+    """
+    hero = w.get("hero") or {}
+    mk, linia = hero.get("rynek_kod"), hero.get("linia")
+    if mk is None or linia is None:
+        return None
+    r = next((r for r in (w.get("rynki") or []) if r.get("rynek_kod") == mk),
+             None)
+    if r is None:
+        return None
+    s = next((s for s in (r.get("drabinka") or [])
+              if float(s.get("linia", -1)) == float(linia)), None)
+    if s is None:
+        return None
+    pok = s.get("pokrycie") or {}
+    if not pok.get("z"):
+        return None
+    if pok["z"] < MIN_PROBA_SCORE or pok["traf"] / pok["z"] < PROG_POKRYCIA_SITA:
+        return False
+    f5 = s.get("pokrycie5")
+    if not f5 or not f5.get("z"):
+        ost = r.get("ostatnie")
+        if not ost:
+            return None
+        o5 = list(ost)[:OKNO_FORMY_SITA]
+        f5 = {"traf": sum(1 for c in o5 if float(c) > float(linia)),
+              "z": len(o5)}
+    if f5["z"] < OKNO_FORMY_SITA:
+        return None
+    _rywal = float((((r.get("kontekst") or {}).get("rywal") or {})
+                    .get("mnoznik")) or 1.0)
+    prog = (PROG_FORMY_SITA_RYWAL if _rywal >= MNOZNIK_RYWALA_WYJATKU
+            else PROG_FORMY_SITA)
+    if f5["traf"] < prog:
+        return False
+    xi = w.get("xi") is True
+    krotkie = w.get("krotkie_wystepy5")
+    if krotkie is None:
+        mins = r.get("minuty")
+        if mins:
+            krotkie = sum(1 for m in list(mins)[:OKNO_FORMY_SITA]
+                          if float(m) < MIN_MINUT_PELNEGO_WYSTEPU)
+    if not xi:
+        if krotkie is None:
+            return None
+        if krotkie:
+            return False
+        udzial = w.get("udzial_startow")
+        if udzial is not None and udzial < MIN_UDZIAL_SITA:
+            return False
+    return True
+
+
 def _kategoria_karty(w: dict) -> str:
     """Rodzaj karty — po czym front dobiera kolor i etykietę.
 
