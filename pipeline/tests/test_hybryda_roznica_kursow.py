@@ -12,18 +12,21 @@ realnie wejść, nie możemy opierać się tylko na kursie".
 from footstats.jobs import radar as R
 
 
-def _kandydat(pokrycie_traf=6, kurs=1.75, p_final=0.54, roznica_pp=None,
+def _kandydat(pokrycie_traf=7, kurs=1.65, p_final=0.56, roznica_pp=None,
               traf2=5, p2=0.40, z=10):
     """Karta, która NIE ma przewagi modelu ani mocnej serii.
 
-    Kurs 1,75 przy pokryciu 6/10 nie łapie się na żadną ścieżkę serii
-    (ta wymaga 7/10 przy 1,70+ albo 6/10 przy 2,00+), a przewaga jest dodatnia,
-    ale poniżej progu karty — czyli o wejściu może zdecydować wyłącznie
-    rozjazd cenowy.
+    ⚑ 7/10 przy 1,65, nie 6/10 przy 1,75 (zmiana 2026-09-17): od sita karta
+    bez linii 7/10 nie powstaje w ogóle, więc 6/10 nie mówiłoby nic o
+    rozjeździe. Kurs 1,65 leży pod progiem serii (MIN_KURS_SERII 1,70, a
+    ścieżka droga wymaga 2,00+), przewaga −4,6 pp jest poniżej progu karty,
+    ale w tolerancji MIN_EDGE_SERII — czyli o POWODZIE wejścia może
+    zdecydować wyłącznie rozjazd cenowy.
     """
     pierwszy = {
         "linia": 1.5, "kurs": kurs,
         "pokrycie": {"traf": pokrycie_traf, "z": z},
+        "pokrycie5": {"traf": min(pokrycie_traf, 5), "z": 5},
         "p_bazowe": p_final, "korekta": 1.0, "p_final": p_final,
     }
     if roznica_pp is not None:
@@ -32,12 +35,13 @@ def _kandydat(pokrycie_traf=6, kurs=1.75, p_final=0.54, roznica_pp=None,
             "roznica_pp": roznica_pp, "przewaga_pct": 20.0, "gdzie": "betclic",
         }
     return {
-        "minuty_sr6": 85, "udzial_startow": 0.9,
+        "minuty_sr6": 85, "udzial_startow": 0.9, "krotkie_wystepy5": 0,
         "rynki": [{
             "rynek_kod": "shots", "rynek": "Strzały",
             "drabinka": [pierwszy, {
                 "linia": 2.5, "kurs": 3.20,
                 "pokrycie": {"traf": traf2, "z": z},
+                "pokrycie5": {"traf": min(traf2, 5), "z": 5},
                 "p_bazowe": p2, "korekta": 1.0, "p_final": p2,
             }],
         }],

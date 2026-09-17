@@ -311,14 +311,53 @@ PROG_POKRYCIA_KARTY = 0.5
 #
 # Dotychczasowy wybór po przewadze `p_final − 1/kurs` dawał 58% kart w paśmie
 # 1,55–1,80 i 53% trafień przy cenie 62% ([[drabinki-liczba-jest-odwrotna]]:
-# przewaga nad ceną porządkuje ODWROTNIE). Sito nie jest bramą — karta bez
-# linii sitowej dalej powstaje, ale w rankingu stoi ZA kartami sitowymi.
+# przewaga nad ceną porządkuje ODWROTNIE).
+#
+# ⚑ SITO JEST BRAMĄ KARTY (2026-09-17, decyzja właściciela: „5 z 7 kart to
+# 6/10 — trzeba znaleźć rozwiązanie"). Do 16.09 karta bez linii sitowej dalej
+# powstawała i stała za sitowymi — przy małej podaży strona pokazywała
+# głównie karty niesitowe. Zmierzone 17.09 na kopii księgi do 14.09
+# (218 rozliczonych kart hero, historia z biblioteki trendów sprzed
+# kickoffu, występy ≥20 min jak w `_grane`):
+#
+#     pokrycie ≥7/10 i…                        n    trafia   cena
+#     forma ost. 5: 4–5/5                     110    52,7%   59,6%
+#     forma ost. 5: 3/5                        37    43,2%   57,6%
+#     forma ost. 5: ≤2/5                        8    37,5%   56,0%
+#     brak występu <60 min w ost. 5           126    52,4%   58,8%
+#     JEST występ <60 min w ost. 5             29    37,9%   59,4%
+#     SITO = 7/10 & 4/5 & brak <60 min         95    55,8%   59,4%
+#       … & kurs ≥1,8                          23    65,2%   50,3%
+#     POZA SITEM (reszta pokazanych)          123    39,8%   53,7%
+#
+# Co z tego wynika i czego NIE ma w sicie:
+#  * FORMA liczona z ostatnich 5 występów na tej linii — 3/5 to inna klasa
+#    niż 4/5. Forma jest bramą SZCZEBLA, nie karty: gdy 2,5 ma 7/10, ale
+#    ostatnio 3/5, hero schodzi na 1,5, a 2,5 zostaje celem polowania.
+#    Forma z samych pełnych występów (≥60 min) nie rozdziela lepiej
+#    (50,9% vs 52,7%), więc liczymy ją z tego samego okna co pokrycie.
+#  * KRÓTKI WYSTĘP (<60 min) w ostatnich 5 zastępuje średnią minut: średnia
+#    z 6 ≥80 nic nie dodawała (55,3% vs 60,0% poniżej 80 przy braku krótkich),
+#    a jeden występ z ławki obniżał trafność o kilkanaście punktów.
+#    Wyjątek: ogłoszony/przewidywany skład (`xi` True) — on odpowiada wprost.
+#  * SUFIT KURSU ZDJĘTY: w sicie pasmo 1,8+ trafia 65% przy cenie 50%;
+#    stary sufit 2,60 wziął się z kart wybieranych po przewadze, nie po
+#    pokryciu. Hero = NAJWYŻSZA linia sitowa, która ma następnik.
+#  * SZANSA MODELU NIE JEST BRAMĄ: w sicie p<0,45 → 66,7% (n=6) — brak
+#    dowodu w obie strony; model zostaje w kolejności kart (ocena).
+#  * WYJĄTEK RYWALA (życzenie właściciela 17.09, NIEZMIERZONY — n=2): gdy
+#    rywal oddaje na tym rynku wyraźnie więcej niż norma, próg formy schodzi
+#    do 3/5. Stempel `sito_wyjatek` w księdze ma to zmierzyć.
+#  * FORMA DRUGIEGO SZCZEBLA: cel polowania z ≤1/5 wchodził 10% (n=10) przy
+#    cenie 30%, z ≥2/5 — 21%; szczebel z martwą formą nie jest następnikiem.
 PROG_POKRYCIA_SITA = 0.70    # 7 z 10 na wybranej linii
-MIN_MINUT_SITA = 80          # średnia z 6 ostatnich
+OKNO_FORMY_SITA = 5          # ostatnie występy, z których liczymy formę linii
+PROG_FORMY_SITA = 4          # 4 z 5 przebić na wybranej linii
+PROG_FORMY_SITA_RYWAL = 3    # 3 z 5, gdy rywal hojny na tym rynku (mierzone)
+MNOZNIK_RYWALA_WYJATKU = 1.15
+MIN_MINUT_PELNEGO_WYSTEPU = 60   # krótszy występ w ostatnich 5 = rotacja
 MIN_UDZIAL_SITA = 0.80       # startów w meczach drużyny (albo XI ogłoszone)
-MIN_P_MODELU_SITA = 0.45     # gdy silnik policzył tę linię
-MAX_KURS_SITA = 2.60         # powyżej: 2,6+ trafia 18% przy cenie 31%
-BONUS_SITA = 1.0             # w jednostkach przewagi — karta sitowa zawsze przed niesitową
+MIN_FORMA_DRUGIEGO = 2       # następnik: wszedł w ≥2 z 5 ostatnich
 # PRÓG ZOSTAJE NA 0.5 mimo zgłoszenia „drabinki są randomowe" (2026-07-27).
 # Podniesienie go na 0.65 wycięłoby kartę, którą user wskazał jako DOBRĄ
 # (Marcel Regula, strzały 2,5 @2,05 przy pokryciu 6/10 = 0,60). Szum, o który
@@ -822,6 +861,21 @@ def wystepy_zawodnikow(trends: list) -> dict[int, statshub.StatshubTrend]:
     return {pid: polacz_wystepy(ich) for pid, ich in per.items()}
 
 
+def krotkie_wystepy(tr, okno: int = OKNO_FORMY_SITA) -> int | None:
+    """Ile z ostatnich `okno` ROZEGRANYCH meczów trwało krócej niż
+    MIN_MINUT_PELNEGO_WYSTEPU — sygnał rotacji (patrz nota przy
+    PROG_POKRYCIA_SITA). None = brak historii.
+
+    Z surowych minut, nie z `_grane`: 15-minutowe wejście też jest rotacją,
+    choć do serii (MIN_MINUT_MECZU) się nie liczy."""
+    if tr is None:
+        return None
+    grane = [float(m) for m in (tr.minutes or []) if m and float(m) > 0][:okno]
+    if not grane:
+        return None
+    return sum(1 for m in grane if m < MIN_MINUT_PELNEGO_WYSTEPU)
+
+
 def udzial_startow(
     tr: statshub.StatshubTrend, okno: int = OKNO_STARTOW,
     kalendarz: dict[int, list[int]] | None = None, teraz: int | None = None,
@@ -1300,6 +1354,12 @@ def _rynki_wpisu(
                 # rdzeń analizy tipsterskiej ("2+ trafione w 8/10")
                 traf = sum(1 for c, _, _ in okno if c > linia)
                 szczebel["pokrycie"] = {"traf": traf, "z": len(okno)}
+                # FORMA: to samo na ostatnich 5 — sito patrzy na obie liczby
+                # (patrz nota przy PROG_POKRYCIA_SITA)
+                okno5 = okno[:OKNO_FORMY_SITA]
+                szczebel["pokrycie5"] = {
+                    "traf": sum(1 for c, _, _ in okno5 if c > linia),
+                    "z": len(okno5)}
                 # SZANSA PO KONTEKŚCIE: pokrycie Wilsona × korekta meczowa.
                 # Bez prognozy minut nie ma czego rzutować na mecz.
                 kor = (
@@ -1622,6 +1682,12 @@ def _oceń_karte(
                         and udzial_nast < MIN_POKRYCIE_DRUGIEGO:
                     lokalne["drugi_szczebel_rzadko_wchodzil"] += 1
                     continue
+                # …i nie zgasł ostatnio: ≤1 z 5 wchodził 10% przy cenie 30%
+                # (patrz nota przy PROG_POKRYCIA_SITA)
+                _f_nast = (nast or {}).get("pokrycie5") or {}
+                if _f_nast.get("z") and _f_nast["traf"] < MIN_FORMA_DRUGIEGO:
+                    lokalne["drugi_szczebel_bez_formy"] += 1
+                    continue
                 if p_nast is None or p_nast < MIN_P_DRUGIEGO_SZCZEBLA:
                     # CZTERY RÓŻNE DIAGNOZY, nie jedna ([[ciche-odrzucenia-zasada]]):
                     # drabinka jednoszczeblowa z powodu sufitu linii albo braku
@@ -1806,30 +1872,78 @@ def _oceń_karte(
             if _w_roz > PROG_WARTOSCI_ROZJAZDU:
                 ocena += WAGA_WARTOSCI_ROZJAZDU * (_w_roz - PROG_WARTOSCI_ROZJAZDU)
             trafiony["wartosc_rozjazdu"] = round(_w_roz, 3)
-            # SITO — patrz nota przy PROG_POKRYCIA_SITA. W obrębie karty
-            # wygrywa NAJWYŻSZA linia sitowa (rosnąca linia = rosnący kurs,
-            # a sito pilnuje, że pokrycie tej linii jest realne), między
-            # kartami sitowa zawsze przed niesitową, dalej dotychczasowa ocena.
-            sito = (
-                not pomiarowy
-                and pokrycie >= PROG_POKRYCIA_SITA
-                and p["z"] >= MIN_PROBA_SCORE
-                and (w.get("minuty_sr6") or 0) >= MIN_MINUT_SITA
-                and (udzial is None or udzial >= MIN_UDZIAL_SITA
-                     or w.get("xi") is True)
-                and (p_mod is None or float(p_mod) >= MIN_P_MODELU_SITA)
-                and s["kurs"] <= MAX_KURS_SITA
+            # SITO — patrz nota przy PROG_POKRYCIA_SITA. Brama SZCZEBLA:
+            # w obrębie karty wygrywa NAJWYŻSZA linia sitowa (rosnąca linia =
+            # rosnący kurs), a karta bez żadnej linii sitowej odpada niżej
+            # z nazwanym powodem. Powód = PIERWSZA brama, która nie puściła —
+            # rentgen mówi wtedy, co realnie tnie podaż.
+            _f5 = s.get("pokrycie5") or {}
+            _rywal = float((((r.get("kontekst") or {}).get("rywal") or {})
+                            .get("mnoznik")) or 1.0)
+            _rywal_hojny = _rywal >= MNOZNIK_RYWALA_WYJATKU
+            _prog_formy = (PROG_FORMY_SITA_RYWAL if _rywal_hojny
+                           else PROG_FORMY_SITA)
+            _forma_ok = (
+                (_f5.get("z") or 0) >= OKNO_FORMY_SITA
+                and _f5["traf"] >= _prog_formy
             )
+            _krotkie = w.get("krotkie_wystepy5")
+            _xi = w.get("xi") is True
+            if pomiarowy:
+                sito_powod = "pomiarowy"
+            elif pokrycie < PROG_POKRYCIA_SITA:
+                sito_powod = "sito_pokrycie_ponizej_7_z_10"
+            elif not _forma_ok:
+                sito_powod = "sito_forma_ponizej_4_z_5"
+            elif _krotkie is None and not _xi:
+                sito_powod = "sito_bez_minut_ostatnich_meczow"
+            elif _krotkie and not _xi:
+                sito_powod = "sito_krotki_wystep_w_ostatnich_5"
+            elif udzial is not None and udzial < MIN_UDZIAL_SITA and not _xi:
+                sito_powod = "sito_rzadko_w_pierwszym_skladzie"
+            else:
+                sito_powod = None
+            sito = sito_powod is None
             trafiony["sito"] = sito
-            klucz =(1 if sito else 0, float(s["kurs"]) if sito else 0.0, ocena)
+            # forma obu szczebli — do księgi (build_wc_fast `_charakter_drabinki`)
+            trafiony["traf5"] = _f5.get("traf")
+            trafiony["z5"] = _f5.get("z")
+            _f5_nast = (nast or {}).get("pokrycie5") or {}
+            trafiony["drugi_traf5"] = _f5_nast.get("traf")
+            trafiony["drugi_z5"] = _f5_nast.get("z")
+            if sito:
+                # KTÓRY WYJĄTEK WPUŚCIŁ — stempel do księgi; bez niego
+                # „wyjątek rywala" i „XI ratuje minuty" nie dadzą się zmierzyć
+                _wyj = []
+                if _f5["traf"] < PROG_FORMY_SITA:
+                    _wyj.append("rywal")
+                if _xi and (
+                    _krotkie is None or _krotkie > 0
+                    or (udzial is not None and udzial < MIN_UDZIAL_SITA)
+                ):
+                    _wyj.append("xi")
+                trafiony["sito_wyjatek"] = ",".join(_wyj) or None
+            elif not pomiarowy:
+                lokalne[sito_powod] += 1
+            klucz = (1 if sito else 0, float(s["kurs"]) if sito else 0.0, ocena)
             if pomiarowy:
                 if ocena > pomiar_score:
                     pomiar_score, pomiar_s = ocena, trafiony
             elif best_s is None or klucz > best_klucz:
                 best_klucz, best_s = klucz, trafiony
-                best_score = ocena + (BONUS_SITA if sito else 0.0)
+                best_score = ocena
     if pomiar_out is not None and pomiar_s is not None:
         pomiar_out.append(pomiar_s)
+    if best_s is not None and not best_s.get("sito"):
+        # KARTA BEZ LINII SITOWEJ NIE POWSTAJE (2026-09-17). Powód = najczęstsza
+        # brama sita wśród jej linii — licznik w rentgenie, nie cisza
+        # ([[ciche-odrzucenia-zasada]]).
+        if powody is not None:
+            _sitowe = [(k, v) for k, v in lokalne.items()
+                       if k.startswith("sito_")]
+            powody[max(_sitowe, key=lambda kv: kv[1])[0]
+                   if _sitowe else "poza_sitem"] += 1
+        return 0.0, None
     if powody is not None and best_s is None:
         # najczęstszy powód odpadnięcia tej karty — bez tego nie wiadomo,
         # czy pusta lista to słaby dzień, czy zbyt ostry próg
@@ -2466,6 +2580,10 @@ def zbuduj(
                 continue  # same puste drabinki (kursy-szum) = nie ma karty
             wpis = {
                 "minuty_sr6": minuty_sr6,
+                # krótkie występy w ostatnich 5 — brama sita (rotacja), z UNII
+                # występów jak udział startów
+                "krotkie_wystepy5": krotkie_wystepy(
+                    polacz_wystepy(list(trendy_mk.values())) or tr_ref),
                 # ile z ostatnich meczów zaczynał w pierwszym składzie —
                 # brama karty i konkret na karcie („gra od pierwszej minuty
                 # w 9 z 10 ostatnich"), zamiast samej średniej minut
@@ -2616,6 +2734,11 @@ def zbuduj(
                 **({"powod": "poza_feedem"} if bez_feedu and not trendy_perf
                    else {"powod": "brak_historii"} if not bez_feedu else {}),
                 "minuty_sr6": minuty_sr6_deb,
+                "krotkie_wystepy5": (
+                    krotkie_wystepy(max(trendy_perf.values(),
+                                        key=lambda t: len(t.counts)))
+                    if trendy_perf else None
+                ),
                 "udzial_startow": (
                     udzial_startow(max(trendy_perf.values(),
                                        key=lambda t: len(t.counts)))
@@ -2828,9 +2951,11 @@ def zbuduj(
             # Front pisze to wprost — karta bez przewagi nie ma prawa
             # wyglądać jak karta z przewagą.
             "powod_wejscia": hero.get("powod_wejscia") or "przewaga",
-            # SITO (2026-09-16): pokrycie ≥7/10 na tej linii, minuty ≥80,
-            # udział startów, szansa modelu — front pokazuje to zdaniem
+            # SITO (2026-09-17): 7/10 + forma 4/5 na tej linii, pełne występy
+            # w ostatnich 5 (albo XI), udział startów — front pokazuje to
+            # zdaniem; `sito_wyjatek` mówi, który wyjątek wpuścił kartę
             "sito": bool(hero.get("sito")),
+            "sito_wyjatek": hero.get("sito_wyjatek"),
             "p_final": hero.get("p_final"),
             "p_bazowe": hero.get("p_bazowe"),
             "korekta": hero.get("korekta"),

@@ -926,6 +926,11 @@ function PokryciePoprzeczek({
               </span>
               <span className="font-data text-right text-[11px] text-ink-soft">
                 {p.traf}/{p.z}
+                {s.pokrycie5 && s.pokrycie5.z > 0 && (
+                  <span className="block text-[9px] font-normal text-faint">
+                    ost. {s.pokrycie5.z}: {s.pokrycie5.traf}
+                  </span>
+                )}
                 {ten && (
                   <span className="ml-1.5 text-[9px] font-semibold uppercase tracking-wide text-brand-deep">
                     ten typ
@@ -1517,9 +1522,13 @@ export const RadarCard = memo(function RadarCard({
                               </span>{" "}
                               to najwyższa linia, którą zawodnik realnie
                               pokrywa – przebił ją w co najmniej 7 z 10
-                              ostatnich meczów, gra po 80+ minut i regularnie
-                              zaczyna, a nasz model nie mówi inaczej. Kurs
+                              ostatnich meczów i w 4 z 5 ostatnich, grał w
+                              nich pełne mecze i regularnie zaczyna. Kurs
                               jest tu dodatkiem, nie powodem.
+                              {w.ocena?.sito_wyjatek?.includes("rywal") &&
+                                " Ostatnia forma to 3 z 5, ale rywal oddaje na tym rynku wyraźnie więcej niż inni."}
+                              {w.ocena?.sito_wyjatek?.includes("xi") &&
+                                " Ostatnio grywał krócej, ale skład na ten mecz go stawia."}
                             </li>
                           )}
                           {kat && (

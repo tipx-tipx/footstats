@@ -275,6 +275,8 @@ export interface RadarSzczebel {
   p_model: number | null;
   /** ile z ostatnich występów przebiło tę linię ("trafione 8/10") */
   pokrycie?: { traf: number; z: number } | null;
+  /** to samo na ostatnich 5 występach – forma linii (sito 17.09) */
+  pokrycie5?: { traf: number; z: number } | null;
   /** pokrycie po korekcie na krótką próbę (dolna granica Wilsona) */
   p_bazowe?: number | null;
   /** ile kontekst tego meczu zmienia szansę (1.0 = nic nie zmienia) */
@@ -486,8 +488,10 @@ export interface RadarWpis {
      * taka karta w ogóle nie mogła powstać i dostawała cudzą etykietę.
      */
     powod_wejscia?: "przewaga" | "seria" | "roznica_kursow" | "pokrycie";
-    /** sito 16.09: pokrycie ≥7/10 na tej linii, minuty ≥80, udział startów, szansa modelu */
+    /** sito 17.09: 7/10 i 4/5 ostatnich na tej linii, pełne występy w ost. 5 (albo XI), udział startów */
     sito?: boolean;
+    /** który wyjątek wpuścił kartę: "rywal" (3/5 przy hojnym rywalu), "xi" (skład ratuje minuty) */
+    sito_wyjatek?: string | null;
     p_final?: number | null;
     p_bazowe?: number | null;
     korekta?: number | null;

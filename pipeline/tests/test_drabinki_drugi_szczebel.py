@@ -40,10 +40,13 @@ def _kandydat(szczeble, traf=7, z=10, traf2=None):
         drabinka.append({
             "linia": linia, "kurs": kurs,
             "pokrycie": {"traf": pok, "z": z},
+            # forma ostatnich 5 idzie za pokryciem — sito (17.09) pyta o nią
+            # osobno, a te testy pytają o drugi szczebel
+            "pokrycie5": {"traf": min(pok, 5), "z": 5},
             "p_bazowe": p, "korekta": 1.0, "p_final": p,
         })
     return {
-        "minuty_sr6": 85, "udzial_startow": 0.9,
+        "minuty_sr6": 85, "udzial_startow": 0.9, "krotkie_wystepy5": 0,
         "rynki": [{"rynek_kod": "shots", "rynek": "Strzały",
                    "drabinka": drabinka}],
     }

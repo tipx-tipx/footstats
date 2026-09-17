@@ -1,6 +1,7 @@
 """Testy detektorów radaru (jobs/radar.py) na syntetycznych trendach."""
 
 import pytest
+from collections import Counter
 
 from footstats.jobs import radar
 from footstats.sources.statshub import StatshubTrend
@@ -732,6 +733,8 @@ def _karta_do_oceny(traf, kurs=2.40, p_final=0.45, z=10,
     drabinka = [{
         "linia": 1.5, "kurs": kurs,
         "pokrycie": {"traf": traf, "z": z},
+        # forma ostatnich 5 idzie za pokryciem — te testy pytają o INNE bramy
+        "pokrycie5": {"traf": min(traf, 5), "z": 5},
         "p_bazowe": p_final, "korekta": 1.0, "p_final": p_final,
     }]
     if drugi_p is not None:
@@ -741,11 +744,13 @@ def _karta_do_oceny(traf, kurs=2.40, p_final=0.45, z=10,
             # wchodzić rzadziej, ale ma zostać nad progiem MIN_POKRYCIE_DRUGIEGO,
             # bo te testy pytają o INNE bramy niż pokrycie drugiego szczebla
             "pokrycie": {"traf": max(traf - 1, 0), "z": z},
+            "pokrycie5": {"traf": min(max(traf - 1, 0), 5), "z": 5},
             "p_bazowe": drugi_p, "korekta": 1.0, "p_final": drugi_p,
         })
     return {
         "minuty_sr6": 85,
         "udzial_startow": 0.9,
+        "krotkie_wystepy5": 0,       # pełne mecze — sito (17.09) przechodzi
         "rynki": [{
             "rynek_kod": "shots", "rynek": "Strzały", "drabinka": drabinka,
         }],
@@ -774,10 +779,15 @@ def test_pomiar_nie_bierze_szczebli_daleko_pod_progiem():
 
 
 def test_szczebel_nad_progiem_zostaje_typem_a_nie_pomiarem():
+    """7/10, nie 6/10 (zmiana 2026-09-17): od sita karta potrzebuje linii
+    z pokryciem ≥7/10 — 6/10 nie idzie do pomiaru, ale też nie jest kartą."""
     pomiar = []
-    _score, hero = radar._oceń_karte(_karta_do_oceny(6), pomiar_out=pomiar)
-    assert hero is not None and hero["traf"] == 6
+    _score, hero = radar._oceń_karte(_karta_do_oceny(7), pomiar_out=pomiar)
+    assert hero is not None and hero["traf"] == 7
     assert pomiar == []
+    powody = Counter()
+    assert radar._oceń_karte(_karta_do_oceny(6), powody=powody)[1] is None
+    assert powody["sito_pokrycie_ponizej_7_z_10"] == 1
 
 
 def test_pomiar_odrzuca_szczebel_ponizej_ceny_fair():
@@ -901,8 +911,9 @@ def test_droga_karta_bez_serii_odpada():
 
 def test_tansza_karta_nie_potrzebuje_serii():
     """Poniżej progu ceny zostaje zwykłe pokrycie — inaczej zabralibyśmy
-    produktowi jego serce (pasmo 2,00–2,50, jedyne bliskie zeru)."""
-    assert radar._oceń_karte(_karta_do_oceny(6, kurs=2.30))[1] is not None
+    produktowi jego serce (pasmo 2,00–2,50, jedyne bliskie zeru).
+    Od 17.09 „zwykłe pokrycie" to i tak 7/10 (sito), więc 7, nie 6."""
+    assert radar._oceń_karte(_karta_do_oceny(7, kurs=2.30))[1] is not None
 
 
 def test_faule_nie_daja_kart_wcale():
@@ -931,50 +942,130 @@ def test_szczebel_za_drobne_po_sufit_linii():
     assert zd["pokrycie"]["z"] == 10
 
 
-# --- SITO (2026-09-16): najwyższa linia, którą zawodnik realnie pokrywa -----
+# --- SITO (2026-09-17): najwyższa linia z pokryciem I formą, pełne występy ---
 
-def _karta_sitowa(minuty=85, udzial=0.9, xi=None, p_model=None):
-    """Trzy linie strzałów: 0,5 @1,30 (10/10), 1,5 @1,90 (8/10), 2,5 @2,50 (7/10),
-    3,5 @4,20 (3/10). Przewaga nad ceną jest największa na 1,5 — sito ma
-    wybrać 2,5, bo to najwyższa linia z pokryciem ≥7/10 i kursem ≤2,60."""
-    def s(linia, kurs, traf, p):
+def _karta_sitowa(udzial=0.9, xi=None, p_model=None, forma=None, krotkie=0,
+                  rywal=None, forma_ostatniej=2, kurs_25=2.50):
+    """Cztery linie strzałów: 0,5 @1,30 (10/10, ost. 5/5), 1,5 @1,90 (8/10,
+    5/5), 2,5 (7/10, forma domyślnie 4/5), 3,5 @4,20 (5/10, forma 2/5).
+    Przewaga nad ceną jest największa na 1,5 — sito ma wybrać 2,5: najwyższą
+    linię z pokryciem ≥7/10 i formą ≥4/5, która ma realny następnik."""
+    def s(linia, kurs, traf, p, traf5):
         d = {"linia": linia, "kurs": kurs, "pokrycie": {"traf": traf, "z": 10},
+             "pokrycie5": {"traf": traf5, "z": 5},
              "p_bazowe": p, "korekta": 1.0, "p_final": p}
         if p_model is not None:
             d["p_model"] = p_model
         return d
-    return {
-        "minuty_sr6": minuty, "udzial_startow": udzial, "xi": xi,
-        "rynki": [{"rynek_kod": "shots", "rynek": "Strzały", "drabinka": [
-            # p_final trzyma się ceny (rozjazd ≤ MAX_ROZJAZD_KARTY), a następnik
-            # każdej linii ma pokrycie ≥ MIN_POKRYCIE_DRUGIEGO i p ≥ 0,25
-            s(0.5, 1.30, 10, 0.78), s(1.5, 1.90, 8, 0.58),
-            s(2.5, 2.50, 7, 0.45), s(3.5, 4.20, 5, 0.27),
-        ]}],
-    }
+    rynek = {"rynek_kod": "shots", "rynek": "Strzały", "drabinka": [
+        # p_final trzyma się ceny (rozjazd ≤ MAX_ROZJAZD_KARTY), a następnik
+        # każdej linii ma pokrycie ≥ MIN_POKRYCIE_DRUGIEGO i p ≥ 0,25
+        s(0.5, 1.30, 10, 0.78, 5), s(1.5, 1.90, 8, 0.58, 5),
+        # przy 2,92 cena bez marży to ~0,318 — 0,38 mieści się w oknie zgody
+        # z rynkiem (MAX_ROZJAZD_KARTY), 0,40 już nie
+        s(2.5, kurs_25, 7, 0.45 if kurs_25 <= 2.6 else 0.38,
+          4 if forma is None else forma),
+        s(3.5, 4.20, 5, 0.27, forma_ostatniej),
+    ]}
+    if rywal is not None:
+        rynek["kontekst"] = {"rywal": {"mnoznik": rywal}}
+    # średnia minut to brama KARTY (MIN_MINUT_KARTY), nie sita — zostaje
+    return {"minuty_sr6": 85, "udzial_startow": udzial, "xi": xi,
+            "krotkie_wystepy5": krotkie, "rynki": [rynek]}
 
 
 def test_sito_wybiera_najwyzsza_pokryta_linie_nie_najhojniejsza():
     score, hero = radar._oceń_karte(_karta_sitowa())
     assert hero is not None and hero["linia"] == 2.5 and hero["kurs"] == 2.5
-    assert hero["sito"] is True
-    assert score > radar.BONUS_SITA          # karta sitowa stoi przed niesitowymi
-    # powód wejścia zostaje tym, czym był (przewaga/seria/pokrycie) — sito to osobna flaga
+    assert hero["sito"] is True and hero["sito_wyjatek"] is None
+    # forma obu szczebli jedzie do księgi
+    assert hero["traf5"] == 4 and hero["z5"] == 5
+    assert hero["drugi_linia"] == 3.5 and hero["drugi_traf5"] == 2
+    # powód wejścia zostaje tym, czym był — sito to osobna flaga
     assert hero["powod_wejscia"] in ("przewaga", "seria", "pokrycie", "roznica_kursow")
 
 
-def test_bez_minut_sito_nie_dziala_i_wraca_wybor_po_przewadze():
-    score, hero = radar._oceń_karte(_karta_sitowa(minuty=70))
-    assert hero is not None and hero["sito"] is False
-    assert hero["linia"] == 1.5              # największa przewaga nad ceną
-    assert score < radar.BONUS_SITA
+def test_sito_nie_ma_sufitu_kursu():
+    """17.09: sufit 2,60 zdjęty — w sicie pasmo 1,8+ trafia 65% przy cenie
+    50%, a stary sufit pochodził z kart wybieranych po przewadze."""
+    _s, hero = radar._oceń_karte(_karta_sitowa(kurs_25=2.92))
+    assert hero is not None and hero["linia"] == 2.5 and hero["kurs"] == 2.92
 
 
-def test_sito_szanuje_szanse_modelu_i_udzial_startow():
+def test_forma_jest_brama_szczebla_nie_karty():
+    """2,5 ma 7/10, ale ostatnio 3/5 — hero schodzi na 1,5 (5/5), a 2,5
+    zostaje celem polowania. Karta NIE znika."""
+    _s, hero = radar._oceń_karte(_karta_sitowa(forma=3))
+    assert hero is not None and hero["linia"] == 1.5 and hero["sito"] is True
+    assert hero["drugi_linia"] == 2.5 and hero["sito_wyjatek"] is None
+
+
+def test_hojny_rywal_luzuje_forme_do_3_z_5_i_zostawia_stempel():
+    """Życzenie właściciela 17.09 (niezmierzone, n=2) — stąd stempel."""
+    _s, hero = radar._oceń_karte(_karta_sitowa(forma=3, rywal=1.2))
+    assert hero is not None and hero["linia"] == 2.5
+    assert hero["sito_wyjatek"] == "rywal"
+    # 2/5 nie ratuje nawet hojny rywal; rywal w normie nie luzuje nic
+    _s, hero = radar._oceń_karte(_karta_sitowa(forma=2, rywal=1.2))
+    assert hero is not None and hero["linia"] == 1.5 and hero["sito_wyjatek"] is None
+    _s, hero = radar._oceń_karte(_karta_sitowa(forma=3, rywal=1.05))
+    assert hero is not None and hero["linia"] == 1.5
+
+
+def test_krotki_wystep_w_ostatnich_5_zdejmuje_karte_chyba_ze_sklad():
+    """Jeden występ <60 min w ostatnich 5 → 38% vs 52% (pomiar 17.09).
+    Ogłoszony/przewidywany skład odpowiada na to pytanie wprost."""
+    powody = Counter()
+    score, hero = radar._oceń_karte(_karta_sitowa(krotkie=1), powody=powody)
+    assert hero is None and score == 0.0
+    assert powody["sito_krotki_wystep_w_ostatnich_5"] == 1
+    _s, hero = radar._oceń_karte(_karta_sitowa(krotkie=1, xi=True))
+    assert hero is not None and hero["linia"] == 2.5
+    assert hero["sito_wyjatek"] == "xi"
+    # bez danych o minutach też nie ma sita — i to jest osobny licznik
+    powody = Counter()
+    assert radar._oceń_karte(_karta_sitowa(krotkie=None), powody=powody)[1] is None
+    assert powody["sito_bez_minut_ostatnich_meczow"] == 1
+
+
+def test_szansa_modelu_nie_jest_brama_sita():
+    """W sicie p<0,45 trafiało 66,7% (n=6) — brak dowodu, więc model zostaje
+    tylko w kolejności kart."""
     _s, hero = radar._oceń_karte(_karta_sitowa(p_model=0.30))
-    assert hero is not None and hero["sito"] is False
-    # udział 0,7 przechodzi bramę karty (0,6), ale nie sito (0,8) — chyba że XI ogłoszone
-    _s, hero = radar._oceń_karte(_karta_sitowa(udzial=0.7))
-    assert hero is not None and hero["sito"] is False
+    assert hero is not None and hero["sito"] is True and hero["linia"] == 2.5
+
+
+def test_sito_szanuje_udzial_startow_albo_xi():
+    powody = Counter()
+    assert radar._oceń_karte(_karta_sitowa(udzial=0.7), powody=powody)[1] is None
+    assert powody["sito_rzadko_w_pierwszym_skladzie"] == 1
     _s, hero = radar._oceń_karte(_karta_sitowa(udzial=0.7, xi=True))
     assert hero is not None and hero["sito"] is True and hero["linia"] == 2.5
+    assert hero["sito_wyjatek"] == "xi"
+
+
+def test_drugi_szczebel_z_martwa_forma_nie_jest_nastepnikiem():
+    """3,5 wchodziło 1/5 ostatnich (≤1/5 → 10% przy cenie 30%) — 2,5 nie ma
+    celu polowania, więc hero schodzi na 1,5 z celem 2,5."""
+    _s, hero = radar._oceń_karte(_karta_sitowa(forma_ostatniej=1))
+    assert hero is not None and hero["linia"] == 1.5 and hero["drugi_linia"] == 2.5
+
+
+def test_karta_bez_zadnej_linii_sitowej_odpada_z_powodem():
+    karta = _karta_sitowa()
+    for s in karta["rynki"][0]["drabinka"]:
+        s["pokrycie5"]["traf"] = 2
+    powody = Counter()
+    score, hero = radar._oceń_karte(karta, powody=powody)
+    assert hero is None and score == 0.0
+    assert powody["sito_forma_ponizej_4_z_5"] == 1
+
+
+def test_krotkie_wystepy_licza_z_surowych_minut():
+    """15-minutowe wejście to rotacja, choć do serii (≥20 min) się nie liczy;
+    mecze bez występu (0 min) nie są „ostatnimi rozegranymi"."""
+    tr = _trend(counts=[1] * 7, minutes=[90, 15, 0, 88, 59, 61, 90])
+    # pięć ostatnich ROZEGRANYCH: 90, 15, 88, 59, 61 → krótkie: 15 i 59
+    assert radar.krotkie_wystepy(tr) == 2
+    assert radar.krotkie_wystepy(None) is None
+    assert radar.krotkie_wystepy(_trend(counts=[], minutes=[])) is None

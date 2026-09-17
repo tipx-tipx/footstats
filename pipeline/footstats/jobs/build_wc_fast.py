@@ -9388,6 +9388,17 @@ def _main_impl(tryb=None):
         # księga porówna karty sitowe z niesitowymi (patrz radar.PROG_POKRYCIA_SITA)
         if h.get("sito") is not None:
             out["sito"] = bool(h["sito"])
+        # FORMA i WYJĄTKI SITA (2026-09-17) — bez nich pytań „czy 3/5 przy
+        # hojnym rywalu trafia" i „czy XI ratuje krótkie występy" nie da się
+        # rozstrzygnąć wstecz (patrz radar.PROG_FORMY_SITA)
+        for pole, klucz in ((f"{pref}traf5", "forma5_traf"),
+                            (f"{pref}z5", "forma5_z")):
+            if h.get(pole) is not None:
+                out[klucz] = int(h[pole])
+        if h.get("sito_wyjatek"):
+            out["sito_wyjatek"] = h["sito_wyjatek"]
+        if w.get("krotkie_wystepy5") is not None:
+            out["krotkie_wystepy5"] = int(w["krotkie_wystepy5"])
         # ⚑ OBIE CENY I MIEJSCE KARTY (2026-09-15). Bez nich pytanie
         # właściciela „czy value z rozjazdu Superbet/Betclic działa" było
         # nierozstrzygalne: księga pisała `bukmacher=Superbet` w 837 z 837
