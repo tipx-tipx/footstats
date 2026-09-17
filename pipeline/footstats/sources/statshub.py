@@ -136,6 +136,14 @@ class StatshubTrend:
     last_game_with_team: int | None = None
     # kursy referencyjne bukmacherów UK dla linii `line` (Bet365, WH, ...)
     ref_odds: list[float] = field(default_factory=list)
+    # ⚑ CZY HISTORIA JEST PEŁNA (2026-09-17). Feed propsów zna tylko mecze,
+    # które bukmacherzy UK kwotowali, a statystyki 365 — tylko rozgrywki
+    # z zakresu. Wyłącznie `player/{id}/performance` oddaje KAŻDY mecz
+    # zawodnika (także z 0 minut), więc tylko taka historia pozwala orzec
+    # „opuścił mecz drużyny" (radar.dopelnij_meczami_druzyny). Hödl (Sturm,
+    # 11 startów z 12) wylatywał jako „w XI w 2 z 10", bo historia z 365
+    # znała same puchary.
+    historia_pelna: bool = False
 
 
 def fetch_event_trends(event_ids: list[int]) -> list[StatshubTrend]:
@@ -431,6 +439,7 @@ def trendy_z_performance(
             game_opponents=[x[3] for x in lista],
             game_opponent_ids=[x[4] for x in lista],
             game_utids=[x[5] for x in lista],
+            historia_pelna=True,
         )
     return out
 

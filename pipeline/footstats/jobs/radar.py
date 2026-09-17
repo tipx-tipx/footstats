@@ -701,7 +701,7 @@ KALENDARZ_NIEAKTUALNY_S = 14 * 86400
 
 def dopelnij_meczami_druzyny(
     tr: statshub.StatshubTrend, kalendarz: dict[int, list[int]] | None,
-    teraz: int, okno: int = OKNO_STARTOW,
+    teraz: int, okno: int = OKNO_STARTOW, tylko_pelna: bool = True,
 ) -> tuple[list[bool], list[float], list[int]] | None:
     """Historia zawodnika DOPEŁNIONA meczami drużyny, w których nie zagrał.
 
@@ -717,8 +717,18 @@ def dopelnij_meczami_druzyny(
     meczów drużyny (od najnowszego); mecz bez występu → (False, 0.0, ts).
     None = nie znamy kalendarza tej drużyny (magazyn jej nie ma) — wołający
     MUSI wtedy wrócić do starej miary, nie udawać zera.
+
+    ⚑ TYLKO PRZY PEŁNEJ HISTORII (2026-09-17). Mecz drużyny bez występu w
+    historii zawodnika to „opuścił" wyłącznie wtedy, gdy historia zna każdy
+    jego mecz (`historia_pelna`, performance). Feed propsów i statystyki 365
+    znają część meczów — Hödl (Sturm) miał z nich 2 mecze na 10 w kalendarzu
+    i wylatywał jako rezerwowy, grając 11 z 12. Z niepełną historią
+    zwracamy None (nie wiemy); podejrzanych dociąga `dociagnij_pelne_wystepy`.
+    `tylko_pelna=False` służy WYŁĄCZNIE do wytypowania podejrzanych.
     """
     if not kalendarz or tr.team_id is None:
+        return None
+    if tylko_pelna and not getattr(tr, "historia_pelna", False):
         return None
     try:
         ts_dr = kalendarz.get(int(tr.team_id)) or []
@@ -849,7 +859,79 @@ def polacz_wystepy(trendy: list) -> statshub.StatshubTrend | None:
         started=[w[1] for w in mecze],
         minutes=[w[2] for w in mecze],
         counts=[w[3] for w in mecze],
+        # unia z choć jednym trendem z performance zna KAŻDY mecz zawodnika
+        historia_pelna=any(getattr(t, "historia_pelna", False) for t in trendy),
     )
+
+
+# budżet zapytań performance na dociągnięcie pełnej historii zawodnikom, których
+# niepełna historia wygląda na „rzadko w XI" (patrz dociagnij_pelne_wystepy)
+MAX_PERF_UDZIAL = 150
+
+
+def dociagnij_pelne_wystepy(
+    wystepy: dict[int, statshub.StatshubTrend],
+    kalendarz: dict[int, list[int]] | None,
+    teraz: int,
+    budzet: int = MAX_PERF_UDZIAL,
+    kickoff: dict[int, int] | None = None,
+    fetch=None,
+) -> dict[str, int]:
+    """Dociągnij z performance pełną historię tym, których NIEPEŁNA historia
+    wygląda na rezerwowego — zanim brama składu ich odrzuci.
+
+    ⚑ PO CO (2026-09-17, Hödl / Sturm Graz). Feed propsów nie miał go wcale,
+    historia z 365 znała same puchary (2 mecze), a kalendarz drużyny 10 —
+    brama widziała „w XI w 2 z 10". Performance: 11 startów z 12. Kalendarz
+    orzeka „opuścił mecz" TYLKO przy pełnej historii (`historia_pelna`),
+    więc bez tego kroku taki zawodnik byłby „nieznany" i przechodził bez
+    kontroli — a prawdziwy rezerwowy z trzema występami razem z nim.
+    Dociągamy więc tylko podejrzanych (kalendarz liczony na niepełnej
+    historii mówi „rzadko" albo „nie grał ostatnio"), najbliższy kickoff
+    pierwszy. Mutuje `wystepy` (unia feed + performance, flaga pełnej
+    historii). Zwraca liczniki do rentgenu.
+    """
+    fetch = fetch or statshub.fetch_player_performance
+    licz = {"podejrzani": 0, "dociagnieci": 0, "bez_budzetu": 0,
+            "bez_danych": 0, "nadal_rzadko": 0}
+    if not kalendarz:
+        return licz
+    kolejka: list[tuple[int, int]] = []
+    for pid, tr in wystepy.items():
+        if tr is None or getattr(tr, "historia_pelna", False):
+            continue
+        dop = dopelnij_meczami_druzyny(tr, kalendarz, teraz, tylko_pelna=False)
+        if not dop or len(dop[0]) < MIN_MECZOW_DRUZYNY:
+            continue
+        rzadko = sum(1 for st in dop[0] if st) / len(dop[0]) < MIN_UDZIAL_STARTOW
+        nieobecny = all((m or 0) <= 0 for m in dop[1][:OKNO_NIEOBECNOSCI])
+        if rzadko or nieobecny:
+            kolejka.append(((kickoff or {}).get(pid, 1 << 40), pid))
+    licz["podejrzani"] = len(kolejka)
+    kolejka.sort()
+    for i, (_k, pid) in enumerate(kolejka):
+        if i >= budzet:
+            licz["bez_budzetu"] += 1
+            continue
+        tr = wystepy[pid]
+        try:
+            rows = fetch(int(pid))
+        except Exception as e:                                 # noqa: BLE001
+            diagnostyka.cichy("statshub", "performance_udzial", e)
+            rows = None
+        perf = (statshub.trendy_z_performance(int(pid), tr.player_name,
+                                              tr.team_id, rows)
+                if rows else {})
+        if not perf:
+            licz["bez_danych"] += 1
+            continue
+        pelny = polacz_wystepy([tr] + list(perf.values()))
+        wystepy[pid] = pelny
+        licz["dociagnieci"] += 1
+        u = udzial_startow(pelny, kalendarz=kalendarz, teraz=teraz)
+        if u is not None and u < MIN_UDZIAL_STARTOW:
+            licz["nadal_rzadko"] += 1
+    return licz
 
 
 def wystepy_zawodnikow(trends: list) -> dict[int, statshub.StatshubTrend]:
@@ -2435,6 +2517,9 @@ def zbuduj(
     wagi_modelu: dict | None = None,
     kalendarz_druzyn: dict[int, list[int]] | None = None,
     tabela_rywali: dict | None = None,
+    # unia występów per zawodnik z cyklu (build_wc_fast), już DOCIĄGNIĘTA
+    # z performance dla podejrzanych — bramy składu karty liczą z niej
+    wystepy_pelne: dict[int, statshub.StatshubTrend] | None = None,
 ) -> list[dict]:
     """Złóż wpisy radaru/drabinek ze zbiorów, które cykl i tak ma w pamięci.
 
@@ -2644,12 +2729,18 @@ def zbuduj(
             if not rynki:
                 lejek["8_odpadly_puste_drabinki"] += 1
                 continue  # same puste drabinki (kursy-szum) = nie ma karty
+            # unia występów: trendy tej karty + unia z cyklu (dociągnięta
+            # z performance dla podejrzanych — patrz dociagnij_pelne_wystepy)
+            _unia = polacz_wystepy(
+                list(trendy_mk.values())
+                + ([wystepy_pelne[pid]] if wystepy_pelne and wystepy_pelne.get(pid) else [])
+            ) or tr_ref
             wpis = {
                 "minuty_sr6": minuty_sr6,
                 # krótkie występy w ostatnich 5 — brama sita (rotacja), z UNII
                 # występów jak udział startów
                 "krotkie_wystepy5": krotkie_wystepy(
-                    polacz_wystepy(list(trendy_mk.values())) or tr_ref),
+                    _unia),
                 # ile z ostatnich meczów zaczynał w pierwszym składzie —
                 # brama karty i konkret na karcie („gra od pierwszej minuty
                 # w 9 z 10 ostatnich"), zamiast samej średniej minut
@@ -2658,10 +2749,10 @@ def zbuduj(
                 # ⚑ z UNII występów ze wszystkich rynków (2026-09-16) — jeden
                 # rynek z feedu zna tylko mecze, które kwotowano
                 "udzial_startow": udzial_startow(
-                    polacz_wystepy(list(trendy_mk.values())) or tr_ref,
+                    _unia,
                     kalendarz=kalendarz_druzyn, teraz=teraz),
                 "nie_gral_ostatnio": nie_gral_ostatnio(
-                    polacz_wystepy(list(trendy_mk.values())) or tr_ref,
+                    _unia,
                     kalendarz_druzyn, teraz),
                 "rodzaj": (
                     "transfer" if transfer else

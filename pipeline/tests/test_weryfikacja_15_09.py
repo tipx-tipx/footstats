@@ -121,8 +121,11 @@ def test_rotowire_rozkodowuje_encje(monkeypatch):
 # --- 4. nieaktualny kalendarz drużyny ---
 
 def _trend(grane_dni):
+    # historia_pelna: od 17.09 kalendarz orzeka „opuścił mecz" tylko przy
+    # historii z performance (podejrzanych dociąga `dociagnij_pelne_wystepy`)
     n = len(grane_dni)
     return StatshubTrend(
+        historia_pelna=True,
         player_id=1, player_name="Martin Tejon", position="M", team_id=100,
         team_name="Marítimo", opponent_id=200, opponent_name="Gil Vicente",
         is_home=False, market_code="shots", line=0.5, in_predicted_lineup=False,
@@ -199,6 +202,7 @@ from footstats.jobs import magazyn_druzyn as MD
 
 def _kolega(pid, grane_dni, rywale, team_id=23, minuty=90.0):
     return StatshubTrend(
+        historia_pelna=True,
         player_id=pid, player_name=f"G{pid}", position="M", team_id=team_id,
         team_name="Barnsley", opponent_id=9, opponent_name="Peterborough",
         is_home=False, market_code="shots", line=0.5, in_predicted_lineup=False,

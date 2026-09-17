@@ -1467,8 +1467,17 @@ def _gid_365(rec: dict, cache: dict) -> int | None:
                 continue
         cache["_wyniki"] = wyniki
     gid = None
+    # ⚑ STOPIEŃ 1 TEŻ W OKNIE CZASU (2026-09-17). Do tej pory porównywał sam
+    # ZBIÓR nazw, bez godziny i bez ról. W dwumeczu pucharowym pierwszy mecz
+    # (Palmeiras – LDU, 10.09) leży jeszcze w wynikach i pasuje do rewanżu
+    # (LDU – Palmeiras, 17.09) co do nazw — rozliczenie wzięło statystyki
+    # sprzed tygodnia: Gómez „90 min, 2 strzały", choć w rewanżu nie grał;
+    # ~80 typów z meczu (drużynowe też) zamknęło się cudzym wynikiem,
+    # nieodwracalnie. Jedna drużyna nie gra dwóch meczów w 3 h, więc okno
+    # ±3 h (to samo, co w stopniach 2 i 2b) usuwa dwuznaczność bez straty.
     for g in cache["_wyniki"]:
-        if {g["home"], g["away"]} == {home, away}:
+        if ({g["home"], g["away"]} == {home, away}
+                and abs(g["ts"] - rec["kickoff_ts"]) < 3 * 3600):
             gid = g["id"]
             break
     if gid is None:

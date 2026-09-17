@@ -77,6 +77,24 @@ def test_nie_bierze_sasiada_o_podobnej_nazwie(monkeypatch):
     assert rozliczanie._gid_365(rec, {}) is None
 
 
+def test_dwumecz_nie_bierze_pierwszego_meczu(monkeypatch):
+    """LDU – Palmeiras (rewanż 17.09) rozliczył się statystykami PIERWSZEGO
+    meczu Palmeiras – LDU z 10.09: stopień 1 porównywał sam zbiór nazw, bez
+    godziny. Gómez dostał „90 min, 2 strzały", choć w rewanżu nie grał — ~80
+    typów zamkniętych cudzym wynikiem, nieodwracalnie.
+    """
+    ts = int(time.time()) - 20 * 3600
+    _bez_sieci(monkeypatch, gry=[
+        _gra(16881449, ts - 7 * 86400, "palmeiras", "ldu"),   # pierwszy mecz
+    ])
+    assert rozliczanie._gid_365(_rec("LDU – Palmeiras", ts), {}) is None
+    _bez_sieci(monkeypatch, gry=[
+        _gra(16881449, ts - 7 * 86400, "palmeiras", "ldu"),
+        _gra(16883029, ts, "ldu", "palmeiras"),                # rewanż
+    ])
+    assert rozliczanie._gid_365(_rec("LDU – Palmeiras", ts), {}) == 16883029
+
+
 # --- JEDNA STRONA OSTRO, DRUGA NA POTWIERDZENIE (2026-08-17) ---------------
 
 

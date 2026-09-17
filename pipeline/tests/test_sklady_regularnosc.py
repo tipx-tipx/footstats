@@ -20,10 +20,14 @@ DZIEN = 86_400
 KLUB = 100
 
 
-def _trend(grane_dni, minuty=90, team_id=KLUB):
-    """Zawodnik z występami `grane_dni` dni temu (tylko mecze, w których grał)."""
+def _trend(grane_dni, minuty=90, team_id=KLUB, pelna=True):
+    """Zawodnik z występami `grane_dni` dni temu (tylko mecze, w których grał).
+
+    `pelna` = historia z performance (zna każdy mecz zawodnika) — tylko taka
+    pozwala kalendarzowi orzec „opuścił mecz" (2026-09-17, Hödl)."""
     n = len(grane_dni)
     return StatshubTrend(
+        historia_pelna=pelna,
         player_id=1, player_name="Rezerwowy", position="M", team_id=team_id,
         team_name="Como", opponent_id=200, opponent_name="Parma", is_home=True,
         market_code="fouls_won", line=1.5, in_predicted_lineup=False,
@@ -57,6 +61,60 @@ def test_dopelnienie_wstawia_zero_minut_za_opuszczone_mecze():
     tr = _trend([1])
     tr.timestamps = [TERAZ - DZIEN + 2 * 3600]
     assert radar.dopelnij_meczami_druzyny(tr, KALENDARZ, TERAZ)[0][0]
+
+
+def test_niepelna_historia_nie_orzeka_opuszczonych_meczow():
+    """Hödl (Sturm) 17.09: feed propsów nie miał go wcale, historia z 365
+    znała same puchary (2 mecze), kalendarz drużyny 10 — brama widziała
+    „w XI w 2 z 10". Performance: 11 startów z 12. Z niepełną historią
+    kalendarz mówi „nie wiem" (stara miara), nie „rezerwowy"."""
+    tr = _trend([1, 22], pelna=False)
+    assert radar.dopelnij_meczami_druzyny(tr, KALENDARZ, TERAZ) is None
+    tr5 = _trend([1, 15, 22, 43, 57], pelna=False)
+    assert radar.udzial_startow(tr5, kalendarz=KALENDARZ, teraz=TERAZ) == 1.0
+    assert radar.nie_gral_ostatnio(_trend([30], pelna=False), KALENDARZ, TERAZ) is None
+    # ...ale do WYTYPOWANIA podejrzanych niepełna historia wystarcza
+    assert radar.dopelnij_meczami_druzyny(tr, KALENDARZ, TERAZ, tylko_pelna=False)[0].count(True) == 2
+    # unia z choć jednym trendem z performance jest pełna
+    unia = radar.polacz_wystepy([tr, _trend([1, 8, 15], pelna=True)])
+    assert unia.historia_pelna is True
+    assert radar.polacz_wystepy([tr, _trend([1], pelna=False)]).historia_pelna is False
+
+
+def test_dociagniecie_performance_dla_podejrzanych():
+    """Podejrzany (niepełna historia „2 z 10") dostaje performance; starter
+    wraca do gry, prawdziwy rezerwowy zostaje rzadki; niepodejrzany nie
+    kosztuje zapytania; kolejność = najbliższy kickoff."""
+    pytano = []
+
+    def _perf(pid):
+        pytano.append(pid)
+        # rekordy performance: pid 1 gra co tydzień, pid 2 naprawdę rzadko
+        dni = [1, 8, 15, 22, 29, 36, 43, 50, 57, 64] if pid == 1 else [1, 43]
+        return [{
+            "player_statistics_event": {"minutesPlayed": 90, "shots": 2, "teamId": KLUB},
+            "events": {"id": 5000 + d, "timeStartTimestamp": TERAZ - d * DZIEN,
+                       "homeTeamId": KLUB, "awayTeamId": 200},
+            "homeTeam": {"name": "Como"}, "awayTeam": {"name": "Parma"},
+        } for d in dni]
+
+    a = _trend([1, 22], pelna=False)                     # feed: 2 z 10 (Hödl)
+    b = _trend([1, 43], pelna=False); b.player_id = 2    # feed: 2 z 10 (rezerwowy)
+    c = _trend([1, 8, 15, 22, 29, 36], pelna=False); c.player_id = 3   # 6/10: ok
+    wyst = {1: a, 2: b, 3: c}
+    licz = radar.dociagnij_pelne_wystepy(
+        wyst, KALENDARZ, TERAZ, kickoff={1: TERAZ + 3600, 2: TERAZ + 600}, fetch=_perf)
+    assert pytano == [2, 1]                    # bliższy kickoff pierwszy, 3 nie pytany
+    assert licz["podejrzani"] == 2 and licz["dociagnieci"] == 2
+    assert wyst[1].historia_pelna and wyst[2].historia_pelna
+    assert radar.udzial_startow(wyst[1], kalendarz=KALENDARZ, teraz=TERAZ) == 1.0
+    assert radar.udzial_startow(wyst[2], kalendarz=KALENDARZ, teraz=TERAZ) == 0.2
+    assert licz["nadal_rzadko"] == 1
+    # budżet: bez zapytania zostaje „nie wiemy", nie fałszywe „rzadko"
+    wyst2 = {1: _trend([1, 22], pelna=False)}
+    licz2 = radar.dociagnij_pelne_wystepy(wyst2, KALENDARZ, TERAZ, budzet=0, fetch=_perf)
+    assert licz2["bez_budzetu"] == 1 and wyst2[1].historia_pelna is False
+    assert radar.udzial_startow(wyst2[1], kalendarz=KALENDARZ, teraz=TERAZ) is None
 
 
 def test_bez_kalendarza_zostaje_stara_miara_nie_zero():

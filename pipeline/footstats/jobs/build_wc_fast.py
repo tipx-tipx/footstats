@@ -2333,6 +2333,7 @@ def odswiez_stare_trendy(
             t.minutes = s.minutes
             t.timestamps = s.timestamps
             t.started = s.started
+            t.historia_pelna = True   # performance zna każdy mecz zawodnika
             t.game_positions = s.game_positions
             t.game_opponents = s.game_opponents
             t.game_opponent_ids = s.game_opponent_ids
@@ -5887,6 +5888,25 @@ def _main_impl(tryb=None):
     # i ten sam starter raz przechodził, raz wylatywał jako „rzadko w XI"
     # (451 par z kursem w audycie). Patrz `radar.polacz_wystepy`.
     _wystepy_gracza = radar.wystepy_zawodnikow(trends)
+    # ⚑ DOCIĄGNIĘCIE PEŁNEJ HISTORII PODEJRZANYM (2026-09-17, Hödl). Kalendarz
+    # orzeka „opuścił mecz" tylko przy historii z performance; feed/365 znają
+    # część meczów. Podejrzani (na niepełnej historii „rzadko"/„nie grał")
+    # dostają performance, najbliższy kickoff pierwszy — reszta = nie wiemy.
+    try:
+        _kick_pid: dict[int, int] = {}
+        for _t in trends:
+            _k = int((ev_by_id.get(getattr(_t, "event_id", None)) or {}).get("timeStartTimestamp") or 0)
+            if _k and (_t.player_id not in _kick_pid or _k < _kick_pid[_t.player_id]):
+                _kick_pid[_t.player_id] = _k
+        _licz_udzial = radar.dociagnij_pelne_wystepy(
+            _wystepy_gracza, _kalendarz_druzyn, _teraz_kal, kickoff=_kick_pid)
+        diagnostyka.zapisz_rentgen("udzial_startow_performance", _licz_udzial)
+        print(f"Udział startów: podejrzanych {_licz_udzial['podejrzani']}, "
+              f"dociągnięto z performance {_licz_udzial['dociagnieci']} "
+              f"(nadal rzadko {_licz_udzial['nadal_rzadko']}, bez danych "
+              f"{_licz_udzial['bez_danych']}, bez budżetu {_licz_udzial['bez_budzetu']})")
+    except Exception as e:                                     # noqa: BLE001
+        diagnostyka.cichy("cykl", "udzial_startow_performance", e)
 
     def _wystepy(tr_w):
         return _wystepy_gracza.get(tr_w.player_id) or tr_w
@@ -9291,6 +9311,7 @@ def _main_impl(tryb=None):
             # z przewidywanego składu (patrz radar.MAX_OPUSZCZONYCH_MECZOW)
             kalendarz_druzyn=_kalendarz_druzyn,
             tabela_rywali=_tabela_rywali,
+            wystepy_pelne=_wystepy_gracza,
         )
         radar_padl = False
     except Exception as ex:
