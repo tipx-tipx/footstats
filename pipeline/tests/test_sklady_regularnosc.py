@@ -110,6 +110,15 @@ def test_dociagniecie_performance_dla_podejrzanych():
     assert radar.udzial_startow(wyst[1], kalendarz=KALENDARZ, teraz=TERAZ) == 1.0
     assert radar.udzial_startow(wyst[2], kalendarz=KALENDARZ, teraz=TERAZ) == 0.2
     assert licz["nadal_rzadko"] == 1
+    # trendy rynków zawodnika dostają pełną historię (do banku), rynek
+    # nieznany performance zostaje jak był
+    a2 = _trend([1, 22], pelna=False); a2.market_code = "shots"
+    a3 = _trend([1, 22], pelna=False); a3.market_code = "headed_shots"
+    wyst3 = {1: _trend([1, 22], pelna=False)}
+    radar.dociagnij_pelne_wystepy(wyst3, KALENDARZ, TERAZ, fetch=_perf,
+                                  trendy_gracza={1: [a2, a3]})
+    assert a2.historia_pelna and len(a2.timestamps) == 10 and a2.counts[0] == 2.0
+    assert not a3.historia_pelna and len(a3.timestamps) == 2
     # budżet: bez zapytania zostaje „nie wiemy", nie fałszywe „rzadko"
     wyst2 = {1: _trend([1, 22], pelna=False)}
     licz2 = radar.dociagnij_pelne_wystepy(wyst2, KALENDARZ, TERAZ, budzet=0, fetch=_perf)

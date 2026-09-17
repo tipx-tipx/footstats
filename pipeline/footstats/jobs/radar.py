@@ -876,6 +876,7 @@ def dociagnij_pelne_wystepy(
     budzet: int = MAX_PERF_UDZIAL,
     kickoff: dict[int, int] | None = None,
     fetch=None,
+    trendy_gracza: dict[int, list] | None = None,
 ) -> dict[str, int]:
     """Dociągnij z performance pełną historię tym, których NIEPEŁNA historia
     wygląda na rezerwowego — zanim brama składu ich odrzuci.
@@ -890,6 +891,12 @@ def dociagnij_pelne_wystepy(
     historii mówi „rzadko" albo „nie grał ostatnio"), najbliższy kickoff
     pierwszy. Mutuje `wystepy` (unia feed + performance, flaga pełnej
     historii). Zwraca liczniki do rentgenu.
+
+    `trendy_gracza` ({pid: [trendy rynków]}): pełna historia PODMIENIA też
+    same trendy rynków (jak `odswiez_stare_trendy`), żeby bank trendów
+    ją zapamiętał — bez tego każdy cykl dociągał tych samych ludzi od nowa
+    (18.09 01:00: 7728 podejrzanych na budżet 150, bo nic nie zostawało).
+    Rynki, których performance nie zna (zza pola, głową), zostają.
     """
     fetch = fetch or statshub.fetch_player_performance
     licz = {"podejrzani": 0, "dociagnieci": 0, "bez_budzetu": 0,
@@ -928,6 +935,17 @@ def dociagnij_pelne_wystepy(
         pelny = polacz_wystepy([tr] + list(perf.values()))
         wystepy[pid] = pelny
         licz["dociagnieci"] += 1
+        for t in (trendy_gracza or {}).get(pid) or []:
+            s = perf.get(t.market_code)
+            if s is None:
+                continue
+            t.counts, t.minutes = list(s.counts), list(s.minutes)
+            t.timestamps, t.started = list(s.timestamps), list(s.started)
+            t.game_positions = list(s.game_positions)
+            t.game_opponents = list(s.game_opponents)
+            t.game_opponent_ids = list(s.game_opponent_ids)
+            t.game_utids = list(s.game_utids)
+            t.historia_pelna = True
         u = udzial_startow(pelny, kalendarz=kalendarz, teraz=teraz)
         if u is not None and u < MIN_UDZIAL_STARTOW:
             licz["nadal_rzadko"] += 1

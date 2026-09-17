@@ -4287,7 +4287,14 @@ def _main_impl(tryb=None):
             prev = lib.get(key)
             ts_new = t.timestamps[0] if t.timestamps else 0
             ts_old = prev.timestamps[0] if prev and prev.timestamps else -1
-            if prev is None or ts_new >= ts_old:
+            # pełna historia (performance) nie ustępuje częściowej z feedu
+            # o TYM SAMYM ostatnim meczu — inaczej dociągnięcie (radar.
+            # dociagnij_pelne_wystepy) znikałoby z banku w następnym cyklu;
+            # nowszy mecz w feedzie = historia i tak nieaktualna, wygrywa feed
+            _pelna_zostaje = (prev is not None and ts_new == ts_old
+                              and getattr(prev, "historia_pelna", False)
+                              and not getattr(t, "historia_pelna", False))
+            if prev is None or (ts_new >= ts_old and not _pelna_zostaje):
                 lib[key] = t
 
         # 2) dołóż co jeszcze zostało z rozegranych eventów + dzisiejsze trendy
@@ -5813,6 +5820,48 @@ def _main_impl(tryb=None):
         print(f"Odkrywanie z oferty: {len(_odkryte_trendy)} trendów odkrytych "
               "zawodników poszło DO SILNIKA TYPÓW i do banku")
 
+    # ⚑ KALENDARZ DRUŻYN UZUPEŁNIONY FEEDEM (2026-09-15, zgłoszenie właściciela:
+    # Connell i Senesi w drabinkach, choć nie grają). Magazyn bywa nieaktualny
+    # dla klubów spoza zakresu drużynowego i po transferach — wtedy „ostatnie
+    # 10 meczów drużyny" sięgało do poprzedniego sezonu. Mecze, w których
+    # zagrali koledzy z drużyny, są w feedzie tego samego cyklu (pomiar
+    # progów przy `magazyn_druzyn.UDZIAL_GRACZY_MECZU_Z_FEEDU`). Ten sam słownik
+    # dostają pewniaki i drabinki.
+    try:
+        _kal_feed = magazyn_druzyn.kalendarz_z_feedu(trends)
+        _przed = sum(len(v) for v in _kalendarz_druzyn.values())
+        _kalendarz_druzyn = magazyn_druzyn.scal_kalendarze(_kalendarz_druzyn, _kal_feed)
+        print(f"Kalendarz drużyn: magazyn {_przed} meczów, z feedu {len(_kal_feed)} "
+              f"drużyn, po scaleniu {sum(len(v) for v in _kalendarz_druzyn.values())}")
+    except Exception as e:                                     # noqa: BLE001
+        diagnostyka.cichy("cykl", "kalendarz_z_feedu", e)
+    # ⚑ DOCIĄGNIĘCIE PEŁNEJ HISTORII PODEJRZANYM (2026-09-17, Hödl). Kalendarz
+    # orzeka „opuścił mecz" tylko przy historii z performance; feed/365 znają
+    # część meczów. Podejrzani (na niepełnej historii „rzadko"/„nie grał")
+    # dostają performance, najbliższy kickoff pierwszy — reszta = nie wiemy.
+    # PRZED zapisem banku: podmienione trendy rynków idą do banku z flagą,
+    # więc dociągnięci zostają pełni w kolejnych cyklach (patrz `_merge`).
+    try:
+        _kick_pid: dict[int, int] = {}
+        for _t in trends:
+            _k = int((ev_by_id.get(getattr(_t, "event_id", None)) or {}).get("timeStartTimestamp") or 0)
+            if _k and (_t.player_id not in _kick_pid or _k < _kick_pid[_t.player_id]):
+                _kick_pid[_t.player_id] = _k
+        _wystepy_tmp = radar.wystepy_zawodnikow(trends)
+        _trendy_pid: dict[int, list] = {}
+        for _t in trends:
+            if _t.player_id:
+                _trendy_pid.setdefault(_t.player_id, []).append(_t)
+        _licz_udzial = radar.dociagnij_pelne_wystepy(
+            _wystepy_tmp, _kalendarz_druzyn, int(time.time()), kickoff=_kick_pid,
+            trendy_gracza=_trendy_pid)
+        diagnostyka.zapisz_rentgen("udzial_startow_performance", _licz_udzial)
+        print(f"Udział startów: podejrzanych {_licz_udzial['podejrzani']}, "
+              f"dociągnięto z performance {_licz_udzial['dociagnieci']} "
+              f"(nadal rzadko {_licz_udzial['nadal_rzadko']}, bez danych "
+              f"{_licz_udzial['bez_danych']}, bez budżetu {_licz_udzial['bez_budzetu']})")
+    except Exception as e:                                     # noqa: BLE001
+        diagnostyka.cichy("cykl", "udzial_startow_performance", e)
     # zapis banku po WSZYSTKICH źródłach (statshub, 365Scores, dopełnianie
     # oferty, ODKRYWANIE z oferty) — uzasadnienie przy `_bank_lib` wyżej. Przepięte z banku trendy
     # (ten sam timestamp) nadpisują wpis wariantem z nadchodzącym meczem, tak
@@ -5863,21 +5912,6 @@ def _main_impl(tryb=None):
                   f"{MIN_GRUPY_DO_PRIORU} zawodników — tam prior zostaje na "
                   f"historii samego zawodnika")
 
-    # ⚑ KALENDARZ DRUŻYN UZUPEŁNIONY FEEDEM (2026-09-15, zgłoszenie właściciela:
-    # Connell i Senesi w drabinkach, choć nie grają). Magazyn bywa nieaktualny
-    # dla klubów spoza zakresu drużynowego i po transferach — wtedy „ostatnie
-    # 10 meczów drużyny" sięgało do poprzedniego sezonu. Mecze, w których
-    # zagrali koledzy z drużyny, są w feedzie tego samego cyklu (pomiar
-    # progów przy `magazyn_druzyn.UDZIAL_GRACZY_MECZU_Z_FEEDU`). Ten sam słownik
-    # dostają pewniaki i drabinki.
-    try:
-        _kal_feed = magazyn_druzyn.kalendarz_z_feedu(trends)
-        _przed = sum(len(v) for v in _kalendarz_druzyn.values())
-        _kalendarz_druzyn = magazyn_druzyn.scal_kalendarze(_kalendarz_druzyn, _kal_feed)
-        print(f"Kalendarz drużyn: magazyn {_przed} meczów, z feedu {len(_kal_feed)} "
-              f"drużyn, po scaleniu {sum(len(v) for v in _kalendarz_druzyn.values())}")
-    except Exception as e:                                     # noqa: BLE001
-        diagnostyka.cichy("cykl", "kalendarz_z_feedu", e)
     # zawodnicy, o których ten cykl WIE, że nie grają — zdejmują też wznowione
     # karty drabinek (patrz `scal_karty_z_publikacjami`)
     _wypadli_z_gry: set = set()
@@ -5888,25 +5922,6 @@ def _main_impl(tryb=None):
     # i ten sam starter raz przechodził, raz wylatywał jako „rzadko w XI"
     # (451 par z kursem w audycie). Patrz `radar.polacz_wystepy`.
     _wystepy_gracza = radar.wystepy_zawodnikow(trends)
-    # ⚑ DOCIĄGNIĘCIE PEŁNEJ HISTORII PODEJRZANYM (2026-09-17, Hödl). Kalendarz
-    # orzeka „opuścił mecz" tylko przy historii z performance; feed/365 znają
-    # część meczów. Podejrzani (na niepełnej historii „rzadko"/„nie grał")
-    # dostają performance, najbliższy kickoff pierwszy — reszta = nie wiemy.
-    try:
-        _kick_pid: dict[int, int] = {}
-        for _t in trends:
-            _k = int((ev_by_id.get(getattr(_t, "event_id", None)) or {}).get("timeStartTimestamp") or 0)
-            if _k and (_t.player_id not in _kick_pid or _k < _kick_pid[_t.player_id]):
-                _kick_pid[_t.player_id] = _k
-        _licz_udzial = radar.dociagnij_pelne_wystepy(
-            _wystepy_gracza, _kalendarz_druzyn, _teraz_kal, kickoff=_kick_pid)
-        diagnostyka.zapisz_rentgen("udzial_startow_performance", _licz_udzial)
-        print(f"Udział startów: podejrzanych {_licz_udzial['podejrzani']}, "
-              f"dociągnięto z performance {_licz_udzial['dociagnieci']} "
-              f"(nadal rzadko {_licz_udzial['nadal_rzadko']}, bez danych "
-              f"{_licz_udzial['bez_danych']}, bez budżetu {_licz_udzial['bez_budzetu']})")
-    except Exception as e:                                     # noqa: BLE001
-        diagnostyka.cichy("cykl", "udzial_startow_performance", e)
 
     def _wystepy(tr_w):
         return _wystepy_gracza.get(tr_w.player_id) or tr_w
