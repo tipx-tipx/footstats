@@ -131,8 +131,17 @@ def norm_name(name: str) -> str:
     """Normalizacja nazwiska do dopasowania między źródłami.
 
     'Mateta, Jean-Philippe' i 'Jean-Philippe Mateta' -> ten sam klucz.
+
+    ⚑ LITERY BEZ ROZKŁADU I APOSTROFY (2026-09-18). ł, ø, ı, đ, ß nie mają
+    rozkładu NFKD, więc cięły nazwisko: „Højlund” → „jlund”, „Łakomy” →
+    „akomy”, „Yılmaz” → „lmaz”, a Superbet pisze już „hojlund”. Apostrof
+    rozcinał „N'Dicka” na „dicka”, gdy statshub ma „Ndicka”. Pełne kadry
+    (18.09) nie parowały przez to 2–6 wycenionych zawodników na mecz.
+    Tablica wspólna z Rotowire (tam ten sam błąd zabijał pół Ekstraklasy).
     """
-    s = unicodedata.normalize("NFKD", name)
+    from .rotowire import _NIEROZKLADALNE
+    s = re.sub(r"[’'`´ʼ]", "", str(name or "")).translate(_NIEROZKLADALNE)
+    s = unicodedata.normalize("NFKD", s)
     s = "".join(c for c in s if not unicodedata.combining(c)).lower()
     tokens = sorted(t for t in re.split(r"[^a-z]+", s) if len(t) > 1)
     return " ".join(tokens)
@@ -160,6 +169,31 @@ def znajdz_zawodnika(players: dict, nazwa: str) -> dict:
     ]
     if len(trafienia) == 1:
         return players[trafienia[0]]
+    if trafienia:
+        return {}          # niejednoznaczne — nie zgadujemy
+    # ⚑ TRZECIA PRÓBA: ZDROBNIENIA I SKLEJONE PRZEDROSTKI (2026-09-18).
+    # Pełne kadry statshub nie parowały z Superbetem: „Javi Villar” vs
+    # „del fraile javier villar”, „Isma Ruiz” vs „ismael ruiz sanchez”,
+    # „Dani Tasende” vs „daniel esmoris tasende”, „Evan Ndicka” vs
+    # „dicka evan”. KAŻDY token krótszej nazwy musi mieć w dłuższej
+    # odpowiednik: ten sam, jego początek (≥ 3 litery: javi → javier) albo
+    # końcówka (≥ 4 litery: dicka ← ndicka) — i tylko jeden kandydat.
+    def _pasuje(a: str, b: str) -> bool:
+        return (a == b or (len(a) >= 3 and b.startswith(a))
+                or (len(b) >= 3 and a.startswith(b))
+                or (min(len(a), len(b)) >= 4 and (a.endswith(b) or b.endswith(a))))
+
+    def _pokrywa(krotka: set, dluga: set) -> bool:
+        return all(any(_pasuje(t, d) for d in dluga) for t in krotka)
+
+    luzne = []
+    for k in players:
+        tk = set(k.split())
+        krotka, dluga = (tokeny, tk) if len(tokeny) <= len(tk) else (tk, tokeny)
+        if len(krotka) >= 2 and _pokrywa(krotka, dluga):
+            luzne.append(k)
+    if len(luzne) == 1:
+        return players[luzne[0]]
     return {}
 
 

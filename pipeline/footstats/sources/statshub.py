@@ -144,6 +144,11 @@ class StatshubTrend:
     # 11 startów z 12) wylatywał jako „w XI w 2 z 10", bo historia z 365
     # znała same puchary.
     historia_pelna: bool = False
+    # ⚑ TREND Z PEŁNEJ KADRY DRUŻYNY (2026-09-18, patrz `trendy_kadry`).
+    # Pobierany tanio co cykl, więc NOWE takie serie nie idą do banku
+    # (bank to 47 MB w magazynie) — bank dostaje je tylko wtedy, gdy
+    # wzbogacają serię, którą już pamięta.
+    z_kadry: bool = False
 
 
 def fetch_event_trends(event_ids: list[int]) -> list[StatshubTrend]:
@@ -340,8 +345,14 @@ def trendy_z_performance(
     rows: list[dict],
     sm_cache: dict | None = None,
     budzet: list[int] | None = None,
+    extra_meczu: dict[int, dict] | None = None,
 ) -> dict[str, StatshubTrend]:
     """Rekordy z `fetch_player_performance` -> trendy per rynek.
+
+    `extra_meczu` ({event_id: rekord zawodnika z `fetch_extra_stats`, {} gdy
+    mecz ma dane, a zawodnika w nich nie ma}) daje zza pola / głową WPROST
+    ze statshub — wtedy shotmapy nie są potrzebne. Mecz spoza słownika =
+    brak danych, pomijany w tych rynkach (nie fałszywe zero).
 
     Ten sam kształt co `fetch_event_trends`, więc konsumenci (radar,
     rozliczanie) nie muszą wiedzieć, z której ścieżki przyszła historia.
@@ -385,6 +396,15 @@ def trendy_z_performance(
             zebrane.setdefault(mk, []).append(
                 (ts, float(v), minuty, rywal, int(rywal_id or 0), utid, poz)
             )
+        if extra_meczu is not None:
+            rec_x = extra_meczu.get(int(ev.get("id") or 0))
+            if rec_x is not None:
+                for pole, mk in EXTRA_STATS_MAP.items():
+                    zebrane.setdefault(mk, []).append((
+                        ts, float(rec_x.get(pole) or 0), minuty, rywal,
+                        int(rywal_id or 0), utid, poz,
+                    ))
+            continue   # zza pola / głową już są — shotmapa zbędna
         # rynki pochodne ze shotmapy (zza pola / głową) — tylko gdy mecz
         # w ogóle miał shotmapę; brak = pomijamy mecz w tych rynkach,
         # zamiast liczyć fałszywe zero
@@ -441,6 +461,147 @@ def trendy_z_performance(
             game_utids=[x[5] for x in lista],
             historia_pelna=True,
         )
+    return out
+
+
+# ⚑⚑ PEŁNE KADRY WPROST ZE STATSHUB (2026-09-18, zgłoszenie właściciela).
+#
+# Do dziś historię budowaliśmy z feedu propsów (tylko mecze kwotowane w UK),
+# a braki łataliśmy zapytaniem PER ZAWODNIK (`player/{id}/performance`, budżet)
+# i mapami strzałów PER MECZ (zza pola / głową, budżet 400). Skutki z 18.09:
+# Chery (NEC) miał strzały zza pola „za mało historii” (1 mecz), choć statshub
+# pokazuje je w każdym meczu (2, 3, 1, 2, 2, 3, 5), a z Widzew–Wieczysta nie
+# mieliśmy ANI JEDNEGO zawodnika (Piazón, faule wywalczone 1,5 @2,17).
+#
+# Strona statshub bierze to samo dwoma zapytaniami, które tu odtwarzamy:
+#   * `team/{id}/players/performance` — CAŁA kadra, każdy mecz drużyny we
+#     wszystkich rozgrywkach, łącznie z 0 minut (ławka), + kontuzje;
+#     0,15–0,3 s i 12–67 KB na drużynę;
+#   * `event/extra-stats-batch` (POST) — zza pola, celne zza pola, głową,
+#     celne głową (i 1. połowa) dla wielu meczów naraz; 12 meczów w 0,1 s.
+KADRA_LIMIT = 20          # meczów drużyny (tyle, ile trzyma bank i model)
+EXTRA_PACZKA = 40         # meczów w jednym zapytaniu extra-stats-batch
+EXTRA_STATS_MAP = {
+    "shotsOutsideBox": "shots_outside_box",
+    "shotsOnTargetOutsideBox": "sot_outside_box",
+    "headedShot": "headed_shots",
+    "headedShotOnTarget": "headed_sot",
+}
+
+
+def _post(url: str, body: dict, timeout: int = 25, retries: int = 3) -> dict:
+    """POST z tym samym retry i backoffem odcięcia co `_get`."""
+    import time as _t
+
+    last = None
+    for attempt in range(retries):
+        odciecie = False
+        try:
+            r = requests.post(url, impersonate="chrome124", timeout=timeout,
+                              headers={**HEADERS, "Content-Type": "application/json"},
+                              json=body)
+            odciecie = getattr(r, "status_code", None) in (403, 429)
+            r.raise_for_status()
+            return r.json()
+        except Exception as e:  # timeout, 5xx, itp.
+            last = e
+            if odciecie:
+                diagnostyka.cichy("statshub", "odciecie_429", e)
+                _t.sleep(PAUZA_ODCIECIA_S * (attempt + 1))
+            else:
+                _t.sleep(PAUZA_PONOWIENIA_S * (attempt + 1))
+    raise last
+
+
+def fetch_team_players_performance(team_id: int, limit: int = KADRA_LIMIT) -> dict:
+    """Cała kadra drużyny: {data: [zawodnik + stats{event_id: staty}],
+    events: [{events, homeTeam, awayTeam, ...}], unavailability: [...]}."""
+    return _get(f"{BASE}/team/{int(team_id)}/players/performance"
+                f"?limit={int(limit)}&location=both", timeout=30, retries=2)
+
+
+def fetch_extra_stats(event_ids, paczka: int = EXTRA_PACZKA) -> dict[int, list[dict]]:
+    """{event_id: [rekord zawodnika]} — zza pola / głową / 1. połowa.
+
+    Mecz bez danych (brak relacji tekstowej, z której statshub to liczy) NIE
+    trafia do wyniku — to „nie wiemy”, nie zero. Paczka, która padła, też
+    nie (cichy licznik), żeby jedna awaria nie zerowała całej kadry.
+    """
+    ids = sorted({int(e) for e in event_ids if e})
+    out: dict[int, list[dict]] = {}
+    for i in range(0, len(ids), paczka):
+        try:
+            d = _post(f"{BASE}/event/extra-stats-batch",
+                      {"eventIds": ids[i:i + paczka]}, timeout=30, retries=2)
+        except Exception as e:                                # noqa: BLE001
+            diagnostyka.cichy("statshub", "extra_stats_batch", e)
+            continue
+        for rec in (d or {}).get("results") or []:
+            dane = rec.get("data") or []
+            if rec.get("eventId") and dane:
+                out[int(rec["eventId"])] = dane
+    return out
+
+
+def _klucz_slug(s) -> str:
+    import unicodedata
+    s = unicodedata.normalize("NFKD", str(s or "")).encode("ascii", "ignore").decode()
+    return s.lower().replace(" ", "-").strip("-")
+
+
+def trendy_kadry(
+    kadra: dict,
+    extra: dict[int, list[dict]] | None,
+    team_id: int,
+) -> dict[int, dict[str, StatshubTrend]]:
+    """Odpowiedź `fetch_team_players_performance` (+ `fetch_extra_stats`)
+    -> {player_id: {rynek: trend}} z pełną historią (`historia_pelna`).
+
+    Idzie przez `trendy_z_performance`, więc kształt, rywal, pozycje, zera
+    kartek i minuty są liczone DOKŁADNIE jak w ścieżce per zawodnik.
+    Zawodnika w meczu extra-stats łączymy po slugu (tam `playerId` to slug,
+    czasem z diakrytykami), zapasowo po nazwisku — jak robi to strona.
+    """
+    ev_by_id: dict[int, dict] = {}
+    for rec in (kadra or {}).get("events") or []:
+        ev = _pierwszy(rec.get("events"))
+        if ev.get("id"):
+            ev_by_id[int(ev["id"])] = rec
+    extra_idx: dict[int, dict[str, dict]] = {}
+    for eid, dane in (extra or {}).items():
+        idx: dict[str, dict] = {}
+        for r in dane:
+            for k in (r.get("playerSlug"), r.get("playerId"), r.get("playerName")):
+                if k:
+                    idx.setdefault(_klucz_slug(k), r)
+        extra_idx[int(eid)] = idx
+    out: dict[int, dict[str, StatshubTrend]] = {}
+    for p in (kadra or {}).get("data") or []:
+        pid = int(p.get("id") or 0)
+        if not pid:
+            continue
+        rows, extra_gracza = [], {}
+        for eid_s, st in (p.get("stats") or {}).items():
+            eid = int(eid_s)
+            rec = ev_by_id.get(eid)
+            if rec is None or not st:
+                continue
+            rows.append({"player_statistics_event": st, "events": rec.get("events"),
+                         "homeTeam": rec.get("homeTeam"), "awayTeam": rec.get("awayTeam")})
+            idx = extra_idx.get(eid)
+            if idx is not None:
+                extra_gracza[eid] = (idx.get(_klucz_slug(p.get("slug")))
+                                     or idx.get(_klucz_slug(p.get("name"))) or {})
+        if not rows:
+            continue
+        tr = trendy_z_performance(pid, str(p.get("name") or ""), team_id, rows,
+                                  extra_meczu=extra_gracza)
+        for t in tr.values():
+            t.z_kadry = True
+            if p.get("position"):
+                t.position = str(p["position"])[:1]
+        if tr:
+            out[pid] = tr
     return out
 
 

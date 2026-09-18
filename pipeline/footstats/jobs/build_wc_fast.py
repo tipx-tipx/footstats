@@ -2387,6 +2387,183 @@ def _trend_z_kontekstem_meczu(swiezy, bazowy, mid: int):
         return None
 
 
+# --- PEŁNE KADRY ZE STATSHUB (2026-09-18) — patrz `statshub.trendy_kadry` ---
+KADRY_OKNO_S = 36 * 3600       # mecze w tym oknie przed kickoffem (jak dociąg kursów)
+KADRY_BUDZET_S = 240           # sufit czasu na pobranie kadr w cyklu
+KADRY_EXTRA_MECZOW = 10        # zza pola / głową: ostatnie N meczów drużyny
+# Mecz z ofertą zawodniczą Superbetu ma w liście wydarzeń ≥ ~178 rynków
+# (zmierzone 18.09 na 66 meczach: poniżej 177 ani jeden nie miał oferty,
+# 178+ prawie zawsze). Próg z zapasem — niżej oferty nie ma i nie pytamy.
+KADRY_MIN_RYNKOW_SB = 170
+_POLA_HISTORII = ("counts", "minutes", "timestamps", "started", "game_positions",
+                  "game_opponents", "game_opponent_ids", "game_utids")
+
+
+def _scal_historie(stary, pelny) -> dict:
+    """Unia historii dwóch trendów tego samego zawodnika i rynku.
+
+    Pełna (kadra) wygrywa w meczach wspólnych; ze starej zostają mecze,
+    których kadra nie zna (poprzedni klub, starsze niż limit kadry) —
+    dopasowanie po czasie ±3 h, bo źródła różnią się o minuty.
+    """
+    def wiersze(t):
+        n = len(t.counts or [])
+        out = []
+        for i in range(n):
+            out.append(tuple(
+                (getattr(t, p) or [])[i] if i < len(getattr(t, p) or []) else d
+                for p, d in zip(_POLA_HISTORII, (0.0, 0.0, 0, False, "", "", 0, 0))
+            ))
+        return out
+    pe = wiersze(pelny)
+    ts_pe = [w[2] for w in pe]
+    reszta = [w for w in wiersze(stary)
+              if not any(abs(int(w[2] or 0) - int(t or 0)) <= 3 * 3600 for t in ts_pe)]
+    razem = sorted(pe + reszta, key=lambda w: -int(w[2] or 0))
+    return {p: [w[i] for w in razem] for i, p in enumerate(_POLA_HISTORII)}
+
+
+def dolacz_pelne_kadry(
+    trends: list, wszystkie_ev: list[dict], teraz: int,
+    oferta=None, fetch_kadra=None, fetch_extra=None,
+    budzet_s: float = KADRY_BUDZET_S, okno_s: int = KADRY_OKNO_S,
+) -> dict[str, int]:
+    """Pełna historia ze statshub dla każdego zawodnika, którego bukmacher
+    wycenia — wszystkie rynki, łącznie z zza pola i głową.
+
+    `oferta(ev)` -> {"sb": {zawodnik: rynki}, "bc": {...}} (albo None) mówi,
+    które mecze mają ofertę zawodniczą. Pobieramy kadry tylko ich drużyn:
+    * trend już obecny (feed/bank) → historia = unia z pełną
+      (`historia_pelna`), kontekst meczu i linia zostają;
+    * brak trendu → nowy trend TYLKO dla pary zawodnik×rynek, którą Superbet
+      albo Betclic wycenia. Silnik liczy każdy trend przed sprawdzeniem
+      kursu, więc całe kadry nie wchodzą w grę (symulacja 18.09: 403 mecze,
+      254 tys. trendów). Bez kontuzjowanych („out”) i bramkarzy.
+
+    Mutuje `trends`. Zwraca liczniki do rentgenu.
+    """
+    import time as _t
+    fetch_kadra = fetch_kadra or statshub.fetch_team_players_performance
+    fetch_extra = fetch_extra or statshub.fetch_extra_stats
+    licz = {"meczow_z_oferta": 0, "meczow_bez_oferty": 0, "druzyn": 0,
+            "druzyn_bez_danych": 0, "druzyn_bez_budzetu": 0, "meczow_extra": 0,
+            "wzbogacone": 0, "nowe": 0, "zawodnikow": 0,
+            "wyceniani_bez_kadry": 0, "pominieci_kontuzja": 0, "sekundy": 0}
+    mecze: list[tuple[dict, dict, dict]] = []
+    for e in sorted(wszystkie_ev, key=lambda e: int(e.get("timeStartTimestamp") or 0)):
+        if not (-3 * 3600 <= int(e.get("timeStartTimestamp") or 0) - teraz <= okno_s):
+            continue
+        off = oferta(e) if oferta else None
+        sbp = (off or {}).get("sb") or {}
+        bcp = (off or {}).get("bc") or {}
+        if not sbp and not bcp:
+            licz["meczow_bez_oferty"] += 1
+            continue
+        licz["meczow_z_oferta"] += 1
+        mecze.append((e, sbp, bcp))
+    t0 = _t.monotonic()          # budżet liczy same kadry (oferta i tak jest pobierana)
+    kolejka: list[int] = []
+    for e, _sbp, _bcp in mecze:
+        for tid in (e.get("homeTeamId"), e.get("awayTeamId")):
+            if tid and int(tid) not in kolejka:
+                kolejka.append(int(tid))
+    kadry: dict[int, dict] = {}
+    for tid in kolejka:
+        if _t.monotonic() - t0 > budzet_s:
+            licz["druzyn_bez_budzetu"] += 1
+            continue
+        try:
+            k = fetch_kadra(tid)
+        except Exception as ex:                                # noqa: BLE001
+            diagnostyka.cichy("statshub", "kadra_druzyny", ex)
+            k = None
+        if not k or not k.get("data"):
+            licz["druzyn_bez_danych"] += 1
+            continue
+        kadry[tid] = k
+    # zza pola / głową tylko z ostatnich meczów drużyny — forma i pokrycie
+    # patrzą na 5 i 10, a paczka 40 meczów to 0,15 s
+    eids: set = set()
+    for k in kadry.values():
+        ts_ev = sorted(
+            ((int((_r.get("events") or {}).get("timeStartTimestamp") or 0),
+              int((_r.get("events") or {}).get("id") or 0))
+             for _r in k.get("events") or []), reverse=True)
+        eids.update(eid for _ts, eid in ts_ev[:KADRY_EXTRA_MECZOW] if eid)
+    try:
+        extra = fetch_extra(sorted(eids)) if eids else {}
+    except Exception as ex:                                    # noqa: BLE001
+        diagnostyka.cichy("statshub", "extra_stats", ex)
+        extra = {}
+    licz["meczow_extra"] = len(extra)
+    pelne: dict[int, dict[int, dict]] = {}
+    wykluczeni: dict[int, set] = {}
+    for tid, k in kadry.items():
+        try:
+            pelne[tid] = statshub.trendy_kadry(k, extra, tid)
+        except Exception as ex:                                # noqa: BLE001
+            diagnostyka.cichy("statshub", "trendy_kadry", ex)
+            continue
+        licz["druzyn"] += 1
+        wykluczeni[tid] = {
+            int(u.get("playerId") or 0) for u in k.get("unavailability") or []
+            if str(u.get("status") or "") == "out"
+            and int(u.get("endDateTimestamp") or 0) > teraz
+        }
+    idx = {(t.event_id, t.player_id, t.market_code): t for t in trends}
+    gracze: set = set()
+    for e, sbp, bcp in mecze:
+        wyceniani = len(sbp) + len(bcp)
+        znalezieni = 0
+        for tid, opp, dom in ((e.get("homeTeamId"), e.get("awayTeamId"), True),
+                              (e.get("awayTeamId"), e.get("homeTeamId"), False)):
+            rt_druzyny = pelne.get(int(tid or 0))
+            if not rt_druzyny:
+                continue
+            opp_nm = ""
+            for _rt in (pelne.get(int(opp or 0)) or {}).values():
+                opp_nm = next(iter(_rt.values())).team_name
+                break
+            for pid, rt in rt_druzyny.items():
+                nazwa = next(iter(rt.values())).player_name
+                wycena = _scal_oferty_zawodnika(
+                    superbet.znajdz_zawodnika(sbp, nazwa) if sbp else {},
+                    betclic.znajdz_zawodnika(bcp, nazwa) if bcp else {})
+                if wycena:
+                    znalezieni += 1
+                for mk, pelny in rt.items():
+                    stary = idx.get((e["id"], pid, mk))
+                    if stary is not None:
+                        for pole, wart in _scal_historie(stary, pelny).items():
+                            setattr(stary, pole, wart)
+                        stary.historia_pelna = True
+                        licz["wzbogacone"] += 1
+                        gracze.add(pid)
+                        continue
+                    if mk not in wycena or (pelny.position or "") == "G":
+                        continue
+                    if pid in wykluczeni.get(int(tid), set()):
+                        licz["pominieci_kontuzja"] += 1
+                        continue
+                    nowy = dc_replace(
+                        pelny, event_id=e["id"], team_id=int(tid),
+                        opponent_id=int(opp or 0),
+                        opponent_name=opp_nm or pelny.opponent_name,
+                        is_home=dom, line=0.0, in_predicted_lineup=False,
+                    )
+                    trends.append(nowy)
+                    idx[(e["id"], pid, mk)] = nowy
+                    licz["nowe"] += 1
+                    licz[f"nowe_{mk}"] = licz.get(f"nowe_{mk}", 0) + 1
+                    gracze.add(pid)
+        # wyceniony przez bukmachera, a w kadrach obu drużyn go nie ma
+        # (nazwisko nie do sparowania albo transfer) — licznik, nie cisza
+        licz["wyceniani_bez_kadry"] += max(0, wyceniani - znalezieni)
+    licz["zawodnikow"] = len(gracze)
+    licz["sekundy"] = round(_t.monotonic() - t0)
+    return licz
+
+
 def bc_z_pamieci(
     kolejnosc: dict[int, int], pamiec: dict, teraz: int,
     swiezosc_s: int = SWIEZOSC_BETCLIC_S,
@@ -4181,6 +4358,13 @@ def main(tryb=None) -> None:
 
 
 def _main_impl(tryb=None):
+    # ⚑ RESET DIAGNOSTYKI NA POCZĄTKU CYKLU (2026-09-18). Stał w połowie
+    # (przed siatką kursów) i kasował wszystko, co zmierzono wcześniej:
+    # etapy feed/ratunek/bank/365/mapy strzałów znikały z `czas_etapow`
+    # (18.09 „_razem 29 min” przy realnym cyklu ~45), a rentgen i ciche
+    # błędy z tego odcinka nie docierały do meta (obchodzone ręcznie przy
+    # `_stan_magazynu`, 11.09).
+    diagnostyka.reset()
     events = tryb.events if tryb else upcoming_wc_events()
     print(f"Nadchodzące mecze {'ligowe' if tryb else 'MŚ'} (statshub): {len(events)}")
     if not events:
@@ -4197,12 +4381,60 @@ def _main_impl(tryb=None):
         return
     print(f"Trendów propsów: {len(trends)} "
           f"({len(set(t.player_id for t in trends))} zawodników)")
+    diagnostyka.etap("feed_trendow")
+    # ⚑⚑ PEŁNE KADRY ZE STATSHUB (2026-09-18) — PRZED ratunkiem, bankiem i 365, żeby
+    # oba dokładały już tylko to, czego statshub nie zna (patrz
+    # `dolacz_pelne_kadry`, `statshub.trendy_kadry`).
+    # oferta Superbetu pobrana tu trafia do `sb_cache` niżej — nie pytamy dwa razy
+    _sb_wstepny: dict[int, dict] = {}
+    try:
+        _teraz_k = int(time.time())
+        _bc_wstepny: dict[int, dict] = {}
+        try:
+            _bc_raw, _bc_ok = supa.get_key_ok(BETCLIC_KLUCZ)
+            if _bc_ok:
+                _bc_wstepny = bc_z_pamieci(
+                    {e["id"]: int(e.get("timeStartTimestamp") or 0) for e in events},
+                    dict(_bc_raw or {}), _teraz_k)
+        except Exception as e:                                 # noqa: BLE001
+            diagnostyka.cichy("cykl", "kadry_pamiec_betclica", e)
+
+        def _oferta_kadr(ev_k: dict) -> dict:
+            mid_k = ev_k["id"]
+            sb_ev_k = tryb.sb_ev_by_mid.get(mid_k) if tryb else None
+            sbp_k: dict = {}
+            if sb_ev_k and int(sb_ev_k.get("marketCount") or 0) >= KADRY_MIN_RYNKOW_SB:
+                _cz = [p.strip() for p in (sb_ev_k.get("matchName") or "·").split("·")]
+                try:
+                    _sb_wstepny[mid_k] = superbet.fetch_stat_odds(
+                        sb_ev_k["eventId"], _cz[0], _cz[1])
+                    sbp_k = _sb_wstepny[mid_k].get("players") or {}
+                except Exception as e:                         # noqa: BLE001
+                    diagnostyka.cichy("superbet", "oferta_kadr", e)
+            return {"sb": sbp_k,
+                    "bc": (_bc_wstepny.get(mid_k) or {}).get("players") or {}}
+
+        _licz_kadry = dolacz_pelne_kadry(
+            trends, [e for e in events if e.get("homeTeamId") and e.get("awayTeamId")],
+            _teraz_k, oferta=_oferta_kadr)
+        diagnostyka.zapisz_rentgen("pelne_kadry", _licz_kadry)
+        print(f"Pełne kadry statshub: {_licz_kadry['druzyn']} drużyn "
+              f"({_licz_kadry['meczow_extra']} meczów z zza pola/głową), "
+              f"{_licz_kadry['zawodnikow']} zawodników: +{_licz_kadry['nowe']} "
+              f"nowych trendów, {_licz_kadry['wzbogacone']} z pełną historią; "
+              f"bez danych {_licz_kadry['druzyn_bez_danych']}, bez budżetu "
+              f"{_licz_kadry['druzyn_bez_budzetu']}, w {_licz_kadry['sekundy']} s; "
+              f"mecze z ofertą {_licz_kadry['meczow_z_oferta']}, bez "
+              f"{_licz_kadry['meczow_bez_oferty']}; wyceniani bez kadry "
+              f"{_licz_kadry['wyceniani_bez_kadry']}")
+    except Exception as e:                                     # noqa: BLE001
+        diagnostyka.cichy("cykl", "pelne_kadry", e)
+    diagnostyka.etap("pelne_kadry")
     # RATUNEK HISTORII (tylko liga): feed propsów pokrywa mecze wycenione
     # przez buków UK, więc poza Europą historia zawodnika bywa dwuletnia i
     # cały kandydat ginie na bramie świeżości. Robimy to TU, przed czymkolwiek
     # innym, żeby świeża próba weszła też do banku, minut i średnich drużyny.
     if tryb and trends:
-        diagnostyka.etap("feed_trendow")
         odswiez_stare_trendy(trends, int(time.time()))
     # ostatni mecz KAŻDEJ drużyny wg feedu — do rozróżnienia "zawodnik siedzi"
     # od "cała liga pauzowała" (przerwa letnia / mundialowa): flaga stare_dane
@@ -4312,9 +4544,13 @@ def _main_impl(tryb=None):
             print(f"Bank: {_przepiete_synt} trendów spod syntetycznego numeru 365 "
                   f"przepiętych na prawdziwy numer zawodnika")
 
-        def _merge(t: statshub.StatshubTrend) -> None:
+        def _merge(t: statshub.StatshubTrend, wpusc_kadre: bool = False) -> None:
             key = (t.player_id, t.market_code)
             prev = lib.get(key)
+            # nowa seria z pełnej kadry (patrz `StatshubTrend.z_kadry`) idzie
+            # do banku tylko z przepustką — inaczej bank puchnie o całe kadry
+            if prev is None and getattr(t, "z_kadry", False) and not wpusc_kadre:
+                return
             ts_new = t.timestamps[0] if t.timestamps else 0
             ts_old = prev.timestamps[0] if prev and prev.timestamps else -1
             # pełna historia (performance) nie ustępuje częściowej z feedu
@@ -4545,6 +4781,10 @@ def _main_impl(tryb=None):
     }
     try:
         shots_trends = [t for t in trends if t.market_code == "shots"]
+        # rynki, które pełna kadra statshub już dała (`dolacz_pelne_kadry`),
+        # nie dostają drugiego, krótszego trendu z 365 pod tym samym kluczem
+        _juz_split = {(t.event_id, t.player_id, t.market_code) for t in trends
+                      if t.market_code in SHOT_SPLIT}
         team_names = sorted({t.team_name for t in shots_trends if t.team_name})
         cids = scores365.competitor_ids(team_names)
         hist365: dict[str, list] = {}
@@ -4565,6 +4805,8 @@ def _main_impl(tryb=None):
             if pkey is None:
                 continue  # zawodnik bez strzałów w historii 365 — nic do modelowania
             for mk2, f365 in SHOT_SPLIT.items():
+                if (t.event_id, t.player_id, mk2) in _juz_split:
+                    continue
                 counts2, minutes2, ts2, started2, pos2 = [], [], [], [], []
                 for i, ts in enumerate(t.timestamps):
                     rec = next(
@@ -5331,11 +5573,9 @@ def _main_impl(tryb=None):
         return _powod_kwarantanny(b) == "kwarantanna_rynku"
 
     ev_by_id = {e["id"]: e for e in events}
-    sb_cache: dict[int, dict] = {}
+    sb_cache: dict[int, dict] = dict(_sb_wstepny)
     tempo.reset_fallback_stats()
-    # licznik cichych błędów zerujemy razem z resztą liczników przebiegu —
-    # patrz `footstats/diagnostyka.py` (79 miejsc bez logu, przegląd 04.08)
-    diagnostyka.reset()
+    # (`diagnostyka.reset()` stoi na początku `_main_impl` — patrz nota tam)
     tempo_cache: dict[int, dict | None] = {}  # mid -> tempo z kursów 1X2/goli
     # pełna siatka kursów Superbet (over) do widoku TOP POKRYCIA na stronie
     # meczu: mecz_id -> player_id -> rynek -> "linia" -> kurs. Zbierana z tej
@@ -5669,6 +5909,9 @@ def _main_impl(tryb=None):
         wcześniej stał przy pierwszym trendzie danego meczu.
         """
         sb_o = sb_cache.get(mid_o)
+        if sb_o is not None and mid_o not in tempo_cache:
+            # oferta pobrana już przy pełnych kadrach — tempo liczymy tutaj
+            tempo_cache[mid_o] = tempo.tempo_from_match_odds(sb_o.get("match"))
         if sb_o is not None or not sb_events:
             return sb_o or {"players": {}, "teams": {}}
         if tryb:
@@ -5916,8 +6159,25 @@ def _main_impl(tryb=None):
     if _bank_lib is not None and _bank_merge is not None:
         try:
             _n_przed = len(_bank_lib)
+            # serie z pełnych kadr wchodzą do banku dla zawodników Z KURSEM —
+            # na nich model uczony się uczy (zza pola, głową); reszta kadry
+            # jest tania do pobrania w następnym cyklu
+            _pid_z_kursem: set = set()
+            _sprawdzeni: set = set()
             for _t in trends:
-                _bank_merge(_t)
+                if not getattr(_t, "z_kadry", False):
+                    continue
+                _k = (_t.event_id, _t.player_id)
+                if _k in _sprawdzeni:
+                    continue
+                _sprawdzeni.add(_k)
+                _sbp = (sb_cache.get(_t.event_id) or {}).get("players") or {}
+                _bcp = ((bc_cache or {}).get(_t.event_id) or {}).get("players") or {}
+                if ((_sbp and superbet.znajdz_zawodnika(_sbp, _t.player_name))
+                        or (_bcp and betclic.znajdz_zawodnika(_bcp, _t.player_name))):
+                    _pid_z_kursem.add(int(_t.player_id or 0))
+            for _t in trends:
+                _bank_merge(_t, wpusc_kadre=int(_t.player_id or 0) in _pid_z_kursem)
             _rynki_banku: dict[str, int] = {}
             for _t in _bank_lib.values():
                 _rynki_banku[_t.market_code] = _rynki_banku.get(_t.market_code, 0) + 1

@@ -254,7 +254,7 @@ def test_odkrywanie_jest_przed_pewniakami_i_zapisem_banku():
               / "footstats" / "jobs" / "build_wc_fast.py").read_text(encoding="utf-8")
     i_odkrycie = zrodlo.index("odkryj_zawodnikow_z_oferty(\n                _do_odkrycia")
     i_srednie = zrodlo.index("_srednie_grupy = srednie_grupowe(trends)")
-    i_bank = zrodlo.index("_bank_merge(_t)")
+    i_bank = zrodlo.index("_bank_merge(_t,")
     i_pewniaki = zrodlo.index("# --- PEWNIAKI: najlepszy typ")
     assert i_odkrycie < i_bank < i_srednie < i_pewniaki, (
         "odkrywanie musi stać przed zapisem banku, średnimi grup i pewniakami"
