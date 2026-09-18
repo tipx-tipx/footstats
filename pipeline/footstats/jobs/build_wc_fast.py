@@ -4284,6 +4284,33 @@ def _main_impl(tryb=None):
                 lib[(t.player_id, t.market_code)] = t
             except TypeError:
                 continue  # stary format po zmianie pól — rekord wypada
+        # ⚑ SYNTETYCZNE NUMERY Z 365 W BANKU (2026-09-18). afef585 zatrzymał
+        # nowe duble przy dopełnianiu z 365, ale bank pamiętał stare trendy pod
+        # syntetycznym numerem i przepinał je co cykl — players 18.09 11:22
+        # nadal 983 dubli (nazwa, drużyna) = numer prawdziwy + syntetyczny.
+        # Przepinamy je na prawdziwy numer tego samego zawodnika tej samej
+        # drużyny; przy kolizji rynku wygrywa nowsza historia (jak w `_merge`).
+        _id_znany_bank: dict[tuple[int, str], int] = {}
+        for (pid, _mk), t in lib.items():
+            if pid and int(pid) < 900_000_000:
+                _id_znany_bank.setdefault((t.team_id, rotowire._norm(t.player_name)), int(pid))
+        _przepiete_synt = 0
+        for (pid, mk), t in list(lib.items()):
+            if not pid or int(pid) < 900_000_000:
+                continue
+            real = _id_znany_bank.get((t.team_id, rotowire._norm(t.player_name)))
+            if real is None:
+                continue
+            del lib[(pid, mk)]
+            _przepiete_synt += 1
+            prev = lib.get((real, mk))
+            ts_new = t.timestamps[0] if t.timestamps else 0
+            ts_old = prev.timestamps[0] if prev and prev.timestamps else -1
+            if prev is None or ts_new > ts_old:
+                lib[(real, mk)] = dc_replace(t, player_id=real)
+        if _przepiete_synt:
+            print(f"Bank: {_przepiete_synt} trendów spod syntetycznego numeru 365 "
+                  f"przepiętych na prawdziwy numer zawodnika")
 
         def _merge(t: statshub.StatshubTrend) -> None:
             key = (t.player_id, t.market_code)
@@ -5877,7 +5904,8 @@ def _main_impl(tryb=None):
         print(f"Udział startów: podejrzanych {_licz_udzial['podejrzani']}, "
               f"dociągnięto z performance {_licz_udzial['dociagnieci']} "
               f"(nadal rzadko {_licz_udzial['nadal_rzadko']}, bez danych "
-              f"{_licz_udzial['bez_danych']}, bez budżetu {_licz_udzial['bez_budzetu']})")
+              f"{_licz_udzial['bez_danych']}, bez budżetu {_licz_udzial['bez_budzetu']}, "
+              f"syntetyczny numer 365 {_licz_udzial['bez_numeru_statshub']})")
     except Exception as e:                                     # noqa: BLE001
         diagnostyka.cichy("cykl", "udzial_startow_performance", e)
     diagnostyka.etap("odkrywanie_i_udzial_startow")

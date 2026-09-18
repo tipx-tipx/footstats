@@ -126,6 +126,27 @@ def test_dociagniecie_performance_dla_podejrzanych():
     assert radar.udzial_startow(wyst2[1], kalendarz=KALENDARZ, teraz=TERAZ) is None
 
 
+def test_syntetyczny_numer_365_nie_zjada_budzetu_performance():
+    """18.09 11:22: 150 z 150 budżetu „bez danych” — kolejkę po kickoffie
+    zapychali zawodnicy z syntetycznym numerem 365 (≥ 900 000 000), których
+    performance nie zna. Nie pytamy o nich, liczymy osobno."""
+    pytano = []
+
+    def _perf(pid):
+        pytano.append(pid)
+        return []
+
+    synt = _trend([1, 22], pelna=False); synt.player_id = 935233537
+    real = _trend([1, 22], pelna=False); real.player_id = 2
+    wyst = {935233537: synt, 2: real}
+    licz = radar.dociagnij_pelne_wystepy(
+        wyst, KALENDARZ, TERAZ, budzet=1,
+        kickoff={935233537: TERAZ + 60, 2: TERAZ + 3600}, fetch=_perf)
+    assert pytano == [2]
+    assert licz["bez_numeru_statshub"] == 1 and licz["podejrzani"] == 1
+    assert licz["bez_budzetu"] == 0
+
+
 def test_bez_kalendarza_zostaje_stara_miara_nie_zero():
     tr = _trend([1, 8, 15, 22, 29])
     assert radar.dopelnij_meczami_druzyny(tr, {}, TERAZ) is None

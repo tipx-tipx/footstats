@@ -938,7 +938,7 @@ def dociagnij_pelne_wystepy(
     """
     fetch = fetch or statshub.fetch_player_performance
     licz = {"podejrzani": 0, "dociagnieci": 0, "bez_budzetu": 0,
-            "bez_danych": 0, "nadal_rzadko": 0}
+            "bez_danych": 0, "nadal_rzadko": 0, "bez_numeru_statshub": 0}
     if not kalendarz:
         return licz
     kolejka: list[tuple[int, int]] = []
@@ -951,6 +951,14 @@ def dociagnij_pelne_wystepy(
         rzadko = sum(1 for st in dop[0] if st) / len(dop[0]) < MIN_UDZIAL_STARTOW
         nieobecny = all((m or 0) <= 0 for m in dop[1][:OKNO_NIEOBECNOSCI])
         if rzadko or nieobecny:
+            # ⚑ NUMER SYNTETYCZNY Z 365 (2026-09-18). Performance go nie zna —
+            # cykl 18.09 11:22: 150 z 150 budżetu „bez danych”, 0 dociągniętych.
+            # Dociągnięci z prawdziwym numerem wypadają z kolejki (bank pamięta
+            # `historia_pelna`), więc najbliższe kickoffy zapychali syntetyczni,
+            # którym zapytanie nigdy nic nie da.
+            if int(pid) >= 900_000_000:
+                licz["bez_numeru_statshub"] += 1
+                continue
             kolejka.append(((kickoff or {}).get(pid, 1 << 40), pid))
     licz["podejrzani"] = len(kolejka)
     kolejka.sort()
