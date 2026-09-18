@@ -350,3 +350,31 @@ def test_odleglosc_do_jeden_zna_trzy_rodzaje_pomylki():
     assert f("ousseynou", "ousseyynou")   # wstawienie
     assert not f("pinho", "zalazar")
     assert not f("kowalski", "kowaski1")  # dwie operacje
+
+
+def test_trzeci_stopien_ta_sama_minuta_kazde_slowo_ma_odpowiednik():
+    """18.09: 26 ze 194 meczów z ofertą bez Betclica — spolszczenia i warianty
+    zapisu o tej samej minucie."""
+    przypadki = [
+        ("FC Bayern München", "1. FC Union Berlin", "Bayern Monachium", "Union Berlin"),
+        ("Hamburger SV", "1. FC Köln", "Hamburger SV", "FC Koeln"),
+        ("Deportivo La Coruña", "Real Betis", "Deportivo A Corunya", "Betis"),
+        ("Lech Poznań", "Radomiak Radom", "Lech Poznań", "RKS Radomiak"),
+        ("Olympique de Marseille", "Paris Saint-Germain", "Marsylia", "Paris Saint-Germain"),
+        ("Minnesota United", "LA Galaxy", "Minnesota United", "Los Angeles Galaxy"),
+    ]
+    for k, (h, a, bh, ba) in enumerate(przypadki):
+        nasze = [{"klucz": k, "home": h, "away": a, "kickoff_ts": TS}]
+        pary, _ = betclic.paruj_mecze(nasze, [_bc(90 + k, bh, ba, TS)])
+        assert k in pary, (h, a)
+
+
+def test_trzeci_stopien_nie_zgaduje_o_innej_minucie_ani_przy_dwoch_kandydatach():
+    nasze = [{"klucz": 1, "home": "FC Bayern München", "away": "1. FC Union Berlin",
+              "kickoff_ts": TS}]
+    pary, _ = betclic.paruj_mecze(nasze, [_bc(9, "Bayern Monachium", "Union Berlin", TS + 3600)])
+    assert pary == {}
+    pary, _ = betclic.paruj_mecze(nasze, [
+        _bc(9, "Bayern Monachium", "Union Berlin", TS),
+        _bc(10, "Bayern Monachium II", "Union Berlin", TS)])
+    assert pary == {}

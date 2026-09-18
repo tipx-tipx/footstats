@@ -391,9 +391,14 @@ def lista_meczow_rozgrywek(id_rozgrywek: int = ID_EKSTRAKLASA) -> list[dict]:
     return _zbierz_mecze(pola)
 
 
-def kalendarz(sport: str = "football", ile: int = 1000,
+def kalendarz(sport: str = "football", ile: int = 5000,
               na_strone: int = 200) -> list[dict]:
     """CAŁY kalendarz nadchodzących meczów, stronicowany.
+
+    ⚑ `ile` 1000 → 5000 (2026-09-18): Betclic miał 1347 meczów, a sufit 1000
+    ucinał dalsze dni — 26 meczów z ofertą zawodniczą nie dostawało pary
+    (m.in. Fiorentina–Napoli, Getafe–Málaga). Stronicowanie i tak kończy się
+    na pierwszej niepełnej stronie.
 
     To jest właściwe źródło do parowania: `lista_meczow` oddaje tylko to, co
     Betclic wrzuca na stronę główną (~46 meczów), a chodzenie po 132
@@ -728,6 +733,9 @@ OKNO_CZASU_S = 3 * 3600
 # brzegach. DOPISYWAĆ, gdy `raport_parowania` pokaże parę, którą człowiek widzi
 # na oko — dokładnie tak, jak robi to KLUB_ALIASY dla Superbetu.
 KLUB_ALIASY: dict[str, str] = {
+    # 2026-09-18, ta sama minuta i ten sam rywal co u nas
+    "royal charleroi sc": "Sporting Charleroi",
+    "new anglia revolution": "New England Revolution",
     "dinamo zagrzeb": "Dinamo Zagreb",
     "fc kopenhaga": "Kobenhavn",
     "zalgiris kaunas": "Kauno Zalgiris",
@@ -836,8 +844,68 @@ def paruj_mecze(nasze: list[dict], bc_mecze: list[dict] | None = None,
                 pary[nasz["klucz"]] = bc_mecze[kandydaci[0]]
                 zajete.add(kandydaci[0])
                 break
+    # ⚑ TRZECI STOPIEŃ: TA SAMA MINUTA + KAŻDE SŁOWO MA ODPOWIEDNIK (2026-09-18).
+    # Po dwóch stopniach 26 ze 194 meczów z ofertą zawodniczą zostawało bez
+    # Betclica, choć o tej samej minucie stał ten sam mecz: „Bayern Monachium”,
+    # „FC Koeln”, „Deportivo A Corunya”, „Lech Poznań – RKS Radomiak”,
+    # „Marsylia – Paris Saint-Germain”. To NIE jest „wspólne słowo” odrzucone
+    # 03.08 (Riestra/Recoleta): tu KAŻDE istotne słowo krótszej nazwy musi mieć
+    # odpowiednik (to samo, początek ≥ 4 litery, wariant zapisu, polska nazwa
+    # miasta), po OBU stronach meczu, o tej samej minucie (±120 s), i tylko
+    # przy jednym kandydacie w obie strony.
+    kand3: list[tuple[object, int]] = []
+    for nasz in nasze:
+        if nasz["klucz"] in pary or not nasz.get("kickoff_ts"):
+            continue
+        for i, m in enumerate(bc_mecze):
+            if i in zajete:
+                continue
+            bts = int(m.get("kickoff_ts") or 0)
+            if not bts or abs(bts - int(nasz["kickoff_ts"])) > OKNO_TEJ_MINUTY_S:
+                continue
+            if (_nazwy_pokrywaja(nasz.get("home"), _pl_en(m.get("gospodarz")))
+                    and _nazwy_pokrywaja(nasz.get("away"), _pl_en(m.get("gosc")))):
+                kand3.append((nasz["klucz"], i))
+    for klucz, i in kand3:
+        if sum(1 for k, _ in kand3 if k == klucz) != 1:
+            continue
+        if sum(1 for _, j in kand3 if j == i) != 1:
+            continue
+        pary[klucz] = bc_mecze[i]
+        zajete.add(i)
     luka = [m for i, m in enumerate(bc_mecze) if i not in zajete]
     return pary, luka
+
+
+OKNO_TEJ_MINUTY_S = 120
+
+
+def _nazwy_pokrywaja(nasza: str | None, obca: str | None) -> bool:
+    """Każde istotne słowo KRÓTSZEJ nazwy ma odpowiednik w dłuższej.
+
+    Normalizacja jak przy Superbecie (`build_league.norm_klub`: bez ozdobników
+    FC/SC/CD, polskie nazwy miast z `TOKEN_ALIASY`). Słowa ≤ 2 liter pomijane
+    („LA Galaxy”, „A Corunya”), chyba że nazwa ma tylko takie.
+    """
+    from ..jobs.build_league import KLUB_ALIASY as _KA, norm_klub
+    from difflib import SequenceMatcher
+    na, nb = norm_klub(nasza or ""), norm_klub(obca or "")
+    na, nb = _KA.get(na, na), _KA.get(nb, nb)
+    if not na or not nb:
+        return False
+    ta, tb = na.split(), nb.split()
+    krotka, dluga = (ta, tb) if len(ta) <= len(tb) else (tb, ta)
+    istotne = [t for t in krotka if len(t) > 2] or krotka
+
+    def _para(x: str, y: str) -> bool:
+        if x == y:
+            return True
+        if min(len(x), len(y)) >= 4 and (x.startswith(y) or y.startswith(x)):
+            return True
+        return (min(len(x), len(y)) >= 4 and x[:2] == y[:2]
+                and SequenceMatcher(None, x, y).ratio() >= 0.8)
+
+    return all(any(_para(t, d) for d in dluga) for t in istotne)
 
 
 def raport_parowania(nasze: list[dict], bc_mecze: list[dict] | None = None,
