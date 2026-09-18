@@ -32,9 +32,11 @@ on:
   workflow_dispatch: {}       # pozwala uruchomić ręcznie z zakładki Actions
 
 # least privilege: workflow tylko czyta repo i woła zewnętrzne API (statshub/
-# 365/Superbet/Supabase) — niczego nie pushuje ani nie zapisuje w GitHubie
+# 365/Superbet/Supabase) — niczego nie pushuje ani nie zapisuje w GitHubie.
+# `actions: write` WYŁĄCZNIE do odpalenia betclic.yml na starcie (krok niżej).
 permissions:
   contents: read
+  actions: write
 
 concurrency:
   group: footstats-cycle
@@ -91,6 +93,18 @@ jobs:
     # ubity limitem nie wypchnąłby niczego.
     timeout-minutes: 80
     steps:
+      # ⚑ OFERTA BETCLICA ODPALANA PRZEZ CYKL (2026-09-18). Harmonogram GitHuba
+      # tworzył betclic.yml co 4–6 h (20:21, 23:30, 02:28, 08:02 przy cronie co
+      # godzinę), a odpalenie z /api/tick po wdrożeniu nie ruszyło ani razu.
+      # `workflow_dispatch` jest wyjątkiem, który GITHUB_TOKEN może wywołać.
+      # Przebieg Betclica trwa ~2 min, a cykl czyta jego ofertę dopiero przy
+      # pełnych kadrach (~5 min od startu) — zdąży. Błąd tu NIE blokuje cyklu.
+      - name: Odpal świeżą ofertę Betclica
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run betclic.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}"
+
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
