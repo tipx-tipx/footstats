@@ -31,6 +31,55 @@ KEYS = ["value_bets", "matches", "players", "calibration", "meta", "kupony",
         "pokrycie_liga"]
 
 
+# ⚑⚑ ZAWODNICY W KAWAŁKACH, KTÓRE STRONA NAPRAWDĘ CZYTA (2026-09-18).
+#
+# `players` waży 43,6 MB (12 766 zawodników × ~7 rynków × 20 meczów historii)
+# i strona pobierała go W CAŁOŚCI przy każdym odświeżeniu (co ≤1 h), choć:
+#   * strona główna używa wyłącznie zawodników z typami i tylko rynków tych
+#     typów (`zawodnicyLite` w app/(app)/page.tsx) — 55 zawodników, 42 KB;
+#   * strona meczu filtruje po nazwie drużyny (`druzyny.has(z.druzyna)`).
+# Panel Supabase 18.09: 1,03 GB transferu w 9 dni przy limicie 5 GB/mies.,
+# czyli ~115 MB/dobę — to w praktyce dwa odczyty `players`. Przy ruchu po
+# starcie sprzedaży limit skończyłby się w tydzień.
+#
+# Dlatego obok pełnego `players` (zostaje bez zmian — zapas i zgodność)
+# wysyłamy dwa pochodne zestawy, liczone TU z tych samych plików:
+#   * `players_typy` — dokładnie to, co strona główna i tak wycinała;
+#   * `players_d00`..`players_d95` — zawodnicy w koszykach po drużynie
+#     (FNV-1a po znakach nazwy, ta sama funkcja w web/src/lib/data.ts);
+#     strona meczu czyta 2 koszyki (~1,4 MB) zamiast 43,6 MB i filtruje
+#     tym samym warunkiem, więc wynik jest identyczny.
+KOSZYKI_PLAYERS = 96      # 64 dawało max 1,8 MB — blisko 2 MB limitu cache Next
+
+
+def koszyk_druzyny(nazwa: str) -> int:
+    """Numer koszyka dla nazwy drużyny — FNV-1a 32-bit po punktach kodowych
+    (w TS: `for (const ch of s) ch.codePointAt(0)`), modulo KOSZYKI_PLAYERS."""
+    h = 0x811C9DC5
+    for ch in str(nazwa or ""):
+        h ^= ord(ch)
+        h = (h * 0x01000193) & 0xFFFFFFFF
+    return h % KOSZYKI_PLAYERS
+
+
+def klucze_pochodne_players(players: list, value_bets: list) -> dict:
+    """{klucz: payload} — `players_typy` i koszyki drużyn (nota wyżej)."""
+    rynki: dict = {}
+    for b in value_bets or []:
+        rynki.setdefault(b.get("podmiot_id"), set()).add(b.get("rynek_kod"))
+    out: dict = {"players_typy": [
+        {**z, "forma": {k: v for k, v in (z.get("forma") or {}).items()
+                        if k in rynki[z.get("id")]}}
+        for z in players or [] if z.get("id") in rynki
+    ]}
+    koszyki: list[list] = [[] for _ in range(KOSZYKI_PLAYERS)]
+    for z in players or []:
+        koszyki[koszyk_druzyny(z.get("druzyna"))].append(z)
+    for i, lista in enumerate(koszyki):
+        out[f"players_d{i:02d}"] = lista
+    return out
+
+
 def _upsert(url: str, key: str, dane: str, opis: str):
     """Jeden upsert do PostgREST, z ponowieniami. Zwraca odpowiedź albo None.
 
@@ -87,6 +136,16 @@ def push() -> bool:
             rows.append({"key": name, "payload": json.loads(f.read_text(encoding="utf-8"))})
     if not rows:
         return False
+    # klucze pochodne `players` (nota przy KOSZYKI_PLAYERS) — tylko gdy sam
+    # `players` idzie w tym cyklu, żeby koszyki nigdy nie rozjechały się
+    # z pełnym kluczem
+    _players = next((w["payload"] for w in rows if w["key"] == "players"), None)
+    if isinstance(_players, list):
+        _vb_plik = WEB_DATA_DIR / "value_bets.json"
+        _vb = (json.loads(_vb_plik.read_text(encoding="utf-8"))
+               if _vb_plik.exists() else [])
+        for k, v in klucze_pochodne_players(_players, _vb).items():
+            rows.append({"key": k, "payload": v})
 
     # ⚑ DLACZEGO NAJPIERW JEDNYM ŻĄDANIEM, A DOPIERO POTEM PO JEDNYM
     # (2026-08-13, POTWIERDZONE LOGIEM przebiegu #909):

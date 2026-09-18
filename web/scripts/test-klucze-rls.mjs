@@ -15,7 +15,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const tu = dirname(fileURLToPath(import.meta.url));
-const SQL = join(tu, "..", "..", "supabase", "migrations", "0007_app_data_bez_rywali.sql");
+const SQL = join(tu, "..", "..", "supabase", "migrations", "0008_app_data_players_koszyki.sql");
 const DATA_TS = join(tu, "..", "src", "lib", "data.ts");
 
 function kluczeZSql(tekst) {
@@ -72,6 +72,18 @@ if (nadmiarWSql.length) {
   console.error(
     `BŁĄD: RLS wystawia anonimowo klucze, których strona nie czyta: ${nadmiarWSql.join(", ")}\n` +
       "       -> to darmowy wyciek; usuń je z migracji 0004.",
+  );
+  bledy++;
+}
+
+// KOSZYKI ZAWODNIKÓW (2026-09-18): `players_d${nr}` składane w kodzie, więc
+// nie ma ich wśród literałów — pilnujemy wzorca w polityce osobno.
+const sqlTekst = readFileSync(SQL, "utf8");
+const dataTekst = readFileSync(DATA_TS, "utf8");
+if (dataTekst.includes("`players_d${") && !sqlTekst.includes("'^players_d[0-9]{2}$'")) {
+  console.error(
+    "BŁĄD: strona czyta koszyki `players_dNN`, a RLS ich nie przepuszcza.",
+    "\n       -> strona meczu wróci do pełnego `players` (~44 MB transferu).",
   );
   bledy++;
 }

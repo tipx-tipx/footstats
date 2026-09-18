@@ -432,6 +432,56 @@ export async function getZawodnicy(): Promise<Zawodnik[]> {
   return fetchKlucz<Zawodnik[]>("players", LOCAL.players, ODSWIEZANIE_SKLADY_S);
 }
 
+/**
+ * ⚑ ZAWODNICY W KAWAŁKACH (2026-09-18) — patrz `push_supabase.KOSZYKI_PLAYERS`.
+ *
+ * Pełny `players` waży ~44 MB i był pobierany w całości przy każdym
+ * odświeżeniu, a to w praktyce cały dzienny transfer Supabase (limit Free
+ * 5 GB/mies.). Pipeline wysyła obok niego:
+ *   * `players_typy` — zawodnicy z typami, tylko rynki typów (strona główna),
+ *   * `players_d00`..`players_d95` — koszyki po nazwie drużyny (strona meczu).
+ * Gdy klucza jeszcze nie ma (pierwszy cykl po wdrożeniu), wracamy do pełnego
+ * `players` — wynik na stronie jest ten sam, zmienia się tylko transfer.
+ */
+export const KOSZYKI_PLAYERS = 96;
+
+/** FNV-1a 32-bit po punktach kodowych — identyczne z `push_supabase.koszyk_druzyny`. */
+export function koszykDruzyny(nazwa: string): number {
+  let h = 0x811c9dc5;
+  for (const ch of nazwa ?? "") {
+    h ^= ch.codePointAt(0)!;
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h % KOSZYKI_PLAYERS;
+}
+
+/** Zawodnicy z typami (tylko rynki typów) — strona główna. */
+export async function getZawodnicyTypow(): Promise<Zawodnik[]> {
+  const typy = await fetchKlucz<Zawodnik[] | null>(
+    "players_typy",
+    null,
+    ODSWIEZANIE_SKLADY_S,
+  );
+  return typy ?? getZawodnicy();
+}
+
+/** Zawodnicy wskazanych drużyn (po nazwie) — strona meczu. */
+export async function getZawodnicyDruzyn(druzyny: string[]): Promise<Zawodnik[]> {
+  const nr = [...new Set(druzyny.map(koszykDruzyny))];
+  const koszyki = await Promise.all(
+    nr.map((i) =>
+      fetchKlucz<Zawodnik[] | null>(
+        `players_d${String(i).padStart(2, "0")}`,
+        null,
+        ODSWIEZANIE_SKLADY_S,
+      ),
+    ),
+  );
+  if (koszyki.some((k) => k == null)) return getZawodnicy();
+  const zbior = new Set(druzyny);
+  return koszyki.flatMap((k) => k!).filter((z) => zbior.has(z.druzyna));
+}
+
 /** Forma drużyn z typami drużynowymi (karta typu na /druzyny). */
 export async function getDruzynyForma(): Promise<DruzynaForma[]> {
   return (await loadBundle()).druzyny_forma;

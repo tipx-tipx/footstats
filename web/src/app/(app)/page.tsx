@@ -10,7 +10,7 @@ import {
   getStsValue,
   getTypyWyniki,
   getValueBets,
-  getZawodnicy,
+  getZawodnicyTypow,
   terazTs,
 } from "@/lib/data";
 
@@ -57,7 +57,9 @@ export default async function OkazjePage({
   //
   // Kosztem jest jeden round-trip sekwencyjnie zamiast równolegle, ale PONOSIMY
   // GO TYLKO WTEDY, GDY DANE SĄ FAKTYCZNIE POTRZEBNE.
-  const zawodnicy = bets.length > 0 ? await getZawodnicy() : [];
+  // od 18.09 osobny klucz `players_typy` (~50 KB zamiast ~44 MB) — dokładnie
+  // ci zawodnicy i rynki, które `zawodnicyLite` niżej i tak zostawiał
+  const zawodnicy = bets.length > 0 ? await getZawodnicyTypow() : [];
 
   // ODCHUDZENIE payloadu: ValueBoard/BetCard czytają z zawodnika wyłącznie
   // forma[rynek_kod] typu – a pełna baza (każdy zawodnik × wszystkie rynki

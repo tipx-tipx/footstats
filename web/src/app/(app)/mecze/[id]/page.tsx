@@ -12,7 +12,7 @@ import {
   getOddsSuperbet,
   getOdrzucenia,
   getValueBets,
-  getZawodnicy,
+  getZawodnicyDruzyn,
 } from "@/lib/data";
 import { etykietaPowodu } from "@/lib/odrzucenia";
 import { fmtKurs, fmtMnoznik, opisZakladu } from "@/lib/format";
@@ -70,10 +70,9 @@ export default async function MeczPage({
 }) {
   const { id } = await params;
   const meczId = Number(id);
-  const [mecze, zawodnicy, bets, odds, legiPool, meta, odrzucenia] =
+  const [mecze, bets, odds, legiPool, meta, odrzucenia] =
     await Promise.all([
       getMecze(),
-      getZawodnicy(),
       getValueBets(),
       getOddsSuperbet(),
       getLegiPool(),
@@ -83,6 +82,9 @@ export default async function MeczPage({
 
   const mecz = mecze.find((m) => m.id === meczId);
   if (!mecz) notFound();
+  // tylko koszyki dwóch drużyn meczu (~1–3 MB) zamiast pełnego `players`
+  // (~44 MB) — filtr niżej ten sam, więc wynik identyczny (patrz data.ts)
+  const zawodnicy = await getZawodnicyDruzyn([mecz.gospodarz, mecz.gosc]);
 
   const legiMeczu = legiPool.filter((l) => l.mecz_id === meczId);
 
