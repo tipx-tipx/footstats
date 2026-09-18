@@ -1119,3 +1119,46 @@ def test_krotkie_wystepy_licza_z_surowych_minut():
     assert radar.krotkie_wystepy(tr) == 2
     assert radar.krotkie_wystepy(None) is None
     assert radar.krotkie_wystepy(_trend(counts=[], minutes=[])) is None
+
+
+def _karta_perly(traf_15=7, forma_15=4, p_15=0.42, p_25=0.24, kurs_15=3.9):
+    """Chery 17.09 (Juventus–NEC): zza pola 0,5 @1,70 (10/10, 5/5),
+    1,5 @3,9 (7/10, 4/5), 2,5 @9,0 (5/10, 2/5); p_final po korekcie
+    strumienia ~−0,4 logit jak w produkcji (symulacja na pełnej historii)."""
+    def s(linia, kurs, traf, p, traf5):
+        return {"linia": linia, "kurs": kurs, "pokrycie": {"traf": traf, "z": 10},
+                "pokrycie5": {"traf": traf5, "z": 5},
+                "p_bazowe": p, "korekta": 1.0, "p_final": p}
+    rynek = {"rynek_kod": "shots_outside_box", "rynek": "Strzały zza pola",
+             "drabinka": [s(0.5, 1.70, 10, 0.86, 5), s(1.5, kurs_15, traf_15, p_15, forma_15),
+                          s(2.5, 9.0, 5, p_25, 2)]}
+    return {"minuty_sr6": 85, "udzial_startow": 0.9, "xi": True,
+            "krotkie_wystepy5": 1, "rynki": [rynek]}
+
+
+def test_perelka_chery_jest_pierwszym_szczeblem():
+    """Iloraz p_final/cena 1,77 (> MAX_ROZJAZD_KARTY 1,25) — bardzo mocna linia
+    (7/10 & 4/5) ma limit MAX_ROZJAZD_KARTY_MOCNEJ; następnik perełki z szansą
+    0,24 (< 0,25) zostaje, bo za kursem ≥2,20 wystarcza MIN_P_NASTEPNIKA_PERLY."""
+    _s, hero = radar._oceń_karte(_karta_perly())
+    assert hero is not None and hero["linia"] == 1.5 and hero["kurs"] == 3.9
+    assert hero["powod_szczebla"] == "perla"
+    assert hero["drugi_linia"] == 2.5
+    assert hero["rozjazd_iloraz"] > radar.MAX_ROZJAZD_KARTY
+
+
+def test_slabsza_linia_nie_dostaje_luzniejszego_rozjazdu():
+    """6/10 & 4/5 (siła 0,72 < PROG_SILY_ROZJAZDU) przy ilorazie ~1,8 dalej
+    odpada na rozjeździe — luz tylko dla linii bardzo mocnych."""
+    powody = Counter()
+    _s, hero = radar._oceń_karte(_karta_perly(traf_15=6), powody=powody)
+    assert hero is None or hero["linia"] != 1.5
+    # a skrajny rozjazd (iloraz > 2,0) nie przechodzi nawet przy mocnej linii
+    _s, hero = radar._oceń_karte(_karta_perly(p_15=0.55))
+    assert hero is None or hero["linia"] != 1.5
+
+
+def test_prog_nastepnika_nizszy_tylko_za_perelka():
+    assert radar.prog_nastepnika(3.9) == radar.MIN_P_NASTEPNIKA_PERLY
+    assert radar.prog_nastepnika(2.1) == radar.MIN_P_DRUGIEGO_SZCZEBLA
+    assert radar.prog_nastepnika(None) == radar.MIN_P_DRUGIEGO_SZCZEBLA

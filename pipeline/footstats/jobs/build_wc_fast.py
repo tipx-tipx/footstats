@@ -9808,7 +9808,9 @@ def _main_impl(tryb=None):
                                                  ("ocena_modelu", "ocena_modelu"),
                                                  ("sila_skladniki", "sila_skladniki"),
                                                  # 18.09: dlaczego TEN szczebel (radar.MIN_KURS_HERO)
-                                                 ("powod_szczebla", "powod_szczebla")))):
+                                                 ("powod_szczebla", "powod_szczebla"),
+                                                 # 18.09: przepuszczona ponad 1,25 (radar.PROG_SILY_ROZJAZDU)
+                                                 ("rozjazd_iloraz", "rozjazd_iloraz")))):
             if h.get(pole) is not None:
                 out[klucz] = h[pole]
         # ⚑ OBIE CENY I MIEJSCE KARTY (2026-09-15). Bez nich pytanie

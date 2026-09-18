@@ -414,6 +414,23 @@ WAGA_NASTEPNIKA = 0.25
 # Każdy hero niesie `powod_szczebla` (perla / najwyzsza_mocna /
 # tania_z_drugim) — progi do przeliczenia z rozliczeń po ~2 tyg.
 MIN_KURS_HERO = 1.70
+# ⚑ PEREŁKA NIE MOŻE PADAĆ NA BRAMACH ZROBIONYCH POD TANIE LINIE (2026-09-18,
+# symulacja Chery'ego na pełnej historii, korekta strumienia −0,5 logit jak w
+# produkcji ~−0,40): zza pola 1,5 @3,9 (7/10, 4/5) ma iloraz p_final/cena 1,67
+# (@4,25: 1,82) — MAX_ROZJAZD_KARTY 1,25 ścinał CAŁĄ kartę, a następnik
+# 2,5 @9,0 (5/10, 2/5) miał 0,22 < MIN_P_DRUGIEGO_SZCZEBLA 0,25, więc 1,5
+# zostawała bez drugiego szczebla i hero schodził na 0,5 @1,70.
+#   * linia BARDZO mocna (siła ≥ PROG_SILY_ROZJAZDU = 7/10 & 4/5) ma limit
+#     rozjazdu MAX_ROZJAZD_KARTY_MOCNEJ zamiast 1,25 — pomiar −37% ROI przy
+#     1,30–1,50× pochodzi sprzed sita (karty z samej przewagi modelu), dla
+#     mocnych linii pomiaru nie ma; każda taka karta niesie `rozjazd_iloraz`
+#     do księgi (decyzja właściciela 18.09: „tak, upewnij się i dopracuj”);
+#   * następnik szczebla z kursem ≥ PROG_PERLY potrzebuje szansy
+#     MIN_P_NASTEPNIKA_PERLY — przy kursach 6–10 to z natury bonus; pokrycie
+#     (≥ 5/10) i forma (≥ 2/5) następnika zostają bez zmian.
+PROG_SILY_ROZJAZDU = 0.76
+MAX_ROZJAZD_KARTY_MOCNEJ = 2.0
+MIN_P_NASTEPNIKA_PERLY = 0.15
 MIN_FORMA_NASTEPNIKA_TANIEGO = 4
 MIN_POKRYCIE_NASTEPNIKA_TANIEGO = 0.50
 WETO_MODELU_PP = 0.10
@@ -1566,7 +1583,7 @@ def _rynki_wpisu(
         # DRUGI SZCZEBEL MA BYĆ REALNY — patrz MIN_P_DRUGIEGO_SZCZEBLA.
         for i, s in enumerate(drabinka):
             p_f = s.get("p_final")
-            if i >= 1 and p_f is not None and p_f < MIN_P_DRUGIEGO_SZCZEBLA:
+            if i >= 1 and p_f is not None and p_f < prog_nastepnika(drabinka[i - 1].get("kurs")):
                 if diag is not None and i == 1:
                     diag["nastepnik_ponizej_progu_szansy"] += 1
                 drabinka = drabinka[:i]
@@ -1857,7 +1874,7 @@ def _oceń_karte(
                 if _f_nast.get("z") and _f_nast["traf"] < MIN_FORMA_DRUGIEGO:
                     lokalne["drugi_szczebel_bez_formy"] += 1
                     continue
-                if p_nast is None or p_nast < MIN_P_DRUGIEGO_SZCZEBLA:
+                if p_nast is None or p_nast < prog_nastepnika(s["kurs"]):
                     # CZTERY RÓŻNE DIAGNOZY, nie jedna ([[ciche-odrzucenia-zasada]]):
                     # drabinka jednoszczeblowa z powodu sufitu linii albo braku
                     # oferty, następnik za słaby, następnik bez policzonej szansy.
@@ -1953,7 +1970,19 @@ def _oceń_karte(
             # mylimy (patrz MAX_ROZJAZD_KARTY). Cena rynku po zdjęciu marży,
             # tak jak w modelu — porównujemy jabłka z jabłkami.
             cena = betting.implied_prob_one_sided(s["kurs"])
-            if cena > 0 and p_final / cena > MAX_ROZJAZD_KARTY:
+            _iloraz = p_final / cena if cena > 0 else 0.0
+            _limit_rozjazdu = MAX_ROZJAZD_KARTY
+            if not pomiarowy and _iloraz > MAX_ROZJAZD_KARTY:
+                # bardzo mocna linia ma własny limit (nota przy PROG_SILY_ROZJAZDU)
+                _sl_r = sila_linii(
+                    p, s.get("pokrycie5"), w.get("krotkie_wystepy5"), udzial,
+                    w.get("xi") is True,
+                    float((((r.get("kontekst") or {}).get("rywal") or {})
+                           .get("mnoznik")) or 1.0))
+                if (_sl_r and _sl_r.get("powod") is None
+                        and _sl_r["sila"] >= PROG_SILY_ROZJAZDU):
+                    _limit_rozjazdu = MAX_ROZJAZD_KARTY_MOCNEJ
+            if cena > 0 and _iloraz > _limit_rozjazdu:
                 if not pomiarowy:
                     lokalne["rozjazd_z_rynkiem"] += 1
                 elif powody_pomiaru is not None:
@@ -1967,6 +1996,10 @@ def _oceń_karte(
                 **({"bukmacher": s["bukmacher"]} if s.get("bukmacher") else {}),
                 "traf": p["traf"], "z": p["z"],
                 "edge": round(edge, 3),
+                # przepuszczona ponad MAX_ROZJAZD_KARTY jako bardzo mocna
+                # linia — do księgi, żeby limit dało się przemierzyć
+                **({"rozjazd_iloraz": round(_iloraz, 2)}
+                   if _iloraz > MAX_ROZJAZD_KARTY else {}),
                 "p_final": p_final,
                 "p_bazowe": s.get("p_bazowe"),
                 "korekta": s.get("korekta"),
@@ -2287,6 +2320,15 @@ def _profil_gry(w: dict) -> str | None:
     return None
 
 
+def prog_nastepnika(kurs_poprzednika) -> float:
+    """Minimalna szansa następnika — niższa za perełką (nota przy PROG_PERLY)."""
+    try:
+        return (MIN_P_NASTEPNIKA_PERLY if float(kurs_poprzednika or 0) >= PROG_PERLY
+                else MIN_P_DRUGIEGO_SZCZEBLA)
+    except (TypeError, ValueError):
+        return MIN_P_DRUGIEGO_SZCZEBLA
+
+
 def karta_ma_realny_drugi_szczebel(w: dict) -> bool | None:
     """Czy `hero` GOTOWEJ karty ma następnik, którego wolno polować.
 
@@ -2321,7 +2363,7 @@ def karta_ma_realny_drugi_szczebel(w: dict) -> bool | None:
     if pok.get("z") and pok["traf"] / pok["z"] < MIN_POKRYCIE_DRUGIEGO:
         return False
     p_nast = _p_po_strzyzeniu(nast)
-    return p_nast is not None and p_nast >= MIN_P_DRUGIEGO_SZCZEBLA
+    return p_nast is not None and p_nast >= prog_nastepnika(hero.get("kurs"))
 
 
 def sila_linii(
