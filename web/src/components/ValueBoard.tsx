@@ -53,8 +53,86 @@ type SortKey = "ranking" | "pewnosc" | "kickoff" | "kurs";
  */
 type SortDrabinki = "najlepsze" | "szansa" | "kurs" | "kickoff";
 
-/** Ile kart drabinek pokazujemy dziennie (decyzja usera 2026-08-01). */
+/**
+ * Ile kart drabinek NA DZIEŃ MECZOWY (decyzja usera 2026-08-01, doprecyzowana
+ * 18.09: „limit 10 na dzień, jak w zawodnikach i drużynach"). Backend pilnuje
+ * tego samego (`radar.MAX_KART_DZIEN`); tu tylko bezpiecznik. Do 18.09 było
+ * to 10 kart z CAŁEGO zakresu (pięć dni), bez wyboru dnia.
+ */
 const DRABINKI_MAX = 10;
+
+/**
+ * WYBÓR DNIA — jedna kontrolka dla typów i drabinek (2026-09-18), żeby oba
+ * miejsca cięły dni tą samą granicą (`kluczDnia`, doba 6:00 → 6:00) i tak
+ * samo wyglądały. Przy jednym dniu kontrolki nie ma — nie ma z czego wybierać.
+ */
+function PasekDni({
+  dni,
+  pierwszyTs,
+  aktywny,
+  onWybierz,
+  teraz,
+}: {
+  dni: string[];
+  pierwszyTs: Map<string, { ts: number; n: number }>;
+  aktywny: string;
+  onWybierz: (k: string) => void;
+  teraz: number;
+}) {
+  if (dni.length <= 1) return null;
+  return (
+    <div
+      role="group"
+      aria-label="Wybierz dzień"
+      className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pt-4 [scrollbar-width:none] sm:flex-wrap"
+    >
+      {dni.map((k) => {
+        const w = pierwszyTs.get(k)!;
+        const et = etykietaDnia(w.ts, teraz);
+        const jest = k === aktywny;
+        return (
+          <button
+            key={k}
+            onClick={() => onWybierz(k)}
+            aria-pressed={jest}
+            className={`shrink-0 rounded-(--radius-control) border px-3 py-1.5 text-left transition-colors ${
+              jest
+                ? "border-brand bg-brand-wash"
+                : "border-hairline hover:border-hairline-strong"
+            }`}
+          >
+            <span
+              className={`block text-[11px] font-semibold uppercase tracking-wide ${
+                jest ? "text-brand-deep" : "text-ink"
+              }`}
+            >
+              {et.glowna}
+            </span>
+            <span
+              className={`font-data block text-[10px] ${
+                jest ? "text-brand-deep/80" : "text-faint"
+              }`}
+            >
+              {k.slice(8, 10)}.{k.slice(5, 7)} · {w.n}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Pierwszy kickoff i liczba pozycji per dzień — do kafelków `PasekDni`. */
+function pierwszyTsDni(elementy: { kickoff_ts: number }[]) {
+  const m = new Map<string, { ts: number; n: number }>();
+  for (const b of elementy) {
+    const k = kluczDnia(b.kickoff_ts);
+    const w = m.get(k);
+    if (!w) m.set(k, { ts: b.kickoff_ts, n: 1 });
+    else m.set(k, { ts: Math.min(w.ts, b.kickoff_ts), n: w.n + 1 });
+  }
+  return m;
+}
 
 const SORTOWANIA_DRABINKI: { kod: SortDrabinki; label: string }[] = [
   { kod: "najlepsze", label: "Najlepsze typy" },
@@ -162,16 +240,7 @@ export function ValueBoard({
     () => bets.filter((b) => kluczDnia(b.kickoff_ts) === dzien),
     [bets, dzien],
   );
-  const pierwszyTsDnia = useMemo(() => {
-    const m = new Map<string, { ts: number; n: number }>();
-    for (const b of bets) {
-      const k = kluczDnia(b.kickoff_ts);
-      const w = m.get(k);
-      if (!w) m.set(k, { ts: b.kickoff_ts, n: 1 });
-      else m.set(k, { ts: Math.min(w.ts, b.kickoff_ts), n: w.n + 1 });
-    }
-    return m;
-  }, [bets]);
+  const pierwszyTsDnia = useMemo(() => pierwszyTsDni(bets), [bets]);
   const [rynek, setRynek] = useState("wszystkie");
   const [pewnosc, setPewnosc] = useState<Pewnosc | "kazda">("kazda");
   const [meczId, setMeczId] = useState<number | undefined>(initialMatchId);
@@ -212,12 +281,24 @@ export function ValueBoard({
   // dziesiątce: user zmienia kolejność patrzenia, a nie to, które karty
   // w ogóle wchodzą. Inaczej „najwyższy kurs" wciągałby karty z gorszą
   // analizą tylko dlatego, że mają grubszą cenę.
+  // DRABINKI PER DZIEŃ (2026-09-18) — własny wybór dnia, niezależny od typów
+  const dniDrabinek = useMemo(
+    () => [...new Set(radarWpisy.map((w) => kluczDnia(w.kickoff_ts)))].sort(),
+    [radarWpisy],
+  );
+  const pierwszyTsDrabinek = useMemo(() => pierwszyTsDni(radarWpisy), [radarWpisy]);
+  const [dzienDrabinekWybrany, setDzienDrabinekWybrany] = useState<string | null>(null);
+  const dzienDrabinek =
+    dzienDrabinekWybrany && dniDrabinek.includes(dzienDrabinekWybrany)
+      ? dzienDrabinekWybrany
+      : dniDrabinek[0];
   const radarNajlepsze = useMemo(
     () =>
-      [...radarWpisy]
+      radarWpisy
+        .filter((w) => kluczDnia(w.kickoff_ts) === dzienDrabinek)
         .sort((a, b) => (a.ocena?.miejsce ?? 9999) - (b.ocena?.miejsce ?? 9999))
         .slice(0, DRABINKI_MAX),
-    [radarWpisy],
+    [radarWpisy, dzienDrabinek],
   );
   const radarPosortowane = useMemo(() => {
     const w = [...radarNajlepsze];
@@ -257,11 +338,10 @@ export function ValueBoard({
    * karty są pogrupowane po meczach i ucięcie w połowie grupy myliłoby
    * bardziej, niż pomaga.
    */
-  const LIMIT_DRABINEK = 5;
-  const [wszystkieDrabinki, setWszystkieDrabinki] = useState(false);
-  const radarPokazane = wszystkieDrabinki
-    ? radarPosortowane
-    : radarPosortowane.slice(0, LIMIT_DRABINEK);
+  // ⚑ 18.09 (właściciel): „limit nie ma być na wyświetlanie, tylko na dzień".
+  // Zwijanie do 5 kart zdjęte — wybrany dzień ma najwyżej DRABINKI_MAX kart
+  // i pokazujemy je wszystkie.
+  const radarPokazane = radarPosortowane;
   // Grupowanie po meczach ma sens WYŁĄCZNIE przy sortowaniu chronologicznym
   // (backend sortuje wtedy chronologicznie, w meczu po jakości). Filtr „tylko
   // sygnały" USUNIĘTY 2026-07-25: odkąd każda karta musi przejść te same
@@ -575,6 +655,15 @@ export function ValueBoard({
             </div>
           ) : (
             <>
+              <div className="-mt-4 mb-3">
+                <PasekDni
+                  dni={dniDrabinek}
+                  pierwszyTs={pierwszyTsDrabinek}
+                  aktywny={dzienDrabinek}
+                  onWybierz={setDzienDrabinekWybrany}
+                  teraz={teraz}
+                />
+              </div>
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                 {/* KRÓTKO I BEZ ŁAMAŃCÓW (2026-08-01, zgłoszenie usera).
                     Poprzedni wstęp miał pięć linijek, tłumaczył zapis „8/10"
@@ -688,24 +777,6 @@ export function ValueBoard({
                       )}
                     </motion.div>
                   ))}
-                  {radarPosortowane.length > LIMIT_DRABINEK && (
-                    <button
-                      onClick={() => setWszystkieDrabinki((v) => !v)}
-                      /* był drobnym szarym napisem pod listą i ginął —
-                         to jedyne wyjście do POŁOWY kart dnia (06.08) */
-                      className="font-display mt-3 inline-flex w-full items-center justify-center gap-2 rounded-(--radius-control) border border-hairline-strong bg-card px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-ink transition-colors hover:border-brand hover:text-brand sm:w-auto"
-                    >
-                      {wszystkieDrabinki
-                        ? "Pokaż mniej"
-                        : `Pokaż pozostałe drabinki (${radarPosortowane.length - LIMIT_DRABINEK})`}
-                      <span
-                        aria-hidden
-                        className={wszystkieDrabinki ? "rotate-180" : ""}
-                      >
-                        ↓
-                      </span>
-                    </button>
-                  )}
                 </div>
               )}
             </>
@@ -778,50 +849,17 @@ export function ValueBoard({
       {/* WYBÓR DNIA (2026-09-15) — patrz `dniTypow` wyżej. Kafelek mówi, ile
           typów ma dany dzień; przy jednym dniu kafelka nie ma, bo nie ma
           z czego wybierać. */}
-      {dniTypow.length > 1 && (
-        <div
-          role="group"
-          aria-label="Wybierz dzień"
-          className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pt-4 [scrollbar-width:none] sm:flex-wrap"
-        >
-          {dniTypow.map((k) => {
-            const w = pierwszyTsDnia.get(k)!;
-            const et = etykietaDnia(w.ts, teraz);
-            const aktywny = k === dzien;
-            return (
-              <button
-                key={k}
-                onClick={() => {
-                  setDzienWybrany(k);
-                  setMeczId(undefined);
-                  setLimit(25);
-                }}
-                aria-pressed={aktywny}
-                className={`shrink-0 rounded-(--radius-control) border px-3 py-1.5 text-left transition-colors ${
-                  aktywny
-                    ? "border-brand bg-brand-wash"
-                    : "border-hairline hover:border-hairline-strong"
-                }`}
-              >
-                <span
-                  className={`block text-[11px] font-semibold uppercase tracking-wide ${
-                    aktywny ? "text-brand-deep" : "text-ink"
-                  }`}
-                >
-                  {et.glowna}
-                </span>
-                <span
-                  className={`font-data block text-[10px] ${
-                    aktywny ? "text-brand-deep/80" : "text-faint"
-                  }`}
-                >
-                  {k.slice(8, 10)}.{k.slice(5, 7)} · {w.n}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      )}
+      <PasekDni
+        dni={dniTypow}
+        pierwszyTs={pierwszyTsDnia}
+        aktywny={dzien}
+        onWybierz={(k) => {
+          setDzienWybrany(k);
+          setMeczId(undefined);
+          setLimit(25);
+        }}
+        teraz={teraz}
+      />
       {/* konsola filtrów: dopracowane dropdowny + żywy odczyt wyniku */}
       {malaLista && !filtryOtwarte ? (
         <div className="mb-6 flex items-baseline justify-between gap-3 pt-4">

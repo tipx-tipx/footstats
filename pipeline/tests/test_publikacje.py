@@ -596,3 +596,36 @@ def test_wznowiona_karta_poza_sitem_schodzi_z_listy(monkeypatch):
     assert [w["podmiot_id"] for w in out] == [1]
     assert out[0]["wznowiony"] is True
     assert out[0]["hero"]["sito"] is True and out[0]["ocena"]["sito"] is True
+
+
+def test_limit_kart_na_dzien_opublikowane_maja_pierwszenstwo(monkeypatch):
+    """18.09 (właściciel): limit drabinek NA DZIEŃ MECZOWY, jak przy typach —
+    nie 30 kart na pięć dni. Opublikowana karta zostaje do gwizdka i zajmuje
+    miejsce; nowe dopełniają dzień wg rankingu, a do rejestru idą tylko te,
+    które weszły."""
+    from footstats.jobs import radar
+    monkeypatch.setattr(radar, "MAX_KART_DZIEN", 2)
+    magazyn: dict = {}
+    _stub_supa(monkeypatch, magazyn)
+    dzis = int(time.time()) + 7200
+    jutro = dzis + 86400
+    stara = {**_karta(mecz_id=1, pid=1, kickoff_ts=dzis), "ocena": {"miejsce": 9}}
+    B.scal_karty_z_publikacjami([stara])            # opublikowana wczoraj
+    nowe = [{**_karta(mecz_id=10 + i, pid=100 + i, kickoff_ts=dzis),
+             "ocena": {"miejsce": i + 1}} for i in range(3)]
+    nowe_jutro = [{**_karta(mecz_id=20 + i, pid=200 + i, kickoff_ts=jutro),
+                   "ocena": {"miejsce": i + 1}} for i in range(3)]
+    out = B.scal_karty_z_publikacjami(nowe + nowe_jutro)
+    dzis_pid = sorted(w["podmiot_id"] for w in out if w["kickoff_ts"] == dzis)
+    jutro_pid = sorted(w["podmiot_id"] for w in out if w["kickoff_ts"] == jutro)
+    assert dzis_pid == [1, 100]           # wznowiona + najlepsza nowa
+    assert jutro_pid == [200, 201]        # drugi dzień ma własny limit
+    rej = magazyn[B.PUBLIKACJE_KART_KLUCZ]
+    assert not any(":102:" in k or ":202:" in k for k in rej)   # poza limitem
+
+
+def test_doba_karty_ta_sama_co_lista_dnia():
+    from footstats.jobs import radar
+    for ts in (1_789_700_000, 1_789_720_800, 1_789_741_000, 1_789_760_000):
+        assert radar.dzien_karty(ts) == B.dzien_listy(ts)
+

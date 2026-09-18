@@ -1659,7 +1659,8 @@ def scal_karty_z_publikacjami(
     kwotował te mecze w komplecie (61–75 graczy) — to nasze bramy, nie oferta.
 
     Wznowiona karta wraca z ZAMROŻONYM `hero` (linia, kurs, przewaga z chwili
-    publikacji) i flagą `wznowiony`. Sufit 30 kart obowiązuje tylko NOWE —
+    publikacji) i flagą `wznowiony`. Limit dnia (radar.MAX_KART_DZIEN, od
+    18.09 zamiast sufitu 30 na cały zakres) obowiązuje tylko NOWE —
     przypięta karta nie może wypaść przez to, że model znalazł dziś coś
     lepszego, bo wtedy wracamy do punktu wyjścia.
 
@@ -1683,13 +1684,10 @@ def scal_karty_z_publikacjami(
                        f":{(w.get('hero') or {}).get('rynek_kod')}"
                        f":{(w.get('hero') or {}).get('linia')}")
     biezace = {klucz(w) for w in wpisy}
-    for w in wpisy:
-        k = klucz(w)
-        rej[k] = {
-            "wpis": w, "kickoff_ts": w.get("kickoff_ts"),
-            "opublikowano_ts": (rej.get(k) or {}).get("opublikowano_ts") or teraz,
-        }
-    out = list(wpisy)
+    # karty już OPUBLIKOWANE (przed gwizdkiem) — zajmują miejsca swojego dnia
+    opublikowane = {k for k, rec in rej.items()
+                    if int(rec.get("kickoff_ts") or 0) > teraz}
+    out: list[dict] = []
     wznowione = 0
     bez_drugiego = 0
     poza_sitem = 0
@@ -1737,6 +1735,34 @@ def scal_karty_z_publikacjami(
         w["opublikowano_ts"] = rec.get("opublikowano_ts")
         out.append(w)
         wznowione += 1
+    # ⚑ LIMIT DNIA (2026-09-18, radar.MAX_KART_DZIEN): opublikowane (wznowione
+    # i przeliczone na nowo) mają pierwszeństwo — karta raz pokazana zostaje
+    # do gwizdka; NOWE dopełniają dzień wg rankingu (`ocena.miejsce`). Do
+    # rejestru idą tylko karty, które faktycznie weszły — wcześniej zapisywał
+    # się cały radar (do 30 kart z pięciu dni), więc wracało wszystko.
+    zajete_dnia: Counter = Counter(radar.dzien_karty(w.get("kickoff_ts")) for w in out)
+    przyjete = [w for w in wpisy if klucz(w) in opublikowane]
+    zajete_dnia.update(radar.dzien_karty(w.get("kickoff_ts")) for w in przyjete)
+    za_limitem = 0
+    for w in sorted((w for w in wpisy if klucz(w) not in opublikowane),
+                    key=lambda w: (w.get("ocena") or {}).get("miejsce") or 9999):
+        dz = radar.dzien_karty(w.get("kickoff_ts"))
+        if zajete_dnia[dz] >= radar.MAX_KART_DZIEN:
+            za_limitem += 1
+            continue
+        zajete_dnia[dz] += 1
+        przyjete.append(w)
+    for w in przyjete:
+        k = klucz(w)
+        rej[k] = {
+            "wpis": w, "kickoff_ts": w.get("kickoff_ts"),
+            "opublikowano_ts": (rej.get(k) or {}).get("opublikowano_ts") or teraz,
+        }
+    out = przyjete + out
+    if za_limitem:
+        print(f"Publikacje kart: limit {radar.MAX_KART_DZIEN} na dzień — "
+              f"{za_limitem} nowych kart poza limitem (dni: "
+              + ", ".join(f"{d} {n}" for d, n in sorted(zajete_dnia.items())) + ")")
     if not _dry_run() and odczyt_ok:
         supa.put_key(PUBLIKACJE_KART_KLUCZ, rej)
     if wznowione or bez_drugiego or nie_gra or poza_sitem:

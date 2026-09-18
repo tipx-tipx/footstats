@@ -98,9 +98,15 @@ MAX_RYNKOW_BEZ_HISTORII = 4  # karta bez historii to sama drabinka kursów —
 # rynki pokazywane na kartach bez historii, w kolejności ważności
 RYNKI_PODSTAWOWE = ("shots", "sot", "fouls_committed", "fouls_won",
                     "shots_outside_box", "offsides", "tackles")
-MAX_WPISOW = 30             # dzienny TOP kart — ranking porządkuje resztę
-                            # (decyzja usera 2026-07-26: więcej materiału, ale
-                            # z jawnymi klasami jakości zamiast płaskiej listy)
+# ⚑ LIMIT KART NA DZIEŃ MECZOWY, NIE NA CAŁY ZAKRES (2026-09-18, właściciel:
+# „analogicznie jak w zawodnikach i drużynach — limit 10 na dzień, wiadomo, że
+# często nie będzie wypełniany"). Do dziś MAX_WPISOW = 30 obejmował pięć dni
+# naraz, a front brał z tego 10 najlepszych (DRABINKI_MAX) — też z całego
+# zakresu. Doba produktowa jak lista dnia (6:00 → 6:00 czasu polskiego,
+# `dzien_karty` = `build_wc_fast.dzien_listy`). Karty już opublikowane
+# zajmują miejsca swojego dnia (`build_wc_fast.scal_karty_z_publikacjami`).
+MAX_KART_DZIEN = 10
+MAX_WPISOW = 80             # bezpiecznik całości (≈ 10 × dni zakresu)
 MAX_WPISOW_MECZ = 2         # sufit kart na mecz (bez gwarancji slotu!)
 MAX_SHOTMAP_CYKL = 160      # budżet zapytań o shotmapy historyczne na cykl
 OSTATNIE_N = 10             # ile ostatnich występów pokazuje karta rynku
@@ -474,7 +480,8 @@ NEAR_POKRYCIA = 0.10        # mierzymy pokrycia 0,40–0,50
 # 3,67–3,85). Bukmacher tam nie kwotuje i pomiar nigdy by nie ruszył.
 # Zostaje więc uczciwe minimum: „warte swojej ceny" (przewaga >= 0).
 MIN_EDGE_POMIARU = 0.0
-# Sufit pomiaru trzymamy PONIŻEJ dziennego sufitu kart (MAX_WPISOW=30): grupa
+# Sufit pomiaru trzymamy w rzędzie publikacji (dawniej MAX_WPISOW=30; od 18.09
+# MAX_KART_DZIEN × dni zakresu): grupa
 # porównawcza ma być tej samej wielkości co publikacja, a nie ją zdominować —
 # rozliczone wpisy nigdy nie wypadają z księgi (to dataset kalibracji).
 # Bierzemy szczeble o największej przewadze, czyli tą samą regułą, którą
@@ -2320,6 +2327,27 @@ def _profil_gry(w: dict) -> str | None:
     return None
 
 
+GODZINA_DOMKNIECIA_DOBY = 6
+
+
+def dzien_karty(ts) -> str:
+    """Doba produktowa karty („YYYY-MM-DD", 6:00 → 6:00 czasu polskiego) —
+    ta sama definicja co `build_wc_fast.dzien_listy` i `kluczDnia` na froncie
+    (test pilnuje zgodności). Mecz o 2:00 należy do dnia poprzedniego."""
+    import datetime as _dt
+    if not ts:
+        return ""
+    try:
+        from zoneinfo import ZoneInfo
+        d = _dt.datetime.fromtimestamp(int(ts), _dt.timezone.utc).astimezone(
+            ZoneInfo("Europe/Warsaw"))
+    except Exception:                                          # pragma: no cover
+        d = _dt.datetime.fromtimestamp(int(ts))
+    if d.hour < GODZINA_DOMKNIECIA_DOBY:
+        d -= _dt.timedelta(days=1)
+    return d.strftime("%Y-%m-%d")
+
+
 def sila_linii_z_trendu(tr, linia: float, xi: bool = False) -> dict | None:
     """Siła linii policzona WPROST z historii zawodnika — ta sama miara co na
     szczeblach drabinki (okno `_grane`[:OSTATNIE_N], forma z 5 ostatnich,
@@ -3307,13 +3335,18 @@ def zbuduj(
     ocenione = list(najlepsza.values())
 
     per_mecz_n: dict[int, int] = {}
+    per_dzien_n: dict[str, int] = {}
     wybrane: list[dict] = []
     for w in sorted(ocenione, key=lambda w: -w["_score"]):
         if len(wybrane) >= MAX_WPISOW:
             break
         if per_mecz_n.get(w["mecz_id"], 0) >= MAX_WPISOW_MECZ:
             continue
+        _dz = dzien_karty(w.get("kickoff_ts"))
+        if per_dzien_n.get(_dz, 0) >= MAX_KART_DZIEN:
+            continue
         per_mecz_n[w["mecz_id"]] = per_mecz_n.get(w["mecz_id"], 0) + 1
+        per_dzien_n[_dz] = per_dzien_n.get(_dz, 0) + 1
         wybrane.append(w)
     wpisy = wybrane
     # OCENA na karcie: miejsce w rankingu dnia + klasa jakości. Front sortuje
