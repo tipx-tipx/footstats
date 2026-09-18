@@ -5,6 +5,7 @@ import { memo, useState } from "react";
 import { SzczegolyTypu } from "./BetCard";
 import { KROPKA_STYL, przewagaKropki } from "@/lib/slownik";
 import { DrabinkaLinii } from "./DrabinkaLinii";
+import { LogoBukmachera } from "./LogoBukmachera";
 import {
   fmtKurs,
   fmtProc,
@@ -193,8 +194,11 @@ export const BetRow = memo(function BetRow({
           {fmtProc(bet.p_model)}
         </span>
 
-        <span className="font-data w-12 text-right text-sm font-semibold">
+        <span className="font-data flex w-12 flex-col items-end text-right text-sm font-semibold">
           {bet.kurs != null ? fmtKurs(bet.kurs) : `~${fmtKurs(bet.fair_kurs * 1.05)}`}
+          {bet.kurs != null && (
+            <LogoBukmachera bukmacher={bet.bukmacher} wysokosc={9} className="mt-0.5" />
+          )}
         </span>
 
         <svg

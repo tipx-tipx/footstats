@@ -53,6 +53,61 @@ const GH_REF = process.env.GH_REF ?? "master";
 const MIN_ODSTEP_S = Number(process.env.TICK_MIN_ODSTEP_S ?? 1200);
 const KLUCZ_STANU = "cykl_dispatch"; // ten sam, którego pilnuje /api/kupon-pomin
 
+/**
+ * OFERTA BETCLICA TEŻ JEDZIE NA TYM ZEGARZE (2026-09-18).
+ *
+ * `betclic.yml` miał cron „co godzinę", a GitHub tworzył z niego przebieg co
+ * 4–6 h (18.09: 20:21, 23:30, 02:28, 08:02) — ta sama best-effort pułapka co
+ * wyżej. Oferta Betclica bywała więc sprzed pół doby, a Chery (zza pola 1,5
+ * @3,9 rano 17.09) dostał ją dopiero o 15:44. Po naprawie zamykania strumienia
+ * przebieg trwa ~2 min, więc odpalamy go stąd, NIEZALEŻNIE od cyklu (własny
+ * `concurrency` w betclic.yml, własny odstęp i stan) — także wtedy, gdy cykl
+ * jeszcze chodzi, bo to on czyta gotową ofertę.
+ */
+const GH_WORKFLOW_BETCLIC = "betclic.yml";
+const MIN_ODSTEP_BETCLIC_S = Number(process.env.TICK_MIN_ODSTEP_BETCLIC_S ?? 1200);
+const KLUCZ_STANU_BETCLIC = "betclic_dispatch";
+
+async function odpalBetclica(
+  naglowkiGh: Record<string, string>,
+  now: number,
+  supaUrl?: string,
+  supaKey?: string,
+): Promise<string> {
+  try {
+    if (supaUrl && supaKey) {
+      const stan = await readAppData(supaUrl, supaKey, KLUCZ_STANU_BETCLIC);
+      const ostatni = typeof stan.ts === "number" ? stan.ts : 0;
+      if (now - ostatni < MIN_ODSTEP_BETCLIC_S) return "za wcześnie";
+    }
+    const chodzi = await fetch(
+      `https://api.github.com/repos/${GH_REPO}/actions/workflows/${GH_WORKFLOW_BETCLIC}` +
+        `/runs?status=in_progress&per_page=1`,
+      { headers: naglowkiGh, cache: "no-store" },
+    );
+    if (chodzi.ok) {
+      const dane = (await chodzi.json()) as { total_count?: number };
+      if ((dane.total_count ?? 0) > 0) return "już chodzi";
+    }
+    const res = await fetch(
+      `https://api.github.com/repos/${GH_REPO}/actions/workflows/${GH_WORKFLOW_BETCLIC}/dispatches`,
+      {
+        method: "POST",
+        headers: { ...naglowkiGh, "Content-Type": "application/json" },
+        body: JSON.stringify({ ref: GH_REF }),
+      },
+    );
+    if (!res.ok) return `GitHub ${res.status}`;
+    if (supaUrl && supaKey) {
+      await writeAppData(supaUrl, supaKey, KLUCZ_STANU_BETCLIC, { ts: now });
+    }
+    return "odpalono";
+  } catch {
+    // awaria Betclica nie może zablokować zegara cyklu
+    return "błąd";
+  }
+}
+
 function podanySekret(req: Request): string {
   const auth = req.headers.get("authorization") ?? "";
   if (auth.toLowerCase().startsWith("bearer ")) return auth.slice(7).trim();
@@ -90,6 +145,9 @@ async function tick(req: Request) {
   };
   const now = Math.floor(Date.now() / 1000);
 
+  // 0. BETCLIC — niezależnie od tego, co dalej stanie się z cyklem
+  const betclic = await odpalBetclica(naglowkiGh, now, supaUrl, supaKey);
+
   // 1. ODSTĘP. Stan trzymamy w Supabase, bo instancje serverless nie mają
   //    wspólnej pamięci — zmienna w module resetuje się co zimny start.
   if (supaUrl && supaKey) {
@@ -102,6 +160,7 @@ async function tick(req: Request) {
         odpalono: false,
         powod: "za wcześnie",
         za_ile_s: MIN_ODSTEP_S - minelo,
+        betclic,
       });
     }
   }
@@ -124,6 +183,7 @@ async function tick(req: Request) {
           ok: true,
           odpalono: false,
           powod: "cykl już chodzi",
+          betclic,
         });
       }
     }
@@ -142,14 +202,14 @@ async function tick(req: Request) {
   );
   if (!res.ok) {
     return NextResponse.json(
-      { ok: false, odpalono: false, powod: `GitHub ${res.status}` },
+      { ok: false, odpalono: false, powod: `GitHub ${res.status}`, betclic },
       { status: 502 },
     );
   }
   if (supaUrl && supaKey) {
     await writeAppData(supaUrl, supaKey, KLUCZ_STANU, { ts: now });
   }
-  return NextResponse.json({ ok: true, odpalono: true });
+  return NextResponse.json({ ok: true, odpalono: true, betclic });
 }
 
 // GET, bo tak wołają darmowe pingery (cron-job.org, UptimeRobot). POST dla

@@ -698,6 +698,31 @@ def _kara_koszyka(legi, kary: dict | None = None) -> float:
     return kara
 
 
+def tylko_superbet(bets: list[dict]) -> list[dict]:
+    """Nogi do kuponu w cenach SUPERBETU (2026-09-18).
+
+    Siatka kursów bierze wyższą cenę z Superbetu i Betclica, a kupon —
+    zwłaszcza betbuilder z jednego meczu — gra się u JEDNEGO bukmachera,
+    i to u Superbetu (Betclic betbuildera nie ma). Noga z ceną Betclica
+    dostaje cenę Superbetu tej samej linii (`kurs_sb`) i przeliczone EV;
+    bez niej wypada z kuponów — typ pojedynczy zostaje z wyższą ceną.
+    Rynki drużynowe i typy bez pola `bukmacher` to Superbet.
+    """
+    out = []
+    for b in bets or []:
+        if (b.get("bukmacher") or "Superbet") == "Superbet":
+            out.append(b)
+            continue
+        k = b.get("kurs_sb")
+        if not k or not b.get("p_model"):
+            continue
+        k = float(k)
+        out.append({**b, "kurs": k, "bukmacher": "Superbet",
+                    "ev_pct": round(betting.ev_brutto_pct(b["p_model"], k), 1),
+                    "ev_netto": round(betting.ev_pct(b["p_model"], k), 1)})
+    return out
+
+
 def _kandydaci(bets: list[dict]) -> list[dict]:
     out = [
         b for b in bets

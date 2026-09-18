@@ -1,4 +1,5 @@
 import { CountUpKurs, PasekSzansy } from "./KuponAnim";
+import { LogoBukmachera } from "./LogoBukmachera";
 import { wyplata } from "@/lib/podatek";
 import {
   fmtDataCzas,
@@ -227,7 +228,12 @@ export function KuponBilet({
       <footer className="border-t border-hairline bg-card-soft/70 px-4 py-2.5 text-xs text-faint sm:px-5">
         {k.legi.length}{" "}
         {k.legi.length === 1 ? "typ" : k.legi.length < 5 ? "typy" : "typów"} ·
-        kursy: {k.legi[0]?.bukmacher ?? "Superbet"}
+        kursy:{" "}
+        <LogoBukmachera
+          bukmacher={k.legi[0]?.bukmacher ?? "Superbet"}
+          wysokosc={11}
+          className="align-middle"
+        />
         {k.mecze_lacznie != null && k.mecze_ze_skladami != null && (
           <>
             {" "}

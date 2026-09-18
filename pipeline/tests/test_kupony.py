@@ -404,3 +404,22 @@ def test_przedzialy_publiczne_ida_w_meta():
 
     zrodlo = inspect.getsource(build_wc_fast)
     assert '"przedzialy_kuponow": kupony.przedzialy_publiczne()' in zrodlo
+
+
+def test_kupon_gra_sie_u_superbetu():
+    """18.09: siatka bierze wyższą cenę z Superbetu i Betclica, a kupon
+    (betbuilder z jednego meczu) składamy u Superbetu — noga z ceną Betclica
+    dostaje cenę Superbetu tej samej linii, bez niej wypada z kuponów."""
+    from footstats.model import kupony as K
+    sb = {"podmiot": "A", "kurs": 1.8, "bukmacher": "Superbet", "p_model": 0.6}
+    bc_z_sb = {"podmiot": "B", "kurs": 2.1, "bukmacher": "Betclic", "kurs_sb": 1.9,
+               "p_model": 0.55, "ev_pct": 15.5}
+    bc_bez = {"podmiot": "C", "kurs": 2.4, "bukmacher": "Betclic", "p_model": 0.5}
+    druzyna = {"podmiot": "D", "kurs": 1.5, "p_model": 0.7}
+    out = K.tylko_superbet([sb, bc_z_sb, bc_bez, druzyna])
+    assert [b["podmiot"] for b in out] == ["A", "B", "D"]
+    b = out[1]
+    assert b["kurs"] == 1.9 and b["bukmacher"] == "Superbet"
+    assert b["ev_pct"] == round((0.55 * 1.9 - 1) * 100, 1)
+    assert bc_z_sb["kurs"] == 2.1           # oryginał (typ pojedynczy) nietknięty
+

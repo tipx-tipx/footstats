@@ -4,6 +4,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { memo, useState } from "react";
 
 import { FormBars } from "./FormBars";
+import { LogoBukmachera } from "./LogoBukmachera";
 import { Krok, Kroki } from "./KrokiRozwiniecia";
 import { fmtKurs, fmtProc } from "@/lib/format";
 import {
@@ -409,6 +410,12 @@ function DrabinkaPasek({ w }: { w: RadarWpis }) {
                   >
                     {fmtKurs(s.kurs)}
                   </span>
+                  {/* u kogo ta cena (siatka bierze wyższą z dwóch) */}
+                  <LogoBukmachera
+                    bukmacher={s.bukmacher}
+                    wysokosc={wybrany ? 12 : 10}
+                    className={`my-0.5 ${wybrany ? "" : "opacity-80"}`}
+                  />
                   <span
                     className={`font-data text-[11px] tabular-nums ${
                       wybrany ? "text-brand-deep" : "text-faint"
@@ -860,7 +867,7 @@ function PokryciePoprzeczek({
   if (zPokryciem.length < 2) return null;
   return (
     <div>
-      <div className="grid grid-cols-[2.4rem_3.2rem_3rem_1fr_auto] items-center gap-x-3 border-b border-hairline pb-1 text-[9px] uppercase tracking-wide text-faint">
+      <div className="grid grid-cols-[2.4rem_4.6rem_3rem_1fr_auto] items-center gap-x-3 border-b border-hairline pb-1 text-[9px] uppercase tracking-wide text-faint">
         <span>linia</span>
         <span>kurs</span>
         <span>szansa</span>
@@ -875,7 +882,7 @@ function PokryciePoprzeczek({
           return (
             <div
               key={s.linia}
-              className="grid grid-cols-[2.4rem_3.2rem_3rem_1fr_auto] items-center gap-x-3"
+              className="grid grid-cols-[2.4rem_4.6rem_3rem_1fr_auto] items-center gap-x-3"
             >
               <span
                 className={`font-data text-xs font-semibold ${
@@ -885,18 +892,25 @@ function PokryciePoprzeczek({
                 {linLabel(s.linia)}
               </span>
               <span className="font-data text-xs font-semibold text-ink-soft">
-                {fmtKurs(s.kurs)}
+                <span className="flex items-center gap-1">
+                  {fmtKurs(s.kurs)}
+                  <LogoBukmachera bukmacher={s.bukmacher} wysokosc={10} />
+                </span>
                 {/* druga cena POD pierwszą – piąta kolumna rozpychałaby
-                    wiersz na telefonie (ta sama zasada co w starej tabeli) */}
+                    wiersz na telefonie (ta sama zasada co w starej tabeli);
+                    pokazujemy TĘ DRUGĄ, niższą — wyższa stoi wyżej */}
                 {s.rozjazd && (
-                  <span
-                    className={`block text-[10px] font-medium ${
+                  <span className="mt-0.5 flex items-center gap-1 text-[10px] font-medium text-faint">
+                    {fmtKurs(
                       s.rozjazd.gdzie === "betclic"
-                        ? "text-data-amber-ink"
-                        : "text-faint"
-                    }`}
-                  >
-                    BC {fmtKurs(s.rozjazd.betclic)}
+                        ? s.rozjazd.superbet
+                        : s.rozjazd.betclic,
+                    )}
+                    <LogoBukmachera
+                      bukmacher={s.rozjazd.gdzie === "betclic" ? "Superbet" : "Betclic"}
+                      wysokosc={9}
+                      className="opacity-70"
+                    />
                   </span>
                 )}
               </span>

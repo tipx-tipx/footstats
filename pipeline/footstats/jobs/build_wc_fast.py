@@ -6877,6 +6877,10 @@ def _main_impl(tryb=None):
                         "rynek_kod": mk, "rynek": MARKET_NAMES_PL[mk], "linia": l,
                         "strona": side_pl, "kurs": odd,
                         "bukmacher": sv[1], "p_model": round(p_side, 4),
+                        # cena SUPERBETU tej samej linii — kupon gra się u jednego
+                        # bukmachera (patrz `kupony.tylko_superbet`); `kurs` wyżej
+                        # zostaje wyższą z dwóch dla typu pojedynczego
+                        "kurs_sb": (sb_lines.get(l) or {}).get(side_key),
                         # delta korekty strony nałożona na `p_side` wyżej —
                         # stempel jedzie razem z liczbą (2026-08-17)
                         "kal_strony": round(_d_strony_p, 4),
@@ -7056,6 +7060,8 @@ def _main_impl(tryb=None):
                 "linia": l, "strona": a.side,
                 "kurs": kurs_wziety,
                 "bukmacher": book,
+                # cena Superbetu tej linii — do kuponów (`kupony.tylko_superbet`)
+                "kurs_sb": (sb_lines.get(l) or {}).get(side_key),
                 # KIEDY TĘ CENĘ WIDZIELIŚMY. Superbet pobieramy co cykl, więc
                 # jego kurs jest sprzed minut; oferta Betclica jest pamiętana
                 # (patrz SWIEZOSC_BETCLIC_S) i bywa sprzed godzin. Bez tego
@@ -9099,6 +9105,7 @@ def _main_impl(tryb=None):
             "udzial_startow": b.get("udzial_startow"),
             "gral_w_ostatnim": b.get("gral_w_ostatnim"),
             "kurs": b["kurs"], "bukmacher": b["bukmacher"],
+            "kurs_sb": b.get("kurs_sb"),
             "p_model": b["p_model"], "p_rynku": None,
             "fair_kurs": round(1.0 / max(b["p_model"], 1e-6), 2),
             "edge_pp": None,
@@ -10760,10 +10767,14 @@ def _main_impl(tryb=None):
             ).get("p_model")
         except Exception as e:
             diagnostyka.cichy("cykl", "p_pokaz_lega", e)
+    # generator kuponów na stronie składa z tej puli — więc ceny Superbetu
+    # (kupon u jednego bukmachera, `kupony.tylko_superbet`); `p_pokaz` po
+    # identyfikatorze ORYGINAŁU, bo przeceniony leg to nowy słownik
     _dump("legi_pool.json", [
         {**{k: b.get(k) for k in _POLA_LEGA}, "id": i,
-         "p_pokaz": _pokaz_lega.get(id(b))}
-        for i, b in enumerate(legi_pool_pub)
+         "p_pokaz": _pokaz_lega.get(id(b_org))}
+        for i, (b_org, b) in enumerate(
+            (o, t) for o in legi_pool_pub for t in kupony.tylko_superbet([o]))
     ])
     n_dzis = len({b["mecz_id"] for b in legi_pool_pub
                   if b["kickoff_ts"] <= time.time() + kupony.OKNO_DZIS_S})
@@ -10839,7 +10850,8 @@ def _main_impl(tryb=None):
                 for k, v in wagi_zauf.items()
             ))
     kupony_list = kupony.build_kupony(
-        value_bets, legi_pool_pub, profil=profil_kuponow, kary=kary_kor,
+        kupony.tylko_superbet(value_bets), kupony.tylko_superbet(legi_pool_pub),
+        profil=profil_kuponow, kary=kary_kor,
         wagi=wagi_zauf or None, kal_szansy=kal_kuponow or None,
         # ⚑ KOREKTA STRUMIENIA JUŻ SIEDZI W `p_model` LEGA (audyt 2026-08-11).
         #

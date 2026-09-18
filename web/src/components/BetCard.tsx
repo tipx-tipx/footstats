@@ -9,7 +9,14 @@ import { DrabinkaLinii } from "./DrabinkaLinii";
 import { FormBars } from "./FormBars";
 import { Krok, Kroki, SzczegolyTechniczne } from "./KrokiRozwiniecia";
 import { Sygnaly, type Sygnal } from "./Sygnaly";
+import { LogoBukmachera, nazwaBukmachera } from "./LogoBukmachera";
 import { kursNetto } from "@/lib/podatek";
+
+/** „u kogo" — dopełniacz nazwy bukmachera do zdań na karcie. */
+const uBukmachera = (b?: string | null) => {
+  const n = nazwaBukmachera(b);
+  return n === "Superbet" ? "Superbetu" : n === "Betclic" ? "Betclica" : n;
+};
 import {
   fmtDataCzas,
   fmtKurs,
@@ -282,9 +289,9 @@ function sygnalyTypu(
   }
   // WIEK CENY (2026-08-08). Kurs zapisujemy w chwili, gdy typ trafia na listę,
   // i po nim rozlicza księga – ale u bukmachera mógł się od tego czasu ruszyć.
-  // Ofertę drugiego bukmachera pobieramy raz na mecz (decyzja usera: „kurs
-  // pobierany jednorazowo, nawet jak później się zmieni"), więc bywa sprzed
-  // godzin. Milczenie o tym byłoby najgorszym wyjściem: user zobaczyłby cenę,
+  // Cena opublikowanego typu jest ZAMROŻONA (po niej rozlicza księga), choć od
+  // 18.09 ofertę obu bukmacherów odświeżamy co ~20 min — więc na karcie bywa
+  // sprzed godzin. Milczenie o tym byłoby najgorszym wyjściem: user zobaczyłby cenę,
   // której nie dostanie, i to wygląda na oszustwo, a nie na nieaktualność.
   // Próg dwóch godzin, żeby nie zawracać głowy przy każdym świeżym typie.
   if (!bet.sugestia && bet.kurs != null && bet.kurs_ts != null) {
@@ -295,7 +302,7 @@ function sygnalyTypu(
         znak: "◷",
         label: `cena sprawdzona ${godzin} h temu`,
         ton: "cichy",
-        opis: `Ten kurs widzieliśmy ${godzin} godz. temu u ${bet.bukmacher || "bukmachera"} i po nim liczymy wynik. Do gwizdka mógł się lekko zmienić – sprawdź go przed zagraniem.`,
+        opis: `Ten kurs widzieliśmy ${godzin} godz. temu u ${uBukmachera(bet.bukmacher)} i po nim liczymy wynik. Do gwizdka mógł się lekko zmienić – sprawdź go przed zagraniem.`,
       });
     }
   }
@@ -1454,9 +1461,13 @@ export const BetCard = memo(function BetCard({
             <span className="font-data text-xl font-semibold leading-none tracking-tight">
               {bet.kurs != null ? fmtKurs(bet.kurs) : `~${fmtKurs(bet.fair_kurs * 1.05)}`}
             </span>
-            <span className="text-[9px] uppercase tracking-wide text-faint">
-              {bet.kurs != null ? bet.bukmacher : "dobry kurs od"}
-            </span>
+            {bet.kurs != null ? (
+              <LogoBukmachera bukmacher={bet.bukmacher} wysokosc={12} />
+            ) : (
+              <span className="text-[9px] uppercase tracking-wide text-faint">
+                dobry kurs od
+              </span>
+            )}
           </span>
         </span>
 

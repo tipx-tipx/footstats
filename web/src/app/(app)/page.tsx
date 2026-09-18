@@ -240,8 +240,11 @@ export default async function OkazjePage({
               znika, gdy wszystkie mecze puli już się zaczęły — wtedy przy
               `md:grid-cols-2` zostawała karta wyników i pół ekranu pustki.
               Przy jednym kafelku siatka schodzi do jednej kolumny i wyśrodkowuje. */}
+          {/* `grid-cols-1` (= minmax(0, 1fr)) JAWNIE (2026-09-18): siatka bez
+              kolumn brała szerokość najszerszej treści karty (383 px) i na
+              telefonie 390 px strona uciekała w bok o 9 px (`npm run audyt`). */}
           <div
-            className={`relative grid items-stretch gap-5 ${
+            className={`relative grid grid-cols-1 items-stretch gap-5 ${
               kuponDnia && pods && pods.rozliczone > 0
                 ? "md:grid-cols-2"
                 : "mx-auto max-w-xl"

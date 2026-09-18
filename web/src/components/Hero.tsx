@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 
 import { fmtKurs, fmtProc, opisZakladu } from "@/lib/format";
 import type { ValueBet } from "@/lib/types";
+import { LogoBukmachera } from "./LogoBukmachera";
 
 const wejscie = {
   hidden: { opacity: 0, y: 18 },
@@ -289,8 +290,9 @@ function ZywyPodglad({ bets }: { bets: ValueBet[] }) {
                        Złotówki wyjaśniają, co to znaczy, ale nie ustawiają
                        wrażenia: przy małej stawce zawsze brzmią jak drobne. */
                     <div>
-                      <p className="text-[10px] uppercase tracking-wide text-faint">
-                        kurs ({bet.bukmacher})
+                      <p className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-faint">
+                        kurs
+                        <LogoBukmachera bukmacher={bet.bukmacher} wysokosc={11} />
                       </p>
                       <p className="font-data mt-0.5 text-2xl font-semibold text-ink">
                         {fmtKurs(bet.kurs)}
