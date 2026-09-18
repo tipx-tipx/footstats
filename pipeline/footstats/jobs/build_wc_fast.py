@@ -409,6 +409,7 @@ def _typ_z_logu(rec: dict) -> dict:
         "czynniki": {}, "uzasadnienie": {"czynniki": []},
         "pewniak": bool(rec.get("pewniak")),
         "wyzsza_linia": bool(rec.get("wyzsza_linia")),
+        "mocna_linia": bool(rec.get("mocna_linia")),
         "matchup": bool(rec.get("matchup")),
         "rotacja": bool(rec.get("rotacja")),
         "miekka_linia": bool(rec.get("miekka_linia")),
@@ -2403,6 +2404,18 @@ _POLA_HISTORII = ("counts", "minutes", "timestamps", "started", "game_positions"
 
 
 ZAKRES_MECZOW_KLUCZ = "zakres_meczow"
+
+
+def klucz_linii_listy(b: dict, atrakcyjnosc) -> tuple:
+    """Klucz wyboru JEDNEJ linii zakładu na liście dnia (2026-09-18).
+
+    Mocna wyższa linia (`mocna_linia`: ≥1,5, siła historii ≥0,76, weto
+    modelu) wygrywa z 0,5 tego samego zakładu, a wśród mocnych — wyższa,
+    jak pierwszy szczebel drabinki (decyzja właściciela: „nie bójmy się 1,5
+    a nawet 2,5"). Pozostałe linie po atrakcyjności, jak dotąd.
+    """
+    return ((1, float(b["linia"])) if b.get("mocna_linia") else (0, 0.0),
+            atrakcyjnosc(b))
 
 
 def zakres_meczow(tryb) -> list[dict]:
@@ -6884,6 +6897,24 @@ def _main_impl(tryb=None):
                 # kontekst, którego kurs mógł nie wycenić (weryfikują rozliczenia)
                 max_div = 0.30 if matchup_typ else betting.MAX_MODEL_MARKET_DIVERGENCE
                 max_rel = 2.3 if matchup_typ else betting.MAX_RELATIVE_DIVERGENCE
+                # ⚑ MOCNA WYŻSZA LINIA NA LIŚCIE DNIA (2026-09-18, właściciel:
+                # „nie bójmy się 1,5 a nawet 2,5, jeśli typ przemyślany").
+                # Księga do 14.09: linie 1,5 z siłą ≥0,70 przy kursie ≥1,8
+                # trafiały 48,8% przy cenie 44,4% (n=43), a dzisiejsze 0,5 na
+                # półce „wyższe kursy" 43,3% przy 48,5% (n=67). Takie linie ginęły
+                # na bramach zgody z rynkiem — ich szansa z definicji leży
+                # daleko od ceny (ten sam mechanizm co perełki w drabinkach).
+                # Linia ≥1,5 z siłą ≥ PROG_SILY_ROZJAZDU (7/10 & 4/5, kara za
+                # krótkie występy jak w radarze) wchodzi z WETEM modelu zamiast
+                # bram zgody; stempel `mocna_linia` + `sila_linii` do księgi.
+                _mocna = None
+                if l >= 1.5 and side_key == "over":
+                    _sl_l = radar.sila_linii_z_trendu(
+                        tr, l, xi=bool(xi_zywy.get((mid, tr.player_id))))
+                    if (_sl_l and _sl_l.get("powod") is None
+                            and _sl_l["sila"] >= radar.PROG_SILY_ROZJAZDU
+                            and p_side >= implied - radar.WETO_MODELU_PP):
+                        _mocna = _sl_l
                 if pewny or perelka or niszowa:
                     prof_ok = True
                     if (sm.ci_high - sm.ci_low) > 0.35:
@@ -6893,11 +6924,12 @@ def _main_impl(tryb=None):
                     ):
                         div_fail = True
                 if (
-                    (pewny or perelka or niszowa)
+                    (pewny or perelka or niszowa or _mocna)
                     and len(tr.counts) >= 5  # pewniak nie powstaje z 2 meczów
                     and (sm.ci_high - sm.ci_low) <= 0.35
-                    and abs(p_side - implied) <= max_div
-                    and (implied <= 0 or p_side / implied <= max_rel)
+                    and (_mocna or (
+                        abs(p_side - implied) <= max_div
+                        and (implied <= 0 or p_side / implied <= max_rel)))
                 ):
                     # wartość lega (do selekcji kuponów „ku przewadze”):
                     # EV vs Superbet zawsze; no-vig UK gdy jest konsensus na tej linii
@@ -6928,6 +6960,9 @@ def _main_impl(tryb=None):
                         # bukmachera (patrz `kupony.tylko_superbet`); `kurs` wyżej
                         # zostaje wyższą z dwóch dla typu pojedynczego
                         "kurs_sb": (sb_lines.get(l) or {}).get(side_key),
+                        # mocna wyższa linia (nota przy `_mocna` wyżej)
+                        "mocna_linia": bool(_mocna),
+                        "sila_linii": (_mocna or {}).get("sila"),
                         # delta korekty strony nałożona na `p_side` wyżej —
                         # stempel jedzie razem z liczbą (2026-08-17)
                         "kal_strony": round(_d_strony_p, 4),
@@ -9050,6 +9085,21 @@ def _main_impl(tryb=None):
     for b in wyzsze.values():
         b["wyzsza_linia"] = True
         do_emisji.append(b)
+    # MOCNE WYŻSZE LINIE (2026-09-18, nota przy `_mocna` w pętli zawodników):
+    # per (mecz, rynek) najwyższy kurs wśród linii ≥1,5 z mocną historią —
+    # jak pierwszy szczebel drabinki. Różnorodność zostaje (jedna na rynek
+    # meczu), a „jedna linia na stronę" niżej woli mocną wyższą od 0,5.
+    mocne: dict[tuple[int, str], dict] = {}
+    for b in legi_pool:
+        if not b.get("mocna_linia"):
+            continue
+        kw = (b["mecz_id"], b["rynek_kod"])
+        w = mocne.get(kw)
+        if w is None or (b["kurs"], b.get("sila_linii") or 0) > (w["kurs"], w.get("sila_linii") or 0):
+            mocne[kw] = b
+    for b in mocne.values():
+        b["wyzsza_linia"] = True
+        do_emisji.append(b)
     for b in perelki_kandydaci:
         if perelki_per_mecz.get(b["mecz_id"], 0) >= 2:
             continue
@@ -9074,10 +9124,11 @@ def _main_impl(tryb=None):
     # Zostaje NAJATRAKCYJNIEJSZA linia — czyli „wyższa linia" i perełka nadal
     # wygrywają, gdy naprawdę są lepsze, ale nie DOKŁADAJĄ się do bazowej.
     najlepsza_na_strone: dict[tuple, dict] = {}
+
     for b in do_emisji:
         k_str = (b["mecz_id"], b["rynek_kod"], b.get("podmiot_id"), b["strona"])
         w = najlepsza_na_strone.get(k_str)
-        if w is None or _atrakcyjnosc(b) > _atrakcyjnosc(w):
+        if w is None or klucz_linii_listy(b, _atrakcyjnosc) > klucz_linii_listy(w, _atrakcyjnosc):
             najlepsza_na_strone[k_str] = b
     if len(najlepsza_na_strone) < len(do_emisji):
         print(f"Jedna linia na stronę: {len(do_emisji)} kandydatów -> "
@@ -9109,9 +9160,11 @@ def _main_impl(tryb=None):
         # sumy meczowe i „kto więcej" (patrz `_kwarantanna_zdejmuje`)
         powod_poza = _kwarantanna_zdejmuje(b)
         if powod_poza is None:
-            if not betting.w_oknie_zgody(b["p_model"], b["kurs"]):
+            if (not b.get("mocna_linia")
+                    and not betting.w_oknie_zgody(b["p_model"], b["kurs"])):
                 # najostrzejsza brama, zmierzona na 336 rozliczeniach — patrz
                 # betting.OKNO_ZGODY_*. Typ dalej się liczy i uczy w tle.
+                # Mocna wyższa linia ma zamiast niej weto modelu (18.09).
                 powod_poza = "rozjazd_z_rynkiem"
             elif _kategoria_zdejmuje(b):
                 powod_poza = "kwarantanna_kategorii"
@@ -9142,6 +9195,8 @@ def _main_impl(tryb=None):
             "linia": b["linia"], "strona": b["strona"],
             "pewniak": True,
             "wyzsza_linia": bool(b.get("wyzsza_linia")),
+            "mocna_linia": bool(b.get("mocna_linia")),
+            "sila_linii": b.get("sila_linii"),
             "matchup": bool(b.get("matchup")),
             "matchup_styl": bool(b.get("matchup_styl")),
             "rotacja": bool(b.get("rotacja")),
@@ -10762,7 +10817,7 @@ def _main_impl(tryb=None):
         # kupony własne (generator na żądanie), inaczej te legi są ślepą
         # plamą w diagnostyce miękkich linii/sygnałów XI/marży UK (patrz
         # kupony.py:_leg_dict i rozliczanie.py:rozlicz, ten sam fix)
-        "wyzsza_linia", "xi_sygnal", "kurs_ref",
+        "wyzsza_linia", "xi_sygnal", "kurs_ref", "mocna_linia", "sila_linii",
         # sygnały rotacji zawodnika (2026-09-14) — lista dnia układa nimi
         # zawodników; muszą dojść do księgi, żeby dało się zmierzyć zwroty
         "udzial_startow", "gral_w_ostatnim",

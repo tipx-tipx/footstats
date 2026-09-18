@@ -229,3 +229,42 @@ def test_syntetyczny_numer_365_przepiety_po_odkrywaniu():
     assert r["zdjete"] == 1 and r["przepiete"] == 1
     klucze = sorted((x.player_id, x.market_code) for x in r["trends"])
     assert klucze == [(1413858, "fouls_won"), (1413858, "shots"), (955555555, "shots")]
+
+
+def test_sila_linii_z_trendu_jak_na_szczeblu_drabinki():
+    """Lista dnia liczy siłę tą samą miarą co radar: 10 ostatnich rozegranych
+    (≥20 min), forma z 5, kara za występ <60 min w ostatnich 5 (XI zdejmuje)."""
+    from footstats.jobs import radar
+    def tr(counts, minutes):
+        return StatshubTrend(
+            player_id=1, player_name="X", position="F", team_id=1, team_name="A",
+            opponent_id=2, opponent_name="B", is_home=True, market_code="shots",
+            line=1.5, in_predicted_lineup=False, league_average=None,
+            opponent_average=None, opponent_rank=None, total_ranks=None,
+            counts=[float(c) for c in counts], minutes=[float(m) for m in minutes],
+            timestamps=[TERAZ - i * DZIEN for i in range(len(counts))],
+            started=[True] * len(counts))
+    # 7/10 powyżej 1,5, forma 4/5, pełne mecze → 0,76
+    t = tr([2, 3, 1, 2, 2, 3, 2, 2, 1, 1, 5], [90] * 11)
+    sl = radar.sila_linii_z_trendu(t, 1.5)
+    assert sl["powod"] is None and sl["sila"] == 0.76
+    # występ 45 min w ostatnich 5 = kara 0,25, chyba że potwierdzony skład
+    t2 = tr([2, 3, 1, 2, 2, 3, 0, 2, 1, 1], [90, 90, 45, 90, 90, 90, 90, 90, 90, 90])
+    assert radar.sila_linii_z_trendu(t2, 1.5)["powod"] is not None
+    assert radar.sila_linii_z_trendu(t2, 1.5, xi=True)["powod"] is None
+    # za krótka próba
+    assert radar.sila_linii_z_trendu(tr([2, 2, 2], [90] * 3), 1.5) is None
+
+
+def test_lista_woli_mocna_wyzsza_linie_od_05():
+    """Ten sam zakład: 0,5 @1,25 i mocne 1,5 @1,85 / 2,5 @3,10 — wygrywa
+    najwyższa mocna; bez mocnej zostaje stara kolejność po atrakcyjności."""
+    atr = lambda b: b["p_model"] * b["kurs"] ** 0.5
+    l05 = {"linia": 0.5, "kurs": 1.25, "p_model": 0.85}
+    l15 = {"linia": 1.5, "kurs": 1.85, "p_model": 0.55, "mocna_linia": True}
+    l25 = {"linia": 2.5, "kurs": 3.10, "p_model": 0.35, "mocna_linia": True}
+    najlepsza = max((l05, l15, l25), key=lambda b: B.klucz_linii_listy(b, atr))
+    assert najlepsza is l25
+    assert max((l05, l15), key=lambda b: B.klucz_linii_listy(b, atr)) is l15
+    zwykla15 = dict(l15, mocna_linia=False)
+    assert max((l05, zwykla15), key=lambda b: B.klucz_linii_listy(b, atr)) is l05

@@ -2320,6 +2320,27 @@ def _profil_gry(w: dict) -> str | None:
     return None
 
 
+def sila_linii_z_trendu(tr, linia: float, xi: bool = False) -> dict | None:
+    """Siła linii policzona WPROST z historii zawodnika — ta sama miara co na
+    szczeblach drabinki (okno `_grane`[:OSTATNIE_N], forma z 5 ostatnich,
+    krótkie występy z surowych minut), dla listy dnia (2026-09-18).
+
+    Bez udziału startów i rywala: lista ma własne bramy składu i kontekstu.
+    None = za krótka próba (mniej niż MIN_PROBA_SCORE rozegranych).
+    """
+    if tr is None:
+        return None
+    okno = _grane(tr)[:OSTATNIE_N]
+    if len(okno) < MIN_PROBA_SCORE:
+        return None
+    lin = float(linia)
+    okno5 = okno[:OKNO_FORMY_SITA]
+    return sila_linii(
+        {"traf": sum(1 for c, _, _ in okno if c > lin), "z": len(okno)},
+        {"traf": sum(1 for c, _, _ in okno5 if c > lin), "z": len(okno5)},
+        krotkie_wystepy(tr), None, bool(xi))
+
+
 def prog_nastepnika(kurs_poprzednika) -> float:
     """Minimalna szansa następnika — niższa za perełką (nota przy PROG_PERLY)."""
     try:

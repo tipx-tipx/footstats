@@ -1238,6 +1238,9 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
             "matchup_styl": bool(b.get("matchup_styl")),
             "rotacja": bool(b.get("rotacja")),
             "wyzsza_linia": bool(b.get("wyzsza_linia")),
+            # mocna wyższa linia listy dnia (18.09) — pomiar za ~2 tyg.
+            "mocna_linia": bool(b.get("mocna_linia")),
+            **({"sila_linii": b["sila_linii"]} if b.get("sila_linii") is not None else {}),
             "pewniak": bool(b.get("pewniak")),
             "miekka_linia": bool(b.get("miekka_linia")),
             # sygnał składu przy publikacji — do kalibracji p_start z rozliczeń
@@ -4612,6 +4615,9 @@ def compute_diagnostyka(log: dict) -> dict:
         "matchup_styl": [r for r in settled if r.get("matchup_styl")],
         "rotacja": [r for r in settled if r.get("rotacja")],
         "wyzsza_linia": [r for r in settled if r.get("wyzsza_linia")],
+        # mocna wyższa linia (18.09): ≥1,5 z siłą historii ≥0,76, weto modelu
+        # zamiast okna zgody — czy trafia względem ceny, rozstrzyga ta kategoria
+        "mocna_linia": [r for r in settled if r.get("mocna_linia")],
         "miekka_linia": [r for r in settled if r.get("miekka_linia")],
         "sugestie": [r for r in settled if r.get("sugestia")],
         # POMIAR PROGÓW: jak trafiają typy odrzucone tuż przy progu vs
