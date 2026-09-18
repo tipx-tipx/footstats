@@ -4406,6 +4406,15 @@ def _main_impl(tryb=None):
             (t.team_id, rotowire._norm(t.player_name), t.market_code)
             for t in trends
         }
+        # ⚑ TEN SAM ZAWODNIK POD JEDNYM NUMEREM (2026-09-18). Rynek, którego feed
+        # nie zna, dostawał tu trend pod SYNTETYCZNYM numerem, choć zawodnik ma
+        # prawdziwy numer z feedu/banku w innych rynkach — 995 z 12 646 zawodników
+        # w players istniało dwa razy (Gómez 220833 i 935233537), a unia występów
+        # do bram składu łączy po numerze, więc historia była rozcięta na pół.
+        id_znany: dict[tuple[int, str], int] = {}
+        for t in trends:
+            if t.player_id and int(t.player_id) < 900_000_000:
+                id_znany.setdefault((t.team_id, rotowire._norm(t.player_name)), int(t.player_id))
         zespoly: list[tuple[dict, int, int, bool, str, str]] = []
         for e in wszystkie_ev:
             hid, aid = e["homeTeamId"], e["awayTeamId"]
@@ -4454,6 +4463,7 @@ def _main_impl(tryb=None):
                         continue  # rynki zawodników z pola — bramkarz zbędny
                     pid_365 = (900_000_000
                                + zlib.crc32(pkey.encode("utf-8")) % 90_000_000)
+                    pid_365 = id_znany.get((tid, pkey), pid_365)
                     for mk in MARKETY_365_FULL:
                         if (tid, pkey, mk) in pokryci:
                             continue  # jest już trend z banku/statshub
