@@ -2426,6 +2426,41 @@ def zakres_meczow(tryb) -> list[dict]:
     return out
 
 
+def przepnij_syntetyczne_numery(trends: list) -> dict:
+    """Trend pod syntetycznym numerem 365 (≥ 900 000 000) przechodzi na
+    prawdziwy numer tego samego zawodnika tej samej drużyny, jeśli taki jest.
+
+    ⚑ PO CO (2026-09-18). Dopełnianie z 365 zna tylko numery obecne w trendach
+    w SWOJEJ chwili, a odkrywanie zawodników z oferty biegnie później — cykl
+    14:34 miał 47 zawodników dwa razy (Real Sociedad B: Lebarbier 1413858 +
+    985557989), historia rozcięta na pół. Gdy ten sam (mecz, rynek) istnieje
+    już pod prawdziwym numerem, syntetyczny trend znika (tamten jest z pełnej
+    historii albo z oferty); inaczej dostaje prawdziwy numer.
+    """
+    znany: dict[tuple, int] = {}
+    for t in trends:
+        if t.player_id and int(t.player_id) < 900_000_000:
+            znany.setdefault((t.team_id, rotowire._norm(t.player_name)), int(t.player_id))
+    zajete = {(t.event_id, int(t.player_id or 0), t.market_code) for t in trends
+              if t.player_id and int(t.player_id) < 900_000_000}
+    out, przepiete, zdjete = [], 0, 0
+    for t in trends:
+        if not t.player_id or int(t.player_id) < 900_000_000:
+            out.append(t)
+            continue
+        real = znany.get((t.team_id, rotowire._norm(t.player_name)))
+        if real is None:
+            out.append(t)
+            continue
+        if (t.event_id, real, t.market_code) in zajete:
+            zdjete += 1
+            continue
+        zajete.add((t.event_id, real, t.market_code))
+        out.append(dc_replace(t, player_id=real))
+        przepiete += 1
+    return {"trends": out, "przepiete": przepiete, "zdjete": zdjete}
+
+
 def _scal_historie(stary, pelny) -> dict:
     """Unia historii dwóch trendów tego samego zawodnika i rynku.
 
@@ -2540,7 +2575,9 @@ def dolacz_pelne_kadry(
     idx = {(t.event_id, t.player_id, t.market_code): t for t in trends}
     gracze: set = set()
     for e, sbp, bcp in mecze:
-        wyceniani = len(sbp) + len(bcp)
+        # klucze obu cenników to `superbet.norm_name` — zawodnik u obu
+        # bukmacherów to JEDEN wyceniony (18.09: suma dawała 1566 zamiast ~połowy)
+        wyceniani = len(set(sbp) | set(bcp))
         znalezieni = 0
         for tid, opp, dom in ((e.get("homeTeamId"), e.get("awayTeamId"), True),
                               (e.get("awayTeamId"), e.get("homeTeamId"), False)):
@@ -6148,6 +6185,16 @@ def _main_impl(tryb=None):
         trends = list(trends) + _odkryte_trendy
         print(f"Odkrywanie z oferty: {len(_odkryte_trendy)} trendów odkrytych "
               "zawodników poszło DO SILNIKA TYPÓW i do banku")
+    # odkrywanie działa PO dopełnianiu z 365 — tamto nie znało jeszcze
+    # prawdziwych numerów odkrytych (patrz `przepnij_syntetyczne_numery`)
+    try:
+        _przep = przepnij_syntetyczne_numery(trends)
+        if _przep["przepiete"] or _przep["zdjete"]:
+            print(f"Numery 365 po odkrywaniu: przepięto {_przep['przepiete']}, "
+                  f"zdjęto {_przep['zdjete']} dubli")
+        trends = _przep["trends"]
+    except Exception as e:                                     # noqa: BLE001
+        diagnostyka.cichy("cykl", "przepnij_syntetyczne", e)
 
     # ⚑ KALENDARZ DRUŻYN UZUPEŁNIONY FEEDEM (2026-09-15, zgłoszenie właściciela:
     # Connell i Senesi w drabinkach, choć nie grają). Magazyn bywa nieaktualny

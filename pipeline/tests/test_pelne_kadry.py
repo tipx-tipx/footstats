@@ -210,3 +210,22 @@ def test_mecz_poza_oknem_pominiety():
                                 fetch_kadra=lambda tid: _kadra(),
                                 fetch_extra=lambda ids: {})
     assert licz["meczow_z_oferta"] == 0 and licz["druzyn"] == 0
+
+
+def test_syntetyczny_numer_365_przepiety_po_odkrywaniu():
+    """Cykl 18.09 14:34: 47 dubli — odkrywanie z oferty dało prawdziwy numer
+    PO dopełnianiu z 365 (Real Sociedad B, Lebarbier 1413858 + 985557989)."""
+    def t(pid, mk, name="Alex Lebarbier", team=77, ev=5):
+        return StatshubTrend(
+            player_id=pid, player_name=name, position="D", team_id=team,
+            team_name="Real Sociedad B", opponent_id=1, opponent_name="X",
+            is_home=True, market_code=mk, line=0.5, in_predicted_lineup=False,
+            league_average=None, opponent_average=None, opponent_rank=None,
+            total_ranks=None, event_id=ev, counts=[1.0], minutes=[90.0],
+            timestamps=[TERAZ], started=[True])
+    trends = [t(1413858, "shots"), t(985557989, "shots"), t(985557989, "fouls_won"),
+              t(955555555, "shots", name="Ktoś Inny")]
+    r = B.przepnij_syntetyczne_numery(trends)
+    assert r["zdjete"] == 1 and r["przepiete"] == 1
+    klucze = sorted((x.player_id, x.market_code) for x in r["trends"])
+    assert klucze == [(1413858, "fouls_won"), (1413858, "shots"), (955555555, "shots")]
