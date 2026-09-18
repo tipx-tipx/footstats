@@ -144,14 +144,23 @@ def test_raport_lapie_rozjazd_obu_nazw_naraz():
     podobieństwie by nie złapała: bukmacher spolszcza OBIE nazwy, więc
     podobieństwo wynosi 0,00. Zbieżna godzina jest jedynym dowodem, że to ten
     sam mecz (żywy przypadek 06.08: Debreceni VSC – FC København)."""
+    # (od 18.09 sam „Debreczyn · FC Kopenhaga” PARUJE SIĘ w drugiej rundzie —
+    # ta sama minuta + TOKEN_ALIASY; raport łapie to, czego nie da się dopasować)
     m = _mecz_druzynowy(1, "Debreceni VSC", "FC København", 1_784_673_000)
-    sb = [_sb(101, "Debreczyn·FC Kopenhaskie", 1_784_673_000)]
+    sb = [_sb(101, "Debreczyński·Kopenhaskie", 1_784_673_000)]
     prawie: list[dict] = []
     n, _luka = bl.paruj_superbet([m], sb, prawie=prawie)
     assert n == 0
     assert len(prawie) == 1
     assert prawie[0]["statshub"] == "Debreceni VSC - FC København"
-    assert prawie[0]["superbet"] == "Debreczyn - FC Kopenhaskie"
+    assert prawie[0]["superbet"] == "Debreczyński - Kopenhaskie"
+
+
+def test_debreczyn_kopenhaga_o_tej_samej_minucie_paruje_sie():
+    """Żywy przypadek 06.08 — ta sama minuta i alias miasta wystarczą."""
+    m = _mecz_druzynowy(1, "Debreceni VSC", "FC København", 1_784_673_000)
+    n, _ = bl.paruj_superbet([m], [_sb(101, "Debreczyn VSC·FC Kopenhaga", 1_784_673_000)])
+    assert n == 1
 
 
 def test_raport_pomija_mecze_ktore_sie_sparowaly():
@@ -184,13 +193,14 @@ def test_raport_milczy_poza_zakresem_druzynowym():
     w_zakresie = _mecz_druzynowy(2, "Debreceni VSC", "FC København",
                                  1_784_673_000)
     sb = [_sb(101, "Montana·PFC Nesebar", 1_784_673_000),
-          _sb(102, "Debreczyn·FC Kopenhaskie", 1_784_673_000)]
+          _sb(102, "Debreczyński·Kopenhaskie", 1_784_673_000)]
     prawie: list[dict] = []
     bl.paruj_superbet([poza, w_zakresie], sb, prawie=prawie)
     # o meczu spoza zakresu drużynowego raport nie mówi ani słowa
     assert {p["statshub"] for p in prawie} == {"Debreceni VSC - FC København"}
-    # a właściwy kandydat stoi pierwszy — kolejne to podpowiedzi z tej minuty
-    assert prawie[0]["superbet"] == "Debreczyn - FC Kopenhaskie"
+    # właściwy kandydat jest wśród podpowiedzi z tej minuty (przy zerowym
+    # podobieństwie obu kolejność jest remisem)
+    assert "Debreczyński - Kopenhaskie" in {p["superbet"] for p in prawie}
 
 
 # --- dopasowanie zawodników do kluczy kursów Superbetu ---
@@ -214,3 +224,40 @@ def test_znajdz_zawodnika_pelne_vs_boiskowe():
     # dokładny klucz ma pierwszeństwo i działa jak dotąd (tryb MŚ)
     assert znajdz_zawodnika({"kane harry": {"sot": {}}}, "Harry Kane") \
         == {"sot": {}}
+
+
+def test_czolowe_mecze_ze_spolszczonymi_nazwami_paruja_sie():
+    """18.09: Atlético–Real, Leverkusen–Lipsk, Marsylia–PSG i Lyon–Rennes —
+    każdy z ofertą zawodniczą Superbetu — wypadały z analizy (0,25–0,50)."""
+    ts = 1_789_913_700
+    pary = [
+        ("Atlético Madrid", "Real Madrid", "Atletico Madryt·Real Madryt"),
+        ("Bayer 04 Leverkusen", "RB Leipzig", "Bayer Leverkusen·RB Lipsk"),
+        ("Olympique de Marseille", "Paris Saint-Germain", "Olympique Marsylia·PSG"),
+        ("Olympique Lyonnais", "Stade Rennais", "Olympique Lyon·Rennes"),
+    ]
+    for k, (h, a, sb_nazwa) in enumerate(pary):
+        m = _mecz(k, h, a, ts + k * 7200)
+        n, _ = bl.paruj_superbet([m], [_sb(100 + k, sb_nazwa, ts + k * 7200)])
+        assert n == 1, sb_nazwa
+
+
+def test_ta_sama_minuta_paruje_przy_polowie_zgodnosci():
+    """Halmstads BK – AIK vs „Halmstads · AIK Stockholm” (0,50): pod progiem
+    0,51, ale ta sama minuta i jedyny kandydat."""
+    ts = 1_789_905_600
+    m = _mecz(1, "Halmstads BK", "AIK", ts)
+    n, _ = bl.paruj_superbet([m], [_sb(101, "Halmstads·AIK Stockholm", ts)])
+    assert n == 1 and m.sb_event["eventId"] == 101
+    # inna godzina — 0,50 nie wystarcza
+    m2 = _mecz(2, "Halmstads BK", "AIK", ts)
+    n2, _ = bl.paruj_superbet([m2], [_sb(102, "Halmstads·AIK Stockholm", ts + 3600)])
+    assert n2 == 0
+
+
+def test_ta_sama_minuta_niejednoznaczna_nie_paruje():
+    ts = 1_789_905_600
+    m = _mecz(1, "Halmstads BK", "AIK", ts)
+    sb = [_sb(101, "Halmstads·AIK Stockholm", ts), _sb(102, "Halmstads·AIK Solna", ts)]
+    n, _ = bl.paruj_superbet([m], sb)
+    assert n == 0

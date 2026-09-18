@@ -68,6 +68,9 @@ PROG_PODOBIENSTWA = 0.51
 # o TEJ SAMEJ godzinie to prawie na pewno ten sam mecz — i dokładnie to
 # człowiek ma zobaczyć w raporcie.
 OKNO_PRAWIE_S = 120
+# druga runda parowania (ta sama minuta) — patrz `paruj_superbet`
+PROG_PODOBIENSTWA_TEJ_MINUTY = 0.5    # 0,25 parowało „Nacional Potosí” z „Nacional
+                                      # Montevideo” po samym „Nacional” (test)
 
 
 def _sh(url: str) -> dict:
@@ -237,6 +240,7 @@ KLUB_ALIASY: dict[str, str] = {
     "fs riga": "rfs",                  # RFS = Rīgas Futbola skola
     "1904 dac": "dac",                 # DAC 1904 Dunajská Streda
     "dunajska streda": "dac",
+    "psg": "germain paris saint",      # PSG -> Paris Saint-Germain
 }
 
 # aliasy POJEDYNCZYCH TOKENÓW — polskie nazwy miast w ofercie Superbetu.
@@ -248,6 +252,18 @@ TOKEN_ALIASY: dict[str, str] = {
     "praga": "praha",           # Sparta Praga -> AC Sparta Praha
     "kopenhaga": "kobenhavn",   # FC Kopenhaga -> FC København
     "debreczyn": "debreceni",   # Debreczyn VSC -> Debreceni VSC
+    # z raportu 18.09 — cztery czołowe mecze kolejki bez pary (Atlético–Real,
+    # Leverkusen–Lipsk, Marsylia–PSG, Lyon–Rennes)
+    "madryt": "madrid",         # Atletico Madryt / Real Madryt
+    "lipsk": "leipzig",         # RB Lipsk -> RB Leipzig
+    "marsylia": "marseille",    # Olympique Marsylia -> Olympique de Marseille
+    "rennais": "rennes",        # Stade Rennais -> Rennes
+    "monachium": "munchen",     # Bayern Monachium -> FC Bayern München
+    "mediolan": "milan",        # Inter Mediolan / AC Mediolan
+    "neapol": "napoli",         # SSC Neapol -> SSC Napoli
+    "lizbona": "lisboa",        # Sporting Lizbona -> Sporting CP (Lisboa)
+    "sewilla": "sevilla",       # Sewilla FC -> Sevilla FC
+    "walencja": "valencia",     # Walencja -> Valencia CF
 }
 
 # ROCZNIK ZAŁOŻENIA ZOSTAJE TOKENEM — sprawdzone i odrzucone 03.08. Kuszące
@@ -389,6 +405,39 @@ def paruj_superbet(
     zajete_m: set[int] = set()
     n = 0
     for sim, m, i in kandydaci:
+        if i in zajete_sb or m.event_id in zajete_m:
+            continue
+        zajete_sb.add(i)
+        zajete_m.add(m.event_id)
+        m.sb_event = sb_events[i]
+        m.sb_podobienstwo = sim
+        n += 1
+    # ⚑ DRUGA RUNDA: TA SAMA MINUTA ROZPOCZĘCIA (2026-09-18). Superbet spolszcza
+    # nazwy tak, że średnia spada pod próg przy oczywistej parze: Atlético
+    # Madrid – Real Madrid vs „Atletico Madryt · Real Madryt” (0,50), Olympique
+    # de Marseille – PSG vs „Olympique Marsylia · PSG” (0,25) — cztery czołowe
+    # mecze kolejki, każdy z ofertą zawodniczą, wypadały z analizy. Kickoff obu
+    # źródeł zgadza się co do sekundy (patrz OKNO_PRAWIE_S), więc przy tej
+    # samej minucie wystarcza 0,5 zamiast 0,51 (Halmstads BK – AIK vs
+    # „Halmstads · AIK Stockholm”; spolszczenia miast łapie TOKEN_ALIASY) — pod warunkiem, że
+    # mecz i oferta są dla siebie WZAJEMNIE jedynym najlepszym kandydatem
+    # (o okrągłej godzinie gra kilkanaście meczów naraz).
+    kand2: list[tuple[float, MeczLigowy, int]] = []
+    for m in mecze:
+        if m.event_id in zajete_m or not m.kickoff_ts:
+            continue
+        for i, sb_h, sb_a, sb_ts in sb_parsed:
+            if i in zajete_sb or not sb_ts or abs(sb_ts - m.kickoff_ts) > OKNO_PRAWIE_S:
+                continue
+            sim = (podobienstwo_klubu(m.home, sb_h)
+                   + podobienstwo_klubu(m.away, sb_a)) / 2.0
+            if sim >= PROG_PODOBIENSTWA_TEJ_MINUTY:
+                kand2.append((sim, m, i))
+    for sim, m, i in kand2:
+        rywale_m = [s2 for s2, m2, i2 in kand2 if m2 is m and i2 != i]
+        rywale_sb = [s2 for s2, m2, i2 in kand2 if i2 == i and m2 is not m]
+        if any(s2 >= sim for s2 in rywale_m + rywale_sb):
+            continue          # niejednoznaczne — nie zgadujemy
         if i in zajete_sb or m.event_id in zajete_m:
             continue
         zajete_sb.add(i)
