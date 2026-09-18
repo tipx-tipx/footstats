@@ -1222,9 +1222,13 @@ export const RadarCard = memo(function RadarCard({
           badge: "bg-data-red-wash text-data-red-ink",
         }
       : null,
-    w.ocena?.sito
-      ? { label: "przez sito", badge: "bg-paper text-ink-soft" }
-      : null,
+    // perełka przed „przez sito": mocna linia przy wysokim kursie to
+    // najważniejsza informacja na karcie (18.09, radar.PROG_PERLY)
+    w.ocena?.powod_szczebla === "perla"
+      ? { label: "perełka", badge: "bg-brand/10 text-brand" }
+      : w.ocena?.sito
+        ? { label: "przez sito", badge: "bg-paper text-ink-soft" }
+        : null,
     w.ocena?.powod_wejscia === "seria"
       ? { label: "mocna seria", badge: "bg-paper text-ink-soft" }
       : null,
@@ -1520,11 +1524,16 @@ export const RadarCard = memo(function RadarCard({
                               <span className="font-medium text-ink-soft">
                                 przez sito:
                               </span>{" "}
-                              to najwyższa linia, którą zawodnik realnie
-                              pokrywa – przebił ją w co najmniej 7 z 10
-                              ostatnich meczów i w 4 z 5 ostatnich, grał w
-                              nich pełne mecze i regularnie zaczyna. Kurs
-                              jest tu dodatkiem, nie powodem.
+                              zawodnik realnie pokrywa tę linię – przebijał
+                              ją regularnie w ostatnich 10 meczach i w
+                              większości z 5 ostatnich, grał w nich pełne
+                              mecze i regularnie zaczyna.
+                              {w.ocena?.powod_szczebla === "perla" &&
+                                " To perełka: tak mocna historia przy tak wysokim kursie – bukmacher wycenia tę linię niżej, niż wynika z gry zawodnika."}
+                              {w.ocena?.powod_szczebla === "najwyzsza_mocna" &&
+                                " Spośród linii, które pokrywa, ta płaci najwięcej."}
+                              {w.ocena?.powod_szczebla === "tania_z_drugim" &&
+                                " Pierwszy szczebel jest tańszy, bo drugi też realnie wchodzi – to on jest celem tej drabinki."}
                               {w.ocena?.sito_wyjatek?.includes("rywal") &&
                                 " Ostatnia forma to 3 z 5, ale rywal oddaje na tym rynku wyraźnie więcej niż inni."}
                               {w.ocena?.sito_wyjatek?.includes("xi") &&

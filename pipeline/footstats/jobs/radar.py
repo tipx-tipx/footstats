@@ -395,6 +395,29 @@ PROG_POKRYCIA_SILY = 0.60       # poniżej 6/10 linia nie jest hero niezależnie
 PROG_SILY_HERO = 0.70
 SKALA_SILY = 0.75               # siła → trafialność (dopasowanie z księgi)
 WAGA_NASTEPNIKA = 0.25
+# ⚑⚑ WYBÓR PIERWSZEGO SZCZEBLA: NAJWYŻSZY KURS WŚRÓD MOCNYCH LINII (2026-09-18,
+# decyzja właściciela „akceptuję wszystko”). Księga do 14.09: linia mocna
+# (7/10 & 4–5/5, bez krótkich) trafia ~55–65% NIEZALEŻNIE od kursu — przy
+# kursie <1,70 59% wobec ceny 63% (przegrywa), przy 1,80–2,50 65% wobec 51%
+# (n=23). Pokrycie 8–9/10 to tanie linie (46%), więc siła 1,0 taniej linii
+# nie jest powodem, żeby wygrała z droższą. Chery 17.09: zza pola 1,5 @3,9
+# (7/10, 4/5) przegrałby z tanią linią w starej wartości pakietu.
+#   * hero = NAJWYŻSZY kurs spośród linii z siłą ≥ PROG_SILY_HERO,
+#     wartość pakietu tylko rozstrzyga remis;
+#   * kurs < MIN_KURS_HERO (1,70) tylko z REALNYM następnikiem (forma
+#     ≥ MIN_FORMA_NASTEPNIKA_TANIEGO z 5 i pokrycie ≥ MIN_POKRYCIE_NASTEPNIKA_TANIEGO)
+#     — „pewny pierwszy, płatny drugi” (Openda 0,5 @1,68 + 1,5 @4,25); inaczej
+#     taka linia zostaje pojedynczym typem listy dnia, nie drabinką;
+#   * weto modelu (skalibrowany w każdym paśmie, pomiar 16.09): szansa
+#     modelu niższa od ceny o więcej niż WETO_MODELU_PP → linia nie jest hero;
+#   * perełka = hero z kursem ≥ PROG_PERLY — stempel do księgi i rankingu.
+# Każdy hero niesie `powod_szczebla` (perla / najwyzsza_mocna /
+# tania_z_drugim) — progi do przeliczenia z rozliczeń po ~2 tyg.
+MIN_KURS_HERO = 1.70
+MIN_FORMA_NASTEPNIKA_TANIEGO = 4
+MIN_POKRYCIE_NASTEPNIKA_TANIEGO = 0.50
+WETO_MODELU_PP = 0.10
+PROG_PERLY = 2.20
 MIN_FORMA_DRUGIEGO = 2       # następnik: wszedł w ≥2 z 5 ostatnich
 # PRÓG ZOSTAJE NA 0.5 mimo zgłoszenia „drabinki są randomowe" (2026-07-27).
 # Podniesienie go na 0.65 wycięłoby kartę, którą user wskazał jako DOBRĄ
@@ -2060,7 +2083,29 @@ def _oceń_karte(
                 trafiony["sito_wyjatek"] = ",".join(_sl["wyjatki"]) or None
             elif not pomiarowy:
                 lokalne[sito_powod] += 1
-            klucz = (1 if sito else 0, _wart if (sito and _wart is not None) else 0.0, ocena)
+            # CENA I WETO (nota przy MIN_KURS_HERO) — tylko dla linii mocnych
+            hero_ok = sito
+            if sito:
+                _f5n = (nast or {}).get("pokrycie5") or {}
+                _nast_realny = (
+                    nast is not None and pok_nast.get("z")
+                    and pok_nast["traf"] / pok_nast["z"] >= MIN_POKRYCIE_NASTEPNIKA_TANIEGO
+                    and (_f5n.get("traf") or 0) >= MIN_FORMA_NASTEPNIKA_TANIEGO)
+                if s["kurs"] < MIN_KURS_HERO and not _nast_realny:
+                    hero_ok = False
+                    lokalne["sito_tania_bez_realnego_drugiego"] += 1
+                elif p_final is not None and p_final < 1.0 / s["kurs"] - WETO_MODELU_PP:
+                    hero_ok = False
+                    lokalne["sito_weto_modelu"] += 1
+                else:
+                    trafiony["powod_szczebla"] = (
+                        "perla" if s["kurs"] >= PROG_PERLY
+                        else "najwyzsza_mocna" if s["kurs"] >= MIN_KURS_HERO
+                        else "tania_z_drugim")
+            trafiony["hero_ok"] = hero_ok
+            klucz = (1 if hero_ok else 0,
+                     float(s["kurs"]) if hero_ok else 0.0,
+                     _wart if (hero_ok and _wart is not None) else 0.0, ocena)
             if pomiarowy:
                 if ocena > pomiar_score:
                     pomiar_score, pomiar_s = ocena, trafiony
@@ -2069,11 +2114,11 @@ def _oceń_karte(
                 # RANKING KART po wartości pakietu (właściciel 17.09: model
                 # nie rządzi kolejnością); klasa karty dalej z `edge` hero
                 best_score = (trafiony["wartosc_pakietu"]
-                              if sito and trafiony.get("wartosc_pakietu") is not None
+                              if hero_ok and trafiony.get("wartosc_pakietu") is not None
                               else ocena)
     if pomiar_out is not None and pomiar_s is not None:
         pomiar_out.append(pomiar_s)
-    if best_s is not None and not best_s.get("sito"):
+    if best_s is not None and not best_s.get("hero_ok"):
         # KARTA BEZ LINII SITOWEJ NIE POWSTAJE (2026-09-17). Powód = najczęstsza
         # brama sita wśród jej linii — licznik w rentgenie, nie cisza
         # ([[ciche-odrzucenia-zasada]]).
@@ -3237,6 +3282,9 @@ def zbuduj(
             # zdaniem; `sito_wyjatek` mówi, który wyjątek wpuścił kartę
             "sito": bool(hero.get("sito")),
             "sito_wyjatek": hero.get("sito_wyjatek"),
+            # dlaczego TEN szczebel (18.09, nota przy MIN_KURS_HERO): „perla”,
+            # „najwyzsza_mocna”, „tania_z_drugim” — front pisze to zdaniem
+            "powod_szczebla": hero.get("powod_szczebla"),
             "p_final": hero.get("p_final"),
             "p_bazowe": hero.get("p_bazowe"),
             "korekta": hero.get("korekta"),

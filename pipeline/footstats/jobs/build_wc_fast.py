@@ -9806,7 +9806,9 @@ def _main_impl(tryb=None):
         for pole, klucz in (((f"{pref}sila", "sila"), (f"{pref}p_sila", "p_sila"))
                             + (() if drugi else (("wartosc_pakietu", "wartosc_pakietu"),
                                                  ("ocena_modelu", "ocena_modelu"),
-                                                 ("sila_skladniki", "sila_skladniki")))):
+                                                 ("sila_skladniki", "sila_skladniki"),
+                                                 # 18.09: dlaczego TEN szczebel (radar.MIN_KURS_HERO)
+                                                 ("powod_szczebla", "powod_szczebla")))):
             if h.get(pole) is not None:
                 out[klucz] = h[pole]
         # ⚑ OBIE CENY I MIEJSCE KARTY (2026-09-15). Bez nich pytanie

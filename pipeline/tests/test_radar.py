@@ -317,8 +317,10 @@ def test_zbuduj_sygnaly_przed_drabinkami():
                                "home": "Klub", "away": "Rywal"}},
             odds_grid={999: {1: {"shots": {"1.5": KURS_W_OKNIE, "2.5": KURS_DRUGIEGO}},
                              # gorsza cena = słabsza karta, więc sygnał
-                             # (transfer) ma wyjść przed zwykłą drabinką
-                             7: {"shots": {"1.5": 1.67,
+                             # (transfer) ma wyjść przed zwykłą drabinką;
+                             # 1,70 = radar.MIN_KURS_HERO (18.09: tańszy start
+                             # tylko z realnym następnikiem, a 2,5 ma tu 3/5)
+                             7: {"shots": {"1.5": 1.70,
                                            "2.5": KURS_DRUGIEGO}}}},
             sb_cache={},
             model_pokrycie=[],
@@ -950,7 +952,8 @@ def test_szczebel_za_drobne_po_sufit_linii():
 # --- SITO (2026-09-17): najwyższa linia z pokryciem I formą, pełne występy ---
 
 def _karta_sitowa(udzial=0.9, xi=None, p_model=None, forma=None, krotkie=0,
-                  rywal=None, forma_ostatniej=2, kurs_25=2.50):
+                  rywal=None, forma_ostatniej=2, kurs_25=2.50, kurs_15=1.90,
+                  traf_25=7):
     """Cztery linie strzałów: 0,5 @1,30 (10/10, ost. 5/5), 1,5 @1,90 (8/10,
     5/5), 2,5 (7/10, forma domyślnie 4/5), 3,5 @4,20 (5/10, forma 2/5).
     Przewaga nad ceną jest największa na 1,5 — sito ma wybrać 2,5: najwyższą
@@ -965,10 +968,10 @@ def _karta_sitowa(udzial=0.9, xi=None, p_model=None, forma=None, krotkie=0,
     rynek = {"rynek_kod": "shots", "rynek": "Strzały", "drabinka": [
         # p_final trzyma się ceny (rozjazd ≤ MAX_ROZJAZD_KARTY), a następnik
         # każdej linii ma pokrycie ≥ MIN_POKRYCIE_DRUGIEGO i p ≥ 0,25
-        s(0.5, 1.30, 10, 0.78, 5), s(1.5, 1.90, 8, 0.58, 5),
+        s(0.5, 1.30, 10, 0.78, 5), s(1.5, kurs_15, 8, 0.58, 5),
         # przy 2,92 cena bez marży to ~0,318 — 0,38 mieści się w oknie zgody
         # z rynkiem (MAX_ROZJAZD_KARTY), 0,40 już nie
-        s(2.5, kurs_25, 7, 0.45 if kurs_25 <= 2.6 else 0.38,
+        s(2.5, kurs_25, traf_25, 0.45 if kurs_25 <= 2.6 else 0.38,
           4 if forma is None else forma),
         s(3.5, 4.20, 5, 0.27, forma_ostatniej),
     ]}
@@ -979,16 +982,18 @@ def _karta_sitowa(udzial=0.9, xi=None, p_model=None, forma=None, krotkie=0,
             "krotkie_wystepy5": krotkie, "rynki": [rynek]}
 
 
-def test_hero_to_najlepszy_pakiet_a_nie_najwyzsza_linia():
-    """Sito v3 (18.09): 1,5 @1,90 (8/10, 5/5) z następnikiem 2,5 (7/10, 4/5)
-    to lepszy pakiet niż 2,5 @2,50 z następnikiem 3,5 (5/10, 2/5) — hero
-    schodzi na 1,5, a 2,5 zostaje celem polowania. Składniki do księgi."""
+def test_hero_to_najwyzszy_kurs_wsrod_mocnych_linii():
+    """Decyzja właściciela 18.09 (radar.MIN_KURS_HERO): mocna linia trafia
+    ~55–65% niezależnie od kursu, więc hero to NAJWYŻSZY kurs z siłą ≥0,70 —
+    2,5 @2,50 (7/10, 4/5), nie 1,5 @1,90 z lepszym „pakietem”. Kurs ≥2,20 =
+    perełka. Składniki do księgi."""
     score, hero = radar._oceń_karte(_karta_sitowa())
-    assert hero is not None and hero["linia"] == 1.5 and hero["kurs"] == 1.90
+    assert hero is not None and hero["linia"] == 2.5 and hero["kurs"] == 2.50
+    assert hero["powod_szczebla"] == "perla" and hero["hero_ok"] is True
     assert hero["sito"] is True and hero["sito_wyjatek"] is None
-    assert hero["drugi_linia"] == 2.5 and hero["drugi_traf5"] == 4
-    assert hero["traf5"] == 5 and hero["z5"] == 5
-    assert hero["sila"] == 0.92 and hero["drugi_sila"] == 0.76
+    assert hero["drugi_linia"] == 3.5 and hero["drugi_traf5"] == 2
+    assert hero["traf5"] == 4 and hero["z5"] == 5
+    assert hero["sila"] == 0.76 and hero["drugi_sila"] == 0.44
     assert hero["sila_skladniki"]["kary"] == {}
     assert hero["wartosc_pakietu"] > 0 and score == hero["wartosc_pakietu"]
     assert hero["p_sila"] is not None and hero["ocena_modelu"] is not None
@@ -1023,10 +1028,13 @@ def test_hojny_rywal_dopycha_linie_i_zostawia_stempel():
     assert sl(f=2, rywal=1.2)["powod"] is not None       # 2/5 nie ratuje
     assert sl(rywal=1.05)["powod"] is not None            # rywal w normie
     assert sl(f=4, rywal=0.8)["sila"] == 0.7              # skąpy rywal odejmuje
-    # na karcie: 2,5 z formą 3/5 nie jest hero bez rywala, z rywalem jest sitowa
+    # na karcie: 2,5 z formą 3/5 nie jest hero bez rywala, z rywalem jest
+    # mocna — i jako najwyższy kurs zostaje hero ze stemplem wyjątku
+    _s, hero = radar._oceń_karte(_karta_sitowa(forma=3))
+    assert hero is not None and hero["linia"] == 1.5
     _s, hero = radar._oceń_karte(_karta_sitowa(forma=3, rywal=1.2))
-    assert hero is not None and hero["linia"] == 1.5      # pakiet i tak woli 1,5
-    assert hero["drugi_sila"] == 0.7
+    assert hero is not None and hero["linia"] == 2.5
+    assert hero["sila"] == 0.7 and hero["sito_wyjatek"] == "rywal"
 
 
 def test_krotki_wystep_w_ostatnich_5_to_kara_ktora_zdejmuje_slabsze_linie():
@@ -1038,7 +1046,7 @@ def test_krotki_wystep_w_ostatnich_5_to_kara_ktora_zdejmuje_slabsze_linie():
     assert hero is None and score == 0.0
     assert powody["sito_krotki_wystep_w_ostatnich_5"] == 1
     _s, hero = radar._oceń_karte(_karta_sitowa(krotkie=1, xi=True))
-    assert hero is not None and hero["linia"] == 1.5
+    assert hero is not None and hero["linia"] == 2.5     # najwyższa mocna
     assert hero["sito_wyjatek"] == "xi"
     # nieznane minuty to mniejsza kara (0,10): 8/10 & 5/5 przechodzi, 7/10 & 4/5 nie
     sl = radar.sila_linii({"traf": 7, "z": 10}, {"traf": 4, "z": 5}, None, 0.9, False)
@@ -1047,11 +1055,16 @@ def test_krotki_wystep_w_ostatnich_5_to_kara_ktora_zdejmuje_slabsze_linie():
     assert hero is not None and hero["linia"] == 1.5 and hero["sila"] == 0.82
 
 
-def test_szansa_modelu_nie_jest_brama_sita():
-    """W sicie p<0,45 trafiało 66,7% (n=6) — brak dowodu, więc model zostaje
-    tylko w `ocena_modelu` (klasa/tiebreak), nie w wyborze hero."""
+def test_szansa_modelu_nie_jest_brama_sita_tylko_wetem():
+    """W sicie p<0,45 trafiało 66,7% (n=6) — sam niski model nie zdejmuje
+    linii; weto (18.09, radar.WETO_MODELU_PP) dopiero przy szansie modelu
+    niższej od ceny o >10 pp (model skalibrowany w każdym paśmie, 16.09)."""
     _s, hero = radar._oceń_karte(_karta_sitowa(p_model=0.30))
-    assert hero is not None and hero["sito"] is True and hero["linia"] == 1.5
+    assert hero is not None and hero["sito"] is True and hero["linia"] == 2.5
+    powody = Counter()
+    # 0,12: następniki dalej przechodzą swoje bramy, hero odpada na wecie
+    _s, hero = radar._oceń_karte(_karta_sitowa(p_model=0.12), powody=powody)
+    assert hero is None and powody["sito_weto_modelu"] == 1
 
 
 def test_udzial_startow_to_kara_zdjeta_przez_xi():
@@ -1073,14 +1086,19 @@ def test_drugi_szczebel_z_martwa_forma_nie_jest_nastepnikiem():
     assert hero is not None and hero["linia"] == 1.5 and hero["drugi_linia"] == 2.5
 
 
-def test_mocny_nastepnik_podnosi_tanszy_start():
-    """Właściciel 17.09: hero 1,6 jest OK, gdy drugi szczebel bardzo realny.
-    Ta sama linia 1,5 @1,90 — pakiet z następnikiem 7/10 & 4/5 jest wart
-    więcej niż z następnikiem 6/10 & 2/5."""
-    mocny, hero_m = radar._oceń_karte(_karta_sitowa())
-    slaby, hero_s = radar._oceń_karte(_karta_sitowa(forma=2))
-    assert hero_m["linia"] == hero_s["linia"] == 1.5
-    assert mocny > slaby
+def test_tani_start_tylko_z_realnym_nastepnikiem():
+    """Właściciel 17–18.09: hero poniżej 1,70 tylko, gdy drugi szczebel
+    realnie trafialny („pewny pierwszy, płatny drugi” — Openda 0,5 @1,68 +
+    1,5 @4,25); inaczej taka linia zostaje pojedynczym typem listy dnia.
+    2,5 z 5/10 & 4/5 (siła 0,68) nie jest hero, ale jest realnym następnikiem."""
+    _s, hero = radar._oceń_karte(_karta_sitowa(kurs_15=1.62, traf_25=5))
+    assert hero is not None and hero["linia"] == 1.5 and hero["kurs"] == 1.62
+    assert hero["powod_szczebla"] == "tania_z_drugim"
+    powody = Counter()
+    _s, hero = radar._oceń_karte(_karta_sitowa(kurs_15=1.62, traf_25=5, forma=3),
+                                 powody=powody)
+    assert hero is None
+    assert powody["sito_tania_bez_realnego_drugiego"] == 1
 
 
 def test_karta_bez_zadnej_linii_sitowej_odpada_z_powodem():

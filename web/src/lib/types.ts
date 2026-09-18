@@ -492,6 +492,10 @@ export interface RadarWpis {
     sito?: boolean;
     /** który wyjątek wpuścił kartę: "rywal" (3/5 przy hojnym rywalu), "xi" (skład ratuje minuty) */
     sito_wyjatek?: string | null;
+    /** 18.09: dlaczego ten 1. szczebel — „perla" (mocna linia przy kursie ≥2,20),
+     *  „najwyzsza_mocna" (najwyższy kurs wśród mocnych linii, ≥1,70),
+     *  „tania_z_drugim" (poniżej 1,70, bo 2. szczebel realnie trafialny) */
+    powod_szczebla?: "perla" | "najwyzsza_mocna" | "tania_z_drugim" | null;
     p_final?: number | null;
     p_bazowe?: number | null;
     korekta?: number | null;
