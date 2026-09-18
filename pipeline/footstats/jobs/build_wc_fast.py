@@ -115,7 +115,7 @@ OKNO_ODSWIEZENIA_BC_S = 6 * 3600
 # ⚑ 80 → 200 (2026-09-14): pamięć obejmuje teraz także mecze BEZ propsów
 # Superbetu (Betclic kwotuje tam ~50 zawodników — zmierzone 14.09 na
 # Midtjylland–Brøndby i América–Pasto), a okno 4 dni to ~130 meczów.
-MAX_MECZOW_W_PAMIECI_BC = 200
+MAX_MECZOW_W_PAMIECI_BC = 800   # 18.09: pełny zakres analizy (5 dni), nie tylko mecze z trendami
 
 SH_BASE = "https://www.statshub.com/api"
 SH_HEADERS = {"Accept": "application/json", "Referer": "https://www.statshub.com/"}
@@ -2388,8 +2388,11 @@ def _trend_z_kontekstem_meczu(swiezy, bazowy, mid: int):
 
 
 # --- PEŁNE KADRY ZE STATSHUB (2026-09-18) — patrz `statshub.trendy_kadry` ---
-KADRY_OKNO_S = 36 * 3600       # mecze w tym oknie przed kickoffem (jak dociąg kursów)
-KADRY_BUDZET_S = 240           # sufit czasu na pobranie kadr w cyklu
+# CAŁY zakres analizy (tryb ligowy: 5 dni) — właściciel odrzucił skracanie
+# horyzontu (07.08), więc kadry nie mogą kończyć się wcześniej niż typy.
+# Mecze bez oferty zawodniczej i tak odpadają na progu `KADRY_MIN_RYNKOW_SB`.
+KADRY_OKNO_S = 6 * 86400
+KADRY_BUDZET_S = 600           # bezpiecznik; 18.09: 178 drużyn w 53 s
 KADRY_EXTRA_MECZOW = 10        # zza pola / głową: ostatnie N meczów drużyny
 # Mecz z ofertą zawodniczą Superbetu ma w liście wydarzeń ≥ ~178 rynków
 # (zmierzone 18.09 na 66 meczach: poniżej 177 ani jeden nie miał oferty,
@@ -2397,6 +2400,30 @@ KADRY_EXTRA_MECZOW = 10        # zza pola / głową: ostatnie N meczów drużyny
 KADRY_MIN_RYNKOW_SB = 170
 _POLA_HISTORII = ("counts", "minutes", "timestamps", "started", "game_positions",
                   "game_opponents", "game_opponent_ids", "game_utids")
+
+
+ZAKRES_MECZOW_KLUCZ = "zakres_meczow"
+
+
+def zakres_meczow(tryb) -> list[dict]:
+    """Wszystkie mecze analizy w kształcie rekordów `matches` (id, gospodarz,
+    gosc, kickoff_ts, propsy_superbet) — dla joba Betclica. `propsy_superbet`
+    to tu znacznik z liczby rynków Superbetu (patrz `KADRY_MIN_RYNKOW_SB`),
+    bo oferty zawodniczej jeszcze nie pobieraliśmy."""
+    out = []
+    for e in tryb.events or []:
+        mid = e.get("id")
+        if not mid:
+            continue
+        sb_ev = (tryb.sb_ev_by_mid or {}).get(mid) or {}
+        out.append({
+            "id": mid,
+            "gospodarz": (tryb.team_name or {}).get(e.get("homeTeamId"), ""),
+            "gosc": (tryb.team_name or {}).get(e.get("awayTeamId"), ""),
+            "kickoff_ts": int(e.get("timeStartTimestamp") or 0),
+            "propsy_superbet": int(int(sb_ev.get("marketCount") or 0) >= KADRY_MIN_RYNKOW_SB),
+        })
+    return out
 
 
 def _scal_historie(stary, pelny) -> dict:
@@ -4382,16 +4409,29 @@ def _main_impl(tryb=None):
     print(f"Trendów propsów: {len(trends)} "
           f"({len(set(t.player_id for t in trends))} zawodników)")
     diagnostyka.etap("feed_trendow")
+    # ⚑ ZAKRES ANALIZY DLA JOBA BETCLICA (2026-09-18). Job brał mecze z klucza
+    # `matches`, czyli tylko te, dla których cykl już MIAŁ zawodników — mecz
+    # bez naszych danych (Widzew–Wieczysta) nigdy nie dostawał oferty
+    # Betclica, więc nie mógł z niej dostać zawodników: błędne koło. Teraz
+    # job dostaje KAŻDY mecz, który analizujemy (sparowany z Superbetem).
+    if tryb and not _dry_run():
+        try:
+            supa.put_key(ZAKRES_MECZOW_KLUCZ, zakres_meczow(tryb))
+        except Exception as e:                                 # noqa: BLE001
+            diagnostyka.cichy("cykl", "zakres_meczow", e)
     # ⚑⚑ PEŁNE KADRY ZE STATSHUB (2026-09-18) — PRZED ratunkiem, bankiem i 365, żeby
     # oba dokładały już tylko to, czego statshub nie zna (patrz
     # `dolacz_pelne_kadry`, `statshub.trendy_kadry`).
     # oferta Superbetu pobrana tu trafia do `sb_cache` niżej — nie pytamy dwa razy
     _sb_wstepny: dict[int, dict] = {}
+    # pamięć Betclica czytana RAZ na cykl (tu i przy siatce kursów niżej)
+    _bc_odczyt_cyklu: tuple | None = None
     try:
         _teraz_k = int(time.time())
         _bc_wstepny: dict[int, dict] = {}
         try:
             _bc_raw, _bc_ok = supa.get_key_ok(BETCLIC_KLUCZ)
+            _bc_odczyt_cyklu = (_bc_raw, _bc_ok)
             if _bc_ok:
                 _bc_wstepny = bc_z_pamieci(
                     {e["id"]: int(e.get("timeStartTimestamp") or 0) for e in events},
@@ -5988,7 +6028,8 @@ def _main_impl(tryb=None):
             # jak pustą pamięć, ale wtedy NIE zapisujemy z powrotem — inaczej
             # jeden timeout Supabase kasowałby dorobek kilku cykli
             # ([[supabase-read-modify-write]]).
-            _pamiec_raw, _odczyt_ok = supa.get_key_ok(BETCLIC_KLUCZ)
+            _pamiec_raw, _odczyt_ok = (_bc_odczyt_cyklu if _bc_odczyt_cyklu is not None
+                                       else supa.get_key_ok(BETCLIC_KLUCZ))
             _pamiec = dict(_pamiec_raw or {}) if _odczyt_ok else {}
             bc_cache = bc_z_pamieci(_kolejnosc_meczow, _pamiec, _teraz_bc)
             _z_pamieci = len(bc_cache)

@@ -109,17 +109,44 @@ def test_jeden_zepsuty_mecz_nie_zabija_przebiegu(monkeypatch):
     assert list(zapisy[J.BETCLIC_KLUCZ]) == ["2"]
 
 
-def test_mecze_bez_propsow_superbetu_tylko_w_oknie_48h():
-    """Mecz bez propsów SB za 3 dni czeka; ten sam z propsami SB wchodzi od razu."""
-    daleko = TERAZ + 3 * 24 * GODZINA
-    matches = [_mecz(1, daleko, propsy=25), _mecz(2, daleko, propsy=0),
-               _mecz(3, TERAZ + 20 * GODZINA, propsy=0)]
-    kolejnosc = J._mecze_w_zakresie(matches, TERAZ)
-    assert set(kolejnosc) == {1, 2, 3}
-    _sb = J._z_propsami_superbetu(matches)
-    do_pobrania = sorted(
-        ((mid, ts) for mid, ts in kolejnosc.items()
-         if mid in _sb or ts - TERAZ <= J.HORYZONT_BEZ_SB_S),
-        key=lambda kv: (kv[0] not in _sb, kv[1]),
-    )
-    assert [m for m, _ in do_pobrania] == [1, 3]
+def test_caly_zakres_5_dni_takze_bez_propsow_superbetu():
+    """⚑ 18.09: okno 48 h dla meczów bez propsów SB i horyzont 4 dni stały na
+    koszcie ~71 s/mecz (blokujące zamykanie strumienia). Teraz cały zakres
+    analizy — tryb ligowy liczy 5 dni."""
+    matches = [_mecz(1, TERAZ + 5 * 24 * GODZINA - GODZINA, propsy=0),
+               _mecz(2, TERAZ + 3 * 24 * GODZINA, propsy=0)]
+    assert set(J._mecze_w_zakresie(matches, TERAZ)) == {1, 2}
+
+
+def test_kazdy_przebieg_odswieza_takze_mecze_z_pamieci_i_bierze_zakres_cyklu(monkeypatch):
+    """Mecz już zapamiętany jest pobierany ponownie (nowe rynki, ruch kursu —
+    Chery 17.09 dostał ofertę Betclica dopiero o 15:44), a zakres pochodzi
+    z `zakres_meczow` (każdy analizowany mecz), nie z `matches`."""
+    kick = int(time.time()) + GODZINA
+    zakres = [_mecz(1, kick, home="A", away="B"), _mecz(2, kick + 60, home="C", away="D")]
+    klucze_czytane = []
+
+    def _get(k):
+        klucze_czytane.append(k)
+        return zakres if k == J.ZAKRES_MECZOW_KLUCZ else [_mecz(9, kick)]
+
+    monkeypatch.setattr(J.supa, "get_key", _get)
+    pamiec = {"1": {"ts": int(time.time()) - 60,
+                    "players": {"stary": {"shots": {"1.5": {"over": 1.9}}}}}}
+    monkeypatch.setattr(J.supa, "get_key_ok", lambda k: (pamiec, True))
+    monkeypatch.setattr(J.betclic, "paruj_mecze", lambda *a, **kw: (
+        {1: {"id": 11, "nazwa": "A - B"}, 2: {"id": 22, "nazwa": "C - D"}}, []))
+    pytano = []
+
+    def _kursy(bc_id):
+        pytano.append(bc_id)
+        return {"players": {"nowy": {"shots_outside_box": {1.5: {"over": 3.9}}}}}
+
+    monkeypatch.setattr(J.betclic, "kursy_zawodnikow", _kursy)
+    zapisy = {}
+    monkeypatch.setattr(J.supa, "put_key_bezpiecznie",
+                        lambda k, v: zapisy.update({k: v}) or True)
+    assert J.main() == 0
+    assert klucze_czytane[0] == J.ZAKRES_MECZOW_KLUCZ
+    assert sorted(pytano) == [11, 22]
+    assert "nowy" in zapisy[J.BETCLIC_KLUCZ]["1"]["players"]

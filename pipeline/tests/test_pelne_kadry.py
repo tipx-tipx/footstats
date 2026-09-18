@@ -190,8 +190,21 @@ def test_zdrobnienia_i_pelne_nazwiska_z_superbetu():
     assert z({"javier villar": {}, "javier villarreal": {}}, "Javi Villar") in ({}, )
 
 
+def test_zakres_meczow_dla_joba_betclica():
+    """Każdy analizowany mecz, z nazwami drużyn i znacznikiem oferty SB."""
+    class _Tryb:
+        events = [{"id": 1, "homeTeamId": 10, "awayTeamId": 20, "timeStartTimestamp": 5},
+                  {"id": 2, "homeTeamId": 30, "awayTeamId": 40, "timeStartTimestamp": 6}]
+        sb_ev_by_mid = {1: {"marketCount": 227}, 2: {"marketCount": 90}}
+        team_name = {10: "Widzew Łódź", 20: "Wieczysta Kraków", 30: "A", 40: "B"}
+    z = B.zakres_meczow(_Tryb())
+    assert z[0] == {"id": 1, "gospodarz": "Widzew Łódź", "gosc": "Wieczysta Kraków",
+                    "kickoff_ts": 5, "propsy_superbet": 1}
+    assert z[1]["propsy_superbet"] == 0
+
+
 def test_mecz_poza_oknem_pominiety():
-    daleki = dict(_mecz(), timeStartTimestamp=TERAZ + 5 * DZIEN)
+    daleki = dict(_mecz(), timeStartTimestamp=TERAZ + 7 * DZIEN)
     licz = B.dolacz_pelne_kadry([], [daleki], TERAZ,
                                 oferta=lambda e: {"sb": {"a": {}}},
                                 fetch_kadra=lambda tid: _kadra(),

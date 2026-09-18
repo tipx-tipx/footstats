@@ -36,7 +36,7 @@ from .. import supa
 from ..sources import betclic
 from .build_wc_fast import (
     BETCLIC_KLUCZ, MAX_MECZOW_W_PAMIECI_BC, OKNO_ODSWIEZENIA_BC_S,
-    SWIEZOSC_BETCLIC_S, bc_rotuj_pamiec, bc_z_pamieci,
+    SWIEZOSC_BETCLIC_S, ZAKRES_MECZOW_KLUCZ, bc_rotuj_pamiec, bc_z_pamieci,
 )
 
 # Ile czasu wolno zużyć na pobieranie. Job chodzi osobno, więc limit jest jego
@@ -45,11 +45,10 @@ from .build_wc_fast import (
 BUDZET_S = float(os.getenv("BETCLIC_BUDZET_S", "1200"))
 # Jak daleko w przód pobieramy. Dalsze mecze i tak nie mają jeszcze pełnej
 # oferty, a zajęłyby miejsce najbliższym.
-HORYZONT_S = 4 * 86400
-# Mecze BEZ propsów Superbetu pytamy dopiero w oknie 48 h przed gwizdkiem:
-# Betclic dokłada propsy bliżej meczu, a pierwszy przebieg po zdjęciu odsiewu
-# (14.09) spalił budżet na 9 pustych meczów z 10 (≈2 min każdy).
-HORYZONT_BEZ_SB_S = 48 * 3600
+# ⚑ 18.09: cały zakres analizy (tryb ligowy liczy 5 dni). Dawne 4 dni i okno
+# 48 h dla meczów bez propsów Superbetu wynikały z kosztu ~71 s na mecz,
+# który okazał się blokującym zamykaniem strumienia (patrz betclic._zapytaj).
+HORYZONT_S = 6 * 86400
 
 
 def _mecze_w_zakresie(matches, teraz: int) -> dict[int, int]:
@@ -95,9 +94,11 @@ def _main() -> int:
     load_dotenv(".env")
     supa.straz_odciecia("betclic")
     teraz = int(time.time())
-    matches = supa.get_key("matches")
+    # ZAKRES = każdy mecz, który analizujemy (zapis cyklu); `matches` tylko
+    # awaryjnie — tam są wyłącznie mecze, dla których cykl już miał dane
+    matches = supa.get_key(ZAKRES_MECZOW_KLUCZ) or supa.get_key("matches")
     if not matches:
-        print("Betclic: klucz `matches` pusty — cykl jeszcze nie zapisał zakresu")
+        print("Betclic: brak zakresu meczów — cykl jeszcze go nie zapisał")
         return 0
     kolejnosc = _mecze_w_zakresie(matches, teraz)
     if not kolejnosc:
@@ -114,10 +115,14 @@ def _main() -> int:
     mamy = bc_z_pamieci(kolejnosc, pamiec, teraz,
                         SWIEZOSC_BETCLIC_S, OKNO_ODSWIEZENIA_BC_S)
     _sb = _z_propsami_superbetu(matches)
+    # ⚑ KAŻDY PRZEBIEG ODŚWIEŻA CAŁY ZAKRES (2026-09-18). „Raz na mecz” (08.08)
+    # stało na koszcie 71 s/mecz, którego już nie ma (~0,5 s). Pobrany raz mecz
+    # czekał do doby na nowe rynki i ruchy kursu — Chery (zza pola 1,5 @3,9
+    # rano) miał ofertę Betclica dopiero o 15:44. Cena OPUBLIKOWANEGO typu
+    # zostaje zamrożona jak dotąd (kurs_ts), więc zmienia się tylko to, co
+    # widzimy przy wyborze nowych typów.
     do_pobrania = sorted(
-        ((mid, ts) for mid, ts in kolejnosc.items()
-         if mid not in mamy
-         and (mid in _sb or ts - teraz <= HORYZONT_BEZ_SB_S)),
+        kolejnosc.items(),
         key=lambda kv: (kv[0] not in _sb, kv[1]),
     )
     print(f"Betclic: {len(kolejnosc)} meczów w zakresie, {len(mamy)} już w pamięci, "

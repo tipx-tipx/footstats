@@ -290,6 +290,10 @@ MAGAZYN: dict[str, str] = {
     # i rozliczanie ciągną go kilkadziesiąt razy na dobę
     "pokazane_na_stronie": "repo",
     **{f"hd_{i}": "repo" for i in range(10)},   # magazyn historii drużyn
+    # oferta Betclica (2026-09-18): job co 20 min × pełny zakres (~3 MB) to
+    # ~13 GB odczytu na miesiąc z Supabase — czyta ją tylko pipeline
+    "betclic_oferty": "repo",
+    "zakres_meczow": "repo",      # zakres analizy dla joba Betclica
 }
 
 # nazwa backendu -> obiekt z `pobierz(key) -> (payload, ok)` i
