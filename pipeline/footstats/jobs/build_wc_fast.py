@@ -4189,6 +4189,7 @@ def _main_impl(tryb=None):
         return
 
     try:
+        diagnostyka.etap("start")
         trends = statshub.fetch_event_trends([e["id"] for e in events])
     except Exception as e:
         print(f"statshub chwilowo niedostępny ({e}) — pomijam ten cykl, dane bez zmian.")
@@ -4201,6 +4202,7 @@ def _main_impl(tryb=None):
     # cały kandydat ginie na bramie świeżości. Robimy to TU, przed czymkolwiek
     # innym, żeby świeża próba weszła też do banku, minut i średnich drużyny.
     if tryb and trends:
+        diagnostyka.etap("feed_trendow")
         odswiez_stare_trendy(trends, int(time.time()))
     # ostatni mecz KAŻDEJ drużyny wg feedu — do rozróżnienia "zawodnik siedzi"
     # od "cała liga pauzowała" (przerwa letnia / mundialowa): flaga stare_dane
@@ -4221,6 +4223,7 @@ def _main_impl(tryb=None):
         print("statshub: 0 propsów w feedzie — buduję trendy z banku "
               "historii i pełnych statystyk 365Scores.")
 
+    diagnostyka.etap("ratunek_swiezosci")
     # --- BIBLIOTEKA HISTORII: mecze bez propsów statshub (np. ćwierćfinały) ---
     # statshub wystawia propsy ~24-48 h przed meczem, a Superbet kwotuje dużo
     # wcześniej (i wtedy kursy są najmiększe). Historia zawodnika nie zależy
@@ -4488,6 +4491,7 @@ def _main_impl(tryb=None):
     except Exception as ex:
         print(f"Biblioteka historii pominięta ({ex})")
 
+    diagnostyka.etap("bank_i_365_pelne_staty")
     # --- rynki z map strzałów (365Scores): głową / zza pola karnego ---
     # Syntetyczne trendy: liczby z chartEvents 365Scores (per typ strzału),
     # minuty/starty/pozycje ze statshubowego trendu "shots" tego zawodnika
@@ -5440,6 +5444,7 @@ def _main_impl(tryb=None):
     if niedostepni:
         print(f"Poza ogłoszonymi składami: {len(niedostepni)} zawodników")
 
+    diagnostyka.etap("shotmapy_365")
     # --- POZA SKŁADEM: twarda brama publikacji (zgłoszenie 2026-07-27) ---
     # `niedostepni` wyżej unieważnia ZAMROŻONE kupony, ale nigdy nie blokował
     # tworzenia NOWYCH typów i kart. Efekt: zawodnik, o którym sami wiemy, że
@@ -5591,6 +5596,7 @@ def _main_impl(tryb=None):
     # Klucz sts_model jest backendowy (apka go nie czyta).
     model_pokrycie: list[dict] = []
 
+    diagnostyka.etap("sklady")
     # --- OFERTA BUKMACHERA JAKO PUNKT WYJŚCIA DLA SILNIKA (2026-08-08) ---
     #
     # Do dziś historia dociągana pod ofertę Superbetu szła WYŁĄCZNIE do
@@ -5679,6 +5685,7 @@ def _main_impl(tryb=None):
             team_name.get(_ev.get("awayTeamId"), ""),
             _ts,
         )
+    diagnostyka.etap("oferta_superbet")
     # --- DRUGI BUKMACHER JAKO ŹRÓDŁO OFERT (2026-08-08, decyzja usera) ---
     #
     # Do dziś Betclic dawał WYŁĄCZNIE drugą cenę na kartach drabinek. A oferty
@@ -5791,6 +5798,7 @@ def _main_impl(tryb=None):
     #
     # Zależności są gotowe: `ev_by_id`, `team_name`, `players_out`, `odds_grid`,
     # `sb_cache`, `bc_cache` (tuż wyżej). Test strukturalny pilnuje kolejności.
+    diagnostyka.etap("oferta_betclic")
     _do_odkrycia = []
     for _mid in sorted(set(sb_cache) | set(bc_cache)):
         _ma = ((sb_cache.get(_mid) or {}).get("players")
@@ -5862,6 +5870,7 @@ def _main_impl(tryb=None):
               f"{_licz_udzial['bez_danych']}, bez budżetu {_licz_udzial['bez_budzetu']})")
     except Exception as e:                                     # noqa: BLE001
         diagnostyka.cichy("cykl", "udzial_startow_performance", e)
+    diagnostyka.etap("odkrywanie_i_udzial_startow")
     # zapis banku po WSZYSTKICH źródłach (statshub, 365Scores, dopełnianie
     # oferty, ODKRYWANIE z oferty) — uzasadnienie przy `_bank_lib` wyżej. Przepięte z banku trendy
     # (ten sam timestamp) nadpisują wpis wariantem z nadchodzącym meczem, tak
@@ -6791,6 +6800,7 @@ def _main_impl(tryb=None):
                 value_bets.append(rec_okazji)
                 matches_out[mid]["okazje"].append(vb_id)
 
+    diagnostyka.etap("zapis_banku_i_bramy")
     # --- OFERTA ZAWODNICZA MECZU: wykonana PRZED pętlą scoringu (2026-08-08).
     # Dawniej stała tutaj i przez to jej rynki mogły zasilić tabelę pokryć oraz
     # drabinki, ale nigdy nie stawały się typem — pętla, która robi typy, była
@@ -6864,6 +6874,7 @@ def _main_impl(tryb=None):
                 "uzasadnienie": sm_r.reasoning,
             }, stare_dane=real.get("stare_dane", False))
 
+    diagnostyka.etap("scoring_zawodnikow")
     # --- RYNKI DRUŻYNOWE: strzały / celne / kartki (historia: statshub
     # team-trends, ~20 meczów) + faule (bank stylu, mecze MŚ). Kursy Superbetu
     # (TEAM_MARKET_SUFFIX) są już w sb_cache. Legi drużynowe wchodzą do
@@ -8510,6 +8521,7 @@ def _main_impl(tryb=None):
     except Exception as e:
         print(f"Rynki drużynowe pominięte ({e})")
 
+    diagnostyka.etap("rynki_druzynowe")
     # --- SPÓJNOŚĆ KIERUNKU (decyzja usera 2026-07-25) ---
     # filtr na CAŁEJ puli, zanim rozejdzie się do pewniaków/kuponów/dumpów
     n_przed_sp = len(legi_pool)
@@ -9283,6 +9295,7 @@ def _main_impl(tryb=None):
             }
             for e in wszystkie_ev
         }
+        diagnostyka.etap("selekcja_typow")
         radar_wpisy = radar.zbuduj(
             trends, events_meta_radar, odds_grid, sb_cache,
             model_pokrycie, players_out, MARKET_NAMES_PL, int(time.time()),
@@ -9920,6 +9933,7 @@ def _main_impl(tryb=None):
     if zdjete:
         print(f"Zdjęte po urealnieniu szansy: {zdjete} typów miało ujemną "
               f"wartość przy pokazywanej liczbie (zostaje {len(do_pokazania)})")
+    diagnostyka.etap("radar_i_kupony")
     # --- CO TRAFIA NA LISTĘ I W JAKIEJ KOLEJNOŚCI (decyzja usera 2026-08-01) ---
     #
     # Zgłoszenie: „nie może być tak, że będziemy wrzucać milion typów; w
@@ -10804,7 +10818,7 @@ def _main_impl(tryb=None):
         # wymaga praw admina do repo (403 nawet dla repo publicznego). Bez
         # tego jedyne liczby, na których wolno ruszać progi drabinek, są
         # nieosiągalne dla następnej sesji — sprawdzone boleśnie 21.08.
-        "rentgen": diagnostyka.rentgen(),
+        "rentgen": diagnostyka.rentgen_z_etapem("lista_dnia_i_zapis"),
     })
     # CO PRZEPADŁO PO CICHU — jedna linia na koniec przebiegu. Do 04.08 nie
     # było tego widać w ogóle: 79 miejsc łapało wyjątek i szło dalej, więc

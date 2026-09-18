@@ -84,6 +84,31 @@ def zapisz_rentgen(nazwa: str, dane: dict) -> None:
         _rentgen[nazwa] = {str(k): v for k, v in dane.items()}
 
 
+# CZAS ETAPÓW CYKLU (2026-09-18): cykl trwa 43–48 min przy cronie co 15,
+# a log Actions jest niedostępny bez tokena — więc sekundy per etap idą do
+# meta jak każdy rentgen. `etap(nazwa)` zapisuje czas OD POPRZEDNIEGO
+# znacznika pod nazwą etapu, który właśnie się skończył.
+_etap_t: list[float] = []
+
+
+def etap(nazwa: str) -> None:
+    import time as _t
+    teraz = _t.monotonic()
+    if _etap_t:
+        cz = _rentgen.setdefault("czas_etapow", {})
+        cz[nazwa] = round(cz.get(nazwa, 0.0) + teraz - _etap_t[0], 1)
+    _etap_t[:] = [teraz]
+
+
+def rentgen_z_etapem(nazwa: str) -> dict[str, dict]:
+    """rentgen() z domknięciem ostatniego etapu (użycie w literale meta)."""
+    etap(nazwa)
+    cz = _rentgen.get("czas_etapow")
+    if cz:
+        cz["_razem"] = round(sum(v for k, v in cz.items() if not k.startswith("_")), 1)
+    return rentgen()
+
+
 def rentgen() -> dict[str, dict]:
     """Wszystkie rozkłady tego przebiegu — do zapisania w meta cyklu."""
     return dict(_rentgen)
@@ -94,6 +119,7 @@ def reset() -> None:
     _licznik.clear()
     _pierwszy.clear()
     _rentgen.clear()
+    _etap_t.clear()
 
 
 def raport() -> dict[str, int]:
