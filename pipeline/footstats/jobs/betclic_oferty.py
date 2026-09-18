@@ -10,6 +10,9 @@ Zmierzone koszty, które o tym zdecydowały:
     oferta meczu z propsami   ~71 s   (bogaty Estoril poszedł w 4 s)
     oferta meczu bez propsów  30-40 s i tak zwraca zero
     kalendarz() do parowania  ~150 s
+⚑ 2026-09-18: to NIE był koszt Betclica, tylko zamykanie strumienia (patrz
+`betclic._zapytaj`) — po naprawie mecz ~0,5 s, kalendarz 1,4 s. Job
+zostaje osobny, ale jeden przebieg obejmuje już cały zakres.
 
 Ten job robi TYLKO jedno i ma na to własny czas: pobiera oferty i odkłada je
 pod `betclic_oferty` w Supabase. Cykl główny czyta gotowe, kosztem zera sekund

@@ -48,6 +48,7 @@ from __future__ import annotations
 
 import re
 import struct
+import threading
 from collections import defaultdict
 from datetime import datetime, timezone
 
@@ -254,7 +255,15 @@ def _zapytaj(metoda: str, msg: bytes, timeout: int = 40,
                 if len(buf) >= 5 + dl:
                     break
     finally:
-        r.close()
+        # ⚑ ZAMKNIĘCIE W TLE (2026-09-18). Dane przychodzą w ~0,1 s, ale
+        # `close()` na strumieniu curl_cffi czeka, aż serwer sam zamknie
+        # połączenie — 10–30 s na zapytanie (zmierzone: Bayern–Union 0,03 s
+        # ramka, 29,97 s close). To było CAŁE „71 s na mecz”, przez które job
+        # zdążał z ~17 meczami na przebieg, a Chery (Juventus–NEC, zza pola
+        # 1,5 @3,9 rano) dostał ofertę Betclica dopiero o 15:44. Każde
+        # zapytanie ma własną sesję, więc zamknięcie w wątku niczego nie
+        # współdzieli z następnym.
+        threading.Thread(target=r.close, daemon=True).start()
     for flaga, tresc in _ramki(bytes(buf)):
         if not flaga & 0x80 and tresc:
             return _dekoduj(tresc)

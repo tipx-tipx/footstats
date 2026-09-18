@@ -14,7 +14,10 @@ name: FootStats — oferta Betclica
 
 on:
   schedule:
-    - cron: "25 * * * *"     # co godzinę, w połowie drogi między cyklami (UTC)
+    # co 20 min (2026-09-18): po naprawie zamykania strumienia mecz to ~0,5 s,
+    # a nie ~71 s — przebieg trwa ~2 min zamiast 20, więc częściej = świeżej
+    # oferta i nadal mniej minut Actions niż jeden dawny przebieg na godzinę
+    - cron: "5,25,45 * * * *"
   workflow_dispatch: {}
 
 permissions:
