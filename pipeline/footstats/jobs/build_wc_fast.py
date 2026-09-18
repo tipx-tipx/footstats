@@ -9448,6 +9448,15 @@ def _main_impl(tryb=None):
             out["sito_wyjatek"] = h["sito_wyjatek"]
         if w.get("krotkie_wystepy5") is not None:
             out["krotkie_wystepy5"] = int(w["krotkie_wystepy5"])
+        # SKŁADNIKI PAKIETU (2026-09-18, sito v3 — radar.WAGA_POKRYCIA_SILY):
+        # siła linii, szansa z siły, wartość pakietu — progi mają być
+        # przeliczone z rozliczeń, nie z głowy; drugi szczebel niesie swoją siłę
+        for pole, klucz in (((f"{pref}sila", "sila"), (f"{pref}p_sila", "p_sila"))
+                            + (() if drugi else (("wartosc_pakietu", "wartosc_pakietu"),
+                                                 ("ocena_modelu", "ocena_modelu"),
+                                                 ("sila_skladniki", "sila_skladniki")))):
+            if h.get(pole) is not None:
+                out[klucz] = h[pole]
         # ⚑ OBIE CENY I MIEJSCE KARTY (2026-09-15). Bez nich pytanie
         # właściciela „czy value z rozjazdu Superbet/Betclic działa" było
         # nierozstrzygalne: księga pisała `bukmacher=Superbet` w 837 z 837

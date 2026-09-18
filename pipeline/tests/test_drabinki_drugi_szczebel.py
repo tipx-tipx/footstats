@@ -322,8 +322,10 @@ def _gotowa_sito(traf=7, ostatnie=None, minuty=None, xi=None, udzial=0.9,
 
 def test_gotowa_karta_przez_sito_z_zapisanych_wystepow():
     assert R.karta_przez_sito(_gotowa_sito()) is True
-    # 6/10 → nie; forma 3/5 (ost. 5: 2,3,0,0,2 → 2 z 5) → nie
-    assert R.karta_przez_sito(_gotowa_sito(traf=6)) is False
+    # 6/10 z formą 4/5 → TAK (sito v3: siła 0,72); 5/10 → nie;
+    # forma 2/5 (ost. 5: 2,3,0,0,2) → nie
+    assert R.karta_przez_sito(_gotowa_sito(traf=6)) is True
+    assert R.karta_przez_sito(_gotowa_sito(traf=5)) is False
     assert R.karta_przez_sito(
         _gotowa_sito(ostatnie=[2, 3, 0, 0, 2, 2, 3, 3, 2, 2])) is False
     # krótki występ w ostatnich 5 → nie, chyba że XI

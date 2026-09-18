@@ -32,11 +32,18 @@ def test_premia_zdjeta_ranking_nie_spycha_do_niskich_kursow():
     """⚑ 15.09: na 142 pierwszych szczeblach od 13.08 pasma 1,55–1,70
     i 1,70–1,90 leżą tak samo pod ceną (56% vs 59%, 50% vs 53%) — premia nie
     ma pokrycia, a spychała 95 ze 142 kart do najniższych kursów. Ta sama
-    przewaga przy dwóch cenach daje tę samą ocenę."""
+    przewaga przy dwóch cenach dawała tę samą ocenę.
+
+    ⚑ 18.09 (sito v3, `wartosc_pakietu`): ocena = szansa z siły linii
+    (historia) zmieszana z p_final, minus cena. Historia nie rośnie z ceną,
+    więc ta sama deklarowana przewaga przy WYŻSZYM kursie jest warta więcej
+    o połowę różnicy cen — w księdze sitowe hero <1,70 przegrywają z ceną
+    (59% vs 63%), a 1,80+ ją biją (65% vs 51%). Premia okna dalej = 0."""
     assert R.BONUS_OKNA_CENY == 0.0
     w_oknie = _score(1.65, round(1 / 1.65 + 0.05, 4))
     poza = _score(1.80, round(1 / 1.80 + 0.05, 4))
-    assert round(w_oknie - poza, 4) == 0.0
+    assert poza > w_oknie
+    assert round(poza - w_oknie, 3) == round(0.5 * (1 / 1.65 - 1 / 1.80), 3)
 
 
 def test_okno_nie_obejmuje_pasma_ktore_traci_najwiecej():

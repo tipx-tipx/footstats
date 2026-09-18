@@ -357,6 +357,44 @@ PROG_FORMY_SITA_RYWAL = 3    # 3 z 5, gdy rywal hojny na tym rynku (mierzone)
 MNOZNIK_RYWALA_WYJATKU = 1.15
 MIN_MINUT_PELNEGO_WYSTEPU = 60   # krótszy występ w ostatnich 5 = rotacja
 MIN_UDZIAL_SITA = 0.80       # startów w meczach drużyny (albo XI ogłoszone)
+# --- SIŁA LINII zamiast twardego sita (sito v3, 2026-09-18) --------------
+# Właściciel 17.09: karta to PAKIET argumentów × cena, nie jeden próg; hero
+# ma być realny i opłacony (~1,7+), ale 1,6 jest OK, gdy drugi szczebel jest
+# bardzo realny. Pomiar w księdze (218 hero, do 14.09):
+#     7/10 & forma 4-5/5   n=93   57%  (cena 59%)
+#     6/10 & forma 4-5/5   n=11   55%  (cena 50%)   <- sito 7/10 to wycinało
+#     7/10 & forma 3/5     n=23   48%  (cena 57%)
+#     6/10 & forma 3/5     n=13   15%
+#     forma <=2/5          n=35   ~35%
+#     sito & kurs <1,70    n=59   59%  (cena 63%)   <- PRZEGRYWA z ceną
+#     sito & kurs 1,80+    n=23   65%  (cena 51%)
+# Pokrycie i forma działają RAZEM: siła = 0,4·pokrycie + 0,6·forma (waga
+# formy większa, bo 6/10&4/5 ≈ 7/10&4/5, a 7/10&3/5 wyraźnie gorsze), minus
+# kary za rotację (występ <60 min w ost. 5: 38% vs 52%), za nieznane minuty
+# i za udział startów <0,8 (XI ogłoszone zdejmuje kary), ± rywal. Trafialność
+# ≈ SKALA_SILY × siła (0,76→57%, 0,72→54%, 0,64→48%, 0,50→37% — pasuje).
+# Hero = linia z NAJWYŻSZĄ WARTOŚCIĄ PAKIETU:
+#     wartość = (SKALA_SILY·siła − 1/kurs) + WAGA_NASTEPNIKA · SKALA_SILY·siła_2
+# czyli własna przewaga po cenie plus realność drugiego szczebla — tania
+# linia 10/10 przy 1,55 wciąż może wygrać, ale 7/10 przy 1,62 przegrywa
+# z 7/10 przy 1,90, a mocny następnik podnosi tańszy start (życzenie
+# właściciela). Próg siły hero = 0,70 (7/10&4/5 = 0,76; 6/10&4/5 = 0,72;
+# 7/10&3/5 = 0,64 odpada, chyba że hojny rywal +0,06). Drugi szczebel w
+# księdze trafia 21% przy cenie 30% w każdym przekroju poza formą 4-5/5 (28%)
+# — dlatego następnik liczy się siłą, nie przewagą. Progi do przeliczenia
+# po ~2 tyg. z księgi (`sila`, `drugi_sila`, `wartosc_pakietu` na hero).
+WAGA_POKRYCIA_SILY = 0.4
+WAGA_FORMY_SILY = 0.6
+KARA_KROTKICH_WYSTEPOW = 0.25   # występ <60 min w ost. 5 (bez ogłoszonej XI)
+KARA_BRAK_MINUT = 0.10          # nie znamy minut ostatnich meczów
+KARA_UDZIALU = 0.10             # udział startów < MIN_UDZIAL_SITA
+KARA_BRAK_FORMY = 0.10          # brak 5 ostatnich występów na linii
+PREMIA_RYWALA = 0.06            # rywal hojny (≥ MNOZNIK_RYWALA_WYJATKU) / skąpy
+MNOZNIK_RYWALA_SKAPEGO = 0.85
+PROG_POKRYCIA_SILY = 0.60       # poniżej 6/10 linia nie jest hero niezależnie od formy
+PROG_SILY_HERO = 0.70
+SKALA_SILY = 0.75               # siła → trafialność (dopasowanie z księgi)
+WAGA_NASTEPNIKA = 0.25
 MIN_FORMA_DRUGIEGO = 2       # następnik: wszedł w ≥2 z 5 ostatnich
 # PRÓG ZOSTAJE NA 0.5 mimo zgłoszenia „drabinki są randomowe" (2026-07-27).
 # Podniesienie go na 0.65 wycięłoby kartę, którą user wskazał jako DOBRĄ
@@ -1972,38 +2010,22 @@ def _oceń_karte(
             if _w_roz > PROG_WARTOSCI_ROZJAZDU:
                 ocena += WAGA_WARTOSCI_ROZJAZDU * (_w_roz - PROG_WARTOSCI_ROZJAZDU)
             trafiony["wartosc_rozjazdu"] = round(_w_roz, 3)
-            # SITO — patrz nota przy PROG_POKRYCIA_SITA. Brama SZCZEBLA:
-            # w obrębie karty wygrywa NAJWYŻSZA linia sitowa (rosnąca linia =
-            # rosnący kurs), a karta bez żadnej linii sitowej odpada niżej
-            # z nazwanym powodem. Powód = PIERWSZA brama, która nie puściła —
-            # rentgen mówi wtedy, co realnie tnie podaż.
-            _f5 = s.get("pokrycie5") or {}
+            # SIŁA LINII zamiast twardego sita (nota przy WAGA_POKRYCIA_SILY):
+            # w obrębie karty wygrywa linia z najwyższą WARTOŚCIĄ PAKIETU
+            # (siła × cena + realność następnika); linia poniżej progu siły
+            # nie jest hero, a karta bez takiej linii odpada z nazwanym
+            # powodem — rentgen mówi, co realnie tnie podaż.
             _rywal = float((((r.get("kontekst") or {}).get("rywal") or {})
                             .get("mnoznik")) or 1.0)
-            _rywal_hojny = _rywal >= MNOZNIK_RYWALA_WYJATKU
-            _prog_formy = (PROG_FORMY_SITA_RYWAL if _rywal_hojny
-                           else PROG_FORMY_SITA)
-            _forma_ok = (
-                (_f5.get("z") or 0) >= OKNO_FORMY_SITA
-                and _f5["traf"] >= _prog_formy
-            )
             _krotkie = w.get("krotkie_wystepy5")
             _xi = w.get("xi") is True
-            if pomiarowy:
-                sito_powod = "pomiarowy"
-            elif pokrycie < PROG_POKRYCIA_SITA:
-                sito_powod = "sito_pokrycie_ponizej_7_z_10"
-            elif not _forma_ok:
-                sito_powod = "sito_forma_ponizej_4_z_5"
-            elif _krotkie is None and not _xi:
-                sito_powod = "sito_bez_minut_ostatnich_meczow"
-            elif _krotkie and not _xi:
-                sito_powod = "sito_krotki_wystep_w_ostatnich_5"
-            elif udzial is not None and udzial < MIN_UDZIAL_SITA and not _xi:
-                sito_powod = "sito_rzadko_w_pierwszym_skladzie"
-            else:
-                sito_powod = None
+            _sl = sila_linii(p, s.get("pokrycie5"), _krotkie, udzial, _xi, _rywal)
+            _sl2 = (sila_linii(pok_nast, (nast or {}).get("pokrycie5"), _krotkie,
+                               udzial, _xi, _rywal)
+                    if nast is not None and pok_nast.get("z") else None)
+            sito_powod = "pomiarowy" if pomiarowy else (_sl or {}).get("powod")
             sito = sito_powod is None
+            _f5 = s.get("pokrycie5") or {}
             trafiony["sito"] = sito
             # forma obu szczebli — do księgi (build_wc_fast `_charakter_drabinki`)
             trafiony["traf5"] = _f5.get("traf")
@@ -2011,27 +2033,36 @@ def _oceń_karte(
             _f5_nast = (nast or {}).get("pokrycie5") or {}
             trafiony["drugi_traf5"] = _f5_nast.get("traf")
             trafiony["drugi_z5"] = _f5_nast.get("z")
+            # SKŁADNIKI PAKIETU do księgi — bez nich progów nie da się
+            # przeliczyć z rozliczeń ([[ciche-odrzucenia-zasada]])
+            trafiony["sila"] = (_sl or {}).get("sila")
+            trafiony["sila_skladniki"] = (
+                {"pokrycie": _sl["pokrycie"], "forma": _sl["forma"],
+                 "kary": _sl["kary"], "premia": _sl["premia"]} if _sl else None)
+            trafiony["drugi_sila"] = (_sl2 or {}).get("sila")
+            trafiony["p_sila"] = szansa_z_sily((_sl or {}).get("sila"), p_final)
+            trafiony["drugi_p_sila"] = szansa_z_sily((_sl2 or {}).get("sila"), p_nast)
+            _wart = (wartosc_pakietu(trafiony["p_sila"], s["kurs"], trafiony["drugi_p_sila"])
+                     if _sl and trafiony["p_sila"] is not None else None)
+            trafiony["wartosc_pakietu"] = _wart
+            trafiony["ocena_modelu"] = round(ocena, 3)
             if sito:
                 # KTÓRY WYJĄTEK WPUŚCIŁ — stempel do księgi; bez niego
                 # „wyjątek rywala" i „XI ratuje minuty" nie dadzą się zmierzyć
-                _wyj = []
-                if _f5["traf"] < PROG_FORMY_SITA:
-                    _wyj.append("rywal")
-                if _xi and (
-                    _krotkie is None or _krotkie > 0
-                    or (udzial is not None and udzial < MIN_UDZIAL_SITA)
-                ):
-                    _wyj.append("xi")
-                trafiony["sito_wyjatek"] = ",".join(_wyj) or None
+                trafiony["sito_wyjatek"] = ",".join(_sl["wyjatki"]) or None
             elif not pomiarowy:
                 lokalne[sito_powod] += 1
-            klucz = (1 if sito else 0, float(s["kurs"]) if sito else 0.0, ocena)
+            klucz = (1 if sito else 0, _wart if (sito and _wart is not None) else 0.0, ocena)
             if pomiarowy:
                 if ocena > pomiar_score:
                     pomiar_score, pomiar_s = ocena, trafiony
             elif best_s is None or klucz > best_klucz:
                 best_klucz, best_s = klucz, trafiony
-                best_score = ocena
+                # RANKING KART po wartości pakietu (właściciel 17.09: model
+                # nie rządzi kolejnością); klasa karty dalej z `edge` hero
+                best_score = (trafiony["wartosc_pakietu"]
+                              if sito and trafiony.get("wartosc_pakietu") is not None
+                              else ocena)
     if pomiar_out is not None and pomiar_s is not None:
         pomiar_out.append(pomiar_s)
     if best_s is not None and not best_s.get("sito"):
@@ -2240,6 +2271,80 @@ def karta_ma_realny_drugi_szczebel(w: dict) -> bool | None:
     return p_nast is not None and p_nast >= MIN_P_DRUGIEGO_SZCZEBLA
 
 
+def sila_linii(
+    pokrycie: dict | None, forma5: dict | None, krotkie: int | None,
+    udzial: float | None, xi: bool, rywal: float = 1.0,
+) -> dict | None:
+    """Siła jednej linii drabinki (nota przy WAGA_POKRYCIA_SILY).
+
+    Zwraca {sila, pokrycie, forma, kary, premia, powod, wyjatki}; `powod`
+    = None, gdy linia może być hero; inaczej nazwa bramy do rentgenu
+    (pierwsza kara, której zdjęcie wystarczyłoby, żeby przejść). `wyjatki`
+    = co wpuściło linię mimo kar („xi", „rywal") — stempel do księgi.
+    None = brak pokrycia (nie ma z czego liczyć).
+    """
+    if not pokrycie or not pokrycie.get("z"):
+        return None
+    pok = pokrycie["traf"] / pokrycie["z"]
+    forma = (forma5["traf"] / forma5["z"]
+             if forma5 and (forma5.get("z") or 0) >= OKNO_FORMY_SITA else None)
+    kary: dict[str, float] = {}
+    if forma is None:
+        kary["brak_formy"] = KARA_BRAK_FORMY
+    if not xi:
+        if krotkie is None:
+            kary["brak_minut"] = KARA_BRAK_MINUT
+        elif krotkie > 0:
+            kary["krotkie_wystepy"] = KARA_KROTKICH_WYSTEPOW
+        if udzial is not None and udzial < MIN_UDZIAL_SITA:
+            kary["udzial"] = KARA_UDZIALU
+    premia = (PREMIA_RYWALA if rywal >= MNOZNIK_RYWALA_WYJATKU
+              else -PREMIA_RYWALA if rywal <= MNOZNIK_RYWALA_SKAPEGO else 0.0)
+    baza = (WAGA_POKRYCIA_SILY * pok
+            + WAGA_FORMY_SILY * (forma if forma is not None else pok))
+    sila = round(baza - sum(kary.values()) + premia, 3)
+    powod = None
+    if pok < PROG_POKRYCIA_SILY:
+        powod = "sito_pokrycie_ponizej_6_z_10"
+    elif sila < PROG_SILY_HERO:
+        nazwy = {"krotkie_wystepy": "sito_krotki_wystep_w_ostatnich_5",
+                 "brak_minut": "sito_bez_minut_ostatnich_meczow",
+                 "udzial": "sito_rzadko_w_pierwszym_skladzie",
+                 "brak_formy": "sito_bez_formy_ostatnich_5"}
+        powod = next((nazwy[k] for k, v in sorted(kary.items(), key=lambda kv: -kv[1])
+                      if sila + v >= PROG_SILY_HERO), "sito_sila_ponizej_progu")
+    wyjatki: list[str] = []
+    if powod is None:
+        if xi and (krotkie is None or krotkie > 0
+                   or (udzial is not None and udzial < MIN_UDZIAL_SITA)):
+            wyjatki.append("xi")
+        if premia > 0 and sila - premia < PROG_SILY_HERO:
+            wyjatki.append("rywal")
+    return {"sila": sila, "pokrycie": round(pok, 2),
+            "forma": round(forma, 2) if forma is not None else None,
+            "kary": kary, "premia": premia, "powod": powod, "wyjatki": wyjatki}
+
+
+def szansa_z_sily(sila: float | None, p_final: float | None) -> float | None:
+    """Szansa szczebla do wartości pakietu: pół z siły linii (historia:
+    pokrycie × forma × rotacja), pół z p_final (pokrycie Wilsona po korekcie
+    kontekstowej — rywal, sędzia, scenariusz). Sama siła nie widzi rywala,
+    samo p_final nie widzi formy i rotacji; obie liczby jadą do księgi."""
+    if sila is None:
+        return None if p_final is None else float(p_final)
+    if p_final is None:
+        return round(SKALA_SILY * sila, 3)
+    return round(0.5 * SKALA_SILY * sila + 0.5 * float(p_final), 3)
+
+
+def wartosc_pakietu(p_hero: float, kurs: float, p_nast: float | None) -> float:
+    """Wartość pary szczebli (nota przy WAGA_POKRYCIA_SILY): własna przewaga
+    po cenie plus realność następnika (szansa, nie przewaga — drugi szczebel
+    w księdze przegrywa z ceną w każdym przekroju)."""
+    return round(float(p_hero) - 1.0 / float(kurs)
+                 + WAGA_NASTEPNIKA * float(p_nast or 0.0), 3)
+
+
 def karta_przez_sito(w: dict) -> bool | None:
     """Czy hero GOTOWEJ karty przechodzi sito — na zapisanych liczbach karty.
 
@@ -2270,7 +2375,7 @@ def karta_przez_sito(w: dict) -> bool | None:
     pok = s.get("pokrycie") or {}
     if not pok.get("z"):
         return None
-    if pok["z"] < MIN_PROBA_SCORE or pok["traf"] / pok["z"] < PROG_POKRYCIA_SITA:
+    if pok["z"] < MIN_PROBA_SCORE:
         return False
     f5 = s.get("pokrycie5")
     if not f5 or not f5.get("z"):
@@ -2284,10 +2389,6 @@ def karta_przez_sito(w: dict) -> bool | None:
         return None
     _rywal = float((((r.get("kontekst") or {}).get("rywal") or {})
                     .get("mnoznik")) or 1.0)
-    prog = (PROG_FORMY_SITA_RYWAL if _rywal >= MNOZNIK_RYWALA_WYJATKU
-            else PROG_FORMY_SITA)
-    if f5["traf"] < prog:
-        return False
     xi = w.get("xi") is True
     krotkie = w.get("krotkie_wystepy5")
     if krotkie is None:
@@ -2295,15 +2396,12 @@ def karta_przez_sito(w: dict) -> bool | None:
         if mins:
             krotkie = sum(1 for m in list(mins)[:OKNO_FORMY_SITA]
                           if float(m) < MIN_MINUT_PELNEGO_WYSTEPU)
-    if not xi:
-        if krotkie is None:
-            return None
-        if krotkie:
-            return False
-        udzial = w.get("udzial_startow")
-        if udzial is not None and udzial < MIN_UDZIAL_SITA:
-            return False
-    return True
+    if krotkie is None and not xi:
+        return None
+    sl = sila_linii(pok, f5, krotkie, w.get("udzial_startow"), xi, _rywal)
+    if sl is None:
+        return None
+    return sl["powod"] is None
 
 
 def _kategoria_karty(w: dict) -> str:
