@@ -5246,9 +5246,17 @@ def skutecznosc_per_dzien(
     typy, które siadły/nie siadły), żeby dzień można było rozwinąć. ROZLICZONE
     typy tylko — `settled` powinno być już bez rynków osobnych.
 
-    `poza` = typy poza publikacją (kwarantanna rynku / limit meczu): trafiają
-    do listy dnia z oznaczeniem i osobnych liczników (poza_n/poza_trafione),
-    ale NIE wchodzą do trafień/ROI — user ich nie widział na liście typów.
+    `poza` = typy poza publikacją (kwarantanna rynku / limit meczu): zasilają
+    TYLKO liczniki dnia (poza_n/poza_trafione), NIE wchodzą do trafień/ROI
+    i NIE dostają wiersza w `typy` — user ich nie widział na liście typów.
+
+    ⚑ TŁO NIE JEDZIE W `typy` (2026-09-21). Do dziś każdy typ „na próbę"
+    dostawał wiersz z etykietą `poza_publikacja`, a strona wycinała te
+    wiersze KAŻDEJ roli (`bezTla`, decyzja właściciela 13.09). Dzień 20.09
+    miał 68 typów pokazanych i 3979 w tle: 1,4 MB w jednym elemencie listy,
+    więcej niż kawałek Supabase, i `typy_wyniki` urosło z 1 do 8,8 MB, czyli
+    ~2 GB transferu miesięcznie z limitu 5 GB. Wiersze, których nikt nie
+    czyta, nie mają prawa ważyć więcej niż cały produkt.
 
     `braki` = typy ze strony zamknięte jako „zwrot" (od 16.09 KAŻDY powód:
     brak danych źródła, nie zagrał, mecz przełożony). Dostają wiersz w liście
@@ -5294,21 +5302,14 @@ def skutecznosc_per_dzien(
             t["poza_publikacja"] = None
         agg["typy"].append(t)
     for r in poza or []:
+        # same liczniki — wiersz tła nie idzie do `typy` (patrz docstring);
+        # to zamyka też dawną pułapkę etykiety (2026-08-16): typ spoza
+        # zamrożonego składu bez znacznika w księdze nie ma jak trafić do UI
+        # jako zwykły typ, bo do UI nie trafia wcale
         agg = _agg(r)
         agg["poza_n"] += 1
         if r.get("wynik") == "wygrany":
             agg["poza_trafione"] += 1
-        t = _typ_dnia(r)
-        # KAŻDY TYP W KOSZYKU „POZA" MA MIEĆ POWÓD (2026-08-16). Typ, który
-        # wypadł z zamrożonego składu dnia, nie dostaje znacznika w księdze
-        # („historii nie przepisujemy"), więc do UI szedł bez etykiety: nie
-        # liczył się do bilansu, a na liście dnia wyglądał jak zwykły typ.
-        # Klientowi `okrojDlaKlienta` wycina typy z tym polem, czyli bez
-        # etykiety widziałby w rozwinięciu dnia zakład, którego na ogłoszonej
-        # liście nie było. To ta sama zasada co [[ciche-odrzucenia-zasada]].
-        if not t.get("poza_publikacja"):
-            t["poza_publikacja"] = "poza_lista_dnia"
-        agg["typy"].append(t)
     # ⚑ ZWROT DOSTAJE WIERSZ, NIE TYLKO LICZNIK (2026-09-16). Do dziś zwrot
     # „brak danych" był samą liczbą, a zwrot „nie zagrał" nie istniał wcale —
     # karta Saki z 15.09 (0 minut) zniknęła ze Skuteczności bez śladu, a
@@ -5351,11 +5352,10 @@ def skutecznosc_per_dzien(
     for d in sorted(dzienne, reverse=True)[:dni]:
         agg = dzienne[d]
         agg["roi_flat"] = round(agg.pop("_zwrot_j") - agg["okazje"], 2)
-        # publikowane przed typami poza publikacją; w obrębie grupy trafione
-        # na górze, potem przegrane, na końcu zwroty i czekające, po nazwie
+        # trafione na górze, potem przegrane, na końcu zwroty i czekające,
+        # w obrębie grupy po nazwie (tła w `typy` nie ma — patrz docstring)
         agg["typy"].sort(
             key=lambda t: (
-                bool(t.get("poza_publikacja")),
                 {"wygrany": 0, "przegrany": 1, "zwrot": 2}.get(t.get("wynik"), 3),
                 str(t.get("podmiot")),
             )

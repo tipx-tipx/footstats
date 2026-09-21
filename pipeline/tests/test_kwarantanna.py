@@ -180,13 +180,13 @@ def test_skutecznosc_pokazuje_poza_publikacja_bez_liczenia():
     dni = rozliczanie.skutecznosc_per_dzien(publ, poza=poza)
     assert len(dni) == 1
     d = dni[0]
-    # liczniki tylko z publikowanych, typ w tle w osobnych polach i liście
+    # liczniki tylko z publikowanych, typ w tle w osobnych polach — ale
+    # BEZ wiersza w `typy` (2026-09-21): strona wycinała te wiersze każdej
+    # roli, a robiły 98% wagi `typy_wyniki`
     assert d["rozliczone"] == 2 and d["trafione"] == 1 and d["okazje"] == 2
     assert d["poza_n"] == 1 and d["poza_trafione"] == 1
-    assert len(d["typy"]) == 3
-    # typ poza publikacją na końcu listy, z flagą
-    assert d["typy"][-1]["poza_publikacja"] == "kwarantanna_rynku"
-    assert all(not t.get("poza_publikacja") for t in d["typy"][:-1])
+    assert [t["podmiot"] for t in d["typy"]] == ["A", "B"]
+    assert all(not t.get("poza_publikacja") for t in d["typy"])
 
 
 def test_kalibracja_wazy_swieze_rozliczenia_mocniej():

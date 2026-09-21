@@ -6,6 +6,7 @@ Brak env SUPABASE_URL / SUPABASE_SERVICE_KEY = tryb lokalny (zwraca puste).
 
 from __future__ import annotations
 
+import copy
 import json
 import os
 import sys
@@ -679,6 +680,37 @@ def _potnij(payload) -> list | None:
     return czesci
 
 
+# Data Cache Nexta odrzuca odpowiedź powyżej 2 MB — taki kawałek strona
+# pobiera z bazy przy KAŻDYM renderze (patrz `sklejCzesci` w web/src/lib/
+# data.ts i incydent 25.08 „exceed_egress_quota"). Zapis przechodzi, ale
+# krzyczy: to sygnał, że jeden element payloadu urósł ponad miarę.
+LIMIT_KAWALKA_STRONY = 2_000_000
+
+
+def _kontrola_czesci(key: str, payload, czesci: list) -> str | None:
+    """Czy kawałki sklejają się DOKŁADNIE w oryginał. None = w porządku.
+
+    Jedyna gwarancja, że `_potnij` i `sklej_czesci` (oraz `scalWGlab` na
+    stronie, jego lustrzane odbicie) są swoimi odwrotnościami — na każdym
+    realnym payloadzie, nie tylko w testach.
+    """
+    try:
+        if sklej_czesci([copy.deepcopy(cz) for cz in czesci]) != payload:
+            return (f"{len(czesci)} kawałków NIE skleja się z powrotem "
+                    "w oryginał (błąd _potnij/sklej_czesci)")
+    except Exception as e:  # noqa: BLE001
+        return f"sklejanie kawałków padło: {e!r}"
+    for nr, cz in enumerate(czesci):
+        w = len(json.dumps(cz, ensure_ascii=False))
+        if w > LIMIT_KAWALKA_STRONY:
+            print(f"Supabase zapis '{key}': część {nr} waży {w / 1e6:.1f} MB "
+                  f"> {LIMIT_KAWALKA_STRONY / 1e6:.0f} MB — Data Cache strony "
+                  "jej nie przyjmie, pobór z bazy przy każdym renderze; "
+                  "jeden element payloadu jest za gruby",
+                  file=sys.stderr, flush=True)
+    return None
+
+
 def sklej_czesci(czesci: list):
     """Odwrotność `_potnij` — z kawałków robi z powrotem całość."""
     if czesci and isinstance(czesci[0], list):
@@ -792,6 +824,15 @@ def _put_key(key: str, payload) -> bool:
         czesci = _potnij(payload)
         if czesci is None:      # payload nie do podziału (liczba, napis)
             return _wyslij(url, headers, key, payload)
+        blad = _kontrola_czesci(key, payload, czesci)
+        if blad:
+            # ⚑ KAWAŁKI, KTÓRE NIE SKLEJAJĄ SIĘ W ORYGINAŁ, NIE JADĄ DO BAZY.
+            # Incydent 2026-09-21: gruby dzień listy wracał jako trzy „dni"
+            # bez daty i strona /model padała. Zapis odmawia GŁOŚNO, pod
+            # kluczem zostaje poprzednia, spójna wersja.
+            print(f"Supabase zapis '{key}': {blad} — NIE zapisuję, zostawiam "
+                  "poprzednią wersję", file=sys.stderr, flush=True)
+            return False
         print(f"Supabase zapis '{key}': {waga_calosci / 1e6:.1f} MB — dzielę "
               f"na {len(czesci)} części (limit zapisu bazy)", flush=True)
         for nr, cz in enumerate(czesci):

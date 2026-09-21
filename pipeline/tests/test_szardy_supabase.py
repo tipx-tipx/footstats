@@ -16,6 +16,7 @@ Testujemy trzy rzeczy, każda odpowiada innej klasie awarii:
   3. brak choćby jednej części to AWARIA ODCZYTU, nie pusty klucz — bo
      wołający dopisuje do historii i zapisuje ją z powrotem.
 """
+import copy
 import json
 
 import pytest
@@ -233,3 +234,35 @@ def test_gruby_element_listy_wraca_w_calosci(baza, monkeypatch):
     assert ok and odczyt == payload
     assert [d["dzien"] for d in odczyt["skutecznosc_dzienna"]] == \
         ["2026-09-21", "2026-09-20", "2026-09-19"]
+
+
+def test_kawalki_nie_sklejajace_sie_w_oryginal_nie_ida_do_bazy(baza, monkeypatch):
+    """Strażnik na przyszłość: jakikolwiek błąd cięcia ma zatrzymać zapis
+    GŁOŚNO, a pod kluczem ma zostać poprzednia, spójna wersja."""
+    stara = {"skutecznosc_dzienna": [{"dzien": "2026-09-19", "roi_flat": 1.0}]}
+    assert supa.put_key("typy_wyniki", stara) is True
+    nowa = {"skutecznosc_dzienna": [{"dzien": "2026-09-20", "roi_flat": 2.0},
+                                    {"dzien": "2026-09-21", "roi_flat": 3.0}]}
+    monkeypatch.setattr(supa, "PROG_SZARDU", 5)
+    monkeypatch.setattr(supa, "_potnij", lambda p: [
+        {"skutecznosc_dzienna": [{"roi_flat": 2.0}]},          # dzień bez daty
+        {"skutecznosc_dzienna": [{"dzien": "2026-09-20"}]},
+    ])
+    assert supa.put_key("typy_wyniki", nowa) is False
+    assert supa.get_key_ok("typy_wyniki") == (stara, True)
+    assert not [k for k in baza.dane if "__cz" in k], "żaden kawałek nie wyszedł"
+
+
+def test_kontrola_kawalkow_nie_rusza_payloadu(baza, monkeypatch):
+    """Sklejanie na próbę dopisuje listy w miejscu — musi pracować na kopii,
+    inaczej sam pomiar podwoiłby listy w payloadzie, który potem jedzie."""
+    dni = [{"dzien": f"2026-09-{d:02d}", "typy": list(_ksiega(60).values())}
+           for d in range(10, 20)]
+    payload = {"skutecznosc_dzienna": dni}
+    wzor = copy.deepcopy(payload)
+    waga = supa.waga(payload)
+    monkeypatch.setattr(supa, "PROG_SZARDU", waga // 2)
+    monkeypatch.setattr(supa, "CEL_CZESCI", waga // 4)
+    assert supa.put_key("typy_wyniki", payload) is True
+    assert payload == wzor
+    assert supa.get_key_ok("typy_wyniki") == (wzor, True)

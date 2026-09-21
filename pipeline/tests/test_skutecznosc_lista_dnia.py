@@ -168,13 +168,11 @@ def test_widok_zbiorczy_pomija_typy_spoza_zamrozonej_listy(monkeypatch):
     assert dzien["okazje"] == 1
     assert dzien["poza_n"] == 1, "typ spoza składu ma być POLICZONY NA PRÓBĘ"
 
-    # etykieta jest warunkiem tego, żeby `okrojDlaKlienta` wyciął ten wiersz
-    # z rozwinięcia dnia — bez niej klient widziałby typ, którego na
-    # ogłoszonej liście nie było, i to bez żadnego oznaczenia
-    poza_wiersz = next(t for t in dzien["typy"] if t["podmiot"] == "Cruzeiro")
-    assert poza_wiersz["poza_publikacja"] == "poza_lista_dnia"
-    na_liscie_wiersz = next(t for t in dzien["typy"]
-                            if t["podmiot"] == "Flamengo")
+    # typ spoza składu NIE dostaje wiersza w `typy` (2026-09-21): strona i tak
+    # wycinała te wiersze każdej roli, a ważyły 98% `typy_wyniki` — na liście
+    # dnia zostaje tylko to, co user realnie widział
+    assert [t["podmiot"] for t in dzien["typy"]] == ["Flamengo"]
+    na_liscie_wiersz = dzien["typy"][0]
     assert not na_liscie_wiersz["poza_publikacja"]
 
 
