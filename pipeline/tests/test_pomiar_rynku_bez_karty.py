@@ -167,3 +167,32 @@ def test_rozliczanie_liczy_pomiar_6_z_10_w_osobnej_grupie():
            "odrzucenie_powod": rozliczanie.POWOD_POMIARU_POKRYCIA6}
     out = rozliczanie.pomiar_progu_drabinek({"a": rec})
     assert out["pokrycie_6_z_10"]["n"] == 1 and out["pod_progiem"]["n"] == 0
+
+
+# --- rekord pomiaru niesie pełny stempel do księgi (21.09) -------------------
+
+def test_rekord_pomiaru_niesie_pokrycie_forme_sile_i_bramy_karty():
+    import inspect
+    from footstats.jobs import build_wc_fast as B
+    p = {"mecz_id": 1, "mecz": "A – B", "kickoff_ts": 1, "podmiot_id": 7,
+         "podmiot": "X", "rynek_kod": "shots", "linia": 1.5, "kurs": 2.05,
+         "p_final": 0.55, "edge": 0.06, "traf": 6, "z": 10, "traf5": 5, "z5": 5,
+         "sila": 0.84, "p_bazowe": 0.5, "korekta": 1.1, "sito_wersja": "v4",
+         "minuty_sr6": 85, "udzial_startow": 0.9, "krotkie_wystepy5": 0,
+         "ostatni_wystep_min": 90, "xi": True,
+         "powod_pomiaru": radar.POWOD_POMIARU_POKRYCIA6}
+    r = B._rekord_pomiaru_drabinki(p)
+    assert r["odrzucony"] is True and r["odrzucenie_powod"] == "pokrycie_6_z_10"
+    assert r["pokrycie_traf"] == 6 and r["pokrycie_z"] == 10 and r["pokrycie"] == 0.6
+    assert r["forma5_traf"] == 5 and r["sila"] == 0.84 and r["korekta"] == 1.1
+    assert r["ostatni_wystep_min"] == 90 and r["xi"] is True
+    # ...i KAŻDE z tych pól przechodzi przez białą listę księgi
+    zrodlo = inspect.getsource(rozliczanie._dopisz_nowe)
+    for pole in ("pokrycie_traf", "pokrycie_z", "pokrycie", "forma5_traf",
+                 "forma5_z", "sila", "p_bazowe", "korekta", "sito_wersja",
+                 "minuty_sr6", "udzial_startow", "krotkie_wystepy5", "xi",
+                 "ostatni_wystep_min", "edge"):
+        assert f'"{pole}"' in zrodlo, f"`{pole}` zginie w _dopisz_nowe"
+    # bez pomiaru rynku/6-z-10 stempel = dawny pomiar progu pokrycia
+    p.pop("powod_pomiaru")
+    assert B._rekord_pomiaru_drabinki(p)["odrzucenie_powod"] == rozliczanie.POWOD_POMIARU_POKRYCIA

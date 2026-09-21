@@ -136,6 +136,52 @@ _generated_this_run: set[str] = set()
 _tryb = None
 
 
+def _rekord_pomiaru_drabinki(p: dict) -> dict:
+    """Szczebel pomiarowy drabinki → rekord księgi (odrzucony, w tle).
+
+    ⚑ Z PEŁNYM STEMPLEM (2026-09-21). Do dziś pomiar niósł tylko kurs, edge
+    i p_final — bez pokrycia, formy, siły, korekty rywala ani minut. Pytania,
+    po które pomiar istnieje („czy 6/10 z przewagą modelu ≥ X trafia jak
+    cena", „czy faule popełnione po sicie bronią ceny") wymagają dokładnie
+    tych pól; bez nich za 3–4 tygodnie znów zostałoby odtwarzanie ze
+    statshuba. Nazwy jak w `_charakter_drabinki`, żeby jedna analiza
+    obejmowała karty i pomiar. Biała lista w `rozliczanie._dopisz_nowe`
+    musi je przepuszczać (test).
+    """
+    out = {
+        "mecz_id": p["mecz_id"], "mecz": p["mecz"],
+        "kickoff_ts": p["kickoff_ts"],
+        "podmiot_id": p.get("podmiot_id") or 0,
+        "podmiot": p["podmiot"],
+        "rynek_kod": p["rynek_kod"],
+        "rynek": p.get("rynek") or p["rynek_kod"],
+        "linia": p["linia"], "strona": "powyzej",
+        "kurs": p["kurs"], "bukmacher": "Superbet",
+        "p_model": p.get("p_final") or 0.0,
+        "pewnosc": None, "sugestia": False,
+        "zrodlo": rozliczanie.ZRODLO_DRABINKA,
+        "edge": p.get("edge"),
+        "odrzucony": True,
+        # pomiar progu pokrycia / rynku bez karty / 6-z-10 — rozliczanie
+        # liczy je w OSOBNYCH grupach (`pomiar_progu_drabinek`)
+        "odrzucenie_powod": (p.get("powod_pomiaru")
+                             or rozliczanie.POWOD_POMIARU_POKRYCIA),
+    }
+    if p.get("traf") is not None and p.get("z"):
+        out["pokrycie_traf"] = int(p["traf"])
+        out["pokrycie_z"] = int(p["z"])
+        out["pokrycie"] = round(int(p["traf"]) / int(p["z"]), 3)
+    if p.get("traf5") is not None and p.get("z5"):
+        out["forma5_traf"] = int(p["traf5"])
+        out["forma5_z"] = int(p["z5"])
+    for pole in ("sila", "p_bazowe", "korekta", "sito_wersja", "powod_szczebla",
+                 "minuty_sr6", "udzial_startow", "krotkie_wystepy5", "xi",
+                 "ostatni_wystep_min"):
+        if p.get(pole) is not None:
+            out[pole] = p[pole]
+    return out
+
+
 def _dry_run() -> bool:
     return _tryb is not None and not _tryb.publikuj
 
@@ -9863,7 +9909,8 @@ def _main_impl(tryb=None):
         # rentgen imienny jedzie do tabeli NIEZALEŻNIE od tego, co dalej
         # zrobią publikacje — odpowiada na „czemu radar nie dał X", a nie
         # „co jest na stronie" (to mówi rejestr publikacji)
-        radar_imienny.zapisz(_imienny_radar, int(time.time()))
+        if not _dry_run():          # dry-run nie dotyka Supabase — także tabeli
+            radar_imienny.zapisz(_imienny_radar, int(time.time()))
         # karta raz pokazana zostaje do gwizdka — ta sama zasada co przy typach
         radar_wpisy = scal_karty_z_publikacjami(radar_wpisy, wypadli=_wypadli_z_gry)
         # RYNEK WYCOFANY schodzi też z KART — i to PO scaleniu z publikacjami,
@@ -10153,25 +10200,7 @@ def _main_impl(tryb=None):
     # strumienia. Po kilku tygodniach `rozliczanie.pomiar_progu_drabinek`
     # powie, czy próg 0,5 zarabia, czy tylko obcina kandydatów.
     for p in pomiar_drabinek:
-        drabinki_typy.append({
-            "mecz_id": p["mecz_id"], "mecz": p["mecz"],
-            "kickoff_ts": p["kickoff_ts"],
-            "podmiot_id": p.get("podmiot_id") or 0,
-            "podmiot": p["podmiot"],
-            "rynek_kod": p["rynek_kod"],
-            "rynek": p.get("rynek") or p["rynek_kod"],
-            "linia": p["linia"], "strona": "powyzej",
-            "kurs": p["kurs"], "bukmacher": "Superbet",
-            "p_model": p.get("p_final") or 0.0,
-            "pewnosc": None, "sugestia": False,
-            "zrodlo": rozliczanie.ZRODLO_DRABINKA,
-            "edge": p.get("edge"),
-            "odrzucony": True,
-            # pomiar progu pokrycia albo pomiar rynku bez karty (faule
-            # popełnione, 21.09) — rozliczanie liczy je w OSOBNYCH grupach
-            "odrzucenie_powod": (p.get("powod_pomiaru")
-                                 or rozliczanie.POWOD_POMIARU_POKRYCIA),
-        })
+        drabinki_typy.append(_rekord_pomiaru_drabinki(p))
 
     # ile z opublikowanych kart oddało swój drugi szczebel do pomiaru. Karta
     # bez drugiego szczebla nie ma prawa powstać (brama z 08.08), więc liczba

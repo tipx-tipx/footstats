@@ -1309,7 +1309,7 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
                     "forma5_traf", "forma5_z", "krotkie_wystepy5",
                     "sito_wyjatek", "sito_wersja", "sila", "p_sila",
                     "wartosc_pakietu", "ocena_modelu", "sila_skladniki",
-                    "powod_szczebla", "rozjazd_iloraz",
+                    "powod_szczebla", "rozjazd_iloraz", "ostatni_wystep_min",
                 ) if b.get(_p) is not None
             },
             "opublikowano_ts": int(time.time()),

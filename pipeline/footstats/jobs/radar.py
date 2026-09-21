@@ -3429,6 +3429,13 @@ def zbuduj(
                     "kickoff_ts": w["kickoff_ts"],
                     "podmiot_id": w.get("podmiot_id") or 0,
                     "podmiot": w["podmiot"],
+                    # bramy karty przy pomiarze — do księgi (21.09), żeby
+                    # pomiar dało się rozbić tak samo jak karty
+                    "minuty_sr6": w.get("minuty_sr6"),
+                    "udzial_startow": w.get("udzial_startow"),
+                    "krotkie_wystepy5": w.get("krotkie_wystepy5"),
+                    "ostatni_wystep_min": w.get("ostatni_wystep_min"),
+                    "xi": w.get("xi"),
                     **max(_grupa, key=lambda s: s["edge"]),
                 })
         if hero is None:
