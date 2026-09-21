@@ -10607,6 +10607,17 @@ def _main_impl(tryb=None):
             f"{d} +{len(k)}" for d, k in sorted(_dolozone_po_domknieciu.items())))
     for _k, _powod in _zdjete_selekcja.items():
         zdjete_klucze.setdefault(_k, _powod)
+    # ⚑ PÓŁKA NIGDY NIE DOJEŻDŻAŁA DO KSIĘGI (zmierzone 2026-09-21: 0 z 37 477
+    # rekordów z `polka` albo `kolejnosc.polka`, także po naprawie z 24.08).
+    # `wybierz_liste_publikowana` dostaje KOPIE (`do_pokazania.append({k: v…})`)
+    # i na nich pisze `b["polka"]`, a do księgi jadą ORYGINAŁY z `value_bets`.
+    # Naprawa 24.08 wpięła półkę do `kolejnosc` — na oryginale, który jej nie
+    # miał. Skutek: właściciel prosi o limity per półka widoczne w Skuteczności,
+    # a Skuteczność nie umie odróżnić „wysokiej szansy" od „wyższych kursów".
+    # Przepisujemy półkę z kopii na oryginał po kluczu publikacji.
+    _polka_po_kluczu = {
+        _klucz_publikacji(b): b["polka"] for b in lista_pub if b.get("polka")
+    }
     _pokazane_wracaja = sum(1 for b in lista_pub if b.get("wznowiony"))
     if len(do_pokazania) > len(lista_pub):
         print(f"Lista publikowana: {len(lista_pub)} z {len(do_pokazania)} "
@@ -11240,6 +11251,10 @@ def _main_impl(tryb=None):
     for _b in (value_bets + typy_poza_publikacja
                + odrzucone_pomiar + legi_pool_pub):
         _ile = _kandydatow_w_meczu.get(_b.get("mecz_id"), 0)
+        if not _b.get("polka"):
+            _p = _polka_po_kluczu.get(_klucz_publikacji(_b))
+            if _p:
+                _b["polka"] = _p      # patrz nota przy `_polka_po_kluczu`
         _b["kolejnosc"] = {"moc": moc_listy(_b, _ile), "kandydatow": _ile,
                            **({"polka": _b["polka"]} if _b.get("polka") else {}),
                            # ⚑ WZNOWIENIE TEŻ NIE DOJEŻDŻAŁO (2026-08-24, ta

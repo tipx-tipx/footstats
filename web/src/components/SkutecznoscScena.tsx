@@ -10,7 +10,7 @@ import { RaportUczenia } from "./skutecznosc/RaportUczenia";
 import { StanWarstw } from "./skutecznosc/StanWarstw";
 import { TypyDnia } from "./skutecznosc/TypyDnia";
 import { WerdyktModelu, type WerdyktDane } from "./WerdyktModelu";
-import { dataPl, fmtProc } from "@/lib/format";
+import { dataPl, fmtProc, fmtU } from "@/lib/format";
 import type {
   Meta,
   SkutecznoscDnia,
@@ -404,6 +404,12 @@ export function SkutecznoscScena({
 
   const poza = wybor === "wszystko" ? null : strumienie[wybor]?.podsumowanie;
   const klasy = wybor === "drabinki" ? strumienie.drabinki?.klasy : undefined;
+  // PÓŁKI listy dnia (2026-09-21): limity per półka mają być rozliczane tam,
+  // gdzie właściciel je akceptuje — obok bilansu strumienia
+  const polki =
+    wybor === "pewniaki" || wybor === "druzyny"
+      ? strumienie[wybor]?.polki
+      : undefined;
 
   return (
     <div>
@@ -601,6 +607,71 @@ export function SkutecznoscScena({
             <p className="rounded-(--radius-card) border border-hairline bg-card px-4 py-3.5 text-sm text-muted shadow-(--shadow-card)">
               Nic tu jeszcze nie ma – żaden typ tego rodzaju się nie rozliczył.
             </p>
+          )}
+          {pelnyWglad && polki && Object.keys(polki).length > 0 && (
+            <div className="overflow-hidden rounded-(--radius-card) border border-hairline bg-card shadow-(--shadow-card)">
+              <div className="px-4 pt-3">
+                <p className="text-[10px] uppercase tracking-wide text-faint">
+                  półki listy dnia · limit na dobę
+                </p>
+              </div>
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-left text-[10px] uppercase tracking-wide text-faint">
+                    <th className="px-4 py-2 font-medium">półka</th>
+                    <th className="py-2 text-right font-medium">limit</th>
+                    <th className="py-2 text-right font-medium">rozl.</th>
+                    <th className="py-2 text-right font-medium">weszło</th>
+                    <th className="py-2 text-right font-medium">cena</th>
+                    <th className="px-4 py-2 text-right font-medium">bilans</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(["wysoka_szansa", "wyzsze_kursy", "mocna_linia", "poza_polkami"] as const)
+                    .filter((k) => polki[k])
+                    .map((k) => {
+                      const p = polki[k]!;
+                      const sk = p.skutecznosc == null ? null : Math.round(p.skutecznosc * 100);
+                      const ce = p.cena == null ? null : Math.round(p.cena * 100);
+                      return (
+                        <tr key={k} className="border-t border-hairline">
+                          <td className="px-4 py-2 text-ink">
+                            {k === "wysoka_szansa"
+                              ? "wysoka szansa"
+                              : k === "wyzsze_kursy"
+                                ? "wyższe kursy"
+                                : k === "mocna_linia"
+                                  ? "mocna linia (w tym)"
+                                  : "poza półkami"}
+                          </td>
+                          <td className="font-data py-2 text-right tabular-nums text-muted">
+                            {p.limit_dobowy ?? "–"}
+                          </td>
+                          <td className="font-data py-2 text-right tabular-nums">{p.n}</td>
+                          <td
+                            className={`font-data py-2 text-right tabular-nums ${
+                              sk != null && ce != null
+                                ? sk >= ce
+                                  ? "text-data-green"
+                                  : "text-data-red"
+                                : ""
+                            }`}
+                          >
+                            {p.trafione}
+                            {sk != null ? ` (${sk}%)` : ""}
+                          </td>
+                          <td className="font-data py-2 text-right tabular-nums text-muted">
+                            {ce != null ? `${ce}%` : "–"}
+                          </td>
+                          <td className="font-data px-4 py-2 text-right tabular-nums">
+                            {fmtU(p.roi_flat)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
           )}
           {pelnyWglad && (poza?.poza_n ?? 0) > 0 && (
             <p className="rounded-(--radius-card) border border-hairline bg-card px-4 py-3 text-xs leading-relaxed text-muted">

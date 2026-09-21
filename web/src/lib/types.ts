@@ -1040,6 +1040,21 @@ export interface SkutecznoscStrumienia {
   };
   /** tylko drabinki: rozbicie po klasie karty (czy „top" trafia lepiej) */
   klasy?: Record<string, { n: number; trafione: number; skutecznosc: number }>;
+  /** pewniaki / drużyny (2026-09-21): skuteczność per PÓŁKA listy dnia
+   *  (wysoka_szansa, wyzsze_kursy, mocna_linia, poza_polkami) z limitem
+   *  dobowym — limity mają być widoczne tam, gdzie się je rozlicza */
+  polki?: Record<
+    string,
+    {
+      n: number;
+      trafione: number;
+      skutecznosc: number | null;
+      /** średnia szansa z kursu (1/kurs), 0–1 */
+      cena: number | null;
+      roi_flat: number;
+      limit_dobowy?: number | null;
+    }
+  >;
 }
 
 /** Wynik jednego rynku w jednej epoce (mundial / sezon ligowy). */

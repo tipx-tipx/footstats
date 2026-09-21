@@ -1240,6 +1240,9 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
             "wyzsza_linia": bool(b.get("wyzsza_linia")),
             # mocna wyższa linia listy dnia (18.09) — pomiar za ~2 tyg.
             "mocna_linia": bool(b.get("mocna_linia")),
+            # PÓŁKA LISTY DNIA (2026-09-21) — osobnym polem, nie tylko
+            # w `kolejnosc`: Skuteczność liczy limity per półka
+            **({"polka": b["polka"]} if b.get("polka") else {}),
             **({"sila_linii": b["sila_linii"]} if b.get("sila_linii") is not None else {}),
             "pewniak": bool(b.get("pewniak")),
             "miekka_linia": bool(b.get("miekka_linia")),
@@ -1310,6 +1313,8 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
                     "sito_wyjatek", "sito_wersja", "sila", "p_sila",
                     "wartosc_pakietu", "ocena_modelu", "sila_skladniki",
                     "powod_szczebla", "rozjazd_iloraz", "ostatni_wystep_min",
+                    # półka listy dnia (2026-09-21) — patrz `_polki_strumienia`
+                    "polka",
                 ) if b.get(_p) is not None
             },
             "opublikowano_ts": int(time.time()),
@@ -5164,7 +5169,48 @@ def _typ_dnia(r: dict) -> dict:
         # 2 i 3 = cel polowania i „za drobne" — wiersz w tym samym zakładzie,
         # osobne liczniki (`szczebel2_n`…), poza trafieniami/ROI hero
         "szczebel": r.get("szczebel"),
+        # PÓŁKA i MOCNA LINIA (2026-09-21) — front rozbija dzień po półkach
+        "polka": r.get("polka") or (r.get("kolejnosc") or {}).get("polka"),
+        "mocna_linia": bool(r.get("mocna_linia")),
     }
+
+
+def _polki_strumienia(settled: list[dict]) -> dict[str, dict]:
+    """Skuteczność per PÓŁKA listy dnia (2026-09-21, właściciel: „limity
+    muszą być w Skuteczności"). Klucze: `wysoka_szansa`, `wyzsze_kursy`,
+    `poza_polkami` (typ bez stempla — sprzed naprawy albo spoza półek) oraz
+    `mocna_linia` (nakłada się na półki kursu — to osobny kanał z 18.09).
+    Każda: n, trafione, skuteczność, cena (średnia 1/kurs), bilans i limit
+    dobowy z `uczony.POLKI`."""
+    from ..model import uczony
+    polki: dict[str, dict] = {}
+
+    def _dodaj(nazwa: str, r: dict) -> None:
+        k = polki.setdefault(nazwa, {"n": 0, "trafione": 0, "okazje": 0,
+                                     "_zwrot": 0.0, "_cena": 0.0})
+        k["n"] += 1
+        if r["wynik"] == "wygrany":
+            k["trafione"] += 1
+        if r.get("kurs") and not r.get("sugestia"):
+            k["okazje"] += 1
+            k["_zwrot"] += _zwrot_typu(r)
+            k["_cena"] += 1.0 / float(r["kurs"])
+
+    for r in settled:
+        _dodaj(r.get("polka") or (r.get("kolejnosc") or {}).get("polka")
+               or "poza_polkami", r)
+        if r.get("mocna_linia"):
+            _dodaj("mocna_linia", r)
+    out: dict[str, dict] = {}
+    for nazwa, k in polki.items():
+        out[nazwa] = {
+            "n": k["n"], "trafione": k["trafione"],
+            "skutecznosc": round(k["trafione"] / k["n"], 3) if k["n"] else None,
+            "cena": round(k["_cena"] / k["okazje"], 3) if k["okazje"] else None,
+            "roi_flat": round(k["_zwrot"] - k["okazje"], 2),
+            "limit_dobowy": (uczony.POLKI.get(nazwa) or {}).get("limit_dobowy"),
+        }
+    return out
 
 
 def _szczeble_dnia(log: dict, hero: list[dict]) -> list[dict]:
@@ -5481,6 +5527,9 @@ def skutecznosc_strumieni(log: dict, dni: int = 21,
             for k in klasy.values():
                 k["skutecznosc"] = round(k["trafione"] / k["n"], 3)
             rec["klasy"] = klasy
+        # PÓŁKI listy dnia (2026-09-21) — dla strumieni z listą dnia
+        if nazwa in ("pewniaki", "druzyny") and settled:
+            rec["polki"] = _polki_strumienia(settled)
         out[nazwa] = rec
     return out
 
