@@ -1400,7 +1400,7 @@ def wybierz_liste_publikowana(
             if b.get("podmiot_typ") == "zawodnik" else None
         )
         _polka_klucz = (dzien, _str, _polka)
-        _polka_limit = (uczony.POLKI[_polka]["limit_dobowy"]
+        _polka_limit = (uczony.limit_polki(_polka, b.get("podmiot_typ"))
                         if _polka else LISTA_CAP)
         if dzien in zamkniete:
             # dzień domknięty: skład jest ogłoszony i drużynowa połowa się nie
@@ -10629,13 +10629,13 @@ def _main_impl(tryb=None):
     # zakładki działa, ani ile produktu zjada sufit kursu. Jedna linia w logu
     # cyklu, bo to jest pierwsze miejsce, w którym patrzy się po wdrożeniu.
     _wg_polki = Counter(
-        str(b.get("polka") or "poza_polkami") for b in lista_pub
-        if not b.get("sugestia")
+        (strumien_listy(b), str(b.get("polka") or "poza_polkami"))
+        for b in lista_pub if not b.get("sugestia")
     )
     _poza = sum(1 for _p in _zdjete_selekcja.values() if _p == "kurs_poza_polkami")
     print("Półki listy dnia: " + ", ".join(
-        f"{k} {v}/{uczony.POLKI[k]['limit_dobowy'] if k in uczony.POLKI else '—'}"
-        for k, v in sorted(_wg_polki.items())
+        f"{s}/{k} {v}/{uczony.limit_polki(k, s) or '—'}"
+        for (s, k), v in sorted(_wg_polki.items())
     ) + f" | poza widełkami (kurs > sufitu): {_poza}")
     if _z_dnia:
         print("Lista wg doby produktowej (6:00→6:00): " + ", ".join(

@@ -56,7 +56,10 @@ RYNKI = ["team_corners", "team_goals", "team_cards", "team_fouls",
 # ⚑ 2026-09-14: pewniaki DRUŻYNOWE do 1,45 (`uczony.KURS_MAX_PEWNIAKA`),
 # półki 18 + 3 — kursy pewniaków muszą mieścić się w nowym suficie, a na
 # półkę wyższych kursów przypada 1 z 6 (limit 3 z 21).
-KURSY = [1.25, 1.30, 1.35, 1.40, 1.45, 1.95]
+# ⚑ DWA KURSY Z PÓŁKI WYŻSZYCH (21.09): limity per strumień to 12 + 8 dla
+# drużyn, więc 36 „różnych" typów musi mieć ≥ 8 kandydatów po 1,80–2,00,
+# inaczej lista doby nie dobije do LISTA_CAP (1,45–1,80 u drużyn = poza półkami)
+KURSY = [1.25, 1.30, 1.35, 1.40, 1.90, 1.95]
 
 
 def _rozne(ile: int, od: int = 1, **kw) -> list[dict]:

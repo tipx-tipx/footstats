@@ -1010,13 +1010,41 @@ def w_zasiegu(lambda_: float | None, linia: float,
 POLKI = {
     "wysoka_szansa": {
         "kurs_min": 1.20, "kurs_max": 1.80,
-        "limit_dobowy": 15, "zasieg": MAX_ODLEGLOSC_LINII,
+        "limit_dobowy": 12, "zasieg": MAX_ODLEGLOSC_LINII,
     },
     "wyzsze_kursy": {
         "kurs_min": 1.80, "kurs_max": 2.20,
-        "limit_dobowy": 5, "zasieg": None,
+        "limit_dobowy": 8, "zasieg": None,
     },
 }
+
+# ⚑ LIMITY PER STRUMIEŃ I PÓŁKA (decyzja właściciela 2026-09-21, cel:
+# TRAFNOŚĆ, nie przewaga nad ceną). Pomiar na kandydatach z księgi
+# 20.08–21.09 (25 185 rozliczeń, ranking jak na liście, per doba i półka,
+# skumulowana trafność do miejsca N, obie połowy września zgodne):
+#   drużyny  wysoka szansa 1,20–1,45: ~75% do 15. miejsca (nie spada),
+#            wyższe kursy  1,80–2,00: ~56% do 15., spadek od 16.;
+#   zawodnicy wysoka szansa 1,20–1,80: ~65% do 15., 63% przy 20,
+#            wyższe kursy  1,80–2,20: ~58% do 12., 54% przy 20.
+# Do 21.09 obie półki miały 15 + 5 dla obu strumieni: lista to 15 tanich
+# i 5 droższych, a droższe były jedyną półką z przewagą nad ceną (+4…+7 pp).
+# Teraz 12 + 8 (drużyny, ~67% listy) i 10 + 8 (zawodnicy, ~62%). Kolejność
+# w półce bez zmian — zmierzona: dzisiejsze klucze wygrały albo zremisowały
+# (zawodnicy po najniższym kursie dawaliby 70%, ale przy śr. kursie 1,26).
+# `POLKI[...]["limit_dobowy"]` zostaje jako wartość dla drużyn (i zapas dla
+# typu bez strumienia); Skuteczność pokazuje limit per strumień.
+LIMITY_POLEK = {
+    "druzyna": {"wysoka_szansa": 12, "wyzsze_kursy": 8},
+    "zawodnik": {"wysoka_szansa": 10, "wyzsze_kursy": 8},
+}
+
+
+def limit_polki(polka: str | None, podmiot_typ: str | None) -> int | None:
+    """Limit dobowy półki w danym strumieniu (None = półka nieznana)."""
+    if not polka or polka not in POLKI:
+        return None
+    return int(LIMITY_POLEK.get(str(podmiot_typ or ""), {}).get(
+        polka, POLKI[polka]["limit_dobowy"]))
 
 # Sufit pewniaków PER STRUMIEŃ (patrz nota wyżej). Brak wpisu = widełki półki.
 KURS_MAX_PEWNIAKA = {"druzyna": 1.45}

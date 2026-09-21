@@ -5175,7 +5175,8 @@ def _typ_dnia(r: dict) -> dict:
     }
 
 
-def _polki_strumienia(settled: list[dict]) -> dict[str, dict]:
+def _polki_strumienia(settled: list[dict],
+                      podmiot_typ: str | None = None) -> dict[str, dict]:
     """Skuteczność per PÓŁKA listy dnia (2026-09-21, właściciel: „limity
     muszą być w Skuteczności"). Klucze: `wysoka_szansa`, `wyzsze_kursy`,
     `poza_polkami` (typ bez stempla — sprzed naprawy albo spoza półek) oraz
@@ -5208,7 +5209,8 @@ def _polki_strumienia(settled: list[dict]) -> dict[str, dict]:
             "skutecznosc": round(k["trafione"] / k["n"], 3) if k["n"] else None,
             "cena": round(k["_cena"] / k["okazje"], 3) if k["okazje"] else None,
             "roi_flat": round(k["_zwrot"] - k["okazje"], 2),
-            "limit_dobowy": (uczony.POLKI.get(nazwa) or {}).get("limit_dobowy"),
+            # limit PER STRUMIEŃ (21.09) — to on ma być widoczny w Skuteczności
+            "limit_dobowy": uczony.limit_polki(nazwa, podmiot_typ),
         }
     return out
 
@@ -5529,7 +5531,8 @@ def skutecznosc_strumieni(log: dict, dni: int = 21,
             rec["klasy"] = klasy
         # PÓŁKI listy dnia (2026-09-21) — dla strumieni z listą dnia
         if nazwa in ("pewniaki", "druzyny") and settled:
-            rec["polki"] = _polki_strumienia(settled)
+            rec["polki"] = _polki_strumienia(
+                settled, "druzyna" if nazwa == "druzyny" else "zawodnik")
         out[nazwa] = rec
     return out
 

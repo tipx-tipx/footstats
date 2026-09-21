@@ -81,7 +81,7 @@ def test_bez_limitu_przedzialu_kursu_polka_sie_wypelnia(monkeypatch):
     rynki = [f"team_r{i}" for i in range(15)]
     kand = [_typ(mecz_id=i, rynek=rynki[i], kurs=1.21 + i / 100) for i in range(15)]
     lista, _z, _p = B.wybierz_liste_publikowana(kand, _klucz)
-    assert len(lista) == U.POLKI["wysoka_szansa"]["limit_dobowy"] == 15
+    assert len(lista) == U.limit_polki("wysoka_szansa", "druzyna") == 12
 
 
 def test_zawodnicy_maja_luzniejszy_limit_rodziny():
@@ -278,23 +278,26 @@ def test_druzynowe_nie_zabieraja_miejsc_zawodnikom(bez_roznorodnosci):
     kand = ([_dru(i, kurs=1.3 + i / 1000) for i in range(40)]
             + [_zaw(i, kurs=1.2 + i / 1000) for i in range(40)])
     lista, _, _ = B.wybierz_liste_publikowana(kand, _klucz)
-    polka = U.POLKI["wysoka_szansa"]["limit_dobowy"]
-    assert sum(1 for b in lista if b["podmiot_typ"] == "druzyna") == polka
-    assert sum(1 for b in lista if b["podmiot_typ"] == "zawodnik") == polka
+    # limity PER STRUMIEŃ (21.09): drużyny 12, zawodnicy 10 na wysokiej szansie
+    assert sum(1 for b in lista if b["podmiot_typ"] == "druzyna") == U.limit_polki("wysoka_szansa", "druzyna") == 12
+    assert sum(1 for b in lista if b["podmiot_typ"] == "zawodnik") == U.limit_polki("wysoka_szansa", "zawodnik") == 10
 
 
-def test_kazdy_strumien_ma_pelne_21_na_dobe(bez_roznorodnosci):
-    wys = U.POLKI["wysoka_szansa"]["limit_dobowy"]
-    wyz = U.POLKI["wyzsze_kursy"]["limit_dobowy"]
+def test_kazdy_strumien_ma_pelne_polki_na_dobe(bez_roznorodnosci):
+    """Limity PER STRUMIEŃ (21.09): drużyny 12 + 8, zawodnicy 10 + 8."""
     kand = []
     for f in (_dru, _zaw):
         kand += [f(i, kurs=1.3) for i in range(30)]
         kand += [f(100 + i, kurs=1.9) for i in range(30)]
     lista, _, per_dzien = B.wybierz_liste_publikowana(kand, _klucz)
+    razem = 0
     for typ in ("druzyna", "zawodnik"):
+        wys = U.limit_polki("wysoka_szansa", typ)
+        wyz = U.limit_polki("wyzsze_kursy", typ)
         n = sum(1 for b in lista if b["podmiot_typ"] == typ)
-        assert n == wys + wyz == B.LISTA_CAP
-    assert list(per_dzien.values()) == [2 * B.LISTA_CAP]
+        assert n == wys + wyz == (20 if typ == "druzyna" else 18)
+        razem += n
+    assert list(per_dzien.values()) == [razem]
 
 
 def test_limit_meczu_osobny_dla_druzyn_i_zawodnikow():
