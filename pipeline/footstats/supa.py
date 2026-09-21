@@ -14,6 +14,8 @@ import time
 
 from curl_cffi import requests
 
+from . import diagnostyka
+
 # PONOWIENIA (2026-08-13). Do dziś KAŻDE zapytanie do Supabase szło raz i tyle:
 # jedno mrugnięcie sieci na runnerze GitHuba kończyło się utratą całej pracy
 # cyklu, bo `push_supabase.push()` idzie na samym końcu, po ~31 minutach
@@ -759,6 +761,92 @@ def _wyslij(url: str, headers: dict, key: str, payload) -> bool:
         impersonate="chrome124", timeout=120,
     ))
     return r is not None and r.status_code < 300
+
+
+# --- TABELE POZA `app_data` (2026-09-21, rentgen imienny drabinek) --------
+#
+# Klucz w `app_data` trzeba czytać, żeby go dopisać; tabela z upsertem nie.
+# `Prefer: return=minimal` = odpowiedź pusta = zero transferu wychodzącego,
+# a ten transfer to jedyny limit, który ten projekt realnie zdejmuje z sieci
+# (25.08, 18.09). Brak tabeli (niewklejona migracja) = False + cichy licznik,
+# nigdy wyjątek do cyklu.
+PACZKA_WIERSZY = 1000
+_tabele_bez_migracji: set[str] = set()
+
+
+def _blad_tabeli(tabela: str, r) -> bool:
+    """404/PGRST205 = tabeli nie ma — powiedz raz na przebieg, nie 70 razy."""
+    if r is not None and r.status_code == 404:
+        if tabela not in _tabele_bez_migracji:
+            _tabele_bez_migracji.add(tabela)
+            print(f"Supabase: tabeli '{tabela}' nie ma — wklej migrację "
+                  "(supabase/migrations). Zapis pominięty.",
+                  file=sys.stderr, flush=True)
+        return True
+    return False
+
+
+def upsert_wiersze(tabela: str, wiersze: list[dict], on_conflict: str,
+                   paczka: int = PACZKA_WIERSZY) -> bool:
+    """Upsert wierszy do tabeli, paczkami, bez odpowiedzi (return=minimal)."""
+    c = _conn()
+    if c is None or not wiersze:
+        return False
+    url, headers = c
+    for i in range(0, len(wiersze), paczka):
+        cz = wiersze[i:i + paczka]
+        r = _z_ponowieniem(f"upsert '{tabela}'", lambda cz=cz: requests.post(
+            f"{url}/rest/v1/{tabela}?on_conflict={on_conflict}",
+            headers={**headers,
+                     "Prefer": "resolution=merge-duplicates,return=minimal"},
+            data=json.dumps(cz, ensure_ascii=False),
+            impersonate="chrome124", timeout=120,
+        ))
+        if r is None or r.status_code >= 300:
+            if not _blad_tabeli(tabela, r):
+                diagnostyka.cichy(
+                    "supa", f"upsert_{tabela}",
+                    RuntimeError(f"HTTP {getattr(r, 'status_code', None)}"))
+            return False
+    return True
+
+
+def usun_wiersze(tabela: str, filtr: str) -> bool:
+    """DELETE z filtrem PostgREST (np. `dzien=lt.2026-09-17`), bez odpowiedzi."""
+    c = _conn()
+    if c is None or not filtr:
+        return False
+    url, headers = c
+    r = _z_ponowieniem(f"delete '{tabela}'", lambda: requests.delete(
+        f"{url}/rest/v1/{tabela}?{filtr}",
+        headers={**headers, "Prefer": "return=minimal"},
+        impersonate="chrome124", timeout=60,
+    ))
+    if r is None or r.status_code >= 300:
+        if not _blad_tabeli(tabela, r):
+            diagnostyka.cichy("supa", f"delete_{tabela}",
+                              RuntimeError(f"HTTP {getattr(r, 'status_code', None)}"))
+        return False
+    return True
+
+
+def czytaj_wiersze(tabela: str, filtr: str) -> list[dict]:
+    """SELECT z filtrem PostgREST — do ręcznych narzędzi, NIE z cyklu."""
+    c = _conn()
+    if c is None:
+        return []
+    url, headers = c
+    r = _z_ponowieniem(f"select '{tabela}'", lambda: requests.get(
+        f"{url}/rest/v1/{tabela}?select=*&{filtr}",
+        headers=headers, impersonate="chrome124", timeout=60,
+    ))
+    if r is None or r.status_code != 200:
+        return []
+    try:
+        dane = r.json()
+        return dane if isinstance(dane, list) else []
+    except Exception:                                        # noqa: BLE001
+        return []
 
 
 def _posprzataj_czesci(url: str, headers: dict, key: str, zostawiam: int):

@@ -43,7 +43,7 @@ from ..sources import (
     betclic, eloratings, rotowire, scores365, sofascore, sportsgambler, statshub,
     superbet,
 )
-from . import magazyn_druzyn, radar, rozliczanie
+from . import magazyn_druzyn, radar, radar_imienny, rozliczanie
 from .build_demo import MARKET_NAMES_PL, WEB_DATA_DIR, line_for_lambda
 
 # KURSY GŁÓWNE: Superbet i Betclic (drugi dołożony 2026-08-08, decyzja usera).
@@ -9770,6 +9770,9 @@ def _main_impl(tryb=None):
             for e in wszystkie_ev
         }
         diagnostyka.etap("selekcja_typow")
+        # IMIENNY RENTGEN (2026-09-21): brama per (mecz, zawodnik) — zapis
+        # do tabeli po radarze, patrz `radar_imienny`
+        _imienny_radar: dict = {}
         radar_wpisy = radar.zbuduj(
             trends, events_meta_radar, odds_grid, sb_cache,
             model_pokrycie, players_out, MARKET_NAMES_PL, int(time.time()),
@@ -9814,6 +9817,7 @@ def _main_impl(tryb=None):
             kalendarz_druzyn=_kalendarz_druzyn,
             tabela_rywali=_tabela_rywali,
             wystepy_pelne=_wystepy_gracza,
+            imienny_out=_imienny_radar,
         )
         radar_padl = False
     except Exception as ex:
@@ -9834,6 +9838,10 @@ def _main_impl(tryb=None):
     # (nie kasujemy strony z powodu wyjątku), przy zerze po bramach wznowione
     # przechodzą przez bramę i zapisujemy wynik, choćby był pusty.
     if not radar_padl:
+        # rentgen imienny jedzie do tabeli NIEZALEŻNIE od tego, co dalej
+        # zrobią publikacje — odpowiada na „czemu radar nie dał X", a nie
+        # „co jest na stronie" (to mówi rejestr publikacji)
+        radar_imienny.zapisz(_imienny_radar, int(time.time()))
         # karta raz pokazana zostaje do gwizdka — ta sama zasada co przy typach
         radar_wpisy = scal_karty_z_publikacjami(radar_wpisy, wypadli=_wypadli_z_gry)
         # RYNEK WYCOFANY schodzi też z KART — i to PO scaleniu z publikacjami,

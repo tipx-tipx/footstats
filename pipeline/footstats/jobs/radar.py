@@ -44,7 +44,7 @@ from ..model import tempo as tempo_mod
 from ..model import uczony
 from ..sources import betclic, statshub, superbet
 from .. import diagnostyka
-from . import magazyn_druzyn
+from . import magazyn_druzyn, radar_imienny
 
 # --- progi detektorów ---
 OKNO_TRANSFER = 15          # ile ostatnich meczów historii patrzymy na ligi
@@ -2780,6 +2780,9 @@ def zbuduj(
     # unia występów per zawodnik z cyklu (build_wc_fast), już DOCIĄGNIĘTA
     # z performance dla podejrzanych — bramy składu karty liczą z niej
     wystepy_pelne: dict[int, statshub.StatshubTrend] | None = None,
+    # IMIENNY RENTGEN (2026-09-21): {(mecz_id, podmiot_id): {brama, …}} —
+    # brama, na której para odpadła, albo „karta"; patrz `radar_imienny`
+    imienny_out: dict | None = None,
 ) -> list[dict]:
     """Złóż wpisy radaru/drabinek ze zbiorów, które cykl i tak ma w pamięci.
 
@@ -2870,10 +2873,27 @@ def zbuduj(
     lejek: Counter = Counter()
     lejek["1_meczow_z_oferta"] = len(odds_grid)
     lejek["2_par_zawodnik_rynek"] = sum(len(g) for g in odds_grid.values())
+
+    def _ri(mid: int, pid: int, brama: str, **kw) -> None:
+        """Imienny rentgen: werdykt pary + to, co o niej wiemy w tym miejscu."""
+        if imienny_out is None:
+            return
+        info = players_out.get(pid) or {}
+        meta_m = events_meta.get(mid) or {}
+        radar_imienny.odnotuj(
+            imienny_out, mid, pid, brama,
+            mecz=meta_m.get("label"), kickoff_ts=meta_m.get("ts"),
+            podmiot=kw.pop("podmiot", None) or info.get("nazwa"),
+            druzyna=kw.pop("druzyna", None) or info.get("druzyna"),
+            **kw,
+        )
+
     for mid, gracze in odds_grid.items():
         meta = events_meta.get(mid)
         if not meta:
             lejek["3_odpadl_mecz_bez_meta"] += 1
+            for pid in gracze:
+                _ri(mid, pid, "mecz_bez_meta")
             continue
         # ZAPAS NA OBSTAWIENIE: nowa karta nie powstaje tuż przed gwizdkiem.
         # Karta już opublikowana wraca z rejestru (scal_karty_z_publikacjami)
@@ -2881,6 +2901,11 @@ def zbuduj(
         # wskakiwało na listę w ostatniej chwili (zgłoszenie: Club Necaxa).
         if margines_startu_s and (meta.get("ts") or 0) <= teraz + margines_startu_s:
             lejek["4_odpadl_mecz_za_blisko_gwizdka"] += 1
+            # werdykt z wcześniejszego cyklu (gdy oferta była do wzięcia)
+            # jest już w tabeli — tu dopisujemy tylko tych, których nie było
+            for pid in gracze:
+                if imienny_out is not None and (mid, pid) not in imienny_out:
+                    _ri(mid, pid, "mecz_za_blisko_gwizdka")
             continue
         for pid, drabinki in gracze.items():
             # POZA SKŁADEM: znamy jedenastkę i jego w niej nie ma. Karta na
@@ -2888,6 +2913,7 @@ def zbuduj(
             # analiza pod spodem liczy z minut, których nie zagra.
             if (mid, pid) in poza_skladem:
                 lejek["5_odpadl_zawodnik_poza_skladem"] += 1
+                _ri(mid, pid, "zawodnik_poza_skladem")
                 continue
             trendy_mk = trendy_pm.get((mid, pid))
             if not trendy_mk:
@@ -2895,6 +2921,8 @@ def zbuduj(
                 # historii — bo albo statshub jej nie oddał, albo nie
                 # zapytaliśmy (mecz poza budżetem `DOCIAG_MAX`).
                 lejek["6_odpadl_zawodnik_bez_historii"] += 1
+                _ri(mid, pid, "zawodnik_bez_historii",
+                    rynki_oferty=sorted(drabinki or {}))
                 continue
             tr_ref = max(trendy_mk.values(), key=lambda t: len(t.counts))
             # ŚWIEŻOŚĆ PRÓBY: dotąd pilnowały jej tylko detektory transferu
@@ -2904,6 +2932,8 @@ def zbuduj(
             grane_ref = _grane(tr_ref)
             if not grane_ref:
                 lejek["7_odpadla_historia_niesw" + "ieza"] += 1
+                _ri(mid, pid, "historia_nieswieza", podmiot=tr_ref.player_name,
+                    druzyna=tr_ref.team_name, wystepow=0)
                 continue
             # ŚWIEŻOŚĆ: liczona w MECZACH DRUŻYNY, gdy znamy jej kalendarz
             # (patrz `MAX_OPUSZCZONYCH_MECZOW`). Kalendarzowy próg zostaje
@@ -2916,9 +2946,15 @@ def zbuduj(
                 if teraz - grane_ref[0][2] > MAX_DNI_SWIEZOSC * 86400:
                     lejek["7_odpadla_historia_niesw" + "ieza"] += 1
                     lejek["7a_w_tym_bez_kalendarza_druzyny"] += 1
+                    _ri(mid, pid, "historia_nieswieza",
+                        podmiot=tr_ref.player_name, druzyna=tr_ref.team_name,
+                        dni_od_ostatniego=(teraz - grane_ref[0][2]) // 86400)
                     continue
             elif _opuscil > MAX_OPUSZCZONYCH_MECZOW:
                 lejek["7_odpadla_historia_niesw" + "ieza"] += 1
+                _ri(mid, pid, "historia_nieswieza",
+                    podmiot=tr_ref.player_name, druzyna=tr_ref.team_name,
+                    opuszczone_mecze=_opuscil)
                 continue
             elif teraz - grane_ref[0][2] > MAX_DNI_SWIEZOSC * 86400:
                 # przeszedł WYŁĄCZNIE dzięki nowej mierze — licznik pokaże,
@@ -2988,6 +3024,9 @@ def zbuduj(
             )
             if not rynki:
                 lejek["8_odpadly_puste_drabinki"] += 1
+                _ri(mid, pid, "puste_drabinki", podmiot=tr_ref.player_name,
+                    druzyna=tr_ref.team_name,
+                    rynki_oferty=sorted(drabinki or {}))
                 continue  # same puste drabinki (kursy-szum) = nie ma karty
             # unia występów: trendy tej karty + unia z cyklu (dociągnięta
             # z performance dla podejrzanych — patrz dociagnij_pelne_wystepy)
@@ -3238,10 +3277,24 @@ def zbuduj(
     statystyki_przewagi: Counter = Counter()
     for w in wpisy:
         pom: list[dict] | None = [] if pomiar_out is not None else None
+        # powody TEJ karty osobno — imienny rentgen dostaje je po nazwisku,
+        # sumy zbiorcze idą dalej do `powody_odpadniecia`
+        _pw: Counter = Counter()
         score, hero = _oceń_karte(
-            w, powody_odpadniecia, pomiar_out=pom,
+            w, _pw, pomiar_out=pom,
             powody_pomiaru=powody_pomiaru, statystyki=statystyki_przewagi,
         )
+        powody_odpadniecia.update(_pw)
+        _ri(w["mecz_id"], w.get("podmiot_id") or 0,
+            "ocena_przeszla" if hero is not None
+            else (_pw.most_common(1)[0][0] if _pw else "bez_szczebla_do_oceny"),
+            podmiot=w.get("podmiot"), druzyna=w.get("druzyna"),
+            powody=dict(_pw) or None,
+            minuty_sr6=w.get("minuty_sr6"),
+            udzial_startow=w.get("udzial_startow"),
+            xi=w.get("xi"),
+            krotkie5=w.get("krotkie_wystepy5"),
+            rynki=radar_imienny.opis_rynkow(w.get("rynki")))
         if pom:
             # jeden pomiar na zawodnika w meczu — najlepszy szczebel spod progu
             pomiar_kandydaci.append({
@@ -3326,9 +3379,11 @@ def zbuduj(
     # i zostawiamy lepszą kartę.
     najlepsza: dict[tuple, dict] = {}
     for w in sorted(ocenione, key=lambda w: -w["_score"]):
-        najlepsza.setdefault(
-            (w["mecz_id"], _klucz_zawodnika(w.get("podmiot") or "")), w
-        )
+        _k = (w["mecz_id"], _klucz_zawodnika(w.get("podmiot") or ""))
+        if _k in najlepsza and najlepsza[_k] is not w:
+            _ri(w["mecz_id"], w.get("podmiot_id") or 0, "duplikat_zawodnika",
+                podmiot=w.get("podmiot"))
+        najlepsza.setdefault(_k, w)
     if len(najlepsza) < len(ocenione):
         print(f"Drabinki — dublety tego samego zawodnika: "
               f"{len(ocenione) - len(najlepsza)} kart scalonych")
@@ -3339,11 +3394,17 @@ def zbuduj(
     wybrane: list[dict] = []
     for w in sorted(ocenione, key=lambda w: -w["_score"]):
         if len(wybrane) >= MAX_WPISOW:
-            break
+            _ri(w["mecz_id"], w.get("podmiot_id") or 0, "limit_wpisow",
+                podmiot=w.get("podmiot"))
+            continue
         if per_mecz_n.get(w["mecz_id"], 0) >= MAX_WPISOW_MECZ:
+            _ri(w["mecz_id"], w.get("podmiot_id") or 0, "limit_kart_meczu",
+                podmiot=w.get("podmiot"))
             continue
         _dz = dzien_karty(w.get("kickoff_ts"))
         if per_dzien_n.get(_dz, 0) >= MAX_KART_DZIEN:
+            _ri(w["mecz_id"], w.get("podmiot_id") or 0, "limit_kart_dnia",
+                podmiot=w.get("podmiot"))
             continue
         per_mecz_n[w["mecz_id"]] = per_mecz_n.get(w["mecz_id"], 0) + 1
         per_dzien_n[_dz] = per_dzien_n.get(_dz, 0) + 1
@@ -3364,6 +3425,9 @@ def zbuduj(
         edge_hero = float(
             hero.get("edge") if hero.get("edge") is not None else w["_score"]
         )
+        _ri(w["mecz_id"], w.get("podmiot_id") or 0, "karta",
+            podmiot=w.get("podmiot"), miejsce=miejsce,
+            hero=f"{hero.get('rynek_kod')} {hero.get('linia')}@{hero.get('kurs')}")
         w["ocena"] = {
             "miejsce": miejsce,
             "klasa": _klasa_karty(edge_hero, miejsce, len(wpisy)),
