@@ -77,7 +77,12 @@ def test_ksiega_PRZEPUSZCZA_charakterystyke():
     for pole in ("pokrycie", "pokrycie_traf", "pokrycie_z", "p_bazowe",
                  "korekta", "minuty_sr6", "udzial_startow",
                  "rodzaj_karty", "kategoria_karty", "klasa_karty",
-                 "pozycja", "xi"):
+                 "pozycja", "xi",
+                 # stemple sita (17–18.09) i wersja sita (21.09) — ginęły tu
+                 # do 21.09; bez nich v4 vs v3 nie da się rozliczyć
+                 "forma5_traf", "forma5_z", "krotkie_wystepy5", "sito_wyjatek",
+                 "sito_wersja", "sila", "p_sila", "wartosc_pakietu",
+                 "powod_szczebla"):
         assert f'"{pole}"' in zrodlo, (
             f"`{pole}` nie przechodzi przez `_dopisz_nowe` — charakterystyka "
             "drabinki zginie przy zapisie do księgi"

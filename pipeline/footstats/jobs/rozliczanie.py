@@ -1299,6 +1299,17 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
                     # `_charakter_drabinki` w cyklu
                     "kurs_superbet", "kurs_betclic", "rozjazd_pp",
                     "lepsza_cena", "bukmacher_szczebla", "miejsce_karty",
+                    # ⚑ STEMPLE SITA (17–18.09) GINĘŁY TU DO 21.09: forma 5,
+                    # krótkie występy, wyjątek sita, siła, składniki pakietu
+                    # i powód szczebla powstawały w `_charakter_drabinki`
+                    # i wypadały na tej liście — w księdze `forma5_traf` był
+                    # pusty w 18 z 18 weekendowych kart. „Progi przeliczyć
+                    # z księgi" (sito v3) nie miało z czego. Od 21.09 idzie
+                    # też `sito_wersja` — Skuteczność rozlicza v4 vs v3.
+                    "forma5_traf", "forma5_z", "krotkie_wystepy5",
+                    "sito_wyjatek", "sito_wersja", "sila", "p_sila",
+                    "wartosc_pakietu", "ocena_modelu", "sila_skladniki",
+                    "powod_szczebla", "rozjazd_iloraz",
                 ) if b.get(_p) is not None
             },
             "opublikowano_ts": int(time.time()),
