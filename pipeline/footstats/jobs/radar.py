@@ -397,7 +397,21 @@ KARA_UDZIALU = 0.10             # udział startów < MIN_UDZIAL_SITA
 KARA_BRAK_FORMY = 0.10          # brak 5 ostatnich występów na linii
 PREMIA_RYWALA = 0.06            # rywal hojny (≥ MNOZNIK_RYWALA_WYJATKU) / skąpy
 MNOZNIK_RYWALA_SKAPEGO = 0.85
-PROG_POKRYCIA_SILY = 0.60       # poniżej 6/10 linia nie jest hero niezależnie od formy
+# ⚑ SITO v4 (2026-09-21, decyzja właściciela po backteście na księdze —
+# 13 006 par z historią sprzed meczu ze statshub, nota w pamięci projektu):
+#   * pokrycie 6/10 z formą 4–5/5, wpuszczone 18.09, trafiało 40,8% przy cenie
+#     51,6% (n=169, −10,8 pp); „to samo sito, ale ≥ 7/10” było lepsze przy
+#     każdym cięciu kursu (≥1,8: −2,3 → +0,2 pp; ≥2,0: +1,4 → +4,0). Próg wraca
+#     na 7/10, kosztem ~40% linii po sicie.
+#   * ostatni występ < 62 min: −8,7 pp (n=115); 2+ krótkie w ostatnich 5:
+#     −11,5 pp (n=43); JEDEN krótki: −4,5 pp vs −2,7 przy zerze — kara 0,25 za
+#     jeden krótki była za ostra. Średnia minut z 6 (dawna brama karty) przy
+#     medianie ≥ 62 nie różniła się od bazy (51,9% vs 56,3%, n=52) — jeden
+#     26-minutowy występ zabijał kartę Mandragory na 0,5 (7/9).
+#   Forma 5 zostaje z wagą 0,6 (decyzja właściciela), okno 10 zostaje.
+PROG_POKRYCIA_SILY = 0.70       # poniżej 7/10 linia nie jest hero niezależnie od formy
+MIN_KROTKICH_KARY = 2           # kara za krótkie występy dopiero od dwóch w ost. 5
+SITO_WERSJA = "v4-2026-09-21"   # stempel do księgi — Skuteczność liczy wersje osobno
 PROG_SILY_HERO = 0.70
 SKALA_SILY = 0.75               # siła → trafialność (dopasowanie z księgi)
 WAGA_NASTEPNIKA = 0.25
@@ -1082,6 +1096,16 @@ def krotkie_wystepy(tr, okno: int = OKNO_FORMY_SITA) -> int | None:
     return sum(1 for m in grane if m < MIN_MINUT_PELNEGO_WYSTEPU)
 
 
+def ostatni_wystep_min(tr) -> float | None:
+    """Minuty OSTATNIEGO rozegranego meczu (sito v4). None = brak historii."""
+    if tr is None:
+        return None
+    for m in (tr.minutes or []):
+        if m and float(m) > 0:
+            return float(m)
+    return None
+
+
 def udzial_startow(
     tr: statshub.StatshubTrend, okno: int = OKNO_STARTOW,
     kalendarz: dict[int, list[int]] | None = None, teraz: int | None = None,
@@ -1429,6 +1453,8 @@ def _rynki_wpisu(
     zrodla: dict[str, dict[str, str]] | None = None,
     wagi_modelu: dict | None = None,
     tabela_rywali: dict | None = None,
+    # imienny rentgen: {rynek: powód}, czemu rynek NIE dał drabinki
+    powody_rynkow: dict | None = None,
 ) -> list[dict]:
     """Sekcja `rynki` wpisu: przycięta drabinka kursów + pokrycie linii
     w ostatnich występach + forma i PEŁNY kontekst meczu per rynek.
@@ -1448,15 +1474,21 @@ def _rynki_wpisu(
     out = []
     for mk, linie in drabinki.items():
         if not linie:
+            if powody_rynkow is not None:
+                powody_rynkow[mk] = "bez_linii_powyzej"
             continue  # rynek bez kursów „powyżej" = pusta drabinka, bez sensu
         tr = trendy_mk.get(mk)
         grane = _grane(tr) if tr is not None else []
         okno = grane[:OSTATNIE_N]
+        if powody_rynkow is not None and not grane:
+            powody_rynkow[mk] = "bez_historii_rynku"
         # RYNEK MUSI BYĆ JEGO RYNKIEM. Obrońca z jednym celnym strzałem głowy
         # na dziesięć meczów nie ma „rynku celnych głową" — ma przypadek.
         # Liczymy mecze z niezerowym wynikiem, nie sumę: 0,0,0,0,4 to jeden
         # mecz, w którym coś się wydarzyło, a nie seria.
         if okno and sum(1 for c, _m, _t in okno if c > 0) < MIN_NIEZEROWYCH_RYNKU:
+            if powody_rynkow is not None:
+                powody_rynkow[mk] = "za_malo_niezerowych"
             continue
         # --- KONTEKST MECZU dla tego rynku (mnożniki lambdy) ---
         posty = _posteriory(grane, teraz) if grane else None
@@ -1621,7 +1653,13 @@ def _rynki_wpisu(
         if diag is not None and przed_smieciami > 1 and len(drabinka) == 1:
             diag["nastepnik_trafiony_mniej_niz_dwa_razy"] += 1
         if not drabinka:
+            if powody_rynkow is not None:
+                powody_rynkow[mk] = (
+                    "bez_pokrycia_szczebli" if przed_smieciami else
+                    "start_za_tani_lub_sufit")
             continue
+        if powody_rynkow is not None:
+            powody_rynkow.pop(mk, None)     # rynek dał drabinkę
         za_drobne = None
         if len(drabinka) >= 2:
             _ost = float(drabinka[-1]["linia"])
@@ -1790,10 +1828,26 @@ def _oceń_karte(
     pomiarowego. Bez niego pusty pomiar wygląda identycznie jak brak takich
     szczebli w ofercie, a to dwie zupełnie różne sytuacje.
     """
-    if (w.get("minuty_sr6") or 0) < MIN_MINUT_KARTY:
-        if powody is not None:
-            powody["za_malo_minut"] += 1
-        return 0.0, None
+    # BRAMA MINUT (sito v4, nota przy PROG_POKRYCIA_SILY): rotację zdradza
+    # OSTATNI występ i liczba krótkich w ostatnich 5, nie średnia z 6 — jeden
+    # krótki mecz w środku serii nie robi z zawodnika zmiennika. Ogłoszona XI
+    # przebija oba sygnały (jak w `sila_linii`). Karta bez pola `ostatni_
+    # wystep_min` (starsza ścieżka) zostaje przy dawnej bramie średniej.
+    if w.get("xi") is not True:
+        _ost = w.get("ostatni_wystep_min")
+        if _ost is not None:
+            if float(_ost) < MIN_MINUT_KARTY:
+                if powody is not None:
+                    powody["ostatni_wystep_krotki"] += 1
+                return 0.0, None
+        elif (w.get("minuty_sr6") or 0) < MIN_MINUT_KARTY:
+            if powody is not None:
+                powody["za_malo_minut"] += 1
+            return 0.0, None
+        if (w.get("krotkie_wystepy5") or 0) >= MIN_KROTKICH_KARY:
+            if powody is not None:
+                powody["rotacja_krotkie_wystepy"] += 1
+            return 0.0, None
     # czy on w ogóle regularnie WYCHODZI w pierwszym składzie: średnia minut
     # potrafi wyglądać dobrze u kogoś, kto raz zagrał 90 minut, a poza tym
     # siedzi. Cała analiza karty stoi na minutach, których rezerwowy nie dostanie.
@@ -2118,6 +2172,7 @@ def _oceń_karte(
             sito = sito_powod is None
             _f5 = s.get("pokrycie5") or {}
             trafiony["sito"] = sito
+            trafiony["sito_wersja"] = SITO_WERSJA
             # forma obu szczebli — do księgi (build_wc_fast `_charakter_drabinki`)
             trafiony["traf5"] = _f5.get("traf")
             trafiony["z5"] = _f5.get("z")
@@ -2467,7 +2522,7 @@ def sila_linii(
     if not xi:
         if krotkie is None:
             kary["brak_minut"] = KARA_BRAK_MINUT
-        elif krotkie > 0:
+        elif krotkie >= MIN_KROTKICH_KARY:
             kary["krotkie_wystepy"] = KARA_KROTKICH_WYSTEPOW
         if udzial is not None and udzial < MIN_UDZIAL_SITA:
             kary["udzial"] = KARA_UDZIALU
@@ -2478,7 +2533,7 @@ def sila_linii(
     sila = round(baza - sum(kary.values()) + premia, 3)
     powod = None
     if pok < PROG_POKRYCIA_SILY:
-        powod = "sito_pokrycie_ponizej_6_z_10"
+        powod = "sito_pokrycie_ponizej_7_z_10"
     elif sila < PROG_SILY_HERO:
         nazwy = {"krotkie_wystepy": "sito_krotki_wystep_w_ostatnich_5",
                  "brak_minut": "sito_bez_minut_ostatnich_meczow",
@@ -2488,7 +2543,7 @@ def sila_linii(
                       if sila + v >= PROG_SILY_HERO), "sito_sila_ponizej_progu")
     wyjatki: list[str] = []
     if powod is None:
-        if xi and (krotkie is None or krotkie > 0
+        if xi and (krotkie is None or krotkie >= MIN_KROTKICH_KARY
                    or (udzial is not None and udzial < MIN_UDZIAL_SITA)):
             wyjatki.append("xi")
         if premia > 0 and sila - premia < PROG_SILY_HERO:
@@ -3029,9 +3084,11 @@ def zbuduj(
                 (meta.get("aid") if is_home else meta.get("hid"))
                 if is_home is not None else (tr_ref.opponent_id or None)
             )
+            _powody_rynkow: dict = {}
             rynki = _rynki_wpisu(
                 drabinki, trendy_mk, p_model_idx,
                 tr_ref.player_name, nazwy_pl,
+                powody_rynkow=_powody_rynkow,
                 sedzia=(sedzia_by_mid or {}).get(mid),
                 tempo=_tempo(mid),
                 is_home=is_home,
@@ -3055,7 +3112,8 @@ def zbuduj(
                 lejek["8_odpadly_puste_drabinki"] += 1
                 _ri(mid, pid, "puste_drabinki", podmiot=tr_ref.player_name,
                     druzyna=tr_ref.team_name,
-                    rynki_oferty=sorted(drabinki or {}))
+                    rynki_oferty=sorted(drabinki or {}),
+                    rynki=_powody_rynkow or None)
                 continue  # same puste drabinki (kursy-szum) = nie ma karty
             # unia występów: trendy tej karty + unia z cyklu (dociągnięta
             # z performance dla podejrzanych — patrz dociagnij_pelne_wystepy)
@@ -3069,6 +3127,7 @@ def zbuduj(
                 # występów jak udział startów
                 "krotkie_wystepy5": krotkie_wystepy(
                     _unia),
+                "ostatni_wystep_min": ostatni_wystep_min(_unia),
                 # ile z ostatnich meczów zaczynał w pierwszym składzie —
                 # brama karty i konkret na karcie („gra od pierwszej minuty
                 # w 9 z 10 ostatnich"), zamiast samej średniej minut
@@ -3222,6 +3281,11 @@ def zbuduj(
                 "krotkie_wystepy5": (
                     krotkie_wystepy(max(trendy_perf.values(),
                                         key=lambda t: len(t.counts)))
+                    if trendy_perf else None
+                ),
+                "ostatni_wystep_min": (
+                    ostatni_wystep_min(max(trendy_perf.values(),
+                                           key=lambda t: len(t.counts)))
                     if trendy_perf else None
                 ),
                 "udzial_startow": (

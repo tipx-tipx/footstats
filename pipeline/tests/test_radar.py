@@ -787,14 +787,14 @@ def test_szczebel_nad_progiem_zostaje_typem_a_nie_pomiarem():
     _score, hero = radar._oceń_karte(_karta_do_oceny(7), pomiar_out=pomiar)
     assert hero is not None and hero["traf"] == 7
     assert pomiar == []
-    # 6/10 z formą 5/5 (fikstura) to siła 0,84 — od 18.09 przechodzi
-    # (w księdze 6/10 & 4–5/5 trafia jak 7/10 & 4/5); 5/10 nie jest hero
-    # niezależnie od formy (PROG_POKRYCIA_SILY)
+    # 6/10 z formą 5/5 (fikstura) to siła 0,84, ale od sita v4 (21.09) NIE
+    # jest hero: backtest na księdze — 6/10 & 4–5/5 trafiało 40,8% przy cenie
+    # 51,6% (n=169). Poniżej 7/10 nie ma hero niezależnie od formy.
     _score, hero6 = radar._oceń_karte(_karta_do_oceny(6))
-    assert hero6 is not None and hero6["sito"] is True
+    assert hero6 is None
     assert radar._oceń_karte(_karta_do_oceny(5))[1] is None
-    assert radar.sila_linii({"traf": 5, "z": 10}, {"traf": 5, "z": 5}, 0, 0.9,
-                            False)["powod"] == "sito_pokrycie_ponizej_6_z_10"
+    assert radar.sila_linii({"traf": 6, "z": 10}, {"traf": 5, "z": 5}, 0, 0.9,
+                            False)["powod"] == "sito_pokrycie_ponizej_7_z_10"
 
 
 def test_pomiar_odrzuca_szczebel_ponizej_ceny_fair():
@@ -1008,10 +1008,12 @@ def test_sila_linii_pokrycie_i_forma_razem():
                                 kw.pop("krotkie", 0), kw.pop("udzial", 0.9),
                                 kw.pop("xi", False), kw.pop("rywal", 1.0))
     assert sl(7, 4)["powod"] is None and sl(7, 4)["sila"] == 0.76
-    assert sl(6, 4)["powod"] is None and sl(6, 4)["sila"] == 0.72
+    # sito v4 (21.09): 6/10 nie jest hero niezależnie od formy (backtest:
+    # 6/10 & 4–5/5 = 40,8% przy cenie 51,6%, n=169)
+    assert sl(6, 4)["powod"] == "sito_pokrycie_ponizej_7_z_10" and sl(6, 4)["sila"] == 0.72
     assert sl(7, 3)["powod"] == "sito_sila_ponizej_progu"
-    assert sl(6, 3)["powod"] == "sito_sila_ponizej_progu"
-    assert sl(5, 5)["powod"] == "sito_pokrycie_ponizej_6_z_10"
+    assert sl(6, 3)["powod"] == "sito_pokrycie_ponizej_7_z_10"
+    assert sl(5, 5)["powod"] == "sito_pokrycie_ponizej_7_z_10"
     assert sl(9, 3)["powod"] is None                      # 0,72
     # brak 5 ostatnich = kara, nie ściana
     assert radar.sila_linii({"traf": 8, "z": 10}, None, 0, 0.9, False)["sila"] == 0.7
@@ -1038,14 +1040,19 @@ def test_hojny_rywal_dopycha_linie_i_zostawia_stempel():
 
 
 def test_krotki_wystep_w_ostatnich_5_to_kara_ktora_zdejmuje_slabsze_linie():
-    """Występ <60 min w ost. 5 → 38% vs 52% (pomiar 17.09): kara 0,25 zdejmuje
-    7/10 & 4/5 (0,51) i 8/10 & 5/5 (0,67); 10/10 & 5/5 (0,75) zostaje.
-    Ogłoszony/przewidywany skład zdejmuje karę i zostawia stempel."""
+    """DWA występy <60 min w ost. 5 (sito v4, 21.09: 2+ krótkie −11,5 pp,
+    jeden krótki jak baza) → kara 0,25 zdejmuje 7/10 & 4/5 (0,51) i 8/10 & 5/5
+    (0,67); 10/10 & 5/5 (0,75) zostaje. Ogłoszony/przewidywany skład zdejmuje
+    karę i zostawia stempel."""
     powody = Counter()
-    score, hero = radar._oceń_karte(_karta_sitowa(krotkie=1), powody=powody)
+    score, hero = radar._oceń_karte(_karta_sitowa(krotkie=2), powody=powody)
     assert hero is None and score == 0.0
-    assert powody["sito_krotki_wystep_w_ostatnich_5"] == 1
-    _s, hero = radar._oceń_karte(_karta_sitowa(krotkie=1, xi=True))
+    # na KARCIE 2+ krótkie zdejmuje brama minut (sito v4) jeszcze przed sitem
+    # linii; kara w `sila_linii` zostaje dla wznowionych kart i listy dnia
+    assert powody["rotacja_krotkie_wystepy"] == 1
+    assert radar.sila_linii({"traf": 7, "z": 10}, {"traf": 4, "z": 5}, 2, 0.9,
+                            False)["powod"] == "sito_krotki_wystep_w_ostatnich_5"
+    _s, hero = radar._oceń_karte(_karta_sitowa(krotkie=2, xi=True))
     assert hero is not None and hero["linia"] == 2.5     # najwyższa mocna
     assert hero["sito_wyjatek"] == "xi"
     # nieznane minuty to mniejsza kara (0,10): 8/10 & 5/5 przechodzi, 7/10 & 4/5 nie

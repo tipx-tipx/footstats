@@ -322,15 +322,17 @@ def _gotowa_sito(traf=7, ostatnie=None, minuty=None, xi=None, udzial=0.9,
 
 def test_gotowa_karta_przez_sito_z_zapisanych_wystepow():
     assert R.karta_przez_sito(_gotowa_sito()) is True
-    # 6/10 z formą 4/5 → TAK (sito v3: siła 0,72); 5/10 → nie;
-    # forma 2/5 (ost. 5: 2,3,0,0,2) → nie
-    assert R.karta_przez_sito(_gotowa_sito(traf=6)) is True
+    # 6/10 z formą 4/5 → NIE (sito v4, 21.09: poniżej 7/10 nie ma hero);
+    # 5/10 → nie; forma 2/5 (ost. 5: 2,3,0,0,2) → nie
+    assert R.karta_przez_sito(_gotowa_sito(traf=6)) is False
     assert R.karta_przez_sito(_gotowa_sito(traf=5)) is False
     assert R.karta_przez_sito(
         _gotowa_sito(ostatnie=[2, 3, 0, 0, 2, 2, 3, 3, 2, 2])) is False
-    # krótki występ w ostatnich 5 → nie, chyba że XI
-    assert R.karta_przez_sito(_gotowa_sito(minuty=[90, 45, 90, 90, 90] + [90] * 5)) is False
-    assert R.karta_przez_sito(_gotowa_sito(minuty=[90, 45, 90, 90, 90] + [90] * 5, xi=True)) is True
+    # JEDEN krótki występ w ostatnich 5 → od sita v4 przechodzi (−4,5 pp vs
+    # −2,7 przy zerze — nie różni się od bazy); DWA → nie, chyba że XI
+    assert R.karta_przez_sito(_gotowa_sito(minuty=[90, 45, 90, 90, 90] + [90] * 5)) is True
+    assert R.karta_przez_sito(_gotowa_sito(minuty=[90, 45, 90, 30, 90] + [90] * 5)) is False
+    assert R.karta_przez_sito(_gotowa_sito(minuty=[90, 45, 90, 30, 90] + [90] * 5, xi=True)) is True
     # rzadko w XI → nie, chyba że XI
     assert R.karta_przez_sito(_gotowa_sito(udzial=0.5)) is False
     assert R.karta_przez_sito(_gotowa_sito(udzial=0.5, xi=True)) is True
@@ -345,7 +347,8 @@ def test_gotowa_karta_z_nowymi_polami_i_bez_danych():
     # karta po 17.09 niesie pokrycie5/krotkie_wystepy5 — mają pierwszeństwo
     assert R.karta_przez_sito(_gotowa_sito(
         ostatnie=[0] * 10, pokrycie5={"traf": 5, "z": 5}, krotkie=0)) is True
-    assert R.karta_przez_sito(_gotowa_sito(krotkie=1)) is False
+    assert R.karta_przez_sito(_gotowa_sito(krotkie=1)) is True     # sito v4: kara od 2
+    assert R.karta_przez_sito(_gotowa_sito(krotkie=2)) is False
     # bez zapisanych występów i minut nie ma z czego ocenić — to NIE odmowa
     assert R.karta_przez_sito(_gotowa_sito(ostatnie=[])) is None
     assert R.karta_przez_sito(_gotowa_sito(minuty=[])) is None

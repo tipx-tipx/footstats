@@ -248,10 +248,13 @@ def test_sila_linii_z_trendu_jak_na_szczeblu_drabinki():
     t = tr([2, 3, 1, 2, 2, 3, 2, 2, 1, 1, 5], [90] * 11)
     sl = radar.sila_linii_z_trendu(t, 1.5)
     assert sl["powod"] is None and sl["sila"] == 0.76
-    # występ 45 min w ostatnich 5 = kara 0,25, chyba że potwierdzony skład
-    t2 = tr([2, 3, 1, 2, 2, 3, 0, 2, 1, 1], [90, 90, 45, 90, 90, 90, 90, 90, 90, 90])
-    assert radar.sila_linii_z_trendu(t2, 1.5)["powod"] is not None
-    assert radar.sila_linii_z_trendu(t2, 1.5, xi=True)["powod"] is None
+    # sito v4 (21.09): JEDEN występ 45 min w ostatnich 5 nie karze;
+    # DWA = kara 0,25, chyba że potwierdzony skład (7/10, forma 4/5)
+    t2 = tr([2, 3, 1, 2, 2, 3, 2, 2, 1, 1], [90, 90, 45, 90, 90, 90, 90, 90, 90, 90])
+    assert radar.sila_linii_z_trendu(t2, 1.5)["powod"] is None
+    t3 = tr([2, 3, 1, 2, 2, 3, 2, 2, 1, 1], [90, 40, 45, 90, 90, 90, 90, 90, 90, 90])
+    assert radar.sila_linii_z_trendu(t3, 1.5)["powod"] is not None
+    assert radar.sila_linii_z_trendu(t3, 1.5, xi=True)["powod"] is None
     # za krótka próba
     assert radar.sila_linii_z_trendu(tr([2, 2, 2], [90] * 3), 1.5) is None
 

@@ -2618,6 +2618,9 @@ def dolacz_pelne_kadry(
         # bukmacherów to JEDEN wyceniony (18.09: suma dawała 1566 zamiast ~połowy)
         wyceniani = len(set(sbp) | set(bcp))
         znalezieni = 0
+        # klucze oferty, które sparowały się z KIMŚ z kadry — reszta to
+        # „wyceniani bez kadry” z nazwiska, nie z odejmowania (rentgen 21.09)
+        sparowane: set = set()
         for tid, opp, dom in ((e.get("homeTeamId"), e.get("awayTeamId"), True),
                               (e.get("awayTeamId"), e.get("homeTeamId"), False)):
             rt_druzyny = pelne.get(int(tid or 0))
@@ -2629,11 +2632,15 @@ def dolacz_pelne_kadry(
                 break
             for pid, rt in rt_druzyny.items():
                 nazwa = next(iter(rt.values())).player_name
-                wycena = _scal_oferty_zawodnika(
-                    superbet.znajdz_zawodnika(sbp, nazwa) if sbp else {},
-                    betclic.znajdz_zawodnika(bcp, nazwa) if bcp else {})
+                _w_sb = superbet.znajdz_zawodnika(sbp, nazwa) if sbp else {}
+                _w_bc = betclic.znajdz_zawodnika(bcp, nazwa) if bcp else {}
+                wycena = _scal_oferty_zawodnika(_w_sb, _w_bc)
                 if wycena:
                     znalezieni += 1
+                    for _cennik, _rek in ((sbp, _w_sb), (bcp, _w_bc)):
+                        if _rek:
+                            sparowane.update(
+                                k for k, v in _cennik.items() if v is _rek)
                 for mk, pelny in rt.items():
                     stary = idx.get((e["id"], pid, mk))
                     if stary is not None:
@@ -2662,6 +2669,21 @@ def dolacz_pelne_kadry(
         # wyceniony przez bukmachera, a w kadrach obu drużyn go nie ma
         # (nazwisko nie do sparowania albo transfer) — licznik, nie cisza
         licz["wyceniani_bez_kadry"] += max(0, wyceniani - znalezieni)
+        # ...i Z NAZWISKA do rentgenu (21.09): sobota 2585, niedziela 1338
+        # takich par na cykl, a licznik nie mówił, czy to parowanie, kadra
+        # bez danych, czy transfer. Próbka + per mecz, do `meta.rentgen`.
+        _bez = sorted((set(sbp) | set(bcp)) - sparowane)
+        if _bez:
+            _et = f"{e.get('homeTeamId')}-{e.get('awayTeamId')}"
+            licz.setdefault("bez_kadry_mecze", {})[_et] = len(_bez)
+            _probka = licz.setdefault("bez_kadry_probka", [])
+            for _k in _bez[:6]:
+                if len(_probka) < 80:
+                    _probka.append(f"{_et}: {_k}")
+            if not pelne.get(int(e.get("homeTeamId") or 0)) \
+                    or not pelne.get(int(e.get("awayTeamId") or 0)):
+                licz["bez_kadry_przez_brak_druzyny"] = \
+                    licz.get("bez_kadry_przez_brak_druzyny", 0) + len(_bez)
     licz["zawodnikow"] = len(gracze)
     licz["sekundy"] = round(_t.monotonic() - t0)
     return licz
@@ -9941,6 +9963,9 @@ def _main_impl(tryb=None):
                 out[klucz] = int(h[pole])
         if h.get("sito_wyjatek"):
             out["sito_wyjatek"] = h["sito_wyjatek"]
+        # WERSJA SITA (v4, 2026-09-21) — księga rozlicza każdą wersję osobno
+        if h.get("sito_wersja"):
+            out["sito_wersja"] = h["sito_wersja"]
         if w.get("krotkie_wystepy5") is not None:
             out["krotkie_wystepy5"] = int(w["krotkie_wystepy5"])
         # SKŁADNIKI PAKIETU (2026-09-18, sito v3 — radar.WAGA_POKRYCIA_SILY):
