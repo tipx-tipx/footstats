@@ -287,9 +287,27 @@ function WierszTypu({
   // kilku – czy weszła WIĘKSZOŚĆ, bo to jedno zdarzenie meczu widziane
   // z kilku wysokości. Kropka ma powiedzieć „ten pomysł się sprawdził albo
   // nie", a rozbicie stoi obok w kolumnie wyniku („5 z 8 weszło").
-  const wygral = wiele ? weszly * 2 > rozstrzygniete : t.wynik === "wygrany";
+  // ⚑ DRABINKA: ROZSTRZYGA PIERWSZY SZCZEBEL (decyzja właściciela 2026-09-21).
+  // „Jak 1. szczebel wejdzie, to jest zaliczone; celujemy w 2 i 3, ale karta
+  // z 1 z 3 świeciła na czerwono" — reguła większości pasuje do zakładu
+  // drużynowego z kilkoma poprzeczkami, nie do drabinki, gdzie 2. i 3.
+  // szczebel to cel polowania, a nie warunek. Wyższe szczeble nie mogą wejść
+  // bez pierwszego (ta sama liczba z meczu), więc „pierwszy przegrał" =
+  // „nic nie weszło" = czerwony. Skuteczność liczy tak od 17.09; tu
+  // dorównuje kolor.
+  const drabinka = linie.some((l) => (l.szczebel ?? 0) >= 2);
+  const pierwszy = drabinka
+    ? (linie.find((l) => (l.szczebel ?? 1) === 1) ?? linie[0])
+    : null;
+  const wygral = wiele
+    ? drabinka
+      ? pierwszy!.wynik === "wygrany"
+      : weszly * 2 > rozstrzygniete
+    : t.wynik === "wygrany";
   const przegral = wiele
-    ? weszly * 2 < rozstrzygniete
+    ? drabinka
+      ? pierwszy!.wynik === "przegrany"
+      : weszly * 2 < rozstrzygniete
     : t.wynik === "przegrany";
   // KOLOR MÓWI „CZY TO WIDZIAŁEŚ", nie „czy weszło" – od tego jest kolumna
   // wyniku. Poziom 2 (był na stronie, ale na innej zakładce) blednie, poziom 3
