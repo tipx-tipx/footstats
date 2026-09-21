@@ -115,3 +115,55 @@ def test_rozliczanie_liczy_pomiar_rynku_w_osobnej_grupie():
     assert out["rynek_bez_karty"]["n"] == 2 and out["rynek_bez_karty"]["hit"] == 0.5
     assert out["pod_progiem"]["n"] == 1
     assert out["opublikowane"]["n"] == 1
+
+
+# --- pomiar 6/10 w tle (sito v4, 21.09) ------------------------------------
+
+def _karta_6_z_10(traf=6, forma5=5, kurs=2.40):
+    """Kształt Gintera: 6/10, forma 5/5, cena grywalna, realny drugi szczebel."""
+    from tests.test_radar import _karta_do_oceny
+    w = _karta_do_oceny(traf, kurs=kurs)
+    w["rynki"][0]["drabinka"][0]["pokrycie5"] = {"traf": forma5, "z": 5}
+    return w
+
+
+def test_stempel_pokrycia6_zgodny():
+    assert radar.POWOD_POMIARU_POKRYCIA6 == rozliczanie.POWOD_POMIARU_POKRYCIA6
+    assert radar.PROG_POKRYCIA_POMIARU < radar.PROG_POKRYCIA_SILY
+
+
+def test_6_z_10_po_sicie_v3_idzie_do_pomiaru_nie_na_karte():
+    pomiar: list = []
+    score, hero = radar._oceń_karte(_karta_6_z_10(), pomiar_out=pomiar)
+    assert hero is None and score == 0.0
+    assert [p.get("powod_pomiaru") for p in pomiar] == [radar.POWOD_POMIARU_POKRYCIA6]
+    assert pomiar[0]["traf"] == 6 and pomiar[0]["sila"] >= 0.70
+
+
+def test_6_z_10_ze_slaba_forma_nie_idzie_do_pomiaru():
+    """Siła 0,4·0,6 + 0,6·0,4 = 0,48 — nie przeszłaby sita v3, więc nie mierzy
+    niczego o progu."""
+    pomiar: list = []
+    radar._oceń_karte(_karta_6_z_10(forma5=2), pomiar_out=pomiar)
+    assert pomiar == []
+
+
+def test_5_z_10_nie_idzie_do_pomiaru_6():
+    pomiar: list = []
+    radar._oceń_karte(_karta_6_z_10(traf=5), pomiar_out=pomiar)
+    assert [p.get("powod_pomiaru") for p in pomiar if p.get("powod_pomiaru")] == []
+
+
+def test_7_z_10_dalej_jest_karta_a_nie_pomiarem():
+    pomiar: list = []
+    _score, hero = radar._oceń_karte(_karta_6_z_10(traf=7), pomiar_out=pomiar)
+    assert hero is not None and hero["sito"] is True
+    assert pomiar == []
+
+
+def test_rozliczanie_liczy_pomiar_6_z_10_w_osobnej_grupie():
+    rec = {"zrodlo": rozliczanie.ZRODLO_DRABINKA, "wynik": "wygrany", "kurs": 2.0,
+           "p_model": 0.55, "odrzucony": True,
+           "odrzucenie_powod": rozliczanie.POWOD_POMIARU_POKRYCIA6}
+    out = rozliczanie.pomiar_progu_drabinek({"a": rec})
+    assert out["pokrycie_6_z_10"]["n"] == 1 and out["pod_progiem"]["n"] == 0

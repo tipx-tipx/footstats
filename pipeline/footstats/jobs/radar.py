@@ -412,6 +412,13 @@ MNOZNIK_RYWALA_SKAPEGO = 0.85
 PROG_POKRYCIA_SILY = 0.70       # poniżej 7/10 linia nie jest hero niezależnie od formy
 MIN_KROTKICH_KARY = 2           # kara za krótkie występy dopiero od dwóch w ost. 5
 SITO_WERSJA = "v4-2026-09-21"   # stempel do księgi — Skuteczność liczy wersje osobno
+# ⚑ POMIAR 6/10 W TLE (właściciel 21.09: „7/10 wytnie Gintera” — 6/10, 3/3
+# weszło). Linia 6/10 z siłą ≥ 0,70 (forma 4–5/5), która przeszłaby całe sito
+# v3 (cena, następnik, weto modelu), NIE idzie na kartę, ale rozlicza się
+# w tle z własnym stemplem — jak faule popełnione. Gdy po 3–4 tygodniach
+# trafia tyle, co cena, PROG_POKRYCIA_SILY wraca na 0,60 jedną stałą.
+PROG_POKRYCIA_POMIARU = 0.60
+POWOD_POMIARU_POKRYCIA6 = "pokrycie_6_z_10"
 PROG_SILY_HERO = 0.70
 SKALA_SILY = 0.75               # siła → trafialność (dopasowanie z księgi)
 WAGA_NASTEPNIKA = 0.25
@@ -1869,6 +1876,8 @@ def _oceń_karte(
     pomiar_score, pomiar_s = float("-inf"), None
     # najlepsza linia rynku bez karty, która przeszła sito — do pomiaru
     pomiar_rynku_score, pomiar_rynku_s = float("-inf"), None
+    # najlepsza linia 6/10, która przeszłaby sito v3 — do pomiaru (v4)
+    pomiar6_score, pomiar6_s = float("-inf"), None
     lokalne: Counter = Counter()
     for r in w.get("rynki", []):
         szczeble = r.get("drabinka", [])
@@ -2170,6 +2179,12 @@ def _oceń_karte(
                     if nast is not None and pok_nast.get("z") else None)
             sito_powod = "pomiarowy" if pomiarowy else (_sl or {}).get("powod")
             sito = sito_powod is None
+            # sito v3 (próg 6/10) — wyłącznie do POMIARU, nie do karty
+            sito_v3 = sito or (
+                not pomiarowy and _sl is not None
+                and _sl["powod"] == "sito_pokrycie_ponizej_7_z_10"
+                and _sl["pokrycie"] >= PROG_POKRYCIA_POMIARU
+                and _sl["sila"] >= PROG_SILY_HERO)
             _f5 = s.get("pokrycie5") or {}
             trafiony["sito"] = sito
             trafiony["sito_wersja"] = SITO_WERSJA
@@ -2198,9 +2213,11 @@ def _oceń_karte(
                 trafiony["sito_wyjatek"] = ",".join(_sl["wyjatki"]) or None
             elif not pomiarowy:
                 lokalne[sito_powod] += 1
-            # CENA I WETO (nota przy MIN_KURS_HERO) — tylko dla linii mocnych
-            hero_ok = sito
-            if sito:
+            # CENA I WETO (nota przy MIN_KURS_HERO) — tylko dla linii mocnych;
+            # liczone też dla linii 6/10 (sito v3), żeby pomiar mierzył
+            # dokładnie to, co poszłoby na kartę po cofnięciu progu
+            hero_ok = sito_v3
+            if sito_v3:
                 _f5n = (nast or {}).get("pokrycie5") or {}
                 _nast_realny = (
                     nast is not None and pok_nast.get("z")
@@ -2208,15 +2225,19 @@ def _oceń_karte(
                     and (_f5n.get("traf") or 0) >= MIN_FORMA_NASTEPNIKA_TANIEGO)
                 if s["kurs"] < MIN_KURS_HERO and not _nast_realny:
                     hero_ok = False
-                    lokalne["sito_tania_bez_realnego_drugiego"] += 1
+                    if sito:
+                        lokalne["sito_tania_bez_realnego_drugiego"] += 1
                 elif p_final is not None and p_final < 1.0 / s["kurs"] - WETO_MODELU_PP:
                     hero_ok = False
-                    lokalne["sito_weto_modelu"] += 1
+                    if sito:
+                        lokalne["sito_weto_modelu"] += 1
                 else:
                     trafiony["powod_szczebla"] = (
                         "perla" if s["kurs"] >= PROG_PERLY
                         else "najwyzsza_mocna" if s["kurs"] >= MIN_KURS_HERO
                         else "tania_z_drugim")
+            hero_ok_v3 = hero_ok
+            hero_ok = hero_ok and sito
             trafiony["hero_ok"] = hero_ok
             klucz = (1 if hero_ok else 0,
                      float(s["kurs"]) if hero_ok else 0.0,
@@ -2231,6 +2252,13 @@ def _oceń_karte(
                     pomiar_rynku_score = ocena
                     pomiar_rynku_s = {**trafiony,
                                       "powod_pomiaru": POWOD_POMIARU_RYNKU}
+            elif not sito and hero_ok_v3:
+                # 6/10 z siłą ≥ 0,70 po całym sicie v3 — pomiar w tle
+                # (nota przy PROG_POKRYCIA_POMIARU)
+                if ocena > pomiar6_score:
+                    pomiar6_score = ocena
+                    pomiar6_s = {**trafiony,
+                                 "powod_pomiaru": POWOD_POMIARU_POKRYCIA6}
             elif best_s is None or klucz > best_klucz:
                 best_klucz, best_s = klucz, trafiony
                 # RANKING KART po wartości pakietu (właściciel 17.09: model
@@ -2242,6 +2270,8 @@ def _oceń_karte(
         pomiar_out.append(pomiar_s)
     if pomiar_out is not None and pomiar_rynku_s is not None:
         pomiar_out.append(pomiar_rynku_s)
+    if pomiar_out is not None and pomiar6_s is not None:
+        pomiar_out.append(pomiar6_s)
     if best_s is not None and not best_s.get("hero_ok"):
         # KARTA BEZ LINII SITOWEJ NIE POWSTAJE (2026-09-17). Powód = najczęstsza
         # brama sita wśród jej linii — licznik w rentgenie, nie cisza
