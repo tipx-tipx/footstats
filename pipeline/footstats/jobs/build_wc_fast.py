@@ -10142,7 +10142,10 @@ def _main_impl(tryb=None):
             "zrodlo": rozliczanie.ZRODLO_DRABINKA,
             "edge": p.get("edge"),
             "odrzucony": True,
-            "odrzucenie_powod": rozliczanie.POWOD_POMIARU_POKRYCIA,
+            # pomiar progu pokrycia albo pomiar rynku bez karty (faule
+            # popełnione, 21.09) — rozliczanie liczy je w OSOBNYCH grupach
+            "odrzucenie_powod": (p.get("powod_pomiaru")
+                                 or rozliczanie.POWOD_POMIARU_POKRYCIA),
         })
 
     # ile z opublikowanych kart oddało swój drugi szczebel do pomiaru. Karta

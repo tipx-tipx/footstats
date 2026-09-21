@@ -523,6 +523,19 @@ BRAMA_PRZEWAGI = False
 # Osiemnaście kart na faulach, JEDNA trafiona. Ten rynek nie jest słaby przy
 # wysokich kursach — jest słaby zawsze, więc nie daje kart w ogóle.
 RYNKI_BEZ_KARTY = frozenset({"fouls_committed"})
+# ⚑ POMIAR RYNKU BEZ KARTY (2026-09-21, decyzja właściciela: „faule popełnione
+# z powrotem, ale upewnij się"). Backtest na księdze (45 dni, historia sprzed
+# meczu ze statshub performance, 13 006 par): faule popełnione po dzisiejszym
+# sicie (siła ≥ 0,70) przy kursie ≥ 1,7 trafiają 36,8% przy cenie 52,7%
+# (n=38, ROI −28,6%), gdy strzały 46,3% przy 48,1%, faule wywalczone 45,2%
+# przy 49,5%. Linia 1,5 z pokryciem 8+/10: 41,7% przy 61,8% (n=12). Ten sam
+# obraz co 08.08 (18 kart, 1 trafiona). Backtest nie ma sędziego, XI ani
+# rywala — radar ma. Dlatego rynek NIE wraca na kartę, tylko do POMIARU:
+# linia fauli, która przeszła WSZYSTKIE bramy karty (sito, minuty, XI,
+# następnik), rozlicza się w tle z własnym stemplem
+# (`rozliczanie.pomiar_progu_drabinek` → „rynek_bez_karty"). Gdy po kilku
+# tygodniach trafia co najmniej tyle, co cena, ban zdejmuje jedna stała.
+POWOD_POMIARU_RYNKU = "rynek_bez_karty"
 # Powyżej tej ceny karta musi mieć mocną serię NA TEJ LINII (decyzja usera:
 # „wpuszczaj, ale tylko z mocnym pokryciem"). Bez tego 2,50+ to −35,7% nawet
 # po odsianiu fauli, a z nim zostają te karty, które user pokazuje jako
@@ -1800,6 +1813,8 @@ def _oceń_karte(
     best_score, best_s = float("-inf"), None
     best_klucz: tuple = (-1, 0.0, float("-inf"))
     pomiar_score, pomiar_s = float("-inf"), None
+    # najlepsza linia rynku bez karty, która przeszła sito — do pomiaru
+    pomiar_rynku_score, pomiar_rynku_s = float("-inf"), None
     lokalne: Counter = Counter()
     for r in w.get("rynki", []):
         szczeble = r.get("drabinka", [])
@@ -1829,9 +1844,14 @@ def _oceń_karte(
                 continue
             # rynek, który nie daje kart w ogóle (patrz RYNKI_BEZ_KARTY) —
             # osobny licznik, bo to decyzja o RYNKU, nie o tej konkretnej linii
-            if r.get("rynek_kod") in RYNKI_BEZ_KARTY:
+            bez_karty = r.get("rynek_kod") in RYNKI_BEZ_KARTY
+            if bez_karty:
                 lokalne["rynek_bez_karty"] += 1
-                continue
+                # bez kolektora pomiaru — jak dotąd; z kolektorem linia idzie
+                # przez WSZYSTKIE bramy jak zwykła (nie jak pomiarowa), ale
+                # nigdy nie zostaje hero (patrz POWOD_POMIARU_RYNKU)
+                if pomiar_out is None:
+                    continue
             # SZCZEBEL POMIAROWY: pokrycie pod progiem, ale w tolerancji.
             # Nie przerywamy od razu — przepuszczamy go przez WSZYSTKIE
             # pozostałe bramy, żeby zmierzyć wyłącznie efekt progu pokrycia,
@@ -2149,6 +2169,13 @@ def _oceń_karte(
             if pomiarowy:
                 if ocena > pomiar_score:
                     pomiar_score, pomiar_s = ocena, trafiony
+            elif bez_karty:
+                # tylko linia, która PRZESZŁA sito — mierzymy dokładnie to,
+                # co poszłoby na kartę po zdjęciu banu, nic słabszego
+                if hero_ok and ocena > pomiar_rynku_score:
+                    pomiar_rynku_score = ocena
+                    pomiar_rynku_s = {**trafiony,
+                                      "powod_pomiaru": POWOD_POMIARU_RYNKU}
             elif best_s is None or klucz > best_klucz:
                 best_klucz, best_s = klucz, trafiony
                 # RANKING KART po wartości pakietu (właściciel 17.09: model
@@ -2158,6 +2185,8 @@ def _oceń_karte(
                               else ocena)
     if pomiar_out is not None and pomiar_s is not None:
         pomiar_out.append(pomiar_s)
+    if pomiar_out is not None and pomiar_rynku_s is not None:
+        pomiar_out.append(pomiar_rynku_s)
     if best_s is not None and not best_s.get("hero_ok"):
         # KARTA BEZ LINII SITOWEJ NIE POWSTAJE (2026-09-17). Powód = najczęstsza
         # brama sita wśród jej linii — licznik w rentgenie, nie cisza
@@ -3296,14 +3325,18 @@ def zbuduj(
             krotkie5=w.get("krotkie_wystepy5"),
             rynki=radar_imienny.opis_rynkow(w.get("rynki")))
         if pom:
-            # jeden pomiar na zawodnika w meczu — najlepszy szczebel spod progu
-            pomiar_kandydaci.append({
-                "mecz_id": w["mecz_id"], "mecz": w["mecz"],
-                "kickoff_ts": w["kickoff_ts"],
-                "podmiot_id": w.get("podmiot_id") or 0,
-                "podmiot": w["podmiot"],
-                **max(pom, key=lambda s: s["edge"]),
-            })
+            # jeden pomiar na zawodnika w meczu I RODZAJ pomiaru: najlepszy
+            # szczebel spod progu pokrycia oraz — osobno — najlepsza linia
+            # rynku bez karty (POWOD_POMIARU_RYNKU); to dwa różne pytania
+            for _rodzaj in sorted({s.get("powod_pomiaru") or "" for s in pom}):
+                _grupa = [s for s in pom if (s.get("powod_pomiaru") or "") == _rodzaj]
+                pomiar_kandydaci.append({
+                    "mecz_id": w["mecz_id"], "mecz": w["mecz"],
+                    "kickoff_ts": w["kickoff_ts"],
+                    "podmiot_id": w.get("podmiot_id") or 0,
+                    "podmiot": w["podmiot"],
+                    **max(_grupa, key=lambda s: s["edge"]),
+                })
         if hero is None:
             continue
         w["_score"] = score
@@ -3314,7 +3347,13 @@ def zbuduj(
         # najbardziej wyglądają na karty, których nie wystawiliśmy
         pomiar_kandydaci.sort(key=lambda s: -s["edge"])
         if pomiar_out is not None:
-            pomiar_out.extend(pomiar_kandydaci[:MAX_POMIAROW_CYKLU])
+            # sufit OSOBNO na każdy rodzaj pomiaru — rynek bez karty nie ma
+            # prawa wypychać pomiaru progu pokrycia ani odwrotnie
+            for _rodzaj in sorted({s.get("powod_pomiaru") or "" for s in pomiar_kandydaci}):
+                pomiar_out.extend([
+                    s for s in pomiar_kandydaci
+                    if (s.get("powod_pomiaru") or "") == _rodzaj
+                ][:MAX_POMIAROW_CYKLU])
     diagnostyka.zapisz_rentgen("drabinki_przewaga", statystyki_przewagi)
     if statystyki_przewagi:
         # rozkład tego, co odpada na braku przewagi — materiał pod decyzję

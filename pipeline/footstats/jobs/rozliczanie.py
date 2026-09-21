@@ -5682,6 +5682,9 @@ def ostrzezenia_trendu(uczenie: dict[str, dict]) -> list[str]:
 # publikacją, poza Skutecznością i poza korektą strumienia. Ta funkcja
 # zestawia obie grupy — dopiero ona odpowiada, czy próg jest w dobrym miejscu.
 POWOD_POMIARU_POKRYCIA = "pokrycie_pod_progiem"
+# linia rynku bez karty (faule popełnione), która przeszła całe sito — mierzona
+# w tle od 21.09, zanim ban zejdzie (radar.POWOD_POMIARU_RYNKU, test zgodności)
+POWOD_POMIARU_RYNKU = "rynek_bez_karty"
 # DRUGI SZCZEBEL KARTY jako typ pomiarowy (2026-08-13) — patrz
 # `pomiar_szczebli_drabinek`. Ta sama mechanika co przy progu pokrycia:
 # rozlicza się w tle, poza Skutecznością i poza korektą strumienia.
@@ -5846,6 +5849,13 @@ def pomiar_progu_drabinek(log: dict) -> dict:
             r for r in dr
             if r.get("odrzucony")
             and r.get("odrzucenie_powod") == POWOD_POMIARU_POKRYCIA
+        ]),
+        # RYNEK BEZ KARTY (faule popełnione, 21.09): linie po pełnym sicie,
+        # rozliczane w tle. Gdy `hit` dogoni `sr_p` (cenę), ban schodzi.
+        "rynek_bez_karty": _stat_drabinek([
+            r for r in dr
+            if r.get("odrzucony")
+            and r.get("odrzucenie_powod") == POWOD_POMIARU_RYNKU
         ]),
     }
 
