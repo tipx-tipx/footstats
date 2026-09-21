@@ -3417,6 +3417,7 @@ def zbuduj(
             udzial_startow=w.get("udzial_startow"),
             xi=w.get("xi"),
             krotkie5=w.get("krotkie_wystepy5"),
+            ostatni_min=w.get("ostatni_wystep_min"),
             rynki=radar_imienny.opis_rynkow(w.get("rynki")))
         if pom:
             # jeden pomiar na zawodnika w meczu I RODZAJ pomiaru: najlepszy
