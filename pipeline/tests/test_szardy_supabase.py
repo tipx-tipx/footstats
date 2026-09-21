@@ -211,3 +211,25 @@ def test_glebokie_scalanie_nie_gubi_stempla(baza, monkeypatch):
     supa.put_key("typy_log_kopia", kopia)
     odczyt, ok = supa.get_key_ok("typy_log_kopia")
     assert ok and odczyt["ts"] == 42 and len(odczyt["log"]) == 400
+
+
+def test_gruby_element_listy_wraca_w_calosci(baza, monkeypatch):
+    """Incydent 2026-09-21: dzień Skuteczności z 4047 typami ważył więcej niż
+    kawałek. `_potnij` ciął go W ŚRODKU i owijał podkawałki w `[pod]`, a
+    `sklej_czesci` dopisywał je do listy jako osobne „dni" bez pola `dzien`
+    — strona /model padała na `dzien.split`. Element listy nie ma klucza,
+    pod którym dałoby się go skleić, więc jedzie w całości."""
+    dni = [
+        {"dzien": "2026-09-21", "rozliczone": 1, "typy": [{"mecz": "A – B"}]},
+        {"dzien": "2026-09-20", "rozliczone": 400, "typy": list(_ksiega(400).values())},
+        {"dzien": "2026-09-19", "rozliczone": 2, "typy": [{"mecz": "C – D"}]},
+    ]
+    payload = {"skutecznosc_dzienna": dni, "podsumowanie": {"n": 403}}
+    waga = supa.waga(payload)
+    monkeypatch.setattr(supa, "PROG_SZARDU", waga // 2)
+    monkeypatch.setattr(supa, "CEL_CZESCI", waga // 4)
+    assert supa.put_key("typy_wyniki", payload) is True
+    odczyt, ok = supa.get_key_ok("typy_wyniki")
+    assert ok and odczyt == payload
+    assert [d["dzien"] for d in odczyt["skutecznosc_dzienna"]] == \
+        ["2026-09-21", "2026-09-20", "2026-09-19"]

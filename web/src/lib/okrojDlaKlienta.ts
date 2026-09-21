@@ -22,7 +22,25 @@ import type { SkutecznoscDnia, TypyWyniki } from "./types";
  */
 
 function bezProbnych(dni: SkutecznoscDnia[]): SkutecznoscDnia[] {
-  return dni.map((d) => ({
+  // ⚑ DZIEŃ BEZ DATY TO NIE DZIEŃ. Incydent 2026-09-21: pipeline ciął dzień
+  // cięższy od kawałka W ŚRODKU i odczyt sklejał go w trzy „dni" (`{typy}`,
+  // `{typy}`, `{dzien, …}`); kalendarz padał na `dzien.split` i cała strona
+  // /model pokazywała „This page couldn't load". Cięcie naprawione w
+  // `supa._potnij`, ale strona nie ma prawa paść od jednego zepsutego wpisu
+  // w bazie — taki wpis odrzucamy GŁOŚNO (log serwera), nie cicho.
+  // Kawałek z samym `dzien` też jest kaleki: brakuje mu `roi_flat` i
+  // `rozliczone`, na których pada bilans (`fmtU`) — sprawdzamy komplet.
+  const caly = (d: SkutecznoscDnia) =>
+    typeof d?.dzien === "string" && typeof d.roi_flat === "number" &&
+    typeof d.rozliczone === "number";
+  const kalekie = dni.filter((d) => !caly(d));
+  if (kalekie.length > 0) {
+    console.error(
+      `[skutecznosc] ${kalekie.length} wpis(y) skutecznosc_dzienna bez ` +
+        "`dzien`/`roi_flat`/`rozliczone` — pominięte. Czy kawałki typy_wyniki są cięte po dniach?",
+    );
+  }
+  return dni.filter(caly).map((d) => ({
     ...d,
     poza_n: 0,
     poza_trafione: 0,

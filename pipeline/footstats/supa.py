@@ -653,16 +653,21 @@ def _potnij(payload) -> list | None:
     czesci, biezaca, waga_biezacej = [], pusty(), 0
     for element in elementy:
         w = len(json.dumps(element, ensure_ascii=False))
-        if w > CEL_CZESCI:
-            wnetrze = element[1] if isinstance(payload, dict) else element
-            podkawalki = _potnij(wnetrze) if w > CEL_CZESCI else None
+        # ⚑ REKURENCJA TYLKO DLA WARTOŚCI SŁOWNIKA. Element LISTY nie ma
+        # klucza, pod którym dałoby się go z powrotem skleić: jego podkawałki
+        # `[pod]` `sklej_czesci` dopisuje do listy jako OSOBNE elementy
+        # (incydent 2026-09-21: dzień Skuteczności 20.09 z 4047 typami ważył
+        # 1,4 MB, wracał jako trzy „dni" — `{typy: …}`, `{typy: …}`,
+        # `{dzien, okazje, …}` — a strona /model padała na `dzien.split`).
+        # Gruby element listy jedzie w całości jako własny kawałek.
+        if w > CEL_CZESCI and isinstance(payload, dict):
+            podkawalki = _potnij(element[1])
             if podkawalki and len(podkawalki) > 1:
                 if waga_biezacej:
                     czesci.append(biezaca)
                     biezaca, waga_biezacej = pusty(), 0
                 for pod in podkawalki:
-                    czesci.append({element[0]: pod} if isinstance(payload, dict)
-                                  else [pod])
+                    czesci.append({element[0]: pod})
                 continue
         if waga_biezacej and waga_biezacej + w > CEL_CZESCI:
             czesci.append(biezaca)
