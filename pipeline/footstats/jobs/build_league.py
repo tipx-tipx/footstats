@@ -8,8 +8,9 @@ Czym różni się od build_wc_fast:
 * mecze ze WSZYSTKICH rozgrywek statshub (nie tylko utid=16); zakres
   drużynowy wyznacza footstats.rozgrywki, propsy — oferta bukmachera,
 * parowanie z Superbetem po ZNORMALIZOWANYCH nazwach klubów z bramkowaniem
-  czasem (±3 h) — w lidze te same drużyny grają wielokrotnie, a słownik
-  TEAM_PL_EN (reprezentacje po polsku) jest bezużyteczny dla klubów,
+  czasem (±3 h) — w lidze te same drużyny grają wielokrotnie; reprezentacje
+  (Liga Narodów, towarzyskie) idą tą samą drogą, więc ich polskie nazwy
+  tłumaczy przed porównaniem `superbet.nazwa_po_angielsku` (od 30.09),
 * luka pokrycia jest MIERZONA i raportowana, nie ignorowana: mecze
   Superbetu z propsami bez danych statshub to świadomie odłożony kawałek
   świata, o którym wiemy.
@@ -309,6 +310,8 @@ def podobienstwo_klubu(a: str, b: str) -> float:
     na, nb = norm_klub(a), norm_klub(b)
     if not na or not nb:
         return 0.0
+    if _kategoria_druzyny(na) != _kategoria_druzyny(nb):
+        return 0.0
     na = KLUB_ALIASY.get(na, na)
     nb = KLUB_ALIASY.get(nb, nb)
     if na == nb:
@@ -325,6 +328,26 @@ def podobienstwo_klubu(a: str, b: str) -> float:
                 wspolne += 1
                 break
     return wspolne / min(len(ta), len(tb))
+
+
+_TOKEN_WIEKU = re.compile(r"^u\d{2}$")
+# tokeny, które odróżniają DWIE różne reprezentacje o wspólnym rdzeniu nazwy
+_TOKENY_ROZROZNIAJACE = frozenset({"northern"})
+
+
+def _kategoria_druzyny(znorm: str) -> tuple:
+    """(kategoria wiekowa, tokeny rozróżniające) znormalizowanej nazwy.
+
+    ⚑ DODANE RAZEM Z TŁUMACZENIEM REPREZENTACJI (2026-09-30). Podobieństwo
+    liczy wspólne tokeny względem KRÓTSZEJ nazwy, więc „Hungary" i „Hungary
+    U21" dawały 1,0, tak samo „Ireland" i „Northern Ireland". Dopóki Superbet
+    pisał „Węgry U21", nikt nie mógł się pomylić; po tłumaczeniu seniorzy
+    i młodzieżówka grający w tym samym oknie 3 h mieliby remis 1,0 i zgadywaną
+    parę. Różna kategoria = to nie ta sama drużyna, bez względu na resztę.
+    """
+    tok = znorm.split()
+    return (tuple(sorted(t for t in tok if _TOKEN_WIEKU.match(t))),
+            tuple(sorted(t for t in tok if t in _TOKENY_ROZROZNIAJACE)))
 
 
 def _tokeny_pasuja(a: str, b: str) -> bool:
@@ -390,6 +413,11 @@ def paruj_superbet(
         parts = [p.strip() for p in str(ev.get("matchName") or "").split("·")]
         if len(parts) != 2:
             continue
+        # ⚑ REPREZENTACJE PO POLSKU (2026-09-30): „Francja·Włochy" miało
+        # z „France – Italy" podobieństwo 0,00, więc połowa Ligi Narodów nie
+        # istniała dla produktu (patrz superbet.TEAM_PL_EN). Tłumaczymy CAŁĄ
+        # nazwę kraju przed porównaniem; kluby przechodzą bez zmian.
+        parts = [superbet.nazwa_po_angielsku(p) for p in parts]
         sb_parsed.append((i, parts[0], parts[1], _sb_kickoff(ev)))
     for m in mecze:
         for i, sb_h, sb_a, sb_ts in sb_parsed:

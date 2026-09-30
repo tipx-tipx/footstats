@@ -39,6 +39,9 @@ RETENCJA_DNI = 4
 KLUCZ_KONFLIKTU = "mecz_id,podmiot_id"
 # ile znaków szczegółu trzymamy — wiersz ma być tani, nie kompletny
 MAX_SZCZEGOL = 600
+# werdykty, które NIE mówią, dlaczego para odpadła, tylko że radar przestał
+# ją oceniać — nie wolno im zasłonić bramy z wcześniejszego cyklu (patrz zapisz)
+BRAMY_TYLKO_NOWE = frozenset({"mecz_za_blisko_gwizdka"})
 
 
 def odnotuj(imienny: dict | None, mid: int, pid: int, brama: str,
@@ -112,7 +115,22 @@ def zapisz(imienny: dict | None, cykl_ts: int) -> bool:
         return False
     try:
         rows = wiersze(imienny, cykl_ts)
-        ok = supa.upsert_wiersze(TABELA, rows, KLUCZ_KONFLIKTU)
+        # ⚑ „ZA BLISKO GWIZDKA" NIE NADPISUJE PRAWDZIWEJ BRAMY (2026-09-30).
+        # `imienny` jest świeży w każdym cyklu, więc radar nie wie, co już leży
+        # w tabeli; ostatnie ~90 min przed meczem każda para dostawała ten
+        # werdykt i zwykły upsert kasował powód z wcześniejszego cyklu — po
+        # meczu 3493 z 4258 wierszy mówiły tylko „za blisko gwizdka" (Coubiș,
+        # Ferguson, Camara nie do odtworzenia). Ten wiersz wchodzi wyłącznie
+        # jako NOWY klucz — para, której radar nigdy wcześniej nie widział.
+        pozne = [r for r in rows if r["brama"] in BRAMY_TYLKO_NOWE]
+        rows = [r for r in rows if r["brama"] not in BRAMY_TYLKO_NOWE]
+        ok = True
+        if rows:
+            ok = supa.upsert_wiersze(TABELA, rows, KLUCZ_KONFLIKTU)
+        if pozne:
+            ok = supa.upsert_wiersze(TABELA, pozne, KLUCZ_KONFLIKTU,
+                                     tylko_nowe=True) and ok
+        rows = rows + pozne
         if ok:
             granica = _dzien(cykl_ts - RETENCJA_DNI * 86400)
             supa.usun_wiersze(TABELA, f"dzien=lt.{granica}")

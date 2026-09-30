@@ -55,7 +55,7 @@ from datetime import datetime, timezone
 from curl_cffi import requests
 
 from .scores365 import _tokeny_druzyny
-from .superbet import TEAM_PL_EN, norm_name
+from .superbet import nazwa_po_angielsku, norm_name
 
 HOST = "https://offering.begmedia.com/web/offering.access.api"
 USLUGA_MECZE = "offering.access.api.MatchService"
@@ -790,7 +790,10 @@ def _pl_en(nazwa: str | None) -> str:
     które spolszcza albo skraca (`KLUB_ALIASY` wyżej).
     """
     s = str(nazwa or "").strip()
-    return KLUB_ALIASY.get(s.lower(), TEAM_PL_EN.get(s, s))
+    if s.lower() in KLUB_ALIASY:
+        return KLUB_ALIASY[s.lower()]
+    # przyrostki U21/(K) i brak ogonków — patrz superbet.nazwa_po_angielsku
+    return nazwa_po_angielsku(s)
 
 
 def paruj_mecze(nasze: list[dict], bc_mecze: list[dict] | None = None,
@@ -887,11 +890,14 @@ def _nazwy_pokrywaja(nasza: str | None, obca: str | None) -> bool:
     FC/SC/CD, polskie nazwy miast z `TOKEN_ALIASY`). Słowa ≤ 2 liter pomijane
     („LA Galaxy”, „A Corunya”), chyba że nazwa ma tylko takie.
     """
-    from ..jobs.build_league import KLUB_ALIASY as _KA, norm_klub
+    from ..jobs.build_league import KLUB_ALIASY as _KA, _kategoria_druzyny, norm_klub
     from difflib import SequenceMatcher
     na, nb = norm_klub(nasza or ""), norm_klub(obca or "")
     na, nb = _KA.get(na, na), _KA.get(nb, nb)
     if not na or not nb:
+        return False
+    # „Hungary" ≠ „Hungary U21", „Ireland" ≠ „Northern Ireland" (30.09)
+    if _kategoria_druzyny(na) != _kategoria_druzyny(nb):
         return False
     ta, tb = na.split(), nb.split()
     krotka, dluga = (ta, tb) if len(ta) <= len(tb) else (tb, ta)

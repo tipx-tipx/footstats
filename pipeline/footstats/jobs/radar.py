@@ -3016,7 +3016,10 @@ def zbuduj(
         if margines_startu_s and (meta.get("ts") or 0) <= teraz + margines_startu_s:
             lejek["4_odpadl_mecz_za_blisko_gwizdka"] += 1
             # werdykt z wcześniejszego cyklu (gdy oferta była do wzięcia)
-            # jest już w tabeli — tu dopisujemy tylko tych, których nie było
+            # jest już w tabeli — tu dopisujemy tylko tych, których nie było.
+            # ⚑ `imienny_out` jest świeży w każdym cyklu, więc samo `not in`
+            # tego nie gwarantowało: pilnuje tego dopiero zapis
+            # (`radar_imienny.BRAMY_TYLKO_NOWE`, poprawka 30.09)
             for pid in gracze:
                 if imienny_out is not None and (mid, pid) not in imienny_out:
                     _ri(mid, pid, "mecz_za_blisko_gwizdka")

@@ -754,7 +754,7 @@ def kontrola_produktu(log: dict, pokazane: dict | None, now: int,
             bez_wiersza["odrzucony"] += 1
         elif r.get("rynek_kod") in RYNKI_OSOBNE:
             bez_wiersza["rynek_osobny"] += 1
-        elif not _z_biezacej_epoki(r) or _z_martwej_epoki(r):
+        elif not _do_skutecznosci(r):
             bez_wiersza["inna_epoka"] += 1
     n_bw = sum(bez_wiersza.values())
     dodaj("strona_bez_wiersza", n_bw == 0, n_bw,
@@ -2975,6 +2975,27 @@ def epoka(r: dict) -> str:
         for s in str(r.get("mecz") or "").replace("–", "-").split("-")
     ]
     return "ms" if len(strony) == 2 and all(s in kraje for s in strony) else "liga"
+
+
+def _do_skutecznosci(r: dict) -> bool:
+    """Czy rekord wolno POKAZAĆ w Skuteczności (niezależnie od epoki uczenia).
+
+    ⚑ SKUTECZNOŚĆ GUBIŁA REPREZENTACJE (2026-09-30, zgłoszenie właściciela:
+    „było więcej w zawodnikach w poszczególnych dniach, a jest mniej
+    w Skuteczności"). Mecz dwóch reprezentacji dostaje epokę „ms" (patrz
+    `epoka`) i słusznie uczy się osobno — ale ten sam filtr stał w liczbach
+    POKAZYWANYCH, więc typ, który user widział na liście, znikał z bilansu.
+    Od 24.09 do 30.09: 25 typów (Serbia–Grecja, Węgry–Ukraina, Polska–Bośnia,
+    Norwegia–Portugalia, Rumunia–Bośnia…), w tym karta Joveljicia; kontrola
+    `strona_bez_wiersza` świeciła „inna_epoka 25".
+
+    Mundial sprzed `START_STATYSTYK` odcina sama data, więc w oknie statystyk
+    epoka nie ma tu nic do powiedzenia. Uczenie, kalibracja i raporty modelu
+    dalej filtrują `_z_biezacej_epoki`.
+    """
+    if _z_martwej_epoki(r):
+        return False
+    return _z_biezacej_epoki(r) or (bool(START_STATYSTYK) and w_oknie_statystyk(r))
 
 
 def _z_biezacej_epoki(r: dict) -> bool:
@@ -5244,7 +5265,7 @@ def _szczeble_dnia(log: dict, hero: list[dict]) -> list[dict]:
         and r.get("odrzucenie_powod") in (POWOD_POMIARU_DRUGIEGO,
                                           POWOD_POMIARU_TRZECIEGO)
         and r.get("wynik") in ("wygrany", "przegrany", "zwrot")
-        and _z_biezacej_epoki(r) and not _z_martwej_epoki(r)
+        and _do_skutecznosci(r)
         and w_oknie_statystyk(r)
         and _para(r) in na_stronie
     ]
@@ -5271,7 +5292,7 @@ def _zwroty_dnia(log: dict, lista_dnia, pokazane) -> list[dict]:
         r for r in log.values()
         if r.get("wynik") == "zwrot"
         and r.get("rynek_kod") not in RYNKI_OSOBNE and not r.get("odrzucony")
-        and _z_biezacej_epoki(r) and not _z_martwej_epoki(r)
+        and _do_skutecznosci(r)
         and w_oknie_statystyk(r)
         and opublikowany(r, lista_dnia, pokazane)
     ]
@@ -5287,7 +5308,7 @@ def _czekajace_dnia(log: dict, lista_dnia, pokazane, now: int) -> list[dict]:
         and int(r.get("kickoff_ts") or 0) + CZEKA_NA_DANE_PO_S < now
         and r.get("rynek_kod") not in RYNKI_OSOBNE and not r.get("odrzucony")
         and not r.get("sugestia")
-        and _z_biezacej_epoki(r) and not _z_martwej_epoki(r)
+        and _do_skutecznosci(r)
         and w_oknie_statystyk(r)
         and opublikowany(r, lista_dnia, pokazane)
     ]
@@ -5462,7 +5483,7 @@ def skutecznosc_strumieni(log: dict, dni: int = 21,
             and not r.get("odrzucony")
             # tylko obecny produkt — patrz komentarz przy `settled`
             # w budowie payloadu Skuteczności
-            and _z_biezacej_epoki(r) and not _z_martwej_epoki(r)
+            and _do_skutecznosci(r)
             # pokazywane liczby liczą się od daty startu (patrz W_OKNIE...)
             and w_oknie_statystyk(r)
             and _strumien(r) == nazwa
@@ -6046,6 +6067,25 @@ BUDZET_PERF_NA_PRZEBIEG = 150
 PERF_ZERO_MINUT_PO_S = 6 * 3600
 
 
+# ścieżka bez 365 (historia statshub / bank trendów) nie rozlicza wcześniej —
+# świeże liczby bywają migawką z trwającego meczu (Słowenia–Szkocja 26.09)
+PERF_WARTOSC_PO_S = 4 * 3600
+# 365 zna mecz, a nie zna nazwiska, i nie ma historii statshub, która by to
+# rozstrzygnęła — po tylu godzinach wracamy do reguły „nie ma go = nie grał"
+NIEZNANY_W_365_PO_S = 24 * 3600
+POWOD_Z_LAWKI = "nie wyszedł w pierwszym składzie"
+
+
+def _perf_pobrana(rec: dict, cache: dict) -> bool:
+    """Czy historia statshub zawodnika jest w pamięci (pobrana bez błędu).
+
+    Odróżnia „w historii nie ma tego meczu" (nie grał) od „historii jeszcze
+    nie mamy" (budżet zapytań, numer syntetyczny) — `_perf_w_meczu` zwraca
+    None w obu przypadkach."""
+    pid = rec.get("podmiot_id")
+    return isinstance(pid, int) and cache.get(pid) is not None
+
+
 def _perf_w_meczu(rec: dict, cache: dict, budzet: list[int]) -> dict | None:
     """Wiersz statystyk zawodnika z TEGO meczu z historii statshub albo None."""
     pid = rec.get("podmiot_id")
@@ -6349,37 +6389,80 @@ def rozlicz(
             except Exception:
                 staty = None
         pkey = scores365.resolve_player_key(set(staty), rec["podmiot"]) if staty else None
+        # ⚑ 365 ZNA MECZ, A NIE ZNA NAZWISKA ≠ „NIE ZAGRAŁ" (2026-09-30).
+        # 365 pomija w statystykach zawodników z zerem minut, więc brak klucza
+        # czytaliśmy jako zero — ale tak samo wygląda nazwisko zapisane inaczej.
+        # Zmierzone 30.09: 149 zwrotów „nie zagrał" dla zawodników, którzy wg
+        # statshub grali (Artur 90', D'Avilla 90', Florentin 90', Geovany
+        # Soares 78'), czyli przegrane i wygrane schowane jako zwroty. Teraz
+        # rozstrzyga historia statshub po NUMERZE zawodnika.
+        nieznany_w_365 = bool(staty) and not pkey
+        z_365 = bool(staty) and bool(pkey)
+        superbet_zaklad = "superbet" in str(rec.get("bukmacher") or "").lower()
 
-        # minuty: najpierw 365 (nieobecny w statystykach meczu = nie zagrał),
-        # fallback bank trendów
+        # ⚑ BEZ 365 CZEKAMY NA KOMPLET (2026-09-30). Słowenia–Szkocja 26.09
+        # rozliczyła się 144 min po gwizdku początkowym z liczbami jak z trwającego
+        # meczu: Ferguson 0 fauli (statshub: 4), McGinn 4 wywalczone (6),
+        # Hendry 3 (4). Rozliczenie jest nieodwracalne, więc ścieżka bez 365
+        # rusza dopiero po PERF_WARTOSC_PO_S.
+        if not z_365 and now - rec["kickoff_ts"] < PERF_WARTOSC_PO_S:
+            continue
+
+        # minuty i pierwszy skład: najpierw 365 (gdy zna zawodnika), potem
+        # historia statshub po numerze, bank trendów, Sofascore
         minuty = None
-        if staty:
-            minuty = float(staty[pkey].get("minutes", 0)) if pkey else 0.0
-        if minuty is None:
-            minuty = _minuty_z_banku(rec, lib)
-        # historia zawodnika statshub — tylko gdy 365 nie zna meczu, bo tam
-        # minuty już są; wiersz meczu z 0 minut to „nie zagrał"
+        wyszedl = None        # czy w pierwszym składzie (reguła Superbetu)
+        if z_365:
+            minuty = float(staty[pkey].get("minutes", 0))
+            if "started" in staty[pkey]:
+                wyszedl = bool(staty[pkey]["started"])
         ps_perf = None
-        if not staty and (mk in POLA_PERF_ROZLICZENIA
-                          or mk in statshub.SHOTMAP_DERIVED):
+        if not z_365:
             ps_perf = _perf_w_meczu(rec, cache_perf, budzet_perf)
+        _sh_koniec = (ps_perf is not None or _perf_pobrana(rec, cache_perf)) \
+            and _statshub_wynik(rec["mecz_id"], cache_sh) is not None
+        if minuty is None and ps_perf is not None and _sh_koniec:
+            m_perf = float(ps_perf.get("minutesPlayed") or 0)
+            if m_perf > 0:
+                minuty = m_perf
+                # statshub: zmiennik ma w `substitutedOut` numer zawodnika,
+                # którego zastąpił (sprawdzone 30.09 na Węgry–Ukraina: Drambaev,
+                # Nazaryna, M. Tóth — zmiennicy, Sudakov — od pierwszej minuty)
+                wyszedl = ps_perf.get("substitutedOut") is None
         # ⚑ „NIE ZAGRAŁ" JEST NIEODWRACALNY — zero minut bierzemy z historii
         # dopiero, gdy mecz jest potwierdzenie skończony i minęło kilka godzin
-        # (świeży wiersz bywa niewypełniony, a pusty = 0 dałby fałszywy zwrot)
-        if (minuty is None and ps_perf is not None
-                and now - rec["kickoff_ts"] > PERF_ZERO_MINUT_PO_S
-                and _statshub_wynik(rec["mecz_id"], cache_sh) is not None):
-            minuty = float(ps_perf.get("minutesPlayed") or 0)
-            if minuty <= 0:
-                rozliczone_z_perf["nie_zagral"] += 1
+        # (świeży wiersz bywa niewypełniony, a pusty = 0 dałby fałszywy zwrot).
+        # Brak wiersza meczu w POBRANEJ historii też znaczy zero: statshub
+        # trzyma wyłącznie mecze, w których zawodnik wszedł na boisko.
+        if (minuty is None and _sh_koniec
+                and now - rec["kickoff_ts"] > PERF_ZERO_MINUT_PO_S):
+            minuty = 0.0
+            rozliczone_z_perf["nie_zagral"] += 1
+        if minuty is None and not nieznany_w_365:
+            minuty = _minuty_z_banku(rec, lib)
         if minuty is None:
             # FALLBACK egzotyki (Warstwa 2): minuty z cache Sofascore
             pg, _e = _sofa_gracz(sofa, rec)
             if pg is not None and pg.get("minutes") is not None:
                 minuty = float(pg["minutes"])
+        if minuty is None and nieznany_w_365:
+            # historii statshub nie ma (numer syntetyczny, budżet zapytań) —
+            # po terminie wracamy do starej reguły „nie ma go w 365 = nie grał"
+            if now - rec["kickoff_ts"] < NIEZNANY_W_365_PO_S:
+                continue
+            minuty = 0.0
         if minuty is not None and minuty <= 0:
             rec.update(wynik="zwrot", faktyczna=0.0, rozliczono_ts=now,
                        powod="nie zagrał", zagral=False)
+            continue
+        # ⚑ REGUŁY BUKMACHERÓW (właściciel 30.09): Superbet zwraca zakład na
+        # zawodnika, który NIE wyszedł w pierwszym składzie (także gdy wszedł
+        # z ławki); Betclic liczy każdą minutę gry. Pomiar 30.09: 333 z ~4700
+        # typów Superbetu rozliczyliśmy jak zwykłe, choć zawodnik wchodził
+        # z ławki. Nieznany skład (tylko bank/Sofascore) = rozliczamy zwykle.
+        if superbet_zaklad and wyszedl is False:
+            rec.update(wynik="zwrot", faktyczna=None, rozliczono_ts=now,
+                       powod=POWOD_Z_LAWKI, zagral=True)
             continue
 
         wartosc = None
@@ -6412,6 +6495,13 @@ def rozlicz(
                 skey = scores365.resolve_player_key(set(gra), rec["podmiot"])
                 if skey:
                     wartosc = float(gra[skey].get(MARKETY_365[mk], 0))
+            if wartosc is None and mk in POLA_PERF_ROZLICZENIA:
+                # ⚑ HISTORIA PO NUMERZE PRZED BANKIEM (2026-09-30): wiersz
+                # meczu z `performance` to komplet po gwizdku, a bank bywał
+                # migawką z trwającego meczu (Słowenia–Szkocja 26.09)
+                wartosc = _wartosc_z_perf(rec, ps_perf, cache_sh)
+                if wartosc is not None:
+                    rozliczone_z_perf[mk] += 1
             if wartosc is None and mk in ("shots", "sot"):
                 # multi-liga: mecz spoza rozgrywek z comp365 nie ma gid —
                 # strzały/celne rozliczamy z banku trendów statshub
@@ -6460,12 +6550,14 @@ def rozlicz(
             ):
                 w = staty[pkey].get(mk)
                 wartosc = float(w) if w is not None else None
-            if wartosc is None:
-                wartosc = _wartosc_z_banku(rec, lib)
+            # ⚑ historia po numerze PRZED bankiem (2026-09-30): Ferguson,
+            # Słowenia–Szkocja 26.09 — bank 0 fauli, statshub 4 (patrz wyżej)
             if wartosc is None and mk in POLA_PERF_ROZLICZENIA:
                 wartosc = _wartosc_z_perf(rec, ps_perf, cache_sh)
                 if wartosc is not None:
                     rozliczone_z_perf[mk] += 1
+            if wartosc is None:
+                wartosc = _wartosc_z_banku(rec, lib)
             if wartosc is None:
                 # FALLBACK egzotyki (Warstwa 2): faule/odbiory/przechwyty z
                 # cache Sofascore (worker domowy) — jedyne źródło tych rynków
@@ -6751,7 +6843,9 @@ def rozlicz(
         # więc silnik, którego nie ma w produkcie. To ta sama poprawka, co
         # w `raport_uczenia` (patrz tam) — pytanie „jak nam idzie" ma dotyczyć
         # tego, co dziś sprzedajemy.
-        and _z_biezacej_epoki(r) and not _z_martwej_epoki(r)
+        # ⚑ 30.09: filtr epoki zamieniony na `_do_skutecznosci` — reprezentacje
+        # pokazane na stronie liczą się tak samo (patrz tam); mundial odcina data.
+        and _do_skutecznosci(r)
         # OD DATY STARTU — dni sprzed niej nie mają zapisanego składu, więc
         # nie da się o nich powiedzieć, co było na stronie (patrz
         # `START_STATYSTYK`)
@@ -6769,7 +6863,7 @@ def rozlicz(
         and r.get("rynek_kod") not in RYNKI_OSOBNE
         and not r.get("odrzucony")
         and not opublikowany(r, _lista_dnia, _na_stronie)
-        and _z_biezacej_epoki(r) and not _z_martwej_epoki(r)
+        and _do_skutecznosci(r)
         and w_oknie_statystyk(r)
     ]
 

@@ -124,7 +124,67 @@ TEAM_PL_EN = {
     "Węgry": "Hungary", "Rumunia": "Romania", "Słowacja": "Slovakia",
     "Mali": "Mali", "Burkina Faso": "Burkina Faso", "RD Konga": "DR Congo",
     "Jordania": "Jordan", "Irak": "Iraq", "Uzbekistan": "Uzbekistan",
+    # ⚑ RESZTA ŚWIATA (2026-09-30). Słownik powstał na MŚ i znał tylko ich
+    # uczestników, a tryb ligowy parował reprezentacje po samym podobieństwie
+    # nazw — „Francja·Włochy" vs „France – Italy" = 0,00. W przerwie 22–30.09
+    # Liga Narodów sparowała się w 18 z 34 meczów; Turcja–Włochy, Szwecja–
+    # Polska, Irlandia Płn.–Węgry czy Grecja–Niemcy nie weszły ani do typów,
+    # ani do drabinek. Nazwy EN = dokładnie te, których używa statshub.
+    "Albania": "Albania", "Andora": "Andorra", "Andorra": "Andorra",
+    "Armenia": "Armenia", "Azerbejdżan": "Azerbaijan", "Białoruś": "Belarus",
+    "Bułgaria": "Bulgaria", "Cypr": "Cyprus", "Czarnogóra": "Montenegro",
+    "Estonia": "Estonia", "Finlandia": "Finland", "Gibraltar": "Gibraltar",
+    "Gruzja": "Georgia", "Irlandia": "Ireland",
+    "Irlandia Północna": "Northern Ireland", "Islandia": "Iceland",
+    "Izrael": "Israel", "Kazachstan": "Kazakhstan", "Kosowo": "Kosovo",
+    "Liechtenstein": "Liechtenstein", "Litwa": "Lithuania",
+    "Luksemburg": "Luxembourg", "Łotwa": "Latvia",
+    "Macedonia Północna": "North Macedonia", "Malta": "Malta",
+    "Mołdawia": "Moldova", "Rosja": "Russia", "San Marino": "San Marino",
+    "Słowenia": "Slovenia", "Wyspy Owcze": "Faroe Islands",
+    "Boliwia": "Bolivia", "Chiny": "China", "Indie": "India",
+    "Indonezja": "Indonesia", "Malezja": "Malaysia", "Singapur": "Singapore",
+    "Bangladesz": "Bangladesh", "Malediwy": "Maldives", "Liban": "Lebanon",
+    "Syria": "Syria", "Palestyna": "Palestine", "Kirgistan": "Kyrgyzstan",
+    "Korea Płd.": "South Korea", "Korea Płn": "North Korea",
+    "Korea Północna": "North Korea", "Kenia": "Kenya", "Uganda": "Uganda",
+    "Gwinea": "Guinea", "Namibia": "Namibia", "Mauritius": "Mauritius",
+    "Sri Lanka": "Sri Lanka", "Haiti": "Haiti", "Jamajka": "Jamaica",
+    "Kuba": "Cuba", "Gwatemala": "Guatemala", "Salwador": "El Salvador",
+    "Nikaragua": "Nicaragua", "Dominika": "Dominica",
+    "Dominikana": "Dominican Republic", "Gujana": "Guyana",
+    "Surinam": "Suriname", "Trynidad i Tobago": "Trinidad and Tobago",
+    "Portoryko": "Puerto Rico", "Kajmany": "Cayman Islands",
+    "Curacao": "Curaçao", "Tahiti": "Tahiti", "Wyspy Cooka": "Cook Islands",
 }
+
+# przyrostki kategorii w ofercie Superbetu/Betclica: młodzieżówki i kobiety
+_PRZYROSTEK_DRUZYNY = re.compile(r"^(.*?)(\s+(?:U\d{2}|\(K\)))?$")
+
+
+def _klucz_kraju(nazwa: str) -> str:
+    s = str(nazwa or "").strip().lower().replace("ł", "l")
+    s = unicodedata.normalize("NFKD", s)
+    return "".join(c for c in s if not unicodedata.combining(c))
+
+
+_KRAJE_PO_KLUCZU = {_klucz_kraju(pl): en for pl, en in TEAM_PL_EN.items()}
+
+
+def nazwa_po_angielsku(nazwa: str | None) -> str:
+    """Polska nazwa reprezentacji → nazwa statshub; każda inna bez zmian.
+
+    Przyrostek kategorii zostaje („Włochy U21" → „Italy U21", tak pisze
+    statshub), wielkość liter i ogonki nie mają znaczenia („Wegry" = „Węgry").
+    Klub o nazwie kraju nie istnieje w ofercie w tej postaci, więc tłumaczymy
+    wyłącznie CAŁĄ nazwę — „Polonia Warszawa" czy „Irlandia Płn. U21 (K)"
+    nie są dotykane w połowie.
+    """
+    s = str(nazwa or "").strip()
+    m = _PRZYROSTEK_DRUZYNY.match(s)
+    rdzen, przyrostek = (m.group(1), m.group(2) or "") if m else (s, "")
+    en = _KRAJE_PO_KLUCZU.get(_klucz_kraju(rdzen))
+    return f"{en}{przyrostek}" if en else s
 
 
 def norm_name(name: str) -> str:

@@ -503,7 +503,12 @@ function WierszTypu({
               className="text-faint"
               title={t.powod ? `Zwrot: ${t.powod}` : "Zwrot"}
             >
-              zwrot{t.powod === "nie zagrał" ? " · nie grał" : ""}
+              zwrot
+              {t.powod === "nie zagrał"
+                ? " · nie grał"
+                : t.powod === "nie wyszedł w pierwszym składzie"
+                  ? " · z ławki" // reguła Superbetu (30.09)
+                  : ""}
             </span>
           ) : (
             // mecz skończony, wynik jeszcze nie przyszedł – typ NIE zniknął,

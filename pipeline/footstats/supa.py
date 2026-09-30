@@ -787,18 +787,23 @@ def _blad_tabeli(tabela: str, r) -> bool:
 
 
 def upsert_wiersze(tabela: str, wiersze: list[dict], on_conflict: str,
-                   paczka: int = PACZKA_WIERSZY) -> bool:
-    """Upsert wierszy do tabeli, paczkami, bez odpowiedzi (return=minimal)."""
+                   paczka: int = PACZKA_WIERSZY,
+                   tylko_nowe: bool = False) -> bool:
+    """Upsert wierszy do tabeli, paczkami, bez odpowiedzi (return=minimal).
+
+    `tylko_nowe=True` — wiersz o istniejącym kluczu zostaje NIETKNIĘTY
+    (`resolution=ignore-duplicates`), wstawiane są wyłącznie nowe klucze."""
     c = _conn()
     if c is None or not wiersze:
         return False
     url, headers = c
+    rozstrzygniecie = "ignore-duplicates" if tylko_nowe else "merge-duplicates"
     for i in range(0, len(wiersze), paczka):
         cz = wiersze[i:i + paczka]
         r = _z_ponowieniem(f"upsert '{tabela}'", lambda cz=cz: requests.post(
             f"{url}/rest/v1/{tabela}?on_conflict={on_conflict}",
             headers={**headers,
-                     "Prefer": "resolution=merge-duplicates,return=minimal"},
+                     "Prefer": f"resolution={rozstrzygniecie},return=minimal"},
             data=json.dumps(cz, ensure_ascii=False),
             impersonate="chrome124", timeout=120,
         ))
