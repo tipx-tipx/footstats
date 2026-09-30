@@ -1815,6 +1815,50 @@ def _p_po_strzyzeniu(s: dict | None) -> float | None:
     return float(p_final)
 
 
+def _linia_pomiaru_sita(w: dict, r: dict, s: dict, p: dict,
+                        udzial: float | None) -> dict | None:
+    """Linia do pomiaru w tle „po samym sicie" albo None (nota w _oceń_karte).
+
+    Dwie grupy, oba pytania właściciela z 21.09/30.09:
+      * faule popełnione 7/10 (karta wymaga 8/10, PROG_POKRYCIA_RYNKU),
+      * dowolny rynek 6/10 (karta wymaga 7/10, PROG_POKRYCIA_SILY),
+    w obu siła linii (forma, rotacja, rywal) ≥ PROG_SILY_HERO — to samo sito,
+    które oceniłoby linię na karcie, tylko z progiem pokrycia o 1/10 niżej.
+    """
+    rk = r.get("rynek_kod")
+    pok = p["traf"] / p["z"]
+    prog_rynku = PROG_POKRYCIA_RYNKU.get(rk)
+    if prog_rynku is not None and PROG_POKRYCIA_SILY <= pok < prog_rynku:
+        powod = POWOD_POMIARU_RYNKU
+    elif PROG_POKRYCIA_POMIARU <= pok < PROG_POKRYCIA_SILY:
+        powod = POWOD_POMIARU_POKRYCIA6
+    else:
+        return None
+    rywal = float((((r.get("kontekst") or {}).get("rywal") or {})
+                   .get("mnoznik")) or 1.0)
+    sl = sila_linii(p, s.get("pokrycie5"), w.get("krotkie_wystepy5"), udzial,
+                    w.get("xi") is True, rywal)
+    if sl is None or sl["sila"] < PROG_SILY_HERO:
+        return None
+    if sl["powod"] not in (None, "sito_pokrycie_ponizej_7_z_10"):
+        return None                       # kara rotacji/formy — sito odrzuca
+    p_final = s.get("p_final")
+    f5 = s.get("pokrycie5") or {}
+    return {
+        "rynek_kod": rk, "rynek": r.get("rynek"),
+        "linia": s["linia"], "kurs": s["kurs"],
+        **({"bukmacher": s["bukmacher"]} if s.get("bukmacher") else {}),
+        "traf": p["traf"], "z": p["z"],
+        "traf5": f5.get("traf"), "z5": f5.get("z"),
+        "edge": round(float(p_final) - 1.0 / s["kurs"], 3) if p_final is not None else 0.0,
+        "p_final": s.get("p_final"), "p_bazowe": s.get("p_bazowe"),
+        "korekta": s.get("korekta"),
+        **({"p_uczony": s["p_uczony"]} if s.get("p_uczony") else {}),
+        "sila": sl["sila"], "sito_wersja": SITO_WERSJA,
+        "powod_pomiaru": powod,
+    }
+
+
 def _oceń_karte(
     w: dict,
     powody: Counter | None = None,
@@ -1887,10 +1931,8 @@ def _oceń_karte(
     best_score, best_s = float("-inf"), None
     best_klucz: tuple = (-1, 0.0, float("-inf"))
     pomiar_score, pomiar_s = float("-inf"), None
-    # najlepsza linia rynku bez karty, która przeszła sito — do pomiaru
-    pomiar_rynku_score, pomiar_rynku_s = float("-inf"), None
-    # najlepsza linia 6/10, która przeszłaby sito v3 — do pomiaru (v4)
-    pomiar6_score, pomiar6_s = float("-inf"), None
+    # pomiar w tle po samym sicie: {powód pomiaru: najlepsza linia}
+    pomiary_sita: dict[str, dict] = {}
     lokalne: Counter = Counter()
     for r in w.get("rynki", []):
         szczeble = r.get("drabinka", [])
@@ -1926,13 +1968,22 @@ def _oceń_karte(
             bez_karty = (r.get("rynek_kod") in RYNKI_BEZ_KARTY
                          or (_prog_rynku is not None
                              and p["traf"] / p["z"] < _prog_rynku))
+            # ⚑ POMIAR W TLE PO SAMYM SICIE (2026-09-30, decyzja właściciela).
+            # Dotąd linia pomiarowa (faule 7/10, pokrycie 6/10) musiała przejść
+            # WSZYSTKIE bramy karty — następnik, seria, rozjazd, weto — i przez
+            # 9 dni do księgi nie trafiła ani jedna (log 30.09: 10 linii fauli,
+            # przeszło 0). Mierzymy więc to, o co pytamy: bramy zawodnika
+            # (wyżej, jak na karcie) + sito (siła ≥ PROG_SILY_HERO) + cena
+            # hero (≥ MIN_KURS_HERO). Jedna linia na grupę i kartę.
+            if pomiar_out is not None and s["kurs"] >= MIN_KURS_HERO:
+                _pm = _linia_pomiaru_sita(w, r, s, p, udzial)
+                if _pm is not None:
+                    _st = pomiary_sita.get(_pm["powod_pomiaru"])
+                    if _st is None or (_pm["sila"], _pm["kurs"]) > (_st["sila"], _st["kurs"]):
+                        pomiary_sita[_pm["powod_pomiaru"]] = _pm
             if bez_karty:
                 lokalne["rynek_bez_karty"] += 1
-                # bez kolektora pomiaru — jak dotąd; z kolektorem linia idzie
-                # przez WSZYSTKIE bramy jak zwykła (nie jak pomiarowa), ale
-                # nigdy nie zostaje hero (patrz POWOD_POMIARU_RYNKU)
-                if pomiar_out is None:
-                    continue
+                continue
             # SZCZEBEL POMIAROWY: pokrycie pod progiem, ale w tolerancji.
             # Nie przerywamy od razu — przepuszczamy go przez WSZYSTKIE
             # pozostałe bramy, żeby zmierzyć wyłącznie efekt progu pokrycia,
@@ -2263,20 +2314,10 @@ def _oceń_karte(
             if pomiarowy:
                 if ocena > pomiar_score:
                     pomiar_score, pomiar_s = ocena, trafiony
-            elif bez_karty:
-                # tylko linia, która PRZESZŁA sito — mierzymy dokładnie to,
-                # co poszłoby na kartę po zdjęciu banu, nic słabszego
-                if hero_ok and ocena > pomiar_rynku_score:
-                    pomiar_rynku_score = ocena
-                    pomiar_rynku_s = {**trafiony,
-                                      "powod_pomiaru": POWOD_POMIARU_RYNKU}
-            elif not sito and hero_ok_v3:
-                # 6/10 z siłą ≥ 0,70 po całym sicie v3 — pomiar w tle
-                # (nota przy PROG_POKRYCIA_POMIARU)
-                if ocena > pomiar6_score:
-                    pomiar6_score = ocena
-                    pomiar6_s = {**trafiony,
-                                 "powod_pomiaru": POWOD_POMIARU_POKRYCIA6}
+            elif not sito:
+                # 6/10 i faule 7/10 mierzy pomiar po samym sicie (wyżej) —
+                # tutaj linia spod sita nie ma już czego szukać
+                pass
             elif best_s is None or klucz > best_klucz:
                 best_klucz, best_s = klucz, trafiony
                 # RANKING KART po wartości pakietu (właściciel 17.09: model
@@ -2286,10 +2327,14 @@ def _oceń_karte(
                               else ocena)
     if pomiar_out is not None and pomiar_s is not None:
         pomiar_out.append(pomiar_s)
-    if pomiar_out is not None and pomiar_rynku_s is not None:
-        pomiar_out.append(pomiar_rynku_s)
-    if pomiar_out is not None and pomiar6_s is not None:
-        pomiar_out.append(pomiar6_s)
+    if pomiar_out is not None:
+        # rynek, na którym POWSTAJE karta, ma własny pomiar szczebli (drugi
+        # i trzeci szczebel) — jego wyższa linia 6/10 to następnik tej karty,
+        # nie osobne pytanie o próg
+        _rynek_karty = (best_s.get("rynek_kod")
+                        if best_s is not None and best_s.get("hero_ok") else None)
+        pomiar_out.extend(v for v in pomiary_sita.values()
+                          if v["rynek_kod"] != _rynek_karty)
     if best_s is not None and not best_s.get("hero_ok"):
         # KARTA BEZ LINII SITOWEJ NIE POWSTAJE (2026-09-17). Powód = najczęstsza
         # brama sita wśród jej linii — licznik w rentgenie, nie cisza

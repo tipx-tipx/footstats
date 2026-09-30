@@ -209,3 +209,19 @@ def test_rekord_pomiaru_niesie_pokrycie_forme_sile_i_bramy_karty():
     # bez pomiaru rynku/6-z-10 stempel = dawny pomiar progu pokrycia
     p.pop("powod_pomiaru")
     assert B._rekord_pomiaru_drabinki(p)["odrzucenie_powod"] == rozliczanie.POWOD_POMIARU_POKRYCIA
+
+
+def test_pomiar_po_samym_sicie_nie_wymaga_drugiego_szczebla():
+    """30.09: przez 9 dni pomiar fauli był pusty, bo linia musiała przejść
+    wszystkie bramy karty. Teraz liczy się sito + cena hero — faule 7/10 bez
+    następnika idą do pomiaru."""
+    pomiar: list = []
+    radar._oceń_karte(_karta_fauli(7, forma5=5, drugi=False), pomiar_out=pomiar)
+    assert [p["powod_pomiaru"] for p in pomiar] == [radar.POWOD_POMIARU_RYNKU]
+
+
+def test_pomiar_po_sicie_trzyma_cene_hero():
+    """Poniżej ceny hero (1,70) linia nie byłaby kartą — nie mierzymy jej."""
+    pomiar: list = []
+    radar._oceń_karte(_karta_fauli(7, forma5=5, kurs=1.45), pomiar_out=pomiar)
+    assert pomiar == []

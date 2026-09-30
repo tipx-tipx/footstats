@@ -1915,6 +1915,7 @@ def w_orientacji_over(grp: list[dict]) -> list[dict]:
 
 def compute_bias(log: dict, min_n: int = MIN_N_KALIBRACJI) -> dict[str, float]:
     """Płaski bias per rynek (stary format) — zachowany dla raportu i testów."""
+    log = widok_nauki(log)
     grupy: dict[str, list[dict]] = {}
     for r in log.values():
         if (r.get("wynik") in ("wygrany", "przegrany")
@@ -1946,6 +1947,7 @@ def compute_bias_full(
     Zwraca {rynek: {"logit": True, "global": b, "bins": [[lo, hi, b], ...]}}
     — format rozumiany przez engine (stary mnożnikowy dalej wspierany).
     """
+    log = widok_nauki(log)
     # sugestie STS trafiają fatalnie względem typów z kursem (inne progi, brak
     # bezpieczników) — mieszanie ich z typami zaniżało bias całych rodzin.
     # Typy POMIAROWE (odrzucone przy progu) też zostają poza kalibracją —
@@ -2179,6 +2181,7 @@ def rynki_kwarantanna(log: dict | None = None) -> dict[str, dict]:
     migotał na granicy. Zwraca {rynek: {roi, n, hit, sr_p, bias}}."""
     if log is None:
         log = _migruj_log(supa.get_key("typy_log") or {})
+    log = widok_nauki(log)
     settled = [
         r for r in log.values()
         if r.get("wynik") in ("wygrany", "przegrany")
@@ -2261,6 +2264,7 @@ def _grupy_stron(log: dict | None = None) -> dict[tuple[str, str], list[dict]]:
     """
     if log is None:
         log = _migruj_log(supa.get_key("typy_log") or {})
+    log = widok_nauki(log)
     settled = [
         r for r in log.values()
         if r.get("wynik") in ("wygrany", "przegrany")
@@ -2418,6 +2422,7 @@ def brama_kwarantanny(
 def kwarantanna() -> dict[str, dict]:
     """Kwarantanna rynków z logu w Supabase (pusta, gdy brak danych/env)."""
     log = _migruj_log(supa.get_key("typy_log") or {})
+    log = widok_nauki(log)
     return rynki_kwarantanna(log)
 
 
@@ -2486,6 +2491,7 @@ def kategorie_kwarantanna(log: dict | None = None) -> dict[str, dict]:
     """
     if log is None:
         log = _migruj_log(supa.get_key("typy_log") or {})
+    log = widok_nauki(log)
     settled = [
         r for r in log.values()
         if r.get("wynik") in ("wygrany", "przegrany")
@@ -2762,6 +2768,7 @@ def raport_cieni(log: dict | None = None) -> dict:
     """
     if log is None:
         log = _migruj_log(supa.get_key("typy_log") or {})
+    log = widok_nauki(log)
     pary = [
         r for r in log.values()
         if r.get("wynik") in ("wygrany", "przegrany")
@@ -2977,6 +2984,36 @@ def epoka(r: dict) -> str:
     return "ms" if len(strony) == 2 and all(s in kraje for s in strony) else "liga"
 
 
+def widok_nauki(log: dict | None) -> dict | None:
+    """Księga oczami WARSTW UCZENIA: `wynik_nauka` zamiast zamrożonego wyniku.
+
+    ⚑ DLACZEGO (2026-09-30, decyzja właściciela). Rozliczony rekord jest
+    zamrożony na zawsze — Skuteczność pokazuje dokładnie to, co zapadło.
+    Ale warstwy korekt (kalibracja rynków, korekta strumienia i strony,
+    kwarantanna, wagi) uczyły się na błędach rozliczenia sprzed 30.09:
+    1206 typów Superbetu na zmienników jako przegrane (Superbet zwraca),
+    zwroty „nie zagrał"/„brak danych" przy zawodnikach, którzy grali.
+    Pomiar 30.09: kalibracja fauli wywalczonych −0,24 → −0,08 po poprawce,
+    celnych −0,16 → −0,05 — model był ściągany w dół przez nasze pomyłki.
+
+    `wynik_nauka` dopisuje jednorazowo `jobs/wyniki_nauki.py` (wąska reguła,
+    tylko przypadki udowodnione historią statshub). Rekord bez tego pola
+    uczy tym, co ma. Idempotentne — funkcje uczenia wołają się nawzajem.
+    NIGDY nie podawać tego widoku Skuteczności ani kontroli produktu.
+    """
+    if not log:
+        return log
+    if not any("wynik_nauka" in r for r in log.values()):
+        return log
+    out = {}
+    for k, r in log.items():
+        if r.get("wynik_nauka") and r.get("wynik_nauka") != r.get("wynik"):
+            r = {**r, "wynik": r["wynik_nauka"],
+                 "faktyczna": r.get("faktyczna_nauka", r.get("faktyczna"))}
+        out[k] = r
+    return out
+
+
 def _do_skutecznosci(r: dict) -> bool:
     """Czy rekord wolno POKAZAĆ w Skuteczności (niezależnie od epoki uczenia).
 
@@ -3089,6 +3126,7 @@ def korekta_strony(log: dict | None = None) -> dict[str, float]:
     """
     if log is None:
         log = _migruj_log(supa.get_key("typy_log") or {})
+    log = widok_nauki(log)
     settled = [
         r for r in log.values()
         if r.get("wynik") in ("wygrany", "przegrany")
@@ -3168,6 +3206,7 @@ def korekta_strumienia(log: dict | None = None) -> dict[str, float]:
     """
     if log is None:
         log = _migruj_log(supa.get_key("typy_log") or {})
+    log = widok_nauki(log)
     settled = [
         r for r in log.values()
         if r.get("wynik") in ("wygrany", "przegrany")
@@ -3245,6 +3284,7 @@ def proby_strumieni(log: dict | None = None) -> dict[str, dict]:
     """
     if log is None:
         log = _migruj_log(supa.get_key("typy_log") or {})
+    log = widok_nauki(log)
     settled = [
         r for r in log.values()
         if r.get("wynik") in ("wygrany", "przegrany")
@@ -3300,6 +3340,7 @@ def sklad_wersji_okna(log: dict | None = None) -> dict[str, dict]:
     """
     if log is None:
         log = _migruj_log(supa.get_key("typy_log") or {})
+    log = widok_nauki(log)
     biezaca = betting.WERSJA_KALIBRACJI
     settled = [
         r for r in log.values()
@@ -3450,6 +3491,7 @@ def rynki_bez_kalibracji(
     """
     if log is None:
         log = _migruj_log(supa.get_key("typy_log") or {})
+    log = widok_nauki(log)
     rozliczen: dict[str, int] = {}
     for r in log.values():
         if (r.get("wynik") in ("wygrany", "przegrany")
@@ -3501,6 +3543,7 @@ def forward_test(log: dict | None = None) -> dict:
     """
     if log is None:
         log = _migruj_log(supa.get_key("typy_log") or {})
+    log = widok_nauki(log)
     grp = [
         r for r in log.values()
         if r.get("wynik") in ("wygrany", "przegrany")
@@ -3678,6 +3721,7 @@ def szansa_pokazywana(
     """
     if log is None:
         log = _migruj_log(supa.get_key("typy_log") or {})
+    log = widok_nauki(log)
     if korekta_przed_brama is None:
         korekta_przed_brama = korekta_strumienia(log)
     settled = [
@@ -3883,6 +3927,7 @@ def _proba_ceny(log: dict | None = None,
     """
     if log is None:
         log = _migruj_log(supa.get_key("typy_log") or {})
+    log = widok_nauki(log)
     chce_uczony = rachunek == "uczony"
     dane = []
     for r in log.values():
@@ -3908,6 +3953,7 @@ def marza_sciagania(log: dict | None = None,
     Zwraca marżę jednostronną z rozliczeń, ściągniętą do domyślnej przy małej
     próbie. Przy braku danych zwraca domyślną, czyli zachowanie sprzed pomiaru.
     """
+    log = widok_nauki(log)
     dane = _proba_ceny(log, rachunek)
     if not dane:
         return MARZA_SCIAGANIA_DOMYSLNA
@@ -3937,6 +3983,7 @@ def waga_sciagania(log: dict | None = None,
     jawnie, żeby waga dobrała się pod TĘ SAMĄ cenę, do której karta zostanie
     ściągnięta w tym cyklu.
     """
+    log = widok_nauki(log)
     if marza is None:
         marza = marza_sciagania(log, rachunek)
     dane = [
@@ -3990,6 +4037,7 @@ def waga_rynku_pomiar(log: dict | None = None) -> dict[str, dict]:
     """
     if log is None:
         log = _migruj_log(supa.get_key("typy_log") or {})
+    log = widok_nauki(log)
     grupy: dict[str, list] = {}
     for r in log.values():
         if r.get("wynik") not in ("wygrany", "przegrany"):
@@ -4042,6 +4090,7 @@ def przewaga_rynkow(log: dict | None = None) -> dict[str, dict]:
     """
     if log is None:
         log = _migruj_log(supa.get_key("typy_log") or {})
+    log = widok_nauki(log)
     grupy: dict[tuple, list] = {}
     for r in log.values():
         if r.get("wynik") not in ("wygrany", "przegrany"):
@@ -4226,6 +4275,7 @@ def przewaga_pasm(log: dict | None = None) -> dict[str, dict]:
     """
     if log is None:
         log = _migruj_log(supa.get_key("typy_log") or {})
+    log = widok_nauki(log)
     rek = []
     for r in log.values():
         if r.get("wynik") not in ("wygrany", "przegrany"):
@@ -4547,6 +4597,7 @@ def market_bias() -> dict[str, dict]:
               "jej co cykl (patrz KALIBRACJA_ZAMROZONA)")
         return zamrozona
     log = _migruj_log(supa.get_key("typy_log") or {})
+    log = widok_nauki(log)
     return compute_bias_full(log)
 
 
@@ -4554,6 +4605,7 @@ def market_bias_sugestie() -> dict[str, dict]:
     """Osobna kalibracja sugestii STS — liczona wyłącznie z rozliczonych
     sugestii, z szerszym capem w dół (przeszacowania rzędu 20 pp)."""
     log = _migruj_log(supa.get_key("typy_log") or {})
+    log = widok_nauki(log)
     return compute_bias_full(log, sugestie=True, cap=SUGESTIA_BIAS_CAP_LOGIT)
 
 
@@ -4572,6 +4624,7 @@ def compute_wagi_zaufania(log: dict) -> dict[str, dict]:
     shrink do wag bazowych i cap stosuje kupony.wagi_zaufania_z_pomiaru
     (ten sam wzorzec co kary korelacji z diagnostyki).
     """
+    log = widok_nauki(log)
     out: dict[str, dict] = {}
     for kubelek in ("wysoka", "srednia"):
         grp = [
@@ -5619,6 +5672,7 @@ def raport_uczenia(
     sześć pełnych paczek, traci `trend` i zakładka mówi „za krótka historia".
     Puste miejsce jest uczciwsze niż wykres cudzego produktu.
     """
+    log = widok_nauki(log)
     out: dict[str, dict] = {}
     for nazwa in STRUMIENIE:
         settled = sorted(
@@ -5983,6 +6037,7 @@ def epoki_per_rynek(log: dict) -> dict:
     Liczone na tej samej próbie co kwarantanna (typy modelu z kursem), żeby
     liczby dało się zestawić z jej progiem wprost.
     """
+    log = widok_nauki(log)
     settled = [
         r for r in log.values()
         if r.get("wynik") in ("wygrany", "przegrany")
