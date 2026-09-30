@@ -297,6 +297,9 @@ MAGAZYN: dict[str, str] = {
     # ~13 GB odczytu na miesiąc z Supabase — czyta ją tylko pipeline
     "betclic_oferty": "repo",
     "zakres_meczow": "repo",      # zakres analizy dla joba Betclica
+    # pierwszy przewidywany / ogłoszony skład meczu — pomiar trafności
+    # przewidywanych XI (2026-09-30, build_wc_fast._zapisz_pomiar_xi)
+    "pomiar_xi": "repo",
 }
 
 # nazwa backendu -> obiekt z `pobierz(key) -> (payload, ok)` i

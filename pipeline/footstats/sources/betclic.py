@@ -645,6 +645,12 @@ def _osoba_z_nazwy_zakladu(nazwa: str) -> tuple[str, str]:
     return czesci[0].strip(), (nazwa or "")[len(czesci[0]):].strip()
 
 
+def _jest_supersub(rynek: dict) -> bool:
+    """Rynek z kategorii SuperSub Betclica (zawodnik LUB jego zmiennik)."""
+    return ("supersub" in _tekst(rynek.get("nazwa")).lower()
+            or _tekst(rynek.get("kategoria")).lower() == "supersub")
+
+
 def kursy_zawodnikow(id_meczu: int, tylko_statystyki: bool = True) -> dict:
     """Kursy zawodnicze Betclica w postaci gotowej do parowania.
 
@@ -675,7 +681,17 @@ def kursy_zawodnikow(id_meczu: int, tylko_statystyki: bool = True) -> dict:
 
     out: dict[str, dict] = defaultdict(lambda: defaultdict(dict))
     nazwy: dict[str, str] = {}
+    pominiete_supersub = 0
     for r in oferta.get("rynki") or []:
+        # ⚑ SUPERSUB TO INNY ZAKŁAD (2026-09-30). „Liczba strzałów zawodnika
+        # (Supersub)" liczy także zmiennika — inna reguła rozliczenia i cena
+        # ~13% niższa od zwykłej (Niemcy–Serbia 01.10: mediana 0,87, 460 linii
+        # w obu cennikach, 108 tylko w Supersub). `kod_rynku` dawał obu ten sam
+        # kod, więc cenniki nadpisywały się w jednej tabeli, a rozliczaliśmy
+        # wszystko zwykłą regułą Betclica. Bierzemy wyłącznie rynki zwykłe.
+        if _jest_supersub(r):
+            pominiete_supersub += 1
+            continue
         kod = kod_rynku(r["nazwa"])
         if kod is None:
             if "zawodnik" in _tekst(r["nazwa"]).lower():
@@ -715,6 +731,7 @@ def kursy_zawodnikow(id_meczu: int, tylko_statystyki: bool = True) -> dict:
     return {"players": {k: {kod: dict(v) for kod, v in d.items()}
                         for k, d in out.items()},
             "player_names": nazwy,
+            "pominiete_supersub": pominiete_supersub,
             "match": {"id": oferta["id"], "nazwa": oferta["nazwa"],
                       "kickoff_ts": oferta["kickoff_ts"]}}
 

@@ -543,7 +543,20 @@ BRAMA_PRZEWAGI = False
 #     bez fauli, kurs 2,50+               n=20        —          zwrot  −35,7%
 # Osiemnaście kart na faulach, JEDNA trafiona. Ten rynek nie jest słaby przy
 # wysokich kursach — jest słaby zawsze, więc nie daje kart w ogóle.
-RYNKI_BEZ_KARTY = frozenset({"fouls_committed"})
+RYNKI_BEZ_KARTY: frozenset = frozenset()
+# ⚑ FAULE POPEŁNIONE WRACAJĄ Z PROGIEM 8/10 (2026-09-30, decyzja właściciela
+# „wypuszczamy 8/10"). Backtest powtórzony na WYNIKACH STATSHUB (księga
+# 17.08–30.09, 16 685 linii, 5175 zawodników) z regułą Superbetu (spoza
+# pierwszego składu = zwrot) — poprzednie liczby stały na rozliczeniach
+# z błędami (Ferguson 0 fauli zamiast 4, zmiennicy liczeni jak przegrane):
+#     sito 7/10 + kurs ≥ 1,70:  faule 39,3% vs cena 53,7% (n=28),
+#                               linia 1,5: 26,7% vs 53,2% (n=15),
+#                               strzały 42,5% vs 49,7% (n=80)
+#     linia 1,5, pokrycie ≥ 8/10, kurs ≥ 1,6:  55,6% vs 54,6% (n=9)
+# Próba 8/10 jest mała — karty fauli od 01.10 rozpoznaje w księdze rynek
+# (`rynek_kod`) i data, a linie 7/10 dalej idą do pomiaru w tle
+# (`POWOD_POMIARU_RYNKU`), żeby po ~30 kartach rozstrzygnąć na liczbach.
+PROG_POKRYCIA_RYNKU: dict[str, float] = {"fouls_committed": 0.80}
 # ⚑ POMIAR RYNKU BEZ KARTY (2026-09-21, decyzja właściciela: „faule popełnione
 # z powrotem, ale upewnij się"). Backtest na księdze (45 dni, historia sprzed
 # meczu ze statshub performance, 13 006 par): faule popełnione po dzisiejszym
@@ -1905,9 +1918,14 @@ def _oceń_karte(
             if s["kurs"] < MIN_KURS_SCORE:
                 lokalne["kurs_ponizej_progu"] += 1
                 continue
-            # rynek, który nie daje kart w ogóle (patrz RYNKI_BEZ_KARTY) —
-            # osobny licznik, bo to decyzja o RYNKU, nie o tej konkretnej linii
-            bez_karty = r.get("rynek_kod") in RYNKI_BEZ_KARTY
+            # rynek, który nie daje kart w ogóle (patrz RYNKI_BEZ_KARTY) albo
+            # linia pod progiem pokrycia WŁAŚCIWYM DLA RYNKU (faule: 8/10,
+            # patrz PROG_POKRYCIA_RYNKU) — osobny licznik, bo to decyzja
+            # o RYNKU, nie o tej konkretnej linii
+            _prog_rynku = PROG_POKRYCIA_RYNKU.get(r.get("rynek_kod"))
+            bez_karty = (r.get("rynek_kod") in RYNKI_BEZ_KARTY
+                         or (_prog_rynku is not None
+                             and p["traf"] / p["z"] < _prog_rynku))
             if bez_karty:
                 lokalne["rynek_bez_karty"] += 1
                 # bez kolektora pomiaru — jak dotąd; z kolektorem linia idzie

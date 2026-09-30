@@ -2234,6 +2234,50 @@ OKNO_SKLADOW_S = 48 * 3600
 LIMIT_SOFA_NA_CYKL = 40
 
 
+# ⚑ POMIAR TRAFNOŚCI PRZEWIDYWANYCH SKŁADÓW (2026-09-30). Przewidywane XI
+# statshub są TWARDĄ bramą („poza składem"), a ich trafności nigdy nie
+# zmierzyliśmy — 01.10 wycinały Ronaldo, Gnabry'ego, Woltemadego, Zhegrovę.
+# Wstecz się tego nie odtworzy (endpoint po meczu oddaje skład ogłoszony),
+# więc odkładamy PIERWSZY przewidywany i ogłoszony skład każdego meczu;
+# porównanie po meczu rozstrzygnie, czy brama ma zostać twarda.
+POMIAR_XI_KLUCZ = "pomiar_xi"
+POMIAR_XI_RETENCJA_S = 21 * 86400
+
+
+def _zapisz_pomiar_xi(xi_pelne: dict, events: list[dict], teraz: int) -> None:
+    """Dopisz do `pomiar_xi` pierwszy przewidywany / ogłoszony skład meczu.
+
+    Nigdy nie rzuca — to pomiar, cykl ma iść dalej bez niego."""
+    try:
+        if not xi_pelne:
+            return
+        stan, ok = supa.get_key_ok(POMIAR_XI_KLUCZ)
+        if not ok:
+            return
+        stan = stan if isinstance(stan, dict) else {}
+        ko = {int(e["id"]): int(e.get("timeStartTimestamp") or 0)
+              for e in events if e.get("id")}
+        zmiana = False
+        for mid, v in xi_pelne.items():
+            wpis = stan.setdefault(str(mid), {"kickoff_ts": ko.get(int(mid), 0)})
+            pole = "ogloszony" if v.get("confirmed") else "przewidywany"
+            if pole in wpis:
+                continue
+            wpis[pole] = {str(t): sorted(int(x) for x in xi)
+                          for t, xi in (v.get("xi_by_team") or {}).items()}
+            wpis[pole + "_ts"] = teraz
+            wpis[pole + "_zrodlo"] = v.get("zrodlo")
+            zmiana = True
+        for k in [k for k, w in stan.items()
+                  if (w.get("kickoff_ts") or teraz) < teraz - POMIAR_XI_RETENCJA_S]:
+            del stan[k]
+            zmiana = True
+        if zmiana:
+            supa.put_key(POMIAR_XI_KLUCZ, stan)
+    except Exception as e:                                   # noqa: BLE001
+        diagnostyka.cichy("cykl", "pomiar_xi", e)
+
+
 def sklady_xi(events: list[dict]) -> dict[int, dict]:
     """Pełne XI nadchodzących meczów: mid -> {xi_by_team, confirmed, zrodlo}.
 
@@ -4651,6 +4695,8 @@ def _main_impl(tryb=None):
     # gdzie znamy całą XI drużyny, nadpisujemy migotliwą flagę
     # inPredictedLineup z trendów pewniejszym źródłem (pid w XI / poza XI)
     xi_pelne = sklady_xi(events)
+    if not _dry_run():
+        _zapisz_pomiar_xi(xi_pelne, events, int(time.time()))
     if xi_pelne:
         n_conf_xi = sum(1 for v in xi_pelne.values() if v["confirmed"])
         zrodla_xi = Counter(v["zrodlo"] for v in xi_pelne.values())

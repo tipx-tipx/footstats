@@ -923,15 +923,18 @@ def test_tansza_karta_nie_potrzebuje_serii():
     assert radar._oceń_karte(_karta_do_oceny(7, kurs=2.30))[1] is not None
 
 
-def test_faule_nie_daja_kart_wcale():
-    """18 kart na faulach popełnionych, JEDNA trafiona — i to niezależnie od
-    ceny (2,00+: −80,4% na 13 kartach; poniżej 2,00: −100% na 5). Rynek nie
-    jest słaby „przy wysokich kursach", jest słaby zawsze."""
-    karta = _karta_do_oceny(8, kurs=2.30)
+def test_faule_daja_karte_dopiero_od_8_z_10():
+    """Od 30.09 (decyzja właściciela) faule popełnione mają próg 8/10 zamiast
+    banu — backtest na wynikach statshub: 7/10 przy kursie ≥ 1,7 trafia
+    39% przy cenie 54%, linia 1,5 z pokryciem ≥ 8/10 na poziomie ceny."""
+    karta = _karta_do_oceny(7, kurs=2.30)
     karta["rynki"][0]["rynek_kod"] = "fouls_committed"
     assert radar._oceń_karte(karta)[1] is None
     # ...a ten sam materiał na innym rynku kartę daje
-    assert radar._oceń_karte(_karta_do_oceny(8, kurs=2.30))[1] is not None
+    assert radar._oceń_karte(_karta_do_oceny(7, kurs=2.30))[1] is not None
+    karta8 = _karta_do_oceny(8, kurs=2.30)
+    karta8["rynki"][0]["rynek_kod"] = "fouls_committed"
+    assert radar._oceń_karte(karta8)[1] is not None
 
 
 def test_szczebel_za_drobne_po_sufit_linii():

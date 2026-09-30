@@ -37,20 +37,33 @@ def _karta_fauli(traf, kurs=2.05, p_final=0.62, forma5=None, minuty=85,
 def test_stemple_radaru_i_rozliczania_sa_zgodne():
     assert radar.POWOD_POMIARU_RYNKU == rozliczanie.POWOD_POMIARU_RYNKU
     assert radar.POWOD_POMIARU_RYNKU != rozliczanie.POWOD_POMIARU_POKRYCIA
-    assert "fouls_committed" in radar.RYNKI_BEZ_KARTY
+    # od 30.09 faule mają próg 8/10 zamiast banu (radar.PROG_POKRYCIA_RYNKU)
+    assert "fouls_committed" not in radar.RYNKI_BEZ_KARTY
+    assert radar.PROG_POKRYCIA_RYNKU["fouls_committed"] == 0.80
 
 
-def test_faule_po_pelnym_sicie_ida_do_pomiaru_nie_na_karte():
-    """8/10, forma 5/5, kurs 2,05, pełne minuty — dokładnie kształt Mukairu
-    (Pogoń, 20.09). Karta NIE powstaje, pomiar dostaje tę linię."""
+def test_faule_8_z_10_to_karta():
+    """8/10, forma 5/5, kurs 2,05, pełne minuty — kształt Mukairu (Pogoń,
+    20.09) i Fergusona (Szkocja, 26.09). Od 30.09 karta POWSTAJE."""
     pomiar: list = []
-    score, hero = radar._oceń_karte(_karta_fauli(8), pomiar_out=pomiar)
+    _score, hero = radar._oceń_karte(_karta_fauli(8), pomiar_out=pomiar)
+    assert hero is not None
+    assert hero["rynek_kod"] == "fouls_committed" and hero["linia"] == 1.5
+    assert not [p for p in pomiar
+                if p.get("powod_pomiaru") == radar.POWOD_POMIARU_RYNKU]
+
+
+def test_faule_7_z_10_ida_do_pomiaru_nie_na_karte():
+    """7/10 przechodzi sito ogólne, ale nie próg fauli — linia rozlicza się
+    w tle, żeby po ~30 kartach porównać 7/10 z 8/10 na liczbach."""
+    pomiar: list = []
+    score, hero = radar._oceń_karte(_karta_fauli(7, forma5=5), pomiar_out=pomiar)
     assert hero is None and score == 0.0
     assert len(pomiar) == 1
     p = pomiar[0]
     assert p["rynek_kod"] == "fouls_committed" and p["linia"] == 1.5
     assert p["powod_pomiaru"] == radar.POWOD_POMIARU_RYNKU
-    assert p["traf"] == 8 and p["kurs"] == 2.05
+    assert p["traf"] == 7 and p["kurs"] == 2.05
 
 
 def test_faule_pod_sitem_nie_ida_do_pomiaru():
@@ -68,22 +81,22 @@ def test_faule_pod_sitem_nie_ida_do_pomiaru():
 def test_bramy_karty_obowiazuja_pomiar_rynku_tak_samo():
     """Zmiennik (54 min śr.) nie idzie do pomiaru — mierzymy porównywalne."""
     pomiar: list = []
-    radar._oceń_karte(_karta_fauli(8, minuty=54), pomiar_out=pomiar)
+    radar._oceń_karte(_karta_fauli(7, forma5=5, minuty=54), pomiar_out=pomiar)
     assert pomiar == []
 
 
-def test_bez_kolektora_pomiaru_ban_dziala_jak_dotad(monkeypatch):
+def test_bez_kolektora_pomiaru_7_z_10_nie_daje_karty(monkeypatch):
     from collections import Counter
     powody: Counter = Counter()
-    score, hero = radar._oceń_karte(_karta_fauli(8), powody)
+    score, hero = radar._oceń_karte(_karta_fauli(7, forma5=5), powody)
     assert hero is None and score == 0.0
     assert powody["rynek_bez_karty"] == 1
 
 
 def test_pomiar_rynku_nie_wypycha_pomiaru_progu_pokrycia():
-    """Zawodnik z dwoma rynkami: strzały 4/10 (pomiar progu) i faule 8/10
+    """Zawodnik z dwoma rynkami: strzały 4/10 (pomiar progu) i faule 7/10
     (pomiar rynku) — oba pomiary zostają, każdy ze swoim stemplem."""
-    w = _karta_fauli(8)
+    w = _karta_fauli(7, forma5=5)
     w["rynki"].append({"rynek_kod": "shots", "rynek": "Strzały", "drabinka": [
         {"linia": 1.5, "kurs": 2.40, "pokrycie": {"traf": 4, "z": 10},
          "pokrycie5": {"traf": 4, "z": 5}, "p_bazowe": 0.45, "korekta": 1.0,
