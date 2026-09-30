@@ -6074,6 +6074,8 @@ PERF_WARTOSC_PO_S = 4 * 3600
 # rozstrzygnęła — po tylu godzinach wracamy do reguły „nie ma go = nie grał"
 NIEZNANY_W_365_PO_S = 24 * 3600
 POWOD_Z_LAWKI = "nie wyszedł w pierwszym składzie"
+# numery nadawane przez nas (bank/365/odkrywanie z oferty) — statshub ich nie zna
+PID_SYNTETYCZNY = 900_000_000
 
 
 def _perf_pobrana(rec: dict, cache: dict) -> bool:
@@ -6082,14 +6084,22 @@ def _perf_pobrana(rec: dict, cache: dict) -> bool:
     Odróżnia „w historii nie ma tego meczu" (nie grał) od „historii jeszcze
     nie mamy" (budżet zapytań, numer syntetyczny) — `_perf_w_meczu` zwraca
     None w obu przypadkach."""
+    # ⚑ PUSTA HISTORIA NIE JEST DOWODEM (poprawka 30.09 wieczorem). Numer
+    # syntetyczny (≥ PID_SYNTETYCZNY) statshub zwraca jako pustą listę, a pusta
+    # lista czytana jak „pobrano, meczu nie ma" dała 12 fałszywych „nie
+    # zagrał" w pierwszym cyklu na 402b92d (Román 90', Montaño 66', Franco
+    # 90', Olivera 90' — wszyscy z numerem z odkrywania oferty).
     pid = rec.get("podmiot_id")
-    return isinstance(pid, int) and cache.get(pid) is not None
+    return (isinstance(pid, int) and 0 < pid < PID_SYNTETYCZNY
+            and bool(cache.get(pid)))
 
 
 def _perf_w_meczu(rec: dict, cache: dict, budzet: list[int]) -> dict | None:
     """Wiersz statystyk zawodnika z TEGO meczu z historii statshub albo None."""
     pid = rec.get("podmiot_id")
-    if not isinstance(pid, int) or pid <= 0 or not rec.get("mecz_id"):
+    if (not isinstance(pid, int) or pid <= 0 or pid >= PID_SYNTETYCZNY
+            or not rec.get("mecz_id")):
+        # numer syntetyczny: statshub go nie zna, zapytanie tylko zjada budżet
         return None
     if pid not in cache:
         if budzet[0] <= 0:

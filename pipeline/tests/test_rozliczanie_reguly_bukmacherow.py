@@ -143,3 +143,27 @@ def test_365_bez_nazwiska_czeka_na_historie(monkeypatch):
     monkeypatch.setattr(scores365, "after_extra_time", lambda gid: False)
     rozliczanie.rozlicz([], [])
     assert list(store["typy_log"].values())[0]["wynik"] is None
+
+
+def test_numer_syntetyczny_to_nie_dowod_ze_nie_gral(monkeypatch):
+    """Pierwszy cykl na 402b92d: statshub zwraca pustą historię dla numeru
+    z odkrywania oferty (≥ 900 mln), a pusta lista czytana jak „meczu nie ma"
+    dała 12 fałszywych „nie zagrał" (Román 90', Montaño 66')."""
+    rec = _rec_zawodniczy(podmiot_id=937286189, bukmacher="Betclic",
+                          kickoff_ts=int(time.time()) - 30 * 3600)
+    pytania = []
+    store = _przygotuj(monkeypatch, rec)
+    monkeypatch.setattr(statshub, "fetch_event_result",
+                        lambda eid: _wynik_meczu())
+    monkeypatch.setattr(statshub, "fetch_player_performance",
+                        lambda pid, limit=20: pytania.append(pid) or [])
+    rozliczanie.rozlicz([], [])
+    w = list(store["typy_log"].values())[0]
+    assert w["wynik"] is None
+    assert pytania == []                    # budżet nie idzie na numer syntetyczny
+
+
+def test_pusta_historia_prawdziwego_numeru_to_nie_dowod(monkeypatch):
+    rec = _rec_zawodniczy(kickoff_ts=int(time.time()) - 30 * 3600)
+    w = _rozlicz(monkeypatch, rec, [])
+    assert w["wynik"] is None
