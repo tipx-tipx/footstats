@@ -167,3 +167,49 @@ def test_pusta_historia_prawdziwego_numeru_to_nie_dowod(monkeypatch):
     rec = _rec_zawodniczy(kickoff_ts=int(time.time()) - 30 * 3600)
     w = _rozlicz(monkeypatch, rec, [])
     assert w["wynik"] is None
+
+
+def _rozlicz_z_historiami(monkeypatch, rec, historie):
+    store = _przygotuj(monkeypatch, rec)
+    monkeypatch.setattr(statshub, "fetch_event_result",
+                        lambda eid: _wynik_meczu())
+    monkeypatch.setattr(statshub, "fetch_player_performance",
+                        lambda pid, limit=20: historie.get(pid, []))
+    rozliczanie.rozlicz([], [])
+    return list(store["typy_log"].values())[0]
+
+
+def test_superzmiana_bez_365_z_historii_statshub(monkeypatch):
+    """Nusa (Norwegia–Portugalia 27.09): 0 fauli, zszedł, zmiennik dołożył
+    1 — u Superbetu to wygrana (superzmiana), a mecz nie ma 365."""
+    rec = _rec_zawodniczy(rynek_kod="fouls_committed", linia=0.5,
+                          bukmacher="Superbet",
+                          kickoff_ts=int(time.time()) - 8 * 3600)
+    w = _rozlicz_z_historiami(monkeypatch, rec, {
+        777: [_wiersz(rec["mecz_id"], 70, fouls=0, substitutedIn=555)],
+        555: [_wiersz(rec["mecz_id"], 20, fouls=1, substitutedOut=777)],
+    })
+    assert w["wynik"] == "wygrany" and w["faktyczna"] == 1.0
+    assert w.get("superzmiana") and "superzmiana" in w["powod"]
+
+
+def test_betclic_bez_superzmiany(monkeypatch):
+    rec = _rec_zawodniczy(rynek_kod="fouls_committed", linia=0.5,
+                          bukmacher="Betclic",
+                          kickoff_ts=int(time.time()) - 8 * 3600)
+    w = _rozlicz_z_historiami(monkeypatch, rec, {
+        777: [_wiersz(rec["mecz_id"], 70, fouls=0, substitutedIn=555)],
+        555: [_wiersz(rec["mecz_id"], 20, fouls=1, substitutedOut=777)],
+    })
+    assert w["wynik"] == "przegrany" and not w.get("superzmiana")
+
+
+def test_superzmiana_nie_rusza_gdy_zmiennik_nic_nie_dolozyl(monkeypatch):
+    rec = _rec_zawodniczy(rynek_kod="fouls_committed", linia=0.5,
+                          bukmacher="Superbet",
+                          kickoff_ts=int(time.time()) - 8 * 3600)
+    w = _rozlicz_z_historiami(monkeypatch, rec, {
+        777: [_wiersz(rec["mecz_id"], 70, fouls=0, substitutedIn=555)],
+        555: [_wiersz(rec["mecz_id"], 20, fouls=0, substitutedOut=777)],
+    })
+    assert w["wynik"] == "przegrany"

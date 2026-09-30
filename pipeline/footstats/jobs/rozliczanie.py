@@ -1655,22 +1655,66 @@ def _wartosc_zmiennika(
     return None
 
 
+def _superzmiana_statshub(
+    rec: dict, wartosc: float | None, perf_ctx: tuple | None,
+) -> tuple[float, str] | None:
+    """Superzmiana w meczu BEZ 365 — z historii statshub po numerach.
+
+    ⚑ DODANE 2026-09-30 (właściciel: „jak schodzi w trakcie meczu i wchodzi
+    zmiennik, to jest superzmiana"). Dotąd superzmiana działała wyłącznie na
+    danych 365 (`gid is None` → nie dotyczy), więc w reprezentacjach i ligach
+    bez 365 typ, który uratował zmiennik, szedł jako przegrany: od 14.09 49
+    takich typów, 6 z nich wygranych (Nusa i Pedro Neto — Norwegia–Portugalia,
+    Screciu — Rumunia–Bośnia, Buurmeester — Leganés–Castellón).
+    W statshub `substitutedIn` w wierszu zawodnika to numer zmiennika, który
+    za niego wszedł (sprawdzone 30.09 na składzie Węgry–Ukraina).
+    """
+    if not perf_ctx or rec.get("rynek_kod") not in POLA_PERF_ROZLICZENIA:
+        return None
+    ps, cache_perf, budzet_perf, cache_sh = perf_ctx
+    if ps is None:
+        ps = _perf_w_meczu(rec, cache_perf, budzet_perf)
+    if not ps or ps.get("substitutedOut") is not None:
+        return None                     # brak danych albo sam był zmiennikiem
+    try:
+        zid = int(ps.get("substitutedIn") or 0)
+    except (TypeError, ValueError):
+        return None
+    if zid <= 0:
+        return None                     # grał do końca
+    ps_z = _perf_w_meczu({"podmiot_id": zid, "mecz_id": rec["mecz_id"]},
+                         cache_perf, budzet_perf)
+    dodatek = _wartosc_z_perf(rec, ps_z, cache_sh)
+    if not dodatek:
+        return None
+    suma = float(wartosc or 0.0) + dodatek
+    if suma > rec["linia"]:
+        return suma, (f"superzmiana: zmiennik (statshub {zid}) dołożył "
+                      f"{dodatek:g} po zejściu {rec['podmiot']}")
+    return None
+
+
 def _superzmiana(
     rec: dict, gid: int | None, staty: dict | None, lib: dict,
     wartosc: float | None,
+    perf_ctx: tuple | None = None,
 ) -> tuple[float, str] | None:
     """Superzmiana Superbetu: dolicz statystyki zmiennika, jeśli ratują lega.
 
     Zwraca (nowa_wartość, powód) tylko gdy suma przebija linię — nigdy nie
     pogarsza wyniku. None = nie dotyczy / brak danych / suma dalej za niska.
+
+    `perf_ctx` = (wiersz_zawodnika | None, cache_perf, budzet_perf, cache_sh)
+    — ścieżka statshub dla meczów bez 365 (patrz `_superzmiana_statshub`).
     """
     if (
         rec.get("strona") != "powyzej"
         or rec.get("rynek_kod") not in SUPERZMIANA_RYNKI
         or "superbet" not in str(rec.get("bukmacher") or "").lower()
-        or gid is None
     ):
         return None
+    if gid is None:
+        return _superzmiana_statshub(rec, wartosc, perf_ctx)
     try:
         subs = scores365.game_substitutions(gid)
     except Exception as e:
@@ -6646,12 +6690,13 @@ def rozlicz(
             wartosc > rec["linia"] if rec["strona"] == "powyzej" else wartosc < rec["linia"]
         )
         if not trafiony:
-            sz = _superzmiana(rec, gid, staty, lib, wartosc)
+            sz = _superzmiana(rec, gid, staty, lib, wartosc,
+                              perf_ctx=(ps_perf, cache_perf, budzet_perf, cache_sh))
             if sz:
                 wartosc, rec["powod"] = sz
                 rec["superzmiana"] = True
                 trafiony = True
-            if gid is not None:
+            if gid is not None or ps_perf is not None:
                 rec["superzmiana_spr"] = True  # sprawdzone — rewizja nie dubluje
         rec.update(
             wynik="wygrany" if trafiony else "przegrany",
@@ -6717,7 +6762,15 @@ def rozlicz(
             continue
         gid = _gid_365(rec, cache_365)
         if gid is None:
-            # dane 365 mogą dojść później — flagę "sprawdzone" wolno ustawić
+            # mecz bez 365 — superzmiana z historii statshub (30.09)
+            sz = _superzmiana(rec, None, None, lib, rec.get("faktyczna"),
+                              perf_ctx=(None, cache_perf, budzet_perf, cache_sh))
+            if sz:
+                wartosc, powod = sz
+                rec.update(wynik="wygrany", faktyczna=wartosc, rozliczono_ts=now,
+                           superzmiana=True, powod=powod, superzmiana_spr=True)
+                continue
+            # dane mogą dojść później — flagę "sprawdzone" wolno ustawić
             # dopiero, gdy mecz znaleziono (albo gdy szanse na dane minęły)
             if now - (rec.get("rozliczono_ts") or 0) > 72 * 3600:
                 rec["superzmiana_spr"] = True
