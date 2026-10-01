@@ -60,6 +60,9 @@ export type DrabinkaV = {
   historia: number[];
   minuty: number[];
   rywale: string[];
+  /** początek meczu – do wyboru dnia na liście (nie ma go w przykładach z warsztatu) */
+  ts?: number;
+  klucz?: string;
 };
 
 export type NogaV = {
@@ -254,14 +257,16 @@ export function przygotujElementy() {
   /* drabinka z radaru */
   type Radar = {
     podmiot: string;
+    podmiot_id?: number;
     pozycja: string;
     druzyna: string;
     przeciwnik: string;
     mecz: string;
     kickoff_ts: number;
-    hero: { linia: number };
+    hero: { linia: number; rynek?: string; rynek_kod?: string };
     rynki: {
       rynek: string;
+      rynek_kod?: string;
       ostatnie: number[];
       minuty: number[];
       rywale: string[];
@@ -269,12 +274,13 @@ export function przygotujElementy() {
       linie_pelne: Record<string, number>;
     }[];
   };
-  const wpis = (zrodlo().radar as { wpisy: Radar[] }).wpisy?.[0];
-  let drabinka: DrabinkaV | null = null;
-  if (wpis) {
-    const r = wpis.rynki[0];
-    const hist = r.ostatnie.slice(0, 10); // od najnowszego
-    const szczeble: SzczebelV[] = Object.entries(r.linie_pelne)
+  // każdy wpis radaru to jedna karta: rynek POLECANY (`hero`), nie pierwszy
+  // z listy – u zawodnika z kilkoma rynkami pierwszy bywał innym niż polecany
+  const zbudujDrabinke = (wpis: Radar): DrabinkaV | null => {
+    const r = wpis.rynki.find((x) => (wpis.hero.rynek_kod ? x.rynek_kod === wpis.hero.rynek_kod : x.rynek === wpis.hero.rynek)) ?? wpis.rynki[0];
+    if (!r) return null;
+    const hist = (r.ostatnie ?? []).slice(0, 10); // od najnowszego
+    const szczeble: SzczebelV[] = Object.entries(r.linie_pelne ?? {})
       .map(([l, kurs]) => {
         const linia = Number(l);
         const d = r.drabinka.find((x) => x.linia === linia);
@@ -288,7 +294,7 @@ export function przygotujElementy() {
         };
       })
       .sort((a, b) => a.linia - b.linia);
-    drabinka = {
+    return {
       kto: wpis.podmiot,
       pozycja: POZYCJE[wpis.pozycja] ?? wpis.pozycja,
       druzyna: druzyna(wpis.druzyna),
@@ -299,10 +305,18 @@ export function przygotujElementy() {
       rynek: r.rynek,
       szczeble,
       historia: hist.slice().reverse(),
-      minuty: r.minuty.slice(0, 10).reverse(),
-      rywale: r.rywale.slice(0, 10).reverse(),
+      minuty: (r.minuty ?? []).slice(0, 10).reverse(),
+      rywale: (r.rywale ?? []).slice(0, 10).reverse(),
+      ts: wpis.kickoff_ts,
+      klucz: `${wpis.podmiot_id ?? wpis.podmiot}-${r.rynek_kod ?? r.rynek}`,
     };
-  }
+  };
+  const drabinkiLista = ((zrodlo().radar as { wpisy?: Radar[] }).wpisy ?? [])
+    .map(zbudujDrabinke)
+    .filter((d): d is DrabinkaV => d !== null)
+    .sort((a, b) => (a.ts ?? 0) - (b.ts ?? 0));
+  // warsztat i słowniczek pokazują jedną przykładową
+  const drabinka = drabinkiLista[0] ?? null;
 
   /* kupony */
   type KuponS = {
@@ -357,7 +371,7 @@ export function przygotujElementy() {
       .sort((a, b) => a.ts - b.ts),
   }));
 
-  return { ...baza, karty, meczeE, meczeWszystkie, drabinka, kupony };
+  return { ...baza, karty, meczeE, meczeWszystkie, drabinka, drabinkiLista, kupony };
 }
 
 export type DaneElementow = ReturnType<typeof przygotujElementy>;

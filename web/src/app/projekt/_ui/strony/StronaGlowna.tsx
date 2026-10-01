@@ -6,8 +6,9 @@ import { useMemo, useState } from "react";
 
 import { fmtLinia } from "@/lib/format";
 
-import { dzienTs } from "../../_dane/formatCzasu";
-import type { TypLekki } from "../../_dane/przygotuj";
+import { dzienTs, etykietaDnia } from "../../_dane/formatCzasu";
+import type { DrabinkaV } from "../../_dane/elementy";
+import type { DzienV, TypLekki } from "../../_dane/przygotuj";
 import type { DaneStron, KartaStrony } from "../../_dane/strony";
 import { FiltryV3 } from "../atomy2/filtry3";
 import { odm } from "../atomy2/filtry2";
@@ -385,6 +386,37 @@ function naJakiDzien(etykieta: string, jedenDzien: boolean) {
 
 type Uklad = { dane: DaneStron; telefon: boolean; otworz?: (id: number) => void };
 
+/**
+ * Wybór dnia na liście typów (01.10): dni, w których MAMY typy na tej stronie,
+ * z liczbą typów (u zawodników razem z drabinkami) – nie liczba meczów
+ * w ofercie. Domyślnie dziś, a gdy dziś nic – najbliższy dzień z typami.
+ */
+const BRAK_DRABINEK: DrabinkaV[] = [];
+
+function useWyborDnia(lista: TypLekki[], drabinki: DrabinkaV[]) {
+  const TERAZ = useTeraz();
+  const dzis = dzienTs(TERAZ);
+  const dni = useMemo<DzienV[]>(() => {
+    const ile = new Map<string, number>();
+    for (const t of lista) {
+      const k = dzienTs(t.ts);
+      ile.set(k, (ile.get(k) ?? 0) + 1);
+    }
+    for (const d of drabinki) {
+      if (!d.ts) continue;
+      const k = dzienTs(d.ts);
+      ile.set(k, (ile.get(k) ?? 0) + 1);
+    }
+    return [...ile.entries()]
+      .filter(([k]) => k >= dzis)
+      .sort(([a], [b]) => (a < b ? -1 : 1))
+      .map(([klucz, n]) => ({ klucz, etykieta: etykietaDnia(klucz, dzis), ile: n }));
+  }, [lista, drabinki, dzis]);
+  const [wybrany, setWybrany] = useState<string | null>(null);
+  const dzien = (wybrany && dni.some((d) => d.klucz === wybrany) ? wybrany : (dni.find((d) => d.klucz === dzis) ?? dni[0])?.klucz) ?? dzis;
+  return { dni, dzien, dzis, setDzien: setWybrany };
+}
+
 type Grupy = { klucz: (t: TypLekki, k?: KartaStrony) => string; naglowek: (t: TypLekki, k: KartaStrony | undefined, ile: number) => React.ReactNode };
 
 function Lista({
@@ -396,8 +428,16 @@ function Lista({
   rodzaj = "zawodnicy",
   wlasneGrupy,
   bezMeczu,
-}: Uklad & { grupy?: boolean; ile?: number; obokPolek?: React.ReactNode; rodzaj?: Rodzaj; wlasneGrupy?: Grupy; bezMeczu?: boolean }) {
+  zDniami = false,
+}: Uklad & { grupy?: boolean; ile?: number; obokPolek?: React.ReactNode; rodzaj?: Rodzaj; wlasneGrupy?: Grupy; bezMeczu?: boolean; zDniami?: boolean }) {
   const { poId, lista } = useStrona(dane, rodzaj);
+  const wszystkieDrabinki = rodzaj === "druzyny" ? BRAK_DRABINEK : dane.drabinkiLista;
+  const wybor = useWyborDnia(lista, wszystkieDrabinki);
+  // bez paska dni (układy warsztatu) – wszystkie dni jak dotąd
+  const listaDnia = zDniami ? lista.filter((t) => dzienTs(t.ts) === wybor.dzien) : lista;
+  const drabinkiDnia = zDniami ? wszystkieDrabinki.filter((d) => d.ts && dzienTs(d.ts) === wybor.dzien) : wszystkieDrabinki;
+  const nastepnyZDrabinka = wybor.dni.find((d) => d.klucz > wybor.dzien && wszystkieDrabinki.some((x) => x.ts && dzienTs(x.ts) === d.klucz));
+  const etykietaWybranego = wybor.dni.find((d) => d.klucz === wybor.dzien)?.etykieta ?? etykietaDnia(wybor.dzien, wybor.dzis);
   const grupuj = useMemo(
     () =>
       wlasneGrupy
@@ -436,19 +476,40 @@ function Lista({
   );
   return (
     <FiltryV3
-      wszystkie={lista}
+      wszystkie={listaDnia}
       ligi={dane.ligiTypow}
-      drabinki={dane.drabinki}
+      drabinki={drabinkiDnia.length}
       telefon={telefon}
       ile={ile}
       grupuj={grupuj}
-      obokPolek={obokPolek}
+      obokPolek={zDniami ? <DniD dni={wybor.dni} wybrany={wybor.dzien} zmien={wybor.setDzien} /> : obokPolek}
       bezDrabinek={rodzaj === "druzyny"}
       wiersz={(t) => {
         const k = poId.get(t.id);
         return k ? <KartaA t={k} bezMeczu={bezMeczu ?? (grupy || !!wlasneGrupy)} /> : null;
       }}
-      drabinkaTresc={<ScenaDrabinki wariant="a" d={dane.drabinka} />}
+      drabinkaTresc={
+        drabinkiDnia.length ? (
+          <div className="st-drabinki">
+            {drabinkiDnia.map((d) => (
+              <ScenaDrabinki key={d.klucz ?? d.kto} wariant="a" d={d} />
+            ))}
+          </div>
+        ) : (
+          <div className="d-pusty">
+            <div className="p-n" style={{ fontSize: 17 }}>
+              {etykietaWybranego === "Dziś" || etykietaWybranego === "Jutro" ? `Na ${etykietaWybranego.toLowerCase()}` : `Na ${etykietaWybranego}`} nie mamy drabinek
+            </div>
+            {nastepnyZDrabinka ? (
+              <button type="button" className="a-guzik" data-t="drugi" data-r="m" onClick={() => wybor.setDzien(nastepnyZDrabinka.klucz)}>
+                Najbliższe: {nastepnyZDrabinka.etykieta.toLowerCase()} <span className="d-strzalka">→</span>
+              </button>
+            ) : (
+              <p>Drabinka pojawia się, gdy zawodnik przechodzi nasze sito – nie co dzień.</p>
+            )}
+          </div>
+        )
+      }
     />
   );
 }
@@ -538,7 +599,7 @@ function UkladC({ dane, telefon }: Uklad) {
         <h2 id="st-c-lista" className="st-h2 p-n">
           Wszystkie typy
         </h2>
-        <Lista dane={dane} telefon={telefon} grupy ile={12} obokPolek={<DniD dni={dane.dni} />} />
+        <Lista dane={dane} telefon={telefon} grupy ile={12} zDniami />
       </section>
     </main>
   );
@@ -683,7 +744,7 @@ function DruzynyA({ dane, telefon }: Uklad) {
         <h2 id="st-d-lista" className="st-h2 p-n">
           Wszystkie typy
         </h2>
-        <Lista dane={dane} telefon={telefon} grupy ile={12} rodzaj="druzyny" obokPolek={<DniD dni={dane.dni} />} />
+        <Lista dane={dane} telefon={telefon} grupy ile={12} rodzaj="druzyny" zDniami />
       </section>
     </main>
   );
@@ -706,7 +767,7 @@ function DruzynyB({ dane, telefon }: Uklad) {
         <h2 id="st-d-lista-b" className="st-h2 p-n">
           Mecze z typami
         </h2>
-        <Lista dane={dane} telefon={telefon} ile={12} rodzaj="druzyny" wlasneGrupy={grupy} obokPolek={<DniD dni={dane.dni} />} />
+        <Lista dane={dane} telefon={telefon} ile={12} rodzaj="druzyny" wlasneGrupy={grupy} zDniami />
       </section>
     </main>
   );
@@ -739,7 +800,7 @@ function DruzynyC({ dane, telefon }: Uklad) {
         <h2 id="st-d-lista-c" className="st-h2 p-n">
           Wszystkie typy według rynku
         </h2>
-        <Lista dane={dane} telefon={telefon} ile={12} rodzaj="druzyny" wlasneGrupy={grupy} bezMeczu={false} obokPolek={<DniD dni={dane.dni} />} />
+        <Lista dane={dane} telefon={telefon} ile={12} rodzaj="druzyny" wlasneGrupy={grupy} bezMeczu={false} zDniami />
       </section>
     </main>
   );
@@ -775,7 +836,7 @@ function DruzynyAB({ dane, telefon }: Uklad) {
           </h2>
           <p>Przy każdym meczu widzisz, ile średnio mają obie drużyny w 10 ostatnich meczach. Jaśniejszy pasek to drużyna z naszym typem.</p>
         </div>
-        <Lista dane={dane} telefon={telefon} ile={12} rodzaj="druzyny" wlasneGrupy={grupy} obokPolek={<DniD dni={dane.dni} />} />
+        <Lista dane={dane} telefon={telefon} ile={12} rodzaj="druzyny" wlasneGrupy={grupy} zDniami />
       </section>
     </main>
   );

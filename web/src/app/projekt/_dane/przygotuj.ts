@@ -200,16 +200,9 @@ export function druzyna(nazwa: string): DruzynaV {
 
 /* ---- czas ------------------------------------------------------------- */
 
-export { DZIEN_FMT, GODZ_FMT, dzienTs } from "./formatCzasu";
-import { GODZ_FMT, TYDZ, dzienTs } from "./formatCzasu";
+export { DZIEN_FMT, GODZ_FMT, dzienTs, etykietaDnia } from "./formatCzasu";
+import { GODZ_FMT, dzienTs, etykietaDnia } from "./formatCzasu";
 
-export function etykietaDnia(klucz: string, dzis: string): string {
-  const d = new Date(`${klucz}T12:00:00Z`);
-  const roznica = Math.round((d.getTime() - new Date(`${dzis}T12:00:00Z`).getTime()) / 86400000);
-  if (roznica === 0) return "Dziś";
-  if (roznica === 1) return "Jutro";
-  return `${TYDZ[d.getUTCDay()]} ${d.getUTCDate()}.${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
-}
 
 /* ---- składanie -------------------------------------------------------- */
 

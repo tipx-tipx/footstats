@@ -1019,3 +1019,4 @@
 .st-strona[data-opozniony] { animation: st-pokaz-szkielet 0.2s ease 0.3s both; }
 @keyframes st-pokaz-szkielet { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .st-strona[data-opozniony] { animation: none; } }
+.st-drabinki { display: grid; gap: 16px; }
