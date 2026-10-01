@@ -32,11 +32,9 @@ const proc = (p: number) => `${Math.round(p * 100)}%`;
 const kursTxt = (k: number) => k.toFixed(2).replace(".", ",");
 const rynekKrotko = (r: string) => r.replace(/\s*drużyny\s*/, " ").trim();
 const DNI_TYG = ["nd", "pn", "wt", "śr", "cz", "pt", "sb"];
-const wejscie = (i: number) => ({
-  initial: { opacity: 0, y: 8 },
-  animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.35, delay: 0.05 + i * 0.06, ease: [0.22, 1, 0.36, 1] as const },
-});
+// wejście kart i słupków w CSS (strony.css: .st-wejscie, .st-slupek-slup): rusza przy
+// pierwszym malowaniu, bez czekania na JavaScript – treść z serwera nigdy nie jest ukryta
+const wejscie = (i: number) => ({ className: "st-wejscie", style: { "--i": i } as React.CSSProperties });
 
 /* szalik: pasek w barwach drużyny zamiast ozdobnego gradientu */
 function Szalik({ t }: { t: KartaStrony }) {
@@ -67,7 +65,7 @@ export function TypDnia({ t, uklad = "duzy" }: { t: KartaStrony; uklad?: "duzy" 
       <div className="st-td-kto">
         <Herb d={t.druzyna} tryb="prawdziwy" rozmiar={maly ? 26 : 34} />
         <div style={{ minWidth: 0 }}>
-          <div className="st-td-nazwisko p-n">{t.kto}</div>
+          <div className="st-td-nazwisko p-n">{t.podmiotId ? <Lnk href={`/zawodnik/${t.podmiotId}`}>{t.kto}</Lnk> : t.kto}</div>
           <div className="st-td-pod">
             {t.pozycja ? `${t.pozycja} · ` : ""}
             {t.druzyna.nazwa}
@@ -157,7 +155,7 @@ function KartaMocna({ t }: { t: KartaStrony }) {
       <div className="st-td-kto">
         <Herb d={t.druzyna} tryb="prawdziwy" rozmiar={28} />
         <div style={{ minWidth: 0 }}>
-          <div className="st-td-nazwisko p-n">{t.kto}</div>
+          <div className="st-td-nazwisko p-n">{t.podmiotId ? <Lnk href={`/zawodnik/${t.podmiotId}`}>{t.kto}</Lnk> : t.kto}</div>
           <div className="st-td-pod">
             {t.podmiotTyp === "druzyna" ? `przeciw ${t.rywal.nazwa}` : `${t.pozycja ? `${t.pozycja} · ` : ""}${t.druzyna.nazwa}`}
           </div>
@@ -243,16 +241,10 @@ export function WynikiMini({ wyniki, suma, pasek = false }: { wyniki: DaneStron[
     <div className="st-slupki" aria-hidden>
       {wyniki.map((d, i) => (
         <span key={d.dzien} className="st-slupek">
-          <motion.span
-            className="st-slupek-slup"
-            style={{ height: "100%", transformOrigin: "bottom" }}
-            initial={{ scaleY: 0 }}
-            animate={{ scaleY: 1 }}
-            transition={{ duration: 0.5, delay: 0.1 + i * 0.04, ease: [0.22, 1, 0.36, 1] }}
-          >
+          <span className="st-slupek-slup" style={{ height: "100%", "--i": i } as React.CSSProperties}>
             <i className="st-slupek-nie" style={{ flexGrow: d.n - d.ok }} />
             <i className="st-slupek-ok" style={{ flexGrow: d.ok }} />
-          </motion.span>
+          </span>
         </span>
       ))}
     </div>
@@ -269,16 +261,10 @@ export function WynikiMini({ wyniki, suma, pasek = false }: { wyniki: DaneStron[
           onClick={() => setWskazany(i)}
           data-wskazany={wskazany === i || undefined}
         >
-          <motion.span
-            className="st-slupek-slup"
-            style={{ height: "100%", transformOrigin: "bottom" }}
-            initial={{ scaleY: 0 }}
-            animate={{ scaleY: 1 }}
-            transition={{ duration: 0.5, delay: 0.1 + i * 0.04, ease: [0.22, 1, 0.36, 1] }}
-          >
+          <span className="st-slupek-slup" style={{ height: "100%", "--i": i } as React.CSSProperties}>
             <i className="st-slupek-nie" style={{ flexGrow: d.n - d.ok }} />
             <i className="st-slupek-ok" style={{ flexGrow: d.ok }} />
-          </motion.span>
+          </span>
           {!pasek && <small>{dzien(d.dzien).tyg}</small>}
         </button>
       ))}
@@ -585,9 +571,9 @@ function UkladC({ dane, telefon }: Uklad) {
         </h2>
         <div className="st-c-top">
           {top.map((t, i) => (
-            <motion.div key={t.id} {...wejscie(i)}>
+            <div key={t.id} {...wejscie(i)}>
               <KartaMocna t={t} />
-            </motion.div>
+            </div>
           ))}
         </div>
         <div className="st-c-skrot">
@@ -721,9 +707,9 @@ function NajmocniejszeDruzyn({ dane }: { dane: DaneStron }) {
       </h2>
       <div className="st-c-top">
         {top.map((t, i) => (
-          <motion.div key={t.id} {...wejscie(i)}>
+          <div key={t.id} {...wejscie(i)}>
             <KartaMocna t={t} />
-          </motion.div>
+          </div>
         ))}
       </div>
     </section>

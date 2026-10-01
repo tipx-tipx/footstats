@@ -19,6 +19,8 @@ import {
 export type Powod = { tekst: string; kier: "za" | "przeciw" | "baza" };
 
 export type KartaV = TypV & {
+  /** numer zawodnika (strona zawodnika); typ drużynowy – brak */
+  podmiotId?: number;
   podmiotTyp: "zawodnik" | "druzyna";
   mecz: string;
   powody: Powod[];
@@ -62,6 +64,8 @@ export type DrabinkaV = {
   rywale: string[];
   /** początek meczu – do wyboru dnia na liście (nie ma go w przykładach z warsztatu) */
   ts?: number;
+  /** numer zawodnika – link do jego strony */
+  podmiotId?: number;
   klucz?: string;
 };
 
@@ -308,6 +312,7 @@ export function przygotujElementy() {
       minuty: (r.minuty ?? []).slice(0, 10).reverse(),
       rywale: (r.rywale ?? []).slice(0, 10).reverse(),
       ts: wpis.kickoff_ts,
+      podmiotId: wpis.podmiot_id,
       klucz: `${wpis.podmiot_id ?? wpis.podmiot}-${r.rynek_kod ?? r.rynek}`,
     };
   };

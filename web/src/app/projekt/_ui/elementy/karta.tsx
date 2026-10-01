@@ -1,5 +1,6 @@
 "use client";
 
+import { Lnk } from "../linki";
 import { AnimatePresence, motion } from "framer-motion";
 import { useId, useState } from "react";
 
@@ -160,6 +161,11 @@ export function KartaA({ t, otwarta = false, bezMeczu = false }: { t: KartaV; ot
       <Rozwin otwarty={otwarty}>
         <div className="el-rozwin-wnetrze" id={id}>
           <SkadTaLiczba t={t} />
+          {t.podmiotId ? (
+            <Lnk href={`/zawodnik/${t.podmiotId}`} className="el-do-zawodnika">
+              Wszystkie rynki: {t.kto} <span className="d-strzalka">→</span>
+            </Lnk>
+          ) : null}
         </div>
       </Rozwin>
     </article>

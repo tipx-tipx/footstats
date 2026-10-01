@@ -103,6 +103,7 @@ export function przygotujStrony() {
       kursUczciwy: t.fair_kurs ?? null,
       uzasadnienie: null,
       podmiotTyp: druzynowy ? "druzyna" : "zawodnik",
+      podmiotId: druzynowy ? undefined : t.podmiot_id,
       mecz: `${m.gospodarz} – ${m.gosc}`,
       powody: (t.uzasadnienie?.czynniki ?? []).map((c) => powodPoLudzku(c, t.rynek)).filter((x): x is NonNullable<typeof x> => x !== null),
       polka: polkaNaStronie(t.polka, t.p_model),

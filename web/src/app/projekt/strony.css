@@ -1020,3 +1020,18 @@
 @keyframes st-pokaz-szkielet { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .st-strona[data-opozniony] { animation: none; } }
 .st-drabinki { display: grid; gap: 16px; }
+
+/* nazwisko jako wejście na stronę zawodnika – wygląda jak tekst, podkreśla się pod kursorem */
+.st-td-nazwisko a, .el-kto a { color: inherit; text-decoration: none; }
+.st-td-nazwisko a:hover, .el-kto a:hover { text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+.el-do-zawodnika { justify-self: start; display: inline-flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 13px; font-weight: 600; color: var(--t2); text-decoration: none; }
+.el-do-zawodnika:hover { color: var(--t1); }
+
+/* wejście kart i słupków w CSS (01.10): animacja rusza przy pierwszym malowaniu,
+   bez JavaScriptu – serwer nie wysyła już ukrytych kart (framer `initial`
+   chował je do końca ładowania skryptów, na wolnym telefonie na sekundy) */
+.st-wejscie { animation: st-wejscie 0.35s cubic-bezier(0.22, 1, 0.36, 1) both; animation-delay: calc(50ms + var(--i, 0) * 60ms); }
+@keyframes st-wejscie { from { opacity: 0; transform: translateY(8px); } }
+.st-slupek-slup { transform-origin: bottom; animation: st-rosnie 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; animation-delay: calc(100ms + var(--i, 0) * 40ms); }
+@keyframes st-rosnie { from { transform: scaleY(0); } }
+@media (prefers-reduced-motion: reduce) { .st-wejscie, .st-slupek-slup { animation: none; } }

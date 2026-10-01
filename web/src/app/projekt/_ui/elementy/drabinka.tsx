@@ -1,5 +1,6 @@
 "use client";
 
+import { Lnk } from "../linki";
 import { motion } from "framer-motion";
 import { useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 
@@ -67,7 +68,7 @@ function Glowa({ d }: { d: DrabinkaV }) {
         </time>
       </div>
       <div>
-        <h3 className="el-kto">{d.kto}</h3>
+        <h3 className="el-kto">{d.podmiotId ? <Lnk href={`/zawodnik/${d.podmiotId}`}>{d.kto}</Lnk> : d.kto}</h3>
         <div className="el-kto-pod">
           {d.pozycja} · {d.druzyna.nazwa} · drabinka: {d.rynek.toLowerCase()}
         </div>

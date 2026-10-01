@@ -31,12 +31,6 @@ export default async function AppLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   const [meta, wszystkie, mecze] = await Promise.all([getMeta(), getValueBets(), getMecze()]);
   const typy = wszystkie.filter((t) => !t.sugestia);
-  // liczby przy pozycjach menu (4.1 A+): typy na zawodników, na drużyny i mecze, w których je mamy
-  const liczby = {
-    zawodnicy: typy.filter((t) => t.podmiot_typ !== "druzyna").length,
-    druzyny: typy.filter((t) => t.podmiot_typ === "druzyna").length,
-    mecze: new Set(typy.map((t) => t.mecz_id)).size,
-  };
   // indeks wyszukiwarki (Ctrl+K): kilka KB z danych, które układ i tak ma
   const kiedy = new Intl.DateTimeFormat("pl-PL", { weekday: "short", day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Warsaw" });
   // stopka: ile rozgrywek naprawdę jest w ofercie na tydzień (zamiast stałej „50+”)
@@ -45,7 +39,7 @@ export default async function AppLayout({
   // herby z numerów drużyn w meczach (7B) – także drużyn spoza mapy w kodzie
   const indeks = zHerbamiMeczow(mecze, () => zbudujIndeks(typy, mecze, kiedy));
   return (
-    <SzkieletAplikacji liczby={liczby} wygenerowanoTs={meta.wygenerowano_ts} indeks={indeks} rozgrywek={rozgrywek}>
+    <SzkieletAplikacji wygenerowanoTs={meta.wygenerowano_ts} indeks={indeks} rozgrywek={rozgrywek}>
       {children}
     </SzkieletAplikacji>
   );

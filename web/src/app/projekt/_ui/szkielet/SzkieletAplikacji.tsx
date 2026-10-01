@@ -70,13 +70,11 @@ function useSwiezosc(ts: number) {
 /* ---- szkielet ---------------------------------------------------------------- */
 
 export function SzkieletAplikacji({
-  liczby,
   wygenerowanoTs,
   indeks,
   rozgrywek,
   children,
 }: {
-  liczby: Partial<Record<KluczNav, number>>;
   wygenerowanoTs: number;
   /** wyszukiwarka Ctrl+K: zawodnicy z typami, drużyny, mecze */
   indeks: IndeksSzukania;
@@ -181,7 +179,6 @@ export function SzkieletAplikacji({
                 <Link href={m.href} className="s-poz-a s-poz-plus" aria-current={aktywna === m.k ? "page" : undefined} onClick={() => klik(m.href)}>
                   {aktywna === m.k && <motion.span layoutId="kreska-ap" className="s-kreska-a" transition={RUCH.sprezyna.znacznik} />}
                   <span style={{ position: "relative" }}>{m.label}</span>
-                  {liczby[m.k] ? <sup className="s-licznik-poz">{liczby[m.k]}</sup> : null}
                 </Link>
               </span>
             ))}
