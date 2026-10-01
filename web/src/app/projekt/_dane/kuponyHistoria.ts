@@ -10,7 +10,7 @@
  * Do przeglądarki idzie tylko to, co widać: bez szans modelu, wartości i kalibracji.
  */
 
-import { fmtLinia, nazwaPodmiotu } from "@/lib/format";
+import { fmtLinia, nazwaPodmiotu, opisZakladu } from "@/lib/format";
 
 import { etykietaDnia } from "./formatCzasu";
 import { dzisZrodla, zrodlo } from "./zrodlo";
@@ -32,8 +32,13 @@ type Roi = Record<string, { n: number; wygrane: number }>;
 export type WynikKuponu = "wygrany" | "przegrany" | "anulowany" | "zwrot" | "w_grze";
 export type WynikNogi = "wygrany" | "przegrany" | "zwrot" | "czeka";
 
+export type RodzajKuponu = "dzienny" | "dlugoterminowy";
+
 export type KuponHistorii = {
   klucz: string;
+  rodzaj: RodzajKuponu;
+  /** kolejność od najnowszego (sortowanie „Najnowsze”) */
+  nr: number;
   /** „Dziś”, „Wt 30.09” */
   dzien: string;
   horyzont: string;
@@ -43,11 +48,11 @@ export type KuponHistorii = {
 };
 
 export type HistoriaKuponow = {
-  bilans: { nazwa: string; n: number; wygrane: number }[];
+  bilans: { klucz: RodzajKuponu | "wszystkie"; nazwa: string; n: number; wygrane: number }[];
   kupony: KuponHistorii[];
 };
 
-const HORYZONTY: [string, string][] = [
+const HORYZONTY: [RodzajKuponu, string][] = [
   ["dzienny", "Na dziś"],
   ["dlugoterminowy", "Na kilka dni"],
 ];
@@ -58,14 +63,16 @@ export function przygotujHistorieKuponow(): HistoriaKuponow | null {
   if (!surowe.length) return null;
   const dzis = dzisZrodla();
   const roi = w.kupony_roi ?? {};
-  const poHoryzoncie = HORYZONTY.filter(([k]) => roi[k]?.n).map(([k, nazwa]) => ({ nazwa, n: roi[k].n, wygrane: roi[k].wygrane }));
+  const poHoryzoncie = HORYZONTY.filter(([k]) => roi[k]?.n).map(([k, nazwa]) => ({ klucz: k, nazwa, n: roi[k].n, wygrane: roi[k].wygrane }));
   const bilans = poHoryzoncie.length
-    ? [{ nazwa: "Wszystkie", n: poHoryzoncie.reduce((a, b) => a + b.n, 0), wygrane: poHoryzoncie.reduce((a, b) => a + b.wygrane, 0) }, ...poHoryzoncie]
+    ? [{ klucz: "wszystkie" as const, nazwa: "Wszystkie", n: poHoryzoncie.reduce((a, b) => a + b.n, 0), wygrane: poHoryzoncie.reduce((a, b) => a + b.wygrane, 0) }, ...poHoryzoncie]
     : [];
 
   const kupony = surowe
     .map((k): [number, KuponHistorii] => [k.opublikowano_ts, {
       klucz: k.klucz ?? `${k.dzien}-${k.opublikowano_ts}`,
+      rodzaj: k.horyzont === "dzienny" ? "dzienny" : "dlugoterminowy",
+      nr: 0,
       dzien: etykietaDnia(k.dzien, dzis),
       // dzienny kupon: sam dzień („Dziś · na dziś” powtarzało to samo)
       horyzont: k.horyzont === "dzienny" ? "" : "na kilka dni",
@@ -76,7 +83,7 @@ export function przygotujHistorieKuponow(): HistoriaKuponow | null {
         const wiecej = n.rynek_kod.startsWith("wiecej_");
         return {
           kto: /^match_/.test(n.rynek_kod) ? n.mecz : nazwaPodmiotu(n),
-          rynek: wiecej ? `więcej ${n.rynek.replace(/^Więcej:\s*/i, "").toLowerCase()} niż rywal` : n.rynek.replace(/\s*drużyny\s*/, " ").trim(),
+          rynek: wiecej ? opisZakladu(n) : n.rynek.replace(/\s*drużyny\s*/, " ").trim(),
           strona: wiecej ? "" : n.strona === "ponizej" ? "poniżej" : "powyżej",
           linia: wiecej ? "" : fmtLinia(n.linia),
           kurs: n.kurs,
@@ -86,7 +93,7 @@ export function przygotujHistorieKuponow(): HistoriaKuponow | null {
     }])
     // w grze na górze, potem od najnowszego
     .sort(([ta, a], [tb, b]) => Number(b.wynik === "w_grze") - Number(a.wynik === "w_grze") || tb - ta)
-    .map(([, k]) => k);
+    .map(([, k], i) => ({ ...k, nr: i }));
 
   return { bilans, kupony };
 }

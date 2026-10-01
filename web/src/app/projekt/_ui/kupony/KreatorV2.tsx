@@ -4,7 +4,7 @@ import { useTeraz } from "../czas";
 import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { fmtKurs, fmtLinia } from "@/lib/format";
+import { fmtKurs, fmtLinia, nazwaPodmiotu, opisZakladu } from "@/lib/format";
 import { legKey, zlozKupon, type Profil } from "@/lib/kuponBuilder";
 import type { LegPool } from "@/lib/types";
 
@@ -66,11 +66,18 @@ function ryzyko(szansaCalosci: number): { slowo: string; kolor: "ok" | "neutral"
 }
 
 const typow = (n: number) => `${n} ${n === 1 ? "typ" : n < 5 ? "typy" : "typów"}`;
-const zaklad = (l: LegPool) => ({
-  rynek: l.rynek.replace(/\s*drużyny\s*/, " ").trim(),
-  strona: l.strona === "ponizej" ? "poniżej" : "powyżej",
-  linia: fmtLinia(l.linia),
-});
+// „kto więcej”: rynek bez linii („więcej strzałów niż rywal”), nazwa typowanej drużyny
+// z `nazwaPodmiotu` – `podmiot` w tym rynku to zawsze gospodarz (wymóg rozliczania)
+const czyWiecej = (l: LegPool) => l.rynek_kod.startsWith("wiecej_");
+const zaklad = (l: LegPool) =>
+  czyWiecej(l)
+    ? { rynek: opisZakladu(l), strona: "", linia: "" }
+    : {
+        rynek: l.rynek.replace(/\s*drużyny\s*/, " ").trim(),
+        strona: l.strona === "ponizej" ? "poniżej" : "powyżej",
+        linia: fmtLinia(l.linia),
+      };
+const kto = (l: LegPool) => nazwaPodmiotu(l);
 
 /* ---- stan + KRÓTKI link --------------------------------------------- */
 
@@ -482,7 +489,7 @@ export function KreatorV2({
     }
   };
 
-  const herb = (l: LegPool) => herby[l.podmiot_typ === "druzyna" ? l.podmiot : l.druzyna];
+  const herb = (l: LegPool) => herby[l.podmiot_typ === "druzyna" ? kto(l) : l.druzyna];
 
   return (
     <div className="k2">
@@ -688,7 +695,7 @@ export function KreatorV2({
                           <button type="button" className="k2-karta-gora" aria-expanded={otw} onClick={() => setOtwarta(otw ? null : l.id)}>
                             <span className="k2-kto">
                               {herb(l) && <Herb d={herb(l)!} tryb="prawdziwy" rozmiar={16} />}
-                              <span>{l.podmiot}</span>
+                              <span>{kto(l)}</span>
                               {zabl && (
                                 <span className="k2-klodka" title="Zablokowany – zostaje przy zmianie wygranej">
                                   <IKlodka zamknieta />
@@ -721,7 +728,7 @@ export function KreatorV2({
                                     return (
                                       <button key={c.id} type="button" className="k2-kandydat" onClick={() => zamien(l, c)}>
                                         <span>
-                                          {c.podmiot}
+                                          {kto(c)}
                                           <small>
                                             {zc.rynek.toLowerCase()} {zc.strona} {zc.linia}
                                           </small>
@@ -784,7 +791,7 @@ export function KreatorV2({
                               }}
                             >
                               <span>
-                                {c.podmiot}
+                                {kto(c)}
                                 <small>
                                   {zc.rynek.toLowerCase()} {zc.strona} {zc.linia}
                                 </small>
@@ -846,7 +853,7 @@ export function KreatorV2({
                       <div key={l.id} className="k-karta-noga">
                         <time>{kiedyMecz(l.kickoff_ts, TERAZ).godzina}</time>
                         <span>
-                          {l.podmiot}{" "}
+                          {kto(l)}{" "}
                           <small>
                             {z.rynek.toLowerCase()} {z.strona} {z.linia}
                           </small>

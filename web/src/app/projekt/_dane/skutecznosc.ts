@@ -9,7 +9,7 @@
  * (właściciel 01.10: „nie ma innych szczebli z kursami”) – `szczeble`.
  */
 
-import { nazwaPodmiotu } from "@/lib/format";
+import { nazwaPodmiotu, opisZakladu } from "@/lib/format";
 
 import { etykietaDnia } from "./przygotuj";
 import { dzisZrodla, zrodlo } from "./zrodlo";
@@ -81,7 +81,7 @@ export function przygotujSkutecznosc() {
             // „kto więcej”: typowana drużyna i „więcej … niż rywal” zamiast „powyżej 0,0”
             kto: /^match_/.test(t.rynek_kod) ? t.mecz : nazwaPodmiotu(t),
             mecz: t.mecz,
-            rynek: t.rynek_kod.startsWith("wiecej_") ? `więcej ${t.rynek.replace(/^Więcej:\s*/i, "").toLowerCase()} niż rywal` : t.rynek,
+            rynek: t.rynek_kod.startsWith("wiecej_") ? opisZakladu(t) : t.rynek,
             strona: t.rynek_kod.startsWith("wiecej_") ? "" : t.strona,
             linia: t.linia,
             kurs: t.kurs,

@@ -957,6 +957,13 @@
 
 .g-rzad { scroll-behavior: auto; }
 
+/* RZĄD PRZEWIJA SIĘ TYLKO W BOK (01.10, zgłoszenie z telefonu: „dziś, jutro…
+   ruszają się góra-dół”). `overflow-x: auto` włącza przeglądarce też pion, a linia
+   tekstu w chipie była o kilka px wyższa od rzędu – palec przesuwał go w pionie.
+   Pion zamknięty; 4 px zapasu na obwódkę fokusu (bez przesunięcia układu);
+   gest w bok nie przechodzi na stronę (bez „cofnij” i bujania całego ekranu). */
+.g-rzad { overflow-y: hidden; padding-block: 4px; margin-block: -4px; overscroll-behavior-x: contain; }
+
 /* wygaszenie tylko po tej stronie, gdzie coś jeszcze jest */
 .g-rzad[data-prawo] { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 48px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 48px), transparent); }
 .g-rzad[data-lewo] { -webkit-mask-image: linear-gradient(90deg, transparent, #000 48px); mask-image: linear-gradient(90deg, transparent, #000 48px); }

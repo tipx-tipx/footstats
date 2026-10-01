@@ -3,6 +3,7 @@ import { druzyna, type DruzynaV } from "@/app/projekt/_dane/przygotuj";
 import { przygotujHistorieKuponow } from "@/app/projekt/_dane/kuponyHistoria";
 import { przygotujStrony } from "@/app/projekt/_dane/strony";
 import { zDanymi } from "@/app/projekt/_dane/zrodlo";
+import { nazwaPodmiotu } from "@/lib/format";
 import type { LegPool } from "@/lib/types";
 import { pobierzSurowe } from "@/lib/nowe/surowe";
 import { czyTelefon } from "@/lib/nowe/telefon";
@@ -20,7 +21,7 @@ export default async function KuponyPage({ searchParams }: { searchParams: Promi
   const pula = surowe.legiPool as LegPool[];
   const [dane, herby, historia] = zDanymi(surowe, () => {
     const h: Record<string, DruzynaV> = {};
-    for (const l of pula) for (const n of [l.druzyna, l.podmiot_typ === "druzyna" ? l.podmiot : null]) if (n && !h[n]) h[n] = druzyna(n);
+    for (const l of pula) for (const n of [l.druzyna, l.podmiot_typ === "druzyna" ? l.podmiot : null, nazwaPodmiotu(l)]) if (n && !h[n]) h[n] = druzyna(n);
     return [przygotujStrony(), h, przygotujHistorieKuponow()] as const;
   });
   return <StronaAplikacji strona="kupony" dane={dane} kupony={{ pula, herby, k, historia }} teraz={surowe.teraz} telefon={telefon} />;

@@ -545,3 +545,19 @@
   .hk-tekst em { display: none; }
   .hk-rozwin { padding: 0 12px 8px 48px; }
 }
+
+/* historia: kafle bilansu jako przełącznik rodzaju, pasek wyniku i sortu */
+.hk-kafel { text-align: left; font: inherit; color: inherit; cursor: pointer; transition: background-color 0.15s ease, box-shadow 0.15s ease; }
+.hk-kafel:hover { background: var(--pow3); }
+.hk-kafel[aria-pressed="true"] { background: var(--pow1); box-shadow: inset 0 0 0 1.5px var(--akcja); }
+.hk-pasek { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 4px 0 10px; }
+.hk-pasek .g-rama { flex: 1; min-width: 0; }
+.hk-sort { position: relative; flex: none; }
+.hk-sort .d-menu { right: 0; left: auto; }
+.hk-statusy .f-rynek:disabled { opacity: 0.4; cursor: default; }
+
+/* nazwa zakładu może się zawinąć (np. „więcej strzałów niż Sporting Kansas City”),
+   linia zostaje w jednym kawałku – ikona nie zostaje sama w wierszu */
+.k2-zaklad b:first-of-type { white-space: normal; }
+.k2-zaklad { flex-wrap: nowrap; align-items: baseline; }
+.k2-zaklad svg { align-self: center; }
