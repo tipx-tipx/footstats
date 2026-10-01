@@ -48,6 +48,7 @@ export default async function ZawodnikPage({ params }: { params: Promise<{ id: s
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const z = await getZawodnikLekki(Number(id));
+  const zid = Number(id);
+  const z = Number.isInteger(zid) && zid > 0 ? await getZawodnikLekki(zid) : null;
   return { title: z ? `${z.nazwa} – FootStats` : "Zawodnik – FootStats" };
 }

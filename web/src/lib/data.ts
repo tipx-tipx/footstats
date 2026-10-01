@@ -262,6 +262,14 @@ async function fetchKlucz<T>(
     }
   })();
   lazyCache.set(key, { ts: Date.now(), dane });
+  // ⚑ „KLUCZA BRAK” NIE ZOSTAJE W PAMIĘCI (01.10). Klucz, którego jeszcze nie
+  // było (pierwszy cykl po wdrożeniu, chwilowy pad), zapamiętany na całe
+  // okno, trzymał stronę bez danych przez godzinę po tym, jak dane już były –
+  // a pamięć Next przy wygaśnięciu oddaje jeszcze raz starą wartość, więc
+  // razem wychodziło ponad godzinę. Brak = następne wejście pyta od nowa.
+  void dane.then((d) => {
+    if (d === fallback && lazyCache.get(key)?.dane === dane) lazyCache.delete(key);
+  });
   return dane;
 }
 
