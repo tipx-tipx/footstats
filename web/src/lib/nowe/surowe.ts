@@ -15,7 +15,6 @@ import {
   getLegiPool,
   getMecze,
   getMeta,
-  getOddsSuperbet,
   getRadar,
   getTypyWyniki,
   getValueBets,
@@ -23,28 +22,7 @@ import {
   getZawodnicyTypow,
   terazTs,
 } from "@/lib/data";
-import type { Mecz, OddsSuperbet } from "@/lib/types";
-
-/**
- * Podsumowanie oferty meczu z kursów na zawodników: ilu zawodników ma kurs,
- * ile rynków, ile linii. Do pipeline (etap 7B): wysyłać gotowe, lekkie
- * podsumowanie zamiast liczyć je tutaj z całej mapy kursów.
- */
-export function ofertaZKursow(kursy: OddsSuperbet): Surowe["oferta"] {
-  const wynik: Surowe["oferta"] = {};
-  for (const [meczId, zawodnicy] of Object.entries(kursy ?? {})) {
-    const rynki = new Set<string>();
-    let linie = 0;
-    for (const rynkiZ of Object.values(zawodnicy)) {
-      for (const [rynek, l] of Object.entries(rynkiZ)) {
-        rynki.add(rynek);
-        linie += Object.keys(l).length;
-      }
-    }
-    wynik[meczId] = { zawodnicy: Object.keys(zawodnicy).length, rynki: rynki.size, linie };
-  }
-  return wynik;
-}
+import type { Mecz } from "@/lib/types";
 
 type MeczZNumerami = Mecz & {
   gospodarz_id?: number;
@@ -94,11 +72,10 @@ export async function pobierzSurowe(): Promise<Surowe> {
     getLegiPool(),
     getTypyWyniki(),
   ]);
-  // podsumowanie oferty: gotowe w `matches` (7B); bez niego – liczone z siatki
-  const zMeczow = mecze.length > 0 && (mecze as MeczZNumerami[]).every((m) => m.oferta);
-  const oferta = zMeczow
-    ? Object.fromEntries((mecze as MeczZNumerami[]).map((m) => [String(m.id), m.oferta!]))
-    : ofertaZKursow(await getOddsSuperbet());
+  // podsumowanie oferty: gotowe w `matches` (7B); mecz bez niego = brak liczb, nie zgadujemy
+  const oferta = Object.fromEntries(
+    (mecze as MeczZNumerami[]).filter((m) => m.oferta).map((m) => [String(m.id), m.oferta!]),
+  );
   return {
     // „sugestie” (brak kursu, tylko podpowiedź modelu) nie są typami z listy
     typy: typy.filter((t) => !t.sugestia),
@@ -128,8 +105,9 @@ export async function pobierzSurowe(): Promise<Surowe> {
  */
 export async function zKadramiMeczu(surowe: Surowe, mecz: Mecz): Promise<Surowe> {
   const [zawodnicy, dwa] = await Promise.all([getZawodnicyDruzyn([mecz.gospodarz, mecz.gosc]), getKursyMeczu(mecz.id)]);
-  // kursy obu bukmacherów osobno (7B); bez nich – stara siatka z jedną ceną
-  const kursy = dwa ?? (await getOddsSuperbet())[String(mecz.id)] ?? {};
+  // kursy obu bukmacherów osobno (7B); brak paczki = brak kursów (głośno w logu), nie stara siatka
+  if (dwa === null) console.error(`[data] brak paczki kursów dla meczu ${mecz.id}`);
+  const kursy = dwa ?? {};
   return {
     ...surowe,
     pokrycia: { mecze: [{ id: mecz.id, gosp: mecz.gospodarz, gosc: mecz.gosc, zawodnicy, kursy }] },

@@ -15,7 +15,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const tu = dirname(fileURLToPath(import.meta.url));
-const SQL = join(tu, "..", "..", "supabase", "migrations", "0009_app_data_lekkie_klucze.sql");
+const SQL = join(tu, "..", "..", "supabase", "migrations", "0010_app_data_zamkniecie_starych.sql");
 const DATA_TS = join(tu, "..", "src", "lib", "data.ts");
 
 function kluczeZSql(tekst) {

@@ -49,8 +49,10 @@ def test_front_ma_komplet_swoich_kluczy():
     """Kontrola samej metody: gdyby `data.ts` zmienił format, test wyżej
     przestałby cokolwiek sprawdzać, milcząco przechodząc."""
     klucze = _klucze_frontu()
-    assert {"value_bets", "matches", "kupony", "players",
-            "odrzucenia", "typy_wyniki"} <= klucze, (
+    # od 01.10 strona nie czyta `players` ani `odrzucenia` (migracja 0010);
+    # czyta koszyki i lekkie klucze 7B
+    assert {"value_bets", "matches", "kupony", "players_typy",
+            "zaw_indeks", "typy_wyniki"} <= klucze, (
         f"nie umiem odczytać kluczy frontu z data.ts (znalazłem: {sorted(klucze)})"
     )
 

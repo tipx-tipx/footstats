@@ -10,18 +10,13 @@
 
 import valueBetsLocal from "@/data/demo/value_bets.json";
 import matchesLocal from "@/data/demo/matches.json";
-import playersLocal from "@/data/demo/players.json";
 import calibrationLocal from "@/data/demo/calibration.json";
 import metaLocal from "@/data/demo/meta.json";
 import kuponyLocal from "@/data/demo/kupony.json";
 import typyWynikiLocal from "@/data/demo/typy_wyniki.json";
-import oddsSuperbetLocal from "@/data/demo/odds_superbet.json";
 import legiPoolLocal from "@/data/demo/legi_pool.json";
-import odrzuceniaLocal from "@/data/demo/odrzucenia.json";
-import stsValueLocal from "@/data/demo/sts_value.json";
 import druzynyFormaLocal from "@/data/demo/druzyny_forma.json";
 import radarLocal from "@/data/demo/radar.json";
-import pokrycieLocal from "@/data/demo/pokrycie_liga.json";
 
 import { scalWGlab } from "./sklejanie";
 
@@ -32,11 +27,7 @@ import type {
   LegPool,
   Mecz,
   Meta,
-  OddsSuperbet,
-  Odrzucenie,
-  PokrycieLiga,
   Radar,
-  StsValue,
   TypyWyniki,
   ValueBet,
   Zawodnik,
@@ -45,35 +36,25 @@ import type {
 type Bundle = {
   value_bets: ValueBet[];
   matches: Mecz[];
-  players: Zawodnik[];
   calibration: Kalibracja;
   meta: Meta;
   kupony: Kupon[];
   typy_wyniki: TypyWyniki;
-  odds_superbet: OddsSuperbet;
   legi_pool: LegPool[];
-  odrzucenia: Odrzucenie[];
-  sts_value: StsValue;
   druzyny_forma: DruzynaForma[];
   radar: Radar;
-  pokrycie_liga: PokrycieLiga;
 };
 
 const LOCAL: Bundle = {
   value_bets: valueBetsLocal as unknown as ValueBet[],
   matches: matchesLocal as unknown as Mecz[],
-  players: playersLocal as unknown as Zawodnik[],
   calibration: calibrationLocal as unknown as Kalibracja,
   meta: metaLocal as unknown as Meta,
   kupony: kuponyLocal as unknown as Kupon[],
   typy_wyniki: typyWynikiLocal as unknown as TypyWyniki,
-  odds_superbet: oddsSuperbetLocal as unknown as OddsSuperbet,
   legi_pool: legiPoolLocal as unknown as LegPool[],
-  odrzucenia: odrzuceniaLocal as unknown as Odrzucenie[],
-  sts_value: stsValueLocal as unknown as StsValue,
   druzyny_forma: druzynyFormaLocal as unknown as DruzynaForma[],
   radar: radarLocal as unknown as Radar,
-  pokrycie_liga: pokrycieLocal as unknown as PokrycieLiga,
 };
 
 const SUPABASE_URL = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -130,8 +111,7 @@ const ODSWIEZANIE_WOLNE_S = 10800;
  */
 const BUNDLE_KEYS = [
   "value_bets", "matches", "calibration", "meta", "kupony",
-  "legi_pool", "sts_value",
-  "druzyny_forma", "radar", "pokrycie_liga",
+  "legi_pool", "druzyny_forma", "radar",
 ] as const;
 
 /**
@@ -306,11 +286,6 @@ function tylkoNadchodzace(bundle: Bundle): Bundle {
     legi_pool: bundle.legi_pool.filter(
       (l) => l.kickoff_ts > now + MARGINES_STARTU_S,
     ),
-    // value bety STS: kurs bywa ulotny, ale mecz po starcie i tak nie do zagrania
-    sts_value: {
-      ...bundle.sts_value,
-      alerty: bundle.sts_value.alerty.filter((a) => (a.mecz_ts ?? 0) > now),
-    },
     // radar: wpis na mecz, który już się zaczął, nie jest do zagrania
     radar: {
       ...bundle.radar,
@@ -364,22 +339,17 @@ async function fetchBundle(): Promise<Bundle> {
     return tylkoNadchodzace({
       value_bets: (map.value_bets ?? LOCAL.value_bets) as ValueBet[],
       matches: (map.matches ?? LOCAL.matches) as Mecz[],
-      // players / odrzucenia / typy_wyniki NIE jadą w bundlu — patrz
-      // `fetchKlucz`. W typie zostają, żeby `Bundle` dalej opisywał komplet
-      // danych aplikacji; tu wypełniamy je lokalnym fallbackiem, bo nikt
-      // ich stąd nie czyta (gettery mają własną ścieżkę).
-      players: LOCAL.players,
+      // typy_wyniki NIE jedzie w bundlu — patrz `fetchKlucz`.
+      // W typie zostają, żeby `Bundle` dalej opisywał komplet danych
+      // aplikacji; tu wypełniamy je lokalnym fallbackiem, bo nikt ich stąd
+      // nie czyta (gettery mają własną ścieżkę).
       calibration: (map.calibration ?? LOCAL.calibration) as Kalibracja,
       meta: (map.meta ?? LOCAL.meta) as Meta,
       kupony: (map.kupony ?? LOCAL.kupony) as Kupon[],
       typy_wyniki: LOCAL.typy_wyniki,
-      odds_superbet: LOCAL.odds_superbet,
       legi_pool: (map.legi_pool ?? LOCAL.legi_pool) as LegPool[],
-      odrzucenia: LOCAL.odrzucenia,
-      sts_value: (map.sts_value ?? LOCAL.sts_value) as StsValue,
       druzyny_forma: (map.druzyny_forma ?? LOCAL.druzyny_forma) as DruzynaForma[],
       radar: (map.radar ?? LOCAL.radar) as Radar,
-      pokrycie_liga: (map.pokrycie_liga ?? LOCAL.pokrycie_liga) as PokrycieLiga,
     });
   } catch {
     return tylkoNadchodzace(LOCAL);
@@ -415,22 +385,6 @@ export async function getMecze(): Promise<Mecz[]> {
   return (await loadBundle()).matches;
 }
 
-/** Rejestr odrzuceń: czemu para (zawodnik, rynek) nie dostała typu. */
-export async function getOdrzucenia(meczId?: number): Promise<Odrzucenie[]> {
-  const wszystkie = await fetchKlucz<Odrzucenie[]>(
-    "odrzucenia",
-    LOCAL.odrzucenia,
-    ODSWIEZANIE_WOLNE_S,
-  );
-  return meczId == null
-    ? wszystkie
-    : wszystkie.filter((o) => o.mecz_id === meczId);
-}
-
-export async function getZawodnicy(): Promise<Zawodnik[]> {
-  return fetchKlucz<Zawodnik[]>("players", LOCAL.players, ODSWIEZANIE_SKLADY_S);
-}
-
 /**
  * ⚑ ZAWODNICY W KAWAŁKACH (2026-09-18) — patrz `push_supabase.KOSZYKI_PLAYERS`.
  *
@@ -439,8 +393,8 @@ export async function getZawodnicy(): Promise<Zawodnik[]> {
  * 5 GB/mies.). Pipeline wysyła obok niego:
  *   * `players_typy` — zawodnicy z typami, tylko rynki typów (strona główna),
  *   * `players_d00`..`players_d95` — koszyki po nazwie drużyny (strona meczu).
- * Gdy klucza jeszcze nie ma (pierwszy cykl po wdrożeniu), wracamy do pełnego
- * `players` — wynik na stronie jest ten sam, zmienia się tylko transfer.
+ * Pełny `players` strona przestała czytać 01.10 (migracja 0010 zamyka mu
+ * odczyt): brak koszyka = pusta lista i głośny log, nigdy 44 MB ani dane demo.
  */
 export const KOSZYKI_PLAYERS = 96;
 
@@ -461,7 +415,8 @@ export async function getZawodnicyTypow(): Promise<Zawodnik[]> {
     null,
     ODSWIEZANIE_SKLADY_S,
   );
-  return typy ?? getZawodnicy();
+  if (!typy) console.error("[data] brak `players_typy` – strona główna bez historii zawodników");
+  return typy ?? [];
 }
 
 /** Zawodnicy wskazanych drużyn (po nazwie) — strona meczu. */
@@ -476,17 +431,18 @@ export async function getZawodnicyDruzyn(druzyny: string[]): Promise<Zawodnik[]>
       ),
     ),
   );
-  if (koszyki.some((k) => k == null)) return getZawodnicy();
+  if (koszyki.some((k) => k == null)) console.error(`[data] brak koszyka zawodników dla ${druzyny.join(", ")}`);
   const zbior = new Set(druzyny);
-  return koszyki.flatMap((k) => k!).filter((z) => zbior.has(z.druzyna));
+  return koszyki.flatMap((k) => k ?? []).filter((z) => zbior.has(z.druzyna));
 }
 
 /* ---- lekkie klucze nowej strony (redesign 7B, `pipeline/footstats/jobs/lekkie_klucze.py`) ----
  * Strona czyta tylko to, co pokazuje: kursy obu bukmacherów jednego meczu
  * (`kursy_mNN`, mecz w koszyku `id % 32`) i jednego zawodnika (`zaw_kNN`,
- * `id % 64`, 10 meczów historii). `null` = klucza jeszcze nie ma (pierwszy
- * cykl po wdrożeniu albo migracja 0009 niewklejona) – strona wraca wtedy do
- * starej ścieżki (`odds_superbet` + koszyki drużyn), wynik ten sam, większy transfer.
+ * `id % 64`, 10 meczów historii). `null` = klucza brak (awaria zapisu) –
+ * strona pokazuje wtedy mniej, nigdy starych ani demonstracyjnych danych.
+ * `odds_superbet` (jedna cena bez nazwy bukmachera) strona przestała czytać
+ * 01.10 – migracja 0010 zamyka mu odczyt.
  */
 export const KOSZYKI_KURSOW = 32;
 export const KOSZYKI_ZAWODNIKOW = 64;
@@ -545,23 +501,6 @@ export async function getKupony(): Promise<Kupon[]> {
   return (await loadBundle()).kupony;
 }
 
-/**
- * Kupon dnia do zajawki na stronie głównej: najbliższy grywalny zestaw
- * (wszystkie mecze przed startem), najpierw horyzont dzienny, potem
- * najniższy cel = największa szansa trafienia.
- */
-export async function getKuponDnia(): Promise<Kupon | undefined> {
-  const kupony = (await loadBundle()).kupony;
-  const now = Math.floor(Date.now() / 1000);
-  return kupony
-    .filter((k) => k.legi.length > 0 && k.legi.every((l) => l.kickoff_ts > now))
-    .sort(
-      (a, b) =>
-        Number(a.horyzont !== "dzienny") - Number(b.horyzont !== "dzienny") ||
-        a.cel - b.cel,
-    )[0];
-}
-
 export async function getTypyWyniki(): Promise<TypyWyniki> {
   return fetchKlucz<TypyWyniki>(
     "typy_wyniki",
@@ -570,23 +509,8 @@ export async function getTypyWyniki(): Promise<TypyWyniki> {
   );
 }
 
-/**
- * Siatka kursów (wyższa cena z dwóch bukmacherów, bez nazwy) – od redesignu
- * 7B tylko ZAPAS: strona meczu czyta `kursy_mNN`, lista meczów podsumowanie
- * z `matches`. Poza bazowym zestawem (2026-10-01), żeby nie jechała przy
- * każdym renderze każdej strony.
- */
-export async function getOddsSuperbet(): Promise<OddsSuperbet> {
-  return fetchKlucz<OddsSuperbet>("odds_superbet", LOCAL.odds_superbet);
-}
-
 export async function getLegiPool(): Promise<LegPool[]> {
   return (await loadBundle()).legi_pool;
-}
-
-/** Value bety STS (klik użytkownika → Supabase). Alerty już po filtrze startu. */
-export async function getStsValue(): Promise<StsValue> {
-  return (await loadBundle()).sts_value;
 }
 
 /** Radar okazji kontekstowych (transfery / serie / debiutanci), po filtrze startu. */
@@ -594,7 +518,3 @@ export async function getRadar(): Promise<Radar> {
   return (await loadBundle()).radar;
 }
 
-/** Tabela pokrycia skanu – ligi i nasze statystyki (zakładka Mecze). */
-export async function getPokrycie(): Promise<PokrycieLiga> {
-  return (await loadBundle()).pokrycie_liga;
-}

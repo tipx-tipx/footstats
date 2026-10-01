@@ -4,7 +4,7 @@ import { StronaAplikacji } from "@/app/projekt/_ui/aplikacja/Strona";
 import { przygotujStrony } from "@/app/projekt/_dane/strony";
 import { przygotujZawodnika } from "@/app/projekt/_dane/zawodnik";
 import { zDanymi, type Surowe } from "@/app/projekt/_dane/zrodlo";
-import { getOddsSuperbet, getZawodnikLekki } from "@/lib/data";
+import { getZawodnikLekki } from "@/lib/data";
 import type { Mecz, ValueBet } from "@/lib/types";
 import { pobierzSurowe, zKadramiMeczu } from "@/lib/nowe/surowe";
 import { czyTelefon } from "@/lib/nowe/telefon";
@@ -15,8 +15,8 @@ import { czyTelefon } from "@/lib/nowe/telefon";
  *
  * 7B: zawodnik z lekkiego koszyka `zaw_kNN` (po numerze, 10 meczów, kursy obu
  * bukmacherów) – kilkadziesiąt KB zamiast dwóch koszyków całych drużyn.
- * Gdy koszyków jeszcze nie ma (pierwszy cykl po wdrożeniu, migracja 0009
- * niewklejona) – stara ścieżka: kadry meczu, w którym ma kurs albo typ.
+ * Gdy koszyka brak (awaria zapisu) – zawodnik z typem dostaje stronę z kadr
+ * meczu; bez typu – 404.
  */
 export default async function ZawodnikPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -35,10 +35,8 @@ export default async function ZawodnikPage({ params }: { params: Promise<{ id: s
       pokrycia: { mecze: [{ id: mecz.id, gosp: mecz.gospodarz, gosc: mecz.gosc, zawodnicy: [zawodnik], kursy: { [String(zid)]: kursy } }] },
     };
   } else {
-    const kursy = await getOddsSuperbet();
-    const meczId =
-      Number(Object.entries(kursy ?? {}).find(([, zaw]) => zaw[String(zid)])?.[0]) ||
-      (surowe.typy as ValueBet[]).find((t) => t.podmiot_typ !== "druzyna" && t.podmiot_id === zid)?.mecz_id;
+    // koszyka brak (awaria zapisu) – zawodnik z typem dalej ma stronę z kadr meczu
+    const meczId = (surowe.typy as ValueBet[]).find((t) => t.podmiot_typ !== "druzyna" && t.podmiot_id === zid)?.mecz_id;
     const mecz = (surowe.mecze as Mecz[]).find((m) => m.id === meczId);
     if (!mecz) notFound();
     zDanymiZawodnika = await zKadramiMeczu(surowe, mecz);
