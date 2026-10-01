@@ -27,6 +27,8 @@ import { StronaDruzyny, StronaGlowna } from "../strony/StronaGlowna";
 import { StronaMecze } from "../strony/StronaMecze";
 import { StronaMeczu } from "../strony/StronaMeczu";
 import { KreatorV2 } from "../kupony/KreatorV2";
+import { HistoriaKuponow } from "../kupony/HistoriaKuponow";
+import type { HistoriaKuponow as HistoriaKuponowDane } from "../../_dane/kuponyHistoria";
 import { StronaWynikowAdmin } from "../strony/StronaKontroli";
 import { StronaSkutecznosci } from "../strony/StronaSkutecznosci";
 import { StronaJakCzytac } from "../strony/StronaJakCzytac";
@@ -81,7 +83,7 @@ export function StronaAplikacji({
   /** strona meczu: mecz z pełnymi kadrami */
   mecz?: MeczStrony;
   /** strona Kupony: pula typów, herby, kupon z linku (`?k=`) */
-  kupony?: { pula: LegPool[]; herby: Record<string, DruzynaV>; k?: string };
+  kupony?: { pula: LegPool[]; herby: Record<string, DruzynaV>; k?: string; historia?: HistoriaKuponowDane | null };
   /** Wyniki: dane klienta; `kontrola` TYLKO dla admina (rola sprawdzona na serwerze) */
   wyniki?: { skutecznosc: DaneSkutecznosci; kontrola?: DaneKontroli; start?: { widok?: string; dzien?: string } };
   /** strona zawodnika */
@@ -108,6 +110,7 @@ export function StronaAplikacji({
     ) : strona === "kupony" && kupony ? (
       <div className="ap-waska">
         <KreatorV2 pula={kupony.pula} herby={kupony.herby} telefon={telefon} start={{ k: kupony.k }} />
+        {kupony.historia && <HistoriaKuponow dane={kupony.historia} />}
       </div>
     ) : strona === "mecz" && mecz ? (
       <StronaMeczu wariant="a" m={mecz} dane={dane} telefon={telefon} />

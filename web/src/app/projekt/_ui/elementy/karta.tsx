@@ -13,7 +13,7 @@ import { IkonaRynku } from "./ikonyRynkow";
 
 const strona = (s: string) => (s === "ponizej" ? "poniżej" : "powyżej");
 
-function Chevron() {
+export function Chevron() {
   return (
     <svg className="el-chevron" width="14" height="14" viewBox="0 0 14 14" aria-hidden>
       <path d="m3.5 5.5 3.5 3.5 3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
@@ -100,7 +100,7 @@ function Meta({ t }: { t: KartaV }) {
   );
 }
 
-function Rozwin({ otwarty, children }: { otwarty: boolean; children: React.ReactNode }) {
+export function Rozwin({ otwarty, children }: { otwarty: boolean; children: React.ReactNode }) {
   return (
     <AnimatePresence initial={false}>
       {otwarty && (

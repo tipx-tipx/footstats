@@ -151,7 +151,13 @@ function WierszWyniku({ t }: { t: TypWyniku }) {
       <span className="sk-typ-tekst">
         <small>{t.kto}</small>
         <span>
-          <b>{t.rynek.replace(/\s*drużyny\s*/, " ").trim()}</b> {t.strona === "ponizej" ? "poniżej" : "powyżej"} <strong>{fmtLinia(t.linia)}</strong>
+          <b>{t.rynek.replace(/\s*drużyny\s*/, " ").trim()}</b>
+          {t.strona && (
+            <>
+              {" "}
+              {t.strona === "ponizej" ? "poniżej" : "powyżej"} <strong>{fmtLinia(t.linia)}</strong>
+            </>
+          )}
         </span>
       </span>
       <span className="sk-typ-bylo">
@@ -165,6 +171,18 @@ function WierszWyniku({ t }: { t: TypWyniku }) {
         )}
       </span>
       <span className="sk-typ-kurs">{kursTxt(t.kurs)}</span>
+      {t.szczeble && t.szczeble.length > 1 && (
+        <span className="sk-szczeble" aria-label="Wszystkie szczeble drabinki">
+          <small>drabinka</small>
+          {t.szczeble.map((s) => (
+            <span key={s.linia} className="sk-szczebel" data-wynik={s.wynik} data-polecany={s.polecany || undefined} title={s.polecany ? "nasz typ – ten szczebel liczy się do wyniku" : "dalszy szczebel – nie liczy się do wyniku"}>
+              <b>{fmtLinia(s.linia)}</b>
+              <i aria-label={s.wynik === "wygrany" ? "weszło" : s.wynik === "przegrany" ? "nie weszło" : "zwrot"}>{s.wynik === "wygrany" ? "✓" : s.wynik === "przegrany" ? "✕" : "↺"}</i>
+              <span>{kursTxt(s.kurs)}</span>
+            </span>
+          ))}
+        </span>
+      )}
     </div>
   );
 }

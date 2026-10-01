@@ -1035,3 +1035,13 @@
 .st-slupek-slup { transform-origin: bottom; animation: st-rosnie 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; animation-delay: calc(100ms + var(--i, 0) * 40ms); }
 @keyframes st-rosnie { from { transform: scaleY(0); } }
 @media (prefers-reduced-motion: reduce) { .st-wejscie, .st-slupek-slup { animation: none; } }
+
+/* Wyniki: wszystkie szczeble drabinki pod zakładem (01.10) – liczy się tylko polecany */
+.sk-szczeble { grid-column: 2 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: -2px; }
+.sk-szczeble > small { font-size: 11.5px; color: var(--t3); margin-right: 2px; }
+.sk-szczebel { display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 8px; border-radius: 7px; background: var(--pow2); font-size: 12.5px; color: var(--t2); font-variant-numeric: tabular-nums; }
+.sk-szczebel b { color: var(--t1); font-weight: 700; }
+.sk-szczebel i { font-style: normal; font-size: 11px; font-weight: 700; color: var(--t3); }
+.sk-szczebel[data-wynik="wygrany"] i { color: var(--ok); }
+.sk-szczebel[data-wynik="przegrany"] i { color: var(--nie); }
+.sk-szczebel[data-polecany] { background: none; box-shadow: inset 0 0 0 1.5px var(--akcja); }
