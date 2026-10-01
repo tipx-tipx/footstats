@@ -12,11 +12,23 @@ behaves exactly as before, one password, everyone is admin.
 Role lives in the session cookie and is covered by the signature, so editing it
 does not escalate — `npm run test:role` proves it (9 checks, no framework).
 
-**Hiding something in the UI is not hiding it.** `SkutecznoscScena` is a client
-component, so anything passed in props ends up in the page source even when
-nothing renders it. Strip on the server instead — see `lib/okrojDlaKlienta.ts`.
-When adding a new panel with model diagnostics, ask first: does the client's
-browser need to *receive* this?
+**Hiding something in the UI is not hiding it.** Pages render through
+`StronaAplikacji` (`app/projekt/_ui/aplikacja/Strona.tsx`), a client component,
+so anything passed in props ends up in the page source even when nothing
+renders it. Model internals are therefore never *computed* for a client:
+`(app)/model/page.tsx` fetches `zKuchnia` and runs `przygotujKontrole()` only
+when `czyPelnyWglad(rola)`. `npm run test:role` checks that contract by reading
+the page sources. When adding a new panel with model diagnostics, ask first:
+does the client's browser need to *receive* this?
+
+# Where the UI lives (redesign, 2026-10)
+
+Real routes (`app/(app)/*`, `app/login`, `error.tsx`, `not-found.tsx`) are thin
+server files: fetch raw data (`lib/nowe/surowe.ts`), run the `_dane` adapters
+via `zDanymi(surowe, …)`, hand the result to components from `app/projekt/_ui`.
+`app/projekt/*` pages are the design workshop (404 in production unless
+`POKAZ_PROJEKT=1`) and run the same components on a snapshot. Tokens and
+fonts: `app/nowy.css` + Barlow; `globals.css` is only the Tailwind reset.
 
 # Previews and mobile: use the scripts, don't eyeball
 

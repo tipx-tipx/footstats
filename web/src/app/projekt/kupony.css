@@ -1,0 +1,303 @@
+/* ==========================================================================
+   Etap 3.6 – prototyp strony Kupony (.k-). Tokeny z projekt.css.
+   ========================================================================== */
+
+.k-strona { display: grid; gap: 22px; }
+
+.k-naglowek h1 { font-size: 30px; }
+.k-naglowek p { color: var(--t2); margin-top: 6px; }
+.k-naglowek small { color: var(--t3); }
+
+/* ---------- kupon dnia ------------------------------------------------- */
+
+.k-dnia {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--pow1);
+  border: 1px solid var(--kreska);
+}
+
+.k-dnia-glowa { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.k-dnia-glowa small { color: var(--t3); font-size: 12px; font-weight: 600; }
+.k-dnia-kurs { font: 700 30px/1 var(--f-n); font-variant-numeric: tabular-nums; margin-top: 6px; }
+.k-dnia-kurs span { color: var(--t3); font: 500 13px var(--f-t); margin-left: 8px; }
+.k-dnia-nogi { display: grid; gap: 4px; }
+.k-dnia-noga { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 10px; align-items: center; font-size: 13px; }
+.k-dnia-noga time { color: var(--t3); font-size: 12px; font-variant-numeric: tabular-nums; }
+.k-dnia-noga span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.k-dnia-noga span small { color: var(--t3); }
+.k-dnia-noga b { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* ---------- kreator ---------------------------------------------------- */
+
+.k-kreator {
+  display: grid;
+  gap: 18px;
+  padding: 18px 16px;
+  border-radius: 12px;
+  background: var(--pow1);
+  border: 1px solid var(--kreska);
+}
+
+.k-cel-glowa { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 10px; font-size: 15px; color: var(--t2); }
+.k-cel-glowa h2 { font-size: 21px; color: var(--t1); width: 100%; }
+.k-cel-glowa b { font: 700 22px/1 var(--f-n); color: var(--t1); font-variant-numeric: tabular-nums; }
+
+.k-stawki { display: inline-flex; gap: 4px; }
+
+/* miarka celu: przesuwasz palcem, kupon przebudowuje się na żywo */
+.k-miarka {
+  position: relative;
+  height: 64px;
+  touch-action: pan-y;
+  user-select: none;
+  cursor: ew-resize;
+  border-radius: 10px;
+  background: var(--pow2);
+  border: 1px solid var(--kreska);
+  overflow: hidden;
+}
+
+.k-miarka-kreski { position: absolute; inset: 0; }
+.k-kreska { position: absolute; bottom: 14px; width: 1px; height: 8px; background: var(--kreska-mocna); }
+.k-kreska[data-duza="true"] { height: 16px; background: var(--t3); }
+.k-kreska-etykieta { position: absolute; bottom: 34px; transform: translateX(-50%); font: 600 12px var(--f-t); color: var(--t3); font-variant-numeric: tabular-nums; }
+
+.k-miarka-znacznik {
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--akcja);
+  pointer-events: none;
+}
+
+.k-miarka-znacznik b {
+  position: absolute;
+  top: -2px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: var(--akcja);
+  color: var(--na-akcji);
+  font: 700 13px/1.3 var(--f-n);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.k-ustawienia { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+
+/* ---------- oś kuponu -------------------------------------------------- */
+
+.k-kupon-glowa {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--kreska);
+}
+
+.k-kurs-laczny { font: 700 34px/1 var(--f-n); font-variant-numeric: tabular-nums; }
+.k-kupon-meta { color: var(--t3); font-size: 12px; margin-top: 6px; }
+.k-kupon-meta b { color: var(--t1); font-weight: 600; }
+.k-szansa-kuponu { text-align: right; }
+.k-szansa-kuponu b { font: 700 22px/1 var(--f-n); font-variant-numeric: tabular-nums; }
+.k-szansa-kuponu small { display: block; color: var(--t3); font-size: 11px; margin-top: 4px; }
+
+.k-os { position: relative; display: grid; gap: 8px; }
+.k-os::before { content: ""; position: absolute; left: 50px; top: 16px; bottom: 16px; width: 2px; background: var(--kreska-mocna); border-radius: 1px; }
+
+.k-noga { display: grid; grid-template-columns: 42px 18px minmax(0, 1fr); align-items: start; }
+.k-noga-czas { padding-top: 12px; font-size: 12px; color: var(--t2); font-variant-numeric: tabular-nums; line-height: 1.25; }
+.k-noga-czas small { display: block; color: var(--t4); font-size: 10px; }
+.k-noga-kropka { margin: 16px auto 0; width: 10px; height: 10px; border-radius: 50%; background: var(--pow1); box-shadow: 0 0 0 2px var(--kreska-mocna); z-index: 1; }
+.k-noga[data-zablokowana] .k-noga-kropka { background: var(--akcja); box-shadow: 0 0 0 2px var(--akcja); }
+
+.k-noga-karta {
+  margin-left: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--pow2);
+  border: 1px solid transparent;
+  display: grid;
+  gap: 8px;
+}
+
+.k-noga[data-zablokowana] .k-noga-karta { border-color: color-mix(in srgb, var(--akcja) 45%, transparent); }
+.k-noga[data-najslabsza] .k-noga-karta { border-color: color-mix(in srgb, var(--czeka) 50%, transparent); }
+
+.k-noga-gora { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; }
+.k-noga-kto { font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 6px; min-width: 0; }
+.k-noga-kto span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.k-noga-zaklad { display: flex; align-items: center; gap: 5px; margin-top: 3px; font-size: 13px; }
+.k-noga-zaklad svg { color: var(--t2); }
+.k-noga-zaklad b { font-weight: 600; }
+.k-noga-zaklad span { color: var(--t3); }
+.k-noga-mecz { color: var(--t3); font-size: 11px; margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.k-noga-kurs { text-align: right; }
+.k-noga-kurs b { font: 700 17px/1 var(--f-n); font-variant-numeric: tabular-nums; }
+.k-noga-kurs small { display: block; color: var(--t3); font-size: 11px; margin-top: 4px; font-variant-numeric: tabular-nums; }
+
+.k-noga-akcje { display: flex; gap: 4px; }
+
+.k-akcja {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 9px;
+  border-radius: 7px;
+  color: var(--t2);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.k-akcja:hover { background: var(--pow3); color: var(--t1); }
+.k-akcja[aria-pressed="true"] { color: var(--akcja); }
+.k-akcja[data-usun]:hover { color: var(--nie); }
+
+.k-najslabsza-etykieta { color: var(--czeka); font-size: 11px; font-weight: 600; }
+
+.k-zamiany { display: grid; gap: 4px; padding-top: 4px; border-top: 1px solid var(--kreska); }
+.k-zamiany > small { color: var(--t3); font-size: 11px; font-weight: 600; padding: 2px 0 4px; }
+
+.k-zamiana {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 7px 8px;
+  border-radius: 7px;
+  text-align: left;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.k-zamiana:hover { background: var(--pow3); }
+.k-zamiana span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.k-zamiana span small { color: var(--t3); }
+.k-zamiana b { font-weight: 700; font-variant-numeric: tabular-nums; }
+.k-roznica { font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.k-roznica[data-plus="true"] { color: var(--ok); }
+.k-roznica[data-plus="false"] { color: var(--czeka); }
+
+/* baner najsłabszego ogniwa */
+.k-ogniwo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--czeka-tlo);
+  font-size: 13px;
+}
+
+.k-ogniwo b { font-weight: 600; }
+.k-ogniwo small { display: block; color: var(--t2); margin-top: 3px; }
+
+.k-dodaj { display: grid; gap: 4px; }
+
+/* ---------- podsumowanie (pasek / pastylka) ---------------------------- */
+
+.k-pasek {
+  position: sticky;
+  bottom: 12px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 10px 10px 16px;
+  border-radius: 14px;
+  background: var(--akcja);
+  color: var(--na-akcji);
+  box-shadow: 0 12px 34px rgb(0 0 0 / 0.3);
+}
+
+.k-pasek-kurs { font: 700 20px/1 var(--f-n); font-variant-numeric: tabular-nums; }
+.k-pasek-wygrana { font-size: 13px; font-weight: 600; opacity: 0.85; white-space: nowrap; }
+.k-pasek-akcje { margin-left: auto; display: flex; gap: 6px; }
+
+.k-pasek-guzik {
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--na-akcji) 14%, transparent);
+  color: var(--na-akcji);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.k-pasek-guzik:hover { background: color-mix(in srgb, var(--na-akcji) 22%, transparent); }
+
+@container (max-width: 560px) {
+  .k-pasek { border-radius: 26px; padding: 8px 8px 8px 16px; }
+  .k-pasek-wygrana { display: none; }
+}
+
+/* ---------- kupon z meczu --------------------------------------------- */
+
+.k-z-meczu { display: grid; gap: 10px; }
+.k-z-meczu-lista { display: flex; flex-wrap: wrap; gap: 6px; }
+.k-uwaga { color: var(--t3); font-size: 12px; }
+
+/* ---------- karta do udostępnienia ------------------------------------ */
+
+.k-modal-tlo {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgb(0 0 0 / 0.6);
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+
+.k-modal {
+  width: min(420px, 100%);
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  border-radius: 16px;
+  background: var(--pow1);
+  border: 1px solid var(--kreska-mocna);
+  padding: 16px;
+  display: grid;
+  gap: 14px;
+}
+
+/* sama karta: format 4:5 (Instagram / Discord), zawsze w motywie „Noc” */
+.k-karta {
+  aspect-ratio: 4 / 5;
+  border-radius: 14px;
+  padding: 22px 20px 18px;
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  gap: 16px;
+  background:
+    radial-gradient(120% 70% at 100% 0%, color-mix(in srgb, var(--marka) 20%, transparent), transparent 60%),
+    #0b0e12;
+  color: #eaeef2;
+  overflow: hidden;
+}
+
+.k-karta-kurs { font: 700 46px/1 var(--pf-barlow), sans-serif; font-variant-numeric: tabular-nums; }
+.k-karta-kurs small { display: block; font: 500 13px var(--pf-barlow), sans-serif; color: rgb(234 238 242 / 0.6); margin-top: 6px; }
+.k-karta-nogi { display: grid; gap: 8px; align-content: start; }
+.k-karta-noga { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 8px; font-size: 13px; }
+.k-karta-noga time { color: rgb(234 238 242 / 0.5); font-variant-numeric: tabular-nums; }
+.k-karta-noga span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.k-karta-noga span small { color: rgb(234 238 242 / 0.55); }
+.k-karta-noga b { font-variant-numeric: tabular-nums; }
+.k-karta-stopka { display: flex; justify-content: space-between; align-items: end; gap: 10px; font-size: 11px; color: rgb(234 238 242 / 0.6); }
+.k-karta-stopka b { color: #eaeef2; font-size: 14px; }
+.k-18 { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid rgb(234 238 242 / 0.6); font-weight: 700; font-size: 10px; color: #eaeef2; }

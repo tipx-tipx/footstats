@@ -43,7 +43,7 @@ from ..sources import (
     betclic, eloratings, rotowire, scores365, sofascore, sportsgambler, statshub,
     superbet,
 )
-from . import magazyn_druzyn, radar, radar_imienny, rozliczanie
+from . import lekkie_klucze, magazyn_druzyn, radar, radar_imienny, rozliczanie
 from .build_demo import MARKET_NAMES_PL, WEB_DATA_DIR, line_for_lambda
 
 # KURSY GŁÓWNE: Superbet i Betclic (drugi dołożony 2026-08-08, decyzja usera).
@@ -10903,10 +10903,28 @@ def _main_impl(tryb=None):
     # właśnie wysłaliśmy, a nie to, co zamierzaliśmy.
     zapisz_pokazane(lista_pub, [] if radar_padl else radar_wpisy,
                     drabinki_typy, int(time.time()))
+    # REDESIGN 7B: numery drużyn/rozgrywek i podsumowanie oferty w meczach,
+    # kursy obu bukmacherów osobno (patrz `lekkie_klucze`). Dodatki do strony –
+    # ich pad nie może kosztować cyklu, więc głośno do diagnostyki i dalej
+    try:
+        lekkie_klucze.uzupelnij_mecze(matches_out, ev_by_id, odds_grid)
+    except Exception as e:
+        diagnostyka.cichy("cykl", "lekkie_mecze", e)
     _dump("matches.json", list(matches_out.values()))
     _dump("players.json", list(players_out.values()))
     _dump("druzyny_forma.json", scal_forme_druzyn(druzyny_forma, lista_pub))
     _dump("odds_superbet.json", odds_grid)   # siatka kursów do TOP POKRYCIA
+    try:
+        # nie idzie do Supabase w całości – `push_supabase` tnie ją na
+        # koszyki meczów (`kursy_mNN`) i dokłada kursy do `zaw_kNN`
+        _dump("kursy_dwa.json", lekkie_klucze.siatka_dwoch_kursow(
+            odds_grid, zrodla_grid,
+            {pid: z.get("nazwa") for pid, z in players_out.items()},
+            sb_cache, bc_cache,
+            superbet.znajdz_zawodnika, betclic.znajdz_zawodnika,
+        ))
+    except Exception as e:
+        diagnostyka.cichy("cykl", "kursy_dwa", e)
     # ⚑ DOMKNIĘCIE REJESTRU O BRAMY WYŚWIETLANIA (2026-09-16). Rejestr zamykał
     # się PRZED wyborem listy dnia, więc typ zdjęty tam (dzień domknięty, kurs
     # poza półkami, limit dnia, rynek ukryty/wycofany) był w księdze, ale na

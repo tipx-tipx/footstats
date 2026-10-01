@@ -1,7 +1,9 @@
-import { MainShell } from "@/components/MainShell";
-import { Nav } from "@/components/Nav";
-import { SiteFooter } from "@/components/SiteFooter";
-import { getMeta } from "@/lib/data";
+import { SzkieletAplikacji } from "@/app/projekt/_ui/szkielet/SzkieletAplikacji";
+import { druzyna } from "@/app/projekt/_dane/przygotuj";
+import type { IndeksSzukania } from "@/app/projekt/_ui/szkielet/PaletaAplikacji";
+import type { Mecz, ValueBet } from "@/lib/types";
+import { getMecze, getMeta, getValueBets } from "@/lib/data";
+import { zHerbamiMeczow } from "@/lib/nowe/surowe";
 
 // ISR: odświeżaj strony grupy (app) co 60 s. Bez tego trasy bez API
 // czasu żądania (druzyny, kupony, model, mecze, zaklady) domyślnie mają
@@ -27,23 +29,40 @@ export const revalidate = 1800;
 export default async function AppLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const meta = await getMeta();
-  const aktualizacja = new Intl.DateTimeFormat("pl-PL", {
-    day: "numeric",
-    month: "long",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "Europe/Warsaw",
-  }).format(new Date(meta.wygenerowano_ts * 1000));
+  const [meta, wszystkie, mecze] = await Promise.all([getMeta(), getValueBets(), getMecze()]);
+  const typy = wszystkie.filter((t) => !t.sugestia);
+  // liczby przy pozycjach menu (4.1 A+): typy na zawodników, na drużyny i mecze, w których je mamy
+  const liczby = {
+    zawodnicy: typy.filter((t) => t.podmiot_typ !== "druzyna").length,
+    druzyny: typy.filter((t) => t.podmiot_typ === "druzyna").length,
+    mecze: new Set(typy.map((t) => t.mecz_id)).size,
+  };
+  // indeks wyszukiwarki (Ctrl+K): kilka KB z danych, które układ i tak ma
+  const kiedy = new Intl.DateTimeFormat("pl-PL", { weekday: "short", day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Warsaw" });
+  // herby z numerów drużyn w meczach (7B) – także drużyn spoza mapy w kodzie
+  const indeks = zHerbamiMeczow(mecze, () => zbudujIndeks(typy, mecze, kiedy));
   return (
-    <>
-      <Nav wygenerowanoTs={meta.wygenerowano_ts} />
-      <MainShell>{children}</MainShell>
-      <SiteFooter
-        liga={meta.liga}
-        sezon={meta.sezon}
-        aktualizacja={aktualizacja}
-      />
-    </>
+    <SzkieletAplikacji liczby={liczby} wygenerowanoTs={meta.wygenerowano_ts} indeks={indeks}>
+      {children}
+    </SzkieletAplikacji>
   );
+}
+
+function zbudujIndeks(typy: ValueBet[], mecze: Mecz[], kiedy: Intl.DateTimeFormat): IndeksSzukania {
+  const zaw = new Map<number, IndeksSzukania["zawodnicy"][number]>();
+  const dr = new Map<string, number>();
+  for (const t of typy) {
+    if (t.podmiot_typ === "druzyna") dr.set(t.podmiot, (dr.get(t.podmiot) ?? 0) + 1);
+    else {
+      const z = zaw.get(t.podmiot_id) ?? { id: t.podmiot_id, nazwa: t.podmiot, druzyna: t.druzyna ? druzyna(t.druzyna) : null, typy: 0 };
+      z.typy++;
+      zaw.set(t.podmiot_id, z);
+    }
+  }
+  for (const m of mecze) for (const n of [m.gospodarz, m.gosc]) if (!dr.has(n)) dr.set(n, 0);
+  return {
+    zawodnicy: [...zaw.values()].sort((a, b) => b.typy - a.typy),
+    druzyny: [...dr.entries()].map(([nazwa, n]) => ({ nazwa, herb: druzyna(nazwa), typy: n })).sort((a, b) => b.typy - a.typy),
+    mecze: [...mecze].sort((a, b) => a.kickoff_ts - b.kickoff_ts).map((m) => ({ id: m.id, gosp: druzyna(m.gospodarz), gosc: druzyna(m.gosc), opis: kiedy.format(new Date(m.kickoff_ts * 1000)) })),
+  };
 }

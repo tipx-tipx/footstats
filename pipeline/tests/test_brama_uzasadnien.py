@@ -2,11 +2,10 @@
 """Brama uzasadnień: półka „więcej płacą" bez rozpisanego rachunku nie wchodzi.
 
 Osobny plik, bo ta brama ma jedną cechę, której nie ma żadna inna: jej próg
-MUSI się zgadzać z liczbą we froncie. Backend tnie półkę, którą front rysuje —
-jeśli te dwie liczby się rozjadą, brama zdejmie typy z innej półki, niż strona
-pokazuje, i nikt tego nie zauważy, bo obie strony będą wewnętrznie spójne.
-To ta sama klasa błędu co przedziały kursowe kuponów wpisane na sztywno
-w `KuponyScena.tsx` (dwa dni pustej zakładki, 2026-08-01).
+dotyczy półki, którą rysuje front. Od redesignu (2026-10-01) front bierze
+półkę z danych zamiast liczyć ją drugi raz własnym progiem – test pilnuje,
+żeby druga kopia progu nie wróciła (ta sama klasa błędu co przedziały kuponów
+wpisane na sztywno w starej `KuponyScena.tsx`, dwa dni pustej zakładki, 2026-08-01).
 """
 
 from __future__ import annotations
@@ -16,24 +15,23 @@ from pathlib import Path
 
 from footstats.model import betting
 
-FRONT = (
-    Path(__file__).resolve().parent.parent.parent
-    / "web" / "src" / "components" / "DruzynyTablica.tsx"
-)
+WEB_SRC = Path(__file__).resolve().parent.parent.parent / "web" / "src"
+FRONT = WEB_SRC / "app" / "projekt" / "_dane" / "przygotuj.ts"
 
 
-def test_prog_polki_zgadza_sie_z_frontem():
-    """`PROG_KURSU_POLEK` w DruzynyTablica.tsx == to samo w betting.py.
-
-    Od 12.08 półki dzieli KURS, nie nasza szansa — patrz nota przy stałej
-    w `betting`. Test pilnuje tej samej rzeczy co wcześniej: żeby brama tnąca
-    półkę i strona ją rysująca liczyły ją z tej samej liczby.
+def test_front_bierze_polke_z_danych_zamiast_wlasnego_progu():
+    """Redesign (2026-10-01): strona nie liczy półki sama – bierze `polka`
+    typu z pipeline'u. Stary test porównywał `PROG_KURSU_POLEK` wpisany we
+    froncie z tym w `betting`; teraz pilnujemy, żeby drugiej kopii progu
+    w ogóle nie było, a półka z danych przechodziła na stronę bez zmian.
     """
     assert FRONT.exists(), f"nie znalazłem {FRONT}"
-    m = re.search(r"const PROG_KURSU_POLEK\s*=\s*([0-9.]+)\s*;",
-                  FRONT.read_text("utf-8"))
-    assert m, "nie znalazłem PROG_KURSU_POLEK w DruzynyTablica.tsx"
-    assert float(m.group(1)) == betting.PROG_KURSU_POLEK
+    zrodlo = FRONT.read_text("utf-8")
+    m = re.search(r"export function polkaNaStronie\(.*?\n}\n", zrodlo, flags=re.S)
+    assert m, "nie znalazłem polkaNaStronie w przygotuj.ts"
+    assert 'if (polka === "wysoka_szansa" || polka === "wyzsze_kursy") return polka;' in m.group(0)
+    kopie = [p for p in WEB_SRC.rglob("*.ts*") if "PROG_KURSU_POLEK" in p.read_text("utf-8")]
+    assert not kopie, f"druga kopia progu półek we froncie: {kopie}"
 
 
 def test_polka_wiecej_placa_wymaga_uzasadnienia():

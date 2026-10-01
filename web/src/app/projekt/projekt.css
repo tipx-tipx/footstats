@@ -1,0 +1,893 @@
+/* ==========================================================================
+   /projekt – warsztat redesignu (tylko localhost, gałąź `redesign`).
+
+   Wszystko, co tu jest, żyje pod [data-p-motyw][data-p-paleta][data-p-font]
+   na ramce podglądu – dzięki temu dwie palety mogą stać obok siebie na jednym
+   ekranie, a reszta aplikacji (stary system v2 z globals.css) nie czuje nic.
+   Gdy właściciel wybierze warianty, wybrane wartości przechodzą do nowych
+   tokenów aplikacji, a ten plik zostaje historią wyborów.
+   ========================================================================== */
+
+/* ---------- PALETY ---------------------------------------------------- */
+
+/* A · ciemny „Grafit”: neutralny grafit (jak Sofascore), przyciski w kolorze
+   kredy z linii boiska, zieleń TYLKO dla marki i wyniku „weszło”. */
+[data-p-motyw="ciemny"][data-p-paleta="a"] {
+  --tlo: #0a0c0d;
+  --pow1: #141719;
+  --pow2: #1c2023;
+  --pow3: #262b2f;
+  --kreska: rgb(255 255 255 / 0.07);
+  --kreska-mocna: rgb(255 255 255 / 0.14);
+  --t1: #eef0ef;
+  --t2: rgb(238 240 239 / 0.72);
+  --t3: rgb(238 240 239 / 0.5);
+  --t4: rgb(238 240 239 / 0.28);
+  --akcja: #eef0ef;
+  --na-akcji: #0a0c0d;
+  --akcja-tlo: rgb(238 240 239 / 0.1);
+  --marka: #2fae74;
+  --ok: #2fae74;
+  --nie: #e4586e;
+  --czeka: #bd8a18;
+  --zwrot: rgb(238 240 239 / 0.5);
+  --ok-tlo: rgb(47 174 116 / 0.14);
+  --nie-tlo: rgb(228 88 110 / 0.14);
+  --czeka-tlo: rgb(189 138 24 / 0.16);
+  --logo-jasne: 1;
+  color-scheme: dark;
+}
+
+/* B · ciemny „Atrament”: tło z atramentu logo (niebieskawy grafit #0f1d28),
+   akcja w butelkowej zieleni marki. */
+[data-p-motyw="ciemny"][data-p-paleta="b"] {
+  --tlo: #070b10;
+  --pow1: #0f1620;
+  --pow2: #16202b;
+  --pow3: #1f2b38;
+  --kreska: rgb(170 200 230 / 0.08);
+  --kreska-mocna: rgb(170 200 230 / 0.16);
+  --t1: #e9eef3;
+  --t2: rgb(233 238 243 / 0.72);
+  --t3: rgb(233 238 243 / 0.5);
+  --t4: rgb(233 238 243 / 0.28);
+  --akcja: #2fae74;
+  --na-akcji: #03130b;
+  --akcja-tlo: rgb(47 174 116 / 0.14);
+  --marka: #2fae74;
+  --ok: #2fae74;
+  --nie: #e4586e;
+  --czeka: #bd8a18;
+  --zwrot: rgb(233 238 243 / 0.5);
+  --ok-tlo: rgb(47 174 116 / 0.14);
+  --nie-tlo: rgb(228 88 110 / 0.14);
+  --czeka-tlo: rgb(189 138 24 / 0.16);
+  --logo-jasne: 1;
+  color-scheme: dark;
+}
+
+/* A · jasny „Biel”: chłodna biel (jak jasny Sofascore), akcja w atramencie
+   logo – czarno-białe sterowanie, zieleń tylko dla marki i wyników. */
+[data-p-motyw="jasny"][data-p-paleta="a"] {
+  --tlo: #eceff1;
+  --pow1: #ffffff;
+  --pow2: #f3f5f6;
+  --pow3: #e6e9ec;
+  --kreska: rgb(16 24 32 / 0.08);
+  --kreska-mocna: rgb(16 24 32 / 0.16);
+  --t1: #11181f;
+  --t2: rgb(17 24 31 / 0.74);
+  --t3: rgb(17 24 31 / 0.54);
+  --t4: rgb(17 24 31 / 0.3);
+  --akcja: #11181f;
+  --na-akcji: #ffffff;
+  --akcja-tlo: rgb(17 24 31 / 0.07);
+  --marka: #0f6c46;
+  --ok: #17824f;
+  --nie: #be3455;
+  --czeka: #a87800;
+  --zwrot: rgb(17 24 31 / 0.54);
+  --ok-tlo: rgb(23 130 79 / 0.1);
+  --nie-tlo: rgb(190 52 85 / 0.09);
+  --czeka-tlo: rgb(192 138 0 / 0.12);
+  --logo-jasne: 0;
+  color-scheme: light;
+}
+
+/* B · jasny „Papier”: ciepły papier programu meczowego, atrament logo,
+   akcja w butelkowej zieleni. */
+[data-p-motyw="jasny"][data-p-paleta="b"] {
+  --tlo: #ece8df;
+  --pow1: #faf8f3;
+  --pow2: #f2eee6;
+  --pow3: #e6e1d6;
+  --kreska: rgb(48 40 24 / 0.1);
+  --kreska-mocna: rgb(48 40 24 / 0.18);
+  --t1: #1a2129;
+  --t2: rgb(26 33 41 / 0.76);
+  --t3: rgb(26 33 41 / 0.56);
+  --t4: rgb(26 33 41 / 0.32);
+  --akcja: #0f6c46;
+  --na-akcji: #ffffff;
+  --akcja-tlo: rgb(15 108 70 / 0.1);
+  --marka: #0f6c46;
+  --ok: #17824f;
+  --nie: #be3455;
+  --czeka: #a87800;
+  --zwrot: rgb(26 33 41 / 0.56);
+  --ok-tlo: rgb(23 130 79 / 0.11);
+  --nie-tlo: rgb(190 52 85 / 0.1);
+  --czeka-tlo: rgb(192 138 0 / 0.13);
+  --logo-jasne: 0;
+  color-scheme: light;
+}
+
+/* ---------- TYPOGRAFIA ------------------------------------------------- */
+
+/* 1 · „Szeroki”: Archivo z osią szerokości – nagłówki rozciągnięte jak litery
+   logo, tekst w normalnej szerokości tej samej rodziny. */
+[data-p-font="1"] {
+  --f-n: var(--pf-archivo), system-ui, sans-serif;
+  --f-t: var(--pf-archivo), system-ui, sans-serif;
+  --n-szer: 116%;
+  --n-waga: 700;
+  --n-track: -0.005em;
+  --t-waga-mocna: 600;
+}
+
+/* 2 · „Tablica”: Barlow – krój z rodu DIN, czyli tablic i oznakowania
+   stadionów; nagłówki w wersji półwąskiej. */
+[data-p-font="2"] {
+  --f-n: var(--pf-barlow-sc), system-ui, sans-serif;
+  --f-t: var(--pf-barlow), system-ui, sans-serif;
+  --n-szer: 100%;
+  --n-waga: 700;
+  --n-track: 0.005em;
+  --t-waga-mocna: 600;
+}
+
+/* 3 · „Gazeta”: Schibsted Grotesk – krój skandynawskiej prasy; ciężkie,
+   ciasne nagłówki jak w dzienniku sportowym. */
+[data-p-font="3"] {
+  --f-n: var(--pf-schibsted), system-ui, sans-serif;
+  --f-t: var(--pf-schibsted), system-ui, sans-serif;
+  --n-szer: 100%;
+  --n-waga: 800;
+  --n-track: -0.025em;
+  --t-waga-mocna: 600;
+}
+
+/* ---------- ETAP 1b: dopracowanie palety B --------------------------- */
+
+/* B1 · „Noc”: mniej niebieskiego, bliżej Sofascore; atrament ledwie wyczuwalny */
+[data-p-paleta="b1"] {
+  --tlo: #07090c;
+  --pow1: #10151a;
+  --pow2: #171e25;
+  --pow3: #212a33;
+  --kreska: rgb(190 210 230 / 0.07);
+  --kreska-mocna: rgb(190 210 230 / 0.15);
+  --t1: #eaeef2;
+  --t2: rgb(234 238 242 / 0.72);
+  --t3: rgb(234 238 242 / 0.5);
+  --t4: rgb(234 238 242 / 0.28);
+  --akcja: #2fae74;
+  --na-akcji: #03130b;
+  --akcja-tlo: rgb(47 174 116 / 0.14);
+  --zwrot: rgb(234 238 242 / 0.5);
+}
+
+/* B2 · „Granat logo”: karta DOKŁADNIE w atramencie logo (#0f1d28) */
+[data-p-paleta="b2"] {
+  --tlo: #081119;
+  --pow1: #0f1d28;
+  --pow2: #172838;
+  --pow3: #203447;
+  --kreska: rgb(150 190 230 / 0.09);
+  --kreska-mocna: rgb(150 190 230 / 0.18);
+  --t1: #e8eef4;
+  --t2: rgb(232 238 244 / 0.74);
+  --t3: rgb(232 238 244 / 0.52);
+  --t4: rgb(232 238 244 / 0.3);
+  --akcja: #34b67b;
+  --na-akcji: #03130b;
+  --akcja-tlo: rgb(52 182 123 / 0.15);
+  --zwrot: rgb(232 238 244 / 0.52);
+}
+
+/* B3 · „Butelka”: atrament z zielonym podbiciem – szkło butelki z logo */
+[data-p-paleta="b3"] {
+  --tlo: #060c0b;
+  --pow1: #0d1716;
+  --pow2: #142220;
+  --pow3: #1c2d2a;
+  --kreska: rgb(170 230 200 / 0.08);
+  --kreska-mocna: rgb(170 230 200 / 0.16);
+  --t1: #e9f0ec;
+  --t2: rgb(233 240 236 / 0.72);
+  --t3: rgb(233 240 236 / 0.5);
+  --t4: rgb(233 240 236 / 0.28);
+  --akcja: #3dbd82;
+  --na-akcji: #03130b;
+  --akcja-tlo: rgb(61 189 130 / 0.14);
+  --zwrot: rgb(233 240 236 / 0.5);
+}
+
+[data-p-paleta="b1"],
+[data-p-paleta="b2"],
+[data-p-paleta="b3"] {
+  --marka: #2fae74;
+  --ok: #2fae74;
+  --nie: #e4586e;
+  --czeka: #bd8a18;
+  --ok-tlo: rgb(47 174 116 / 0.14);
+  --nie-tlo: rgb(228 88 110 / 0.14);
+  --czeka-tlo: rgb(189 138 24 / 0.16);
+  color-scheme: dark;
+}
+
+/* P1 · „Jaśniejszy”: mniej żółci, papier bliżej bieli */
+[data-p-paleta="p1"] {
+  --tlo: #f0eee8;
+  --pow1: #fdfcf9;
+  --pow2: #f6f4ef;
+  --pow3: #ebe8e0;
+  --kreska: rgb(40 36 28 / 0.09);
+  --kreska-mocna: rgb(40 36 28 / 0.17);
+  --t1: #1a2129;
+  --akcja: #0f6c46;
+}
+
+/* P2 · „Kontrast”: białe karty na ciemniejszym papierze – warstwy czytelne
+   bez cieni, jak u Superbetu */
+[data-p-paleta="p2"] {
+  --tlo: #e4dfd4;
+  --pow1: #ffffff;
+  --pow2: #f5f2ec;
+  --pow3: #ebe6dc;
+  --kreska: rgb(48 40 24 / 0.1);
+  --kreska-mocna: rgb(48 40 24 / 0.19);
+  --t1: #1a2129;
+  --akcja: #0f6c46;
+}
+
+/* P3 · „Gazeta”: neutralny papier gazetowy, ciemniejszy atrament, głębsza zieleń */
+[data-p-paleta="p3"] {
+  --tlo: #e9e8e3;
+  --pow1: #f7f6f2;
+  --pow2: #efeee9;
+  --pow3: #e3e1da;
+  --kreska: rgb(20 26 32 / 0.1);
+  --kreska-mocna: rgb(20 26 32 / 0.18);
+  --t1: #141a20;
+  --akcja: #0c5a3a;
+}
+
+[data-p-paleta="p1"],
+[data-p-paleta="p2"],
+[data-p-paleta="p3"] {
+  --t2: color-mix(in srgb, var(--t1) 76%, transparent);
+  --t3: color-mix(in srgb, var(--t1) 56%, transparent);
+  --t4: color-mix(in srgb, var(--t1) 32%, transparent);
+  --na-akcji: #ffffff;
+  --akcja-tlo: rgb(15 108 70 / 0.1);
+  --marka: #0f6c46;
+  --ok: #17824f;
+  --nie: #be3455;
+  --czeka: #a87800;
+  --zwrot: var(--t3);
+  --ok-tlo: rgb(23 130 79 / 0.11);
+  --nie-tlo: rgb(190 52 85 / 0.1);
+  --czeka-tlo: rgb(192 138 0 / 0.13);
+  color-scheme: light;
+}
+
+/* ---------- ETAP 1b: nagłówki w Barlow -------------------------------- */
+
+/* 2a · półwąski (jak w etapie 1) */
+[data-p-font="2a"] {
+  --f-n: var(--pf-barlow-sc), system-ui, sans-serif;
+  --f-t: var(--pf-barlow), system-ui, sans-serif;
+  --n-szer: 100%;
+  --n-waga: 700;
+  --n-track: 0.005em;
+  --t-waga-mocna: 600;
+}
+
+/* 2b · wąski, tytuły wersalikami – tablica wyników na stadionie */
+[data-p-font="2b"] {
+  --f-n: var(--pf-barlow-c), system-ui, sans-serif;
+  --f-t: var(--pf-barlow), system-ui, sans-serif;
+  --n-szer: 100%;
+  --n-waga: 700;
+  --n-track: 0.01em;
+  --t-waga-mocna: 600;
+  --tytul-wersaliki: uppercase;
+  --tytul-track: 0.025em;
+}
+
+/* 2c · pełna szerokość – spokojniej, mniej „sportowo” */
+[data-p-font="2c"] {
+  --f-n: var(--pf-barlow), system-ui, sans-serif;
+  --f-t: var(--pf-barlow), system-ui, sans-serif;
+  --n-szer: 100%;
+  --n-waga: 700;
+  --n-track: -0.01em;
+  --t-waga-mocna: 600;
+}
+
+.p-tytul,
+.p-tytul-probka {
+  text-transform: var(--tytul-wersaliki, none);
+  letter-spacing: var(--tytul-track, var(--n-track));
+}
+
+@media (min-width: 1100px) {
+  .p-obok[data-ile="4"] { grid-template-columns: 1fr 1fr; }
+  .p-obok[data-ile="4"] > :nth-child(even) { border-left: 1px solid #25292c; }
+}
+
+@media (min-width: 1500px) {
+  .p-obok[data-ile="3"] { grid-template-columns: 1fr 1fr 1fr; }
+  .p-obok[data-ile="3"] > * + * { border-left: 1px solid #25292c; }
+}
+
+/* ---------- RAMA PODGLĄDU --------------------------------------------- */
+
+.p-ekran {
+  container-type: inline-size;
+  background: var(--tlo);
+  color: var(--t1);
+  font-family: var(--f-t);
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.35s ease, color 0.35s ease;
+}
+
+.p-n {
+  font-family: var(--f-n);
+  font-weight: var(--n-waga);
+  font-stretch: var(--n-szer);
+  letter-spacing: var(--n-track);
+  line-height: 1.1;
+}
+
+.p-t1 { color: var(--t1); }
+.p-t2 { color: var(--t2); }
+.p-t3 { color: var(--t3); }
+.p-t4 { color: var(--t4); }
+
+/* cyfry równej szerokości TYLKO tam, gdzie liczby stoją w kolumnie lub skaczą
+   (godziny, kursy, szanse) – w zwykłym tekście rozpychały kropki i dwukropki */
+.p-liczby,
+.p-czas,
+.p-kurs b,
+.p-szansa b,
+.p-okazje b,
+.p-dzien small,
+.p-liga-glowa em,
+.p-pp-liczba,
+.p-poprzeczka-opis b {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- PASEK APLIKACJI ------------------------------------------- */
+
+.p-pasek {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  height: 56px;
+  /* treść paska w tej samej kolumnie co strona (1120 px), tło na całą szerokość */
+  padding: 0 max(20px, calc((100% - 1120px) / 2));
+  border-bottom: 1px solid var(--kreska);
+  background: var(--tlo);
+}
+
+.p-menu {
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.p-menu a {
+  padding: 7px 11px;
+  border-radius: 7px;
+  color: var(--t2);
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.p-menu a:hover { color: var(--t1); background: var(--pow2); }
+
+.p-menu a[aria-current="page"] {
+  color: var(--t1);
+  background: var(--pow2);
+  box-shadow: inset 0 -2px 0 var(--akcja);
+}
+
+.p-menu .p-menu-kreska {
+  width: 1px;
+  margin: 8px 6px;
+  background: var(--kreska-mocna);
+}
+
+.p-swiezosc {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--t3);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.p-swiezosc i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ok);
+}
+
+@container (max-width: 720px) {
+  .p-menu, .p-swiezosc span { display: none; }
+  .p-pasek { gap: 12px; }
+}
+
+/* ---------- UKŁAD TREŚCI ---------------------------------------------- */
+
+.p-tresc {
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 28px 20px 40px;
+}
+
+.p-siatka {
+  display: grid;
+  gap: 20px;
+}
+
+@container (min-width: 900px) {
+  .p-siatka { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 24px; }
+}
+
+.p-tytul { font-size: 30px; }
+
+@container (max-width: 560px) {
+  .p-tytul { font-size: 25px; }
+  .p-tresc { padding: 20px 14px 32px; }
+}
+
+/* ---------- PASEK DNI ------------------------------------------------- */
+
+.p-dni {
+  display: flex;
+  gap: 6px;
+  margin: 18px 0 20px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.p-dzien {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--pow1);
+  border: 1px solid var(--kreska);
+  color: var(--t2);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.p-dzien small { color: var(--t4); font-size: 12px; }
+
+.p-dzien[aria-pressed="true"] {
+  background: var(--akcja);
+  border-color: var(--akcja);
+  color: var(--na-akcji);
+}
+
+.p-dzien[aria-pressed="true"] small { color: var(--na-akcji); opacity: 0.6; }
+
+/* ---------- LISTA MECZÓW ---------------------------------------------- */
+
+.p-liga {
+  background: var(--pow1);
+  border-radius: 10px;
+  border: 1px solid var(--kreska);
+  overflow: hidden;
+}
+
+.p-liga + .p-liga { margin-top: 10px; }
+
+.p-liga-glowa {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--kreska);
+}
+
+.p-liga-glowa b { font-weight: var(--t-waga-mocna); font-size: 13px; }
+.p-liga-glowa span { color: var(--t3); font-size: 12px; }
+.p-liga-glowa em { margin-left: auto; font-style: normal; color: var(--t3); font-size: 12px; }
+
+.p-mecz {
+  display: grid;
+  grid-template-columns: 50px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 14px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.p-mecz + .p-mecz { border-top: 1px solid var(--kreska); }
+.p-mecz:hover { background: var(--pow2); }
+
+.p-czas { display: flex; flex-direction: column; font-size: 13px; }
+.p-czas small { color: var(--t3); font-size: 11px; }
+.p-czas .p-wkrotce { color: var(--czeka); }
+
+.p-druzyny { display: grid; gap: 4px; min-width: 0; }
+
+.p-druzyna {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.p-druzyna span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.p-okazje {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--t2);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.p-okazje b {
+  min-width: 22px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: var(--akcja-tlo);
+  color: var(--t1);
+  font-weight: var(--t-waga-mocna);
+  text-align: center;
+}
+
+.p-okazje .p-brak { color: var(--t4); }
+
+/* ---------- HERB / TARCZA / FLAGA ------------------------------------- */
+
+.p-herb {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+}
+
+.p-herb img { width: 100%; height: 100%; object-fit: contain; }
+
+.p-flaga {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--kreska);
+}
+
+/* ---------- KARTA TYPU ------------------------------------------------ */
+
+.p-karta {
+  background: var(--pow1);
+  border: 1px solid var(--kreska);
+  border-radius: 10px;
+  padding: 14px 16px 16px;
+}
+
+.p-karta + .p-karta { margin-top: 12px; }
+
+.p-karta-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--t3);
+  font-size: 12px;
+  min-width: 0;
+}
+
+.p-karta-meta span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.p-karta-glowa {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+  margin-top: 12px;
+}
+
+.p-kto { font-size: 21px; }
+.p-kto-pod { margin-top: 5px; color: var(--t3); font-size: 12px; }
+
+.p-szansa { text-align: right; }
+.p-szansa b { display: block; font-size: 34px; line-height: 1; }
+.p-szansa small { color: var(--t3); font-size: 11px; }
+
+.p-zaklad {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--kreska);
+}
+
+.p-zaklad-co { font-weight: var(--t-waga-mocna); font-size: 15px; }
+.p-zaklad-co span { color: var(--t3); font-weight: 400; }
+
+/* kafelek kursu – jak u bukmachera: opis po lewej, liczba po prawej,
+   cały kafelek jest przyciskiem */
+.p-kurs {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 10px 7px 11px;
+  border-radius: 6px;
+  background: var(--pow2);
+  border: 1px solid var(--kreska);
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.p-kurs:hover { background: var(--pow3); border-color: var(--kreska-mocna); }
+.p-kurs small { color: var(--t3); font-size: 11px; }
+.p-kurs b { font-size: 17px; }
+
+/* ---------- POPRZECZKA: historia zawodnika vs linia bukmachera --------- */
+
+.p-poprzeczka { margin-top: 14px; }
+
+.p-poprzeczka-opis {
+  display: flex;
+  justify-content: space-between;
+  color: var(--t3);
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.p-poprzeczka-opis b { color: var(--t1); font-weight: var(--t-waga-mocna); }
+
+.p-poprzeczka svg { display: block; width: 100%; height: auto; overflow: visible; }
+
+.p-pp-linia {
+  stroke: var(--t3);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.p-pp-trasa {
+  fill: none;
+  stroke: var(--t4);
+  stroke-width: 1.25;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  animation: p-trasa 0.9s cubic-bezier(0.45, 0, 0.2, 1) both;
+}
+
+@keyframes p-trasa {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+
+.p-pp-kropka {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: p-kropka 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--i) * 45ms + 120ms);
+}
+
+.p-pp-ponad { fill: var(--ok); }
+.p-pp-pod { fill: var(--pow1); stroke: var(--t3); stroke-width: 1.5; }
+
+.p-pp-liczba {
+  fill: var(--t4);
+  font-size: 10px;
+  font-family: var(--f-t);
+  text-anchor: middle;
+}
+
+@keyframes p-kropka {
+  from { opacity: 0; transform: translateY(-6px) scale(0.4); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ---------- PRZYCISKI ------------------------------------------------- */
+
+.p-przyciski { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+
+.p-guzik {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 8px;
+  font-weight: var(--t-waga-mocna);
+  cursor: pointer;
+  transition: transform 0.12s ease, background-color 0.15s ease, opacity 0.15s ease;
+}
+
+.p-guzik:active { transform: scale(0.97); }
+.p-guzik-glowny { background: var(--akcja); color: var(--na-akcji); }
+.p-guzik-glowny:hover { opacity: 0.9; }
+.p-guzik-glowny span { opacity: 0.65; font-weight: 500; }
+.p-guzik-drugi { background: var(--pow2); color: var(--t1); border: 1px solid var(--kreska); }
+.p-guzik-drugi:hover { background: var(--pow3); }
+
+/* ---------- ARKUSZ (typografia + kolory) ------------------------------ */
+
+.p-arkusz {
+  margin-top: 28px;
+  display: grid;
+  gap: 20px;
+}
+
+@container (min-width: 900px) {
+  .p-arkusz { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 24px; }
+}
+
+.p-arkusz section {
+  background: var(--pow1);
+  border: 1px solid var(--kreska);
+  border-radius: 10px;
+  padding: 16px;
+}
+
+.p-arkusz h3 {
+  color: var(--t3);
+  font-size: 12px;
+  font-weight: 500;
+  margin-bottom: 14px;
+}
+
+.p-probka + .p-probka { margin-top: 14px; }
+.p-probka small { display: block; color: var(--t4); font-size: 11px; margin-bottom: 3px; }
+
+.p-probki-kolorow {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+  gap: 8px;
+}
+
+.p-kolor {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--t2);
+}
+
+.p-kolor i {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px var(--kreska-mocna);
+}
+
+.p-wyniki { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+
+.p-wynik {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px 4px 7px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: var(--t-waga-mocna);
+}
+
+.p-wynik svg { width: 12px; height: 12px; }
+.p-wynik-ok { background: var(--ok-tlo); color: var(--ok); }
+.p-wynik-nie { background: var(--nie-tlo); color: var(--nie); }
+.p-wynik-zwrot { background: var(--akcja-tlo); color: var(--zwrot); }
+.p-wynik-czeka { background: var(--czeka-tlo); color: var(--czeka); }
+
+/* ---------- PULPIT WYBORU (narzędzie, nie projekt) -------------------- */
+
+.p-pulpit {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: #0d0f10;
+  color: #e8eaea;
+  border-bottom: 1px solid #25292c;
+  font: 13px/1.4 system-ui, sans-serif;
+}
+
+.p-pulpit-wnetrze {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 10px 16px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 18px;
+}
+
+.p-pulpit-tytul { font-weight: 600; margin-right: 6px; }
+.p-pulpit-tytul span { color: #8b9194; font-weight: 400; }
+
+.p-wybor { display: flex; align-items: center; gap: 8px; }
+.p-wybor > span { color: #8b9194; font-size: 12px; }
+
+.p-segmenty {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: 8px;
+  background: #1b1f21;
+  border: 1px solid #2a2f32;
+}
+
+.p-segmenty button {
+  padding: 5px 10px;
+  border-radius: 6px;
+  color: #aeb4b6;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.p-segmenty button[aria-pressed="true"] { background: #e8eaea; color: #0d0f10; }
+
+.p-pulpit-opis {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 16px 10px;
+  color: #8b9194;
+  font-size: 12px;
+}
+
+.p-pulpit-opis b { color: #cfd3d4; font-weight: 600; }
+
+.p-obok {
+  display: grid;
+  gap: 0;
+}
+
+@media (min-width: 1100px) {
+  .p-obok[data-ile="2"] { grid-template-columns: 1fr 1fr; }
+  .p-obok[data-ile="2"] > * + * { border-left: 1px solid #25292c; }
+}
+
+.p-rama-telefon {
+  width: 390px;
+  max-width: 100%;
+  margin: 24px auto;
+  border-radius: 28px;
+  overflow: hidden;
+  box-shadow: 0 0 0 8px #1b1f21, 0 30px 80px rgb(0 0 0 / 0.5);
+}
+
+.p-etykieta-ramy {
+  padding: 6px 16px;
+  font: 12px system-ui, sans-serif;
+  color: #8b9194;
+  background: #0d0f10;
+  border-bottom: 1px solid #25292c;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .p-pp-kropka, .p-pp-trasa { animation: none; }
+  .p-ekran, .p-dzien, .p-mecz, .p-kurs, .p-guzik { transition: none; }
+}

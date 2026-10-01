@@ -1,0 +1,193 @@
+/* ==========================================================================
+   Etap 5.6 – Wyniki › Kontrola (.kt-). Tylko admin.
+   ========================================================================== */
+
+.kt-naglowek { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 22px; }
+.kt-naglowek .st-naglowek { margin: 0; }
+.kt-widok { flex: none; }
+.kt-widok .mz-seg-tresc { gap: 7px; }
+
+.kt-kropka { display: inline-block; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--t3); }
+.kt-kropka[data-s="ok"] { background: var(--ok); }
+.kt-kropka[data-s="uwaga"] { background: var(--czeka); }
+.kt-kropka[data-s="zle"] { background: var(--nie); }
+
+/* poprzeczka: pasek = weszło, kreska = obiecywał / kurs */
+.kt-poprzeczka { position: relative; display: block; height: 10px; border-radius: 5px; background: var(--pow3); }
+.kt-pop-pasek { position: absolute; inset: 0 auto 0 0; border-radius: 5px; background: var(--t3); }
+.kt-poprzeczka[data-ton="ok"] .kt-pop-pasek { background: var(--ok); }
+.kt-poprzeczka[data-ton="uwaga"] .kt-pop-pasek { background: var(--czeka); }
+.kt-poprzeczka[data-ton="zle"] .kt-pop-pasek { background: var(--nie); }
+.kt-poprzeczka[data-ton="neutralny"] .kt-pop-pasek { background: var(--t2); }
+.kt-poprzeczka[data-ton="szary"] .kt-pop-pasek { background: var(--t4); }
+.kt-pop-cel { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--t1); box-shadow: 0 0 0 2px var(--pow1); }
+
+.kt-roznica { font: 700 13px/1 var(--f-n, inherit); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; color: var(--t2); }
+.kt-roznica[data-ton="ok"] { color: var(--ok); }
+.kt-roznica[data-ton="uwaga"] { color: var(--czeka); }
+.kt-roznica[data-ton="zle"] { color: var(--nie); }
+.kt-roznica[data-ton="szary"] { color: var(--t3); font-weight: 600; }
+
+.kt-legenda { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0 0 10px; font-size: 12px; color: var(--t3); }
+.kt-legenda span { display: inline-flex; align-items: center; gap: 6px; }
+.kt-leg-pasek { width: 16px; height: 8px; border-radius: 4px; background: var(--t2); }
+.kt-leg-cel { width: 2px; height: 14px; border-radius: 1px; background: var(--t1); }
+
+.kt-h4 { margin: 18px 0 8px; font-size: 13px; font-weight: 600; color: var(--t2); }
+.kt-przypis { margin-top: 10px; font-size: 13px; color: var(--t3); }
+.kt-rozwin { margin-top: 8px; height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--kreska); background: none; color: var(--t2); font: 600 13px/1 inherit; cursor: pointer; }
+.kt-rozwin:hover { color: var(--t1); border-color: var(--kreska-mocna); }
+
+/* tabela wierszy z poprzeczką */
+.kt-tabela { border: 1px solid var(--kreska); border-radius: 12px; background: var(--pow1); overflow: hidden; }
+.kt-tabela-dalej { margin-top: 8px; }
+.kt-wiersz {
+  display: grid;
+  grid-template-columns: minmax(150px, 220px) minmax(0, 1fr) 92px 60px;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--kreska);
+}
+.kt-wiersz:first-child { border-top: 0; }
+.kt-wiersz-prosty { grid-template-columns: minmax(150px, 220px) minmax(0, 1fr) 92px; }
+.kt-wiersz-kurs { grid-template-columns: minmax(150px, 260px) minmax(0, 1fr) 56px; }
+.kt-wiersz[data-wyszarz] .kt-w-nazwa b { color: var(--t2); }
+.kt-w-nazwa { min-width: 0; display: grid; gap: 1px; }
+.kt-w-nazwa b { font-size: 14px; font-weight: 600; color: var(--t1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kt-w-nazwa small { font-size: 12px; color: var(--t3); font-variant-numeric: tabular-nums; }
+.kt-w-liczby { display: grid; justify-items: end; gap: 1px; font-variant-numeric: tabular-nums; }
+.kt-w-liczby b { font-size: 15px; font-weight: 700; color: var(--t1); }
+.kt-w-liczby small { font-size: 12px; color: var(--t3); white-space: nowrap; }
+
+/* oś różnicy (model vs kurs) */
+.kt-os { position: relative; display: block; height: 10px; }
+.kt-os-zero { position: absolute; left: 50%; top: -4px; bottom: -4px; width: 1px; background: var(--kreska-mocna); }
+.kt-os-pasek { position: absolute; top: 0; bottom: 0; border-radius: 5px; background: var(--nie); }
+.kt-os-pasek[data-ton="ok"] { background: var(--ok); }
+
+.kt-grupa + .kt-grupa { margin-top: 4px; }
+.kt-dwie { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 20px; }
+.kt-dwie .kt-wiersz { grid-template-columns: minmax(110px, 1fr) minmax(60px, 1fr) 70px 54px; gap: 12px; }
+.kt-dwie .kt-wiersz-prosty { grid-template-columns: minmax(110px, 1fr) minmax(60px, 1fr) 54px; }
+.kt-dwie .kt-wiersz-kurs { grid-template-columns: minmax(140px, 1.4fr) minmax(50px, 1fr) 46px; }
+
+/* czy działa: lista z kropkami */
+.kt-lista { list-style: none; margin: 0; padding: 4px 0; border: 1px solid var(--kreska); border-radius: 12px; background: var(--pow1); }
+.kt-lista li { display: grid; grid-template-columns: 8px minmax(0, 1fr); gap: 10px; padding: 8px 14px; }
+.kt-lista li .kt-kropka { margin-top: 6px; }
+.kt-lista li span { display: grid; gap: 1px; min-width: 0; }
+.kt-lista b { font-size: 14px; font-weight: 600; }
+.kt-lista em { font-style: normal; font-size: 11px; color: var(--t3); }
+.kt-lista small { font-size: 12px; color: var(--t3); overflow-wrap: anywhere; }
+.kt-lista li[data-zle] small { color: var(--nie); }
+
+/* uczenie: kolumny różnicy wokół linii obietnicy */
+.kt-uczenie { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.kt-ucz { padding: 14px 16px 12px; border: 1px solid var(--kreska); border-radius: 12px; background: var(--pow1); }
+.kt-ucz-glowa { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.kt-ucz-glowa > b { font-size: 15px; font-weight: 700; }
+.kt-ucz-glowa em { font-style: normal; font-size: 12px; font-weight: 600; color: var(--t2); }
+.kt-ucz-glowa em[data-k="lepiej"] { color: var(--ok); }
+.kt-ucz-glowa em[data-k="gorzej"] { color: var(--nie); }
+.kt-ucz-glowa span { flex-basis: 100%; font-size: 13px; color: var(--t3); }
+.kt-ucz-glowa span b { color: var(--t1); font-weight: 600; }
+.kt-ucz-wykres { position: relative; display: flex; align-items: flex-start; gap: 4px; height: 92px; margin-top: 12px; padding-top: 40px; }
+.kt-ucz-wykres::before { content: ""; position: absolute; left: 0; right: 0; top: 40px; height: 1.5px; background: var(--t3); }
+.kt-ucz-kol { position: relative; flex: 1; height: 0; }
+.kt-ucz-kol i { position: absolute; left: 0; right: 0; top: 0; border-radius: 0 0 3px 3px; background: var(--nie); transform-origin: top; }
+.kt-ucz-kol i[data-gora] { top: auto; bottom: 0; border-radius: 3px 3px 0 0; transform-origin: bottom; }
+.kt-ucz-kol i[data-ton="ok"] { background: var(--ok); }
+.kt-ucz-kol i[data-ton="uwaga"] { background: var(--czeka); }
+.kt-ucz-kol i[data-trwa] { opacity: 0.45; }
+.kt-ucz-os { display: flex; justify-content: space-between; gap: 8px; margin-top: 4px; font-size: 11px; color: var(--t3); }
+
+/* drabinki: sito */
+.kt-sito { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 6px; }
+.kt-sito-strona { display: grid; gap: 4px; padding: 14px 16px; border: 1px solid var(--kreska); border-radius: 12px; background: var(--pow1); }
+.kt-sito-strona[data-ton="ok"] { border-color: color-mix(in srgb, var(--ok) 35%, transparent); }
+.kt-sito-strona small { font-size: 12px; color: var(--t3); }
+.kt-sito-strona > b { font-size: 34px; line-height: 1; }
+.kt-sito-strona[data-ton="ok"] > b { color: var(--ok); }
+.kt-sito-strona span { font-size: 13px; color: var(--t2); margin-bottom: 6px; }
+
+/* kupony */
+.kt-kupony { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.kt-kupon { display: grid; grid-template-columns: 22px auto 1fr auto; align-items: center; gap: 10px; padding: 9px 12px; border: 1px solid var(--kreska); border-radius: 10px; background: var(--pow1); font-size: 13px; color: var(--t2); }
+.kt-kupon b { color: var(--t1); font-weight: 600; }
+.kt-kupon-znak { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; font-size: 11px; font-weight: 700; background: var(--nie-tlo); color: var(--nie); }
+.kt-kupon[data-wynik="wygrany"] .kt-kupon-znak { background: var(--ok-tlo); color: var(--ok); }
+.kt-kupon-nogi { display: flex; gap: 3px; }
+.kt-kupon-nogi i { width: 5px; height: 14px; border-radius: 2px; box-shadow: inset 0 0 0 1.5px var(--kreska-mocna); }
+.kt-kupon-nogi i[data-ok] { background: var(--ok); box-shadow: none; }
+.kt-kupon-kurs { font-variant-numeric: tabular-nums; }
+
+/* egzamin: małe wykresy kalibracji */
+.kt-egzamin { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+.kt-egz { margin: 0; }
+.kt-egz svg { display: block; width: 100%; height: auto; }
+.kt-egz-tlo { fill: var(--pow1); stroke: var(--kreska); }
+.kt-egz-przekatna { stroke: var(--kreska-mocna); stroke-dasharray: 3 4; }
+.kt-egz-kropka { fill: var(--ok); fill-opacity: 0.85; }
+.kt-egz figcaption { display: grid; margin-top: 6px; }
+.kt-egz figcaption b { font-size: 13px; font-weight: 600; }
+.kt-egz figcaption small { font-size: 12px; color: var(--t3); }
+
+/* werdykt pod pytaniem */
+.kt-werdykt { display: flex; align-items: baseline; gap: 10px; margin-top: 6px; font-size: 15px; line-height: 1.45; color: var(--t2); text-wrap: pretty; }
+.kt-werdykt .kt-kropka { position: relative; top: -1px; }
+
+/* ---- A · raport ---- */
+.kt-raport { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 36px; align-items: start; }
+.kt-raport[data-telefon] { grid-template-columns: 1fr; }
+.kt-spis { position: sticky; top: 76px; display: grid; gap: 2px; padding: 6px; border: 1px solid var(--kreska); border-radius: 12px; background: var(--pow1); }
+.kt-spis a { position: relative; display: grid; grid-template-columns: 8px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 8px; color: var(--t2); font-size: 13px; text-decoration: none; cursor: pointer; }
+.kt-spis a:hover { background: var(--pow2); color: var(--t1); }
+.kt-spis a[aria-current] { background: var(--pow3); color: var(--t1); }
+.kt-spis a b { font-size: 12px; font-weight: 600; color: var(--t3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.kt-sekcje { display: grid; }
+.kt-sekcja { padding: 26px 0 30px; border-top: 1px solid var(--kreska); scroll-margin-top: 70px; }
+.kt-sekcja:first-child { padding-top: 0; border-top: 0; }
+.kt-sekcja h2 { font-size: 21px; line-height: 1.2; }
+.kt-szczegol { margin-top: 14px; }
+
+/* telefon: przyklejony pasek pytań pod górnym paskiem */
+.kt-pas {
+  position: sticky;
+  top: 54px;
+  z-index: 4;
+  display: flex;
+  gap: 6px;
+  margin: 0 -14px 18px;
+  padding: 8px 14px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  background: color-mix(in srgb, var(--tlo) 92%, transparent);
+  border-bottom: 1px solid var(--kreska);
+}
+.kt-pas button { flex: none; display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 12px; border-radius: 17px; border: 1px solid var(--kreska); background: var(--pow1); color: var(--t2); font: 600 13px/1 inherit; white-space: nowrap; cursor: pointer; }
+.kt-pas button[aria-current] { border-color: var(--t2); color: var(--t1); background: var(--pow2); }
+.kt-raport[data-telefon] .kt-sekcja { scroll-margin-top: 112px; }
+
+.kt-pusto { padding: 14px 16px; border: 1px dashed var(--kreska-mocna); border-radius: 12px; font-size: 14px; color: var(--t2); }
+
+/* ---- telefon ---- */
+@container (max-width: 760px) {
+  .kt-uczenie, .kt-dwie, .kt-sito { grid-template-columns: 1fr; }
+  .kt-egzamin { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .kt-kupony { grid-template-columns: 1fr; }
+  .kt-wiersz, .kt-dwie .kt-wiersz {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-areas: "nazwa liczby roznica" "pasek pasek pasek";
+    gap: 6px 12px;
+    padding: 10px 12px;
+  }
+  .kt-wiersz > .kt-w-nazwa { grid-area: nazwa; }
+  .kt-wiersz > .kt-poprzeczka, .kt-wiersz > .kt-os { grid-area: pasek; }
+  .kt-wiersz > .kt-w-liczby { grid-area: liczby; }
+  .kt-wiersz > .kt-roznica { grid-area: roznica; }
+  .kt-wiersz-prosty, .kt-dwie .kt-wiersz-prosty { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "nazwa liczby" "pasek pasek"; }
+  .kt-wiersz-kurs, .kt-dwie .kt-wiersz-kurs { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "nazwa roznica" "pasek pasek"; }
+  .kt-sekcja h2 { font-size: 19px; }
+  .kt-werdykt { font-size: 14px; }
+}

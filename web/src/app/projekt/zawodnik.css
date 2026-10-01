@@ -1,0 +1,141 @@
+/* ==========================================================================
+   Etap 5.7 – strona zawodnika (.zw-). Klocki ze strony meczu (.mz-),
+   Wyników (.sk-) i atomów (kratki .d-) – tu tylko układ.
+   ========================================================================== */
+
+.zw-glowa { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "wroc wroc" "kto mecz"; align-items: center; gap: 12px 24px; margin-bottom: 8px; }
+.zw-glowa .mz-wroc { grid-area: wroc; }
+.zw-kto { grid-area: kto; display: flex; align-items: center; gap: 16px; min-width: 0; }
+.zw-kto h1 { font-size: 32px; line-height: 1.05; }
+.zw-kto p { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 0; margin-top: 6px; font-size: 14px; color: var(--t2); }
+.zw-kto p > span + span::before { content: "·"; margin: 0 8px; color: var(--t4); }
+.zw-sklad { display: inline-flex; align-items: center; gap: 5px; flex-basis: 100%; margin-top: 4px; color: var(--ok); }
+.zw-kto p > .zw-sklad::before { content: none; }
+
+.zw-mecz { grid-area: mecz; display: grid; gap: 5px; min-width: 280px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--kreska); background: var(--pow1); color: var(--t1); cursor: pointer; transition: border-color 0.15s ease; }
+.zw-mecz:hover { border-color: var(--kreska-mocna); }
+.zw-mecz small { font-size: 12px; color: var(--t3); }
+.zw-mecz-druzyny { display: flex; align-items: center; gap: 7px; font-size: 14px; }
+.zw-mecz-druzyny b { font-weight: 600; white-space: nowrap; }
+.zw-mecz-druzyny i { font-style: normal; color: var(--t3); }
+.zw-mecz-kiedy { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--t2); }
+.zw-mecz-kiedy em { font-style: normal; font-weight: 600; color: var(--t1); white-space: nowrap; }
+
+.zw-sekcja { margin-top: 8px; }
+.zw-sekcja-glowa { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 30px 0 4px; }
+.zw-sekcja-glowa .st-h2 { margin: 0; }
+.zw-objasnienie { margin: 8px 0 12px; font-size: 13px; color: var(--t3); }
+.zw-typy { display: grid; gap: 8px; }
+
+.zw-ikona { width: 28px; height: 28px; flex: none; display: grid; place-items: center; border-radius: 8px; background: var(--pow2); color: var(--t2); }
+
+/* linie: małe przyciski 0,5+ 1,5+ … */
+.zw-linie { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.zw-linie button { height: 28px; min-width: 40px; padding: 0 8px; border-radius: 14px; border: 1px solid var(--kreska); background: none; color: var(--t2); font: 600 12px/1 var(--f-t, inherit); font-variant-numeric: tabular-nums; cursor: pointer; }
+.zw-linie button:hover { color: var(--t1); border-color: var(--kreska-mocna); }
+.zw-linie button[aria-checked="true"] { background: var(--akcja); border-color: transparent; color: var(--na-akcji); }
+
+/* ---- A · tabela rynków ---- */
+.zw-tabela { border: 1px solid var(--kreska); border-radius: 12px; background: var(--pow1); overflow: hidden; }
+.zw-wiersz {
+  display: grid;
+  grid-template-columns: minmax(170px, 1fr) minmax(150px, 210px) auto 64px 52px 104px;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--kreska);
+}
+.zw-blok { border-top: 1px solid var(--kreska); }
+.zw-blok .zw-wiersz { border-top: 0; }
+.zw-blok[data-otwarty] { background: color-mix(in srgb, var(--pow2) 45%, transparent); }
+.zw-wiersz:first-child { border-top: 0; }
+.zw-wiersz[data-typ] { background: color-mix(in srgb, var(--akcja) 5%, transparent); }
+.zw-glowka { padding-top: 9px; padding-bottom: 9px; background: var(--pow2); font-size: 11px; color: var(--t3); }
+.zw-glowka > * { justify-self: start; text-align: left; }
+.zw-wiersz .mz-kratki i[data-s="brak"] { background: none; box-shadow: inset 0 0 0 1px var(--kreska); }
+.zw-rynek { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.zw-rynek b { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---- rozwinięcie wiersza ---- */
+.zw-linie-lista { display: grid; gap: 2px; }
+.zw-linie-lista button {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) 44px 44px;
+  align-items: center;
+  gap: 10px;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: none;
+  color: var(--t2);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.zw-linie-lista button:hover { background: var(--pow2); }
+.zw-linie-lista button[aria-checked="true"] { background: var(--pow2); border-color: var(--kreska-mocna); color: var(--t1); }
+.zw-ll-pasek { height: 6px; border-radius: 3px; background: var(--pow3); overflow: hidden; }
+.zw-ll-pasek i { display: block; height: 100%; border-radius: 3px; background: var(--t3); transition: width 0.3s ease; }
+.zw-linie-lista button[data-poziom="mocne"] .zw-ll-pasek i { background: var(--ok); }
+.zw-linie-lista button[data-poziom="srednie"] .zw-ll-pasek i { background: var(--t2); }
+.zw-ll-weszlo { font-variant-numeric: tabular-nums; text-align: right; color: var(--t1); }
+.zw-linie-lista button[data-poziom="mocne"] .zw-ll-weszlo { color: var(--ok); }
+.zw-ll-kurs { font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; color: var(--t1); }
+
+/* historia naszych typów */
+.zw-hist-wynik { margin: -4px 0 10px; font-size: 14px; color: var(--t2); }
+.zw-hist-wynik b { color: var(--t1); }
+.zw-hist-wynik span { color: var(--t3); }
+.zw-pusty { max-width: 640px; }
+
+/* ---- telefon ---- */
+@container (max-width: 760px) {
+  .zw-glowa { grid-template-columns: 1fr; grid-template-areas: "wroc" "kto" "mecz"; }
+  .zw-mecz { min-width: 0; }
+  .zw-kto h1 { font-size: 27px; }
+    .zw-wiersz {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "rynek weszlo" "linie linie" "kratki kurs";
+    gap: 8px 10px;
+    padding: 12px;
+  }
+  .zw-wiersz > :nth-child(1) { grid-area: rynek; }
+  .zw-wiersz > :nth-child(2) { grid-area: linie; }
+  .zw-wiersz > :nth-child(3) { grid-area: kratki; min-width: 0; }
+  .zw-wiersz > :nth-child(4) { grid-area: weszlo; text-align: right; }
+  .zw-wiersz > :nth-child(5) { grid-area: kurs; }
+  .zw-wiersz .mz-kratki { gap: 2px; }
+  .zw-wiersz .mz-kratki i { width: 21px; height: 21px; font-size: 11px; }
+  .zw-wiersz .mz-weszlo { justify-items: end; }
+  .zw-wiersz .mz-kurs { height: 30px; padding: 0 8px; }
+  .zw-linie-lista button { grid-template-columns: 86px minmax(0, 1fr) 40px 40px; gap: 8px; }
+}
+
+.zw-rozwin { display: inline-flex; align-items: center; gap: 10px; min-width: 0; padding: 0; border: 0; background: none; color: var(--t1); font: inherit; text-align: left; cursor: pointer; }
+.zw-rozwin b { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.zw-rozwin:hover b { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--t4); }
+.zw-rozwin:focus-visible { outline: 2px solid var(--akcja); outline-offset: 3px; border-radius: 6px; }
+.zw-strzalka { flex: none; color: var(--t3); transition: transform 0.2s ease; }
+.zw-rozwin[aria-expanded="true"] .zw-strzalka { transform: rotate(180deg); }
+
+.zw-wiersz .mz-kratki i { transition: background 0.25s ease, color 0.25s ease, box-shadow 0.25s ease; }
+
+.zw-szczegoly { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; padding: 4px 16px 16px 54px; }
+.zw-h4 { margin: 4px 0 8px; font-size: 12px; font-weight: 600; color: var(--t3); }
+.zw-dziennik { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.zw-dziennik li { display: grid; grid-template-columns: 46px minmax(0, 1fr) auto 30px; align-items: center; gap: 10px; height: 30px; padding: 0 10px; border-radius: 7px; font-size: 13px; color: var(--t2); }
+.zw-dziennik li:nth-child(odd) { background: var(--pow2); }
+.zw-dz-data { color: var(--t3); font-variant-numeric: tabular-nums; }
+.zw-dz-rywal { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--t1); }
+.zw-dz-min { font-size: 12px; color: var(--t3); font-variant-numeric: tabular-nums; }
+.zw-dz-v { justify-self: end; display: grid; place-items: center; width: 26px; height: 22px; border-radius: 6px; font-variant-numeric: tabular-nums; background: var(--pow3); color: var(--t2); }
+.zw-dziennik li[data-s="ok"] .zw-dz-v { background: var(--ok-tlo); color: var(--ok); }
+.zw-dziennik li[data-s="nz"] .zw-dz-v { background: none; color: var(--t3); }
+
+@container (max-width: 760px) {
+  .zw-szczegoly { grid-template-columns: 1fr; gap: 14px; padding: 0 12px 14px; }
+  .zw-rynek { flex-wrap: wrap; row-gap: 4px; }
+  .zw-rozwin b { white-space: normal; }
+}

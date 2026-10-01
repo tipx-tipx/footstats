@@ -20,7 +20,12 @@ export default async function proxy(request: NextRequest) {
   if (await verifySessionToken(token, secret)) {
     return NextResponse.next();
   }
+  // po zalogowaniu wracamy tam, skąd bramka zawróciła; nieważne ciasteczko
+  // = sesja wygasła (inny komunikat niż pierwsze wejście)
   const loginUrl = new URL("/login", request.url);
+  const { pathname, search } = request.nextUrl;
+  if (pathname !== "/" && !pathname.startsWith("/api/")) loginUrl.searchParams.set("next", pathname + search);
+  if (token) loginUrl.searchParams.set("stan", "sesja");
   return NextResponse.redirect(loginUrl);
 }
 

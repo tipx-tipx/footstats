@@ -5290,6 +5290,13 @@ def _typ_dnia(r: dict) -> dict:
         # PÓŁKA i MOCNA LINIA (2026-09-21) — front rozbija dzień po półkach
         "polka": r.get("polka") or (r.get("kolejnosc") or {}).get("polka"),
         "mocna_linia": bool(r.get("mocna_linia")),
+        # NUMERY MECZU I ZAWODNIKA (redesign 7B, 2026-10-01): strona zawodnika
+        # pokazuje „nasze typy na niego”, a 404 rozegranego meczu – jego typy.
+        # Po samych nazwach (`mecz`, `podmiot`) to zgadywanie: ten sam zawodnik
+        # bywa pisany różnie w 365 i statshubie, drużyna i zawodnik mogą się
+        # nazywać tak samo
+        "mecz_id": r.get("mecz_id"),
+        "podmiot_id": r.get("podmiot_id"),
     }
 
 

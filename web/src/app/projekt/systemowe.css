@@ -1,0 +1,238 @@
+/* ==========================================================================
+   Etap 5 – strony systemowe (.sy-): logowanie, 404, błąd, brak internetu.
+   ========================================================================== */
+
+.sy-stany { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; color: var(--t3); }
+.sy-stany span { margin-right: 4px; }
+.sy-stany button { height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--kreska-mocna); background: var(--pow1); color: var(--t2); font: inherit; cursor: pointer; }
+.sy-stany button[aria-pressed="true"] { background: var(--akcja-tlo); color: var(--t1); border-color: var(--akcja); }
+
+.sy-okno { height: 640px; }
+
+/* ---- S.1 logowanie v2 ---- */
+
+.sy-okno-login { height: 680px; }
+.sy-telefon-login { height: 760px; }
+
+/* komunikat: ikona w kółku, tytuł, opis – kolor niesie znaczenie */
+.sy-kom { overflow: hidden; }
+.sy-kom-w {
+  --ton: var(--t3);
+  --ton-tlo: var(--pow2);
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--ton-tlo);
+  border: 1px solid color-mix(in srgb, var(--ton) 38%, transparent);
+}
+.sy-kom[data-rodzaj="blad"] .sy-kom-w { --ton: var(--nie); --ton-tlo: var(--nie-tlo); }
+.sy-kom[data-rodzaj="uwaga"] .sy-kom-w { --ton: var(--czeka); --ton-tlo: var(--czeka-tlo); }
+.sy-kom[data-rodzaj="ok"] .sy-kom-w { --ton: var(--ok); --ton-tlo: var(--ok-tlo); }
+.sy-kom[data-rodzaj="info"] .sy-kom-w { --ton: var(--t2); --ton-tlo: var(--pow2); }
+.sy-kom-ikona { width: 20px; height: 20px; margin-top: 1px; display: grid; place-items: center; border-radius: 50%; background: var(--ton); color: var(--tlo); }
+.sy-kom b { display: block; font-size: 14px; font-weight: 600; color: var(--t1); line-height: 1.35; }
+.sy-kom p { text-wrap: pretty; margin-top: 2px; font-size: 13px; line-height: 1.45; color: var(--t2); }
+.sy-kom p b { display: inline; font-size: inherit; }
+.sy-kom[data-maly] .sy-kom-w { margin: 8px 0 0; padding: 8px 12px; }
+.sy-kom[data-maly] b { font-size: 13px; }
+.sy-kom[data-maly] p { font-size: 12px; }
+
+/* formularz */
+.sy-l-naglowek h1 { font-size: 34px; line-height: 1.05; letter-spacing: -0.01em; }
+.sy-l-naglowek p { margin-top: 8px; font-size: 15px; color: var(--t2); text-wrap: pretty; }
+.sy-form { margin-top: 28px; display: grid; }
+.sy-etykieta { font-size: 13px; font-weight: 600; color: var(--t2); margin-bottom: 7px; }
+.sy-pole { position: relative; }
+.sy-pole-ikona { position: absolute; left: 14px; top: 50%; translate: 0 -50%; color: var(--t3); display: grid; pointer-events: none; transition: color 0.15s ease; }
+.sy-pole:focus-within .sy-pole-ikona { color: var(--t1); }
+.sy-pole[data-blad] .sy-pole-ikona { color: var(--nie); }
+.sy-pole input {
+  width: 100%;
+  height: 50px;
+  padding: 0 52px 0 42px;
+  border-radius: 10px;
+  border: 1px solid var(--kreska-mocna);
+  background: var(--pow1);
+  color: var(--t1);
+  font: inherit;
+  font-size: 16px; /* 16 px: iOS nie powiększa strony przy fokusie */
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+.sy-pole input::placeholder { color: var(--t4); }
+.sy-pole input:hover { border-color: var(--t4); }
+.sy-pole input:focus { border-color: var(--akcja); box-shadow: 0 0 0 3px var(--akcja-tlo); background: var(--pow2); }
+.sy-pole input:disabled { opacity: 0.7; }
+.sy-pole[data-blad] input { border-color: var(--nie); box-shadow: 0 0 0 3px var(--nie-tlo); }
+.sy-oko { position: absolute; right: 3px; top: 3px; width: 44px; height: 44px; display: grid; place-items: center; border: 0; background: none; color: var(--t3); border-radius: 8px; cursor: pointer; }
+.sy-oko:hover { color: var(--t1); background: var(--pow3); }
+.sy-oko:focus-visible { outline: 2px solid var(--akcja); outline-offset: -4px; }
+.sy-wejdz { width: 100%; margin-top: 20px; }
+.sy-wejdz[data-faza="wchodze"] { background: var(--ok); color: var(--na-akcji); opacity: 1; }
+.sy-wejdz:disabled[data-faza="nic"] { opacity: 1; background: var(--pow3); color: var(--t3); }
+.sy-wejdz-tresc { display: inline-flex; align-items: center; gap: 8px; }
+.sy-bez-hasla { text-wrap: pretty; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--kreska); font-size: 13px; color: var(--t3); }
+.sy-bez-hasla span { color: var(--t2); }
+
+.sy-l-stopka { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; font-size: 12px; color: var(--t3); }
+.sy-l-stopka i { display: inline-grid; place-items: center; height: 20px; padding: 0 6px; margin-right: 6px; border-radius: 5px; border: 1px solid var(--kreska-mocna); color: var(--t2); font-style: normal; font-weight: 600; font-size: 11px; }
+
+/* ---- S.2–S.4 strony w menu ---- */
+
+@container (max-width: 520px) {
+  .sy-sys { padding: 28px 16px 48px; min-height: 0; }
+}
+.sy-sys h1 { font-size: 34px; line-height: 1.08; }
+.sy-lead { color: var(--t2); font-size: 15px; margin-top: 8px; }
+.sy-lead span { display: block; }
+.sy-adres { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; margin-bottom: 16px; padding: 5px 10px; border-radius: 7px; background: var(--pow2); color: var(--t2); font: 13px/1.3 ui-monospace, "Cascadia Mono", Consolas, monospace; overflow-wrap: anywhere; }
+.sy-adres span { font-family: inherit; color: var(--t3); }
+.sy-akcje { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
+.sy-szukaj {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 48px;
+  margin-top: 24px;
+  padding: 0 12px 0 14px;
+  border-radius: 10px;
+  border: 1px solid var(--kreska-mocna);
+  background: var(--pow1);
+  color: var(--t3);
+  font: inherit;
+  text-align: left;
+  cursor: text;
+}
+.sy-szukaj:hover { border-color: var(--t4); }
+.sy-szukaj:focus-visible { outline: none; border-color: var(--akcja); box-shadow: 0 0 0 3px var(--akcja-tlo); }
+.sy-szukaj-slowo { color: var(--t1); font-size: 16px; }
+.sy-szukaj-podpowiedz { flex: 1; min-width: 0; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sy-szukaj kbd { font: 11px/1 inherit; padding: 4px 6px; border-radius: 5px; border: 1px solid var(--kreska-mocna); color: var(--t3); }
+@container (max-width: 520px) {
+  .sy-szukaj kbd { display: none; }
+}
+
+.sy-znowu { margin-top: 16px; padding: 10px 12px; border-radius: 10px; background: var(--czeka-tlo); color: var(--t1); font-size: 13px; overflow: hidden; }
+.sy-kod { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 28px; padding-top: 16px; border-top: 1px solid var(--kreska); font-size: 13px; color: var(--t3); }
+.sy-kod-etykieta { margin-right: 2px; }
+.sy-kod code { font: 13px ui-monospace, "Cascadia Mono", Consolas, monospace; color: var(--t2); padding: 2px 6px; border-radius: 5px; background: var(--pow2); }
+.sy-kod button { height: 30px; padding: 0 10px; border: 1px solid var(--kreska-mocna); border-radius: 7px; background: var(--pow1); color: var(--t1); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.sy-kod button:hover { background: var(--pow2); }
+
+/* brak internetu – pasek */
+.sy-pasek { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 10px 12px 10px 14px; border-radius: 10px; background: var(--pow2); color: var(--t2); font-size: 13px; line-height: 1.4; }
+.sy-pasek b { color: var(--t1); font-weight: 600; }
+.sy-pasek[data-online] { background: var(--ok-tlo); }
+.sy-atrapa { display: grid; gap: 10px; margin-top: 20px; opacity: 0.55; }
+.sy-atrapa div { height: 64px; border-radius: 12px; background: var(--pow1); border: 1px solid var(--kreska); }
+
+/* ---- logo animowane ---- */
+
+.sy-logo-anim { display: inline-flex; align-items: center; gap: 10px; color: var(--t1); }
+.sy-logo-anim-znak { display: block; flex: none; overflow: visible; }
+.sy-logo-anim-napis { display: block; }
+
+/* ---- przycisk motywu ---- */
+
+.sy-motyw { position: absolute; top: 20px; right: 20px; z-index: 3; }
+
+/* ---- S.2–S.4: wspólny układ ---- */
+.sy-sys { max-width: 1180px; margin: 0 auto; padding: 56px 24px 72px; min-height: 470px; }
+.sy-sys-gora { display: grid; grid-template-columns: minmax(0, 600px) minmax(0, 260px); justify-content: space-between; align-items: center; gap: 40px; }
+.sy-sys-tekst { min-width: 0; }
+.sy-sys-znak { display: grid; justify-items: end; }
+.sy-znak-ilu { width: 100%; max-width: 260px; height: auto; color: var(--t3); }
+@container (max-width: 760px) {
+  .sy-sys { padding: 24px 16px 40px; min-height: 0; }
+  .sy-sys-gora { grid-template-columns: 1fr; gap: 0; }
+  .sy-sys-znak { order: -1; justify-items: start; margin-bottom: 16px; }
+  .sy-znak-ilu { width: 120px; }
+  .sy-sys h1 { font-size: 30px; }
+}
+
+/* 404: najbliższe mecze z typami */
+.sy-najblizsze { margin-top: 44px; max-width: 760px; }
+.sy-najblizsze-glowa { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; padding: 12px 16px; border-bottom: 1px solid var(--kreska); }
+.sy-najblizsze-glowa b { font-size: 15px; font-weight: 600; color: var(--t1); }
+.sy-najblizsze-glowa span { font-size: 13px; color: var(--t3); }
+
+/* 404: mecz się skończył – wyniki naszych typów */
+.sy-mecz-wyniki { margin-top: 36px; max-width: 760px; border-radius: 12px; background: var(--pow1); border: 1px solid var(--kreska); overflow: hidden; }
+.sy-mecz-wyniki header { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; padding: 12px 16px; border-bottom: 1px solid var(--kreska); }
+.sy-mecz-wyniki header b { font-size: 15px; font-weight: 600; }
+.sy-mecz-wyniki header span { font-size: 13px; color: var(--t3); }
+.sy-mecz-wyniki header em { margin-left: auto; font-style: normal; font-size: 13px; font-weight: 600; color: var(--t2); }
+.sy-mecz-typ { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 10px 16px; border-top: 1px solid var(--kreska); }
+.sy-mecz-typ:first-of-type { border-top: 0; }
+.sy-mecz-znak { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; font-size: 12px; font-weight: 700; background: var(--pow3); color: var(--t2); }
+.sy-mecz-typ[data-wynik="wygrany"] .sy-mecz-znak { background: var(--ok-tlo); color: var(--ok); }
+.sy-mecz-typ[data-wynik="przegrany"] .sy-mecz-znak { background: var(--nie-tlo); color: var(--nie); }
+.sy-mecz-opis { min-width: 0; display: grid; gap: 1px; }
+.sy-mecz-opis small { font-size: 13px; color: var(--t3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sy-mecz-opis span { font-size: 15px; color: var(--t2); }
+.sy-mecz-opis b, .sy-mecz-opis strong { color: var(--t1); font-weight: 600; }
+.sy-mecz-bylo { display: grid; justify-items: end; font-variant-numeric: tabular-nums; }
+.sy-mecz-bylo small { font-size: 11px; color: var(--t3); }
+.sy-mecz-bylo b { font-size: 15px; font-weight: 600; }
+
+/* błąd */
+.sy-blad-kom { margin-top: 18px; }
+.sy-blad-kom .sy-kom-w { margin-bottom: 0; }
+
+/* brak internetu: odliczanie samoczynnej próby */
+.sy-ponowie { display: flex; align-items: center; gap: 12px; margin-top: 18px; font-size: 13px; color: var(--t3); font-variant-numeric: tabular-nums; }
+.sy-ponowie-pasek { width: 120px; height: 3px; border-radius: 2px; background: var(--pow3); overflow: hidden; }
+.sy-ponowie-pasek i { display: block; height: 100%; background: var(--t3); transition: width 1s linear; }
+.sy-offline { padding-top: 16px; }
+.sy-pasek { align-items: flex-start; flex-wrap: nowrap; }
+.sy-pasek-ikona { width: 24px; height: 24px; flex: none; display: grid; place-items: center; border-radius: 50%; background: var(--pow3); color: var(--t1); margin-top: -2px; }
+.sy-pasek[data-online] .sy-pasek-ikona { background: var(--ok); color: var(--na-akcji); }
+
+.sy-l-naglowek p span { display: block; }
+
+/* ---- N · logowanie nad aplikacją ---- */
+.sy-ln { position: relative; height: 100%; min-height: 100%; overflow: hidden; background: var(--tlo); color: var(--t1); }
+.sy-ln-tlo { position: absolute; inset: 0; overflow: hidden; user-select: none; }
+.sy-ln:not([data-otwarte]) .sy-ln-tlo { pointer-events: none; }
+/* zasłona: przyciemnia produkt, ale go nie chowa – widać, do czego wchodzisz */
+.sy-ln-zaslona { position: absolute; inset: 0; background: color-mix(in srgb, var(--tlo) 58%, transparent); }
+.sy-ln-okno {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(420px, calc(100% - 32px));
+  translate: -50% -50%;
+  padding: 24px 28px 20px;
+  border-radius: 16px;
+  background: var(--pow1);
+  border: 1px solid var(--kreska-mocna);
+  box-shadow: 0 30px 80px rgb(0 0 0 / 0.45), 0 2px 0 var(--marka) inset;
+}
+.sy-ln-glowa { display: flex; align-items: center; justify-content: space-between; margin-bottom: 26px; }
+.sy-ln-glowa .sy-motyw { position: static; }
+.sy-ln .sy-l-naglowek h1 { font-size: 28px; }
+.sy-ln .sy-form { margin-top: 22px; }
+.sy-ln .sy-l-stopka { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--kreska); }
+
+.sy-ln[data-telefon] .sy-ln-okno {
+  left: 0;
+  right: 0;
+  top: auto;
+  bottom: 0;
+  width: auto;
+  translate: none;
+  padding: 10px 16px max(18px, env(safe-area-inset-bottom));
+  border-radius: 20px 20px 0 0;
+  border-bottom: 0;
+}
+.sy-ln-uchwyt { display: block; width: 40px; height: 4px; margin: 0 auto 14px; border-radius: 2px; background: var(--kreska-mocna); }
+.sy-ln[data-telefon] .sy-ln-glowa { margin-bottom: 18px; }
+.sy-ln[data-telefon] .sy-l-naglowek h1 { font-size: 26px; }
+
+.sy-pelny > .sy-ln { height: 100dvh; }
+.sy-ln .sy-bez-hasla { border-top: 0; padding-top: 0; margin-top: 14px; }
+.sy-aplikacja { width: 100%; flex: 1; }

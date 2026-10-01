@@ -1,0 +1,502 @@
+/* ==========================================================================
+   Strona Kupony v2 (.k2-) – po „bardzo duży chaos” (01.10): jeden kupon,
+   kafle celu zamiast miarki, spokojne nogi, jeden przycisk Udostępnij.
+   ========================================================================== */
+
+/* minmax(0, 1fr): bez tego przewijany rząd kafli rozpychał siatkę i cała
+   strona wychodziła poza ekran telefonu */
+.k2 { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; }
+.k2 > * { min-width: 0; }
+
+.k2-glowa h1 { font-size: 30px; }
+.k2-glowa p { color: var(--t2); margin-top: 6px; }
+
+/* ---- 1. cel ---- */
+
+.k2-cel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--pow1);
+  border: 1px solid var(--kreska);
+}
+
+.k2-stawka { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; color: var(--t2); font-size: 14px; }
+.k2-stawka h2 { font-size: 19px; color: var(--t1); margin-right: auto; }
+.k2-stawka-etykieta { color: var(--t3); font-size: 12px; }
+
+.k2-stawki {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: 8px;
+  background: var(--pow2);
+  border: 1px solid var(--kreska);
+}
+
+.k2-stawki button {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 6px;
+  color: var(--t2);
+  font-weight: 600;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.k2-stawki button[aria-checked="true"] { background: var(--pow1); color: var(--t1); box-shadow: 0 0 0 1px var(--kreska-mocna); }
+
+.k2-kafle { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; padding-top: 6px; }
+
+@container (max-width: 560px) {
+  .k2-kafle {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    margin: 0 -16px;
+    padding: 8px 16px 4px;
+    scroll-padding: 0 16px;
+  }
+  .k2-kafle::-webkit-scrollbar { display: none; }
+  .k2-kafel { flex: 0 0 31%; scroll-snap-align: start; }
+}
+
+.k2-kafel {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  gap: 3px;
+  justify-items: start;
+  padding: 12px 12px 11px;
+  border-radius: 10px;
+  background: var(--pow2);
+  border: 1px solid var(--kreska);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.12s ease;
+}
+
+.k2-kafel:hover { border-color: var(--kreska-mocna); }
+.k2-kafel:active { transform: scale(0.98); }
+.k2-kafel:disabled { opacity: 0.45; cursor: not-allowed; }
+.k2-kafel b { font: 700 19px/1.1 var(--f-n); font-variant-numeric: tabular-nums; color: var(--t1); }
+.k2-kafel small { color: var(--t3); font-size: 12px; font-variant-numeric: tabular-nums; }
+.k2-kafel em { font-style: normal; color: var(--t2); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.k2-kafel-tlo {
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  border-radius: 10px;
+  background: var(--akcja-tlo);
+  box-shadow: inset 0 0 0 1.5px var(--akcja);
+}
+
+.k2-polecany {
+  position: absolute;
+  top: -8px;
+  right: 8px;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: var(--akcja);
+  color: var(--na-akcji);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.k2-ustawienia-link {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding-top: 10px;
+  border-top: 1px solid var(--kreska);
+  color: var(--t3);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.k2-ustawienia-link span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.k2-ustawienia-link span::first-letter { text-transform: uppercase; }
+.k2-ustawienia-link b { flex: none; display: inline-flex; align-items: center; gap: 4px; color: var(--t1); font-weight: 600; }
+
+.k2-ustawienia { overflow: hidden; }
+
+.k2-ustawienia-wnetrze {
+  display: grid;
+  grid-template-columns: 130px minmax(0, 1fr);
+  align-items: center;
+  justify-items: start;
+  gap: 10px 14px;
+  padding: 6px 0 2px;
+}
+
+.k2-ustawienia-wnetrze label { color: var(--t3); font-size: 13px; }
+
+@container (max-width: 560px) {
+  .k2-ustawienia-wnetrze { grid-template-columns: 1fr; gap: 6px; }
+  .k2-ustawienia-wnetrze label { margin-top: 6px; }
+}
+
+/* ---- 2. kupon ---- */
+
+.k2-kupon {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--pow1);
+  border: 1px solid var(--kreska);
+  scroll-margin-top: 16px;
+}
+
+.k2-kupon-glowa { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; }
+.k2-etykieta { color: var(--t3); font-size: 12px; font-weight: 600; }
+.k2-wygrana { font: 700 34px/1.05 var(--f-n); font-variant-numeric: tabular-nums; margin-top: 4px; }
+/* błysk ma własny margines wewnętrzny – wyrównujemy liczbę do etykiety */
+.k2-wygrana .a-blysk { margin-left: -8px; }
+.k2-meta { color: var(--t3); font-size: 13px; margin-top: 6px; }
+.k2-meta b { color: var(--t1); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.k2-mecz {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  background: var(--akcja-tlo);
+  font-size: 13px;
+  color: var(--t2);
+}
+
+.k2-mecz b { color: var(--t1); font-weight: 600; }
+
+.k2-os { position: relative; display: grid; gap: 8px; list-style: none; padding: 0; margin: 0; }
+.k2-os::before { content: ""; position: absolute; left: 51px; top: 18px; bottom: 18px; width: 2px; border-radius: 1px; background: var(--kreska-mocna); }
+
+.k2-noga { display: grid; grid-template-columns: 44px 16px minmax(0, 1fr); align-items: start; }
+.k2-czas { padding-top: 11px; font-size: 13px; font-variant-numeric: tabular-nums; color: var(--t2); line-height: 1.2; }
+.k2-czas small { display: block; color: var(--t4); font-size: 11px; }
+.k2-kropka { margin: 15px auto 0; width: 10px; height: 10px; border-radius: 50%; background: var(--pow1); box-shadow: 0 0 0 2px var(--kreska-mocna); z-index: 1; }
+.k2-kropka[data-zablokowana] { background: var(--akcja); box-shadow: 0 0 0 2px var(--akcja); }
+
+.k2-karta {
+  margin-left: 8px;
+  border-radius: 10px;
+  background: var(--pow2);
+  border: 1px solid transparent;
+  overflow: hidden;
+  transition: border-color 0.15s ease;
+}
+
+.k2-noga[data-otwarta] .k2-karta { border-color: var(--kreska-mocna); }
+
+.k2-karta-gora {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 12px;
+  width: 100%;
+  padding: 10px 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.k2-karta-gora:hover { background: var(--pow3); }
+
+.k2-kto { display: flex; align-items: center; gap: 7px; min-width: 0; font-weight: 600; font-size: 14px; }
+.k2-kto > span:not(.k2-klodka):not(.p-herb) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.k2-klodka { color: var(--akcja); display: inline-grid; }
+.k2-kurs { font: 700 17px/1 var(--f-n); font-variant-numeric: tabular-nums; text-align: right; align-self: center; }
+.k2-zaklad { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 5px; min-width: 0; color: var(--t3); font-size: 13px; }
+.k2-zaklad svg { color: var(--t2); flex: none; }
+.k2-zaklad b { color: var(--t1); font-weight: 600; white-space: nowrap; }
+.k2-szansa { color: var(--t3); font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; }
+
+.k2-podpowiedz {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  border-top: 1px dashed var(--kreska-mocna);
+  font-size: 12px;
+  color: var(--t2);
+}
+
+.k2-podpowiedz b { color: var(--t1); font-weight: 600; }
+
+.k2-podpowiedz button {
+  flex: none;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 7px;
+  background: var(--akcja);
+  color: var(--na-akcji);
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.k2-rozwin { overflow: hidden; }
+.k2-rozwin-wnetrze { display: grid; gap: 2px; padding: 4px 8px 10px; }
+.k2-rozwin-wnetrze > small { color: var(--t3); font-size: 11px; font-weight: 600; padding: 4px 4px 2px; }
+
+.k2-kandydat {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 7px 6px;
+  border-radius: 7px;
+  text-align: left;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.k2-kandydat:hover { background: var(--pow3); }
+.k2-kandydat span { display: grid; min-width: 0; font-weight: 600; }
+.k2-kandydat span small { color: var(--t3); font-weight: 400; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.k2-kandydat em { font-style: normal; font-size: 12px; font-weight: 600; color: var(--t3); font-variant-numeric: tabular-nums; }
+.k2-kandydat em[data-plus="true"] { color: var(--ok); }
+.k2-kandydat em[data-plus="false"] { color: var(--czeka); }
+.k2-kandydat b { font: 700 15px/1 var(--f-n); font-variant-numeric: tabular-nums; }
+
+.k2-akcje { display: flex; flex-wrap: wrap; gap: 4px; padding: 8px 4px 0; margin-top: 4px; border-top: 1px solid var(--kreska); }
+
+.k2-akcje button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 7px;
+  color: var(--t2);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.k2-akcje button:hover { background: var(--pow3); color: var(--t1); }
+.k2-akcje button[data-usun]:hover { color: var(--nie); }
+
+.k2-dodaj { padding-left: 60px; }
+.k2-dodaj > button { color: var(--t2); font-size: 13px; font-weight: 600; cursor: pointer; padding: 4px 0; }
+.k2-dodaj > button:hover { color: var(--t1); }
+
+/* ---- 3. kupon z meczu ---- */
+
+.k2-z-meczu { display: grid; gap: 8px; }
+.k2-z-meczu > b { font-weight: 600; font-size: 14px; }
+.k2-z-meczu-lista { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* ---- telefon: pastylka ---- */
+
+.k2-pastylka {
+  position: sticky;
+  bottom: 12px;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 8px 8px 18px;
+  border-radius: 28px;
+  background: var(--akcja);
+  color: var(--na-akcji);
+  box-shadow: 0 12px 34px rgb(0 0 0 / 0.3);
+}
+
+.k2-pastylka span { display: grid; line-height: 1.15; }
+.k2-pastylka b { font: 700 18px/1.1 var(--f-n); font-variant-numeric: tabular-nums; }
+.k2-pastylka small { font-size: 11px; opacity: 0.8; font-variant-numeric: tabular-nums; }
+
+.k2-pastylka button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--na-akcji) 16%, transparent);
+  color: var(--na-akcji);
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.k2-udostepnij-akcje { display: flex; gap: 8px; }
+.k2-udostepnij-akcje .a-guzik[data-t="glowny"] { flex: 1; }
+
+
+/* ---- ustawienia: widoczne przyciski z wartością (01.10) ---- */
+
+.k2-ust { position: relative; display: grid; gap: 8px; padding-top: 12px; border-top: 1px solid var(--kreska); }
+.k2-ust-rzad { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.k2-ust-guzik {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px 0 12px;
+  border-radius: 8px;
+  background: var(--pow2);
+  border: 1px solid var(--kreska);
+  color: var(--t2);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.k2-ust-guzik:hover { background: var(--pow3); color: var(--t1); }
+.k2-ust-guzik[aria-expanded="true"] { border-color: var(--kreska-mocna); background: var(--pow3); color: var(--t1); }
+/* zmienione ustawienie widać bez otwierania */
+.k2-ust-guzik[data-zmieniony] { color: var(--t1); border-color: var(--akcja); background: var(--akcja-tlo); }
+
+.k2-ust-lista {
+  display: grid;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 10px;
+  background: var(--pow2);
+  border: 1px solid var(--kreska-mocna);
+}
+
+.k2-ust-opcja {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 10px;
+  border-radius: 7px;
+  text-align: left;
+  cursor: pointer;
+  color: var(--t1);
+}
+
+.k2-ust-opcja:hover { background: var(--pow3); }
+.k2-ust-opcja[aria-checked="true"] { background: var(--pow1); }
+.k2-ust-opcja span { display: grid; gap: 2px; }
+.k2-ust-opcja b { font-weight: 600; font-size: 14px; }
+.k2-ust-opcja small { color: var(--t3); font-size: 12px; }
+.k2-ust-opcja svg { color: var(--akcja); flex: none; }
+
+/* ---- „Dodaj typ” jako ostatni punkt osi ---- */
+
+.k2-dodaj { position: relative; display: grid; grid-template-columns: 44px 16px minmax(0, 1fr); align-items: center; padding-left: 0; }
+.k2-dodaj > button { grid-column: 3; justify-self: start; margin-left: 8px; }
+.k2-dodaj > div { grid-column: 3; margin-left: 8px; }
+
+.k2-dodaj-kropka {
+  grid-column: 2;
+  justify-self: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font: 700 12px/1 var(--f-t);
+  color: var(--t2);
+  background: var(--pow1);
+  box-shadow: 0 0 0 1.5px var(--kreska-mocna);
+}
+
+/* ---- noga otwarta: wyraźniej, że to „tryb zmiany” ---- */
+
+.k2-noga[data-otwarta] .k2-karta { border-color: var(--akcja); box-shadow: 0 0 0 3px var(--akcja-tlo); }
+.k2-rozwin-wnetrze > small { text-transform: none; letter-spacing: 0; }
+
+/* ---- obrazek: tekst promocyjny ---- */
+
+.k-karta-promo { display: grid; gap: 3px; font-size: 12px; color: rgb(234 238 242 / 0.7); }
+.k-karta-promo b { font: 700 16px/1.2 var(--pf-barlow), sans-serif; color: #eaeef2; }
+
+
+/* ---- poprawki po zrzutach 01.10 ---- */
+
+@container (max-width: 560px) {
+  .k2-stawka h2 { flex-basis: 100%; }
+}
+
+.k2-kandydat em { display: grid; justify-items: end; gap: 1px; line-height: 1.2; }
+.k2-kandydat em small { color: var(--t3); font-weight: 500; font-size: 11px; }
+
+/* obrazek: nogi większe, lepiej wypełniają format 4:5 */
+.k-karta-nogi { gap: 12px; }
+.k-karta-noga { font-size: 14px; grid-template-columns: 44px minmax(0, 1fr) auto; }
+.k-karta-noga span { display: grid; white-space: normal; }
+.k-karta-noga span small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; }
+.k-karta-noga b { font: 700 16px/1.2 var(--pf-barlow), sans-serif; }
+
+
+/* ---- mecz jako ustawienie (01.10) ---- */
+
+.k2-ust-lista { max-height: 320px; overflow-y: auto; }
+.k2-ust-opcja { justify-content: flex-start; }
+.k2-ust-opcja > svg { margin-left: auto; }
+.k2-ust-tekst { display: grid; gap: 2px; min-width: 0; }
+.k2-ust-tekst b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.k2-ust-herby { flex: none; display: inline-flex; gap: 3px; }
+.k2-ust-herby i { width: 18px; }
+.k2-ust-guzik { max-width: 100%; }
+
+.k2-mecz-x {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 7px;
+  background: var(--pow1);
+  border: 1px solid var(--kreska-mocna);
+  color: var(--t1);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.k2-mecz-x:hover { background: var(--pow3); }
+
+/* herby w liście meczów obok siebie (ogólna reguła „span = siatka” je układała pionowo) */
+.k2-ust-opcja .k2-ust-herby { display: inline-flex; gap: 3px; align-items: center; }
+
+
+/* ---- ustawienia w jednym rzędzie (01.10) ---- */
+.k2-ust-rzad { display: flex; flex-wrap: nowrap; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.k2-ust-rzad::-webkit-scrollbar { display: none; }
+.k2-ust-guzik { flex: none; white-space: nowrap; }
+
+/* ---- ryzyko zamiast „szansa 3%” (01.10) ---- */
+.k2-kafel-typy { color: var(--t3) !important; font-weight: 500 !important; }
+
+.k2-ryzyko {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 1px 7px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  font-style: normal;
+  background: var(--pow3);
+  color: var(--t2);
+}
+
+.k2-ryzyko[data-kolor="ok"] { background: var(--ok-tlo); color: var(--ok); }
+.k2-ryzyko[data-kolor="czeka"] { background: var(--czeka-tlo); color: var(--czeka); }
+.k2-meta .k2-ryzyko { margin: 0 0 0 8px; vertical-align: 1px; }
+
+.k2-pyt { position: relative; display: inline-flex; vertical-align: -3px; margin-left: 6px; }
+.k2-pyt-dymek { top: calc(100% + 8px); left: -120px; width: 240px; }
+
+/* treść kafla przy górze – w przewijanym rzędzie kafle mają równą wysokość */
+.k2-kafel { align-content: start; }

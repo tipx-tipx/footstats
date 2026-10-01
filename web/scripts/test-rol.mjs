@@ -9,7 +9,8 @@
  *   2. PODMIANA roli w ciasteczku unieważnia podpis (nie da się awansować),
  *   3. token sprzed podziału na role dalej działa i znaczy admin
  *      (wdrożenie nie wylogowuje nikogo w środku pracy),
- *   4. token po terminie nie działa niezależnie od roli.
+ *   4. token po terminie nie działa niezależnie od roli,
+ *   5. kuchnia modelu (Kontrola, typy w tle) nie jest liczona dla klienta.
  */
 
 import { createSessionToken, verifySessionRole } from "../src/lib/auth.ts";
@@ -52,36 +53,73 @@ sprawdz("brak ciasteczka = brak roli", (await verifySessionRole(undefined, S)) =
 sprawdz("śmieci w ciasteczku odpadają", (await verifySessionRole("abc", S)) === null);
 sprawdz("nieznana rola odpada", (await verifySessionRole(`${exp}.krol.xxx`, S)) === null);
 
-// --- CO KLIENT DOSTAJE W PROPSACH ---
-// Sam token to połowa kontraktu. Druga połowa: dane dla klienta muszą wyjść
-// z serwera BEZ kuchni modelu — scena jest komponentem klienckim, więc
-// wszystko, co dostanie w propsach, ląduje w źródle strony, nawet jeśli nic
-// tego nie renderuje. Każde nowe pole diagnostyczne trzeba tu dopisać.
-const { okrojDlaKlienta } = await import("../src/lib/okrojDlaKlienta.ts");
+// --- CO KLIENT DOSTAJE W PROPSACH (redesign, 01.10) ---
+// Sam token to połowa kontraktu. Druga połowa: kuchnia modelu (Kontrola,
+// diagnostyka, typy w tle) nie może wyjść z serwera do klienta – strony są
+// komponentami klienckimi, więc wszystko w propsach ląduje w źródle strony.
+// Stara warstwa `okrojDlaKlienta` zniknęła razem ze starymi stronami; teraz
+// kuchnia w ogóle NIE JEST LICZONA dla klienta. Czytamy źródła stron, żeby
+// test nie trzymał własnej kopii reguły (ta sama zasada co przy matcherze).
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const pelne = {
-  podsumowanie: null,
-  po_rynku: [{ rynek_kod: "shots", rynek: "Strzały", n: 40, trafione: 23,
-               sr_p_model: 0.71, czestosc: 0.575, bias: 0.8 }],
-  ostatnie: [],
-  diagnostyka: { kategorie: {} },
-  kupony_diag: {},
-  prog_drabinek: { opublikowane: { n: 12 }, pod_progiem: { n: 0 } },
-  raport_uczenia: { pewniaki: { paczki: [{ n: 40, luka: -0.13 }] } },
-};
-const dlaKlienta = okrojDlaKlienta(pelne);
-const wSzkielecie = JSON.stringify(dlaKlienta);
+const SRC = join(dirname(fileURLToPath(import.meta.url)), "..", "src");
+const czytaj = (...czesci) => readFileSync(join(SRC, ...czesci), "utf8");
 
-for (const pole of ["diagnostyka", "kupony_diag", "prog_drabinek",
-                    "raport_uczenia"]) {
-  sprawdz(`klient nie dostaje pola „${pole}"`,
-    dlaKlienta[pole] === undefined);
+const wynikiSrc = czytaj("app", "(app)", "model", "page.tsx");
+sprawdz("Wyniki: rola z ciasteczka, pełny wgląd tylko admina",
+  /const admin = czyPelnyWglad\(rola\)/.test(wynikiSrc));
+sprawdz("Wyniki: dane kuchni (zKuchnia) pobierane TYLKO dla admina",
+  /admin \? await zKuchnia\(/.test(wynikiSrc) && (wynikiSrc.match(/zKuchnia\(/g) ?? []).length === 1);
+sprawdz("Wyniki: Kontrola liczona TYLKO dla admina",
+  /admin \? przygotujKontrole\(\) : undefined/.test(wynikiSrc) && (wynikiSrc.match(/przygotujKontrole\(\)/g) ?? []).length === 1);
+
+// żadna inna strona aplikacji nie sięga po kuchnię
+for (const strona of [["page.tsx"], ["druzyny", "page.tsx"], ["mecze", "page.tsx"], ["mecze", "[id]", "page.tsx"],
+                      ["kupony", "page.tsx"], ["jak-to-dziala", "page.tsx"], ["zawodnik", "[id]", "page.tsx"]]) {
+  const src = czytaj("app", "(app)", ...strona);
+  sprawdz(`/${strona.join("/")} nie pobiera kuchni`, !/zKuchnia|przygotujKontrole|getKalibracja/.test(src));
 }
-sprawdz("klient nie dostaje tabeli rynków", dlaKlienta.po_rynku.length === 0);
-// twardy dowód, że nic z kuchni nie przecieka bocznym wejściem: liczby
-// z raportu uczenia nie mogą się pojawić NIGDZIE w wysyłanym obiekcie
-sprawdz("żadna liczba z raportu uczenia nie zostaje w payloadzie",
-  !wSzkielecie.includes("-0.13") && !wSzkielecie.includes("0.575"));
+
+// KOMPONENTY PRZEGLĄDARKI NIE IMPORTUJĄ DANYCH (wykryte przed wdrożeniem
+// 01.10): jeden import funkcji daty z `_dane/przygotuj.ts` wciągał migawkę
+// warsztatu (typy, wyniki, dane Kontroli – `admin.json`) do paczki JS każdej
+// strony, także publicznej `/login`. Z `_dane` wolno brać w przeglądarce tylko
+// typy (`import type`) i dwa moduły bez danych.
+{
+  const { readdirSync, statSync } = await import("node:fs");
+  const pliki = [];
+  const zbierz = (k) => {
+    for (const n of readdirSync(k)) {
+      const p = join(k, n);
+      if (statSync(p).isDirectory()) zbierz(p);
+      else if (/\.(ts|tsx)$/.test(n)) pliki.push(p);
+    }
+  };
+  zbierz(SRC);
+  const wolne = /_dane\/(formatCzasu|czasMigawki)$/;
+  const zle = [];
+  for (const p of pliki) {
+    const src = readFileSync(p, "utf8");
+    const kliencki = /^\s*["']use client["']/.test(src) || p.includes(join("projekt", "_ui"));
+    if (!kliencki) continue;
+    for (const m of src.matchAll(/import\s+(type\s+)?(\{[^}]*\}|[\w*\s,]+?)\s*from\s*["']([^"']+)["']/g)) {
+      const [, tylkoTyp, nazwy, skad] = m;
+      const dane = /_dane\//.test(skad) && !wolne.test(skad);
+      const baza = /@\/lib\/data$|\/data\/demo\//.test(skad);
+      if (!(dane || baza) || tylkoTyp) continue;
+      const wartosci = nazwy.replace(/[{}]/g, "").split(",").map((x) => x.trim()).filter((x) => x && !x.startsWith("type "));
+      if (wartosci.length) zle.push(`${p.slice(SRC.length + 1)} ← ${skad}: ${wartosci.join(", ")}`);
+    }
+  }
+  sprawdz("komponenty przeglądarki nie importują danych (migawka, Kontrola, baza)", zle.length === 0);
+  for (const z of zle) console.log("        " + z);
+}
+
+// typy w tle (nigdy niepokazane) nie liczą się do Wyników żadnej roli
+sprawdz("Wyniki bez typów spoza publikacji",
+  czytaj("app", "projekt", "_dane", "skutecznosc.ts").includes("!t.poza_publikacja"));
 
 /* ------------------------------------------------------------------ *
  * BRAMKA DOSTĘPU — regex matchera z proxy.ts
@@ -92,10 +130,6 @@ sprawdz("żadna liczba z raportu uczenia nie zostaje w payloadzie",
  * Czytamy regex z pliku, żeby test nie trzymał własnej kopii — to ta sama
  * zasada co przy RLS i BUNDLE_KEYS (patrz test-klucze-rls.mjs).
  * ------------------------------------------------------------------ */
-import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
-
 const proxySrc = readFileSync(
   join(dirname(fileURLToPath(import.meta.url)), "..", "src", "proxy.ts"),
   "utf8",
@@ -105,7 +139,7 @@ sprawdz("matcher da się odczytać z proxy.ts", Boolean(mMatcher));
 if (mMatcher) {
   const re = new RegExp(`^${mMatcher[1].replace(/\\\\/g, "\\")}$`);
   const chronione = ["/", "/model", "/kupony", "/druzyny", "/mecze/123",
-                     "/api/kupon-pomin", "/zaklady"];
+                     "/zawodnik/123", "/jak-to-dziala", "/api/szukaj", "/zaklady"];
   for (const p of chronione) {
     sprawdz(`bramka chroni ${p}`, re.test(p));
   }
@@ -113,51 +147,6 @@ if (mMatcher) {
     sprawdz(`bramka PRZEPUSZCZA ${p}`, !re.test(p));
   }
 }
-
-/* ------------------------------------------------------------------ *
- * UPRAWNIENIA W /api/kupon-pomin (P0 z audytu, naprawione 2026-08-12)
- *
- * Bramka wyżej sprawdza tylko, czy ktoś JEST zalogowany — a `KLIENT_PASSWORD`
- * daje sesję tak samo jak `APP_PASSWORD`. Klient mógł więc zmienić globalny
- * profil buildera, pominąć cudzy kupon i wywołać cykl pipeline'u. Do tego
- * `wlasny_nauka` przyjmowało `p_model`, kursy i EV wprost z żądania i
- * zapisywało je do księgi, czyli do WARSTW UCZENIA.
- *
- * Czytamy źródło trasy, żeby test nie trzymał własnej kopii reguły — ta sama
- * zasada co przy matcherze wyżej.
- * ------------------------------------------------------------------ */
-const trasaSrc = readFileSync(
-  join(dirname(fileURLToPath(import.meta.url)), "..", "src", "app", "api",
-       "kupon-pomin", "route.ts"),
-  "utf8",
-);
-
-sprawdz("trasa w ogóle sprawdza rolę", trasaSrc.includes("czytajRole()"));
-sprawdz("odmowa to 403, nie ciche przepuszczenie",
-  /status:\s*403/.test(trasaSrc));
-
-const mAkcje = trasaSrc.match(/AKCJE_ADMINA\s*=\s*new Set\(\[([^\]]+)\]\)/);
-sprawdz("lista akcji administratora da się odczytać", Boolean(mAkcje));
-if (mAkcje) {
-  const akcje = mAkcje[1].match(/"([^"]+)"/g).map((s) => s.replace(/"/g, ""));
-  // każda z nich rusza WSPÓLNY stan produktu albo odpala cykl
-  for (const a of ["profil", "pomin", "przywroc", "wymien", "przebuduj"]) {
-    sprawdz(`akcja "${a}" wymaga administratora`, akcje.includes(a));
-  }
-  // ...a ta jest własnym kuponem klienta i ma dla niego zostać dostępna
-  sprawdz('akcja "wlasny_nauka" NIE jest zablokowana dla klienta',
-    !akcje.includes("wlasny_nauka"));
-}
-
-// parametry modelowe mają pochodzić z naszej puli, nie z przeglądarki
-sprawdz("wlasny_nauka czyta pulę legów z serwera",
-  trasaSrc.includes('readKey("legi_pool")'));
-sprawdz("leg spoza puli jest odrzucany",
-  trasaSrc.includes("if (!zrodlo) return null"));
-sprawdz("kurs łączny liczony z legów, nie z żądania",
-  !/kurs_laczny:\s*Number\(kk\.kurs_laczny\)/.test(trasaSrc));
-sprawdz("szansa kuponu liczona z legów, nie z żądania",
-  !/p_model:\s*Number\(kk\.p_model\)/.test(trasaSrc));
 
 console.log(bledy === 0 ? "\nWszystko gra." : `\n${bledy} błędów.`);
 process.exit(bledy === 0 ? 0 : 1);

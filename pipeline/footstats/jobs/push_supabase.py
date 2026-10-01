@@ -80,6 +80,29 @@ def klucze_pochodne_players(players: list, value_bets: list) -> dict:
     return out
 
 
+def klucze_lekkie(rows: list, generated: set | None) -> dict:
+    """{klucz: payload} z `kursy_dwa.json` (+ `players`, `value_bets`,
+    `matches` z tej samej wysyłki) – patrz `lekkie_klucze`."""
+    from .lekkie_klucze import klucze_kursow_meczow, klucze_zawodnikow
+
+    plik = WEB_DATA_DIR / "kursy_dwa.json"
+    if not plik.exists() or (generated is not None and "kursy_dwa" not in generated):
+        return {}
+    try:
+        kursy_dwa = json.loads(plik.read_text(encoding="utf-8"))
+    except Exception as e:
+        print(f"Supabase: kursy_dwa.json nieczytelny ({e}) – bez lekkich kluczy",
+              file=sys.stderr)
+        return {}
+    out = klucze_kursow_meczow(kursy_dwa)
+    payload = {w["key"]: w["payload"] for w in rows}
+    if isinstance(payload.get("players"), list):
+        out.update(klucze_zawodnikow(payload["players"], kursy_dwa,
+                                     payload.get("value_bets") or [],
+                                     payload.get("matches") or []))
+    return out
+
+
 def _upsert(url: str, key: str, dane: str, opis: str):
     """Jeden upsert do PostgREST, z ponowieniami. Zwraca odpowiedź albo None.
 
@@ -146,6 +169,13 @@ def push() -> bool:
                if _vb_plik.exists() else [])
         for k, v in klucze_pochodne_players(_players, _vb).items():
             rows.append({"key": k, "payload": v})
+
+    # LEKKIE KLUCZE NOWEJ STRONY (redesign 7B, `lekkie_klucze`): kursy obu
+    # bukmacherów per mecz (`kursy_mNN`) i strona zawodnika (`zaw_kNN`,
+    # `zaw_indeks`). Liczone z siatki TEGO cyklu – stary plik z checkoutu
+    # nie może rozjechać się z resztą, więc tylko gdy jest w manifeście
+    for k, v in klucze_lekkie(rows, generated).items():
+        rows.append({"key": k, "payload": v})
 
     # ⚑ DLACZEGO NAJPIERW JEDNYM ŻĄDANIEM, A DOPIERO POTEM PO JEDNYM
     # (2026-08-13, POTWIERDZONE LOGIEM przebiegu #909):

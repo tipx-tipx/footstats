@@ -1,0 +1,1021 @@
+/* Etap 5 – układy stron. Kontenerem jest okno podglądu (.s-okno / .s-telefon),
+   więc przełamania liczą się od szerokości ekranu, nie całej przeglądarki. */
+
+.st-sceny { display: grid; gap: 28px; }
+.st-okno { height: 880px; }
+
+.st-strona { padding: 24px 24px 40px; max-width: 1180px; margin: 0 auto; }
+.st-naglowek h1 { font-size: 30px; line-height: 1.1; }
+.st-naglowek p { color: var(--t2); font-size: 15px; margin-top: 6px; text-wrap: balance; }
+.st-naglowek p span { display: block; }
+.st-h2 { font-size: 20px; margin: 30px 0 12px; }
+.st-strona .d-dni-rama { margin-bottom: 14px; }
+.st-kicker { font-size: 12px; font-weight: 600; color: var(--t3); letter-spacing: 0.01em; }
+.st-link { font-size: 12px; color: var(--t2); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--kreska-mocna); }
+.st-link:hover { color: var(--t1); }
+
+/* ---- wspólne bloki ---------------------------------------------------- */
+
+.st-blok {
+  background: var(--pow1);
+  border: 1px solid var(--kreska);
+  border-radius: 12px;
+  padding: 14px 16px 16px;
+}
+.st-blok-glowa { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+
+/* typ dnia */
+.st-typ-dnia {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid var(--kreska);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--barwa) 11%, var(--pow1)) 0, var(--pow1) 150px);
+  padding: 20px 18px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  height: 100%;
+}
+/* kratki kurczą się w wąskiej karcie zamiast wychodzić poza nią */
+.st-typ-dnia[data-uklad="duzy"] .d-kratka { width: 36px; height: 36px; font-size: 15px; border-radius: 9px; }
+[data-p-motyw="jasny"] .st-typ-dnia { background: linear-gradient(180deg, color-mix(in srgb, var(--barwa) 6%, var(--pow1)) 0, var(--pow1) 150px); }
+
+/* mecz na dole dużej karty – herby obu drużyn, godzina w środku */
+.st-td-spotkanie {
+  margin-top: auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--pow2);
+}
+.st-td-strona { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.st-td-strona:first-child { justify-content: flex-end; }
+.st-td-strona b { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-td-kiedy { text-align: center; font: 700 17px/1.1 var(--f-n); font-variant-numeric: tabular-nums; }
+.st-td-kiedy small { display: block; font: 400 11px/1.2 var(--f-t, inherit); color: var(--t3); }
+.st-szalik { position: absolute; inset: 0 0 auto 0; height: 5px; }
+.st-td-glowa { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; min-width: 0; }
+.st-td-mecz { font-size: 12px; color: var(--t3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.st-td-kto { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: center; }
+.st-td-nazwisko { font-size: 26px; line-height: 1.05; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-td-pod { font-size: 13px; color: var(--t3); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-td-zaklad { display: flex; align-items: center; gap: 7px; font-size: 18px; color: var(--t2); flex-wrap: wrap; }
+.st-td-zaklad b { color: var(--t1); font-weight: 600; }
+.st-td-zaklad strong { color: var(--t1); font-weight: 700; font-variant-numeric: tabular-nums; }
+.st-td-liczby { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.st-td-szansa { display: flex; align-items: baseline; gap: 8px; }
+.st-td-szansa .p-n { font-size: 46px; line-height: 1; color: var(--ok); font-variant-numeric: tabular-nums; }
+.st-td-szansa small { color: var(--t3); font-size: 13px; }
+.st-td-historia { border-top: 1px solid var(--kreska); padding-top: 12px; }
+.st-td-powody { border-top: 1px solid var(--kreska); padding-top: 10px; }
+
+.st-typ-dnia[data-uklad="boczny"] { padding: 18px 16px 14px; gap: 10px; }
+.st-typ-dnia[data-uklad="boczny"] .st-td-nazwisko { font-size: 22px; }
+.st-typ-dnia[data-uklad="boczny"] .st-td-zaklad { font-size: 16px; }
+.st-typ-dnia[data-uklad="boczny"] .st-td-szansa .p-n { font-size: 36px; }
+
+.st-typ-dnia[data-uklad="maly"] { padding: 16px 14px 14px; gap: 10px; }
+.st-typ-dnia[data-uklad="maly"] .st-td-nazwisko { font-size: 19px; }
+.st-typ-dnia[data-uklad="maly"] .st-td-pod { font-size: 12px; }
+.st-typ-dnia[data-uklad="maly"] .st-td-zaklad { font-size: 15px; }
+.st-typ-dnia[data-uklad="maly"] .st-td-szansa .p-n { font-size: 32px; }
+.st-typ-dnia[data-uklad="maly"] .st-td-szansa small { display: none; }
+
+/* kupon dnia */
+.st-kupon-kurs { font-size: 26px; font-variant-numeric: tabular-nums; }
+.st-kupon-nogi { list-style: none; margin: 10px 0 12px; padding: 0; display: grid; }
+.st-kupon-nogi li {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 0;
+  border-top: 1px solid var(--kreska);
+}
+.st-kupon-nogi time { font-size: 13px; color: var(--t2); font-variant-numeric: tabular-nums; font-weight: 600; }
+.st-kupon-nogi time small { display: block; font-size: 11px; color: var(--t3); font-weight: 400; }
+.st-kupon-nogi span { min-width: 0; }
+.st-kupon-nogi b, .st-kupon-nogi small { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-kupon-nogi b { font-weight: 600; font-size: 14px; }
+.st-kupon-nogi small { color: var(--t3); font-size: 12px; margin-top: 1px; }
+.st-kupon-nogi em { font-style: normal; font-weight: 600; font-variant-numeric: tabular-nums; font-size: 14px; }
+.st-kupon-guzik { width: 100%; justify-content: center; }
+
+/* 7 dni */
+.st-wyniki-liczba { display: flex; align-items: baseline; gap: 8px; margin-top: 6px; }
+.st-wyniki-liczba b { font-size: 30px; font-variant-numeric: tabular-nums; }
+.st-wyniki-liczba span { color: var(--t3); font-size: 13px; }
+.st-slupki { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; height: 64px; margin-top: 10px; }
+.st-slupek {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 4px;
+  align-items: end;
+  justify-items: stretch;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  color: var(--t3);
+  font: inherit;
+}
+.st-slupek small { font-size: 11px; text-align: center; }
+.st-slupek-slup { display: flex; flex-direction: column; border-radius: 4px; overflow: hidden; align-self: end; transition: opacity 0.15s; }
+.st-slupek-ok { background: var(--ok); min-height: 2px; }
+.st-slupek-nie { background: var(--nie-tlo); }
+.st-slupki:hover .st-slupek:not([data-wskazany]) .st-slupek-slup { opacity: 0.45; }
+.st-slupek[data-wskazany] small { color: var(--t1); }
+.st-wyniki-stopka { font-size: 12px; color: var(--t3); margin-top: 10px; }
+
+/* ---- lista typów -------------------------------------------------------- */
+
+.f-karta-wiersz + .f-karta-wiersz { margin-top: 8px; }
+.f-grupa + .f-karta-wiersz { margin-top: 0; }
+.f-karta-wiersz + .f-grupa { margin-top: 18px; }
+.f-wiecej {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 12px;
+  height: 42px;
+  border-radius: 10px;
+  border: 1px dashed var(--kreska-mocna);
+  background: none;
+  color: var(--t1);
+  font: 600 14px/42px var(--f-t, inherit);
+  cursor: pointer;
+}
+.f-wiecej small { color: var(--t3); font-weight: 400; }
+.f-wiecej:hover { background: var(--pow1); }
+
+.st-grupa {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 2px 8px;
+  font-size: 14px;
+  min-width: 0;
+}
+.st-grupa b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-grupa-meta { margin-left: auto; flex: none; color: var(--t3); font-size: 12px; font-variant-numeric: tabular-nums; }
+
+/* ---- A · tablica ------------------------------------------------------ */
+
+.st-tablica {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+  gap: 14px;
+  margin-top: 20px;
+}
+.st-tablica-bok { display: grid; gap: 14px; align-content: start; }
+
+/* ---- B · dwie kolumny ------------------------------------------------- */
+
+.st-b {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-areas: "glowa bok" "lista bok";
+  grid-template-rows: auto 1fr;
+  column-gap: 24px;
+  row-gap: 18px;
+  align-items: start;
+}
+.st-b-glowa { grid-area: glowa; }
+.st-b-glowna { grid-area: lista; }
+.st-b-bok { grid-area: bok; position: sticky; top: 72px; display: grid; gap: 12px; }
+
+/* ---- C · najpierw najlepsze ------------------------------------------- */
+
+.st-c .st-h2 { margin: 28px 0 12px; }
+.st-c-top { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.st-c-top > * { min-width: 0; }
+
+/* karta „najmocniejsze”: jedno tło, cienka kreska w barwie drużyny, bez szarf i poświat */
+.st-mocna {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+  padding: 14px 16px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--kreska);
+  background: var(--pow1);
+  overflow: hidden;
+}
+.st-mocna::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 3px; background: var(--barwa); opacity: 0.9; }
+.st-mocna-mecz { display: flex; gap: 10px; justify-content: space-between; font-size: 12px; color: var(--t3); min-width: 0; }
+.st-mocna-mecz span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-mocna-mecz time { flex: none; font-variant-numeric: tabular-nums; }
+.st-mocna .st-td-nazwisko { font-size: 20px; }
+.st-mocna .st-td-pod { font-size: 12px; }
+.st-mocna .st-td-zaklad { font-size: 15px; }
+.st-mocna .st-td-liczby { margin-top: auto; padding-top: 12px; border-top: 1px solid var(--kreska); }
+.st-mocna .st-td-szansa .p-n { font-size: 32px; }
+.st-mocna .st-td-szansa small { font-size: 12px; }
+
+.st-passa { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--t2); }
+.st-passa b { color: var(--t1); font-weight: 600; font-variant-numeric: tabular-nums; }
+.st-passa-kreski { display: flex; gap: 3px; flex: none; }
+.st-passa-kreski i { width: 5px; height: 16px; border-radius: 2px; background: var(--nie); opacity: 0.8; }
+.st-passa-kreski i[data-s="ok"] { background: var(--ok); opacity: 1; }
+.st-passa-kreski i[data-s="nz"] { background: var(--t4); opacity: 1; }
+
+/* kupon dnia i 7 dni: jedna ramka, dwie połówki */
+.st-c-skrot {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin-top: 12px;
+  border: 1px solid var(--kreska);
+  border-radius: 12px;
+  background: var(--pow1);
+  overflow: hidden;
+}
+.st-c-skrot .st-pasek-poz { border: 0; border-radius: 0; background: none; padding: 11px 16px; }
+.st-c-skrot .st-pasek-poz + .st-pasek-poz { border-left: 1px solid var(--kreska); }
+.st-c-skrot .st-pasek-poz:hover { background: var(--pow2); }
+
+.st-pasek-poz {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--kreska);
+  background: var(--pow1);
+  cursor: pointer;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.st-pasek-poz b { font-size: 20px; font-variant-numeric: tabular-nums; }
+.st-pasek-poz > .p-t3 { overflow: hidden; text-overflow: ellipsis; font-size: 12px; }
+.st-pasek-poz .st-kicker { color: var(--t2); }
+.st-strzalka { margin-left: auto; color: var(--t3); }
+.st-pasek-poz .st-slupki { height: 22px; width: 90px; margin: 0 0 0 auto; gap: 3px; flex: none; }
+.st-pasek-poz .st-slupek { pointer-events: none; }
+
+/* dni i półki w jednym rzędzie */
+.f-rzad-polek { display: flex; align-items: center; gap: 12px; min-width: 0; max-width: 100%; }
+.st-strona .e-rama { grid-template-columns: minmax(0, 1fr); }
+.f-rzad-polek > * { min-width: 0; max-width: 100%; }
+.f-rzad-polek > .d-dni-rama { flex: 1; min-width: 0; margin: 0 !important; }
+.f-rzad-polek > .a-karty-zakladek { flex: none; }
+
+/* mecz = jedna karta: nagłówek z herbami, typy oddzielone kreską */
+.f-grupa {
+  background: var(--pow2);
+  border: 1px solid var(--kreska);
+  border-radius: 12px 12px 0 0;
+}
+.f-karta-wiersz + .f-grupa { margin-top: 12px; }
+.f-karta-wiersz[data-w-grupie] + .f-karta-wiersz[data-w-grupie] { margin-top: 0; }
+.f-karta-wiersz[data-w-grupie] .el-karta { border-top: 0; border-radius: 0; }
+.f-karta-wiersz[data-w-grupie][data-koniec-grupy] .el-karta { border-radius: 0 0 12px 12px; }
+.f-karta-wiersz[data-w-grupie] .el-wiersz:hover { border-radius: 0; }
+.f-karta-wiersz[data-w-grupie][data-koniec-grupy] .el-wiersz:hover { border-radius: 0 0 12px 12px; }
+.st-grupa { padding: 9px 14px; }
+.st-grupa-meta { display: flex; gap: 10px; align-items: baseline; }
+.st-grupa-meta time { color: var(--t1); font-weight: 600; font-size: 13px; }
+
+/* ---- węższe ekrany ---------------------------------------------------- */
+
+@container (max-width: 1000px) {
+  .st-b { grid-template-columns: minmax(0, 1fr); grid-template-areas: "glowa" "bok" "lista"; grid-template-rows: none; row-gap: 14px; }
+  .st-b-bok {
+    position: static;
+    align-items: stretch;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(280px, 1fr);
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+  .st-b-bok > * { scroll-snap-align: start; }
+  .st-b-bok::-webkit-scrollbar { display: none; }
+}
+
+@container (max-width: 760px) {
+  .st-tablica { grid-template-columns: minmax(0, 1fr); }
+  .st-c-top {
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: 84%;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    margin: 0 -14px;
+    padding: 0 14px;
+    scroll-padding: 0 14px;
+  }
+  .st-c-top::-webkit-scrollbar { display: none; }
+  .st-c-top > * { scroll-snap-align: start; }
+  .st-c-skrot { grid-template-columns: minmax(0, 1fr); }
+  .st-c-skrot .st-pasek-poz + .st-pasek-poz { border-left: 0; border-top: 1px solid var(--kreska); }
+  .f-rzad-polek { flex-direction: column; align-items: stretch; gap: 10px; }
+
+}
+
+@container (max-width: 560px) {
+  .st-tylko-szeroki { display: none; }
+  .st-tylko-waski { display: grid; }
+  .st-strona { padding: 16px 14px 28px; }
+  .st-naglowek h1 { font-size: 25px; }
+  .st-naglowek p { font-size: 14px; }
+  .st-h2 { font-size: 18px; margin-top: 24px; }
+  .st-typ-dnia { padding: 18px 14px 14px; gap: 10px; }
+  .st-td-nazwisko { font-size: 22px; }
+  .st-td-zaklad { font-size: 16px; }
+  .st-td-szansa .p-n { font-size: 38px; }
+  .st-td-strona b { font-size: 13px; }
+  .st-typ-dnia[data-uklad="duzy"] .d-kratka { width: 27px; height: 27px; font-size: 13px; border-radius: 7px; }
+  .st-b-bok .d-kratka { width: 25px; height: 25px; font-size: 12px; }
+  .st-b-bok .d-kratki { gap: 3px; }
+  .st-td-spotkanie { gap: 10px; padding: 9px 10px; }
+  .st-b-bok { grid-auto-columns: 86%; margin: 0 -14px; padding: 0 14px 2px; scroll-padding: 0 14px; }
+}
+
+/* długie nazwy drużyn w nagłówku meczu skracają się zamiast rozpychać kartę */
+.st-grupa b { min-width: 0; }
+.f-grupa, .f-karta-wiersz { min-width: 0; }
+
+@container (max-width: 560px) {
+  .st-passa { gap: 8px; font-size: 12.5px; }
+  /* karta: dwa bloki – kto (mecz, nazwisko) i zakład (rynek, passa) – z wyraźną przerwą */
+  .st-mocna .st-td-kto { margin-bottom: 4px; }
+  .st-mocna .st-td-zaklad { font-size: 16px; }
+  .st-passa-kreski { gap: 2px; }
+  .st-passa-kreski i { width: 4px; height: 14px; }
+  .st-mocna { padding: 13px 14px; gap: 10px; }
+}
+
+/* ---- 5.2 Drużyny · pojedynek --------------------------------------------- */
+
+.f-grupa:has(.st-poj) { background: var(--pow1); }
+.st-poj { padding: 12px 16px 14px; display: grid; gap: 12px; }
+.st-poj-meta { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; color: var(--t3); }
+.st-poj-meta span:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-poj-meta span:last-child { flex: none; font-variant-numeric: tabular-nums; }
+.st-poj-druzyny { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+.st-poj-d { display: flex; align-items: center; gap: 10px; min-width: 0; }
+/* nazwa w dwóch liniach zamiast ucinania („Seattle Sounders FC”) */
+.st-poj-d b { font-size: 18px; line-height: 1.15; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+.st-poj-prawa { justify-content: flex-end; text-align: right; }
+.st-poj-rynki { display: grid; gap: 10px; padding-top: 12px; border-top: 1px solid var(--kreska); }
+.st-poj-rynek {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: baseline;
+  row-gap: 5px;
+}
+.st-poj-rynek > b { font: 600 15px/1 var(--f-n); font-variant-numeric: tabular-nums; color: var(--t2); }
+.st-poj-rynek > b:last-of-type { text-align: right; }
+.st-poj-rynek > b[data-wiekszy] { color: var(--t1); font-weight: 700; }
+.st-poj-nazwa { text-align: center; font-size: 13px; color: var(--t2); }
+.st-poj-pasy { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.st-poj-pas { height: 6px; border-radius: 3px; background: var(--pow3); overflow: hidden; display: flex; }
+.st-poj-pas-l { justify-content: flex-end; }
+.st-poj-pas i { display: block; height: 100%; border-radius: 3px; background: var(--t4); transform-origin: left; }
+.st-poj-pas-l i { transform-origin: right; }
+.st-poj-pas i[data-wiekszy] { background: var(--t1); }
+.st-poj-pod { font-size: 11.5px; color: var(--t3); text-align: center; }
+
+.st-grupa-rynek svg { color: var(--t2); }
+
+@container (max-width: 560px) {
+  .st-poj { padding: 11px 12px 12px; }
+  .st-poj-d b { font-size: 15px; }
+  .st-poj-d { gap: 8px; }
+}
+
+/* nagłówek listy z jednym zdaniem objaśnienia (zamiast podpisu w każdej karcie) */
+.st-h2-z-opisem { margin: 28px 0 12px; }
+.st-h2-z-opisem .st-h2 { margin: 0; }
+.st-h2-z-opisem p { display: flex; align-items: center; gap: 8px; margin-top: 5px; font-size: 13px; color: var(--t2); }
+.st-legenda-pasek { display: inline-grid; grid-template-columns: 1fr 1fr; gap: 2px; width: 30px; flex: none; }
+.st-legenda-pasek i { height: 5px; border-radius: 3px; background: var(--t1); }
+.st-legenda-pasek i + i { background: var(--t4); width: 60%; }
+
+/* ---- 5.3 Mecze ---------------------------------------------------------- */
+
+.sm .st-naglowek { margin-bottom: 18px; }
+.sm-filtry { display: grid; gap: 10px; margin-bottom: 14px; min-width: 0; }
+.sm-filtry > * { min-width: 0; }
+.sm-ligi { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 1px; }
+.sm-ligi::-webkit-scrollbar { display: none; }
+.sm-liga {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 16px;
+  border: 1px solid var(--kreska);
+  background: none;
+  color: var(--t2);
+  font: 500 13px/1 var(--f-t, inherit);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.sm-liga small { color: var(--t3); font-size: 12px; font-variant-numeric: tabular-nums; }
+.sm-liga:hover { color: var(--t1); border-color: var(--kreska-mocna); }
+.sm-liga[aria-pressed="true"] { color: var(--t1); background: var(--pow2); border-color: var(--kreska-mocna); }
+
+/* przyklejony nagłówek rozgrywek pod menu strony */
+.sm .el-liga-glowa { top: 52px; }
+.sm-wiersz + .sm-wiersz { border-top: 1px solid var(--kreska); }
+.el-mecz-a[data-wybrany] { background: var(--pow2); box-shadow: inset 3px 0 0 var(--akcja); }
+.sm-pod-wybranym { overflow: hidden; border-top: 1px solid var(--kreska); background: var(--tlo); }
+.sm-stopka-listy { margin-top: 12px; font-size: 12px; color: var(--t3); text-align: center; }
+
+/* B · lista + podgląd */
+.sm-b {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  grid-template-areas: "glowa glowa" "lista bok";
+  column-gap: 20px;
+  align-items: start;
+}
+.sm-b-glowa { grid-area: glowa; min-width: 0; }
+.sm-b-lista { grid-area: lista; min-width: 0; }
+.sm-b-bok { grid-area: bok; position: sticky; top: 64px; }
+.sm-podglad { border: 1px solid var(--kreska); border-radius: 12px; background: var(--pow1); overflow: hidden; }
+.sm-podglad[data-zwarty] { border: 0; border-radius: 0; background: none; }
+.sm-podglad .st-poj { border-bottom: 1px solid var(--kreska); background: var(--pow2); }
+.sm-podglad .st-poj-d b { font-size: 16px; }
+.sm-podglad-glowa { padding: 12px 16px 14px; background: var(--pow2); border-bottom: 1px solid var(--kreska); display: grid; gap: 12px; }
+.sm-podglad-meta { font-size: 12px; color: var(--t3); }
+.sm-podglad-druzyny { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.sm-podglad-druzyny span { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.sm-podglad-druzyny span:last-child { justify-content: flex-end; text-align: right; }
+.sm-podglad-druzyny b { font-size: 16px; line-height: 1.15; }
+.sm-podglad-tresc { padding: 12px 14px 14px; display: grid; gap: 10px; }
+.sm-podglad[data-zwarty] .sm-podglad-tresc { padding: 10px 12px 14px; }
+.sm-podglad-info { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--t2); }
+.sm-podglad-tytul { font-size: 12px; font-weight: 600; color: var(--t2); }
+.sm-podglad-typy { display: grid; gap: 6px; }
+.sm-podglad-typy .el-karta + .el-karta { margin-top: 0; }
+.sm-podglad-pusto { font-size: 13px; color: var(--t2); }
+.sm-podglad-guzik { justify-content: center; width: 100%; }
+
+/* C · zaraz grają */
+.sm-wkrotce-rzad { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.sm-wkrotce {
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--kreska);
+  background: var(--pow1);
+  cursor: pointer;
+  min-width: 0;
+  color: inherit;
+}
+.sm-wkrotce:hover { border-color: var(--kreska-mocna); }
+.sm-wkrotce-meta { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--t3); min-width: 0; }
+.sm-wkrotce-meta span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sm-wkrotce-meta time { margin-left: auto; flex: none; display: flex; gap: 6px; align-items: baseline; color: var(--t1); font-weight: 600; font-size: 13px; font-variant-numeric: tabular-nums; }
+.sm-wkrotce-druzyny { display: grid; gap: 7px; }
+.sm-wkrotce-druzyny span { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.sm-wkrotce-druzyny b { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sm-wkrotce-typ { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding-top: 10px; border-top: 1px solid var(--kreska); font-size: 13px; color: var(--t2); min-width: 0; }
+.sm-wkrotce-typ > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sm-wkrotce-typ b { color: var(--t1); font-weight: 600; }
+.sm-wkrotce-typ strong { flex: none; color: var(--ok); font: 700 17px/1 var(--f-n); }
+.sm-wkrotce-stopka { font-size: 12px; color: var(--t3); }
+
+@container (max-width: 1000px) {
+  .sm-b { grid-template-columns: minmax(0, 1fr); grid-template-areas: "glowa" "lista"; }
+}
+@container (max-width: 760px) {
+  .sm-wkrotce-rzad {
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: 82%;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    margin: 0 -14px;
+    padding: 0 14px;
+    scroll-padding: 0 14px;
+  }
+  .sm-wkrotce-rzad::-webkit-scrollbar { display: none; }
+  .sm-wkrotce-rzad > * { scroll-snap-align: start; }
+}
+@container (max-width: 560px) {
+  .sm .el-liga-glowa { top: 54px; }
+  .sm-ligi { margin: 0 -14px; padding: 0 14px 1px; }
+}
+
+/* zwarty typ w podglądzie meczu */
+.sm-typ {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--kreska);
+  background: var(--pow1);
+  color: inherit;
+  cursor: pointer;
+}
+.sm-typ:hover { border-color: var(--kreska-mocna); }
+.sm-typ > :first-child { margin-top: 2px; }
+.sm-typ-tekst { display: grid; gap: 3px; min-width: 0; }
+.sm-typ-tekst small { font-size: 12.5px; color: var(--t2); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sm-typ-tekst > span { font-size: 14px; color: var(--t3); }
+.sm-typ-tekst > span svg { display: inline-block; vertical-align: -2px; margin-right: 5px; color: var(--t2); }
+.sm-typ-tekst b { color: var(--t1); font-weight: 600; }
+.sm-typ-tekst strong { color: var(--t1); font-weight: 700; font-variant-numeric: tabular-nums; }
+.sm-typ-liczby { grid-column: 2; display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 4px; }
+.sm-typ-liczby em { font: 700 20px/1 var(--f-n); font-style: normal; font-variant-numeric: tabular-nums; }
+
+/* dzień jest wybrany wyżej – w wierszu zostaje sama godzina (i odliczanie) */
+.sm .el-czas small:not(.el-wkrotce) { display: none; }
+.sm-wkrotce-dzien { color: var(--t3); font-weight: 400; font-size: 12px; }
+
+/* ---- 5.4 Strona meczu – pokrycia ----------------------------------------- */
+
+.mz-wybor-meczu { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; color: #8b9194; }
+.mz-wybor-meczu button { padding: 5px 10px; border-radius: 6px; border: 1px solid #2c3236; background: #171b1d; color: #c9cdcf; font-size: 12px; cursor: pointer; }
+.mz-wybor-meczu button[aria-pressed="true"] { background: #e8eaea; color: #111; }
+
+.mz-glowa { display: grid; gap: 12px; padding: 4px 0 22px; border-bottom: 1px solid var(--kreska); }
+.mz-wroc { font-size: 13px; color: var(--t2); cursor: pointer; width: max-content; }
+.mz-wroc:hover { color: var(--t1); }
+.mz-meta { font-size: 13px; color: var(--t3); text-align: center; }
+.mz-druzyny { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 20px; }
+.mz-d { display: flex; align-items: center; gap: 14px; justify-content: flex-end; min-width: 0; }
+.mz-d-prawa { justify-content: flex-start; }
+.mz-d b { font-size: 26px; line-height: 1.1; overflow-wrap: anywhere; }
+.mz-d:first-child b { text-align: right; }
+.mz-godz { font-size: 30px; color: var(--t1); font-variant-numeric: tabular-nums; padding: 6px 14px; border-radius: 10px; background: var(--pow1); border: 1px solid var(--kreska); }
+.mz-info { display: flex; justify-content: center; flex-wrap: wrap; gap: 4px 18px; font-size: 13px; color: var(--t2); }
+
+.mz-sekcja { margin-top: 6px; }
+.mz-sekcja .f-grupa { margin-top: 0; }
+
+/* pasek narzędzi przykleja się pod menu */
+.mz-narzedzia {
+  position: sticky;
+  top: 52px;
+  z-index: 2;
+  display: grid;
+  gap: 10px;
+  padding: 6px 0 10px;
+  background: var(--tlo);
+}
+.mz-przelaczniki { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; }
+.mz-seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: 9px; border: 1px solid var(--kreska); background: var(--pow1); }
+.mz-seg button { position: relative; height: 30px; padding: 0 12px; border-radius: 6px; border: 0; background: none; color: var(--t2); font: 600 13px/1 var(--f-t, inherit); cursor: pointer; }
+.mz-seg button[aria-checked="true"] { color: var(--t1); }
+.mz-seg-tlo { position: absolute; inset: 0; border-radius: 6px; background: var(--pow3); }
+.mz-seg-tresc { position: relative; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+
+.mz-linie { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 4px 0 12px; }
+.mz-linie > span { font-size: 12px; color: var(--t3); margin-right: 4px; }
+.mz-linie button { height: 30px; padding: 0 12px; border-radius: 15px; border: 1px solid var(--kreska); background: none; color: var(--t2); font: 600 13px/1 var(--f-t, inherit); cursor: pointer; font-variant-numeric: tabular-nums; }
+.mz-linie button:hover { color: var(--t1); border-color: var(--kreska-mocna); }
+.mz-linie button[aria-pressed="true"] { background: var(--akcja); border-color: transparent; color: var(--na-akcji); }
+
+/* A · tabela */
+.mz-tabela { border: 1px solid var(--kreska); border-radius: 12px; background: var(--pow1); overflow: hidden; }
+.mz-tr {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.3fr) minmax(0, 1.6fr) 92px 64px 210px;
+  align-items: center;
+  gap: 14px;
+  padding: 9px 14px;
+  border-top: 1px solid var(--kreska);
+  background: var(--pow1);
+}
+.mz-tr:first-child { border-top: 0; }
+.mz-th { padding: 9px 14px; background: var(--pow2); font-size: 12px; color: var(--t3); font-weight: 500; }
+.mz-th button { background: none; border: 0; padding: 0; text-align: left; color: var(--t2); font: inherit; font-weight: 600; cursor: pointer; }
+.mz-th button[aria-sort="descending"] { color: var(--t1); }
+
+.mz-kto { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.mz-kto-tekst { display: grid; min-width: 0; }
+.mz-kto-tekst b { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mz-kto-tekst small { font-size: 12px; color: var(--t3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mz-na-liscie {
+  flex: none;
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: var(--akcja-tlo);
+  color: var(--akcja);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.mz-kratki { display: flex; gap: 3px; }
+.mz-kratki i {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  font: 600 12px/1 var(--f-t, inherit);
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  background: var(--pow2);
+  color: var(--t3);
+  box-shadow: inset 0 0 0 1px var(--kreska);
+}
+.mz-kratki i[data-s="ok"] { background: var(--ok-tlo); color: var(--ok); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ok) 35%, transparent); }
+.mz-kratki i[data-s="nz"] { background: repeating-linear-gradient(-45deg, transparent 0 4px, var(--kreska-mocna) 4px 5px); }
+
+.mz-weszlo { display: grid; gap: 1px; }
+.mz-weszlo b { font: 700 18px/1 var(--f-n); font-variant-numeric: tabular-nums; color: var(--t2); }
+.mz-weszlo[data-poziom="mocne"] b { color: var(--ok); }
+.mz-weszlo[data-poziom="srednie"] b { color: var(--t1); }
+.mz-weszlo small { font-size: 11px; color: var(--t3); }
+.mz-srednia { font-size: 14px; color: var(--t2); font-variant-numeric: tabular-nums; }
+
+.mz-kursy { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.mz-kurs {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--kreska);
+  background: var(--pow2);
+  color: var(--t2);
+}
+.mz-kurs b { font: 700 15px/1 var(--f-n); font-variant-numeric: tabular-nums; color: var(--t1); }
+.mz-kurs[data-lepszy] { border-color: color-mix(in srgb, var(--akcja) 55%, transparent); }
+.mz-kurs[data-brak] { opacity: 0.5; }
+.mz-kurs[data-brak] b { color: var(--t3); }
+
+.mz-przypis { margin-top: 10px; font-size: 12px; color: var(--t3); }
+
+/* B · siatka */
+.mz-siatka-ramka { border: 1px solid var(--kreska); border-radius: 12px; background: var(--pow1); overflow-x: auto; }
+.mz-siatka { min-width: max-content; }
+.mz-sr {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) repeat(var(--linie), 108px);
+  align-items: stretch;
+  border-top: 1px solid var(--kreska);
+  background: var(--pow1);
+}
+.mz-sr:first-child { border-top: 0; }
+.mz-sr > * { padding: 8px 12px; }
+.mz-sr-kto { display: flex; align-items: center; position: sticky; left: 0; background: var(--pow1); z-index: 1; }
+.mz-sh { background: var(--pow2); font-size: 12px; color: var(--t3); }
+.mz-sh > span { position: sticky; left: 0; background: var(--pow2); }
+.mz-sh button { background: none; border: 0; color: var(--t2); font: 600 13px/1 var(--f-t, inherit); cursor: pointer; text-align: center; font-variant-numeric: tabular-nums; }
+.mz-sh button[aria-sort="descending"] { color: var(--t1); }
+.mz-komorka {
+  display: grid;
+  place-content: center;
+  text-align: center;
+  gap: 2px;
+  border-left: 1px solid var(--kreska);
+  background: color-mix(in srgb, var(--ok) calc(var(--udzial) * 26%), transparent);
+}
+.mz-komorka b { font: 700 16px/1 var(--f-n); font-variant-numeric: tabular-nums; color: var(--t2); }
+.mz-komorka[data-poziom="mocne"] b { color: var(--t1); }
+.mz-komorka small { font-size: 11.5px; color: var(--t3); font-variant-numeric: tabular-nums; }
+.mz-komorka[data-poziom="brak"] { background: none; }
+.mz-komorka[data-poziom="brak"] b { color: var(--t4); }
+
+.mz-kupony {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 26px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--kreska);
+  background: var(--pow1);
+  cursor: pointer;
+  color: var(--t3);
+}
+.mz-kupony span:first-child { display: grid; gap: 2px; }
+.mz-kupony b { color: var(--t1); font-weight: 600; font-size: 15px; }
+.mz-kupony small { font-size: 13px; color: var(--t2); }
+.mz-kupony:hover { border-color: var(--kreska-mocna); }
+
+@container (max-width: 900px) {
+  .mz-tr { grid-template-columns: minmax(150px, 1fr) auto 80px 170px; }
+  .mz-tr > :nth-child(4) { display: none; }
+}
+
+/* telefon: każdy zawodnik to zwarty wiersz */
+@container (max-width: 560px) {
+  .mz-narzedzia { top: 54px; }
+  .mz-d b { font-size: 17px; }
+  .mz-d { gap: 8px; flex-direction: column; align-items: center; text-align: center; }
+  .mz-d-prawa { flex-direction: column-reverse; }
+  .mz-d:first-child b { text-align: center; }
+  .mz-godz { font-size: 22px; padding: 5px 10px; }
+  .mz-druzyny { gap: 10px; align-items: start; }
+  .mz-przelaczniki { gap: 6px; }
+  .mz-seg button { padding: 0 9px; font-size: 12.5px; }
+  .mz-tr {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "kto weszlo" "kratki kratki" "kursy kursy";
+    gap: 8px 10px;
+    padding: 11px 12px;
+  }
+  .mz-tr > :nth-child(1) { grid-area: kto; min-width: 0; }
+  .mz-tr > :nth-child(2) { grid-area: kratki; }
+  .mz-tr > :nth-child(3) { grid-area: weszlo; text-align: right; }
+  .mz-tr > :nth-child(4) { display: none; }
+  .mz-tr > :nth-child(5) { grid-area: kursy; }
+  .mz-kratki { gap: 3px; }
+  .mz-kratki i { width: auto; flex: 1 1 0; max-width: 30px; height: 26px; }
+  .mz-weszlo b { font-size: 20px; }
+  .mz-sr { grid-template-columns: 150px repeat(var(--linie), 84px); }
+  .mz-sr-kto .mz-kto-tekst small { display: none; }
+  .mz-sr-kto .mz-na-liscie { display: none; }
+  .mz-kupony { margin-top: 20px; }
+}
+
+/* linie w przyklejonym pasku: jeden rząd, przewijany w bok na wąskim ekranie */
+.mz-narzedzia .mz-linie { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0; }
+.mz-narzedzia .mz-linie::-webkit-scrollbar { display: none; }
+.mz-linie button { flex: none; }
+.mz-linie > span { flex: none; }
+.mz-seg-nazwa { max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
+.mz-tabela { margin-top: 2px; }
+/* bez kursu na tej linii – informacyjnie, przygaszone */
+.mz-tr[data-bez-kursu] > :not(:first-child) { opacity: 0.55; }
+@container (max-width: 560px) {
+  .mz-narzedzia .mz-linie { margin: 0 -14px; padding: 0 14px; }
+  .mz-linie button { height: 28px; padding: 0 10px; font-size: 12.5px; }
+  .mz-seg-nazwa { max-width: 80px; }
+}
+/* telefon: okno i drużyna w jednym rzędzie – drużyny samymi herbami */
+@container (max-width: 560px) {
+  .mz-przelaczniki { flex-wrap: nowrap; }
+  .mz-seg-nazwa { display: none; }
+  .mz-seg button { padding: 0 10px; }
+}
+
+/* 5.3 – prawa kolumna wiersza: co jest w środku meczu */
+.sm-co b { font-weight: 600; }
+.sm-co .sm-co-brak { color: var(--t3); font-weight: 500; font-size: 12.5px; }
+.sm-co .sm-co-typy { color: var(--akcja); font-weight: 600; }
+@container (max-width: 560px) {
+  .sm-co-dl { display: none; }
+  .sm-co b { font-size: 13px; }
+}
+/* dopisek w pogrubionej linii dziedziczy jej styl (nie styl szarego podpisu wiersza) */
+.sm-co b .sm-co-dl { display: inline; margin: 0; font: inherit; color: inherit; white-space: pre; }
+.sm-co b { display: block; text-align: right; }
+@container (max-width: 560px) {
+  .sm-co b .sm-co-dl { display: none; }
+}
+
+/* ---- 5.5 Skuteczność ------------------------------------------------------ */
+
+.sk .st-naglowek { margin-bottom: 18px; }
+.sk-filtr small { color: var(--t3); font-size: 11.5px; font-weight: 500; }
+.sk-filtr { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.sk-filtr::-webkit-scrollbar { display: none; }
+
+.sk-wynik {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  margin-top: 14px;
+  padding: 18px 20px;
+  border-radius: 12px;
+  border: 1px solid var(--kreska);
+  background: var(--pow1);
+}
+.sk-wynik-glowny { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.sk-wynik-proc { font-size: 58px; line-height: 1; color: var(--ok); font-variant-numeric: tabular-nums; }
+.sk-wynik-opis { display: grid; gap: 4px; min-width: 0; }
+.sk-wynik-opis b { font-size: 17px; font-weight: 600; }
+.sk-wynik-opis span { font-size: 13px; color: var(--t2); }
+.sk-wynik-boki { display: flex; gap: 8px; }
+.sk-kafel { display: grid; gap: 2px; min-width: 92px; padding: 10px 12px; border-radius: 10px; background: var(--pow2); border: 1px solid var(--kreska); }
+.sk-kafel small { font-size: 11.5px; color: var(--t2); }
+.sk-kafel b { font-size: 22px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.sk-kafel span { font-size: 12px; color: var(--t3); font-variant-numeric: tabular-nums; }
+
+/* typ rozliczony */
+.sk-lista { display: grid; border: 1px solid var(--kreska); border-radius: 12px; background: var(--pow1); overflow: hidden; }
+.sk-typ {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) 54px 52px;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--kreska);
+}
+.sk-typ:first-child { border-top: 0; }
+.sk-znak { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; font-size: 13px; font-weight: 700; background: var(--pow3); color: var(--t3); }
+.sk-typ[data-wynik="wygrany"] .sk-znak { background: var(--ok-tlo); color: var(--ok); }
+.sk-typ[data-wynik="przegrany"] .sk-znak { background: var(--nie-tlo); color: var(--nie); }
+.sk-typ-tekst { display: grid; gap: 2px; min-width: 0; }
+.sk-typ-tekst small { font-size: 12.5px; color: var(--t2); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sk-typ-tekst > span { font-size: 14.5px; color: var(--t3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sk-typ-tekst b { color: var(--t1); font-weight: 600; }
+.sk-typ-tekst strong { color: var(--t1); font-weight: 700; font-variant-numeric: tabular-nums; }
+.sk-typ[data-wynik="zwrot"] .sk-typ-tekst { opacity: 0.75; }
+.sk-typ-bylo { display: grid; justify-items: end; gap: 1px; }
+.sk-typ-bylo small { font-size: 11px; color: var(--t3); }
+.sk-typ-bylo b { font: 700 17px/1 var(--f-n); font-variant-numeric: tabular-nums; }
+.sk-typ[data-wynik="wygrany"] .sk-typ-bylo b { color: var(--ok); }
+.sk-typ[data-wynik="przegrany"] .sk-typ-bylo b { color: var(--nie); }
+.sk-typ-kurs { text-align: right; font: 600 14px/1 var(--f-n); color: var(--t2); font-variant-numeric: tabular-nums; }
+
+.sk-panel { margin-top: 14px; }
+.sk-panel-glowa { display: flex; align-items: baseline; gap: 12px; margin-bottom: 10px; }
+.sk-panel-glowa b { font-size: 18px; }
+.sk-panel-glowa span { font-size: 13px; color: var(--t2); }
+.sk-panel-glowa em, .sk-dzien-glowa em { margin-left: auto; font: 700 16px/1 var(--f-n); font-style: normal; color: var(--t2); font-variant-numeric: tabular-nums; }
+.sk-panel-glowa em[data-dobry], .sk-dzien-glowa em[data-dobry] { color: var(--ok); }
+
+/* A · kalendarz */
+.sk-kal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.sk-kal-tydz { font-size: 11.5px; color: var(--t3); text-align: center; padding-bottom: 2px; }
+.sk-kal-pusty { display: grid; place-items: start; min-height: 64px; padding: 8px; border-radius: 10px; font-size: 12px; color: var(--t4); border: 1px dashed var(--kreska); }
+.sk-kal-dzien {
+  display: grid;
+  align-content: space-between;
+  justify-items: start;
+  gap: 4px;
+  min-height: 64px;
+  padding: 8px 9px;
+  border-radius: 10px;
+  border: 1px solid var(--kreska);
+  background: var(--pow1);
+  color: var(--t1);
+  cursor: pointer;
+  text-align: left;
+}
+.sk-kal-dzien:hover { border-color: var(--kreska-mocna); }
+.sk-kal-dzien[aria-selected="true"] { border-color: var(--t1); box-shadow: 0 0 0 1px var(--t1); }
+.sk-kal-nr { font-size: 11.5px; color: var(--t2); }
+.sk-kal-dzien b { font: 700 17px/1 var(--f-n); font-variant-numeric: tabular-nums; }
+.sk-kal-dzien small { font-size: 11.5px; color: var(--t2); font-variant-numeric: tabular-nums; }
+
+/* B · lista dni */
+.sk-dni { display: grid; gap: 8px; }
+.sk-dzien { border: 1px solid var(--kreska); border-radius: 12px; background: var(--pow1); overflow: hidden; }
+.sk-dzien-glowa {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) auto 48px;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 12px 14px;
+  background: none;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.sk-dzien-glowa:hover { background: var(--pow2); }
+.sk-dzien-glowa b { font-size: 16px; }
+.sk-dzien-pasek { height: 6px; border-radius: 3px; background: var(--nie-tlo); overflow: hidden; }
+.sk-dzien-pasek i { display: block; height: 100%; background: var(--ok); border-radius: 3px; }
+.sk-dzien-liczby { font-size: 13px; color: var(--t2); font-variant-numeric: tabular-nums; }
+.sk-dzien-glowa em { margin-left: 0; text-align: right; }
+.sk-dzien-tresc { overflow: hidden; }
+.sk-dzien-tresc .sk-lista { border: 0; border-top: 1px solid var(--kreska); border-radius: 0; }
+
+/* C · wykres */
+.sk-wykres { position: relative; height: 200px; padding: 12px 14px 0; border-radius: 12px; border: 1px solid var(--kreska); background: var(--pow1); }
+.sk-wykres-slupki { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; height: 100%; }
+.sk-wykres-srednia {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  height: 0;
+  margin-bottom: 28px;
+  border-top: 1px dashed var(--kreska-mocna);
+  pointer-events: none;
+  z-index: 1;
+}
+.sk-wykres-srednia small { position: absolute; right: 0; top: -18px; font-size: 11px; color: var(--t2); background: var(--pow1); padding: 0 4px; }
+.sk-slup { display: grid; grid-template-rows: minmax(0, 1fr) 24px; height: 100%; padding: 0; border: 0; background: none; cursor: pointer; color: var(--t3); }
+.sk-slup-tor { display: flex; align-items: flex-end; height: 100%; }
+.sk-slup-tor i { display: block; width: 100%; border-radius: 5px 5px 2px 2px; background: var(--t4); transform-origin: bottom; }
+.sk-slup-tor i[data-dobry] { background: var(--ok); }
+.sk-slup small { display: grid; place-items: center; font-size: 11px; font-variant-numeric: tabular-nums; }
+.sk-slup[aria-pressed="true"] small { color: var(--t1); font-weight: 700; }
+.sk-slup[aria-pressed="true"] .sk-slup-tor i { box-shadow: 0 0 0 2px var(--t1); }
+
+@container (max-width: 760px) {
+  .sk-wynik { grid-template-columns: minmax(0, 1fr); }
+  .sk-wynik-boki { flex-wrap: wrap; }
+  .sk-kafel { flex: 1 1 0; min-width: 0; }
+}
+@container (max-width: 560px) {
+  .sk-wynik { padding: 14px; gap: 14px; }
+  .sk-wynik-proc { font-size: 46px; }
+  .sk-wynik-opis b { font-size: 15px; }
+  .sk-kafel { padding: 8px 9px; }
+  .sk-kafel b { font-size: 18px; }
+  .sk-wynik-boki { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sk-typ { grid-template-columns: 22px minmax(0, 1fr) 40px 40px; gap: 9px; padding: 10px 11px; }
+  .sk-znak { width: 22px; height: 22px; font-size: 12px; }
+  .sk-kal { gap: 4px; }
+  .sk-kal-dzien, .sk-kal-pusty { min-height: 54px; padding: 6px 5px; border-radius: 8px; }
+  .sk-kal-dzien b { font-size: 14px; }
+  .sk-kal-dzien small { font-size: 10.5px; }
+  .sk-dzien-glowa { grid-template-columns: 74px minmax(0, 1fr) auto 40px; gap: 10px; padding: 11px 12px; }
+  .sk-dzien-glowa b { font-size: 14px; }
+  .sk-wykres { height: 170px; padding: 10px 8px 0; }
+  .sk-wykres-slupki { gap: 3px; }
+}
+/* kalendarz: zieleń od 55% (ten sam próg co lista dni) – słabszy dzień zostaje neutralny (bez straszenia czerwienią) */
+.sk-kal-dzien[data-poziom="sredni"] { background: color-mix(in srgb, var(--ok) 12%, var(--pow1)); }
+.sk-kal-dzien[data-poziom="mocny"] { background: color-mix(in srgb, var(--ok) 24%, var(--pow1)); }
+.sk-kal-dzien[data-poziom="slaby"] b { color: var(--t2); }
+
+/* ---- 5.5 A · kalendarz dopracowany (01.10) ------------------------------- */
+
+.sk-kal-ramka { padding: 12px 14px 14px; border-radius: 12px; border: 1px solid var(--kreska); background: var(--pow1); }
+.sk-kal-glowa { display: flex; align-items: center; justify-content: center; gap: 14px; margin-bottom: 10px; }
+.sk-kal-glowa b { font-size: 17px; min-width: 150px; text-align: center; }
+.sk-kal-glowa button,
+.sk-panel-strzalki button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--kreska);
+  background: var(--pow2);
+  color: var(--t1);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.sk-kal-glowa button:disabled,
+.sk-panel-strzalki button:disabled { opacity: 0.35; cursor: default; }
+
+.sk-kal[data-z-tygodniem] { grid-template-columns: repeat(7, minmax(0, 1fr)) 84px; }
+.sk-kal-dzien[data-poziom="proba"] { background: var(--pow2); }
+.sk-kal-proba { font: 600 14px/1.1 var(--f-n) !important; color: var(--t2); }
+.sk-kal-dzien[data-inny],
+.sk-kal-pusty[data-inny] { opacity: 0.45; }
+.sk-kal-dzien { background: var(--pow2); }
+.sk-kal-pusty { border-style: solid; border-color: transparent; background: none; color: var(--t4); }
+.sk-kal-pusty[data-przyszly] { border: 1px dashed var(--kreska); color: var(--t3); }
+.sk-kal-nr { display: inline-flex; align-items: center; gap: 5px; }
+.sk-kal-dzis { width: 6px; height: 6px; border-radius: 50%; background: var(--akcja); display: inline-block; }
+
+.sk-kal-tydzien {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 3px;
+  min-height: 64px;
+  border-radius: 10px;
+  border-left: 1px solid var(--kreska);
+  color: var(--t2);
+}
+.sk-kal-tydzien b { font: 700 16px/1 var(--f-n); font-variant-numeric: tabular-nums; }
+.sk-kal-tydzien small { font-size: 11px; color: var(--t3); font-variant-numeric: tabular-nums; }
+.sk-kal-tydzien[data-poziom="mocny"] b,
+.sk-kal-tydzien[data-poziom="sredni"] b { color: var(--ok); }
+
+.sk-kal-legenda { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 12px; font-size: 12px; color: var(--t3); }
+.sk-kal-legenda span { display: inline-flex; align-items: center; gap: 6px; }
+.sk-kal-legenda i { width: 12px; height: 12px; border-radius: 3px; border: 1px solid var(--kreska); background: var(--pow2); }
+.sk-kal-legenda i[data-poziom="sredni"] { background: color-mix(in srgb, var(--ok) 12%, var(--pow1)); }
+.sk-kal-legenda i[data-poziom="mocny"] { background: color-mix(in srgb, var(--ok) 24%, var(--pow1)); }
+
+.sk-panel-strzalki { display: inline-flex; gap: 4px; align-self: center; }
+.sk-panel-strzalki button { width: 28px; height: 28px; font-size: 16px; }
+.sk-panel-glowa { align-items: center; }
+.sk-proba { margin-left: auto; font: 500 12px/1 var(--f-t, inherit) !important; color: var(--t3) !important; font-style: normal; }
+
+@container (max-width: 560px) {
+  .sk-kal-ramka { padding: 10px 8px 12px; }
+  .sk-kal-glowa b { font-size: 15px; min-width: 120px; }
+  .sk-kal-proba { font-size: 12px !important; }
+  .sk-kal-legenda { gap: 4px 12px; font-size: 11px; }
+  .sk-kal-legenda span:last-child { flex-basis: 100%; }
+  .sk-panel-glowa { flex-wrap: wrap; row-gap: 4px; }
+}
+.mz-kto-nazwa { color: inherit; text-decoration: none; } .mz-kto-nazwa:hover b { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--t4); }
+
+/* ładowanie strony: szkielet dopiero po 300 ms (szybkie przejście nie mruga) */
+.st-strona[data-opozniony] { animation: st-pokaz-szkielet 0.2s ease 0.3s both; }
+@keyframes st-pokaz-szkielet { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .st-strona[data-opozniony] { animation: none; } }

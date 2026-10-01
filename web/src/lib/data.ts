@@ -130,7 +130,7 @@ const ODSWIEZANIE_WOLNE_S = 10800;
  */
 const BUNDLE_KEYS = [
   "value_bets", "matches", "calibration", "meta", "kupony",
-  "odds_superbet", "legi_pool", "sts_value",
+  "legi_pool", "sts_value",
   "druzyny_forma", "radar", "pokrycie_liga",
 ] as const;
 
@@ -373,7 +373,7 @@ async function fetchBundle(): Promise<Bundle> {
       meta: (map.meta ?? LOCAL.meta) as Meta,
       kupony: (map.kupony ?? LOCAL.kupony) as Kupon[],
       typy_wyniki: LOCAL.typy_wyniki,
-      odds_superbet: (map.odds_superbet ?? LOCAL.odds_superbet) as OddsSuperbet,
+      odds_superbet: LOCAL.odds_superbet,
       legi_pool: (map.legi_pool ?? LOCAL.legi_pool) as LegPool[],
       odrzucenia: LOCAL.odrzucenia,
       sts_value: (map.sts_value ?? LOCAL.sts_value) as StsValue,
@@ -394,8 +394,7 @@ async function fetchBundle(): Promise<Bundle> {
  * gettery w ramach renderu i równoległe żądania, a TTL 60 s (intencja
  * dawnego revalidate) niesie dane między żądaniami – instancja Fluid
  * Compute żyje dłużej niż pojedynczy request, więc kolejne wejścia mają
- * bundle od ręki. Świeży kupon po pominięciu nadal pojawia się w ~2-3 min
- * (pipeline odpalany od razu, patrz /api/kupon-pomin).
+ * bundle od ręki.
  */
 const BUNDLE_TTL_MS = 60_000;
 let bundleCache: { ts: number; bundle: Promise<Bundle> } | null = null;
@@ -482,6 +481,47 @@ export async function getZawodnicyDruzyn(druzyny: string[]): Promise<Zawodnik[]>
   return koszyki.flatMap((k) => k!).filter((z) => zbior.has(z.druzyna));
 }
 
+/* ---- lekkie klucze nowej strony (redesign 7B, `pipeline/footstats/jobs/lekkie_klucze.py`) ----
+ * Strona czyta tylko to, co pokazuje: kursy obu bukmacherów jednego meczu
+ * (`kursy_mNN`, mecz w koszyku `id % 32`) i jednego zawodnika (`zaw_kNN`,
+ * `id % 64`, 10 meczów historii). `null` = klucza jeszcze nie ma (pierwszy
+ * cykl po wdrożeniu albo migracja 0009 niewklejona) – strona wraca wtedy do
+ * starej ścieżki (`odds_superbet` + koszyki drużyn), wynik ten sam, większy transfer.
+ */
+export const KOSZYKI_KURSOW = 32;
+export const KOSZYKI_ZAWODNIKOW = 64;
+
+/** zawodnik → rynek → linia → [Superbet, Betclic] (null = nie kwotuje) */
+export type KursyDwaMeczu = Record<string, Record<string, Record<string, [number | null, number | null]>>>;
+export type ZawodnikLekki = Zawodnik & { mecz_id: number; kursy: KursyDwaMeczu[string] };
+export type WpisIndeksuZawodnikow = { id: number; n: string; d: string; m: number };
+
+const nr2 = (i: number) => String(i).padStart(2, "0");
+
+/** Kursy na zawodników jednego meczu, osobno u obu bukmacherów. */
+export async function getKursyMeczu(meczId: number): Promise<KursyDwaMeczu | null> {
+  const koszyk = await fetchKlucz<Record<string, KursyDwaMeczu> | null>(
+    `kursy_m${nr2(meczId % KOSZYKI_KURSOW)}`,
+    null,
+  );
+  return koszyk ? (koszyk[String(meczId)] ?? {}) : null;
+}
+
+/** Zawodnik z historią (10 meczów), najbliższym meczem i jego kursami. `undefined` = brak takiego w ofercie. */
+export async function getZawodnikLekki(id: number): Promise<ZawodnikLekki | undefined | null> {
+  const koszyk = await fetchKlucz<ZawodnikLekki[] | null>(
+    `zaw_k${nr2(id % KOSZYKI_ZAWODNIKOW)}`,
+    null,
+    ODSWIEZANIE_SKLADY_S,
+  );
+  return koszyk ? koszyk.find((z) => z.id === id) : null;
+}
+
+/** Wszyscy zawodnicy z kursem albo typem – do wyszukiwarki (serwer, nie do przeglądarki w całości). */
+export async function getIndeksZawodnikow(): Promise<WpisIndeksuZawodnikow[] | null> {
+  return fetchKlucz<WpisIndeksuZawodnikow[] | null>("zaw_indeks", null, ODSWIEZANIE_SKLADY_S);
+}
+
 /** Forma drużyn z typami drużynowymi (karta typu na /druzyny). */
 export async function getDruzynyForma(): Promise<DruzynaForma[]> {
   return (await loadBundle()).druzyny_forma;
@@ -530,8 +570,14 @@ export async function getTypyWyniki(): Promise<TypyWyniki> {
   );
 }
 
+/**
+ * Siatka kursów (wyższa cena z dwóch bukmacherów, bez nazwy) – od redesignu
+ * 7B tylko ZAPAS: strona meczu czyta `kursy_mNN`, lista meczów podsumowanie
+ * z `matches`. Poza bazowym zestawem (2026-10-01), żeby nie jechała przy
+ * każdym renderze każdej strony.
+ */
 export async function getOddsSuperbet(): Promise<OddsSuperbet> {
-  return (await loadBundle()).odds_superbet;
+  return fetchKlucz<OddsSuperbet>("odds_superbet", LOCAL.odds_superbet);
 }
 
 export async function getLegiPool(): Promise<LegPool[]> {

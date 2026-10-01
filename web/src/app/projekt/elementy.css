@@ -1,0 +1,680 @@
+/* ==========================================================================
+   Etap 3 – główne elementy (.el-). Tokeny z projekt.css, atomy z atomy*.css.
+   ========================================================================== */
+
+/* ---------- 3.1 WIERSZ MECZU ------------------------------------------ */
+
+.el-liga {
+  background: var(--pow1);
+  border: 1px solid var(--kreska);
+  border-radius: 10px;
+  /* clip, nie hidden: hidden robi z sekcji kontener przewijania i psuje
+     przyklejony nagłówek rozgrywek */
+  overflow: clip;
+}
+
+.el-liga + .el-liga { margin-top: 10px; }
+
+.el-liga-glowa {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--kreska);
+  font-size: 13px;
+}
+
+.el-liga-glowa b { font-weight: 600; }
+.el-liga-glowa span { color: var(--t3); font-size: 12px; }
+.el-liga-glowa em { margin-left: auto; font-style: normal; color: var(--t3); font-size: 12px; font-variant-numeric: tabular-nums; }
+
+/* A · lista */
+.el-mecz-a {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) auto 14px;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 14px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.el-mecz-a + .el-mecz-a { border-top: 1px solid var(--kreska); }
+.el-mecz-a:hover { background: var(--pow2); }
+
+.el-czas { display: grid; gap: 2px; font-size: 13px; font-variant-numeric: tabular-nums; }
+.el-czas small { color: var(--t3); font-size: 11px; }
+
+.el-druzyny { display: grid; gap: 5px; min-width: 0; }
+.el-druzyna { display: flex; align-items: center; gap: 9px; min-width: 0; font-size: 14px; }
+.el-druzyna span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.el-typy-meczu { display: grid; justify-items: end; gap: 2px; white-space: nowrap; }
+.el-typy-meczu b { font: 700 16px/1 var(--f-n); font-variant-numeric: tabular-nums; }
+.el-typy-meczu b small { font-size: 0.62em; color: var(--t2); margin-left: 1px; }
+.el-typy-meczu span { color: var(--t3); font-size: 12px; }
+
+.el-strzalka { color: var(--t4); }
+
+/* B · z najmocniejszym typem */
+.el-mecz-b { padding: 11px 14px 12px; cursor: pointer; transition: background-color 0.15s ease; }
+.el-mecz-b + .el-mecz-b { border-top: 1px solid var(--kreska); }
+.el-mecz-b:hover { background: color-mix(in srgb, var(--pow2) 55%, transparent); }
+
+.el-mecz-b-glowa {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.el-mecz-b-glowa .el-vs { color: var(--t4); font-weight: 400; }
+.el-mecz-b-glowa .el-godz { margin-left: auto; color: var(--t3); font-weight: 500; font-size: 13px; font-variant-numeric: tabular-nums; flex: none; }
+.el-mecz-b-glowa .el-nazwa { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.el-mecz-b-typ {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 14px;
+  margin-top: 9px;
+  padding: 9px 10px 9px 12px;
+  border-radius: 8px;
+  background: var(--pow2);
+}
+
+.el-mecz-b-typ .a-typ-kto { font-size: 14px; }
+.el-mecz-b-stopka { display: flex; justify-content: space-between; margin-top: 8px; color: var(--t3); font-size: 12px; }
+.el-mecz-b-stopka b { color: var(--t1); font-weight: 600; }
+
+/* C · kafle */
+.el-kafle { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
+
+.el-kafel {
+  display: grid;
+  gap: 12px;
+  padding: 12px 14px 14px;
+  border-radius: 10px;
+  background: var(--pow1);
+  border: 1px solid var(--kreska);
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.el-kafel:hover { border-color: var(--kreska-mocna); transform: translateY(-1px); }
+
+.el-kafel-glowa { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--t3); min-width: 0; }
+.el-kafel-glowa span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.el-kafel-glowa b { margin-left: auto; color: var(--t1); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.el-kafel-druzyny { display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; gap: 8px; text-align: center; }
+.el-kafel-druzyna { display: grid; justify-items: center; gap: 6px; font-size: 13px; font-weight: 600; line-height: 1.2; }
+.el-kafel-vs { color: var(--t4); font-size: 12px; padding-top: 10px; }
+
+.el-kafel-stopka { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12px; color: var(--t3); }
+.el-kafel-stopka b { color: var(--t1); font-weight: 600; }
+
+.el-mini-szanse { display: flex; align-items: flex-end; gap: 3px; height: 18px; }
+.el-mini-szanse i { width: 6px; border-radius: 2px 2px 0 0; background: var(--t4); }
+.el-mini-szanse i[data-mocny="true"] { background: var(--ok); }
+
+/* ---------- 3.2 KARTA TYPU -------------------------------------------- */
+
+.el-karta {
+  background: var(--pow1);
+  border: 1px solid var(--kreska);
+  border-radius: 10px;
+}
+
+.el-karta + .el-karta { margin-top: 10px; }
+
+.el-karta-meta {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--t3);
+  font-size: 12px;
+  min-width: 0;
+}
+
+.el-karta-meta span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.el-karta-meta time { margin-left: auto; flex: none; font-variant-numeric: tabular-nums; }
+
+.el-kto { font: 700 20px/1.15 var(--f-n); letter-spacing: -0.01em; }
+.el-kto-pod { color: var(--t3); font-size: 12px; margin-top: 3px; }
+
+.el-zaklad { font-weight: 600; font-size: 15px; }
+.el-zaklad span { color: var(--t3); font-weight: 400; }
+
+/* A · wiersz rozwijany */
+.el-wiersz {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto 16px;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+}
+
+.el-wiersz:hover { background: color-mix(in srgb, var(--pow2) 55%, transparent); border-radius: 10px; }
+
+.el-rozwin {
+  overflow: hidden;
+}
+
+.el-rozwin-wnetrze {
+  display: grid;
+  gap: 14px;
+  padding: 2px 14px 16px 46px;
+}
+
+@container (max-width: 560px) {
+  .el-rozwin-wnetrze { padding-left: 14px; }
+
+}
+
+.el-chevron { color: var(--t3); transition: transform 0.2s ease; }
+[aria-expanded="true"] .el-chevron { transform: rotate(180deg); }
+
+/* B · karta pełna */
+.el-karta-b { padding: 14px 16px 12px; display: grid; gap: 14px; }
+
+.el-karta-b-glowa { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: end; }
+
+.el-karta-b-zaklad { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 12px; border-top: 1px solid var(--kreska); }
+
+.el-najwazniejsze { display: flex; gap: 8px; color: var(--t2); font-size: 13px; }
+.el-najwazniejsze svg { flex: none; margin-top: 3px; color: var(--ok); }
+
+.el-skad {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 0 2px;
+  border-top: 1px solid var(--kreska);
+  color: var(--t2);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.el-skad:hover { color: var(--t1); }
+
+/* C · powody na wierzchu */
+.el-karta-c { padding: 14px 16px 16px; display: grid; gap: 14px; }
+
+.el-karta-c-glowa { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: center; }
+
+.el-powody { display: grid; gap: 7px; }
+
+.el-powod { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 8px; align-items: start; font-size: 13px; color: var(--t1); }
+
+.el-powod i {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-style: normal;
+}
+
+.el-powod[data-kier="za"] i { background: var(--ok-tlo); color: var(--ok); }
+.el-powod[data-kier="przeciw"] i { background: var(--czeka-tlo); color: var(--czeka); }
+.el-powod[data-kier="baza"] i { background: var(--pow2); color: var(--t2); }
+
+.el-podsumowanie-powodow { display: flex; gap: 12px; font-size: 12px; color: var(--t3); }
+.el-podsumowanie-powodow b { font-weight: 600; }
+.el-podsumowanie-powodow .za { color: var(--ok); }
+.el-podsumowanie-powodow .przeciw { color: var(--czeka); }
+
+/* ---------- 3.3 DRABINKA ---------------------------------------------- */
+
+.el-drabinka { padding: 14px 16px 16px; display: grid; gap: 16px; }
+
+.el-drab-wybor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--pow2);
+}
+
+.el-drab-wybor-linia { font: 700 20px/1.1 var(--f-n); }
+.el-drab-wybor-linia small { display: block; margin-top: 4px; font: 500 12px var(--f-t); color: var(--t3); }
+.el-drab-wybor-prawa { display: flex; align-items: center; gap: 18px; }
+
+.el-nasz {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: var(--ok-tlo);
+  color: var(--ok);
+  font: 600 11px/1.4 var(--f-t);
+  vertical-align: 3px;
+  margin-left: 8px;
+}
+
+/* A · suwak linii */
+.el-suwak { position: relative; padding-top: 6px; }
+
+.el-suwak-tor {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 30px;
+  height: 2px;
+  background: var(--kreska-mocna);
+  border-radius: 1px;
+}
+
+.el-suwak-przystanki { position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; }
+
+.el-przystanek {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 0 2px 4px;
+  color: var(--t3);
+  cursor: pointer;
+  position: relative;
+}
+
+.el-przystanek-linia { font: 700 15px/1 var(--f-n); color: var(--t2); height: 16px; }
+.el-przystanek-kropka {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--pow1);
+  border: 2px solid var(--kreska-mocna);
+  z-index: 1;
+  transition: border-color 0.15s ease;
+}
+
+.el-przystanek-kurs { font-size: 12px; font-variant-numeric: tabular-nums; }
+.el-przystanek-pokrycie { font-size: 11px; color: var(--t4); font-variant-numeric: tabular-nums; }
+.el-przystanek:hover .el-przystanek-kropka { border-color: var(--t2); }
+.el-przystanek[aria-checked="true"] .el-przystanek-linia { color: var(--t1); }
+.el-przystanek[aria-checked="true"] .el-przystanek-kurs { color: var(--t1); font-weight: 600; }
+
+.el-suwak-znacznik {
+  position: absolute;
+  top: 22px;
+  width: 20px;
+  height: 20px;
+  margin-left: -10px;
+  border-radius: 50%;
+  background: var(--akcja);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--akcja) 25%, transparent);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.el-przystanek-nasz {
+  position: absolute;
+  top: -14px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ok);
+  white-space: nowrap;
+}
+
+/* B · schody */
+.el-schody { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 8px; align-items: end; height: 190px; }
+
+.el-stopien {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  justify-items: center;
+  gap: 6px;
+  height: 100%;
+  cursor: pointer;
+  text-align: center;
+}
+
+.el-stopien-kurs { font: 700 14px/1 var(--f-n); color: var(--t2); font-variant-numeric: tabular-nums; }
+.el-stopien-slup {
+  align-self: end;
+  width: 100%;
+  border-radius: 8px 8px 4px 4px;
+  background: var(--pow2);
+  border: 1px solid var(--kreska);
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  align-items: end;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.el-stopien-wypelnienie { background: var(--ok-tlo); border-top: 2px solid var(--ok); }
+.el-stopien-proc { position: absolute; inset: 8px 0 auto; font: 700 13px var(--f-n); color: var(--t1); font-variant-numeric: tabular-nums; }
+.el-stopien-linia { font-size: 12px; color: var(--t3); }
+.el-stopien[aria-checked="true"] .el-stopien-slup { border-color: var(--akcja); background: var(--pow3); box-shadow: inset 0 0 0 1px var(--akcja); }
+.el-stopien[aria-checked="true"] .el-stopien-kurs,
+.el-stopien[aria-checked="true"] .el-stopien-linia { color: var(--t1); font-weight: 600; }
+
+/* C · tabela szczebli */
+.el-tabela { display: grid; }
+
+.el-szczebel {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px 56px auto;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.el-szczebel + .el-szczebel { margin-top: 2px; }
+.el-szczebel:hover { background: var(--pow2); }
+.el-szczebel[aria-checked="true"] { background: var(--pow2); box-shadow: inset 3px 0 0 var(--akcja); }
+.el-szczebel-linia { font-weight: 600; }
+.el-szczebel-pokrycie { color: var(--t2); font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.el-szczebel .d-kurs { width: 140px; }
+.el-szczebel-p { font: 700 16px/1 var(--f-n); text-align: right; font-variant-numeric: tabular-nums; }
+.el-szczebel-p[data-brak="true"] { color: var(--t4); font-weight: 500; font-size: 13px; }
+
+@container (max-width: 560px) {
+  .el-szczebel { grid-template-columns: minmax(0, 1fr) 48px auto; }
+  .el-szczebel-pokrycie { display: none; }
+}
+
+/* ---------- 3.4 KUPON GOTOWY ------------------------------------------ */
+
+.el-kupony { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); align-items: start; }
+
+/* A · bilet */
+.el-bilet {
+  --wyciecie: 9px;
+  position: relative;
+  background: var(--pow1);
+  border: 1px solid var(--kreska);
+  border-radius: 12px;
+}
+
+.el-bilet-glowa { padding: 16px 16px 14px; display: grid; gap: 10px; }
+.el-bilet-cel { display: flex; justify-content: space-between; align-items: baseline; }
+.el-bilet-cel b { font: 700 34px/1 var(--f-n); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.el-bilet-cel span { color: var(--t3); font-size: 12px; text-align: right; }
+.el-bilet-wyplata { display: flex; justify-content: space-between; font-size: 13px; color: var(--t2); }
+.el-bilet-wyplata b { color: var(--t1); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.el-pasek-szansy { height: 5px; border-radius: 3px; background: var(--pow3); overflow: hidden; }
+.el-pasek-szansy i { display: block; height: 100%; background: var(--t2); border-radius: 3px; }
+
+/* perforacja: wycięcia po bokach + przerywana linia */
+.el-perforacja {
+  position: relative;
+  height: 1px;
+  margin: 0 14px;
+  background-image: linear-gradient(90deg, var(--kreska-mocna) 50%, transparent 50%);
+  background-size: 8px 1px;
+}
+
+.el-perforacja::before,
+.el-perforacja::after {
+  content: "";
+  position: absolute;
+  top: calc(var(--wyciecie) * -1);
+  width: calc(var(--wyciecie) * 2);
+  height: calc(var(--wyciecie) * 2);
+  border-radius: 50%;
+  background: var(--tlo-sceny, var(--tlo));
+  border: 1px solid var(--kreska);
+}
+
+.el-perforacja::before { left: calc(-14px - var(--wyciecie) - 1px); clip-path: inset(0 0 0 50%); }
+.el-perforacja::after { right: calc(-14px - var(--wyciecie) - 1px); clip-path: inset(0 50% 0 0); }
+
+.el-nogi { padding: 6px 16px 4px; }
+
+.el-noga {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 0;
+}
+
+.el-noga + .el-noga { border-top: 1px solid var(--kreska); }
+.el-noga-kto { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.el-noga-co { color: var(--t3); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.el-noga-kurs { font: 700 15px/1 var(--f-n); font-variant-numeric: tabular-nums; text-align: right; }
+.el-noga-kurs small { display: block; margin-top: 4px; font: 500 11px var(--f-t); color: var(--t3); }
+
+.el-status {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--kreska-mocna);
+}
+
+.el-status[data-w="ok"] { background: var(--ok); }
+.el-status[data-w="nie"] { background: var(--nie); }
+.el-status[data-w="czeka"] { background: transparent; box-shadow: inset 0 0 0 1.5px var(--czeka); }
+
+.el-najslabszy { color: var(--czeka); font-size: 11px; font-weight: 600; margin-left: 6px; }
+
+.el-bilet-stopka {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px 16px;
+}
+
+.el-bilet-stopka .a-guzik[data-t="glowny"] { flex: 1; }
+.el-bilet-info { display: flex; justify-content: space-between; padding: 0 16px 12px; color: var(--t3); font-size: 12px; }
+
+/* B · oś meczów */
+.el-os { padding: 14px 16px 16px; display: grid; gap: 14px; }
+
+.el-os-linia { position: relative; display: grid; gap: 4px; }
+.el-os-linia::before { content: ""; position: absolute; left: 53px; top: 12px; bottom: 12px; width: 2px; background: var(--kreska-mocna); border-radius: 1px; }
+
+.el-os-punkt { display: grid; grid-template-columns: 42px 24px minmax(0, 1fr); align-items: center; gap: 0; min-height: 50px; }
+.el-os-godz { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--t2); line-height: 1.2; }
+.el-os-godz small { display: block; color: var(--t4); font-size: 10px; }
+.el-os-kropka { justify-self: center; width: 10px; height: 10px; border-radius: 50%; background: var(--pow1); box-shadow: 0 0 0 2px var(--kreska-mocna); z-index: 1; }
+.el-os-kropka[data-w="ok"] { background: var(--ok); box-shadow: 0 0 0 2px var(--ok); }
+.el-os-kropka[data-w="nie"] { background: var(--nie); box-shadow: 0 0 0 2px var(--nie); }
+.el-os-kropka[data-w="czeka"] { box-shadow: 0 0 0 2px var(--czeka); }
+.el-os-noga { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; background: var(--pow2); margin-left: 6px; }
+
+/* C · kompakt */
+.el-kompakt { padding: 12px 14px 14px; display: grid; gap: 10px; }
+.el-kompakt-glowa { display: flex; align-items: baseline; gap: 10px; }
+.el-kompakt-glowa b { font: 700 24px/1 var(--f-n); font-variant-numeric: tabular-nums; }
+.el-kompakt-glowa span { color: var(--t3); font-size: 12px; }
+.el-kompakt-glowa .a-guzik { margin-left: auto; }
+.el-kompakt-nogi { display: grid; gap: 4px; font-size: 13px; }
+.el-kompakt-noga { display: grid; grid-template-columns: 8px minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.el-kompakt-noga span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.el-kompakt-noga span small { color: var(--t3); }
+.el-kompakt-noga b { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* ---------- 3.5 TWÓJ KUPON (koszyk) ----------------------------------- */
+
+.el-koszyk-scena { position: relative; display: grid; gap: 16px; min-height: 520px; }
+
+@container (min-width: 900px) {
+  .el-koszyk-scena { grid-template-columns: minmax(0, 1fr) 320px; align-items: start; }
+}
+
+.el-koszyk-lista { display: grid; }
+
+.el-koszyk-panel {
+  position: sticky;
+  top: 90px;
+  border-radius: 12px;
+  background: var(--pow1);
+  border: 1px solid var(--kreska-mocna);
+  overflow: hidden;
+}
+
+.el-koszyk-glowa { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--kreska); }
+.el-koszyk-pusty { padding: 22px 14px; color: var(--t3); font-size: 13px; text-align: center; }
+
+.el-koszyk-noga { display: grid; grid-template-columns: minmax(0, 1fr) auto 24px; gap: 10px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--kreska); }
+
+.el-usun { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; color: var(--t3); cursor: pointer; }
+.el-usun:hover { background: var(--pow2); color: var(--nie); }
+
+.el-stawka { padding: 12px 14px; display: grid; gap: 10px; }
+.el-stawka-wiersz { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--t2); }
+.el-stawka-wiersz b { color: var(--t1); font: 700 18px/1 var(--f-n); font-variant-numeric: tabular-nums; }
+
+.el-kwoty { display: flex; gap: 6px; flex-wrap: wrap; }
+.el-kwota {
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 7px;
+  background: var(--pow2);
+  border: 1px solid var(--kreska);
+  color: var(--t1);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+
+.el-kwota[aria-pressed="true"] { border-color: var(--akcja); background: var(--akcja-tlo); }
+
+/* telefon: pastylka przyklejona do dołu, rozwija się w arkusz */
+.el-pastylka {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 52px;
+  padding: 0 8px 0 16px;
+  border-radius: 26px;
+  background: var(--akcja);
+  color: var(--na-akcji);
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.3);
+  cursor: pointer;
+}
+
+.el-pastylka b { font: 700 16px/1 var(--f-n); font-variant-numeric: tabular-nums; }
+.el-pastylka span { font-size: 13px; font-weight: 600; opacity: 0.8; }
+
+.el-pastylka-licznik {
+  min-width: 26px;
+  height: 26px;
+  padding: 0 7px;
+  border-radius: 13px;
+  background: var(--na-akcji);
+  color: var(--akcja);
+  font: 700 13px/26px var(--f-t);
+  text-align: center;
+}
+
+.el-pastylka-guzik { margin-left: auto; height: 36px; padding: 0 14px; border-radius: 18px; background: color-mix(in srgb, var(--na-akcji) 14%, transparent); font-weight: 700; font-size: 13px; display: grid; place-items: center; }
+
+/* ---------- telefon: poprawki po zrzutach 390 px ----------------------- */
+
+@container (max-width: 560px) {
+  /* 3.1 B: godzina nad drużynami, nazwy dostają cały rząd */
+  .el-mecz-b-glowa { flex-wrap: wrap; row-gap: 4px; }
+  .el-mecz-b-glowa .el-godz { order: -1; flex-basis: 100%; margin-left: 0; font-size: 12px; }
+  .el-mecz-b-typ { gap: 10px; padding: 9px 8px 9px 10px; }
+  .el-mecz-b-typ .d-kurs, .el-karta-c .d-kurs, .el-drab-wybor .d-kurs { min-width: 0; gap: 8px; padding: 0 10px; }
+
+  /* 3.2 C: nazwa i zakład w pierwszym rzędzie, szansa i kurs pod spodem */
+  .el-karta-c-glowa { grid-template-columns: auto minmax(0, 1fr); }
+  .el-karta-c-glowa > :last-child { grid-column: 1 / -1; justify-content: space-between; }
+
+  /* 3.3: wybrana linia nad szansą i kursem */
+  .el-drab-wybor { grid-template-columns: 1fr; gap: 10px; }
+  .el-drab-wybor-linia { font-size: 17px; }
+  .el-drab-wybor-prawa { justify-content: space-between; }
+}
+
+/* przełącznik wariantów nie może wychodzić poza ekran */
+.a-warianty { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.a-warianty::-webkit-scrollbar { display: none; }
+
+/* ---------- 3.1 A dopracowane ------------------------------------------ */
+
+.el-wkrotce { color: var(--czeka); font-size: 11px; font-weight: 600; }
+
+.el-typy-meczu { gap: 6px; }
+.el-typy-meczu b { display: inline-flex; align-items: center; font: 600 14px/1.2 var(--f-t); color: var(--t1); }
+.el-typy-meczu span strong { color: var(--t1); font-weight: 600; font-variant-numeric: tabular-nums; }
+.el-sklady { color: var(--ok); display: inline-grid; place-items: center; margin: 2px 6px 0 0; }
+
+.el-kropki { display: inline-flex; align-items: center; gap: 3px; }
+.el-kropki i { width: 6px; height: 6px; border-radius: 50%; box-shadow: inset 0 0 0 1.3px var(--t3); }
+.el-kropki i[data-mocny="true"] { background: var(--ok); box-shadow: none; }
+.el-kropki em { font-style: normal; font-size: 11px; color: var(--t3); margin-left: 2px; font-variant-numeric: tabular-nums; }
+
+/* nagłówek rozgrywek przyklejony przy przewijaniu długiej listy */
+.el-liga-glowa { position: sticky; top: 0; z-index: 1; background: var(--pow1); }
+
+/* ---------- 3.2 A dopracowane: rodzaj zakładu na pierwszym planie ------- */
+
+.el-zaklad-wiersz {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: 15px;
+  color: var(--t1);
+  min-width: 0;
+}
+
+.el-zaklad-wiersz svg { color: var(--t2); }
+.el-zaklad-wiersz b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.el-zaklad-wiersz span { color: var(--t3); white-space: nowrap; }
+.el-zaklad-wiersz strong { font: 700 15px/1 var(--f-n); font-variant-numeric: tabular-nums; }
+.el-wiersz-meta { margin-top: 3px; color: var(--t3); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 01.10: nazwisko i zakład miały ten sam rozmiar i grubość – zlewały się */
+.el-wiersz .a-typ-kto { font-size: 13px; color: var(--t2); font-weight: 500; letter-spacing: 0.005em; }
+
+/* ---------- 3.3 A dopracowane ------------------------------------------ */
+
+.el-suwak { touch-action: pan-y; user-select: none; cursor: pointer; }
+.el-suwak[data-ciagnie] { cursor: grabbing; }
+
+.el-suwak-wypelnienie {
+  position: absolute;
+  left: 0;
+  top: 30px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--akcja);
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+/* kolor przystanku = jak często linia wchodziła w ostatnich meczach */
+.el-przystanek[data-pokrycie="mocne"] .el-przystanek-kropka { background: var(--ok); border-color: var(--ok); }
+.el-przystanek[data-pokrycie="srednie"] .el-przystanek-kropka { background: var(--ok-tlo); border-color: color-mix(in srgb, var(--ok) 60%, transparent); }
+.el-przystanek[data-pokrycie="mocne"] .el-przystanek-pokrycie { color: var(--ok); }
+
+/* kratki przebarwiają się płynnie przy zmianie linii */
+.el-drabinka .d-kratka { transition: background-color 0.25s ease, color 0.25s ease, box-shadow 0.25s ease; }
+
+/* 3.2 A na telefonie: tekst dostaje cały rząd, szansa (z lewej) i kurs
+   (z prawej) schodzą do drugiego rzędu – nazwa rynku już się nie ucina */
+@container (max-width: 560px) {
+  .el-wiersz { grid-template-columns: auto minmax(0, 1fr) 16px; row-gap: 10px; }
+  .el-wiersz > :nth-child(1) { grid-row: 1; grid-column: 1; align-self: start; margin-top: 2px; }
+  .el-wiersz > :nth-child(2) { grid-row: 1; grid-column: 2; }
+  .el-wiersz > :nth-child(5) { grid-row: 1; grid-column: 3; align-self: start; margin-top: 4px; }
+  .el-wiersz > :nth-child(3) { grid-row: 2; grid-column: 2; justify-self: start; align-self: center; }
+  .el-wiersz > :nth-child(4) { grid-row: 2; grid-column: 2 / 4; justify-self: end; align-self: center; }
+}

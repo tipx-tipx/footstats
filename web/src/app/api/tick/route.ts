@@ -24,8 +24,7 @@ import { readAppData, writeAppData } from "@/lib/appDataWrite";
  *
  * KONFIGURACJA (Vercel → Environment Variables):
  *   TICK_SECRET       wymagany; bez niego trasa oddaje 503 i nic nie robi
- *   GH_DISPATCH_TOKEN fine-grained PAT z uprawnieniem Actions: write (już jest,
- *                     używa go /api/kupon-pomin)
+ *   GH_DISPATCH_TOKEN fine-grained PAT z uprawnieniem Actions: write
  *   TICK_MIN_ODSTEP_S opcjonalny, domyślnie 1200 (20 min)
  *
  * Wołać: GET /api/tick?klucz=<TICK_SECRET>  (albo nagłówek Authorization:
@@ -51,7 +50,7 @@ const GH_REF = process.env.GH_REF ?? "master";
  * u źródeł (Superbet/365/statshub), które celowo oszczędzamy.
  */
 const MIN_ODSTEP_S = Number(process.env.TICK_MIN_ODSTEP_S ?? 1200);
-const KLUCZ_STANU = "cykl_dispatch"; // ten sam, którego pilnuje /api/kupon-pomin
+const KLUCZ_STANU = "cykl_dispatch";
 
 /**
  * OFERTA BETCLICA TEŻ JEDZIE NA TYM ZEGARZE (2026-09-18).

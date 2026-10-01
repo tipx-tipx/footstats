@@ -1,0 +1,606 @@
+/* ==========================================================================
+   Etap 2 – atomy. Działa pod ramą .p-ekran (tokeny palet z projekt.css:
+   ciemny = b1 „Noc”, jasny = p3 „Gazeta”, font 2c „Barlow pełny”).
+   Prefiks .a- = atom w warsztacie.
+   ========================================================================== */
+
+/* ---------- sekcja warsztatu ------------------------------------------ */
+
+.a-sekcja {
+  padding: 30px 0;
+  border-top: 1px solid var(--kreska);
+}
+
+.a-sekcja:first-of-type { border-top: 0; padding-top: 8px; }
+
+.a-sekcja-glowa {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px 24px;
+  margin-bottom: 14px;
+}
+
+.a-sekcja-glowa h2 { font-size: 22px; }
+.a-sekcja-glowa h2 span { color: var(--t4); margin-right: 8px; }
+
+.a-opis {
+  color: var(--t3);
+  font-size: 13px;
+  margin-top: 4px;
+  max-width: 640px;
+}
+
+.a-warianty {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 9px;
+  background: var(--pow2);
+  border: 1px solid var(--kreska);
+}
+
+.a-warianty button {
+  padding: 5px 11px;
+  border-radius: 6px;
+  color: var(--t2);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.a-warianty button[aria-pressed="true"] { background: var(--pow1); color: var(--t1); box-shadow: 0 0 0 1px var(--kreska-mocna); }
+
+.a-wariant-opis {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--akcja-tlo);
+  color: var(--t2);
+  font-size: 13px;
+}
+
+.a-wariant-opis b { color: var(--t1); font-weight: 600; }
+
+.a-scena {
+  background: var(--pow1);
+  border: 1px solid var(--kreska);
+  border-radius: 10px;
+  padding: 18px;
+}
+
+.a-scena + .a-scena { margin-top: 10px; }
+
+.a-podpis {
+  color: var(--t4);
+  font-size: 11px;
+  margin-bottom: 10px;
+}
+
+.a-rzad {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 18px;
+}
+
+.a-demo-guzik {
+  margin-top: 14px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 7px;
+  background: var(--pow2);
+  border: 1px solid var(--kreska);
+  color: var(--t1);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.a-demo-guzik:hover { background: var(--pow3); }
+
+/* ---------- wiersz z typem (kontekst dla atomów) ---------------------- */
+
+.a-typ {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 0;
+}
+
+.a-typ + .a-typ { border-top: 1px solid var(--kreska); }
+
+.a-typ-kto { font-weight: 600; font-size: 15px; }
+.a-typ-co { color: var(--t3); font-size: 13px; margin-top: 2px; }
+
+/* ---------- 2.1 KAFELEK KURSU ----------------------------------------- */
+
+.a-logo-buk { display: block; height: auto; }
+
+/* wspólne stany */
+.a-kurs {
+  position: relative;
+  cursor: pointer;
+  background: var(--pow2);
+  border: 1px solid var(--kreska);
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.a-kurs:hover { background: var(--pow3); border-color: var(--kreska-mocna); }
+.a-kurs:active { transform: scale(0.97); }
+
+.a-kurs[data-wybrany="true"] {
+  background: var(--akcja-tlo);
+  border-color: var(--akcja);
+  box-shadow: inset 0 0 0 1px var(--akcja);
+}
+
+.a-kurs[data-brak="true"] { cursor: default; opacity: 0.6; }
+
+.a-kurs-liczba {
+  font-family: var(--f-n);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--t1);
+  line-height: 1;
+}
+
+.a-kurs-zmiana { font-size: 10px; line-height: 1; }
+.a-kurs-zmiana[data-kier="gora"] { color: var(--ok); }
+.a-kurs-zmiana[data-kier="dol"] { color: var(--nie); }
+
+.a-kurs-ptaszek {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--akcja);
+  color: var(--na-akcji);
+}
+
+/* A · tablica: logo na górze, liczba pod spodem, stała szerokość */
+.a-kurs-a {
+  display: inline-grid;
+  gap: 7px;
+  width: 96px;
+  padding: 8px 10px 9px;
+  border-radius: 8px;
+  text-align: left;
+}
+
+.a-kurs-a .a-kurs-liczba { font-size: 21px; display: flex; align-items: baseline; gap: 5px; }
+
+/* B · poziomy: logo z lewej, liczba z prawej, jedna wysokość */
+.a-kurs-b {
+  display: inline-grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 14px;
+  min-width: 134px;
+  height: 42px;
+  padding: 0 12px;
+  border-radius: 8px;
+}
+
+.a-kurs-b .a-kurs-liczba { font-size: 18px; display: flex; align-items: center; gap: 5px; }
+
+/* C · pigułka: znak bukmachera + liczba – do gęstych wierszy */
+.a-kurs-c {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 9px 0 5px;
+  border-radius: 7px;
+}
+
+.a-kurs-c .a-kurs-liczba { font-size: 15px; }
+
+.a-znak-buk {
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font: 800 11px/1 var(--f-n);
+}
+
+/* ---------- 2.2 SZANSA ------------------------------------------------ */
+
+.a-szansa-liczba {
+  font-family: var(--f-n);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: var(--t1);
+}
+
+.a-szansa-slowo { color: var(--t3); font-size: 12px; margin-top: 4px; }
+
+.a-tor { width: 200px; }
+.a-tor-pasek { position: relative; height: 6px; border-radius: 3px; background: var(--pow3); margin-top: 10px; }
+.a-tor-wypelnienie { position: absolute; inset: 0 auto 0 0; border-radius: 3px; background: var(--t2); }
+.a-tor-znacznik { position: absolute; top: -4px; width: 2px; height: 14px; border-radius: 1px; background: var(--czeka); }
+.a-tor-opis { display: flex; justify-content: space-between; margin-top: 7px; font-size: 11px; color: var(--t3); }
+.a-tor-opis b { color: var(--czeka); font-weight: 600; }
+
+.a-kreski { display: flex; gap: 3px; margin-top: 9px; }
+.a-kreski i { width: 5px; height: 16px; border-radius: 2px; background: var(--pow3); }
+.a-kreski i[data-pelna="true"] { background: var(--marka); }
+
+/* ---------- 2.3 HISTORIA ---------------------------------------------- */
+
+.a-slupek { fill: var(--pow3); }
+.a-slupek[data-trafil="true"] { fill: var(--ok); }
+
+.a-kratki { display: flex; flex-wrap: wrap; gap: 4px; }
+
+.a-kratka {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  font: 600 12px/1 var(--f-t);
+  font-variant-numeric: tabular-nums;
+  background: var(--pow2);
+  color: var(--t3);
+}
+
+.a-kratka[data-trafil="true"] { background: var(--ok-tlo); color: var(--ok); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ok) 35%, transparent); }
+
+/* ---------- 2.4 DNI --------------------------------------------------- */
+
+.a-dni { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+
+.a-dzien-kal {
+  flex: none;
+  width: 58px;
+  padding: 8px 0 9px;
+  border-radius: 10px;
+  background: var(--pow2);
+  border: 1px solid var(--kreska);
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  cursor: pointer;
+  color: var(--t2);
+  transition: background-color 0.15s ease;
+}
+
+.a-dzien-kal small { font-size: 11px; color: var(--t3); }
+.a-dzien-kal b { font: 700 21px/1 var(--f-n); color: var(--t1); }
+.a-dzien-kal em { font-style: normal; font-size: 11px; color: var(--t3); }
+.a-dzien-kal[aria-pressed="true"] { background: var(--akcja); border-color: var(--akcja); }
+.a-dzien-kal[aria-pressed="true"] :is(small, b, em) { color: var(--na-akcji); }
+
+.a-zakladki-tekst {
+  display: flex;
+  gap: 22px;
+  border-bottom: 1px solid var(--kreska);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.a-zakladka-tekst {
+  position: relative;
+  flex: none;
+  padding: 10px 0 12px;
+  color: var(--t3);
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.a-zakladka-tekst sup { font-size: 11px; font-weight: 500; margin-left: 3px; color: var(--t4); }
+.a-zakladka-tekst[aria-pressed="true"] { color: var(--t1); }
+
+.a-podkreslenie {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--akcja);
+}
+
+/* ---------- 2.5 FILTRY ------------------------------------------------ */
+
+.a-chipy { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+
+.a-chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 11px;
+  border-radius: 8px;
+  background: var(--pow2);
+  border: 1px solid var(--kreska);
+  color: var(--t2);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.a-chip small { color: var(--t4); font-size: 12px; font-variant-numeric: tabular-nums; }
+.a-chip:hover { background: var(--pow3); }
+.a-chip[aria-pressed="true"] { background: var(--akcja-tlo); border-color: var(--akcja); color: var(--t1); }
+.a-chip[aria-pressed="true"] small { color: var(--t2); }
+
+.a-panel {
+  margin-top: 10px;
+  padding: 16px;
+  border-radius: 10px;
+  background: var(--pow2);
+  border: 1px solid var(--kreska);
+  display: grid;
+  gap: 16px;
+  overflow: hidden;
+}
+
+.a-panel h4 { font-size: 12px; color: var(--t3); font-weight: 500; margin-bottom: 8px; }
+
+.a-licznik {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: var(--akcja);
+  color: var(--na-akcji);
+  font-size: 12px;
+  font-weight: 700;
+  display: inline-grid;
+  place-items: center;
+}
+
+.a-segment {
+  position: relative;
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 9px;
+  background: var(--pow2);
+  border: 1px solid var(--kreska);
+}
+
+.a-segment button {
+  position: relative;
+  padding: 6px 12px;
+  border-radius: 6px;
+  color: var(--t3);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  z-index: 1;
+  transition: color 0.15s ease;
+}
+
+.a-segment button:is([aria-pressed="true"], [aria-checked="true"]) { color: var(--t1); }
+
+.a-segment-tlo {
+  position: absolute;
+  inset: 0;
+  border-radius: 6px;
+  background: var(--pow1);
+  box-shadow: 0 0 0 1px var(--kreska-mocna), 0 1px 2px rgb(0 0 0 / 0.12);
+  z-index: -1;
+}
+
+/* ---------- 2.6 ZAKŁADKI SEKCJI --------------------------------------- */
+
+.a-karty-zakladek { display: grid; gap: 8px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+/* przełącznik: jeden rząd w ramce, bez opisów (też na komputerze) */
+.a-karty-zakladek[data-kompakt] {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 10px;
+  border: 1px solid var(--kreska);
+  background: var(--pow1);
+}
+.a-karty-zakladek[data-kompakt] .a-karta-zakladki {
+  padding: 7px 14px 8px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+}
+.a-karty-zakladek[data-kompakt] .a-karta-zakladki[aria-selected="true"] { background: var(--pow3); }
+.a-karty-zakladek[data-kompakt] .a-karta-zakladki b { justify-content: flex-start; gap: 8px; font-size: 14px; white-space: nowrap; color: var(--t2); transition: color 0.15s; }
+.a-karty-zakladek[data-kompakt] .a-karta-zakladki[aria-selected="true"] b { color: var(--t1); }
+.a-karty-zakladek[data-kompakt] .a-karta-zakladki small { display: none; }
+/* znacznik wybranej półki: krótka kreska akcji u dołu, przesuwa się między półkami */
+.a-karty-zakladek[data-kompakt] .a-karta-zakladki .a-podkreslenie { top: auto; bottom: 4px; left: 14px; right: auto; width: 18px; height: 2px; border-radius: 2px; }
+
+/* telefon: jeden rząd – nazwa i liczba typów, opis chowa się */
+@container (max-width: 560px) {
+  .a-karty-zakladek { gap: 6px; }
+  .a-karty-zakladek .a-karta-zakladki { padding: 9px 10px 10px; }
+  .a-karty-zakladek .a-karta-zakladki b { flex-direction: column; gap: 2px; font-size: 13px; white-space: nowrap; }
+  .a-karty-zakladek .a-karta-zakladki b span { font-size: 12px; font-weight: 400; }
+  .a-karty-zakladek .a-karta-zakladki small { display: none; }
+  /* przełącznik na telefonie: kolumny tak szerokie jak nazwa (+ równy zapas),
+     tekst na środku – „Wysokie szanse” nie dotyka krawędzi */
+  .a-karty-zakladek[data-kompakt] { display: grid; grid-template-columns: auto auto auto; gap: 2px; }
+  .a-karty-zakladek[data-kompakt] .a-karta-zakladki { padding: 8px 8px 11px; text-align: center; }
+  .a-karty-zakladek[data-kompakt] .a-karta-zakladki b { align-items: center; gap: 1px; font-size: 13.5px; }
+  .a-karty-zakladek[data-kompakt] .a-karta-zakladki b span { font-size: 11.5px; color: var(--t3); }
+  .a-karty-zakladek[data-kompakt] .a-karta-zakladki .a-podkreslenie { left: calc(50% - 9px); bottom: 4px; }
+}
+
+.a-karta-zakladki {
+  position: relative;
+  text-align: left;
+  padding: 12px 14px 13px;
+  border-radius: 10px;
+  background: var(--pow2);
+  border: 1px solid var(--kreska);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  overflow: hidden;
+}
+
+.a-karta-zakladki b { display: flex; justify-content: space-between; font-weight: 600; color: var(--t1); }
+.a-karta-zakladki b span { color: var(--t3); font-weight: 500; font-variant-numeric: tabular-nums; }
+.a-karta-zakladki b span i { display: none; font-style: normal; }
+@container (max-width: 560px) {
+  .a-karta-zakladki b span i { display: inline; }
+}
+.a-karta-zakladki small { display: block; margin-top: 3px; color: var(--t3); font-size: 12px; }
+.a-karta-zakladki:is([aria-pressed="true"], [aria-selected="true"]) { background: var(--pow1); border-color: var(--kreska-mocna); }
+
+.a-karta-zakladki .a-podkreslenie { top: 0; bottom: auto; height: 2px; border-radius: 0; }
+
+/* ---------- 2.7 ROZLICZENIE ------------------------------------------- */
+
+.a-wiersz-wyniku {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 14px;
+  padding: 11px 12px;
+  border-radius: 8px;
+}
+
+.a-wiersz-wyniku + .a-wiersz-wyniku { margin-top: 4px; }
+.a-wiersz-wyniku .a-kurs-liczba { font-size: 15px; }
+
+.a-wiersz-wyniku[data-styl="b"] {
+  position: relative;
+  background: var(--pow2);
+  padding-left: 16px;
+}
+
+.a-wiersz-wyniku[data-styl="b"]::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--kolor-wyniku);
+}
+
+/* przegrany typ gaśnie jak przegrana drużyna w Sofascore – ale etykieta wyniku
+   zostaje w pełnym kolorze, żeby nie zgadywać */
+.a-wiersz-wyniku[data-styl="b"][data-wynik="nie"] .a-przygas { opacity: 0.5; }
+
+.a-wynik-kolko {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--kolor-wyniku);
+  background: color-mix(in srgb, var(--kolor-wyniku) 16%, transparent);
+}
+
+.a-wynik-liczba { font-size: 13px; color: var(--t2); text-align: right; white-space: nowrap; }
+.a-wynik-liczba b { font-family: var(--f-n); font-size: 17px; color: var(--kolor-wyniku); font-variant-numeric: tabular-nums; }
+
+/* ---------- 2.8 ZMIANA LICZBY ----------------------------------------- */
+
+.a-licznik-cyfr { display: inline-flex; overflow: hidden; line-height: 1; }
+.a-kolumna-cyfr { display: inline-block; height: 1em; overflow: hidden; }
+.a-kolumna-cyfr > span { display: block; }
+.a-kolumna-cyfr > span > span { display: block; height: 1em; text-align: center; }
+
+.a-blysk {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 7px;
+}
+
+/* ---------- 2.9 ŁADOWANIE --------------------------------------------- */
+
+.a-szkielet { display: grid; gap: 10px; }
+
+.a-kosc {
+  height: 12px;
+  border-radius: 6px;
+  background: var(--pow3);
+}
+
+.a-kosc[data-anim="polysk"] {
+  background: linear-gradient(90deg, var(--pow3) 0%, var(--pow2) 40%, var(--pow3) 80%);
+  background-size: 300% 100%;
+  animation: a-polysk 1.4s ease-in-out infinite;
+}
+
+.a-kosc[data-anim="puls"] { animation: a-puls 1.3s ease-in-out infinite; }
+
+@keyframes a-polysk { from { background-position: 100% 0; } to { background-position: -50% 0; } }
+@keyframes a-puls { 50% { opacity: 0.45; } }
+
+.a-postep {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  overflow: hidden;
+  border-radius: 10px 10px 0 0;
+}
+
+.a-postep::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 35%;
+  background: var(--akcja);
+  animation: a-postep 1.1s cubic-bezier(0.45, 0, 0.2, 1) infinite;
+}
+
+@keyframes a-postep { from { transform: translateX(-100%); } to { transform: translateX(300%); } }
+
+/* ---------- 2.10 PRZYCISKI -------------------------------------------- */
+
+.a-guzik {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.12s ease, background-color 0.15s ease, opacity 0.15s ease;
+}
+
+.a-guzik:active { transform: scale(0.97); }
+.a-guzik[data-r="s"] { height: 32px; padding: 0 12px; font-size: 13px; }
+.a-guzik[data-r="m"] { height: 40px; padding: 0 16px; font-size: 14px; }
+.a-guzik[data-r="l"] { height: 48px; padding: 0 20px; font-size: 15px; }
+.a-guzik[data-t="glowny"] { background: var(--akcja); color: var(--na-akcji); }
+.a-guzik[data-t="glowny"]:hover { opacity: 0.9; }
+.a-guzik[data-t="drugi"] { background: var(--pow2); color: var(--t1); border: 1px solid var(--kreska-mocna); }
+.a-guzik[data-t="drugi"]:hover { background: var(--pow3); }
+.a-guzik[data-t="cichy"] { color: var(--t2); }
+.a-guzik[data-t="cichy"]:hover { color: var(--t1); background: var(--pow2); }
+.a-guzik[data-t="ikona"] { width: 40px; height: 40px; padding: 0; background: var(--pow2); color: var(--t1); border: 1px solid var(--kreska); }
+
+.a-pusty {
+  padding: 26px 20px;
+  border-radius: 10px;
+  border: 1px dashed var(--kreska-mocna);
+  text-align: center;
+}
+
+.a-pusty p { color: var(--t2); max-width: 420px; margin: 6px auto 14px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .a-kosc[data-anim], .a-postep::after { animation: none; }
+}

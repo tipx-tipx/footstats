@@ -23,8 +23,8 @@ name: FootStats — cykl zbierania danych
 #
 # WNIOSEK: skrócenie cyklu NIE poprawi świeżości strony. Jedyne, co realnie
 # działa, to `workflow_dispatch` z zewnątrz — nie jest dławiony i odpala od
-# razu. Mechanizm już mamy: `web/src/app/api/kupon-pomin/route.ts` woła go po
-# akcji usera (GH_DISPATCH_TOKEN). Brakuje wyłącznie regularnego pingu.
+# razu. Regularny ping robi `web/src/app/api/tick/route.ts` (GH_DISPATCH_TOKEN,
+# woła go zewnętrzny pinger).
 
 on:
   schedule:

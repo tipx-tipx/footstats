@@ -1,0 +1,126 @@
+/* ==========================================================================
+   Redesign – fundamenty aplikacji (etap 7.1).
+
+   Te same tokeny co w warsztacie (/projekt, palety B1 „Noc” i P3 „Gazeta”,
+   czcionka 2c „Barlow pełny”), ale podpięte pod istniejący przełącznik
+   motywu: <html data-theme="dark|light"> ustawiany skryptem przed pierwszym
+   malowaniem (bez mignięcia). Komponenty warsztatu mówią tylko tokenami
+   (--tlo, --pow1…, --t1…, --akcja, --ok…), więc działają tu bez zmian.
+   ========================================================================== */
+
+:root,
+:root[data-theme="dark"] {
+  --tlo: #07090c;
+  --pow1: #10151a;
+  --pow2: #171e25;
+  --pow3: #212a33;
+  --kreska: rgb(190 210 230 / 0.07);
+  --kreska-mocna: rgb(190 210 230 / 0.15);
+  --t1: #eaeef2;
+  --t2: rgb(234 238 242 / 0.72);
+  --t3: rgb(234 238 242 / 0.5);
+  --t4: rgb(234 238 242 / 0.28);
+  --akcja: #2fae74;
+  --na-akcji: #03130b;
+  --akcja-tlo: rgb(47 174 116 / 0.14);
+  --zwrot: rgb(234 238 242 / 0.5);
+  --marka: #2fae74;
+  --ok: #2fae74;
+  --nie: #e4586e;
+  --czeka: #bd8a18;
+  --ok-tlo: rgb(47 174 116 / 0.14);
+  --nie-tlo: rgb(228 88 110 / 0.14);
+  --czeka-tlo: rgb(189 138 24 / 0.16);
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  --tlo: #e9e8e3;
+  --pow1: #f7f6f2;
+  --pow2: #efeee9;
+  --pow3: #e3e1da;
+  --kreska: rgb(20 26 32 / 0.1);
+  --kreska-mocna: rgb(20 26 32 / 0.18);
+  --t1: #141a20;
+  --t2: color-mix(in srgb, var(--t1) 76%, transparent);
+  --t3: color-mix(in srgb, var(--t1) 56%, transparent);
+  --t4: color-mix(in srgb, var(--t1) 32%, transparent);
+  --akcja: #0c5a3a;
+  --na-akcji: #ffffff;
+  --akcja-tlo: rgb(15 108 70 / 0.1);
+  --zwrot: var(--t3);
+  --marka: #0f6c46;
+  --ok: #17824f;
+  --nie: #be3455;
+  --czeka: #a87800;
+  --ok-tlo: rgb(23 130 79 / 0.11);
+  --nie-tlo: rgb(190 52 85 / 0.1);
+  --czeka-tlo: rgb(192 138 0 / 0.13);
+  color-scheme: light;
+}
+
+/* czcionka 2c: Barlow pełnej szerokości, nagłówki 700 */
+:root {
+  --f-n: var(--pf-barlow), system-ui, sans-serif;
+  --f-t: var(--pf-barlow), system-ui, sans-serif;
+  --n-szer: 100%;
+  --n-waga: 700;
+  --n-track: -0.01em;
+  --t-waga-mocna: 600;
+}
+
+/* strona aplikacji = to, co w warsztacie robiła ramka podglądu */
+.nowa {
+  min-height: 100dvh;
+  background: var(--tlo);
+  color: var(--t1);
+  font-family: var(--f-t);
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  container-type: inline-size;
+}
+
+.nowa .p-n,
+.p-n {
+  font-family: var(--f-n);
+  font-weight: var(--n-waga);
+  font-stretch: var(--n-szer);
+  letter-spacing: var(--n-track);
+  line-height: 1.1;
+}
+
+/* jedyna reguła warsztatu zależna od motywu (strony.css: typ dnia) */
+:root[data-theme="light"] .st-typ-dnia { background: linear-gradient(180deg, color-mix(in srgb, var(--barwa) 6%, var(--pow1)) 0, var(--pow1) 150px); }
+
+/* fokus z klawiatury – jeden wygląd w całej aplikacji */
+.nowa :focus-visible { outline: 2px solid var(--akcja); outline-offset: 2px; }
+
+/* ---- szkielet aplikacji (7.2): komputer vs telefon ---- */
+/* paski telefonu mają własne display z szkielet.css – ukrywamy je mocniej */
+@media (min-width: 761px) {
+  .ap .ap-tel { display: none !important; }
+}
+@media (max-width: 760px) {
+  .ap .ap-komp { display: none !important; }
+}
+.ap-tresc { min-height: 60vh; }
+.ap-baner { max-width: 1180px; margin: 12px auto 0; padding: 0 24px; }
+.ap-arkusz-tlo { position: fixed !important; z-index: 40 !important; }
+.ap-arkusz { position: fixed !important; z-index: 41 !important; left: 0; right: 0; bottom: 0; border-radius: 18px 18px 0 0; padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+.ap .s-t-dol { z-index: 30; padding-bottom: max(6px, env(safe-area-inset-bottom)); }
+.ap .s-t-poz { border: 0; background: none; font: inherit; color: inherit; cursor: pointer; }
+.ap .s-pasek-a { z-index: 30; }
+.ap .s-t-gora { z-index: 30; }
+
+/* strony w wąskiej kolumnie (Kupony – jak w warsztacie, 760 px) */
+.ap-waska { max-width: 760px; margin: 0 auto; padding: 24px 24px 40px; }
+@media (max-width: 760px) { .ap-waska { padding: 16px 14px 28px; } }
+.ap-paleta-tlo { position: fixed !important; z-index: 50 !important; }
+.nowa .s-paleta-pole input:focus-visible { outline: none; }
+
+/* strony systemowe w aplikacji (404, błąd) i poza nią (sam znak marki) */
+.ap-sys { max-width: 1180px; margin: 0 auto; }
+.ap-samo { min-height: 100dvh; background: var(--tlo); color: var(--t1); }
+.ap-samo-glowa { max-width: 1180px; margin: 0 auto; padding: 18px 24px; }
+@media (max-width: 760px) { .ap-samo-glowa { padding: 14px 16px; } }

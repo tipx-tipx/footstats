@@ -1,0 +1,997 @@
+/* ==========================================================================
+   Etap 2b – dopracowanie wybranych atomów (.d-). Tokeny z projekt.css,
+   rama i sekcje z atomy.css.
+   ========================================================================== */
+
+/* ---------- wspólne: fokus z klawiatury, obszar dotyku ------------------ */
+
+.p-ekran :is(button, a):focus-visible {
+  outline: 2px solid var(--akcja);
+  outline-offset: 2px;
+}
+
+/* palec potrzebuje ~44 px, oko nie – powiększamy obszar dotyku, nie wygląd */
+.d-dotyk { position: relative; }
+@media (pointer: coarse) {
+  .d-dotyk::after { content: ""; position: absolute; inset: -6px -2px; }
+}
+
+.d-lista-poprawek {
+  margin: 12px 0 0;
+  padding: 12px 14px 12px 30px;
+  border-radius: 8px;
+  border: 1px solid var(--kreska);
+  color: var(--t2);
+  font-size: 13px;
+  display: grid;
+  gap: 4px;
+  list-style: disc;
+}
+
+.d-lista-poprawek b { color: var(--t1); font-weight: 600; }
+
+.d-uwaga {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--czeka-tlo);
+  color: var(--t1);
+  font-size: 13px;
+}
+
+.d-porownanie {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 7px;
+  background: var(--pow2);
+  border: 1px solid var(--kreska);
+  margin-bottom: 10px;
+}
+
+.d-porownanie button {
+  padding: 3px 9px;
+  border-radius: 5px;
+  font-size: 12px;
+  color: var(--t3);
+  cursor: pointer;
+}
+
+.d-porownanie button[aria-pressed="true"] { background: var(--pow1); color: var(--t1); box-shadow: 0 0 0 1px var(--kreska-mocna); }
+
+/* ---------- logo bukmachera jako maska: kolor bierze z tekstu ---------- */
+
+.d-logo {
+  display: block;
+  flex: none;
+  background: currentColor;
+  -webkit-mask: var(--maska) no-repeat left center / contain;
+  mask: var(--maska) no-repeat left center / contain;
+}
+
+/* ---------- 2.1 KAFELEK KURSU (poziomy, dopracowany) ------------------- */
+
+.d-kurs {
+  position: relative;
+  display: inline-grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 14px;
+  min-width: 132px;
+  height: 40px;
+  padding: 0 12px 0 11px;
+  border-radius: 8px;
+  background: var(--pow2);
+  border: 1px solid var(--kreska);
+  color: var(--t3);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease, transform 0.12s ease;
+}
+
+@media (pointer: coarse) { .d-kurs { height: 44px; } }
+
+.d-kurs:hover { background: var(--pow3); border-color: var(--kreska-mocna); color: var(--t2); }
+.d-kurs:active { transform: scale(0.97); }
+
+.d-kurs-prawa {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+}
+
+.d-kurs-liczba {
+  font: 700 17px/1 var(--f-n);
+  font-variant-numeric: tabular-nums;
+  color: var(--t1);
+  min-width: 3.1ch;
+  text-align: right;
+}
+
+.d-kurs-strzalka { font-size: 9px; line-height: 1; }
+.d-kurs-strzalka[data-kier="gora"] { color: var(--ok); }
+.d-kurs-strzalka[data-kier="dol"] { color: var(--nie); }
+
+/* wybrany = pełne wypełnienie jak u bukmachera, bez doklejonej plakietki */
+.d-kurs[aria-pressed="true"] {
+  background: var(--akcja);
+  border-color: var(--akcja);
+  color: var(--na-akcji);
+}
+
+.d-kurs[aria-pressed="true"] .d-kurs-liczba,
+.d-kurs[aria-pressed="true"] .d-kurs-strzalka { color: var(--na-akcji); }
+
+.d-kurs-ptaszek { display: inline-grid; place-items: center; }
+
+/* brak kursu: nie przycisk, tylko informacja – od jakiego kursu typ ma sens */
+.d-kurs[data-brak="true"] {
+  cursor: default;
+  background: transparent;
+  border-style: dashed;
+  border-color: var(--kreska-mocna);
+}
+
+.d-kurs[data-brak="true"]:hover { background: transparent; color: var(--t3); }
+.d-kurs[data-brak="true"]:active { transform: none; }
+
+.d-kurs-od { font-size: 12px; color: var(--t3); white-space: nowrap; }
+.d-kurs-od b { font: 700 15px/1 var(--f-n); color: var(--t2); font-variant-numeric: tabular-nums; }
+
+.d-kurs-blysk {
+  position: absolute;
+  inset: -1px;
+  border-radius: 8px;
+  pointer-events: none;
+}
+
+/* ---------- 2.2 SZANSA (liczba i słowo, dopracowana) ------------------ */
+
+.d-szansa { display: inline-grid; justify-items: start; }
+.d-szansa[data-mala="true"] { justify-items: end; }
+
+.d-szansa-liczba {
+  display: inline-flex;
+  align-items: flex-start;
+  font: 700 40px/0.9 var(--f-n);
+  font-variant-numeric: tabular-nums;
+  color: var(--t1);
+  letter-spacing: -0.01em;
+}
+
+.d-szansa-liczba small {
+  font-size: 0.5em;
+  font-weight: 600;
+  color: var(--t2);
+  margin: 0.12em 0 0 0.06em;
+}
+
+.d-szansa[data-mala="true"] .d-szansa-liczba { font-size: 21px; }
+
+.d-szansa-slowo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 7px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.d-szansa-slowo[data-poziom="bardzo-wysoka"] { color: var(--marka); }
+.d-szansa-slowo[data-poziom="wysoka"] { color: var(--t1); }
+.d-szansa-slowo[data-poziom="umiarkowana"] { color: var(--t2); }
+.d-szansa-slowo[data-poziom="niska"] { color: var(--czeka); }
+
+.d-info {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid var(--kreska-mocna);
+  color: var(--t3);
+  font: 700 10px/1 var(--f-t);
+  display: inline-grid;
+  place-items: center;
+  cursor: help;
+}
+
+.d-info:hover, .d-info[aria-expanded="true"] { color: var(--t1); border-color: var(--t3); }
+
+.d-dymek {
+  position: absolute;
+  z-index: 5;
+  width: 250px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--pow3);
+  border: 1px solid var(--kreska-mocna);
+  color: var(--t1);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.45;
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.25);
+}
+
+.d-dymek p + p { margin-top: 6px; color: var(--t2); }
+
+/* ---------- 2.3 KRATKI (dopracowane) ---------------------------------- */
+
+.d-hist-glowa {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.d-hist-wynik { font: 700 18px/1 var(--f-n); font-variant-numeric: tabular-nums; }
+.d-hist-wynik span { color: var(--t3); font: 500 12px var(--f-t); margin-left: 6px; }
+.d-hist-l5 { color: var(--t3); font-size: 12px; }
+.d-hist-l5 b { color: var(--t1); font-weight: 600; }
+
+.d-kratki { display: flex; gap: 4px; position: relative; }
+
+.d-kratka {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  display: grid;
+  place-items: center;
+  font: 600 13px/1 var(--f-t);
+  font-variant-numeric: tabular-nums;
+  background: var(--pow2);
+  color: var(--t3);
+  cursor: default;
+  overflow: hidden;
+}
+
+@container (max-width: 400px) {
+  .d-kratka { width: 27px; height: 27px; }
+}
+
+.d-kratka[data-trafil="true"] {
+  background: var(--ok-tlo);
+  color: var(--ok);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ok) 35%, transparent);
+}
+
+/* mało minut: liczba zostaje, ale kratka jest „kreskowana” – mecz nie w pełni */
+.d-kratka[data-malo-minut="true"]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(135deg, transparent 0 4px, color-mix(in srgb, var(--t1) 9%, transparent) 4px 5px);
+}
+
+/* nie zagrał: osobny znak – pusta kratka przekreślona po skosie + „NZ”;
+   poza wynikiem „8/9”, ale widoczna, żeby nie ginęła z historii */
+.d-kratka[data-nie-gral="true"] {
+  background: linear-gradient(135deg, transparent calc(50% - 0.6px), var(--kreska-mocna) calc(50% - 0.6px) calc(50% + 0.6px), transparent calc(50% + 0.6px));
+  box-shadow: inset 0 0 0 1px var(--kreska-mocna);
+  color: var(--t3);
+}
+
+.d-ng {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 1px 2px;
+  border-radius: 3px;
+  background: var(--pow1);
+}
+
+.d-ng-probka {
+  background: linear-gradient(135deg, transparent calc(50% - 0.6px), var(--kreska-mocna) calc(50% - 0.6px) calc(50% + 0.6px), transparent calc(50% + 0.6px));
+  box-shadow: inset 0 0 0 1px var(--kreska-mocna);
+}
+
+.d-kratka[data-najnowsza="true"]::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 3px;
+  height: 2px;
+  border-radius: 1px;
+  background: currentColor;
+  opacity: 0.55;
+}
+
+.d-hist-os {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  color: var(--t4);
+  font-size: 11px;
+}
+
+.d-hist-legenda { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 8px; color: var(--t3); font-size: 11px; }
+.d-hist-legenda i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; vertical-align: -1px; margin-right: 5px; }
+
+/* ---------- 2.4 CHIPY DNI (dopracowane) ------------------------------- */
+
+.d-dni-rama { position: relative; }
+
+.d-dni {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  scroll-snap-type: x proximity;
+  scroll-padding: 0 24px;
+}
+
+.d-dni::-webkit-scrollbar { display: none; }
+
+.d-dzien {
+  position: relative;
+  flex: none;
+  scroll-snap-align: start;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  height: 36px;
+  padding: 0 13px;
+  border-radius: 8px;
+  background: var(--pow2);
+  border: 1px solid var(--kreska);
+  color: var(--t2);
+  font-weight: 600;
+  line-height: 34px;
+  cursor: pointer;
+  isolation: isolate;
+  transition: color 0.18s ease;
+}
+
+.d-dzien small { color: var(--t3); font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; transition: color 0.18s ease; }
+.d-dzien:hover { color: var(--t1); }
+.d-dzien[aria-selected="true"] { color: var(--na-akcji); border-color: transparent; }
+.d-dzien[aria-selected="true"] small { color: color-mix(in srgb, var(--na-akcji) 65%, transparent); }
+.d-dzien:disabled { opacity: 0.4; cursor: default; }
+
+.d-dzien-tlo {
+  position: absolute;
+  inset: -1px;
+  border-radius: 8px;
+  background: var(--akcja);
+  z-index: -1;
+}
+
+/* ---------- 2.5 FILTRY (przycisk i panel, dopracowane) ---------------- */
+
+.d-filtry-pasek {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 2px;
+}
+
+.d-filtry-pasek::-webkit-scrollbar { display: none; }
+
+.d-separator { flex: none; width: 1px; height: 20px; background: var(--kreska-mocna); margin: 0 4px; }
+
+.d-chip-aktywny { background: var(--akcja-tlo); border-color: var(--akcja); color: var(--t1); padding-right: 7px; }
+
+.d-chip-usun {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  margin-right: -4px;
+  border-radius: 50%;
+  color: var(--t2);
+}
+
+.d-chip-usun:hover { background: var(--pow3); color: var(--t1); }
+
+.d-filtry-dol {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+  color: var(--t3);
+  font-size: 13px;
+}
+
+.d-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+  color: var(--t2);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.d-sort:hover { background: var(--pow2); color: var(--t1); }
+.d-sort b { color: var(--t1); font-weight: 600; }
+
+.d-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 6;
+  min-width: 200px;
+  padding: 5px;
+  border-radius: 10px;
+  background: var(--pow3);
+  border: 1px solid var(--kreska-mocna);
+  box-shadow: 0 14px 40px rgb(0 0 0 / 0.28);
+  display: grid;
+}
+
+.d-menu button {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 6px;
+  color: var(--t2);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.d-menu button:hover { background: var(--pow2); color: var(--t1); }
+.d-menu button[aria-checked="true"] { color: var(--t1); font-weight: 600; }
+
+.d-panel-tlo {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  background: rgb(0 0 0 / 0.45);
+  border-radius: 10px;
+}
+
+.d-panel {
+  position: absolute;
+  z-index: 8;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  background: var(--pow1);
+  border: 1px solid var(--kreska-mocna);
+  box-shadow: 0 18px 50px rgb(0 0 0 / 0.35);
+  overflow: hidden;
+}
+
+/* komputer: dymek pod przyciskiem */
+.d-panel[data-tryb="dymek"] {
+  top: 54px;
+  left: 18px;
+  width: min(430px, calc(100% - 36px));
+  max-height: 470px;
+  border-radius: 12px;
+}
+
+/* telefon: arkusz od dołu z uchwytem */
+.d-panel[data-tryb="arkusz"] {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-height: 88%;
+  border-radius: 16px 16px 10px 10px;
+}
+
+.d-panel-glowa {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--kreska);
+}
+
+.d-uchwyt { width: 36px; height: 4px; border-radius: 2px; background: var(--kreska-mocna); margin: 8px auto 0; }
+
+.d-panel-tresc { overflow-y: auto; padding: 14px 16px; display: grid; gap: 18px; align-content: start; }
+.d-panel-tresc h4 { font-size: 12px; color: var(--t3); font-weight: 600; margin-bottom: 8px; }
+.d-panel-tresc .a-chipy { flex-wrap: wrap; overflow: visible; }
+
+.d-panel-stopka {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--kreska);
+  background: var(--pow1);
+}
+
+.d-scena-filtrow { position: relative; transition: min-height 0.2s ease; }
+
+/* kratki, oś i nagłówek mają szerokość samych kratek – przy 7 meczach
+   podpis „ostatni mecz” stoi pod ostatnią kratką, a nie na końcu karty */
+.d-historia { width: max-content; max-width: 100%; }
+
+/* ---------- 2.6 KARTY ZAKŁADEK (dopracowane) -------------------------- */
+
+.d-karty {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+@container (max-width: 560px) {
+  .d-karty {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    margin: 0 -18px;
+    padding: 0 18px;
+    scroll-padding: 0 18px;
+  }
+  .d-karty::-webkit-scrollbar { display: none; }
+  .d-karta { flex: 0 0 72%; scroll-snap-align: start; }
+}
+
+.d-karta {
+  position: relative;
+  text-align: left;
+  padding: 13px 14px 14px;
+  border-radius: 10px;
+  background: var(--pow2);
+  border: 1px solid var(--kreska);
+  cursor: pointer;
+  overflow: hidden;
+  transition: background-color 0.18s ease, border-color 0.18s ease;
+}
+
+.d-karta:hover { background: var(--pow3); }
+.d-karta[aria-selected="true"] { background: var(--pow1); border-color: var(--kreska-mocna); }
+
+.d-karta-glowa { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.d-karta-glowa b { font-weight: 600; color: var(--t1); font-size: 15px; }
+.d-karta-glowa span { font: 700 22px/1 var(--f-n); color: var(--t1); font-variant-numeric: tabular-nums; }
+.d-karta[aria-selected="false"] .d-karta-glowa span { color: var(--t3); }
+.d-karta small { display: block; margin-top: 6px; color: var(--t3); font-size: 12px; }
+.d-karta-staty { display: flex; gap: 12px; margin-top: 9px; color: var(--t2); font-size: 12px; font-variant-numeric: tabular-nums; }
+.d-karta-staty b { color: var(--t1); font-weight: 600; }
+
+.d-karta-kreska {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 2px;
+  background: var(--akcja);
+}
+
+/* ---------- 2.7 ROZLICZENIE (pasek i przygaszenie, dopracowane) ------- */
+
+.d-dzien-wynikow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+  color: var(--t2);
+  font-size: 13px;
+}
+
+.d-dzien-wynikow b { color: var(--t1); font-weight: 600; }
+
+.d-mini-pasek {
+  flex: 1;
+  max-width: 160px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--pow3);
+  overflow: hidden;
+  display: flex;
+}
+
+.d-mini-pasek i { height: 100%; }
+
+.d-wiersz {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 16px;
+  padding: 11px 14px 11px 18px;
+  border-radius: 8px;
+  background: var(--pow2);
+}
+
+.d-wiersz + .d-wiersz { margin-top: 4px; }
+
+.d-wiersz-pasek {
+  position: absolute;
+  left: 0;
+  top: 7px;
+  bottom: 7px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--kolor-wyniku);
+  transform-origin: center;
+}
+
+/* czeka: pasek przerywany – jeszcze nie wiadomo */
+.d-wiersz[data-wynik="czeka"] .d-wiersz-pasek {
+  background: repeating-linear-gradient(180deg, var(--kolor-wyniku) 0 3px, transparent 3px 6px);
+}
+
+.d-wiersz[data-wynik="nie"] .d-przygas { opacity: 0.5; }
+.d-przygas { transition: opacity 0.4s ease; }
+
+.d-wynik-prawa { display: grid; justify-items: end; gap: 3px; min-width: 96px; }
+.d-wynik-bylo { color: var(--t3); font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.d-wynik-bylo b { color: var(--t2); font-weight: 600; }
+
+/* ---------- 2.9 SZKIELET (dopracowany) -------------------------------- */
+
+/* JEDEN połysk dla wszystkich kości: tło przypięte do ekranu, więc
+   wszystkie szkielety błyszczą razem, jedną falą – nie każdy osobno */
+.d-kosc {
+  border-radius: 6px;
+  background-color: var(--pow3);
+  background-image: linear-gradient(
+    100deg,
+    transparent 30%,
+    color-mix(in srgb, var(--t1) 7%, transparent) 50%,
+    transparent 70%
+  );
+  background-attachment: fixed;
+  background-size: 200vw 100%;
+  background-repeat: no-repeat;
+  animation: d-fala 1.6s linear infinite;
+}
+
+@keyframes d-fala {
+  from { background-position: -100vw 0; }
+  to { background-position: 100vw 0; }
+}
+
+/* ---------- 2.10 PRZYCISKI (dopracowane) ------------------------------ */
+
+.a-guzik:disabled { opacity: 0.42; cursor: not-allowed; transform: none; }
+.a-guzik[data-t="cichy"] .d-strzalka { display: inline-block; transition: transform 0.18s ease; }
+.a-guzik[data-t="cichy"]:hover .d-strzalka { transform: translateX(3px); }
+.a-guzik .d-meta { font-weight: 500; opacity: 0.68; }
+
+@media (pointer: coarse) {
+  .a-guzik[data-t="ikona"] { width: 44px; height: 44px; }
+}
+
+.d-krecik {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  animation: d-krec 0.7s linear infinite;
+}
+
+@keyframes d-krec { to { transform: rotate(360deg); } }
+
+.d-pusty {
+  padding: 22px;
+  border-radius: 10px;
+  background: var(--pow2);
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+}
+
+.d-pusty p { color: var(--t2); max-width: 460px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .d-kosc, .d-krecik { animation: none; }
+  .d-kurs, .d-dzien, .d-karta { transition: none; }
+}
+
+/* ---------- 2.5 v2: filtry w kontekście (.e-) ------------------------- */
+
+.e-rama { position: relative; display: grid; gap: 14px; transition: min-height 0.2s ease; }
+
+.e-pasek {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--kreska);
+}
+
+.e-lewa, .e-prawa { display: flex; align-items: center; gap: 6px; min-width: 0; }
+
+/* przełącznik: wygląda jak przełącznik (ikona + słowo), NIE jak filtr-chip */
+.e-przelacznik {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 11px;
+  border-radius: 16px;
+  color: var(--t2);
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid var(--kreska-mocna);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+}
+
+.e-przelacznik:hover { color: var(--t1); background: var(--pow2); }
+.e-przelacznik[aria-pressed="true"] { background: var(--t1); border-color: var(--t1); color: var(--pow1); }
+.e-przelacznik:disabled { opacity: 0.4; cursor: not-allowed; }
+.e-przelacznik:disabled:hover { background: transparent; color: var(--t2); }
+
+/* menu (Sortuj, Filtry): kwadratowe przyciski – inna rodzina niż przełączniki */
+.e-menu-guzik {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 11px;
+  border-radius: 8px;
+  background: var(--pow2);
+  border: 1px solid var(--kreska);
+  color: var(--t1);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.e-menu-guzik:hover { background: var(--pow3); }
+.e-menu-guzik[data-aktywny="true"] { border-color: var(--akcja); }
+.e-etykieta-sortu { font-weight: 500; color: var(--t2); }
+
+@container (max-width: 560px) {
+  .e-etykieta-sortu { display: none; }
+  .e-menu-guzik { padding: 0 10px; }
+}
+
+.e-aktywne {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  margin-top: -4px;
+  font-size: 12px;
+  color: var(--t3);
+  overflow: hidden;
+}
+
+.e-aktywne-liczba { color: var(--t2); font-variant-numeric: tabular-nums; }
+.e-aktywne-liczba::after { content: "·"; margin-left: 12px; color: var(--t4); }
+
+.e-aktywny {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--t1);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.e-aktywny svg { color: var(--t3); }
+.e-aktywny:hover svg { color: var(--nie); }
+
+.e-wyczysc { color: var(--t3); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.e-wyczysc:hover { color: var(--t1); }
+
+.e-lista { display: grid; }
+
+.e-wiersz {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 16px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--kreska);
+}
+
+@container (max-width: 560px) {
+  .e-wiersz { gap: 10px; }
+  .e-wiersz .d-kurs { min-width: 0; gap: 8px; padding: 0 10px; }
+}
+
+.e-wiecej { padding-top: 10px; color: var(--t3); font-size: 12px; }
+
+.e-panel[data-tryb="dymek"] { left: auto; right: 18px; top: 150px; }
+
+.e-ligi { display: grid; gap: 2px; }
+
+.e-liga {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  border-radius: 7px;
+  text-align: left;
+  cursor: pointer;
+  color: var(--t1);
+  font-size: 13px;
+}
+
+.e-liga:hover { background: var(--pow2); }
+.e-liga:disabled { opacity: 0.4; cursor: default; }
+.e-liga em { font-style: normal; color: var(--t3); font-size: 12px; font-variant-numeric: tabular-nums; }
+.e-liga-nazwa { display: grid; min-width: 0; }
+.e-liga-nazwa small { color: var(--t3); font-size: 11px; }
+
+.e-pole {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  border: 1.5px solid var(--kreska-mocna);
+  display: grid;
+  place-items: center;
+  color: var(--na-akcji);
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+
+.e-liga[aria-checked="true"] .e-pole { background: var(--akcja); border-color: var(--akcja); }
+
+/* ---------- 2.5 v3: szukaj + rząd rynków (.f-) ------------------------ */
+
+.f-pasek { border-bottom: 0; padding-bottom: 0; }
+
+.f-szukaj {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  max-width: 320px;
+  min-width: 0;
+  height: 32px;
+  padding: 0 8px 0 10px;
+  border-radius: 8px;
+  background: var(--pow2);
+  border: 1px solid var(--kreska);
+  color: var(--t3);
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.f-szukaj:focus-within { border-color: var(--akcja); background: var(--pow1); color: var(--t2); }
+
+@container (max-width: 560px) {
+  .f-szukaj { max-width: none; height: 36px; }
+}
+
+.f-szukaj input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  color: var(--t1);
+  font: 500 13px var(--f-t);
+}
+
+.f-szukaj input::placeholder { color: var(--t3); }
+.f-szukaj input::-webkit-search-cancel-button { display: none; }
+
+.f-kbd {
+  font: 600 11px/1 var(--f-t);
+  color: var(--t3);
+  padding: 3px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--kreska-mocna);
+}
+
+.f-szukaj-x {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  color: var(--t2);
+  cursor: pointer;
+}
+
+.f-szukaj-x:hover { background: var(--pow3); color: var(--t1); }
+
+.f-podpowiedzi {
+  position: absolute;
+  z-index: 9;
+  left: -1px;
+  right: -1px;
+  top: calc(100% + 6px);
+  min-width: 280px;
+  padding: 5px;
+  border-radius: 10px;
+  background: var(--pow3);
+  border: 1px solid var(--kreska-mocna);
+  box-shadow: 0 14px 40px rgb(0 0 0 / 0.28);
+}
+
+.f-podp-naglowek { padding: 8px 10px 4px; font-size: 11px; font-weight: 600; color: var(--t3); }
+
+.f-podp {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  color: var(--t1);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.f-podp small { color: var(--t3); font-size: 12px; white-space: nowrap; }
+.f-podp[aria-selected="true"] { background: var(--pow2); }
+
+.f-rynki {
+  display: flex;
+  gap: 20px;
+  border-bottom: 1px solid var(--kreska);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.f-rynki::-webkit-scrollbar { display: none; }
+
+.f-rynek {
+  position: relative;
+  flex: none;
+  padding: 8px 0 10px;
+  color: var(--t3);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.f-rynek:hover { color: var(--t2); }
+.f-rynek sup { margin-left: 3px; font-size: 11px; font-weight: 500; color: var(--t3); font-variant-numeric: tabular-nums; }
+.f-rynek[aria-selected="true"] { color: var(--t1); }
+
+.e-rama .e-panel[data-tryb="dymek"] { top: 142px; }
+
+/* ---------- przewijany rząd (rynki, dni) ------------------------------- */
+
+.g-rama { position: relative; min-width: 0; }
+
+.g-rzad { scroll-behavior: auto; }
+
+/* wygaszenie tylko po tej stronie, gdzie coś jeszcze jest */
+.g-rzad[data-prawo] { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 48px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 48px), transparent); }
+.g-rzad[data-lewo] { -webkit-mask-image: linear-gradient(90deg, transparent, #000 48px); mask-image: linear-gradient(90deg, transparent, #000 48px); }
+.g-rzad[data-lewo][data-prawo] {
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 48px, #000 calc(100% - 48px), transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 48px, #000 calc(100% - 48px), transparent);
+}
+
+.g-strzalka {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--pow1);
+  border: 1px solid var(--kreska-mocna);
+  color: var(--t1);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.18);
+  cursor: pointer;
+  z-index: 2;
+  transition: background-color 0.15s ease;
+}
+
+.g-strzalka:hover { background: var(--pow3); }
+.g-strzalka[data-strona="lewo"] { left: -4px; }
+.g-strzalka[data-strona="prawo"] { right: -4px; }
+
+/* palcem przewija się naturalnie – strzałki tylko przy myszy */
+@media (pointer: coarse) { .g-strzalka { display: none; } }
+
+/* ekran dotykowy: „?” rysuje się 16 px, ale łapie palec na 34 px */
+@media (pointer: coarse) {
+  .d-info { position: relative; }
+  .d-info::after { content: ""; position: absolute; inset: -9px; border-radius: 50%; }
+}

@@ -445,6 +445,16 @@ def test_skutecznosc_per_dzien_grupuje_i_liczy_roi():
     assert len(by[db]["typy"]) == 2                  # sugestia też jest na liście
 
 
+def test_typ_dnia_niesie_numery_meczu_i_zawodnika():
+    """Redesign 7B: strona zawodnika i 404 rozegranego meczu szukają typów
+    po numerach, nie po nazwach."""
+    rec = {"kickoff_ts": 100_000, "wynik": "wygrany", "kurs": 1.5,
+           "sugestia": False, "podmiot": "Erling Haaland", "mecz": "A – B",
+           "mecz_id": 15527741, "podmiot_id": 839956}
+    typ = rozliczanie.skutecznosc_per_dzien([rec])[0]["typy"][0]
+    assert typ["mecz_id"] == 15527741 and typ["podmiot_id"] == 839956
+
+
 def test_skutecznosc_per_dzien_limit_dni():
     settled = [
         {"kickoff_ts": i * 86_400, "wynik": "wygrany", "kurs": 2.0,

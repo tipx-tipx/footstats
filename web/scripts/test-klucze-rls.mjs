@@ -15,7 +15,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const tu = dirname(fileURLToPath(import.meta.url));
-const SQL = join(tu, "..", "..", "supabase", "migrations", "0008_app_data_players_koszyki.sql");
+const SQL = join(tu, "..", "..", "supabase", "migrations", "0009_app_data_lekkie_klucze.sql");
 const DATA_TS = join(tu, "..", "src", "lib", "data.ts");
 
 function kluczeZSql(tekst) {
@@ -78,14 +78,26 @@ if (nadmiarWSql.length) {
 
 // KOSZYKI ZAWODNIKÓW (2026-09-18): `players_d${nr}` składane w kodzie, więc
 // nie ma ich wśród literałów — pilnujemy wzorca w polityce osobno.
+// Od 0009 (lekkie klucze, 2026-10-01) trzy rodziny koszyków w jednym wzorcu
+// `~ '^(players_d|zaw_k|kursy_m)[0-9]{2}$'`.
 const sqlTekst = readFileSync(SQL, "utf8");
 const dataTekst = readFileSync(DATA_TS, "utf8");
-if (dataTekst.includes("`players_d${") && !sqlTekst.includes("'^players_d[0-9]{2}$'")) {
-  console.error(
-    "BŁĄD: strona czyta koszyki `players_dNN`, a RLS ich nie przepuszcza.",
-    "\n       -> strona meczu wróci do pełnego `players` (~44 MB transferu).",
-  );
-  bledy++;
+const wzorzec = sqlTekst.match(/~ '\^\(([a-z_|]+)\)\[0-9\]\{2\}\$'/);
+const rodzinySql = wzorzec ? wzorzec[1].split("|") : [];
+for (const [rodzina, skutek] of [
+  ["players_d", "strona meczu wróci do pełnego `players` (~44 MB transferu)"],
+  ["zaw_k", "strona zawodnika wróci do koszyków całych drużyn"],
+  ["kursy_m", "strona meczu wróci do `odds_superbet` (jedna cena bez nazwy bukmachera)"],
+]) {
+  const czyta = dataTekst.includes("`" + rodzina + "${");
+  if (czyta && !rodzinySql.includes(rodzina)) {
+    console.error(`BŁĄD: strona czyta koszyki \`${rodzina}NN\`, a RLS ich nie przepuszcza.\n       -> ${skutek}.`);
+    bledy++;
+  }
+  if (!czyta && rodzinySql.includes(rodzina)) {
+    console.error(`BŁĄD: RLS wystawia koszyki \`${rodzina}NN\`, których strona nie czyta – usuń je z migracji.`);
+    bledy++;
+  }
 }
 
 if (bledy) process.exit(1);

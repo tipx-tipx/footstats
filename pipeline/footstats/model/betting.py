@@ -828,9 +828,11 @@ MAX_CI_WIDTH = 0.30                 # zbyt szerokie widełki szansy = nie stawia
 # Trzy typy, które dziś odpadają, to dokładnie te, których nie umiemy wytłumaczyć
 # (brak czynników albo brak przedziału ufności) — czyli brama robi to, co ma.
 #
-# PRÓG MUSI SIĘ ZGADZAĆ Z FRONTEM (`PROG_KURSU_POLEK` w `web/src/components/
-# DruzynyTablica.tsx`) — inaczej brama tnie inną półkę, niż strona pokazuje.
-# Pilnuje tego `test_brama_uzasadnien.py`; nie zmieniać jednego bez drugiego.
+# FRONT NIE MA WŁASNEGO PROGU (redesign, 2026-10-01). Stara strona dzieliła
+# półki kursem wpisanym drugi raz (`DruzynyTablica.tsx`) i test pilnował, żeby
+# obie liczby się zgadzały. Nowa bierze półkę z danych (`polka` typu,
+# `polkaNaStronie` w `web/src/app/projekt/_dane/przygotuj.ts`), więc brama i
+# strona z definicji widzą tę samą półkę. Pilnuje tego `test_brama_uzasadnien.py`.
 #
 # ⚑ KRYTERIUM ZMIENIONE Z SZANSY NA KURS (2026-08-12). Do 12.08 półka szła po
 # `p_model < 0,70`. Tego samego dnia szansa na karcie zaczęła być ściągana do

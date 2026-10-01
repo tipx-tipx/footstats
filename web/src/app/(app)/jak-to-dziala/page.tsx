@@ -1,109 +1,17 @@
-import { PageHeader } from "@/components/PageHeader";
-import { Reveal } from "@/components/Reveal";
+import { StronaAplikacji } from "@/app/projekt/_ui/aplikacja/Strona";
+import { przygotujStrony } from "@/app/projekt/_dane/strony";
+import { zDanymi } from "@/app/projekt/_dane/zrodlo";
+import { pobierzSurowe } from "@/lib/nowe/surowe";
+import { czyTelefon } from "@/lib/nowe/telefon";
 
-export const metadata = { title: "Jak to działa – FootStats" };
+export const metadata = { title: "Jak czytać typy – FootStats" };
 
-const KROKI = [
-  {
-    tytul: "Zbieramy historię",
-    opis: "Dla każdego zawodnika system zna każdy mecz: ile grał minut, ile miał strzałów, fauli, odbiorów. Świeże mecze ważą więcej niż te sprzed pół roku: forma się liczy, ale nie zapominamy o dłuższej historii.",
-  },
-  {
-    tytul: "Liczymy „prawdziwy poziom” zawodnika",
-    opis: "Zawodnik po 3 meczach z dobrymi liczbami to często przypadek. Model porównuje go z podobnymi zawodnikami (ta sama pozycja i rola) i ostrożnie przesuwa ocenę w stronę jego wyników dopiero wtedy, gdy danych przybywa. Dzięki temu nie daje się nabrać na chwilowe wystrzały.",
-  },
-  {
-    tytul: "Przewidujemy minuty i składy",
-    opis: "Ta sama skuteczność przy 90 i przy 60 minutach to zupełnie inna szansa na „powyżej 1,5 strzału”. Model rozważa scenariusze: pełny mecz, zejście w 70. minucie, wejście z ławki, brak występu. Przewidywane jedenastki bierzemy z dwóch niezależnych źródeł, a po ogłoszeniu oficjalnych składów wszystko przeliczamy od nowa.",
-  },
-  {
-    tytul: "Uwzględniamy kontekst i strony boiska",
-    opis: "Przeciwnik, który pozwala rywalom dużo strzelać, podbija szansę na strzały. Sędzia gwiżdżący 30% więcej fauli podbija rynki fauli i kartek. Skrzydłowy grający na najczęściej faulującego obrońcę dostaje bonus do fauli wywalczonych. Każdy czynnik to osobna, ograniczona korekta, którą widzisz w uzasadnieniu zakładu.",
-  },
-  {
-    tytul: "Zamieniamy to na szansę i uczciwy kurs",
-    opis: "Model daje pełen rozkład: jaka szansa na 0, 1, 2, 3… zdarzeń. Z tego wprost wynika szansa „powyżej linii” i uczciwy kurs (odwrotność szansy). Przykład: szansa 58% → uczciwy kurs 1,72.",
-  },
-  {
-    tytul: "Porównujemy z kursem bukmachera",
-    opis: "Z kursu bukmachera zdejmujemy jego marżę i sprawdzamy, co naprawdę „mówi” o szansie. Jeśli bukmacher wycenia zdarzenie na 45%, a model na 58%, to kurs płaci za dużo. Dodatkowo patrzymy na średnią bukmacherów zagranicznych: kurs wyraźnie odstający od reszty rynku to często najlepszy sygnał.",
-  },
-  {
-    tytul: "Oceniamy pewność i ryzyko",
-    opis: "Pewność mówi, ile danych i jak stabilnych stoi za predykcją (mała próba, niepewne minuty = niska pewność). Ryzyko mówi, jak kapryśne jest samo zdarzenie: rzadkie zdarzenia (np. strzały głową) to loteria nawet przy dobrym modelu. Wysokiej wartości bez pewności nie traktujemy poważnie.",
-  },
-  {
-    tytul: "Odrzucamy to, czego nie da się obstawić",
-    opis: "Typ nie powstaje, jeśli wiemy, że zawodnika nie ma w składzie, albo jeśli spodziewamy się po nim mniej niż godziny gry. Nic nowego nie pojawia się też później niż półtorej godziny przed pierwszym gwizdkiem – żebyś zdążył spokojnie obstawić, a nie gonił kurs na dziesięć minut przed meczem.",
-  },
-  {
-    tytul: "Wstrzymujemy to, co traci pieniądze",
-    opis: "Co jakiś czas przeliczamy, ile zarobił albo stracił każdy rynek i każdy powód, dla którego typ trafia na listę. Jeśli coś w ostatnich kilkudziesięciu rozliczeniach oddaje pieniądze, znika ze strony – ale liczymy je dalej po cichu, więc wraca samo, gdy przestanie tracić. Nikt nie decyduje o tym ręcznie.",
-  },
-  {
-    tytul: "Sprawdzamy sami siebie",
-    opis: "Zakładka „Skuteczność” pokazuje wszystko, co pokazaliśmy i co się już zakończyło – także nietrafione. Jest tam też egzamin na meczach, których model nie widział, gdy się uczył: jeśli mówi „60%”, a takie zdarzenia zachodzą w 60% przypadków, możesz mu wierzyć. Sprawdzamy też, czy kursy, które łapiemy, są lepsze od tych tuż przed meczem – to znak, że wyprzedzamy bukmachera.",
-  },
-];
-
-export default function JakToDzialaPage() {
-  return (
-    <div>
-      <PageHeader
-        eyebrow="metoda"
-        title="Jak to działa"
-        lead={
-          <>
-            Bez żargonu: co się dzieje między „mecz w sobotę” a „ten kurs jest
-            zawyżony”. Poniżej wszystkie kroki, dokładnie w tej kolejności, w
-            jakiej system wykonuje je dla każdego zawodnika i każdego rynku.
-          </>
-        }
-      />
-
-      <ol className="relative mt-9 max-w-3xl space-y-5">
-        {/* linia łącząca kroki – u góry w kolorze marki, niżej wygasa */}
-        <span
-          aria-hidden
-          className="absolute bottom-8 left-[19px] top-8 w-px bg-gradient-to-b from-brand-bright/50 via-hairline-strong to-transparent"
-        />
-        {KROKI.map((k, i) => (
-          <Reveal key={k.tytul} delay={Math.min(i * 0.04, 0.2)}>
-            <li className="relative flex gap-4 sm:gap-5">
-              <span
-                aria-hidden
-                className="font-data relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-brand/25 bg-brand-wash text-sm font-semibold text-brand shadow-(--shadow-card)"
-              >
-                {i + 1}
-              </span>
-              <div className="min-w-0 flex-1 rounded-(--radius-card) border border-hairline bg-card p-5 shadow-(--shadow-card) transition-shadow hover:shadow-(--shadow-card-hover)">
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-faint">
-                  krok {i + 1} z {KROKI.length}
-                </p>
-                <h2 className="mt-1 font-display text-lg font-bold tracking-tight">
-                  {k.tytul}
-                </h2>
-                <p className="mt-1.5 text-sm leading-relaxed text-ink-soft">
-                  {k.opis}
-                </p>
-              </div>
-            </li>
-          </Reveal>
-        ))}
-      </ol>
-
-      <Reveal className="mt-10">
-        <div className="max-w-3xl rounded-(--radius-card) border border-data-amber/40 bg-data-amber-wash p-5 text-sm leading-relaxed text-data-amber-ink-strong">
-          <h2 className="font-semibold">Uczciwe zastrzeżenie</h2>
-          <p className="mt-1">
-            Model nie zna kontuzji ogłoszonej godzinę temu, konfliktu w szatni
-            ani planów trenera. Dlatego nigdy nie pokazujemy zakładów, w których
-            model drastycznie nie zgadza się z rynkiem, bo najczęściej to rynek
-            wie coś, czego nie wie model. Wartość dodatnia w długiej serii, a
-            nie pojedynczy „pewniak”, jest celem tego narzędzia.
-          </p>
-        </div>
-      </Reveal>
-    </div>
-  );
+/**
+ * Jak czytać typy (redesign, etap 7.3; 5.8 B „krok po kroku” zatwierdzone 01.10):
+ * prawdziwa karta typu z listy rozebrana na części, słowniczek, pytania.
+ */
+export default async function JakPage() {
+  const [surowe, telefon] = await Promise.all([pobierzSurowe(), czyTelefon()]);
+  const dane = zDanymi(surowe, () => przygotujStrony());
+  return <StronaAplikacji strona="jak" dane={dane} teraz={surowe.teraz} telefon={telefon} />;
 }

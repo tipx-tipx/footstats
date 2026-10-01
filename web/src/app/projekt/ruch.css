@@ -1,0 +1,107 @@
+/* ==========================================================================
+   Etap 6 – ruch (.ru-). Sceny pokazowe; wygląd z zatwierdzonych etapów.
+   ========================================================================== */
+
+.ru-wybrany { font-size: 14px; color: var(--t2); }
+.ru-wybrany b { color: var(--t1); }
+
+/* scena: komputer i telefon obok siebie */
+.ru-dwie { display: grid; grid-template-columns: minmax(0, 1fr) 390px; gap: 24px; align-items: start; }
+.ru-komp, .ru-tel { container-type: inline-size; }
+.ru-tel { padding: 8px; border-radius: 30px; background: #1b1f21; }
+.ru-tel .ru-scena { border-radius: 23px; }
+
+.ru-scena { position: relative; overflow: hidden; border-radius: 12px; border: 1px solid var(--kreska-mocna); background: var(--tlo); color: var(--t1); }
+.ru-menu { position: relative; display: flex; align-items: center; gap: 18px; height: 52px; padding: 0 16px; border-bottom: 1px solid var(--kreska); }
+.ru-menu-poz { position: relative; display: inline-flex; align-items: center; gap: 6px; height: 52px; border: 0; background: none; padding: 0; font: 600 14px/1 inherit; color: var(--t2); cursor: pointer; }
+.ru-menu-poz[data-on] { color: var(--t1); }
+.ru-licznik { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: var(--akcja); color: var(--na-akcji); font: 700 12px/1 var(--f-n); font-variant-numeric: tabular-nums; }
+.ru-licznik[data-pusty] { background: var(--pow3); color: var(--t3); }
+.ru-kreska { position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; border-radius: 1px; background: var(--akcja); }
+
+.ru-tresc { display: grid; gap: 12px; padding: 16px; }
+.ru-dzien { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 14px; color: var(--t2); }
+.ru-dzien b { color: var(--t1); }
+.ru-dzien > b { font-size: 20px; }
+.ru-proc { color: var(--ok) !important; font-variant-numeric: tabular-nums; }
+.ru-polki { justify-self: start; }
+
+.ru-lista { display: grid; border: 1px solid var(--kreska); border-radius: 12px; background: var(--pow1); overflow: hidden; }
+.ru-wiersz { position: relative; border-top: 1px solid var(--kreska); }
+.ru-wiersz:first-child { border-top: 0; }
+.ru-zalanie { position: absolute; inset: 0; transform-origin: left; background: linear-gradient(90deg, var(--ok-tlo), transparent 85%); pointer-events: none; }
+.ru-wiersz-glowa { position: relative; display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 10px 14px 10px 10px; }
+.ru-status { display: grid; place-items: center; }
+.ru-status small { font-size: 12px; color: var(--t3); font-variant-numeric: tabular-nums; }
+.ru-znak { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; }
+.ru-znak[data-wynik="wygrany"] { background: var(--ok-tlo); color: var(--ok); }
+.ru-znak[data-wynik="przegrany"] { background: var(--nie-tlo); color: var(--nie); }
+.ru-wiersz-tekst { display: grid; gap: 2px; min-width: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.ru-wiersz-tekst small { font-size: 13px; color: var(--t3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ru-wiersz-tekst span { font-size: 15px; color: var(--t2); }
+.ru-wiersz-tekst b, .ru-wiersz-tekst strong { color: var(--t1); font-weight: 600; }
+.ru-prawa { display: flex; align-items: center; gap: 12px; }
+.ru-szansa { font: 700 18px/1 var(--f-n); color: var(--t1); font-variant-numeric: tabular-nums; }
+.ru-szansa small { font-size: 11px; color: var(--t3); margin-left: 1px; }
+.ru-bylo { display: grid; justify-items: end; gap: 1px; font-variant-numeric: tabular-nums; }
+.ru-bylo small { font-size: 11px; color: var(--t3); }
+.ru-bylo b { font: 700 16px/1 var(--f-n); }
+.ru-bylo b[data-wynik="wygrany"] { color: var(--ok); }
+.ru-bylo b[data-wynik="przegrany"] { color: var(--nie); }
+
+.ru-kurs { position: relative; display: inline-flex; align-items: center; gap: 6px; height: 40px; min-width: 84px; padding: 0 12px; border-radius: 9px; border: 1px solid var(--kreska); background: var(--pow2); color: var(--t1); font: inherit; cursor: pointer; overflow: hidden; transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease; }
+.ru-kurs:hover:not(:disabled):not([aria-pressed="true"]) { border-color: var(--kreska-mocna); background: var(--pow3); }
+.ru-kurs:active:not(:disabled) { transform: scale(0.97); }
+.ru-kurs[aria-pressed="true"] { background: var(--akcja); border-color: transparent; color: var(--na-akcji); }
+.ru-kurs:disabled { cursor: default; opacity: 0.7; }
+.ru-kurs-liczba { position: relative; display: inline-flex; align-items: center; gap: 3px; margin-left: auto; overflow: hidden; }
+.ru-kurs-liczba b { display: block; font: 700 15px/1 var(--f-n); font-variant-numeric: tabular-nums; }
+.ru-kier { font-size: 9px; font-style: normal; color: var(--ok); }
+.ru-kurs[aria-pressed="true"] .ru-kier { color: var(--na-akcji); }
+.ru-ptaszek { font-weight: 700; font-size: 13px; }
+.ru-blysk { position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1.5px var(--ok); background: color-mix(in srgb, var(--ok) 20%, transparent); pointer-events: none; }
+
+.ru-rozwin { overflow: hidden; }
+.ru-rozwin-w { display: grid; gap: 6px; padding: 0 14px 14px 54px; }
+.ru-rozwin-w small { font-size: 11px; color: var(--t3); }
+
+.ru-lot { position: absolute; left: -6px; top: -6px; z-index: 20; width: 12px; height: 12px; border-radius: 50%; background: var(--akcja); box-shadow: 0 0 0 3px color-mix(in srgb, var(--akcja) 30%, transparent); pointer-events: none; }
+
+.ru-sterowanie { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 16px 16px; border-top: 1px dashed var(--kreska-mocna); }
+.ru-sterowanie small { flex-basis: 100%; font-size: 12px; color: var(--t3); }
+
+@container (max-width: 480px) {
+  .ru-wiersz-glowa { grid-template-columns: 34px minmax(0, 1fr); grid-template-areas: "s t" "s p"; row-gap: 8px; }
+  .ru-status { grid-area: s; align-self: start; padding-top: 4px; }
+  .ru-wiersz-tekst { grid-area: t; }
+  .ru-prawa { grid-area: p; justify-content: space-between; }
+  .ru-rozwin-w { padding-left: 44px; }
+  .ru-menu { gap: 14px; padding: 0 12px; }
+  .ru-tresc { padding: 12px; }
+  .ru-polki button { padding: 0 9px; font-size: 12.5px; }
+}
+
+/* 6.3 przejście */
+.ru-przejscie { max-width: 760px; border-radius: 12px; border: 1px solid var(--kreska-mocna); background: var(--tlo); overflow: hidden; }
+.ru-ladowanie { position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; transform-origin: left; background: var(--akcja); }
+.ru-strona { min-height: 190px; padding: 18px 16px; }
+.ru-szk { display: grid; gap: 10px; }
+.ru-atrapa { height: 52px; display: flex; align-items: center; padding: 0 14px; border-radius: 10px; border: 1px solid var(--kreska); background: var(--pow1); font-size: 14px; color: var(--t2); }
+.ru-opis { padding: 12px 16px 16px; border-top: 1px dashed var(--kreska-mocna); font-size: 12px; color: var(--t3); }
+
+/* 6.4 słownik */
+.ru-slownik { border: 1px solid var(--kreska); border-radius: 12px; background: var(--pow1); overflow: hidden; }
+.ru-sl-wiersz { display: grid; grid-template-columns: 170px 80px minmax(0, 1fr) 220px; align-items: center; gap: 16px; padding: 11px 16px; border-top: 1px solid var(--kreska); font-size: 14px; }
+.ru-sl-wiersz:first-child { border-top: 0; }
+.ru-sl-wiersz b { color: var(--t1); }
+.ru-sl-wiersz code { font: 600 13px/1 ui-monospace, Consolas, monospace; color: var(--t2); }
+.ru-sl-wiersz span { color: var(--t3); font-size: 13px; }
+.ru-tor { position: relative; display: block; height: 12px; border-radius: 6px; background: var(--pow3); }
+.ru-tor i { position: absolute; top: 0; width: 12px; height: 12px; border-radius: 50%; background: var(--akcja); }
+.ru-slownik-stopka { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--kreska); background: var(--pow2); font-size: 12px; color: var(--t3); }
+
+@media (max-width: 1100px) {
+  .ru-dwie { grid-template-columns: 1fr; }
+  .ru-tel { max-width: 390px; }
+  .ru-sl-wiersz { grid-template-columns: 1fr 1fr; }
+}
