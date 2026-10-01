@@ -1,7 +1,7 @@
 import "../../atomy2.css";
 import "../../strony.css";
 
-import { SzkieletWiersza } from "../atomy2/reszta";
+import { SzkieletWiersza } from "../atomy2/SzkieletWiersza";
 
 /**
  * Szkielet strony z zatwierdzonych kości (2.9): nagłówek + wiersze typów

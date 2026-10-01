@@ -3,7 +3,7 @@
 import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useId, useState, useSyncExternalStore } from "react";
+import { useEffect, useId, useState } from "react";
 
 import "../../atomy.css";
 import "../../atomy2.css";
@@ -11,6 +11,7 @@ import "../../elementy.css";
 import "../../szkielet.css";
 
 import { LogoPoziome } from "../LogoPoziome";
+import { przelaczMotyw, useCiemny } from "../motyw";
 import { RUCH } from "../ruch/slownik";
 import { IkonaMotyw, IkonaNav, IkonaSzukaj, IkonaWyloguj, type KluczNav } from "./ikonyNav";
 import { PasekPolaczenia, usePolaczenie } from "../systemowe/Polaczenie";
@@ -34,37 +35,14 @@ const MENU: { k: KluczNav; label: string; href: string; grupa: 1 | 2 }[] = [
   { k: "jak", label: "Jak czytać typy", href: "/jak-to-dziala", grupa: 2 },
 ];
 
+export { przelaczMotyw, useCiemny };
+
 export const LINKI_STOPKI: Record<string, string> = Object.fromEntries(MENU.map((m) => [m.label, m.href]));
 
 const aktywnaZAdresu = (sciezka: string): KluczNav | "" => {
   const m = [...MENU].reverse().find((x) => (x.href === "/" ? sciezka === "/" : sciezka.startsWith(x.href)));
   return m?.k ?? "";
 };
-
-/* ---- motyw: html[data-theme] jest źródłem prawdy (skrypt w layout.tsx) ---- */
-
-const KLUCZ_MOTYWU = "footstats-motyw";
-const subskrybuj = (powiadom: () => void) => {
-  const obs = new MutationObserver(powiadom);
-  obs.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-  return () => obs.disconnect();
-};
-const czyCiemny = () => document.documentElement.dataset.theme !== "light";
-
-export function useCiemny() {
-  // serwer nie zna motywu – zakładamy ciemny (domyślny), przeglądarka poprawia po hydracji
-  return useSyncExternalStore(subskrybuj, czyCiemny, () => true);
-}
-
-export function przelaczMotyw() {
-  const naCiemny = !czyCiemny();
-  document.documentElement.dataset.theme = naCiemny ? "dark" : "light";
-  try {
-    localStorage.setItem(KLUCZ_MOTYWU, naCiemny ? "dark" : "light");
-  } catch {
-    /* tryb prywatny – motyw działa do końca wizyty */
-  }
-}
 
 /* ---- świeżość: z czasu ostatniego cyklu ---------------------------------- */
 
@@ -95,12 +73,15 @@ export function SzkieletAplikacji({
   liczby,
   wygenerowanoTs,
   indeks,
+  rozgrywek,
   children,
 }: {
   liczby: Partial<Record<KluczNav, number>>;
   wygenerowanoTs: number;
   /** wyszukiwarka Ctrl+K: zawodnicy z typami, drużyny, mecze */
   indeks: IndeksSzukania;
+  /** stopka: rozgrywki w ofercie na najbliższe 7 dni */
+  rozgrywek: number;
   children: React.ReactNode;
 }) {
   const sciezka = usePathname();
@@ -251,7 +232,7 @@ export function SzkieletAplikacji({
 
       <div className="ap-tresc">{children}</div>
 
-      <StopkaPlus jasneLogo={ciemny} linki={LINKI_STOPKI} />
+      <StopkaPlus jasneLogo={ciemny} linki={LINKI_STOPKI} rozgrywek={rozgrywek} />
 
       {/* telefon: dolny pasek A */}
       <LayoutGroup id={`${id}-t`}>

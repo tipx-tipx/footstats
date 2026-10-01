@@ -11,7 +11,8 @@ import "../../strony.css";
 import "../../systemowe.css";
 
 import type { DaneSystemowe } from "../../_dane/systemowe";
-import { Logowanie, type StanLogowania } from "./Logowanie";
+import type { StanLogowania } from "./Logowanie";
+import { Logowanie } from "./LogowanieWarsztat";
 
 /*
  * Podgląd logowania na całym ekranie – bez ramki warsztatu, żeby oceniać

@@ -10,7 +10,7 @@ import "../../szkielet.css";
 import "../../strony.css";
 import "../../systemowe.css";
 
-import { przelaczMotyw, useCiemny } from "../szkielet/SzkieletAplikacji";
+import { przelaczMotyw, useCiemny } from "../motyw";
 import { SzkieletStrony } from "./SzkieletStrony";
 import { LogowanieNadAplikacja, type StanLogowania, type WynikLogowania } from "./Logowanie";
 
@@ -31,6 +31,16 @@ async function zaloguj(haslo: string): Promise<WynikLogowania> {
   if (res.status === 429) return "limit";
   if (res.status === 401) return "zle";
   return "siec";
+}
+
+/** „sesja wygasła”: dokąd wróci – z adresu, bez zgadywania nazw (meczu ani zawodnika strona logowania nie zna) */
+function opisPowrotu(dalej: string): string | undefined {
+  const sciezka = dalej.split("?")[0];
+  if (sciezka === "/") return undefined;
+  if (/^\/mecze\/\d+/.test(sciezka)) return "strona meczu";
+  if (/^\/zawodnik\/\d+/.test(sciezka)) return "strona zawodnika";
+  const MENU: Record<string, string> = { "/druzyny": "Drużyny", "/kupony": "Kupony", "/mecze": "Mecze", "/model": "Wyniki", "/jak-to-dziala": "Jak czytać typy" };
+  return MENU[sciezka] ?? "strona, którą oglądałeś";
 }
 
 function useTelefon(start: boolean) {
@@ -68,6 +78,7 @@ export function LogowanieAplikacji({ telefon: telefonStart, stan, dalej }: { tel
         liczbyMenu={{}}
         zaloguj={zaloguj}
         poWejsciu={poWejsciu}
+        powrot={stan === "sesja" ? opisPowrotu(dalej) : undefined}
       />
     </div>
   );

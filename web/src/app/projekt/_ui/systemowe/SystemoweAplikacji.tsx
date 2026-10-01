@@ -1,7 +1,7 @@
 "use client";
 
-import { usePathname, useRouter } from "next/navigation";
-import { startTransition, useEffect, useState } from "react";
+import dynamic from "next/dynamic";
+import { usePathname } from "next/navigation";
 
 import "../../atomy.css";
 import "../../atomy2.css";
@@ -14,17 +14,20 @@ import type { MeczZakonczony } from "../../_dane/zakonczony";
 import { fmtLinia } from "@/lib/format";
 
 import { CzasProvider } from "../czas";
-import { WierszA } from "../elementy/mecz";
 import { Lnk, LinkiAplikacji } from "../linki";
 import { IkonaSzukaj } from "../szkielet/ikonyNav";
-import { Komunikat, ZnakRysowany } from "./Logowanie";
-import { UkladSys } from "./Systemowe";
+import { ZnakRysowany } from "./znak";
+import { UkladSys } from "./UkladSys";
 
 /*
  * Etap 7 – strony systemowe w aplikacji (zatwierdzone S.2–S.4 z warsztatu):
  * 404 z prawdziwym adresem i wyszukiwarką, błąd z „Spróbuj ponownie”
  * i identyfikatorem, pasek braku internetu nad treścią.
  */
+
+// lista meczów (WierszA z odliczaniem) ładuje się dopiero, gdy jest co pokazać –
+// globalne 404 jej nie pokazuje, a siedzi w paczce każdej strony
+const Najblizsze = dynamic(() => import("./Najblizsze").then((m) => m.Najblizsze));
 
 /** szukanie z treści strony – paletę trzyma szkielet aplikacji */
 export const otworzSzukaj = (q = "") => window.dispatchEvent(new CustomEvent("footstats:szukaj", { detail: q }));
@@ -57,7 +60,6 @@ export function NieMaAplikacji({
   bezSzukania?: boolean;
 }) {
   const sciezka = usePathname();
-  const router = useRouter();
   const slowo = slowoZAdresu(sciezka);
   const mecz = wariant === "mecz";
   const z = mecz ? zakonczony : null;
@@ -95,17 +97,7 @@ export function NieMaAplikacji({
                     </div>
                   ))}
                 </section>
-              ) : najblizsze.length > 0 && (
-                <section className="sy-najblizsze el-liga" aria-label="Najbliższe mecze z typami">
-                  <div className="sy-najblizsze-glowa">
-                    <b>Najbliższe mecze z typami</b>
-                    <span>wejdź w mecz albo przejdź do całej listy</span>
-                  </div>
-                  {najblizsze.map((m) => (
-                    <WierszA key={m.id} m={m} wybierz={() => router.push(`/mecze/${m.id}`)} />
-                  ))}
-                </section>
-              )
+              ) : najblizsze.length > 0 && <Najblizsze najblizsze={najblizsze} />
             }
           >
             <p className="sy-adres">
@@ -159,94 +151,6 @@ export function NieMaAplikacji({
           </UkladSys>
         </div>
       </CzasProvider>
-    </LinkiAplikacji>
-  );
-}
-
-/* ---- błąd ----------------------------------------------------------------- */
-
-// po „Spróbuj ponownie” granica dostaje NOWY błąd (albo montuje się od nowa) –
-// wtedy mówimy wprost, że błąd się powtarza. Po udanej próbie granica znika
-// i znacznik się zeruje.
-let poProbie = false;
-
-/** `ponow` = unstable_retry granicy błędu: pobiera stronę od nowa i renderuje ją zamiast błędu */
-export function BladAplikacji({ blad, digest, ponow: ponowStrone }: { blad: Error; digest?: string; ponow: () => void }) {
-  const [trwa, setTrwa] = useState(false);
-  const [powtarza, setPowtarza] = useState(() => poProbie);
-  const [poprzedni, setPoprzedni] = useState(blad);
-  if (blad !== poprzedni) {
-    setPoprzedni(blad);
-    setTrwa(false);
-    if (poProbie) setPowtarza(true);
-  }
-  useEffect(
-    () => () => {
-      poProbie = false;
-    },
-    [],
-  );
-  const [skopiowano, setSkopiowano] = useState(false);
-  useEffect(() => {
-    if (!skopiowano) return;
-    const t = setTimeout(() => setSkopiowano(false), 1600);
-    return () => clearTimeout(t);
-  }, [skopiowano]);
-
-  const ponow = () => {
-    poProbie = true;
-    setTrwa(true);
-    startTransition(() => ponowStrone());
-  };
-  const kopiuj = async () => {
-    try {
-      await navigator.clipboard.writeText(digest ?? "");
-      setSkopiowano(true);
-    } catch {
-      /* brak uprawnień do schowka – identyfikator widać, da się go przepisać */
-    }
-  };
-
-  return (
-    <LinkiAplikacji>
-      <div className="ap-sys">
-        <UkladSys znak={<ZnakRysowany koniec="blad" className="sy-znak-ilu" />}>
-          <h1 className="p-n">Nie udało się wczytać strony</h1>
-          <p className="sy-lead">
-            <span>Wystąpił błąd po naszej stronie.</span> <span>Spróbuj ponownie – zwykle to wystarcza.</span>
-          </p>
-          {powtarza && (
-            <div className="sy-blad-kom">
-              <Komunikat rodzaj="uwaga" tytul="Błąd się powtarza">
-                Spróbuj ponownie za kilka minut. {digest ? "Jeśli problem nie zniknie, przekaż nam identyfikator błędu." : "Jeśli problem nie zniknie, daj nam znać."}
-              </Komunikat>
-            </div>
-          )}
-          <div className="sy-akcje">
-            <button type="button" className="a-guzik" data-t="glowny" data-r="l" aria-busy={trwa} disabled={trwa} onClick={ponow}>
-              {trwa ? (
-                <>
-                  <span className="d-krecik" aria-hidden /> Wczytuję ponownie
-                </>
-              ) : (
-                "Spróbuj ponownie"
-              )}
-            </button>
-            <Lnk href="/" className="a-guzik" data-t="drugi" data-r="l">
-              Przejdź do typów
-            </Lnk>
-          </div>
-          {digest && (
-            <div className="sy-kod">
-              <span className="sy-kod-etykieta">Identyfikator błędu</span>
-              <code>{digest}</code>
-              <button type="button" onClick={kopiuj} aria-live="polite">
-                {skopiowano ? "✓ Skopiowano" : "Kopiuj"}
-              </button>
-            </div>
-          )}
-        </UkladSys>
-      </div>
     </LinkiAplikacji>
   );
 }

@@ -2,7 +2,7 @@ import { SzkieletAplikacji } from "@/app/projekt/_ui/szkielet/SzkieletAplikacji"
 import { druzyna } from "@/app/projekt/_dane/przygotuj";
 import type { IndeksSzukania } from "@/app/projekt/_ui/szkielet/PaletaAplikacji";
 import type { Mecz, ValueBet } from "@/lib/types";
-import { getMecze, getMeta, getValueBets } from "@/lib/data";
+import { getMecze, getMeta, getValueBets, terazTs } from "@/lib/data";
 import { zHerbamiMeczow } from "@/lib/nowe/surowe";
 
 // ISR: odświeżaj strony grupy (app) co 60 s. Bez tego trasy bez API
@@ -39,10 +39,13 @@ export default async function AppLayout({
   };
   // indeks wyszukiwarki (Ctrl+K): kilka KB z danych, które układ i tak ma
   const kiedy = new Intl.DateTimeFormat("pl-PL", { weekday: "short", day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Warsaw" });
+  // stopka: ile rozgrywek naprawdę jest w ofercie na tydzień (zamiast stałej „50+”)
+  const zaTydzien = terazTs() + 7 * 86400;
+  const rozgrywek = new Set(mecze.filter((m) => m.kickoff_ts < zaTydzien && m.liga).map((m) => m.liga)).size;
   // herby z numerów drużyn w meczach (7B) – także drużyn spoza mapy w kodzie
   const indeks = zHerbamiMeczow(mecze, () => zbudujIndeks(typy, mecze, kiedy));
   return (
-    <SzkieletAplikacji liczby={liczby} wygenerowanoTs={meta.wygenerowano_ts} indeks={indeks}>
+    <SzkieletAplikacji liczby={liczby} wygenerowanoTs={meta.wygenerowano_ts} indeks={indeks} rozgrywek={rozgrywek}>
       {children}
     </SzkieletAplikacji>
   );

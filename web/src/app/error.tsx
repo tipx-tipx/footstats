@@ -1,6 +1,6 @@
 "use client";
 
-import { BladAplikacji } from "@/app/projekt/_ui/systemowe/SystemoweAplikacji";
+import { BladAplikacji } from "@/app/projekt/_ui/systemowe/BladAplikacji";
 import { SamoLogo } from "@/app/projekt/_ui/systemowe/SamoLogo";
 
 /** błąd poza stronami (np. padło menu aplikacji) – sam znak marki i ta sama treść */

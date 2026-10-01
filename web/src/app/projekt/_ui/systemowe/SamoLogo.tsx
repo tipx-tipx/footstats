@@ -5,7 +5,7 @@ import Link from "next/link";
 import "../../szkielet.css";
 
 import { LogoPoziome } from "../LogoPoziome";
-import { useCiemny } from "../szkielet/SzkieletAplikacji";
+import { useCiemny } from "../motyw";
 
 /** strona systemowa bez menu aplikacji: sam znak marki u góry, prowadzi na start */
 export function SamoLogo({ children }: { children: React.ReactNode }) {

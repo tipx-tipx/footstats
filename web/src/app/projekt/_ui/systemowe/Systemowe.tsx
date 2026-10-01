@@ -16,7 +16,9 @@ import { IkonaSzukaj } from "../szkielet/ikonyNav";
 import { MenuKomputerPlus, MenuTelefon, Paleta, PrawaStrona, StopkaPlus } from "../szkielet/Szkielet";
 import { WierszA } from "../elementy/mecz";
 import { IkonaBezSieci } from "./Polaczenie";
-import { Komunikat, Logowanie, STANY_LOGOWANIA, ZnakRysowany, type StanLogowania } from "./Logowanie";
+import { UkladSys } from "./UkladSys";
+import { Komunikat, STANY_LOGOWANIA, ZnakRysowany, type StanLogowania } from "./Logowanie";
+import { Logowanie } from "./LogowanieWarsztat";
 
 /*
  * Strony systemowe. Zasada głosu marki: co się stało, dlaczego, co zrobić –
@@ -91,20 +93,6 @@ const dataDnia = (k: string) => {
   const d = new Date(`${k}T12:00:00Z`);
   return `${["nd", "pn", "wt", "śr", "cz", "pt", "sb"][d.getUTCDay()]} ${d.getUTCDate()}.${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
 };
-
-/* układ wspólny dla 404, błędu i braku internetu: tekst po lewej, znak z logo
-   po prawej (na telefonie nad tekstem), pod spodem droga dalej */
-export function UkladSys({ znak, children, dol }: { znak: React.ReactNode; children: React.ReactNode; dol?: React.ReactNode }) {
-  return (
-    <main className="sy-sys">
-      <div className="sy-sys-gora">
-        <div className="sy-sys-tekst">{children}</div>
-        <div className="sy-sys-znak">{znak}</div>
-      </div>
-      {dol}
-    </main>
-  );
-}
 
 function NieMa({ stan, szukaj, dane }: { stan: Stan404; szukaj: () => void; dane: DaneSystemowe }) {
   if (stan === "mecz" && dane.zakonczony) {

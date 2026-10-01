@@ -607,7 +607,18 @@ function LinkStopki({ nazwa, linki }: { nazwa: string; linki?: Record<string, st
   return href ? <Link href={href}>{nazwa}</Link> : <a>{nazwa}</a>;
 }
 
-export function StopkaPlus({ jasneLogo, linki }: { jasneLogo: boolean; linki?: Record<string, string> }) {
+const odmRozgrywek = (n: number) => (n === 1 ? "rozgrywki" : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? "rozgrywki" : "rozgrywek");
+
+export function StopkaPlus({
+  jasneLogo,
+  linki,
+  rozgrywek,
+}: {
+  jasneLogo: boolean;
+  linki?: Record<string, string>;
+  /** aplikacja: prawdziwa liczba rozgrywek w ofercie na 7 dni (stała „50+” bywała nieprawdą, np. w przerwie reprezentacyjnej) */
+  rozgrywek?: number;
+}) {
   return (
     <footer className="s-stopka-plus">
       <LiniaZLogo />
@@ -625,10 +636,17 @@ export function StopkaPlus({ jasneLogo, linki }: { jasneLogo: boolean; linki?: R
             <dt>0</dt>
             <dd>typów bez uzasadnienia – przy każdym widzisz, co za nim stoi</dd>
           </div>
-          <div>
-            <dt>50+</dt>
-            <dd>rozgrywek z całego świata przeglądamy co tydzień</dd>
-          </div>
+          {rozgrywek === undefined ? (
+            <div>
+              <dt>50+</dt>
+              <dd>rozgrywek z całego świata przeglądamy co tydzień</dd>
+            </div>
+          ) : rozgrywek > 0 ? (
+            <div>
+              <dt>{rozgrywek}</dt>
+              <dd>{odmRozgrywek(rozgrywek)} z całego świata w ofercie na najbliższy tydzień</dd>
+            </div>
+          ) : null}
         </dl>
       </div>
       <div className="s-stopka-kolumny">
