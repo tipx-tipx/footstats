@@ -377,7 +377,7 @@ export function StronaZawodnika({ z, telefon }: { z: ZawodnikStrony; telefon: bo
           Kratka = jeden mecz, od najnowszego. Zielona – przebił linię, szara – nie, przekreślona – nie zagrał. Kliknij rynek, żeby zobaczyć wszystkie linie i mecz po meczu.
         </p>
         <TabelaRynkow z={z} okno={okno} telefon={telefon} />
-        <p className="mz-przypis">Kurs: wyższy z Superbetu i Betclica (osobno pokażemy oba po zmianie w danych).</p>
+        <p className="mz-przypis">Kurs: wyższy z Superbetu i Betclica – logo przy kursie pokazuje, u którego.</p>
       </section>
 
       <section className="zw-sekcja" aria-labelledby="zw-historia">

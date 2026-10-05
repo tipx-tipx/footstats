@@ -51,7 +51,18 @@ export type Kurs = {
   /** kurs, od którego typ ma sens – pokazywany, gdy bukmachera jeszcze nie ma */
   uczciwy?: number | null;
   zmiana?: "gora" | "dol" | null;
+  /** cena BIEŻĄCA, gdy różni się od ceny z publikacji – „teraz 1,29” pod kursem */
+  teraz?: number | null;
+  terazBukmacher?: string;
 };
+
+/** Kafelek kursu typu: cena z publikacji + bieżąca, gdy się zmieniła. */
+export const kursTypu = (t: { kurs: number; bukmacher: string; kursTeraz?: number | null; kursTerazBukmacher?: string }): Kurs => ({
+  kurs: t.kurs,
+  bukmacher: t.bukmacher,
+  teraz: t.kursTeraz ?? null,
+  terazBukmacher: t.kursTerazBukmacher,
+});
 
 export function KafelekD({
   k,
@@ -89,13 +100,18 @@ export function KafelekD({
   }
 
   const kolorBlysku = k.zmiana === "gora" ? "var(--ok)" : k.zmiana === "dol" ? "var(--nie)" : "transparent";
+  const teraz = k.teraz && Math.abs(k.teraz - k.kurs) >= 0.005 ? k.teraz : null;
+  const kierTeraz = teraz === null ? null : teraz > k.kurs ? "gora" : "dol";
+  const uKogoTeraz = teraz !== null && k.terazBukmacher && k.terazBukmacher !== k.bukmacher ? ` w ${k.terazBukmacher}` : "";
 
   return (
     <button
       type="button"
       className="d-kurs"
       aria-pressed={wybrany}
-      aria-label={`${k.bukmacher}, kurs ${fmtKurs(k.kurs)}${wybrany ? ", w kuponie" : ""}`}
+      aria-label={`${k.bukmacher}, kurs ${fmtKurs(k.kurs)}${teraz !== null ? ` przy publikacji, teraz ${fmtKurs(teraz)}${uKogoTeraz}` : ""}${wybrany ? ", w kuponie" : ""}`}
+      title={teraz !== null ? `Kurs przy publikacji ${fmtKurs(k.kurs)}, teraz ${fmtKurs(teraz)}${uKogoTeraz}` : undefined}
+      data-teraz={teraz !== null || undefined}
       onClick={onClick}
     >
       {blysk && k.zmiana && (
@@ -128,7 +144,16 @@ export function KafelekD({
             {k.zmiana === "gora" ? "▲" : "▼"}
           </span>
         )}
-        <span className="d-kurs-liczba">{fmtKurs(k.kurs)}</span>
+        {teraz !== null ? (
+          <span className="d-kurs-dwa">
+            <span className="d-kurs-liczba">{fmtKurs(k.kurs)}</span>
+            <span className="d-kurs-teraz" data-kier={kierTeraz}>
+              teraz {fmtKurs(teraz)} {kierTeraz === "gora" ? "▲" : "▼"}
+            </span>
+          </span>
+        ) : (
+          <span className="d-kurs-liczba">{fmtKurs(k.kurs)}</span>
+        )}
       </span>
     </button>
   );

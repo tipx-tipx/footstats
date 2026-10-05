@@ -3,7 +3,7 @@
 import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 
-import { fmtKurs } from "@/lib/format";
+import { fmtKurs, odmien } from "@/lib/format";
 
 import type { HistoriaKuponow as Dane, KuponHistorii, RodzajKuponu } from "../../_dane/kuponyHistoria";
 import { Ptaszek } from "../atomy/wspolne";
@@ -34,7 +34,7 @@ function Kupon({ k }: { k: KuponHistorii }) {
       ? `w grze · weszło ${weszlo}, czeka ${k.nogi.length - rozstrzygniete}`
       : k.wynik === "anulowany"
         ? "anulowany – zmieniły się składy"
-        : `weszło ${weszlo} z ${k.nogi.length}${zwroty ? `, ${zwroty} ${zwroty === 1 ? "zwrot" : "zwroty"}` : ""}`;
+        : `weszło ${weszlo} z ${k.nogi.length}${zwroty ? `, ${zwroty} ${odmien(zwroty, "zwrot", "zwroty", "zwrotów")}` : ""}`;
   return (
     <div className="hk-kupon" data-wynik={k.wynik}>
       <button type="button" className="hk-wiersz" aria-expanded={otwarty} aria-controls={id} onClick={() => setOtwarty((o) => !o)}>

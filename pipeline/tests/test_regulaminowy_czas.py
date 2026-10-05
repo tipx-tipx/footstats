@@ -61,8 +61,9 @@ def test_kartki_tylko_z_etapow_regulaminowych(monkeypatch):
         {"stageId": 9, "competitorId": 1, "eventType": {"name": "Substitution"}},
     ]
     monkeypatch.setattr(S, "_get", lambda *a, **k: _mecz(ETAPY_Z_DOGRYWKA, events))
-    # dogrywka (10) i karne (11) NIE liczą się; zmiana to nie kartka
-    assert S.game_team_cards_90(113) == {"bodo glimt": 1.0, "union sg": 2.0}
+    # dogrywka (10) i karne (11) NIE liczą się; zmiana to nie kartka;
+    # czerwona = 2 kartki (reguła Superbetu, Komunikat 06/2022)
+    assert S.game_team_cards_90(113) == {"bodo glimt": 1.0, "union sg": 3.0}
 
 
 def test_zero_kartek_to_nie_to_samo_co_brak_zdarzen(monkeypatch):

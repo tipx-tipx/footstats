@@ -126,9 +126,9 @@ function Weszlo({ p }: { p: NonNullable<ReturnType<typeof pokrycie>> }) {
   );
 }
 
-function Kurs({ k, bukmacher, lepszy }: { k: number | null; bukmacher: string; lepszy: boolean }) {
+function Kurs({ k, bukmacher, lepszy, uwaga }: { k: number | null; bukmacher: string; lepszy: boolean; uwaga?: string }) {
   return (
-    <span className="mz-kurs" data-lepszy={lepszy || undefined} data-brak={k === null || undefined}>
+    <span className="mz-kurs" data-lepszy={lepszy || undefined} data-brak={k === null || undefined} title={uwaga} aria-label={uwaga ? `${bukmacher}: ${uwaga}` : undefined}>
       <Logo nazwa={bukmacher} wysokosc={10} />
       <b>{kursTxt(k)}</b>
     </span>
@@ -221,7 +221,7 @@ function TabelaA({ m, rynek, okno, strona, telefon, l }: { m: MeczStrony; rynek:
                 </span>
                 <span role="cell" className="mz-kursy">
                   <Kurs k={k.sb} bukmacher="Superbet" lepszy={lepszySb} />
-                  <Kurs k={k.bc} bukmacher="Betclic" lepszy={!lepszySb && k.bc !== null} />
+                  <Kurs k={k.bc} bukmacher="Betclic" lepszy={!lepszySb && k.bc !== null} uwaga={k.bcInaczej ? "Betclic liczy tę statystykę inaczej – ceny nie porównujemy" : undefined} />
                 </span>
               </motion.div>
             );

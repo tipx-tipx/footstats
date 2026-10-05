@@ -40,7 +40,7 @@ def test_game_team_stats_parsuje_liste(monkeypatch):
     assert arg["dribbles_att"] == 16.0       # mianownik pary, nie licznik
     assert arg["aerial_won"] == 20.0 and arg["aerial_att"] == 34.0
     assert arg["crosses_att"] == 22.0
-    assert arg["kartki"] == 3.0              # żółte + czerwone
+    assert arg["kartki"] == 4.0              # żółte + 2 × czerwona (reguła Superbetu)
     swi = out["switzerland"]
     assert swi["shots_outside"] == 6.0 and swi["shots"] == 9.0
 

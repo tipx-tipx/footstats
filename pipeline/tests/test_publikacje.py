@@ -514,7 +514,7 @@ def test_zero_swiezych_kart_i_tak_przelicza_wznowione():
     i = zrodlo.index('_dump("radar.json"')
     przed = zrodlo[:i]
     # ostatni warunek przed zapisem rozstrzyga o AWARII, nie o liczbie kart
-    assert "if not radar_padl:" in przed[-1200:], (
+    assert "if not radar_padl:" in przed[-1400:], (
         "zapis radaru znowu zależy od tego, ile kart przeszło bramy — "
         "wtedy przy zerze na stronie zostaje poprzedni radar")
     assert "radar_padl = True" in przed

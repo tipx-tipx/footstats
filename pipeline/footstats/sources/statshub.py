@@ -1038,6 +1038,29 @@ def status_meczu(event_id: int) -> str | None:
     return str(ev.get("status") or "").lower() or None
 
 
+def status_i_start(event_id: int) -> tuple[str | None, int | None]:
+    """(status, faktyczny start meczu ts) — start po przełożeniu jest NOWYM
+    terminem pod tym samym id (Sabadell – Andorra 03.10 → 04.10 19:00 UTC).
+    Kontrola „przełożony mecz, który się odbył" porównuje go z terminem
+    bukmachera (`rozliczanie.termin_przelozonego`)."""
+    try:
+        d = _get(f"{BASE}/event/{event_id}")
+    except Exception as e:
+        diagnostyka.cichy("statshub", "status_meczu", e)
+        return None, None
+    root = d.get("data", d) or {}
+    ev = root.get("events")
+    ev = (ev[0] if isinstance(ev, list) and ev else ev) or {}
+    if not isinstance(ev, dict):
+        return None, None
+    st = str(ev.get("status") or "").lower() or None
+    try:
+        start = int(ev.get("timeStartTimestamp") or 0) or None
+    except (TypeError, ValueError):
+        start = None
+    return st, start
+
+
 def player_shots_from_shotmap(event_id: int) -> dict[str, dict] | None:
     """{nazwa_zawodnika: {"shots": n, "sot": n}} z shotmapy meczu (otwarte API).
 

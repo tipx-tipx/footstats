@@ -720,6 +720,87 @@ def _nierozstrzygniete(log: dict, lista_dnia: dict[str, set] | None = None,
     }
 
 
+# ⚑ WERYFIKACJE ZAMKNIĘĆ PO FAKCIE (2026-10-05, audyt 05.10 pkt 15). Dwa
+# rodzaje zwrotu zapadały na podstawie jednego źródła i nikt ich potem nie
+# sprawdzał: „mecz przełożony" (Sabadell – Andorra 03.10: zwrot, a mecz zagrano
+# nazajutrz pod tym samym id) i „nie zagrał" (22–30.09: fałszywe zwroty, gdy
+# 365 znało mecz, a nie znało nazwiska). Rozliczenia NIE zmieniamy (rekord
+# zamrożony) — stemplujemy wynik weryfikacji, a `kontrola_produktu` zapala
+# alarm. Zapytania z budżetem, każdy rekord sprawdzany do skutku raz.
+WERYFIKACJA_OKNO_S = 7 * 86400
+WERYFIKACJA_PRZELOZONYCH_NA_PRZEBIEG = 10
+WERYFIKACJA_NIE_ZAGRAL_NA_PRZEBIEG = 8
+WERYFIKACJA_NIE_ZAGRAL_BRAK_PO_S = 3 * 86400   # pusta historia tyle po meczu = koniec prób
+# zwroty sprzed poprawki terminu (e04d93c, 05.10 12:47 PL) to znane przypadki
+# (Sabadell – Andorra, decyzja właściciela: zostają) — stempel tak, alarm nie
+PRZELOZONE_ALARM_OD_TS = 1_791_197_252
+_WER_PRZELOZONY = "spr_przelozony"
+_WER_NIE_ZAGRAL = "spr_nie_zagral"
+
+
+def weryfikuj_przelozone(log: dict, now: int,
+                         limit: int = WERYFIKACJA_PRZELOZONYCH_NA_PRZEBIEG) -> int:
+    """Stempluje zwroty „mecz przełożony" z ostatnich 7 dni: czy mecz jednak
+    odbył się w terminie bukmachera. Zwraca liczbę zapytań."""
+    po_meczu: dict[int, list[dict]] = {}
+    for r in log.values():
+        if (r.get("powod") != POWOD_MECZ_ODWOLANY or r.get(_WER_PRZELOZONY)
+                or not r.get("mecz_id")
+                or now - int(r.get("rozliczono_ts") or 0) > WERYFIKACJA_OKNO_S):
+            continue
+        po_meczu.setdefault(int(r["mecz_id"]), []).append(r)
+    zapytan = 0
+    for mid, recs in list(po_meczu.items())[:limit]:
+        st, start = statshub.status_i_start(mid)
+        zapytan += 1
+        if st == "finished" and start:
+            for r in recs:
+                r[_WER_PRZELOZONY] = ("rozegrany_w_terminie"
+                                      if start < termin_przelozonego(r)
+                                      else "rozegrany_po_terminie")
+        elif st in _STATUSY_BEZ_MECZU and all(
+                now > termin_przelozonego(r) + 3 * 86400 for r in recs):
+            for r in recs:
+                r[_WER_PRZELOZONY] = "potwierdzony"
+    return zapytan
+
+
+def weryfikuj_nie_zagral(log: dict, now: int,
+                         limit: int = WERYFIKACJA_NIE_ZAGRAL_NA_PRZEBIEG) -> int:
+    """Próbka zwrotów „nie zagrał" z ostatnich 7 dni sprawdzana w historii
+    zawodnika statshub (trzyma tylko mecze z minutami). Najpierw typy ze
+    strony. Zwraca liczbę zapytań."""
+    kandydaci = [
+        r for r in log.values()
+        if r.get("powod") == "nie zagrał" and not r.get(_WER_NIE_ZAGRAL)
+        and isinstance(r.get("podmiot_id"), int)
+        and 0 < r["podmiot_id"] < 900_000_000 and r.get("mecz_id")
+        and now - int(r.get("rozliczono_ts") or 0) <= WERYFIKACJA_OKNO_S
+    ]
+    kandydaci.sort(key=lambda r: (bool(r.get("poza_publikacja")),
+                                  -(r.get("rozliczono_ts") or 0)))
+    historie: dict[int, list] = {}
+    for r in kandydaci:
+        pid = r["podmiot_id"]
+        if pid not in historie:
+            if len(historie) >= limit:
+                continue
+            historie[pid] = statshub.fetch_player_performance(pid, limit=20) or []
+        wiersze = historie[pid]
+        wiersz = next((w for w in wiersze
+                       if str((w.get("events") or {}).get("id")) == str(r["mecz_id"])),
+                      None)
+        if wiersz is not None:
+            minuty = ((wiersz.get("player_statistics_event") or {})
+                      .get("minutesPlayed") or 0)
+            r[_WER_NIE_ZAGRAL] = "gral" if minuty > 0 else "potwierdzony"
+        elif wiersze:
+            r[_WER_NIE_ZAGRAL] = "potwierdzony"
+        elif now - int(r.get("kickoff_ts") or 0) > WERYFIKACJA_NIE_ZAGRAL_BRAK_PO_S:
+            r[_WER_NIE_ZAGRAL] = "brak_danych"
+    return len(historie)
+
+
 # ⚑⚑ KONTROLA PRODUKTU (2026-09-13, zgłoszenie właściciela: „mam dość").
 #
 # Każda usterka ostatnich tygodni była odkrywana przez właściciela, patrzącego
@@ -734,8 +815,9 @@ KONTROLA_WAGI_MAX_H = 30           # nocny trening + zapas
 
 
 def kontrola_produktu(log: dict, pokazane: dict | None, now: int,
-                      wagi_ts: float | None) -> dict:
-    """Sześć sprawdzeń: {"policzono_ts", "sprawdzenia": [{kod, ok, liczba, opis}]}.
+                      wagi_ts: float | None,
+                      log_kuponow: dict | None = None) -> dict:
+    """Dziewięć sprawdzeń: {"policzono_ts", "sprawdzenia": [{kod, ok, liczba, opis}]}.
 
     Cykl żyje sprawdza FRONT (po `meta.wygenerowano_ts`), bo job rozliczania
     nie wie, kiedy cykl ostatnio doszedł — tu zostaje pięć pozostałych.
@@ -817,6 +899,40 @@ def kontrola_produktu(log: dict, pokazane: dict | None, now: int,
           round(wiek_h, 1) if wiek_h is not None else None,
           f"model trenowany {wiek_h:.0f} h temu" if wiek_h is not None
           else "brak wag modelu — nocny trening nie zapisał wyniku")
+
+    # --- 2026-10-05: trzy sprawdzenia z audytu 05.10 (pkt 15) ---
+    okno = now - WERYFIKACJA_OKNO_S
+    w_oknie = [r for r in log.values() if int(r.get("rozliczono_ts") or 0) >= okno]
+    przel = [r for r in w_oknie if r.get(_WER_PRZELOZONY) == "rozegrany_w_terminie"
+             and int(r.get("rozliczono_ts") or 0) >= PRZELOZONE_ALARM_OD_TS]
+    przel_mecze = sorted({str(r.get("mecz") or r.get("mecz_id")) for r in przel})
+    n_przel_spr = sum(1 for r in w_oknie if r.get(_WER_PRZELOZONY))
+    dodaj("przelozony_rozegrany", not przel, len(przel),
+          f"zwroty „mecz przełożony” potwierdzone (sprawdzonych w 7 dni: {n_przel_spr})"
+          if not przel
+          else f"{len(przel)} typów zamkniętych jako „mecz przełożony”, a mecz "
+               f"odbył się w terminie bukmachera: {', '.join(przel_mecze[:3])}")
+
+    schowane = [
+        r for r in (log_kuponow or {}).values()
+        if r.get("pominiety") and r.get("pominiety_przez") == "konfiguracja"
+        and int(r.get("opublikowano_ts") or 0) >= now - 2 * 86400
+    ]
+    sloty_sch = sorted({str(r.get("slot")) for r in schowane})
+    dodaj("kupony_schowane", not schowane, len(schowane),
+          "żaden świeży kupon nie zniknął przez konfigurację slotów"
+          if not schowane
+          else f"{len(schowane)} kuponów z ostatnich 48 h schowanych przez "
+               f"konfigurację (slot spoza listy): {', '.join(sloty_sch[:4])}")
+
+    nz = [r for r in w_oknie if r.get(_WER_NIE_ZAGRAL)]
+    gral = [r for r in nz if r[_WER_NIE_ZAGRAL] == "gral"]
+    przyklady = ", ".join(f"{r.get('podmiot')} ({r.get('mecz')})" for r in gral[:3])
+    dodaj("nie_zagral_probka", not gral, len(gral),
+          f"„nie zagrał” zgodne ze statshubem: {len(nz) - len(gral)} z {len(nz)} "
+          f"sprawdzonych w 7 dni" if not gral
+          else f"{len(gral)} z {len(nz)} sprawdzonych zwrotów „nie zagrał” – "
+               f"zawodnik GRAŁ wg statshub, np. {przyklady}")
 
     return {"policzono_ts": now, "sprawdzenia": out}
 
@@ -6336,6 +6452,75 @@ def _sofa_druzyna(sofa: dict, rec: dict) -> tuple[dict | None, dict | None]:
     return normed.get(rotowire._norm(str(rec["podmiot"]))), e
 
 
+# ⚑ ZAPASOWE ŹRÓDŁO ROZLICZEŃ DRUŻYNOWYCH: STATSHUB (2026-10-05). Rynki
+# drużynowe (poza golami), sumy meczowe i „kto więcej" znały tylko 365 — gdy 365
+# nie miało meczu, po 7 dniach szedł zwrot „brak danych" (19–20.09: 42 typy,
+# Lyon–Rennes, Auxerre–Brest, Marseille–PSG; statshub miał komplet). Statshub
+# zgadza się z naszymi rozliczeniami z 365 w 185 na 187 próbek.
+STATSHUB_POLA_DRUZYNY = {
+    "shots": "totalShotsOnGoal", "sot": "shotsOnGoal",
+    "fouls": "fouls", "corners": "cornerKicks",
+}
+BUDZET_TEAM_PERF_NA_PRZEBIEG = 40
+ROZLICZONE_ZE_STATSHUB: Counter = Counter()
+
+
+def _statshub_druzyna(rec: dict, cache: dict, budzet: list[int]
+                      ) -> tuple[dict, dict] | None:
+    """(statystyki drużyny `podmiot_id`, statystyki rywala) z meczu
+    `rec["mecz_id"]` albo None — brak meczu, dogrywka (statshub sumuje
+    120 minut, zakład liczy 90) albo wyczerpany budżet zapytań."""
+    pid, mid = rec.get("podmiot_id"), rec.get("mecz_id")
+    if not pid or not mid:
+        return None
+    if pid not in cache:
+        if budzet[0] <= 0:
+            return None
+        budzet[0] -= 1
+        try:
+            cache[pid] = statshub.fetch_team_performance(int(pid), limit=10)
+        except Exception:                                   # noqa: BLE001
+            cache[pid] = []
+    for row in cache.get(pid) or []:
+        ev = row.get("event") or {}
+        try:
+            if int(ev.get("id") or 0) != int(mid):
+                continue
+        except (TypeError, ValueError):
+            continue
+        if (ev.get("homeScoreOvertime") is not None
+                or ev.get("homeScorePenalties") is not None):
+            return None
+        return (row.get("statistics") or {}), (row.get("opponentStatistics") or {})
+    return None
+
+
+def kartki_superbet_statshub(st: dict) -> tuple[float, float] | None:
+    """Kartki drużyny wg Superbetu z pól statshub: (dolna, górna) granica.
+
+    Superbet (Oficjalny Komunikat nr 06/2022 z 13.02.2024, pkt 2): żółta = 1,
+    czerwona = 2, wykluczenie za dwie żółte = 3. Z samych liczników statshub
+    nie odróżni czerwonej bezpośredniej (Y + 2R) od wykluczenia za drugą
+    żółtą, jeśli druga żółta wchodzi do `yellowCards` (wtedy Y + R) —
+    prawda leży w [Y + R, Y + 2R], więc rozliczamy tylko, gdy obie granice
+    dają ten sam wynik zakładu.
+    """
+    y = st.get("yellowCards")
+    if y is None:
+        return None
+    r = float(st.get("redCards") or 0)
+    y = float(y)
+    return (y, y) if r == 0 else (y + r, y + 2 * r)
+
+
+def _wartosc_statshub(st: dict, klucz: str) -> tuple[float, float] | None:
+    """(dolna, górna) wartość statystyki — dla wszystkiego poza kartkami równe."""
+    if klucz == "kartki":
+        return kartki_superbet_statshub(st)
+    v = st.get(STATSHUB_POLA_DRUZYNY.get(klucz, ""))
+    return None if v is None else (float(v), float(v))
+
+
 def rozlicz(
     value_bets: list[dict],
     kupony_list: list[dict] | None = None,
@@ -6391,6 +6576,9 @@ def rozlicz(
     cache_sh_sm: dict = {}   # shotmapy statshub (fallback strzałów egzotyki)
     cache_perf: dict = {}    # historia zawodników statshub (patrz POLA_PERF_ROZLICZENIA)
     budzet_perf = [BUDZET_PERF_NA_PRZEBIEG]
+    cache_tp: dict = {}      # historia drużyn statshub (zapas rozliczeń drużynowych)
+    budzet_tp = [BUDZET_TEAM_PERF_NA_PRZEBIEG]
+    ROZLICZONE_ZE_STATSHUB.clear()
     rozliczone_z_perf = Counter()
     # mecze przełożone: jeśli mecz wciąż figuruje w nadchodzących typach,
     # deadline braku danych nie może zamknąć jego legów jako zwrot
@@ -6415,7 +6603,8 @@ def rozlicz(
         if mk in MARKETY_SUMY or mk in MARKETY_WIECEJ:
             gid_n = _gid_365(rec, cache_365)
             wartosci = None
-            if gid_n is not None and not scores365.after_extra_time(gid_n):
+            _aet_n = gid_n is not None and scores365.after_extra_time(gid_n)
+            if gid_n is not None and not _aet_n:
                 try:
                     st_n = scores365.game_team_stats(gid_n)
                 except Exception:
@@ -6433,6 +6622,29 @@ def rozlicz(
                         wa = (st_n[ka] or {}).get(klucz_staty)
                         if wh is not None and wa is not None:
                             wartosci = (float(wh), float(wa))
+            # ZAPAS: statshub (patrz STATSHUB_POLA_DRUZYNY) — dopiero po
+            # PERF_WARTOSC_PO_S, żeby 365 miało pierwszeństwo. `podmiot` to
+            # gospodarz, więc `statistics` = gospodarz, `opponentStatistics` = gość.
+            if (wartosci is None and not _aet_n
+                    and now - rec["kickoff_ts"] >= PERF_WARTOSC_PO_S):
+                _sh = _statshub_druzyna(rec, cache_tp, budzet_tp)
+                if _sh is not None:
+                    _k = MARKETY_SUMY.get(mk) or MARKETY_WIECEJ[mk]
+                    _gh, _ga = _wartosc_statshub(_sh[0], _k), _wartosc_statshub(_sh[1], _k)
+                    if _gh is not None and _ga is not None:
+                        if _gh[0] == _gh[1] and _ga[0] == _ga[1]:
+                            wartosci = (_gh[0], _ga[0])
+                        elif mk in MARKETY_SUMY:
+                            # czerwona kartka: rozliczamy tylko, gdy obie
+                            # granice sumy dają ten sam wynik zakładu
+                            _lo, _hi = _gh[0] + _ga[0], _gh[1] + _ga[1]
+                            _t = lambda x: (x > rec["linia"] if rec["strona"] == "powyzej"
+                                            else x < rec["linia"])
+                            if _t(_lo) == _t(_hi):
+                                wartosci = (_gh[0], _ga[0])
+                    if wartosci is not None:
+                        rec["zrodlo_wyniku"] = "statshub"
+                        ROZLICZONE_ZE_STATSHUB[mk] += 1
             if wartosci is None:
                 if (
                     now - rec["kickoff_ts"] > TERMIN_BRAK_DANYCH_S
@@ -6529,6 +6741,20 @@ def rozlicz(
                             wartosc_t = sr["home_goals"]
                         elif sr.get("away_name") and rotowire._norm(sr["away_name"]) == tkn:
                             wartosc_t = sr["away_goals"]
+            if (wartosc_t is None and mk != "team_goals" and not _po_dogrywce
+                    and now - rec["kickoff_ts"] >= PERF_WARTOSC_PO_S):
+                # ZAPAS: statshub (patrz STATSHUB_POLA_DRUZYNY); dogrywka i brak
+                # meczu dają None — typ czeka na kolejne źródło
+                _sh = _statshub_druzyna(rec, cache_tp, budzet_tp)
+                _w = (_wartosc_statshub(_sh[0], MARKETY_DRUZYNOWE[mk])
+                      if _sh is not None else None)
+                if _w is not None:
+                    _t = lambda x: (x > rec["linia"] if rec["strona"] == "powyzej"
+                                    else x < rec["linia"])
+                    if _w[0] == _w[1] or _t(_w[0]) == _t(_w[1]):
+                        wartosc_t = _w[0]
+                        rec["zrodlo_wyniku"] = "statshub"
+                        ROZLICZONE_ZE_STATSHUB[mk] += 1
             if wartosc_t is None:
                 # FALLBACK egzotyki (Warstwa 2): staty drużynowe z cache
                 # Sofascore (worker domowy) — rożne/kartki/faule/strzały drużyny.
@@ -6795,6 +7021,12 @@ def rozlicz(
               + ", ".join(f"{k} {v}" for k, v in rozliczone_z_perf.most_common())
               + f" | zapytań {BUDZET_PERF_NA_PRZEBIEG - budzet_perf[0]}"
               f"/{BUDZET_PERF_NA_PRZEBIEG}")
+    if ROZLICZONE_ZE_STATSHUB or budzet_tp[0] < BUDZET_TEAM_PERF_NA_PRZEBIEG:
+        print("Rozliczone z historii drużyn statshub (365 nie miało statystyk): "
+              + (", ".join(f"{k} {v}" for k, v in ROZLICZONE_ZE_STATSHUB.most_common())
+                 or "0")
+              + f" | zapytań {BUDZET_TEAM_PERF_NA_PRZEBIEG - budzet_tp[0]}"
+              f"/{BUDZET_TEAM_PERF_NA_PRZEBIEG}")
     _czekaja = [
         r for r in log.values()
         if not r.get("wynik") and r.get("kickoff_ts")
@@ -6863,6 +7095,12 @@ def rozlicz(
         k: r for k, r in log.items()
         if r.get("wynik") or now - (r.get("kickoff_ts") or now) < 30 * 86400
     }
+    # weryfikacje zwrotów po fakcie — stemple lądują w księdze tym samym zapisem
+    for _wer in (weryfikuj_przelozone, weryfikuj_nie_zagral):
+        try:
+            _wer(log, now)
+        except Exception as e:                               # noqa: BLE001
+            print(f"Weryfikacja {_wer.__name__} pominięta ({e})")
     if supa.put_key_bezpiecznie("typy_log", log):
         _kopia_zapasowa_logu(log, now)
 
@@ -7146,7 +7384,7 @@ def rozlicz(
         _wagi_ts = float((supa.get_key("model_wagi") or {}).get("trenowano_ts") or 0) or None
     except Exception:
         _wagi_ts = None
-    _kontrola = kontrola_produktu(log, _na_stronie, now, _wagi_ts)
+    _kontrola = kontrola_produktu(log, _na_stronie, now, _wagi_ts, log_kuponow)
     for _spr in _kontrola["sprawdzenia"]:
         if not _spr["ok"]:
             print(f"⚑ KONTROLA [{_spr['kod']}]: {_spr['opis']}")

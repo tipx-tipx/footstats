@@ -3,7 +3,7 @@
 import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
 import { useId, useMemo, useState } from "react";
 
-import { fmtLinia } from "@/lib/format";
+import { fmtLinia, odmien } from "@/lib/format";
 
 import { useDzis } from "../czas";
 import type { DaneSkutecznosci, DzienWynikow, Produkt, TypWyniku } from "../../_dane/skutecznosc";
@@ -113,7 +113,7 @@ function Wynik({ dni, wszystkieDni, filtr, start }: { dni: DzienWynikow[]; wszys
           </b>
           <span>
             od {start}
-            {caly.zwrot > 0 && ` · do tego ${caly.zwrot} zwrotów (nie zagrał, stawka wraca)`}
+            {caly.zwrot > 0 && ` · do tego ${caly.zwrot} ${odmien(caly.zwrot, "zwrot", "zwroty", "zwrotów")} (stawka wraca)`}
           </span>
         </div>
       </div>
@@ -208,7 +208,7 @@ function PanelDnia({ d, poprzedni, nastepny }: { d: DzienWynikow; poprzedni?: ()
         )}
         <b className="p-n">{etykieta(d, dzis)}</b>
         <span>
-          {l.ok} z {l.n} weszło{l.zwrot > 0 && ` · ${l.zwrot} ${l.zwrot === 1 ? "zwrot" : "zwroty"}`}
+          {l.ok} z {l.n} weszło{l.zwrot > 0 && ` · ${l.zwrot} ${odmien(l.zwrot, "zwrot", "zwroty", "zwrotów")}`}
         </span>
         {proba ? <em className="sk-proba">mała próba</em> : <em data-dobry={l.p >= 55 || undefined}>{l.p}%</em>}
       </header>

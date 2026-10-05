@@ -12,7 +12,7 @@ import type { DzienV, TypLekki } from "../../_dane/przygotuj";
 import type { DaneStron, KartaStrony } from "../../_dane/strony";
 import { FiltryV3 } from "../atomy2/filtry3";
 import { odm } from "../atomy2/filtry2";
-import { DniD, KafelekD, KratkiD } from "../atomy2/podstawowe";
+import { DniD, KafelekD, KratkiD, kursTypu } from "../atomy2/podstawowe";
 import { ScenaDrabinki } from "../elementy/drabinka";
 import { IkonaRynku } from "../elementy/ikonyRynkow";
 import { KartaA, Powody } from "../elementy/karta";
@@ -83,7 +83,7 @@ export function TypDnia({ t, uklad = "duzy" }: { t: KartaStrony; uklad?: "duzy" 
           <span className="p-n">{proc(t.szansa)}</span>
           <small>szansy według nas</small>
         </div>
-        <KafelekD k={{ kurs: t.kurs, bukmacher: t.bukmacher }} />
+        <KafelekD k={kursTypu(t)} />
       </div>
       {!maly && (
         <div className="st-td-historia">
@@ -173,7 +173,7 @@ function KartaMocna({ t }: { t: KartaStrony }) {
           <span className="p-n">{proc(t.szansa)}</span>
           <small>szansy</small>
         </div>
-        <KafelekD k={{ kurs: t.kurs, bukmacher: t.bukmacher }} />
+        <KafelekD k={kursTypu(t)} />
       </div>
     </article>
   );

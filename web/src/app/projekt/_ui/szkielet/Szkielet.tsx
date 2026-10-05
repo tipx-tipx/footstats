@@ -12,7 +12,7 @@ import "../../szkielet.css";
 import type { DaneElementow } from "../../_dane/elementy";
 import type { DruzynaV } from "../../_dane/przygotuj";
 import { Sekcja, type WariantAtomu } from "../atomy/wspolne";
-import { KafelekD, SzansaD } from "../atomy2/podstawowe";
+import { KafelekD, SzansaD, kursTypu } from "../atomy2/podstawowe";
 import { Herb } from "../Herb";
 import { LogoPoziome } from "../LogoPoziome";
 import { IkonaMotyw, IkonaNav, IkonaSzukaj, IkonaWyloguj, type KluczNav } from "./ikonyNav";
@@ -93,7 +93,7 @@ function Tresc({ dane, aktywna, stan }: { dane: DaneElementow; aktywna: string; 
               </div>
             </div>
             <SzansaD p={t.p} mala />
-            <KafelekD k={{ kurs: t.kurs, bukmacher: t.bukmacher }} />
+            <KafelekD k={kursTypu(t)} />
           </div>
         ))}
       </div>

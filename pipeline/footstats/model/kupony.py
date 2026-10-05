@@ -218,8 +218,20 @@ def wartosc_brutto(k: dict) -> float:
         return 0.0
 
 
+# ⚑ RODZAJE ZWOLNIONE Z BRAMY WARTOŚCI (2026-10-05, decyzja właściciela:
+# „kupon zawodniczy akceptuję"). Celem produktu jest trafność (20.08), a nie
+# zysk; kupon zawodniczy pierwszego dnia miał wartość 0,93–0,95 przy szansie
+# 44–46% i brama zdejmowała go w każdym cyklu. Szansa na kuponie zostaje
+# uczciwa (liczona z legów jak wszędzie), więc klient widzi prawdziwe 44%.
+ZWOLNIONE_Z_BRAMY_WARTOSCI = frozenset({HORYZONT_ZAWODNICY})
+
+
 def kupon_oplacalny(k: dict) -> bool:
-    """Czy kupon ma dodatnią wartość brutto (patrz MIN_WARTOSC_KUPONU)."""
+    """Czy kupon ma dodatnią wartość brutto (patrz MIN_WARTOSC_KUPONU).
+
+    Rodzaje z `ZWOLNIONE_Z_BRAMY_WARTOSCI` przechodzą zawsze."""
+    if k.get("horyzont") in ZWOLNIONE_Z_BRAMY_WARTOSCI:
+        return True
     return wartosc_brutto(k) >= MIN_WARTOSC_KUPONU
 
 

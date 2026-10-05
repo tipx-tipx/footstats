@@ -28,8 +28,9 @@ export const RYNKI_ZAWODNIKA: [string, string][] = [
 
 type FormaS = { ts: number[]; kadra: boolean[]; minuty: number[]; rywale: string[]; ostatnie: number[]; srednia90: number | null };
 type ZawS = { id: number; nazwa: string; pozycja: string; druzyna: string; xi: boolean; minuty_lacznie: number; forma: Record<string, FormaS> };
-/** kurs linii: [Superbet, Betclic] z `kursy_mNN` (7B) albo sama liczba ze starej siatki (wyższa z dwóch, bez nazwy) */
-type KursS = number | [number | null, number | null];
+/** kurs linii: [Superbet, Betclic] z `kursy_mNN` (7B) albo sama liczba ze starej siatki (wyższa z dwóch, bez nazwy);
+ *  trzeci element 1 = Betclic liczy tę statystykę inaczej, cena Betclica ukryta (05.10) */
+type KursS = number | [number | null, number | null] | [number | null, number | null, number];
 type MeczS = { id: number; gosp: string; gosc: string; zawodnicy: ZawS[]; kursy: Record<string, Record<string, Record<string, KursS>>> };
 
 export type HistoriaRynku = {
@@ -49,7 +50,7 @@ export type ZawodnikMeczu = {
   /** rynek → historia (tylko rynki z kursem dla tego zawodnika) */
   rynki: Record<string, HistoriaRynku>;
   /** rynek → linia → kurs Superbet / Betclic (w prototypie Betclic pusty) */
-  kursy: Record<string, Record<string, { sb: number | null; bc: number | null }>>;
+  kursy: Record<string, Record<string, { sb: number | null; bc: number | null; bcInaczej?: boolean }>>;
   /** rynek → id typu na liście dnia (znacznik „na liście”) */
   naLiscie: Record<string, { id: number; linia: number }>;
 };
@@ -96,7 +97,7 @@ export function przygotujMecze(): MeczStrony[] {
               rywale: (f.rywale ?? []).slice(0, n),
               daty: (f.ts ?? []).slice(0, n).map(data),
             };
-            kursy[kod] = Object.fromEntries(Object.entries(kz[kod]).map(([l, k]) => [l, Array.isArray(k) ? { sb: k[0], bc: k[1] } : { sb: k, bc: null }]));
+            kursy[kod] = Object.fromEntries(Object.entries(kz[kod]).map(([l, k]) => [l, Array.isArray(k) ? { sb: k[0], bc: k[1], bcInaczej: k[2] === 1 } : { sb: k, bc: null }]));
           }
           const naLiscie: ZawodnikMeczu["naLiscie"] = {};
           for (const t of typy) {

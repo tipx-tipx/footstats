@@ -31,6 +31,16 @@ function Kratki({ d, linia }: { d: DrabinkaV; linia: number }) {
   return <KratkiD t={t} />;
 }
 
+/* Szansę pokazujemy TYLKO przy naszym typie (05.10). Dalsze szczeble deklarowały
+   ok. 35% i 21%, a weszły w 16% i 6% (70 i 49 kart) – liczba wprowadzała w błąd. */
+const szansaWidoczna = (s: SzczebelV) => s.polecany && s.p !== null;
+function bezSzansy(s: SzczebelV, d: DrabinkaV): string {
+  const nasza = d.szczeble.find((x) => x.polecany)?.linia ?? null;
+  if (nasza !== null && s.linia < nasza) return "Kurs za niski – nie typujemy";
+  if (s.p !== null) return "Dalszy szczebel – wchodzi rzadko, szansy nie podajemy";
+  return "Za mała szansa – nie typujemy";
+}
+
 function Wybrany({ s, d }: { s: SzczebelV; d: DrabinkaV }) {
   return (
     <div className="el-drab-wybor">
@@ -44,14 +54,14 @@ function Wybrany({ s, d }: { s: SzczebelV; d: DrabinkaV }) {
         </small>
       </div>
       <div className="el-drab-wybor-prawa">
-        {s.p !== null ? (
+        {szansaWidoczna(s) && s.p !== null ? (
           <span className="d-szansa-liczba" style={{ fontSize: 22 }}>
             <Blysk tekst={`${Math.round(s.p * 100)}%`} kier={null} />
           </span>
         ) : (
-          <span style={{ color: "var(--t3)", fontSize: 12, maxWidth: 120, textAlign: "right" }}>Za mała szansa – nie typujemy</span>
+          <span style={{ color: "var(--t3)", fontSize: 12, maxWidth: 120, textAlign: "right" }}>{bezSzansy(s, d)}</span>
         )}
-        <KafelekD k={{ kurs: s.kurs, bukmacher: "Superbet" }} />
+        <KafelekD k={{ kurs: s.kurs, bukmacher: s.bukmacher, teraz: s.teraz, terazBukmacher: s.terazBukmacher }} />
       </div>
     </div>
   );
@@ -248,11 +258,11 @@ function Tabela({ d }: { d: DrabinkaV }) {
             <span className="el-szczebel-pokrycie">
               {x.traf}/{x.z} meczów
             </span>
-            <span className="el-szczebel-p" data-brak={x.p === null ? "true" : undefined}>
-              {x.p !== null ? `${Math.round(x.p * 100)}%` : "–"}
+            <span className="el-szczebel-p" data-brak={szansaWidoczna(x) ? undefined : "true"}>
+              {szansaWidoczna(x) && x.p !== null ? `${Math.round(x.p * 100)}%` : "–"}
             </span>
             <span onClick={(e) => e.stopPropagation()}>
-              <KafelekD k={{ kurs: x.kurs, bukmacher: "Superbet" }} />
+              <KafelekD k={{ kurs: x.kurs, bukmacher: x.bukmacher, teraz: x.teraz, terazBukmacher: x.terazBukmacher }} />
             </span>
           </div>
         ))}

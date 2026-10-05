@@ -46,7 +46,7 @@ const CZESCI: Czesc[] = [
     id: "kurs",
     nazwa: "Kurs",
     selektor: ".d-kurs",
-    tekst: "Najwyższy kurs z dwóch bukmacherów, przy nim logo tego, który płaci więcej. Sprawdzamy kursy co godzinę – przed postawieniem zerknij, czy się nie zmienił.",
+    tekst: "Kurs z chwili, gdy typ trafił na listę – najwyższy z dwóch bukmacherów, przy nim logo tego, który płaci więcej. Kursy sprawdzamy co pół godziny – przed postawieniem zerknij, czy się nie zmienił.",
   },
   {
     id: "historia",
@@ -261,7 +261,7 @@ const POJECIA: Pojecie[] = [
   {
     id: "zwrot",
     nazwa: "Zwrot",
-    tekst: "Zawodnik nie wszedł na boisko albo mecz przełożono – bukmacher oddaje stawkę. W Wynikach zwrot nie jest ani trafieniem, ani pudłem.",
+    tekst: "Bukmacher oddaje stawkę. W Superbecie – gdy zawodnik nie wyjdzie w pierwszym składzie, w Betclicu – gdy nie zagra ani minuty. Przełożony mecz to zwrot, jeśli nie odbędzie się w terminie bukmachera. W Wynikach zwrot nie jest ani trafieniem, ani pudłem.",
     przyklad: (
       <span className="jc-ex">
         <span className="jc-zwrot">↺</span> stawka wraca
@@ -316,10 +316,11 @@ function Slowniczek({ drabinka }: { drabinka: DaneStron["drabinka"] }) {
 /* ---- najczęstsze pytania ---------------------------------------------------- */
 
 const PYTANIA: { p: string; o: React.ReactNode }[] = [
-  { p: "Kiedy pojawiają się typy?", o: "Gdy bukmacherzy wystawią kursy – na jutrzejsze mecze zwykle po 18:00. Lista odświeża się co godzinę, a nowe typy przestają dochodzić półtorej godziny przed meczem, żebyś zdążył spokojnie postawić." },
-  { p: "Co, jeśli zawodnik nie zagra?", o: "Bukmacher oddaje stawkę – to zwrot. U nas taki typ nie liczy się ani jako trafiony, ani jako pudło." },
+  { p: "Kiedy pojawiają się typy?", o: "Gdy bukmacherzy wystawią kursy – na jutrzejsze mecze zwykle po 18:00. Lista odświeża się co pół godziny, a nowe typy przestają dochodzić półtorej godziny przed meczem, żebyś zdążył spokojnie postawić." },
+  { p: "Co, jeśli zawodnik nie zagra?", o: "Zależy od bukmachera. Superbet oddaje stawkę, gdy zawodnik nie wyjdzie w pierwszym składzie – nawet jeśli wejdzie z ławki. Gdy zejdzie w trakcie, Superbet dolicza to, co zrobi jego zmiennik. Betclic oddaje stawkę tylko wtedy, gdy zawodnik nie zagra ani minuty. U nas zwrot nie liczy się ani jako trafiony, ani jako pudło." },
+  { p: "A jeśli mecz przełożą?", o: "Superbet oddaje stawkę, gdy mecz nie odbędzie się do północy następnego dnia, Betclic – gdy nie odbędzie się w ciągu 48 godzin. Jeśli zagrają w tym terminie, typ rozliczamy normalnie." },
   { p: "Czy gwarantujecie wygraną?", o: "Nie. Typ to szansa, nie pewność – nawet przy 75% co czwarty taki zakład nie wejdzie. Dlatego w Wynikach zostaje każdy typ, także te nietrafione." },
-  { p: "Skąd bierzecie kursy?", o: "Z ofert Superbetu i Betclica, sprawdzanych co godzinę. Kurs u bukmachera może się zmienić między naszym odświeżeniem a Twoim zakładem – zerknij przed postawieniem." },
+  { p: "Skąd bierzecie kursy?", o: "Z ofert Superbetu i Betclica, sprawdzanych co pół godziny. Kurs u bukmachera może się zmienić między naszym odświeżeniem a Twoim zakładem – zerknij przed postawieniem." },
   { p: "Jak liczycie skuteczność?", o: "Każdy typ, który był na stronie, rozliczamy po meczu – bez poprawiania wstecz. Drabinka liczy się raz, za pierwszy szczebel. Zwroty pomijamy." },
   { p: "Czym różni się szansa od kursu?", o: "Kurs to cena bukmachera, szansa to nasza ocena z historii i kontekstu meczu. Gdy nasza szansa jest wyraźnie wyższa niż to, co wynika z kursu, bukmacher płaci więcej, niż powinien." },
 ];

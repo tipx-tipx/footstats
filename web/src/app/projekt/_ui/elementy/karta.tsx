@@ -7,7 +7,7 @@ import { useId, useState } from "react";
 import { fmtLinia } from "@/lib/format";
 
 import type { KartaV, Powod } from "../../_dane/elementy";
-import { KafelekD, KratkiD, SzansaD } from "../atomy2/podstawowe";
+import { KafelekD, KratkiD, SzansaD, kursTypu } from "../atomy2/podstawowe";
 import { Herb } from "../Herb";
 import { IkonaRynku } from "./ikonyRynkow";
 
@@ -154,7 +154,7 @@ export function KartaA({ t, otwarta = false, bezMeczu = false }: { t: KartaV; ot
         </div>
         <SzansaD p={t.szansa} mala />
         <span onClick={(e) => e.stopPropagation()}>
-          <KafelekD k={{ kurs: t.kurs, bukmacher: t.bukmacher }} />
+          <KafelekD k={kursTypu(t)} />
         </span>
         <Chevron />
       </div>
@@ -193,7 +193,7 @@ export function KartaB({ t }: { t: KartaV }) {
         <div className="el-zaklad">
           {t.rynek} <span>{strona(t.strona)}</span> {fmtLinia(t.linia)}
         </div>
-        <KafelekD k={{ kurs: t.kurs, bukmacher: t.bukmacher }} />
+        <KafelekD k={kursTypu(t)} />
       </div>
       <KratkiD t={t} />
       {glowny && (
@@ -238,7 +238,7 @@ function KartaC({ t }: { t: KartaV }) {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <SzansaD p={t.szansa} mala />
-          <KafelekD k={{ kurs: t.kurs, bukmacher: t.bukmacher }} />
+          <KafelekD k={kursTypu(t)} />
         </div>
       </div>
       <Powody powody={pokaz} />

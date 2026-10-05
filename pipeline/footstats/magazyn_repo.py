@@ -254,12 +254,26 @@ def pobierz(key: str) -> tuple[object | None, bool]:
         return None, True          # magazyn działa, klucza jeszcze nie ma
 
     asset = wersje[0]
-    r = _z_ponowieniem(f"pobranie '{asset['name']}'", lambda: requests.get(
-        f"{API}/repos/{repo}/releases/assets/{asset['id']}",
-        headers=_naglowki(token, "application/octet-stream"), timeout=120,
-    ))
+    r = _pobierz_asset(repo, token, asset)
     if r is None or r.status_code != 200:
-        return None, False
+        # ⚑ SPIS Z PAMIĘCI BYWA NIEAKTUALNY (2026-10-05). Spis wersji trzymamy
+        # na cały proces, a INNY proces (backfill magazynu drużyn zapisuje co
+        # 25 drużyn, ~90 razy na przebieg) w tym czasie dopisuje nowe wersje
+        # i kasuje stare ponad RETENCJA. Cykl z 11:30 UTC trafił na skasowaną
+        # wersję 9 z 10 szard hd_*, uznał magazyn za niepełny i liczył cały
+        # cykl bez modelu uczonego. Jedno odświeżenie spisu i próba
+        # z najnowszą wersją — dodatkowe zapytanie tylko przy błędzie.
+        wyczysc_pamiec()
+        rel = _release(repo, token, tag)
+        if rel is None:
+            return None, False
+        nowe = _wersje(rel[1], key)
+        if not nowe or nowe[0]["id"] == asset["id"]:
+            return None, False
+        asset = nowe[0]
+        r = _pobierz_asset(repo, token, asset)
+        if r is None or r.status_code != 200:
+            return None, False
     try:
         with gzip.open(io.BytesIO(r.content), "rt", encoding="utf-8") as f:
             return json.load(f), True
@@ -270,6 +284,13 @@ def pobierz(key: str) -> tuple[object | None, bool]:
               f"({ex!r}) — traktuję jak padnięty odczyt",
               file=sys.stderr, flush=True)
         return None, False
+
+
+def _pobierz_asset(repo: str, token: str, asset: dict):
+    return _z_ponowieniem(f"pobranie '{asset['name']}'", lambda: requests.get(
+        f"{API}/repos/{repo}/releases/assets/{asset['id']}",
+        headers=_naglowki(token, "application/octet-stream"), timeout=120,
+    ))
 
 
 def zapisz(key: str, payload) -> bool:

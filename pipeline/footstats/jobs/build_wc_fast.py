@@ -658,11 +658,57 @@ def moc_listy(b: dict, kandydatow_w_meczu: int) -> float:
     return round(moc, 4)
 
 
+# ⚑ „KURS TERAZ" (2026-10-05, audyt 05.10 pkt 16). Typ i karta pokazują cenę
+# z chwili publikacji — po niej rozlicza je księga i ją user widział, biorąc
+# typ. Kurs potem się rusza, a przy cenie, której już nie ma, user pisze
+# „takiego kursu nie ma" (Aydin 05.10). Stempel `kurs_teraz` = najlepsza
+# BIEŻĄCA cena tej samej linii u naszych bukmacherów, tylko gdy różni się od
+# ceny publikacji. Źródła po kolei: przeliczenie tego cyklu (typy na liście
+# i zdjęte bramami — ta sama wycena co typ) → siatka kursów zawodników
+# (`odds_grid`, tylko „powyżej"). Brak w obu = brak stempla, NIE „zdjęty
+# z oferty" — tego z samej nieobecności nie wiemy.
+def kurs_z_siatki(oferta: dict | None, zrodla: dict | None, mid, pid, mk,
+                  linia) -> tuple[float, str] | None:
+    """(kurs „powyżej", bukmacher) z siatki zawodników albo None."""
+    if not oferta or mid is None or pid is None or linia is None:
+        return None
+    try:
+        linie = ((oferta.get(mid) or oferta.get(int(mid)) or {})
+                 .get(pid) or (oferta.get(mid) or oferta.get(int(mid)) or {})
+                 .get(int(pid)) or {}).get(mk) or {}
+        kl = next((x for x in (str(float(linia)), str(linia)) if x in linie), None)
+    except (TypeError, ValueError):
+        return None
+    if kl is None or not linie.get(kl):
+        return None
+    try:
+        kto = ((((zrodla or {}).get(mid) or {}).get(pid) or {}).get(mk) or {}).get(kl)
+    except AttributeError:
+        kto = None
+    return float(linie[kl]), (kto or "Superbet")
+
+
+def stempluj_kurs_teraz(bet: dict, teraz: tuple[float, str] | None) -> bool:
+    """Dopisz `kurs_teraz`/`kurs_teraz_bukmacher`, gdy cena się zmieniła."""
+    bet.pop("kurs_teraz", None)
+    bet.pop("kurs_teraz_bukmacher", None)
+    if not teraz or not bet.get("kurs"):
+        return False
+    kurs, kto = teraz
+    if abs(float(kurs) - float(bet["kurs"])) < 0.005:
+        return False
+    bet["kurs_teraz"] = round(float(kurs), 2)
+    bet["kurs_teraz_bukmacher"] = kto
+    return True
+
+
 def scal_z_publikacjami(
     value_bets: list[dict], matches_out: dict, teraz: int | None = None,
     typy_log: dict | None = None, liga_by_mid: dict | None = None,
     policzone_w_cyklu: list[dict] | None = None,
     zamkniete: dict[str, set] | None = None,
+    oferta_zawodnikow: dict | None = None,
+    zrodla_oferty: dict | None = None,
 ) -> tuple[list[dict], int]:
     """Lista typów = wszystko, co OPUBLIKOWANE i czeka na gwizdek.
 
@@ -746,6 +792,13 @@ def scal_z_publikacjami(
         for r in (typy_log or {}).values() if r.get("kurs")
     }
 
+    # ceny BIEŻĄCE (patrz `kurs_z_siatki`) — zbierane ZANIM pętla niżej
+    # podmieni kurs świeżo przeliczonego typu na cenę z księgi
+    kursy_biezace: dict[str, tuple[float, str]] = {}
+    for b in list(policzone_w_cyklu or []) + list(value_bets):
+        if b.get("kurs") and not b.get("sugestia"):
+            kursy_biezace[_klucz_publikacji(b)] = (
+                float(b["kurs"]), b.get("bukmacher") or "Superbet")
     out = list(value_bets)
     swieze_po_kluczu: dict[str, list[dict]] = {}
     for b in value_bets:
@@ -1073,6 +1126,28 @@ def scal_z_publikacjami(
         print(f"Ogłoszona doba dokańcza dzień: {_wznow_ogloszona_doba} typów "
               "wróciło mimo innej wersji, bo stoją w zamrożonej liście dnia "
               "(nowe typy tej doby i tak nie wejdą)")
+    # KURS TERAZ (patrz `kurs_z_siatki`) — świeży typ ma kurs = cena bieżąca,
+    # więc stempel dostają tylko pokazane wcześniej, którym cena się ruszyła
+    _kt = Counter()
+    for b in out:
+        if b.get("sugestia"):
+            continue
+        teraz_b = kursy_biezace.get(_klucz_publikacji(b))
+        zrodlo_kt = "przeliczenie"
+        if (teraz_b is None and b.get("strona") == "powyzej"
+                and not str(b.get("rynek_kod") or "").startswith(
+                    betting.PRZEDROSTKI_DRUZYNOWE)):
+            teraz_b = kurs_z_siatki(oferta_zawodnikow, zrodla_oferty,
+                                    b.get("mecz_id"), b.get("podmiot_id"),
+                                    b.get("rynek_kod"), b.get("linia"))
+            zrodlo_kt = "siatka"
+        if stempluj_kurs_teraz(b, teraz_b):
+            _kt[zrodlo_kt] += 1
+            _kt["w_gore" if b["kurs_teraz"] > b["kurs"] else "w_dol"] += 1
+        elif teraz_b is None and (b.get("wznowiony") or b.get("pokazany_wczesniej")):
+            _kt["bez_ceny"] += 1
+    if _kt:
+        print("Kurs teraz (typy): " + ", ".join(f"{k} {v}" for k, v in sorted(_kt.items())))
     return out, wznowione + z_logu
 
 
@@ -1690,9 +1765,28 @@ def zapisz_pokazane(lista_pub: list[dict], radar_wpisy: list[dict],
 PUBLIKACJE_KART_KLUCZ = "publikacje_karty"
 
 
+def bez_poza_ogloszonym(bets: list[dict], poza_ogloszonym: set | None
+                        ) -> tuple[list[dict], int]:
+    """Typy zawodników, których NIE MA w ogłoszonym składzie, wypadają z listy.
+
+    Tylko zawodnicy (drużyna zawsze gra) i tylko pewna informacja — zbiór
+    `poza_ogloszonym` z potwierdzonych składów, nie z prognozy.
+    """
+    if not poza_ogloszonym:
+        return bets, 0
+    out = [b for b in bets
+           if not (b.get("podmiot_typ") == "zawodnik"
+                   and (_int_lub_zero(b.get("mecz_id")), b.get("podmiot_id"))
+                   in poza_ogloszonym)]
+    return out, len(bets) - len(out)
+
+
 def scal_karty_z_publikacjami(
     wpisy: list[dict], teraz: int | None = None,
     wypadli: set | None = None,
+    poza_ogloszonym: set | None = None,
+    oferta_zawodnikow: dict | None = None,
+    zrodla_oferty: dict | None = None,
 ) -> list[dict]:
     """To samo co `scal_z_publikacjami`, ale dla kart drabinek.
 
@@ -1738,6 +1832,7 @@ def scal_karty_z_publikacjami(
     bez_drugiego = 0
     poza_sitem = 0
     nie_gra = 0
+    poza_skladem_ogl = 0
     nierozstrzygniete = 0
     for k, rec in list(rej.items()):
         # jak przy typach: karta bez kickoffu wygasa od razu, zamiast wracać
@@ -1756,6 +1851,13 @@ def scal_karty_z_publikacjami(
         # „100% startów". Ogłoszony skład (xi True) to przebija.
         if wypadli and w.get("podmiot_id") in wypadli and w.get("xi") is not True:
             nie_gra += 1
+            continue
+        # ⚑ OGŁOSZONY SKŁAD BEZ ZAWODNIKA (2026-10-05) — schodzi zawsze,
+        # zamrożone `xi=True` z chwili publikacji tego nie przebija
+        # (Matanović 03.10). Wpis zostaje w rejestrze i w księdze.
+        if poza_ogloszonym and (
+                _int_lub_zero(w.get("mecz_id")), w.get("podmiot_id")) in poza_ogloszonym:
+            poza_skladem_ogl += 1
             continue
         # brama struktury na wznowieniu (patrz nota w docstringu). Wpis
         # ZOSTAJE w rejestrze — zdejmujemy go z listy, nie z historii; sam
@@ -1798,11 +1900,47 @@ def scal_karty_z_publikacjami(
             continue
         zajete_dnia[dz] += 1
         przyjete.append(w)
+    # KURS Z PUBLIKACJI I KURS TERAZ (2026-10-05, patrz `kurs_z_siatki`).
+    # Karta przeliczona na nowo niesie BIEŻĄCE ceny, wznowiona — ceny
+    # z ostatniego cyklu, w którym ją liczono; księga rozlicza 1. szczebel po
+    # cenie z PIERWSZEJ publikacji. Rejestr zapamiętuje tę cenę
+    # (`kurs_publikacji`, pierwsza wygrywa jak `opublikowano_ts`), a hero
+    # dostaje obie: front pokazuje „przy publikacji X, teraz Y".
+    _kt = Counter()
+    for w in przyjete + out:
+        k = klucz(w)
+        hero = dict(w.get("hero") or {})
+        kp = (rej.get(k) or {}).get("kurs_publikacji") or hero.get("kurs")
+        if not kp:
+            continue
+        if w.get("wznowiony"):
+            teraz_h = kurs_z_siatki(oferta_zawodnikow, zrodla_oferty, w.get("mecz_id"),
+                                    w.get("podmiot_id"), hero.get("rynek_kod"),
+                                    hero.get("linia"))
+        else:
+            teraz_h = (float(hero["kurs"]), hero.get("bukmacher") or "Superbet") \
+                if hero.get("kurs") else None
+        hero["kurs_publikacji"] = round(float(kp), 2)
+        if stempluj_kurs_teraz({"kurs": kp}, teraz_h):
+            hero["kurs_teraz"] = round(float(teraz_h[0]), 2)
+            hero["kurs_teraz_bukmacher"] = teraz_h[1]
+            _kt["w_gore" if teraz_h[0] > float(kp) else "w_dol"] += 1
+        else:
+            hero.pop("kurs_teraz", None)
+            hero.pop("kurs_teraz_bukmacher", None)
+            if teraz_h is None:
+                _kt["bez_ceny"] += 1
+        w["hero"] = hero
+    if _kt:
+        print("Kurs teraz (karty): " + ", ".join(f"{k} {v}" for k, v in sorted(_kt.items())))
     for w in przyjete:
         k = klucz(w)
         rej[k] = {
             "wpis": w, "kickoff_ts": w.get("kickoff_ts"),
             "opublikowano_ts": (rej.get(k) or {}).get("opublikowano_ts") or teraz,
+            "kurs_publikacji": (rej.get(k) or {}).get("kurs_publikacji")
+            or (w.get("hero") or {}).get("kurs_publikacji")
+            or (w.get("hero") or {}).get("kurs"),
         }
     out = przyjete + out
     if za_limitem:
@@ -1811,13 +1949,14 @@ def scal_karty_z_publikacjami(
               + ", ".join(f"{d} {n}" for d, n in sorted(zajete_dnia.items())) + ")")
     if not _dry_run() and odczyt_ok:
         supa.put_key(PUBLIKACJE_KART_KLUCZ, rej)
-    if wznowione or bez_drugiego or nie_gra or poza_sitem:
+    if wznowione or bez_drugiego or nie_gra or poza_sitem or poza_skladem_ogl:
         # licznik przy bramie, nie cisza ([[ciche-odrzucenia-zasada]])
         print(f"Publikacje kart: wznowiono {wznowione} "
               f"(bieżące przeliczenie dało {len(wpisy)}), "
               f"bez drugiego szczebla zdjęto {bez_drugiego}, "
               f"poza sitem zdjęto {poza_sitem}, "
-              f"zawodnik nie gra: {nie_gra}"
+              f"zawodnik nie gra: {nie_gra}, "
+              f"poza ogłoszonym składem: {poza_skladem_ogl}"
               + (f", bez zapisanej drabinki {nierozstrzygniete}"
                  if nierozstrzygniete else ""))
     out.sort(key=lambda w: (w.get("kickoff_ts") or 0, w.get("mecz_id") or 0))
@@ -1937,7 +2076,7 @@ def czynniki_pary(h_n: dict, a_n: dict, nazwa_bazy: str, rho: float) -> list[dic
         "nazwa": "Poziom bazowy",
         "opis": (
             f"{h_n['nazwa']} notuje średnio {h_n['pred'].lam:.1f} "
-            f"({kto}) na mecz, {a_n['nazwa']} {a_n['pred'].lam:.1f} — "
+            f"({kto}) na mecz, {a_n['nazwa']} {a_n['pred'].lam:.1f} – "
             f"razem {h_n['pred'].lam + a_n['pred'].lam:.1f}. Obie liczby są "
             f"już po korekcie na siłę rywala i miejsce gry"
         ),
@@ -1951,7 +2090,7 @@ def czynniki_pary(h_n: dict, a_n: dict, nazwa_bazy: str, rho: float) -> list[dic
             "opis": (
                 "Kiedy jedna drużyna notuje więcej, druga zwykle "
                 + ("też" if rho > 0 else "mniej")
-                + f" — zmierzone na historii ({rho:+.2f}). Bez tego suma "
+                + f" – zmierzone na historii ({rho:+.2f}). Bez tego suma "
                   "wychodziłaby zbyt równa"
             ),
             "mnoznik": None,
@@ -2184,7 +2323,7 @@ OPISY_ZDJECIA_PL = {
     "poza_lista_dnia": "limit listy dnia wyczerpany (15 + 5 na dobę, 3 na mecz, limit rodziny)",
     "rynek_ukryty": "rynek chwilowo ukryty na stronie",
     "rynek_wycofany": "rynku nie umiemy rozliczyć, więc nie pokazujemy typu",
-    "bez_sygnalu_skladu": "ani składu, ani występu w ostatnim meczu drużyny — nie wiemy, czy zagra",
+    "bez_sygnalu_skladu": "ani składu, ani występu w ostatnim meczu drużyny – nie wiemy, czy zagra",
     "ujemna_po_korekcie": "po urealnieniu szansy wartość wyszła ujemna",
     "kurs_poza_widelkami": "kurs poza widełkami, w jakich gramy",
     "limit_meczu": "z tego meczu mamy już tyle typów, ile publikujemy",
@@ -6015,6 +6154,28 @@ def _main_impl(tryb=None):
             is False
         ):
             poza_skladem.add((t.event_id, t.player_id))
+    # ⚑ POZA OFICJALNYM SKŁADEM (2026-10-05). `poza_skladem` miesza prognozę
+    # (myli się w ~22%) z ogłoszonym składem — jako brama nowych typów to
+    # świadoma decyzja, ale WZNOWIONE karty i typy (zamrożone, opublikowane
+    # wcześniej) mogą zejść ze strony WYŁĄCZNIE na pewnej informacji: skład
+    # potwierdzony (statshub `confirmed` albo potwierdzenie Rotowire),
+    # a zawodnika w nim nie ma. Matanović 03.10: karta z zamrożonym xi=True
+    # wisiała do gwizdka, a zawodnik zaczął na ławce (zwrot u Superbetu).
+    poza_ogloszonym: set[tuple[int, int]] = set()
+    for mid_x, v in xi_pelne.items():
+        if not v.get("confirmed"):
+            continue
+        for tid_x, xi_set in v["xi_by_team"].items():
+            for t in trends:
+                if (t.event_id == mid_x and t.team_id == tid_x
+                        and t.player_id and t.player_id not in xi_set):
+                    poza_ogloszonym.add((mid_x, t.player_id))
+    for t in trends:
+        if (t.player_id and t.event_id
+                and rotowire.is_confirmed(roto, t.team_name)
+                and rotowire.predicted_status(roto, t.team_name, t.player_name)
+                is False):
+            poza_ogloszonym.add((t.event_id, t.player_id))
     # tri-state dla UI: True = w składzie, False = poza składem, None = nie
     # wiemy. Bez tego karta nie umie odróżnić „ławka" od „skład nieznany".
     xi_znany: dict[tuple[int, int], bool] = {}
@@ -10028,7 +10189,9 @@ def _main_impl(tryb=None):
         if not _dry_run():          # dry-run nie dotyka Supabase — także tabeli
             radar_imienny.zapisz(_imienny_radar, int(time.time()))
         # karta raz pokazana zostaje do gwizdka — ta sama zasada co przy typach
-        radar_wpisy = scal_karty_z_publikacjami(radar_wpisy, wypadli=_wypadli_z_gry)
+        radar_wpisy = scal_karty_z_publikacjami(
+            radar_wpisy, wypadli=_wypadli_z_gry, poza_ogloszonym=poza_ogloszonym,
+            oferta_zawodnikow=odds_grid, zrodla_oferty=zrodla_grid)
         # RYNEK WYCOFANY schodzi też z KART — i to PO scaleniu z publikacjami,
         # bo inaczej wróciłby tą samą drogą co wznowiony typ
         # ([[wznowione-karty-omijaly-bramy]]). Karta bez ani jednego rynku
@@ -10450,7 +10613,15 @@ def _main_impl(tryb=None):
         # wznowiona z księgi może z niego skorzystać (patrz `_dolóż_rentgen`)
         policzone_w_cyklu=typy_poza_publikacja,
         zamkniete=_zamkniete,
+        oferta_zawodnikow=odds_grid, zrodla_oferty=zrodla_grid,
     )
+    # ⚑ WZNOWIONY TYP ZAWODNIKA SPOZA OGŁOSZONEGO SKŁADU schodzi ze strony
+    # (2026-10-05) — ta sama zasada co przy kartach (`poza_ogloszonym`).
+    # Rekord zostaje w księdze i rozliczy się według reguły bukmachera.
+    value_bets_pub, _zdjete_ogl = bez_poza_ogloszonym(value_bets_pub, poza_ogloszonym)
+    if _zdjete_ogl:
+        print(f"Typy poza ogłoszonym składem: {_zdjete_ogl} wznowionych typów "
+              "zawodników zdjętych ze strony (rekordy zostają w księdze)")
 
     # TYP WZNOWIONY TEŻ JEST LEGIEM (naprawa 2026-07-30, zgłoszenie usera:
     # „jak to możliwe, że pula ma jednego lega, jak jest dużo więcej").
@@ -10734,6 +10905,16 @@ def _main_impl(tryb=None):
     _polka_po_kluczu = {
         _klucz_publikacji(b): b["polka"] for b in lista_pub if b.get("polka")
     }
+    # ⚑ SZANSA Z KARTY TEŻ NIE DOJEŻDŻAŁA DO KSIĘGI (2026-10-05, audyt: 0 z
+    # 25 923 rekordów). Ta sama pułapka co `polka`: ściąganie do ceny pisze na
+    # KOPII z listy (`_sciagnij_karte_do_ceny`), a do księgi idzie oryginał.
+    # Bez tej liczby nie da się zmierzyć, czy karta mówi prawdę.
+    _pokazane_po_kluczu = {
+        _klucz_publikacji(b): b["rachunek"]["p_pokazane"]
+        for b in lista_pub
+        if isinstance(b.get("rachunek"), dict)
+        and b["rachunek"].get("p_pokazane") is not None
+    }
     _pokazane_wracaja = sum(1 for b in lista_pub if b.get("wznowiony"))
     if len(do_pokazania) > len(lista_pub):
         print(f"Lista publikowana: {len(lista_pub)} z {len(do_pokazania)} "
@@ -10992,6 +11173,8 @@ def _main_impl(tryb=None):
             {pid: z.get("nazwa") for pid, z in players_out.items()},
             sb_cache, bc_cache,
             superbet.znajdz_zawodnika, betclic.znajdz_zawodnika,
+            # ta sama brama wiarygodności Betclica co w typach (05.10)
+            brama_bc=lambda _sb, _bc: betclic.linie_do_scalenia(_sb, _bc)[0],
         ))
     except Exception as e:
         diagnostyka.cichy("cykl", "kursy_dwa", e)
@@ -11389,6 +11572,10 @@ def _main_impl(tryb=None):
             _p = _polka_po_kluczu.get(_klucz_publikacji(_b))
             if _p:
                 _b["polka"] = _p      # patrz nota przy `_polka_po_kluczu`
+        _pp = _pokazane_po_kluczu.get(_klucz_publikacji(_b))
+        if _pp is not None and isinstance(_b.get("rachunek"), dict)                 and _b["rachunek"].get("p_pokazane") is None:
+            # nowy słownik — oryginał bywa współdzielony z kopią listy
+            _b["rachunek"] = {**_b["rachunek"], "p_pokazane": _pp}
         _b["kolejnosc"] = {"moc": moc_listy(_b, _ile), "kandydatow": _ile,
                            **({"polka": _b["polka"]} if _b.get("polka") else {}),
                            # ⚑ WZNOWIENIE TEŻ NIE DOJEŻDŻAŁO (2026-08-24, ta

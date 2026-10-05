@@ -85,6 +85,9 @@ export type TypV = {
   kadra: boolean[];
   /** kurs, od którego typ ma sens (gdy bukmacher jeszcze nie wystawił) */
   kursUczciwy: number | null;
+  /** bieżąca najlepsza cena tej linii, gdy różni się od ceny z publikacji (pipeline od 05.10) */
+  kursTeraz?: number | null;
+  kursTerazBukmacher?: string;
   uzasadnienie: string | null;
 };
 import { dzisZrodla, zrodlo } from "./zrodlo";
@@ -240,6 +243,8 @@ type TypSurowy = {
   mecz_id: number;
   polka?: string;
   fair_kurs?: number | null;
+  kurs_teraz?: number | null;
+  kurs_teraz_bukmacher?: string;
   uzasadnienie?: { czynniki?: { nazwa: string; opis: string }[] };
 };
 
@@ -321,6 +326,8 @@ export function przygotujFundamenty() {
       }),
       kadra: (f.kadra ?? []).slice(0, 10).reverse(),
       kursUczciwy: t.fair_kurs ?? null,
+      kursTeraz: t.kurs_teraz ?? null,
+      kursTerazBukmacher: t.kurs_teraz_bukmacher,
       uzasadnienie: t.uzasadnienie?.czynniki?.[0]?.opis ?? null,
     };
   };

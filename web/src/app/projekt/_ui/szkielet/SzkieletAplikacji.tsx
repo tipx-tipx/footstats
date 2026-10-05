@@ -60,7 +60,7 @@ function useSwiezosc(ts: number) {
   const stan: Stan = wiekH <= 2 ? "swieze" : wiekH <= 24 ? "stare" : "awaria";
   const tekst =
     stan === "swieze"
-      ? { przedrostek: "kursy z ", rdzen: godz, opis: `Kursy i typy przeliczone o ${godz}. Odświeżamy co godzinę.` }
+      ? { przedrostek: "kursy z ", rdzen: godz, opis: `Kursy i typy przeliczone o ${godz}. Odświeżamy co pół godziny. Kurs przy typie to kurs z chwili publikacji – przed postawieniem zerknij u bukmachera.` }
       : stan === "stare"
         ? { przedrostek: "kursy sprzed ", rdzen: `${Math.round(wiekH)} h`, opis: `Od ${Math.round(wiekH)} h nie mamy świeżych kursów – sprawdź kurs u bukmachera przed postawieniem.` }
         : { przedrostek: "dane sprzed ", rdzen: `${Math.round(wiekH / 24)} dni`, opis: `Dane nie odświeżają się od ${Math.round(wiekH / 24)} dni. Typy mogą być nieaktualne.` };

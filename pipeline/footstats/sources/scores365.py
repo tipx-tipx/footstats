@@ -996,9 +996,13 @@ def game_scores_90(game_id: int) -> dict[str, float]:
 def game_team_cards_90(game_id: int) -> dict[str, float]:
     """Kartki drużyn W REGULAMINOWYM CZASIE: {znormalizowana nazwa: kartki}.
 
-    Liczone ze zdarzeń o `stageId` z ETAPY_REGULAMINOWE. Suma żółtych i
-    czerwonych — ta sama konwencja co `game_team_stats` (`kartki` = żółte +
-    czerwone), żeby obie drogi dawały tę samą liczbę.
+    Liczone ze zdarzeń o `stageId` z ETAPY_REGULAMINOWE według reguły
+    Superbetu (Oficjalny Komunikat nr 06/2022 z 13.02.2024, pkt 2): żółta = 1,
+    czerwona = 2, wykluczenie za dwie żółte = 3. W 365 druga żółta to jedno
+    zdarzenie „Red Card" (podtyp „Second Yellow Card"), a pierwsza żółta
+    zostaje osobnym zdarzeniem — więc każde „Red Card" = 2 daje dokładnie
+    regułę bukmachera (sprawdzone 05.10: Everton – Ipswich, gid 4742058,
+    Ipswich 1 + 2 + 1 = 4). Ta sama konwencja co `game_team_stats`.
 
     Pusty słownik, gdy mecz nie ma ANI JEDNEGO zdarzenia regulaminowego —
     „zero kartek" i „brak danych o zdarzeniach" muszą zostać rozróżnialne,
@@ -1025,12 +1029,13 @@ def game_team_cards_90(game_id: int) -> dict[str, float]:
         widziano_regulaminowe = True
         typ = e.get("eventType")
         nazwa_typu = str((typ or {}).get("name") if isinstance(typ, dict) else typ or "")
-        if nazwa_typu.strip().lower() not in ("yellow card", "red card"):
+        waga = {"yellow card": 1.0, "red card": 2.0}.get(nazwa_typu.strip().lower())
+        if waga is None:
             continue
         cid = e.get("competitorId")
         nm = nazwy.get(str(int(cid))) if cid is not None else None
         if nm:
-            out[nm] = out.get(nm, 0.0) + 1.0
+            out[nm] = out.get(nm, 0.0) + waga
     if not widziano_regulaminowe:
         return {}
     _cards90_cache[game_id] = out
@@ -1045,7 +1050,10 @@ def game_team_stats(game_id: int) -> dict[str, dict[str, float]]:
 
     Endpoint `game/stats/?...&games=` (NIE `game/`) — płaska lista ~40
     statystyk per competitorId; nazwy drużyn z pola `competitors` tej samej
-    odpowiedzi. `kartki` = żółte + czerwone (skala matchup.LG_TEAM_CARDS).
+    odpowiedzi. `kartki` = żółte + 2 × czerwone — reguła Superbetu (patrz
+    `game_team_cards_90`; statystyka `zolte` 365 liczy też pierwszą żółtą
+    wykluczonego, więc druga żółta → 1 + 2 = 3 jak u bukmachera). Czerwone
+    to ~0,1 na drużynę na mecz — skala matchup.LG_TEAM_CARDS bez zmian.
     """
     if game_id in _team_stats_cache:
         return _team_stats_cache[game_id]
@@ -1078,7 +1086,7 @@ def game_team_stats(game_id: int) -> dict[str, dict[str, float]]:
         nm = nazwa_cid.get(cid)
         if not nm:
             continue
-        st["kartki"] = st.pop("zolte", 0.0) + st.pop("czerwone", 0.0)
+        st["kartki"] = st.pop("zolte", 0.0) + 2.0 * st.pop("czerwone", 0.0)
         out[nm] = st
     _team_stats_cache[game_id] = out
     return out

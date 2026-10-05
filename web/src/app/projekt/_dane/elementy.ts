@@ -46,7 +46,19 @@ export type MeczE = {
   szanse: number[];
 };
 
-export type SzczebelV = { linia: number; kurs: number; p: number | null; traf: number; z: number; polecany: boolean };
+/** `bukmacher` – u kogo ta cena (05.10: karta pisała „Superbet” na sztywno, także przy cenach Betclica) */
+export type SzczebelV = {
+  linia: number;
+  kurs: number;
+  p: number | null;
+  traf: number;
+  z: number;
+  polecany: boolean;
+  bukmacher: "Superbet" | "Betclic";
+  /** polecany szczebel: bieżąca cena, gdy różni się od ceny z publikacji (pipeline od 05.10) */
+  teraz?: number | null;
+  terazBukmacher?: string;
+};
 
 export type DrabinkaV = {
   kto: string;
@@ -111,6 +123,8 @@ type TypS = {
   kickoff_ts: number;
   mecz_id: number;
   fair_kurs?: number | null;
+  kurs_teraz?: number | null;
+  kurs_teraz_bukmacher?: string;
   uzasadnienie?: { czynniki?: Czynnik[] };
 };
 
@@ -213,6 +227,8 @@ export function przygotujElementy() {
       daty: (f.ts ?? []).slice(0, n).reverse().map(data),
       kadra: Array(n).fill(false),
       kursUczciwy: dr.fair_kurs ?? null,
+      kursTeraz: dr.kurs_teraz ?? null,
+      kursTerazBukmacher: dr.kurs_teraz_bukmacher,
       uzasadnienie: null,
       podmiotTyp: "druzyna",
       mecz: nazwaMeczu(dr.mecz_id),
@@ -267,15 +283,26 @@ export function przygotujElementy() {
     przeciwnik: string;
     mecz: string;
     kickoff_ts: number;
-    hero: { linia: number; rynek?: string; rynek_kod?: string };
+    hero: {
+      linia: number;
+      rynek?: string;
+      rynek_kod?: string;
+      bukmacher?: string;
+      /** cena z pierwszej publikacji – po niej rozlicza się 1. szczebel */
+      kurs_publikacji?: number;
+      kurs_teraz?: number;
+      kurs_teraz_bukmacher?: string;
+    };
     rynki: {
       rynek: string;
       rynek_kod?: string;
       ostatnie: number[];
       minuty: number[];
       rywale: string[];
-      drabinka: { linia: number; kurs: number; p_final: number }[];
+      drabinka: { linia: number; kurs: number; p_final: number; bukmacher?: string }[];
       linie_pelne: Record<string, number>;
+      /** u kogo każda linia – tylko wyjątki od Superbetu (pipeline od 05.10) */
+      linie_bukmacher?: Record<string, string>;
     }[];
   };
   // każdy wpis radaru to jedna karta: rynek POLECANY (`hero`), nie pierwszy
@@ -284,17 +311,31 @@ export function przygotujElementy() {
     const r = wpis.rynki.find((x) => (wpis.hero.rynek_kod ? x.rynek_kod === wpis.hero.rynek_kod : x.rynek === wpis.hero.rynek)) ?? wpis.rynki[0];
     if (!r) return null;
     const hist = (r.ostatnie ?? []).slice(0, 10); // od najnowszego
+    // U kogo cena: szczebel ze swoim bukmacherem > mapa linii z pipeline'u >
+    // (karty sprzed 05.10, bez mapy) Betclic, gdy WSZYSTKIE szczeble są od
+    // Betclica – wtedy Superbet tego zawodnika nie wystawia (Güler).
+    const tylkoBetclic = r.drabinka.length > 0 && r.drabinka.every((x) => x.bukmacher === "Betclic");
+    const uKogo = (linia: number, l: string, d?: { bukmacher?: string }): "Superbet" | "Betclic" => {
+      // radar zapisuje bukmachera szczebla TYLKO, gdy to nie Superbet
+      const kto = d ? (d.bukmacher ?? "Superbet") : (r.linie_bukmacher?.[String(linia)] ?? r.linie_bukmacher?.[l] ?? (!r.linie_bukmacher && tylkoBetclic ? "Betclic" : "Superbet"));
+      return kto === "Betclic" ? "Betclic" : "Superbet";
+    };
     const szczeble: SzczebelV[] = Object.entries(r.linie_pelne ?? {})
       .map(([l, kurs]) => {
         const linia = Number(l);
         const d = r.drabinka.find((x) => x.linia === linia);
+        const polecany = linia === wpis.hero.linia;
+        // polecany szczebel pokazuje cenę z publikacji (po niej się rozliczy),
+        // a bieżącą obok – „teraz”
         return {
           linia,
-          kurs,
+          kurs: polecany && wpis.hero.kurs_publikacji ? wpis.hero.kurs_publikacji : kurs,
           p: d ? d.p_final : null,
           traf: hist.filter((v) => v > linia).length,
           z: hist.length,
-          polecany: linia === wpis.hero.linia,
+          polecany,
+          bukmacher: uKogo(linia, l, d),
+          ...(polecany && wpis.hero.kurs_teraz ? { teraz: wpis.hero.kurs_teraz, terazBukmacher: wpis.hero.kurs_teraz_bukmacher ?? "Superbet" } : {}),
         };
       })
       .sort((a, b) => a.linia - b.linia);

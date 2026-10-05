@@ -68,6 +68,7 @@ def siatka_dwoch_kursow(
     bc_cache: dict,
     znajdz_sb: Callable[[dict, str], dict],
     znajdz_bc: Callable[[dict, str], dict],
+    brama_bc: Callable[[dict, dict], dict] | None = None,
 ) -> dict:
     """{mecz_id: {zawodnik_id: {rynek: {linia: [superbet, betclic]}}}} – kurs
     „powyżej” u każdego bukmachera osobno (None = nie kwotuje tej linii).
@@ -78,6 +79,13 @@ def siatka_dwoch_kursow(
     odnaleźć (np. inna pisownia w odkrywaniu), zostaje cena z siatki u tego
     bukmachera, którego wskazuje `zrodla_grid` – wiadomo przynajmniej, czyja
     jest, a drugi kurs zostaje pusty zamiast zgadniętego.
+
+    `brama_bc(linie_sb, linie_bc) -> linie_bc_przyjete` (2026-10-05, w cyklu
+    `betclic.linie_do_scalenia`): rynek Betclica niezgodny z Superbetem (inna
+    statystyka – np. strzały Kabasakala 1,38 vs 3,10) traci cenę Betclica,
+    a linia dostaje trzeci element `1` = „Betclic liczy inaczej” (front pisze
+    „–” z podpowiedzią). Ta sama brama co w typach – strona nie może
+    pokazywać „lepszego kursu” na inną statystykę.
     """
     wynik: dict = {}
     for mid, gracze in (odds_grid or {}).items():
@@ -91,6 +99,10 @@ def siatka_dwoch_kursow(
             for mk, linie in (rynki or {}).items():
                 sb_l = {_f(l): (v or {}).get("over") for l, v in (sb_z.get(mk) or {}).items()}
                 bc_l = {_f(l): (v or {}).get("over") for l, v in (bc_z.get(mk) or {}).items()}
+                bc_inaczej = False
+                if brama_bc is not None and bc_l and not brama_bc(
+                        sb_z.get(mk) or {}, bc_z.get(mk) or {}):
+                    bc_l, bc_inaczej = {}, True
                 kto = obce.get(mk) or {}
                 cele: dict = {}
                 for l, najlepszy in (linie or {}).items():
@@ -99,11 +111,15 @@ def siatka_dwoch_kursow(
                     if sb is None and bc is None:
                         # oferty nie znaleźliśmy – cena z siatki u jej właściciela
                         if kto.get(l) == "Betclic":
-                            bc = najlepszy
+                            if not bc_inaczej:
+                                bc = najlepszy
                         else:
                             sb = najlepszy
-                    cele[str(l)] = [round(float(sb), 2) if sb else None,
-                                    round(float(bc), 2) if bc else None]
+                    para = [round(float(sb), 2) if sb else None,
+                            round(float(bc), 2) if bc else None]
+                    if bc_inaczej:
+                        para.append(1)
+                    cele[str(l)] = para
                 if cele:
                     wynik.setdefault(int(mid), {}).setdefault(int(pid), {})[mk] = cele
     return wynik

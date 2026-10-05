@@ -293,3 +293,44 @@ def test_nazwa_repo_jest_normalizowana(monkeypatch, wpisane):
     monkeypatch.setenv("STAN_REPO", wpisane)
     monkeypatch.setenv("STAN_TOKEN", "x")
     assert mr._konf()[0] == "tipx-tipx/footstats-stan"
+
+
+# --- 2026-10-05: spis z pamięci nieaktualny, bo inny proces skasował wersję ---
+
+def test_skasowana_wersja_ze_spisu_w_pamieci_to_ponowny_odczyt(gh):
+    """Cykl z 11:30 UTC: spis zapamiętany na starcie, backfill magazynu w tym
+    czasie dopisał nową wersję szardy i skasował starą — odczyt dostawał 404
+    i cykl wyłączał model uczony. Teraz: odśwież spis i weź najnowszą."""
+    api = gh([_asset("hd_3--20261005T110000Z.json.gz", {"stare": 1}, aid=1),
+              _asset("typy_log--20261005T110000Z.json.gz", {"k": 1}, aid=5)])
+    assert mr.pobierz("typy_log") == ({"k": 1}, True)     # spis w pamięci
+    # inny proces: nowa wersja hd_3, stara skasowana
+    api.assety.append(_asset("hd_3--20261005T113000Z.json.gz", {"nowe": 2}, aid=2))
+    api.assety[:] = [a for a in api.assety if a["id"] != 1]
+    assert mr.pobierz("hd_3") == ({"nowe": 2}, True)
+    assert api.slad.count("spis") == 2
+
+
+def test_ponowny_odczyt_bez_nowszej_wersji_to_awaria(gh):
+    """Wersję skasowano, nowszej nie ma — to awaria odczytu, nie „pusty klucz”."""
+    api = gh([_asset("hd_3--20261005T110000Z.json.gz", {"stare": 1}, aid=1),
+              _asset("typy_log--20261005T110000Z.json.gz", {"k": 1}, aid=5)])
+    assert mr.pobierz("typy_log") == ({"k": 1}, True)     # spis w pamięci
+    api.assety[:] = [a for a in api.assety if a["id"] != 1]
+    assert mr.pobierz("hd_3") == (None, False)
+
+
+def test_ten_sam_asset_po_odswiezeniu_nie_jest_pobierany_w_kolko(gh):
+    """Odświeżony spis wskazuje ten sam niedostępny asset — awaria, bez pętli."""
+    api = gh([_asset("hd_3--20261005T110000Z.json.gz", {"stare": 1}, aid=1)])
+    oryginalny_get = api.get
+
+    def _get(url, **kw):
+        if "/releases/assets/" in url:
+            api.slad.append("pobierz-404")
+            return _Odp(404)
+        return oryginalny_get(url, **kw)
+
+    api.get = _get
+    assert mr.pobierz("hd_3") == (None, False)
+    assert api.slad.count("pobierz-404") == 1

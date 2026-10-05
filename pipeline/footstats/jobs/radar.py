@@ -1718,6 +1718,17 @@ def _rynki_wpisu(
             "linie_pelne": {str(k): v for k, v in sorted(
                 ((float(l), kurs) for l, kurs in linie.items()),
             )},
+            # ⚑ U KOGO KAŻDA LINIA (2026-10-05). Karta drabinki rysuje WSZYSTKIE
+            # linie z `linie_pelne`, a bukmacher szedł tylko przy szczeblach —
+            # front podpisywał resztę (i kafelek główny) „Superbet” na sztywno.
+            # Güler 05.10: same ceny Betclica, Superbet go w ogóle nie wystawia,
+            # a karta pokazywała logo Superbetu. Tylko wyjątki od Superbetu.
+            **({"linie_bukmacher": _lb} if (_lb := {
+                str(float(l)): _kto_l
+                for l in linie
+                if (_kto_l := (((zrodla or {}).get(mk) or {}).get(str(float(l)))
+                               or ((zrodla or {}).get(mk) or {}).get(str(l))))
+            }) else {}),
             # WODOSPAD KONTEKSTU — karta ma powiedzieć wprost, czemu ścinamy
             # albo podbijamy pokrycie. Puste sekcje (np. sędzia bez obsady)
             # zostają z etykietą źródła, żeby UI mogło napisać „nie wiemy".

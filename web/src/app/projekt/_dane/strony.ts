@@ -54,6 +54,8 @@ type TypS = {
   mecz_id: number;
   polka?: string;
   fair_kurs?: number | null;
+  kurs_teraz?: number | null;
+  kurs_teraz_bukmacher?: string;
   uzasadnienie?: { czynniki?: Czynnik[] };
 };
 type Forma = { ostatnie: number[]; rywale?: string[]; minuty?: number[]; ts?: number[]; kadra?: boolean[] };
@@ -101,6 +103,8 @@ export function przygotujStrony() {
       daty: (f?.ts ?? []).slice(0, n).reverse().map(data),
       kadra: (f?.kadra ?? Array(n).fill(false)).slice(0, n).reverse(),
       kursUczciwy: t.fair_kurs ?? null,
+      kursTeraz: t.kurs_teraz ?? null,
+      kursTerazBukmacher: t.kurs_teraz_bukmacher,
       uzasadnienie: null,
       podmiotTyp: druzynowy ? "druzyna" : "zawodnik",
       podmiotId: druzynowy ? undefined : t.podmiot_id,
