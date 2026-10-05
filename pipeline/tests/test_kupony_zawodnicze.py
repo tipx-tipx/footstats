@@ -122,3 +122,48 @@ def test_kwarantanna_w_puli_kuponow_to_etykieta_poza_luka_trafnosci():
     kw = cialo[cialo.index("_kw = _powod_kwarantanny"):cialo.index('if b.get("stare_dane")')]
     assert kw.count("return False") == 1
     assert "kupony.zawyzona_deklaracja(_stat)" in kw
+
+
+# --- regres 05.10: rozliczanie chowało nowe kupony jako „konfiguracja" ------
+
+def _rec_kuponu(slot, opubl, pominiety=False, przez=None, wynik=None):
+    from footstats.jobs import rozliczanie as R  # noqa: F401
+    horyzont, cel = slot.split(":")
+    r = {"slot": slot, "klucz": f"{slot}:2026-10-05", "horyzont": horyzont,
+         "cel_label": cel, "wynik": wynik, "opublikowano_ts": opubl,
+         "legi": [{"mecz_id": 1, "podmiot": "A", "podmiot_id": 1, "rynek_kod": "shots",
+                   "linia": 0.5, "strona": "powyzej", "kickoff_ts": TERAZ + 3600}]}
+    if pominiety:
+        r.update(pominiety=True, pominiety_przez=przez, pominieto_ts=TERAZ - 60)
+    return r
+
+
+def test_sloty_zawodnicze_i_hybrydowe_sa_w_konfiguracji():
+    from footstats.jobs import rozliczanie as R
+    sloty = R._sloty_aktualne()
+    assert "zawodnicy:2–3,5" in sloty and "hybryda:3–5" in sloty
+
+
+def test_aktywna_hybryda_nie_jest_chowana_a_schowana_wraca():
+    from footstats.jobs import rozliczanie as R
+    log = {"h": _rec_kuponu("hybryda:3–5", TERAZ - 3600, True, "konfiguracja"),
+           "z": _rec_kuponu("zawodnicy:2–3,5", TERAZ - 600)}
+    R._kupon_do_logu(log, [], TERAZ)
+    assert not log["h"]["pominiety"] and "pominiety_przez" not in log["h"]
+    assert not log["z"].get("pominiety")
+
+
+def test_schowany_nie_wraca_gdy_slot_zajety_nowszym():
+    from footstats.jobs import rozliczanie as R
+    log = {"stary": _rec_kuponu("hybryda:3–5", TERAZ - 7200, True, "konfiguracja"),
+           "nowy": _rec_kuponu("hybryda:3–5", TERAZ - 600)}
+    log["nowy"]["klucz"] = "hybryda:3–5:2026-10-05#2"
+    R._kupon_do_logu(log, [], TERAZ)
+    assert log["stary"]["pominiety"] and not log["nowy"].get("pominiety")
+
+
+def test_stary_slot_spoza_konfiguracji_dalej_chowany():
+    from footstats.jobs import rozliczanie as R
+    log = {"x": _rec_kuponu("dzienny:3–5", TERAZ - 600)}
+    R._kupon_do_logu(log, [], TERAZ)
+    assert log["x"]["pominiety"] and log["x"]["pominiety_przez"] == "konfiguracja"

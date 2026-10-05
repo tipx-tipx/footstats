@@ -4986,6 +4986,12 @@ def _sloty_aktualne() -> set[str]:
         | {f"dlugoterminowy:{et(a, b)}"
            for a, b in kupony_model.PRZEDZIALY_DLUGOTERMINOWE}
         | {f"value:{et(a, b)}" for a, b in kupony_model.PRZEDZIALY_VALUE}
+        # ⚑ 2026-10-05: kupony zawodnicze i hybrydy mają własne sloty — bez
+        # nich krok 1c chował każdy nowy kupon jako „konfiguracja"
+        | {f"{kupony_model.HORYZONT_ZAWODNICY}:{et(a, b)}"
+           for a, b in kupony_model.PRZEDZIALY_ZAWODNICZE}
+        | {f"{kupony_model.HORYZONT_HYBRYDA}:{et(a, b)}"
+           for a, b in kupony_model.PRZEDZIALY_HYBRYDA}
     )
 
 
@@ -5198,6 +5204,26 @@ def _kupon_do_logu(
             rec["pominiety"] = True
             rec["pominieto_ts"] = now
             rec["pominiety_przez"] = "konfiguracja"
+    # 1c2) POWRÓT Z „KONFIGURACJI" (2026-10-05): slot, który znowu jest
+    # w konfiguracji, odzyskuje swój aktywny kupon — o ile nie zajął go już
+    # nowszy. Tak wraca hybryda z 05.10, schowana przez brak slotu.
+    zajete_teraz = {
+        r["slot"] for r in log_kuponow.values()
+        if not r.get("wynik") and not r.get("pominiety")
+    }
+    for rec in sorted(
+        (r for r in log_kuponow.values()
+         if r.get("pominiety") and r.get("pominiety_przez") == "konfiguracja"
+         and not r.get("wynik") and r.get("slot") in aktualne_sloty),
+        key=lambda r: -(r.get("opublikowano_ts") or 0),
+    ):
+        if rec["slot"] in zajete_teraz:
+            continue
+        # był już opublikowany — wraca także w trakcie meczu (historia „w grze")
+        rec["pominiety"] = False
+        rec.pop("pominieto_ts", None)
+        rec.pop("pominiety_przez", None)
+        zajete_teraz.add(rec["slot"])
 
     # 2) nowe kupony wyłącznie do wolnych slotów
     zajete = {
