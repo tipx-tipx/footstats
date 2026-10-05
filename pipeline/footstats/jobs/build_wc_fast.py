@@ -233,6 +233,7 @@ def _rozlicz_i_zapisz(
     przewaga: dict[str, dict] | None = None,
     pasma: dict[str, dict] | None = None,
     sciaganie: tuple[float, float] | None = None,
+    sciaganie_uczony: tuple[float, float] | None = None,
 ) -> None:
     """Rozliczanie + zapis wyników. Wywoływane w KAŻDYM cyklu — także gdy
     statshub nie ma propsów (rozliczenia nie mogą czekać na nowe typy).
@@ -274,7 +275,7 @@ def _rozlicz_i_zapisz(
     # był taki, że naprawa wartości netto wracała do stanu sprzed naprawy przy
     # pierwszym lekkim rozliczeniu (patrz rozliczanie.kupon_do_pokazania).
     _dump("kupony.json", [
-        rozliczanie.kupon_do_pokazania(k, urealnienie, sciaganie)
+        rozliczanie.kupon_do_pokazania(k, urealnienie, sciaganie, sciaganie_uczony)
         for k in wyniki["kupony"]
         if k.get("wynik") is None and not k.get("pominiety")
     ])
@@ -1834,6 +1835,7 @@ def scal_karty_z_publikacjami(
     nie_gra = 0
     poza_skladem_ogl = 0
     nierozstrzygniete = 0
+    wycofany_rynek = 0
     for k, rec in list(rej.items()):
         # jak przy typach: karta bez kickoffu wygasa od razu, zamiast wracać
         # na listę w nieskończoność
@@ -1843,7 +1845,15 @@ def scal_karty_z_publikacjami(
             continue
         if k in biezace or not rec.get("wpis"):
             continue
-        w = dict(rec["wpis"])
+        # ⚑ RYNEK WYCOFANY PRZED LIMITEM DNIA (2026-10-05, audyt pkt 4) — karta
+        # z hero na wycofanym rynku (Katić, odbiory 03.10) zajmowała miejsce
+        # dnia i spadała dopiero po scaleniu. Pozostałe rynki karty też
+        # schodzą tu, a nie na końcu. Wpis zostaje w rejestrze do gwizdka.
+        w = _bez_wycofanych_rynkow(dict(rec["wpis"]))
+        if w is None:
+            wycofany_rynek += 1
+            continue
+        w = dict(w)
         # ⚑ ZAWODNIK, KTÓRY NIE GRA, SCHODZI TAKŻE Z KARTY WZNOWIONEJ
         # (2026-09-15, Senesi: karta z 14.09 sprzed bramy składu, od transferu
         # jeden mecz na pięć). Ten cykl policzył go na świeżym kalendarzu
@@ -1949,14 +1959,15 @@ def scal_karty_z_publikacjami(
               + ", ".join(f"{d} {n}" for d, n in sorted(zajete_dnia.items())) + ")")
     if not _dry_run() and odczyt_ok:
         supa.put_key(PUBLIKACJE_KART_KLUCZ, rej)
-    if wznowione or bez_drugiego or nie_gra or poza_sitem or poza_skladem_ogl:
+    if wznowione or bez_drugiego or nie_gra or poza_sitem or poza_skladem_ogl or wycofany_rynek:
         # licznik przy bramie, nie cisza ([[ciche-odrzucenia-zasada]])
         print(f"Publikacje kart: wznowiono {wznowione} "
               f"(bieżące przeliczenie dało {len(wpisy)}), "
               f"bez drugiego szczebla zdjęto {bez_drugiego}, "
               f"poza sitem zdjęto {poza_sitem}, "
               f"zawodnik nie gra: {nie_gra}, "
-              f"poza ogłoszonym składem: {poza_skladem_ogl}"
+              f"poza ogłoszonym składem: {poza_skladem_ogl}, "
+              f"hero na rynku wycofanym: {wycofany_rynek}"
               + (f", bez zapisanej drabinki {nierozstrzygniete}"
                  if nierozstrzygniete else ""))
     out.sort(key=lambda w: (w.get("kickoff_ts") or 0, w.get("mecz_id") or 0))
@@ -7089,6 +7100,16 @@ def _main_impl(tryb=None):
                     # najlepszą próbą do porównania dwóch rachunków, bo nie
                     # przeszły selekcji)
                     **({"p_uczony": _pu_zaw_pomiar} if _pu_zaw_pomiar else {}),
+                    # ⚑ KTÓRY RACHUNEK (2026-10-05). Bez stempla rekord, który
+                    # później przechodzi bramy i „awansuje", zostawał dla warstw
+                    # starym rachunkiem (patrz `rozliczanie._stary_rachunek`).
+                    # `p_model` z `assess` jest liczbą modelu, gdy silnik dostał
+                    # `p_over_zewnetrzne` — ta sama reguła co `_zrodlo_p_zaw`.
+                    "zrodlo_p": (
+                        "uczony" if _p_zew is not None
+                        else ("stary_bez_pokrycia"
+                              if uczony.na_stronie("pewniaki") else "stary")
+                    ),
                     "pewnosc": "wysoka" if (sm.ci_high - sm.ci_low) <= 0.18
                     else "srednia",
                     "sugestia": False,
@@ -11620,6 +11641,8 @@ def _main_impl(tryb=None):
                       # typów — patrz `rozliczanie.kupon_do_pokazania`
                       sciaganie=((_waga_karty, _marza_karty)
                                  if _waga_karty else None),
+                      sciaganie_uczony=((_waga_karty_uczony, _marza_karty_uczony)
+                                        if _waga_karty_uczony else None),
                       # policzone wyżej przy układaniu listy — nie liczymy
                       # drugi raz, bo to kolejny odczyt księgi z Supabase
                       przewaga=_przewaga, pasma=_pasma)

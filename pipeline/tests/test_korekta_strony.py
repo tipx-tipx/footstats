@@ -311,3 +311,56 @@ def test_ta_sama_formula_w_puli_i_w_assess():
         "pula i `assess` liczą deltę inaczej — to wraca do dwóch szans "
         "dla jednego zakładu"
     )
+
+
+# --- 2026-10-05: uczy się tylko tam, gdzie jest nakładana (stary rachunek) ---
+
+def test_typy_modelu_uczonego_nie_ucza_korekty_strony():
+    """Na liczbę modelu uczonego korekty nie nakładamy, więc jego trafienia
+    nie mogą jej przestawiać: stary rachunek przeszacowuje, model nie."""
+    stary = [_rec(p=0.70, wynik="wygrany" if i < 30 else "przegrany", mecz_id=i)
+             for i in range(50)]
+    model = [_rec(p=0.70, wynik="wygrany" if i < 35 else "przegrany",
+                  mecz_id=500 + i, zrodlo_p="uczony") for i in range(200)]
+    d_sam = R.korekta_strony(_log(stary))["team_corners|ponizej"]
+    d_z_modelem = R.korekta_strony(_log(stary + model))["team_corners|ponizej"]
+    assert d_sam < -0.1 and abs(d_sam - d_z_modelem) < 1e-9
+    # rekord bez stempla, ale z liczbą modelu (awans z pomiaru) — też model
+    bez_stempla = [_rec(p=0.70, wynik="wygrany", mecz_id=900 + i,
+                        p_uczony={"p": 0.70}) for i in range(200)]
+    assert R.korekta_strony(_log(stary + bez_stempla))["team_corners|ponizej"] == d_sam
+
+
+def test_stary_rachunek_rozpoznaje_liczbe_modelu_bez_stempla():
+    assert R._stary_rachunek({"p_model": 0.6})
+    assert not R._stary_rachunek({"zrodlo_p": "uczony", "p_model": 0.6})
+    assert R._stary_rachunek({"zrodlo_p": "stary_bez_pokrycia", "p_model": 0.6})
+    assert not R._stary_rachunek({"p_model": 0.6123, "p_uczony": {"p": 0.6123}})
+    assert R._stary_rachunek({"p_model": 0.58, "p_uczony": {"p": 0.6123}})
+    # stempel wygrywa z równością
+    assert R._stary_rachunek({"zrodlo_p": "stary", "p_model": 0.6, "p_uczony": {"p": 0.6}})
+
+
+def test_rekord_pomiarowy_zawodnika_niesie_stempel_rachunku():
+    import inspect
+    from footstats.jobs import build_wc_fast as B
+    zr = inspect.getsource(B)
+    i = zr.index("odrzucone_pomiar.append({")
+    blok = zr[i:zr.index('"odrzucony": True,', i)]
+    assert '"zrodlo_p": (' in blok
+
+
+def test_leg_kuponu_modelu_uczonego_jak_na_liscie():
+    """Leg liczony modelem: bez urealnienia starego rachunku i z własną wagą
+    ściągania (None = bez ściągania) — jak `_urealnij_do_pokazania` na liście."""
+    k = {"p_model": 0.4, "kurs_laczny": 2.5, "legi": [
+        {"p_model": 0.70, "kurs": 1.5, "rynek_kod": "shots", "zrodlo_p": "uczony"},
+        {"p_model": 0.70, "kurs": 1.5, "rynek_kod": "shots"},
+    ]}
+    out = R.kupon_do_pokazania(k, {"pewniaki": -0.3}, (0.5, 0.07), None)
+    model, stary = out["legi"]
+    assert model["p_pokaz"] == 0.70
+    assert stary["p_pokaz"] < 0.70
+    out2 = R.kupon_do_pokazania(k, {"pewniaki": -0.3}, (0.5, 0.07), (0.8, 0.05))
+    assert out2["legi"][0]["p_pokaz"] == round(
+        R.sciagnij_do_ceny(0.70, 1.5, 0.8, 0.05), 4)

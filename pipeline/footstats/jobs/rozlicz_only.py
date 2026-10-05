@@ -74,11 +74,17 @@ def main() -> None:
         # Księga jest już wczytana wewnątrz `rozlicz`, ale te dwie warstwy
         # czytają ją same — koszt to jeden dodatkowy odczyt na 20 minut.
         sciaganie = None
+        sciaganie_uczony = None
         with rozliczanie.warstwa_uczenia("sciaganie_karty") as _w:
             _ksiega_s = rozliczanie._migruj_log(supa.get_key("typy_log") or {})
             _marza = rozliczanie.marza_sciagania(_ksiega_s)
             _waga = rozliczanie.waga_sciagania(_ksiega_s, _marza)
             sciaganie = (_waga, _marza) if _waga else None
+            # leg modelu uczonego — własna waga, jak na liście typów
+            # (patrz `rozliczanie.kupon_do_pokazania`)
+            _marza_u = rozliczanie.marza_sciagania(_ksiega_s, "uczony")
+            _waga_u = rozliczanie.waga_sciagania(_ksiega_s, _marza_u, "uczony")
+            sciaganie_uczony = (_waga_u, _marza_u) if _waga_u else None
             _w.opisz(n=(1 if _waga else 0),
                      opis=(f"w={_waga:.2f} / cena minus {_marza:.1%}"
                            if _waga else "za mała próba — legi bez zmian"))
@@ -89,7 +95,7 @@ def main() -> None:
             supa.put_key("typy_wyniki", wyniki)
             return
         aktywne = [
-            rozliczanie.kupon_do_pokazania(k, urealnienie, sciaganie)
+            rozliczanie.kupon_do_pokazania(k, urealnienie, sciaganie, sciaganie_uczony)
             for k in wyniki["kupony"]
             if k.get("wynik") is None and not k.get("pominiety")
         ]

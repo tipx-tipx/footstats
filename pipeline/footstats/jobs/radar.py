@@ -3475,7 +3475,25 @@ def zbuduj(
     pomiar_kandydaci: list[dict] = []
     powody_pomiaru: Counter = Counter()
     statystyki_przewagi: Counter = Counter()
+    wycofane_rynki = wycofane_karty = 0
     for w in wpisy:
+        # ⚑ RYNEK WYCOFANY NIE KANDYDUJE NA TYP KARTY (2026-10-05, audyt pkt 4).
+        # Dotąd znikał dopiero po scaleniu z publikacjami: karta z hero na
+        # odbiorach (Katić 03.10) wchodziła do rejestru, zajmowała miejsce
+        # w limicie dnia i co cykl wracała, by spaść na końcu („karty 5 → 4").
+        # Zdejmujemy go PRZED oceną — hero wybiera się z rynków, które umiemy
+        # rozliczyć, a zawodnik bez nich nie jest kandydatem.
+        _rynki_ok = [r for r in (w.get("rynki") or [])
+                     if not betting.rynek_wycofany(r.get("rynek_kod"))]
+        if len(_rynki_ok) != len(w.get("rynki") or []):
+            wycofane_rynki += len(w.get("rynki") or []) - len(_rynki_ok)
+            w["rynki"] = _rynki_ok
+            if not _rynki_ok:
+                wycofane_karty += 1
+                powody_odpadniecia["rynek_wycofany"] += 1
+                _ri(w["mecz_id"], w.get("podmiot_id") or 0, "rynek_wycofany",
+                    podmiot=w.get("podmiot"), druzyna=w.get("druzyna"))
+                continue
         pom: list[dict] | None = [] if pomiar_out is not None else None
         # powody TEJ karty osobno — imienny rentgen dostaje je po nazwisku,
         # sumy zbiorcze idą dalej do `powody_odpadniecia`
@@ -3521,6 +3539,10 @@ def zbuduj(
         w["_score"] = score
         w["hero"] = hero    # najlepsza linia karty — front pokazuje ją w nagłówku
         ocenione.append(w)
+    if wycofane_rynki:
+        print(f"Radar — rynki wycofane ({', '.join(sorted(betting.RYNKI_WYCOFANE))}): "
+              f"{wycofane_rynki} rynków zdjętych przed oceną, "
+              f"{wycofane_karty} zawodników bez innego rynku")
     if pomiar_kandydaci:
         # sufit na pomiarze: bierzemy te z największą przewagą, bo to one
         # najbardziej wyglądają na karty, których nie wystawiliśmy

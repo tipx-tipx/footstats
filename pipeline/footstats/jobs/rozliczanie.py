@@ -418,8 +418,29 @@ def _stary_rachunek(r: dict) -> bool:
     RAZY dał zły wniosek ([[wersjonowanie-i-martwe-epoki]]).
 
     Rekordy sprzed 18.08 nie mają stempla `zrodlo_p` i są z definicji stare.
+
+    ⚑ REKORD BEZ STEMPLA, A Z LICZBĄ MODELU (2026-10-05). Typ pomiarowy
+    zawodnika (odrzucony przy progu) szedł do księgi bez `zrodlo_p`, a gdy
+    później przechodził bramy, rekord tylko „awansował" — stempla nie
+    dostawał nigdy. Zmierzone na księdze 05.10: 4560 rekordów zawodników
+    i 689 drużyn (18–24.08, biała lista `rec_pewniaka`) po przełączeniu bez
+    stempla, a z `p_model` RÓWNYM `p_uczony.p` co do czwartego miejsca —
+    czyli liczonych modelem. Warstwy starego rachunku uczyły się na nich jak
+    na starym rachunku. Rozpoznajemy je po tej równości: przed 18.08 nie
+    zachodzi ani razu (0 z 7033), a „stary_bez_pokrycia" nigdy nie ma
+    `p_uczony`. Źródło stempluje od 05.10 (`odrzucone_pomiar`).
     """
-    return str(r.get("zrodlo_p") or "") != "uczony"
+    zrodlo = str(r.get("zrodlo_p") or "")
+    if zrodlo:
+        return zrodlo != "uczony"
+    pu, pm = r.get("p_uczony"), r.get("p_model")
+    if isinstance(pu, dict) and pu.get("p") is not None and pm is not None:
+        try:
+            if abs(float(pu["p"]) - float(pm)) < 5e-4:
+                return False
+        except (TypeError, ValueError):
+            pass
+    return True
 
 
 def _strumien(r: dict) -> str:
@@ -3333,6 +3354,13 @@ def korekta_strony(log: dict | None = None) -> dict[str, float]:
         and r.get("strona") in ("powyzej", "ponizej")
         and r.get("p_model")
         and _z_modelu(r)
+        # ⚑ UCZY SIĘ TAM, GDZIE JEST NAKŁADANA (2026-10-05, audyt pkt 10).
+        # Na liczbę modelu uczonego korekty nie nakładamy (`_zrodlo_t`,
+        # `_zrodlo_p_zaw` w cyklu), a uczyła się na wszystkich typach — w ~94%
+        # właśnie jego. Poza próbą (uczone do 10.09 / 20.09, test na starym
+        # rachunku po nich, n=851 / 679): luka −5,2 / −4,2 pp → −0,3 / +0,3,
+        # Brier 0,2386 → 0,2342 / 0,2392 → 0,2360.
+        and _stary_rachunek(r)
         and _z_biezacej_epoki(r) and not _z_martwej_epoki(r)
         # ⚑ typy POMIAROWE też uczą — to dwie trzecie próby zawodniczej,
         # a odrzucenie przy progu nie zmienia tego, czy zdarzenie zaszło
@@ -4646,6 +4674,7 @@ def kupon_do_pokazania(
     k: dict,
     urealnienie: dict[str, float] | None = None,
     sciaganie: tuple[float, float] | None = None,
+    sciaganie_uczony: tuple[float, float] | None = None,
 ) -> dict:
     """Kupon z logu przygotowany do POKAZANIA — wartość przeliczona od nowa.
 
@@ -4680,6 +4709,13 @@ def kupon_do_pokazania(
     kończy się na urealnieniu, czyli na zachowaniu sprzed tej zmiany.
 
     Dotyczy WYŁĄCZNIE tego, co pokazujemy — log kuponów zostaje surowy.
+
+    ⚑ LEG MODELU UCZONEGO JAK NA LIŚCIE (2026-10-05). Lista typów nie nakłada
+    na liczbę modelu `urealnienie` (uczone na STARYM rachunku, patrz
+    `build_wc_fast._urealnij_do_pokazania`) i ściąga ją do ceny WŁASNĄ wagą
+    (`sciaganie_uczony`; None = bez ściągania). Leg kuponu robił oba kroki
+    starymi liczbami — ten sam typ miał dwie różne szanse dwa kliknięcia od
+    siebie. Rozpoznanie rachunku: `_stary_rachunek`.
     """
     p_k = k.get("p_model")
     kurs_k = k.get("kurs_laczny")
@@ -4690,16 +4726,19 @@ def kupon_do_pokazania(
             "ev_netto": round(betting.ev_pct(
                 float(p_k), float(kurs_k), k.get("tryb_podatku")), 1),
         }
-    if not urealnienie and not sciaganie:
+    if not urealnienie and not sciaganie and not sciaganie_uczony:
         return k
 
     def _pokaz(l: dict) -> dict:
         if not l.get("p_model"):
             return l
-        p = urealnij_p(float(l["p_model"]),
-                       (urealnienie or {}).get(_strumien(l), 0.0))
-        if sciaganie and l.get("kurs"):
-            waga, marza = sciaganie
+        stary = _stary_rachunek(l)
+        p = float(l["p_model"])
+        if stary:
+            p = urealnij_p(p, (urealnienie or {}).get(_strumien(l), 0.0))
+        sc = sciaganie if stary else sciaganie_uczony
+        if sc and l.get("kurs"):
+            waga, marza = sc
             p = sciagnij_do_ceny(p, float(l["kurs"]), float(waga), float(marza))
         return {**l, "p_pokaz": round(p, 4)}
 
