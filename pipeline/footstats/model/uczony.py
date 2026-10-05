@@ -1233,17 +1233,34 @@ def _chronologicznie(czasy: list) -> list[int]:
     return idx
 
 
+def _jako_slownik(seria) -> dict | None:
+    """Seria z banku jako słownik — także obiekt `StatshubTrend` z cyklu.
+
+    ⚑ 2026-10-05: cykl podawał tu obiekty, a funkcje banku brały wyłącznie
+    słowniki i resztę pomijały BEZ ŚLADU. Od wdrożenia rywala (14.09) tabela
+    rywali w produkcji była pusta („0 drużyn, 0 profili"), więc model
+    zawodników liczył każdy typ z neutralnym rywalem, choć trening go znał.
+    """
+    if isinstance(seria, dict):
+        return seria
+    d = getattr(seria, "__dict__", None)
+    return d if isinstance(d, dict) else None
+
+
 def tabela_rywali(lib: dict) -> dict:
     """Koncesje rywali z banku: {(rywal, rynek, grupa): (ts↑, Σc, Σmin)} + normy.
 
     Sumy są skumulowane, więc okno „ostatnie N meczów przed t" to dwie
     różnice. Obserwacja = jeden zawodnik-mecz (≥ 20 minut); mecz rywala
     to suma obserwacji wszystkich zawodników tej grupy w tym meczu.
+    Bank może trzymać słowniki (magazyn, trening) albo obiekty `StatshubTrend`
+    (cykl) — patrz `_jako_slownik`.
     """
     obs: dict = defaultdict(lambda: defaultdict(lambda: [0.0, 0.0]))
     norm: dict = defaultdict(lambda: defaultdict(lambda: [0.0, 0.0]))
     for seria in (lib or {}).values():
-        if not isinstance(seria, dict):
+        seria = _jako_slownik(seria)
+        if seria is None:
             continue
         mk = str(seria.get("market_code") or "")
         if mk not in CELE_ZAW:
@@ -1382,7 +1399,8 @@ def wiersze_zawodnicze(lib: dict, tabela: dict | None = None
     if tabela is None:
         tabela = tabela_rywali(lib)
     for _, seria in (lib or {}).items():
-        if not isinstance(seria, dict):
+        seria = _jako_slownik(seria)
+        if seria is None:
             continue
         mk = str(seria.get("market_code") or "")
         if mk not in CELE_ZAW:

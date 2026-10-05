@@ -4839,11 +4839,25 @@ def _main_impl(tryb=None):
         # ⚑ KONCESJE RYWALI DLA MODELU UCZONEGO (2026-09-14) — z banku, który
         # i tak jest w pamięci; ta sama tabela, którą trening liczy z tego
         # samego banku (patrz `uczony.CECHY_LOG_ZAW`).
+        #
+        # ⚑ SŁOWNIKI, NIE OBIEKTY (2026-10-05). Do dziś szło tu `lib`
+        # (obiekty `StatshubTrend`), a funkcja brała tylko słowniki — log
+        # każdego cyklu od 14.09: „0 drużyn, 0 profili", czyli model zawodników
+        # bez rywala, choć trening (z banku w słownikach) go zna. Backtest 05.10
+        # poza próbą: rywal poprawia Brier we wszystkich 10 rynkach
+        # zawodniczych. `bank_recs` = dokładnie ten kształt, który dostaje
+        # trening.
         try:
-            _tabela_rywali = uczony.tabela_rywali(lib)
+            _tabela_rywali = uczony.tabela_rywali(bank_recs)
+            _n_druzyn_r = len({k[0] for k in _tabela_rywali['prof']})
             print(f"Profil rywali (model uczony): "
-                  f"{len({k[0] for k in _tabela_rywali['prof']})} drużyn, "
+                  f"{_n_druzyn_r} drużyn, "
                   f"{len(_tabela_rywali['prof'])} profili rywal×rynek×grupa")
+            if not _tabela_rywali["prof"] and len(bank_recs) >= 1000:
+                # brama nie może być cicha — tak przez 3 tygodnie nikt nie
+                # zauważył, że cecha nie działa ([[ciche-odrzucenia-zasada]])
+                print(f"UWAGA: profil rywali PUSTY przy {len(bank_recs)} "
+                      f"seriach w banku — model zawodników liczy bez rywala")
         except Exception as e:                                 # noqa: BLE001
             diagnostyka.cichy("cykl", "tabela_rywali", e)
             _tabela_rywali = None

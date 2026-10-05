@@ -141,3 +141,45 @@ def test_stare_wagi_z_cecha_opp_dalej_licza():
                                1.5, "powyzej", oczekiwane_minuty=90.0,
                                do_ts=T0 + 7 * DZIEN * 20)
     assert out and out["p"] is not None and "rywal" not in out
+
+
+# --- 2026-10-05: w produkcji tabela rywali była PUSTA ------------------------
+# Cykl podawał bank jako obiekty `StatshubTrend`, a `tabela_rywali` brała tylko
+# słowniki — log od 14.09: „Profil rywali (model uczony): 0 drużyn, 0 profili".
+
+def _jako_trend(d: dict):
+    from footstats.sources.statshub import StatshubTrend
+    return StatshubTrend(
+        player_id=d["player_id"], player_name=f"P{d['player_id']}",
+        position=d["position"], team_id=1, team_name="T", opponent_id=0,
+        opponent_name="", is_home=True, market_code=d["market_code"], line=0.5,
+        in_predicted_lineup=False, league_average=None, opponent_average=None,
+        opponent_rank=None, total_ranks=None,
+        counts=d["counts"], minutes=d["minutes"], timestamps=d["timestamps"],
+        started=d["started"], game_positions=d["game_positions"],
+        game_opponent_ids=d["game_opponent_ids"],
+    )
+
+
+def test_tabela_rywali_z_obiektow_cyklu_jak_ze_slownikow():
+    slowniki = _bank()
+    obiekty = {k: _jako_trend(v) for k, v in slowniki.items()}
+    a, b = U.tabela_rywali(slowniki), U.tabela_rywali(obiekty)
+    assert b["prof"], "tabela z obiektów StatshubTrend nie może być pusta"
+    assert set(a["prof"]) == set(b["prof"])
+    for k in a["prof"]:
+        assert list(a["prof"][k][0]) == list(b["prof"][k][0])
+        assert list(a["prof"][k][1]) == list(b["prof"][k][1])
+    # wiersze treningowe też nie gubią obiektów
+    assert U.wiersze_zawodnicze(obiekty).keys() == U.wiersze_zawodnicze(slowniki).keys()
+
+
+def test_cykl_podaje_tabeli_rywali_bank_w_slownikach():
+    """Strukturalnie: cykl liczy tabelę z `bank_recs` (kształt treningu)
+    i głośno ostrzega, gdy przy pełnym banku wychodzi pusta."""
+    import inspect
+    from footstats.jobs import build_wc_fast as B
+    zrodlo = inspect.getsource(B)
+    assert "uczony.tabela_rywali(bank_recs)" in zrodlo
+    assert "uczony.tabela_rywali(lib)" not in zrodlo
+    assert "UWAGA: profil rywali PUSTY" in zrodlo
