@@ -9,7 +9,7 @@
  * (właściciel 01.10: „nie ma innych szczebli z kursami”) – `szczeble`.
  */
 
-import { nazwaPodmiotu, opisZakladu } from "@/lib/format";
+import { czyRynekDruzynowy, nazwaPodmiotu, opisZakladu } from "@/lib/format";
 
 import { etykietaDnia } from "./przygotuj";
 import { dzisZrodla, zrodlo } from "./zrodlo";
@@ -55,7 +55,7 @@ type TypS = {
 };
 
 const produkt = (t: TypS): Produkt =>
-  t.ekran === "drabinki" ? "drabinki" : /^(team_|match_)/.test(t.rynek_kod) ? "druzyny" : "zawodnicy";
+  t.ekran === "drabinki" ? "drabinki" : czyRynekDruzynowy(t.rynek_kod) ? "druzyny" : "zawodnicy";
 
 export function przygotujSkutecznosc() {
   const dni = (zrodlo().wyniki as { skutecznosc_dzienna: { dzien: string; typy: TypS[] }[] }).skutecznosc_dzienna ?? [];

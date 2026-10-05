@@ -75,6 +75,64 @@ PRZEDZIALY_DLUGOTERMINOWE = (
 # parytetu; podajemy próg jawnie tylko dla kuponów automatycznych.
 MIN_LEGI_PEWNIAKI = 2
 
+# ⚑ KUPONY Z ZAWODNIKAMI (2026-10-05, właściciel: „czemu nie ma kuponów
+# z zawodniczymi typami? hybryd i tylko zawodniczych"). Do dziś żaden kupon
+# nie miał szansy ich dostać: brama kwarantanny w puli (build_wc_fast,
+# `_leg_dopuszczalny`) zdejmowała KAŻDE zawodnicze „powyżej" (226 legów
+# w cyklu 05.10 09:00), a wszystkie przedziały składały się z jednej, wspólnej
+# puli, w której legi drużynowe i tak wygrywają szansą. Dwa osobne rodzaje,
+# każdy we WŁASNYM slocie (`horyzont` = rodzaj, bo slot to horyzont+przedział
+# i zawodniczy kupon 2–3 nie może zająć miejsca drużynowego 2–3):
+#   * „zawodnicy": same legi zawodnicze, 2–3 nogi,
+#   * „hybryda": co najmniej jeden zawodnik i co najmniej jedna drużyna.
+# Okno jak w dziennym (dziś, a gdy się nie składa — do jutra), bo zawodnik
+# potrzebuje składu. Szansa kuponu liczy się z już skorygowanych legów, więc
+# karta nie obieca więcej, niż zawodnicy dziś trafiają.
+PRZEDZIALY_ZAWODNICZE = ((2.0, 3.5),)
+PRZEDZIALY_HYBRYDA = ((3.0, 5.0),)
+HORYZONT_ZAWODNICY = "zawodnicy"
+HORYZONT_HYBRYDA = "hybryda"
+
+
+# ⚑ BRAMA LUKI DEKLARACJI W PULI KUPONÓW (2026-10-05). Kwarantanna rynków,
+# stron i kategorii jest liczona na ROI, czyli na pieniądzach — i jako brama
+# puli kuponów wycinała wszystkie zawodnicze „powyżej". Celem produktu jest
+# trafność, więc nogę zatrzymujemy WYŁĄCZNIE wtedy, gdy jej segment trafia
+# wyraźnie rzadziej, niż sami deklarujemy: builder szuka najwyższej szansy,
+# a zawyżona szansa ciągnie do kuponu dokładnie te nogi, które przegrywają,
+# i błąd mnoży się przez cały kupon. Zmierzone 05.10 (okno kwarantanny):
+#     team_sot poniżej        trafia 40,0% przy deklarowanych 63,4%  (n=50)
+#     wiecej_shots goście     48,0% przy 66,9%                         (n=50)
+#     „zaniżony kurs" (kat.)  40,7% przy 55,8%                         (n=91)
+#     strzały zaw. powyżej    45,3% przy 54,7%  -> wchodzi (luka −9,4)
+#     faule popełnione pow.   55,3% przy 55,8%  -> wchodzi
+# Reszta segmentów w kwarantannie wchodzi do puli z etykietą `slabsza_seria`.
+PROG_LUKI_KUPONU = 0.10
+MIN_N_LUKI_KUPONU = 30
+
+
+def zawyzona_deklaracja(stat: dict | None) -> bool:
+    """Czy segment trafia o ≥ PROG_LUKI_KUPONU rzadziej, niż deklaruje
+    (`hit` vs `sr_p` z wpisu kwarantanny), przy próbie ≥ MIN_N_LUKI_KUPONU."""
+    if not stat:
+        return False
+    try:
+        n = int(stat.get("n") or 0)
+        luka = round(float(stat["hit"]) - float(stat["sr_p"]), 4)
+    except (KeyError, TypeError, ValueError):
+        return False
+    return n >= MIN_N_LUKI_KUPONU and luka <= -PROG_LUKI_KUPONU
+
+
+def rodzaj_lega(b: dict) -> str:
+    """„druzyna" albo „zawodnik" — po stemplu, a bez niego po kodzie rynku
+    (te same przedrostki co `betting.PRZEDROSTKI_DRUZYNOWE`)."""
+    if b.get("podmiot_typ") in ("druzyna", "zawodnik"):
+        return b["podmiot_typ"]
+    return ("druzyna" if str(b.get("rynek_kod") or "").startswith(
+        betting.PRZEDROSTKI_DRUZYNOWE) else "zawodnik")
+
+
 # VALUE wylaczone: 0 wygranych na 13 przy deklarowanych 38,1%. Wracaja
 # dopiero, gdy pojedyncze typy udowodnia przewage — kupon z legow bez
 # przewagi nie moze jej wytworzyc.
@@ -811,8 +869,14 @@ def _zloz_pewniaki(
     kary: dict | None = None,
     wagi: dict | None = None,
     teraz: int | None = None,
+    *,
+    wymagane: frozenset | None = None,
 ) -> dict | None:
     """Maksymalizuj szansę kuponu przy kursie łącznym w przedziale [cmin, cmax].
+
+    `wymagane` (2026-10-05, kupony hybrydowe) — rodzaje legów (`rodzaj_lega`),
+    z których KAŻDY musi być w kuponie. Domyślnie None = zachowanie bez zmian
+    (ta funkcja jest portowana do kuponBuilder.ts i pilnowana parytetem).
 
     Beam search (wiązka BEAM_W stanów) zamiast zachłannego dokładania —
     przy ograniczeniach (przedział kursu, max/mecz, dywersyfikacja) greedy
@@ -868,7 +932,17 @@ def _zloz_pewniaki(
             if b["kurs"] > 1.0 and 0 < b["p_model"] < 1 and _dopuszczalny(b)
         ),
         key=lambda b: -_q(b),
-    )[:MAX_KANDYDATOW]
+    )
+    if wymagane:
+        # każdy wymagany rodzaj dostaje swoją część kandydatów — inaczej
+        # 120 najlepszych bywa samymi drużynami i hybryda nie ma z czego powstać
+        na_rodzaj = max(1, MAX_KANDYDATOW // len(wymagane))
+        wybrani: list[dict] = []
+        for r in sorted(wymagane):
+            wybrani += [b for b in cands if rodzaj_lega(b) == r][:na_rodzaj]
+        cands = sorted(wybrani, key=lambda b: -_q(b))
+    else:
+        cands = cands[:MAX_KANDYDATOW]
     # stan wiązki: (kurs_łączny, iloczyn UREALNIONYCH szans do selekcji, legi
     # jako krotka) — wyświetlana szansa kuponu i tak liczy się z p_model legów
     beam: list[tuple[float, float, tuple]] = [(1.0, 1.0, ())]
@@ -900,7 +974,9 @@ def _zloz_pewniaki(
             legi2 = legi + (b,)
             p2 = p * p_sel_b
             nowe.append((kurs2, p2, legi2))
-            if kurs2 >= cmin and len(legi2) >= min_legi:
+            if kurs2 >= cmin and len(legi2) >= min_legi and (
+                    not wymagane
+                    or wymagane <= {rodzaj_lega(l) for l in legi2}):
                 komplety.append((kurs2, p2, legi2))
         beam.extend(nowe)
         # prune: obiecujące = wysoka szansa × jak blisko dolnej granicy kursu.
@@ -1159,6 +1235,44 @@ def build_kupony(
             _rentgen(k, dlugo, cmin, cmax, kary=kary)
             _dolozenie(k, dlugo, cmin, cmax, kary=kary)
             out.append(k)
+
+    # ZAWODNICY i HYBRYDA (2026-10-05) — patrz PRZEDZIALY_ZAWODNICZE. Okno
+    # dzienne (dziś, a gdy się nie składa — do jutra); własny `horyzont`, bo
+    # z niego powstaje slot w rozliczaniu.
+    sygn_dotad = {_sygnatura(k) for k in out}
+    for horyzont, przedzialy, tylko_zawodnicy, wym in (
+        (HORYZONT_ZAWODNICY, PRZEDZIALY_ZAWODNICZE, True, None),
+        (HORYZONT_HYBRYDA, PRZEDZIALY_HYBRYDA, False,
+         frozenset({"zawodnik", "druzyna"})),
+    ):
+        for cmin, cmax in przedzialy:
+            k = None
+            for pula_k in (dzis20, dzis44):
+                if tylko_zawodnicy:
+                    pula_k = [b for b in pula_k if rodzaj_lega(b) == "zawodnik"]
+                if len({b["mecz_id"] for b in pula_k}) < 2:
+                    continue
+                k = _zloz_pewniaki(pula_k, cmin, cmax, profil=profil, kary=kary,
+                                   wagi=wagi, min_legi=MIN_LEGI_PEWNIAKI,
+                                   teraz=now, wymagane=wym)
+                if k is not None:
+                    break
+            if k is None or _sygnatura(k) in sygn_dotad:
+                continue
+            k["horyzont"] = horyzont
+            # wariant B nie musi spełniać wymogu rodzaju — nie pokazujemy go
+            k.pop("wariant_b", None)
+            # zamiennik najsłabszej nogi tylko tego samego rodzaju — hybryda
+            # musi zostać hybrydą także po podpowiedzianej zamianie
+            slaba = min(k["legi"], key=lambda l: l["p_model"])
+            _rentgen(k, [b for b in pula_k if rodzaj_lega(b) == rodzaj_lega(slaba)],
+                     cmin, cmax, kary=kary)
+            if tylko_zawodnicy:
+                # dołożenie z tej samej puli zawodników; w hybrydzie mogłoby
+                # podsunąć zamiennik, który zabiera jedyną nogę jednego rodzaju
+                _dolozenie(k, pula_k, cmin, cmax, kary=kary)
+            out.append(k)
+            sygn_dotad.add(_sygnatura(k))
 
     # VALUE: ten sam builder co pewniaki (max iloczyn szans przy zadanym
     # kursie = max EV), ale pula tylko z wyraźną przewagą i 1 leg na mecz;

@@ -32,7 +32,8 @@ type Roi = Record<string, { n: number; wygrane: number }>;
 export type WynikKuponu = "wygrany" | "przegrany" | "anulowany" | "zwrot" | "w_grze";
 export type WynikNogi = "wygrany" | "przegrany" | "zwrot" | "czeka";
 
-export type RodzajKuponu = "dzienny" | "dlugoterminowy";
+/** „zawodnicy” i „hybryda” od 05.10 (własne sloty w pipeline, `horyzont` = rodzaj) */
+export type RodzajKuponu = "dzienny" | "dlugoterminowy" | "zawodnicy" | "hybryda";
 
 export type KuponHistorii = {
   klucz: string;
@@ -55,7 +56,17 @@ export type HistoriaKuponow = {
 const HORYZONTY: [RodzajKuponu, string][] = [
   ["dzienny", "Na dziś"],
   ["dlugoterminowy", "Na kilka dni"],
+  ["zawodnicy", "Zawodnicy"],
+  ["hybryda", "Hybryda"],
 ];
+const RODZAJE = new Set<string>(HORYZONTY.map(([k]) => k));
+/* podpis przy dniu: dzienny – sam dzień („Dziś · na dziś” powtarzało to samo) */
+const PODPIS: Record<RodzajKuponu, string> = {
+  dzienny: "",
+  dlugoterminowy: "na kilka dni",
+  zawodnicy: "zawodnicy",
+  hybryda: "hybryda",
+};
 
 export function przygotujHistorieKuponow(): HistoriaKuponow | null {
   const w = zrodlo().wyniki as { kupony?: KuponS[]; kupony_roi?: Roi };
@@ -71,11 +82,10 @@ export function przygotujHistorieKuponow(): HistoriaKuponow | null {
   const kupony = surowe
     .map((k): [number, KuponHistorii] => [k.opublikowano_ts, {
       klucz: k.klucz ?? `${k.dzien}-${k.opublikowano_ts}`,
-      rodzaj: k.horyzont === "dzienny" ? "dzienny" : "dlugoterminowy",
+      rodzaj: RODZAJE.has(k.horyzont ?? "") ? (k.horyzont as RodzajKuponu) : "dlugoterminowy",
       nr: 0,
       dzien: etykietaDnia(k.dzien, dzis),
-      // dzienny kupon: sam dzień („Dziś · na dziś” powtarzało to samo)
-      horyzont: k.horyzont === "dzienny" ? "" : "na kilka dni",
+      horyzont: PODPIS[RODZAJE.has(k.horyzont ?? "") ? (k.horyzont as RodzajKuponu) : "dlugoterminowy"],
       wynik: (k.wynik ?? "w_grze") as WynikKuponu,
       kurs: k.kurs_rozliczony ?? k.kurs_laczny,
       nogi: k.legi.map((n) => {

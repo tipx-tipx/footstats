@@ -118,7 +118,9 @@ WZORCE_RYNKOW: tuple[tuple[tuple[str, ...], str], ...] = (
 #   * „nogą" — strzały nogą, których w ogóle nie modelujemy,
 #   * podania — nie mamy takiego rynku.
 ODRZUCANE_WZORCE: tuple[str, ...] = (
-    "połowa", "dogryw", "nogą", "podań", "podania", "asyst",
+    # „połow", nie „połowa" (2026-10-05): „…w 1. połowie" przechodziło;
+    # „poł." — skrót, który Betclic stosuje w zakładkach
+    "połow", "poł.", "dogryw", "nogą", "podań", "podania", "asyst",
     # czerwona kartka to inne zdarzenie niż nasz rynek żółtej — musi odpaść
     # ZANIM zadziała rdzeń „kart"
     "czerwon",
@@ -126,6 +128,26 @@ ODRZUCANE_WZORCE: tuple[str, ...] = (
 
 # nazwy rynków, których nie umiemy zaszufladkować — zbierane, nie gubione
 NIEZNANE_RYNKI: set[str] = set()
+
+# ⚑ ZAKŁADKI I GAŁĘZIE TEŻ NIOSĄ ZNACZENIE (2026-10-05). Rynek bywa jednym
+# widżetem z zakładkami („Mecz" / „1. połowa") pod JEDNĄ nazwą — wtedy
+# `kod_rynku` widzi tylko nazwę i oba warianty lądowały pod tym samym kodem,
+# a późniejszy nadpisywał wcześniejszy. Etykiety ścieżki sprawdzamy tymi
+# wzorcami, co dotyczą CZASU gry (nie listą ODRZUCANE_WZORCE: „podań" złapałoby
+# nazwisko „Podański" w etykiecie suwaka).
+WZORCE_CZASU_W_SCIEZCE: tuple[str, ...] = ("połow", "poł.", "dogryw")
+
+
+def _sciezka_spoza_meczu(sciezka: str | None, osoba: str | None) -> bool:
+    """Czy etykiety ścieżki zakładu mówią o części meczu (połowa, dogrywka)."""
+    os_ = (osoba or "").strip().lower()
+    for seg in re.sub(r"\[[^\]]*\]", "", sciezka or "").split("/"):
+        seg = seg.strip().lower()
+        if not seg or seg == os_:
+            continue
+        if any(w in seg for w in WZORCE_CZASU_W_SCIEZCE):
+            return True
+    return False
 
 
 # ---------------------------------------------------------------------------
@@ -682,6 +704,9 @@ def kursy_zawodnikow(id_meczu: int, tylko_statystyki: bool = True) -> dict:
     out: dict[str, dict] = defaultdict(lambda: defaultdict(dict))
     nazwy: dict[str, str] = {}
     pominiete_supersub = 0
+    pominiete_czesc_meczu = 0
+    # (gracz, rynek) z dwiema różnymi cenami jednej linii — patrz niżej
+    skonfliktowane: set[tuple[str, str]] = set()
     for r in oferta.get("rynki") or []:
         # ⚑ SUPERSUB TO INNY ZAKŁAD (2026-09-30). „Liczba strzałów zawodnika
         # (Supersub)" liczy także zmiennika — inna reguła rozliczenia i cena
@@ -723,15 +748,52 @@ def kursy_zawodnikow(id_meczu: int, tylko_statystyki: bool = True) -> dict:
             linia, strona = linia_i_strona(nazwa_zakladu)
             if linia is None or not osoba:
                 continue
+            # zakładka „1. połowa" / „dogrywka" pod nazwą zwykłego rynku
+            if _sciezka_spoza_meczu(z.get("sciezka"), osoba):
+                pominiete_czesc_meczu += 1
+                continue
             klucz = norm_name(osoba)
             if not klucz:
                 continue
             nazwy.setdefault(klucz, osoba)
-            out[klucz][kod].setdefault(linia, {})[strona or "over"] = float(z["kurs"])
+            try:
+                kurs = float(z["kurs"])
+            except (TypeError, ValueError):
+                continue
+            slot = out[klucz][kod].setdefault(linia, {})
+            s_key = strona or "over"
+            # ⚑ DWIE RÓŻNE CENY TEJ SAMEJ LINII (2026-10-05). Ten sam rynek
+            # wraca z kilku kategorii (Statystyki, Strzelcy) z identyczną ceną;
+            # inna cena znaczy inny zakład pod tym samym kodem (1. połowa jako
+            # „cały mecz" — karta Aydina) albo DWÓCH ZAWODNIKÓW O TEJ SAMEJ
+            # NAZWIE (Medellín–Santa Fe 05.10: dwaj „Juan Quintero", drabinki
+            # zlane w jedną). Dotąd wygrywał OSTATNI. Nie da się rozstrzygnąć,
+            # która cena jest właściwa, więc cały rynek zawodnika odpada niżej.
+            if s_key in slot and abs(slot[s_key] - kurs) > 1e-9:
+                skonfliktowane.add((klucz, kod))
+                continue
+            slot[s_key] = kurs
+    # rynek z konfliktem cen albo z drabinką, w której kurs spada mimo wyższej
+    # linii (zlane drabinki dwóch osób / dwóch zakładów) — wypada w całości;
+    # brak rynku jest lepszy niż cena za inną statystykę
+    konflikty_cen = niespojne_drabinki = 0
+    for klucz, rynki in out.items():
+        for kod in list(rynki):
+            if (klucz, kod) in skonfliktowane:
+                del rynki[kod]
+                konflikty_cen += 1
+                continue
+            over = {l: v["over"] for l, v in rynki[kod].items() if v.get("over")}
+            if not _rosnie_z_linia(over):
+                del rynki[kod]
+                niespojne_drabinki += 1
     return {"players": {k: {kod: dict(v) for kod, v in d.items()}
-                        for k, d in out.items()},
+                        for k, d in out.items() if d},
             "player_names": nazwy,
             "pominiete_supersub": pominiete_supersub,
+            "pominiete_czesc_meczu": pominiete_czesc_meczu,
+            "konflikty_cen": konflikty_cen,
+            "niespojne_drabinki": niespojne_drabinki,
             "match": {"id": oferta["id"], "nazwa": oferta["nazwa"],
                       "kickoff_ts": oferta["kickoff_ts"]}}
 
@@ -1282,6 +1344,123 @@ def porownaj_drabinke(linie_sb: dict, linie_bc: dict) -> dict:
         return {}
     # drabinka spójna -> ufamy jej także tam, gdzie jedna linia odjeżdża
     return {linia: r for linia, r in surowe.items() if r}
+
+
+# ---------------------------------------------------------------------------
+# Które linie Betclica wolno dołożyć do cennika (2026-10-05)
+# ---------------------------------------------------------------------------
+
+# ⚑ KARTA OGUZA AYDINA (Italy–Türkiye, 05.10). Drabinka pokazała strzały
+# 0,5 @2,05 i 1,5 @6,0 „u Betclica" — to były kursy rynku „Liczba strzałów
+# zawodnika (OPTA) – 1. połowa" (sprawdzone na żywej ofercie; za cały mecz
+# Betclic dawał 1,42 / 2,90, Superbet 1,13 / 1,70). Scalanie cenników brało
+# WYŻSZY kurs bez żadnej kontroli, więc cudza statystyka weszła do siatki,
+# do karty i do Skuteczności. Dwa sygnały, że coś jest nie tak, leżały na
+# wierzchu: drabinka Betclica rozjeżdżała się z drabinką Superbetu na KAŻDEJ
+# wspólnej linii (+81%, +253%), a po scaleniu 1,5 płaciło więcej niż 2,5 —
+# czego ta sama statystyka nie potrafi.
+#
+# Reguła jest ta sama co w porównywarce (`porownaj_drabinke`), żeby karta
+# i siatka nie miały dwóch definicji „ten sam rynek":
+#   * ≥ 2 wspólne linie: drabinki muszą się zgadzać (mediana rozjazdu
+#     ≤ PROG_ZGODY_DRABINKI_PCT, bez przesunięcia o szczebel) — wtedy ufamy
+#     całej drabince Betclica, także pojedynczej linii, która odjeżdża
+#     (to jest okazja, w tym „pewniak taniej"),
+#   * 1 wspólna linia: drabinki nie da się porównać, więc ta jedna linia
+#     nie może odjeżdżać dalej niż PROG_ZGODY_DRABINKI_PCT,
+#   * 0 wspólnych (rynek albo linie tylko u Betclica): przyjmujemy,
+#   * zawsze na końcu: po scaleniu kurs „powyżej" musi rosnąć z linią;
+#     jeśli Betclic to psuje, cały jego rynek odpada.
+# Rynek Betclica odrzucamy W CAŁOŚCI — jeśli jedna linia liczy co innego,
+# reszta drabinki pochodzi z tego samego, podejrzanego cennika.
+ODRZUCONE_SCALENIA: dict[str, int] = {
+    "drabinka_niezgodna": 0, "drabinka_przesunieta": 0,
+    "jedna_wspolna_za_daleko": 0, "niemonotoniczna": 0,
+}
+
+
+def _linie_liczbowe(linie: dict) -> dict[float, dict]:
+    out: dict[float, dict] = {}
+    for l, v in (linie or {}).items():
+        try:
+            out[float(l)] = v if isinstance(v, dict) else {"over": v}
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
+def _kurs_liczba(v) -> float | None:
+    try:
+        k = float(v)
+    except (TypeError, ValueError):
+        return None
+    return k if k > 1.0 else None
+
+
+def _rosnie_z_linia(linie: dict[float, float]) -> bool:
+    """Kurs „powyżej" nie może spadać, gdy linia rośnie (równy — dopuszczalny)."""
+    kursy = [linie[l] for l in sorted(linie)]
+    return all(b >= a for a, b in zip(kursy, kursy[1:]))
+
+
+def linie_do_scalenia(linie_sb: dict, linie_bc: dict,
+                      licz: bool = False) -> tuple[dict, str | None]:
+    """(linie Betclica, które wolno dołożyć, powód odrzucenia albo None).
+
+    `licz` — dopisać odrzucenie do `ODRZUCONE_SCALENIA` (robi to wyłącznie
+    pętla typów, gdzie każda para zawodnik×rynek przechodzi raz; scalanie
+    oferty i mapa źródeł wołają tę samą bramę dla tego samego zawodnika).
+
+    Kształt wejścia i wyjścia: `{linia: {"over": kurs, ...}}`; klucze wyjścia
+    zostają takie, jakie przyszły od Betclica (scalanie samo je normalizuje).
+    Wejście nie jest modyfikowane.
+    """
+    if not linie_bc:
+        return {}, None
+    sb = _linie_liczbowe(linie_sb)
+    bc = _linie_liczbowe(linie_bc)
+    sb_over = {l: k for l, v in sb.items() if (k := _kurs_liczba((v or {}).get("over")))}
+    bc_over = {l: k for l, v in bc.items() if (k := _kurs_liczba((v or {}).get("over")))}
+    wspolne = sorted(set(sb_over) & set(bc_over))
+    if len(wspolne) >= MIN_WSPOLNYCH_LINII:
+        gapy = sorted((max(sb_over[l], bc_over[l]) / min(sb_over[l], bc_over[l]) - 1) * 100
+                      for l in wspolne)
+        srodek = len(gapy) // 2
+        mediana = gapy[srodek] if len(gapy) % 2 else (gapy[srodek - 1] + gapy[srodek]) / 2
+        sb_d = {l: {"over": k} for l, k in sb_over.items()}
+        bc_d = {l: {"over": k} for l, k in bc_over.items()}
+        if mediana > PROG_ZGODY_DRABINKI_PCT:
+            if licz:
+                ODRZUCONE_SCALENIA["drabinka_niezgodna"] += 1
+            return {}, "drabinka_niezgodna"
+        if _drabinka_przesunieta(sb_d, bc_d, mediana):
+            if licz:
+                ODRZUCONE_SCALENIA["drabinka_przesunieta"] += 1
+            return {}, "drabinka_przesunieta"
+    elif len(wspolne) == 1:
+        l = wspolne[0]
+        gap = (max(sb_over[l], bc_over[l]) / min(sb_over[l], bc_over[l]) - 1) * 100
+        if gap > PROG_ZGODY_DRABINKI_PCT:
+            if licz:
+                ODRZUCONE_SCALENIA["jedna_wspolna_za_daleko"] += 1
+            return {}, "jedna_wspolna_za_daleko"
+    scalone = dict(sb_over)
+    for l, k in bc_over.items():
+        scalone[l] = max(k, scalone.get(l, 0.0))
+    if not _rosnie_z_linia(scalone) and _rosnie_z_linia(sb_over):
+        if licz:
+            ODRZUCONE_SCALENIA["niemonotoniczna"] += 1
+        return {}, "niemonotoniczna"
+    return dict(linie_bc), None
+
+
+def raport_scalen() -> str:
+    """Linia do logu cyklu — brama nie może być cicha ([[ciche-odrzucenia-zasada]])."""
+    n = sum(ODRZUCONE_SCALENIA.values())
+    if not n:
+        return "Betclic — scalanie cenników: żaden rynek nie odpadł"
+    return ("Betclic — scalanie cenników: odrzucone rynki Betclica " + str(n) + " ("
+            + ", ".join(f"{k}={v}" for k, v in ODRZUCONE_SCALENIA.items() if v) + ")")
 
 
 def porownaj_kursy(sb_players: dict, bc_players: dict) -> list[dict]:

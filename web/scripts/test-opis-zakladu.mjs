@@ -23,6 +23,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  czyRynekDruzynowy,
   nazwaPodmiotu,
   opisZakladu,
   rywalWZakladzie,
@@ -125,6 +126,19 @@ sprawdz(
   stronaLinii("ponizej") === "ponizej" && stronaLinii("gosc") === undefined,
 );
 
+/* --- 3b. drużyna czy zawodnik (Wyniki dzielą typy po tym) ---------------- */
+// 05.10: „kto więcej” (wiecej_) lądowało w Wynikach u zawodników
+sprawdz(
+  "kto więcej, rynki drużyny i sumy meczu są drużynowe",
+  ["wiecej_shots", "wiecej_sot", "wiecej_cards", "team_goals", "team_corners", "match_cards", "match_fouls"]
+    .every((k) => czyRynekDruzynowy(k)),
+);
+sprawdz(
+  "rynki zawodnicze nie są drużynowe",
+  ["shots", "sot", "fouls_committed", "fouls_won", "shots_outside_box", "sot_outside_box", "headed_shots", "offsides", "yellow_card", "tackles"]
+    .every((k) => !czyRynekDruzynowy(k)) && !czyRynekDruzynowy(undefined) && !czyRynekDruzynowy(""),
+);
+
 /* --- 4. SIATKA NA PRZYSZŁOŚĆ: wszystkie rynki z prawdziwych danych -------- */
 
 function wczytaj(nazwa) {
@@ -193,6 +207,18 @@ sprawdz(
   `żaden z ${rynki.size} rynków w danych nie drukuje „undefined”`,
   zle.length === 0,
   zle.map(([k, o]) => `${k}: ${o}`).join(" | "),
+);
+
+// pipeline stempluje `podmiot_typ` – podział na stronie musi się z nim zgadzać
+const sprzeczne = new Set();
+for (const b of zrodla) {
+  if (!b?.rynek_kod || !b.podmiot_typ) continue;
+  if ((b.podmiot_typ === "druzyna") !== czyRynekDruzynowy(b.rynek_kod)) sprzeczne.add(`${b.rynek_kod}/${b.podmiot_typ}`);
+}
+sprawdz(
+  "podział drużyna/zawodnik zgodny z `podmiot_typ` z pipeline'u",
+  sprzeczne.size === 0,
+  [...sprzeczne].join(", "),
 );
 
 console.log(

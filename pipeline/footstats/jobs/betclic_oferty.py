@@ -156,6 +156,7 @@ def _main() -> int:
           f"({time.time() - start:.0f} s na kalendarz)")
 
     pobrane = puste = bledy = 0
+    czesc_meczu = konflikty = niespojne = 0
     for mid, ts in do_pobrania:
         bc = pary.get(mid)
         if not bc:
@@ -179,6 +180,10 @@ def _main() -> int:
                   f"{type(e).__name__}: {e}")
             continue
         gracze = paczka.get("players") or {}
+        # zakładki „1. połowa" i dwie ceny jednej linii (2026-10-05) — licznik
+        czesc_meczu += int(paczka.get("pominiete_czesc_meczu") or 0)
+        konflikty += int(paczka.get("konflikty_cen") or 0)
+        niespojne += int(paczka.get("niespojne_drabinki") or 0)
         if not gracze:
             # ⚑ 2026-09-14: pusty wynik ZAPAMIĘTUJEMY, ale na krótko
             # (`PUSTA_SWIEZOSC_BC_S` = 6 h w cyklu, nie dobę): pierwszy przebieg
@@ -203,7 +208,10 @@ def _main() -> int:
         for mk in d
     }
     print(f"Betclic: pobrane {pobrane}, bez oferty {puste}, błędy {bledy}; "
-          f"w pamięci {len(pamiec)} meczów, rynków {len(rynki)}")
+          f"w pamięci {len(pamiec)} meczów, rynków {len(rynki)}; "
+          f"pominięte zakłady z części meczu (połowa/dogrywka) {czesc_meczu}, "
+          f"rynki zawodników odrzucone: dwie ceny jednej linii {konflikty}, "
+          f"kurs spada mimo wyższej linii {niespojne}")
     if (pobrane or puste) and not supa.put_key_bezpiecznie(BETCLIC_KLUCZ, pamiec):
         print("UWAGA: zapis oferty Betclica NIE POWIÓDŁ SIĘ")
         return 1

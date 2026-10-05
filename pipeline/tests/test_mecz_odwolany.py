@@ -41,8 +41,9 @@ def _statusy(monkeypatch, mapa):
     return pytania
 
 
-def test_mecz_przelozony_zamyka_typy_od_razu(monkeypatch):
-    log = {"a": _rec(), "b": _rec()}
+def test_mecz_przelozony_po_terminie_bukmachera_zamyka_typy(monkeypatch):
+    """60 h po pierwotnym terminie — po terminie Superbetu i Betclica."""
+    log = {"a": _rec(godzin_temu=60), "b": _rec(godzin_temu=60, bukmacher="Betclic")}
     _statusy(monkeypatch, {101: "postponed"})
     rozliczanie._zamknij_odwolane_mecze(log, int(time.time()))
     for rec in log.values():
@@ -53,10 +54,60 @@ def test_mecz_przelozony_zamyka_typy_od_razu(monkeypatch):
 
 def test_mecz_odwolany_tez(monkeypatch):
     for status in ("canceled", "cancelled", "abandoned"):
-        log = {"a": _rec()}
+        log = {"a": _rec(godzin_temu=60)}
         _statusy(monkeypatch, {101: status})
         rozliczanie._zamknij_odwolane_mecze(log, int(time.time()))
         assert log["a"]["wynik"] == "zwrot", status
+
+
+# --- 2026-10-05: CE Sabadell – FC Andorra -------------------------------------
+# Statshub „postponed" 03.10, mecz rozegrany 04.10 21:00 pod tym samym numerem;
+# zamknęliśmy 29 typów zwrotem, a u bukmacherów zakłady były ważne.
+SABADELL_KO = 1791045000          # 03.10.2026 16:30 UTC = 18:30 w Polsce
+SABADELL_GRANY = 1791140400       # 04.10.2026 19:00 UTC = 21:00 w Polsce
+
+
+def test_termin_superbetu_to_polnoc_po_nastepnym_dniu():
+    rec = {"kickoff_ts": SABADELL_KO, "bukmacher": "Superbet"}
+    # 05.10 00:00 w Polsce = 04.10 22:00 UTC
+    assert rozliczanie.termin_przelozonego(rec) == 1791151200
+    assert rozliczanie.termin_przelozonego(rec) > SABADELL_GRANY
+
+
+def test_termin_liczy_sie_od_daty_polskiej_nie_utc():
+    """00:30 w Polsce to jeszcze poprzedni dzień w UTC — termin od daty PL."""
+    ko = 1791066600                # 03.10 22:30 UTC = 04.10 00:30 w Polsce
+    assert rozliczanie.termin_przelozonego({"kickoff_ts": ko}) == 1791237600  # 06.10 00:00 PL
+
+
+def test_termin_betclica_to_48_godzin():
+    rec = {"kickoff_ts": SABADELL_KO, "bukmacher_szczebla": "Betclic"}
+    assert rozliczanie.termin_przelozonego(rec) == SABADELL_KO + 48 * 3600
+
+
+def test_przelozony_w_terminie_czeka_i_rozlicza_sie_wynikiem(monkeypatch):
+    log = {"a": {**_rec(), "kickoff_ts": SABADELL_KO, "bukmacher": "Superbet"}}
+    pytania = _statusy(monkeypatch, {101: "postponed"})
+    rozliczanie._zamknij_odwolane_mecze(log, SABADELL_KO + 2 * 3600 + 1800)
+    assert log["a"]["wynik"] is None
+    assert not log["a"].get("status_zrodla_spr")       # pytamy dalej
+    # mecz się odbył — normalne rozliczenie, bez zwrotu
+    _statusy(monkeypatch, {101: "finished"})
+    rozliczanie._zamknij_odwolane_mecze(log, SABADELL_GRANY + 3 * 3600)
+    assert log["a"]["wynik"] is None
+    assert log["a"]["status_zrodla_spr"] is True
+    assert pytania == [101]
+
+
+def test_rozne_terminy_w_jednym_meczu(monkeypatch):
+    """Po północy następnego dnia Superbet oddaje stawkę, Betclic jeszcze nie."""
+    teraz = 1791151200 + 3600       # godzinę po terminie Superbetu
+    log = {"sb": {**_rec(), "kickoff_ts": SABADELL_KO, "bukmacher": "Superbet"},
+           "bc": {**_rec(), "kickoff_ts": SABADELL_KO, "bukmacher": "Betclic"}}
+    _statusy(monkeypatch, {101: "postponed"})
+    rozliczanie._zamknij_odwolane_mecze(log, teraz)
+    assert log["sb"]["wynik"] == "zwrot"
+    assert log["bc"]["wynik"] is None
 
 
 def test_mecz_rozegrany_zostaje_do_normalnego_rozliczenia(monkeypatch):

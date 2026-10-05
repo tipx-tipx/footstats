@@ -15,8 +15,13 @@ import { FlagaLigi } from "../Herb";
  * Etap 5.3 – lista meczów jako wejście do narzędzia pokryć (decyzja 01.10):
  * w wierszu to, co znajdziesz w środku – ilu zawodników ma kurs i ile naszych
  * typów jest już na liście. Żadnych „najmocniejszy X%”.
- * Na liście: mecze z kursami na zawodników albo z naszymi typami.
+ * Na liście WYŁĄCZNIE mecze z kursami na zawodników (właściciel 05.10: „bez
+ * kursów na zawodników niech tu nie będzie”) – mecz bez propsów to pusta strona
+ * narzędzia. Pojawi się sam, gdy bukmacher wystawi ofertę. Mecze z samymi
+ * typami drużynowymi zostają w Drużynach.
  */
+
+const zKursami = (dane: DaneStron, id: number) => (dane.infoMeczow[id]?.zawodnicy ?? 0) > 0;
 
 const odmTyp = (n: number) => (n === 1 ? "typ" : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? "typy" : "typów");
 const odmZaw = (n: number) => (n === 1 ? "zawodnik" : "zawodników");
@@ -26,7 +31,7 @@ type Uklad = { dane: DaneStron; telefon: boolean; otworz?: (id: number) => void 
 
 function useMecze(dane: DaneStron) {
   const TERAZ = useTeraz();
-  const mecze = useMemo(() => dane.meczeWszystkie.filter((m) => m.ts > TERAZ), [dane, TERAZ]);
+  const mecze = useMemo(() => dane.meczeWszystkie.filter((m) => m.ts > TERAZ && zKursami(dane, m.id)), [dane, TERAZ]);
   const dni: DzienV[] = useMemo(() => {
     const m = new Map<string, { etykieta: string; ile: number }>();
     for (const x of mecze) {
@@ -128,6 +133,14 @@ export function StronaMecze({ dane, otworz }: Uklad & { wariant?: string }) {
         <ChipyLig ligi={s.ligi} liga={s.liga} setLiga={s.setLiga} wszystkie={s.wszystkieDnia} />
       </div>
       <div className="sm-lista">
+        {!grupy.length && (
+          <div className="d-pusty">
+            <div className="p-n" style={{ fontSize: 17 }}>
+              Na razie żaden mecz nie ma kursów na zawodników
+            </div>
+            <p>Mecz pojawi się tu sam, gdy bukmacher wystawi kursy na zawodników.</p>
+          </div>
+        )}
         {grupy.map(([liga, lista]) => (
           <section key={liga} className="el-liga">
             <GlowaLigi mecze={lista} />

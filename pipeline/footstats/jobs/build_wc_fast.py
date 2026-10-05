@@ -2925,6 +2925,21 @@ def _da_sie_na_liczbe(x) -> bool:
         return False
 
 
+def _bc_wiarygodne(sb_rec: dict | None, bc_rec: dict | None) -> dict:
+    """Rynki Betclica jednego zawodnika po bramie `betclic.linie_do_scalenia`.
+
+    Jedna funkcja dla wszystkich miejsc, które łączą cenniki (scalanie oferty,
+    mapa źródeł, pętla typów) — inaczej karta pisałaby „u Betclica" nad ceną,
+    której siatka już nie ma.
+    """
+    out: dict = {}
+    for mk, linie in (bc_rec or {}).items():
+        dobre, _powod = betclic.linie_do_scalenia((sb_rec or {}).get(mk) or {}, linie or {})
+        if dobre:
+            out[mk] = dobre
+    return out
+
+
 def _scal_oferty_zawodnika(sb_rec: dict, bc_rec: dict) -> dict:
     """Oferty dwóch bukmacherów na jednego zawodnika w jeden słownik rynków.
 
@@ -2945,6 +2960,9 @@ def _scal_oferty_zawodnika(sb_rec: dict, bc_rec: dict) -> dict:
     """
     if not bc_rec:
         return sb_rec or {}
+    # ⚑ TYLKO WIARYGODNE LINIE BETCLICA (2026-10-05, karta Aydina: kursy
+    # z 1. połowy weszły jako „cały mecz") — patrz `betclic.linie_do_scalenia`.
+    bc_rec = _bc_wiarygodne(sb_rec, bc_rec)
     if not sb_rec:
         # też przez normalizację — zawodnik kwotowany WYŁĄCZNIE przez Betclica
         # idzie tą gałęzią i inaczej wniósłby do silnika tekstowe linie
@@ -2984,7 +3002,7 @@ def zrodla_kursow(sb_rec: dict, bc_rec: dict) -> dict:
     powielać w niej całości.
     """
     out: dict = {}
-    for mk, linie in (bc_rec or {}).items():
+    for mk, linie in _bc_wiarygodne(sb_rec, bc_rec).items():
         sb_linie = (sb_rec or {}).get(mk) or {}
         for l_raw, strony in (linie or {}).items():
             try:
@@ -3293,8 +3311,10 @@ def odkryj_zawodnikow_z_oferty(
             # więc suma po kluczu nie dubluje zawodnika; przy wspólnym kluczu
             # rynki się sumują (Superbet nadpisuje wspólne linie)
             _pl = {}
+            _sb_gracze = sb_odds.get("players") or {}
             for _k, _v in (bc_odds.get("players") or {}).items():
-                _pl[_k] = dict(_v or {})
+                # ta sama brama wiarygodności co w scalaniu (karta Aydina 05.10)
+                _pl[_k] = dict(_bc_wiarygodne(_sb_gracze.get(_k) or {}, _v or {}))
             for _k, _v in (sb_odds.get("players") or {}).items():
                 _pl.setdefault(_k, {}).update(_v or {})
             # nazwiska obu cenników razem — bez tego zawodnik znany tylko
@@ -6739,6 +6759,11 @@ def _main_impl(tryb=None):
             bc_lines = betclic.znajdz_zawodnika(
                 bc_odds.get("players") or {}, tr.player_name
             ).get(mk, {})
+        # ⚑ drabinka Betclica niezgodna z Superbetem albo psująca kolejność
+        # kursów nie wchodzi do cennika (karta Aydina 05.10, 1. połowa jako
+        # „cały mecz") — ta sama brama co w `_scal_oferty_zawodnika`
+        if bc_lines:
+            bc_lines, _ = betclic.linie_do_scalenia(sb_lines or {}, bc_lines, licz=True)
 
         # kursy: linia -> strona -> (kurs, bukmacher). Gdy obaj kwotują tę samą
         # linię, zostaje WYŻSZY — ten sam zakład za więcej pieniędzy. Nazwa
@@ -9091,6 +9116,8 @@ def _main_impl(tryb=None):
     diagnostyka.etap("rynki_druzynowe")
     # --- SPÓJNOŚĆ KIERUNKU (decyzja usera 2026-07-25) ---
     # filtr na CAŁEJ puli, zanim rozejdzie się do pewniaków/kuponów/dumpów
+    # brama wiarygodności Betclica (pętla typów) — licznik, nie cisza
+    print(betclic.raport_scalen())
     n_przed_sp = len(legi_pool)
     # kierunki już zamrożone w logu — bez nich filtr widzi tylko bieżący cykl
     # i przepuszcza kolizję rozłożoną na kilka dni (pomiar 2026-07-26)
@@ -9574,6 +9601,8 @@ def _main_impl(tryb=None):
     # z pięciu bram zjadła pulę (zmierzone 03.08: z ~52 legów drużynowych
     # zostało 5, wszystkie „gole drużyny poniżej").
     odpadki_legow: Counter = Counter()
+    # nogi ze „słabszą serią" (kwarantanna) — w puli z etykietą, nie wyrzucone
+    etykiety_legow: Counter = Counter()
 
     def _leg_dopuszczalny(b: dict) -> bool:
         # rynek wycofany (betting.RYNKI_WYCOFANE) — leg, którego nie umiemy
@@ -9595,16 +9624,36 @@ def _main_impl(tryb=None):
         # przestał zdejmować stronę z własnym werdyktem (`_rynek_wstrzymany`),
         # bez niej do kuponów wchodziłoby dokładnie to, co brama stron
         # wcześniej wstrzymała: `team_corners:ponizej` (ROI −19%, n=118).
+        # ⚑ KWARANTANNA W PULI KUPONÓW: ZOSTAJE TYLKO LUKA TRAFNOŚCI
+        # (2026-10-05, właściciel). Kwarantanna jest liczona na ROI i jako
+        # brama zdejmowała KAŻDE zawodnicze „powyżej" (226 legów w cyklu
+        # 05.10 09:00: strzały, faule, celne, zza pola) — ani kupony od modelu,
+        # ani kreator nie miały ani jednej nogi zawodniczej. Celem produktu
+        # jest trafność ([[cel-produktu-to-trafnosc]]), więc segment
+        # w kwarantannie wchodzi do puli z etykietą `slabsza_seria`, a odpada
+        # tylko wtedy, gdy trafia wyraźnie rzadziej, niż deklarujemy
+        # (`kupony.zawyzona_deklaracja` — zawyżoną szansę builder ciągnie
+        # do kuponu w pierwszej kolejności).
+        _mk_s = f"{b['rynek_kod']}:{b.get('strona')}"
+        _segmenty: list[tuple[str, dict | None]] = []
         _kw = _powod_kwarantanny(b)
-        if _kw:
-            odpadki_legow[
-                f"{_kw}:{b['rynek_kod']}:{b.get('strona')}"] += 1
-            return False
+        if _kw == "kwarantanna_rynku":
+            _segmenty.append((f"{_kw}:{_mk_s}", kwarantanna_rynkow.get(b["rynek_kod"])))
+        elif _kw == "kwarantanna_strony":
+            _segmenty.append((f"{_kw}:{_mk_s}", kwarantanna_stron.get(_mk_s)))
+        _kat = _kategoria_wstrzymana(b)
+        if _kat:
+            _segmenty.append((f"kwarantanna_kategorii:{_kat}",
+                              kwarantanna_kategorii.get(_kat)))
+        for _etyk, _stat in _segmenty:
+            if kupony.zawyzona_deklaracja(_stat):
+                odpadki_legow[f"luka_trafnosci:{_etyk}"] += 1
+                return False
+        if _segmenty:
+            b["slabsza_seria"] = _segmenty[0][0]
+            etykiety_legow[b["slabsza_seria"]] += 1
         if b.get("stare_dane"):
             odpadki_legow["stare_dane"] += 1
-            return False
-        if _kategoria_wstrzymana(b):
-            odpadki_legow["kwarantanna_kategorii"] += 1
             return False
         # ta sama brama co przy typach: leg poza oknem zgody z rynkiem nie
         # wchodzi do kuponów. Błąd pojedynczego lega MNOŻY się przez kupon,
@@ -9620,6 +9669,13 @@ def _main_impl(tryb=None):
         print(f"Pula kuponów — bramy zdjęły {sum(odpadki_legow.values())} "
               f"z {len(legi_pool)} legów: " + ", ".join(
                   f"{k}={v}" for k, v in odpadki_legow.most_common()))
+    if etykiety_legow:
+        print(f"Pula kuponów — słabsza seria (etykieta, nie brama): "
+              f"{sum(etykiety_legow.values())} legów: " + ", ".join(
+                  f"{k}={v}" for k, v in etykiety_legow.most_common()))
+    _zaw_w_puli = sum(1 for b in legi_pool_pub if kupony.rodzaj_lega(b) == "zawodnik")
+    print(f"Pula kuponów: zawodników {_zaw_w_puli}, drużyn "
+          f"{len(legi_pool_pub) - _zaw_w_puli}")
 
     # REJESTR ODRZUCEŃ — domknięcie: para (zawodnik, rynek) opublikowana
     # (typ/sugestia) wypada z rejestru; obecna w puli kuponów, ale nie na

@@ -591,6 +591,36 @@ _STATUSY_BEZ_MECZU = ("postponed", "canceled", "cancelled", "abandoned")
 # Bezpiecznik kosztu: tyle meczów pytamy o status w jednym przebiegu.
 LIMIT_PYTAN_O_STATUS = 40
 
+# ⚑ PRZEŁOŻONY TO JESZCZE NIE ODWOŁANY (2026-10-05). CE Sabadell – FC Andorra
+# miał grać 03.10 o 18:30, statshub dał „postponed", a my po 2,5 h
+# zamknęliśmy 29 typów jako zwrot. Mecz rozegrano 04.10 o 21:00 pod TYM SAMYM
+# numerem — a u bukmacherów zakłady były ważne:
+#   * Superbet (centrum pomocy): zwrot, gdy mecz „nie zostanie rozegrany przed
+#     północą następnego dnia od pierwotnej daty rozpoczęcia" (czas polski;
+#     regulamin mówi o 48 h — bierzemy wcześniejszy termin, bo tak rozlicza
+#     obsługa),
+#   * Betclic (regulamin): 48 h od pierwotnego terminu.
+# Do terminu bukmachera typ czeka (i pytamy o status dalej); po terminie,
+# jeśli meczu dalej nie ma, zamyka się zwrotem. Rozegrany w terminie rozlicza
+# się normalnie, wynikiem.
+TERMIN_BETCLIC_S = 48 * 3600
+
+
+def termin_przelozonego(rec: dict) -> int:
+    """Do kiedy przełożony mecz może się odbyć, żeby zakład był ważny (ts)."""
+    ko = int(rec.get("kickoff_ts") or 0)
+    bukm = rec.get("bukmacher_szczebla") or rec.get("bukmacher") or "Superbet"
+    if bukm == "Betclic":
+        return ko + TERMIN_BETCLIC_S
+    if STREFA is None:                                     # pragma: no cover
+        return ko + TERMIN_BETCLIC_S
+    lok = datetime.fromtimestamp(ko, timezone.utc).astimezone(STREFA)
+    # północ po „następnym dniu" = początek dnia +2 od daty pierwotnej
+    nastepny = (lok.replace(hour=0, minute=0, second=0, microsecond=0)
+                .date().toordinal() + 2)
+    d = datetime.fromordinal(nastepny).replace(tzinfo=STREFA)
+    return int(d.timestamp())
+
 
 def _zamknij_odwolane_mecze(log: dict, now: int) -> None:
     """Typ na mecz, którego NIE BYŁO, zamyka się od razu — nie po tygodniu.
@@ -625,19 +655,27 @@ def _zamknij_odwolane_mecze(log: dict, now: int) -> None:
     pominiete = max(0, len(czekaja) - LIMIT_PYTAN_O_STATUS)
     zamkniete = 0
     mecze = 0
+    czeka_dalej = 0
     for mid in list(czekaja)[:LIMIT_PYTAN_O_STATUS]:
         st = statshub.status_meczu(mid)
         if st is None:
             continue
         if st in _STATUSY_BEZ_MECZU:
-            for rec in czekaja[mid]:
+            # bez stempla do terminu bukmachera — następny przebieg zapyta
+            # znowu, a rozegrany w terminie mecz rozliczy się wynikiem
+            po_terminie = [r for r in czekaja[mid] if now >= termin_przelozonego(r)]
+            czeka_dalej += len(czekaja[mid]) - len(po_terminie)
+            for rec in po_terminie:
                 rec.update(wynik="zwrot", faktyczna=None, rozliczono_ts=now,
                            powod=POWOD_MECZ_ODWOLANY, status_zrodla_spr=True)
-            zamkniete += len(czekaja[mid])
-            mecze += 1
+            zamkniete += len(po_terminie)
+            mecze += 1 if po_terminie else 0
         elif st == "finished":
             for rec in czekaja[mid]:
                 rec["status_zrodla_spr"] = True
+    if czeka_dalej:
+        print(f"Mecze przełożone: {czeka_dalej} typów czeka na nowy termin "
+              f"(zwrot dopiero po terminie bukmachera)")
     if zamkniete or pominiete:
         print(
             f"Mecze, których nie było: {mecze} meczów, {zamkniete} typów "

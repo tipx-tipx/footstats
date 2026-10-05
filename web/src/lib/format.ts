@@ -146,6 +146,16 @@ const CZY_WIECEJ = (b: ZakladDoOpisu) => (b.rynek_kod ?? "").startsWith("wiecej_
 const CZY_SUMA = (b: ZakladDoOpisu) => (b.rynek_kod ?? "").startsWith("match_");
 
 /**
+ * Czy rynek jest drużynowy – te same przedrostki co `betting.PRZEDROSTKI_DRUZYNOWE`
+ * w pipeline. Wyniki liczyły dotąd tylko `team_`/`match_`, więc „kto więcej”
+ * (`wiecej_`) lądowało u zawodników (32 typy od 14.09, zgłoszenie 05.10).
+ */
+const PRZEDROSTKI_DRUZYNOWE = ["team_", "match_", "wiecej_"];
+export function czyRynekDruzynowy(kod?: string | null): boolean {
+  return PRZEDROSTKI_DRUZYNOWE.some((p) => (kod ?? "").startsWith(p));
+}
+
+/**
  * Dopełniacz nazwy rynku — „więcej STRZAŁÓW niż Radomiak", nie „więcej
  * strzały". Odmiana idzie po KODZIE rynku, nie po napisie: kod jest stały,
  * a nazwa bywa przerabiana po drodze (pipeline ucina z niej „drużyny").
