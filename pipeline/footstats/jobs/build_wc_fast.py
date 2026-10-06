@@ -43,7 +43,7 @@ from ..sources import (
     betclic, eloratings, rotowire, scores365, sofascore, sportsgambler, statshub,
     superbet,
 )
-from . import archiwum_ofert, lekkie_klucze, magazyn_druzyn, radar, radar_imienny, rozliczanie
+from . import archiwum_ofert, lekkie_klucze, pomiar_skladow, magazyn_druzyn, radar, radar_imienny, rozliczanie
 from .build_demo import MARKET_NAMES_PL, WEB_DATA_DIR, line_for_lambda
 
 # KURSY GŁÓWNE: Superbet i Betclic (drugi dołożony 2026-08-08, decyzja usera).
@@ -6132,6 +6132,10 @@ def _main_impl(tryb=None):
     except Exception as e:
         roto = {}
         print(f"Rotowire niedostępny: {e}")
+    # kopia SAMEGO Rotowire do pomiaru źródeł — po `dolacz_do_rotowire`
+    # nie da się już odróżnić, co przyszło skąd (patrz `pomiar_skladow`)
+    _roto_sam = {k: dict(v) for k, v in roto.items()}
+    _sg_mapa: dict = {}
     # ⚑ SPORTSGAMBLER — drugie źródło składów (2026-09-14). Rotowire to Europa
     # Zachodnia + MLS; SportsGambler dokłada Skandynawię, Turcję, Portugalię,
     # Belgię, Holandię, Amerykę Płd., zaplecza (~60 rozgrywek; bez Ekstraklasy).
@@ -6166,6 +6170,23 @@ def _main_impl(tryb=None):
     except Exception as e:                                     # noqa: BLE001
         print(f"SportsGambler niedostępny ({type(e).__name__}: {e}) — składy "
               "tylko z Rotowire i statshub")
+    # POMIAR PRZEWIDYWANYCH SKŁADÓW PER ŹRÓDŁO (2026-10-06) — statshub,
+    # Rotowire i SportsGambler osobno + ogłoszony skład; materiał do jednego,
+    # lepszego przewidywania. Pomiar: awaria nie kosztuje cyklu, dry-run nie pisze.
+    if not _dry_run():
+        try:
+            _mecze_pomiaru = [
+                {"id": e.get("id"), "k": e.get("timeStartTimestamp"),
+                 "h": team_name.get(e.get("homeTeamId"), ""),
+                 "a": team_name.get(e.get("awayTeamId"), ""),
+                 "h_id": e.get("homeTeamId"), "a_id": e.get("awayTeamId")}
+                for e in events
+                if (e.get("timeStartTimestamp") or 0) - time.time() <= OKNO_SKLADOW_S
+            ]
+            print(pomiar_skladow.zapisz(_mecze_pomiaru, xi_pelne, _roto_sam,
+                                        _sg_mapa, rotowire._norm))
+        except Exception as e:                                 # noqa: BLE001
+            diagnostyka.cichy("cykl", "pomiar_skladow", e)
 
     # składy: potwierdzone (event.lineupConfirmed) i przewidywane (czy statshub
     # w ogóle wystawił przewidywany skład dla danego meczu)
