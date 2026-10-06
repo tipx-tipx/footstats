@@ -1323,6 +1323,34 @@ def przez_druga_sciezke(b: dict, polka: str | None,
             and p >= 1.0 / kurs)
 
 
+def przez_zejscie_wyzszych(b: dict, bijace_cene: frozenset | set | None) -> bool:
+    """Czy typ BEZ półki wchodzi na „wyższe kursy" zejściem do 1,45
+    (uczony.ZEJSCIE_WYZSZYCH_KURSOW): drużynowy, kurs w paśmie (dolna granica
+    wyłącznie — 1,45 należy jeszcze do wysokiej szansy), rynek|strona bije
+    cenę, p ≥ 1/kurs."""
+    pasmo = uczony.ZEJSCIE_WYZSZYCH_KURSOW.get(str(b.get("podmiot_typ") or ""))
+    if not pasmo or not bijace_cene:
+        return False
+    if f"{b.get('rynek_kod')}|{b.get('strona')}" not in bijace_cene:
+        return False
+    try:
+        kurs = float(b.get("kurs") or 0.0)
+        p = float(b.get("p_przed_sciagnieciem") or b.get("p_model") or 0.0)
+    except (TypeError, ValueError):
+        return False
+    return pasmo["kurs_min"] < kurs < pasmo["kurs_max"] and p >= 1.0 / kurs
+
+
+def polka_typu(b: dict, bijace_cene: frozenset | set | None = None
+               ) -> tuple[str | None, bool]:
+    """(półka, czy przez zejście) — zwykłe półki z `uczony.polka_dla`, a typ
+    drużynowy bez półki może wejść na „wyższe kursy" zejściem do 1,45."""
+    polka = uczony.polka_dla(b.get("kurs"), b.get("podmiot_typ"))
+    if polka is None and przez_zejscie_wyzszych(b, bijace_cene):
+        return "wyzsze_kursy", True
+    return polka, False
+
+
 def ponizej_progu_jakosci(b: dict, polka: str | None,
                           bijace_cene: frozenset | set | None = None) -> bool:
     """Czy typ NIE przechodzi progu jakości swojej półki (uczony.PROG_JAKOSCI_POLKI).
@@ -1506,7 +1534,9 @@ def wybierz_liste_publikowana(
         # [[stempel-zrodla-uciekal-biala-lista]]: NOWE POLE WPIĘTE W JEDNEJ
         # ŚCIEŻCE, gdy wejść na listę jest kilka. Dopinać przy każdym `append`
         # do `lista_pub`, nie przy jednym.
-        _polka = uczony.polka_dla(b.get("kurs"), b.get("podmiot_typ"))
+        # zwykłe półki + zejście „wyższych kursów" do 1,45 u drużyn
+        # (uczony.ZEJSCIE_WYZSZYCH_KURSOW) — z OSOBNYM licznikiem niżej
+        _polka, _zejscie = polka_typu(b, bijace_cene)
         if _polka:
             b["polka"] = _polka
         # osobne liczniki dla drużyn i zawodników — patrz `LISTA_CAP`
@@ -1520,9 +1550,11 @@ def wybierz_liste_publikowana(
             (dzien, rotowire._norm(str(b.get("podmiot") or "")))
             if b.get("podmiot_typ") == "zawodnik" else None
         )
-        _polka_klucz = (dzien, _str, _polka)
-        _polka_limit = (uczony.limit_polki(_polka, b.get("podmiot_typ"))
-                        if _polka else LISTA_CAP)
+        _polka_klucz = (dzien, _str, _polka, _zejscie)
+        _polka_limit = (
+            uczony.ZEJSCIE_WYZSZYCH_KURSOW[_str]["limit_dobowy"] if _zejscie
+            else uczony.limit_polki(_polka, b.get("podmiot_typ")) if _polka
+            else LISTA_CAP)
         if dzien in zamkniete:
             # dzień domknięty: skład jest ogłoszony i drużynowa połowa się nie
             # zmienia. ⚑ ZAWODNICZA POŁOWA DOKŁADA (2026-09-14, decyzja
@@ -11078,6 +11110,10 @@ def _main_impl(tryb=None):
           f"{len(_druga)} nowych typów na liście"
           + (f" ({', '.join(sorted({str(b.get('rynek_kod')) + '|' + str(b.get('strona')) for b in _druga}))})" if _druga else "")
           + f"; rynki bijące cenę: {', '.join(sorted(_bijace_cene)) or 'brak'}")
+    _zejscie_n = sum(1 for b in lista_pub
+                     if not juz_pokazany(b) and polka_typu(b, _bijace_cene)[1])
+    print(f"Zejście „wyższych kursów” do 1,45 (drużyny 1,45–1,80, rynek bije cenę, "
+          f"model ≥ kurs): {_zejscie_n} nowych typów na liście")
     if _dolozone_po_domknieciu:
         print("Lista dnia — DOŁOŻONE po domknięciu (ogłoszone XI): " + ", ".join(
             f"{d} +{len(k)}" for d, k in sorted(_dolozone_po_domknieciu.items())))
@@ -11114,13 +11150,20 @@ def _main_impl(tryb=None):
     # ⚑ CZUJNIK PÓŁEK (2026-08-20) — bez niego nie widać, czy podział na dwie
     # zakładki działa, ani ile produktu zjada sufit kursu. Jedna linia w logu
     # cyklu, bo to jest pierwsze miejsce, w którym patrzy się po wdrożeniu.
+    # zejście „wyższych kursów" do 1,45 liczy się OSOBNO (własny limit)
     _wg_polki = Counter(
-        (strumien_listy(b), str(b.get("polka") or "poza_polkami"))
+        (strumien_listy(b), str(b.get("polka") or "poza_polkami")
+         + ("_1,45-1,80" if polka_typu(b, _bijace_cene)[1] else ""))
         for b in lista_pub if not b.get("sugestia")
     )
     _poza = sum(1 for _p in _zdjete_selekcja.values() if _p == "kurs_poza_polkami")
+
+    def _limit_opis(s, k):
+        if k.endswith("_1,45-1,80"):
+            return (uczony.ZEJSCIE_WYZSZYCH_KURSOW.get(s) or {}).get("limit_dobowy") or "—"
+        return uczony.limit_polki(k, s) or "—"
     print("Półki listy dnia: " + ", ".join(
-        f"{s}/{k} {v}/{uczony.limit_polki(k, s) or '—'}"
+        f"{s}/{k} {v}/{_limit_opis(s, k)}"
         for (s, k), v in sorted(_wg_polki.items())
     ) + f" | poza widełkami (kurs > sufitu): {_poza}")
     if _z_dnia:

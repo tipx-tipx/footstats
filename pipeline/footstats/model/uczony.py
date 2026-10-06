@@ -1137,6 +1137,26 @@ PROG_JAKOSCI_POLKI = {"wysoka_szansa": {"p": 0.80, "cena": 0.75}}
 # Powrót jedną wartością: pusty słownik wyłącza ścieżkę.
 DRUGA_SCIEZKA_POLKI = {"wysoka_szansa": {"druzyna": {"kurs_min": 1.25, "kurs_max": 1.45}}}
 
+# ⚑⚑ ZEJŚCIE PÓŁKI „WYŻSZE KURSY" DO 1,45 U DRUŻYN (2026-10-06, właściciel:
+# „naszym celem jest, żeby te kursy się pojawiały, czy to wysoka szansa, czy
+# wyższe kursy"). Typ drużynowy 1,45–1,80 nie miał żadnej półki (wysoka szansa
+# kończy się dla drużyn na 1,45, wyższe kursy zaczynają od 1,80) — na stronie
+# nie było go wcale. Wchodzi na „wyższe kursy" tą samą regułą co druga ścieżka
+# (rynek bije cenę w pomiarze modelu z 30 dni, p ≥ 1/kurs), z OSOBNYM limitem
+# dobowym, żeby nie wypychał typów 1,80–2,20 (cel: różne kursy na stronie).
+#
+# Test dzień po dniu, księga 18.08–06.10 (rynki bijące cenę tylko z meczów
+# sprzed dnia), doba produktowa, kolejność listy p·√kurs:
+#   limit 3/dobę   70,7%  n=99   śr. kurs 1,64
+#   limit 4/dobę   74,8%  n=127
+#   limit 6/dobę   73,3%  n=176  (3,5/d)   <- wybrany
+#   limit 8/dobę   72,2%  n=216
+#   bez limitu     65,7%  n=647  (I/II poł. 64,2/67,0); cena uczciwa ~57%
+#   KONTROLA: rynek nie bije + model ≥ kurs 57,6%
+# Zawodnicy w tym paśmie: najlepsza reguła 50% przy cenie 58% — bez zejścia.
+ZEJSCIE_WYZSZYCH_KURSOW = {"druzyna": {"kurs_min": 1.45, "kurs_max": 1.80,
+                                       "limit_dobowy": 6}}
+
 
 def limit_polki(polka: str | None, podmiot_typ: str | None) -> int | None:
     """Limit dobowy półki w danym strumieniu (None = półka nieznana)."""
