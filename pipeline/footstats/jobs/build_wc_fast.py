@@ -1304,11 +1304,33 @@ def _pasmo_kursu(kurs) -> str:
     return "?"
 
 
-def ponizej_progu_jakosci(b: dict, polka: str | None) -> bool:
+def przez_druga_sciezke(b: dict, polka: str | None,
+                        bijace_cene: frozenset | set | None) -> bool:
+    """Czy typ wchodzi na półkę DRUGĄ ŚCIEŻKĄ (uczony.DRUGA_SCIEZKA_POLKI):
+    drużynowy, kurs w paśmie ścieżki, rynek|strona bije cenę, p ≥ 1/kurs."""
+    sciezka = (uczony.DRUGA_SCIEZKA_POLKI.get(polka or "") or {}).get(
+        str(b.get("podmiot_typ") or ""))
+    if not sciezka or not bijace_cene:
+        return False
+    if f"{b.get('rynek_kod')}|{b.get('strona')}" not in bijace_cene:
+        return False
+    try:
+        kurs = float(b.get("kurs") or 0.0)
+        p = float(b.get("p_przed_sciagnieciem") or b.get("p_model") or 0.0)
+    except (TypeError, ValueError):
+        return False
+    return (sciezka["kurs_min"] <= kurs <= sciezka["kurs_max"]
+            and p >= 1.0 / kurs)
+
+
+def ponizej_progu_jakosci(b: dict, polka: str | None,
+                          bijace_cene: frozenset | set | None = None) -> bool:
     """Czy typ NIE przechodzi progu jakości swojej półki (uczony.PROG_JAKOSCI_POLKI).
 
     Szansa modelu przed ściągnięciem do ceny (ta sama co w `szansa_z_ceną`)
-    i cena z kursu po marży. Półka bez progu → False.
+    i cena z kursu po marży. Półka bez progu → False. Typ, który nie
+    przechodzi progu, może wejść DRUGĄ ŚCIEŻKĄ (`przez_druga_sciezke`) —
+    `bijace_cene` to rynki|strony z dodatnią przewagą nad ceną w tym cyklu.
     """
     prog = uczony.PROG_JAKOSCI_POLKI.get(polka or "")
     if not prog:
@@ -1320,8 +1342,10 @@ def ponizej_progu_jakosci(b: dict, polka: str | None) -> bool:
         return True
     if kurs <= 1.0:
         return True
-    return (p < prog["p"]
-            or betting.implied_prob_one_sided(kurs) < prog["cena"])
+    if (p >= prog["p"]
+            and betting.implied_prob_one_sided(kurs) >= prog["cena"]):
+        return False
+    return not przez_druga_sciezke(b, polka, bijace_cene)
 
 
 def priorytet_skladu(b: dict) -> int:
@@ -1348,6 +1372,7 @@ def wybierz_liste_publikowana(
     kandydaci: list[dict], klucz_sortowania, ukryte=frozenset(),
     zamkniete: dict[str, set] | None = None,
     dolozone: dict[str, list[str]] | None = None,
+    bijace_cene: frozenset | set | None = None,
 ) -> tuple[list[dict], dict, dict]:
     """Które typy staną na stronie. Zwraca (lista, zdjęte, ile na dzień).
 
@@ -1513,7 +1538,7 @@ def wybierz_liste_publikowana(
                 continue
             elif (dolozone is not None and _str == "zawodnik"
                     and b.get("xi_sygnal") == "official" and _polka
-                    and not ponizej_progu_jakosci(b, _polka)
+                    and not ponizej_progu_jakosci(b, _polka, bijace_cene)
                     and z_strumienia.get(doba_str, 0) < LISTA_CAP
                     and z_polki.get(_polka_klucz, 0) < _polka_limit
                     and z_meczu.get(mecz, 0) < LISTA_PER_MECZ
@@ -1549,7 +1574,7 @@ def wybierz_liste_publikowana(
         # PRÓG JAKOŚCI (2026-10-05) — patrz `uczony.PROG_JAKOSCI_POLKI`. Tylko
         # nowe wejścia: typ raz pokazany zostaje do gwizdka.
         if (not juz_pokazany(b) and not na_ogloszonej_liscie(b, zamkniete)
-                and ponizej_progu_jakosci(b, _polka)):
+                and ponizej_progu_jakosci(b, _polka, bijace_cene)):
             zdjete.setdefault(_klucz_publikacji(b), "ponizej_progu_jakosci")
             continue
         if not juz_pokazany(b):
@@ -2368,7 +2393,7 @@ OPISY_ZDJECIA_PL = {
     "rynek_ukryty": "rynek chwilowo ukryty na stronie",
     "rynek_wycofany": "rynku nie umiemy rozliczyć, więc nie pokazujemy typu",
     "stary_rachunek": "model nie ma jeszcze historii tej drużyny lub zawodnika – liczymy w tle, nie pokazujemy",
-    "ponizej_progu_jakosci": "szansa poniżej progu półki wysokiej szansy (model ≥ 80% i kurs do ok. 1,27)",
+    "ponizej_progu_jakosci": "szansa poniżej progu półki wysokiej szansy (model ≥ 80% i kurs do ok. 1,24; drużyny 1,25–1,45 także z rynku bijącego cenę, gdy model ≥ kurs)",
     "bez_sygnalu_skladu": "ani składu, ani występu w ostatnim meczu drużyny – nie wiemy, czy zagra",
     "ujemna_po_korekcie": "po urealnieniu szansy wartość wyszła ujemna",
     "kurs_poza_widelkami": "kurs poza widełkami, w jakich gramy",
@@ -11036,10 +11061,23 @@ def _main_impl(tryb=None):
         print("UWAGA: nie udało się odczytać manifestu listy dnia — ten cykl "
               "pracuje bez domknięć (nie nadpisujemy go)")
     _dolozone_po_domknieciu: dict[str, list[str]] = {}
+    # rynki|strony, które w pomiarze modelu z 30 dni biją cenę — druga ścieżka
+    # na półkę wysokiej szansy (patrz `uczony.DRUGA_SCIEZKA_POLKI`)
+    _bijace_cene = frozenset(k for k, v in (_przewaga or {}).items()
+                             if (v.get("przewaga") or 0) > 0)
     lista_pub, _zdjete_selekcja, _z_dnia = wybierz_liste_publikowana(
         do_pokazania, _klucz_listy, _ukryte, zamkniete=_zamkniete,
-        dolozone=_dolozone_po_domknieciu,
+        dolozone=_dolozone_po_domknieciu, bijace_cene=_bijace_cene,
     )
+    _druga = [b for b in lista_pub
+              if not juz_pokazany(b) and not na_ogloszonej_liscie(b, _zamkniete)
+              and przez_druga_sciezke(b, uczony.polka_dla(b.get("kurs"), b.get("podmiot_typ")),
+                                      _bijace_cene)
+              and ponizej_progu_jakosci(b, uczony.polka_dla(b.get("kurs"), b.get("podmiot_typ")))]
+    print(f"Druga ścieżka półki (rynek bije cenę, drużyny 1,25–1,45, model ≥ kurs): "
+          f"{len(_druga)} nowych typów na liście"
+          + (f" ({', '.join(sorted({str(b.get('rynek_kod')) + '|' + str(b.get('strona')) for b in _druga}))})" if _druga else "")
+          + f"; rynki bijące cenę: {', '.join(sorted(_bijace_cene)) or 'brak'}")
     if _dolozone_po_domknieciu:
         print("Lista dnia — DOŁOŻONE po domknięciu (ogłoszone XI): " + ", ".join(
             f"{d} +{len(k)}" for d, k in sorted(_dolozone_po_domknieciu.items())))

@@ -1115,6 +1115,28 @@ LIMITY_POLEK = {
 # wczesnych typów, więc miejsca czekają na lepsze.
 PROG_JAKOSCI_POLKI = {"wysoka_szansa": {"p": 0.80, "cena": 0.75}}
 
+# ⚑⚑ DRUGA ŚCIEŻKA NA PÓŁKĘ WYSOKIEJ SZANSY (2026-10-06, właściciel: „wysoka
+# trafialność, ale też jak najbardziej korzystne kursy"). Próg wyżej wpuszcza
+# praktycznie tylko kursy do ~1,24 („cena" 0,75 to cena PO marży 7%). Druga
+# ścieżka: typ DRUŻYNOWY z kursem 1,25–1,45, gdy jego rynek (rynek|strona)
+# w pomiarze `rozliczanie.przewaga_rynkow` (model, ostatnie 30 dni) BIJE CENĘ
+# (`przewaga > 0`) i model daje co najmniej tyle, ile kurs (p ≥ 1/kurs).
+#
+# Test dzień po dniu na księdze 18.08–06.10, rynki bijące cenę liczone tą samą
+# funkcją wyłącznie z meczów sprzed danego dnia (bez zaglądania w przyszłość),
+# kandydaci = wszystkie rozliczone wyceny modelu z liniami bukmachera:
+#   reguła                                   trafia   n    /dobę  śr. kurs
+#   rynek bije cenę + model ≥ kurs           81,1%   106    2,1    1,37
+#     I połowa / II połowa                   81,7% / 80,4%
+#   KONTROLA: rynek NIE bije + model ≥ kurs  69,7%   715   14,3    1,35
+#   rynek bije cenę bez warunku modelu       76,3%   190
+#   (zawodnicy tą samą regułą: 52% — dlatego tylko drużyny)
+# Najwięcej niosą kartki „poniżej" (drużyny 85%, n=52; mecz 79%, n=24), reszta
+# rynków razem 78% (n=54). Rynki NIE są wybrane ręcznie — lista zmienia się
+# z pomiarem, więc rynek, który przestanie bić cenę, sam wypada.
+# Powrót jedną wartością: pusty słownik wyłącza ścieżkę.
+DRUGA_SCIEZKA_POLKI = {"wysoka_szansa": {"druzyna": {"kurs_min": 1.25, "kurs_max": 1.45}}}
+
 
 def limit_polki(polka: str | None, podmiot_typ: str | None) -> int | None:
     """Limit dobowy półki w danym strumieniu (None = półka nieznana)."""
