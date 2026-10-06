@@ -22,6 +22,7 @@ import {
   getZawodnicyTypow,
   terazTs,
 } from "@/lib/data";
+import { bezZjechanych, pulaPoKursieTeraz } from "@/lib/kursTeraz";
 import type { Mecz } from "@/lib/types";
 
 type MeczZNumerami = Mecz & {
@@ -76,15 +77,19 @@ export async function pobierzSurowe(): Promise<Surowe> {
   const oferta = Object.fromEntries(
     (mecze as MeczZNumerami[]).filter((m) => m.oferta).map((m) => [String(m.id), m.oferta!]),
   );
+  // „sugestie” (brak kursu, tylko podpowiedź modelu) nie są typami z listy
+  const naLiscie = typy.filter((t) => !t.sugestia);
   return {
-    // „sugestie” (brak kursu, tylko podpowiedź modelu) nie są typami z listy
-    typy: typy.filter((t) => !t.sugestia),
+    // typ, którego kursu już nie ma (poniżej podłogi), schodzi z list; Wyniki
+    // czytają `typy_wyniki`, więc tam zostaje z ceną z publikacji – patrz lib/kursTeraz.ts
+    typy: bezZjechanych(naLiscie),
     mecze,
     zawodnicy,
     druzynyForma,
     radar,
     kupony,
-    legiPool,
+    // pula po cenie teraz – z PEŁNEJ listy, także typów zdjętych wyżej
+    legiPool: pulaPoKursieTeraz(legiPool, naLiscie),
     wyniki,
     oferta,
     // kadry tylko dla oglądanego meczu – dokłada je `zKadramiMeczu`

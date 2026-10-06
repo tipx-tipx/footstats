@@ -88,6 +88,21 @@ def main() -> None:
             _w.opisz(n=(1 if _waga else 0),
                      opis=(f"w={_waga:.2f} / cena minus {_marza:.1%}"
                            if _waga else "za mała próba — legi bez zmian"))
+        # ⚑ POMIAR „CZY BIJEMY CENĘ” MUSI PRZEŻYĆ TEN JOB (2026-10-06).
+        # Liczył go tylko duży cykl, a ten job co 20 minut nadpisywał
+        # `typy_wyniki` bez niego — sekcja „Model a kurs” w Kontroli przez
+        # większość doby pisała „brak pomiaru”. Księga jest już w pamięci
+        # procesu, więc to tylko rachunek, bez dodatkowego transferu.
+        try:
+            _ksiega_p = rozliczanie._migruj_log(supa.get_key("typy_log") or {})
+            _przewaga = rozliczanie.przewaga_rynkow(_ksiega_p)
+            _pasma = rozliczanie.przewaga_pasm(_ksiega_p)
+            if _przewaga:
+                wyniki["przewaga_rynkow"] = _przewaga
+            if _pasma:
+                wyniki["przewaga_pasm"] = _pasma
+        except Exception as ex:
+            print(f"[{stamp}] Pomiar przewagi nad ceną pominięty ({ex})", flush=True)
         if rozliczanie.krytyczne_padniete():
             print(f"[{stamp}] Kupony NIE nadpisane — padła warstwa "
                   f"{', '.join(rozliczanie.krytyczne_padniete())}; "

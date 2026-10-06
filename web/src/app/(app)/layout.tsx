@@ -3,6 +3,7 @@ import { druzyna } from "@/app/projekt/_dane/przygotuj";
 import type { IndeksSzukania } from "@/app/projekt/_ui/szkielet/PaletaAplikacji";
 import type { Mecz, ValueBet } from "@/lib/types";
 import { getMecze, getMeta, getValueBets, terazTs } from "@/lib/data";
+import { bezZjechanych } from "@/lib/kursTeraz";
 import { zHerbamiMeczow } from "@/lib/nowe/surowe";
 
 // ISR: odświeżaj strony grupy (app) co 60 s. Bez tego trasy bez API
@@ -30,7 +31,8 @@ export default async function AppLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   const [meta, wszystkie, mecze] = await Promise.all([getMeta(), getValueBets(), getMecze()]);
-  const typy = wszystkie.filter((t) => !t.sugestia);
+  // wyszukiwarka nie podsuwa typów, których kursu już nie ma (lib/kursTeraz.ts)
+  const typy = bezZjechanych(wszystkie.filter((t) => !t.sugestia));
   // indeks wyszukiwarki (Ctrl+K): kilka KB z danych, które układ i tak ma
   const kiedy = new Intl.DateTimeFormat("pl-PL", { weekday: "short", day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Warsaw" });
   // stopka: ile rozgrywek naprawdę jest w ofercie na tydzień (zamiast stałej „50+”)

@@ -51,12 +51,13 @@ export type Kurs = {
   /** kurs, od którego typ ma sens – pokazywany, gdy bukmachera jeszcze nie ma */
   uczciwy?: number | null;
   zmiana?: "gora" | "dol" | null;
-  /** cena BIEŻĄCA, gdy różni się od ceny z publikacji – „teraz 1,29” pod kursem */
+  /** cena BIEŻĄCA, gdy różni się od ceny z publikacji – idzie grubo, a cena
+   *  z publikacji (po niej rozliczamy) małym „z 1,62 ▲” pod spodem */
   teraz?: number | null;
   terazBukmacher?: string;
 };
 
-/** Kafelek kursu typu: cena z publikacji + bieżąca, gdy się zmieniła. */
+/** Kafelek kursu typu: cena bieżąca, gdy się zmieniła, z ceną z publikacji pod spodem. */
 export const kursTypu = (t: { kurs: number; bukmacher: string; kursTeraz?: number | null; kursTerazBukmacher?: string }): Kurs => ({
   kurs: t.kurs,
   bukmacher: t.bukmacher,
@@ -102,15 +103,18 @@ export function KafelekD({
   const kolorBlysku = k.zmiana === "gora" ? "var(--ok)" : k.zmiana === "dol" ? "var(--nie)" : "transparent";
   const teraz = k.teraz && Math.abs(k.teraz - k.kurs) >= 0.005 ? k.teraz : null;
   const kierTeraz = teraz === null ? null : teraz > k.kurs ? "gora" : "dol";
-  const uKogoTeraz = teraz !== null && k.terazBukmacher && k.terazBukmacher !== k.bukmacher ? ` w ${k.terazBukmacher}` : "";
+  // 06.10 (właściciel): grubo cena, którą da się wziąć TERAZ – i logo tego,
+  // kto ją daje; cena z publikacji (po niej rozlicza się typ) małym „z 1,62 ▲”
+  const bukGruby = teraz !== null && k.terazBukmacher ? k.terazBukmacher : k.bukmacher;
+  const uKogoPublikacja = teraz !== null && bukGruby !== k.bukmacher ? ` w ${k.bukmacher}` : "";
 
   return (
     <button
       type="button"
       className="d-kurs"
       aria-pressed={wybrany}
-      aria-label={`${k.bukmacher}, kurs ${fmtKurs(k.kurs)}${teraz !== null ? ` przy publikacji, teraz ${fmtKurs(teraz)}${uKogoTeraz}` : ""}${wybrany ? ", w kuponie" : ""}`}
-      title={teraz !== null ? `Kurs przy publikacji ${fmtKurs(k.kurs)}, teraz ${fmtKurs(teraz)}${uKogoTeraz}` : undefined}
+      aria-label={`${bukGruby}, kurs ${fmtKurs(teraz ?? k.kurs)}${teraz !== null ? `, przy publikacji ${fmtKurs(k.kurs)}${uKogoPublikacja}` : ""}${wybrany ? ", w kuponie" : ""}`}
+      title={teraz !== null ? `Kurs teraz ${fmtKurs(teraz)}, przy publikacji ${fmtKurs(k.kurs)}${uKogoPublikacja} – po nim rozliczamy typ` : undefined}
       data-teraz={teraz !== null || undefined}
       onClick={onClick}
     >
@@ -124,7 +128,7 @@ export function KafelekD({
           transition={{ duration: 1.6, ease: "easeOut" }}
         />
       )}
-      <Logo nazwa={k.bukmacher} kolor={logoKolor && !wybrany} />
+      <Logo nazwa={bukGruby} kolor={logoKolor && !wybrany} />
       <span className="d-kurs-prawa">
         <AnimatePresence initial={false}>
           {wybrany && (
@@ -146,9 +150,9 @@ export function KafelekD({
         )}
         {teraz !== null ? (
           <span className="d-kurs-dwa">
-            <span className="d-kurs-liczba">{fmtKurs(k.kurs)}</span>
+            <span className="d-kurs-liczba">{fmtKurs(teraz)}</span>
             <span className="d-kurs-teraz" data-kier={kierTeraz}>
-              teraz {fmtKurs(teraz)} {kierTeraz === "gora" ? "▲" : "▼"}
+              z {fmtKurs(k.kurs)} {kierTeraz === "gora" ? "▲" : "▼"}
             </span>
           </span>
         ) : (

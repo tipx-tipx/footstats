@@ -325,8 +325,8 @@ export function przygotujElementy() {
         const linia = Number(l);
         const d = r.drabinka.find((x) => x.linia === linia);
         const polecany = linia === wpis.hero.linia;
-        // polecany szczebel pokazuje cenę z publikacji (po niej się rozliczy),
-        // a bieżącą obok – „teraz”
+        // polecany szczebel niesie cenę z publikacji (po niej się rozliczy)
+        // i bieżącą – kafelek pokazuje grubo bieżącą, publikacji małym „z …”
         return {
           linia,
           kurs: polecany && wpis.hero.kurs_publikacji ? wpis.hero.kurs_publikacji : kurs,

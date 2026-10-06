@@ -164,7 +164,7 @@ function Suwak({ d }: { d: DrabinkaV }) {
                 type="button"
                 role="radio"
                 aria-checked={j === i}
-                aria-label={`powyżej ${fmtLinia(x.linia)}, kurs ${fmtKurs(x.kurs)}, weszło ${x.traf} z ${x.z}`}
+                aria-label={`powyżej ${fmtLinia(x.linia)}, kurs ${fmtKurs(x.teraz ?? x.kurs)}, weszło ${x.traf} z ${x.z}`}
                 tabIndex={j === i ? 0 : -1}
                 className="el-przystanek"
                 data-pokrycie={r >= 0.8 ? "mocne" : r >= 0.5 ? "srednie" : "slabe"}
@@ -173,7 +173,8 @@ function Suwak({ d }: { d: DrabinkaV }) {
                 {x.polecany && <span className="el-przystanek-nasz">nasz typ</span>}
                 <span className="el-przystanek-linia">{fmtLinia(x.linia)}</span>
                 <span className="el-przystanek-kropka" />
-                <span className="el-przystanek-kurs">{fmtKurs(x.kurs)}</span>
+                {/* ta sama cena co gruba w kafelku – bieżąca, gdy się ruszyła */}
+                <span className="el-przystanek-kurs">{fmtKurs(x.teraz ?? x.kurs)}</span>
                 <span className="el-przystanek-pokrycie">
                   {x.traf}/{x.z}
                 </span>
@@ -201,7 +202,7 @@ function Schody({ d }: { d: DrabinkaV }) {
           const pokrycie = x.traf / x.z;
           return (
             <button key={x.linia} type="button" role="radio" aria-checked={j === i} tabIndex={j === i ? 0 : -1} className="el-stopien" onClick={() => setI(j)}>
-              <span className="el-stopien-kurs">{fmtKurs(x.kurs)}</span>
+              <span className="el-stopien-kurs">{fmtKurs(x.teraz ?? x.kurs)}</span>
               <motion.span
                 className="el-stopien-slup"
                 initial={{ height: 0 }}
