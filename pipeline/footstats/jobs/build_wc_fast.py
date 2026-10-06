@@ -43,7 +43,7 @@ from ..sources import (
     betclic, eloratings, rotowire, scores365, sofascore, sportsgambler, statshub,
     superbet,
 )
-from . import lekkie_klucze, magazyn_druzyn, radar, radar_imienny, rozliczanie
+from . import archiwum_ofert, lekkie_klucze, magazyn_druzyn, radar, radar_imienny, rozliczanie
 from .build_demo import MARKET_NAMES_PL, WEB_DATA_DIR, line_for_lambda
 
 # KURSY GŁÓWNE: Superbet i Betclic (drugi dołożony 2026-08-08, decyzja usera).
@@ -11396,6 +11396,14 @@ def _main_impl(tryb=None):
         )
     except Exception as e:
         diagnostyka.cichy("cykl", "kursy_dwa", e)
+    # ARCHIWUM PEŁNEJ OFERTY ZAWODNICZEJ (2026-10-06) — ostatni zrzut przed
+    # gwizdkiem, materiał do szukania szczebli, które nam umykają (patrz
+    # `archiwum_ofert`). Dodatek: awaria nie kosztuje cyklu, dry-run nie pisze.
+    if kursy_dwa and not _dry_run():
+        try:
+            print(archiwum_ofert.zapisz_zrzut(kursy_dwa, matches_out))
+        except Exception as e:
+            diagnostyka.cichy("cykl", "archiwum_ofert", e)
     # stempel na KOPII – do księgi i manifestu pokazanych idzie lista bez niego
     # (cena drugiego bukmachera to podpowiedź na teraz, nie stan publikacji)
     _vb_strona = [dict(b) for b in lista_pub]
