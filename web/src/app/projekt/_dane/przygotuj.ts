@@ -88,8 +88,12 @@ export type TypV = {
   /** bieżąca najlepsza cena tej linii, gdy różni się od ceny z publikacji (pipeline od 05.10) */
   kursTeraz?: number | null;
   kursTerazBukmacher?: string;
+  /** ceny tej linii u OBU bukmacherów – tylko gdy pipeline zna obie (06.10, lib/cenyBukmacherow.ts) */
+  kursyBukmacherow?: CenyBukmacherow | null;
   uzasadnienie: string | null;
 };
+import type { CenyBukmacherow } from "@/lib/cenyBukmacherow";
+
 import { dzisZrodla, zrodlo } from "./zrodlo";
 
 /** lekka lista WSZYSTKICH typów migawki – do filtrów i liczników */

@@ -17,7 +17,8 @@
     "zrzuty": "node scripts/zrzuty.mjs",
     "audyt": "node scripts/audyt-mobile.mjs",
     "test:sklejanie": "node --experimental-strip-types --no-warnings scripts/test-sklejanie-czesci.mjs",
-    "test:kurs-teraz": "node --experimental-strip-types --no-warnings scripts/test-kurs-teraz.mjs"
+    "test:kurs-teraz": "node --experimental-strip-types --no-warnings scripts/test-kurs-teraz.mjs",
+    "test:ceny-bukmacherow": "node --experimental-strip-types --no-warnings scripts/test-ceny-bukmacherow.mjs"
   },
   "dependencies": {
     "framer-motion": "^12.42.2",

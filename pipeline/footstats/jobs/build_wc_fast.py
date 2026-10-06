@@ -11299,7 +11299,33 @@ def _main_impl(tryb=None):
         print(f"Rynki wstrzymane: {_wstrzymane} typów na liście pochodzi "
               f"z rynków/stron ze słabszą serią — od 14.08 wchodzą normalnie, "
               f"z etykietą na karcie i na końcu kolejności; do kuponów nie")
-    _dump("value_bets.json", lista_pub)
+    # KURSY OBU BUKMACHERÓW OSOBNO (redesign 7B) – liczone PRZED zapisem typów,
+    # bo karta typu zawodniczego dostaje z nich cenę u drugiego bukmachera
+    # (06.10, `lekkie_klucze.stempluj_ceny_bukmacherow`). Dodatek do strony –
+    # pad nie może kosztować cyklu: głośno do diagnostyki, karty bez porównania.
+    kursy_dwa = None
+    try:
+        kursy_dwa = lekkie_klucze.siatka_dwoch_kursow(
+            odds_grid, zrodla_grid,
+            {pid: z.get("nazwa") for pid, z in players_out.items()},
+            sb_cache, bc_cache,
+            superbet.znajdz_zawodnika, betclic.znajdz_zawodnika,
+            # ta sama brama wiarygodności Betclica co w typach (05.10)
+            brama_bc=lambda _sb, _bc: betclic.linie_do_scalenia(_sb, _bc)[0],
+        )
+    except Exception as e:
+        diagnostyka.cichy("cykl", "kursy_dwa", e)
+    # stempel na KOPII – do księgi i manifestu pokazanych idzie lista bez niego
+    # (cena drugiego bukmachera to podpowiedź na teraz, nie stan publikacji)
+    _vb_strona = [dict(b) for b in lista_pub]
+    if kursy_dwa:
+        _z_dwiema = lekkie_klucze.stempluj_ceny_bukmacherow(_vb_strona, kursy_dwa)
+        _zawodnicze = sum(1 for b in _vb_strona
+                          if b.get("podmiot_typ") != "druzyna" and not b.get("sugestia"))
+        print(f"Ceny obu bukmacherów na kartach: {_z_dwiema} z {_zawodnicze} "
+              "typów zawodniczych (reszta: drugi bukmacher nie ma tej linii, "
+              "Betclic liczy inaczej albo typ „poniżej” – karta bez porównania)")
+    _dump("value_bets.json", _vb_strona)
     # CO POSZŁO NA STRONĘ — jedyne źródło prawdy Skuteczności (patrz
     # `rozliczanie.POKAZANE_KLUCZ`). Stoi ZA dumpem, bo zapisujemy to, co
     # właśnie wysłaliśmy, a nie to, co zamierzaliśmy.
@@ -11316,19 +11342,10 @@ def _main_impl(tryb=None):
     _dump("players.json", list(players_out.values()))
     _dump("druzyny_forma.json", scal_forme_druzyn(druzyny_forma, lista_pub))
     _dump("odds_superbet.json", odds_grid)   # siatka kursów do TOP POKRYCIA
-    try:
+    if kursy_dwa is not None:
         # nie idzie do Supabase w całości – `push_supabase` tnie ją na
         # koszyki meczów (`kursy_mNN`) i dokłada kursy do `zaw_kNN`
-        _dump("kursy_dwa.json", lekkie_klucze.siatka_dwoch_kursow(
-            odds_grid, zrodla_grid,
-            {pid: z.get("nazwa") for pid, z in players_out.items()},
-            sb_cache, bc_cache,
-            superbet.znajdz_zawodnika, betclic.znajdz_zawodnika,
-            # ta sama brama wiarygodności Betclica co w typach (05.10)
-            brama_bc=lambda _sb, _bc: betclic.linie_do_scalenia(_sb, _bc)[0],
-        ))
-    except Exception as e:
-        diagnostyka.cichy("cykl", "kursy_dwa", e)
+        _dump("kursy_dwa.json", kursy_dwa)
     # ⚑ DOMKNIĘCIE REJESTRU O BRAMY WYŚWIETLANIA (2026-09-16). Rejestr zamykał
     # się PRZED wyborem listy dnia, więc typ zdjęty tam (dzień domknięty, kurs
     # poza półkami, limit dnia, rynek ukryty/wycofany) był w księdze, ale na

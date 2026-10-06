@@ -113,8 +113,12 @@ async function rozwinKarty(page, ile) {
   // Bez tego wyjątku skrypt otwierał je wszystkie i zrzut pokazywał kartę
   // dłuższą, niż ktokolwiek ją widzi — czyli dokładnie odwrotność tego,
   // po co ta flaga istnieje.
+  // `[role="button"]` (06.10): wiersz typu nowego układu (`KartaA`) rozwija
+  // się przez `div role="button"`, nie `<button>` – bez tego flaga cicho
+  // dawała „rozwinięte karty: 0” na liście typów.
   const SEL =
     'article button[aria-expanded="false"]:not([data-rozwiniecie]):visible,' +
+    ' article [role="button"][aria-expanded="false"]:not([data-rozwiniecie]):visible,' +
     ' table button[aria-expanded="false"]:not([data-rozwiniecie]):visible';
   const n = Math.min(await page.locator(SEL).count(), ile);
   for (let i = 0; i < n; i++) {

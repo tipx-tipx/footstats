@@ -125,6 +125,39 @@ def siatka_dwoch_kursow(
     return wynik
 
 
+def stempluj_ceny_bukmacherow(typy: list[dict], kursy_dwa: dict) -> int:
+    """Dopisuje typom zawodniczym `kursy_bukmacherow = {"Superbet": x,
+    "Betclic": y}` z tej samej siatki co strona meczu (właściciel 06.10: po
+    rozwinięciu karty cena u drugiego bukmachera).
+
+    Stempel TYLKO, gdy znamy OBIE ceny tej samej linii – inaczej nie ma czego
+    porównać, a karta nie pokazuje nic (właściciel: „jak nie da się sczytać,
+    to się nie wyświetla”). Bez stempla zostają też: linia „Betclic liczy
+    inaczej” (inna statystyka), typy „poniżej” (siatka zna tylko „powyżej”)
+    i drużynowe. Zwraca liczbę ostemplowanych typów."""
+    n = 0
+    for t in typy or []:
+        t.pop("kursy_bukmacherow", None)
+        if (t.get("sugestia") or t.get("podmiot_typ") == "druzyna"
+                or t.get("strona") != "powyzej"):
+            continue
+        try:
+            linie = (((kursy_dwa or {}).get(int(t["mecz_id"])) or {})
+                     .get(int(t["podmiot_id"])) or {}).get(t["rynek_kod"]) or {}
+        except (KeyError, TypeError, ValueError):
+            continue
+        para = next((linie[k] for k in (str(t.get("linia")), str(_f(t.get("linia"))))
+                     if k in linie), None)
+        if not para or len(para) < 2 or (len(para) > 2 and para[2]):
+            continue
+        sb, bc = _f(para[0]), _f(para[1])
+        if not sb or not bc or sb <= 1.0 or bc <= 1.0:
+            continue
+        t["kursy_bukmacherow"] = {"Superbet": round(sb, 2), "Betclic": round(bc, 2)}
+        n += 1
+    return n
+
+
 def klucze_kursow_meczow(kursy_dwa: dict) -> dict:
     """`kursy_m00`..`kursy_m31` – mecz w koszyku `id % 32`. Wszystkie koszyki
     zawsze (także puste), żeby po meczu nie zostawała stara oferta."""

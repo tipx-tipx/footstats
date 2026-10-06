@@ -177,6 +177,29 @@
 
 }
 
+/* ta sama linia u obu bukmacherów (06.10) – kafelki jak w tabeli kursów meczu */
+.el-ceny { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; }
+.el-ceny-tytul { font-size: 12px; color: var(--t3); }
+.el-ceny-pary { display: grid; grid-template-columns: repeat(2, minmax(104px, auto)); gap: 6px; }
+.el-cena {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--kreska);
+  background: var(--pow2);
+  color: var(--t2);
+}
+.el-cena b { font: 700 15px/1 var(--f-n); font-variant-numeric: tabular-nums; color: var(--t1); }
+.el-cena[data-lepszy] { border-color: color-mix(in srgb, var(--akcja) 55%, transparent); }
+
+@container (max-width: 400px) {
+  .el-ceny-pary { width: 100%; grid-template-columns: 1fr 1fr; }
+}
+
 .el-chevron { color: var(--t3); transition: transform 0.2s ease; }
 [aria-expanded="true"] .el-chevron { transform: rotate(180deg); }
 

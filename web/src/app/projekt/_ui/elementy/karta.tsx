@@ -4,10 +4,11 @@ import { Lnk } from "../linki";
 import { AnimatePresence, motion } from "framer-motion";
 import { useId, useState } from "react";
 
-import { fmtLinia } from "@/lib/format";
+import { porownanieCen } from "@/lib/cenyBukmacherow";
+import { fmtKurs, fmtLinia } from "@/lib/format";
 
 import type { KartaV, Powod } from "../../_dane/elementy";
-import { KafelekD, KratkiD, SzansaD, kursTypu } from "../atomy2/podstawowe";
+import { KafelekD, KratkiD, Logo, SzansaD, kursTypu } from "../atomy2/podstawowe";
 import { Herb } from "../Herb";
 import { IkonaRynku } from "./ikonyRynkow";
 
@@ -66,12 +67,36 @@ export function Powody({ powody, ile }: { powody: Powod[]; ile?: number }) {
   );
 }
 
+/**
+ * Ta sama linia u obu bukmacherów (06.10). Wiersz jest TYLKO, gdy obie ceny
+ * są pewne – każdą wątpliwą sytuację odsiewa `porownanieCen`, a wtedy karta
+ * nie pokazuje nic (żadnego „–”). Wygląd jak tabela kursów na stronie meczu.
+ */
+function CenyUBukmacherow({ t }: { t: KartaV }) {
+  const ceny = porownanieCen(t);
+  if (!ceny) return null;
+  return (
+    <div className="el-ceny" role="group" aria-label="Kurs u bukmacherów">
+      <span className="el-ceny-tytul">Kurs u bukmacherów</span>
+      <span className="el-ceny-pary">
+        {ceny.map((c) => (
+          <span key={c.bukmacher} className="el-cena" data-lepszy={c.lepszy || undefined} aria-label={`${c.bukmacher} ${fmtKurs(c.kurs)}${c.lepszy ? ", wyższy kurs" : ""}`}>
+            <Logo nazwa={c.bukmacher} wysokosc={10} />
+            <b>{fmtKurs(c.kurs)}</b>
+          </span>
+        ))}
+      </span>
+    </div>
+  );
+}
+
 /** „Skąd ta liczba” – ten sam środek we wszystkich wariantach karty */
 function SkadTaLiczba({ t }: { t: KartaV }) {
   const za = t.powody.filter((p) => p.kier === "za").length;
   const przeciw = t.powody.filter((p) => p.kier === "przeciw").length;
   return (
     <div style={{ display: "grid", gap: 14 }}>
+      <CenyUBukmacherow t={t} />
       {t.historia.length > 0 && <KratkiD t={t} />}
       <div>
         <div className="el-podsumowanie-powodow" style={{ marginBottom: 8 }}>

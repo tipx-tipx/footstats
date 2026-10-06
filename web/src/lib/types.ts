@@ -62,6 +62,9 @@ export interface ValueBet {
    *  po nim rozliczamy) – patrz `lib/kursTeraz.ts` */
   kurs_teraz?: number | null;
   kurs_teraz_bukmacher?: string;
+  /** ta sama linia u obu bukmacherów – tylko typy zawodnicze, tylko gdy obie
+   *  ceny są pewne (`lekkie_klucze.stempluj_ceny_bukmacherow`) */
+  kursy_bukmacherow?: { Superbet: number; Betclic: number };
   /** mediana kursów bukmacherów UK (Bet365, WH...) dla tej linii – konsensus rynku */
   kurs_ref?: number | null;
   /** uczciwy kurs UK po zdjęciu marży (no-vig) – benchmark „prawdziwej" ceny */

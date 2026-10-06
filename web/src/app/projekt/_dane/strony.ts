@@ -4,6 +4,7 @@
  * i krótkie podsumowanie wyników z ostatnich dni.
  */
 
+import type { CenyBukmacherow } from "@/lib/cenyBukmacherow";
 import { zlozKupon } from "@/lib/kuponBuilder";
 import type { LegPool } from "@/lib/types";
 
@@ -56,6 +57,7 @@ type TypS = {
   fair_kurs?: number | null;
   kurs_teraz?: number | null;
   kurs_teraz_bukmacher?: string;
+  kursy_bukmacherow?: CenyBukmacherow;
   uzasadnienie?: { czynniki?: Czynnik[] };
 };
 type Forma = { ostatnie: number[]; rywale?: string[]; minuty?: number[]; ts?: number[]; kadra?: boolean[] };
@@ -105,6 +107,7 @@ export function przygotujStrony() {
       kursUczciwy: t.fair_kurs ?? null,
       kursTeraz: t.kurs_teraz ?? null,
       kursTerazBukmacher: t.kurs_teraz_bukmacher,
+      kursyBukmacherow: t.kursy_bukmacherow ?? null,
       uzasadnienie: null,
       podmiotTyp: druzynowy ? "druzyna" : "zawodnik",
       podmiotId: druzynowy ? undefined : t.podmiot_id,
