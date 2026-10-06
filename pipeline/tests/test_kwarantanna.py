@@ -12,8 +12,14 @@ def _rec(mk: str, p: float, wynik: str, ts: int = 0, kurs: float = 1.5,
          **kw) -> dict:
     return {
         "rynek_kod": mk, "rynek": mk, "p_model": p, "wynik": wynik,
-        "kickoff_ts": ts, "sugestia": False, "kurs": kurs, **kw,
+        "kickoff_ts": ts, "sugestia": False, "kurs": kurs,
+        # bramy nowego modelu liczą się tylko na jego typach (05.10)
+        "zrodlo_p": "uczony", **kw,
     }
+
+
+# punkt odniesienia okna przewagi (30 dni) — rekordy testów mają ts ≈ 0
+_T_PRZEWAGI = 10_000
 
 
 def _log(recs: list[dict]) -> dict:
@@ -392,7 +398,7 @@ def _typ_z_kursem(i, p, kurs, wynik, rynek="team_goals", strona="ponizej"):
         "mecz_id": i, "mecz": "A – B", "kickoff_ts": 1_700_000_000 + i,
         "podmiot_id": i, "podmiot": f"G{i}", "rynek_kod": rynek, "rynek": "R",
         "linia": 1.5, "strona": strona, "kurs": kurs, "p_model": p,
-        "wynik": wynik,
+        "wynik": wynik, "zrodlo_p": "uczony",
     }
 
 
@@ -402,7 +408,7 @@ def test_przewaga_dodatnia_gdy_model_bije_cene():
     for i in range(40):
         log[str(i)] = _typ_z_kursem(
             i, 0.80, 2.0, "wygrany" if i % 10 < 8 else "przegrany")
-    w = rozliczanie.przewaga_rynkow(log)["team_goals|ponizej"]
+    w = rozliczanie.przewaga_rynkow(log, teraz=_T_PRZEWAGI)["team_goals|ponizej"]
     assert w["n"] == 40
     assert w["przewaga"] > 0, "model trafia zgodnie z deklaracją, cena nie"
     assert w["brier_model"] < w["brier_kurs"]
@@ -414,14 +420,14 @@ def test_przewaga_ujemna_gdy_model_gada():
     for i in range(40):
         log[str(i)] = _typ_z_kursem(
             i, 0.85, 2.0, "wygrany" if i % 10 < 4 else "przegrany")
-    w = rozliczanie.przewaga_rynkow(log)["team_goals|ponizej"]
+    w = rozliczanie.przewaga_rynkow(log, teraz=_T_PRZEWAGI)["team_goals|ponizej"]
     assert w["przewaga"] < 0
 
 
 def test_przewaga_milczy_na_malej_probie():
     """Brak danych to nie wina rynku — po prostu go nie oceniamy."""
     log = {str(i): _typ_z_kursem(i, 0.80, 2.0, "wygrany") for i in range(10)}
-    assert rozliczanie.przewaga_rynkow(log) == {}
+    assert rozliczanie.przewaga_rynkow(log, teraz=_T_PRZEWAGI) == {}
 
 
 def test_przewaga_tlumiona_wielkoscia_proby():
@@ -431,8 +437,8 @@ def test_przewaga_tlumiona_wielkoscia_proby():
         return {str(i): _typ_z_kursem(
             i, 0.80, 2.0, "wygrany" if i % 10 < 8 else "przegrany")
             for i in range(ile)}
-    mala = rozliczanie.przewaga_rynkow(zbuduj(30))["team_goals|ponizej"]
-    duza = rozliczanie.przewaga_rynkow(zbuduj(200))["team_goals|ponizej"]
+    mala = rozliczanie.przewaga_rynkow(zbuduj(30), teraz=_T_PRZEWAGI)["team_goals|ponizej"]
+    duza = rozliczanie.przewaga_rynkow(zbuduj(200), teraz=_T_PRZEWAGI)["team_goals|ponizej"]
     assert duza["przewaga"] > mala["przewaga"]
 
 
@@ -446,7 +452,7 @@ def test_przewaga_rozdziela_strony_tego_samego_rynku():
         log[f"n{i}"] = _typ_z_kursem(
             100 + i, 0.85, 2.0, "wygrany" if i % 10 < 4 else "przegrany",
             strona="powyzej")
-    w = rozliczanie.przewaga_rynkow(log)
+    w = rozliczanie.przewaga_rynkow(log, teraz=_T_PRZEWAGI)
     assert w["team_goals|ponizej"]["przewaga"] > 0
     assert w["team_goals|powyzej"]["przewaga"] < 0
 
@@ -465,7 +471,7 @@ def test_przewaga_pasm_znajduje_przedzial_z_przewaga():
     for i in range(40):          # drogo: cena mowi ~28%, wchodzi 50%
         log[f"d{i}"] = _typ_z_kursem(
             100 + i, 0.50, 3.2, "wygrany" if i % 2 == 0 else "przegrany")
-    p = rozliczanie.przewaga_pasm(log)
+    p = rozliczanie.przewaga_pasm(log, teraz=_T_PRZEWAGI)
     assert p["3.0-6.01"]["przewaga"] > 0, "przy 3,0+ bijemy cene"
     assert p["1.19-1.35"]["przewaga"] < p["3.0-6.01"]["przewaga"]
 
@@ -623,8 +629,8 @@ def test_przewaga_rynkow_liczy_istotnosc():
         return {str(i): _typ_z_kursem(
             i, 0.85, 2.0, "wygrany" if i % 10 < 4 else "przegrany")
             for i in range(ile)}
-    mala = rozliczanie.przewaga_rynkow(log(30))["team_goals|ponizej"]
-    duza = rozliczanie.przewaga_rynkow(log(300))["team_goals|ponizej"]
+    mala = rozliczanie.przewaga_rynkow(log(30), teraz=_T_PRZEWAGI)["team_goals|ponizej"]
+    duza = rozliczanie.przewaga_rynkow(log(300), teraz=_T_PRZEWAGI)["team_goals|ponizej"]
     assert duza["blad_std"] < mala["blad_std"]
     assert duza["se"] < mala["se"]          # bardziej ujemne = pewniejsze
 
@@ -993,3 +999,28 @@ def test_raport_cieni_wykrywa_poprawe():
 def test_raport_cieni_milczy_bez_par():
     assert rozliczanie.raport_cieni({})["n"] == 0
     assert rozliczanie.raport_cieni({})["gotowy"] is False
+
+
+def test_stary_rachunek_nie_wchodzi_do_kwarantanny_nowego_modelu():
+    """05.10: bramy modelu liczą się tylko na jego typach — zapas starego
+    rachunku („stary_bez_pokrycia") i historia sprzed 18.08 nie wstrzymują
+    rynku, na którym model trafia."""
+    stary = _seria("team_corners", 30, 5, 1.6, zrodlo_p="stary_bez_pokrycia")
+    model = _seria("team_corners", 30, 26, 1.6)
+    assert "team_corners" not in rozliczanie.rynki_kwarantanna(_log(stary + model))
+    assert "team_corners" in rozliczanie.rynki_kwarantanna(
+        _log([{**r, "zrodlo_p": "uczony"} for r in stary]))
+
+
+def test_przewaga_tylko_model_i_ostatnie_30_dni():
+    """05.10: ukrywanie rynków liczy się na modelu uczonym z 30 dni — stary
+    rachunek i dawna historia nie trzymają rynku w ukryciu."""
+    teraz = 1_800_000_000
+    def _t(i, wynik, **kw):
+        return {**_typ_z_kursem(i, 0.80, 2.0, wynik), "kickoff_ts": teraz - 86400 - i, **kw}
+    swieze = {f"s{i}": _t(i, "wygrany" if i % 10 < 8 else "przegrany") for i in range(40)}
+    stare = {f"o{i}": _t(i, "przegrany", zrodlo_p="stary_bez_pokrycia") for i in range(200)}
+    dawne = {f"d{i}": {**_t(i, "przegrany"), "kickoff_ts": teraz - 40 * 86400}
+             for i in range(200)}
+    w = rozliczanie.przewaga_rynkow({**swieze, **stare, **dawne}, teraz=teraz)
+    assert w["team_goals|ponizej"]["n"] == 40 and w["team_goals|ponizej"]["przewaga"] > 0

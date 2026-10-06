@@ -1304,6 +1304,26 @@ def _pasmo_kursu(kurs) -> str:
     return "?"
 
 
+def ponizej_progu_jakosci(b: dict, polka: str | None) -> bool:
+    """Czy typ NIE przechodzi progu jakości swojej półki (uczony.PROG_JAKOSCI_POLKI).
+
+    Szansa modelu przed ściągnięciem do ceny (ta sama co w `szansa_z_ceną`)
+    i cena z kursu po marży. Półka bez progu → False.
+    """
+    prog = uczony.PROG_JAKOSCI_POLKI.get(polka or "")
+    if not prog:
+        return False
+    try:
+        kurs = float(b.get("kurs") or 0.0)
+        p = float(b.get("p_przed_sciagnieciem") or b.get("p_model") or 0.0)
+    except (TypeError, ValueError):
+        return True
+    if kurs <= 1.0:
+        return True
+    return (p < prog["p"]
+            or betting.implied_prob_one_sided(kurs) < prog["cena"])
+
+
 def priorytet_skladu(b: dict) -> int:
     """Szczebel pewności, że zawodnik ZAGRA — układa zawodników na liście.
 
@@ -1493,6 +1513,7 @@ def wybierz_liste_publikowana(
                 continue
             elif (dolozone is not None and _str == "zawodnik"
                     and b.get("xi_sygnal") == "official" and _polka
+                    and not ponizej_progu_jakosci(b, _polka)
                     and z_strumienia.get(doba_str, 0) < LISTA_CAP
                     and z_polki.get(_polka_klucz, 0) < _polka_limit
                     and z_meczu.get(mecz, 0) < LISTA_PER_MECZ
@@ -1524,6 +1545,12 @@ def wybierz_liste_publikowana(
         # policzyć, ile i czego odpada ([[ciche-odrzucenia-zasada]]).
         if _polka is None and not juz_pokazany(b):
             zdjete.setdefault(_klucz_publikacji(b), "kurs_poza_polkami")
+            continue
+        # PRÓG JAKOŚCI (2026-10-05) — patrz `uczony.PROG_JAKOSCI_POLKI`. Tylko
+        # nowe wejścia: typ raz pokazany zostaje do gwizdka.
+        if (not juz_pokazany(b) and not na_ogloszonej_liscie(b, zamkniete)
+                and ponizej_progu_jakosci(b, _polka)):
+            zdjete.setdefault(_klucz_publikacji(b), "ponizej_progu_jakosci")
             continue
         if not juz_pokazany(b):
             if (z_polki.get(_polka_klucz, 0) >= _polka_limit
@@ -2070,7 +2097,9 @@ def mnozniki_pary(h_n: dict, a_n: dict) -> dict:
     return out
 
 
-def czynniki_pary(h_n: dict, a_n: dict, nazwa_bazy: str, rho: float) -> list[dict]:
+def czynniki_pary(h_n: dict, a_n: dict, nazwa_bazy: str, rho: float,
+                  lam_h: float | None = None,
+                  lam_a: float | None = None) -> list[dict]:
     """Uzasadnienie dla rynków liczonych z OBU drużyn (suma meczowa, „kto więcej").
 
     PO CO (2026-08-03). Te dwa rynki były budowane z pustym `czynniki: []`,
@@ -2083,12 +2112,16 @@ def czynniki_pary(h_n: dict, a_n: dict, nazwa_bazy: str, rho: float) -> list[dic
     zapisywał w formie do przeczytania.
     """
     kto = nazwa_bazy.lower()
+    # λ liczby, która POSZŁA NA STRONĘ — przy modelu uczonym jego własne
+    # (2026-10-05); bez tego karta opisywała liczbę starego rachunku
+    _lh = float(lam_h) if lam_h else float(h_n['pred'].lam)
+    _la = float(lam_a) if lam_a else float(a_n['pred'].lam)
     czynniki = [{
         "nazwa": "Poziom bazowy",
         "opis": (
-            f"{h_n['nazwa']} notuje średnio {h_n['pred'].lam:.1f} "
-            f"({kto}) na mecz, {a_n['nazwa']} {a_n['pred'].lam:.1f} – "
-            f"razem {h_n['pred'].lam + a_n['pred'].lam:.1f}. Obie liczby są "
+            f"{h_n['nazwa']} notuje średnio {_lh:.1f} "
+            f"({kto}) na mecz, {a_n['nazwa']} {_la:.1f} – "
+            f"razem {_lh + _la:.1f}. Obie liczby są "
             f"już po korekcie na siłę rywala i miejsce gry"
         ),
         "mnoznik": None,
@@ -2334,6 +2367,8 @@ OPISY_ZDJECIA_PL = {
     "poza_lista_dnia": "limit listy dnia wyczerpany (15 + 5 na dobę, 3 na mecz, limit rodziny)",
     "rynek_ukryty": "rynek chwilowo ukryty na stronie",
     "rynek_wycofany": "rynku nie umiemy rozliczyć, więc nie pokazujemy typu",
+    "stary_rachunek": "model nie ma jeszcze historii tej drużyny lub zawodnika – liczymy w tle, nie pokazujemy",
+    "ponizej_progu_jakosci": "szansa poniżej progu półki wysokiej szansy (model ≥ 80% i kurs do ok. 1,27)",
     "bez_sygnalu_skladu": "ani składu, ani występu w ostatnim meczu drużyny – nie wiemy, czy zagra",
     "ujemna_po_korekcie": "po urealnieniu szansy wartość wyszła ujemna",
     "kurs_poza_widelkami": "kurs poza widełkami, w jakich gramy",
@@ -5671,13 +5706,21 @@ def _main_impl(tryb=None):
     # szanse, o których wiemy, że są zawyżone, a brama zgody z rynkiem
     # odrzuciłaby prawie wszystko (incydent 01.08 — 26 typów zamiast 99).
     # Dry-run leci dalej, żeby dało się diagnozować lokalnie bez sekretów.
+    #
+    # ⚑ OD 2026-10-05 STOP DOTYCZY TYLKO TEGO, CO Z TYCH WARSTW KORZYSTA.
+    # Obie warstwy uczą się i działają na STARYM rachunku; typy modelu
+    # uczonego ich nie używają (`_urealnij_do_pokazania`, `_zrodlo_t`), a typy
+    # starego rachunku nie wchodzą już na stronę (brama „stary_rachunek"
+    # w pętli wyświetlania). Z tych warstw korzystają jeszcze tylko karty
+    # drabinek (`korekta_logit` radaru) — przy awarii zostają na stronie
+    # z poprzedniego cyklu (jak przy awarii radaru), a typy modelu idą dalej.
+    # Do 05.10 awaria warstwy starego rachunku zatrzymywała CAŁY cykl.
     _padniete = rozliczanie.krytyczne_padniete()
-    if _padniete and not _dry_run():
-        raise RuntimeError(
-            "krytyczne warstwy uczenia padły: " + ", ".join(_padniete)
-            + " — cykl przerwany, żeby nie opublikować typów z niepoprawioną "
-              "szansą (patrz rozliczanie.WARSTWY_KRYTYCZNE)"
-        )
+    _warstwy_starego_padly = bool(_padniete) and not _dry_run()
+    if _warstwy_starego_padly:
+        print("UWAGA: krytyczne warstwy starego rachunku padły: "
+              + ", ".join(_padniete) + " — karty drabinek zostają z poprzedniego "
+              "cyklu, typy modelu uczonego idą normalnie")
 
     def _urealnij_do_pokazania(b: dict) -> dict:
         """Kopia typu z szansą taką, jaka wychodzi z rozliczeń — do payloadu.
@@ -8347,6 +8390,9 @@ def _main_impl(tryb=None):
             _slot_t = "home" if tt.team_id == ev.get("homeTeamId") else "away"
             predykcje_druzyn.setdefault((mid, tt.market_code), {})[_slot_t] = {
                 "pred": pred_t, "nazwa": tt.team_name, "team_id": tt.team_id,
+                # rozgrywki — model uczony liczy „kto więcej" z λ obu drużyn
+                # i potrzebuje średniej ligi (2026-10-05)
+                "liga": tt.league_id or None,
                 "mecz": match_label, "ts": ts, "stare": stare_t,
                 "home_name": home_name, "away_name": away_name,
                 # posterior potrzebny do PRZEDZIAŁU nowych rynków (2026-07-31):
@@ -8417,6 +8463,9 @@ def _main_impl(tryb=None):
                 # samego `p` przy surowym `lo` rozjeżdżało obie liczby:
                 # im mocniejsza korekta, tym bardziej brama ją rozwadniała.
                 # Ścieżka zawodnicza kalibruje CI od dawna (engine._kalibruj).
+                # Surowy przedział zostaje obok — z niego bierze szerokość typ
+                # modelu uczonego (patrz niżej, 2026-10-05).
+                lo_o_sur, hi_o_sur = lo_o, hi_o
                 lo_o = apply_bias(_bias_t_pelny, lo_o)
                 hi_o = apply_bias(_bias_t_pelny, hi_o)
                 # obie strony linii: Superbet kwotuje over i under, a model ma
@@ -8456,7 +8505,14 @@ def _main_impl(tryb=None):
                         # świeżych) i ta się nie zmienia od zmiany rachunku;
                         # zerowanie przedziału otworzyłoby bramę `p_dec`, bo
                         # ona liczy (p + lo) / 2.
-                        _pol_t = max((hi_t - lo_t) / 2.0, 0.0)
+                        #
+                        # ⚑ SZEROKOŚĆ Z PRZEDZIAŁU SUROWEGO (2026-10-05). Brana
+                        # była z przedziału po kalibracji rynku i korekcie
+                        # strumienia STAREGO rachunku — przesunięcie logitowe
+                        # zmienia szerokość, więc stara maszyneria ruszała
+                        # bramę `p_dec` typów modelu. Niepewność próby niesie
+                        # przedział surowy (ta sama posteriora, bez warstw).
+                        _pol_t = max((hi_o_sur - lo_o_sur) / 2.0, 0.0)
                         lo_t = max(0.0, p_t - _pol_t)
                         hi_t = min(1.0, p_t + _pol_t)
                     # KOREKTA STRUMIENIA — patrz `_p_over_t_kor` wyżej.
@@ -8876,6 +8932,28 @@ def _main_impl(tryb=None):
                 p_h, p_remis, p_a = counts.porownanie_druzyn(
                     h_n["pred"], a_n["pred"], rho=rho_n
                 )
+                # ⚑ „KTO WIĘCEJ" LICZY MODEL UCZONY (2026-10-05) — patrz
+                # `uczony.porownanie`. Stary rachunek zostaje wyłącznie jako
+                # druga liczba w stemplu (`p_stary`) i jako zapas bez pokrycia,
+                # który brama „stary_rachunek" trzyma poza stroną.
+                _ph_stary, _pa_stary = p_h, p_a
+                _pu_wh = _prognoza_uczonego(
+                    mk_n, h_n["team_id"], a_n["team_id"], 1, h_n.get("liga"),
+                    0.5, "powyzej", ts_n)
+                _pu_wa = _prognoza_uczonego(
+                    mk_n, a_n["team_id"], h_n["team_id"], 0, a_n.get("liga"),
+                    0.5, "powyzej", ts_n)
+                _por_u = (uczony.porownanie(
+                    _pu_wh.get("lam"), _pu_wh.get("r_nb"),
+                    _pu_wa.get("lam"), _pu_wa.get("r_nb"))
+                    if _pu_wh and _pu_wa and uczony.na_stronie("sumy") else None)
+                if _por_u is not None:
+                    p_h, p_remis, p_a = _por_u
+                    _zrodlo_w = "uczony"
+                else:
+                    _zrodlo_w = ("stary_bez_pokrycia"
+                                 if uczony.na_stronie("sumy") else "stary")
+                _licznik_zrodla[f"kto_wiecej:{_zrodlo_w}"] += 1
                 # PRZEDZIAŁ na P(kto więcej) — liczony RAZ na mecz+rynek,
                 # osobno dla każdej strony (remis zjada masę po obu stronach,
                 # więc strona gościa NIE jest dopełnieniem strony gospodarza)
@@ -8916,6 +8994,12 @@ def _main_impl(tryb=None):
                     if lo_w is None:
                         odpadki_nowe["kto wiecej: brak przedzialu"] += 1
                         continue
+                    if _zrodlo_w == "uczony":
+                        # szerokość = niepewność próby z posteriory (bez warstw),
+                        # centrum = liczba modelu — jak w drużynach i sumach
+                        _pol_w = max((hi_w - lo_w) / 2.0, 0.0)
+                        lo_w = max(0.0, p_w - _pol_w)
+                        hi_w = min(1.0, p_w + _pol_w)
                     if hi_w - lo_w > betting.MAX_CI_WIDTH:
                         odpadki_nowe["kto wiecej: szeroki przedzial"] += 1
                         continue
@@ -8948,6 +9032,15 @@ def _main_impl(tryb=None):
                         "rynek_kod": kod_w,
                         "rynek": "Więcej: " + nazwa_bazy.lower(),
                         "linia": 0, "strona": strona_w,
+                        # która liczba poszła na stronę + obie do księgi
+                        **uczony.stempel_zrodla(
+                            _ph_stary if strona_w == "gospodarz" else _pa_stary,
+                            ({"p": round(p_w, 4),
+                              "lam": (_pu_wh if strona_w == "gospodarz" else _pu_wa).get("lam"),
+                              "lam_rywala": (_pu_wa if strona_w == "gospodarz" else _pu_wh).get("lam"),
+                              "r_nb": (_pu_wh if strona_w == "gospodarz" else _pu_wa).get("r_nb")}
+                             if _zrodlo_w == "uczony" else None),
+                            _zrodlo_w),
                         "kurs": float(kurs_w), "bukmacher": "Superbet",
                         "p_model": round(p_w, 4),
                         "p_rynku": betting.implied_prob_one_sided(
@@ -8973,7 +9066,8 @@ def _main_impl(tryb=None):
                         "rank_score": round(ev_w, 3),
                         "ci": [round(lo_w, 4), round(hi_w, 4)],
                         "oczekiwane_minuty": None,
-                        "lambda": round(h_n["pred"].lam, 3),
+                        "lambda": round(float(_pu_wh["lam"]) if _zrodlo_w == "uczony"
+                                        else h_n["pred"].lam, 3),
                         "rozklad": None, "sugestia": False,
                         "czynniki": mnozniki_pary(h_n, a_n),
                         # ⚑ „KTO WIĘCEJ" ZOSTAJE BEZ WARSTW UCZENIA — ŚWIADOMIE
@@ -9001,8 +9095,12 @@ def _main_impl(tryb=None):
                         "p_remis": round(p_remis, 4),
                         "uzasadnienie": {
                             "czynniki": czynniki_pary(
-                                h_n, a_n, nazwa_bazy, rho_n),
-                            "oczekiwana_liczba": round(h_n["pred"].lam, 2),
+                                h_n, a_n, nazwa_bazy, rho_n,
+                                lam_h=(_pu_wh or {}).get("lam") if _zrodlo_w == "uczony" else None,
+                                lam_a=(_pu_wa or {}).get("lam") if _zrodlo_w == "uczony" else None),
+                            "oczekiwana_liczba": round(
+                                float(_pu_wh["lam"]) if _zrodlo_w == "uczony"
+                                else h_n["pred"].lam, 2),
                         },
                     }
                     value_bets.append(_rec_w)
@@ -9067,10 +9165,13 @@ def _main_impl(tryb=None):
                         # ...i w TEJ SAMEJ skali co `p`, inaczej brama
                         # „p ostrożne" rozwadnia korektę (ta sama poprawka co
                         # w pętli drużynowej, 2026-07-27)
+                        # surowy przedział — szerokość dla typu modelu
+                        # (patrz nota przy `lo_o_sur` w pętli drużynowej)
+                        lo_o_s_sur, hi_o_s_sur = lo_o_s, hi_o_s
                         lo_o_s = apply_bias(_bias_s_pelny, lo_o_s)
                         hi_o_s = apply_bias(_bias_s_pelny, hi_o_s)
                     except Exception:
-                        lo_o_s = hi_o_s = None
+                        lo_o_s = hi_o_s = lo_o_s_sur = hi_o_s_sur = None
                     for strona_s, p_s, kurs_s in (
                         ("powyzej", p_over_s, slot_s.get("over")),
                         ("ponizej", 1.0 - p_over_s, slot_s.get("under")),
@@ -9144,7 +9245,9 @@ def _main_impl(tryb=None):
                         if _zrodlo_s == "uczony":
                             # model nie oddaje przedziału — zachowujemy
                             # SZEROKOŚĆ (niepewność próby) i przesuwamy centrum
-                            _pol_s = max((hi_s - lo_s) / 2.0, 0.0)
+                            # szerokość z przedziału SUROWEGO (2026-10-05) —
+                            # patrz nota przy `_pol_t` w pętli drużynowej
+                            _pol_s = max((hi_o_s_sur - lo_o_s_sur) / 2.0, 0.0)
                             lo_s = max(0.0, p_s - _pol_s)
                             hi_s = min(1.0, p_s + _pol_s)
                         if _d_strony_s:
@@ -9806,6 +9909,10 @@ def _main_impl(tryb=None):
         if betting.rynek_wycofany(b.get("rynek_kod")):
             odpadki_legow["rynek_wycofany"] += 1
             return False
+        # stary rachunek — ta sama zasada co na stronie (2026-10-05)
+        if rozliczanie._stary_rachunek(b):
+            odpadki_legow["stary_rachunek"] += 1
+            return False
         if not b.get("kurs"):
             odpadki_legow["brak_kursu"] += 1
             return False
@@ -10139,6 +10246,12 @@ def _main_impl(tryb=None):
         # IMIENNY RENTGEN (2026-09-21): brama per (mecz, zawodnik) — zapis
         # do tabeli po radarze, patrz `radar_imienny`
         _imienny_radar: dict = {}
+        if _warstwy_starego_padly:
+            # patrz nota przy `_warstwy_starego_padly` — karta drabinki bez
+            # `korekta_logit` pokazałaby zawyżoną szansę; `radar_padl` zostawia
+            # poprzednie karty na stronie
+            raise RuntimeError("krytyczne warstwy starego rachunku padły — "
+                               "karty drabinek z poprzedniego cyklu")
         radar_wpisy = radar.zbuduj(
             trends, events_meta_radar, odds_grid, sb_cache,
             model_pokrycie, players_out, MARKET_NAMES_PL, int(time.time()),
@@ -10735,6 +10848,7 @@ def _main_impl(tryb=None):
     zdjete = 0
     poza_kursem = 0
     wycofane_typy = 0
+    stary_rachunek_typy: Counter = Counter()
     # POWÓD ZDJĘCIA PER TYP — księga musi wiedzieć, że tego typu user NIE
     # widział (2026-08-01). Do dziś `_rozlicz_i_zapisz` dostawał surowe
     # `value_bets`, czyli listę SPRZED bram wyświetlania, więc typ zdjęty tutaj
@@ -10750,6 +10864,17 @@ def _main_impl(tryb=None):
         if betting.rynek_wycofany(b.get("rynek_kod")):
             wycofane_typy += 1
             zdjete_klucze[_klucz_publikacji(b)] = "rynek_wycofany"
+            continue
+        # ⚑ STARY RACHUNEK NIE WCHODZI NA STRONĘ (2026-10-05, właściciel:
+        # „wszystko ze starego modelu odciąć"). Zapas „stary_bez_pokrycia"
+        # (model bez historii drużyny/zawodnika) liczy się dalej i uczy w tle
+        # (`poza_publikacja = "stary_rachunek"`), ale typ na stronie ma liczbę
+        # modelu albo go nie ma. Typ JUŻ POKAZANY zostaje do gwizdka (cena
+        # zamrożona, user mógł go zagrać). Drabinki mają osobną ścieżkę.
+        if (not b.get("sugestia") and rozliczanie._stary_rachunek(b)
+                and not b.get("wznowiony") and not b.get("pokazany_wczesniej")):
+            stary_rachunek_typy[str(b.get("zrodlo_p") or b.get("rynek_kod"))] += 1
+            zdjete_klucze[_klucz_publikacji(b)] = "stary_rachunek"
             continue
         if not b.get("sugestia") and not betting.kurs_w_widelkach(b.get("kurs")):
             poza_kursem += 1
@@ -10773,6 +10898,11 @@ def _main_impl(tryb=None):
         # Patrz `rozliczanie.waga_sciagania`.
         u = _sciagnij_karte_do_ceny(u)
         do_pokazania.append({k: v for k, v in u.items() if k != "kal_tau"})
+    if stary_rachunek_typy:
+        print("Stary rachunek: " + ", ".join(
+            f"{k} {v}" for k, v in stary_rachunek_typy.most_common())
+              + " — świeżych typów bez liczby modelu zdjętych ze strony "
+              "(liczą się w tle)")
     if wycofane_typy:
         print(f"Rynki wycofane: {wycofane_typy} typów zdjętych, bo rynku nie "
               f"umiemy ZAMKNĄĆ ({', '.join(sorted(betting.RYNKI_WYCOFANE))}) "
@@ -11392,7 +11522,11 @@ def _main_impl(tryb=None):
                 for k, v in wagi_zauf.items()
             ))
     kupony_list = kupony.build_kupony(
-        kupony.tylko_superbet(value_bets), kupony.tylko_superbet(legi_pool_pub),
+        # typy starego rachunku nie wchodzą do kuponów (2026-10-05) — pula
+        # legów filtruje je w `_leg_dopuszczalny`, lista typów tutaj
+        kupony.tylko_superbet([b for b in value_bets
+                               if not rozliczanie._stary_rachunek(b)]),
+        kupony.tylko_superbet(legi_pool_pub),
         profil=profil_kuponow, kary=kary_kor,
         wagi=wagi_zauf or None, kal_szansy=kal_kuponow or None,
         # ⚑ KOREKTA STRUMIENIA JUŻ SIEDZI W `p_model` LEGA (audyt 2026-08-11).

@@ -67,6 +67,7 @@ def test_zla_passa_jednego_dnia_nie_wystarcza_na_kwarantanne():
             "podmiot_id": 1, "rynek_kod": rynek, "rynek": rynek,
             "linia": 1.5, "strona": "ponizej", "kurs": 1.9, "p_model": 0.6,
             "wynik": wynik, "kickoff_ts": dzien * DOBA + i,
+            "zrodlo_p": "uczony",
         }
     # liczby odwzorowują rzeczywistość z 03.08: dobre dni trafiały ~67%,
     # feralna niedziela 34% przy wolumenie 41 typów

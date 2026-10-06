@@ -629,3 +629,15 @@ def test_doba_karty_ta_sama_co_lista_dnia():
     for ts in (1_789_700_000, 1_789_720_800, 1_789_741_000, 1_789_760_000):
         assert radar.dzien_karty(ts) == B.dzien_listy(ts)
 
+
+
+
+# Próg jakości półki (uczony.PROG_JAKOSCI_POLKI, 2026-10-05) ma własne testy
+# (test_prog_jakosci_polki.py) — tu sprawdzamy limity i kolejność listy.
+import pytest as _pytest_prog  # noqa: E402
+from footstats.model import uczony as _uczony_prog  # noqa: E402
+
+
+@_pytest_prog.fixture(autouse=True)
+def _bez_progu_jakosci(monkeypatch):
+    monkeypatch.setattr(_uczony_prog, "PROG_JAKOSCI_POLKI", {})

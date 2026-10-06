@@ -396,3 +396,15 @@ def test_manifest_trzyma_dzien_sprzed_trzech_tygodni():
     assert "2026-08-21" in out, "21 dni wstecz wciąż jest w oknie Skuteczności"
     assert "2026-09-10" in out
 
+
+
+
+# Próg jakości półki (uczony.PROG_JAKOSCI_POLKI, 2026-10-05) ma własne testy
+# (test_prog_jakosci_polki.py) — tu sprawdzamy limity i kolejność listy.
+import pytest as _pytest_prog  # noqa: E402
+from footstats.model import uczony as _uczony_prog  # noqa: E402
+
+
+@_pytest_prog.fixture(autouse=True)
+def _bez_progu_jakosci(monkeypatch):
+    monkeypatch.setattr(_uczony_prog, "PROG_JAKOSCI_POLKI", {})

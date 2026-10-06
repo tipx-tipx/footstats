@@ -323,3 +323,15 @@ def test_wysoka_szansa_ukladana_srednia_modelu_i_kursu():
     assert B.szansa_z_ceną(tani) == round((0.80 + 1 / 1.25) / 2, 4)
     # wznowiony typ bez pola — bierze zamrożoną szansę
     assert B.szansa_z_ceną({"kurs": 2.0, "p_model": 0.6}) == 0.55
+
+
+
+# Próg jakości półki (uczony.PROG_JAKOSCI_POLKI, 2026-10-05) ma własne testy
+# (test_prog_jakosci_polki.py) — tu sprawdzamy limity i kolejność listy.
+import pytest as _pytest_prog  # noqa: E402
+from footstats.model import uczony as _uczony_prog  # noqa: E402
+
+
+@_pytest_prog.fixture(autouse=True)
+def _bez_progu_jakosci(monkeypatch):
+    monkeypatch.setattr(_uczony_prog, "PROG_JAKOSCI_POLKI", {})

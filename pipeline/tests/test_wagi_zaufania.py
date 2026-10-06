@@ -14,6 +14,7 @@ def _log_z_kubelka(n: int, p: float, kurs: float, hit_rate: float,
             "linia": 0.5, "strona": "powyzej", "kurs": kurs,
             "p_model": p, "pewnosc": kubelek, "sugestia": False,
             "wynik": "wygrany" if i < n_hit else "przegrany",
+            "zrodlo_p": "uczony",
         }
     return log
 

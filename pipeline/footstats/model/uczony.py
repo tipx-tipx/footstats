@@ -782,6 +782,64 @@ def p_powyzej(lambda_: float | None, linia: float,
     return float(min(max(1.0 - suma, 1e-6), 1.0 - 1e-6))
 
 
+def rozklad_liczby(lambda_: float, r_nb: float | None = None,
+                   tol: float = 1e-9, k_max: int = 400) -> list[float]:
+    """P(X=k) dla k = 0, 1, … — Poisson, a przy `r_nb` ujemny dwumianowy
+    (ta sama parametryzacja co `p_powyzej`). Ucięty, gdy ogon < `tol`."""
+    lam_ = max(float(lambda_), 1e-9)
+    if r_nb and r_nb > 0:
+        p0 = r_nb / (r_nb + lam_)
+        sk = p0 ** r_nb
+        krok = lambda k: (r_nb + k - 1.0) / k * (1.0 - p0)
+    else:
+        sk = math.exp(-lam_)
+        krok = lambda k: lam_ / k
+    out, suma = [sk], sk
+    for k in range(1, k_max):
+        sk *= krok(k)
+        out.append(sk)
+        suma += sk
+        if 1.0 - suma < tol and k > lam_:
+            break
+    return out
+
+
+# ⚑ „KTO WIĘCEJ" NA MODELU UCZONYM (2026-10-05, właściciel: „kto więcej
+# przenosimy na nowy model"). Do dziś ten rynek liczył WYŁĄCZNIE stary
+# rachunek (`counts.porownanie_druzyn`) — bez stempla, bez warstw, jako jedyny
+# strumień „uczony" w `ZRODLO_SZANSY` nie liczony modelem.
+#
+# Dwie λ drużyn z `prognoza` (SUROWE, bez ściągania do linii — tu nie ma
+# linii), rozkład NB każdej, P(gospodarz > gość), remis, P(gość > gospodarz).
+# Test historyczny na 292 rozliczonych typach (λ obu drużyn zapisane PRZED
+# meczem przy ich typach drużynowych): Brier 0,2210 — stary rachunek 0,2212,
+# cena 0,2208; deklaracja 60,3% przy trafieniach 64,4% (stary 70,3%).
+# Ściąganie λ ku sobie (0,2 / 0,35 / 0,5) psuło Brier (0,2239 / 0,2278 /
+# 0,2333), mniejszy rozrzut (r × 1,5–3, Poisson) nie zmieniał nic (±0,0005)
+# — zostaje czysty rozkład modelu. Selekcja po tej liczbie: p ≥ 0,70 → 83,6%
+# trafień (n=55), p ≥ 0,65 → 73,6% (n=106).
+def porownanie(lam_h: float | None, r_h: float | None,
+               lam_a: float | None, r_a: float | None
+               ) -> tuple[float, float, float] | None:
+    """(P(gospodarz więcej), P(remis), P(gość więcej)) albo None."""
+    if not lam_h or not lam_a or lam_h <= 0 or lam_a <= 0:
+        return None
+    ph = rozklad_liczby(lam_h, r_h)
+    pa = rozklad_liczby(lam_a, r_a)
+    cdf_a, c = [], 0.0
+    for v in pa:
+        cdf_a.append(c)          # P(A < k)
+        c += v
+    cdf_h, c = [], 0.0
+    for v in ph:
+        cdf_h.append(c)
+        c += v
+    p_h = sum(ph[k] * (cdf_a[k] if k < len(cdf_a) else 1.0) for k in range(len(ph)))
+    p_a = sum(pa[k] * (cdf_h[k] if k < len(cdf_h) else 1.0) for k in range(len(pa)))
+    p_r = max(0.0, 1.0 - p_h - p_a)
+    return round(p_h, 4), round(p_r, 4), round(p_a, 4)
+
+
 def p_strony(lambda_: float | None, linia: float, strona: str,
              r_nb: float | None = None) -> float | None:
     """Szansa WYBRANEJ strony zakładu — jedna λ, dwie strony, suma równa 1.
@@ -1037,6 +1095,25 @@ LIMITY_POLEK = {
     "druzyna": {"wysoka_szansa": 12, "wyzsze_kursy": 8},
     "zawodnik": {"wysoka_szansa": 10, "wyzsze_kursy": 8},
 }
+
+# ⚑⚑ PRÓG JAKOŚCI PÓŁKI WYSOKIEJ SZANSY (2026-10-05, właściciel: „cel 80%+,
+# docelowo 90%+ trafionych typów na stronie"). Limit półki jest od teraz
+# MAKSIMUM, nie liczbą do zapełnienia: nowy typ wchodzi tylko, gdy model daje
+# ≥ 0,80 I cena bukmachera mówi ≥ 0,75 (kurs ~1,27 i niżej). Reszta liczy się
+# w tle (`poza_publikacja = "ponizej_progu_jakosci"`).
+#
+# Symulacja na księdze, z zapełnianiem półki tak jak w produkcji (typ raz
+# pokazany zostaje, kandydaci przychodzą cyklami), okres 18.08 / 14.09 / 22.09:
+#   zawodnicy  bez progu   50,9% / 52,3% / 50,0%   ~6–8 typów na dobę
+#              z progiem   81,6% / 79,4% / 88,9%   ~1–1,6 na dobę
+#   drużyny    bez progu   73,1% / 71,2% / 74,4%   ~3–8 na dobę
+#              z progiem   85,4% / 83,8% / 77,8%   ~2–3 na dobę
+# Przyczyna 50% u zawodników (B1, 05.10): półka zapełnia się pierwszymi
+# kandydatami (średnio 34 h przed domknięciem doby), a lepsi przychodzą
+# później i trafiają do „poza listą dnia" — symulacja „kto pierwszy" daje
+# dokładnie 50,0% przy kursie 1,48, jak lista. Próg nie wpuszcza słabych
+# wczesnych typów, więc miejsca czekają na lepsze.
+PROG_JAKOSCI_POLKI = {"wysoka_szansa": {"p": 0.80, "cena": 0.75}}
 
 
 def limit_polki(polka: str | None, podmiot_typ: str | None) -> int | None:

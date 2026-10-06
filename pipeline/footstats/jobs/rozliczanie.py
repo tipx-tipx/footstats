@@ -443,6 +443,24 @@ def _stary_rachunek(r: dict) -> bool:
     return True
 
 
+# ⚑⚑ STARY MODEL ODCIĘTY OD BRAM NOWEGO (2026-10-05, właściciel: „trzeba
+# wszystko ze starego modelu odciąć, z głową"). Bramy i warstwy, które
+# decydują o typach MODELU UCZONEGO — ukrywanie rynków, kwarantanny rynków /
+# stron / powodów, wagi zaufania kuponów — liczyły się na całej księdze,
+# razem ze starym rachunkiem (sprzed 18.08 i zapasem „stary_bez_pokrycia").
+# Zmierzone 05.10: gole drużyny powyżej ukryte przez historię starego
+# rachunku (cała księga se −5,4, sam model 30 dni −0,7), team_corners /
+# team_shots „poniżej" w kwarantannie tylko przez 20–30% starych typów w oknie.
+# Warstwy STAREGO rachunku (`korekta_*`, `szansa_pokazywana`) mają filtr
+# odwrotny — każdy rachunek uczy się na sobie.
+PRZEWAGA_OKNO_S = 30 * 86400   # ukrywanie rynków: ostatnie 30 dni modelu
+
+
+def _nowy_model(r: dict) -> bool:
+    """Typ policzony modelem uczonym (patrz `_stary_rachunek`)."""
+    return not _stary_rachunek(r)
+
+
 def _strumien(r: dict) -> str:
     """Strumień skuteczności typu: pewniaki / druzyny / drabinki.
 
@@ -2405,7 +2423,8 @@ def rynki_kwarantanna(log: dict | None = None) -> dict[str, dict]:
         r for r in log.values()
         if r.get("wynik") in ("wygrany", "przegrany")
         and not r.get("sugestia") and not r.get("odrzucony")
-        and _z_modelu(r)   # kwarantanna dotyczy DEKLARACJI MODELU, nie drabinek
+        and _z_modelu(r)   # kwarantanna dotyczy DEKLARACJI MODELU, nie drabin
+        and _nowy_model(r)   # bez starego rachunku (patrz `_nowy_model`)ek
         # bez kursu nie ma ROI — typ jest wtedy niemierzalny tą bramą
         and r.get("kurs") and float(r["kurs"]) > 1.0
         # TRZECIA BLOKADA NA TYM SAMYM RYNKU (2026-08-03). Okno tej kwarantanny
@@ -2488,7 +2507,7 @@ def _grupy_stron(log: dict | None = None) -> dict[tuple[str, str], list[dict]]:
         r for r in log.values()
         if r.get("wynik") in ("wygrany", "przegrany")
         and not r.get("sugestia") and not r.get("odrzucony")
-        and _z_modelu(r)
+        and _z_modelu(r) and _nowy_model(r)
         and r.get("kurs") and float(r["kurs"]) > 1.0
         # STRONY, KTORE ZNAMY: linia ma dwie („powyzej"/„ponizej"), a rynek
         # „kto wiecej" — dwie druzynowe („gospodarz"/„gosc"). Bez dopisania
@@ -2715,7 +2734,7 @@ def kategorie_kwarantanna(log: dict | None = None) -> dict[str, dict]:
         r for r in log.values()
         if r.get("wynik") in ("wygrany", "przegrany")
         and not r.get("sugestia") and not r.get("odrzucony")
-        and _z_modelu(r)
+        and _z_modelu(r) and _nowy_model(r)
         and r.get("kurs") and float(r["kurs"]) > 1.0
         and _z_biezacej_epoki(r)   # mundial to archiwum, nie nauczyciel
     ]
@@ -4302,7 +4321,8 @@ def waga_rynku_pomiar(log: dict | None = None) -> dict[str, dict]:
     return out
 
 
-def przewaga_rynkow(log: dict | None = None) -> dict[str, dict]:
+def przewaga_rynkow(log: dict | None = None,
+                    teraz: int | None = None) -> dict[str, dict]:
     """Per (rynek, strona): o ile nasza prognoza bije prognozę z kursu.
 
     Zwraca `{"team_goals|ponizej": {"n":.., "brier_model":.., "brier_kurs":..,
@@ -4317,11 +4337,15 @@ def przewaga_rynkow(log: dict | None = None) -> dict[str, dict]:
     if log is None:
         log = _migruj_log(supa.get_key("typy_log") or {})
     log = widok_nauki(log)
+    od_ts = (teraz or int(time.time())) - PRZEWAGA_OKNO_S
     grupy: dict[tuple, list] = {}
     for r in log.values():
         if r.get("wynik") not in ("wygrany", "przegrany"):
             continue
         if r.get("sugestia") or r.get("odrzucony") or r.get("zrodlo"):
+            continue
+        # tylko model uczony z ostatnich 30 dni — patrz `_nowy_model`
+        if not _nowy_model(r) or int(r.get("kickoff_ts") or 0) < od_ts:
             continue
         if not r.get("kurs") or not r.get("p_model"):
             continue
@@ -4493,7 +4517,8 @@ PASMA_CENY = ((1.19, 1.35), (1.35, 1.60), (1.60, 1.90),
               (1.90, 2.30), (2.30, 3.00), (3.00, 6.01))
 
 
-def przewaga_pasm(log: dict | None = None) -> dict[str, dict]:
+def przewaga_pasm(log: dict | None = None,
+                  teraz: int | None = None) -> dict[str, dict]:
     """To samo co `przewaga_rynkow`, ale w przekroju PASM CENY.
 
     Klucz to `"1.9-2.3"`. Dodatnia `przewaga` = w tym przedziale kursowym
@@ -4502,11 +4527,14 @@ def przewaga_pasm(log: dict | None = None) -> dict[str, dict]:
     if log is None:
         log = _migruj_log(supa.get_key("typy_log") or {})
     log = widok_nauki(log)
+    od_ts = (teraz or int(time.time())) - PRZEWAGA_OKNO_S
     rek = []
     for r in log.values():
         if r.get("wynik") not in ("wygrany", "przegrany"):
             continue
         if r.get("sugestia") or r.get("odrzucony") or r.get("zrodlo"):
+            continue
+        if not _nowy_model(r) or int(r.get("kickoff_ts") or 0) < od_ts:
             continue
         if not r.get("kurs") or not r.get("p_model") or _z_martwej_epoki(r):
             continue
@@ -4869,6 +4897,7 @@ def compute_wagi_zaufania(log: dict) -> dict[str, dict]:
             if r.get("wynik") in ("wygrany", "przegrany")
             and not r.get("sugestia") and not r.get("odrzucony")
             and _z_modelu(r)   # waga zaufania dotyczy p_model, nie drabinek
+            and _nowy_model(r)   # składa kupony z liczby modelu
             and r.get("kurs") and float(r["kurs"]) > 1.0
             and (r.get("pewnosc") or "srednia") == kubelek
             and _z_biezacej_epoki(r)   # mundial to archiwum, nie nauczyciel

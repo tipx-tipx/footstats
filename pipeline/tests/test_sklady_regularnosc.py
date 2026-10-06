@@ -334,3 +334,15 @@ def test_okno_startow_nie_siega_zeszlego_sezonu():
     # a gdy w oknie jest za mało meczów drużyny, wraca stara miara z występów
     kal2 = {KLUB: [TERAZ - DZIEN, TERAZ - 8 * DZIEN] + stare}
     assert radar.udzial_startow(tr, kalendarz=kal2, teraz=TERAZ) == 1.0
+
+
+
+# Próg jakości półki (uczony.PROG_JAKOSCI_POLKI, 2026-10-05) ma własne testy
+# (test_prog_jakosci_polki.py) — tu sprawdzamy limity i kolejność listy.
+import pytest as _pytest_prog  # noqa: E402
+from footstats.model import uczony as _uczony_prog  # noqa: E402
+
+
+@_pytest_prog.fixture(autouse=True)
+def _bez_progu_jakosci(monkeypatch):
+    monkeypatch.setattr(_uczony_prog, "PROG_JAKOSCI_POLKI", {})
