@@ -3,6 +3,8 @@
  * kupon) z tej samej zamrożonej migawki co etapy 1–2.
  */
 
+import { fmtKurs } from "@/lib/format";
+
 import { dzisZrodla, zrodlo } from "./zrodlo";
 import {
   druzyna,
@@ -58,6 +60,42 @@ export type SzczebelV = {
   /** polecany szczebel: bieżąca cena, gdy różni się od ceny z publikacji (pipeline od 05.10) */
   teraz?: number | null;
   terazBukmacher?: string;
+  /** ta sama linia u Betclica – tylko pewna cena (siatka strony meczu, bez „Betclic liczy inaczej”) */
+  betclic?: number | null;
+};
+
+/**
+ * RODZAJ DRABINKI = powód, na którym karta stoi (logika właściciela 17.09:
+ * pokrycie, forma, pewny start, hojny rywal, cena; perełka 18.09). Jedna karta
+ * może mieć kilka, każdy tylko wtedy, gdy dane go potwierdzają – karta bez
+ * powodu ponad sito nie dostaje żadnego (zwykła drabinka).
+ */
+export type RodzajD = {
+  kod:
+    | "perla" | "cena_pewne" | "cena_lepsza" | "przewaga" | "ceny_zgodne"
+    | "seria" | "forma" | "transfer"
+    | "rywal";
+  /**
+   * KOLOR = ZNACZENIE GRUPY, nie rodzaju (11.10): „cena” bursztyn (argument
+   * z kursu), „forma” zieleń (ta sama co trafienia w historii), „mecz”
+   * zwykły tekst z herbem rywala. Trzy barwy zamiast tęczy po jednej na rodzaj.
+   */
+  grupa: "cena" | "forma" | "mecz";
+  /** 1–3 słowa do nagłówka karty, rzeczownik, bez ozdobników */
+  krotko: string;
+  /** pełne zdanie z liczbą, która je potwierdza */
+  zdanie: string;
+  /** „ceny zgodne” to potwierdzenie, nie powód – nie idzie do nagłówka */
+  wNaglowku: boolean;
+};
+
+/** Cena polecanego szczebla u obu bukmacherów – gdy obie są pewne. */
+export type CenyD = {
+  superbet: number;
+  betclic: number;
+  /** kto płaci więcej */
+  lepszy: "Superbet" | "Betclic";
+  typ: "lepsza" | "pewne" | "zgodne";
 };
 
 export type DrabinkaV = {
@@ -79,6 +117,15 @@ export type DrabinkaV = {
   /** numer zawodnika – link do jego strony */
   podmiotId?: number;
   klucz?: string;
+  /** od najważniejszego; pusta = zwykła drabinka */
+  rodzaje?: RodzajD[];
+  /**
+   * SKŁAD – warunek, nie atut (właściciel 11.10: „każdy w drabince ma mieć
+   * w miarę pewny start, to nie jest korzyść drabinki”). Znak przy nazwisku,
+   * nie rodzaj: ogłoszony XI albo pewny start z historii.
+   */
+  sklad?: { stan: "ogloszony" | "pewny_start"; opis: string } | null;
+  ceny?: CenyD | null;
 };
 
 export type NogaV = {
@@ -292,18 +339,102 @@ export function przygotujElementy() {
       kurs_publikacji?: number;
       kurs_teraz?: number;
       kurs_teraz_bukmacher?: string;
+      kurs?: number;
+      traf?: number;
+      z?: number;
+      traf5?: number;
+      z5?: number;
+      powod_szczebla?: string | null;
+      wartosc_rozjazdu?: number;
+      powod_wejscia?: string;
     };
+    kategoria?: string;
+    rozjazd_pewniak?: boolean;
+    rodzaj?: string;
+    udzial_startow?: number | null;
+    ostatni_wystep_min?: number | null;
+    /** skład OGŁOSZONY (pipeline od 11.10); `xi` miesza ogłoszony z przewidywanym */
+    xi_ogloszony?: boolean;
     rynki: {
       rynek: string;
       rynek_kod?: string;
       ostatnie: number[];
       minuty: number[];
       rywale: string[];
-      drabinka: { linia: number; kurs: number; p_final: number; bukmacher?: string }[];
+      drabinka: {
+        linia: number; kurs: number; p_final: number; bukmacher?: string;
+        rozjazd?: { superbet?: number; betclic?: number; gdzie?: string; roznica_pp?: number; typ?: string } | null;
+      }[];
       linie_pelne: Record<string, number>;
       /** u kogo każda linia – tylko wyjątki od Superbetu (pipeline od 05.10) */
       linie_bukmacher?: Record<string, string>;
+      /** ta sama linia u Betclica, pewna cena (pipeline / warsztat) */
+      linie_betclic?: Record<string, number>;
+      kontekst?: { rywal?: { mnoznik?: number; srednia?: number; norma?: number } };
     }[];
+  };
+  const liczba = (x: number) => x.toFixed(1).replace(".", ",");
+  const proc = (x: number) => `${Math.round(x * 100)}%`;
+  /** cena polecanego szczebla u obu bukmacherów (radar `rozjazd`), kategoria karty */
+  /**
+   * Te same progi co radar (`PROG_OKAZJI_PP`, „pewniak taniej”): różnica
+   * w punktach szansy ≥ 12 = lepsza cena; jeden ≤ 1,45 i drugi ≥ 1,75 =
+   * cena mówi: pewne; inaczej ceny zgodne.
+   */
+  const cenyDrabinki = (wpis: Radar, r: Radar["rynki"][number]): CenyD | null => {
+    const l = wpis.hero.linia;
+    const roz = r.drabinka.find((x) => x.linia === l)?.rozjazd;
+    const sb = roz?.superbet ?? (r.linie_bukmacher?.[String(l)] === "Betclic" ? null : r.linie_pelne?.[String(l)]) ?? null;
+    const bc = roz?.betclic ?? r.linie_betclic?.[String(l)] ?? null;
+    if (!sb || !bc || sb <= 1 || bc <= 1) return null;
+    const lepszy = Math.max(sb, bc);
+    const gorszy = Math.min(sb, bc);
+    const typ = gorszy <= 1.45 && lepszy >= 1.75 ? "pewne" : (1 / gorszy - 1 / lepszy) * 100 >= 12 ? "lepsza" : "zgodne";
+    return { superbet: sb, betclic: bc, lepszy: sb >= bc ? "Superbet" : "Betclic", typ };
+  };
+  const skladDrabinki = (wpis: Radar): DrabinkaV["sklad"] =>
+    wpis.xi_ogloszony
+      ? { stan: "ogloszony", opis: "W ogłoszonym składzie od pierwszej minuty" }
+      : (wpis.udzial_startow ?? 0) >= 0.9 && (wpis.ostatni_wystep_min ?? 0) >= 60
+        ? { stan: "pewny_start", opis: `Pewny start – zaczynał w ${Math.round((wpis.udzial_startow ?? 0) * 10)} z 10 ostatnich meczów drużyny` }
+        : null;
+  /**
+   * RODZAJE KARTY – kolejność = ważność (pierwszy idzie do nagłówka w C i D).
+   * Teksty: krótko = rzeczownik, który da się zobaczyć na karcie; zdanie =
+   * fakt + liczba, która go potwierdza. Bez „pewniak”, „gwarancja” (właściciel 28.07).
+   */
+  const rodzajeDrabinki = (wpis: Radar, r: Radar["rynki"][number], ceny: CenyD | null): RodzajD[] => {
+    const h = wpis.hero;
+    const out: RodzajD[] = [];
+    const traf = h.traf ?? 0;
+    const z = h.z ?? 0;
+    const kurs = h.kurs_publikacji ?? h.kurs ?? 0;
+    const p = r.drabinka.find((x) => x.linia === h.linia)?.p_final ?? null;
+    const gorszy = ceny ? (ceny.lepszy === "Superbet" ? "Betclic" : "Superbet") : null;
+    const cenaU = (b: string | null) => (ceny && b ? fmtKurs(b === "Superbet" ? ceny.superbet : ceny.betclic) : "");
+    if (h.powod_szczebla === "perla" && kurs)
+      out.push({ kod: "perla", grupa: "cena", wNaglowku: true, krotko: "Perełka", zdanie: `Kurs ${fmtKurs(kurs)}, a ta linia weszła w ${traf} z ${z} ostatnich meczów` });
+    if (ceny?.typ === "pewne")
+      out.push({ kod: "cena_pewne", grupa: "cena", wNaglowku: true, krotko: "Cena mówi: pewne", zdanie: `${gorszy} daje tylko ${cenaU(gorszy)} – wycenia to jak niemal pewne; ${ceny.lepszy} płaci ${cenaU(ceny.lepszy)}` });
+    if (ceny?.typ === "lepsza")
+      out.push({ kod: "cena_lepsza", grupa: "cena", wNaglowku: true, krotko: "Lepsza cena", zdanie: `${ceny.lepszy} płaci ${cenaU(ceny.lepszy)}, ${gorszy} ${cenaU(gorszy)} za tę samą linię` });
+    if (z >= 8 && traf / z >= 0.8)
+      out.push({ kod: "seria", grupa: "forma", wNaglowku: true, krotko: `Seria ${traf}/${z}`, zdanie: `Ta linia weszła w ${traf} z ${z} ostatnich meczów` });
+    if ((h.z5 ?? 0) >= 5 && h.traf5 === h.z5)
+      out.push({ kod: "forma", grupa: "forma", wNaglowku: true, krotko: "Forma 5/5", zdanie: "Weszła w każdym z 5 ostatnich meczów" });
+    const ryw = r.kontekst?.rywal;
+    if (ryw && (ryw.mnoznik ?? 1) >= 1.1 && ryw.srednia != null && ryw.norma != null)
+      out.push({
+        kod: "rywal", grupa: "mecz", wNaglowku: true, krotko: "Hojny rywal",
+        zdanie: `Przeciw ${druzyna(wpis.przeciwnik).nazwa} średnio ${liczba(ryw.srednia)} na zawodnika, w lidze ${liczba(ryw.norma)}`,
+      });
+    if (h.powod_wejscia === "przewaga" && p !== null && kurs)
+      out.push({ kod: "przewaga", grupa: "cena", wNaglowku: true, krotko: "Kurs ponad szansę", zdanie: `Z analizy wychodzi ${proc(p)}, a kurs ${fmtKurs(kurs)} płaci jak za ${proc(1 / kurs)}` });
+    if (wpis.rodzaj === "transfer")
+      out.push({ kod: "transfer", grupa: "forma", wNaglowku: true, krotko: "Nowy w klubie", zdanie: "Mało meczów w nowym klubie – liczymy też z poprzedniego sezonu" });
+    if (ceny?.typ === "zgodne")
+      out.push({ kod: "ceny_zgodne", grupa: "cena", wNaglowku: false, krotko: "Ceny zgodne", zdanie: `Superbet ${fmtKurs(ceny.superbet)}, Betclic ${fmtKurs(ceny.betclic)} – obaj wyceniają to tak samo` });
+    return out;
   };
   // każdy wpis radaru to jedna karta: rynek POLECANY (`hero`), nie pierwszy
   // z listy – u zawodnika z kilkoma rynkami pierwszy bywał innym niż polecany
@@ -335,6 +466,8 @@ export function przygotujElementy() {
           z: hist.length,
           polecany,
           bukmacher: uKogo(linia, l, d),
+          // druga cena tylko obok Superbetu (gdy szczebel jest od Betclica, to on jest ceną główną)
+          betclic: uKogo(linia, l, d) === "Superbet" ? (d?.rozjazd?.betclic ?? r.linie_betclic?.[l] ?? null) : null,
           ...(polecany && wpis.hero.kurs_teraz ? { teraz: wpis.hero.kurs_teraz, terazBukmacher: wpis.hero.kurs_teraz_bukmacher ?? "Superbet" } : {}),
         };
       })
@@ -355,6 +488,9 @@ export function przygotujElementy() {
       ts: wpis.kickoff_ts,
       podmiotId: wpis.podmiot_id,
       klucz: `${wpis.podmiot_id ?? wpis.podmiot}-${r.rynek_kod ?? r.rynek}`,
+      ceny: cenyDrabinki(wpis, r),
+      sklad: skladDrabinki(wpis),
+      rodzaje: rodzajeDrabinki(wpis, r, cenyDrabinki(wpis, r)),
     };
   };
   const drabinkiLista = ((zrodlo().radar as { wpisy?: Radar[] }).wpisy ?? [])

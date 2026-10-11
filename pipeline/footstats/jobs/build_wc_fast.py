@@ -11431,6 +11431,19 @@ def _main_impl(tryb=None):
             print(archiwum_ofert.zapisz_zrzut(kursy_dwa, matches_out))
         except Exception as e:
             diagnostyka.cichy("cykl", "archiwum_ofert", e)
+    # DRABINKI: cena Betclica przy szczeblach (właściciel 11.10) – radar zapisał
+    # się wyżej, zanim siatka powstała, więc dopisujemy i zapisujemy go jeszcze
+    # raz. Dodatek: pad nie kosztuje cyklu, a przy padniętym radarze nie ruszamy
+    # kart z poprzedniego cyklu.
+    if kursy_dwa and not radar_padl and radar_wpisy:
+        try:
+            _bc_szczebli = lekkie_klucze.stempluj_ceny_drabinek(radar_wpisy, kursy_dwa)
+            _dump("radar.json", {"wygenerowano_ts": int(time.time()), "wpisy": radar_wpisy})
+            print(f"Ceny Betclica na drabinkach: {_bc_szczebli} szczebli "
+                  f"w {len(radar_wpisy)} kartach (reszta: Betclic nie ma linii "
+                  "albo liczy inaczej – karta pokazuje jedną cenę)")
+        except Exception as e:
+            diagnostyka.cichy("cykl", "ceny_drabinek", e)
     # stempel na KOPII – do księgi i manifestu pokazanych idzie lista bez niego
     # (cena drugiego bukmachera to podpowiedź na teraz, nie stan publikacji)
     _vb_strona = [dict(b) for b in lista_pub]

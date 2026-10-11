@@ -31,6 +31,8 @@
   --ok-tlo: rgb(47 174 116 / 0.14);
   --nie-tlo: rgb(228 88 110 / 0.14);
   --czeka-tlo: rgb(189 138 24 / 0.16);
+  /* perełka drabinki – jedyny rodzaj z własnym kolorem (11.10) */
+  --perla: #d6b45e;
   color-scheme: dark;
 }
 
@@ -56,6 +58,7 @@
   --ok-tlo: rgb(23 130 79 / 0.11);
   --nie-tlo: rgb(190 52 85 / 0.1);
   --czeka-tlo: rgb(192 138 0 / 0.13);
+  --perla: #86650c;
   color-scheme: light;
 }
 

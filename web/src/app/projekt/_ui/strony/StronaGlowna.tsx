@@ -478,7 +478,7 @@ function Lista({
         drabinkiDnia.length ? (
           <div className="st-drabinki">
             {drabinkiDnia.map((d) => (
-              <ScenaDrabinki key={d.klucz ?? d.kto} wariant="a" d={d} />
+              <ScenaDrabinki key={d.klucz ?? d.kto} wariant="a" d={d} oznaczenia="e" />
             ))}
           </div>
         ) : (

@@ -257,7 +257,50 @@
 
 /* ---------- 3.3 DRABINKA ---------------------------------------------- */
 
-.el-drabinka { padding: 14px 16px 16px; display: grid; gap: 16px; }
+.el-drabinka { padding: 14px 16px 16px; display: grid; gap: 16px; container-type: inline-size; }
+/* wąska karta (kolumna na komputerze, telefon): wybrana linia nad szansą i kursem –
+   inaczej nazwa zakładu i „nasz typ” łamały się w trzy linie (11.10) */
+@container (max-width: 520px) {
+  .el-drab-wybor { grid-template-columns: 1fr; gap: 10px; }
+  .el-drab-wybor-prawa { justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  /* dwa kafelki kursu obok siebie muszą się zmieścić na 360 px – węższe, jak na telefonie */
+  .el-drab-wybor .d-kurs { min-width: 0; gap: 6px; padding: 0 8px; }
+}
+.el-drabinka { min-width: 0; }
+.el-drab-bez { color: var(--t3); font-size: 12px; white-space: nowrap; }
+
+/* rodzaje drabinki (warsztat 11.10): słowa, nie plakietki; perełka w kolorze
+   ceny (bursztyn – ta sama barwa co dawna „lepsza cena”), reszta w tekście */
+.el-drab-rodzaje { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 8px; font-size: 12px; color: var(--t1); font-weight: 600; }
+.el-drab-rodzaje > span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+/* KOLOR = ZNACZENIE (11.10, właściciel: „czemu wszędzie bursztyn”): zieleń
+   tylko seria i forma (ta sama co trafienia w historii), złoto tylko perełka
+   (najrzadszy rodzaj), cena i mecz zwykłym tekstem – mówią same słowa */
+.el-drab-rodzaje [data-grupa="forma"] { color: var(--ok); }
+.el-drab-rodzaje [data-kod="perla"] { color: var(--perla); }
+/* seria / forma: kreski trafień jak w passie – zieleń = weszło */
+.el-drab-kreski { display: inline-flex; gap: 2px; }
+.el-drab-kreski b { width: 3px; height: 11px; border-radius: 1px; background: var(--t4); }
+.el-drab-kreski b[data-s="ok"] { background: var(--ok); }
+/* skład: „XI” – pełne = ogłoszony, obrys = pewny start z historii */
+.el-drab-xi {
+  display: inline-block; margin-left: 8px; vertical-align: 3px;
+  font: 700 10px/1 var(--f-n); font-style: normal; letter-spacing: 0.02em;
+  padding: 3px 4px; border-radius: 3px; border: 1px solid var(--ok); color: var(--ok); cursor: help;
+}
+.el-drab-xi[data-ogloszony] { background: var(--ok); color: var(--na-akcji); }
+/* dwa kafelki kursu obok siebie, gdy Betclic ma tę samą linię */
+.el-drab-kursy { display: inline-flex; gap: 6px; flex-wrap: nowrap; justify-content: flex-end; min-width: 0; }
+.el-drab-zdanie { margin-top: 6px; font-size: 13px; color: var(--t2); }
+.el-drab-glowny { flex: none; font-weight: 600; color: var(--t2); }
+.el-drab-glowny[data-grupa="forma"] { color: var(--ok); }
+.el-drab-glowny[data-kod="perla"] { color: var(--perla); }
+.el-drabinka[data-kreska] { position: relative; overflow: hidden; }
+.el-drabinka[data-kreska]::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 3px; background: var(--perla); opacity: 0.9; }
+.el-przystanek-nasz[data-perla] { color: var(--perla); }
+/* d: mecz i skład pod historią – zwykłe zdania, bez ikon */
+.el-drab-mecz { display: grid; gap: 4px; padding-top: 10px; border-top: 1px solid var(--kreska); }
+.el-drab-mecz p { margin: 0; font-size: 13px; color: var(--t2); display: flex; align-items: center; gap: 7px; }
 
 .el-drab-wybor {
   display: grid;

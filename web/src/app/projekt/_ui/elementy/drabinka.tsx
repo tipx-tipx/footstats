@@ -6,11 +6,101 @@ import { useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 
 import { fmtKurs, fmtLinia } from "@/lib/format";
 
-import type { DrabinkaV, SzczebelV } from "../../_dane/elementy";
+import type { DrabinkaV, RodzajD, SzczebelV } from "../../_dane/elementy";
 import type { TypV } from "../../_dane/przygotuj";
 import { Blysk } from "../atomy/wyniki-ruch";
 import { KafelekD, KratkiD } from "../atomy2/podstawowe";
 import { Herb } from "../Herb";
+import { Powody } from "./karta";
+
+/**
+ * OZNACZENIA RODZAJÓW (warsztat 11.10, do wyboru właściciela). Rodzaj = powód,
+ * na którym karta stoi (`DrabinkaV.rodzaje`); bez wybranego wariantu karta
+ * wygląda jak dotąd. Wspólne zasady wszystkich wariantów:
+ *   – jeden kolor, jedno znaczenie: bursztyn = argument z ceny, reszta tekstem,
+ *   – słowo („krótko”) to nazwa rodzaju, zdanie to fakt z liczbą,
+ *   – seria i forma są na karcie liczbami (kratki), więc w zdaniach ich nie ma.
+ *   a – słowa w nagłówku, b – zdania pod drabinką, c – główny rodzaj (kreska
+ *   ceny) + jedno zdanie, d – argumenty na swoich miejscach (cena przy kursie,
+ *   mecz i skład pod historią)
+ */
+export type OznaczeniaD = "a" | "b" | "c" | "d" | "e";
+/** e = D dopracowany (wybór właściciela 11.10) – na produkcji */
+const jakD = (oz?: OznaczeniaD) => oz === "d" || oz === "e";
+const rodzajeD = (d: DrabinkaV) => d.rodzaje ?? [];
+const naglowkowe = (d: DrabinkaV) => rodzajeD(d).filter((r) => r.wNaglowku);
+const jestPerla = (d: DrabinkaV) => rodzajeD(d).some((r) => r.kod === "perla");
+const WIDOCZNE_W_KRATKACH = ["seria", "forma"];
+const zdaniaPowodow = (d: DrabinkaV) => rodzajeD(d).filter((r) => r.kod !== "perla" && !WIDOCZNE_W_KRATKACH.includes(r.kod));
+/** d: argumenty meczu i zawodnika (bez ceny – ta stoi przy kursie) */
+const zdaniaMeczu = (d: DrabinkaV) => zdaniaPowodow(d).filter((r) => r.grupa !== "cena");
+
+/**
+ * ZNAK RODZAJU – z języka karty, nie ikona: seria i forma to te same kreski
+ * trafień co w historii (zieleń = weszło), skład to „XI”, rywal to jego herb,
+ * argument z ceny to bursztyn. Kolor niesie znaczenie, nie ozdobę.
+ */
+function ZnakRodzaju({ r, d }: { r: RodzajD; d: DrabinkaV }) {
+  const linia = d.szczeble.find((x) => x.polecany)?.linia ?? 0;
+  if (r.kod === "seria" || r.kod === "forma") {
+    const okno = (r.kod === "forma" ? d.historia.slice(-5) : d.historia).slice(-10);
+    return (
+      <i className="el-drab-kreski" aria-hidden>
+        {okno.map((v, j) => (
+          <b key={j} data-s={v > linia ? "ok" : undefined} />
+        ))}
+      </i>
+    );
+  }
+  if (r.kod === "rywal") return <Herb d={d.rywal} tryb="prawdziwy" rozmiar={13} />;
+  return null;
+}
+
+function Slowa({ d, ile, bezMeczu }: { d: DrabinkaV; ile?: number; bezMeczu?: boolean }) {
+  // e: argument meczu stoi zdaniem pod historią – w nagłówku byłby dublem
+  const lista = naglowkowe(d).filter((r) => !bezMeczu || r.grupa !== "mecz").slice(0, ile ?? 99);
+  if (!lista.length) return null;
+  return (
+    <div className="el-drab-rodzaje">
+      {lista.map((r) => (
+        <span key={r.kod} data-grupa={r.grupa} data-kod={r.kod} title={r.zdanie}>
+          <ZnakRodzaju r={r} d={d} />
+          {r.krotko}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * SKŁAD – warunek, nie rodzaj (właściciel 11.10). „XI” przy nazwisku: pełne =
+ * ogłoszony skład, obrys = pewny start z historii; brak znaku = nie wiemy.
+ */
+function ZnakSkladu({ d }: { d: DrabinkaV }) {
+  if (!d.sklad) return null;
+  return (
+    <i className="el-drab-xi" data-ogloszony={d.sklad.stan === "ogloszony" || undefined} title={d.sklad.opis} aria-label={d.sklad.opis}>
+      XI
+    </i>
+  );
+}
+
+/**
+ * KURS U OBU BUKMACHERÓW (właściciel 11.10: „w każdej drabince kursy obu,
+ * a jak nie ma jednego – nie pisać”). Dwa te same kafelki co wszędzie;
+ * wyższa cena jest wybrana. Druga cena tylko pewna (siatka strony meczu).
+ */
+function KursyObu({ s }: { s: SzczebelV }) {
+  const sb = { kurs: s.kurs, bukmacher: s.bukmacher, teraz: s.teraz, terazBukmacher: s.terazBukmacher };
+  if (!s.betclic) return <KafelekD k={sb} />;
+  return (
+    <span className="el-drab-kursy">
+      {/* bez wyróżniania wyższej ceny (właściciel 11.10) – liczby mówią same */}
+      <KafelekD k={sb} />
+      <KafelekD k={{ kurs: s.betclic, bukmacher: "Betclic" }} />
+    </span>
+  );
+}
 
 /**
  * Drabinka: jeden zawodnik, kilka linii tego samego rynku. Wspólna zasada
@@ -34,11 +124,12 @@ function Kratki({ d, linia }: { d: DrabinkaV; linia: number }) {
 /* Szansę pokazujemy TYLKO przy naszym typie (05.10). Dalsze szczeble deklarowały
    ok. 35% i 21%, a weszły w 16% i 6% (70 i 49 kart) – liczba wprowadzała w błąd. */
 const szansaWidoczna = (s: SzczebelV) => s.polecany && s.p !== null;
-function bezSzansy(s: SzczebelV, d: DrabinkaV): string {
+/* 11.10 (właściciel: „krócej, bez łamania”): słowo na karcie, wyjaśnienie w dymku */
+function bezSzansy(s: SzczebelV, d: DrabinkaV): { krotko: string; dymek: string } {
   const nasza = d.szczeble.find((x) => x.polecany)?.linia ?? null;
-  if (nasza !== null && s.linia < nasza) return "Kurs za niski – nie typujemy";
-  if (s.p !== null) return "Dalszy szczebel – wchodzi rzadko, szansy nie podajemy";
-  return "Za mała szansa – nie typujemy";
+  if (nasza !== null && s.linia < nasza) return { krotko: "Za niski kurs", dymek: "Kurs za niski – tego szczebla nie typujemy" };
+  if (s.p !== null) return { krotko: "Dalszy szczebel", dymek: "Wchodzi rzadko – szansy nie podajemy, bo myliłaby" };
+  return { krotko: "Za mała szansa", dymek: "Za mała szansa – tego szczebla nie typujemy" };
 }
 
 function Wybrany({ s, d }: { s: SzczebelV; d: DrabinkaV }) {
@@ -50,7 +141,7 @@ function Wybrany({ s, d }: { s: SzczebelV; d: DrabinkaV }) {
           {s.polecany && <span className="el-nasz">nasz typ</span>}
         </div>
         <small style={{ display: "block", marginTop: 4, color: "var(--t3)", fontSize: 12 }}>
-          weszłoby w {s.traf} z {s.z} ostatnich meczów
+          weszło w {s.traf} z {s.z} ostatnich
         </small>
       </div>
       <div className="el-drab-wybor-prawa">
@@ -59,29 +150,45 @@ function Wybrany({ s, d }: { s: SzczebelV; d: DrabinkaV }) {
             <Blysk tekst={`${Math.round(s.p * 100)}%`} kier={null} />
           </span>
         ) : (
-          <span style={{ color: "var(--t3)", fontSize: 12, maxWidth: 120, textAlign: "right" }}>{bezSzansy(s, d)}</span>
+          <span className="el-drab-bez" title={bezSzansy(s, d).dymek}>
+            {bezSzansy(s, d).krotko}
+          </span>
         )}
-        <KafelekD k={{ kurs: s.kurs, bukmacher: s.bukmacher, teraz: s.teraz, terazBukmacher: s.terazBukmacher }} />
+        <KursyObu s={s} />
       </div>
     </div>
   );
 }
 
-function Glowa({ d }: { d: DrabinkaV }) {
+function Glowa({ d, oz }: { d: DrabinkaV; oz?: OznaczeniaD }) {
+  const glowny = naglowkowe(d)[0];
+  const zdanieC = zdaniaPowodow(d)[0];
   return (
     <div style={{ display: "grid", gap: 10 }}>
       <div className="el-karta-meta">
         <Herb d={d.druzyna} tryb="prawdziwy" rozmiar={15} />
         <span>{d.mecz}</span>
+        {oz === "c" && glowny && (
+          <span className="el-drab-glowny" data-grupa={glowny.grupa} data-kod={glowny.kod}>
+            {glowny.krotko}
+          </span>
+        )}
         <time>
           {d.dzien}, {d.godzina}
         </time>
       </div>
       <div>
-        <h3 className="el-kto">{d.podmiotId ? <Lnk href={`/zawodnik/${d.podmiotId}`}>{d.kto}</Lnk> : d.kto}</h3>
+        <h3 className="el-kto">
+          {d.podmiotId ? <Lnk href={`/zawodnik/${d.podmiotId}`}>{d.kto}</Lnk> : d.kto}
+          {oz && <ZnakSkladu d={d} />}
+        </h3>
         <div className="el-kto-pod">
           {d.pozycja} · {d.druzyna.nazwa} · drabinka: {d.rynek.toLowerCase()}
         </div>
+        {oz === "a" && <Slowa d={d} />}
+        {oz === "d" && <Slowa d={d} ile={3} />}
+        {oz === "e" && <Slowa d={d} ile={3} bezMeczu />}
+        {oz === "c" && zdanieC && <div className="el-drab-zdanie">{zdanieC.zdanie}</div>}
       </div>
     </div>
   );
@@ -106,7 +213,8 @@ function useWybor(d: DrabinkaV) {
 /* A · suwak linii (Polymarket), dopracowany 01.10:
    przeciąganie z przyciąganiem do linii, kolor przystanku = jak często wchodziła,
    wibracja przy przeskoku na telefonie, strzałki na klawiaturze */
-function Suwak({ d }: { d: DrabinkaV }) {
+function Suwak({ d, oz }: { d: DrabinkaV; oz?: OznaczeniaD }) {
+  const perlaNaPrzystanku = (oz === "b" || oz === "e") && jestPerla(d);
   const { i, setI, klawisze } = useWybor(d);
   const n = d.szczeble.length;
   const s = d.szczeble[i];
@@ -170,7 +278,11 @@ function Suwak({ d }: { d: DrabinkaV }) {
                 data-pokrycie={r >= 0.8 ? "mocne" : r >= 0.5 ? "srednie" : "slabe"}
                 onClick={() => setI(j)}
               >
-                {x.polecany && <span className="el-przystanek-nasz">nasz typ</span>}
+                {x.polecany && (
+                  <span className="el-przystanek-nasz" data-perla={perlaNaPrzystanku || undefined}>
+                    {perlaNaPrzystanku ? "perełka" : "nasz typ"}
+                  </span>
+                )}
                 <span className="el-przystanek-linia">{fmtLinia(x.linia)}</span>
                 <span className="el-przystanek-kropka" />
                 {/* ta sama cena co gruba w kafelku – bieżąca, gdy się ruszyła */}
@@ -283,13 +395,27 @@ function bezPustych(d: DrabinkaV): { d: DrabinkaV; ukryte: SzczebelV[] } {
   return { d: { ...d, szczeble: d.szczeble.filter((s) => !ukryte.includes(s)) }, ukryte };
 }
 
-export function ScenaDrabinki({ wariant, d: surowa }: { wariant: string; d: DrabinkaV | null }) {
+export function ScenaDrabinki({ wariant, d: surowa, oznaczenia: oz }: { wariant: string; d: DrabinkaV | null; oznaczenia?: OznaczeniaD }) {
   if (!surowa) return null;
   const { d, ukryte } = bezPustych(surowa);
+  const powody = oz === "b" ? zdaniaPowodow(d) : [];
+  const meczD = jakD(oz) ? zdaniaMeczu(d) : [];
+  const glowny = naglowkowe(d)[0];
   return (
-    <article className="el-karta el-drabinka">
-      <Glowa d={d} />
-      {wariant === "b" ? <Schody d={d} /> : wariant === "c" ? <Tabela d={d} /> : <Suwak d={d} />}
+    <article className="el-karta el-drabinka" data-kreska={(oz === "c" && glowny?.kod === "perla") || undefined}>
+      <Glowa d={d} oz={oz} />
+      {wariant === "b" ? <Schody d={d} /> : wariant === "c" ? <Tabela d={d} /> : <Suwak d={d} oz={oz} />}
+      {powody.length > 0 && <Powody powody={powody.map((r) => ({ tekst: r.zdanie, kier: "za" as const }))} />}
+      {meczD.length > 0 && (
+        <div className="el-drab-mecz">
+          {meczD.map((r) => (
+            <p key={r.kod}>
+              {oz === "e" && r.kod === "rywal" && <Herb d={d.rywal} tryb="prawdziwy" rozmiar={14} />}
+              {r.zdanie}
+            </p>
+          ))}
+        </div>
+      )}
       {ukryte.length > 0 && (
         <p className="p-t3" style={{ fontSize: 12 }}>
           Wyższe progi ({ukryte.map((s) => fmtLinia(s.linia)).join(" i ")}) pomijamy – w ostatnich {ukryte[0].z} meczach nie weszły ani

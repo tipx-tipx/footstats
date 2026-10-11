@@ -891,3 +891,7 @@
   .p-pp-kropka, .p-pp-trasa { animation: none; }
   .p-ekran, .p-dzien, .p-mecz, .p-kurs, .p-guzik { transition: none; }
 }
+
+/* perełka drabinki – te same wartości co w nowy.css (11.10) */
+[data-p-motyw="ciemny"] { --perla: #d6b45e; }
+[data-p-motyw="jasny"] { --perla: #86650c; }

@@ -158,6 +158,40 @@ def stempluj_ceny_bukmacherow(typy: list[dict], kursy_dwa: dict) -> int:
     return n
 
 
+def stempluj_ceny_drabinek(wpisy: list[dict], kursy_dwa: dict) -> int:
+    """Kartom drabinek `linie_betclic = {linia: kurs}` przy każdym rynku – cena
+    TEJ SAMEJ linii u Betclica (właściciel 11.10: „w każdej drabince kursy na
+    obu bukmacherach, a jak nie ma jednego – po prostu nie pisać”).
+
+    Te same zasady co `stempluj_ceny_bukmacherow`: siatka strony meczu, tylko
+    linie, które karta pokazuje (`linie_pelne`), bez linii „Betclic liczy
+    inaczej” (trzeci element pary) i bez pustych cen. Zwraca liczbę szczebli
+    z drugą ceną. Stempel liczony od nowa w każdym cyklu (cena na teraz)."""
+    n = 0
+    for w in wpisy or []:
+        try:
+            gracz = ((kursy_dwa or {}).get(int(w["mecz_id"])) or {}).get(int(w["podmiot_id"])) or {}
+        except (KeyError, TypeError, ValueError):
+            gracz = {}
+        for r in w.get("rynki") or []:
+            r.pop("linie_betclic", None)
+            linie = gracz.get(r.get("rynek_kod")) or {}
+            if not linie:
+                continue
+            out = {}
+            for l in (r.get("linie_pelne") or {}):
+                para = linie.get(str(l)) or linie.get(str(_f(l)))
+                if not para or len(para) < 2 or (len(para) > 2 and para[2]):
+                    continue
+                bc = _f(para[1])
+                if bc and bc > 1.0:
+                    out[str(l)] = round(bc, 2)
+            if out:
+                r["linie_betclic"] = out
+                n += len(out)
+    return n
+
+
 def klucze_kursow_meczow(kursy_dwa: dict) -> dict:
     """`kursy_m00`..`kursy_m31` – mecz w koszyku `id % 32`. Wszystkie koszyki
     zawsze (także puste), żeby po meczu nie zostawała stara oferta."""

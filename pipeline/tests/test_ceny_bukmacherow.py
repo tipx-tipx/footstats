@@ -71,3 +71,29 @@ def test_pusta_siatka_nie_wywraca():
     assert L.stempluj_ceny_bukmacherow([t], {}) == 0
     assert L.stempluj_ceny_bukmacherow([t], None) == 0
     assert L.stempluj_ceny_bukmacherow(None, SIATKA) == 0
+
+
+
+def _karta(**kw):
+    w = {"mecz_id": 7, "podmiot_id": 101, "rynki": [
+        {"rynek_kod": "shots", "linie_pelne": {"0.5": 1.4, "1.5": 2.6}},
+        {"rynek_kod": "fouls_committed", "linie_pelne": {"0.5": 1.3}},
+    ]}
+    w.update(kw)
+    return w
+
+
+def test_drabinka_dostaje_cene_betclica_tylko_przy_pewnej_linii():
+    """Właściciel 11.10: kursy obu bukmacherów w każdej drabince, a jak
+    jednego nie ma – nie pisać. 1,5 bez Betclica i faule „liczy inaczej” bez."""
+    w = _karta()
+    assert L.stempluj_ceny_drabinek([w], SIATKA) == 1
+    assert w["rynki"][0]["linie_betclic"] == {"0.5": 1.45}
+    assert "linie_betclic" not in w["rynki"][1]
+
+
+def test_drabinka_bez_oferty_i_stary_stempel_znika():
+    w = _karta(podmiot_id=999)
+    w["rynki"][0]["linie_betclic"] = {"0.5": 9.9}
+    assert L.stempluj_ceny_drabinek([w], SIATKA) == 0
+    assert "linie_betclic" not in w["rynki"][0]
