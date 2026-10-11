@@ -224,6 +224,7 @@ def main() -> int:
         return _main()
     finally:
         print(supa.raport_egress(), flush=True)
+        supa.zapisz_dziennik_transferu('betclic')
 
 
 if __name__ == "__main__":

@@ -418,6 +418,56 @@ def straz_budzetu(job: str, *, podnies: bool = True) -> float:
     return mb
 
 
+# ⚑ DZIENNIK TRANSFERU — SUMA DOBOWA W KONTROLI (2026-10-11, audyt właściciela
+# „dopisać sprawdzenie zużycia, żeby ostrzegała zawczasu").
+#
+# Straż wyżej widzi jeden przebieg i pisze tylko do logu Actions, którego nikt
+# nie czyta. Dziennik zapisuje po każdym przebiegu, ile przeczytał, a Kontrola
+# (panel admina) sumuje ostatnie 24 h ze wszystkich jobów. Klucz PER JOB, bo
+# Betclic, rozliczanie i cykl chodzą równolegle i wspólna lista gubiłaby wpisy
+# przy jednoczesnym zapisie. Przebieg bez odczytów (Betclic) nic nie zapisuje.
+#
+# Ruchu STRONY (Vercel) pipeline nie widzi — ten jest tylko w panelu Supabase.
+DZIENNIK_TRANSFERU_PREFIKS = "transfer_dziennik_"
+DZIENNIK_TRANSFERU_OKNO_S = 48 * 3600
+JOBY_TRANSFERU = ("cykl", "rozliczanie", "betclic")
+
+
+def zapisz_dziennik_transferu(job: str, teraz: int | None = None) -> bool:
+    """Dopisz [ts, MB] tego przebiegu do dziennika joba. Nigdy nie podnosi."""
+    try:
+        mb = sum(w[1] for w in _egress.values()) / 1e6
+        if mb <= 0:
+            return False
+        teraz = int(teraz or time.time())
+        klucz = DZIENNIK_TRANSFERU_PREFIKS + job
+        stary, ok = get_key_ok(klucz)
+        if not ok:
+            return False
+        wpisy = [w for w in (stary if isinstance(stary, list) else [])
+                 if isinstance(w, list) and len(w) >= 2
+                 and teraz - int(w[0]) <= DZIENNIK_TRANSFERU_OKNO_S]
+        wpisy.append([teraz, round(mb, 3)])
+        return put_key(klucz, wpisy)
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def wczytaj_dzienniki_transferu() -> dict[str, list] | None:
+    """{job: [[ts, MB], ...]} albo None, gdy żaden odczyt się nie udał."""
+    out: dict[str, list] = {}
+    udane = 0
+    for job in JOBY_TRANSFERU:
+        try:
+            d, ok = get_key_ok(DZIENNIK_TRANSFERU_PREFIKS + job)
+        except Exception:  # noqa: BLE001
+            continue
+        if ok:
+            udane += 1
+            out[job] = d if isinstance(d, list) else []
+    return out if udane else None
+
+
 def raport_poza_supabase() -> str:
     """Ile transferu przeszło magazynami spoza Supabase (nie liczy się do limitu)."""
     if not _ruch_poza:

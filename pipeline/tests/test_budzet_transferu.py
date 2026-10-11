@@ -73,3 +73,29 @@ def test_progi_maja_sens_wobec_limitu():
     assert supa.ALARM_PRZEBIEGU_MB > supa.OSTRZEZENIE_PRZEBIEGU_MB
     # alarm ma być wcześniej niż tempo palące miesięczny limit w jedną dobę
     assert supa.ALARM_PRZEBIEGU_MB * 40 < 5000
+
+
+def test_dziennik_dopisuje_przebieg_i_tnie_stare(monkeypatch):
+    """Dziennik joba: [ts, MB] po każdym przebiegu, okno 48 h (Kontrola sumuje 24 h)."""
+    teraz = 1_800_000_000
+    zapisane = {}
+    stary = [[teraz - 50 * 3600, 9.0], [teraz - 3600, 8.0]]
+    monkeypatch.setattr(supa, "get_key_ok", lambda k: (stary, True))
+    monkeypatch.setattr(supa, "put_key", lambda k, v: zapisane.update({k: v}) or True)
+    _przeczytaj(7.5)
+    assert supa.zapisz_dziennik_transferu("cykl", teraz)
+    assert zapisane == {"transfer_dziennik_cykl": [[teraz - 3600, 8.0], [teraz, 7.5]]}
+
+
+def test_dziennik_nie_nadpisuje_przy_padnietym_odczycie(monkeypatch):
+    """Padnięty odczyt to nie pusty dziennik — bez zapisu, bez wyjątku."""
+    monkeypatch.setattr(supa, "get_key_ok", lambda k: (None, False))
+    monkeypatch.setattr(supa, "put_key", lambda k, v: pytest.fail("zapis mimo padu"))
+    _przeczytaj(3.0)
+    assert not supa.zapisz_dziennik_transferu("cykl")
+
+
+def test_dziennik_pomija_przebieg_bez_odczytow(monkeypatch):
+    """Betclic nie czyta z Supabase — nie ma czego zapisywać."""
+    monkeypatch.setattr(supa, "put_key", lambda k, v: pytest.fail("zapis bez odczytów"))
+    assert not supa.zapisz_dziennik_transferu("betclic")

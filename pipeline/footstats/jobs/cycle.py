@@ -176,6 +176,7 @@ def main():
             # regresja transferu ma krzyczec ZANIM limit padnie — licznik
             # sam z siebie nikogo nie obudzil ani 25.08, ani 04.09
             supa.straz_budzetu('cykl', podnies=False)
+            supa.zapisz_dziennik_transferu('cykl')
         except Exception:  # noqa: BLE001
             pass
 

@@ -44,7 +44,7 @@ concurrency:
 
 jobs:
   cycle:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # 20 -> 35 (2026-08-01). Cykl trwa 16-20 min i ROŚNIE z zakresem lig, więc
     # regularnie ginął na limicie: z 19 kolejnych przebiegów SZEŚĆ skończyło się
     # statusem `cancelled` na 20,2-20,3 min. Zabity przebieg nie wypycha NICZEGO
@@ -105,9 +105,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh workflow run betclic.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}"
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip

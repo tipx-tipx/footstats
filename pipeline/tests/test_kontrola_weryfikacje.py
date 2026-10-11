@@ -134,8 +134,28 @@ def test_nie_zagral_najpierw_typy_ze_strony_i_budzet(monkeypatch):
     assert "spr_nie_zagral" not in log["synt"]
 
 
-def test_kontrola_ma_dziewiec_sprawdzen():
+def test_kontrola_ma_dziesiec_sprawdzen():
     k = R.kontrola_produktu({}, None, TERAZ, TERAZ)
-    assert len(k["sprawdzenia"]) == 9
-    for kod in ("przelozony_rozegrany", "kupony_schowane", "nie_zagral_probka"):
+    assert len(k["sprawdzenia"]) == 10
+    for kod in ("przelozony_rozegrany", "kupony_schowane", "nie_zagral_probka",
+                "transfer_supabase"):
         assert _spr(k, kod)["ok"]
+
+
+def test_transfer_sumuje_ostatnia_dobe_wszystkich_jobow():
+    transfer = {
+        "cykl": [[TERAZ - 2 * GODZ, 8.0], [TERAZ - 30 * GODZ, 500.0]],  # 30 h – poza dobą
+        "rozliczanie": [[TERAZ - GODZ, 2.0]],
+        "betclic": [],
+    }
+    s = _spr(R.kontrola_produktu({}, None, TERAZ, TERAZ, None, transfer),
+             "transfer_supabase")
+    assert s["ok"] and s["liczba"] == 10.0
+    assert "cykl 8 MB" in s["opis"] and "rozliczanie 2 MB" in s["opis"]
+
+
+def test_transfer_powyzej_progu_zapala_alarm():
+    transfer = {"cykl": [[TERAZ - GODZ * i, 40.0] for i in range(24)]}  # 960 MB
+    s = _spr(R.kontrola_produktu({}, None, TERAZ, TERAZ, None, transfer),
+             "transfer_supabase")
+    assert not s["ok"] and "POZA NORMĄ" in s["opis"]

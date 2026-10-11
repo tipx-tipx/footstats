@@ -30,7 +30,7 @@ concurrency:
 
 jobs:
   magazyn:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # 18.08: magazyn urósł z 309 do 1299 drużyn (dołożone kluby
     # z nadchodzącego terminarza — patrz nota w backfillu). Przebieg
     # zmierzony lokalnie: 19 min na 1314 drużynach. Po zawężeniu do
@@ -38,9 +38,9 @@ jobs:
     # zabity job nie zapisuje nic, a magazyn jest teraz podstawą wyceny.
     timeout-minutes: 40
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip

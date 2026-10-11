@@ -851,12 +851,19 @@ def weryfikuj_nie_zagral(log: dict, now: int,
 KONTROLA_ZALEGLOSC_H = 48          # mecz ze strony bez wyniku dłużej = alarm
 KONTROLA_BEZ_DANYCH_MAX = 0.10     # udział zwrotów „brak danych" wśród pokazanych
 KONTROLA_WAGI_MAX_H = 30           # nocny trening + zapas
+# transfer z Supabase w 24 h, wszystkie joby razem (`supa.zapisz_dziennik_transferu`).
+# Norma 11.10: cykl ~8 MB × 24 + rozliczanie ~1,8 MB × 20 ≈ 230 MB; licznik
+# mierzy bajty PO rozpakowaniu, więc panel Supabase pokazuje ok. 11× mniej.
+# Próg = trzykrotność normy: regresja (09.09 było 476 MB na JEDEN cykl) świeci
+# na czerwono w panelu, zanim limit 5 GB/mies. padnie.
+KONTROLA_TRANSFER_DOBA_MB = 700.0
 
 
 def kontrola_produktu(log: dict, pokazane: dict | None, now: int,
                       wagi_ts: float | None,
-                      log_kuponow: dict | None = None) -> dict:
-    """Dziewięć sprawdzeń: {"policzono_ts", "sprawdzenia": [{kod, ok, liczba, opis}]}.
+                      log_kuponow: dict | None = None,
+                      transfer: dict | None = None) -> dict:
+    """Dziesięć sprawdzeń: {"policzono_ts", "sprawdzenia": [{kod, ok, liczba, opis}]}.
 
     Cykl żyje sprawdza FRONT (po `meta.wygenerowano_ts`), bo job rozliczania
     nie wie, kiedy cykl ostatnio doszedł — tu zostaje pięć pozostałych.
@@ -972,6 +979,27 @@ def kontrola_produktu(log: dict, pokazane: dict | None, now: int,
           f"sprawdzonych w 7 dni" if not gral
           else f"{len(gral)} z {len(nz)} sprawdzonych zwrotów „nie zagrał” – "
                f"zawodnik GRAŁ wg statshub, np. {przyklady}")
+
+    # --- 2026-10-11: transfer z Supabase w 24 h (audyt 11.10, pkt 7c) ---
+    if transfer is None:
+        dodaj("transfer_supabase", True, None,
+              "dziennik transferu nieodczytany — liczba wróci w następnym przebiegu")
+    else:
+        doba = now - 86400
+        per_job = {job: sum(float(w[1]) for w in (wpisy or [])
+                            if isinstance(w, list) and len(w) >= 2 and int(w[0]) > doba)
+                   for job, wpisy in transfer.items()}
+        mb = sum(per_job.values())
+        rozklad = ", ".join(f"{j} {v:.0f} MB" for j, v in per_job.items() if v)
+        dodaj("transfer_supabase", mb <= KONTROLA_TRANSFER_DOBA_MB, round(mb, 1),
+              f"pipeline przeczytał z Supabase {mb:.0f} MB w 24 h"
+              + (f" ({rozklad})" if rozklad else "")
+              + f", próg {KONTROLA_TRANSFER_DOBA_MB:.0f} MB; ruch strony widać "
+                "tylko w panelu Supabase"
+              if mb <= KONTROLA_TRANSFER_DOBA_MB
+              else f"TRANSFER POZA NORMĄ: {mb:.0f} MB w 24 h ({rozklad}) przy "
+                   f"progu {KONTROLA_TRANSFER_DOBA_MB:.0f} MB — któryś klucz "
+                   "czyta się za często; rozkład po kluczach w logu joba")
 
     return {"policzono_ts": now, "sprawdzenia": out}
 
@@ -7452,7 +7480,12 @@ def rozlicz(
         _wagi_ts = float((supa.get_key("model_wagi") or {}).get("trenowano_ts") or 0) or None
     except Exception:
         _wagi_ts = None
-    _kontrola = kontrola_produktu(log, _na_stronie, now, _wagi_ts, log_kuponow)
+    try:
+        _transfer = supa.wczytaj_dzienniki_transferu()
+    except Exception:
+        _transfer = None
+    _kontrola = kontrola_produktu(log, _na_stronie, now, _wagi_ts, log_kuponow,
+                                  _transfer)
     for _spr in _kontrola["sprawdzenia"]:
         if not _spr["ok"]:
             print(f"⚑ KONTROLA [{_spr['kod']}]: {_spr['opis']}")

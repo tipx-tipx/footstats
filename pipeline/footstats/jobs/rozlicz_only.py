@@ -143,6 +143,7 @@ def main() -> None:
         if poza:
             print(poza, flush=True)
         supa.straz_budzetu('rozliczanie', podnies=False)
+        supa.zapisz_dziennik_transferu('rozliczanie')
 
 
 if __name__ == "__main__":

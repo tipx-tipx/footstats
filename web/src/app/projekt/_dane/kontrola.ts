@@ -64,6 +64,7 @@ const NAZWY_SPRAWDZEN: Record<string, string> = {
   bez_danych: "Typy zamykane z wynikiem", wagi_modelu: "Nocny trening modelu",
   przelozony_rozegrany: "Zwroty za przełożone mecze potwierdzone", kupony_schowane: "Kupony nie znikają ze strony",
   nie_zagral_probka: "Zwroty „nie zagrał” potwierdzone",
+  transfer_supabase: "Transfer z bazy w normie",
 };
 
 const godz = (ts: number) => new Date((ts + 2 * 3600) * 1000).toISOString().slice(11, 16);

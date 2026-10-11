@@ -39,7 +39,7 @@ concurrency:
 jobs:
   pipeline:
     name: Model i pipeline (pytest)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Cały zestaw (470 testów) idzie ~45 s. Limit jest tu jako BEZPIECZNIK,
     # nie jako budżet: do 2026-07-31 dwa pliki testowe wchodziły w sieć
     # (`radar` i `drabinki_kontekst` wołały Betclica przez `radar.zbuduj`),
@@ -49,9 +49,9 @@ jobs:
     # kolejny taki przypadek ubił przebieg zamiast wisieć.
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
@@ -72,12 +72,12 @@ jobs:
 
   web:
     name: Aplikacja (lint, typy, build)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: "22"
           cache: npm
