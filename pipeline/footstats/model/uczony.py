@@ -559,6 +559,10 @@ def prognoza(wagi: dict | None, ctx: dict, team_id: int | str, rynek: str,
     kod = RYNEK_NA_KOD.get(rynek)
     if not out or out.get("p") is None or kod is None:
         return out
+    try:
+        out["skl"] = skladniki_druzyny(wr, cechy)
+    except Exception:  # noqa: BLE001 – opis nie może kosztować wyceny
+        pass
     # ta sama droga do historii co w cechach — jedno źródło prawdy o tym,
     # które mecze wolno widzieć (patrz nota przy `cechy_z_kontekstu`)
     serie = ctx.get("serie") or {}
@@ -579,6 +583,100 @@ def prognoza(wagi: dict | None, ctx: dict, team_id: int | str, rynek: str,
     if pokr is not None:
         out["pokr"] = round(float(pokr), 3)
     return out
+
+
+# --------------------------------------------- SKŁADNIKI λ (opis typu) -----
+# ⚑ OPIS PISZE TO, NA CZYM STOI LICZBA (2026-10-11, właściciel: „opisy pod
+# typami przepisać dokładnie”). Do dziś karta typu modelu pokazywała czynniki
+# STAREGO silnika (scenariusz meczu, sędzia, styl rywala z jego mnożnikami),
+# a szansę liczył model uczony – opis i liczba mówiły o dwóch różnych
+# rachunkach. λ modelu to exp(Σ β·x), więc wpływ grupy cech da się policzyć
+# DOKŁADNIE: exp(Σ β·(x − x_odniesienia)) po kolumnach grupy, gdzie odniesieniem
+# jest mediana z treningu (typowa drużyna / typowy zawodnik). Iloczyn grup
+# i stałej daje λ – nic nie jest dorysowane.
+_STYL_PL = {
+    "pos": "posiadanie piłki", "crs": "dośrodkowania", "f3": "gra w ostatniej tercji",
+    "box": "dotknięcia w polu karnym", "ins": "strzały z pola karnego",
+    "out": "strzały zza pola", "off": "spalone", "tck": "odbiory",
+    "int": "przechwyty", "xg": "jakość sytuacji",
+}
+
+
+def _grupa_kolumny(nazwa: str) -> str:
+    if nazwa in ("log_w6", "log_w12", "log_w_dom", "trend", "brak_w12", "brak_w_dom"):
+        return "forma"
+    if nazwa in ("log_opp12", "brak_opp12", "brak_rywala", "log_rywal"):
+        return "rywal"
+    if nazwa in ("log_liga", "brak_liga"):
+        return "liga"
+    if nazwa == "dom":
+        return "dom"
+    if nazwa.startswith(("log_p_", "brak_p_")):
+        return "styl"
+    if nazwa in ("log_t3", "log_t6", "log_t12"):
+        return "forma"
+    if nazwa == "log_min6":
+        return "minuty"
+    if nazwa == "udzial_startow":
+        return "start"
+    if nazwa.startswith("poz_"):
+        return "pozycja"
+    return "inne"
+
+
+def _rozklad(beta: list, nazwy: list, x: np.ndarray, ref: dict) -> dict:
+    """{grupa: czynnik} – exp(Σ β·(x − odniesienie)) po kolumnach grupy."""
+    sumy: dict = defaultdict(float)
+    for b, n, v in zip(beta, nazwy, x):
+        if n == "const":
+            continue
+        sumy[_grupa_kolumny(n)] += float(b) * (float(v) - ref.get(n, 0.0))
+    return {g: round(math.exp(max(min(s, 3.0), -3.0)), 3) for g, s in sumy.items()}
+
+
+def skladniki_druzyny(wagi_rynku: dict, cechy: dict) -> dict:
+    """Wpływ grup cech na λ drużyny + liczby, z których powstał (do opisu)."""
+    sch = {"log": wagi_rynku.get("log") or [], "med": wagi_rynku.get("med") or {},
+           "flagi": wagi_rynku.get("flagi") or []}
+    x = macierz([cechy], sch)[0]
+    nazwy = nazwy_cech(sch)
+    # odniesienie: mediana z treningu, połowa drogi dom/wyjazd, trend 0
+    ref = {f"log_{c}": math.log(max(float(sch["med"][c]), 0.0) + 0.5) for c in sch["log"]}
+    ref["dom"] = 0.5
+    mn = _rozklad(wagi_rynku.get("beta") or [], nazwy, x, ref)
+    styl = []
+    for b, n, v in zip(wagi_rynku.get("beta") or [], nazwy, x):
+        if n.startswith("log_p_"):
+            styl.append((n[6:], float(b) * (float(v) - ref.get(n, 0.0))))
+    styl.sort(key=lambda t: -abs(t[1]))
+    return {
+        "mn": mn,
+        "x": {k: (round(float(cechy[k]), 2) if cechy.get(k) is not None else None)
+              for k in ("w6", "w12", "w_dom", "opp12", "liga", "dom")},
+        "styl": [[_STYL_PL.get(k, k), round(math.exp(v), 3)] for k, v in styl[:2]
+                 if abs(v) >= 0.02],
+    }
+
+
+def skladniki_zawodnika(wagi_rynku: dict, cechy: dict,
+                        oczekiwane_minuty: float | None = None) -> dict:
+    """Wpływ grup cech na λ zawodnika (z minutami) + liczby do opisu."""
+    sch = {"log": wagi_rynku.get("log") or [], "med": wagi_rynku.get("med") or {}}
+    x = macierz_zaw([cechy], sch)[0]
+    nazwy = nazwy_cech_zaw(sch)
+    ref = {f"log_{c}": math.log(max(float(sch["med"][c]), 0.0) + 0.1) for c in sch["log"]}
+    ref["dom"] = 0.5
+    ref["udzial_startow"] = 1.0
+    mn = _rozklad(wagi_rynku.get("beta") or [], nazwy, x, ref)
+    minuty = float(oczekiwane_minuty or cechy.get("min6") or 90.0)
+    # minuty to też offset log(min/90) – pełny mecz = 1,0
+    mn["minuty"] = round(mn.get("minuty", 1.0) * max(minuty, 1.0) / 90.0, 3)
+    return {
+        "mn": mn,
+        "x": {"t3": cechy.get("t3"), "t6": cechy.get("t6"), "t12": cechy.get("t12"),
+              "min": round(minuty, 0), "liga": cechy.get("liga"),
+              "rywal": cechy.get("rywal"), "dom": cechy.get("dom")},
+    }
 
 
 # ------------------------------------------------------------------ trening --
@@ -1662,6 +1760,10 @@ def prognoza_zawodnika(wagi: dict | None, seria: dict, rynek: str,
         if _w06 is not None:
             out["p_sciag"] = _w06["p"]
     out["min"] = round(float(oczekiwane_minuty or cechy.get("min6") or 90.0), 1)
+    try:
+        out["skl"] = skladniki_zawodnika(wr, cechy, oczekiwane_minuty)
+    except Exception:  # noqa: BLE001 – opis nie może kosztować wyceny
+        pass
     if cechy.get("rywal") is not None and "rywal" in (wr.get("log") or []):
         lm0 = lam_zaw(wr, {**cechy, "rywal": None}, oczekiwane_minuty)
         w0 = (wycena(lm0, linia, strona, wr.get("r_nb"), sila=SCIAGANIE_LAMBDY_ZAW)

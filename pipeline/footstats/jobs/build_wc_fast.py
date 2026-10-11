@@ -37,7 +37,7 @@ from ..engine import (
 )
 from ..model import (
     betting, context, counts, koncesje, kupony, matchup, matchup_lite,
-    minutes as minutes_mod, profil_druzyn, styl, tempo, uczony,
+    minutes as minutes_mod, opis_uczony, profil_druzyn, styl, tempo, uczony,
 )
 from ..sources import (
     betclic, eloratings, rotowire, scores365, sofascore, sportsgambler, statshub,
@@ -11447,6 +11447,22 @@ def _main_impl(tryb=None):
     # stempel na KOPII – do księgi i manifestu pokazanych idzie lista bez niego
     # (cena drugiego bukmachera to podpowiedź na teraz, nie stan publikacji)
     _vb_strona = [dict(b) for b in lista_pub]
+    # OPIS MODELU UCZONEGO (2026-10-11, właściciel: „opisy przepisać dokładnie”)
+    # – czynniki z rozkładu λ (`opis_uczony`), OBOK starego `uzasadnienie`;
+    # front przełącza się po akceptacji wyglądu. Pad nie kosztuje cyklu.
+    _z_opisem = 0
+    for _b in _vb_strona:
+        if _b.get("zrodlo_p") != "uczony" or not (_b.get("p_uczony") or {}).get("skl"):
+            continue
+        try:
+            _cz = opis_uczony.czynniki(_b)
+        except Exception as e:                                  # noqa: BLE001
+            diagnostyka.cichy("cykl", "opis_uczony", e)
+            continue
+        if _cz:
+            _b["uzasadnienie_uczony"] = {"czynniki": _cz}
+            _z_opisem += 1
+    print(f"Opis modelu uczonego: {_z_opisem} z {len(_vb_strona)} typów na stronie")
     if kursy_dwa:
         _z_dwiema = lekkie_klucze.stempluj_ceny_bukmacherow(_vb_strona, kursy_dwa)
         _zawodnicze = sum(1 for b in _vb_strona
