@@ -1096,19 +1096,15 @@ def test_drugi_szczebel_z_martwa_forma_nie_jest_nastepnikiem():
     assert hero is not None and hero["linia"] == 1.5 and hero["drugi_linia"] == 2.5
 
 
-def test_tani_start_tylko_z_realnym_nastepnikiem():
-    """Właściciel 17–18.09: hero poniżej 1,70 tylko, gdy drugi szczebel
-    realnie trafialny („pewny pierwszy, płatny drugi” — Openda 0,5 @1,68 +
-    1,5 @4,25); inaczej taka linia zostaje pojedynczym typem listy dnia.
-    2,5 z 5/10 & 4/5 (siła 0,68) nie jest hero, ale jest realnym następnikiem."""
-    _s, hero = radar._oceń_karte(_karta_sitowa(kurs_15=1.62, traf_25=5))
-    assert hero is not None and hero["linia"] == 1.5 and hero["kurs"] == 1.62
-    assert hero["powod_szczebla"] == "tania_z_drugim"
+def test_hero_ponizej_1_70_nie_istnieje_takze_z_realnym_drugim():
+    """Właściciel 11.10: pierwszy szczebel z value, ~1,8–1,9. Wyjątek
+    „tania z drugim” trafiał 2/6 na stronie — linia poniżej 1,70 zostaje
+    typem listy dnia, nie drabinką (dawniej: 1,5 @1,62 + realne 2,5)."""
     powody = Counter()
-    _s, hero = radar._oceń_karte(_karta_sitowa(kurs_15=1.62, traf_25=5, forma=3),
+    _s, hero = radar._oceń_karte(_karta_sitowa(kurs_15=1.62, traf_25=5),
                                  powody=powody)
     assert hero is None
-    assert powody["sito_tania_bez_realnego_drugiego"] == 1
+    assert powody["sito_kurs_ponizej_1_70"] >= 1
 
 
 def test_karta_bez_zadnej_linii_sitowej_odpada_z_powodem():
@@ -1172,3 +1168,11 @@ def test_prog_nastepnika_nizszy_tylko_za_perelka():
     assert radar.prog_nastepnika(3.9) == radar.MIN_P_NASTEPNIKA_PERLY
     assert radar.prog_nastepnika(2.1) == radar.MIN_P_DRUGIEGO_SZCZEBLA
     assert radar.prog_nastepnika(None) == radar.MIN_P_DRUGIEGO_SZCZEBLA
+
+
+def test_ogloszony_sklad_pierwszy_przy_wyborze_kart():
+    """Właściciel 11.10: ogłoszony skład wyżej (bez dopisków na karcie)."""
+    karty = [{"_score": 0.30, "xi_ogloszony": False},
+             {"_score": 0.10, "xi_ogloszony": True},
+             {"_score": 0.20}]
+    assert [k["_score"] for k in sorted(karty, key=radar.kolejnosc_kart)] == [0.10, 0.30, 0.20]

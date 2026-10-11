@@ -40,10 +40,12 @@ def test_premia_zdjeta_ranking_nie_spycha_do_niskich_kursow():
     o połowę różnicy cen — w księdze sitowe hero <1,70 przegrywają z ceną
     (59% vs 63%), a 1,80+ ją biją (65% vs 51%). Premia okna dalej = 0."""
     assert R.BONUS_OKNA_CENY == 0.0
-    w_oknie = _score(1.65, round(1 / 1.65 + 0.05, 4))
-    poza = _score(1.80, round(1 / 1.80 + 0.05, 4))
-    assert poza > w_oknie
-    assert round(poza - w_oknie, 3) == round(0.5 * (1 / 1.65 - 1 / 1.80), 3)
+    # od 11.10 hero < 1,70 nie istnieje (radar.MIN_KURS_HERO) — ta sama
+    # zasada sprawdzana na dwóch cenach powyżej progu
+    nizej = _score(1.75, round(1 / 1.75 + 0.05, 4))
+    wyzej = _score(1.90, round(1 / 1.90 + 0.05, 4))
+    assert wyzej > nizej
+    assert abs((wyzej - nizej) - 0.5 * (1 / 1.75 - 1 / 1.90)) < 0.002
 
 
 def test_okno_nie_obejmuje_pasma_ktore_traci_najwiecej():

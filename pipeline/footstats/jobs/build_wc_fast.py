@@ -6317,6 +6317,11 @@ def _main_impl(tryb=None):
                 xi_znany[(mid_x, pid_x)] = True
     for k_ps in poza_skladem:
         xi_znany.setdefault(k_ps, False)
+    # tylko skład OGŁOSZONY (`confirmed`) — `xi_znany` ma też przewidywany
+    xi_ogloszony = {
+        (mid_x, pid_x) for mid_x, v in xi_pelne.items() if v.get("confirmed")
+        for xi_set in v["xi_by_team"].values() for pid_x in xi_set
+    }
     if poza_skladem:
         print(f"Poza znanym składem: {len(poza_skladem)} par (mecz, zawodnik) "
               "— typy i karty tych zawodników nie powstają")
@@ -10345,6 +10350,7 @@ def _main_impl(tryb=None):
             # że go w jedenastce nie ma (zgłoszenie 2026-07-27: Fabio Fehr)
             poza_skladem=poza_skladem,
             xi_znany=xi_znany,
+            xi_ogloszony=xi_ogloszony,
             # zapas na obstawienie — nowa karta nie wskakuje tuż przed meczem
             margines_startu_s=kupony.MARGINES_STARTU_S,
             # WŁASNE UCZENIE DRABINEK: delta z ICH rozliczeń (nie modelu) —

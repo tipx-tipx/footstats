@@ -12,7 +12,7 @@ realnie wejść, nie możemy opierać się tylko na kursie".
 from footstats.jobs import radar as R
 
 
-def _kandydat(pokrycie_traf=7, kurs=1.65, p_final=0.56, roznica_pp=None,
+def _kandydat(pokrycie_traf=7, kurs=1.80, p_final=0.48, roznica_pp=None,
               traf2=5, p2=0.40, z=10):
     """Karta, która NIE ma przewagi modelu ani mocnej serii.
 
@@ -22,6 +22,10 @@ def _kandydat(pokrycie_traf=7, kurs=1.65, p_final=0.56, roznica_pp=None,
     ścieżka droga wymaga 2,00+), przewaga −4,6 pp jest poniżej progu karty,
     ale w tolerancji MIN_EDGE_SERII — czyli o POWODZIE wejścia może
     zdecydować wyłącznie rozjazd cenowy.
+
+    ⚑ 11.10: hero < 1,70 nie istnieje (radar.MIN_KURS_HERO), więc karta stoi
+    na 1,80 z szansą 0,48 (−7,6 pp): poniżej tolerancji serii (−6 pp), ale
+    powyżej weta modelu (−10 pp) — o powodzie dalej decyduje tylko rozjazd.
     """
     pierwszy = {
         "linia": 1.5, "kurs": kurs,
@@ -67,11 +71,14 @@ def test_bez_roznicy_karta_wchodzi_ale_z_innym_powodem():
 
 
 def test_roznica_kursow_wpuszcza_karte_bez_przewagi_modelu():
-    """Sedno hybrydy: dwaj bukmacherzy wyceniają to samo inaczej."""
-    score, hero = R._oceń_karte(_kandydat(roznica_pp=15.0))
-    assert hero is not None
-    assert hero["powod_wejscia"] == "roznica_kursow"
-    assert score > 0
+    """Sedno hybrydy: dwaj bukmacherzy wyceniają to samo inaczej.
+
+    ⚑ 11.10: przy hero ≥ 1,70 i 7/10 warunki hybrydy (przewaga ≥ −6 pp)
+    pokrywają się z serią, która ma pierwszeństwo w nazwie powodu — etykieta
+    „roznica_kursow” praktycznie nie występuje. Karta wchodzi, a wartość
+    różnicy cen jedzie na karcie (`wartosc_rozjazdu`)."""
+    _score, hero = R._oceń_karte(_kandydat(roznica_pp=15.0))
+    assert hero is not None and hero["wartosc_rozjazdu"] > 0
 
 
 def test_sama_roznica_nie_wystarcza_gdy_typ_realnie_nie_wchodzi():

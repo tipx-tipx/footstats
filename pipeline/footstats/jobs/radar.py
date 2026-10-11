@@ -431,16 +431,28 @@ WAGA_NASTEPNIKA = 0.25
 # (7/10, 4/5) przegrałby z tanią linią w starej wartości pakietu.
 #   * hero = NAJWYŻSZY kurs spośród linii z siłą ≥ PROG_SILY_HERO,
 #     wartość pakietu tylko rozstrzyga remis;
-#   * kurs < MIN_KURS_HERO (1,70) tylko z REALNYM następnikiem (forma
-#     ≥ MIN_FORMA_NASTEPNIKA_TANIEGO z 5 i pokrycie ≥ MIN_POKRYCIE_NASTEPNIKA_TANIEGO)
-#     — „pewny pierwszy, płatny drugi” (Openda 0,5 @1,68 + 1,5 @4,25); inaczej
-#     taka linia zostaje pojedynczym typem listy dnia, nie drabinką;
+#   * kurs < MIN_KURS_HERO (1,70) — do 11.10 z wyjątkiem „tania z drugim”
+#     (Openda 0,5 @1,68 + 1,5 @4,25), od 11.10 BEZ wyjątku (nota niżej);
 #   * weto modelu (skalibrowany w każdym paśmie, pomiar 16.09): szansa
 #     modelu niższa od ceny o więcej niż WETO_MODELU_PP → linia nie jest hero;
 #   * perełka = hero z kursem ≥ PROG_PERLY — stempel do księgi i rankingu.
 # Każdy hero niesie `powod_szczebla` (perla / najwyzsza_mocna /
 # tania_z_drugim) — progi do przeliczenia z rozliczeń po ~2 tyg.
 MIN_KURS_HERO = 1.70
+# ⚑ BEZ WYJĄTKU „TANIA Z DRUGIM” (2026-10-11, właściciel: „pierwszy szczebel
+# z value, koło 1,8–1,9”, kursy 1,4–1,6 nie). Karty na stronie od 14.09:
+#   najwyzsza_mocna (≥1,70, od 24.09)   16/22 = 73% przy cenie 51%
+#   tania_z_drugim  (<1,70, od 24.09)    2/6
+#   wszystkie karty z 1. szczeblem <1,60   47,8% przy cenie 59,6% (n=23)
+# Linia poniżej 1,70 nie jest hero wcale — zostaje typem listy dnia. Bez
+# warunku „model ≥ kurs” (przewaga nad bukmacherem to czynnik, nie warunek);
+# weto modelu (−10 pp) bez zmian.
+#
+# ⚑ POJEDYNCZE 0,5 ZOSTAJĄ KARTAMI (sprawdzone 11.10 przed wdrożeniem): karty
+# z bazą 0,5 od 1,70 i 2. szczeblem 5/10 trafiały 1. szczeblem 7/10, a te
+# same linie przez listę dnia (mocne 0,5 przy 1,80–2,20) 51,6% przy cenie
+# 48,6% (n=64) — przeniesienie na „Wyższe kursy” zamieniłoby dobre typy na
+# średnie. Wymóg 2. szczebla ≥6/10 dla bazy 0,5 NIE został wdrożony.
 # ⚑ PEREŁKA NIE MOŻE PADAĆ NA BRAMACH ZROBIONYCH POD TANIE LINIE (2026-09-18,
 # symulacja Chery'ego na pełnej historii, korekta strumienia −0,5 logit jak w
 # produkcji ~−0,40): zza pola 1,5 @3,9 (7/10, 4/5) ma iloraz p_final/cena 1,67
@@ -458,8 +470,6 @@ MIN_KURS_HERO = 1.70
 PROG_SILY_ROZJAZDU = 0.76
 MAX_ROZJAZD_KARTY_MOCNEJ = 2.0
 MIN_P_NASTEPNIKA_PERLY = 0.15
-MIN_FORMA_NASTEPNIKA_TANIEGO = 4
-MIN_POKRYCIE_NASTEPNIKA_TANIEGO = 0.50
 WETO_MODELU_PP = 0.10
 PROG_PERLY = 2.20
 MIN_FORMA_DRUGIEGO = 2       # następnik: wszedł w ≥2 z 5 ostatnich
@@ -2298,24 +2308,17 @@ def _oceń_karte(
             # dokładnie to, co poszłoby na kartę po cofnięciu progu
             hero_ok = sito_v3
             if sito_v3:
-                _f5n = (nast or {}).get("pokrycie5") or {}
-                _nast_realny = (
-                    nast is not None and pok_nast.get("z")
-                    and pok_nast["traf"] / pok_nast["z"] >= MIN_POKRYCIE_NASTEPNIKA_TANIEGO
-                    and (_f5n.get("traf") or 0) >= MIN_FORMA_NASTEPNIKA_TANIEGO)
-                if s["kurs"] < MIN_KURS_HERO and not _nast_realny:
+                if s["kurs"] < MIN_KURS_HERO:
                     hero_ok = False
                     if sito:
-                        lokalne["sito_tania_bez_realnego_drugiego"] += 1
+                        lokalne["sito_kurs_ponizej_1_70"] += 1
                 elif p_final is not None and p_final < 1.0 / s["kurs"] - WETO_MODELU_PP:
                     hero_ok = False
                     if sito:
                         lokalne["sito_weto_modelu"] += 1
                 else:
                     trafiony["powod_szczebla"] = (
-                        "perla" if s["kurs"] >= PROG_PERLY
-                        else "najwyzsza_mocna" if s["kurs"] >= MIN_KURS_HERO
-                        else "tania_z_drugim")
+                        "perla" if s["kurs"] >= PROG_PERLY else "najwyzsza_mocna")
             hero_ok_v3 = hero_ok
             hero_ok = hero_ok and sito
             trafiony["hero_ok"] = hero_ok
@@ -2657,6 +2660,18 @@ def sila_linii(
             "kary": kary, "premia": premia, "powod": powod, "wyjatki": wyjatki}
 
 
+def kolejnosc_kart(w: dict) -> tuple:
+    """Klucz wyboru kart dnia: najpierw OGŁOSZONY skład, potem siła pary.
+
+    ⚑ 2026-10-11 (właściciel: „ogłoszony skład wyżej”, bez dopisków na
+    karcie). Księga od 20.08, mocne linie 1,60–2,30: z ogłoszonym XI 59,7%
+    (n=176), bez niego 43,0% (n=200). Działa tylko na NOWE karty — opublikowane
+    wracają z rejestru i trzymają swoje miejsca (`scal_karty_z_publikacjami`),
+    a strona i tak układa drabinki po godzinie meczu.
+    """
+    return (0 if w.get("xi_ogloszony") else 1, -w["_score"])
+
+
 def szansa_z_sily(sila: float | None, p_final: float | None) -> float | None:
     """Szansa szczebla do wartości pakietu: pół z siły linii (historia:
     pokrycie × forma × rotacja), pół z p_final (pokrycie Wilsona po korekcie
@@ -2957,6 +2972,7 @@ def zbuduj(
     koncesje_tab=None,
     poza_skladem: set[tuple[int, int]] | None = None,
     xi_znany: dict[tuple[int, int], bool] | None = None,
+    xi_ogloszony: set[tuple[int, int]] | None = None,
     margines_startu_s: int = 0,
     korekta_logit: float = 0.0,
     pomiar_out: list | None = None,
@@ -3036,6 +3052,7 @@ def zbuduj(
 
     poza_skladem = poza_skladem or set()
     xi_znany = xi_znany or {}
+    xi_ogloszony = xi_ogloszony or set()
 
     wpisy: list[dict] = []
     # GDZIE GINIE DRUGI SZCZEBEL — licznik na etapie BUDOWY drabinki, nie
@@ -3271,6 +3288,9 @@ def zbuduj(
                     if (mid, pid) in xi_znany
                     else (True if info.get("xi") else None)
                 ),
+                # skład OGŁOSZONY (nie przewidywany) — pierwszeństwo przy
+                # wyborze kart dnia, patrz `kolejnosc_kart`
+                "xi_ogloszony": (mid, pid) in xi_ogloszony,
                 "rynki": rynki,
             }
             if transfer:
@@ -3382,6 +3402,7 @@ def zbuduj(
                 "przeciwnik": przeciwnik or "",
                 "pozycja": (profil.get("position") or "?")[:1],
                 "xi": xi_znany.get((mid, profil.get("id"))),
+                "xi_ogloszony": (mid, profil.get("id")) in xi_ogloszony,
                 **({"powod": "poza_feedem"} if bez_feedu and not trendy_perf
                    else {"powod": "brak_historii"} if not bez_feedu else {}),
                 "minuty_sr6": minuty_sr6_deb,
@@ -3632,7 +3653,7 @@ def zbuduj(
     per_mecz_n: dict[int, int] = {}
     per_dzien_n: dict[str, int] = {}
     wybrane: list[dict] = []
-    for w in sorted(ocenione, key=lambda w: -w["_score"]):
+    for w in sorted(ocenione, key=kolejnosc_kart):
         if len(wybrane) >= MAX_WPISOW:
             _ri(w["mecz_id"], w.get("podmiot_id") or 0, "limit_wpisow",
                 podmiot=w.get("podmiot"))
@@ -3653,9 +3674,7 @@ def zbuduj(
     # OCENA na karcie: miejsce w rankingu dnia + klasa jakości. Front sortuje
     # i oznacza WYŁĄCZNIE tym — nie ma drugiej definicji „najlepszego typu"
     # po stronie web (rozjazd backend/front byłby nie do wytłumaczenia userowi).
-    for miejsce, w in enumerate(
-        sorted(wpisy, key=lambda w: -w["_score"]), start=1
-    ):
+    for miejsce, w in enumerate(sorted(wpisy, key=kolejnosc_kart), start=1):
         hero = w.get("hero") or {}
         # KOLEJNOŚĆ liczy się z pary szczebli (`_score`), ale KLASA i liczba
         # „przewaga" na karcie zostają przy pierwszym szczeblu — to jego cenę
