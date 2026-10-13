@@ -34,12 +34,35 @@ def _istotny(m: float | None) -> bool:
     return m is not None and abs(m - 1.0) >= MIN_WPLYW
 
 
+def _zgodny(v, r, surowy: float | None) -> bool:
+    """Liczba stoi po tej stronie odniesienia, w którą czynnik pcha λ.
+
+    Kierunek `mn` model liczy względem mediany z treningu, nie względem
+    linii. Bez tego warunku karta potrafiła pokazać „przeciw” przy liczbie,
+    która na oko pomaga (Thun, rożne powyżej 1,5: „przeciw Twente średnio
+    3,5” – mniej niż przy przeciętnym rywalu 4,6, ale gracz porównuje z 1,5).
+    Czynnik, którego liczba przeczy kierunkowi, nie trafia na kartę."""
+    if v is None or r is None or surowy is None:
+        return False
+    v, r = float(v), float(r)
+    if round(v, 1) == round(r, 1):
+        return False
+    return (v > r) == (float(surowy) > 1.0)
+
+
 def czynniki(b: dict) -> list[dict]:
-    """Czynniki opisu dla typu `b` (rekord listy dnia z `p_uczony.skl`)."""
+    """Czynniki opisu dla typu `b` (rekord listy dnia z `p_uczony.skl`).
+
+    14.10 (właściciel: „krótko, z głową”): każda liczba z porównaniem do
+    przeciętnej (tego, względem czego model liczy kierunek), „gdzie gra”
+    z ogólnego efektu gospodarza (średnia drużyny u siebie siedzi w formie),
+    bez stylu gry (nieczytelny: „posiadanie piłki” przy kartkach) i bez
+    „ostatnich meczów” zawodnika (karta pokazuje je kratkami)."""
     pu = b.get("p_uczony") or {}
     skl = pu.get("skl") or {}
     mn = skl.get("mn") or {}
     x = skl.get("x") or {}
+    ref = skl.get("ref") or {}
     strona = b.get("strona")
     if not mn or strona not in ("powyzej", "ponizej"):
         return []
@@ -57,43 +80,50 @@ def czynniki(b: dict) -> list[dict]:
         if _istotny(m):
             out.append({"nazwa": nazwa, "mnoznik": m, "opis": opis})
 
+    def gdzie_gra() -> None:
+        dom, s = x.get("dom"), mn.get("dom")
+        if dom is None or s is None or float(dom) not in (0.0, 1.0):
+            return
+        kto = "gospodarze" if dom else "goście"
+        dodaj("Gdzie gra", "dom",
+              f"Gra {'u siebie' if dom else 'na wyjeździe'}, a {kto} mają zwykle "
+              f"{'więcej' if float(s) > 1 else 'mniej'}")
+
     if zawodnik:
-        if x.get("t12") is not None:
-            t3 = f", w ostatnich 3 meczach {_l(x['t3'])}" if x.get("t3") is not None else ""
-            dodaj("Tempo", "forma", f"Średnio {_l(x['t12'])} na 90 minut{t3}")
+        s = mn.get("forma")
+        if _zgodny(x.get("t12"), ref.get("t12"), s):
+            t3 = (f", w ostatnich 3 meczach {_l(x['t3'])}"
+                  if _zgodny(x.get("t3"), ref.get("t12"), s) else "")
+            dodaj("Tempo", "forma", f"Średnio {_l(x['t12'])} na 90 minut{t3}, "
+                                    f"przeciętny zawodnik {_l(ref['t12'])}")
+        elif _zgodny(x.get("t3"), ref.get("t3"), s):
+            dodaj("Tempo", "forma", f"W ostatnich 3 meczach {_l(x['t3'])} na 90 minut, "
+                                    f"przeciętny zawodnik {_l(ref['t3'])}")
         if x.get("min"):
             dodaj("Minuty gry", "minuty", f"Powinien zagrać ok. {int(x['min'])} minut")
         if x.get("rywal"):
             r = float(x["rywal"])
             ile = abs(round((r - 1.0) * 100))
-            if ile >= 5:
+            if ile >= 5 and (r > 1) == (float(mn.get("rywal") or 1.0) > 1):
                 dodaj("Rywal", "rywal",
                       f"Przeciw {rywal} zawodnicy na tej pozycji mają o {ile}% "
                       f"{'więcej' if r > 1 else 'mniej'} niż średnio w lidze")
-        dodaj("Gdzie gra", "dom", "Gra u siebie" if x.get("dom") else "Gra na wyjeździe")
-        if pu.get("pkw") is not None and pu.get("pkn"):
-            n = int(pu["pkn"])
-            k = round(float(pu["pkw"]) * n)
-            k = k if strona == "powyzej" else n - k
-            out.append({"nazwa": "Ostatnie mecze", "mnoznik": None,
-                        "opis": f"{'Powyżej' if strona == 'powyzej' else 'Poniżej'} "
-                                f"{_l(linia)} w {k} z {n} ostatnich meczów"})
+        gdzie_gra()
     else:
-        if x.get("w12") is not None:
-            w6 = f", w ostatnich 6 – {_l(x['w6'])}" if x.get("w6") is not None else ""
-            dodaj("Forma", "forma", f"Średnio {_l(x['w12'])} w ostatnich 12 meczach{w6}")
-        dom = x.get("dom")
-        gdzie = "Gra u siebie" if dom else "Gra na wyjeździe"
-        if x.get("w_dom") is not None:
-            gdzie += f" – w takich meczach średnio {_l(x['w_dom'])}"
-        dodaj("Gdzie gra", "dom", gdzie)
-        if x.get("opp12") is not None:
-            dodaj("Rywal", "rywal", f"Przeciw {rywal} drużyny mają średnio {_l(x['opp12'])}")
-        if x.get("liga") is not None:
-            dodaj("Liga", "liga", f"Średnia w tej lidze {_l(x['liga'])}")
-        styl = [n for n, _ in (skl.get("styl") or [])]
-        if styl:
-            dodaj("Styl gry", "styl", "Styl gry drużyny: " + " i ".join(styl))
+        s = mn.get("forma")
+        for k, tekst in (("w12", "w ostatnich 12 meczach"), ("w6", "w ostatnich 6 meczach"),
+                         ("w_dom", "u siebie" if x.get("dom") else "na wyjeździe")):
+            if _zgodny(x.get(k), ref.get(k), s):
+                dodaj("Forma", "forma", f"Średnio {_l(x[k])} {tekst}, "
+                                        f"przeciętna drużyna {_l(ref[k])}")
+                break
+        gdzie_gra()
+        if _zgodny(x.get("opp12"), ref.get("opp12"), mn.get("rywal")):
+            dodaj("Rywal", "rywal", f"Przeciw {rywal} drużyny mają średnio {_l(x['opp12'])}, "
+                                    f"przy przeciętnym rywalu {_l(ref['opp12'])}")
+        if _zgodny(x.get("liga"), ref.get("liga"), mn.get("liga")):
+            dodaj("Liga", "liga", f"Średnia w tej lidze {_l(x['liga'])}, "
+                                  f"w przeciętnej {_l(ref['liga'])}")
         # pokrycie linii – mieszane z modelem, wpływ = p z pokryciem / p bez
         if pu.get("p_bez_pokrycia") and pu.get("p"):
             m = round(float(pu["p"]) / float(pu["p_bez_pokrycia"]), 3)

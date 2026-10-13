@@ -59,6 +59,8 @@ type TypS = {
   kurs_teraz_bukmacher?: string;
   kursy_bukmacherow?: CenyBukmacherow;
   uzasadnienie?: { czynniki?: Czynnik[] };
+  /** opis z rozkładu λ modelu uczonego (pipeline `opis_uczony`, od 11.10) – pierwszeństwo przed starym */
+  uzasadnienie_uczony?: { czynniki?: Czynnik[] };
 };
 type Forma = { ostatnie: number[]; rywale?: string[]; minuty?: number[]; ts?: number[]; kadra?: boolean[] };
 
@@ -112,7 +114,9 @@ export function przygotujStrony() {
       podmiotTyp: druzynowy ? "druzyna" : "zawodnik",
       podmiotId: druzynowy ? undefined : t.podmiot_id,
       mecz: `${m.gospodarz} – ${m.gosc}`,
-      powody: (t.uzasadnienie?.czynniki ?? []).map((c) => powodPoLudzku(c, t.rynek)).filter((x): x is NonNullable<typeof x> => x !== null),
+      // właściciel 14.10: opisy z modelu, który liczy szansę; stary silnik tylko tam,
+      // gdzie nowego opisu nie ma (sumy meczowe, „kto więcej”)
+      powody: (t.uzasadnienie_uczony?.czynniki ?? t.uzasadnienie?.czynniki ?? []).map((c) => powodPoLudzku(c, t.rynek)).filter((x): x is NonNullable<typeof x> => x !== null),
       polka: polkaNaStronie(t.polka, t.p_model),
       ts: t.kickoff_ts,
       meczId: t.mecz_id,

@@ -653,6 +653,10 @@ def skladniki_druzyny(wagi_rynku: dict, cechy: dict) -> dict:
         "mn": mn,
         "x": {k: (round(float(cechy[k]), 2) if cechy.get(k) is not None else None)
               for k in ("w6", "w12", "w_dom", "opp12", "liga", "dom")},
+        # odniesienie czynnika (mediana z treningu) – opis porównuje z nim,
+        # bo kierunek `mn` jest liczony względem niego, nie względem linii
+        "ref": {k: round(float(sch["med"][k]), 2)
+                for k in ("w6", "w12", "w_dom", "opp12", "liga") if k in sch["med"]},
         "styl": [[_STYL_PL.get(k, k), round(math.exp(v), 3)] for k, v in styl[:2]
                  if abs(v) >= 0.02],
     }
@@ -676,6 +680,8 @@ def skladniki_zawodnika(wagi_rynku: dict, cechy: dict,
         "x": {"t3": cechy.get("t3"), "t6": cechy.get("t6"), "t12": cechy.get("t12"),
               "min": round(minuty, 0), "liga": cechy.get("liga"),
               "rywal": cechy.get("rywal"), "dom": cechy.get("dom")},
+        "ref": {k: round(float(sch["med"][k]), 2)
+                for k in ("t3", "t6", "t12") if k in sch["med"]},
     }
 
 

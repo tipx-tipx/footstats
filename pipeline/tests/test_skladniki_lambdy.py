@@ -37,6 +37,8 @@ def test_czynniki_druzyny_skladaja_sie_w_lambde():
     assert _lam_z_rozkladu(WAGI_DRUZYNY, CECHY_DRUZYNY, skl) * math.exp(0.5 * b_dom) == pytest.approx(lam, rel=0.01)
     assert skl["mn"]["forma"] > 1.0          # 5,5 / 5,0 przy medianie ~4
     assert skl["x"]["w6"] == 5.5 and skl["x"]["dom"] == 1
+    # odniesienie kierunku (mediana z treningu) – opis porównuje z nim liczbę
+    assert skl["ref"] == {"w6": 4.0, "w12": 4.2, "w_dom": 4.1, "opp12": 4.3, "liga": 4.2}
     assert skl["styl"][0][0] == "dośrodkowania"
 
 
@@ -60,3 +62,4 @@ def test_czynniki_zawodnika_z_minutami():
     assert skl["mn"]["forma"] > 1.0 and skl["mn"]["rywal"] > 1.0
     assert skl["mn"]["minuty"] < 1.0          # 85 minut to mniej niż pełny mecz
     assert skl["x"]["min"] == 85
+    assert skl["ref"] == {"t3": 1.5, "t6": 1.5, "t12": 1.5}
