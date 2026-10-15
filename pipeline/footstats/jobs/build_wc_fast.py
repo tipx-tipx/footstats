@@ -10562,6 +10562,9 @@ def _main_impl(tryb=None):
             "kickoff_ts": w["kickoff_ts"],
             "podmiot_id": w.get("podmiot_id") or 0,
             "podmiot": w["podmiot"],
+            # drużyna zawodnika — do stempla „gra u siebie" przy przebiegu
+            # meczu (`rozliczanie._gospodarz_typu`); w księdze nie ląduje
+            "druzyna": w.get("druzyna") or "",
             "rynek_kod": h["rynek_kod"],
             "rynek": h.get("rynek") or h["rynek_kod"],
             "linia": h["linia"], "strona": "powyzej",
@@ -10628,6 +10631,9 @@ def _main_impl(tryb=None):
             "kickoff_ts": w["kickoff_ts"],
             "podmiot_id": w.get("podmiot_id") or 0,
             "podmiot": w["podmiot"],
+            # drużyna zawodnika — do stempla „gra u siebie" przy przebiegu
+            # meczu (`rozliczanie._gospodarz_typu`); w księdze nie ląduje
+            "druzyna": w.get("druzyna") or "",
             "rynek_kod": h["rynek_kod"],
             "rynek": h.get("rynek") or h["rynek_kod"],
             "linia": h["drugi_linia"], "strona": "powyzej",
@@ -10675,6 +10681,9 @@ def _main_impl(tryb=None):
             "kickoff_ts": w["kickoff_ts"],
             "podmiot_id": w.get("podmiot_id") or 0,
             "podmiot": w["podmiot"],
+            # drużyna zawodnika — do stempla „gra u siebie" przy przebiegu
+            # meczu (`rozliczanie._gospodarz_typu`); w księdze nie ląduje
+            "druzyna": w.get("druzyna") or "",
             "rynek_kod": h["rynek_kod"],
             "rynek": h.get("rynek") or h["rynek_kod"],
             "linia": zd["linia"], "strona": "powyzej",
@@ -10698,6 +10707,19 @@ def _main_impl(tryb=None):
     # powie, czy próg 0,5 zarabia, czy tylko obcina kandydatów.
     for p in pomiar_drabinek:
         drabinki_typy.append(_rekord_pomiaru_drabinki(p))
+
+    # PRZEBIEG MECZU Z KURSÓW 1X2 DO KSIĘGI (2026-10-15) — tempo liczone wyżej
+    # (`tempo_cache`, radar) dotąd ginęło po cyklu; od dziś zostaje przy
+    # każdym typie jako pomiar (patrz `rozliczanie._stempel_tempa`). Strony
+    # nie zmienia.
+    try:
+        _tempo_ksiegi = {m: t for m, t in tempo_cache.items() if t}
+        rozliczanie.ustaw_tempo_cyklu(_tempo_ksiegi)
+        print(f"Przebieg meczu (1X2) do księgi: {len(_tempo_ksiegi)} meczów "
+              f"z kursami 1X2 z {len(tempo_cache)} sprawdzonych")
+    except Exception as e:                                      # noqa: BLE001
+        rozliczanie.ustaw_tempo_cyklu({})
+        diagnostyka.cichy("cykl", "tempo_do_ksiegi", e)
 
     # ile z opublikowanych kart oddało swój drugi szczebel do pomiaru. Karta
     # bez drugiego szczebla nie ma prawa powstać (brama z 08.08), więc liczba

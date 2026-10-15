@@ -1308,6 +1308,9 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
                         rec[f] = True
                 if b.get("xi_sygnal") is not None:
                     rec["xi_sygnal"] = b["xi_sygnal"]  # najświeższy przed meczem
+                # przebieg meczu z 1X2 — też najświeższy przed meczem
+                # (patrz `_stempel_tempa`)
+                rec.update(_stempel_tempa(b))
                 # typ pomiarowy (odrzucony przy progu), który PÓŹNIEJ przeszedł
                 # progi i został opublikowany — przestaje być pomiarowy (wraca
                 # do kalibracji/skuteczności); w drugą stronę NIGDY nie
@@ -1435,6 +1438,8 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
             **({"zrodlo_p": b["zrodlo_p"]} if b.get("zrodlo_p") else {}),
             **({"p_stary": round(float(b["p_stary"]), 4)}
                if isinstance(b.get("p_stary"), (int, float)) else {}),
+            # PRZEBIEG MECZU Z KURSÓW 1X2 (2026-10-15) — patrz `_stempel_tempa`
+            **_stempel_tempa(b),
             # WKŁAD KAŻDEJ ZALEŻNOŚCI, ZAMROŻONY PRZY PUBLIKACJI (2026-08-07).
             #
             # Do dziś księga zapisywała sam WYNIK rachunku (`p_model`), więc po
@@ -3023,6 +3028,75 @@ def ustaw_cienie_skladow(cienie: dict[str, float]) -> None:
     """Świeże `p` dla typów z meczów, gdzie skład jest już potwierdzony."""
     global _CIENIE_CYKLU
     _CIENIE_CYKLU = dict(cienie or {})
+
+
+# --- PRZEBIEG MECZU Z KURSÓW 1X2 PRZY TYPIE (2026-10-15) --------------------
+#
+# Model uczony nie wie, kto jest faworytem. Zmierzone 15.10 na księdze: typy
+# ataku „pod prąd" przebiegu meczu (strzały underdoga powyżej, faworyta
+# poniżej) model wycenia na 59%, a wchodzi 50% (n=6655); w pucharach 62% →
+# 47%. Jedyny ślad przebiegu w księdze to mnożnik starego silnika
+# `czynniki.scenariusz_meczu` — obcięty do 0,85–1,20 (w pucharach 44% typów
+# ataku stoi na obcięciu) i bez korekty fauli faworyta. Backtest na nim
+# poprawia kalibrację ataku, ale nie rozstrzyga trafności listy, a fauli
+# w ogóle nie widzi. Tempo z kursów 1X2/goli cykl liczy (`tempo_cache`)
+# i wyrzucało — od dziś zostaje przy KAŻDYM typie, surowe: różnica goli
+# gospodarz−gość, suma goli, szanse wygranej obu. Najświeższe przed meczem
+# (aktualizowane, dopóki typ czeka na wynik), bo kursy 1X2 żyją do gwizdka.
+# NIC nie zmienia w produkcie — to dane do pomiaru
+# [[puchary-i-scenariusz-meczu-15-10]].
+_TEMPO_CYKLU: dict[int, dict] = {}
+
+
+def ustaw_tempo_cyklu(tempo_by_mid: dict | None) -> None:
+    """Tempo meczów z TEGO cyklu (mecz_id -> wynik `tempo.tempo_from_match_odds`)."""
+    global _TEMPO_CYKLU
+    _TEMPO_CYKLU = {
+        int(k): v for k, v in (tempo_by_mid or {}).items()
+        if isinstance(v, dict) and v.get("spread") is not None
+    }
+
+
+def _gospodarz_typu(b: dict) -> bool | None:
+    """Czy drużyna typu gra u siebie — z nazwy meczu „Gospodarz – Gość".
+
+    Zawodnik niesie drużynę w `druzyna`, typ drużynowy — w `podmiot`.
+    None, gdy nie da się tego stwierdzić (suma meczowa, inna pisownia):
+    cisza znaczy „nie wiemy", nie zgadujemy.
+    """
+    mecz = str(b.get("mecz") or "")
+    if "–" not in mecz:
+        return None
+    dom, wyj = (s.strip() for s in mecz.split("–", 1))
+    druz = str(b.get("druzyna") or "").strip()
+    if (not druz or "–" in druz) and str(b.get("rynek_kod") or "").startswith("team_"):
+        druz = str(b.get("podmiot") or "").strip()
+    if druz and druz == dom:
+        return True
+    if druz and druz == wyj:
+        return False
+    return None
+
+
+def _stempel_tempa(b: dict) -> dict:
+    """`{"tempo": {...}, "gosp": bool}` dla rekordu księgi albo {}."""
+    try:
+        t = _TEMPO_CYKLU.get(int(b.get("mecz_id") or 0))
+    except (TypeError, ValueError):
+        return {}
+    if not t:
+        return {}
+    out = {"tempo": {
+        "s": round(float(t["spread"]), 3),
+        "t": round(float(t.get("total") or 0.0), 3),
+        **({"ph": round(float(t["p_home"]), 4)} if t.get("p_home") is not None else {}),
+        **({"pa": round(float(t["p_away"]), 4)} if t.get("p_away") is not None else {}),
+        "ts": int(time.time()),
+    }}
+    g = _gospodarz_typu(b)
+    if g is not None:
+        out["gosp"] = g
+    return out
 
 
 def raport_cieni(log: dict | None = None) -> dict:
