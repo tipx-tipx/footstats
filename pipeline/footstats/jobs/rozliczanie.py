@@ -27,6 +27,7 @@ from __future__ import annotations
 import contextlib
 import json
 import math
+import re
 import time
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
@@ -3076,6 +3077,104 @@ def _gospodarz_typu(b: dict) -> bool | None:
     if druz and druz == wyj:
         return False
     return None
+
+
+def sila_z_kursu(tempo: dict | None, gosp: bool | None) -> float | None:
+    """Siła drużyny wobec rywala z kursów 1X2 — w JEDNOSTCE cechy `sila`
+    modelu (różnica rankingu / 400, z przewagą domu, obcięta do ±1).
+
+    Wynik oczekiwany gospodarza E = P(wygrana) + ½·P(remis) przechodzi
+    w różnicę punktów tym samym wzorem, którym ranking (`sila_klubow`)
+    przewiduje wynik. Ranking jest skalibrowany do wyników (nachylenie
+    1,05, w pucharach 0,9 – pomiar 15.10), więc kurs i ranking mówią
+    w tej samej skali i model uczony na rankingu może wziąć liczbę z kursu.
+    """
+    if not tempo or gosp is None or tempo.get("ph") is None or tempo.get("pa") is None:
+        return None
+    ph, pa = float(tempo["ph"]), float(tempo["pa"])
+    e = min(max(ph + 0.5 * max(0.0, 1.0 - ph - pa), 0.01), 0.99)
+    s = math.log10(e / (1.0 - e))          # = różnica/400
+    s = max(-1.0, min(1.0, s))
+    return s if gosp else -s
+
+
+_EURO = re.compile(r"Mistrz|Europy|Konferencji|Champions League$|Europa League|Conference League", re.I)
+_ATAK_ZAW = ("shots", "sot", "headed_shots", "headed_sot", "shots_outside_box", "sot_outside_box")
+# zawodnicy: model nie ma kolumny siły – w pomiarze 15.10 (księga, test od
+# 12.09, n=4701) najlepiej działało obniżenie ataku TYLKO słabszej drużyny,
+# λ·exp(0,4·min(siła, 0)); silniejszej model nie zaniża (58% vs 61%)
+GAMMA_ZAW_SLABSZA = 0.4
+
+
+def raport_sily_z_kursu(log: dict, wagi: dict | None) -> dict:
+    """POMIAR W TLE (2026-10-15, właściciel: kurs 1X2 może wejść do modelu,
+    „z głową, upewnij się, że realnie rozwiązuje problem”).
+
+    Na rozliczonych typach ze stemplem `tempo` liczy drugą szansę: drużyny –
+    ta sama λ z siłą wziętą z kursu zamiast z rankingu (waga `sila` z wag
+    modelu), zawodnicy (atak) – λ obniżona przy słabszej drużynie. Ta sama
+    droga do szansy co produkcja (`uczony.wycena` + pokrycie u drużyn).
+    Nic nie publikuje — porównanie Brierem obu liczb rozstrzyga przełączenie.
+    """
+    from ..model import uczony
+    rynki = (wagi or {}).get("rynki") or {}
+    grupy: dict = defaultdict(lambda: {"n": 0, "traf": 0, "b0": 0.0, "b1": 0.0, "p0": 0.0, "p1": 0.0})
+    for r in log.values():
+        if r.get("wynik") not in ("wygrany", "przegrany"):
+            continue
+        pu = r.get("p_uczony") or {}
+        lam = pu.get("lam")
+        s_k = sila_z_kursu(r.get("tempo"), r.get("gosp"))
+        if not lam or s_k is None or r.get("linia") is None:
+            continue
+        kod, linia, strona = r.get("rynek_kod"), float(r["linia"]), r.get("strona")
+        wr = rynki.get(kod)
+        if wr and "sila" in (wr.get("cechy") or []):
+            s_e = ((pu.get("skl") or {}).get("x") or {}).get("sila")
+            if s_e is None:
+                continue
+            beta = float(wr["beta"][wr["cechy"].index("sila")])
+            sciag = pu.get("sciag")
+            lam1 = float(lam) * math.exp(beta * (s_k - float(s_e)))
+            w0 = uczony.wycena(float(lam), linia, strona, wr.get("r_nb"), sila=sciag)
+            w1 = uczony.wycena(lam1, linia, strona, wr.get("r_nb"), sila=sciag)
+            if not w0 or not w1:
+                continue
+            p0, p1 = w0["p"], w1["p"]
+            if pu.get("pokr") is not None:
+                p0 = 0.6 * p0 + 0.4 * float(pu["pokr"])
+                p1 = 0.6 * p1 + 0.4 * float(pu["pokr"])
+            strumien = "druzyny"
+        elif kod in _ATAK_ZAW:
+            sciag = pu.get("sciag") or 1.0
+            w0 = uczony.wycena(float(lam), linia, strona, pu.get("r_nb"), sila=sciag)
+            w1 = uczony.wycena(float(lam) * math.exp(GAMMA_ZAW_SLABSZA * min(s_k, 0.0)),
+                               linia, strona, pu.get("r_nb"), sila=sciag)
+            if not w0 or not w1:
+                continue
+            p0, p1 = w0["p"], w1["p"]
+            strumien = "zawodnicy_atak"
+        else:
+            continue
+        y = 1.0 if r["wynik"] == "wygrany" else 0.0
+        puchar = "puchary" if _EURO.search(str(r.get("liga") or "")) else "ligi"
+        for klucz in ((strumien, puchar), (strumien, "razem")):
+            g = grupy[klucz]
+            g["n"] += 1
+            g["traf"] += y
+            g["b0"] += (p0 - y) ** 2
+            g["b1"] += (p1 - y) ** 2
+            g["p0"] += p0
+            g["p1"] += p1
+    out = {}
+    for k, g in grupy.items():
+        n = g["n"]
+        out[f"{k[0]}/{k[1]}"] = {
+            "n": n, "weszlo": round(g["traf"] / n, 4),
+            "model": round(g["p0"] / n, 4), "z_kursu": round(g["p1"] / n, 4),
+            "brier_model": round(g["b0"] / n, 4), "brier_z_kursu": round(g["b1"] / n, 4),
+        }
+    return out
 
 
 def _stempel_tempa(b: dict) -> dict:
@@ -7273,6 +7372,16 @@ def rozlicz(
             print(f"Weryfikacja {_wer.__name__} pominięta ({e})")
     if supa.put_key_bezpiecznie("typy_log", log):
         _kopia_zapasowa_logu(log, now)
+    # SIŁA Z KURSU 1X2 – pomiar w tle (patrz `raport_sily_z_kursu`)
+    try:
+        from ..model import uczony as _ucz
+        _rs = raport_sily_z_kursu(log, supa.get_key(_ucz.KLUCZ_WAG) or {})
+        print("Siła z kursu 1X2 (pomiar w tle, nie na stronie): " + (" | ".join(
+            f"{k} n={v['n']} weszło {100*v['weszlo']:.1f}% model {100*v['model']:.1f}% "
+            f"z kursu {100*v['z_kursu']:.1f}% Brier {v['brier_model']:.4f}→{v['brier_z_kursu']:.4f}"
+            for k, v in sorted(_rs.items())) or "brak rozliczonych typów ze stemplem tempa"))
+    except Exception as e:                                      # noqa: BLE001
+        print(f"Siła z kursu 1X2: pomiar pominięty ({e})")
 
     # ---- historia kuponów ----
     # ten sam bezpiecznik co przy księdze typów: nieudany odczyt = pomijamy
