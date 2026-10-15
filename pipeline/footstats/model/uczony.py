@@ -51,6 +51,8 @@ from collections import defaultdict
 
 import numpy as np
 
+from . import sila_klubow
+
 WERSJA_MODELU_UCZONEGO = "2026-08-17-uczony-1"
 
 # ---------------------------------------------------------------------------
@@ -160,7 +162,24 @@ CECHY_LOG = ["w6", "w12", "w_dom", "opp12", "liga"] + [
     f"p_{p}" for p in POMOCNICZE
 ]
 # cechy wchodzące wprost (bez logarytmu)
-CECHY_LIN = ["dom", "trend", "brak_rywala"]
+CECHY_LIN = ["dom", "trend", "brak_rywala", "sila"]
+# ⚑ SIŁA KLUBU (2026-10-15, `sila_klubow`): różnica rankingu drużyny i rywala
+# z wyników (Elo z poziomem ligi), w jednostkach 400 pkt, z przewagą domu.
+# Model nie wiedział, kto jest faworytem — backtest na dwóch niezależnych
+# okresach (trening przed T0, test po), te same wiersze, model bez/z siłą:
+#     log-likelihood zdarzeń: lepszy na 5/6 i 6/6 rynków,
+#     Brier typów z księgi:  0,2292 → 0,2269 (n=6807), 0,2334 → 0,2318 (n=2123),
+#     lista top-K/dobę:       +0,7…+7,0 pp i +1,4…+4,6 pp trafności,
+#     wagi stabilne między okresami: gole +0,70, rożne +0,41, celne +0,41,
+#     strzały +0,30, kartki −0,18, faule −0,05 (silniejszy fauluje mniej).
+# W pucharach europejskich poprawy NIE widać (n=216 i 50) — tam czekamy na
+# przebieg meczu z 1X2 w księdze (`rozliczanie._stempel_tempa`).
+#
+# Wagi zapisane PRZED tą zmianą nie mają kolumny `sila` — `lin` przy wagach
+# mówi, z jakimi cechami liniowymi je wytrenowano, a brak pola znaczy listę
+# dawną. Bez tego pierwszy cykl po wdrożeniu (wagi jeszcze stare) dostałby
+# rozjazd schematu i model milczałby do najbliższego treningu.
+CECHY_LIN_DAWNE = ["dom", "trend", "brak_rywala"]
 
 # Ile meczów historii musi być, żeby wiersz w ogóle powstał. Poniżej tego
 # własna średnia jest szumem, a model nauczyłby się, że „mało historii"
@@ -212,7 +231,8 @@ def srednie_ligowe(serie: dict[str, list], min_n: int = 20) -> dict:
 
 
 def cechy_wiersza(kod: str, hist: list[dict], opp_hist: list[dict],
-                  dom: int, liga_sr: float | None) -> dict | None:
+                  dom: int, liga_sr: float | None,
+                  sila: float | None = None) -> dict | None:
     """Cechy dla jednego (mecz, drużyna, rynek) — WYŁĄCZNIE z przeszłości.
 
     `hist` to mecze naszej drużyny sprzed tego meczu, `opp_hist` — mecze rywala
@@ -241,6 +261,10 @@ def cechy_wiersza(kod: str, hist: list[dict], opp_hist: list[dict],
         # JEDNA flaga braku historii rywala zamiast dwóch skorelowanych —
         # patrz nota przy CECHY_LOG.
         "brak_rywala": 1.0 if opp12 is None else 0.0,
+        # siła klubu wobec rywala (`sila_klubow.roznica`); None = jednej
+        # z drużyn nie ma w rankingu — kolumna dostaje wtedy 0, czyli
+        # „równe siły”, nie zgadujemy
+        "sila": sila,
         "n_hist": len(hist),
         **{f"p_{p}": _sr([(h.get("s") or {}).get(p) for h in hist[-6:]])
            for p in POMOCNICZE},
@@ -285,6 +309,9 @@ def wiersze_treningowe(mag: dict, tylko_zakres: bool = True) -> dict[str, list[d
     serie = _serie(mag)
     zakres = _ligi_zakresu() if tylko_zakres else set()
     liga_sr = srednie_ligowe(serie)
+    # ranking z CAŁEGO magazynu (też spoza zakresu — puchary i sparingi
+    # niosą porównanie lig); wiersz dostaje siłę PRZED swoim meczem
+    przed = sila_klubow.licz(serie)["przed"]
     out: dict[str, list[dict]] = defaultdict(list)
     for tid, mecze in serie.items():
         for i, m in enumerate(mecze):
@@ -299,12 +326,18 @@ def wiersze_treningowe(mag: dict, tylko_zakres: bool = True) -> dict[str, list[d
             ]
             if zakres and m.get("l") not in zakres:
                 continue        # mecz spoza zakresu drużynowego — patrz wyżej
+            pr = przed.get(sila_klubow.klucz_meczu(m, tid))
+            sila = None
+            if pr is not None:
+                gosp, _, r_g, r_go = pr
+                sila = (sila_klubow.roznica(r_g, r_go, True) if str(tid) == gosp
+                        else sila_klubow.roznica(r_go, r_g, False))
             for kod, rynek in CELE.items():
                 y = _wartosc(m, kod)
                 if y is None:
                     continue
                 c = cechy_wiersza(kod, hist, opp_hist, dom,
-                                  liga_sr.get((m.get("l"), kod)))
+                                  liga_sr.get((m.get("l"), kod)), sila)
                 if c is None:
                     continue
                 out[rynek].append({**c, "y": float(y), "t": czas, "team": tid})
@@ -319,7 +352,8 @@ def przygotuj(mag: dict) -> dict:
     1400 razy na przebieg. Kontekst zamienia to na jedno przeliczenie.
     """
     serie = _serie(mag)
-    return {"serie": serie, "liga_sr": srednie_ligowe(serie)}
+    return {"serie": serie, "liga_sr": srednie_ligowe(serie),
+            "sila": sila_klubow.licz(serie)}
 
 
 def cechy_z_kontekstu(ctx: dict, team_id: int | str, rynek: str,
@@ -345,8 +379,11 @@ def cechy_z_kontekstu(ctx: dict, team_id: int | str, rynek: str,
     if len(hist) < MIN_HISTORII:
         return None
     opp_hist = [h for h in serie.get(str(opp_id), []) if int(h.get("t") or 0) < prog]
+    stan = ctx.get("sila") or {}
+    sila = sila_klubow.roznica(sila_klubow.sila_na(stan, team_id, do_ts),
+                               sila_klubow.sila_na(stan, opp_id, do_ts), int(dom))
     return cechy_wiersza(kod, hist, opp_hist, int(dom),
-                         (ctx.get("liga_sr") or {}).get((liga, kod)))
+                         (ctx.get("liga_sr") or {}).get((liga, kod)), sila)
 
 
 def cechy_na_mecz(mag: dict, team_id: int | str, rynek: str,
@@ -611,6 +648,8 @@ def _grupa_kolumny(nazwa: str) -> str:
         return "liga"
     if nazwa == "dom":
         return "dom"
+    if nazwa == "sila":
+        return "sila"
     if nazwa.startswith(("log_p_", "brak_p_")):
         return "styl"
     if nazwa in ("log_t3", "log_t6", "log_t12"):
@@ -637,7 +676,7 @@ def _rozklad(beta: list, nazwy: list, x: np.ndarray, ref: dict) -> dict:
 def skladniki_druzyny(wagi_rynku: dict, cechy: dict) -> dict:
     """Wpływ grup cech na λ drużyny + liczby, z których powstał (do opisu)."""
     sch = {"log": wagi_rynku.get("log") or [], "med": wagi_rynku.get("med") or {},
-           "flagi": wagi_rynku.get("flagi") or []}
+           "flagi": wagi_rynku.get("flagi") or [], "lin": wagi_rynku.get("lin")}
     x = macierz([cechy], sch)[0]
     nazwy = nazwy_cech(sch)
     # odniesienie: mediana z treningu, połowa drogi dom/wyjazd, trend 0
@@ -652,7 +691,7 @@ def skladniki_druzyny(wagi_rynku: dict, cechy: dict) -> dict:
     return {
         "mn": mn,
         "x": {k: (round(float(cechy[k]), 2) if cechy.get(k) is not None else None)
-              for k in ("w6", "w12", "w_dom", "opp12", "liga", "dom")},
+              for k in ("w6", "w12", "w_dom", "opp12", "liga", "dom", "sila")},
         # odniesienie czynnika (mediana z treningu) – opis porównuje z nim,
         # bo kierunek `mn` jest liczony względem niego, nie względem linii
         "ref": {k: round(float(sch["med"][k]), 2)
@@ -704,12 +743,17 @@ def schemat(wiersze: list[dict]) -> dict:
         med[c] = float(np.nanmedian(sur))
         if float(np.isnan(sur).mean()) > 0.02:
             flagi.append(c)
-    return {"log": uzyte, "med": med, "flagi": flagi}
+    return {"log": uzyte, "med": med, "flagi": flagi, "lin": list(CECHY_LIN)}
+
+
+def _lin(sch: dict) -> list[str]:
+    """Cechy liniowe schematu — wagi sprzed `lin` znają tylko listę dawną."""
+    return list(sch.get("lin") or CECHY_LIN_DAWNE)
 
 
 def nazwy_cech(sch: dict) -> list[str]:
     return (["const"] + [f"log_{c}" for c in sch["log"]]
-            + [f"brak_{c}" for c in sch["flagi"]] + list(CECHY_LIN))
+            + [f"brak_{c}" for c in sch["flagi"]] + _lin(sch))
 
 
 def macierz(wiersze: list[dict], sch: dict) -> np.ndarray:
@@ -724,7 +768,7 @@ def macierz(wiersze: list[dict], sch: dict) -> np.ndarray:
     for c in sch["flagi"]:
         kolumny.append(np.array([1.0 if w.get(c) is None else 0.0
                                  for w in wiersze]))
-    for c in CECHY_LIN:
+    for c in _lin(sch):
         kolumny.append(np.array([float(w.get(c) or 0) for w in wiersze]))
     return np.column_stack(kolumny)
 
@@ -804,6 +848,7 @@ def trenuj_rynek(wiersze: list[dict], ridge: float = RIDGE) -> dict | None:
         "cechy": nazwy_cech(sch),
         "log": sch["log"], "med": {k: round(v, 4) for k, v in sch["med"].items()},
         "flagi": sch["flagi"],
+        "lin": _lin(sch),
         "n": len(wiersze),
         "sr_y": round(float(y.mean()), 4),
         "naddyspersja": round(naddyspersja(y, mu), 4),
@@ -845,7 +890,8 @@ def lam(wagi_rynku: dict, cechy: dict) -> float | None:
         return None
     sch = {"log": wagi_rynku.get("log") or [],
            "med": wagi_rynku.get("med") or {},
-           "flagi": wagi_rynku.get("flagi") or []}
+           "flagi": wagi_rynku.get("flagi") or [],
+           "lin": wagi_rynku.get("lin")}
     X = macierz([cechy], sch)
     beta = np.array(wagi_rynku.get("beta") or [], dtype=float)
     if X.shape[1] != beta.shape[0]:

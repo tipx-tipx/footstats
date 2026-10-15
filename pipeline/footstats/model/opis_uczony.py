@@ -118,6 +118,19 @@ def czynniki(b: dict) -> list[dict]:
                                         f"przeciętna drużyna {_l(ref[k])}")
                 break
         gdzie_gra()
+        # siła klubu z wyników (15.10) – bez przewagi domu, bo ta ma własny
+        # wiersz „Gdzie gra”; zdanie tylko, gdy różnica jest wyraźna
+        # (≥ 40 pkt rankingu) i przewaga domu nie odwraca jej znaku (czynnik
+        # liczy się z różnicą RAZEM z domem – inaczej zdanie mówiłoby
+        # „słabsza”, a czynnik działałby jak dla silniejszej)
+        if x.get("sila") is not None and x.get("dom") in (0, 1, 0.0, 1.0) and mn.get("sila"):
+            s_r = float(x["sila"]) - (0.15 if float(x["dom"]) else -0.15)
+            if abs(s_r) >= 0.1 and (s_r > 0) == (float(x["sila"]) > 0):
+                kto = b.get("przeciwnik")
+                wobec = f"od {kto}" if kto else "od rywala"
+                stopien = "wyraźnie " if abs(s_r) >= 0.25 else ""
+                dodaj("Siła drużyn", "sila",
+                      f"Według wyników {stopien}{'silniejsza' if s_r > 0 else 'słabsza'} {wobec}")
         if _zgodny(x.get("opp12"), ref.get("opp12"), mn.get("rywal")):
             dodaj("Rywal", "rywal", f"Przeciw {rywal} drużyny mają średnio {_l(x['opp12'])}, "
                                     f"przy przeciętnym rywalu {_l(ref['opp12'])}")

@@ -85,6 +85,14 @@ def _main() -> None:
         opis = ", ".join(f"{n} {b:+.2f}" for n, b in pary[:5] if n != "const")
         print(f"   {rynek:<16}{opis}")
 
+    # SIŁA KLUBU (2026-10-15, `model/sila_klubow.py`) — backtest dał stabilne
+    # wagi: gole ~+0,70, rożne/celne ~+0,41, strzały ~+0,30, kartki ~−0,18,
+    # faule ~−0,05. Inny znak albo rząd wielkości = sprawdzić ranking.
+    wagi_sily = {r: w["beta"][w["cechy"].index("sila")]
+                 for r, w in sorted(rynki.items()) if "sila" in w["cechy"]}
+    print("\nSiła klubu (waga w log λ): " + (", ".join(
+        f"{r} {b:+.3f}" for r, b in wagi_sily.items()) or "⚑ BRAK kolumny"))
+
     if pokaz:
         print("\n--pokaz: wagi NIE zostały zapisane")
         return
