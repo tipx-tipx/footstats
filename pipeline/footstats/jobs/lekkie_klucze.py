@@ -261,3 +261,78 @@ def klucze_zawodnikow(players: list, kursy_dwa: dict, value_bets: list,
     out = {f"zaw_k{i:02d}": k for i, k in enumerate(koszyki)}
     out["zaw_indeks"] = indeks
     return out
+
+
+# ⚑ LINIE DNIA (15.10) – zakładka Mecze › „Najlepsze linie”: linie ze
+# WSZYSTKICH meczów naraz, z pokryciem i najlepszą ceną (właściciel: „żeby dało
+# się znaleźć jak najszybciej najlepsze kursy z najlepszymi pokryciami”).
+# Strona nie może liczyć tego sama – kursy + forma wszystkich meczów to ~29 MB
+# w 96 koszykach. Tu zostaje tylko to, co da się pokazać: cena ≥ 1,30 (niżej
+# nie ma czego szukać – właściciel: „bez sensu, żebyśmy 1,05 mieli”) i
+# pokrycie ≥ 70% w oknie 10 albo 5 meczów. Pomiar 15.10: ~650 linii, ~100 KB.
+PROG_KURSU_LINII = 1.30
+PROG_POKRYCIA_LINII = 0.7
+# okno 10: co najmniej 7 rozegranych; okno 5: co najmniej 4 – inaczej
+# „5/5 przy pięciu meczach bez gry” udaje pewniaka (właściciel 15.10 przyjął
+# 80% / od 1,40 / min. 7: pomiar 10–58 linii na dzień przy 13–54 meczach)
+MIN_ZAGRANYCH = {10: 7, 5: 4}
+
+
+def _pokrycie(ostatnie: list, minuty: list, linia: float, okno: int) -> float:
+    zagrane = [v for v, m in zip(ostatnie[:okno], minuty[:okno]) if (m or 0) > 0]
+    if len(zagrane) < MIN_ZAGRANYCH[okno]:
+        return 0.0
+    return sum(1 for v in zagrane if (_f(v) or 0) > linia) / len(zagrane)
+
+
+def klucz_linii_dnia(players: list, kursy_dwa: dict, mecze: list,
+                     teraz: float) -> dict:
+    """`linie_dnia` = {"zaw": {id: [nazwa, pozycja, drużyna, xi]},
+    "forma": {"id|rynek": [ostatnie10, minuty10]},
+    "linie": [[mecz, zawodnik, rynek, linia, superbet, betclic(, 1)]]}.
+
+    Tylko mecze, które się jeszcze nie zaczęły. Trzeci element pary
+    `kursy_dwa` (Betclic liczy statystykę inaczej) przechodzi jako siódmy
+    element linii, a cena Betclica nie bierze udziału w progu – ta sama
+    zasada co na stronie meczu. Kolejność, progi okna i wybór jednej linii na
+    zawodnika robi strona (filtry gracza)."""
+    przyszle = {int(m["id"]) for m in mecze or []
+                if m.get("id") is not None and (m.get("kickoff_ts") or 0) > teraz}
+    gracze = {int(z["id"]): z for z in players or [] if z.get("id") is not None}
+    zaw: dict = {}
+    forma: dict = {}
+    linie: list = []
+    for mid, g in (kursy_dwa or {}).items():
+        if int(mid) not in przyszle:
+            continue
+        for pid, rynki in (g or {}).items():
+            z = gracze.get(int(pid))
+            if not z:
+                continue
+            for mk, ceny in (rynki or {}).items():
+                f = (z.get("forma") or {}).get(mk) or {}
+                ost = list(f.get("ostatnie") or [])[:OKNO_ZAWODNIKA]
+                mins = list(f.get("minuty") or [90] * len(ost))[:OKNO_ZAWODNIKA]
+                if not ost:
+                    continue
+                for l, para in (ceny or {}).items():
+                    linia = _f(l)
+                    if linia is None or not para:
+                        continue
+                    sb = _f(para[0])
+                    bc = _f(para[1]) if len(para) > 1 else None
+                    inaczej = len(para) > 2 and bool(para[2])
+                    najlepszy = max([c for c in (sb, None if inaczej else bc) if c] or [0])
+                    if najlepszy < PROG_KURSU_LINII:
+                        continue
+                    if max(_pokrycie(ost, mins, linia, 10),
+                           _pokrycie(ost, mins, linia, 5)) < PROG_POKRYCIA_LINII:
+                        continue
+                    wpis = [int(mid), int(pid), mk, linia, sb, None if inaczej else bc]
+                    if inaczej:
+                        wpis.append(1)
+                    linie.append(wpis)
+                    zaw[str(pid)] = [z.get("nazwa"), z.get("pozycja"),
+                                     z.get("druzyna"), bool(z.get("xi"))]
+                    forma[f"{pid}|{mk}"] = [ost, mins]
+    return {"zaw": zaw, "forma": forma, "linie": linie}

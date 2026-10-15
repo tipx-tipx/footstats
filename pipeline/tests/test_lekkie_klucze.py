@@ -77,3 +77,39 @@ def test_zawodnicy_tylko_z_kursem_albo_typem_i_okno_10():
     # typ drużynowy nie robi z drużyny zawodnika; bez kursu i typu – brak strony
     assert {z["id"] for z in out["zaw_indeks"]} == {101, 165}
     assert {"id": 165, "n": "Piotr", "d": "B", "m": 9} in out["zaw_indeks"]
+
+
+def _zaw(pid, ost, mins=None, xi=False):
+    return {"id": pid, "nazwa": f"Z{pid}", "pozycja": "F", "druzyna": "A", "xi": xi,
+            "forma": {"shots": {"ostatnie": ost, "minuty": mins or [90] * len(ost)}}}
+
+
+def test_linie_dnia_tylko_przyszle_mecze_cena_i_pokrycie():
+    players = [_zaw(1, [3, 2, 2, 3, 2, 4, 2, 2, 3, 2]),       # 10/10 powyżej 1,5
+               _zaw(2, [0, 1, 0, 2, 0, 1, 0, 0, 1, 0])]       # słabe pokrycie
+    kursy = {7: {1: {"shots": {"0.5": [1.05, 1.08], "1.5": [1.40, 1.62], "2.5": [2.6, None]}},
+                 2: {"shots": {"0.5": [1.9, 2.0]}}},
+             8: {1: {"shots": {"1.5": [1.5, 1.5]}}}}
+    mecze = [{"id": 7, "kickoff_ts": 2000}, {"id": 8, "kickoff_ts": 500}]
+    k = L.klucz_linii_dnia(players, kursy, mecze, teraz=1000)
+    # mecz 8 już trwa; 0,5 za tanio (1,08 < 1,30); 2,5: 3/10 – odpada; Z2 słaby
+    assert k["linie"] == [[7, 1, "shots", 1.5, 1.4, 1.62]]
+    assert k["zaw"] == {"1": ["Z1", "F", "A", False]}
+    assert k["forma"]["1|shots"][0][:3] == [3, 2, 2]
+
+
+def test_linie_dnia_nie_zagral_i_betclic_inaczej():
+    # 4 rozegrane z 10 (reszta bez minut) – za mało w oknie 10, ale 4/4 w oknie 5
+    players = [_zaw(1, [2, 3, 0, 0, 0, 0, 0, 2, 2, 0],
+                    [90, 80, 0, 0, 0, 0, 0, 90, 90, 0])]
+    kursy = {7: {1: {"shots": {"1.5": [1.2, 1.9, 1]}}}}
+    k = L.klucz_linii_dnia(players, kursy, [{"id": 7, "kickoff_ts": 2000}], teraz=1000)
+    # Betclic liczy inaczej: jego 1,90 nie podnosi linii ponad próg ceny
+    assert k["linie"] == []
+    kursy = {7: {1: {"shots": {"1.5": [1.35, 1.9, 1]}}}}
+    k = L.klucz_linii_dnia(players, kursy, [{"id": 7, "kickoff_ts": 2000}], teraz=1000)
+    # tylko 2 rozegrane w oknie 5 – za mało; w oknie 10: 4 rozegrane – też za mało
+    assert k["linie"] == []
+    players = [_zaw(1, [2, 3, 2, 3, 0, 2], [90, 80, 70, 90, 0, 90])]
+    k = L.klucz_linii_dnia(players, kursy, [{"id": 7, "kickoff_ts": 2000}], teraz=1000)
+    assert k["linie"] == [[7, 1, "shots", 1.5, 1.35, None, 1]]

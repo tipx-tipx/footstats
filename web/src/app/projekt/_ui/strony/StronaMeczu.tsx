@@ -2,27 +2,45 @@
 
 import { Lnk } from "../linki";
 import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
-import { useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { fmtLinia } from "@/lib/format";
 
 import type { MeczStrony, ZawodnikMeczu } from "../../_dane/mecz";
 import type { DaneStron } from "../../_dane/strony";
+import { Ptaszek } from "../atomy/wspolne";
+import { IkonaKoszulka } from "../atomy2/filtry2";
 import { Logo } from "../atomy2/podstawowe";
 import { PrzewijanyRzad } from "../atomy2/PrzewijanyRzad";
-import { KartaA } from "../elementy/karta";
 import { Herb } from "../Herb";
-import { Pojedynek, stronyTypow } from "./StronaGlowna";
+import { silaPokrycia } from "../liniePomiar";
 
 /*
  * Etap 5.4 – strona meczu jako narzędzie (decyzja właściciela 01.10):
  * pokrycie WSZYSTKICH zawodników z ofertą, kursy Superbet i Betclic osobno,
  * okno 5/10 meczów. Żadnych propozycji – tylko znacznik „na liście”, gdy
- * zawodnik ma nasz typ. Typy drużynowe: tylko te, które już są na stronie.
+ * zawodnik ma nasz typ. Bez typów drużynowych (właściciel 15.10: w zakładce
+ * Mecze nic drużynowego – te są w Drużynach).
  */
 
 type Okno = 5 | 10;
 type Strona = "obie" | "gosp" | "gosc";
+type Sort = "pokrycie" | "kurs" | "srednia";
+
+const SORTY: [Sort, string][] = [
+  ["pokrycie", "Pokrycie"],
+  ["kurs", "Najwyższy kurs"],
+  ["srednia", "Średnia"],
+];
+const KURS_OD: [number, string][] = [
+  [0, "każdy"],
+  [1.3, "od 1,30"],
+  [1.5, "od 1,50"],
+  [2, "od 2,00"],
+];
+
+/** wyższa z dwóch cen; Betclic liczony inaczej się nie liczy (15.10: sort szedł tylko po Superbecie) */
+const najlepsza = (k: { sb: number | null; bc: number | null; bcInaczej?: boolean }) => Math.max(k.sb ?? 0, k.bcInaczej ? 0 : (k.bc ?? 0));
 
 const kursTxt = (k: number | null) => (k === null ? "–" : k.toFixed(2).replace(".", ","));
 const proc = (x: number) => `${Math.round(x * 100)}%`;
@@ -101,6 +119,84 @@ function Segment<T extends string | number>({
   );
 }
 
+/* menu z jednym wyborem – ten sam guzik i dymek co „Sortuj” na stronie głównej */
+export function MenuWyboru<T extends string | number>({
+  etykieta,
+  ikona,
+  opcje,
+  wartosc,
+  zmien,
+  aktywny,
+}: {
+  etykieta: string;
+  ikona: React.ReactNode;
+  opcje: [T, string][];
+  wartosc: T;
+  zmien: (v: T) => void;
+  aktywny?: boolean;
+}) {
+  const [otwarte, setOtwarte] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!otwarte) return;
+    const klik = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOtwarte(false);
+    };
+    const klaw = (e: KeyboardEvent) => e.key === "Escape" && setOtwarte(false);
+    document.addEventListener("mousedown", klik);
+    document.addEventListener("keydown", klaw);
+    return () => {
+      document.removeEventListener("mousedown", klik);
+      document.removeEventListener("keydown", klaw);
+    };
+  }, [otwarte]);
+  const nazwa = opcje.find(([v]) => v === wartosc)?.[1];
+  return (
+    <span ref={ref} className="mz-menu">
+      <button type="button" className="e-menu-guzik d-dotyk" aria-haspopup="menu" aria-expanded={otwarte} aria-label={`${etykieta}: ${nazwa}`} data-aktywny={aktywny ? "true" : undefined} onClick={() => setOtwarte((o) => !o)}>
+        {ikona}
+        <span className="e-etykieta-sortu">
+          <span className="mz-menu-co">{etykieta}:</span> {nazwa}
+        </span>
+      </button>
+      <AnimatePresence>
+        {otwarte && (
+          <motion.div className="d-menu" role="menu" initial={{ opacity: 0, y: -4, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -4, scale: 0.98 }} transition={{ duration: 0.14 }}>
+            {opcje.map(([v, e]) => (
+              <button
+                key={String(v)}
+                type="button"
+                role="menuitemradio"
+                aria-checked={v === wartosc}
+                onClick={() => {
+                  zmien(v);
+                  setOtwarte(false);
+                }}
+              >
+                {e}
+                {v === wartosc && <Ptaszek rozmiar={11} />}
+              </button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </span>
+  );
+}
+
+export const IkonaSortu = () => (
+  <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden>
+    <path d="M4 2.5v9M1.8 9.3 4 11.5l2.2-2.2M10 11.5v-9M7.8 4.7 10 2.5l2.2 2.2" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+/* kurs jak kafelek: ramka z liczbą */
+const IkonaKursu = () => (
+  <svg width="16" height="14" viewBox="0 0 16 14" aria-hidden>
+    <rect x="1" y="2" width="14" height="10" rx="2.5" fill="none" stroke="currentColor" strokeWidth="1.4" />
+    <path d="M5 9.5V7.2M8 9.5V5M11 9.5V6.2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+  </svg>
+);
+
 /* ---- komórki --------------------------------------------------------- */
 
 function MiniKratki({ p, linia }: { p: NonNullable<ReturnType<typeof pokrycie>>; linia: number }) {
@@ -115,7 +211,7 @@ function MiniKratki({ p, linia }: { p: NonNullable<ReturnType<typeof pokrycie>>;
   );
 }
 
-function Weszlo({ p }: { p: NonNullable<ReturnType<typeof pokrycie>> }) {
+export function Weszlo({ p }: { p: { weszlo: number; zagrane: number; nz: number; udzial: number } }) {
   return (
     <span className="mz-weszlo" data-poziom={poziom(p.udzial)}>
       <b>
@@ -126,7 +222,7 @@ function Weszlo({ p }: { p: NonNullable<ReturnType<typeof pokrycie>> }) {
   );
 }
 
-function Kurs({ k, bukmacher, lepszy, uwaga }: { k: number | null; bukmacher: string; lepszy: boolean; uwaga?: string }) {
+export function Kurs({ k, bukmacher, lepszy, uwaga }: { k: number | null; bukmacher: string; lepszy: boolean; uwaga?: string }) {
   return (
     <span className="mz-kurs" data-lepszy={lepszy || undefined} data-brak={k === null || undefined} title={uwaga} aria-label={uwaga ? `${bukmacher}: ${uwaga}` : undefined}>
       <Logo nazwa={bukmacher} wysokosc={10} />
@@ -160,24 +256,69 @@ function Kto({ z, m, rynek }: { z: ZawodnikMeczu; m: MeczStrony; rynek: string }
 
 /* ---- A · tabela z wyborem linii --------------------------------------- */
 
-function TabelaA({ m, rynek, okno, strona, telefon, l }: { m: MeczStrony; rynek: string; okno: Okno; strona: Strona; telefon: boolean; l: number }) {
+function TabelaA({
+  m,
+  rynek,
+  okno,
+  strona,
+  telefon,
+  l,
+  sort,
+  setSort,
+  kursOd,
+  tylkoXi,
+}: {
+  m: MeczStrony;
+  rynek: string;
+  okno: Okno;
+  strona: Strona;
+  telefon: boolean;
+  l: number;
+  sort: Sort;
+  setSort: (s: Sort) => void;
+  kursOd: number;
+  tylkoXi: boolean;
+}) {
   const r = m.rynki.find((x) => x.kod === rynek)!;
-  const [sort, setSort] = useState<"pokrycie" | "kurs">("pokrycie");
 
+  const wszystkie = useMemo(
+    () =>
+      m.zawodnicy
+        .filter((z) => z.rynki[rynek] && (strona === "obie" || z.strona === strona) && (!tylkoXi || z.xi))
+        .map((z) => ({ z, p: pokrycie(z, rynek, l, okno)!, k: z.kursy[rynek]?.[String(l)] ?? { sb: null, bc: null } })),
+    [m, rynek, l, okno, strona, tylkoXi],
+  );
   const wiersze = useMemo(() => {
-    const w = m.zawodnicy
-      .filter((z) => z.rynki[rynek] && (strona === "obie" || z.strona === strona))
-      .map((z) => ({ z, p: pokrycie(z, rynek, l, okno)!, k: z.kursy[rynek]?.[String(l)] ?? { sb: null, bc: null } }));
+    const w = kursOd ? wszystkie.filter((x) => najlepsza(x.k) >= kursOd) : [...wszystkie];
     w.sort((a, b) =>
       sort === "kurs"
-        ? (b.k.sb ?? 0) - (a.k.sb ?? 0)
-        : b.p.udzial - a.p.udzial || b.p.zagrane - a.p.zagrane || (a.k.sb ?? 99) - (b.k.sb ?? 99),
+        ? najlepsza(b.k) - najlepsza(a.k) || b.p.udzial - a.p.udzial
+        : sort === "srednia"
+          ? (b.p.srednia ?? -1) - (a.p.srednia ?? -1) || b.p.udzial - a.p.udzial
+          : // z kursem przed bez kursu, potem siła dowodu (7/7 nad 9/10, 2/2 przy ośmiu meczach bez gry nisko)
+            Number(najlepsza(b.k) > 0) - Number(najlepsza(a.k) > 0) || silaPokrycia(b.p) - silaPokrycia(a.p) || najlepsza(b.k) - najlepsza(a.k),
     );
     return w;
-  }, [m, rynek, l, okno, strona, sort]);
+  }, [wszystkie, kursOd, sort]);
+
+  if (!wiersze.length) {
+    return (
+      <div className="d-pusty">
+        <div className="p-n" style={{ fontSize: 17 }}>
+          Nikt nie ma tu kursu {KURS_OD.find(([k]) => k === kursOd)?.[1]}
+        </div>
+        <p>Spróbuj niższej linii albo niższego progu kursu.</p>
+      </div>
+    );
+  }
 
   return (
     <>
+      {kursOd > 0 && wiersze.length < wszystkie.length && (
+        <p className="mz-ukryci">
+          {wiersze.length} z {wszystkie.length} zawodników ma kurs {KURS_OD.find(([k]) => k === kursOd)?.[1]}
+        </p>
+      )}
       <div className="mz-tabela" role="table" aria-label={`Pokrycie: ${r.nazwa} powyżej ${fmtLinia(l)}`}>
         {!telefon && (
           <div className="mz-tr mz-th" role="row">
@@ -186,7 +327,9 @@ function TabelaA({ m, rynek, okno, strona, telefon, l }: { m: MeczStrony; rynek:
             <button type="button" role="columnheader" aria-sort={sort === "pokrycie" ? "descending" : "none"} onClick={() => setSort("pokrycie")}>
               Weszło {sort === "pokrycie" && "↓"}
             </button>
-            <span role="columnheader">Średnio</span>
+            <button type="button" role="columnheader" aria-sort={sort === "srednia" ? "descending" : "none"} onClick={() => setSort("srednia")}>
+              Średnio {sort === "srednia" && "↓"}
+            </button>
             <button type="button" role="columnheader" aria-sort={sort === "kurs" ? "descending" : "none"} onClick={() => setSort("kurs")}>
               Kursy {sort === "kurs" && "↓"}
             </button>
@@ -194,7 +337,7 @@ function TabelaA({ m, rynek, okno, strona, telefon, l }: { m: MeczStrony; rynek:
         )}
         <AnimatePresence initial={false}>
           {wiersze.map(({ z, p, k }) => {
-            const lepszySb = k.sb !== null && (k.bc === null || k.sb >= k.bc);
+            const lepszySb = k.sb !== null && (k.bc === null || k.bcInaczej || k.sb >= k.bc);
             return (
               <motion.div
                 key={z.id}
@@ -221,7 +364,7 @@ function TabelaA({ m, rynek, okno, strona, telefon, l }: { m: MeczStrony; rynek:
                 </span>
                 <span role="cell" className="mz-kursy">
                   <Kurs k={k.sb} bukmacher="Superbet" lepszy={lepszySb} />
-                  <Kurs k={k.bc} bukmacher="Betclic" lepszy={!lepszySb && k.bc !== null} uwaga={k.bcInaczej ? "Betclic liczy tę statystykę inaczej – ceny nie porównujemy" : undefined} />
+                  <Kurs k={k.bcInaczej ? null : k.bc} bukmacher="Betclic" lepszy={!lepszySb && k.bc !== null && !k.bcInaczej} uwaga={k.bcInaczej ? "Betclic liczy tę statystykę inaczej – ceny nie porównujemy" : undefined} />
                 </span>
               </motion.div>
             );
@@ -284,35 +427,22 @@ function SiatkaB({ m, rynek, okno, strona }: { m: MeczStrony; rynek: string; okn
 
 /* ---- strona ----------------------------------------------------------- */
 
-export function StronaMeczu({ wariant, m, dane, telefon }: { wariant: string; m: MeczStrony; dane: DaneStron; telefon: boolean }) {
-  const [rynek, setRynek] = useState(m.rynki[0]?.kod ?? "");
+export function StronaMeczu({ wariant, m, telefon, start }: { wariant: string; m: MeczStrony; dane: DaneStron; telefon: boolean; start?: { rynek?: string; linia?: string } }) {
+  // wejście z „Najlepszych linii”: od razu ten rynek i ta linia
+  const [rynek, setRynek] = useState(m.rynki.some((x) => x.kod === start?.rynek) ? start!.rynek! : (m.rynki[0]?.kod ?? ""));
+  const [sort, setSort] = useState<Sort>("pokrycie");
+  const [kursOd, setKursOd] = useState(0);
+  const [tylkoXi, setTylkoXi] = useState(false);
   const [okno, setOkno] = useState<Okno>(10);
   const [strona, setStrona] = useState<Strona>("obie");
   const idRynkow = useId();
   const r = m.rynki.find((x) => x.kod === rynek) ?? m.rynki[0];
-  const [linia, setLinia] = useState(0.5);
+  const [linia, setLinia] = useState(start?.linia && Number.isFinite(Number(start.linia)) ? Number(start.linia) : 0.5);
   const l = r?.linie.includes(linia) ? linia : r?.linie.includes(0.5) ? 0.5 : (r?.linie[0] ?? 0.5);
-  const druzynowe = dane.kartyStrony.filter((k) => k.meczId === m.id && k.podmiotTyp === "druzyna");
 
   return (
     <main className="st-strona mz">
       <GlowaMeczu m={m} />
-
-      {druzynowe.length > 0 && (
-        <section className="mz-sekcja" aria-labelledby="mz-druzynowe">
-          <h2 id="mz-druzynowe" className="st-h2 p-n">
-            Typy drużynowe z tego meczu
-          </h2>
-          <div className="f-grupa">
-            <Pojedynek k={druzynowe[0]} rynki={dane.pojedynki[m.id] ?? []} ile={druzynowe.length} strony={stronyTypow(dane.kartyStrony, m.id)} />
-          </div>
-          {druzynowe.map((k) => (
-            <div key={k.id} className="f-karta-wiersz" data-w-grupie="" data-koniec-grupy={k === druzynowe.at(-1) ? "" : undefined}>
-              <KartaA t={k} bezMeczu />
-            </div>
-          ))}
-        </section>
-      )}
 
       <section className="mz-sekcja" aria-labelledby="mz-pokrycie">
         <div className="st-h2-z-opisem">
@@ -357,13 +487,25 @@ export function StronaMeczu({ wariant, m, dane, telefon }: { wariant: string; m:
             />
           </div>
           {wariant !== "b" && r && (
-            <div className="mz-linie" role="group" aria-label="Linia">
-              <span>Linia</span>
-              {r.linie.map((x) => (
-                <button key={x} type="button" aria-pressed={x === l} onClick={() => setLinia(x)}>
-                  powyżej {fmtLinia(x)}
-                </button>
-              ))}
+            <div className="mz-linie-rzad">
+              <div className="mz-linie" role="group" aria-label="Linia">
+                <span>Linia</span>
+                {r.linie.map((x) => (
+                  <button key={x} type="button" aria-pressed={x === l} onClick={() => setLinia(x)}>
+                    powyżej {fmtLinia(x)}
+                  </button>
+                ))}
+              </div>
+              <div className="mz-menu-rzad">
+                {m.sklady && (
+                  <button type="button" className="e-przelacznik d-dotyk" aria-pressed={tylkoXi} onClick={() => setTylkoXi((x) => !x)} title="Tylko zawodnicy z ogłoszonego składu">
+                    <IkonaKoszulka />
+                    <span className="mz-menu-etykieta">W składzie</span>
+                  </button>
+                )}
+                <MenuWyboru etykieta="Kurs" ikona={<IkonaKursu />} opcje={KURS_OD} wartosc={kursOd} zmien={setKursOd} aktywny={kursOd > 0} />
+                <MenuWyboru etykieta="Sortuj" ikona={<IkonaSortu />} opcje={SORTY} wartosc={sort} zmien={setSort} />
+              </div>
             </div>
           )}
         </div>
@@ -372,7 +514,7 @@ export function StronaMeczu({ wariant, m, dane, telefon }: { wariant: string; m:
           (wariant === "b" ? (
             <SiatkaB key={r.kod} m={m} rynek={r.kod} okno={okno} strona={strona} />
           ) : (
-            <TabelaA key={r.kod} m={m} rynek={r.kod} okno={okno} strona={strona} telefon={telefon} l={l} />
+            <TabelaA key={r.kod} m={m} rynek={r.kod} okno={okno} strona={strona} telefon={telefon} l={l} sort={sort} setSort={setSort} kursOd={kursOd} tylkoXi={tylkoXi} />
           ))}
         <p className="mz-przypis">
           Pokazujemy zawodników, na których bukmacher daje kurs w tym rynku. Kratka z kreską = nie zagrał (nie liczy się do wyniku).

@@ -15,6 +15,7 @@ import "../../zawodnik.css";
 
 import type { LegPool } from "@/lib/types";
 
+import type { DaneLinii } from "../../_dane/linie";
 import type { MeczStrony } from "../../_dane/mecz";
 import type { DaneKontroli } from "../../_dane/kontrola";
 import type { DruzynaV } from "../../_dane/przygotuj";
@@ -75,19 +76,24 @@ export function StronaAplikacji({
   kupony,
   wyniki,
   zawodnik,
+  linie,
+  startMeczu,
 }: {
   strona: RodzajStrony;
   dane: DaneStron;
   teraz: number;
   telefon: boolean;
-  /** strona meczu: mecz z pełnymi kadrami */
+  /** strona meczu: mecz z pełnymi kadrami; `startMeczu` – rynek i linia z adresu (wejście z „Najlepszych linii”) */
   mecz?: MeczStrony;
+  startMeczu?: { rynek?: string; linia?: string };
   /** strona Kupony: pula typów, herby, kupon z linku (`?k=`) */
   kupony?: { pula: LegPool[]; herby: Record<string, DruzynaV>; k?: string; historia?: HistoriaKuponowDane | null };
   /** Wyniki: dane klienta; `kontrola` TYLKO dla admina (rola sprawdzona na serwerze) */
   wyniki?: { skutecznosc: DaneSkutecznosci; kontrola?: DaneKontroli; start?: { widok?: string; dzien?: string } };
   /** strona zawodnika */
   zawodnik?: ZawodnikStrony;
+  /** Mecze › „Najlepsze linie” i zapowiedź „N mocnych linii” w wierszu meczu */
+  linie?: { dane: DaneLinii | null; mocne: Record<number, number>; widok?: string };
 }) {
   const telefon = useTelefon(telefonStart);
   const czas = useTykajacyCzas(teraz);
@@ -96,7 +102,7 @@ export function StronaAplikacji({
     strona === "druzyny" ? (
       <StronaDruzyny wariant="ab" dane={dane} telefon={telefon} />
     ) : strona === "mecze" ? (
-      <StronaMecze dane={dane} telefon={telefon} otworz={(id) => router.push(`/mecze/${id}`)} />
+      <StronaMecze dane={dane} telefon={telefon} linie={linie} otworz={(id, gdzie) => router.push(`/mecze/${id}${gdzie ? `?rynek=${gdzie.rynek}&linia=${gdzie.linia}` : ""}`)} />
     ) : strona === "zawodnik" && zawodnik ? (
       <StronaZawodnika z={zawodnik} telefon={telefon} />
     ) : strona === "jak" ? (
@@ -113,7 +119,7 @@ export function StronaAplikacji({
         {kupony.historia && <HistoriaKuponow dane={kupony.historia} />}
       </div>
     ) : strona === "mecz" && mecz ? (
-      <StronaMeczu wariant="a" m={mecz} dane={dane} telefon={telefon} />
+      <StronaMeczu wariant="a" m={mecz} dane={dane} telefon={telefon} start={startMeczu} />
     ) : (
       <StronaGlowna wariant="c" dane={dane} telefon={telefon} />
     );

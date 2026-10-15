@@ -46,6 +46,8 @@ export type Surowe = {
   oferta: Record<string, { zawodnicy: number; rynki: number; linie: number }>;
   /** pełne kadry + kursy na zawodników dla stron meczów (w aplikacji: tylko oglądany mecz) */
   pokrycia: { mecze: unknown[] };
+  /** linie ze wszystkich meczów (Mecze › „Najlepsze linie”) – tylko na liście meczów, `null` = brak klucza */
+  linie: unknown | null;
   /** kuchnia dla admina (Wyniki › Kontrola): typy_wyniki + meta.uczenie_stan + calibration – NIGDY do klienta */
   admin: unknown;
   /** herby i barwy drużyn (Sofascore) – do pipeline: id/kolory/kody */
@@ -70,6 +72,7 @@ export const MIGAWKA: Surowe = {
   wyniki: wynikiRaw,
   oferta: ofertaRaw as Surowe["oferta"],
   pokrycia: pokryciaRaw as unknown as Surowe["pokrycia"],
+  linie: null,
   admin: adminRaw,
   druzyny: druzynyRaw as Record<string, unknown>,
   ligi: ligiRaw as Record<string, unknown>,

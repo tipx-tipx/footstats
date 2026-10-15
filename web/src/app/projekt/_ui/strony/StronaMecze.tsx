@@ -1,15 +1,18 @@
 "use client";
 
 import { useTeraz } from "../czas";
-import { useMemo, useState } from "react";
+import { LayoutGroup, motion } from "framer-motion";
+import { useId, useMemo, useState } from "react";
 
 import type { MeczE } from "../../_dane/elementy";
+import type { DaneLinii } from "../../_dane/linie";
 import { dzienTs } from "../../_dane/formatCzasu";
 import type { DzienV } from "../../_dane/przygotuj";
 import type { DaneStron } from "../../_dane/strony";
 import { DniD } from "../atomy2/podstawowe";
 import { GlowaLigi, WierszA } from "../elementy/mecz";
 import { FlagaLigi } from "../Herb";
+import { NajlepszeLinie, odmLinia } from "./NajlepszeLinie";
 
 /*
  * Etap 5.3 – lista meczów jako wejście do narzędzia pokryć (decyzja 01.10):
@@ -23,11 +26,21 @@ import { FlagaLigi } from "../Herb";
 
 const zKursami = (dane: DaneStron, id: number) => (dane.infoMeczow[id]?.zawodnicy ?? 0) > 0;
 
-const odmTyp = (n: number) => (n === 1 ? "typ" : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? "typy" : "typów");
 const odmZaw = (n: number) => (n === 1 ? "zawodnik" : "zawodników");
+const odmMocne = (n: number) => {
+  const l = odmLinia(n);
+  return l === "linia" ? "mocna linia" : l === "linie" ? "mocne linie" : "mocnych linii";
+};
 const odmRynek = (n: number) => (n === 1 ? "rynek" : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? "rynki" : "rynków");
 
-type Uklad = { dane: DaneStron; telefon: boolean; otworz?: (id: number) => void };
+type Uklad = {
+  dane: DaneStron;
+  telefon: boolean;
+  /** `gdzie` – z „Najlepszych linii”: strona meczu otwiera się na tym rynku i linii */
+  otworz?: (id: number, gdzie?: { rynek: string; linia: number }) => void;
+  /** Najlepsze linie (15.10); bez nich lista meczów jak dotąd */
+  linie?: { dane: DaneLinii | null; mocne: Record<number, number>; widok?: string };
+};
 
 function useMecze(dane: DaneStron) {
   const TERAZ = useTeraz();
@@ -56,7 +69,7 @@ function useMecze(dane: DaneStron) {
     setDzien(k);
     setLiga("");
   };
-  return { dni, dzien, zmienDzien, liga: aktywnaLiga, setLiga, ligi, widoczne, wszystkieDnia: zDnia.length };
+  return { dni, dzien, zmienDzien, liga: aktywnaLiga, setLiga, ligi, widoczne, zDnia, wszystkieDnia: zDnia.length };
 }
 
 /* chipy rozgrywek z flagą – lżejsze niż dni, żeby nie udawały drugiego kalendarza */
@@ -81,10 +94,10 @@ function ChipyLig({ ligi, liga, setLiga, wszystkie }: { ligi: [string, MeczE[]][
   );
 }
 
-/* prawa kolumna wiersza: co jest w środku meczu */
-function CoWSrodku({ info }: { info: DaneStron["infoMeczow"][number] | undefined }) {
+/* prawa kolumna wiersza: co jest w środku meczu – tylko zawodnicy (właściciel
+   15.10: w zakładce Mecze nic drużynowego, więc bez „N typów na liście”) */
+function CoWSrodku({ info, mocne = 0 }: { info: DaneStron["infoMeczow"][number] | undefined; mocne?: number }) {
   const z = info?.zawodnicy ?? 0;
-  const t = info?.typy ?? 0;
   return (
     <div className="el-typy-meczu sm-co">
       {z > 0 ? (
@@ -97,9 +110,9 @@ function CoWSrodku({ info }: { info: DaneStron["infoMeczow"][number] | undefined
           bez kursów<span className="sm-co-dl"> na zawodników</span>
         </b>
       )}
-      {t > 0 ? (
-        <span className="sm-co-typy">
-          {t} {odmTyp(t)} na liście
+      {mocne > 0 ? (
+        <span className="sm-co-mocne" title="Pokrycie od 80% w ostatnich 10 meczach i kurs od 1,40">
+          {mocne} {odmMocne(mocne)}
         </span>
       ) : (
         z > 0 && (
@@ -112,8 +125,21 @@ function CoWSrodku({ info }: { info: DaneStron["infoMeczow"][number] | undefined
   );
 }
 
-export function StronaMecze({ dane, otworz }: Uklad & { wariant?: string }) {
+type Widok = "mecze" | "linie";
+
+export function StronaMecze({ dane, otworz, telefon, linie }: Uklad & { wariant?: string }) {
   const s = useMecze(dane);
+  const [widok, setWidok] = useState<Widok>(linie?.widok === "linie" ? "linie" : "mecze");
+  const idWidoku = useId();
+  const zmienWidok = (w: Widok) => {
+    setWidok(w);
+    // powrót ze strony meczu wraca do tego samego widoku
+    const u = new URL(window.location.href);
+    if (w === "linie") u.searchParams.set("widok", "linie");
+    else u.searchParams.delete("widok");
+    window.history.replaceState(window.history.state, "", u);
+  };
+  const mocneDnia = linie ? s.zDnia.reduce((a, m) => a + (linie.mocne[m.id] ?? 0), 0) : 0;
   const grupy = useMemo(() => {
     const w = new Map<string, MeczE[]>();
     for (const m of s.widoczne) w.set(m.liga, [...(w.get(m.liga) ?? []), m]);
@@ -129,9 +155,35 @@ export function StronaMecze({ dane, otworz }: Uklad & { wariant?: string }) {
         </p>
       </div>
       <div className="sm-filtry">
-        <DniD dni={s.dni} wybrany={s.dzien} zmien={s.zmienDzien} />
-        <ChipyLig ligi={s.ligi} liga={s.liga} setLiga={s.setLiga} wszystkie={s.wszystkieDnia} />
+        {linie ? (
+          <div className="f-rzad-polek">
+            <DniD dni={s.dni} wybrany={s.dzien} zmien={s.zmienDzien} />
+            <LayoutGroup id={idWidoku}>
+              <div className="a-karty-zakladek sm-widoki" role="tablist" aria-label="Widok" data-kompakt="">
+                {(
+                  [
+                    ["mecze", "Mecze", s.wszystkieDnia],
+                    ["linie", "Najlepsze linie", mocneDnia],
+                  ] as [Widok, string, number][]
+                ).map(([k, nazwa, n]) => (
+                  <button key={k} type="button" role="tab" className="a-karta-zakladki" aria-selected={widok === k} onClick={() => zmienWidok(k)}>
+                    {widok === k && <motion.span layoutId="sm-kreska-widoku" className="a-podkreslenie" transition={{ type: "spring", stiffness: 500, damping: 38 }} />}
+                    <b>
+                      {nazwa} <span>{n}</span>
+                    </b>
+                  </button>
+                ))}
+              </div>
+            </LayoutGroup>
+          </div>
+        ) : (
+          <DniD dni={s.dni} wybrany={s.dzien} zmien={s.zmienDzien} />
+        )}
+        {widok === "mecze" && <ChipyLig ligi={s.ligi} liga={s.liga} setLiga={s.setLiga} wszystkie={s.wszystkieDnia} />}
       </div>
+      {widok === "linie" && linie ? (
+        <NajlepszeLinie key={s.dzien} dane={linie.dane} mecze={s.zDnia} telefon={telefon} otworz={otworz} />
+      ) : (
       <div className="sm-lista">
         {!grupy.length && (
           <div className="d-pusty">
@@ -146,12 +198,13 @@ export function StronaMecze({ dane, otworz }: Uklad & { wariant?: string }) {
             <GlowaLigi mecze={lista} />
             {lista.map((m) => (
               <div key={m.id} className="sm-wiersz">
-                <WierszA m={m} wybierz={otworz ? () => otworz(m.id) : undefined} prawa={<CoWSrodku info={dane.infoMeczow[m.id]} />} />
+                <WierszA m={m} wybierz={otworz ? () => otworz(m.id) : undefined} prawa={<CoWSrodku info={dane.infoMeczow[m.id]} mocne={linie?.mocne[m.id]} />} />
               </div>
             ))}
           </section>
         ))}
       </div>
+      )}
     </main>
   );
 }

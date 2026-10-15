@@ -1045,3 +1045,100 @@
 .sk-szczebel[data-wynik="wygrany"] i { color: var(--ok); }
 .sk-szczebel[data-wynik="przegrany"] i { color: var(--nie); }
 .sk-szczebel[data-polecany] { background: none; box-shadow: inset 0 0 0 1.5px var(--akcja); }
+
+
+/* ---- Mecze › Najlepsze linie (15.10) -------------------------------------
+   Rodzeństwo tabeli strony meczu: te same kratki, „Weszło” i kafelki kursów,
+   plus kolumna linii (rynek + próg). Wiersz = wejście w mecz na tej linii. */
+.sm-widoki .a-karta-zakladki b span { color: var(--t3); font-weight: 500; font-variant-numeric: tabular-nums; }
+.sm-co .sm-co-mocne { color: var(--t2); font-weight: 500; font-size: 12.5px; }
+.nl { gap: 12px; }
+.nl-opis { margin: 0; font-size: 13px; color: var(--t2); text-wrap: pretty; }
+.nl-progi { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; font-size: 12.5px; color: var(--t3); }
+.nl-progi b { color: var(--t1); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.nl-progi .e-wyczysc { margin-left: auto; }
+.nl .d-panel[data-tryb="dymek"] { top: 44px; right: 0; left: auto; width: 390px; }
+.nl-panel-uwaga { font-size: 12px; color: var(--t3); margin: 0; }
+/* pasek: szukaj i przełączniki z lewej, sortuj i progi z prawej – jak na stronie meczu */
+.nl-pasek .e-lewa { flex: 1; }
+.nl-pasek .mz-menu .e-menu-guzik { height: 32px; }
+.nl-progi-guzik { position: relative; }
+.nl-progi-guzik .e-menu-guzik[data-aktywny] .e-etykieta-sortu { color: var(--t1); }
+/* licznik w przełączniku: ile linii zostanie po włączeniu */
+.nl-ile { color: var(--t3); font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.e-przelacznik[aria-pressed="true"] .nl-ile { color: inherit; }
+.nl-progi-tel { display: none; }
+
+.mz-tr.nl-tr {
+  grid-template-columns: minmax(150px, 1fr) minmax(170px, 1fr) 268px 64px 200px;
+  grid-template-areas: none;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+.mz-tr.nl-tr.mz-th { cursor: default; }
+.mz-tr.nl-tr:not(.mz-th):hover { background: var(--pow2); }
+.mz-tr.nl-tr:focus-visible { outline: 2px solid var(--akcja); outline-offset: -2px; }
+/* tabela meczu chowa 4. kolumnę (Średnio) na węższym ekranie – tu to „Weszło” */
+.mz-tr.nl-tr > :nth-child(4) { display: block; }
+.nl-linia { display: grid; min-width: 0; }
+.nl-linia b { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nl-linia small { font-size: 12px; color: var(--t3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nl-kratki { min-width: 0; overflow: hidden; }
+.nl-prog { color: var(--t2); font-weight: 500; }
+.nl-bez-herbu { flex: none; width: 18px; height: 18px; border-radius: 50%; background: var(--pow3); }
+
+/* węższy ekran: kratki w drugim rzędzie wiersza */
+@container (max-width: 1000px) {
+  .mz-tr.nl-tr.mz-th { display: none; }
+  .mz-tr.nl-tr {
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) 64px 180px;
+    grid-template-areas: "kto linia weszlo kursy" "kratki kratki kratki kursy";
+    row-gap: 8px;
+  }
+  .mz-tr.nl-tr > :nth-child(1) { grid-area: kto; }
+  .mz-tr.nl-tr > :nth-child(2) { grid-area: linia; }
+  .mz-tr.nl-tr > :nth-child(3) { grid-area: kratki; }
+  .mz-tr.nl-tr > :nth-child(4) { grid-area: weszlo; }
+  .mz-tr.nl-tr > :nth-child(5) { grid-area: kursy; align-self: center; }
+}
+
+/* telefon: zawodnik i wynik, linia, kratki, kursy */
+@container (max-width: 560px) {
+  .mz-tr.nl-tr {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "kto weszlo" "linia linia" "kratki kratki" "kursy kursy";
+    gap: 6px 10px;
+    padding: 11px 12px 12px;
+  }
+  .mz-tr.nl-tr > :nth-child(4) { text-align: right; }
+  .nl-linia { display: flex; align-items: baseline; gap: 8px; }
+  .nl-linia small::before { content: "· "; }
+  /* arkusz przypięty do ekranu – lista jest długa, dół ramki bywa daleko pod ekranem */
+  .nl .d-panel-tlo { position: fixed; z-index: 70; border-radius: 0; }
+  .nl .d-panel[data-tryb="arkusz"] { position: fixed; z-index: 71; top: auto; bottom: 0; max-height: 82vh; }
+  .sm-widoki[data-kompakt] { grid-template-columns: 1fr 1fr; }
+  .nl-progi .e-wyczysc { margin-left: 0; }
+  .nl-progi-tel { display: inline; }
+}
+
+
+/* ---- strona meczu: kurs od / sortuj / w składzie (15.10) ----------------
+   Menu siedzą na końcu rzędu linii – przyklejony pasek nie rośnie o rząd. */
+.mz-linie-rzad { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.mz-linie-rzad .mz-linie { flex: 1; min-width: 0; }
+.mz-menu-rzad { display: flex; align-items: center; gap: 6px; flex: none; }
+.mz-menu { position: relative; }
+.mz-menu .e-menu-guzik { height: 30px; }
+.mz-menu .mz-menu-co { color: var(--t3); }
+.mz-menu-rzad .e-przelacznik { height: 30px; }
+.mz-ukryci { margin: 0 0 8px; font-size: 12.5px; color: var(--t3); }
+/* lepsza z dwóch cen: ramka akcji i lekkie tło – widać ją bez czytania liczb */
+.mz-kurs[data-lepszy] { background: color-mix(in srgb, var(--akcja) 9%, var(--pow2)); }
+@container (max-width: 560px) {
+  .mz-linie-rzad { gap: 6px; }
+  .mz-menu-etykieta { display: none; }
+  .mz-menu-rzad .e-przelacznik { padding: 0 9px; }
+  /* aktywny próg kursu widać też na telefonie */
+  .mz-menu [data-aktywny] .e-etykieta-sortu { display: inline; }
+  .mz-menu [data-aktywny] .mz-menu-co { display: none; }
+}

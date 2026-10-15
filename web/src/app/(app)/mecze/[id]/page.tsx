@@ -22,8 +22,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
  * pokryć jak Statshub – wszyscy zawodnicy z kursem, linie, okno 10/5,
  * znacznik „na liście”. Kadry z koszyków jak na starej stronie (ten sam transfer).
  */
-export default async function MeczPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+export default async function MeczPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ rynek?: string; linia?: string }> }) {
+  const [{ id }, start] = await Promise.all([params, searchParams]);
   const meczId = Number(id);
   const [surowe, telefon] = await Promise.all([pobierzSurowe(), czyTelefon()]);
   const mecz = (surowe.mecze as { id: number; gospodarz: string; gosc: string }[]).find((m) => m.id === meczId);
@@ -39,5 +39,5 @@ export default async function MeczPage({ params }: { params: Promise<{ id: strin
   const [dane, mecze] = zDanymi(zKadrami, () => [przygotujStrony(), przygotujMecze()] as const);
   const m = mecze.find((x) => x.id === meczId);
   if (!m) notFound();
-  return <StronaAplikacji strona="mecz" dane={dane} mecz={m} teraz={surowe.teraz} telefon={telefon} />;
+  return <StronaAplikacji strona="mecz" dane={dane} mecz={m} teraz={surowe.teraz} telefon={telefon} startMeczu={{ rynek: start.rynek, linia: start.linia }} />;
 }

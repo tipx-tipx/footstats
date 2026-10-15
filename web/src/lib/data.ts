@@ -231,6 +231,16 @@ async function fetchKlucz<T>(
   fallback: T,
   oknoS: number = ODSWIEZANIE_S,
 ): Promise<T> {
+  // podgląd na localhoście: klucz policzony lokalnie, zanim wyśle go pipeline
+  // (`KLUCZE_LOKALNE=<katalog> npm run dev`, plik `<klucz>.json`); nigdy w produkcji
+  if (process.env.NODE_ENV === "development" && process.env.KLUCZE_LOKALNE) {
+    try {
+      const { readFile } = await import("node:fs/promises");
+      return JSON.parse(await readFile(`${process.env.KLUCZE_LOKALNE}/${key}.json`, "utf-8")) as T;
+    } catch {
+      // brak pliku – zwykła droga przez Supabase
+    }
+  }
   if (!SUPABASE_URL || !SUPABASE_ANON) return fallback;
   const cached = lazyCache.get(key);
   if (cached && Date.now() - cached.ts < oknoS * 1000) {
@@ -484,6 +494,24 @@ export async function getZawodnikLekki(id: number): Promise<ZawodnikLekki | unde
 /** Wszyscy zawodnicy z kursem albo typem – do wyszukiwarki (serwer, nie do przeglądarki w całości). */
 export async function getIndeksZawodnikow(): Promise<WpisIndeksuZawodnikow[] | null> {
   return fetchKlucz<WpisIndeksuZawodnikow[] | null>("zaw_indeks", null, ODSWIEZANIE_SKLADY_S);
+}
+
+/**
+ * Linie ze wszystkich meczów naraz (Mecze › „Najlepsze linie”, 15.10): cena
+ * ≥ 1,30 i pokrycie ≥ 70% – resztę filtruje strona. Liczone w pipeline
+ * (`lekkie_klucze.klucz_linii_dnia`), bo z koszyków byłoby ~29 MB.
+ */
+export type LinieDnia = {
+  /** id → [nazwa, pozycja, drużyna, w składzie] */
+  zaw: Record<string, [string, string, string, boolean]>;
+  /** "id|rynek" → [ostatnie 10, minuty 10], od najnowszego */
+  forma: Record<string, [number[], number[]]>;
+  /** [mecz, zawodnik, rynek, linia, Superbet, Betclic, (1 = Betclic liczy inaczej)] */
+  linie: [number, number, string, number, number | null, number | null, 1?][];
+};
+
+export async function getLinieDnia(): Promise<LinieDnia | null> {
+  return fetchKlucz<LinieDnia | null>("linie_dnia", null);
 }
 
 /** Forma drużyn z typami drużynowymi (karta typu na /druzyny). */

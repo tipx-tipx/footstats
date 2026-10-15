@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import time
 from pathlib import Path
 
 WEB_DATA_DIR = Path(__file__).resolve().parent.parent.parent.parent / "web" / "src" / "data" / "demo"
@@ -83,7 +84,8 @@ def klucze_pochodne_players(players: list, value_bets: list) -> dict:
 def klucze_lekkie(rows: list, generated: set | None) -> dict:
     """{klucz: payload} z `kursy_dwa.json` (+ `players`, `value_bets`,
     `matches` z tej samej wysyłki) – patrz `lekkie_klucze`."""
-    from .lekkie_klucze import klucze_kursow_meczow, klucze_zawodnikow
+    from .lekkie_klucze import (klucz_linii_dnia, klucze_kursow_meczow,
+                                klucze_zawodnikow)
 
     plik = WEB_DATA_DIR / "kursy_dwa.json"
     if not plik.exists() or (generated is not None and "kursy_dwa" not in generated):
@@ -100,6 +102,10 @@ def klucze_lekkie(rows: list, generated: set | None) -> dict:
         out.update(klucze_zawodnikow(payload["players"], kursy_dwa,
                                      payload.get("value_bets") or [],
                                      payload.get("matches") or []))
+        # zakładka Mecze › „Najlepsze linie” (15.10) – patrz klucz_linii_dnia
+        out["linie_dnia"] = klucz_linii_dnia(payload["players"], kursy_dwa,
+                                             payload.get("matches") or [],
+                                             time.time())
     return out
 
 

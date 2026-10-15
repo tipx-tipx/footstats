@@ -13,6 +13,7 @@ import {
   getKupony,
   getKursyMeczu,
   getLegiPool,
+  getLinieDnia,
   getMecze,
   getMeta,
   getRadar,
@@ -94,6 +95,8 @@ export async function pobierzSurowe(): Promise<Surowe> {
     oferta,
     // kadry tylko dla oglądanego meczu – dokłada je `zKadramiMeczu`
     pokrycia: { mecze: [] },
+    // linie ze wszystkich meczów tylko dla listy meczów – dokłada je `zLiniami`
+    linie: null,
     // kuchnia (Kontrola) tylko dla admina – dokłada ją `zKuchnia`, nigdy dla klienta
     admin: null,
     // herby i barwy: mapa z warsztatu (Sofascore) + numery z meczów (7B) –
@@ -102,6 +105,13 @@ export async function pobierzSurowe(): Promise<Surowe> {
     ligi: zNumerowLig(mecze),
     teraz: terazTs(),
   };
+}
+
+/** Lista meczów › „Najlepsze linie”: gotowy klucz z pipeline (~190 KB), nie koszyki (~29 MB). */
+export async function zLiniami(surowe: Surowe): Promise<Surowe> {
+  const linie = await getLinieDnia();
+  if (linie === null) console.error("[data] brak klucza linie_dnia");
+  return { ...surowe, linie };
 }
 
 /**
