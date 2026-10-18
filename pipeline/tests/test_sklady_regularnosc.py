@@ -246,7 +246,9 @@ def test_dzien_domkniety_doklada_zawodnika_z_ogloszonym_xi():
     stary = _zaw(1, podmiot="Stary", gral_w_ostatnim=True)
     xi = _zaw(2, podmiot="Nowy XI", xi_sygnal="official")
     przewid = _zaw(3, podmiot="Tylko przewidywany", xi_sygnal="predicted")
-    druzyna = {**_zaw(4, podmiot="Klub"), "podmiot_typ": "druzyna", "kurs": 1.3}
+    # drużyna z WYŻSZYCH KURSÓW — od 18.10 dochodzą tylko drużyny z wysokiej
+    # szansy (test_prog_jakosci_polki), wyższe kursy dalej czekają
+    druzyna = {**_zaw(4, podmiot="Klub"), "podmiot_typ": "druzyna", "kurs": 1.95}
     zamkniete = {"2026-09-14": {B._klucz_publikacji(stary)}}
     dolozone: dict = {}
     lista, zdjete, z_dnia = B.wybierz_liste_publikowana(

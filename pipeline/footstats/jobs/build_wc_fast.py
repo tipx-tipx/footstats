@@ -1381,6 +1381,35 @@ def polka_typu(b: dict, bijace_cene: frozenset | set | None = None
     return polka, False
 
 
+def tani_typ_druzyny(b: dict) -> bool:
+    """Czy to najtańszy typ drużynowy (uczony.TANIE_DRUZYNY_POLKI): kurs
+    1,20–1,25 i model nie jest wyraźnie przeciw (p ≥ 0,65). Taki typ omija
+    okno zgody i próg jakości — liczby przy stałej."""
+    pasmo = uczony.TANIE_DRUZYNY_POLKI
+    if not pasmo or b.get("podmiot_typ") != "druzyna":
+        return False
+    try:
+        kurs = float(b.get("kurs") or 0.0)
+        p = float(b.get("p_przed_sciagnieciem") or b.get("p_model") or 0.0)
+    except (TypeError, ValueError):
+        return False
+    return pasmo["kurs_min"] <= kurs < pasmo["kurs_max"] and p >= pasmo["p_min"]
+
+
+def tylko_tania_sciezka(b: dict) -> bool:
+    """Najtańszy typ drużynowy, który BEZ tej ścieżki nie przeszedłby progu
+    jakości (p < 0,80) — tylko takie liczą się do limitu „1 na mecz".
+    Typ nad progiem wchodził przed 18.10 i dalej wchodzi bez nowego limitu."""
+    if not tani_typ_druzyny(b):
+        return False
+    prog = uczony.PROG_JAKOSCI_POLKI.get("wysoka_szansa") or {}
+    try:
+        p = float(b.get("p_przed_sciagnieciem") or b.get("p_model") or 0.0)
+    except (TypeError, ValueError):
+        return True
+    return p < float(prog.get("p", 1.0))
+
+
 def ponizej_progu_jakosci(b: dict, polka: str | None,
                           bijace_cene: frozenset | set | None = None) -> bool:
     """Czy typ NIE przechodzi progu jakości swojej półki (uczony.PROG_JAKOSCI_POLKI).
@@ -1392,6 +1421,8 @@ def ponizej_progu_jakosci(b: dict, polka: str | None,
     """
     prog = uczony.PROG_JAKOSCI_POLKI.get(polka or "")
     if not prog:
+        return False
+    if polka == "wysoka_szansa" and tani_typ_druzyny(b):
         return False
     try:
         kurs = float(b.get("kurs") or 0.0)
@@ -1435,9 +1466,9 @@ def wybierz_liste_publikowana(
     """Które typy staną na stronie. Zwraca (lista, zdjęte, ile na dzień).
 
     `dolozone` (opcjonalny słownik wyjściowy) — {dzień: [klucze]} typów
-    zawodniczych DOŁOŻONYCH do domkniętej doby, bo dostały OGŁOSZONE XI
-    (patrz gałąź `dzien in zamkniete`); cykl dopisuje je do manifestu,
-    żeby Skuteczność je liczyła.
+    DOŁOŻONYCH do domkniętej doby: zawodniczych, które dostały OGŁOSZONE XI,
+    i drużynowych z wysokiej szansy (od 18.10; patrz gałąź `dzien in
+    zamkniete`); cykl dopisuje je do manifestu, żeby Skuteczność je liczyła.
 
     TRZY ZASADY:
 
@@ -1497,6 +1528,7 @@ def wybierz_liste_publikowana(
     z_dnia: dict = {}          # wszystkie typy doby — do logu i meta
     z_strumienia: dict = {}    # (doba, drużyna/zawodnik) — to jest limit
     z_zawodnika: dict = {}
+    z_tanich: dict = {}        # (doba, mecz) — uczony.TANIE_DRUZYNY_POLKI["na_mecz"]
     lista_pub: list[dict] = []
     zdjete: dict = {}
     # ⚑ WZNOWIONE IDĄ PIERWSZE — NAPRAWA PRZECIEKU LIMITÓW (2026-08-14).
@@ -1580,6 +1612,10 @@ def wybierz_liste_publikowana(
             klucze_zawodnika_listy(b, dzien)
             if b.get("podmiot_typ") == "zawodnik" else None
         )
+        # najtańszy typ drużynowy z nowej ścieżki — jeden na mecz
+        # (uczony.TANIE_DRUZYNY_POLKI)
+        tani = (dzien, b.get("mecz_id")) if tylko_tania_sciezka(b) else None
+        _tanich_limit = (uczony.TANIE_DRUZYNY_POLKI or {}).get("na_mecz", 1)
         _polka_klucz = (dzien, _str, _polka, _zejscie)
         _polka_limit = (
             uczony.ZEJSCIE_WYZSZYCH_KURSOW[_str]["limit_dobowy"] if _zejscie
@@ -1593,13 +1629,24 @@ def wybierz_liste_publikowana(
             # 1 na zawodnika). To jedyny wyjątek od zamrożenia i tylko
             # w górę: nic z ogłoszonej listy nie schodzi. Klucz idzie do
             # `dolozone`, a cykl dopisuje go do manifestu.
+            # ⚑ DRUŻYNY DOKŁADAJĄ NA WYSOKĄ SZANSĘ (2026-10-18, właściciel:
+            # „w porządku, tylko pamiętaj o limitach"). Typy drużynowe z progiem
+            # jakości, zdjęte zamrożeniem doby, trafiały 81,8% (n=55, 01–17.10,
+            # ~3/dobę), a półka stoi średnio na 4,5 z 12 miejsc. Wchodzą na tych
+            # samych limitach co reszta (doba, półka, mecz, rodzina, tani/mecz);
+            # mecz za 90 min odpada wcześniej (`za_pozno`).
             _k = _klucz_publikacji(b)
+            _dokladany = (
+                (_str == "zawodnik" and b.get("xi_sygnal") == "official")
+                or (_str == "druzyna" and _polka == "wysoka_szansa"
+                    and not _zejscie
+                    and z_rodziny.get(rodzina, 0) < LISTA_PER_RODZINA
+                    and (tani is None or z_tanich.get(tani, 0) < _tanich_limit)))
             if _k in zamkniete[dzien]:
                 lista_pub.append(b)
             elif juz_pokazany(b):
                 continue
-            elif (dolozone is not None and _str == "zawodnik"
-                    and b.get("xi_sygnal") == "official" and _polka
+            elif (dolozone is not None and _dokladany and _polka
                     and not ponizej_progu_jakosci(b, _polka, bijace_cene)
                     and z_strumienia.get(doba_str, 0) < LISTA_CAP
                     and z_polki.get(_polka_klucz, 0) < _polka_limit
@@ -1615,6 +1662,9 @@ def wybierz_liste_publikowana(
             z_strumienia[doba_str] = z_strumienia.get(doba_str, 0) + 1
             z_polki[_polka_klucz] = z_polki.get(_polka_klucz, 0) + 1
             z_meczu[mecz] = z_meczu.get(mecz, 0) + 1
+            z_rodziny[rodzina] = z_rodziny.get(rodzina, 0) + 1
+            if tani is not None:
+                z_tanich[tani] = z_tanich.get(tani, 0) + 1
             for _kz in zawodnik or ():
                 z_zawodnika[_kz] = z_zawodnika.get(_kz, 0) + 1
             continue
@@ -1648,7 +1698,9 @@ def wybierz_liste_publikowana(
                         else LISTA_PER_RODZINA)
                     or (zawodnik is not None
                         and _ile_zawodnika(z_zawodnika, zawodnik)
-                        >= LISTA_PER_ZAWODNIKA)):
+                        >= LISTA_PER_ZAWODNIKA)
+                    or (tani is not None
+                        and z_tanich.get(tani, 0) >= _tanich_limit)):
                 zdjete.setdefault(_klucz_publikacji(b), "poza_lista_dnia")
                 continue
         z_dnia[dzien] = z_dnia.get(dzien, 0) + 1
@@ -1656,6 +1708,8 @@ def wybierz_liste_publikowana(
         z_polki[_polka_klucz] = z_polki.get(_polka_klucz, 0) + 1
         z_meczu[mecz] = z_meczu.get(mecz, 0) + 1
         z_rodziny[rodzina] = z_rodziny.get(rodzina, 0) + 1
+        if tani is not None:
+            z_tanich[tani] = z_tanich.get(tani, 0) + 1
         for _kz in zawodnik or ():
             z_zawodnika[_kz] = z_zawodnika.get(_kz, 0) + 1
         lista_pub.append(b)
@@ -9740,11 +9794,13 @@ def _main_impl(tryb=None):
         # sumy meczowe i „kto więcej" (patrz `_kwarantanna_zdejmuje`)
         powod_poza = _kwarantanna_zdejmuje(b)
         if powod_poza is None:
-            if (not b.get("mocna_linia")
+            if (not b.get("mocna_linia") and not tani_typ_druzyny(b)
                     and not betting.w_oknie_zgody(b["p_model"], b["kurs"])):
                 # najostrzejsza brama, zmierzona na 336 rozliczeniach — patrz
                 # betting.OKNO_ZGODY_*. Typ dalej się liczy i uczy w tle.
-                # Mocna wyższa linia ma zamiast niej weto modelu (18.09).
+                # Mocna wyższa linia ma zamiast niej weto modelu (18.09),
+                # najtańszy typ drużynowy — weto p ≥ 0,65 (18.10, patrz
+                # uczony.TANIE_DRUZYNY_POLKI: tam kurs wie lepiej niż model).
                 powod_poza = "rozjazd_z_rynkiem"
             elif _kategoria_zdejmuje(b):
                 powod_poza = "kwarantanna_kategorii"
@@ -11195,8 +11251,13 @@ def _main_impl(tryb=None):
     print(f"Zejście „wyższych kursów” do 1,45 (drużyny 1,45–1,80, rynek bije cenę, "
           f"model ≥ kurs): {_zejscie_n} nowych typów na liście")
     if _dolozone_po_domknieciu:
-        print("Lista dnia — DOŁOŻONE po domknięciu (ogłoszone XI): " + ", ".join(
+        print("Lista dnia — DOŁOŻONE po domknięciu (zawodnicy z ogłoszonym XI, "
+              "drużyny z wysokiej szansy): " + ", ".join(
             f"{d} +{len(k)}" for d, k in sorted(_dolozone_po_domknieciu.items())))
+    _tanie_n = sum(1 for b in lista_pub if tylko_tania_sciezka(b)
+                   and not b.get("pokazany_wczesniej") and not b.get("wznowiony"))
+    print(f"Najtańsze typy drużynowe (1,20–1,25, model ≥ 0,65, 1 na mecz): "
+          f"{_tanie_n} nowych na liście")
     for _k, _powod in _zdjete_selekcja.items():
         zdjete_klucze.setdefault(_k, _powod)
     # ⚑ PÓŁKA NIGDY NIE DOJEŻDŻAŁA DO KSIĘGI (zmierzone 2026-09-21: 0 z 37 477

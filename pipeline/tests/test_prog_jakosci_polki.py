@@ -41,3 +41,74 @@ def test_lista_wpuszcza_tylko_typy_nad_progiem(monkeypatch):
     powody = set(zdjete.values())
     assert powody == {"ponizej_progu_jakosci"}
     assert "ponizej_progu_jakosci" in B.OPISY_ZDJECIA_PL
+
+
+# --- najtańsze typy drużynowe (2026-10-18, uczony.TANIE_DRUZYNY_POLKI) ---
+
+def test_tani_typ_druzyny_definicja():
+    assert B.tani_typ_druzyny({"podmiot_typ": "druzyna", "kurs": 1.22, "p_model": 0.70})
+    assert B.tani_typ_druzyny({"podmiot_typ": "druzyna", "kurs": 1.20, "p_model": 0.65})
+    assert not B.tani_typ_druzyny({"podmiot_typ": "druzyna", "kurs": 1.25, "p_model": 0.70})
+    assert not B.tani_typ_druzyny({"podmiot_typ": "druzyna", "kurs": 1.19, "p_model": 0.70})
+    assert not B.tani_typ_druzyny({"podmiot_typ": "druzyna", "kurs": 1.22, "p_model": 0.64})
+    assert not B.tani_typ_druzyny({"podmiot_typ": "zawodnik", "kurs": 1.22, "p_model": 0.70})
+    # szansa sprzed ściągnięcia do ceny, jak w progu jakości
+    assert B.tani_typ_druzyny({"podmiot_typ": "druzyna", "kurs": 1.22,
+                               "p_model": 0.60, "p_przed_sciagnieciem": 0.70})
+
+
+def test_tani_typ_druzyny_przechodzi_prog_jakosci():
+    b = {"podmiot_typ": "druzyna", "kurs": 1.22, "p_model": 0.70}
+    assert not B.ponizej_progu_jakosci(b, "wysoka_szansa")
+    # zawodnik w tym samym miejscu dalej podlega progowi
+    assert B.ponizej_progu_jakosci(dict(b, podmiot_typ="zawodnik"), "wysoka_szansa")
+
+
+def test_tanie_typy_jeden_na_mecz():
+    kand = [_typ(1, 0.72, 1.22), _typ(2, 0.71, 1.23, mecz_id=101, linia=3.5),
+            _typ(3, 0.70, 1.21, mecz_id=102)]
+    lista, zdjete, _ = B.wybierz_liste_publikowana(kand, B.szansa_z_ceną)
+    assert {b["id"] for b in lista} == {1, 3}       # mecz 101 tylko raz
+    assert set(zdjete.values()) == {"poza_lista_dnia"}
+
+
+def test_tani_nie_blokuje_zwyklego_typu_tego_meczu():
+    """Limit „1 na mecz" dotyczy tylko najtańszych — typ nad progiem z tego
+    samego meczu wchodzi normalnie."""
+    kand = [_typ(1, 0.72, 1.22), _typ(2, 0.86, 1.22, mecz_id=101, linia=2.5)]
+    lista, _zdjete, _ = B.wybierz_liste_publikowana(kand, B.szansa_z_ceną)
+    assert {b["id"] for b in lista} == {1, 2}
+
+
+# --- dokładanie drużyn po domknięciu doby (2026-10-18) ---
+
+def _zamknieta_doba(b):
+    return {B.dzien_listy(b["kickoff_ts"]): {"inny-klucz"}}
+
+
+def test_druzyna_z_wysokiej_szansy_dochodzi_po_domknieciu():
+    nowy = _typ(1, 0.86, 1.21)
+    dolozone = {}
+    lista, zdjete, _ = B.wybierz_liste_publikowana(
+        [nowy], B.szansa_z_ceną, zamkniete=_zamknieta_doba(nowy), dolozone=dolozone)
+    assert [b["id"] for b in lista] == [1]
+    assert lista[0]["dolozony_po_domknieciu"] is True
+    assert sum(len(v) for v in dolozone.values()) == 1
+
+
+def test_po_domknieciu_druzyna_ponizej_progu_i_wyzsze_kursy_nie_dochodza():
+    slaby = _typ(1, 0.74, 1.30)                 # nie przechodzi progu jakości
+    drogi = _typ(2, 0.56, 1.95)                 # wyższe kursy — bez dokładania
+    zamk = _zamknieta_doba(slaby)
+    lista, zdjete, _ = B.wybierz_liste_publikowana(
+        [slaby, drogi], B.szansa_z_ceną, zamkniete=zamk, dolozone={})
+    assert lista == []
+    assert set(zdjete.values()) == {"dzien_zamkniety"}
+
+
+def test_po_domknieciu_tani_tez_jeden_na_mecz():
+    a = _typ(1, 0.72, 1.22)
+    b = _typ(2, 0.71, 1.23, mecz_id=101, linia=3.5)
+    lista, _zdjete, _ = B.wybierz_liste_publikowana(
+        [a, b], B.szansa_z_ceną, zamkniete=_zamknieta_doba(a), dolozone={})
+    assert [x["id"] for x in lista] == [1]

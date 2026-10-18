@@ -1287,6 +1287,27 @@ PROG_JAKOSCI_POLKI = {"wysoka_szansa": {"p": 0.80, "cena": 0.75}}
 # Powrót jedną wartością: pusty słownik wyłącza ścieżkę.
 DRUGA_SCIEZKA_POLKI = {"wysoka_szansa": {"druzyna": {"kurs_min": 1.25, "kurs_max": 1.45}}}
 
+# ⚑⚑ NAJTAŃSZE TYPY DRUŻYNOWE (2026-10-18, właściciel: „ok", cel: jak
+# największa trafność i jak najwięcej takich typów). Drużyny po kursie
+# 1,20–1,25 trafiają ~80%, a nasz model daje im średnio ~72% — kurs ocenia
+# je trafniej niż my. Przez zaniżoną szansę wycinały je dwie bramy naraz:
+# okno zgody (p < ceny po marży → „rozjazd_z_rynkiem", ~32 typy/dobę)
+# i próg jakości wyżej (p ≥ 0,80). Na stronę trafiały ~2 z ~50 dziennie.
+#
+# Księga 14.09–17.10 (rozliczone, bez dubli), drużyny 1,19–1,25:
+#   okres                 p ≥ 0,65 trafia    n
+#   14–30.09              78,0%             404
+#   01–10.10              81,1%             244
+#   11–17.10              79,8%             549
+#   każdy rynek osobno    78–84% (rożne, gole, celne, strzały, kartki)
+#   szansa modelu < 0,65  72–75% (n=53) — stąd weto „model nie wyraźnie przeciw"
+# Symulacja półki z limitami (20.09–17.10, 26 dni, dziś stoi średnio 4,5
+# typu/dobę przy limicie 12, więc limit nie wiąże): +3,7 typu/dobę przy
+# 83,3%, półka 4,5 → 8,2/dobę, trafność 79,7% → 81,3%. Jeden taki typ na
+# mecz (`na_mecz`) — kilka linii tego samego meczu to jeden scenariusz.
+# Powrót jedną wartością: pusty słownik wyłącza ścieżkę.
+TANIE_DRUZYNY_POLKI = {"kurs_min": 1.20, "kurs_max": 1.25, "p_min": 0.65, "na_mecz": 1}
+
 # ⚑⚑ ZEJŚCIE PÓŁKI „WYŻSZE KURSY" DO 1,45 U DRUŻYN (2026-10-06, właściciel:
 # „naszym celem jest, żeby te kursy się pojawiały, czy to wysoka szansa, czy
 # wyższe kursy"). Typ drużynowy 1,45–1,80 nie miał żadnej półki (wysoka szansa
