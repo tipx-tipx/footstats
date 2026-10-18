@@ -9750,6 +9750,40 @@ def _main_impl(tryb=None):
             continue
         perelki_per_mecz[b["mecz_id"]] = perelki_per_mecz.get(b["mecz_id"], 0) + 1
         do_emisji.append(b)
+    # POMIAR (2026-10-18, właściciel: „ok, ale nie sądzę, że to problem"):
+    # kanały wyżej biorą jednego kandydata na (mecz, rynek) — bez podmiotu,
+    # więc drugi zawodnik (albo druga drużyna) z tym samym rynkiem w meczu
+    # odpada, zanim zobaczy jakąkolwiek bramę, i nie zostawia śladu w księdze.
+    # Tu tylko liczymy, ilu takich było i ilu z nich miałoby szansę na półkę
+    # wysokiej szansy (próg jakości albo najtańsza ścieżka drużyn).
+    try:
+        _w_emisji = {(b["mecz_id"], b["rynek_kod"], b.get("podmiot_id"))
+                     for b in do_emisji}
+        _poza_kanalem: dict[tuple, dict] = {}
+        for b in legi_pool:
+            _kp = (b["mecz_id"], b["rynek_kod"], b.get("podmiot_id"))
+            if _kp in _w_emisji:
+                continue
+            _w = _poza_kanalem.get(_kp)
+            if _w is None or b["p_model"] > _w["p_model"]:
+                _poza_kanalem[_kp] = b
+        _pk_licz: Counter = Counter()
+        _prog = uczony.PROG_JAKOSCI_POLKI.get("wysoka_szansa") or {}
+        for b in _poza_kanalem.values():
+            _s = "druzyny" if b.get("podmiot_typ") == "druzyna" else "zawodnicy"
+            _pk_licz[_s] += 1
+            if ((b["p_model"] >= _prog.get("p", 1.0)
+                 and betting.implied_prob_one_sided(b["kurs"]) >= _prog.get("cena", 1.0)
+                 and uczony.polka_dla(b["kurs"], b.get("podmiot_typ")) == "wysoka_szansa")
+                    or tani_typ_druzyny(b)):
+                _pk_licz[f"{_s}_na_wysoka"] += 1
+        print(f"Jeden kandydat na (mecz, rynek) — odpadli inni z tym samym rynkiem "
+              f"w meczu (pomiar, bez zmian w wyborze): zawodnicy "
+              f"{_pk_licz['zawodnicy']} (z progiem wysokiej szansy "
+              f"{_pk_licz['zawodnicy_na_wysoka']}), drużyny {_pk_licz['druzyny']} "
+              f"(z progiem {_pk_licz['druzyny_na_wysoka']})")
+    except Exception as e:      # pomiar nie ma prawa przewrócić cyklu
+        diagnostyka.cichy("cykl", "pomiar_jednego_na_rynek", e)
     # === JEDNA LINIA NA (mecz, rynek, podmiot, stronę) — 2026-08-01 ===
     #
     # Zgłoszenie usera: „czemu tu jest miliard typów?". Trzy kanały wyżej
