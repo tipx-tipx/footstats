@@ -101,6 +101,7 @@ def na_stronie(strumien: str) -> bool:
 
 def wybierz_szanse(
     strumien: str, p_stary: float, p_uczony: dict | None,
+    korekta: float | None = None,
 ) -> tuple[float, str]:
     """Która liczba idzie na stronę. Zwraca (p, źródło).
 
@@ -114,7 +115,69 @@ def wybierz_szanse(
         return float(p_stary), "stary"
     if not isinstance(p_uczony, dict) or p_uczony.get("p") is None:
         return float(p_stary), "stary_bez_pokrycia"
+    if korekta:
+        # KOREKTA RYNEK|STRONA (2026-10-18, patrz `korekty_rynku_strony`):
+        # `p` w słowniku ZOSTAJE SUROWE — z niego uczy się korekta (inaczej
+        # uczyłaby się na własnym efekcie, jak dawne warstwy); obok idą delta
+        # i liczba po korekcie, która idzie do selekcji i na kartę
+        p_kor = 1.0 / (1.0 + math.exp(-(_logit_p(float(p_uczony["p"])) + float(korekta))))
+        p_uczony["kor"] = round(float(korekta), 4)
+        p_uczony["p_kor"] = round(p_kor, 4)
+        return p_kor, "uczony"
     return float(p_uczony["p"]), "uczony"
+
+
+def _logit_p(p: float) -> float:
+    p = min(max(float(p), 1e-4), 1 - 1e-4)
+    return math.log(p / (1 - p))
+
+
+# ⚑ KOREKTA MODELU DRUŻYN PER RYNEK|STRONA (2026-10-18, właściciel: „ok
+# akcept”). Model idzie surowy (nota przy ZRODLO_SZANSY), a na kandydatach
+# 25.08–17.10 (16 918 rozliczeń) przecenia strony „poniżej”, stabilnie
+# w obu okresach: strzały −10 pp, celne −13, gole −8, rożne −6, sumy meczowe
+# „poniżej” −12…−14; „powyżej” prawie trafione. Przy surowej liczbie WYŻSZA
+# pewność dawała NIŻSZĄ trafność (próg 0,86 → 66,7%).
+# Walk-forward (uczenie na wszystkim wcześniejszym, test co tydzień
+# 15.09–17.10): Brier 0,2283 → 0,2251 (kontrola na losowych grupach 0,2262);
+# lista „wysoka szansa” drużyn 76,6% przy 5,0/d → 80,0% przy 3,4/d, a samo
+# podniesienie progu do tej liczby typów daje 74,5% (połowy 75,0/84,9 wobec
+# 70,2/78,4); siła ściągania 50–500 i okno 28 dni/całość: 77–80%.
+# Skrypty: scratchpad sesji 18.10 (kor_rynek*.py).
+# Uczy się co cykl z księgi, WYŁĄCZNIE z surowego `p_uczony.p`.
+KOREKTA_RS_SILA = 200          # n/(n+200) — mała grupa zostaje blisko zera
+KOREKTA_RS_OKNO_S = 60 * 86400
+KOREKTA_RS_MIN_N = 100
+KOREKTA_RS_RYNKI = ("team_", "match_")
+
+
+def korekty_rynku_strony(log: dict | None, teraz: int | None = None) -> dict[str, float]:
+    """{"rynek|strona": delta logitowa} z rozliczonych typów modelu uczonego."""
+    import time as _time
+    teraz = int(teraz or _time.time())
+    grupy: dict[str, list[tuple[float, int]]] = {}
+    for k, r in (log or {}).items():
+        if str(k).endswith(":drabinka") or r.get("wynik") not in ("wygrany", "przegrany"):
+            continue
+        rk, st = str(r.get("rynek_kod") or ""), r.get("strona")
+        if not rk.startswith(KOREKTA_RS_RYNKI) or st not in ("powyzej", "ponizej"):
+            continue
+        if teraz - int(r.get("kickoff_ts") or 0) > KOREKTA_RS_OKNO_S:
+            continue
+        pu = r.get("p_uczony") or {}
+        if not isinstance(pu, dict) or pu.get("p") is None:
+            continue
+        grupy.setdefault(f"{rk}|{st}", []).append(
+            (float(pu["p"]), 1 if r["wynik"] == "wygrany" else 0))
+    out: dict[str, float] = {}
+    for g, v in grupy.items():
+        n = len(v)
+        if n < KOREKTA_RS_MIN_N:
+            continue
+        y = sum(w for _, w in v) / n
+        p = sum(q for q, _ in v) / n
+        out[g] = round((_logit_p(y) - _logit_p(p)) * n / (n + KOREKTA_RS_SILA), 4)
+    return out
 
 
 def stempel_zrodla(p_stary: float, p_uczony: dict | None, zrodlo: str) -> dict:

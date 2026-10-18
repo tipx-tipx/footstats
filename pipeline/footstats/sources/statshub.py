@@ -22,6 +22,7 @@ OGRANICZENIA:
 
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass, field
 
 from curl_cffi import requests
@@ -730,6 +731,93 @@ def braki_druzyny(kadra: dict, niedostepni: dict[int, dict], ko: int,
         "lid": int(lider in pewni) if lider else 0,
         "lid_w": int(lider in watpliwi) if lider else 0,
     }
+
+
+# ⚑ KRYCIE RYWALA PRZY FAULACH (2026-10-18, właściciel: „ok akcept” — tylko
+# STEMPEL dla selektora). Pomiar na 10 709 kandydatach fouls_committed (fl_*.py
+# w scratchpadzie): faule wywalczane / dryblingi zawodników rywala po stronie,
+# którą kryje nasz zawodnik, dają 2–4 pp przy tym samym kursie, ale lista
+# z nimi nie trafia lepiej — do wyboru NIE wchodzą. Liczone 1:1 jak fl_cechy.py.
+_POZ_OGOLNE = {"D", "M", "F", "G", "GK", None, ""}
+_LUSTRO = {"L": "R", "R": "L", "C": "C"}
+
+
+def _strona_poz(p):
+    if p in _POZ_OGOLNE:
+        return None
+    return "L" if p[0] == "L" else ("R" if p[0] == "R" else "C")
+
+
+def _linia_poz(p):
+    if p in (None, ""):
+        return None
+    if p in ("G", "GK"):
+        return "G"
+    if "WB" in p:
+        return "WB"
+    if p == "D" or p.endswith("B"):
+        return "D"
+    if p == "M" or "M" in p:
+        return "M"
+    return "F"
+
+
+def _mecze_kadry(kadra: dict, tid: int, ko: int, n: int) -> list[int]:
+    es = []
+    for rec in (kadra or {}).get("events") or []:
+        ev = _pierwszy(rec.get("events"))
+        ts = int(ev.get("timeStartTimestamp") or 0)
+        if ev.get("id") and ts and ts < ko - 3 * 3600 and int(tid) in (
+                int(ev.get("homeTeamId") or 0), int(ev.get("awayTeamId") or 0)):
+            es.append((ts, int(ev["id"])))
+    return [e for _, e in sorted(es, reverse=True)[:n]]
+
+
+def krycie_rywala(kadra_nasza: dict, kadra_rywala: dict, nasza: int, rywal: int,
+                  pid: int, ko: int) -> dict | None:
+    """{"poz", "f90", "min", "zk", "a_mir", "d_mir", "a_tot", "d_tot", "a_of"}
+    albo None (za krótka historia zawodnika / rywala)."""
+    gracz = next((p for p in (kadra_nasza or {}).get("data") or []
+                  if int(p.get("id") or 0) == int(pid)), None)
+    if gracz is None:
+        return None
+    me = _mecze_kadry(kadra_nasza, nasza, ko, 10)
+    st = {int(k): v for k, v in (gracz.get("stats") or {}).items() if v}
+    hist = [st[e] for e in me if e in st and float(st[e].get("minutesPlayed") or 0) >= 15]
+    if len(hist) < 3:
+        return None
+    pozy = [h.get("position") for h in hist if h.get("position") not in _POZ_OGOLNE]
+    poz = (Counter(pozy).most_common(1)[0][0] if pozy
+           else (hist[0].get("position") or gracz.get("position")))
+    s_my = _strona_poz(poz)
+    minuty = sum(float(h.get("minutesPlayed") or 0) for h in hist)
+    prev = st.get(me[0]) if me else None
+    mo = _mecze_kadry(kadra_rywala, rywal, ko, 8)
+    if len(mo) < 4:
+        return None
+    a_tot, d_tot, a_mir, d_mir, a_of = [], [], [], [], []
+    for e in mo:
+        at = dt_ = am = dm = ao = 0.0
+        for q in (kadra_rywala or {}).get("data") or []:
+            sq_ = (q.get("stats") or {}).get(str(e)) or (q.get("stats") or {}).get(e)
+            if not sq_ or float(sq_.get("minutesPlayed") or 0) <= 0:
+                continue
+            wf, wc = float(sq_.get("wasFouled") or 0), float(sq_.get("wonContest") or 0)
+            at += wf
+            dt_ += wc
+            pq = sq_.get("position") if sq_.get("position") not in _POZ_OGOLNE else q.get("position")
+            if _linia_poz(pq) in ("F", "M", "WB"):
+                ao += wf
+                if s_my and _strona_poz(pq) == _LUSTRO[s_my]:
+                    am += wf
+                    dm += wc
+        a_tot.append(at); d_tot.append(dt_); a_mir.append(am); d_mir.append(dm); a_of.append(ao)
+    sr = lambda v: round(sum(v) / len(v), 2)
+    return {"poz": poz, "f90": round(90 * sum(float(h.get("fouls") or 0) for h in hist) / minuty, 2),
+            "min": round(minuty / len(hist), 1),
+            "zk": 1 if (prev and prev.get("yellowCard")) else 0,
+            "a_mir": sr(a_mir) if s_my else None, "d_mir": sr(d_mir) if s_my else None,
+            "a_tot": sr(a_tot), "d_tot": sr(d_tot), "a_of": sr(a_of)}
 
 
 def fetch_referee(referee_id: int) -> dict | None:

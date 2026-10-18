@@ -3409,7 +3409,8 @@ def dolacz_pelne_kadry(
             licz["niedostepni_watpliwi"] = licz.get("niedostepni_watpliwi", 0) + sum(
                 1 for i in nd.values() if not i.get("pewny"))
             if braki_out is not None:
-                braki_out[(int(e["id"]), int(tid))] = {"nd": nd, "braki": br}
+                # kadra jedzie dalej do stempla krycia przy faulach (bez nowych zapytań)
+                braki_out[(int(e["id"]), int(tid))] = {"nd": nd, "braki": br, "kadra": k}
     idx = {(t.event_id, t.player_id, t.market_code): t for t in trends}
     gracze: set = set()
     for e, sbp, bcp in mecze:
@@ -6032,6 +6033,21 @@ def _main_impl(tryb=None):
             rozliczanie.sklad_wersji_okna(_ksiega)))
     except Exception as e:
         diagnostyka.cichy("cykl", "sklad_wersji_okna", e)
+
+    # ⚑ KOREKTA MODELU DRUŻYN PER RYNEK|STRONA (2026-10-18, właściciel: „ok
+    # akcept”) — model uczony przecenia strony „poniżej”; delta uczona z
+    # surowego `p_uczony.p` w księdze (patrz `uczony.korekty_rynku_strony`),
+    # nakładana w `uczony.wybierz_szanse` dla drużyn i sum meczowych
+    korekta_rs: dict[str, float] = {}
+    with rozliczanie.warstwa_uczenia("korekta_rynku_strony") as _w:
+        korekta_rs = uczony.korekty_rynku_strony(_ksiega)
+        _w.opisz(n=len(korekta_rs),
+                 opis=(", ".join(f"{k} {v:+.2f}" for k, v in
+                                 sorted(korekta_rs.items(), key=lambda x: x[1])[:8])
+                       or "za mała próba — bez korekty"))
+    if korekta_rs:
+        print("Korekta modelu drużyn (rynek|strona, Δlogit): " + ", ".join(
+            f"{k} {v:+.2f}" for k, v in sorted(korekta_rs.items(), key=lambda x: x[1])))
 
     # ⚑ KOREKTA STRONY ZAKŁADU (2026-08-16) — jedyna warstwa nakładana na `p`
     # WYBRANEJ strony, a nie na `p_over`. Powód i liczby: nota przy
@@ -9150,7 +9166,9 @@ def _main_impl(tryb=None):
                         l_t, strona_t, ts,
                     )
                     _p_stary_t = p_t
-                    p_t, _zrodlo_t = uczony.wybierz_szanse("druzyny", p_t, _pu)
+                    p_t, _zrodlo_t = uczony.wybierz_szanse(
+                        "druzyny", p_t, _pu,
+                        korekta=korekta_rs.get(f"{tt.market_code}|{strona_t}"))
                     _licznik_zrodla[f"druzyny:{_zrodlo_t}"] += 1
                     if _zrodlo_t == "uczony":
                         # MODEL NIE ODDAJE PRZEDZIAŁU, więc zachowujemy
@@ -9864,7 +9882,8 @@ def _main_impl(tryb=None):
                         # jakości niżej, więc zmienia SELEKCJĘ, nie napis.
                         _p_stary_s = p_s
                         p_s, _zrodlo_s = uczony.wybierz_szanse(
-                            "sumy", p_s, _pu_s
+                            "sumy", p_s, _pu_s,
+                            korekta=korekta_rs.get(f"{kod_s}|{strona_s}"),
                         )
                         _licznik_zrodla[f"sumy:{_zrodlo_s}"] += 1
                         # warstwa uczy się błędu STAREGO rachunku
@@ -12637,6 +12656,24 @@ def _main_impl(tryb=None):
         _pstart_cache[kk] = out
         return out
 
+    _krycie_cache: dict = {}
+
+    def _krycie_b(mid: int, pid) -> dict | None:
+        kk = (mid, pid)
+        if kk not in _krycie_cache:
+            out = None
+            tid = _druzyna_zaw_kal.get(kk)
+            gosp, gosc = _mecze_druzyn_arg.get(mid) or (None, None)
+            if tid and tid in (gosp, gosc) and pid:
+                opp = gosc if tid == gosp else gosp
+                kn = (_braki_kadr.get((mid, int(tid))) or {}).get("kadra")
+                kr = (_braki_kadr.get((mid, int(opp or 0))) or {}).get("kadra")
+                if kn and kr and _ko_meczu_kal.get(mid):
+                    out = statshub.krycie_rywala(kn, kr, int(tid), int(opp), int(pid),
+                                                 _ko_meczu_kal[mid])
+            _krycie_cache[kk] = out
+        return _krycie_cache[kk]
+
     # sędzia ze statshub — patrz `odswiez_sedziow_sh`
     _sedzia_sh: dict[int, dict] = {}
     try:
@@ -12684,6 +12721,17 @@ def _main_impl(tryb=None):
             if _ps:
                 b["p_start"] = _ps
                 _ile_kal["p_start"] += 1
+        # krycie rywala przy faulach popełnianych (statshub.krycie_rywala) —
+        # stempel dla selektora, do wyboru nie wchodzi
+        if b.get("rynek_kod") == "fouls_committed" and "krycie" not in b:
+            try:
+                _kr = _krycie_b(_int_lub_zero(b.get("mecz_id")), b.get("podmiot_id"))
+            except Exception as e:                              # noqa: BLE001
+                diagnostyka.cichy("cykl", "krycie_rywala", e)
+                _kr = None
+            if _kr:
+                b["krycie"] = _kr
+                _ile_kal["krycie"] += 1
         _sd = _sedzia_sh.get(_int_lub_zero(b.get("mecz_id")))
         if _sd and "sedzia_sh" not in b:
             b["sedzia_sh"] = _sd
@@ -12741,7 +12789,8 @@ def _main_impl(tryb=None):
         _xi_drab[_b.get("xi_sygnal") or "brak"] += 1
     print(f"Kalendarz w księdze: {_ile_kal['z']} typów z kalendarzem, "
           f"{_ile_kal['bez']} bez historii drużyny, {_ile_kal['braki']} z brakami "
-          f"kadrowymi, {_ile_kal['p_start']} zawodników z pewnością startu "
+          f"kadrowymi, {_ile_kal['krycie']} fauli z kryciem rywala, "
+          f"{_ile_kal['p_start']} zawodników z pewnością startu "
           f"(w cieniu, {sklad.WERSJA}) | skład przy drabinkach: "
           + (", ".join(f"{k} {v}" for k, v in sorted(_xi_drab.items())) or "brak kart"))
 

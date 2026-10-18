@@ -117,6 +117,8 @@ WARSTWY_UCZENIA = (
     "wagi_zaufania",
     "kalibracja_kuponow",
     "sciaganie_karty",
+    # korekta modelu drużyn per rynek|strona (2026-10-18, uczony.korekty_rynku_strony)
+    "korekta_rynku_strony",
 )
 
 # CO LICZY `n` W KAŻDEJ WARSTWIE. Bez tego panel podpisywał każdą liczbę
@@ -135,6 +137,7 @@ JEDNOSTKI_WARSTW = {
     "wagi_zaufania": ("kubełek pewności", "kubełki pewności", "kubełków pewności"),
     "kalibracja_kuponow": ("horyzont", "horyzonty", "horyzontów"),
     "sciaganie_karty": ("waga karty", "wagi karty", "wag karty"),
+    "korekta_rynku_strony": ("strona rynku", "strony rynku", "stron rynku"),
 }
 
 _STAN_UCZENIA: dict[str, dict] = {}
@@ -1349,7 +1352,7 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
                 # składów zbliżają się do prawdy tuż przed meczem)
                 if isinstance(b.get("p_start"), dict):
                     rec["p_start_ost"] = b["p_start"]
-                for _pole in ("braki", "niedostepny", "sedzia_sh", "p_start"):
+                for _pole in ("braki", "niedostepny", "sedzia_sh", "p_start", "krycie"):
                     if isinstance(b.get(_pole), dict) and _pole not in rec:
                         rec[_pole] = b[_pole]
                 # typ pomiarowy (odrzucony przy progu), który PÓŹNIEJ przeszedł
@@ -1498,7 +1501,7 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
             # BRAKI KADROWE (2026-10-18, statshub `unavailability`): udział minut
             # i strzałów nieobecnych w drużynie typu i u rywala, brak lidera;
             # `niedostepny` — wątpliwy stan samego zawodnika
-            **{_p: b[_p] for _p in ("braki", "niedostepny", "sedzia_sh", "p_start")
+            **{_p: b[_p] for _p in ("braki", "niedostepny", "sedzia_sh", "p_start", "krycie")
                if isinstance(b.get(_p), dict)},
             # WKŁAD KAŻDEJ ZALEŻNOŚCI, ZAMROŻONY PRZY PUBLIKACJI (2026-08-07).
             #

@@ -328,3 +328,82 @@ def test_ksiega_p_start_i_najswiezszy():
     assert rec["p_start"] == {"s": 0.7}
     R._dopisz_nowe(log, [_typ(p_start={"s": 0.9})])
     assert rec["p_start"] == {"s": 0.7} and rec["p_start_ost"] == {"s": 0.9}
+
+
+# ---------------------------------------------------------------- korekta rynek|strona
+from footstats.model import uczony as U
+
+
+def _rek(rk, st, p, w, ko=None, **kw):
+    r = {"rynek_kod": rk, "strona": st, "wynik": "wygrany" if w else "przegrany",
+         "kickoff_ts": ko or 1_800_000_000, "p_uczony": {"p": p}}
+    r.update(kw)
+    return r
+
+
+def test_korekta_rynku_strony_uczy_sie_z_surowej_liczby():
+    teraz = 1_800_000_000 + 3600
+    log = {}
+    # „poniżej”: model mówi 0,85, weszło 70% → korekta ujemna
+    for i in range(300):
+        log[f"a{i}"] = _rek("team_shots", "ponizej", 0.85, i % 10 < 7)
+    # „powyżej”: trafione → korekta ≈ 0
+    for i in range(300):
+        log[f"b{i}"] = _rek("team_shots", "powyzej", 0.80, i % 10 < 8)
+    # za mała grupa, stary rekord, drabinka, zawodnik — pomijane
+    for i in range(50):
+        log[f"c{i}"] = _rek("team_cards", "ponizej", 0.9, False)
+    log["stary"] = _rek("team_sot", "ponizej", 0.9, False, ko=1_700_000_000)
+    log["x:drabinka"] = _rek("team_sot", "ponizej", 0.9, False)
+    k = U.korekty_rynku_strony(log, teraz)
+    assert k["team_shots|ponizej"] < -0.5
+    assert abs(k["team_shots|powyzej"]) < 0.01
+    assert "team_cards|ponizej" not in k and "team_sot|ponizej" not in k
+    # rekord z korektą: w księdze `p` zostaje SUROWE → nauka się nie zmienia
+    pu = {"p": 0.85}
+    p, z = U.wybierz_szanse("druzyny", 0.6, pu, korekta=k["team_shots|ponizej"])
+    assert z == "uczony" and p < 0.80 and pu["p"] == 0.85 and pu["p_kor"] == round(p, 4)
+    assert U.wybierz_szanse("druzyny", 0.6, {"p": 0.85})[0] == 0.85
+    assert U.wybierz_szanse("drabinki", 0.6, {"p": 0.85}, korekta=-1.0) == (0.6, "stary")
+
+
+def test_korekta_rynku_strony_w_rejestrze_i_cyklu():
+    assert "korekta_rynku_strony" in R.WARSTWY_UCZENIA
+    src = inspect.getsource(B)
+    assert 'warstwa_uczenia("korekta_rynku_strony")' in src
+    assert src.count("korekta=korekta_rs.get(") == 2          # drużyny i sumy
+
+
+# ---------------------------------------------------------------- krycie przy faulach
+def _kadra_kr(tid, gracze, mecze):
+    """gracze: {pid: {eid: (minuty, faule, wasFouled, wonContest, pozycja)}}"""
+    return {
+        "events": [{"events": {"id": e, "timeStartTimestamp": ts, "homeTeamId": tid,
+                               "awayTeamId": 999}} for e, ts in mecze.items()],
+        "data": [{"id": pid, "position": "M",
+                  "stats": {str(e): {"minutesPlayed": v[0], "fouls": v[1], "wasFouled": v[2],
+                                     "wonContest": v[3], "position": v[4]} for e, v in st.items()}}
+                 for pid, st in gracze.items()],
+    }
+
+
+def test_krycie_rywala_strona_lustrzana():
+    mecze_n = {i: KO - (i + 1) * 7 * DZIEN for i in range(1, 6)}
+    mecze_r = {100 + i: KO - (i + 1) * 7 * DZIEN for i in range(1, 6)}
+    nasza = _kadra_kr(1, {7: {e: (90, 2, 0, 0, "RB") for e in mecze_n}}, mecze_n)
+    rywal = _kadra_kr(2, {
+        50: {e: (90, 0, 3, 2, "LW") for e in mecze_r},     # naprzeciw naszego prawego obrońcy
+        51: {e: (90, 0, 1, 1, "RW") for e in mecze_r},     # druga strona
+        52: {e: (90, 0, 5, 0, "CB") for e in mecze_r},     # obrońca — nie liczy się do ofensywy
+    }, mecze_r)
+    k = S.krycie_rywala(nasza, rywal, 1, 2, 7, KO)
+    assert k["poz"] == "RB" and k["f90"] == 2.0 and k["min"] == 90.0
+    assert k["a_mir"] == 3.0 and k["d_mir"] == 2.0
+    assert k["a_tot"] == 9.0 and k["a_of"] == 4.0
+    assert S.krycie_rywala(nasza, rywal, 1, 2, 8, KO) is None   # nie ma go w kadrze
+
+
+def test_ksiega_zapisuje_krycie():
+    log: dict = {}
+    R._dopisz_nowe(log, [_typ(rynek_kod="fouls_committed", krycie={"a_mir": 3.0})])
+    assert next(iter(log.values()))["krycie"] == {"a_mir": 3.0}
