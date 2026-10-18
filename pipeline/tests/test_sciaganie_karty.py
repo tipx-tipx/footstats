@@ -197,6 +197,57 @@ def test_sciaganie_jest_w_rejestrze_warstw():
     assert "sciaganie_karty" in R.JEDNOSTKI_WARSTW
 
 
+def _log_uczony(n: int, kurs: float, hit: float, rynek: str, od: int = 0) -> dict:
+    ile = round(n * hit)
+    return {
+        f"{rynek}{od + i}": {
+            "wynik": "wygrany" if i < ile else "przegrany",
+            "p_model": 0.70, "kurs": kurs, "kickoff_ts": 1000 + i,
+            "rynek_kod": rynek, "strona": "powyzej", "wersje": {},
+            "zrodlo_p": "uczony",
+        }
+        for i in range(n)
+    }
+
+
+def test_marza_osobno_druzyny_i_zawodnicy():
+    """18.10: drużyny ~5% marży, zawodnicy ~18,5% — wspólna liczba (10%,
+    na sufocie) zawyżała karty zawodników i zaniżała drużyn."""
+    log = {**_log_uczony(2000, 2.00, 0.475, "team_goals"),
+           **_log_uczony(2000, 2.00, 0.41, "shots")}
+    m_d = R.marza_sciagania(log, "uczony", "druzyny")
+    m_z = R.marza_sciagania(log, "uczony", "zawodnicy")
+    assert 0.04 <= m_d <= 0.06
+    assert 0.16 <= m_z <= 0.19            # bez sufitu 10% — to cennik propsów
+    assert R.marza_sciagania(log, "uczony") <= R.MARZA_SCIAGANIA_SUFIT
+
+
+def test_strumien_sciagania_po_kodzie_rynku():
+    assert R._strumien_sciagania({"rynek_kod": "team_corners", "ekran": "wysokie_szanse"}) == "druzyny"
+    assert R._strumien_sciagania({"rynek_kod": "match_cards"}) == "druzyny"
+    assert R._strumien_sciagania({"rynek_kod": "fouls_committed"}) == "zawodnicy"
+
+
+def test_sciaganie_strumieni_zwraca_oba():
+    log = {**_log_uczony(2000, 1.60, 0.60, "team_goals"),
+           **_log_uczony(2000, 1.60, 0.50, "shots")}
+    s = R.sciaganie_uczony_strumieni(log)
+    assert set(s) == {"druzyny", "zawodnicy"}
+    assert s["zawodnicy"][1] > s["druzyny"][1]      # marża zawodników wyższa
+
+
+def test_kupon_bierze_sciaganie_swojego_strumienia():
+    leg_d = {"p_model": 0.70, "kurs": 1.60, "rynek_kod": "team_goals", "zrodlo_p": "uczony"}
+    leg_z = {**leg_d, "rynek_kod": "shots"}
+    k = {"legi": [leg_d, leg_z], "kurs": 2.56}
+    sc = {"druzyny": (0.3, 0.05), "zawodnicy": (0.3, 0.19)}
+    out = R.kupon_do_pokazania(k, sciaganie_uczony=sc)
+    p_d, p_z = (l["p_pokaz"] for l in out["legi"])
+    assert p_d == round(R.sciagnij_do_ceny(0.70, 1.60, 0.3, 0.05), 4)
+    assert p_z == round(R.sciagnij_do_ceny(0.70, 1.60, 0.3, 0.19), 4)
+    assert p_z < p_d
+
+
 def test_sciaganie_nie_jest_krytyczne():
     """Ta warstwa dotyczy PREZENTACJI. Gdyby padła, produkt ma pokazać liczbę
     sprzed ściągnięcia, a nie przerwać cykl — inaczej awaria kosmetyki

@@ -4352,10 +4352,44 @@ MARZA_SCIAGANIA_MIN_N = 200      # poniżej tylu rozliczeń zostaje domyślna
 MARZA_SCIAGANIA_DOMYSLNA = betting.DEFAULT_ONE_SIDED_MARGIN
 MARZA_SCIAGANIA_SHRINK_N0 = 200  # siła ciągnięcia do domyślnej przy małej próbie
 MARZA_SCIAGANIA_SUFIT = 0.10     # wyżej niż to znaczyłoby błąd danych, nie marżę
+# ⚑⚑ OSOBNO DRUŻYNY I ZAWODNICY (2026-10-18). Jedna marża na oba strumienie
+# zakładała, że cennik jest ten sam — a nie jest. Księga uczony (rozliczone):
+#   drużyny    n=19 759  marża 4,7%   (najlepszy Brier: 5%, w=0,05)
+#   zawodnicy  n=25 581  marża 18,5%  (najlepszy Brier: 19%, w=0,30)
+# Wspólna liczba wychodziła 10% (i siedziała na sufocie), więc karta
+# zawodnika pokazywała 60,7% przy 54,6% trafień, a drużyny 60,0% przy 65,4%
+# (pokazane od 14.09). Po rozbiciu: zawodnicy 56,9%, drużyny 62,3%, Brier
+# lepszy w obu. 18,5% to NIE błąd danych: overy zawodników trafiają
+# ~10–13 pp poniżej kursu w każdym paśmie — taki jest cennik propsów.
+# Wybór typów się nie zmienia: półki i kolejność liczą `p_przed_sciagnieciem`.
+MARZA_SCIAGANIA_SUFIT_STRUMIENIA = {"zawodnicy": 0.25}
+STRUMIENIE_SCIAGANIA = ("druzyny", "zawodnicy")
+
+
+def _strumien_sciagania(r: dict) -> str:
+    """drużyny / zawodnicy — po kodzie rynku (stempel `ekran` nie dzieli
+    strumieni: drużyna z „wysokich szans" ma ekran zawodniczy)."""
+    return ("druzyny"
+            if str(r.get("rynek_kod") or "").startswith(betting.PRZEDROSTKI_DRUZYNOWE)
+            else "zawodnicy")
+
+
+def sciaganie_uczony_strumieni(log: dict | None = None) -> dict[str, tuple[float, float]]:
+    """{strumień: (waga, marża)} ściągania karty modelu uczonego — osobno
+    drużyny i zawodnicy (patrz MARZA_SCIAGANIA_SUFIT_STRUMIENIA). Strumień bez
+    własnej próby nie ma wpisu, czyli jego karta pokazuje liczbę modelu."""
+    out: dict[str, tuple[float, float]] = {}
+    for s in STRUMIENIE_SCIAGANIA:
+        m = marza_sciagania(log, "uczony", s)
+        w = waga_sciagania(log, m, "uczony", s)
+        if w:
+            out[s] = (w, m)
+    return out
 
 
 def _proba_ceny(log: dict | None = None,
-                rachunek: str = "stary") -> list[tuple[float, float, float]]:
+                rachunek: str = "stary",
+                strumien: str | None = None) -> list[tuple[float, float, float]]:
     """(p_model, kurs, wynik) z rozliczeń, na których uczy się ściąganie karty.
 
     Jedna próba dla marży i dla wagi — inaczej waga dobrałaby się pod inną
@@ -4370,6 +4404,8 @@ def _proba_ceny(log: dict | None = None,
 
     `rachunek="stary"` — typy starej maszynerii (domyślnie; tak liczy się waga
     dla nich). `"uczony"` — typy policzone modelem.
+    `strumien` — "druzyny" / "zawodnicy" (patrz MARZA_SCIAGANIA_SUFIT_STRUMIENIA);
+    None = oba razem, jak przed 18.10.
     """
     if log is None:
         log = _migruj_log(supa.get_key("typy_log") or {})
@@ -4387,20 +4423,23 @@ def _proba_ceny(log: dict | None = None,
             continue
         if (not _stary_rachunek(r)) != chce_uczony:
             continue
+        if strumien is not None and _strumien_sciagania(r) != strumien:
+            continue
         dane.append((float(r["p_model"]), float(r["kurs"]),
                      1.0 if r["wynik"] == "wygrany" else 0.0))
     return dane
 
 
 def marza_sciagania(log: dict | None = None,
-                    rachunek: str = "stary") -> float:
+                    rachunek: str = "stary",
+                    strumien: str | None = None) -> float:
     """O ile cena bukmachera jest zawyżona wobec realnych trafień.
 
     Zwraca marżę jednostronną z rozliczeń, ściągniętą do domyślnej przy małej
     próbie. Przy braku danych zwraca domyślną, czyli zachowanie sprzed pomiaru.
     """
     log = widok_nauki(log)
-    dane = _proba_ceny(log, rachunek)
+    dane = _proba_ceny(log, rachunek, strumien)
     if not dane:
         return MARZA_SCIAGANIA_DOMYSLNA
     n = len(dane)
@@ -4414,12 +4453,14 @@ def marza_sciagania(log: dict | None = None,
     # tydzień razem z serią wyników, a ona ma opisywać cennik, nie passę.
     m = ((n * m + MARZA_SCIAGANIA_SHRINK_N0 * MARZA_SCIAGANIA_DOMYSLNA)
          / (n + MARZA_SCIAGANIA_SHRINK_N0))
-    return round(min(max(m, 0.0), MARZA_SCIAGANIA_SUFIT), 4)
+    sufit = MARZA_SCIAGANIA_SUFIT_STRUMIENIA.get(strumien or "", MARZA_SCIAGANIA_SUFIT)
+    return round(min(max(m, 0.0), sufit), 4)
 
 
 def waga_sciagania(log: dict | None = None,
                    marza: float | None = None,
-                   rachunek: str = "stary") -> float | None:
+                   rachunek: str = "stary",
+                   strumien: str | None = None) -> float | None:
     """Ile NASZEJ liczby zostaje w szansie pokazywanej na karcie.
 
     Zwraca `w` z przedziału [PODLOGA, 1] albo None, gdy próba jest za mała —
@@ -4431,10 +4472,10 @@ def waga_sciagania(log: dict | None = None,
     """
     log = widok_nauki(log)
     if marza is None:
-        marza = marza_sciagania(log, rachunek)
+        marza = marza_sciagania(log, rachunek, strumien)
     dane = [
         (p, betting.implied_prob_one_sided(kurs, marza), y)
-        for p, kurs, y in _proba_ceny(log, rachunek)
+        for p, kurs, y in _proba_ceny(log, rachunek, strumien)
     ]
     if len(dane) < WAGA_SCIAGANIA_MIN_N:
         return None
@@ -4966,6 +5007,8 @@ def kupon_do_pokazania(
         if stary:
             p = urealnij_p(p, (urealnienie or {}).get(_strumien(l), 0.0))
         sc = sciaganie if stary else sciaganie_uczony
+        if isinstance(sc, dict):     # model uczony: osobno drużyny i zawodnicy
+            sc = sc.get(_strumien_sciagania(l))
         if sc and l.get("kurs"):
             waga, marza = sc
             p = sciagnij_do_ceny(p, float(l["kurs"]), float(waga), float(marza))

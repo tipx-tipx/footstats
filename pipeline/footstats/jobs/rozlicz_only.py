@@ -84,7 +84,9 @@ def main() -> None:
             # (patrz `rozliczanie.kupon_do_pokazania`)
             _marza_u = rozliczanie.marza_sciagania(_ksiega_s, "uczony")
             _waga_u = rozliczanie.waga_sciagania(_ksiega_s, _marza_u, "uczony")
-            sciaganie_uczony = (_waga_u, _marza_u) if _waga_u else None
+            # osobno drużyny i zawodnicy, jak w dużym cyklu (18.10)
+            sciaganie_uczony = (rozliczanie.sciaganie_uczony_strumieni(_ksiega_s)
+                                or ((_waga_u, _marza_u) if _waga_u else None))
             _w.opisz(n=(1 if _waga else 0),
                      opis=(f"w={_waga:.2f} / cena minus {_marza:.1%}"
                            if _waga else "za mała próba — legi bez zmian"))

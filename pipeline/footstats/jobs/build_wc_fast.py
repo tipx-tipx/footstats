@@ -5924,6 +5924,7 @@ def _main_impl(tryb=None):
     # (dokładnie ten wzorzec opisuje nota przy WARSTWY_KRYTYCZNE).
     _waga_karty_uczony = None
     _marza_karty_uczony = rozliczanie.MARZA_SCIAGANIA_DOMYSLNA
+    _sciaganie_uczony_s: dict = {}
     with rozliczanie.warstwa_uczenia("sciaganie_karty") as _w:
         # NAJPIERW CENA, POTEM WAGA. Do jakiej ceny ściągamy, wynika z
         # rozliczeń (`marza_sciagania`) — dopóki brała się ze stałej 7%,
@@ -5946,6 +5947,11 @@ def _main_impl(tryb=None):
         _waga_karty_uczony = rozliczanie.waga_sciagania(
             _ksiega, _marza_karty_uczony, "uczony"
         )
+        # ⚑ OSOBNO DRUŻYNY I ZAWODNICY (2026-10-18) — cennik propsów
+        # zawodników ma ~18,5% marży, drużyn ~5%; wspólna liczba zawyżała
+        # karty zawodników i zaniżała drużyn (rozliczanie.
+        # MARZA_SCIAGANIA_SUFIT_STRUMIENIA). Strumień bez próby → wspólna.
+        _sciaganie_uczony_s = rozliczanie.sciaganie_uczony_strumieni(_ksiega)
         _w.opisz(n=(1 if _waga_karty else 0),
                  opis=(f"w={_waga_karty:.2f} (nasza liczba) / "
                        f"{1 - _waga_karty:.2f} (cena minus {_marza_karty:.1%})"
@@ -5953,7 +5959,9 @@ def _main_impl(tryb=None):
     print("Ściąganie karty do ceny — model uczony: " + (
         f"w={_waga_karty_uczony:.2f} (własny pomiar na {_marza_karty_uczony:.1%})"
         if _waga_karty_uczony else
-        "brak własnej próby — karta pokazuje LICZBĘ MODELU bez ściągania"))
+        "brak własnej próby — karta pokazuje LICZBĘ MODELU bez ściągania")
+        + "".join(f" | {s}: w={w:.2f}, marża {m:.1%}"
+                  for s, (w, m) in sorted(_sciaganie_uczony_s.items())))
     if _waga_karty:
         print(f"Szansa na karcie ściągana do ceny: w={_waga_karty:.2f} "
               f"naszej liczby, reszta z kursu po zdjęciu zmierzonej marży "
@@ -5973,6 +5981,9 @@ def _main_impl(tryb=None):
         _z_modelu_karta = str(u.get("zrodlo_p") or "") == "uczony"
         _w_k = _waga_karty_uczony if _z_modelu_karta else _waga_karty
         _m_k = _marza_karty_uczony if _z_modelu_karta else _marza_karty
+        if _z_modelu_karta:
+            _w_k, _m_k = _sciaganie_uczony_s.get(
+                rozliczanie._strumien_sciagania(u), (_w_k, _m_k))
         if (not _w_k or u.get("sugestia") or not u.get("kurs")
                 or not u.get("p_model")):
             return u
@@ -12051,8 +12062,9 @@ def _main_impl(tryb=None):
                       # typów — patrz `rozliczanie.kupon_do_pokazania`
                       sciaganie=((_waga_karty, _marza_karty)
                                  if _waga_karty else None),
-                      sciaganie_uczony=((_waga_karty_uczony, _marza_karty_uczony)
-                                        if _waga_karty_uczony else None),
+                      sciaganie_uczony=(_sciaganie_uczony_s or (
+                          (_waga_karty_uczony, _marza_karty_uczony)
+                          if _waga_karty_uczony else None)),
                       # policzone wyżej przy układaniu listy — nie liczymy
                       # drugi raz, bo to kolejny odczyt księgi z Supabase
                       przewaga=_przewaga, pasma=_pasma)
