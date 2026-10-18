@@ -1511,6 +1511,50 @@ def argumenty_typu(b: dict, idx, mecze_druzyn: dict, trendy_zaw: dict,
 WETO_ARGUMENTOW_POLEK = frozenset({("druzyna", "wyzsze_kursy"), ("zawodnik", "wyzsze_kursy")})
 
 
+# ⚑ JEDNORAZOWE ZDJĘCIE ZE STRONY (2026-10-18, właściciel: „te przypadki akurat
+# możesz jednorazowo usunąć, ale tylko jednorazowo"). Typy i karty pokazane PRZED
+# regułą `wiecej_przeciw_niz_za` (2ef1fa4), którym opis przeczy — np. Mugisha.
+# Wyjątek od „raz pokazany zostaje do gwizdka" WYŁĄCZNIE dla tej listy; w zapisie
+# pokazanych (`pokazane_na_stronie`) zostają, więc Skuteczność je rozliczy —
+# stały na stronie kilka godzin i ktoś mógł je zagrać. Lista wygasa sama z meczami
+# (ostatni 22.10); potem do usunięcia z kodu.
+ZDJETE_RECZNIE_2026_10_18 = frozenset({
+    "16939015:sabah fk:team_corners:1.5:powyzej",
+    "16363890:coventry city:team_shots:9.5:powyzej",
+    "16938770:real madrid:team_corners:9.5:ponizej",
+    "16671627:club atletico union de santa fe:team_sot:2.5:powyzej",
+    "16363890:tottenham hotspur:team_cards:0.5:powyzej",
+    "15238199:vitoria:team_cards:3.5:ponizej",
+    "16285045:monza:match_fouls:25.5:ponizej",
+    "15238198:santos:team_cards:4.5:ponizej",
+    "16278726:fc midtjylland:team_goals:2.5:ponizej",
+    "16938875:roma:match_sot:10.5:ponizej",
+    "16421072:getafe:match_shots:24.5:powyzej",
+    "16939015:joy lance mickels:shots:0.5:powyzej",
+    "16938775:marc guehi:fouls_committed:0.5:powyzej",
+    "16938889:xavier mbuyamba:shots:0.5:powyzej",
+    "16938800:alberto moleiro:shots:1.5:powyzej",
+    "16938800:renato veiga:shots:0.5:powyzej",
+    "15238199:rodrigo garro:fouls_won:2.5:powyzej",
+    "16938770:willi orban:shots:0.5:powyzej",
+    "16653122:bonheur mugisha:shots:0.5:powyzej",
+    "16938859:harry kane:sot:1.5:powyzej",
+    "15272545:daniel sundgren:fouls_committed:0.5:powyzej",
+})
+# karty drabinek: (mecz_id, zawodnik_id) — Jović i Orban
+KARTY_ZDJETE_RECZNIE_2026_10_18 = frozenset({(16938775, 319129), (16938770, 136924)})
+
+
+def bez_kart_zdjetych_recznie(wpisy: list[dict]) -> list[dict]:
+    """Karty drabinek bez jednorazowo zdjętych (KARTY_ZDJETE_RECZNIE_2026_10_18)."""
+    out = [w for w in wpisy
+           if (int(w.get("mecz_id") or 0), int(w.get("podmiot_id") or 0))
+           not in KARTY_ZDJETE_RECZNIE_2026_10_18]
+    if len(out) != len(wpisy):
+        print(f"Drabinki zdjęte ręcznie (18.10): {len(wpisy) - len(out)}")
+    return out
+
+
 def bilans_powodow(b: dict) -> int:
     """Widoczny bilans powodów typu (model/argumenty.bilans_widoczny): zdania
     modelu uczonego (`opis_uczony`, jak na karcie), a bez nich stary opis
@@ -1706,6 +1750,10 @@ def wybierz_liste_publikowana(
     for b in kolejnosc:
         if b.get("sugestia"):
             lista_pub.append(b)      # sugestia nie jest zakładem, nie liczy się
+            continue
+        # jednorazowe zdjęcie właściciela — patrz ZDJETE_RECZNIE_2026_10_18
+        if _klucz_publikacji(b) in ZDJETE_RECZNIE_2026_10_18:
+            zdjete.setdefault(_klucz_publikacji(b), "zdjete_recznie")
             continue
         # rynek ukryty do czasu dopracowania — zostaje w puli kuponów i dalej
         # rozlicza się w księdze, więc ma jak udowodnić poprawę; świeży typ
@@ -2670,6 +2718,7 @@ OPISY_ZDJECIA_PL = {
     "bez_sygnalu_skladu": "ani składu, ani występu w ostatnim meczu drużyny – nie wiemy, czy zagra",
     "argument_przeciw": "na wyższych kursach stoi przeciw typowi mocny argument (słaba forma, rywal tego nie oddaje, z rywalem nie wchodziło, rzadko w składzie)",
     "wiecej_przeciw_niz_za": "na karcie stałoby więcej powodów przeciw niż za – opis przeczyłby typowi",
+    "zdjete_recznie": "jednorazowo zdjęty przez właściciela (18.10: opis przeczył typowi)",
     "ujemna_po_korekcie": "po urealnieniu szansy wartość wyszła ujemna",
     "kurs_poza_widelkami": "kurs poza widełkami, w jakich gramy",
     "limit_meczu": "z tego meczu mamy już tyle typów, ile publikujemy",
@@ -10742,6 +10791,7 @@ def _main_impl(tryb=None):
         ]
         if _kart_przed != len(radar_wpisy):
             print(f"Rynki wycofane: karty {_kart_przed} → {len(radar_wpisy)}")
+        radar_wpisy = bez_kart_zdjetych_recznie(radar_wpisy)
         _dump("radar.json", {
             "wygenerowano_ts": int(time.time()),
             "wpisy": radar_wpisy,
