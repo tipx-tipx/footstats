@@ -1582,6 +1582,83 @@ def kalendarz_typu(b: dict, idx, mecze_druzyn: dict, druzyna_zaw: dict,
     return _kal(druzyna_zaw.get((mid, b.get("podmiot_id"))))
 
 
+# ⚑ SĘDZIA ZE STATSHUB (2026-10-18, plan „90%”). Profil z 365 budujemy sami
+# i dojrzewa powoli (połowa sędziów ma u nas jeden mecz, limit 40 nowych na
+# cykl); statshub daje bilans kariery od ręki (`statshub.fetch_referee`).
+# Na razie STEMPEL w księdze — materiał dla selektora i pomiaru kartek.
+# Pamięć między cyklami w repo stanu (`sedziowie_sh`), odświeżanie co
+# SEDZIOWIE_SH_SWIEZOSC_S, najwyżej SEDZIOWIE_SH_MAX_CYKL zapytań na cykl.
+SEDZIOWIE_SH_KLUCZ = "sedziowie_sh"
+SEDZIOWIE_SH_SWIEZOSC_S = 3 * 86400
+SEDZIOWIE_SH_MAX_CYKL = 40
+SEDZIOWIE_SH_BUDZET_S = 25.0
+
+
+def odswiez_sedziow_sh(events: list[dict], pamiec: dict, teraz: int,
+                       fetch=None, limit: int = SEDZIOWIE_SH_MAX_CYKL,
+                       budzet_s: float = SEDZIOWIE_SH_BUDZET_S) -> tuple[dict, int]:
+    """Uzupełnia `pamiec` {sędzia: {"ts", "p": profil|None}} dla sędziów
+    meczów z `events` (najbliższe mecze pierwsze). Zwraca (mecz → profil,
+    liczba pobranych)."""
+    import time as _t
+    fetch = fetch or statshub.fetch_referee
+    t0 = _t.monotonic()
+    pobrane = 0
+    for e in sorted(events, key=lambda e: int(e.get("timeStartTimestamp") or 0)):
+        rid = e.get("refereeId")
+        if not rid:
+            continue
+        zap = pamiec.get(str(rid))
+        if zap and teraz - int(zap.get("ts") or 0) < SEDZIOWIE_SH_SWIEZOSC_S:
+            continue
+        if pobrane >= limit or _t.monotonic() - t0 > budzet_s:
+            break
+        try:
+            prof = fetch(int(rid))
+        except Exception as ex:                                # noqa: BLE001
+            diagnostyka.cichy("statshub", "sedzia_profil", ex)
+            continue
+        pamiec[str(rid)] = {"ts": int(teraz), "p": prof}
+        pobrane += 1
+    po_meczu = {}
+    for e in events:
+        rid = e.get("refereeId")
+        prof = ((pamiec.get(str(rid)) or {}).get("p") if rid else None)
+        if prof and e.get("id"):
+            po_meczu[int(e["id"])] = {"id": int(rid), **prof}
+    return po_meczu, pobrane
+
+
+def braki_typu(b: dict, braki_kadr: dict, mecze_druzyn: dict,
+               druzyna_zaw: dict) -> dict | None:
+    """Braki kadrowe obu drużyn meczu typu (statshub.braki_druzyny) — stempel
+    do księgi: {"my": drużyna typu, "ryw": rywal}; suma meczowa {"g", "a"}.
+    None = brak kadr tego meczu (to nie jest „zero braków”)."""
+    try:
+        mid = int(b.get("mecz_id") or 0)
+    except (TypeError, ValueError):
+        return None
+    gosp, gosc = mecze_druzyn.get(mid) or (None, None)
+
+    def _br(tid):
+        return ((braki_kadr.get((mid, int(tid))) or {}).get("braki")
+                if tid else None)
+
+    rk = str(b.get("rynek_kod") or "")
+    if rk.startswith(("match_", "wiecej_")):
+        out = {"g": _br(gosp), "a": _br(gosc)}
+    else:
+        if b.get("podmiot_typ") == "druzyna" or rk.startswith("team_"):
+            tid = abs(int(b.get("podmiot_id") or 0))
+        else:
+            tid = druzyna_zaw.get((mid, b.get("podmiot_id")))
+        if not tid or tid not in (gosp, gosc):
+            return None
+        out = {"my": _br(tid), "ryw": _br(gosc if tid == gosp else gosp)}
+    out = {k: v for k, v in out.items() if v}
+    return out or None
+
+
 # ⚑ JEDNORAZOWE ZDJĘCIE ZE STRONY (2026-10-18, właściciel: „te przypadki akurat
 # możesz jednorazowo usunąć, ale tylko jednorazowo"). Typy i karty pokazane PRZED
 # regułą `wiecej_przeciw_niz_za` (2ef1fa4), którym opis przeczy — np. Mugisha.
@@ -3223,6 +3300,7 @@ def dolacz_pelne_kadry(
     trends: list, wszystkie_ev: list[dict], teraz: int,
     oferta=None, fetch_kadra=None, fetch_extra=None,
     budzet_s: float = KADRY_BUDZET_S, okno_s: int = KADRY_OKNO_S,
+    braki_out: dict | None = None,
 ) -> dict[str, int]:
     """Pełna historia ze statshub dla każdego zawodnika, którego bukmacher
     wycenia — wszystkie rynki, łącznie z zza pola i głową.
@@ -3234,7 +3312,12 @@ def dolacz_pelne_kadry(
     * brak trendu → nowy trend TYLKO dla pary zawodnik×rynek, którą Superbet
       albo Betclic wycenia. Silnik liczy każdy trend przed sprawdzeniem
       kursu, więc całe kadry nie wchodzą w grę (symulacja 18.09: 403 mecze,
-      254 tys. trendów). Bez kontuzjowanych („out”) i bramkarzy.
+      254 tys. trendów). Bez niedostępnych na ten mecz (pewna kontuzja albo
+      zawieszenie w tych rozgrywkach — `statshub.niedostepni_z_kadry`)
+      i bramkarzy.
+
+    `braki_out` (2026-10-18) dostaje {(mecz, drużyna): {"nd": niedostępni,
+    "braki": statshub.braki_druzyny}} — do bramek typów i kart oraz do księgi.
 
     Mutuje `trends`. Zwraca liczniki do rentgenu.
     """
@@ -3293,7 +3376,7 @@ def dolacz_pelne_kadry(
         extra = {}
     licz["meczow_extra"] = len(extra)
     pelne: dict[int, dict[int, dict]] = {}
-    wykluczeni: dict[int, set] = {}
+    wykluczeni: dict[tuple[int, int], set] = {}
     for tid, k in kadry.items():
         try:
             pelne[tid] = statshub.trendy_kadry(k, extra, tid)
@@ -3301,11 +3384,32 @@ def dolacz_pelne_kadry(
             diagnostyka.cichy("statshub", "trendy_kadry", ex)
             continue
         licz["druzyn"] += 1
-        wykluczeni[tid] = {
-            int(u.get("playerId") or 0) for u in k.get("unavailability") or []
-            if str(u.get("status") or "") == "out"
-            and int(u.get("endDateTimestamp") or 0) > teraz
-        }
+    # NIEDOSTĘPNI PER MECZ (2026-10-18) — zawieszenie obowiązuje tylko w swoich
+    # rozgrywkach, więc liczymy dla meczu, nie dla drużyny (patrz nota przy
+    # `statshub.niedostepni_z_kadry`)
+    for e, _sbp, _bcp in mecze:
+        ko_e = int(e.get("timeStartTimestamp") or 0)
+        utid_e = e.get("uniqueTournamentId") or (e.get("tournament") or {}).get(
+            "uniqueTournamentId")
+        for tid in (e.get("homeTeamId"), e.get("awayTeamId")):
+            k = kadry.get(int(tid or 0))
+            if not k:
+                continue
+            try:
+                _wyst = statshub._wystepy_kadry(k)
+                nd = statshub.niedostepni_z_kadry(k, ko_e, utid_e, wystepy=_wyst)
+                br = statshub.braki_druzyny(k, nd, ko_e, wystepy=_wyst)
+            except Exception as ex:                            # noqa: BLE001
+                diagnostyka.cichy("statshub", "niedostepni_kadry", ex)
+                continue
+            wykluczeni[(int(e["id"]), int(tid))] = {
+                p for p, i in nd.items() if i.get("pewny")}
+            licz["niedostepni_pewni"] = licz.get("niedostepni_pewni", 0) + len(
+                wykluczeni[(int(e["id"]), int(tid))])
+            licz["niedostepni_watpliwi"] = licz.get("niedostepni_watpliwi", 0) + sum(
+                1 for i in nd.values() if not i.get("pewny"))
+            if braki_out is not None:
+                braki_out[(int(e["id"]), int(tid))] = {"nd": nd, "braki": br}
     idx = {(t.event_id, t.player_id, t.market_code): t for t in trends}
     gracze: set = set()
     for e, sbp, bcp in mecze:
@@ -3347,7 +3451,7 @@ def dolacz_pelne_kadry(
                         continue
                     if mk not in wycena or (pelny.position or "") == "G":
                         continue
-                    if pid in wykluczeni.get(int(tid), set()):
+                    if pid in wykluczeni.get((int(e["id"]), int(tid)), set()):
                         licz["pominieci_kontuzja"] += 1
                         continue
                     nowy = dc_replace(
@@ -5249,6 +5353,8 @@ def _main_impl(tryb=None):
     _sb_wstepny: dict[int, dict] = {}
     # pamięć Betclica czytana RAZ na cykl (tu i przy siatce kursów niżej)
     _bc_odczyt_cyklu: tuple | None = None
+    # niedostępni i braki per (mecz, drużyna) — patrz `dolacz_pelne_kadry`
+    _braki_kadr: dict[tuple[int, int], dict] = {}
     try:
         _teraz_k = int(time.time())
         _bc_wstepny: dict[int, dict] = {}
@@ -5279,7 +5385,7 @@ def _main_impl(tryb=None):
 
         _licz_kadry = dolacz_pelne_kadry(
             trends, [e for e in events if e.get("homeTeamId") and e.get("awayTeamId")],
-            _teraz_k, oferta=_oferta_kadr)
+            _teraz_k, oferta=_oferta_kadr, braki_out=_braki_kadr)
         diagnostyka.zapisz_rentgen("pelne_kadry", _licz_kadry)
         print(f"Pełne kadry statshub: {_licz_kadry['druzyn']} drużyn "
               f"({_licz_kadry['meczow_extra']} meczów z zza pola/głową), "
@@ -5289,7 +5395,9 @@ def _main_impl(tryb=None):
               f"{_licz_kadry['druzyn_bez_budzetu']}, w {_licz_kadry['sekundy']} s; "
               f"mecze z ofertą {_licz_kadry['meczow_z_oferta']}, bez "
               f"{_licz_kadry['meczow_bez_oferty']}; wyceniani bez kadry "
-              f"{_licz_kadry['wyceniani_bez_kadry']}")
+              f"{_licz_kadry['wyceniani_bez_kadry']}; niedostępni na mecz: "
+              f"pewni {_licz_kadry.get('niedostepni_pewni', 0)}, wątpliwi "
+              f"{_licz_kadry.get('niedostepni_watpliwi', 0)}")
     except Exception as e:                                     # noqa: BLE001
         diagnostyka.cichy("cykl", "pelne_kadry", e)
     diagnostyka.etap("pelne_kadry")
@@ -6709,6 +6817,26 @@ def _main_impl(tryb=None):
                 and rotowire.predicted_status(roto, t.team_name, t.player_name)
                 is False):
             poza_ogloszonym.add((t.event_id, t.player_id))
+    # ⚑ NIEDOSTĘPNI: KONTUZJA ALBO ZAWIESZENIE (2026-10-18, właściciel: „tak
+    # i dopracować”) — statshub `unavailability` liczone per mecz w
+    # `dolacz_pelne_kadry` (zasady przy `statshub.niedostepni_z_kadry`).
+    # PEWNY brak działa jak ogłoszony skład bez zawodnika: nowy typ i karta nie
+    # powstają, pokazane schodzą („jak ktoś nie gra, to po prostu znikają”).
+    # WĄTPLIWY („dayToDay”) blokuje tylko NOWE — jak prognoza składu; pokazany
+    # zostaje. Do UI („poza składem”) idzie to samo, bo to prawda.
+    kontuzje_zawieszenia: dict[tuple[int, int], dict] = {}
+    for (mid_x, _tid_x), _v in _braki_kadr.items():
+        for pid_x, info_x in (_v.get("nd") or {}).items():
+            kontuzje_zawieszenia[(mid_x, int(pid_x))] = info_x
+    for k_nd, info_x in kontuzje_zawieszenia.items():
+        poza_skladem.add(k_nd)
+        if info_x.get("pewny"):
+            poza_ogloszonym.add(k_nd)
+    if kontuzje_zawieszenia:
+        _np = sum(1 for i in kontuzje_zawieszenia.values() if i.get("pewny"))
+        print(f"Niedostępni (kontuzja/zawieszenie, statshub): {_np} pewnych, "
+              f"{len(kontuzje_zawieszenia) - _np} wątpliwych par (mecz, zawodnik) — nowe "
+              "typy i karty nie powstają, pewni schodzą też z pokazanych")
     # tri-state dla UI: True = w składzie, False = poza składem, None = nie
     # wiemy. Bez tego karta nie umie odróżnić „ławka" od „skład nieznany".
     xi_znany: dict[tuple[int, int], bool] = {}
@@ -7245,6 +7373,12 @@ def _main_impl(tryb=None):
         # o to, że wejdzie z ławki i zdąży. Rozliczenia mówią, ile to kosztuje:
         # przy nieznanym składzie zawodnik zagrał w 85% przypadków, przy
         # ogłoszonym — w 95%. Te 10 pp to czyste pudła bez żadnej szansy.
+        if (mid, tr.player_id) in kontuzje_zawieszenia:
+            _i_nd = kontuzje_zawieszenia[(mid, tr.player_id)]
+            _odrzuc(mid, tr, "niedostepny",
+                    f"{_i_nd.get('r')} ({'pewna' if _i_nd.get('pewny') else 'wątpliwy'}"
+                    f", {_i_nd.get('s')}) — statshub")
+            continue
         if (mid, tr.player_id) in poza_skladem:
             _odrzuc(mid, tr, "poza_skladem",
                     "nie ma go w składzie na ten mecz")
@@ -12474,6 +12608,21 @@ def _main_impl(tryb=None):
     _druzyna_zaw_kal = {(int(getattr(t, "event_id", 0) or 0), t.player_id): t.team_id
                         for t in trends if getattr(t, "team_id", None)}
     _ile_kal = Counter()
+    # sędzia ze statshub — patrz `odswiez_sedziow_sh`
+    _sedzia_sh: dict[int, dict] = {}
+    try:
+        _sedz_pam, _sedz_ok = supa.get_key_ok(SEDZIOWIE_SH_KLUCZ)
+        if _sedz_ok:
+            _sedz_pam = dict(_sedz_pam or {})
+            _sedzia_sh, _sedz_nowi = odswiez_sedziow_sh(events, _sedz_pam, int(time.time()))
+            if _sedz_nowi and not _dry_run():
+                supa.put_key(SEDZIOWIE_SH_KLUCZ, _sedz_pam)
+            print(f"Sędziowie ze statshub: {len(_sedzia_sh)} meczów z profilem "
+                  f"(pobrano {_sedz_nowi}, w pamięci {len(_sedz_pam)})")
+        else:
+            print("Sędziowie ze statshub: odczyt pamięci padł — bez stempla w tym cyklu")
+    except Exception as e:                                      # noqa: BLE001
+        diagnostyka.cichy("cykl", "sedziowie_sh", e)
 
     def _stempel_kalendarza(b: dict) -> None:
         if "kalendarz" in b or b.get("sugestia"):
@@ -12487,6 +12636,21 @@ def _main_impl(tryb=None):
         _ile_kal["z" if _k else "bez"] += 1
         if _k:
             b["kalendarz"] = _k
+        # braki kadrowe obu drużyn i stan samego zawodnika (2026-10-18)
+        try:
+            _br = braki_typu(b, _braki_kadr, _mecze_druzyn_arg, _druzyna_zaw_kal)
+        except Exception as e:                                  # noqa: BLE001
+            diagnostyka.cichy("cykl", "braki_typu", e)
+            _br = None
+        if _br:
+            b["braki"] = _br
+            _ile_kal["braki"] += 1
+        _sd = _sedzia_sh.get(_int_lub_zero(b.get("mecz_id")))
+        if _sd and "sedzia_sh" not in b:
+            b["sedzia_sh"] = _sd
+        _nd = kontuzje_zawieszenia.get((_int_lub_zero(b.get("mecz_id")), b.get("podmiot_id")))
+        if _nd and b.get("podmiot_typ") != "druzyna":
+            b["niedostepny"] = {k: v for k, v in _nd.items() if k != "do"}
 
     for _b in (value_bets + typy_poza_publikacja
                + odrzucone_pomiar + legi_pool_pub):
@@ -12524,7 +12688,10 @@ def _main_impl(tryb=None):
     for _b in drabinki_typy:
         _stempel_kalendarza(_b)
         _kx = (_int_lub_zero(_b.get("mecz_id")), _b.get("podmiot_id"))
-        if _kx in xi_ogloszony:
+        if _kx in kontuzje_zawieszenia:
+            _b["xi_sygnal"] = ("niedostepny" if kontuzje_zawieszenia[_kx].get("pewny")
+                               else "watpliwy")
+        elif _kx in xi_ogloszony:
             _b["xi_sygnal"] = "official"
         elif _kx in poza_ogloszonym:
             _b["xi_sygnal"] = "poza_ogloszonym"
@@ -12534,7 +12701,8 @@ def _main_impl(tryb=None):
             _b["xi_sygnal"] = "poza_przewidywanym"
         _xi_drab[_b.get("xi_sygnal") or "brak"] += 1
     print(f"Kalendarz w księdze: {_ile_kal['z']} typów z kalendarzem, "
-          f"{_ile_kal['bez']} bez historii drużyny | skład przy drabinkach: "
+          f"{_ile_kal['bez']} bez historii drużyny, {_ile_kal['braki']} z brakami "
+          "kadrowymi | skład przy drabinkach: "
           + (", ".join(f"{k} {v}" for k, v in sorted(_xi_drab.items())) or "brak kart"))
 
     # ⚑ TYP NA STRONIE BEZ REKORDU W KSIĘDZE (2026-09-13). Księga dostaje

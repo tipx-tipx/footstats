@@ -1251,6 +1251,19 @@ def opublikowany(r: dict, lista_dnia: dict[str, set] | None,
     return not r.get("poza_publikacja")
 
 
+def _stempel_awansu(rec: dict, b: dict) -> None:
+    """RUCH KURSU (2026-10-18, plan „90%”): rekord urodzony jako pomiar albo
+    „poza publikacją” trzyma `kurs` z chwili PIERWSZEGO zapisu (dla szerokiego
+    zapisu to praktycznie otwarcie), `kurs_zamkniecia` — ostatnią cenę przed
+    meczem. Brakowało ceny z chwili wejścia na stronę: ten stempel ją dokłada
+    (raz, przy pierwszym awansie). `kurs` zostaje — historii nie przepisujemy."""
+    if "kurs_pub" in rec:
+        return
+    if isinstance(b.get("kurs"), (int, float)) and b["kurs"]:
+        rec["kurs_pub"] = float(b["kurs"])
+        rec["pub_ts"] = int(time.time())
+
+
 def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
     for b in value_bets:
         # ⚑ RYNEK WYCOFANY NIE WCHODZI DO KSIĘGI ŻADNĄ DROGĄ (2026-08-19).
@@ -1286,6 +1299,16 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
                 and rec0.get("poza_publikacja") in POZA_LISTA_POWODY
                 and not b.get("poza_publikacja") and not b.get("odrzucony")):
             del log[k]
+        # ⚑ SZEROKI ZAPIS KANDYDATÓW (2026-10-18) — tak samo: linia zapisana
+        # w tle (`pomiar_szeroki`) i potem pokazana rodzi się od nowa z ceną
+        # i szansą z chwili publikacji (Wyniki i kalibracja jadą po cenie, którą
+        # user mógł wziąć). Cena z pierwszego zapisu zostaje jako `kurs_otw`.
+        _kurs_otw = None
+        if (rec0 is not None and rec0.get("wynik") is None
+                and rec0.get("odrzucenie_powod") == POWOD_POMIARU_SZEROKIEGO
+                and not b.get("odrzucony")):
+            _kurs_otw = (rec0.get("kurs"), rec0.get("opublikowano_ts"))
+            del log[k]
         if k in log:
             # flagi kategorii potrafią pojawić się PO pierwszej publikacji
             # (miękka linia w dniu meczu, matchup gdy urośnie profil rywala,
@@ -1320,6 +1343,10 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
                 # pierwszy stempel dla rekordów sprzed 18.10 (stan sprzed meczu)
                 if isinstance(b.get("kalendarz"), dict) and "kalendarz" not in rec:
                     rec["kalendarz"] = b["kalendarz"]
+                # braki kadrowe (2026-10-18) — tak samo: pierwszy stempel
+                for _pole in ("braki", "niedostepny", "sedzia_sh"):
+                    if isinstance(b.get(_pole), dict) and _pole not in rec:
+                        rec[_pole] = b[_pole]
                 # typ pomiarowy (odrzucony przy progu), który PÓŹNIEJ przeszedł
                 # progi i został opublikowany — przestaje być pomiarowy (wraca
                 # do kalibracji/skuteczności); w drugą stronę NIGDY nie
@@ -1327,13 +1354,17 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
                 if rec.get("odrzucony") and not b.get("odrzucony"):
                     rec["odrzucony"] = False
                     rec.pop("odrzucenie_powod", None)
+                    _stempel_awansu(rec, b)
                 # typ spoza publikacji (kwarantanna/limit meczu), który w
                 # kolejnym cyklu WSZEDŁ do publikacji — awansuje; w drugą
                 # stronę nigdy nie degradujemy opublikowanego typu
                 if rec.get("poza_publikacja") and not b.get("poza_publikacja"):
                     rec.pop("poza_publikacja", None)
+                    _stempel_awansu(rec, b)
             continue
         log[k] = {
+            **({"kurs_otw": _kurs_otw[0], "kurs_otw_ts": _kurs_otw[1]}
+               if _kurs_otw and _kurs_otw[0] else {}),
             "mecz_id": b["mecz_id"], "mecz": b["mecz"],
             "kickoff_ts": b["kickoff_ts"],
             # numer drużyny bez minusa — patrz `_znak_podmiotu`
@@ -1459,6 +1490,11 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
             # (puchar = różne), dni do następnego meczu — materiał dla selektora
             **({"kalendarz": b["kalendarz"]}
                if isinstance(b.get("kalendarz"), dict) else {}),
+            # BRAKI KADROWE (2026-10-18, statshub `unavailability`): udział minut
+            # i strzałów nieobecnych w drużynie typu i u rywala, brak lidera;
+            # `niedostepny` — wątpliwy stan samego zawodnika
+            **{_p: b[_p] for _p in ("braki", "niedostepny", "sedzia_sh")
+               if isinstance(b.get(_p), dict)},
             # WKŁAD KAŻDEJ ZALEŻNOŚCI, ZAMROŻONY PRZY PUBLIKACJI (2026-08-07).
             #
             # Do dziś księga zapisywała sam WYNIK rachunku (`p_model`), więc po

@@ -300,6 +300,9 @@ MAGAZYN: dict[str, str] = {
     # pierwszy przewidywany / ogłoszony skład meczu — pomiar trafności
     # przewidywanych XI (2026-09-30, build_wc_fast._zapisz_pomiar_xi)
     "pomiar_xi": "repo",
+    # profile sędziów ze statshub (2026-10-18, plan „90%”) — pamięć między
+    # cyklami, odświeżana co kilka dni; czyta ją tylko pipeline
+    "sedziowie_sh": "repo",
 }
 
 # nazwa backendu -> obiekt z `pobierz(key) -> (payload, ok)` i

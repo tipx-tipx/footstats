@@ -132,3 +132,151 @@ def test_cykl_stempluje_i_dolacza_szeroki_zapis():
     i_zapis = src.index("_rozlicz_i_zapisz(value_bets, kupony_list")
     assert i_dol < i_petla < i_zapis
     assert src.index("for _b in drabinki_typy:\n        _stempel_kalendarza(_b)") < i_zapis
+
+
+# ---------------------------------------------------------------- braki kadrowe
+from footstats.sources import statshub as S
+
+
+def _kadra(unav, wystepy):
+    """`wystepy`: {zawodnik: [(ts, minuty, strzały)]}"""
+    evs = sorted({ts for w in wystepy.values() for ts, _, _ in w})
+    eid = {ts: 1000 + i for i, ts in enumerate(evs)}
+    return {
+        "events": [{"events": {"id": eid[ts], "timeStartTimestamp": ts}} for ts in evs],
+        "data": [{"id": pid, "stats": {str(eid[ts]): {"minutesPlayed": mi,
+                                                      "onTargetScoringAttempt": sh}
+                                       for ts, mi, sh in w}}
+                 for pid, w in wystepy.items()],
+        "unavailability": unav,
+    }
+
+
+def test_niedostepni_zasady():
+    ko = KO
+    w = {1: [(ko - 4 * DZIEN, 90, 3)], 2: [(ko - 4 * DZIEN, 0, 0)],
+         3: [(ko - 4 * DZIEN, 90, 1)], 4: [(ko - 4 * DZIEN, 90, 0)],
+         5: [(ko - 30 * DZIEN, 90, 0)], 6: [(ko - 4 * DZIEN, 80, 0)]}
+    unav = [
+        # kontuzja bez daty końca, nie grał od początku wpisu → pewny brak
+        {"playerId": 2, "kind": "injury", "status": "out", "startDateTimestamp": ko - 10 * DZIEN},
+        # wątpliwy
+        {"playerId": 3, "kind": "injury", "status": "dayToDay",
+         "startDateTimestamp": ko - DZIEN, "endDateTimestamp": ko + 5 * DZIEN},
+        # zawieszenie w LIDZE (utid 8), mecz w LM (utid 7) → gra
+        {"playerId": 4, "kind": "suspension", "status": None, "uniqueTournamentId": 8,
+         "startDateTimestamp": ko - DZIEN, "endDateTimestamp": ko + 20 * DZIEN},
+        # wpis nieaktualny: zagrał po początku wpisu
+        {"playerId": 1, "kind": "injury", "status": "out", "startDateTimestamp": ko - 10 * DZIEN},
+        # wraca przed meczem
+        {"playerId": 5, "kind": "injury", "status": "out",
+         "startDateTimestamp": ko - 40 * DZIEN, "endDateTimestamp": ko - DZIEN},
+        # zawieszenie w tych rozgrywkach
+        {"playerId": 6, "kind": "suspension", "status": None, "uniqueTournamentId": 7,
+         "reason": "red_card_suspension", "startDateTimestamp": ko - DZIEN,
+         "endDateTimestamp": ko + 3 * DZIEN},
+    ]
+    nd = S.niedostepni_z_kadry(_kadra(unav, w), ko, utid=7)
+    assert set(nd) == {2, 3, 6}
+    assert nd[2]["pewny"] and nd[2]["r"] == "kontuzja"
+    assert not nd[3]["pewny"]
+    assert nd[6]["pewny"] and nd[6]["r"] == "zawieszenie"
+    # rozgrywki meczu nieznane → zawieszenie nie działa (bez fałszywego zdjęcia)
+    assert 6 not in S.niedostepni_z_kadry(_kadra(unav, w), ko, utid=None)
+
+
+def test_braki_druzyny_udzialy_i_lider():
+    ko = KO
+    w = {1: [(ko - 4 * DZIEN, 90, 4), (ko - 11 * DZIEN, 90, 4)],
+         2: [(ko - 4 * DZIEN, 90, 1), (ko - 11 * DZIEN, 90, 1)],
+         3: [(ko - 4 * DZIEN, 90, 1), (ko - 11 * DZIEN, 90, 0)]}
+    k = _kadra([], w)
+    br = S.braki_druzyny(k, {1: {"pewny": True}, 3: {"pewny": False}}, ko)
+    assert br["n"] == 1 and br["w"] == 1
+    assert br["lid"] == 1 and br["lid_w"] == 0
+    assert abs(br["sh"] - 8 / 11) < 0.01 and abs(br["min"] - 1 / 3) < 0.01
+    assert S.braki_druzyny(_kadra([], {}), {}, ko) is None
+
+
+def test_braki_typu():
+    mecze = {5: (1, 2)}
+    bk = {(5, 1): {"braki": {"n": 1}}, (5, 2): {"braki": {"n": 3}}}
+    t = B.braki_typu({"mecz_id": 5, "podmiot_typ": "druzyna", "podmiot_id": -2,
+                      "rynek_kod": "team_shots"}, bk, mecze, {})
+    assert t == {"my": {"n": 3}, "ryw": {"n": 1}}
+    z = B.braki_typu({"mecz_id": 5, "podmiot_typ": "zawodnik", "podmiot_id": 9,
+                      "rynek_kod": "shots"}, bk, mecze, {(5, 9): 1})
+    assert z == {"my": {"n": 1}, "ryw": {"n": 3}}
+    assert B.braki_typu({"mecz_id": 5, "rynek_kod": "match_cards"}, bk, mecze, {}) == \
+        {"g": {"n": 1}, "a": {"n": 3}}
+    assert B.braki_typu({"mecz_id": 6, "rynek_kod": "match_cards"}, bk, mecze, {}) is None
+
+
+def test_dolacz_kadry_niedostepni_per_mecz():
+    ko = KO
+    w = {7: [(ko - 4 * DZIEN, 90, 2)], 8: [(ko - 30 * DZIEN, 90, 0)]}
+    unav = [{"playerId": 8, "kind": "injury", "status": "out",
+             "startDateTimestamp": ko - 20 * DZIEN}]
+    kadra = _kadra(unav, w)
+    ev = {"id": 55, "timeStartTimestamp": ko, "homeTeamId": 1, "awayTeamId": 2,
+          "uniqueTournamentId": 7}
+    braki: dict = {}
+    licz = B.dolacz_pelne_kadry(
+        [], [ev], ko - 3600, oferta=lambda e: {"sb": {"x": {}}, "bc": {}},
+        fetch_kadra=lambda tid: kadra, fetch_extra=lambda ids: {}, braki_out=braki)
+    assert set(braki) == {(55, 1), (55, 2)}
+    assert braki[(55, 1)]["nd"][8]["pewny"]
+    assert licz["niedostepni_pewni"] == 2          # ta sama kadra po obu stronach
+
+
+# ---------------------------------------------------------------- sędziowie
+def test_sedziowie_pamiec_i_limit():
+    pobrane = []
+
+    def fetch(rid):
+        pobrane.append(rid)
+        return {"m": 50, "zk": 4.0, "ck": 0.2, "k": 0.3, "ost": KO}
+
+    ev = [{"id": 1 + i, "refereeId": 100 + i, "timeStartTimestamp": KO + i} for i in range(5)]
+    pam: dict = {"100": {"ts": KO, "p": {"m": 9, "zk": 1.0, "ck": 0.0, "k": 0.0}}}
+    po, n = B.odswiez_sedziow_sh(ev, pam, KO + 60, fetch=fetch, limit=2)
+    assert n == 2 and pobrane == [101, 102]          # 100 świeży, limit 2
+    assert po[1] == {"id": 100, "m": 9, "zk": 1.0, "ck": 0.0, "k": 0.0}
+    assert set(po) == {1, 2, 3}
+    # po terminie świeżości pobiera ponownie
+    po, n = B.odswiez_sedziow_sh(ev[:1], pam, KO + B.SEDZIOWIE_SH_SWIEZOSC_S + 1,
+                                 fetch=fetch, limit=5)
+    assert n == 1 and pobrane[-1] == 100
+
+
+# ---------------------------------------------------------------- księga
+def test_ksiega_braki_sedzia_i_odrodzenie_szerokiego():
+    log: dict = {}
+    R._dopisz_nowe(log, [_typ(kurs=2.4, p_model=0.41, odrzucony=True,
+                              odrzucenie_powod=R.POWOD_POMIARU_SZEROKIEGO,
+                              braki={"my": {"n": 1}}, sedzia_sh={"id": 1, "m": 50})])
+    k = next(iter(log))
+    assert log[k]["braki"] == {"my": {"n": 1}} and log[k]["sedzia_sh"]["m"] == 50
+    # ta sama linia pokazana później — rekord od nowa, z ceną publikacji
+    R._dopisz_nowe(log, [_typ(kurs=2.1, p_model=0.5)])
+    rec = log[k]
+    assert rec["kurs"] == 2.1 and rec["p_model"] == 0.5 and not rec["odrzucony"]
+    assert rec["kurs_otw"] == 2.4
+
+
+def test_awans_pomiaru_zapisuje_cene_publikacji():
+    log: dict = {}
+    R._dopisz_nowe(log, [_typ(kurs=1.9, odrzucony=True, odrzucenie_powod="ev_ponizej_progu")])
+    R._dopisz_nowe(log, [_typ(kurs=1.8)])
+    rec = next(iter(log.values()))
+    assert rec["kurs"] == 1.9 and rec["kurs_pub"] == 1.8 and rec["pub_ts"]
+    R._dopisz_nowe(log, [_typ(kurs=1.7)])
+    assert rec["kurs_pub"] == 1.8                     # tylko pierwszy awans
+
+
+def test_cykl_niedostepni_przed_bramka_zawodnika():
+    src = inspect.getsource(B)
+    i_def = src.index("kontuzje_zawieszenia: dict[tuple[int, int], dict] = {}")
+    i_bram = src.index('_odrzuc(mid, tr, "niedostepny"')
+    i_poza = src.index('_odrzuc(mid, tr, "poza_skladem"')
+    assert i_def < i_bram < i_poza

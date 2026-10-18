@@ -622,6 +622,134 @@ def trendy_kadry(
     return out
 
 
+# ⚑ NIEDOSTĘPNI Z KADRY (2026-10-18, plan „90%”, decyzja właściciela).
+# `team/{id}/players/performance` niesie `unavailability` — kontuzje (status
+# "out" albo "dayToDay" = wątpliwy) i zawieszenia (status None, z rozgrywkami
+# `uniqueTournamentId` i liczbą meczów). Do dziś brane było tylko "out"
+# z datą końca, więc zawieszeni za kartki i kontuzje bez daty powrotu
+# przechodziły (pomiar 18.10: Porra 21.09 i Oroz 11.10 — kontuzja na liście
+# przed meczem, a typ stał na stronie).
+#
+# Zasady (sprawdzone na żywych kadrach 18.10):
+#   * wpis NIEAKTUALNY — zawodnik zagrał (minuty > 0) po początku wpisu — nic
+#     nie znaczy (lista bywa nieodświeżana: Manuba, wpis z 11.08); wpis bez
+#     daty początku — nie da się ocenić, zostaje;
+#   * kontuzja "out": koniec nieznany albo po meczu → pewny brak;
+#   * kontuzja "dayToDay": wątpliwy (nie pewny);
+#   * zawieszenie: TYLKO w swoich rozgrywkach (Vinícius: 4 mecze w LaLidze,
+#     w LM gra) i tylko gdy rozgrywki meczu są znane — inaczej nic.
+def _wystepy_kadry(kadra: dict) -> dict[int, list[tuple[int, float, float]]]:
+    """{zawodnik: [(start meczu, minuty, strzały)]}, najnowszy mecz pierwszy."""
+    ts_ev: dict[int, int] = {}
+    for rec in (kadra or {}).get("events") or []:
+        ev = _pierwszy(rec.get("events"))
+        if ev.get("id") and ev.get("timeStartTimestamp"):
+            ts_ev[int(ev["id"])] = int(ev["timeStartTimestamp"])
+    out: dict[int, list[tuple[int, float, float]]] = {}
+    for p in (kadra or {}).get("data") or []:
+        pid = int(p.get("id") or 0)
+        if not pid:
+            continue
+        w = []
+        for eid_s, st in (p.get("stats") or {}).items():
+            ts = ts_ev.get(int(eid_s))
+            if not ts or not st:
+                continue
+            strz = sum(float(st.get(k) or 0) for k in (
+                "onTargetScoringAttempt", "shotOffTarget", "blockedScoringAttempt"))
+            w.append((ts, float(st.get("minutesPlayed") or 0), strz))
+        out[pid] = sorted(w, reverse=True)
+    return out
+
+
+def niedostepni_z_kadry(kadra: dict, ko: int, utid: int | None = None,
+                        wystepy: dict | None = None) -> dict[int, dict]:
+    """{zawodnik: {"r": "kontuzja"|"zawieszenie", "pewny": bool, "s": status,
+    "do": koniec|None}} na mecz o starcie `ko` w rozgrywkach `utid`."""
+    wystepy = _wystepy_kadry(kadra) if wystepy is None else wystepy
+    out: dict[int, dict] = {}
+    for u in (kadra or {}).get("unavailability") or []:
+        try:
+            pid = int(u.get("playerId") or 0)
+        except (TypeError, ValueError):
+            continue
+        if not pid:
+            continue
+        start = int(u.get("startDateTimestamp") or 0)
+        koniec = int(u.get("endDateTimestamp") or 0) or None
+        if start and any(ts > start + 3600 and mi > 0 for ts, mi, _ in wystepy.get(pid, ())):
+            continue                       # zagrał po początku wpisu — nieaktualny
+        if koniec is not None and koniec <= ko:
+            continue                       # wraca przed meczem
+        kind, status = u.get("kind"), u.get("status")
+        if kind == "suspension":
+            u_utid = u.get("uniqueTournamentId")
+            if not (utid and u_utid and int(u_utid) == int(utid)):
+                continue                   # inne rozgrywki albo nie wiemy
+            info = {"r": "zawieszenie", "pewny": True, "s": u.get("reason")}
+        elif status == "out":
+            info = {"r": "kontuzja", "pewny": True, "s": "out"}
+        elif status == "dayToDay":
+            info = {"r": "kontuzja", "pewny": False, "s": "dayToDay"}
+        else:
+            continue
+        info["do"] = koniec
+        if pid not in out or (info["pewny"] and not out[pid]["pewny"]):
+            out[pid] = info
+    return out
+
+
+def braki_druzyny(kadra: dict, niedostepni: dict[int, dict], ko: int,
+                  n: int = 5, wystepy: dict | None = None) -> dict | None:
+    """Ile drużyna traci przez braki: udział minut i strzałów nieobecnych
+    w ostatnich `n` meczach przed `ko` (pewni i wątpliwi osobno) oraz czy
+    brakuje lidera strzałów. None = brak historii kadry."""
+    wystepy = _wystepy_kadry(kadra) if wystepy is None else wystepy
+    mecze = sorted({ts for w in wystepy.values() for ts, mi, _ in w
+                    if ts < ko - 3 * 3600 and mi > 0}, reverse=True)[:n]
+    if not mecze:
+        return None
+    okno = set(mecze)
+    minuty: dict[int, float] = {}
+    strzaly: dict[int, float] = {}
+    for pid, w in wystepy.items():
+        for ts, mi, sh in w:
+            if ts in okno:
+                minuty[pid] = minuty.get(pid, 0.0) + mi
+                strzaly[pid] = strzaly.get(pid, 0.0) + sh
+    tm, ts_ = sum(minuty.values()) or 1.0, sum(strzaly.values()) or 1.0
+    pewni = {p for p, i in niedostepni.items() if i.get("pewny")}
+    watpliwi = {p for p, i in niedostepni.items() if not i.get("pewny")}
+    lider = max(strzaly, key=strzaly.get) if strzaly and max(strzaly.values()) > 0 else None
+    return {
+        "n": len(pewni), "w": len(watpliwi),
+        "min": round(sum(minuty.get(p, 0.0) for p in pewni) / tm, 3),
+        "sh": round(sum(strzaly.get(p, 0.0) for p in pewni) / ts_, 3),
+        "min_w": round(sum(minuty.get(p, 0.0) for p in watpliwi) / tm, 3),
+        "sh_w": round(sum(strzaly.get(p, 0.0) for p in watpliwi) / ts_, 3),
+        "lid": int(lider in pewni) if lider else 0,
+        "lid_w": int(lider in watpliwi) if lider else 0,
+    }
+
+
+def fetch_referee(referee_id: int) -> dict | None:
+    """Profil sędziego ze statshub (2026-10-18): `matchRecords` to bilans
+    kariery liczony na bieżąco (lastGameTimestamp = wczoraj przy sprawdzeniu
+    18.10), w odróżnieniu od `/statistics` per rozgrywki (stan z 2025 — nie
+    używamy). {"m": mecze, "zk": żółte/mecz, "ck": czerwone/mecz,
+    "k": karne/mecz, "ost": ostatni mecz}. None = brak danych."""
+    d = (_get(f"{BASE}/referee/{int(referee_id)}", timeout=15, retries=1) or {}).get("data") or {}
+    mr = d.get("matchRecords") or {}
+    m = int(mr.get("games") or 0)
+    if not m:
+        return None
+    return {"m": m,
+            "zk": round(float(mr.get("yellowCardsPerGame") or 0.0), 3),
+            "ck": round(float(mr.get("redCardsPerGame") or 0.0), 3),
+            "k": round(float(mr.get("penalties") or 0) / m, 3),
+            "ost": int(mr.get("lastGameTimestamp") or 0) or None}
+
+
 def fetch_predicted_lineup(event_id: int) -> dict:
     """Przewidywane XI OBU drużyn: {'home': [pid...], 'away': [...], 'confirmed': bool}.
 
