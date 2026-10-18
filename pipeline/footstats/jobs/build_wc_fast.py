@@ -4696,7 +4696,10 @@ def aktualizuj_bank_stylu(
         nowych_smap = 0
         for ev in (past_events if past_events is not None else past_wc_events()):
             eid = str(ev["id"])
-            if eid in smapy:
+            # ⚑ 2026-10-18: mecz bez osobnych rzutów wolnych/karnych (zapis
+            # sprzed tej daty) pobieramy jeszcze raz — w tym samym limicie
+            # na cykl, więc bank uzupełnia się porcjami
+            if eid in smapy and "wolne" in smapy[eid]:
                 continue
             # w sezonie ligowym rozegranych meczów jest wielokrotnie więcej
             # niż na turnieju — pierwszy cykl dogania porcjami, nie zalewa API
@@ -4713,6 +4716,11 @@ def aktualizuj_bank_stylu(
                 continue
             dr: dict[str, dict] = {}
             stale: dict[str, int] = {}
+            # WYKONAWCY (2026-10-18, wzorce typera: „wykonuje rzuty wolne
+            # i karne") — osobno, bo `stale` miesza je z rożnymi, a po rożnym
+            # strzela stoper głową, nie wykonawca
+            wolne: dict[str, int] = {}
+            karne: dict[str, int] = {}
             for s in strzaly:
                 tid = str(s.get("teamId") or "")
                 if tid:
@@ -4720,15 +4728,17 @@ def aktualizuj_bank_stylu(
                     slot["shots"] += 1
                     if s.get("situation") == "fast-break":
                         slot["kontra"] += 1
-                if str(s.get("situation") or "") in (
-                    "corner", "free-kick", "set-piece", "penalty"
-                ):
-                    pid = str(s.get("playerId") or "")
-                    if pid:
-                        stale[pid] = stale.get(pid, 0) + 1
+                sytuacja = str(s.get("situation") or "")
+                pid = str(s.get("playerId") or "")
+                if sytuacja in ("corner", "free-kick", "set-piece", "penalty") and pid:
+                    stale[pid] = stale.get(pid, 0) + 1
+                if sytuacja == "free-kick" and pid:
+                    wolne[pid] = wolne.get(pid, 0) + 1
+                if sytuacja == "penalty" and pid:
+                    karne[pid] = karne.get(pid, 0) + 1
             smapy[eid] = {
                 "ts": ev.get("timeStartTimestamp") or 0,
-                "druzyny": dr, "stale": stale,
+                "druzyny": dr, "stale": stale, "wolne": wolne, "karne": karne,
             }
             nowych_smap += 1
             zmienione = True

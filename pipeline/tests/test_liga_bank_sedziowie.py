@@ -86,3 +86,29 @@ def test_profil_sedziow_liga_cache_i_comp_ids(monkeypatch):
     assert "sedziowie_cache" not in store
     assert out[501]["sedzia"] == "Szymon Marciniak"
     assert out[501]["n"] == 2                  # obie gry z historii sędziego
+
+
+def test_bank_stylu_osobno_rzuty_wolne_i_karne(monkeypatch):
+    """18.10: mapa strzałów zapisuje wykonawców rzutów wolnych i karnych osobno
+    (`stale` miesza je z rożnymi); mecz zapisany bez nich pobiera się ponownie."""
+    store: dict = {"styl_bank_liga": {"gry": {}, "zawodnicy": {}, "wzrost": {},
+                                       "shotmap": {"1": {"ts": 1, "druzyny": {}, "stale": {"7": 1}},
+                                                   "2": {"ts": 1, "druzyny": {}, "stale": {}, "wolne": {}, "karne": {}}}}}
+    _mock_supa(monkeypatch, store)
+    monkeypatch.setattr(scores365, "finished_games_by_competition", lambda comp_id=None: [])
+    pytane = []
+
+    def _mapa(eid):
+        pytane.append(eid)
+        return [{"teamId": 10, "playerId": 7, "situation": "free-kick"},
+                {"teamId": 10, "playerId": 7, "situation": "penalty"},
+                {"teamId": 10, "playerId": 8, "situation": "corner"}]
+
+    monkeypatch.setattr(build_wc_fast.statshub, "fetch_event_shotmap", _mapa)
+    monkeypatch.setattr(build_wc_fast.time, "sleep", lambda s: None)
+    bank = build_wc_fast.aktualizuj_bank_stylu(
+        set(), comp_ids=[], past_events=[{"id": 1}, {"id": 2}], klucz="styl_bank_liga")
+    assert pytane == [1]                        # 2 ma już podział — nie pytamy
+    m = bank["shotmap"]["1"]
+    assert m["wolne"] == {"7": 1} and m["karne"] == {"7": 1}
+    assert m["stale"] == {"7": 2, "8": 1}
