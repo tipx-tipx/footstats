@@ -407,3 +407,31 @@ def bilans(arg: dict | None) -> int:
 def czysty_pakiet(arg: dict | None, min_za: int = 2) -> bool:
     """Co najmniej `min_za` argumentów za i żadnego przeciw."""
     return bool(arg) and len(arg.get("za") or []) >= min_za and not arg.get("przeciw")
+
+
+# ⚑ KALENDARZ DRUŻYNY PRZED MECZEM (2026-10-18, etap 1 planu „90%”, rozbiór
+# przegranych): model drużyn nie zna dni odpoczynku ani pucharów, a na puli
+# 14.09–17.10 następny mecz za < 4 dni dawał lukę −6,6 pp wobec −4,1 (obie
+# połowy zgodne), odpoczynek < 4 dni −5,0 wobec −3,4. Zawodnicy w pucharach
+# 56% wobec 72% w lidze (wysoka szansa). Na razie WYŁĄCZNIE STEMPEL w księdze
+# — materiał dla selektora (etap 3), nie brama i nie argument.
+def kalendarz(idx: Indeks, tid: int, ko: int, liga_meczu: int | None = None,
+              nast_ts: int | None = None) -> dict | None:
+    """{"odp": dni od ostatniego meczu, "m14": meczów w 14 dniach przed,
+    "l": rozgrywki tego meczu, "ld": liga domowa, "nast": dni do następnego
+    meczu (tylko gdy znany z listy meczów cyklu)}. Surowe liczby — „puchar”
+    to l ≠ ld i liczy go pomiar, żeby nie zamrozić tu złej reguły.
+    None = brak historii drużyny."""
+    ms = idx.przed(tid, ko, n=OKNO_MECZOW)
+    if not ms:
+        return None
+    out = {"odp": round((ko - int(ms[0]["t"])) / 86400.0, 1),
+           "m14": sum(1 for m in ms if ko - int(m["t"]) <= 14 * 86400)}
+    ld = idx.liga(tid, ko)
+    if ld:
+        out["ld"] = int(ld)
+    if liga_meczu:
+        out["l"] = int(liga_meczu)
+    if nast_ts and nast_ts > ko:
+        out["nast"] = round((int(nast_ts) - ko) / 86400.0, 1)
+    return out

@@ -1511,6 +1511,77 @@ def argumenty_typu(b: dict, idx, mecze_druzyn: dict, trendy_zaw: dict,
 WETO_ARGUMENTOW_POLEK = frozenset({("druzyna", "wyzsze_kursy"), ("zawodnik", "wyzsze_kursy")})
 
 
+# ⚑ SZEROKI ZAPIS KANDYDATÓW (2026-10-18, plan „90%”, decyzja właściciela).
+# Selektor typów (etap 3) uczy się na kandydatach z księgi, a księga zna tylko
+# to, co przeszło bramy: zawodnicy na wyższych kursach ~13 na dobę, drabinki
+# ~18 (stanowisko pomiarowe 18.10) — za mało, żeby się czegokolwiek nauczyć.
+# Linie zawodników z kursem 1,70–3,00 (wyższe kursy i strefa 1. szczebla
+# drabinek) idą więc do księgi jako POMIAR (`odrzucony`, poza Skutecznością,
+# kalibracją i stroną) — stała próbka po kluczu linii, tylko zawodnicy
+# z przewidywanymi minutami ≥ 45 (realna pula). Budżet chroni rozmiar księgi.
+POMIAR_SZEROKI_KURS = (1.70, 3.00)
+POMIAR_SZEROKI_UDZIAL = 35          # % linii (ten sam klucz → ta sama decyzja)
+POMIAR_SZEROKI_MIN_MINUT = 45.0
+POMIAR_SZEROKI_MAX_CYKL = 300
+POWOD_POMIARU_SZEROKIEGO = rozliczanie.POWOD_POMIARU_SZEROKIEGO
+
+
+def do_pomiaru_szerokiego(mecz_id, zawodnik_id, rynek, linia, kurs,
+                          oczekiwane_minuty) -> bool:
+    """Czy linia zawodnika wchodzi do szerokiego zapisu kandydatów."""
+    lo, hi = POMIAR_SZEROKI_KURS
+    try:
+        if not (lo <= float(kurs) <= hi):
+            return False
+        if float(oczekiwane_minuty or 0.0) < POMIAR_SZEROKI_MIN_MINUT:
+            return False
+    except (TypeError, ValueError):
+        return False
+    h = zlib.crc32(f"{mecz_id}:{zawodnik_id}:{rynek}:{linia}".encode("utf-8")) % 100
+    return h < POMIAR_SZEROKI_UDZIAL
+
+
+def pokrycie_historii(counts, minutes, linia: float, n: int,
+                      min_minut: float = 15.0) -> tuple[int, int]:
+    """Ile z ostatnich `n` występów (≥ `min_minut`, najnowszy pierwszy, jak
+    w StatshubTrend) przebiło linię: (trafione, występy)."""
+    gr = [float(c) for c, mi in zip(counts or [], minutes or [])
+          if float(mi or 0.0) >= min_minut][:n]
+    return sum(1 for c in gr if c > linia), len(gr)
+
+
+def kalendarz_typu(b: dict, idx, mecze_druzyn: dict, druzyna_zaw: dict,
+                   liga_meczu: dict, nast_mecz) -> dict | None:
+    """Kalendarz drużyny typu (model/argumenty.kalendarz) — stempel do księgi.
+
+    `mecze_druzyn`: {mecz_id: (gospodarz, gość)}, `druzyna_zaw`:
+    {(mecz_id, zawodnik_id): drużyna}, `liga_meczu`: {mecz_id: rozgrywki},
+    `nast_mecz(drużyna, ko)` → start następnego meczu z listy cyklu albo None.
+    Suma meczowa niesie oba kalendarze ("g" gospodarz, "a" gość)."""
+    if idx is None:
+        return None
+    try:
+        mid = int(b.get("mecz_id") or 0)
+        ko = int(b.get("kickoff_ts") or 0)
+    except (TypeError, ValueError):
+        return None
+    lm = liga_meczu.get(mid)
+
+    def _kal(tid):
+        if not tid:
+            return None
+        return argumenty.kalendarz(idx, int(tid), ko, lm, nast_mecz(int(tid), ko))
+
+    rk = str(b.get("rynek_kod") or "")
+    if rk.startswith(("match_", "wiecej_")):
+        gosp, gosc = mecze_druzyn.get(mid) or (None, None)
+        g, a = _kal(gosp), _kal(gosc)
+        return {k: v for k, v in (("g", g), ("a", a)) if v} or None
+    if b.get("podmiot_typ") == "druzyna" or rk.startswith("team_"):
+        return _kal(abs(int(b.get("podmiot_id") or 0)))
+    return _kal(druzyna_zaw.get((mid, b.get("podmiot_id"))))
+
+
 # ⚑ JEDNORAZOWE ZDJĘCIE ZE STRONY (2026-10-18, właściciel: „te przypadki akurat
 # możesz jednorazowo usunąć, ale tylko jednorazowo"). Typy i karty pokazane PRZED
 # regułą `wiecej_przeciw_niz_za` (2ef1fa4), którym opis przeczy — np. Mugisha.
@@ -6758,6 +6829,8 @@ def _main_impl(tryb=None):
     # pomiar bramy kurs×szansa — ten, po który go w ogóle dokładamy — nie
     # zebrałby ani jednej próbki. Dwa liczniki, żeby jedno nie głodziło drugiego.
     ODRZUCONE_POMIAR_DRUZYN_MAX = 60
+    # szeroki zapis kandydatów do selektora — patrz POMIAR_SZEROKI_KURS
+    pomiar_szeroki: list[dict] = []
 
     # PEŁNE POKRYCIE p_model per (zawodnik, rynek, linia) — dla scannera value
     # betów STS. Model „widzi" KAŻDĄ kwotowaną linię, nie tylko te, które weszły
@@ -7529,6 +7602,40 @@ def _main_impl(tryb=None):
                                          else korekta_stron
                                      ),
                                      p_over_zewnetrzne=_p_zew)
+            # SZEROKI ZAPIS KANDYDATÓW (patrz POMIAR_SZEROKI_KURS) — cechy
+            # sprzed meczu: szansa obu rachunków, pokrycie 10, forma 5, minuty,
+            # skład; kalendarz i argumenty dokłada stempel przed księgą
+            if (len(pomiar_szeroki) < POMIAR_SZEROKI_MAX_CYKL
+                    and do_pomiaru_szerokiego(mid, tr.player_id, mk, l, over_odd,
+                                              _mm_zaw.expected_minutes)):
+                _pt10, _pz10 = pokrycie_historii(tr.counts, tr.minutes, l, 10)
+                _pt5, _pz5 = pokrycie_historii(tr.counts, tr.minutes, l, 5)
+                _min6 = [float(mi) for mi in tr.minutes if float(mi or 0) > 0][:6]
+                pomiar_szeroki.append({
+                    "id": 0, "mecz_id": mid, "mecz": match_label,
+                    "kickoff_ts": ts, "podmiot_typ": "zawodnik",
+                    "podmiot_id": tr.player_id, "podmiot": tr.player_name,
+                    "druzyna": tr.team_name or "",
+                    "rynek_kod": mk, "rynek": MARKET_NAMES_PL[mk],
+                    "linia": l, "strona": "powyzej",
+                    "kurs": over_odd, "bukmacher": slot["over"][1],
+                    "p_model": round(float(_p_zew if _p_zew is not None
+                                           else sm.p_over), 4),
+                    **({"p_uczony": _pu_over} if _pu_over else {}),
+                    "zrodlo_p": "uczony" if _p_zew is not None else "stary",
+                    "lambda": sm.lam,
+                    "pewnosc": None, "sugestia": False,
+                    "xi_sygnal": xi_sygnal,
+                    "udzial_startow": udzial_klub,
+                    "gral_w_ostatnim": gral_w_ostatnim,
+                    **({"pokrycie_traf": _pt10, "pokrycie_z": _pz10,
+                        "pokrycie": round(_pt10 / _pz10, 3)} if _pz10 else {}),
+                    **({"forma5_traf": _pt5, "forma5_z": _pz5} if _pz5 else {}),
+                    **({"minuty_sr6": round(sum(_min6) / len(_min6), 1)}
+                       if _min6 else {}),
+                    "odrzucony": True,
+                    "odrzucenie_powod": POWOD_POMIARU_SZEROKIEGO,
+                })
             # POMIAR PROGÓW: odrzucenia tuż przy progu (betting.NEAR_*) —
             # rozliczą się w tle poza kalibracją/skutecznością/UI
             for od in sm.odrzucone:
@@ -12333,8 +12440,57 @@ def _main_impl(tryb=None):
     #
     # ⚑ Działa OD TERAZ w przód. Rekordów sprzed 24.08 nie da się odtworzyć:
     # `_dopisz_nowe` nie dopisuje pól do rekordów, które już istnieją.
+    # ⚑ SZEROKI ZAPIS KANDYDATÓW (2026-10-18, plan „90%”) — dołącza do typów
+    # pomiarowych tylko linie, których ten cykl nie wysyła do księgi inną drogą
+    # (patrz POMIAR_SZEROKI_KURS). Dalej jadą tą samą ścieżką: stempel niżej,
+    # `_dopisz_nowe`, rozliczenie w tle.
+    _klucze_ksiegi_cyklu = {rozliczanie._klucz(_b) for _b in (
+        value_bets + typy_poza_publikacja + odrzucone_pomiar + legi_pool_pub)}
+    _szerokie = [_b for _b in pomiar_szeroki
+                 if rozliczanie._klucz(_b) not in _klucze_ksiegi_cyklu]
+    if _szerokie:
+        odrzucone_pomiar = list(odrzucone_pomiar) + _szerokie
+    print(f"Szeroki zapis kandydatów (zawodnicy, kurs {POMIAR_SZEROKI_KURS[0]:.2f}"
+          f"–{POMIAR_SZEROKI_KURS[1]:.2f}): {len(_szerokie)} linii do księgi "
+          f"(zebrano {len(pomiar_szeroki)}, limit cyklu {POMIAR_SZEROKI_MAX_CYKL})")
+
+    # ⚑ KALENDARZ DRUŻYNY W KSIĘDZE (2026-10-18, plan „90%”, rozbiór przegranych)
+    # — patrz `argumenty.kalendarz`. Następny mecz tylko z listy meczów cyklu
+    # (brak = nie wiemy, nie „daleko”).
+    _liga_meczu_kal = {
+        int(e["id"]): int(e.get("uniqueTournamentId")
+                          or (e.get("tournament") or {}).get("uniqueTournamentId") or 0)
+        for e in events if e.get("id")}
+    _starty_druzyn_kal: dict = defaultdict(list)
+    for _e in events:
+        for _t in (_e.get("homeTeamId"), _e.get("awayTeamId")):
+            if _t and _e.get("timeStartTimestamp"):
+                _starty_druzyn_kal[int(_t)].append(int(_e["timeStartTimestamp"]))
+
+    def _nast_mecz_kal(tid: int, ko: int):
+        _po = [t for t in _starty_druzyn_kal.get(tid, ()) if t > ko + 6 * 3600]
+        return min(_po) if _po else None
+
+    _druzyna_zaw_kal = {(int(getattr(t, "event_id", 0) or 0), t.player_id): t.team_id
+                        for t in trends if getattr(t, "team_id", None)}
+    _ile_kal = Counter()
+
+    def _stempel_kalendarza(b: dict) -> None:
+        if "kalendarz" in b or b.get("sugestia"):
+            return
+        try:
+            _k = kalendarz_typu(b, _indeks_arg, _mecze_druzyn_arg, _druzyna_zaw_kal,
+                                _liga_meczu_kal, _nast_mecz_kal)
+        except Exception as e:                                  # noqa: BLE001
+            diagnostyka.cichy("cykl", "kalendarz_typu", e)
+            _k = None
+        _ile_kal["z" if _k else "bez"] += 1
+        if _k:
+            b["kalendarz"] = _k
+
     for _b in (value_bets + typy_poza_publikacja
                + odrzucone_pomiar + legi_pool_pub):
+        _stempel_kalendarza(_b)
         _ile = _kandydatow_w_meczu.get(_b.get("mecz_id"), 0)
         if not _b.get("polka"):
             _p = _polka_po_kluczu.get(_klucz_publikacji(_b))
@@ -12359,6 +12515,27 @@ def _main_impl(tryb=None):
                            # omijają limity listy dnia (patrz `wybierz_liste_
                            # publikowana`) i to na nie zrzucano puchnięcie doby.
                            **({"wzn": 1} if _b.get("wznowiony") else {})}
+
+    # ⚑ SKŁAD PRZY DRABINKACH (2026-10-18, rozbiór przegranych): księga miała
+    # `xi_sygnal` pusty w 100% rekordów drabinek, więc nie dało się zmierzyć,
+    # czy ogłoszony skład potwierdzał kartę. Stan z TEGO cyklu (nie zamrożone
+    # `xi` karty) — rekord nierozliczony bierze najświeższy stan przed meczem.
+    _xi_drab = Counter()
+    for _b in drabinki_typy:
+        _stempel_kalendarza(_b)
+        _kx = (_int_lub_zero(_b.get("mecz_id")), _b.get("podmiot_id"))
+        if _kx in xi_ogloszony:
+            _b["xi_sygnal"] = "official"
+        elif _kx in poza_ogloszonym:
+            _b["xi_sygnal"] = "poza_ogloszonym"
+        elif xi_znany.get(_kx) is True:
+            _b["xi_sygnal"] = "predicted"
+        elif xi_znany.get(_kx) is False:
+            _b["xi_sygnal"] = "poza_przewidywanym"
+        _xi_drab[_b.get("xi_sygnal") or "brak"] += 1
+    print(f"Kalendarz w księdze: {_ile_kal['z']} typów z kalendarzem, "
+          f"{_ile_kal['bez']} bez historii drużyny | skład przy drabinkach: "
+          + (", ".join(f"{k} {v}" for k, v in sorted(_xi_drab.items())) or "brak kart"))
 
     # ⚑ TYP NA STRONIE BEZ REKORDU W KSIĘDZE (2026-09-13). Księga dostaje
     # wyłącznie świeże przeliczenie, a wznowiony typ ma rekord „od wcześniej"

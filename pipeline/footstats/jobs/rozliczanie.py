@@ -1316,6 +1316,10 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
                 # 18.10 (dalej stan sprzed meczu — rekord jest nierozliczony)
                 if isinstance(b.get("argumenty"), dict) and "argumenty" not in rec:
                     rec["argumenty"] = b["argumenty"]
+                # kalendarz drużyny (odpoczynek, puchar, następny mecz) — ten sam
+                # pierwszy stempel dla rekordów sprzed 18.10 (stan sprzed meczu)
+                if isinstance(b.get("kalendarz"), dict) and "kalendarz" not in rec:
+                    rec["kalendarz"] = b["kalendarz"]
                 # typ pomiarowy (odrzucony przy progu), który PÓŹNIEJ przeszedł
                 # progi i został opublikowany — przestaje być pomiarowy (wraca
                 # do kalibracji/skuteczności); w drugą stronę NIGDY nie
@@ -1450,6 +1454,11 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
             # pomiar na żywych meczach, zanim argumenty zaczną decydować
             **({"argumenty": b["argumenty"]}
                if isinstance(b.get("argumenty"), dict) else {}),
+            # KALENDARZ DRUŻYNY (2026-10-18, model/argumenty.kalendarz): dni od
+            # ostatniego meczu, mecze w 14 dniach, rozgrywki meczu i liga domowa
+            # (puchar = różne), dni do następnego meczu — materiał dla selektora
+            **({"kalendarz": b["kalendarz"]}
+               if isinstance(b.get("kalendarz"), dict) else {}),
             # WKŁAD KAŻDEJ ZALEŻNOŚCI, ZAMROŻONY PRZY PUBLIKACJI (2026-08-07).
             #
             # Do dziś księga zapisywała sam WYNIK rachunku (`p_model`), więc po
@@ -6671,6 +6680,10 @@ POLA_PERF_ROZLICZENIA = {
 # jedno zapytanie na zawodnika na przebieg; typy czekają na dane do 7 dni
 # i są pytane w każdym przebiegu, więc bez sufitu przebieg mógłby puchnąć
 BUDZET_PERF_NA_PRZEBIEG = 150
+# rekordy szerokiego zapisu kandydatów (`build_wc_fast.POMIAR_SZEROKI_KURS`)
+# sięgają po historię statshub dopiero, gdy w budżecie zostaje więcej niż tyle
+POWOD_POMIARU_SZEROKIEGO = "pomiar_szeroki"
+REZERWA_PERF_DLA_TYPOW = 75
 PERF_ZERO_MINUT_PO_S = 6 * 3600
 
 
@@ -6711,6 +6724,11 @@ def _perf_w_meczu(rec: dict, cache: dict, budzet: list[int]) -> dict | None:
     if pid not in cache:
         if budzet[0] <= 0:
             return None                  # spróbujemy w kolejnym przebiegu
+        # szeroki zapis kandydatów (pomiar do selektora, 18.10) nie może
+        # zjadać zapytań typom ze strony — bierze tylko nadwyżkę budżetu
+        if (rec.get("odrzucenie_powod") == POWOD_POMIARU_SZEROKIEGO
+                and budzet[0] <= REZERWA_PERF_DLA_TYPOW):
+            return None
         budzet[0] -= 1
         try:
             cache[pid] = statshub.fetch_player_performance(pid, limit=20)
