@@ -88,6 +88,8 @@ OPISY = {
     # bilans bramek z ostatnich 10 meczów, nie siła klubu — PSG z Barceloną
     # potrafi tu wyjść „słabszy" (podgląd 18.10), więc opis mówi, co liczymy
     "slabsza_ponizej": "ostatnie 10 meczów: rywal z wyraźnie lepszym bilansem bramek",
+    "mecz_sprzyja": "obie drużyny pod ten typ (notują i oddają)",
+    "mecz_nie_sprzyja": "obie drużyny przeciw temu typowi",
     "wykonawca_karnych": "wykonuje rzuty karne",
     "wykonawca_wolnych": "uderza z rzutów wolnych",
 }
@@ -246,6 +248,42 @@ def argumenty_druzyny(idx: Indeks, tid: int, opp: int, ko: int, rynek: str,
     if s1 is not None and s2 is not None and s1 - s2 < -1 and strona == "ponizej":
         za.append("slabsza_ponizej")
     return {"za": za, "przeciw": przeciw, "dane": _bez_pustych(dane)}
+
+
+# sumy meczowe: (pole „notuje", pole „oddaje") — mecz to suma obu drużyn
+POLE_MECZU = {
+    "match_cards": "crd", "match_corners": "cor", "match_shots": "sh",
+    "match_sot": "sot", "match_fouls": "fol",
+}
+PROG_MECZ_ZA = 0.70         # średnie miejsce obu drużyn (notują + oddają) po stronie typu
+PROG_MECZ_PRZECIW = 0.30
+
+
+def argumenty_meczu(idx: Indeks, gosp: int, gosc: int, ko: int, rynek: str,
+                    linia: float, strona: str) -> dict[str, list[str]] | None:
+    """Argumenty sumy meczowej (match_*): czy OBIE drużyny w swojej lidze dużo
+    (albo mało) notują i oddają tę statystykę.
+
+    Pomiar 18.10 (księga 14.09–17.10, 1604 sumy, efekt przy tym samym kursie):
+    obie sprzyjają (średnie miejsce po stronie typu ≥ 0,7) → 61,5%, +12,5 pp
+    (połowy +17,3 / +5,8); nie sprzyjają (< 0,3) → −4,8 pp. Mecze bezpośrednie
+    niestabilne (+17 / −12) — bez argumentu. „Kto więcej" (wiecej_*) nie dał
+    żadnej stabilnej zależności — tam argumentów nie ma."""
+    stat = POLE_MECZU.get(rynek)
+    if not stat or strona not in ("powyzej", "ponizej") or not gosp or not gosc:
+        return None
+    r = [idx.ranga(t, ko, (p, stat)) for t in (gosp, gosc) for p in ("s", "sp")]
+    if any(v is None for v in r):
+        return None
+    srednie = sum(r) / 4
+    po_stronie = srednie if strona == "powyzej" else 1.0 - srednie
+    za: list[str] = []
+    przeciw: list[str] = []
+    if po_stronie >= PROG_MECZ_ZA:
+        za.append("mecz_sprzyja")
+    if po_stronie < PROG_MECZ_PRZECIW:
+        przeciw.append("mecz_nie_sprzyja")
+    return {"za": za, "przeciw": przeciw, "dane": {"mecz_miejsce": round(srednie, 2)}}
 
 
 def wykonawcy_z_banku(bank_stylu: dict | None, ko: int,

@@ -1472,6 +1472,11 @@ def argumenty_typu(b: dict, idx, mecze_druzyn: dict, trendy_zaw: dict,
     except (TypeError, ValueError):
         return None
     rk, strona = b.get("rynek_kod"), b.get("strona")
+    if str(rk or "").startswith("match_"):
+        gosp, gosc = mecze_druzyn.get(mid) or (None, None)
+        if not gosp or not gosc:
+            return None
+        return argumenty.argumenty_meczu(idx, int(gosp), int(gosc), ko, rk, linia, strona)
     if b.get("podmiot_typ") == "druzyna":
         tid = abs(int(b.get("podmiot_id") or 0))
         gosp, gosc = mecze_druzyn.get(mid) or (None, None)

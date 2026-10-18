@@ -16,6 +16,8 @@ export type ArgumentyTypu = {
     na_90?: number;
     karne?: number;
     wolne?: number;
+    /** sumy meczowe: średnie miejsce obu drużyn (notują + oddają), 1 = najwięcej */
+    mecz_miejsce?: number;
   };
 };
 
@@ -50,6 +52,12 @@ function tekst(kod: string, d: NonNullable<ArgumentyTypu["dane"]>, ponizej: bool
       return `Drużyna notuje ${ponizej ? "mało" : "dużo"}${m(d.druzyna_miejsce)}`;
     case "slabsza_ponizej":
       return "Ostatnie 10 meczów: rywal z wyraźnie lepszym bilansem bramek";
+    case "mecz_sprzyja":
+    case "mecz_nie_sprzyja": {
+      // średnie miejsce obu drużyn (notują + oddają): wysoko = dużo w meczach tych drużyn
+      const duzo = (d.mecz_miejsce ?? 0.5) >= 0.5;
+      return `Mecze obu drużyn: zwykle ${duzo ? "dużo" : "mało"} w tej statystyce`;
+    }
     case "wykonawca_karnych":
       return d.karne ? `Wykonuje rzuty karne (${d.karne} w ostatnich meczach)` : "Wykonuje rzuty karne";
     case "wykonawca_wolnych":

@@ -222,6 +222,25 @@ def test_wykonawcy_z_banku_i_argument():
     assert "wykonawca_wolnych" not in z["za"]                       # jeden wolny to za mało
 
 
+def test_argumenty_meczu():
+    """Suma meczowa: obie drużyny wysoko w lidze (notują i oddają) → za."""
+    mag = {}
+    for tid in range(1, 11):
+        v = 30 if tid in (1, 2) else 5 + tid * 0.1
+        mag[str(tid)] = {"m": [_mecz(KO - (i + 1) * 7 * DZIEN, o=100 + i, s={"crd": v}, sp={"crd": v})
+                               for i in range(10)]}
+    idx = A.Indeks(mag)
+    a = A.argumenty_meczu(idx, 1, 2, KO, "match_cards", 4.5, "powyzej")
+    assert a["za"] == ["mecz_sprzyja"] and a["przeciw"] == []
+    b = A.argumenty_meczu(idx, 1, 2, KO, "match_cards", 4.5, "ponizej")
+    assert b["przeciw"] == ["mecz_nie_sprzyja"]
+    assert A.argumenty_meczu(idx, 1, 2, KO, "wiecej_cards", 0, "gospodarz") is None
+    from footstats.jobs import build_wc_fast as B
+    typ = {"podmiot_typ": "druzyna", "podmiot_id": 1, "mecz_id": 77, "kickoff_ts": KO,
+           "rynek_kod": "match_cards", "linia": 4.5, "strona": "powyzej"}
+    assert B.argumenty_typu(typ, idx, {77: (1, 2)}, {})["za"] == ["mecz_sprzyja"]
+
+
 def test_opisy_dla_wszystkich_kodow():
     kody = {"rywal_top", "rywal_slaby", "h2h_wszystkie", "h2h_wiekszosc", "h2h_nie", "pokrycie",
             "forma", "forma_slaba", "na_90", "rzadko_sklad", "druzyna_top", "slabsza_ponizej"}
