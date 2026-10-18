@@ -100,6 +100,16 @@ function SkadTaLiczba({ t }: { t: KartaV }) {
     <div style={{ display: "grid", gap: 14 }}>
       <CenyUBukmacherow t={t} />
       {t.historia.length > 0 && <KratkiD t={t} />}
+      {/* 18.10: argumenty „jak u typera” (rywal w lidze, mecze z rywalem, forma) –
+          osobno od powodów modelu, ten sam wygląd wiersza */}
+      {t.argumenty && t.argumenty.length > 0 && (
+        <div>
+          <div className="el-podsumowanie-powodow" style={{ marginBottom: 8 }}>
+            <span>Argumenty</span>
+          </div>
+          <Powody powody={t.argumenty} />
+        </div>
+      )}
       <div>
         <div className="el-podsumowanie-powodow" style={{ marginBottom: 8 }}>
           <span>

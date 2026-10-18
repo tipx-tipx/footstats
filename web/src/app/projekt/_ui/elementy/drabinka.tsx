@@ -52,7 +52,7 @@ function ZnakRodzaju({ r, d }: { r: RodzajD; d: DrabinkaV }) {
       </i>
     );
   }
-  if (r.kod === "rywal") return <Herb d={d.rywal} tryb="prawdziwy" rozmiar={13} />;
+  if (r.kod === "rywal" || r.kod === "h2h") return <Herb d={d.rywal} tryb="prawdziwy" rozmiar={13} />;
   return null;
 }
 
@@ -410,7 +410,7 @@ export function ScenaDrabinki({ wariant, d: surowa, oznaczenia: oz }: { wariant:
         <div className="el-drab-mecz">
           {meczD.map((r) => (
             <p key={r.kod}>
-              {oz === "e" && r.kod === "rywal" && <Herb d={d.rywal} tryb="prawdziwy" rozmiar={14} />}
+              {oz === "e" && (r.kod === "rywal" || r.kod === "h2h") && <Herb d={d.rywal} tryb="prawdziwy" rozmiar={14} />}
               {r.zdanie}
             </p>
           ))}
