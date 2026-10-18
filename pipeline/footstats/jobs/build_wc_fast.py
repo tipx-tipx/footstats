@@ -1400,15 +1400,18 @@ def tani_typ_druzyny(b: dict) -> bool:
 # teksty"; „mają być dobre sprzedażowo i analityczne"). Tylko to, co w księdze
 # daje przewagę nad kursem (14.09–17.10, rozliczeni kandydaci bez dubli, kurs
 # skalibrowany per rynek; „połowy" = do 03.10 / od 04.10):
-#   perla       wyższe kursy, pokrycie ≥ 8/10, model ≥ cena strumienia
-#               drużyny +5,0 pp (61,7% przy 1,68; połowy +4,7 / +5,3)
+#   perla       wyższe kursy, pokrycie STRONY ≥ 8/10, model ≥ cena strumienia
+#               drużyny +3,8 pp (60,6% przy 1,68; połowy +2,9 / +4,7)
 #               zawodnicy +10,7 pp (50% przy 1,95, n=80)
 #   nad_kursem  zawodnicy, model ≥ cena + 15 pp
 #               wysoka szansa +5,8 (połowy +2,2 / +8,8), wyższe +8,8 (+8,7 / +8,9)
 #               — u drużyn ta sama reguła wychodzi UJEMNIE (−3,7), więc nie ma
-#   seria       pokrycie ≥ 9/10: zawodnicy wysoka +3,9 (+3,4 / +4,4),
-#               drużyny wyższe +4,9; drużyny wysoka szansa — sam fakt, bez
-#               przewagi (+2,2, połowy −2,5 / +5,2)
+#   seria       pokrycie STRONY ≥ 9/10: zawodnicy wysoka +3,9 (+3,4 / +4,4),
+#               drużyny wyższe +5,1 (+5,4 / +4,9); drużyny wysoka szansa —
+#               BEZ oznaczenia (+0,8, a 9/10 ma tam prawie każdy typ)
+# ⚑ POKRYCIE STRONY: `p_uczony.pkw` to udział meczów POWYŻEJ linii bez względu
+# na stronę typu — typ „poniżej" ma pokrycie 1 − pkw (podgląd 18.10: NEC gole
+# poniżej 3,5 „weszło w 9 z 10" na karcie, a pkw = 0,0).
 # „U siebie" i „faworyt" (+4–6 pp u zawodników) czekają na ~2 tygodnie danych
 # (`tempo` w księdze od 15.10). Cena = kurs po marży strumienia
 # (rozliczanie.sciaganie_uczony_strumieni), ta sama co na karcie.
@@ -1429,15 +1432,26 @@ def oznaczenia_typu(b: dict, marze: dict[str, float] | None = None) -> list[str]
                               rozliczanie.MARZA_SCIAGANIA_DOMYSLNA)
     cena = betting.implied_prob_one_sided(kurs, marza)
     pkw = (b.get("p_uczony") or {}).get("pkw")
-    pkw = float(pkw) if isinstance(pkw, (int, float)) else None
+    strona = b.get("strona")
+    if not isinstance(pkw, (int, float)) or strona not in ("powyzej", "ponizej"):
+        pkw = None          # „kto więcej" i rekordy bez historii linii
+    else:
+        pkw = float(pkw) if strona == "powyzej" else 1.0 - float(pkw)
+    # wyższe kursy: półka z listy, a typ bez półki (pokazany przed jej
+    # nadaniem) po kursie — tak jak był mierzony (drużyny od 1,45, zaw. 1,80)
+    wyzsze = (b.get("polka") == "wyzsze_kursy"
+              or (not b.get("polka") and kurs >= (1.45 if druz else 1.80)))
     out: list[str] = []
-    if (b.get("polka") == "wyzsze_kursy" and pkw is not None
+    if (wyzsze and pkw is not None
             and pkw >= OZNACZENIA_TYPU["perla_pokrycie"] and p >= cena):
         out.append("perla")
     if not druz and p >= cena + OZNACZENIA_TYPU["nad_kursem_pp"]:
         out.append("nad_kursem")
+    # u drużyn seria tylko w wyższych kursach: na wysokiej szansie 9/10 ma
+    # prawie każdy typ (podgląd 18.10: 9 z 11), a przewagi nie daje (+0,8)
     if ("perla" not in out and pkw is not None
-            and pkw >= OZNACZENIA_TYPU["seria_pokrycie"]):
+            and pkw >= OZNACZENIA_TYPU["seria_pokrycie"]
+            and (not druz or wyzsze)):
         out.append("seria")
     return out
 

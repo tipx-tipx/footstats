@@ -4,9 +4,23 @@ from footstats.jobs import build_wc_fast as B
 MARZE = {"druzyny": 0.05, "zawodnicy": 0.18}
 
 
-def _typ(podmiot_typ="zawodnik", kurs=1.40, p=0.70, pkw=0.7, polka="wysoka_szansa", **kw):
+def _typ(podmiot_typ="zawodnik", kurs=1.40, p=0.70, pkw=0.7, polka="wysoka_szansa",
+         strona="powyzej", **kw):
     return {"podmiot_typ": podmiot_typ, "kurs": kurs, "p_model": p, "polka": polka,
-            "p_uczony": {"p": p, "pkw": pkw}, **kw}
+            "strona": strona, "p_uczony": {"p": p, "pkw": pkw}, **kw}
+
+
+def test_pokrycie_strony_ponizej():
+    """pkw = udział meczów POWYŻEJ linii — typ „poniżej" ma pokrycie 1 − pkw
+    (podgląd 18.10: NEC gole poniżej 3,5, 9/10 na karcie, pkw 0,0)."""
+    assert B.oznaczenia_typu(_typ("druzyna", 1.70, 0.50, 0.0, "wyzsze_kursy",
+                                  strona="ponizej"), MARZE) == ["seria"]
+    assert B.oznaczenia_typu(_typ("druzyna", 1.70, 0.50, 0.9, "wyzsze_kursy",
+                                  strona="ponizej"), MARZE) == []
+    assert B.oznaczenia_typu(_typ("druzyna", 1.90, 0.60, 0.1, "wyzsze_kursy",
+                                  strona="ponizej"), MARZE) == ["perla"]
+    # „kto więcej" (strona gospodarz/gość) — bez serii
+    assert B.oznaczenia_typu(_typ("druzyna", 1.30, 0.80, 1.0, strona="gospodarz"), MARZE) == []
 
 
 def test_perla_wyzsze_kursy_z_pokryciem_i_modelem_nad_cena():
@@ -29,6 +43,17 @@ def test_nad_kursem_tylko_zawodnicy():
 def test_seria_od_dziewieciu_na_dziesiec():
     assert B.oznaczenia_typu(_typ(p=0.50, pkw=0.9), MARZE) == ["seria"]
     assert B.oznaczenia_typu(_typ(p=0.50, pkw=0.8), MARZE) == []
+
+
+def test_druzyny_seria_tylko_w_wyzszych_kursach():
+    assert B.oznaczenia_typu(_typ("druzyna", 1.30, 0.80, 1.0), MARZE) == []
+    assert B.oznaczenia_typu(_typ("druzyna", 1.70, 0.50, 1.0, "wyzsze_kursy"), MARZE) == ["seria"]
+
+
+def test_typ_bez_polki_po_kursie():
+    """Pokazany przed nadaniem półki (Botafogo 18.10, rożne 3,5 po 1,57)."""
+    assert B.oznaczenia_typu(_typ("druzyna", 1.57, 0.55, 1.0, None), MARZE) == ["seria"]
+    assert B.oznaczenia_typu(_typ("druzyna", 1.30, 0.80, 1.0, None), MARZE) == []
 
 
 def test_perla_nie_dubluje_serii():
