@@ -200,6 +200,9 @@ def _zaw(i, p=0.7, **kw):
          "p_model": p, "kurs": 1.6, "podmiot_typ": "zawodnik",
          "kickoff_ts": _ts("2026-09-14", 20)}
     r.update(kw)
+    # inny zawodnik = inny numer (limit „1 na zawodnika" liczy też po numerze)
+    if "podmiot" in kw and "podmiot_id" not in kw:
+        r["podmiot_id"] = 100000 * i + sum(map(ord, kw["podmiot"]))
     return r
 
 

@@ -1283,6 +1283,36 @@ LISTA_PER_RODZINA_ZAWODNIK = 6
 LISTA_PER_ZAWODNIKA = 1
 
 
+def klucze_zawodnika_listy(b: dict, dzien) -> tuple:
+    """Klucze tożsamości zawodnika do limitu „1 typ na zawodnika w dniu".
+
+    ⚑ DUBEL POD DWIEMA NAZWAMI (2026-10-18). Feed `props/player-trends`
+    statshuba od ~16.10 podaje tego samego `playerId` pod różnymi zapisami
+    nazwiska w różnych rekordach („Oosting, Thijs" i „Thijs Oosting";
+    w meczu PEC – GAE 12 z 19 zawodników). Klucz z samej nazwy bez
+    sortowania słów dawał dwóch ludzi — na stronie 18.10 stały dwa identyczne
+    typy na Oostinga i dwa na Fernando Pedro.
+
+    Dlatego DWA klucze naraz: numer zawodnika i nazwa bez względu na
+    kolejność słów (`radar._klucz_zawodnika`, ta sama, którą drabinki scalają
+    duble). Numer w księdze nigdy nie łączył dwóch różnych osób (36,9 tys.
+    rekordów, 18.10), a nazwa łapie odwrotny przypadek z radaru — tego samego
+    człowieka pod innym numerem feedu ([[drabinki-analiza-zawodnika]]).
+    """
+    klucze = []
+    nazwa = radar._klucz_zawodnika(str(b.get("podmiot") or ""))
+    if nazwa:   # pusty klucz (brak nazwy, same inicjały) zlałby różnych ludzi
+        klucze.append((dzien, "n", nazwa))
+    if b.get("podmiot_id"):
+        klucze.append((dzien, "id", int(b["podmiot_id"])))
+    return tuple(klucze)
+
+
+def _ile_zawodnika(licznik: dict, klucze: tuple | None) -> int:
+    """Ile typów zawodnik ma już w dniu — po którymkolwiek z kluczy."""
+    return max((licznik.get(k, 0) for k in klucze or ()), default=0)
+
+
 def _rodzina_statystyki(kod) -> str:
     """Kartki to kartki, wszystko jedno czyje — `match_cards` i `team_cards`
     to dla użytkownika jedno i to samo."""
@@ -1547,7 +1577,7 @@ def wybierz_liste_publikowana(
         # jeden typ na ZAWODNIKA w dniu (patrz LISTA_PER_ZAWODNIKA); drużyny
         # zostają poza tym licznikiem — u nich rynki nie są tak skorelowane
         zawodnik = (
-            (dzien, rotowire._norm(str(b.get("podmiot") or "")))
+            klucze_zawodnika_listy(b, dzien)
             if b.get("podmiot_typ") == "zawodnik" else None
         )
         _polka_klucz = (dzien, _str, _polka, _zejscie)
@@ -1574,7 +1604,7 @@ def wybierz_liste_publikowana(
                     and z_strumienia.get(doba_str, 0) < LISTA_CAP
                     and z_polki.get(_polka_klucz, 0) < _polka_limit
                     and z_meczu.get(mecz, 0) < LISTA_PER_MECZ
-                    and z_zawodnika.get(zawodnik, 0) < LISTA_PER_ZAWODNIKA):
+                    and _ile_zawodnika(z_zawodnika, zawodnik) < LISTA_PER_ZAWODNIKA):
                 b["dolozony_po_domknieciu"] = True
                 dolozone.setdefault(dzien, []).append(_k)
                 lista_pub.append(b)
@@ -1585,8 +1615,8 @@ def wybierz_liste_publikowana(
             z_strumienia[doba_str] = z_strumienia.get(doba_str, 0) + 1
             z_polki[_polka_klucz] = z_polki.get(_polka_klucz, 0) + 1
             z_meczu[mecz] = z_meczu.get(mecz, 0) + 1
-            if zawodnik is not None:
-                z_zawodnika[zawodnik] = z_zawodnika.get(zawodnik, 0) + 1
+            for _kz in zawodnik or ():
+                z_zawodnika[_kz] = z_zawodnika.get(_kz, 0) + 1
             continue
         # ⚑ ZAWODNIK BEZ ŻADNEGO SYGNAŁU, ŻE ZAGRA (2026-09-14): ani XI
         # (ogłoszone/przewidywane), ani występu w ostatnim meczu drużyny —
@@ -1617,7 +1647,8 @@ def wybierz_liste_publikowana(
                         LISTA_PER_RODZINA_ZAWODNIK if _str == "zawodnik"
                         else LISTA_PER_RODZINA)
                     or (zawodnik is not None
-                        and z_zawodnika.get(zawodnik, 0) >= LISTA_PER_ZAWODNIKA)):
+                        and _ile_zawodnika(z_zawodnika, zawodnik)
+                        >= LISTA_PER_ZAWODNIKA)):
                 zdjete.setdefault(_klucz_publikacji(b), "poza_lista_dnia")
                 continue
         z_dnia[dzien] = z_dnia.get(dzien, 0) + 1
@@ -1625,8 +1656,8 @@ def wybierz_liste_publikowana(
         z_polki[_polka_klucz] = z_polki.get(_polka_klucz, 0) + 1
         z_meczu[mecz] = z_meczu.get(mecz, 0) + 1
         z_rodziny[rodzina] = z_rodziny.get(rodzina, 0) + 1
-        if zawodnik is not None:
-            z_zawodnika[zawodnik] = z_zawodnika.get(zawodnik, 0) + 1
+        for _kz in zawodnik or ():
+            z_zawodnika[_kz] = z_zawodnika.get(_kz, 0) + 1
         lista_pub.append(b)
     return lista_pub, zdjete, z_dnia
 

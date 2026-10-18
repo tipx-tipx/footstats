@@ -111,9 +111,10 @@ def test_dzien_liczony_doba_polska():
 # --- jeden typ na zawodnika (2026-08-08, wpięcie oferty do silnika) ---
 
 def _typ_zawodnika(nazwa="K. Mbappe", rynek="shots", mecz_id=1, kurs=1.8,
-                   **kw) -> dict:
+                   podmiot_id=555, **kw) -> dict:
     return _typ(mecz_id=mecz_id, rynek=rynek, kurs=kurs,
-                podmiot=nazwa, podmiot_typ="zawodnik", podmiot_id=555, **kw)
+                podmiot=nazwa, podmiot_typ="zawodnik", podmiot_id=podmiot_id,
+                **kw)
 
 
 def test_jeden_zawodnik_nie_zajmuje_listy_kilkoma_rynkami():
@@ -171,6 +172,48 @@ def test_pokazany_typ_zawodnika_zostaje_i_zajmuje_swoje_miejsce():
     lista, zdjete, _p = B.wybierz_liste_publikowana(kand, _klucz)
     assert [b["rynek_kod"] for b in lista] == ["sot"]      # pokazany zostaje
     assert len(zdjete) == 1                                # nowy czeka
+
+
+def test_ten_sam_zawodnik_pod_dwiema_nazwami_to_jeden_typ():
+    """18.10: „Thijs Oosting" i „Oosting, Thijs" (ten sam numer) stały na
+    stronie jako dwa typy — feed statshuba podaje oba zapisy."""
+    kand = [
+        _typ_zawodnika(nazwa="Thijs Oosting", rynek="fouls_committed", kurs=2.12),
+        _typ_zawodnika(nazwa="Oosting, Thijs", rynek="fouls_committed", kurs=2.10),
+    ]
+    lista, zdjete, _p = B.wybierz_liste_publikowana(kand, _klucz)
+    assert len(lista) == 1
+    assert set(zdjete.values()) == {"poza_lista_dnia"}
+
+
+def test_ten_sam_numer_inna_nazwa_to_jeden_typ():
+    """„Fernando Pedro" i „Fernando dos Santos Pedro" — inne słowa, ten sam
+    numer zawodnika: rozstrzyga numer."""
+    kand = [
+        _typ_zawodnika(nazwa="Fernando Pedro", rynek="shots", kurs=1.9),
+        _typ_zawodnika(nazwa="Fernando dos Santos Pedro", rynek="shots", kurs=1.8),
+    ]
+    lista, _zdjete, _p = B.wybierz_liste_publikowana(kand, _klucz)
+    assert len(lista) == 1
+
+
+def test_odwrocona_nazwa_bez_numeru_to_jeden_typ():
+    """Bez numeru (stare rekordy) zostaje nazwa niezależna od kolejności słów."""
+    kand = [
+        _typ_zawodnika(nazwa="Thijs Oosting", podmiot_id=None),
+        _typ_zawodnika(nazwa="Oosting, Thijs", rynek="sot", podmiot_id=None),
+    ]
+    lista, _zdjete, _p = B.wybierz_liste_publikowana(kand, _klucz)
+    assert len(lista) == 1
+
+
+def test_rozni_zawodnicy_tego_samego_meczu_dostaja_swoje_typy():
+    kand = [
+        _typ_zawodnika(nazwa="Thijs Oosting", podmiot_id=876233),
+        _typ_zawodnika(nazwa="Nick Viergever", podmiot_id=46900, rynek="sot"),
+    ]
+    lista, _zdjete, _p = B.wybierz_liste_publikowana(kand, _klucz)
+    assert len(lista) == 2
 
 
 # --- typ raz pokazany zostaje do gwizdka ---

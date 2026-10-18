@@ -151,6 +151,23 @@ class StatshubTrend:
     z_kadry: bool = False
 
 
+def nazwa_zawodnika(surowa) -> str:
+    """„Nazwisko, Imię" -> „Imię Nazwisko"; inne zapisy bez zmian.
+
+    ⚑ 2026-10-18: feed player-trends od ~16.10 miesza w jednym meczu oba
+    zapisy tego samego zawodnika („Oosting, Thijs" i „Thijs Oosting"). Klucze
+    typów, księgi i parowanie ze składami (`rotowire._norm`) idą po nazwie
+    w kolejności słów, więc jeden człowiek robił się dwoma typami, a wersja
+    z przecinkiem nie parowała się z XI. Odwracamy tylko zapis z JEDNYM
+    przecinkiem — tak samo jak `radar.debiutanci_meczu` przed wyszukiwarką.
+    """
+    s = str(surowa or "").strip()
+    if s.count(",") != 1:
+        return s
+    nazwisko, imie = (c.strip() for c in s.split(","))
+    return f"{imie} {nazwisko}".strip() if imie and nazwisko else s
+
+
 def fetch_event_trends(event_ids: list[int]) -> list[StatshubTrend]:
     """Pobierz trendy propsów dla podanych meczów (Z PAGINACJĄ).
 
@@ -187,7 +204,7 @@ def fetch_event_trends(event_ids: list[int]) -> list[StatshubTrend]:
         out.append(
             StatshubTrend(
                 player_id=rec["playerId"],
-                player_name=rec["playerName"],
+                player_name=nazwa_zawodnika(rec["playerName"]),
                 position=(rec.get("position") or "M")[:1],
                 team_id=rec.get("teamId"),
                 team_name=rec.get("teamName", ""),
