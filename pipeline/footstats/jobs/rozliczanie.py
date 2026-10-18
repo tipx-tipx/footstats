@@ -1197,16 +1197,43 @@ def poza_zamrozona_lista(r: dict, lista_dnia: dict[str, set] | None) -> bool:
 POKAZANE_KLUCZ = "pokazane_na_stronie"
 
 
-def wczytaj_pokazane() -> dict | None:
+def wczytaj_pokazane(log: dict | None = None) -> dict | None:
     """`{"od_ts": int, "klucze": {klucz_ksiegi: kickoff_ts}}` albo None.
 
     None także przy nieudanym odczycie — wtedy odczyt wraca do starej reguły
-    zamiast uznać, że NIC nie było na stronie.
+    zamiast uznać, że NIC nie było na stronie. Z `log` dochodzi `_pomin` —
+    patrz `dublety_pokazanych`.
     """
     stan, ok = supa.get_key_ok(POKAZANE_KLUCZ)
     if not ok or not isinstance(stan, dict) or not stan.get("od_ts"):
         return None
+    if log:
+        stan["_pomin"] = dublety_pokazanych(log, stan)
     return stan
+
+
+def dublety_pokazanych(log: dict, pokazane: dict) -> set[str]:
+    """⚑ TEN SAM TYP POD DWIEMA NAZWAMI (2026-10-19). Zmiana zapisu nazwisk ze
+    statshub („Oosting, Thijs” → „Thijs Oosting”, 18.10) dała dwa klucze księgi
+    dla jednego typu (ten sam mecz, numer zawodnika, rynek, linia, strona) —
+    oba w zapisie pokazanych, więc Skuteczność liczyła Oostinga 18.10 jako dwie
+    przegrane. Zostaje rekord opublikowany NAJWCZEŚNIEJ, pozostałe klucze
+    pomijamy przy odczycie. Księgi ani zapisu pokazanych nie ruszamy.
+    Nowych dubli nie będzie: lista dnia liczy od 18.10 zawodnika po numerze."""
+    klucze = (pokazane or {}).get("klucze") or {}
+    grupy: dict[tuple, list[tuple[int, str]]] = {}
+    for k in klucze:
+        r = (log or {}).get(k)
+        if not r or not isinstance(r.get("podmiot_id"), int) or r["podmiot_id"] <= 0:
+            continue
+        g = (r.get("mecz_id"), r["podmiot_id"], r.get("rynek_kod"), r.get("linia"),
+             r.get("strona"), r.get("zrodlo"))
+        grupy.setdefault(g, []).append((int(r.get("opublikowano_ts") or 0), k))
+    out: set[str] = set()
+    for v in grupy.values():
+        if len(v) > 1:
+            out.update(k for _, k in sorted(v)[1:])
+    return out
 
 
 def opublikowany(r: dict, lista_dnia: dict[str, set] | None,
@@ -1244,7 +1271,8 @@ def opublikowany(r: dict, lista_dnia: dict[str, set] | None,
     do „prób" każdą kartę, która stała na stronie.
     """
     if pokazane and int(r.get("kickoff_ts") or 0) >= int(pokazane["od_ts"]):
-        return _klucz(r) in (pokazane.get("klucze") or {})
+        k = _klucz(r)
+        return k in (pokazane.get("klucze") or {}) and k not in (pokazane.get("_pomin") or ())
     if r.get("zrodlo") == ZRODLO_DRABINKA:
         return not r.get("poza_publikacja")
     if lista_dnia:
@@ -6127,7 +6155,7 @@ def skutecznosc_strumieni(log: dict, dni: int = 21,
     # strumieni liczyły z DOKŁADNIE tego samego składu (i żeby nie robić
     # drugiego odczytu Supabase w tym samym przebiegu).
     _lista_dnia = lista_dnia if lista_dnia is not None else wczytaj_liste_dnia()
-    _na_stronie = pokazane if pokazane is not None else wczytaj_pokazane()
+    _na_stronie = pokazane if pokazane is not None else wczytaj_pokazane(log)
     _now = now if now is not None else int(time.time())
     # zwroty i typy czekające na dane — te same reguły co w widoku zbiorczym
     # (patrz `_zwroty_dnia` / `_czekajace_dnia`), rozdzielone po strumieniu
@@ -7636,8 +7664,8 @@ def rozlicz(
     # dalej rozlicza się i uczy model, przenosi się tylko do „policzonych
     # na próbę" (`poza_pub`), dokładnie jak w strumieniach.
     _lista_dnia = wczytaj_liste_dnia()
-    # co REALNIE poszło na stronę — patrz `POKAZANE_KLUCZ`
-    _na_stronie = wczytaj_pokazane()
+    # co REALNIE poszło na stronę — patrz `POKAZANE_KLUCZ` (bez dubli nazw)
+    _na_stronie = wczytaj_pokazane(log)
     settled = [
         r for r in log.values()
         if r.get("wynik") in ("wygrany", "przegrany")

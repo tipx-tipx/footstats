@@ -407,3 +407,18 @@ def test_ksiega_zapisuje_krycie():
     log: dict = {}
     R._dopisz_nowe(log, [_typ(rynek_kod="fouls_committed", krycie={"a_mir": 3.0})])
     assert next(iter(log.values()))["krycie"] == {"a_mir": 3.0}
+
+
+def test_dublet_nazwy_liczy_sie_raz_w_skutecznosci():
+    """Oosting 18.10: ten sam typ pod „Oosting, Thijs” i „Thijs Oosting”."""
+    a = _typ(podmiot="Oosting, Thijs", podmiot_id=77, kickoff_ts=1792300000, wynik="przegrany",
+             opublikowano_ts=100)
+    b = _typ(podmiot="Thijs Oosting", podmiot_id=77, kickoff_ts=1792300000, wynik="przegrany",
+             opublikowano_ts=200)
+    c = _typ(podmiot="Inny", podmiot_id=78, kickoff_ts=1792300000, wynik="wygrany", opublikowano_ts=150)
+    log = {R._klucz(x): x for x in (a, b, c)}
+    pok = {"od_ts": 1, "klucze": {k: 1792300000 for k in log}}
+    pok["_pomin"] = R.dublety_pokazanych(log, pok)
+    assert pok["_pomin"] == {R._klucz(b)}
+    assert R.opublikowany(a, None, pok) and not R.opublikowany(b, None, pok)
+    assert R.opublikowany(c, None, pok)
