@@ -107,6 +107,14 @@ RYNKI_PODSTAWOWE = ("shots", "sot", "fouls_committed", "fouls_won",
 # `dzien_karty` = `build_wc_fast.dzien_listy`). Karty już opublikowane
 # zajmują miejsca swojego dnia (`build_wc_fast.scal_karty_z_publikacjami`).
 MAX_KART_DZIEN = 10
+# ⚑ WETO „ARGUMENT PRZECIW" (2026-10-18, właściciel: „logika maksymalnie
+# dopracowana, jak u typera"; model/argumenty.py). Nowa karta nie powstaje, gdy
+# przeciw linii nagłówka stoi mocny argument: forma 0–1/5, rywal w dolnych 20%
+# ligi w oddawaniu tej statystyki, z tym rywalem nie wchodziło (2+ mecze),
+# rzadko w pierwszym składzie. Linie zawodników 1,70–2,60, wybór 10/dobę,
+# 14.09–17.10: 43,8% → 47,0% (połowy 45,5/41,7 → 50,3/43,2), 8,5 → 7,9 karty/d.
+# Przykład z 18.10: Jović strzały 1,5 – forma 1/5, rywal 19. na 23.
+WETO_ARGUMENTOW_KART = True
 MAX_WPISOW = 80             # bezpiecznik całości (≈ 10 × dni zakresu)
 MAX_WPISOW_MECZ = 2         # sufit kart na mecz (bez gwarancji slotu!)
 MAX_SHOTMAP_CYKL = 160      # budżet zapytań o shotmapy historyczne na cykl
@@ -3683,7 +3691,16 @@ def zbuduj(
     per_mecz_n: dict[int, int] = {}
     per_dzien_n: dict[str, int] = {}
     wybrane: list[dict] = []
+    _weto_n = 0
     for w in sorted(ocenione, key=kolejnosc_kart):
+        # WETO „ARGUMENT PRZECIW" — patrz WETO_ARGUMENTOW_KART. Karta już
+        # opublikowana wraca z rejestru (`scal_karty_z_publikacjami`), więc
+        # weto dotyczy wyłącznie nowych kart.
+        if WETO_ARGUMENTOW_KART and (w.get("argumenty") or {}).get("przeciw"):
+            _weto_n += 1
+            _ri(w["mecz_id"], w.get("podmiot_id") or 0, "argument_przeciw",
+                podmiot=w.get("podmiot"))
+            continue
         if len(wybrane) >= MAX_WPISOW:
             _ri(w["mecz_id"], w.get("podmiot_id") or 0, "limit_wpisow",
                 podmiot=w.get("podmiot"))
@@ -3700,6 +3717,9 @@ def zbuduj(
         per_mecz_n[w["mecz_id"]] = per_mecz_n.get(w["mecz_id"], 0) + 1
         per_dzien_n[_dz] = per_dzien_n.get(_dz, 0) + 1
         wybrane.append(w)
+    if _weto_n:
+        print(f"Drabinki — weto „argument przeciw” (słaba forma, rywal nie oddaje, "
+              f"z rywalem nie wchodziło, rzadko w składzie): {_weto_n} nowych kart")
     wpisy = wybrane
     # OCENA na karcie: miejsce w rankingu dnia + klasa jakości. Front sortuje
     # i oznacza WYŁĄCZNIE tym — nie ma drugiej definicji „najlepszego typu"

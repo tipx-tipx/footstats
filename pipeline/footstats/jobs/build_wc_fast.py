@@ -1490,6 +1490,28 @@ def argumenty_typu(b: dict, idx, mecze_druzyn: dict, trendy_zaw: dict) -> dict |
         getattr(tr, "timestamps", None), getattr(tr, "game_opponent_ids", None))
 
 
+# ⚑ WETO „ARGUMENT PRZECIW" (2026-10-18, właściciel: „logika tworzenia typów
+# maksymalnie dopracowana, jak u typera"). Typer nie publikuje typu, przeciw
+# któremu stoi mocny argument: słaba forma, rywal, który tej statystyki nie
+# oddaje, z tym rywalem nie wchodziło, rzadko w składzie (model/argumenty.py).
+# Lista z limitami 14.09–17.10, nowe wejścia:
+#   zawodnicy wyższe kursy   42,6% → 46,8%  (połowy 47,1/37,5 → 53,0/39,7), 5,6 → 5,0/d
+#   drużyny wyższe 1,80–2,00 51,7% → 56,2% z kolejnością po bilansie, ta sama liczba
+#   drużyny zejście 1,45–1,80 62,4% → 64,2%
+# Na wysokiej szansie weta NIE MA: u drużyn nic nie dało (81,4 → 80,5%),
+# u zawodników zabrało 40% typów przy tej samej trafności (77,7 → 77,8%).
+# Typ bez argumentów (brak danych) przechodzi — brak danych nie jest dowodem.
+WETO_ARGUMENTOW_POLEK = frozenset({("druzyna", "wyzsze_kursy"), ("zawodnik", "wyzsze_kursy")})
+
+
+def weto_argumentow(b: dict, polka: str | None) -> bool:
+    """Czy nowy typ odpada, bo ma argument przeciw (patrz WETO_ARGUMENTOW_POLEK)."""
+    strumien = "druzyna" if b.get("podmiot_typ") == "druzyna" else "zawodnik"
+    if (strumien, polka) not in WETO_ARGUMENTOW_POLEK:
+        return False
+    return bool(((b.get("argumenty") or {}).get("przeciw")))
+
+
 def tylko_tania_sciezka(b: dict) -> bool:
     """Najtańszy typ drużynowy, który BEZ tej ścieżki nie przeszedłby progu
     jakości (p < 0,80) — tylko takie liczą się do limitu „1 na mecz".
@@ -1742,6 +1764,7 @@ def wybierz_liste_publikowana(
                 continue
             elif (dolozone is not None and _dokladany and _polka
                     and not ponizej_progu_jakosci(b, _polka, bijace_cene)
+                    and not weto_argumentow(b, _polka)
                     and z_strumienia.get(doba_str, 0) < LISTA_CAP
                     and z_polki.get(_polka_klucz, 0) < _polka_limit
                     and z_meczu.get(mecz, 0) < LISTA_PER_MECZ
@@ -1782,6 +1805,11 @@ def wybierz_liste_publikowana(
         if (not juz_pokazany(b) and not na_ogloszonej_liscie(b, zamkniete)
                 and ponizej_progu_jakosci(b, _polka, bijace_cene)):
             zdjete.setdefault(_klucz_publikacji(b), "ponizej_progu_jakosci")
+            continue
+        # WETO „ARGUMENT PRZECIW" — patrz WETO_ARGUMENTOW_POLEK (tylko nowe wejścia)
+        if (not juz_pokazany(b) and not na_ogloszonej_liscie(b, zamkniete)
+                and weto_argumentow(b, _polka)):
+            zdjete.setdefault(_klucz_publikacji(b), "argument_przeciw")
             continue
         if not juz_pokazany(b):
             if (z_polki.get(_polka_klucz, 0) >= _polka_limit
@@ -2606,6 +2634,7 @@ OPISY_ZDJECIA_PL = {
     "stary_rachunek": "model nie ma jeszcze historii tej drużyny lub zawodnika – liczymy w tle, nie pokazujemy",
     "ponizej_progu_jakosci": "szansa poniżej progu półki wysokiej szansy (model ≥ 80% i kurs do ok. 1,24; drużyny 1,25–1,45 także z rynku bijącego cenę, gdy model ≥ kurs)",
     "bez_sygnalu_skladu": "ani składu, ani występu w ostatnim meczu drużyny – nie wiemy, czy zagra",
+    "argument_przeciw": "na wyższych kursach stoi przeciw typowi mocny argument (słaba forma, rywal tego nie oddaje, z rywalem nie wchodziło, rzadko w składzie)",
     "ujemna_po_korekcie": "po urealnieniu szansy wartość wyszła ujemna",
     "kurs_poza_widelkami": "kurs poza widełkami, w jakich gramy",
     "limit_meczu": "z tego meczu mamy już tyle typów, ile publikujemy",
@@ -11315,6 +11344,31 @@ def _main_impl(tryb=None):
         if not b.get("sugestia")
     )
 
+    # ARGUMENTY TYPU „jak u typera" (2026-10-18, model/argumenty.py) — liczone
+    # PRZED wyborem listy: decydują o kolejności drużyn i o wecie „przeciw" na
+    # wyższych kursach (patrz `weto_argumentow`), lecą też do księgi i na kartę.
+    _mecze_druzyn_arg = {int(e["id"]): (e.get("homeTeamId"), e.get("awayTeamId"))
+                         for e in events if e.get("id")}
+    _trendy_zaw_arg = {(int(getattr(t, "event_id", 0) or 0), t.player_id, t.market_code): t
+                       for t in trends}
+    _arg_cache: dict = {}
+
+    def _argumenty_b(b: dict) -> dict | None:
+        k = _klucz_publikacji(b)
+        if k not in _arg_cache:
+            try:
+                _arg_cache[k] = argumenty_typu(b, _indeks_arg, _mecze_druzyn_arg,
+                                               _trendy_zaw_arg)
+            except Exception as e:                              # noqa: BLE001
+                diagnostyka.cichy("cykl", "argumenty_typu", e)
+                _arg_cache[k] = None
+        return _arg_cache[k]
+
+    for b in do_pokazania:
+        _a = _argumenty_b(b)
+        if _a is not None:
+            b["argumenty"] = _a
+
     def _klucz_listy(b: dict):
         # ⚑ JEDNA MIARA DLA WEJŚCIA I DLA KOLEJNOŚCI (2026-08-14).
         #
@@ -11357,9 +11411,15 @@ def _main_impl(tryb=None):
         # w limitach różnorodności (mecz/rynek/rodzina). Gdyby to kiedyś
         # zaczęło przeszkadzać, sortować trzeba per półka, nie jedną listą.
         ma_rachunek = bool(b.get("czynniki")) and (b.get("ci") or [None])[0] is not None
+        # ⚑ DRUŻYNY: NAJPIERW BILANS ARGUMENTÓW (2026-10-18, logika typera —
+        # patrz model/argumenty.py). Lista z limitami 14.09–17.10: wysoka szansa
+        # 81,4% → 83,3%, wyższe 1,80–2,00 51,7% → 56,2% (z wetem), ta sama liczba
+        # typów. Zawodnicy bez tego: u nich kolejność po argumentach nic nie dała.
+        bil = (argumenty.bilans(b.get("argumenty"))
+               if b.get("podmiot_typ") == "druzyna" else 0)
         if uczony.polka_dla(b.get("kurs"), b.get("podmiot_typ")) == "wysoka_szansa":
-            return (szansa_z_ceną(b), ma_rachunek)
-        return (moc_listy(b, _kandydatow_w_meczu.get(b.get("mecz_id"), 0)),
+            return (bil, szansa_z_ceną(b), ma_rachunek)
+        return (bil, moc_listy(b, _kandydatow_w_meczu.get(b.get("mecz_id"), 0)),
                 ma_rachunek)
 
     # KSIĘGA MA WIEDZIEĆ, ŻE ODCIĘTY SELEKCJĄ TYP NIE BYŁ NA STRONIE
@@ -11410,38 +11470,17 @@ def _main_impl(tryb=None):
           f"{_tanie_n} nowych na liście")
     # oznaczenia na karcie (patrz OZNACZENIA_TYPU) — liczone na liście, bo
     # półka jest znana dopiero tu; wznowione też, to tylko prezentacja
-    # ARGUMENTY TYPU „jak u typera" (2026-10-18, model/argumenty.py) — na
-    # razie POMIAR i opis: liczone dla listy i dla wszystkiego, co idzie do
-    # księgi; wybór typów bez zmian (decyzja po ~2 tyg. na żywych meczach).
-    _mecze_druzyn_arg = {int(e["id"]): (e.get("homeTeamId"), e.get("awayTeamId"))
-                         for e in events if e.get("id")}
-    _trendy_zaw_arg = {(int(getattr(t, "event_id", 0) or 0), t.player_id, t.market_code): t
-                       for t in trends}
-    _arg_cache: dict = {}
-
-    def _argumenty_b(b: dict) -> dict | None:
-        k = _klucz_publikacji(b)
-        if k not in _arg_cache:
-            try:
-                _arg_cache[k] = argumenty_typu(b, _indeks_arg, _mecze_druzyn_arg,
-                                               _trendy_zaw_arg)
-            except Exception as e:                              # noqa: BLE001
-                diagnostyka.cichy("cykl", "argumenty_typu", e)
-                _arg_cache[k] = None
-        return _arg_cache[k]
-
     _arg_licz: Counter = Counter()
     for b in lista_pub:
-        _a = _argumenty_b(b)
+        _a = b.get("argumenty")
         if _a is not None:
-            b["argumenty"] = _a
             _arg_licz["z_argumentami"] += 1
             _arg_licz.update("za:" + z for z in _a["za"])
             _arg_licz.update("przeciw:" + z for z in _a["przeciw"])
             if argumenty.czysty_pakiet(_a):
                 _arg_licz["pakiet_2_za_0_przeciw"] += 1
     print(f"Argumenty typów na liście ({_arg_licz.pop('z_argumentami', 0)} z "
-          f"{len(lista_pub)}; pomiar, wybór bez zmian): " + ", ".join(
+          f"{len(lista_pub)}): " + ", ".join(
               f"{k}={v}" for k, v in _arg_licz.most_common()))
     _marze_strumieni = {s: m for s, (_w_s, m) in _sciaganie_uczony_s.items()}
     _ozn_licz: Counter = Counter()

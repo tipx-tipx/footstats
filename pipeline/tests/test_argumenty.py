@@ -157,6 +157,52 @@ def test_argumenty_typu_druzyny_i_zawodnika():
     assert B.argumenty_typu(zaw, None, {}, {(77, 9, "shots"): tr}) is None
 
 
+def _typ_listy(i, kurs, przeciw=(), za=(), podmiot_typ="druzyna", **kw):
+    import time
+    return {"id": i, "mecz_id": 500 + i, "mecz": f"A{i} – B{i}", "podmiot": f"D{i}",
+            "podmiot_id": 900 + i, "podmiot_typ": podmiot_typ,
+            "rynek_kod": "team_corners" if podmiot_typ == "druzyna" else "shots",
+            "rynek": "R", "linia": 4.5, "strona": "powyzej", "kurs": kurs, "p_model": 0.6,
+            "kickoff_ts": int(time.time()) + 3 * 3600, "xi_sygnal": "official",
+            "argumenty": {"za": list(za), "przeciw": list(przeciw)}, **kw}
+
+
+def test_weto_argumentow_tylko_na_wyzszych_kursach():
+    from footstats.jobs import build_wc_fast as B
+    zly = {"podmiot_typ": "druzyna", "argumenty": {"za": [], "przeciw": ["rywal_slaby"]}}
+    assert B.weto_argumentow(zly, "wyzsze_kursy")
+    assert not B.weto_argumentow(zly, "wysoka_szansa")
+    assert B.weto_argumentow({**zly, "podmiot_typ": "zawodnik"}, "wyzsze_kursy")
+    assert not B.weto_argumentow({"podmiot_typ": "druzyna"}, "wyzsze_kursy")   # brak danych
+
+
+def test_lista_odrzuca_nowy_typ_z_argumentem_przeciw():
+    from footstats.jobs import build_wc_fast as B
+    kand = [_typ_listy(1, 1.90, przeciw=["forma_slaba"]), _typ_listy(2, 1.90),
+            _typ_listy(3, 1.90, przeciw=["h2h_nie"], pokazany_wczesniej=True)]
+    lista, zdjete, _ = B.wybierz_liste_publikowana(kand, lambda b: (b["kurs"],))
+    assert {b["id"] for b in lista} == {2, 3}          # pokazany wcześniej zostaje
+    assert set(zdjete.values()) == {"argument_przeciw"}
+    assert "argument_przeciw" in B.OPISY_ZDJECIA_PL
+
+
+def test_kolejnosc_druzyn_po_bilansie_argumentow():
+    """Klucz listy: drużyna z lepszym bilansem argumentów idzie pierwsza (limit 1)."""
+    from footstats.jobs import build_wc_fast as B
+    lepszy = _typ_listy(1, 1.90, za=["rywal_top", "h2h_wszystkie"])
+    gorszy = _typ_listy(2, 1.95, za=[])
+    klucz = lambda b: (A.bilans(b.get("argumenty")), b["kurs"])
+    import pytest
+    mp = pytest.MonkeyPatch()
+    mp.setattr(B.uczony, "LIMITY_POLEK", {**B.uczony.LIMITY_POLEK,
+               "druzyna": {**B.uczony.LIMITY_POLEK.get("druzyna", {}), "wyzsze_kursy": 1}})
+    try:
+        lista, _z, _ = B.wybierz_liste_publikowana([gorszy, lepszy], klucz)
+    finally:
+        mp.undo()
+    assert [b["id"] for b in lista] == [1]
+
+
 def test_opisy_dla_wszystkich_kodow():
     kody = {"rywal_top", "rywal_slaby", "h2h_wszystkie", "h2h_wiekszosc", "h2h_nie", "pokrycie",
             "forma", "forma_slaba", "na_90", "rzadko_sklad", "druzyna_top", "slabsza_ponizej"}
