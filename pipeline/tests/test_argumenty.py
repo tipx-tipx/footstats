@@ -203,6 +203,25 @@ def test_kolejnosc_druzyn_po_bilansie_argumentow():
     assert [b["id"] for b in lista] == [1]
 
 
+def test_wykonawcy_z_banku_i_argument():
+    bank = {"shotmap": {
+        "1": {"ts": KO - 10 * DZIEN, "karne": {"9": 1}, "wolne": {"9": 2, "8": 1}},
+        "2": {"ts": KO - 200 * DZIEN, "karne": {"8": 3}},            # poza oknem
+        "3": {"ts": KO - 5 * DZIEN, "stale": {"9": 4}},              # stary zapis bez podziału
+    }}
+    w = A.wykonawcy_z_banku(bank, KO)
+    assert w == {"9": {"karne": 1, "wolne": 2}, "8": {"karne": 0, "wolne": 1}}
+    idx = A.Indeks(_magazyn())
+    c, mi, ts, opp = _hist()
+    a = A.argumenty_zawodnika(idx, 3, KO, "sot", 0.5, c, mi, ts, opp, wykonawca=w["9"])
+    assert {"wykonawca_karnych", "wykonawca_wolnych"} <= set(a["za"])
+    assert a["dane"]["karne"] == 1 and a["dane"]["wolne"] == 2
+    b = A.argumenty_zawodnika(idx, 3, KO, "fouls_won", 0.5, c, mi, ts, opp, wykonawca=w["9"])
+    assert "wykonawca_karnych" not in b["za"]                       # nie ten rynek
+    z = A.argumenty_zawodnika(idx, 3, KO, "shots", 0.5, c, mi, ts, opp, wykonawca=w["8"])
+    assert "wykonawca_wolnych" not in z["za"]                       # jeden wolny to za mało
+
+
 def test_opisy_dla_wszystkich_kodow():
     kody = {"rywal_top", "rywal_slaby", "h2h_wszystkie", "h2h_wiekszosc", "h2h_nie", "pokrycie",
             "forma", "forma_slaba", "na_90", "rzadko_sklad", "druzyna_top", "slabsza_ponizej"}

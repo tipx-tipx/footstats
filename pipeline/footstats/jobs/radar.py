@@ -2998,6 +2998,8 @@ def zbuduj(
     imienny_out: dict | None = None,
     # indeks magazynu drużyn do argumentów karty (model/argumenty.py, 18.10)
     indeks_argumentow=None,
+    # wykonawcy karnych/wolnych {zawodnik_id: {"karne", "wolne"}} (18.10)
+    wykonawcy: dict | None = None,
 ) -> list[dict]:
     """Złóż wpisy radaru/drabinek ze zbiorów, które cykl i tak ma w pamięci.
 
@@ -3679,7 +3681,8 @@ def zbuduj(
                     indeks_argumentow, int(getattr(t, "opponent_id", 0) or 0),
                     int(w.get("kickoff_ts") or 0), h["rynek_kod"], float(h["linia"]),
                     t.counts, t.minutes, getattr(t, "timestamps", None),
-                    getattr(t, "game_opponent_ids", None))
+                    getattr(t, "game_opponent_ids", None),
+                    wykonawca=(wykonawcy or {}).get(str(w.get("podmiot_id"))))
             except Exception as e:                              # noqa: BLE001
                 diagnostyka.cichy("radar", "argumenty_karty", e)
                 continue

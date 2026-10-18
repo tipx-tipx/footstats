@@ -66,6 +66,12 @@ PROG_DRUZYNA_TOP = 0.80     # drużyna w top 20% ligi w swojej statystyce
 PROG_POKRYCIA = 0.80
 PROG_NA_90 = 1.20           # średnia na 90 min ≥ 1,2 × (linia + 0,5)
 MIN_MINUT_WYSTEPU = 15
+# wykonawcy stałych fragmentów (mapa strzałów w banku stylu, od 18.10)
+OKNO_WYKONAWCY_S = 120 * 86400
+MIN_KARNYCH = 1             # choć jeden karny w oknie
+MIN_WOLNYCH = 2             # co najmniej dwa strzały z rzutu wolnego
+RYNKI_KARNYCH = frozenset({"shots", "sot"})
+RYNKI_WOLNYCH = frozenset({"shots", "sot", "shots_outside_box"})
 
 OPISY = {
     "rywal_top": "rywal w czołówce ligi pod ten typ",
@@ -82,6 +88,8 @@ OPISY = {
     # bilans bramek z ostatnich 10 meczów, nie siła klubu — PSG z Barceloną
     # potrafi tu wyjść „słabszy" (podgląd 18.10), więc opis mówi, co liczymy
     "slabsza_ponizej": "ostatnie 10 meczów: rywal z wyraźnie lepszym bilansem bramek",
+    "wykonawca_karnych": "wykonuje rzuty karne",
+    "wykonawca_wolnych": "uderza z rzutów wolnych",
 }
 
 
@@ -240,12 +248,33 @@ def argumenty_druzyny(idx: Indeks, tid: int, opp: int, ko: int, rynek: str,
     return {"za": za, "przeciw": przeciw, "dane": _bez_pustych(dane)}
 
 
+def wykonawcy_z_banku(bank_stylu: dict | None, ko: int,
+                      okno_s: int = OKNO_WYKONAWCY_S) -> dict[str, dict[str, int]]:
+    """{zawodnik_id: {"karne": n, "wolne": n}} z map strzałów banku stylu
+    (`shotmap[mecz]["karne"/"wolne"]`, od 18.10) z ostatnich `okno_s` sekund."""
+    out: dict[str, dict[str, int]] = {}
+    for m in ((bank_stylu or {}).get("shotmap") or {}).values():
+        t = int((m or {}).get("ts") or 0)
+        if not t or t >= ko or t < ko - okno_s:
+            continue
+        for rodzaj in ("karne", "wolne"):
+            for pid, n in ((m or {}).get(rodzaj) or {}).items():
+                slot = out.setdefault(str(pid), {"karne": 0, "wolne": 0})
+                slot[rodzaj] += int(n or 0)
+    return out
+
+
 def argumenty_zawodnika(idx: Indeks, opp: int, ko: int, rynek: str, linia: float,
-                        counts, minutes, timestamps, opp_ids=None
+                        counts, minutes, timestamps, opp_ids=None,
+                        wykonawca: dict | None = None,
                         ) -> dict[str, list[str]] | None:
     """Argumenty linii zawodnika „powyżej". Historia jak w StatshubTrend
     (najnowszy mecz pierwszy): `counts`, `minutes`, `timestamps`,
-    `opp_ids` (game_opponent_ids)."""
+    `opp_ids` (game_opponent_ids). `wykonawca`: {"karne": n, "wolne": n}
+    z `wykonawcy_z_banku` — informacja na kartę jak u typera; pomiar 18.10
+    (411 zawodników): wykonawca karnych przy celnych +5,3 pp nad kurs wobec
+    +1,9 pozostałych, ale połowy −2,6 / +12,6 — bukmacher to wycenia, więc
+    to argument opisu, nie wyboru (argumenty „za" zawodników nie decydują)."""
     pole = POLE_RYWALA_ZAWODNIKA.get(rynek)
     if not pole or not counts:
         return None
@@ -289,6 +318,13 @@ def argumenty_zawodnika(idx: Indeks, opp: int, ko: int, rynek: str, linia: float
             za.append("na_90")
     if sum(mi >= 60 for _, mi, _ in hist[:10]) / min(10, len(hist)) < 0.5:
         przeciw.append("rzadko_sklad")
+    if wykonawca:
+        if rynek in RYNKI_KARNYCH and wykonawca.get("karne", 0) >= MIN_KARNYCH:
+            za.append("wykonawca_karnych")
+            dane["karne"] = int(wykonawca["karne"])
+        if rynek in RYNKI_WOLNYCH and wykonawca.get("wolne", 0) >= MIN_WOLNYCH:
+            za.append("wykonawca_wolnych")
+            dane["wolne"] = int(wykonawca["wolne"])
     return {"za": za, "przeciw": przeciw, "dane": _bez_pustych(dane)}
 
 

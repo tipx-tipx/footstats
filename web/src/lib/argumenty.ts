@@ -14,10 +14,15 @@ export type ArgumentyTypu = {
     /** drużyny: udział meczów po stronie typu (0–1); zawodnicy: [weszło, z] */
     pokrycie?: number | [number, number];
     na_90?: number;
+    karne?: number;
+    wolne?: number;
   };
 };
 
 export type ArgumentTekst = { tekst: string; kier: "za" | "przeciw" };
+
+/** 1 strzał, 2–4 strzały, 5+ strzałów (12–14 też „strzałów”) */
+const strzaly = (n: number) => (n === 1 ? "strzał" : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? "strzały" : "strzałów");
 
 /**
  * Miejsce w lidze liczy pipeline zawsze od NAJWIĘKSZEJ wartości (1 = najwięcej),
@@ -45,6 +50,10 @@ function tekst(kod: string, d: NonNullable<ArgumentyTypu["dane"]>, ponizej: bool
       return `Drużyna notuje ${ponizej ? "mało" : "dużo"}${m(d.druzyna_miejsce)}`;
     case "slabsza_ponizej":
       return "Ostatnie 10 meczów: rywal z wyraźnie lepszym bilansem bramek";
+    case "wykonawca_karnych":
+      return d.karne ? `Wykonuje rzuty karne (${d.karne} w ostatnich meczach)` : "Wykonuje rzuty karne";
+    case "wykonawca_wolnych":
+      return d.wolne ? `Uderza z rzutów wolnych (${d.wolne} ${strzaly(d.wolne)} w ostatnich meczach)` : "Uderza z rzutów wolnych";
     default:
       return null;
   }

@@ -1456,7 +1456,8 @@ def oznaczenia_typu(b: dict, marze: dict[str, float] | None = None) -> list[str]
     return out
 
 
-def argumenty_typu(b: dict, idx, mecze_druzyn: dict, trendy_zaw: dict) -> dict | None:
+def argumenty_typu(b: dict, idx, mecze_druzyn: dict, trendy_zaw: dict,
+                   wykonawcy: dict | None = None) -> dict | None:
     """Argumenty typu „jak u typera" (model/argumenty.py) — stan sprzed meczu.
 
     `mecze_druzyn`: {mecz_id: (gospodarz_id, gość_id)} z listy meczów cyklu,
@@ -1487,7 +1488,8 @@ def argumenty_typu(b: dict, idx, mecze_druzyn: dict, trendy_zaw: dict) -> dict |
     opp = getattr(tr, "opponent_id", None)
     return argumenty.argumenty_zawodnika(
         idx, int(opp) if opp else 0, ko, rk, linia, tr.counts, tr.minutes,
-        getattr(tr, "timestamps", None), getattr(tr, "game_opponent_ids", None))
+        getattr(tr, "timestamps", None), getattr(tr, "game_opponent_ids", None),
+        wykonawca=(wykonawcy or {}).get(str(b.get("podmiot_id"))))
 
 
 # ⚑ WETO „ARGUMENT PRZECIW" (2026-10-18, właściciel: „logika tworzenia typów
@@ -5644,6 +5646,16 @@ def _main_impl(tryb=None):
               f"{len(bank_stylu.get('wzrost', {}))} wzrostów")
     except Exception as e:
         print(f"Bank stylu pominięty ({e}) — matchupy w trybie lite")
+    # WYKONAWCY RZUTÓW KARNYCH I WOLNYCH z map strzałów banku (od 18.10) —
+    # argument „za" na karcie typu i drabinki (model/argumenty.py)
+    try:
+        _wykonawcy_arg = argumenty.wykonawcy_z_banku(bank_stylu, int(time.time()))
+    except Exception as e:                                      # noqa: BLE001
+        diagnostyka.cichy("cykl", "wykonawcy_stalych_fragmentow", e)
+        _wykonawcy_arg = {}
+    print(f"Wykonawcy z map strzałów (120 dni): karne "
+          f"{sum(1 for v in _wykonawcy_arg.values() if v['karne'])}, rzuty wolne "
+          f"{sum(1 for v in _wykonawcy_arg.values() if v['wolne'])} zawodników")
 
     # kursy Superbetu (w trybie ligowym lista przyjechała już z parownikiem)
     if tryb:
@@ -10655,6 +10667,7 @@ def _main_impl(tryb=None):
             imienny_out=_imienny_radar,
             # argumenty karty „jak u typera" — opis i pomiar (model/argumenty.py)
             indeks_argumentow=_indeks_arg,
+            wykonawcy=_wykonawcy_arg,
         )
         radar_padl = False
     except Exception as ex:
@@ -11368,7 +11381,7 @@ def _main_impl(tryb=None):
         if k not in _arg_cache:
             try:
                 _arg_cache[k] = argumenty_typu(b, _indeks_arg, _mecze_druzyn_arg,
-                                               _trendy_zaw_arg)
+                                               _trendy_zaw_arg, _wykonawcy_arg)
             except Exception as e:                              # noqa: BLE001
                 diagnostyka.cichy("cykl", "argumenty_typu", e)
                 _arg_cache[k] = None
