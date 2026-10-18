@@ -1344,7 +1344,12 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
                 if isinstance(b.get("kalendarz"), dict) and "kalendarz" not in rec:
                     rec["kalendarz"] = b["kalendarz"]
                 # braki kadrowe (2026-10-18) — tak samo: pierwszy stempel
-                for _pole in ("braki", "niedostepny", "sedzia_sh"):
+                # pewność startu (model/sklad.py, w cieniu): przy narodzinach
+                # `p_start`, a do meczu najświeższa `p_start_ost` (źródła
+                # składów zbliżają się do prawdy tuż przed meczem)
+                if isinstance(b.get("p_start"), dict):
+                    rec["p_start_ost"] = b["p_start"]
+                for _pole in ("braki", "niedostepny", "sedzia_sh", "p_start"):
                     if isinstance(b.get(_pole), dict) and _pole not in rec:
                         rec[_pole] = b[_pole]
                 # typ pomiarowy (odrzucony przy progu), który PÓŹNIEJ przeszedł
@@ -1493,7 +1498,7 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
             # BRAKI KADROWE (2026-10-18, statshub `unavailability`): udział minut
             # i strzałów nieobecnych w drużynie typu i u rywala, brak lidera;
             # `niedostepny` — wątpliwy stan samego zawodnika
-            **{_p: b[_p] for _p in ("braki", "niedostepny", "sedzia_sh")
+            **{_p: b[_p] for _p in ("braki", "niedostepny", "sedzia_sh", "p_start")
                if isinstance(b.get(_p), dict)},
             # WKŁAD KAŻDEJ ZALEŻNOŚCI, ZAMROŻONY PRZY PUBLIKACJI (2026-08-07).
             #

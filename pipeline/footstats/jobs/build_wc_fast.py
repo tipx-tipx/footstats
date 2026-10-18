@@ -37,7 +37,7 @@ from ..engine import (
 )
 from ..model import (
     argumenty, betting, context, counts, koncesje, kupony, matchup, matchup_lite,
-    minutes as minutes_mod, opis_uczony, profil_druzyn, styl, tempo, uczony,
+    minutes as minutes_mod, opis_uczony, profil_druzyn, sklad, styl, tempo, uczony,
 )
 from ..sources import (
     betclic, eloratings, rotowire, scores365, sofascore, sportsgambler, statshub,
@@ -12608,6 +12608,35 @@ def _main_impl(tryb=None):
     _druzyna_zaw_kal = {(int(getattr(t, "event_id", 0) or 0), t.player_id): t.team_id
                         for t in trends if getattr(t, "team_id", None)}
     _ile_kal = Counter()
+    # ⚑ PEWNOŚĆ STARTU W CIENIU (2026-10-18, model/sklad.py) — liczona raz na
+    # (mecz, zawodnik) z kalendarza drużyny, występów i źródeł składu cyklu
+    _trend_zaw_kal: dict = {}
+    for t in trends:
+        _trend_zaw_kal.setdefault((int(getattr(t, "event_id", 0) or 0), t.player_id), t)
+    _pstart_cache: dict = {}
+    _ko_meczu_kal = {int(e["id"]): int(e.get("timeStartTimestamp") or 0)
+                     for e in events if e.get("id")}
+
+    def _pewnosc_startu(mid: int, pid) -> dict | None:
+        kk = (mid, pid)
+        if kk in _pstart_cache:
+            return _pstart_cache[kk]
+        out = None
+        tr_k = _trend_zaw_kal.get(kk)
+        if tr_k is not None and _indeks_arg is not None and getattr(tr_k, "team_id", None):
+            ko_k = _ko_meczu_kal.get(mid, 0)
+            if ko_k:
+                wyst = [(int(ts), float(mi or 0), bool(st))
+                        for ts, mi, st in zip(tr_k.timestamps or [], tr_k.minutes or [],
+                                              tr_k.started or [])]
+                sh_k = (bool(tr_k.in_predicted_lineup)
+                        if predicted_available.get(mid) else None)
+                rs_k = rotowire.predicted_status(roto, tr_k.team_name, tr_k.player_name)
+                out = sklad.stempel(_indeks_arg.przed(int(tr_k.team_id), ko_k),
+                                    wyst, _liga_meczu_kal.get(mid) or None, sh_k, rs_k)
+        _pstart_cache[kk] = out
+        return out
+
     # sędzia ze statshub — patrz `odswiez_sedziow_sh`
     _sedzia_sh: dict[int, dict] = {}
     try:
@@ -12645,6 +12674,16 @@ def _main_impl(tryb=None):
         if _br:
             b["braki"] = _br
             _ile_kal["braki"] += 1
+        if b.get("podmiot_typ") != "druzyna" and not str(b.get("rynek_kod") or "").startswith(
+                ("team_", "match_", "wiecej_")):
+            try:
+                _ps = _pewnosc_startu(_int_lub_zero(b.get("mecz_id")), b.get("podmiot_id"))
+            except Exception as e:                              # noqa: BLE001
+                diagnostyka.cichy("cykl", "pewnosc_startu", e)
+                _ps = None
+            if _ps:
+                b["p_start"] = _ps
+                _ile_kal["p_start"] += 1
         _sd = _sedzia_sh.get(_int_lub_zero(b.get("mecz_id")))
         if _sd and "sedzia_sh" not in b:
             b["sedzia_sh"] = _sd
@@ -12702,7 +12741,8 @@ def _main_impl(tryb=None):
         _xi_drab[_b.get("xi_sygnal") or "brak"] += 1
     print(f"Kalendarz w księdze: {_ile_kal['z']} typów z kalendarzem, "
           f"{_ile_kal['bez']} bez historii drużyny, {_ile_kal['braki']} z brakami "
-          "kadrowymi | skład przy drabinkach: "
+          f"kadrowymi, {_ile_kal['p_start']} zawodników z pewnością startu "
+          f"(w cieniu, {sklad.WERSJA}) | skład przy drabinkach: "
           + (", ".join(f"{k} {v}" for k, v in sorted(_xi_drab.items())) or "brak kart"))
 
     # ⚑ TYP NA STRONIE BEZ REKORDU W KSIĘDZE (2026-09-13). Księga dostaje

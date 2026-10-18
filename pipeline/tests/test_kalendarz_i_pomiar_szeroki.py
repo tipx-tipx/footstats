@@ -280,3 +280,51 @@ def test_cykl_niedostepni_przed_bramka_zawodnika():
     i_bram = src.index('_odrzuc(mid, tr, "niedostepny"')
     i_poza = src.index('_odrzuc(mid, tr, "poza_skladem"')
     assert i_def < i_bram < i_poza
+
+
+# ---------------------------------------------------------------- pewność startu
+from footstats.model import sklad as SK
+
+
+def _mecze_dr(n=10, l=17, puchar_od=None):
+    return [{"t": KO - (i + 1) * 7 * DZIEN, "l": (7 if puchar_od is not None and i in puchar_od else l)}
+            for i in range(n)]
+
+
+def test_pewnosc_startu_regularny_vs_rezerwowy():
+    m = _mecze_dr()
+    regularny = [(x["t"], 90.0, True) for x in m]
+    rezerwowy = [(x["t"], 15.0, False) for x in m[:4]]
+    pr = SK.stempel(m, regularny, 17, None, None)
+    pz = SK.stempel(m, rezerwowy, 17, None, None)
+    assert pr["s"] > 0.8 > 0.3 > pz["s"]
+    # źródła przesuwają w swoją stronę, zgoda mocniej
+    tak = SK.stempel(m, rezerwowy, 17, True, True)["s"]
+    nie = SK.stempel(m, regularny, 17, False, False)["s"]
+    assert tak > pz["s"] and nie < pr["s"]
+    assert pr["v"] == SK.WERSJA and pr["zr"] == [None, None]
+
+
+def test_pewnosc_startu_bez_historii():
+    m = _mecze_dr()
+    assert SK.stempel(m[:4], [(x["t"], 90.0, True) for x in m[:4]], 17, None, None) is None
+    # nie grał w żadnym z 5 ostatnich meczów drużyny — nie wiemy, czy jest w kadrze
+    assert SK.stempel(m, [(x["t"], 90.0, True) for x in m[6:]], 17, None, None) is None
+
+
+def test_pewnosc_startu_puchar_i_tolerancja_godziny():
+    m = _mecze_dr()
+    # występ zapisany z godziną przesuniętą o 2 h (przełożony start) to ten sam mecz
+    przes = [(x["t"] + 2 * 3600, 90.0, True) for x in m]
+    assert SK.cechy_historii(m, przes, 17)[0] == 1.0
+    c = SK.cechy_historii(m, [(x["t"], 90.0, True) for x in m], 7)
+    assert c[8] == 1.0                                  # puchar: rozgrywki ≠ liga domowa
+
+
+def test_ksiega_p_start_i_najswiezszy():
+    log: dict = {}
+    R._dopisz_nowe(log, [_typ(p_start={"s": 0.7})])
+    rec = next(iter(log.values()))
+    assert rec["p_start"] == {"s": 0.7}
+    R._dopisz_nowe(log, [_typ(p_start={"s": 0.9})])
+    assert rec["p_start"] == {"s": 0.7} and rec["p_start_ost"] == {"s": 0.9}
