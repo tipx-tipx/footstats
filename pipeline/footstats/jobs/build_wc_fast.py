@@ -36,7 +36,7 @@ from ..engine import (
     MatchContext, PlayerHistory, RARE_MARKETS, apply_bias, score_player_market,
 )
 from ..model import (
-    betting, context, counts, koncesje, kupony, matchup, matchup_lite,
+    argumenty, betting, context, counts, koncesje, kupony, matchup, matchup_lite,
     minutes as minutes_mod, opis_uczony, profil_druzyn, styl, tempo, uczony,
 )
 from ..sources import (
@@ -1454,6 +1454,40 @@ def oznaczenia_typu(b: dict, marze: dict[str, float] | None = None) -> list[str]
             and (not druz or wyzsze)):
         out.append("seria")
     return out
+
+
+def argumenty_typu(b: dict, idx, mecze_druzyn: dict, trendy_zaw: dict) -> dict | None:
+    """Argumenty typu „jak u typera" (model/argumenty.py) — stan sprzed meczu.
+
+    `mecze_druzyn`: {mecz_id: (gospodarz_id, gość_id)} z listy meczów cyklu,
+    `trendy_zaw`: {(mecz_id, zawodnik_id, rynek): StatshubTrend}.
+    None = brak danych (to nie jest argument przeciw)."""
+    if idx is None or b.get("sugestia"):
+        return None
+    try:
+        mid = int(b.get("mecz_id") or 0)
+        ko = int(b.get("kickoff_ts") or 0)
+        linia = float(b.get("linia"))
+    except (TypeError, ValueError):
+        return None
+    rk, strona = b.get("rynek_kod"), b.get("strona")
+    if b.get("podmiot_typ") == "druzyna":
+        tid = abs(int(b.get("podmiot_id") or 0))
+        gosp, gosc = mecze_druzyn.get(mid) or (None, None)
+        opp = gosc if tid == gosp else gosp if tid == gosc else None
+        if not opp:
+            return None
+        pkw = (b.get("p_uczony") or {}).get("pkw")
+        return argumenty.argumenty_druzyny(idx, tid, int(opp), ko, rk, linia, strona, pkw)
+    if strona != "powyzej":
+        return None
+    tr = trendy_zaw.get((mid, b.get("podmiot_id"), rk))
+    if tr is None:
+        return None
+    opp = getattr(tr, "opponent_id", None)
+    return argumenty.argumenty_zawodnika(
+        idx, int(opp) if opp else 0, ko, rk, linia, tr.counts, tr.minutes,
+        getattr(tr, "timestamps", None), getattr(tr, "game_opponent_ids", None))
 
 
 def tylko_tania_sciezka(b: dict) -> bool:
@@ -5740,6 +5774,9 @@ def _main_impl(tryb=None):
     # (zapis przed) nie. Trzymamy więc liczby i odkładamy je razem z resztą
     # rentgenu przy licznikach źródła szansy.
     _stan_magazynu: dict = {}
+    # indeks magazynu do argumentów typu (model/argumenty.py) — istnieje tylko
+    # przy pełnym magazynie; bez niego typy po prostu nie mają argumentów
+    _indeks_arg: argumenty.Indeks | None = None
     try:
         _wagi_modelu = supa.get_key(uczony.KLUCZ_WAG) or {}
         print(uczony.zdanie_stanu(_wagi_modelu))
@@ -5755,6 +5792,10 @@ def _main_impl(tryb=None):
             else:
                 _st_mag = magazyn_druzyn.statystyki(_mag_uczony)
                 print(magazyn_druzyn.zdanie_stanu(_st_mag))
+                try:
+                    _indeks_arg = argumenty.Indeks(_mag_uczony)
+                except Exception as e:                          # noqa: BLE001
+                    diagnostyka.cichy("cykl", "indeks_argumentow", e)
                 # STAN MAGAZYNU DO META (2026-09-11) — odkładany na koniec
                 # przebiegu, patrz `_stan_magazynu`. Po przeprowadzce magazynu
                 # do prywatnego repo nie da się go odczytać z sesji bez tokenu,
@@ -10573,6 +10614,8 @@ def _main_impl(tryb=None):
             tabela_rywali=_tabela_rywali,
             wystepy_pelne=_wystepy_gracza,
             imienny_out=_imienny_radar,
+            # argumenty karty „jak u typera" — opis i pomiar (model/argumenty.py)
+            indeks_argumentow=_indeks_arg,
         )
         radar_padl = False
     except Exception as ex:
@@ -10793,6 +10836,8 @@ def _main_impl(tryb=None):
             "szczebel": 1,
             # na czym stała ta drabinka — patrz `_charakter_drabinki`
             **_charakter_drabinki(w, h),
+            # argumenty karty (model/argumenty.py) — do pomiaru w księdze
+            **({"argumenty": w["argumenty"]} if w.get("argumenty") else {}),
         })
 
     # DRUGI SZCZEBEL KAŻDEJ KARTY — POMIAR (2026-08-13). Karta pokazuje go
@@ -11365,6 +11410,39 @@ def _main_impl(tryb=None):
           f"{_tanie_n} nowych na liście")
     # oznaczenia na karcie (patrz OZNACZENIA_TYPU) — liczone na liście, bo
     # półka jest znana dopiero tu; wznowione też, to tylko prezentacja
+    # ARGUMENTY TYPU „jak u typera" (2026-10-18, model/argumenty.py) — na
+    # razie POMIAR i opis: liczone dla listy i dla wszystkiego, co idzie do
+    # księgi; wybór typów bez zmian (decyzja po ~2 tyg. na żywych meczach).
+    _mecze_druzyn_arg = {int(e["id"]): (e.get("homeTeamId"), e.get("awayTeamId"))
+                         for e in events if e.get("id")}
+    _trendy_zaw_arg = {(int(getattr(t, "event_id", 0) or 0), t.player_id, t.market_code): t
+                       for t in trends}
+    _arg_cache: dict = {}
+
+    def _argumenty_b(b: dict) -> dict | None:
+        k = _klucz_publikacji(b)
+        if k not in _arg_cache:
+            try:
+                _arg_cache[k] = argumenty_typu(b, _indeks_arg, _mecze_druzyn_arg,
+                                               _trendy_zaw_arg)
+            except Exception as e:                              # noqa: BLE001
+                diagnostyka.cichy("cykl", "argumenty_typu", e)
+                _arg_cache[k] = None
+        return _arg_cache[k]
+
+    _arg_licz: Counter = Counter()
+    for b in lista_pub:
+        _a = _argumenty_b(b)
+        if _a is not None:
+            b["argumenty"] = _a
+            _arg_licz["z_argumentami"] += 1
+            _arg_licz.update("za:" + z for z in _a["za"])
+            _arg_licz.update("przeciw:" + z for z in _a["przeciw"])
+            if argumenty.czysty_pakiet(_a):
+                _arg_licz["pakiet_2_za_0_przeciw"] += 1
+    print(f"Argumenty typów na liście ({_arg_licz.pop('z_argumentami', 0)} z "
+          f"{len(lista_pub)}; pomiar, wybór bez zmian): " + ", ".join(
+              f"{k}={v}" for k, v in _arg_licz.most_common()))
     _marze_strumieni = {s: m for s, (_w_s, m) in _sciaganie_uczony_s.items()}
     _ozn_licz: Counter = Counter()
     for b in lista_pub:
@@ -12117,6 +12195,10 @@ def _main_impl(tryb=None):
             _p = _polka_po_kluczu.get(_klucz_publikacji(_b))
             if _p:
                 _b["polka"] = _p      # patrz nota przy `_polka_po_kluczu`
+        if "argumenty" not in _b:     # do księgi — patrz `_argumenty_b`
+            _a = _argumenty_b(_b)
+            if _a is not None:
+                _b["argumenty"] = _a
         _pp = _pokazane_po_kluczu.get(_klucz_publikacji(_b))
         if _pp is not None and isinstance(_b.get("rachunek"), dict)                 and _b["rachunek"].get("p_pokazane") is None:
             # nowy słownik — oryginał bywa współdzielony z kopią listy

@@ -1312,6 +1312,10 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
                 # przebieg meczu z 1X2 — też najświeższy przed meczem
                 # (patrz `_stempel_tempa`)
                 rec.update(_stempel_tempa(b))
+                # argumenty typu: pierwszy stempel także dla rekordów sprzed
+                # 18.10 (dalej stan sprzed meczu — rekord jest nierozliczony)
+                if isinstance(b.get("argumenty"), dict) and "argumenty" not in rec:
+                    rec["argumenty"] = b["argumenty"]
                 # typ pomiarowy (odrzucony przy progu), który PÓŹNIEJ przeszedł
                 # progi i został opublikowany — przestaje być pomiarowy (wraca
                 # do kalibracji/skuteczności); w drugą stronę NIGDY nie
@@ -1441,6 +1445,11 @@ def _dopisz_nowe(log: dict, value_bets: list[dict]) -> None:
                if isinstance(b.get("p_stary"), (int, float)) else {}),
             # PRZEBIEG MECZU Z KURSÓW 1X2 (2026-10-15) — patrz `_stempel_tempa`
             **_stempel_tempa(b),
+            # ARGUMENTY TYPU „jak u typera" (2026-10-18, model/argumenty.py):
+            # stan sprzed meczu, zamrożony przy publikacji — za dwa tygodnie
+            # pomiar na żywych meczach, zanim argumenty zaczną decydować
+            **({"argumenty": b["argumenty"]}
+               if isinstance(b.get("argumenty"), dict) else {}),
             # WKŁAD KAŻDEJ ZALEŻNOŚCI, ZAMROŻONY PRZY PUBLIKACJI (2026-08-07).
             #
             # Do dziś księga zapisywała sam WYNIK rachunku (`p_model`), więc po

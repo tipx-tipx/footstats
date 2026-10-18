@@ -36,6 +36,7 @@ from dataclasses import replace as dc_replace
 
 import numpy as np
 
+from ..model import argumenty
 from ..model import betting
 from ..model import context as context_mod
 from ..model import counts as counts_mod
@@ -2987,6 +2988,8 @@ def zbuduj(
     # IMIENNY RENTGEN (2026-09-21): {(mecz_id, podmiot_id): {brama, …}} —
     # brama, na której para odpadła, albo „karta"; patrz `radar_imienny`
     imienny_out: dict | None = None,
+    # indeks magazynu drużyn do argumentów karty (model/argumenty.py, 18.10)
+    indeks_argumentow=None,
 ) -> list[dict]:
     """Złóż wpisy radaru/drabinek ze zbiorów, które cykl i tak ma w pamięci.
 
@@ -3649,6 +3652,33 @@ def zbuduj(
         print(f"Drabinki — dublety tego samego zawodnika: "
               f"{len(ocenione) - len(najlepsza)} kart scalonych")
     ocenione = list(najlepsza.values())
+    # ARGUMENTY KARTY „jak u typera" (2026-10-18, model/argumenty.py) — dla
+    # linii nagłówka; opis na karcie i pomiar w księdze. Kolejności kart NIE
+    # zmieniają: na historii kolejność po argumentach dała 50,0% wobec 50,7%,
+    # a przy ~4 kartach dziennie limit dnia i tak nie wiąże.
+    if indeks_argumentow is not None:
+        _tr_arg = {(int(getattr(t, "event_id", 0) or 0), t.player_id, t.market_code): t
+                   for t in trends}
+        _z_arg = 0
+        for w in ocenione:
+            h = w.get("hero") or {}
+            t = _tr_arg.get((int(w.get("mecz_id") or 0), w.get("podmiot_id"),
+                             h.get("rynek_kod")))
+            if t is None or h.get("linia") is None:
+                continue
+            try:
+                a = argumenty.argumenty_zawodnika(
+                    indeks_argumentow, int(getattr(t, "opponent_id", 0) or 0),
+                    int(w.get("kickoff_ts") or 0), h["rynek_kod"], float(h["linia"]),
+                    t.counts, t.minutes, getattr(t, "timestamps", None),
+                    getattr(t, "game_opponent_ids", None))
+            except Exception as e:                              # noqa: BLE001
+                diagnostyka.cichy("radar", "argumenty_karty", e)
+                continue
+            if a is not None:
+                w["argumenty"] = a
+                _z_arg += 1
+        print(f"Drabinki — argumenty kart (opis i pomiar): {_z_arg} z {len(ocenione)}")
 
     per_mecz_n: dict[int, int] = {}
     per_dzien_n: dict[str, int] = {}
