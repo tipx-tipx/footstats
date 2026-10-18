@@ -241,6 +241,29 @@ def test_argumenty_meczu():
     assert B.argumenty_typu(typ, idx, {77: (1, 2)}, {})["za"] == ["mecz_sprzyja"]
 
 
+def test_bilans_widoczny():
+    cz = [{"mnoznik": None}, {"mnoznik": 1.10}, {"mnoznik": 0.80}, {"mnoznik": 0.70}, {"mnoznik": 1.01}]
+    assert A.bilans_widoczny(cz, None) == -1
+    assert A.bilans_widoczny(cz, {"za": ["rywal_top", "forma"], "przeciw": []}) == 0   # forma niewidoczna
+    assert A.bilans_widoczny([], {"za": [], "przeciw": ["rywal_slaby"]}) == -1
+
+
+def test_lista_odrzuca_typ_ktoremu_opis_przeczy():
+    """Mugisha 18.10: więcej powodów przeciw niż za — nowy typ nie wchodzi
+    (także na wysokiej szansie), pokazany wcześniej zostaje."""
+    from footstats.jobs import build_wc_fast as B
+    przeczy = {"czynniki": [{"nazwa": "Tempo", "mnoznik": 0.68, "opis": "x"},
+                            {"nazwa": "Rywal", "mnoznik": 0.95, "opis": "y"}]}
+    kand = [_typ_listy(1, 1.90, uzasadnienie=przeczy),
+            _typ_listy(2, 1.22, uzasadnienie=przeczy, p_model=0.9, p_przed_sciagnieciem=0.9),
+            _typ_listy(3, 1.90, uzasadnienie=przeczy, pokazany_wczesniej=True),
+            _typ_listy(4, 1.90, uzasadnienie={"czynniki": [{"nazwa": "Rywal", "mnoznik": 1.2, "opis": "z"}]})]
+    lista, zdjete, _ = B.wybierz_liste_publikowana(kand, lambda b: (b["kurs"],))
+    assert {b["id"] for b in lista} == {3, 4}
+    assert set(zdjete.values()) == {"wiecej_przeciw_niz_za"}
+    assert "wiecej_przeciw_niz_za" in B.OPISY_ZDJECIA_PL
+
+
 def test_opisy_dla_wszystkich_kodow():
     kody = {"rywal_top", "rywal_slaby", "h2h_wszystkie", "h2h_wiekszosc", "h2h_nie", "pokrycie",
             "forma", "forma_slaba", "na_90", "rzadko_sklad", "druzyna_top", "slabsza_ponizej"}

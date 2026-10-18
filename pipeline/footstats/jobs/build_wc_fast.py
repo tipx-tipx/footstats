@@ -1511,6 +1511,27 @@ def argumenty_typu(b: dict, idx, mecze_druzyn: dict, trendy_zaw: dict,
 WETO_ARGUMENTOW_POLEK = frozenset({("druzyna", "wyzsze_kursy"), ("zawodnik", "wyzsze_kursy")})
 
 
+def bilans_powodow(b: dict) -> int:
+    """Widoczny bilans powodów typu (model/argumenty.bilans_widoczny): zdania
+    modelu uczonego (`opis_uczony`, jak na karcie), a bez nich stary opis
+    (`uzasadnienie`), plus argumenty."""
+    cz: list = []
+    if (b.get("p_uczony") or {}).get("skl"):
+        try:
+            cz = opis_uczony.czynniki(b)
+        except Exception:                                       # noqa: BLE001
+            cz = []
+    if not cz:
+        cz = (b.get("uzasadnienie") or {}).get("czynniki") or []
+    return argumenty.bilans_widoczny(cz, b.get("argumenty"))
+
+
+def wiecej_przeciw_niz_za(b: dict) -> bool:
+    """Nowy typ odpada, gdy na karcie stałoby więcej powodów przeciw niż za
+    (liczby przy `argumenty.bilans_widoczny`)."""
+    return bilans_powodow(b) < 0
+
+
 def weto_argumentow(b: dict, polka: str | None) -> bool:
     """Czy nowy typ odpada, bo ma argument przeciw (patrz WETO_ARGUMENTOW_POLEK)."""
     strumien = "druzyna" if b.get("podmiot_typ") == "druzyna" else "zawodnik"
@@ -1772,6 +1793,7 @@ def wybierz_liste_publikowana(
             elif (dolozone is not None and _dokladany and _polka
                     and not ponizej_progu_jakosci(b, _polka, bijace_cene)
                     and not weto_argumentow(b, _polka)
+                    and not wiecej_przeciw_niz_za(b)
                     and z_strumienia.get(doba_str, 0) < LISTA_CAP
                     and z_polki.get(_polka_klucz, 0) < _polka_limit
                     and z_meczu.get(mecz, 0) < LISTA_PER_MECZ
@@ -1817,6 +1839,11 @@ def wybierz_liste_publikowana(
         if (not juz_pokazany(b) and not na_ogloszonej_liscie(b, zamkniete)
                 and weto_argumentow(b, _polka)):
             zdjete.setdefault(_klucz_publikacji(b), "argument_przeciw")
+            continue
+        # OPIS NIE MOŻE PRZECZYĆ TYPOWI — patrz argumenty.bilans_widoczny
+        if (not juz_pokazany(b) and not na_ogloszonej_liscie(b, zamkniete)
+                and wiecej_przeciw_niz_za(b)):
+            zdjete.setdefault(_klucz_publikacji(b), "wiecej_przeciw_niz_za")
             continue
         if not juz_pokazany(b):
             if (z_polki.get(_polka_klucz, 0) >= _polka_limit
@@ -2642,6 +2669,7 @@ OPISY_ZDJECIA_PL = {
     "ponizej_progu_jakosci": "szansa poniżej progu półki wysokiej szansy (model ≥ 80% i kurs do ok. 1,24; drużyny 1,25–1,45 także z rynku bijącego cenę, gdy model ≥ kurs)",
     "bez_sygnalu_skladu": "ani składu, ani występu w ostatnim meczu drużyny – nie wiemy, czy zagra",
     "argument_przeciw": "na wyższych kursach stoi przeciw typowi mocny argument (słaba forma, rywal tego nie oddaje, z rywalem nie wchodziło, rzadko w składzie)",
+    "wiecej_przeciw_niz_za": "na karcie stałoby więcej powodów przeciw niż za – opis przeczyłby typowi",
     "ujemna_po_korekcie": "po urealnieniu szansy wartość wyszła ujemna",
     "kurs_poza_widelkami": "kurs poza widełkami, w jakich gramy",
     "limit_meczu": "z tego meczu mamy już tyle typów, ile publikujemy",

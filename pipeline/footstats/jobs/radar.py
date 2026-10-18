@@ -41,6 +41,7 @@ from ..model import betting
 from ..model import context as context_mod
 from ..model import counts as counts_mod
 from ..model import kontekst_drabinki as kd
+from ..model import opis_uczony
 from ..model import tempo as tempo_mod
 from ..model import uczony
 from ..sources import betclic, statshub, superbet
@@ -2669,6 +2670,23 @@ def sila_linii(
             "kary": kary, "premia": premia, "powod": powod, "wyjatki": wyjatki}
 
 
+def _bilans_karty(w: dict) -> int:
+    """Widoczny bilans powodów linii nagłówka karty (argumenty.bilans_widoczny):
+    zdania modelu uczonego tej linii (`hero.p_uczony.skl`) + argumenty karty."""
+    h = w.get("hero") or {}
+    cz: list = []
+    if (h.get("p_uczony") or {}).get("skl"):
+        try:
+            cz = opis_uczony.czynniki({
+                "p_uczony": h["p_uczony"], "strona": "powyzej",
+                "linia": h.get("linia"), "podmiot_typ": "zawodnik",
+                "przeciwnik": w.get("przeciwnik"),
+            })
+        except Exception:                                       # noqa: BLE001
+            cz = []
+    return argumenty.bilans_widoczny(cz, w.get("argumenty"))
+
+
 def kolejnosc_kart(w: dict) -> tuple:
     """Klucz wyboru kart dnia: najpierw OGŁOSZONY skład, potem siła pary.
 
@@ -3704,6 +3722,14 @@ def zbuduj(
             _ri(w["mecz_id"], w.get("podmiot_id") or 0, "argument_przeciw",
                 podmiot=w.get("podmiot"))
             continue
+        # OPIS NIE MOŻE PRZECZYĆ KARCIE (2026-10-18) — zdania modelu dla linii
+        # nagłówka + argumenty; drabinki od 11.10: 39,4% → 47,6% przy tej samej
+        # liczbie kart (patrz argumenty.bilans_widoczny)
+        if WETO_ARGUMENTOW_KART and _bilans_karty(w) < 0:
+            _weto_n += 1
+            _ri(w["mecz_id"], w.get("podmiot_id") or 0, "wiecej_przeciw_niz_za",
+                podmiot=w.get("podmiot"))
+            continue
         if len(wybrane) >= MAX_WPISOW:
             _ri(w["mecz_id"], w.get("podmiot_id") or 0, "limit_wpisow",
                 podmiot=w.get("podmiot"))
@@ -3721,8 +3747,8 @@ def zbuduj(
         per_dzien_n[_dz] = per_dzien_n.get(_dz, 0) + 1
         wybrane.append(w)
     if _weto_n:
-        print(f"Drabinki — weto „argument przeciw” (słaba forma, rywal nie oddaje, "
-              f"z rywalem nie wchodziło, rzadko w składzie): {_weto_n} nowych kart")
+        print(f"Drabinki — weto (argument przeciw albo więcej powodów przeciw niż "
+              f"za na karcie): {_weto_n} nowych kart")
     wpisy = wybrane
     # OCENA na karcie: miejsce w rankingu dnia + klasa jakości. Front sortuje
     # i oznacza WYŁĄCZNIE tym — nie ma drugiej definicji „najlepszego typu"

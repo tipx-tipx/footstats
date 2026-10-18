@@ -366,6 +366,40 @@ def argumenty_zawodnika(idx: Indeks, opp: int, ko: int, rynek: str, linia: float
     return {"za": za, "przeciw": przeciw, "dane": _bez_pustych(dane)}
 
 
+# argumenty, które karta pokazuje zdaniem (web/src/lib/argumenty.ts) — forma,
+# pokrycie i „na 90" stoją w kratkach / opisie modelu, więc tu ich nie liczymy
+ARG_POKAZYWANE = frozenset({
+    "rywal_top", "rywal_slaby", "h2h_wszystkie", "h2h_wiekszosc", "h2h_nie",
+    "rzadko_sklad", "druzyna_top", "slabsza_ponizej", "mecz_sprzyja",
+    "mecz_nie_sprzyja", "wykonawca_karnych", "wykonawca_wolnych",
+})
+
+
+def bilans_widoczny(czynniki_modelu: list[dict] | None, arg: dict | None) -> int:
+    """Powody ZA minus PRZECIW, które człowiek widzi na karcie: zdania modelu
+    (kierunek z mnożnika, te same progi co front: > 1,02 za, < 0,98 przeciw)
+    plus pokazywane argumenty.
+
+    ⚑ 2026-10-18 (właściciel: „w rozwinięciach większości typów mamy argumenty,
+    czemu nie grać, a nie co przemawia za"): 24 z 84 typów na stronie miało
+    więcej powodów przeciw niż za. Kandydaci od 11.10 (od kiedy model zapisuje
+    składniki): bilans < 0 → drużyny tańsze 63,3% przy kursie 69,8%, droższe
+    34,0% przy 47,0%, zawodnicy tańsi 58,0% przy 71,2%; bilans > 0 trafia
+    tyle, ile kurs. Typ, którego opis sam sobie przeczy, nie wchodzi."""
+    za = przeciw = 0
+    for c in czynniki_modelu or []:
+        m = c.get("mnoznik")
+        if not isinstance(m, (int, float)):
+            continue
+        if m > 1.02:
+            za += 1
+        elif m < 0.98:
+            przeciw += 1
+    za += sum(1 for k in (arg or {}).get("za") or [] if k in ARG_POKAZYWANE)
+    przeciw += sum(1 for k in (arg or {}).get("przeciw") or [] if k in ARG_POKAZYWANE)
+    return za - przeciw
+
+
 def bilans(arg: dict | None) -> int:
     return len((arg or {}).get("za") or []) - len((arg or {}).get("przeciw") or [])
 
