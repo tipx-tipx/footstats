@@ -1396,6 +1396,52 @@ def tani_typ_druzyny(b: dict) -> bool:
     return pasmo["kurs_min"] <= kurs < pasmo["kurs_max"] and p >= pasmo["p_min"]
 
 
+# ⚑ OZNACZENIA TYPÓW NA STRONIE (2026-10-18, właściciel: „pasuje, ale krótsze
+# teksty"; „mają być dobre sprzedażowo i analityczne"). Tylko to, co w księdze
+# daje przewagę nad kursem (14.09–17.10, rozliczeni kandydaci bez dubli, kurs
+# skalibrowany per rynek; „połowy" = do 03.10 / od 04.10):
+#   perla       wyższe kursy, pokrycie ≥ 8/10, model ≥ cena strumienia
+#               drużyny +5,0 pp (61,7% przy 1,68; połowy +4,7 / +5,3)
+#               zawodnicy +10,7 pp (50% przy 1,95, n=80)
+#   nad_kursem  zawodnicy, model ≥ cena + 15 pp
+#               wysoka szansa +5,8 (połowy +2,2 / +8,8), wyższe +8,8 (+8,7 / +8,9)
+#               — u drużyn ta sama reguła wychodzi UJEMNIE (−3,7), więc nie ma
+#   seria       pokrycie ≥ 9/10: zawodnicy wysoka +3,9 (+3,4 / +4,4),
+#               drużyny wyższe +4,9; drużyny wysoka szansa — sam fakt, bez
+#               przewagi (+2,2, połowy −2,5 / +5,2)
+# „U siebie" i „faworyt" (+4–6 pp u zawodników) czekają na ~2 tygodnie danych
+# (`tempo` w księdze od 15.10). Cena = kurs po marży strumienia
+# (rozliczanie.sciaganie_uczony_strumieni), ta sama co na karcie.
+OZNACZENIA_TYPU = {"perla_pokrycie": 0.80, "nad_kursem_pp": 0.15, "seria_pokrycie": 0.90}
+
+
+def oznaczenia_typu(b: dict, marze: dict[str, float] | None = None) -> list[str]:
+    """Kody oznaczeń typu na stronie: "perla", "nad_kursem", "seria"."""
+    try:
+        kurs = float(b.get("kurs") or 0.0)
+        p = float(b.get("p_przed_sciagnieciem") or b.get("p_model") or 0.0)
+    except (TypeError, ValueError):
+        return []
+    if kurs <= 1.0 or b.get("sugestia"):
+        return []
+    druz = b.get("podmiot_typ") == "druzyna"
+    marza = (marze or {}).get("druzyny" if druz else "zawodnicy",
+                              rozliczanie.MARZA_SCIAGANIA_DOMYSLNA)
+    cena = betting.implied_prob_one_sided(kurs, marza)
+    pkw = (b.get("p_uczony") or {}).get("pkw")
+    pkw = float(pkw) if isinstance(pkw, (int, float)) else None
+    out: list[str] = []
+    if (b.get("polka") == "wyzsze_kursy" and pkw is not None
+            and pkw >= OZNACZENIA_TYPU["perla_pokrycie"] and p >= cena):
+        out.append("perla")
+    if not druz and p >= cena + OZNACZENIA_TYPU["nad_kursem_pp"]:
+        out.append("nad_kursem")
+    if ("perla" not in out and pkw is not None
+            and pkw >= OZNACZENIA_TYPU["seria_pokrycie"]):
+        out.append("seria")
+    return out
+
+
 def tylko_tania_sciezka(b: dict) -> bool:
     """Najtańszy typ drużynowy, który BEZ tej ścieżki nie przeszedłby progu
     jakości (p < 0,80) — tylko takie liczą się do limitu „1 na mecz".
@@ -11303,6 +11349,15 @@ def _main_impl(tryb=None):
                    and not b.get("pokazany_wczesniej") and not b.get("wznowiony"))
     print(f"Najtańsze typy drużynowe (1,20–1,25, model ≥ 0,65, 1 na mecz): "
           f"{_tanie_n} nowych na liście")
+    # oznaczenia na karcie (patrz OZNACZENIA_TYPU) — liczone na liście, bo
+    # półka jest znana dopiero tu; wznowione też, to tylko prezentacja
+    _marze_strumieni = {s: m for s, (_w_s, m) in _sciaganie_uczony_s.items()}
+    _ozn_licz: Counter = Counter()
+    for b in lista_pub:
+        b["oznaczenia"] = oznaczenia_typu(b, _marze_strumieni)
+        _ozn_licz.update(b["oznaczenia"])
+    print("Oznaczenia typów na liście: " + (", ".join(
+        f"{k}={v}" for k, v in _ozn_licz.most_common()) or "brak"))
     for _k, _powod in _zdjete_selekcja.items():
         zdjete_klucze.setdefault(_k, _powod)
     # ⚑ PÓŁKA NIGDY NIE DOJEŻDŻAŁA DO KSIĘGI (zmierzone 2026-09-21: 0 z 37 477
