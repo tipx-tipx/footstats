@@ -81,7 +81,7 @@ OPISY = {
     "druzyna_top": "drużyna w czołówce ligi w tej statystyce",
     # bilans bramek z ostatnich 10 meczów, nie siła klubu — PSG z Barceloną
     # potrafi tu wyjść „słabszy" (podgląd 18.10), więc opis mówi, co liczymy
-    "slabsza_ponizej": "rywal z wyraźnie lepszym bilansem bramek",
+    "slabsza_ponizej": "ostatnie 10 meczów: rywal z wyraźnie lepszym bilansem bramek",
 }
 
 
@@ -152,17 +152,19 @@ class Indeks:
         v = d[int(tid)]
         return sum(1 for x in d.values() if x < v) / (len(d) - 1)
 
-    def miejsce(self, tid: int, ko: int, pole, od_najwiekszej: bool = True
-                ) -> tuple[int, int] | None:
-        """(miejsce, liczba drużyn) w lidze — do opisu „2. na 18". Liczone
-        z tego samego rankingu co `ranga` (wywołać po niej)."""
+    def miejsce(self, tid: int, ko: int, pole) -> tuple[int, int] | None:
+        """(miejsce, liczba drużyn) w lidze, 1 = najwięcej — do opisu „2. na 18".
+
+        Ta sama reguła co `ranga` (liczą się drużyny z MNIEJSZĄ średnią), więc
+        remisy nie rozjeżdżają opisu z argumentem: przy kartkach pół ligi ma
+        tę samą średnią i „17. na 23" stało obok „rywal pozwala na mało"
+        (podgląd 18.10)."""
         if self.ranga(tid, ko, pole) is None:
             return None
         liga = self.liga(tid, ko)
         d = self._ranking[(liga, int(ko // 86400), pole)]
         v = d[int(tid)]
-        lepszych = sum(1 for x in d.values() if (x > v if od_najwiekszej else x < v))
-        return lepszych + 1, len(d)
+        return len(d) - sum(1 for x in d.values() if x < v), len(d)
 
     def sila(self, tid: int, ko: int) -> float | None:
         """Średnia różnica bramek z ostatnich meczów (≥5)."""
@@ -212,8 +214,9 @@ def argumenty_druzyny(idx: Indeks, tid: int, opp: int, ko: int, rynek: str,
     if ro is not None and ro < PROG_RYWAL_PRZECIW:
         przeciw.append("rywal_slaby")
     if ro is not None:
-        # „powyżej": miejsce od rywala, który oddaje najwięcej; „poniżej" — najmniej
-        dane["rywal_miejsce"] = idx.miejsce(opp, ko, rywala, strona == "powyzej")
+        # miejsce zawsze od drużyny, która oddaje NAJWIĘCEJ (1 = najwięcej) —
+        # karta mówi „pozwala na dużo/mało", kierunek bierze ze strony typu
+        dane["rywal_miejsce"] = idx.miejsce(opp, ko, rywala)
     traf = []
     for m in idx.h2h(tid, opp, ko)[-5:]:
         v = _wart(m, nasze)
@@ -230,7 +233,7 @@ def argumenty_druzyny(idx: Indeks, tid: int, opp: int, ko: int, rynek: str,
     rn = _po_stronie(idx.ranga(tid, ko, nasze), strona)
     if rn is not None and rn >= PROG_DRUZYNA_TOP:
         za.append("druzyna_top")
-        dane["druzyna_miejsce"] = idx.miejsce(tid, ko, nasze, strona == "powyzej")
+        dane["druzyna_miejsce"] = idx.miejsce(tid, ko, nasze)
     s1, s2 = idx.sila(tid, ko), idx.sila(opp, ko)
     if s1 is not None and s2 is not None and s1 - s2 < -1 and strona == "ponizej":
         za.append("slabsza_ponizej")

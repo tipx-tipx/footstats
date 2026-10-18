@@ -29,7 +29,14 @@ def test_ranga_rywala_w_lidze():
     assert idx.ranga(1, KO, ("sp", "sh")) == 0.0
     assert idx.ranga(999, KO, ("sp", "sh")) is None          # brak w magazynie
     assert idx.miejsce(5, KO, ("sp", "sh")) == (1, 10)       # „1. na 10"
-    assert idx.miejsce(5, KO, ("sp", "sh"), od_najwiekszej=False) == (10, 10)
+    assert idx.miejsce(1, KO, ("sp", "sh")) == (10, 10)
+
+
+def test_miejsce_przy_remisach_jak_ranga():
+    """Remisy: miejsce liczone jak `ranga` — „mało" nie stoi przy 17. na 23."""
+    idx = A.Indeks(_magazyn(oddaje={t: (5 if t <= 6 else 10 + t) for t in range(1, 11)}))
+    assert idx.ranga(3, KO, ("sp", "sh")) == 0.0
+    assert idx.miejsce(3, KO, ("sp", "sh")) == (10, 10)
 
 
 def test_dane_do_opisu():
