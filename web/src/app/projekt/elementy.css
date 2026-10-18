@@ -709,6 +709,12 @@
 .el-wiersz-meta { margin-top: 3px; color: var(--t3); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* 01.10: nazwisko i zakład miały ten sam rozmiar i grubość – zlewały się */
 .el-wiersz .a-typ-kto { font-size: 13px; color: var(--t2); font-weight: 500; letter-spacing: 0.005em; }
+/* 18.10: oznaczenia przy nazwie – nazwa skraca się wielokropkiem, oznaczenie zostaje */
+.el-kto-wiersz { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.el-kto-nazwa { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.el-oznaczenia { flex: none; display: inline-flex; gap: 8px; font-size: 12px; font-weight: 600; color: var(--t1); white-space: nowrap; cursor: help; }
+.el-oznaczenia [data-kod="perla"] { color: var(--perla); }
+.el-oznaczenia [data-kod="seria"] { color: var(--ok); }
 
 /* ---------- 3.3 A dopracowane ------------------------------------------ */
 

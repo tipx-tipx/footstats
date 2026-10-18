@@ -7,6 +7,8 @@ import { useId, useState } from "react";
 import { porownanieCen } from "@/lib/cenyBukmacherow";
 import { fmtKurs, fmtLinia } from "@/lib/format";
 
+import { OZNACZENIA_TYPU, type OznaczenieTypu } from "@/lib/oznaczenia";
+
 import type { KartaV, Powod } from "../../_dane/elementy";
 import { KafelekD, KratkiD, Logo, SzansaD, kursTypu } from "../atomy2/podstawowe";
 import { Herb } from "../Herb";
@@ -143,6 +145,21 @@ export function Rozwin({ otwarty, children }: { otwarty: boolean; children: Reac
   );
 }
 
+/* oznaczenia typu (18.10) – słowa, nie plakietki; kolor = znaczenie jak w drabinkach:
+   złoto tylko perełka, zieleń tylko seria (jak trafienia), „nad kursem” zwykłym tekstem */
+export function Oznaczenia({ kody }: { kody?: OznaczenieTypu[] }) {
+  if (!kody?.length) return null;
+  return (
+    <span className="el-oznaczenia">
+      {kody.map((k) => (
+        <span key={k} data-kod={k} title={OZNACZENIA_TYPU[k].opis}>
+          {OZNACZENIA_TYPU[k].tekst}
+        </span>
+      ))}
+    </span>
+  );
+}
+
 /* A · wiersz rozwijany – gęsta lista, szczegóły po kliknięciu */
 export function KartaA({ t, otwarta = false, bezMeczu = false }: { t: KartaV; otwarta?: boolean; bezMeczu?: boolean }) {
   const [otwarty, setOtwarty] = useState(otwarta);
@@ -162,8 +179,9 @@ export function KartaA({ t, otwarta = false, bezMeczu = false }: { t: KartaV; ot
         {/* 01.10: rodzaj zakładu na pierwszym planie – ikona rynku, nazwa rynku
             i próg największe w wierszu; kto i kiedy – pomocniczo */}
         <div style={{ minWidth: 0 }}>
-          <div className="a-typ-kto" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {t.kto}
+          <div className="a-typ-kto el-kto-wiersz">
+            <span className="el-kto-nazwa">{t.kto}</span>
+            <Oznaczenia kody={t.oznaczenia} />
           </div>
           <div className="el-zaklad-wiersz">
             <IkonaRynku rynek={t.rynek} />

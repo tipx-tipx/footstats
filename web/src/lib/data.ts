@@ -339,6 +339,20 @@ async function fetchBundle(): Promise<Bundle> {
     const map: Record<string, unknown> = Object.fromEntries(
       rows.map((r) => [r.key, r.payload]),
     );
+    // podgląd na localhoście: klucze paczki z plików (jak w `fetchKlucz`,
+    // 18.10 – `value_bets` z oznaczeniami przed wysłaniem pipeline); nigdy w produkcji
+    if (process.env.NODE_ENV === "development" && process.env.KLUCZE_LOKALNE) {
+      const { readFile } = await import("node:fs/promises");
+      await Promise.all(
+        BUNDLE_KEYS.map(async (k) => {
+          try {
+            map[k] = JSON.parse(await readFile(`${process.env.KLUCZE_LOKALNE}/${k}.json`, "utf-8"));
+          } catch {
+            // brak pliku – zostaje Supabase
+          }
+        }),
+      );
+    }
     // klucz bazowy też może kiedyś przekroczyć próg i przyjechać jako marker
     // (patrz `sklejCzesci`) — bez tego wpadłby cicho na fallback demo
     await Promise.all(

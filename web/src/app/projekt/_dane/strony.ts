@@ -6,6 +6,7 @@
 
 import type { CenyBukmacherow } from "@/lib/cenyBukmacherow";
 import { zlozKupon } from "@/lib/kuponBuilder";
+import { czyOznaczenie } from "@/lib/oznaczenia";
 import type { LegPool } from "@/lib/types";
 
 import { powodPoLudzku, przygotujElementy, type KartaV } from "./elementy";
@@ -61,6 +62,8 @@ type TypS = {
   uzasadnienie?: { czynniki?: Czynnik[] };
   /** opis z rozkładu λ modelu uczonego (pipeline `opis_uczony`, od 11.10) – pierwszeństwo przed starym */
   uzasadnienie_uczony?: { czynniki?: Czynnik[] };
+  /** oznaczenia typu (pipeline `oznaczenia_typu`, od 18.10) */
+  oznaczenia?: string[];
 };
 type Forma = { ostatnie: number[]; rywale?: string[]; minuty?: number[]; ts?: number[]; kadra?: boolean[] };
 
@@ -117,6 +120,7 @@ export function przygotujStrony() {
       // właściciel 14.10: opisy z modelu, który liczy szansę; stary silnik tylko tam,
       // gdzie nowego opisu nie ma (sumy meczowe, „kto więcej”)
       powody: (t.uzasadnienie_uczony?.czynniki ?? t.uzasadnienie?.czynniki ?? []).map((c) => powodPoLudzku(c, t.rynek)).filter((x): x is NonNullable<typeof x> => x !== null),
+      oznaczenia: (t.oznaczenia ?? []).filter(czyOznaczenie),
       polka: polkaNaStronie(t.polka, t.p_model),
       ts: t.kickoff_ts,
       meczId: t.mecz_id,

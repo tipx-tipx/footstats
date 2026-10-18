@@ -15,7 +15,7 @@ import { odm } from "../atomy2/filtry2";
 import { DniD, KafelekD, KratkiD, kursTypu } from "../atomy2/podstawowe";
 import { ScenaDrabinki } from "../elementy/drabinka";
 import { IkonaRynku } from "../elementy/ikonyRynkow";
-import { KartaA, Powody } from "../elementy/karta";
+import { KartaA, Oznaczenia, Powody } from "../elementy/karta";
 import { useTeraz } from "../czas";
 import { Herb } from "../Herb";
 
@@ -66,9 +66,12 @@ export function TypDnia({ t, uklad = "duzy" }: { t: KartaStrony; uklad?: "duzy" 
         <Herb d={t.druzyna} tryb="prawdziwy" rozmiar={maly ? 26 : 34} />
         <div style={{ minWidth: 0 }}>
           <div className="st-td-nazwisko p-n">{t.podmiotId ? <Lnk href={`/zawodnik/${t.podmiotId}`}>{t.kto}</Lnk> : t.kto}</div>
-          <div className="st-td-pod">
-            {t.pozycja ? `${t.pozycja} · ` : ""}
-            {t.druzyna.nazwa}
+          <div className="st-td-pod el-kto-wiersz">
+            <span className="el-kto-nazwa">
+              {t.pozycja ? `${t.pozycja} · ` : ""}
+              {t.druzyna.nazwa}
+            </span>
+            <Oznaczenia kody={t.oznaczenia} />
           </div>
         </div>
       </div>
@@ -156,8 +159,11 @@ function KartaMocna({ t }: { t: KartaStrony }) {
         <Herb d={t.druzyna} tryb="prawdziwy" rozmiar={28} />
         <div style={{ minWidth: 0 }}>
           <div className="st-td-nazwisko p-n">{t.podmiotId ? <Lnk href={`/zawodnik/${t.podmiotId}`}>{t.kto}</Lnk> : t.kto}</div>
-          <div className="st-td-pod">
-            {t.podmiotTyp === "druzyna" ? `przeciw ${t.rywal.nazwa}` : `${t.pozycja ? `${t.pozycja} · ` : ""}${t.druzyna.nazwa}`}
+          <div className="st-td-pod el-kto-wiersz">
+            <span className="el-kto-nazwa">
+              {t.podmiotTyp === "druzyna" ? `przeciw ${t.rywal.nazwa}` : `${t.pozycja ? `${t.pozycja} · ` : ""}${t.druzyna.nazwa}`}
+            </span>
+            <Oznaczenia kody={t.oznaczenia} />
           </div>
         </div>
       </div>

@@ -4,6 +4,7 @@
  */
 
 import { fmtKurs } from "@/lib/format";
+import type { OznaczenieTypu } from "@/lib/oznaczenia";
 
 import { dzisZrodla, zrodlo } from "./zrodlo";
 import {
@@ -26,6 +27,8 @@ export type KartaV = TypV & {
   podmiotTyp: "zawodnik" | "druzyna";
   mecz: string;
   powody: Powod[];
+  /** oznaczenia z pipeline (`OZNACZENIA_TYPU`, 18.10) – tylko te z przewagą nad kursem w księdze */
+  oznaczenia?: OznaczenieTypu[];
 };
 
 export type MeczE = {
