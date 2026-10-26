@@ -403,6 +403,23 @@ def test_krycie_rywala_strona_lustrzana():
     assert S.krycie_rywala(nasza, rywal, 1, 2, 8, KO) is None   # nie ma go w kadrze
 
 
+def test_krycie_wywalczone_kto_fauluje_naprzeciw():
+    """26.10: para przy faulach wywalczonych — nasz lewoskrzydłowy, naprzeciw
+    prawa strona obrony rywala."""
+    mecze_n = {i: KO - (i + 1) * 7 * DZIEN for i in range(1, 6)}
+    mecze_r = {100 + i: KO - (i + 1) * 7 * DZIEN for i in range(1, 6)}
+    nasza = _kadra_kr(1, {7: {e: (90, 0, 3, 0, "LW") for e in mecze_n}}, mecze_n)
+    rywal = _kadra_kr(2, {
+        50: {e: (90, 2, 0, 0, "RB") for e in mecze_r},     # naprzeciw naszego lewego skrzydła
+        51: {e: (90, 1, 0, 0, "LB") for e in mecze_r},     # druga strona
+        52: {e: (90, 3, 0, 0, "ST") for e in mecze_r},     # napastnik — nie kryje skrzydła
+    }, mecze_r)
+    k = S.krycie_wywalczone(nasza, rywal, 1, 2, 7, KO)
+    assert k["poz"] == "LW" and k["w90"] == 3.0 and k["min"] == 90.0
+    assert k["f_mir"] == 2.0 and k["f_def"] == 3.0 and k["f_tot"] == 6.0
+    assert S.krycie_wywalczone(nasza, rywal, 1, 2, 8, KO) is None
+
+
 def test_ksiega_zapisuje_krycie():
     log: dict = {}
     R._dopisz_nowe(log, [_typ(rynek_kod="fouls_committed", krycie={"a_mir": 3.0})])

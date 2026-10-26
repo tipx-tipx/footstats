@@ -820,6 +820,57 @@ def krycie_rywala(kadra_nasza: dict, kadra_rywala: dict, nasza: int, rywal: int,
             "a_tot": sr(a_tot), "d_tot": sr(d_tot), "a_of": sr(a_of)}
 
 
+def krycie_wywalczone(kadra_nasza: dict, kadra_rywala: dict, nasza: int, rywal: int,
+                      pid: int, ko: int) -> dict | None:
+    """Para przy faulach WYWALCZONYCH (2026-10-26, właściciel: „parowanie przy
+    faulach — najpierw pomiar”): kto po stronie rywala gra naprzeciw naszego
+    zawodnika i ile fauluje. Lustro `krycie_rywala`: tam nasz zawodnik
+    fauluje, tu jest faulowany.
+
+    {"poz", "w90" (nasze wywalczone na 90), "min", "f_mir" (faule rywala po
+    przeciwnej stronie boiska — obrona, wahadła, pomoc), "f_def" (faule całej
+    obrony i pomocy rywala), "f_tot" (wszystkie faule rywala)} na mecz rywala
+    z ostatnich 8, albo None (za krótka historia). Stempel do księgi, bez
+    wpływu na wybór."""
+    gracz = next((p for p in (kadra_nasza or {}).get("data") or []
+                  if int(p.get("id") or 0) == int(pid)), None)
+    if gracz is None:
+        return None
+    me = _mecze_kadry(kadra_nasza, nasza, ko, 10)
+    st = {int(k): v for k, v in (gracz.get("stats") or {}).items() if v}
+    hist = [st[e] for e in me if e in st and float(st[e].get("minutesPlayed") or 0) >= 15]
+    if len(hist) < 3:
+        return None
+    pozy = [h.get("position") for h in hist if h.get("position") not in _POZ_OGOLNE]
+    poz = (Counter(pozy).most_common(1)[0][0] if pozy
+           else (hist[0].get("position") or gracz.get("position")))
+    s_my = _strona_poz(poz)
+    minuty = sum(float(h.get("minutesPlayed") or 0) for h in hist)
+    mo = _mecze_kadry(kadra_rywala, rywal, ko, 8)
+    if len(mo) < 4:
+        return None
+    f_tot, f_def, f_mir = [], [], []
+    for e in mo:
+        ft = fd = fm = 0.0
+        for q in (kadra_rywala or {}).get("data") or []:
+            sq_ = (q.get("stats") or {}).get(str(e)) or (q.get("stats") or {}).get(e)
+            if not sq_ or float(sq_.get("minutesPlayed") or 0) <= 0:
+                continue
+            fl = float(sq_.get("fouls") or 0)
+            ft += fl
+            pq = sq_.get("position") if sq_.get("position") not in _POZ_OGOLNE else q.get("position")
+            if _linia_poz(pq) in ("D", "WB", "M"):
+                fd += fl
+                if s_my and _strona_poz(pq) == _LUSTRO[s_my]:
+                    fm += fl
+        f_tot.append(ft); f_def.append(fd); f_mir.append(fm)
+    sr = lambda v: round(sum(v) / len(v), 2)
+    return {"poz": poz,
+            "w90": round(90 * sum(float(h.get("wasFouled") or 0) for h in hist) / minuty, 2),
+            "min": round(minuty / len(hist), 1),
+            "f_mir": sr(f_mir) if s_my else None, "f_def": sr(f_def), "f_tot": sr(f_tot)}
+
+
 def fetch_referee(referee_id: int) -> dict | None:
     """Profil sędziego ze statshub (2026-10-18): `matchRecords` to bilans
     kariery liczony na bieżąco (lastGameTimestamp = wczoraj przy sprawdzeniu

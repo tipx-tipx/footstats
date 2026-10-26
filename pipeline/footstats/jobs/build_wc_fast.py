@@ -12691,19 +12691,20 @@ def _main_impl(tryb=None):
 
     _krycie_cache: dict = {}
 
-    def _krycie_b(mid: int, pid) -> dict | None:
-        kk = (mid, pid)
+    def _krycie_b(mid: int, pid, rynek: str = "fouls_committed") -> dict | None:
+        kk = (mid, pid, rynek)
         if kk not in _krycie_cache:
             out = None
-            tid = _druzyna_zaw_kal.get(kk)
+            tid = _druzyna_zaw_kal.get((mid, pid))
             gosp, gosc = _mecze_druzyn_arg.get(mid) or (None, None)
             if tid and tid in (gosp, gosc) and pid:
                 opp = gosc if tid == gosp else gosp
                 kn = (_braki_kadr.get((mid, int(tid))) or {}).get("kadra")
                 kr = (_braki_kadr.get((mid, int(opp or 0))) or {}).get("kadra")
                 if kn and kr and _ko_meczu_kal.get(mid):
-                    out = statshub.krycie_rywala(kn, kr, int(tid), int(opp), int(pid),
-                                                 _ko_meczu_kal[mid])
+                    _f = (statshub.krycie_wywalczone if rynek == "fouls_won"
+                          else statshub.krycie_rywala)
+                    out = _f(kn, kr, int(tid), int(opp), int(pid), _ko_meczu_kal[mid])
             _krycie_cache[kk] = out
         return _krycie_cache[kk]
 
@@ -12754,11 +12755,13 @@ def _main_impl(tryb=None):
             if _ps:
                 b["p_start"] = _ps
                 _ile_kal["p_start"] += 1
-        # krycie rywala przy faulach popełnianych (statshub.krycie_rywala) —
+        # krycie rywala przy faulach popełnianych (statshub.krycie_rywala)
+        # i para przy wywalczonych (statshub.krycie_wywalczone, 26.10) —
         # stempel dla selektora, do wyboru nie wchodzi
-        if b.get("rynek_kod") == "fouls_committed" and "krycie" not in b:
+        if b.get("rynek_kod") in ("fouls_committed", "fouls_won") and "krycie" not in b:
             try:
-                _kr = _krycie_b(_int_lub_zero(b.get("mecz_id")), b.get("podmiot_id"))
+                _kr = _krycie_b(_int_lub_zero(b.get("mecz_id")), b.get("podmiot_id"),
+                                b["rynek_kod"])
             except Exception as e:                              # noqa: BLE001
                 diagnostyka.cichy("cykl", "krycie_rywala", e)
                 _kr = None
