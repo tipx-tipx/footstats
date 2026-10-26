@@ -910,9 +910,9 @@ def test_droga_karta_bez_serii_odpada():
     # cena rynku bez marży to ~0,358, więc 0,40 mieści się pod górną granicą
     # rozjazdu (MAX_ROZJAZD_KARTY). Bez tego karta odpadałaby na innej bramie
     # i test kłamałby o tym, co sprawdza.
-    slaba = _karta_do_oceny(6, kurs=2.60, p_final=0.40)
+    slaba = _karta_do_oceny(6, kurs=2.50, p_final=0.40)
     assert radar._oceń_karte(slaba)[1] is None
-    mocna = _karta_do_oceny(8, kurs=2.60, p_final=0.40)
+    mocna = _karta_do_oceny(8, kurs=2.50, p_final=0.40)
     assert radar._oceń_karte(mocna)[1] is not None
 
 
@@ -985,12 +985,25 @@ def _karta_sitowa(udzial=0.9, xi=None, p_model=None, forma=None, krotkie=0,
             "krotkie_wystepy5": krotkie, "rynki": [rynek]}
 
 
-def test_hero_to_najwyzszy_kurs_wsrod_mocnych_linii():
-    """Decyzja właściciela 18.09 (radar.MIN_KURS_HERO): mocna linia trafia
-    ~55–65% niezależnie od kursu, więc hero to NAJWYŻSZY kurs z siłą ≥0,70 —
-    2,5 @2,50 (7/10, 4/5), nie 1,5 @1,90 z lepszym „pakietem”. Kurs ≥2,20 =
-    perełka. Składniki do księgi."""
-    score, hero = radar._oceń_karte(_karta_sitowa())
+def test_hero_to_mocna_linia_najblizej_kursu_2():
+    """Właściciel 26.10 (radar.KURS_HERO_CEL): 1. szczebel w okolicach kursu 2,
+    dowolnej linii — z dwóch mocnych 1,5 @1,90 i 2,5 @2,50 nagłówkiem jest 1,5,
+    a 2,5 zostaje drugim szczeblem."""
+    _s, hero = radar._oceń_karte(_karta_sitowa())
+    assert hero is not None and hero["linia"] == 1.5 and hero["kurs"] == 1.90
+    assert hero["powod_szczebla"] == "najwyzsza_mocna" and hero["drugi_linia"] == 2.5
+
+
+def test_hero_tylko_w_oknie_kursu():
+    """Mocna linia powyżej MAX_KURS_HERO nie jest nagłówkiem."""
+    _s, hero = radar._oceń_karte(_karta_sitowa(kurs_15=1.60, kurs_25=2.60))
+    assert hero is None
+
+
+def test_hero_jedyna_mocna_w_oknie_ze_skladnikami():
+    """1,5 @1,60 jest pod MIN_KURS_HERO, więc nagłówkiem zostaje 2,5 @2,50
+    (7/10, 4/5) — kurs ≥2,20 = perełka. Składniki do księgi."""
+    score, hero = radar._oceń_karte(_karta_sitowa(kurs_15=1.60))
     assert hero is not None and hero["linia"] == 2.5 and hero["kurs"] == 2.50
     assert hero["powod_szczebla"] == "perla" and hero["hero_ok"] is True
     assert hero["sito"] is True and hero["sito_wyjatek"] is None
@@ -1035,9 +1048,10 @@ def test_hojny_rywal_dopycha_linie_i_zostawia_stempel():
     assert sl(f=4, rywal=0.8)["sila"] == 0.7              # skąpy rywal odejmuje
     # na karcie: 2,5 z formą 3/5 nie jest hero bez rywala, z rywalem jest
     # mocna — i jako najwyższy kurs zostaje hero ze stemplem wyjątku
-    _s, hero = radar._oceń_karte(_karta_sitowa(forma=3))
-    assert hero is not None and hero["linia"] == 1.5
-    _s, hero = radar._oceń_karte(_karta_sitowa(forma=3, rywal=1.2))
+    # 1,5 @1,60 jest pod oknem kursu nagłówka, więc pyta tylko o 2,5
+    _s, hero = radar._oceń_karte(_karta_sitowa(forma=3, kurs_15=1.60))
+    assert hero is None
+    _s, hero = radar._oceń_karte(_karta_sitowa(forma=3, rywal=1.2, kurs_15=1.60))
     assert hero is not None and hero["linia"] == 2.5
     assert hero["sila"] == 0.7 and hero["sito_wyjatek"] == "rywal"
 
@@ -1055,8 +1069,8 @@ def test_krotki_wystep_w_ostatnich_5_to_kara_ktora_zdejmuje_slabsze_linie():
     assert powody["rotacja_krotkie_wystepy"] == 1
     assert radar.sila_linii({"traf": 7, "z": 10}, {"traf": 4, "z": 5}, 2, 0.9,
                             False)["powod"] == "sito_krotki_wystep_w_ostatnich_5"
-    _s, hero = radar._oceń_karte(_karta_sitowa(krotkie=2, xi=True))
-    assert hero is not None and hero["linia"] == 2.5     # najwyższa mocna
+    _s, hero = radar._oceń_karte(_karta_sitowa(krotkie=2, xi=True, kurs_15=1.60))
+    assert hero is not None and hero["linia"] == 2.5     # jedyna mocna w oknie
     assert hero["sito_wyjatek"] == "xi"
     # nieznane minuty to mniejsza kara (0,10): 8/10 & 5/5 przechodzi, 7/10 & 4/5 nie
     sl = radar.sila_linii({"traf": 7, "z": 10}, {"traf": 4, "z": 5}, None, 0.9, False)
@@ -1069,7 +1083,7 @@ def test_szansa_modelu_nie_jest_brama_sita_tylko_wetem():
     """W sicie p<0,45 trafiało 66,7% (n=6) — sam niski model nie zdejmuje
     linii; weto (18.09, radar.WETO_MODELU_PP) dopiero przy szansie modelu
     niższej od ceny o >10 pp (model skalibrowany w każdym paśmie, 16.09)."""
-    _s, hero = radar._oceń_karte(_karta_sitowa(p_model=0.30))
+    _s, hero = radar._oceń_karte(_karta_sitowa(p_model=0.30, kurs_15=1.60))
     assert hero is not None and hero["sito"] is True and hero["linia"] == 2.5
     powody = Counter()
     # 0,12: następniki dalej przechodzą swoje bramy, hero odpada na wecie
@@ -1145,12 +1159,20 @@ def _karta_perly(traf_15=7, forma_15=4, p_15=0.42, p_25=0.24, kurs_15=3.9):
 def test_perelka_chery_jest_pierwszym_szczeblem():
     """Iloraz p_final/cena 1,77 (> MAX_ROZJAZD_KARTY 1,25) — bardzo mocna linia
     (7/10 & 4/5) ma limit MAX_ROZJAZD_KARTY_MOCNEJ; następnik perełki z szansą
-    0,24 (< 0,25) zostaje, bo za kursem ≥2,20 wystarcza MIN_P_NASTEPNIKA_PERLY."""
-    _s, hero = radar._oceń_karte(_karta_perly())
-    assert hero is not None and hero["linia"] == 1.5 and hero["kurs"] == 3.9
+    0,24 (< 0,25) zostaje, bo za kursem ≥2,20 wystarcza MIN_P_NASTEPNIKA_PERLY.
+    Od 26.10 perełka musi mieścić się w oknie nagłówka (≤ MAX_KURS_HERO)."""
+    _s, hero = radar._oceń_karte(_karta_perly(kurs_15=2.30))
+    assert hero is not None and hero["linia"] == 1.5 and hero["kurs"] == 2.30
     assert hero["powod_szczebla"] == "perla"
     assert hero["drugi_linia"] == 2.5
-    assert hero["rozjazd_iloraz"] > radar.MAX_ROZJAZD_KARTY
+
+
+def test_perelka_ponad_oknem_zostaje_drugim_szczeblem():
+    """Chery @3,9 (26.10): nagłówkiem jest 0,5 @1,70 z okna kursu, 1,5 @3,9
+    wyższym szczeblem."""
+    _s, hero = radar._oceń_karte(_karta_perly())
+    assert hero is not None and hero["linia"] == 0.5 and hero["kurs"] == 1.70
+    assert hero["drugi_linia"] == 1.5
 
 
 def test_slabsza_linia_nie_dostaje_luzniejszego_rozjazdu():
@@ -1176,3 +1198,17 @@ def test_ogloszony_sklad_pierwszy_przy_wyborze_kart():
              {"_score": 0.10, "xi_ogloszony": True},
              {"_score": 0.20}]
     assert [k["_score"] for k in sorted(karty, key=radar.kolejnosc_kart)] == [0.10, 0.30, 0.20]
+
+
+def test_logika_karty_obronca_na_strzalach_i_forma():
+    """26.10: obrońca bez drabinki na strzały, nagłówek z formą ≥ 4/5."""
+    karta = {"pozycja": "D", "hero": {"rynek_kod": "shots", "traf5": 4, "z5": 5}}
+    assert radar.powod_logiki_karty(karta) == "obronca_na_strzalach"
+    assert radar.powod_logiki_karty(dict(karta, pozycja="CB")) == "obronca_na_strzalach"
+    # obrońca na faulach wywalczonych zostaje; DM to pomocnik
+    assert radar.powod_logiki_karty({"pozycja": "D", "hero": {"rynek_kod": "fouls_won",
+                                                              "traf5": 4, "z5": 5}}) is None
+    assert radar.powod_logiki_karty(dict(karta, pozycja="DM")) is None
+    slaba = {"pozycja": "F", "hero": {"rynek_kod": "shots", "traf5": 3, "z5": 5}}
+    assert radar.powod_logiki_karty(slaba) == "forma_ponizej_4_z_5"
+    assert radar.powod_logiki_karty({"pozycja": "F", "hero": {"rynek_kod": "shots"}}) is None

@@ -112,3 +112,48 @@ def test_po_domknieciu_tani_tez_jeden_na_mecz():
     lista, _zdjete, _ = B.wybierz_liste_publikowana(
         [a, b], B.szansa_z_ceną, zamkniete=_zamknieta_doba(a), dolozone={})
     assert [x["id"] for x in lista] == [1]
+
+
+# --- zawodnicy: ścieżka logiki typera (2026-10-26, uczony.LOGIKA_ZAWODNIKOW) ---
+
+def _zaw_logika(**kw):
+    b = {"podmiot_typ": "zawodnik", "strona": "powyzej", "kurs": 1.35, "linia": 0.5,
+         "p_model": 0.77, "p_uczony": {"min": 86.0},
+         "argumenty": {"za": ["forma", "pokrycie", "na_90"], "przeciw": [],
+                       "dane": {"forma": [4, 5], "pokrycie": [8, 10], "na_90": 1.7,
+                                "rywal_miejsce": [12, 20]}}}
+    b.update(kw)
+    return b
+
+
+def test_logika_zawodnika_dwa_powody_wpuszczaja():
+    b = _zaw_logika()
+    assert B.powody_logiki_zawodnika(b) == ["forma", "na_90"]
+    assert B.logika_typera_zawodnika(b)
+    assert not B.ponizej_progu_jakosci(b, "wysoka_szansa")
+
+
+def test_logika_zawodnika_odmawia():
+    # jeden powód
+    assert not B.logika_typera_zawodnika(_zaw_logika(linia=1.5))
+    # argument przeciw
+    zly = _zaw_logika()
+    zly["argumenty"] = dict(zly["argumenty"], przeciw=["rywal_slaby"])
+    assert not B.logika_typera_zawodnika(zly)
+    # niepewny skład, za niski model, za drogi, „poniżej”, drużyna
+    assert not B.logika_typera_zawodnika(_zaw_logika(p_uczony={"min": 70.0}))
+    assert not B.logika_typera_zawodnika(_zaw_logika(p_model=0.74))
+    assert not B.logika_typera_zawodnika(_zaw_logika(kurs=1.50))
+    assert not B.logika_typera_zawodnika(_zaw_logika(strona="ponizej"))
+    assert not B.logika_typera_zawodnika(_zaw_logika(podmiot_typ="druzyna"))
+    # bez argumentów: kandydat (okno zgody), ale nie logika i nie przechodzi progu
+    bez = _zaw_logika(argumenty=None)
+    assert B.kandydat_logiki_zawodnika(bez) and not B.logika_typera_zawodnika(bez)
+    assert B.ponizej_progu_jakosci(bez, "wysoka_szansa")
+
+
+def test_logika_zawodnika_rywal_w_gornej_czesci_ligi():
+    b = _zaw_logika(linia=1.5)
+    b["argumenty"]["dane"]["rywal_miejsce"] = [5, 20]
+    assert B.powody_logiki_zawodnika(b) == ["forma", "rywal"]
+    assert B.logika_typera_zawodnika(b)

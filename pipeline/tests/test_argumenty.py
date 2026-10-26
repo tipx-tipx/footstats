@@ -268,3 +268,12 @@ def test_opisy_dla_wszystkich_kodow():
     kody = {"rywal_top", "rywal_slaby", "h2h_wszystkie", "h2h_wiekszosc", "h2h_nie", "pokrycie",
             "forma", "forma_slaba", "na_90", "rzadko_sklad", "druzyna_top", "slabsza_ponizej"}
     assert kody <= set(A.OPISY)
+
+
+def test_argumenty_informacyjne_nie_licza_sie_do_bilansu():
+    """26.10: „drużyna w czołówce” i „słabsza + poniżej” zostają na karcie,
+    ale nie wchodzą do bilansu ani pakietu (tydzień na żywo: −9 / −16 pp)."""
+    arg = {"za": ["druzyna_top", "slabsza_ponizej", "pokrycie"], "przeciw": []}
+    assert A.bilans(arg) == 1
+    assert not A.czysty_pakiet(arg)
+    assert A.bilans_widoczny([], {"za": ["druzyna_top"], "przeciw": ["rywal_slaby"]}) == -1

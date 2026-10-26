@@ -449,6 +449,26 @@ WAGA_NASTEPNIKA = 0.25
 # Każdy hero niesie `powod_szczebla` (perla / najwyzsza_mocna /
 # tania_z_drugim) — progi do przeliczenia z rozliczeń po ~2 tyg.
 MIN_KURS_HERO = 1.70
+# ⚑ 1. SZCZEBEL W OKOLICACH KURSU 2 (2026-10-26, właściciel: „nas obchodzą
+# kursy w okolicach 2, taki ma być pierwszy szczebel… to nie tylko 0,5 —
+# czasem pierwszy szczebel to 1,5, 2,5 czegoś”). Hero = mocna linia DOWOLNEJ
+# wysokości z kursem w oknie MIN_KURS_HERO–MAX_KURS_HERO; przy kilku mocnych
+# wygrywa ta najbliżej KURS_HERO_CEL (do 26.10 — najdroższa, więc nagłówkiem
+# potrafiła być linia @3,9). Droższe linie zostają wyższymi szczeblami.
+MAX_KURS_HERO = 2.50
+KURS_HERO_CEL = 2.00
+# ⚑ LOGIKA KARTY (2026-10-26, właściciel: „wszystko akceptuję”). Linia
+# nagłówka musi mieć formę ≥ FORMA_HERO z 5 ostatnich występów (obok
+# pokrycia 7/10 z sita i braku argumentów przeciw). Księga 18–25.10, linie
+# zawodników „powyżej” 1,80–2,40: pewny skład + nic przeciw 38,9% (n=650),
+# + forma 4/5 49,4% (n=81, połowy 40,7 / 53,7).
+FORMA_HERO = 4
+# Obrońca nie dostaje drabinki na strzały: stoper oddaje strzał prawie
+# wyłącznie ze stałego fragmentu, więc jego seria to głównie przypadek.
+# Karty obrońców od 14.09: 3/13 (19–25.10: 0/6 — Ginter, Ullrich, Alemão,
+# Orban), napastnicy i pomocnicy 23/44.
+RYNKI_STRZALOW_BEZ_OBRONCOW = frozenset({"shots", "sot", "shots_outside_box",
+                                         "sot_outside_box", "headed_shots", "headed_sot"})
 # ⚑ BEZ WYJĄTKU „TANIA Z DRUGIM” (2026-10-11, właściciel: „pierwszy szczebel
 # z value, koło 1,8–1,9”, kursy 1,4–1,6 nie). Karty na stronie od 14.09:
 #   najwyzsza_mocna (≥1,70, od 24.09)   16/22 = 73% przy cenie 51%
@@ -2322,6 +2342,10 @@ def _oceń_karte(
                     hero_ok = False
                     if sito:
                         lokalne["sito_kurs_ponizej_1_70"] += 1
+                elif s["kurs"] > MAX_KURS_HERO:
+                    hero_ok = False
+                    if sito:
+                        lokalne["sito_kurs_powyzej_okna_hero"] += 1
                 elif p_final is not None and p_final < 1.0 / s["kurs"] - WETO_MODELU_PP:
                     hero_ok = False
                     if sito:
@@ -2333,7 +2357,7 @@ def _oceń_karte(
             hero_ok = hero_ok and sito
             trafiony["hero_ok"] = hero_ok
             klucz = (1 if hero_ok else 0,
-                     float(s["kurs"]) if hero_ok else 0.0,
+                     -abs(float(s["kurs"]) - KURS_HERO_CEL) if hero_ok else -9.0,
                      _wart if (hero_ok and _wart is not None) else 0.0, ocena)
             if pomiarowy:
                 if ocena > pomiar_score:
@@ -2685,6 +2709,20 @@ def _bilans_karty(w: dict) -> int:
         except Exception:                                       # noqa: BLE001
             cz = []
     return argumenty.bilans_widoczny(cz, w.get("argumenty"))
+
+
+def powod_logiki_karty(w: dict) -> str | None:
+    """Czemu nowa karta nie przechodzi logiki karty (FORMA_HERO,
+    RYNKI_STRZALOW_BEZ_OBRONCOW) — nazwa powodu do rejestru albo None."""
+    h = w.get("hero") or {}
+    if (h.get("rynek_kod") in RYNKI_STRZALOW_BEZ_OBRONCOW
+            and uczony.grupa_pozycji(w.get("pozycja")) == "DEF"):
+        return "obronca_na_strzalach"
+    traf, z = h.get("traf5"), h.get("z5")
+    if (isinstance(traf, (int, float)) and isinstance(z, (int, float))
+            and z >= OKNO_FORMY_SITA and traf < FORMA_HERO):
+        return "forma_ponizej_4_z_5"
+    return None
 
 
 def kolejnosc_kart(w: dict) -> tuple:
@@ -3713,7 +3751,15 @@ def zbuduj(
     per_dzien_n: dict[str, int] = {}
     wybrane: list[dict] = []
     _weto_n = 0
+    _logika_kart: Counter = Counter()
     for w in sorted(ocenione, key=kolejnosc_kart):
+        # LOGIKA KARTY — patrz FORMA_HERO i RYNKI_STRZALOW_BEZ_OBRONCOW
+        _pow_logiki = powod_logiki_karty(w)
+        if _pow_logiki:
+            _logika_kart[_pow_logiki] += 1
+            _ri(w["mecz_id"], w.get("podmiot_id") or 0, _pow_logiki,
+                podmiot=w.get("podmiot"))
+            continue
         # WETO „ARGUMENT PRZECIW" — patrz WETO_ARGUMENTOW_KART. Karta już
         # opublikowana wraca z rejestru (`scal_karty_z_publikacjami`), więc
         # weto dotyczy wyłącznie nowych kart.
@@ -3746,6 +3792,8 @@ def zbuduj(
         per_mecz_n[w["mecz_id"]] = per_mecz_n.get(w["mecz_id"], 0) + 1
         per_dzien_n[_dz] = per_dzien_n.get(_dz, 0) + 1
         wybrane.append(w)
+    if _logika_kart:
+        print(f"Drabinki — logika karty (nowe karty odrzucone): {dict(_logika_kart)}")
     if _weto_n:
         print(f"Drabinki — weto (argument przeciw albo więcej powodów przeciw niż "
               f"za na karcie): {_weto_n} nowych kart")

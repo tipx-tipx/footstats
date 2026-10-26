@@ -1396,6 +1396,54 @@ def tani_typ_druzyny(b: dict) -> bool:
     return pasmo["kurs_min"] <= kurs < pasmo["kurs_max"] and p >= pasmo["p_min"]
 
 
+def kandydat_logiki_zawodnika(b: dict) -> bool:
+    """Zawodnik, który MOŻE wejść ścieżką logiki typera
+    (uczony.LOGIKA_ZAWODNIKOW): „powyżej”, kurs pod sufitem, model ≥ progu,
+    pewny w składzie. Argumentów jeszcze nie sprawdza — przy oknie zgody ich
+    nie ma; pełny warunek to `logika_typera_zawodnika`."""
+    cfg = uczony.LOGIKA_ZAWODNIKOW
+    if not cfg or b.get("podmiot_typ") == "druzyna" or b.get("strona") != "powyzej":
+        return False
+    try:
+        kurs = float(b.get("kurs") or 0.0)
+        p = float(b.get("p_przed_sciagnieciem") or b.get("p_model") or 0.0)
+        minuty = float((b.get("p_uczony") or {}).get("min") or 0.0)
+    except (TypeError, ValueError):
+        return False
+    return 1.0 < kurs < cfg["kurs_max"] and p >= cfg["p_min"] and minuty >= cfg["min_minut"]
+
+
+def powody_logiki_zawodnika(b: dict) -> list[str]:
+    """Które z trzech powodów logiki typera ma typ zawodnika: "forma"
+    (forma i pokrycie), "na_90", "rywal" — z danych argumentów karty."""
+    cfg = uczony.LOGIKA_ZAWODNIKOW or {}
+    dane = (b.get("argumenty") or {}).get("dane") or {}
+    out = []
+    forma, pok = dane.get("forma") or [0, 0], dane.get("pokrycie") or [0, 0]
+    if (forma[0] >= cfg.get("forma", 99)
+            and pok[1] and pok[0] / pok[1] >= cfg.get("pokrycie", 9.9)):
+        out.append("forma")
+    try:
+        if (dane.get("na_90") is not None
+                and float(dane["na_90"]) >= float(b.get("linia") or 0) + cfg.get("na_90_ponad_linie", 99)):
+            out.append("na_90")
+    except (TypeError, ValueError):
+        pass
+    rm = dane.get("rywal_miejsce") or [None, None]
+    if rm[0] and rm[1] and rm[0] / rm[1] <= cfg.get("rywal_gora", 0.0):
+        out.append("rywal")
+    return out
+
+
+def logika_typera_zawodnika(b: dict) -> bool:
+    """Pełny warunek ścieżki logiki typera (uczony.LOGIKA_ZAWODNIKOW):
+    kandydat + argumenty policzone, nic przeciw, dość powodów za."""
+    arg = b.get("argumenty")
+    if not kandydat_logiki_zawodnika(b) or not isinstance(arg, dict) or arg.get("przeciw"):
+        return False
+    return len(powody_logiki_zawodnika(b)) >= uczony.LOGIKA_ZAWODNIKOW["min_powodow"]
+
+
 # ⚑ OZNACZENIA TYPÓW NA STRONIE (2026-10-18, właściciel: „pasuje, ale krótsze
 # teksty"; „mają być dobre sprzedażowo i analityczne"). Tylko to, co w księdze
 # daje przewagę nad kursem (14.09–17.10, rozliczeni kandydaci bez dubli, kurs
@@ -1714,7 +1762,7 @@ def ponizej_progu_jakosci(b: dict, polka: str | None,
     prog = uczony.PROG_JAKOSCI_POLKI.get(polka or "")
     if not prog:
         return False
-    if polka == "wysoka_szansa" and tani_typ_druzyny(b):
+    if polka == "wysoka_szansa" and (tani_typ_druzyny(b) or logika_typera_zawodnika(b)):
         return False
     try:
         kurs = float(b.get("kurs") or 0.0)
@@ -10286,12 +10334,16 @@ def _main_impl(tryb=None):
         powod_poza = _kwarantanna_zdejmuje(b)
         if powod_poza is None:
             if (not b.get("mocna_linia") and not tani_typ_druzyny(b)
+                    and not kandydat_logiki_zawodnika(b)
                     and not betting.w_oknie_zgody(b["p_model"], b["kurs"])):
                 # najostrzejsza brama, zmierzona na 336 rozliczeniach — patrz
                 # betting.OKNO_ZGODY_*. Typ dalej się liczy i uczy w tle.
                 # Mocna wyższa linia ma zamiast niej weto modelu (18.09),
-                # najtańszy typ drużynowy — weto p ≥ 0,65 (18.10, patrz
-                # uczony.TANIE_DRUZYNY_POLKI: tam kurs wie lepiej niż model).
+                # najtańszy typ drużynowy — weto p ≥ 0,75 (patrz
+                # uczony.TANIE_DRUZYNY_POLKI: tam kurs wie lepiej niż model),
+                # zawodnik z logiki typera — pełny warunek przy liście
+                # (`logika_typera_zawodnika`, argumentów tu jeszcze nie ma;
+                # bez niego odpada progiem jakości).
                 powod_poza = "rozjazd_z_rynkiem"
             elif _kategoria_zdejmuje(b):
                 powod_poza = "kwarantanna_kategorii"
@@ -11728,15 +11780,16 @@ def _main_impl(tryb=None):
         # w limitach różnorodności (mecz/rynek/rodzina). Gdyby to kiedyś
         # zaczęło przeszkadzać, sortować trzeba per półka, nie jedną listą.
         ma_rachunek = bool(b.get("czynniki")) and (b.get("ci") or [None])[0] is not None
-        # ⚑ DRUŻYNY: NAJPIERW BILANS ARGUMENTÓW (2026-10-18, logika typera —
-        # patrz model/argumenty.py). Lista z limitami 14.09–17.10: wysoka szansa
-        # 81,4% → 83,3%, wyższe 1,80–2,00 51,7% → 56,2% (z wetem), ta sama liczba
-        # typów. Zawodnicy bez tego: u nich kolejność po argumentach nic nie dała.
-        bil = (argumenty.bilans(b.get("argumenty"))
-               if b.get("podmiot_typ") == "druzyna" else 0)
+        # ⚑ BEZ BILANSU ARGUMENTÓW W KOLEJNOŚCI (2026-10-26, właściciel: „ok”).
+        # Od 18.10 drużyny szły najpierw po liczbie argumentów za; tydzień na
+        # żywo 18–25.10 (księga, drużyny, wynik wobec ceny): bilans ≥ 2
+        # trafiał 72,0% wobec 75,8% przy bilansie 1 (wysoka szansa), na
+        # wyższych kursach 53,0% wobec 57,1% — więcej „za” nie znaczyło
+        # lepiej. Argumenty przeciw dalej działają jako weto (h2h_nie −8 pp,
+        # rywal_slaby −4 pp), kolejność wraca do szansy / mocy.
         if uczony.polka_dla(b.get("kurs"), b.get("podmiot_typ")) == "wysoka_szansa":
-            return (bil, szansa_z_ceną(b), ma_rachunek)
-        return (bil, moc_listy(b, _kandydatow_w_meczu.get(b.get("mecz_id"), 0)),
+            return (szansa_z_ceną(b), ma_rachunek)
+        return (moc_listy(b, _kandydatow_w_meczu.get(b.get("mecz_id"), 0)),
                 ma_rachunek)
 
     # KSIĘGA MA WIEDZIEĆ, ŻE ODCIĘTY SELEKCJĄ TYP NIE BYŁ NA STRONIE
@@ -11769,6 +11822,21 @@ def _main_impl(tryb=None):
               and przez_druga_sciezke(b, uczony.polka_dla(b.get("kurs"), b.get("podmiot_typ")),
                                       _bijace_cene)
               and ponizej_progu_jakosci(b, uczony.polka_dla(b.get("kurs"), b.get("podmiot_typ")))]
+    try:
+        _logika = [b for b in lista_pub
+                   if not juz_pokazany(b) and logika_typera_zawodnika(b)
+                   and ponizej_progu_jakosci(dict(b, argumenty=None), "wysoka_szansa")]
+        _kand_logiki = [b for b in do_pokazania if kandydat_logiki_zawodnika(b)]
+        _z_powodami = Counter(
+            "+".join(powody_logiki_zawodnika(b)) or "brak"
+            for b in _kand_logiki if not (b.get("argumenty") or {}).get("przeciw"))
+        print(f"Zawodnicy — logika typera (model ≥ {uczony.LOGIKA_ZAWODNIKOW['p_min']}, "
+              f"pewny skład, nic przeciw, 2 z 3 powodów): {len(_logika)} nowych typów na liście "
+              f"z {len(_kand_logiki)} kandydatów (z argumentem przeciw "
+              f"{sum(1 for b in _kand_logiki if (b.get('argumenty') or {}).get('przeciw'))}; "
+              f"powody: {dict(_z_powodami.most_common(6))})")
+    except Exception as e:                                      # noqa: BLE001
+        diagnostyka.cichy("cykl", "pomiar_logiki_zawodnikow", e)
     print(f"Druga ścieżka półki (rynek bije cenę, drużyny 1,25–1,45, model ≥ kurs): "
           f"{len(_druga)} nowych typów na liście"
           + (f" ({', '.join(sorted({str(b.get('rynek_kod')) + '|' + str(b.get('strona')) for b in _druga}))})" if _druga else "")

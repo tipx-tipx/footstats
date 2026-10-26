@@ -395,18 +395,32 @@ def bilans_widoczny(czynniki_modelu: list[dict] | None, arg: dict | None) -> int
             za += 1
         elif m < 0.98:
             przeciw += 1
-    za += sum(1 for k in (arg or {}).get("za") or [] if k in ARG_POKAZYWANE)
+    za += sum(1 for k in (arg or {}).get("za") or []
+              if k in ARG_POKAZYWANE and k not in ARG_INFORMACJA)
     przeciw += sum(1 for k in (arg or {}).get("przeciw") or [] if k in ARG_POKAZYWANE)
     return za - przeciw
 
 
+# ⚑ ARGUMENTY „ZA” TYLKO DO OPISU (2026-10-26, właściciel: „ok”). Tydzień na
+# żywo 18–25.10 (księga, drużyny, wynik wobec ceny): „drużyna w czołówce ligi
+# w tej statystyce” −9,1 pp przy wysokiej szansie (połowy −6,6 / −10,1) —
+# bukmacher już stawia mocnej drużynie wyższą linię; „słabsza + poniżej”
+# −15,7 pp przy wyższych kursach (połowy −17,3 / −14,8). To dalej prawdziwe
+# fakty o meczu, więc karta je pisze, ale do żadnego bilansu się nie liczą.
+ARG_INFORMACJA = frozenset({"druzyna_top", "slabsza_ponizej"})
+
+
+def _za_liczone(arg: dict | None) -> list[str]:
+    return [k for k in (arg or {}).get("za") or [] if k not in ARG_INFORMACJA]
+
+
 def bilans(arg: dict | None) -> int:
-    return len((arg or {}).get("za") or []) - len((arg or {}).get("przeciw") or [])
+    return len(_za_liczone(arg)) - len((arg or {}).get("przeciw") or [])
 
 
 def czysty_pakiet(arg: dict | None, min_za: int = 2) -> bool:
     """Co najmniej `min_za` argumentów za i żadnego przeciw."""
-    return bool(arg) and len(arg.get("za") or []) >= min_za and not arg.get("przeciw")
+    return bool(arg) and len(_za_liczone(arg)) >= min_za and not arg.get("przeciw")
 
 
 # ⚑ KALENDARZ DRUŻYNY PRZED MECZEM (2026-10-18, etap 1 planu „90%”, rozbiór

@@ -1377,6 +1377,25 @@ DRUGA_SCIEZKA_POLKI = {"wysoka_szansa": {"druzyna": {"kurs_min": 1.25, "kurs_max
 # ≥ 0,75 27/33. Półka drużyn wysoka szansa trafiała 71–76% zamiast ~80%.
 TANIE_DRUZYNY_POLKI = {"kurs_min": 1.20, "kurs_max": 1.25, "p_min": 0.75, "na_mecz": 1}
 
+# ⚑ ZAWODNICY: ŚCIEŻKA „LOGIKA TYPERA” NA WYSOKĄ SZANSĘ (2026-10-26,
+# właściciel: „model ma się opierać też na logice… sensowna ilość typów
+# zawodniczych”). Dziś zawodnik wchodzi tylko przy modelu ≥ 0,80 i cenie
+# ≥ 0,75 — w dni z małą liczbą meczów to 0–2 typy. Druga droga dla typu
+# z pełnym uzasadnieniem, jak u typera:
+#   * pewny w składzie — model zakłada ≥ `min_minut` minut gry,
+#   * nic przeciw — żadnego argumentu przeciw (model/argumenty.py),
+#   * co najmniej `min_powodow` z trzech: forma ≥ 4/5 i pokrycie ≥ 8/10,
+#     średnia na 90 min ≥ linia + 1, rywal w górnych 35% ligi w oddawaniu,
+#   * model „za” (≥ `p_min`), strona „powyżej”, kurs < `kurs_max`.
+# Księga 18–25.10 (linie „powyżej” 1,19–1,45, bez dubli): logika + model
+# ≥ 0,75 → 79,4% (n=97, połowy 81 / 78), dzisiejsza reguła model ≥ 0,80 →
+# 77,0% (n=100) — ta sama trafność, drugie tyle kandydatów. Przy 1,45–1,80
+# próba za mała (n=4), stąd sufit kursu. Omija okno zgody i próg jakości jak
+# najtańsze drużyny; reszta bram (skład, weto, bilans opisu, limity) bez zmian.
+LOGIKA_ZAWODNIKOW = {"kurs_max": 1.45, "p_min": 0.75, "min_minut": 80.0,
+                     "forma": 4, "pokrycie": 0.80, "na_90_ponad_linie": 1.0,
+                     "rywal_gora": 0.35, "min_powodow": 2}
+
 # ⚑⚑ ZEJŚCIE PÓŁKI „WYŻSZE KURSY" DO 1,45 U DRUŻYN (2026-10-06, właściciel:
 # „naszym celem jest, żeby te kursy się pojawiały, czy to wysoka szansa, czy
 # wyższe kursy"). Typ drużynowy 1,45–1,80 nie miał żadnej półki (wysoka szansa
