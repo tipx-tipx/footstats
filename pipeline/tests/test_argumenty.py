@@ -264,28 +264,7 @@ def test_lista_odrzuca_typ_ktoremu_opis_przeczy():
     assert "wiecej_przeciw_niz_za" in B.OPISY_ZDJECIA_PL
 
 
-def test_jednorazowe_zdjecie_18_10_tylko_z_listy():
-    """Typ z jednorazowej listy właściciela schodzi nawet, gdy był pokazany
-    i stoi w domkniętej dobie; inne pokazane zostają."""
-    from footstats.jobs import build_wc_fast as B
-    zdjety = {**_typ_listy(1, 2.05, podmiot_typ="zawodnik", pokazany_wczesniej=True),
-              "mecz_id": 16653122, "podmiot": "Bonheur Mugisha", "rynek_kod": "shots",
-              "linia": 0.5, "strona": "powyzej"}
-    assert B._klucz_publikacji(zdjety) in B.ZDJETE_RECZNIE_2026_10_18
-    inny = _typ_listy(2, 1.90, pokazany_wczesniej=True)
-    zamk = {B.dzien_listy(zdjety["kickoff_ts"]): {B._klucz_publikacji(zdjety), B._klucz_publikacji(inny)}}
-    lista, zdjete, _ = B.wybierz_liste_publikowana([zdjety, inny], lambda b: (b["kurs"],), zamkniete=zamk)
-    assert [b["id"] for b in lista] == [2]
-    assert zdjete == {B._klucz_publikacji(zdjety): "zdjete_recznie"}
-
-
 def test_opisy_dla_wszystkich_kodow():
     kody = {"rywal_top", "rywal_slaby", "h2h_wszystkie", "h2h_wiekszosc", "h2h_nie", "pokrycie",
             "forma", "forma_slaba", "na_90", "rzadko_sklad", "druzyna_top", "slabsza_ponizej"}
     assert kody <= set(A.OPISY)
-
-
-def test_jednorazowe_zdjecie_kart_18_10():
-    from footstats.jobs import build_wc_fast as B
-    karty = [{"mecz_id": 16938775, "podmiot_id": 319129}, {"mecz_id": 16938775, "podmiot_id": 1}]
-    assert B.bez_kart_zdjetych_recznie(karty) == [{"mecz_id": 16938775, "podmiot_id": 1}]

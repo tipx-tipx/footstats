@@ -1369,7 +1369,13 @@ DRUGA_SCIEZKA_POLKI = {"wysoka_szansa": {"druzyna": {"kurs_min": 1.25, "kurs_max
 # 83,3%, półka 4,5 → 8,2/dobę, trafność 79,7% → 81,3%. Jeden taki typ na
 # mecz (`na_mecz`) — kilka linii tego samego meczu to jeden scenariusz.
 # Powrót jedną wartością: pusty słownik wyłącza ścieżkę.
-TANIE_DRUZYNY_POLKI = {"kurs_min": 1.20, "kurs_max": 1.25, "p_min": 0.65, "na_mecz": 1}
+#
+# ⚑ PRÓG 0,65 → 0,75 (2026-10-26, właściciel: „ok"). Tydzień na żywo 19–25.10
+# (po korekcie rynek|strona) — księga, drużyny 1,20–1,25, szansa `p_model`:
+#   0,65–0,70  67%   0,70–0,75  75%   ≥ 0,75  83% (n=111)
+# 01–18.10 ≥ 0,75: 81–85% (stabilnie); pokazane 19–25.10: < 0,75 33/51,
+# ≥ 0,75 27/33. Półka drużyn wysoka szansa trafiała 71–76% zamiast ~80%.
+TANIE_DRUZYNY_POLKI = {"kurs_min": 1.20, "kurs_max": 1.25, "p_min": 0.75, "na_mecz": 1}
 
 # ⚑⚑ ZEJŚCIE PÓŁKI „WYŻSZE KURSY" DO 1,45 U DRUŻYN (2026-10-06, właściciel:
 # „naszym celem jest, żeby te kursy się pojawiały, czy to wysoka szansa, czy
