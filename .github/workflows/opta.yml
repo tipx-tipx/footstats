@@ -1,0 +1,49 @@
+name: FootStats — archiwum Opta (pomiar)
+
+# CODZIENNA MIGAWKA DANYCH THE ANALYST / OPTA (2026-10-26, właściciel:
+# „archiwizuj”). Wyłącznie do pomiaru za 4–6 tygodni — nic z tego nie wchodzi
+# do wyboru typów ani na stronę. Pełny opis i ryzyko prawne: nota na górze
+# `footstats/jobs/archiwum_opta.py`. Wyłączenie = usunięcie tego pliku.
+#
+# Osobny release (`STAN_TAG: opta`), nie `stan`: odczyt magazynu bierze spis
+# assetów z jednej odpowiedzi API, więc ~40 dziennych plików nie ma prawa
+# mieszać się z księgą i resztą stanu.
+
+on:
+  schedule:
+    - cron: "30 8 * * *"     # 8:30 UTC — pliki sezonu odświeżają się ~7:10 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: footstats-opta
+  cancel-in-progress: false
+
+jobs:
+  archiwum:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pipeline/requirements.txt
+
+      - name: Instalacja zależności
+        working-directory: pipeline
+        run: pip install -r requirements.txt
+
+      - name: Migawka plików Opta do magazynu
+        working-directory: pipeline
+        env:
+          PYTHONIOENCODING: utf-8
+          PYTHONUTF8: "1"
+          STAN_REPO: ${{ vars.STAN_REPO }}
+          STAN_TOKEN: ${{ secrets.STAN_TOKEN }}
+          STAN_TAG: opta
+        run: python -m footstats.jobs.archiwum_opta
