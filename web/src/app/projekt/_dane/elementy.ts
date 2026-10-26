@@ -4,7 +4,7 @@
  */
 
 import { fmtKurs } from "@/lib/format";
-import type { ArgumentTekst, ArgumentyTypu } from "@/lib/argumenty";
+import { statystykaMn, type ArgumentTekst, type ArgumentyTypu } from "@/lib/argumenty";
 import type { OznaczenieTypu } from "@/lib/oznaczenia";
 
 import { dzisZrodla, zrodlo } from "./zrodlo";
@@ -204,7 +204,9 @@ export function powodPoLudzku(c: Czynnik, rynek: string): Powod | null {
   if (c.nazwa === "Poziom bazowy") {
     const m = c.opis.match(/Średnio ([\d,]+) (na 90 minut|na mecz)/);
     const l5 = c.opis.match(/ostatnie 5 meczów: ([\d,]+)/);
-    return m ? { kier, tekst: `Średnio ${m[1]} ${m[2]}${l5 ? `, w ostatnich 5 meczach ${l5[1]}` : ""}` } : null;
+    if (m) return { kier, tekst: `Średnio ${m[1]} ${m[2]}${l5 ? `, w ostatnich 5 meczach ${l5[1]}` : ""}` };
+    // sumy meczowe i „kto więcej” (26.10): pipeline pisze już pełne zdanie
+    return c.opis.startsWith("Nasz model") ? { kier, tekst: c.opis } : null;
   }
   if (c.nazwa === "Minuty") {
     const m = c.opis.match(/Przewidywane (\d+) min gry, (\d+)% szans na pierwszy skład/);
@@ -438,19 +440,21 @@ export function przygotujElementy() {
     if (arg?.za.includes("rywal_top") && rywM)
       out.push({
         kod: "rywal", grupa: "mecz", wNaglowku: true, krotko: "Hojny rywal",
-        zdanie: `${druzyna(wpis.przeciwnik).nazwa} pozwala na dużo: ${rywM[0]}. na ${rywM[1]} w lidze`,
+        zdanie: r.rynek_kod === "fouls_won"
+          ? `${druzyna(wpis.przeciwnik).nazwa} fauluje dużo – ${rywM[0]}. miejsce na ${rywM[1]} drużyn w lidze`
+          : `W meczach z drużyną ${druzyna(wpis.przeciwnik).nazwa} przeciwnicy notują dużo ${statystykaMn(r.rynek_kod)} – ${rywM[0]}. miejsce na ${rywM[1]} drużyn w lidze`,
       });
     else if (ryw && (ryw.mnoznik ?? 1) >= 1.1 && ryw.srednia != null && ryw.norma != null)
       out.push({
         kod: "rywal", grupa: "mecz", wNaglowku: true, krotko: "Hojny rywal",
-        zdanie: `Przeciw ${druzyna(wpis.przeciwnik).nazwa} średnio ${liczba(ryw.srednia)} na zawodnika, w lidze ${liczba(ryw.norma)}`,
+        zdanie: `Zawodnicy grający przeciw drużynie ${druzyna(wpis.przeciwnik).nazwa} mają średnio ${liczba(ryw.srednia)}, a w całej lidze ${liczba(ryw.norma)}`,
       });
     const h2h = arg?.dane?.h2h;
     if (h2h && (arg?.za.includes("h2h_wszystkie") || arg?.za.includes("h2h_wiekszosc")))
       out.push({
         kod: "h2h", grupa: "mecz", wNaglowku: true, krotko: `Z tym rywalem ${h2h[0]}/${h2h[1]}`,
         // bez odmiany nazwy klubu („Przeciw Sporting” – podgląd 18.10)
-        zdanie: `Z tym rywalem weszło ${h2h[0]} z ${h2h[1]}`,
+        zdanie: `Ta linia weszła w ${h2h[0]} z ${h2h[1]} ostatnich meczów z drużyną ${druzyna(wpis.przeciwnik).nazwa}`,
       });
     if (h.powod_wejscia === "przewaga" && p !== null && kurs)
       out.push({ kod: "przewaga", grupa: "cena", wNaglowku: true, krotko: "Kurs ponad szansę", zdanie: `Z analizy wychodzi ${proc(p)}, a kurs ${fmtKurs(kurs)} płaci jak za ${proc(1 / kurs)}` });

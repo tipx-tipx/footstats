@@ -206,8 +206,8 @@ def test_poziom_bazowy_jest_zawsze():
     cz = czynniki_pary(h, a, "Rzuty rożne", 0.0)
     assert cz[0]["nazwa"] == "Poziom bazowy"
     # obie liczby i ich suma muszą paść w zdaniu — to jest cały rachunek
-    assert "6.1" in cz[0]["opis"] and "4.4" in cz[0]["opis"]
-    assert "10.5" in cz[0]["opis"]
+    assert "6,1" in cz[0]["opis"] and "4,4" in cz[0]["opis"]
+    assert "10,5" in cz[0]["opis"]
 
 
 def test_korelacja_wchodzi_tylko_gdy_zmierzona():

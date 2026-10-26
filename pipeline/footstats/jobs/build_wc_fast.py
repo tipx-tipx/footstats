@@ -2593,7 +2593,9 @@ def mnozniki_pary(h_n: dict, a_n: dict) -> dict:
 
 def czynniki_pary(h_n: dict, a_n: dict, nazwa_bazy: str, rho: float,
                   lam_h: float | None = None,
-                  lam_a: float | None = None) -> list[dict]:
+                  lam_a: float | None = None,
+                  strona: str | None = None,
+                  rynek_kod: str | None = None) -> list[dict]:
     """Uzasadnienie dla rynków liczonych z OBU drużyn (suma meczowa, „kto więcej").
 
     PO CO (2026-08-03). Te dwa rynki były budowane z pustym `czynniki: []`,
@@ -2605,7 +2607,10 @@ def czynniki_pary(h_n: dict, a_n: dict, nazwa_bazy: str, rho: float,
     każdej drużyny i mierzoną korelację między nimi — tylko nigdy tego nie
     zapisywał w formie do przeczytania.
     """
-    kto = nazwa_bazy.lower()
+    # ⚑ PEŁNE ZDANIA (2026-10-26, właściciel: „logicznie, zgodnie z prawdą,
+    # bez skrótów myślowych”) — statystyka w dopełniaczu jak w opis_uczony
+    sg, mn_l = opis_uczony.statystyka(rynek_kod) if rynek_kod else (nazwa_bazy.lower(), nazwa_bazy.lower())
+    _l = lambda v: f"{float(v):.1f}".replace(".", ",")
     # λ liczby, która POSZŁA NA STRONĘ — przy modelu uczonym jego własne
     # (2026-10-05); bez tego karta opisywała liczbę starego rachunku
     _lh = float(lam_h) if lam_h else float(h_n['pred'].lam)
@@ -2613,10 +2618,8 @@ def czynniki_pary(h_n: dict, a_n: dict, nazwa_bazy: str, rho: float,
     czynniki = [{
         "nazwa": "Poziom bazowy",
         "opis": (
-            f"{h_n['nazwa']} notuje średnio {_lh:.1f} "
-            f"({kto}) na mecz, {a_n['nazwa']} {_la:.1f} – "
-            f"razem {_lh + _la:.1f}. Obie liczby są "
-            f"już po korekcie na siłę rywala i miejsce gry"
+            f"Nasz model spodziewa się, że {h_n['nazwa']} zanotuje ok. {_l(_lh)} {sg}, "
+            f"a {a_n['nazwa']} ok. {_l(_la)} – razem ok. {_l(_lh + _la)}"
         ),
         "mnoznik": None,
     }]
@@ -2626,39 +2629,48 @@ def czynniki_pary(h_n: dict, a_n: dict, nazwa_bazy: str, rho: float,
         czynniki.append({
             "nazwa": "Zależność między drużynami",
             "opis": (
-                "Kiedy jedna drużyna notuje więcej, druga zwykle "
-                + ("też" if rho > 0 else "mniej")
-                + f" – zmierzone na historii ({rho:+.2f}). Bez tego suma "
-                  "wychodziłaby zbyt równa"
+                f"W tej lidze, gdy jedna drużyna notuje więcej {mn_l}, druga zwykle "
+                + ("też notuje więcej" if rho > 0 else "notuje mniej")
             ),
             "mnoznik": None,
         })
     # CO PODNIOSŁO ALBO ŚCIĘŁO TĘ LICZBĘ. Do 05.08 karta sumy meczowej mówiła
     # tylko „tyle notują średnio" i kończyła — a model liczył dla obu drużyn
     # pełen zestaw poprawek, po prostu nigdzie ich nie opisywał.
+    # ⚑ KIERUNEK WZGLĘDEM STRONY TYPU (2026-10-26). Do dziś `mnoznik` był
+    # surowy (> 1 = podnosi liczbę), a karta czyta > 1 jako „za” — przy sumie
+    # „poniżej” czynnik podnoszący liczbę pokazywał się jako argument za typem
+    # (Instituto–Riestra, faule poniżej 26,5: „kursy 1X2 zapowiadają mecz,
+    # który podnosi tę statystykę” na zielono). Teraz jak w opis_uczony:
+    # przy „poniżej” odwrotność. „Kto więcej” (strona = gospodarz/gość) nie ma
+    # tych czynników wcale — średnia obu drużyn nie mówi, która ma więcej.
+    if strona not in ("powyzej", "ponizej"):
+        return czynniki
     mn = mnozniki_pary(h_n, a_n)
-    for pole, tytul, zdanie in (
+    for pole, tytul, w_gore, w_dol in (
         ("rywal", "Profil rywali",
-         "przeciwnicy obu drużyn {kier} niż przeciętny zespół w tej lidze"),
+         f"Rywale obu drużyn zwykle pozwalają na więcej {mn_l} niż przeciętny zespół w tej lidze",
+         f"Rywale obu drużyn zwykle pozwalają na mniej {mn_l} niż przeciętny zespół w tej lidze"),
         ("dom_wyjazd", "Dom i wyjazd",
-         "miejsce gry {kier} liczbę względem neutralnego boiska"),
+         f"Gospodarz u siebie i gość na wyjeździe notują zwykle więcej {mn_l}",
+         f"Gospodarz u siebie i gość na wyjeździe notują zwykle mniej {mn_l}"),
         ("scenariusz_meczu", "Scenariusz meczu",
-         "kursy 1X2 zapowiadają mecz, który {kier} tę statystykę"),
+         f"Kursy na wynik zapowiadają mecz, w którym zwykle jest więcej {mn_l}",
+         f"Kursy na wynik zapowiadają mecz, w którym zwykle jest mniej {mn_l}"),
         ("matchup", "Styl rywali",
-         "styl przeciwników {kier} to, ile się tu dzieje"),
+         f"Styl gry obu drużyn sprzyja temu, żeby {mn_l} było więcej",
+         f"Styl gry obu drużyn sprzyja temu, żeby {mn_l} było mniej"),
         ("sedzia", "Sędzia",
-         "arbiter tego meczu {kier} liczbę względem przeciętnego"),
+         f"Sędzia tego meczu zwykle pozwala na więcej {mn_l} niż przeciętny",
+         f"Sędzia tego meczu zwykle pozwala na mniej {mn_l} niż przeciętny"),
     ):
         m = float(mn.get(pole) or 1.0)
         if abs(m - 1.0) < 0.02:      # mnożnik ~1,00 nic nie robi, więc milczymy
             continue
-        kier = "podnoszą" if m > 1 else "obniżają"
-        if pole in ("dom_wyjazd", "scenariusz_meczu", "sedzia"):
-            kier = "podnosi" if m > 1 else "obniża"
         czynniki.append({
             "nazwa": tytul,
-            "opis": zdanie.format(kier=kier),
-            "mnoznik": round(m, 3),
+            "opis": w_gore if m > 1 else w_dol,
+            "mnoznik": round(m if strona == "powyzej" else 1.0 / m, 3),
         })
     return czynniki
 
@@ -9769,7 +9781,8 @@ def _main_impl(tryb=None):
                             "czynniki": czynniki_pary(
                                 h_n, a_n, nazwa_bazy, rho_n,
                                 lam_h=(_pu_wh or {}).get("lam") if _zrodlo_w == "uczony" else None,
-                                lam_a=(_pu_wa or {}).get("lam") if _zrodlo_w == "uczony" else None),
+                                lam_a=(_pu_wa or {}).get("lam") if _zrodlo_w == "uczony" else None,
+                                rynek_kod=kod_w),
                             "oczekiwana_liczba": round(
                                 float(_pu_wh["lam"]) if _zrodlo_w == "uczony"
                                 else h_n["pred"].lam, 2),
@@ -10008,7 +10021,8 @@ def _main_impl(tryb=None):
                             ),
                             "uzasadnienie": {
                                 "czynniki": czynniki_pary(
-                                    h_n, a_n, nazwa_bazy, rho_n),
+                                    h_n, a_n, nazwa_bazy, rho_n,
+                                    strona=strona_s, rynek_kod=kod_s),
                                 "oczekiwana_liczba": round(
                                     h_n["pred"].lam + a_n["pred"].lam, 2),
                             },

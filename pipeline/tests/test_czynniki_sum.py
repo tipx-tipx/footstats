@@ -67,7 +67,7 @@ def test_poziom_bazowy_jest_zawsze_pierwszy():
     h, a = _druzyna("Gospodarz", 1.2), _druzyna("Gość", 0.9)
     lista = czynniki_pary(h, a, "corners", rho=0.0)
     assert lista[0]["nazwa"] == "Poziom bazowy"
-    assert "1.2" in lista[0]["opis"] and "0.9" in lista[0]["opis"]
+    assert "1,2" in lista[0]["opis"] and "0,9" in lista[0]["opis"]
 
 
 def test_mnoznik_bez_wplywu_nie_produkuje_zdania():
@@ -82,16 +82,24 @@ def test_kazdy_mnoznik_ma_swoje_zdanie_i_kierunek():
                  scenariusz_meczu=0.80, matchup=1.15, sedzia=1.10)
     a = _druzyna("Gość", 0.9, rywal=1.30, dom_wyjazd=1.20,
                  scenariusz_meczu=0.80, matchup=1.15, sedzia=1.10)
-    lista = czynniki_pary(h, a, "cards", rho=0.0)
+    lista = czynniki_pary(h, a, "cards", rho=0.0, strona="powyzej", rynek_kod="match_cards")
     nazwy = [c["nazwa"] for c in lista]
     for oczekiwana in ("Profil rywali", "Dom i wyjazd", "Scenariusz meczu",
                        "Styl rywali", "Sędzia"):
         assert oczekiwana in nazwy
     wg_nazwy = {c["nazwa"]: c for c in lista}
-    assert "podnos" in wg_nazwy["Profil rywali"]["opis"]
-    assert "obniża" in wg_nazwy["Scenariusz meczu"]["opis"]
+    assert "więcej kartek" in wg_nazwy["Profil rywali"]["opis"]
+    assert "mniej kartek" in wg_nazwy["Scenariusz meczu"]["opis"]
     # mnożnik ma trafić na kartę jako liczba, nie tylko jako słowo
     assert wg_nazwy["Sędzia"]["mnoznik"] == pytest.approx(1.10, abs=1e-3)
+    # „poniżej”: ten sam czynnik działa PRZECIW typowi (26.10 — karta pokazywała
+    # podnoszący czynnik jako „za” przy sumie poniżej)
+    pon = {c["nazwa"]: c for c in czynniki_pary(h, a, "cards", rho=0.0, strona="ponizej",
+                                                 rynek_kod="match_cards")}
+    assert pon["Sędzia"]["mnoznik"] == pytest.approx(1 / 1.10, abs=1e-3)
+    assert pon["Scenariusz meczu"]["mnoznik"] > 1
+    # „kto więcej” (gospodarz/gość) bez czynników kierunkowych
+    assert [c["nazwa"] for c in czynniki_pary(h, a, "cards", rho=0.0, strona="gospodarz")] == ["Poziom bazowy"]
 
 
 def test_korelacja_ponizej_progu_milczy():

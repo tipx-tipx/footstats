@@ -122,9 +122,17 @@ export function przygotujStrony() {
       mecz: `${m.gospodarz} – ${m.gosc}`,
       // właściciel 14.10: opisy z modelu, który liczy szansę; stary silnik tylko tam,
       // gdzie nowego opisu nie ma (sumy meczowe, „kto więcej”)
-      powody: (t.uzasadnienie_uczony?.czynniki ?? t.uzasadnienie?.czynniki ?? []).map((c) => powodPoLudzku(c, t.rynek)).filter((x): x is NonNullable<typeof x> => x !== null),
+      // właściciel 26.10: na karcie wyłącznie to, co stoi ZA typem
+      powody: (t.uzasadnienie_uczony?.czynniki ?? t.uzasadnienie?.czynniki ?? [])
+        .map((c) => powodPoLudzku(c, t.rynek))
+        .filter((x): x is NonNullable<typeof x> => x !== null && x.kier !== "przeciw"),
       oznaczenia: (t.oznaczenia ?? []).filter(czyOznaczenie),
-      argumenty: argumentyPoLudzku(t.argumenty, t.strona),
+      argumenty: argumentyPoLudzku(t.argumenty, t.strona, {
+        kto: t.podmiot,
+        druzyna: t.rynek_kod.startsWith("match_") ? undefined : t.druzyna || t.podmiot,
+        rywal: t.przeciwnik || undefined,
+        rynekKod: t.rynek_kod,
+      }),
       polka: polkaNaStronie(t.polka, t.p_model),
       ts: t.kickoff_ts,
       meczId: t.mecz_id,

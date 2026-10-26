@@ -122,7 +122,8 @@ def _typ(sila, dom, mn_sila, strona="powyzej"):
 def test_opis_sily_na_karcie():
     cz = O.czynniki(_typ(0.6, 1, 1.25))
     sil = [c for c in cz if c["nazwa"] == "Siła drużyn"]
-    assert sil and sil[0]["opis"] == "Według wyników wyraźnie silniejsza od Brugge"
+    assert sil and sil[0]["opis"].startswith("Według wyników ostatnich meczów drużyna ")
+    assert sil[0]["opis"].endswith(" jest wyraźnie silniejsza od drużyny Brugge")
     assert sil[0]["mnoznik"] == 1.25
     # „poniżej” – ten sam czynnik działa przeciw typowi
     assert [c for c in O.czynniki(_typ(0.6, 1, 1.25, "ponizej"))

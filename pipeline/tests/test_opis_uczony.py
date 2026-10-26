@@ -14,8 +14,8 @@ def _typ(strona="powyzej", ref=REF, **pu):
                         "ref": ref,
                         "styl": [["posiadanie piłki", 1.2]]}}
     p_uczony.update(pu)
-    return {"podmiot_typ": "druzyna", "strona": strona, "linia": 3.5,
-            "przeciwnik": "Atalanta", "p_uczony": p_uczony}
+    return {"podmiot_typ": "druzyna", "strona": strona, "linia": 3.5, "podmiot": "Lazio",
+            "rynek_kod": "team_corners", "przeciwnik": "Atalanta", "p_uczony": p_uczony}
 
 
 def _opis(c, nazwa):
@@ -28,12 +28,17 @@ def test_druzyna_powyzej_kolejnosc_i_teksty():
     nazwy = [x["nazwa"] for x in c]
     # liga 1,00 bez wpływu; styl gry nigdy (nieczytelny dla gracza)
     assert "Liga" not in nazwy and "Styl gry" not in nazwy
-    assert nazwy[1] == "Linia w historii" and "8 z 10 meczów drużyny" in c[1]["opis"]
+    assert nazwy[1] == "Linia w historii" and "w 8 z 10 ostatnich meczów drużyny Lazio" in c[1]["opis"]
     # każda liczba z porównaniem do przeciętnej – względem niej model liczy kierunek
-    assert _opis(c, "Rywal") == "Przeciw Atalanta drużyny mają średnio 5,0, przy przeciętnym rywalu 4,3"
+    assert _opis(c, "Rywal") == ("Przeciwnicy drużyny Atalanta notują średnio 5,0 rzutu rożnego "
+                                 "na mecz, a przy przeciętnym rywalu 4,3")
     # w12 (4,0) jest PONIŻEJ przeciętnej, a forma podnosi λ – opis bierze w6 (4,4 > 4,0)
-    assert _opis(c, "Forma") == "Średnio 4,4 w ostatnich 6 meczach, przeciętna drużyna 4,0"
-    assert _opis(c, "Gdzie gra") == "Gra na wyjeździe, a goście mają zwykle mniej"
+    assert _opis(c, "Forma") == ("Lazio w ostatnich 6 meczach notuje średnio 4,4 rzutu rożnego "
+                                 "na mecz, a przeciętna drużyna 4,0")
+    assert _opis(c, "Gdzie gra") == ("Drużyna Lazio gra na wyjeździe, a goście notują zwykle "
+                                     "mniej rzutów rożnych")
+    assert c[0]["opis"] == ("Nasz model spodziewa się, że Lazio zanotuje ok. 4,4 rzutu "
+                            "rożnego – linia wynosi 3,5")
     assert next(x for x in c if x["nazwa"] == "Gdzie gra")["mnoznik"] < 1
     assert all(";" not in x["opis"] and "(" not in x["opis"] for x in c)
 
@@ -45,7 +50,7 @@ def test_ponizej_odwraca_kierunek_i_liczy_mecze_ponizej():
     gdzie = next(x for x in c if x["nazwa"] == "Gdzie gra")
     assert gdzie["mnoznik"] > 1                  # wyjazd obniża λ – za „poniżej”
     hist = next(x for x in c if x["nazwa"] == "Linia w historii")
-    assert hist["opis"].startswith("Poniżej 3,5: 2 z 10")
+    assert hist["opis"].startswith("Mniej niż 3,5 rzutu rożnego było w 2 z 10")
 
 
 def test_liczba_sprzeczna_z_kierunkiem_nie_trafia_na_karte():
@@ -63,6 +68,7 @@ def test_liczba_sprzeczna_z_kierunkiem_nie_trafia_na_karte():
 
 def test_zawodnik():
     t = {"podmiot_typ": "zawodnik", "strona": "powyzej", "linia": 0.5, "przeciwnik": "Bayern",
+         "podmiot": "Kane", "rynek_kod": "shots",
          "p_uczony": {"lam": 1.3, "pkw": 0.7, "pkn": 10,
                       "skl": {"mn": {"forma": 1.3, "minuty": 0.94, "rywal": 1.12, "dom": 1.0},
                               "x": {"t3": 2.0, "t6": 1.6, "t12": 1.5, "min": 85, "rywal": 1.18, "dom": 1},
@@ -72,8 +78,11 @@ def test_zawodnik():
     # „ostatnie mecze” karta zawodnika pokazuje kratkami – w opisie bez dubla
     assert "Ostatnie mecze" not in nazwy
     assert nazwy[:2] == ["Spodziewana liczba", "Tempo"]
-    assert c[1]["opis"] == "Średnio 1,5 na 90 minut, w ostatnich 3 meczach 2,0, przeciętny zawodnik 1,2"
-    assert "o 18% więcej" in _opis(c, "Rywal")
+    assert c[1]["opis"] == ("Kane ma średnio 1,5 strzału na 90 minut, w ostatnich 3 meczach 2,0, "
+                            "a przeciętny zawodnik 1,2")
+    assert _opis(c, "Rywal") == ("Zawodnicy na tej pozycji grający przeciw drużynie Bayern mają "
+                                 "o 18% więcej strzałów niż średnio w lidze")
+    assert _opis(c, "Minuty gry") == "Kane powinien zagrać ok. 85 minut"
     assert next(x for x in c if x["nazwa"] == "Minuty gry")["mnoznik"] < 1
 
 
