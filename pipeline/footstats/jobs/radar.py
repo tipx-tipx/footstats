@@ -3056,6 +3056,8 @@ def zbuduj(
     indeks_argumentow=None,
     # wykonawcy karnych/wolnych {zawodnik_id: {"karne", "wolne"}} (18.10)
     wykonawcy: dict | None = None,
+    # pamięć H2H z 80 meczów kadr (build_wc_fast.odswiez_h2h_kadr, 27.10)
+    h2h_kadr: dict | None = None,
 ) -> list[dict]:
     """Złóż wpisy radaru/drabinek ze zbiorów, które cykl i tak ma w pamięci.
 
@@ -3733,12 +3735,16 @@ def zbuduj(
             if t is None or h.get("linia") is None:
                 continue
             try:
+                _opp = int(getattr(t, "opponent_id", 0) or 0)
                 a = argumenty.argumenty_zawodnika(
-                    indeks_argumentow, int(getattr(t, "opponent_id", 0) or 0),
+                    indeks_argumentow, _opp,
                     int(w.get("kickoff_ts") or 0), h["rynek_kod"], float(h["linia"]),
                     t.counts, t.minutes, getattr(t, "timestamps", None),
                     getattr(t, "game_opponent_ids", None),
-                    wykonawca=(wykonawcy or {}).get(str(w.get("podmiot_id"))))
+                    wykonawca=(wykonawcy or {}).get(str(w.get("podmiot_id"))),
+                    h2h_gleb=statshub.h2h_gracza(h2h_kadr, getattr(t, "team_id", 0), _opp,
+                                                 w.get("podmiot_id"), h["rynek_kod"])
+                    if _opp else None)
             except Exception as e:                              # noqa: BLE001
                 diagnostyka.cichy("radar", "argumenty_karty", e)
                 continue

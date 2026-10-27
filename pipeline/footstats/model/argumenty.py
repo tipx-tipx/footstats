@@ -305,6 +305,7 @@ def wykonawcy_z_banku(bank_stylu: dict | None, ko: int,
 def argumenty_zawodnika(idx: Indeks, opp: int, ko: int, rynek: str, linia: float,
                         counts, minutes, timestamps, opp_ids=None,
                         wykonawca: dict | None = None,
+                        h2h_gleb: list | None = None,
                         ) -> dict[str, list[str]] | None:
     """Argumenty linii zawodnika „powyżej". Historia jak w StatshubTrend
     (najnowszy mecz pierwszy): `counts`, `minutes`, `timestamps`,
@@ -312,14 +313,20 @@ def argumenty_zawodnika(idx: Indeks, opp: int, ko: int, rynek: str, linia: float
     z `wykonawcy_z_banku` — informacja na kartę jak u typera; pomiar 18.10
     (411 zawodników): wykonawca karnych przy celnych +5,3 pp nad kurs wobec
     +1,9 pozostałych, ale połowy −2,6 / +12,6 — bukmacher to wycenia, więc
-    to argument opisu, nie wyboru (argumenty „za" zawodników nie decydują)."""
+    to argument opisu, nie wyboru (argumenty „za" zawodników nie decydują).
+
+    `h2h_gleb` (2026-10-27): mecze z tym rywalem z 80 meczów kadry
+    (`statshub.h2h_gracza`, [[start, liczba, minuty]]) — `dane["h2h_gl"]`
+    to H2H z ich sumy z historią trendu. Na razie TYLKO pomiar i karta:
+    argumenty za/przeciw (bilans, weto) liczą się dalej z `dane["h2h"]`."""
     pole = POLE_RYWALA_ZAWODNIKA.get(rynek)
     if not pole or not counts:
         return None
     ids = list(opp_ids or []) + [0] * max(0, len(counts) - len(opp_ids or []))
-    hist = [(float(c), float(mi or 0), o) for c, mi, o, ts
-            in zip(counts, minutes, ids, timestamps or [])
-            if ts and ts < ko - ODSTEP_PRZED_MECZEM_S]
+    hist4 = [(float(c), float(mi or 0), o, int(ts)) for c, mi, o, ts
+             in zip(counts, minutes, ids, timestamps or [])
+             if ts and ts < ko - ODSTEP_PRZED_MECZEM_S]
+    hist = [(c, mi, o) for c, mi, o, _ts in hist4]
     gr = [h for h in hist if h[1] >= MIN_MINUT_WYSTEPU]
     if len(gr) < 6:
         return None
@@ -338,6 +345,14 @@ def argumenty_zawodnika(idx: Indeks, opp: int, ko: int, rynek: str, linia: float
         _h2h_argument(h2h, za, przeciw)
         if h2h:
             dane["h2h"] = [sum(h2h), len(h2h)]
+        if h2h_gleb is not None:
+            spotkania = {int(ts): (float(c), float(mi or 0)) for ts, c, mi in h2h_gleb}
+            for c, mi, o, ts in hist4:
+                if o == opp:
+                    spotkania.setdefault(ts, (c, mi))
+            gl = [c > linia for ts, (c, mi) in sorted(spotkania.items(), reverse=True)
+                  if ts < ko - ODSTEP_PRZED_MECZEM_S and mi >= MIN_MINUT_WYSTEPU][:5]
+            dane["h2h_gl"] = [sum(gl), len(gl)]
     f5 = sum(c > linia for c, _, _ in gr[:5])
     dane["forma"] = [f5, min(5, len(gr))]
     if f5 >= 4:

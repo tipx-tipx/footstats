@@ -623,6 +623,43 @@ def trendy_kadry(
     return out
 
 
+# ⚑ H2H Z GŁĘBOKIEJ HISTORII KADRY (2026-10-27, właściciel: „tak, dawaj po
+# kolei”). Historia zawodnika to najwyżej 20 ostatnich meczów (mediana 6),
+# więc mecze z tym samym rywalem — w lidze dwa razy w sezonie — prawie nigdy
+# się nie mieszczą: H2H z ≥ 2 meczów miało ~6% kandydatów, a Semedo przed
+# derbami Galatasaray–Fenerbahçe 26.10 nie miał żadnego (statshub z limitem 80
+# oddaje oba poprzednie derby: 1 i 3 faule). Jedno zapytanie na drużynę daje
+# H2H całej kadry; mecze z poprzednim klubem zostają z trendu zawodnika.
+H2H_KADRY_LIMIT = 80
+
+
+def h2h_z_kadry(kadra: dict, team_id: int, rywale,
+                rynki=None) -> dict[int, dict[str, dict[str, list[list]]]]:
+    """{rywal: {zawodnik_id: {rynek: [[start meczu, liczba, minuty], ...]}}}
+    z meczów drużyny z każdym z `rywale` w historii kadry (najnowszy
+    pierwszy), tylko `rynki` (None = wszystkie). Rywal bez meczu
+    w historii → {} (wiemy, że ich nie było)."""
+    out: dict[int, dict] = {int(r): {} for r in rywale if r}
+    for pid, tr_gracza in trendy_kadry(kadra, None, team_id).items():
+        for mk, t in tr_gracza.items():
+            if rynki is not None and mk not in rynki:
+                continue
+            for c, mi, o, ts in zip(t.counts, t.minutes, t.game_opponent_ids, t.timestamps):
+                if int(o or 0) in out:
+                    out[int(o)].setdefault(str(pid), {}).setdefault(mk, []).append(
+                        [int(ts), float(c), float(mi)])
+    return out
+
+
+def h2h_gracza(pamiec: dict | None, team_id, opp, pid, rynek: str) -> list | None:
+    """Mecze zawodnika z rywalem z pamięci H2H kadr albo None, gdy pary
+    drużyn w pamięci nie ma (nie wiemy). [] = para znana, meczów brak."""
+    zap = (pamiec or {}).get(f"{int(team_id or 0)}:{int(opp or 0)}")
+    if not isinstance(zap, dict):
+        return None
+    return (((zap.get("g") or {}).get(str(pid)) or {}).get(rynek)) or []
+
+
 # ⚑ NIEDOSTĘPNI Z KADRY (2026-10-18, plan „90%”, decyzja właściciela).
 # `team/{id}/players/performance` niesie `unavailability` — kontuzje (status
 # "out" albo "dayToDay" = wątpliwy) i zawieszenia (status None, z rozgrywkami

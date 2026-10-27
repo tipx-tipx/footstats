@@ -10,6 +10,8 @@ export type ArgumentyTypu = {
     rywal_miejsce?: [number, number];
     druzyna_miejsce?: [number, number];
     h2h?: [number, number];
+    /** H2H z 80 meczów kadry + historii zawodnika (27.10) – gdy jest, zastępuje `h2h` na karcie */
+    h2h_gl?: [number, number];
     forma?: [number, number];
     /** drużyny: udział meczów po stronie typu (0–1); zawodnicy: [weszło, z] */
     pokrycie?: number | [number, number];
@@ -96,8 +98,19 @@ export function argumentyPoLudzku(a?: ArgumentyTypu | null, strona?: string, k: 
   const ponizej = strona === "ponizej";
   const out: ArgumentTekst[] = [];
   for (const kod of a.za ?? []) {
+    // głębokie H2H zastępuje to z krótkiej historii (pipeline liczy je z sumy obu)
+    if (d.h2h_gl && kod.startsWith("h2h_")) continue;
     const t = tekst(kod, d, ponizej, k);
     if (t) out.push({ tekst: t, kier: "za" });
   }
+  if (d.h2h_gl && h2hZa(d.h2h_gl))
+    out.push({ tekst: `Ta linia weszła w ${d.h2h_gl[0]} z ${d.h2h_gl[1]} ostatnich meczów z ${k.rywal ? `drużyną ${k.rywal}` : "tym rywalem"}`, kier: "za" });
   return out;
 }
+
+/**
+ * H2H stoi za typem jak w pipeline (`argumenty._h2h_argument`): weszło za każdym
+ * razem w co najmniej 2 meczach albo w ≥ 66% z co najmniej 3.
+ */
+export const h2hZa = (h?: [number, number]) =>
+  !!h && ((h[1] >= 2 && h[0] === h[1]) || (h[1] >= 3 && h[0] / h[1] >= 0.66));

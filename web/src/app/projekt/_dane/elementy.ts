@@ -4,7 +4,7 @@
  */
 
 import { fmtKurs } from "@/lib/format";
-import { statystykaMn, type ArgumentTekst, type ArgumentyTypu } from "@/lib/argumenty";
+import { h2hZa, statystykaMn, type ArgumentTekst, type ArgumentyTypu } from "@/lib/argumenty";
 import type { OznaczenieTypu } from "@/lib/oznaczenia";
 
 import { dzisZrodla, zrodlo } from "./zrodlo";
@@ -451,8 +451,10 @@ export function przygotujElementy() {
         kod: "rywal", grupa: "mecz", wNaglowku: true, krotko: "Hojny rywal",
         zdanie: `Zawodnicy grający przeciw drużynie ${druzyna(wpis.przeciwnik).nazwa} mają średnio ${liczba(ryw.srednia)}, a w całej lidze ${liczba(ryw.norma)}`,
       });
-    const h2h = arg?.dane?.h2h;
-    if (h2h && (arg?.za.includes("h2h_wszystkie") || arg?.za.includes("h2h_wiekszosc")))
+    // głębokie H2H (80 meczów kadry, 27.10) zastępuje to z krótkiej historii
+    const h2hGl = arg?.dane?.h2h_gl;
+    const h2h = h2hGl ? (h2hZa(h2hGl) ? h2hGl : undefined) : arg?.dane?.h2h;
+    if (h2h && (h2hGl || arg?.za.includes("h2h_wszystkie") || arg?.za.includes("h2h_wiekszosc")))
       out.push({
         kod: "h2h", grupa: "mecz", wNaglowku: true, krotko: `Z tym rywalem ${h2h[0]}/${h2h[1]}`,
         // bez odmiany nazwy klubu („Przeciw Sporting” – podgląd 18.10)

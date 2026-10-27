@@ -303,6 +303,9 @@ MAGAZYN: dict[str, str] = {
     # profile sędziów ze statshub (2026-10-18, plan „90%”) — pamięć między
     # cyklami, odświeżana co kilka dni; czyta ją tylko pipeline
     "sedziowie_sh": "repo",
+    # H2H zawodników z 80 meczów kadr (2026-10-27, pomiar) — pamięć między
+    # cyklami, odświeżana raz na dobę na parę drużyn; czyta ją tylko pipeline
+    "h2h_kadry": "repo",
 }
 
 # nazwa backendu -> obiekt z `pobierz(key) -> (payload, ok)` i

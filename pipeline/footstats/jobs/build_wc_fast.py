@@ -1505,11 +1505,13 @@ def oznaczenia_typu(b: dict, marze: dict[str, float] | None = None) -> list[str]
 
 
 def argumenty_typu(b: dict, idx, mecze_druzyn: dict, trendy_zaw: dict,
-                   wykonawcy: dict | None = None) -> dict | None:
+                   wykonawcy: dict | None = None,
+                   h2h_kadr: dict | None = None) -> dict | None:
     """Argumenty typu „jak u typera" (model/argumenty.py) — stan sprzed meczu.
 
     `mecze_druzyn`: {mecz_id: (gospodarz_id, gość_id)} z listy meczów cyklu,
-    `trendy_zaw`: {(mecz_id, zawodnik_id, rynek): StatshubTrend}.
+    `trendy_zaw`: {(mecz_id, zawodnik_id, rynek): StatshubTrend},
+    `h2h_kadr`: pamięć H2H z kadr (patrz `odswiez_h2h_kadr`).
     None = brak danych (to nie jest argument przeciw)."""
     if idx is None or b.get("sugestia"):
         return None
@@ -1542,7 +1544,73 @@ def argumenty_typu(b: dict, idx, mecze_druzyn: dict, trendy_zaw: dict,
     return argumenty.argumenty_zawodnika(
         idx, int(opp) if opp else 0, ko, rk, linia, tr.counts, tr.minutes,
         getattr(tr, "timestamps", None), getattr(tr, "game_opponent_ids", None),
-        wykonawca=(wykonawcy or {}).get(str(b.get("podmiot_id"))))
+        wykonawca=(wykonawcy or {}).get(str(b.get("podmiot_id"))),
+        h2h_gleb=statshub.h2h_gracza(h2h_kadr, getattr(tr, "team_id", 0), opp,
+                                     b.get("podmiot_id"), rk) if opp else None)
+
+
+# ⚑ H2H Z GŁĘBOKIEJ HISTORII KADR (2026-10-27, właściciel: „tak, dawaj po
+# kolei”) — patrz nota przy `statshub.H2H_KADRY_LIMIT`. Etap 1 to POMIAR:
+# `dane["h2h_gl"]` w argumentach (księga, karta), wybór typów bez zmian.
+# Raz na dobę na parę drużyn z meczem w oknie, osobne zapytanie z limitem 80
+# (zwykłe kadry cyklu zostają na 20 — ich odpowiedź czyta pół pipeline'u),
+# pamięć między cyklami w repo stanu (`h2h_kadry`).
+H2H_KADR_KLUCZ = "h2h_kadry"
+H2H_KADR_SWIEZOSC_S = 20 * 3600
+H2H_KADR_OKNO_S = 3 * 86400
+H2H_KADR_TRZYMAJ_S = 4 * 86400
+H2H_KADR_MAX_CYKL = 60             # drużyn (0,3 s i ~1,8 MB na drużynę)
+H2H_KADR_BUDZET_S = 60.0
+
+
+def odswiez_h2h_kadr(events: list[dict], pamiec: dict, teraz: int, fetch=None,
+                     limit: int = H2H_KADR_MAX_CYKL,
+                     budzet_s: float = H2H_KADR_BUDZET_S) -> tuple[int, int]:
+    """Uzupełnia `pamiec` {"drużyna:rywal": {"ts", "g": {zawodnik: {rynek:
+    [[start, liczba, minuty]]}}}} dla meczów z `events` w oknie (najbliższe
+    pierwsze) i usuwa pary nieodświeżane dłużej niż H2H_KADR_TRZYMAJ_S.
+    Zwraca (pobrane drużyny, usunięte pary)."""
+    import time as _t
+    fetch = fetch or (lambda tid: statshub.fetch_team_players_performance(
+        tid, limit=statshub.H2H_KADRY_LIMIT))
+    rywale: dict[int, list[int]] = {}
+    for e in sorted(events, key=lambda e: int(e.get("timeStartTimestamp") or 0)):
+        if not 0 <= int(e.get("timeStartTimestamp") or 0) - teraz <= H2H_KADR_OKNO_S:
+            continue
+        gosp, gosc = e.get("homeTeamId"), e.get("awayTeamId")
+        if not gosp or not gosc:
+            continue
+        for tid, opp in ((int(gosp), int(gosc)), (int(gosc), int(gosp))):
+            zap = pamiec.get(f"{tid}:{opp}")
+            if zap and teraz - int(zap.get("ts") or 0) < H2H_KADR_SWIEZOSC_S:
+                continue
+            if opp not in rywale.setdefault(tid, []):
+                rywale[tid].append(opp)
+    t0 = _t.monotonic()
+    pobrane = 0
+    for tid, opps in rywale.items():
+        if pobrane >= limit or _t.monotonic() - t0 > budzet_s:
+            break
+        try:
+            k = fetch(tid)
+        except Exception as ex:                                # noqa: BLE001
+            diagnostyka.cichy("statshub", "h2h_kadry", ex)
+            continue
+        pobrane += 1
+        if not k or not k.get("data"):
+            continue                       # bez wpisu — spróbujemy w następnym cyklu
+        try:
+            h2h = statshub.h2h_z_kadry(k, tid, opps, set(argumenty.POLE_RYWALA_ZAWODNIKA))
+        except Exception as ex:                                # noqa: BLE001
+            diagnostyka.cichy("statshub", "h2h_z_kadry", ex)
+            continue
+        for opp in opps:
+            pamiec[f"{tid}:{opp}"] = {"ts": int(teraz), "g": h2h.get(opp) or {}}
+    stare = [kl for kl, v in pamiec.items()
+             if teraz - int((v or {}).get("ts") or 0) > H2H_KADR_TRZYMAJ_S]
+    for kl in stare:
+        del pamiec[kl]
+    return pobrane, len(stare)
 
 
 # ⚑ WETO „ARGUMENT PRZECIW" (2026-10-18, właściciel: „logika tworzenia typów
@@ -5958,6 +6026,24 @@ def _main_impl(tryb=None):
     print(f"Wykonawcy z map strzałów (120 dni): karne "
           f"{sum(1 for v in _wykonawcy_arg.values() if v['karne'])}, rzuty wolne "
           f"{sum(1 for v in _wykonawcy_arg.values() if v['wolne'])} zawodników")
+    # H2H z 80 meczów kadr — patrz `odswiez_h2h_kadr` (pomiar i karta)
+    _h2h_kadr: dict = {}
+    try:
+        _h2h_pam, _h2h_ok = supa.get_key_ok(H2H_KADR_KLUCZ)
+        if _h2h_ok:
+            _h2h_kadr = dict(_h2h_pam or {})
+            _h2h_nowe, _h2h_stare = odswiez_h2h_kadr(events, _h2h_kadr, int(time.time()))
+            if (_h2h_nowe or _h2h_stare) and not _dry_run():
+                supa.put_key(H2H_KADR_KLUCZ, _h2h_kadr)
+            _z_meczami = sum(1 for v in _h2h_kadr.values() if (v or {}).get("g"))
+            print(f"H2H z kadr ({statshub.H2H_KADRY_LIMIT} meczów): pobrano {_h2h_nowe} "
+                  f"drużyn, w pamięci {len(_h2h_kadr)} par drużyn ({_z_meczami} "
+                  f"z meczami między sobą), usunięto starych {_h2h_stare}")
+        else:
+            print("H2H z kadr: odczyt pamięci padł — bez głębokiego H2H w tym cyklu")
+    except Exception as e:                                      # noqa: BLE001
+        diagnostyka.cichy("cykl", "h2h_kadry", e)
+        _h2h_kadr = {}
 
     # kursy Superbetu (w trybie ligowym lista przyjechała już z parownikiem)
     if tryb:
@@ -11056,6 +11142,7 @@ def _main_impl(tryb=None):
             # argumenty karty „jak u typera" — opis i pomiar (model/argumenty.py)
             indeks_argumentow=_indeks_arg,
             wykonawcy=_wykonawcy_arg,
+            h2h_kadr=_h2h_kadr,
         )
         radar_padl = False
     except Exception as ex:
@@ -11769,7 +11856,7 @@ def _main_impl(tryb=None):
         if k not in _arg_cache:
             try:
                 _arg_cache[k] = argumenty_typu(b, _indeks_arg, _mecze_druzyn_arg,
-                                               _trendy_zaw_arg, _wykonawcy_arg)
+                                               _trendy_zaw_arg, _wykonawcy_arg, _h2h_kadr)
             except Exception as e:                              # noqa: BLE001
                 diagnostyka.cichy("cykl", "argumenty_typu", e)
                 _arg_cache[k] = None
@@ -11779,6 +11866,14 @@ def _main_impl(tryb=None):
         _a = _argumenty_b(b)
         if _a is not None:
             b["argumenty"] = _a
+    # pokrycie H2H (27.10): krótka historia trendu vs 80 meczów kadry
+    _dane_zaw = [(b.get("argumenty") or {}).get("dane") or {} for b in do_pokazania
+                 if b.get("podmiot_typ") != "druzyna" and b.get("argumenty")]
+    print(f"H2H zawodników — z ≥ 2 meczów z rywalem: krótka historia "
+          f"{sum(1 for d in _dane_zaw if (d.get('h2h') or [0, 0])[1] >= 2)}, "
+          f"80 meczów kadry {sum(1 for d in _dane_zaw if (d.get('h2h_gl') or [0, 0])[1] >= 2)} "
+          f"z {len(_dane_zaw)} typów (para drużyn w pamięci: "
+          f"{sum(1 for d in _dane_zaw if 'h2h_gl' in d)})")
 
     def _klucz_listy(b: dict):
         # ⚑ JEDNA MIARA DLA WEJŚCIA I DLA KOLEJNOŚCI (2026-08-14).
