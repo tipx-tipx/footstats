@@ -159,7 +159,8 @@ export type KuponV = {
   nogi: NogaV[];
 };
 
-type Czynnik = { nazwa: string; opis: string; mnoznik: number | null };
+// `ukryj` (27.10): czynnik liczy się w bilansie powodów, ale na kartę nie idzie
+type Czynnik = { nazwa: string; opis: string; mnoznik: number | null; ukryj?: boolean };
 
 type TypS = {
   id: number;
@@ -198,6 +199,7 @@ type MeczS = {
  * jak ma to brzmieć dla gracza. Czynnik bez wpływu nie trafia na kartę.
  */
 export function powodPoLudzku(c: Czynnik, rynek: string): Powod | null {
+  if (c.ukryj) return null;
   const kier: Powod["kier"] = c.mnoznik === null ? "baza" : c.mnoznik > 1.02 ? "za" : c.mnoznik < 0.98 ? "przeciw" : "baza";
   if (c.mnoznik !== null && kier === "baza") return null;
   const r = rynek.toLowerCase().replace(/\s*drużyny\s*/, " ").trim();

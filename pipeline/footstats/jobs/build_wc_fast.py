@@ -11865,7 +11865,7 @@ def _main_impl(tryb=None):
             f"{d} +{len(k)}" for d, k in sorted(_dolozone_po_domknieciu.items())))
     _tanie_n = sum(1 for b in lista_pub if tylko_tania_sciezka(b)
                    and not b.get("pokazany_wczesniej") and not b.get("wznowiony"))
-    print(f"Najtańsze typy drużynowe (1,20–1,25, model ≥ 0,65, 1 na mecz): "
+    print(f"Najtańsze typy drużynowe (1,20–1,25, model ≥ {uczony.TANIE_DRUZYNY_POLKI['p_min']}, 1 na mecz): "
           f"{_tanie_n} nowych na liście")
     # oznaczenia na karcie (patrz OZNACZENIA_TYPU) — liczone na liście, bo
     # półka jest znana dopiero tu; wznowione też, to tylko prezentacja

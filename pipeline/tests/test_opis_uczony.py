@@ -49,8 +49,45 @@ def test_ponizej_odwraca_kierunek_i_liczy_mecze_ponizej():
     assert rywal["mnoznik"] < 1                  # rywal podnosi λ – przeciw „poniżej”
     gdzie = next(x for x in c if x["nazwa"] == "Gdzie gra")
     assert gdzie["mnoznik"] > 1                  # wyjazd obniża λ – za „poniżej”
+    # w 2 z 10 u obu – zdanie przeczyłoby typowi: czynnik zostaje dla bilansu,
+    # ale z flagą `ukryj` (27.10)
     hist = next(x for x in c if x["nazwa"] == "Linia w historii")
-    assert hist["opis"].startswith("Mniej niż 3,5 rzutu rożnego było w 2 z 10")
+    assert hist.get("ukryj") is True and hist["opis"] == "" and hist["mnoznik"] < 1
+    # średnia 4,4 nad linią 3,5, a szansa 0,4 – zdania o spodziewanej liczbie nie ma
+    assert "Spodziewana liczba" not in [x["nazwa"] for x in c]
+
+
+def test_linia_w_historii_tylko_czesc_za_typem():
+    # Frosinone 27.10: kartki poniżej 1,5 – własne 3 z 10, rywala 9 z 10
+    t = _typ(strona="ponizej", lam=1.2, pkw=0.7, pkr=0.1)
+    t["linia"] = 1.5
+    hist = next(x for x in O.czynniki(t) if x["nazwa"] == "Linia w historii")
+    assert hist["opis"] == ("W 9 z 10 ostatnich meczów drużyny Atalanta jej przeciwnicy "
+                            "mieli mniej niż 1,5 rzutu rożnego")
+    # odwrotnie – tylko własna część; 5 z 10 to nie argument
+    t = _typ(pkw=0.8, pkr=0.5)
+    hist = next(x for x in O.czynniki(t) if x["nazwa"] == "Linia w historii")
+    assert hist["opis"] == "Więcej niż 3,5 rzutu rożnego było w 8 z 10 ostatnich meczów drużyny Lazio"
+    assert "ukryj" not in hist
+
+
+def test_spodziewana_po_zlej_stronie_linii():
+    # Frosinone 27.10: kartki poniżej 1,5, średnia 1,6 – mówi, która strona częstsza
+    t = _typ(strona="ponizej", lam=1.62, p=0.53)
+    t["linia"] = 1.5
+    t["rynek_kod"] = "team_cards"
+    t["podmiot"] = "Frosinone"
+    c = O.czynniki(t)
+    assert c[0]["opis"] == ("Nasz model spodziewa się, że Frosinone zanotuje średnio ok. 1,6 kartki, "
+                            "ale wynik poniżej linii 1,5 wychodzi mu częściej niż powyżej – średnią "
+                            "podnoszą rzadsze mecze z dużą liczbą kartek")
+    # średnia równa linii po zaokrągleniu też jest „po złej stronie”
+    t = _typ(strona="ponizej", lam=3.46, p=0.55)
+    assert "częściej niż powyżej" in O.czynniki(t)[0]["opis"]
+    # szansa z ceną przed ściąganiem ma pierwszeństwo przed surową
+    t = _typ(strona="ponizej", lam=3.6, p=0.6)
+    t["p_przed_sciagnieciem"] = 0.48
+    assert "Spodziewana liczba" not in [x["nazwa"] for x in O.czynniki(t)]
 
 
 def test_liczba_sprzeczna_z_kierunkiem_nie_trafia_na_karte():

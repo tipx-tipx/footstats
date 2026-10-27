@@ -81,6 +81,34 @@ def _zgodny(v, r, surowy: float | None) -> bool:
     return (v > r) == (float(surowy) > 1.0)
 
 
+def _spodziewana(b: dict, pu: dict, kto: str, sg: str, mn_l: str,
+                 linia: float, strona: str) -> str | None:
+    """Zdanie o spodziewanej liczbie albo None, gdy przeczyłoby typowi.
+
+    ⚑ 2026-10-27 (właściciel: „rób jak rekomendujesz”). Średnia po złej
+    stronie linii czyta się jak argument przeciw (Frosinone, kartki poniżej
+    1,5: „spodziewa się ok. 1,6 kartki – linia wynosi 1,5”), choć szansa
+    wychodzi z całego rozkładu, nie ze średniej. Wtedy zdanie mówi, która
+    strona linii wychodzi modelowi częściej — a gdy to nie strona typu
+    (typ z wyższego kursu, szansa ≤ 50%), zdania nie ma wcale."""
+    lam = round(float(pu["lam"]), 1)
+    if (lam > linia) if strona == "powyzej" else (lam < linia):
+        return (f"Nasz model spodziewa się, że {kto} zanotuje ok. {_l(lam)} {sg} "
+                f"– linia wynosi {_l(linia)}")
+    try:
+        p = float(b.get("p_przed_sciagnieciem") or pu.get("p"))
+    except (TypeError, ValueError):
+        return None
+    if p <= 0.5:
+        return None
+    tu, tam = ("poniżej", "powyżej") if strona == "ponizej" else ("powyżej", "poniżej")
+    zdanie = (f"Nasz model spodziewa się, że {kto} zanotuje średnio ok. {_l(lam)} {sg}, "
+              f"ale wynik {tu} linii {_l(linia)} wychodzi mu częściej niż {tam}")
+    if strona == "ponizej":
+        zdanie += f" – średnią podnoszą rzadsze mecze z dużą liczbą {mn_l}"
+    return zdanie
+
+
 def czynniki(b: dict) -> list[dict]:
     """Czynniki opisu dla typu `b` (rekord listy dnia z `p_uczony.skl`).
 
@@ -107,9 +135,9 @@ def czynniki(b: dict) -> list[dict]:
     out: list[dict] = []
 
     if pu.get("lam") is not None:
-        out.append({"nazwa": "Spodziewana liczba", "mnoznik": None,
-                    "opis": f"Nasz model spodziewa się, że {kto} zanotuje ok. "
-                            f"{_l(pu['lam'])} {sg} – linia wynosi {_l(linia)}"})
+        zdanie = _spodziewana(b, pu, kto, sg, mn_l, linia, strona)
+        if zdanie:
+            out.append({"nazwa": "Spodziewana liczba", "mnoznik": None, "opis": zdanie})
 
     def dodaj(nazwa: str, grupa: str, opis: str) -> None:
         m = _kier(mn.get(grupa), strona)
@@ -176,24 +204,45 @@ def czynniki(b: dict) -> list[dict]:
             dodaj("Liga", "liga", f"W tej lidze drużyny notują średnio {_l(x['liga'])} {sg} "
                                   f"na mecz, a w przeciętnej lidze {_l(ref['liga'])}")
         # pokrycie linii – mieszane z modelem, wpływ = p z pokryciem / p bez
+        # ⚑ 2026-10-27 (właściciel: „rób jak rekomendujesz”): zdanie łączyło
+        # naszą drużynę i rywala, więc przy mnożniku > 1 stało jako „za” także
+        # wtedy, gdy nasza drużyna sama linii nie trzymała (Frosinone, kartki
+        # poniżej 1,5: „w 3 z 10 meczów Frosinone, a u przeciwników Lecce
+        # w 9 z 10”). Na kartę idzie tylko część z WIĘCEJ niż połową meczów;
+        # gdy żadna, czynnik zostaje z flagą `ukryj` — front go nie pokazuje,
+        # a bilans powodów (weto „więcej przeciw niż za”) liczy jak dotąd.
         if pu.get("p_bez_pokrycia") and pu.get("p"):
             m = round(float(pu["p"]) / float(pu["p_bez_pokrycia"]), 3)
-            czesci = []
+            wlasne = rywala = None
             if pu.get("pkw") is not None and pu.get("pkn"):
                 n = int(pu["pkn"])
                 k = round(float(pu["pkw"]) * n)
-                czesci.append(f"w {k if strona == 'powyzej' else n - k} z {n} ostatnich "
-                              f"meczów drużyny {kto}")
+                wlasne = (k if strona == "powyzej" else n - k, n)
             if pu.get("pkr") is not None and pu.get("pkrn"):
                 n = int(pu["pkrn"])
                 k = round(float(pu["pkr"]) * n)
-                ryw = f"drużyny {rywal}" if rywal else "tego rywala"
-                czesci.append(f"a u przeciwników {ryw} – w "
-                              f"{k if strona == 'powyzej' else n - k} z {n} jej ostatnich meczów")
-            if czesci and _istotny(m):
-                out.append({"nazwa": "Linia w historii", "mnoznik": m,
-                            "opis": f"{'Więcej' if strona == 'powyzej' else 'Mniej'} niż "
-                                    f"{_l(linia)} {sg} było " + ", ".join(czesci)})
+                rywala = (k if strona == "powyzej" else n - k, n)
+            jest_historia = bool(wlasne or rywala)
+            wlasne = wlasne if wlasne and 2 * wlasne[0] > wlasne[1] else None
+            rywala = rywala if rywala and 2 * rywala[0] > rywala[1] else None
+            co = f"{'Więcej' if strona == 'powyzej' else 'Mniej'} niż {_l(linia)} {sg}"
+            ryw = f"drużyny {rywal}" if rywal else "tego rywala"
+            if wlasne and rywala:
+                opis = (f"{co} było w {wlasne[0]} z {wlasne[1]} ostatnich meczów drużyny "
+                        f"{kto}, a u przeciwników {ryw} – w {rywala[0]} z {rywala[1]} "
+                        f"jej ostatnich meczów")
+            elif wlasne:
+                opis = f"{co} było w {wlasne[0]} z {wlasne[1]} ostatnich meczów drużyny {kto}"
+            elif rywala:
+                opis = (f"W {rywala[0]} z {rywala[1]} ostatnich meczów {ryw} jej przeciwnicy "
+                        f"mieli {co[0].lower() + co[1:]}")
+            else:
+                opis = None
+            if jest_historia and _istotny(m):
+                c = {"nazwa": "Linia w historii", "mnoznik": m, "opis": opis or ""}
+                if not opis:
+                    c["ukryj"] = True
+                out.append(c)
     # najpierw fakt (spodziewana liczba), potem najsilniejsze za, potem przeciw
     baza = [c for c in out if c["mnoznik"] is None]
     za = sorted((c for c in out if c["mnoznik"] is not None and c["mnoznik"] > 1),
