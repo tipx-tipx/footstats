@@ -152,6 +152,34 @@ def test_logika_zawodnika_odmawia():
     assert B.ponizej_progu_jakosci(bez, "wysoka_szansa")
 
 
+def test_srednia_po_zlej_stronie_definicja():
+    # Frosinone 27.10: kartki poniżej 1,5 przy średniej 1,6
+    b = _typ(1, 0.57, 2.00, strona="ponizej", linia=1.5, p_uczony={"lam": 1.62})
+    assert B.srednia_po_zlej_stronie(b)
+    assert not B.srednia_po_zlej_stronie(dict(b, p_uczony={"lam": 1.3}))
+    # równa linii po zaokrągleniu (jak na karcie) zostaje
+    assert not B.srednia_po_zlej_stronie(dict(b, p_uczony={"lam": 1.46}))
+    # „powyżej” lustrzanie
+    assert B.srednia_po_zlej_stronie(_typ(2, 0.55, 1.80, linia=4.5, p_uczony={"lam": 4.3}))
+    assert not B.srednia_po_zlej_stronie(_typ(2, 0.55, 1.80, linia=4.5, p_uczony={"lam": 4.8}))
+    # zawodnik, bez λ, „kto więcej” – reguła nie dotyczy
+    assert not B.srednia_po_zlej_stronie(dict(b, podmiot_typ="zawodnik"))
+    assert not B.srednia_po_zlej_stronie(dict(b, p_uczony=None))
+    assert not B.srednia_po_zlej_stronie(dict(b, strona="gospodarz"))
+    assert "srednia_po_zlej_stronie" in B.OPISY_ZDJECIA_PL
+
+
+def test_srednia_po_zlej_stronie_zdejmuje_tylko_nowe(monkeypatch):
+    monkeypatch.setattr(B, "juz_pokazany", lambda b: bool(b.get("pokazany_wczesniej")))
+    zly = _typ(1, 0.57, 1.95, strona="ponizej", linia=1.5, p_uczony={"lam": 1.62})
+    dobry = _typ(2, 0.57, 1.95, strona="ponizej", linia=1.5, p_uczony={"lam": 1.2})
+    stary = _typ(3, 0.57, 1.95, strona="ponizej", linia=1.5, p_uczony={"lam": 1.62},
+                 pokazany_wczesniej=True)
+    lista, zdjete, _ = B.wybierz_liste_publikowana([zly, dobry, stary], B.szansa_z_ceną)
+    assert {b["id"] for b in lista} == {2, 3}
+    assert set(zdjete.values()) == {"srednia_po_zlej_stronie"}
+
+
 def test_logika_zawodnika_rywal_w_gornej_czesci_ligi():
     b = _zaw_logika(linia=1.5)
     b["argumenty"]["dane"]["rywal_miejsce"] = [5, 20]

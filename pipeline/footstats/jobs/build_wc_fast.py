@@ -1728,6 +1728,27 @@ def wiecej_przeciw_niz_za(b: dict) -> bool:
     return bilans_powodow(b) < 0
 
 
+# ⚑ ŚREDNIA PO ZŁEJ STRONIE LINII (2026-10-27, właściciel: „jak
+# rekomendujesz”). Typer nie gra „poniżej 1,5 kartki”, gdy sam spodziewa się
+# 1,6. Księga 17.08–27.10, drużyny 1,45–2,40: λ modelu (zaokrąglona jak na
+# karcie) po złej stronie linii 42,9% przy cenie 48,6% (−5,7 pp, połowy
+# −5,9 / −4,4, n=1916), model obiecywał 52%; λ po stronie typu −1,1 pp,
+# λ równa linii +0,9 (zostaje). Prawie wyłącznie „poniżej”. Na stronie było
+# ~0,75 takiego typu na dobę: 50% wobec 61% reszty półki (n=22). Na wysokiej
+# szansie takich typów nie ma, u zawodników model sam daje im niską szansę.
+# Tylko lista — kandydat dalej idzie do księgi.
+def srednia_po_zlej_stronie(b: dict) -> bool:
+    """Typ drużynowy, którego λ modelu leży po złej stronie linii."""
+    if b.get("podmiot_typ") != "druzyna" or b.get("strona") not in ("powyzej", "ponizej"):
+        return False
+    try:
+        lam = round(float((b.get("p_uczony") or {})["lam"]), 1)
+        linia = float(b["linia"])
+    except (KeyError, TypeError, ValueError):
+        return False
+    return lam < linia if b["strona"] == "powyzej" else lam > linia
+
+
 def weto_argumentow(b: dict, polka: str | None) -> bool:
     """Czy nowy typ odpada, bo ma argument przeciw (patrz WETO_ARGUMENTOW_POLEK)."""
     strumien = "druzyna" if b.get("podmiot_typ") == "druzyna" else "zawodnik"
@@ -1990,6 +2011,7 @@ def wybierz_liste_publikowana(
                     and not ponizej_progu_jakosci(b, _polka, bijace_cene)
                     and not weto_argumentow(b, _polka)
                     and not wiecej_przeciw_niz_za(b)
+                    and not srednia_po_zlej_stronie(b)
                     and z_strumienia.get(doba_str, 0) < LISTA_CAP
                     and z_polki.get(_polka_klucz, 0) < _polka_limit
                     and z_meczu.get(mecz, 0) < LISTA_PER_MECZ
@@ -2040,6 +2062,11 @@ def wybierz_liste_publikowana(
         if (not juz_pokazany(b) and not na_ogloszonej_liscie(b, zamkniete)
                 and wiecej_przeciw_niz_za(b)):
             zdjete.setdefault(_klucz_publikacji(b), "wiecej_przeciw_niz_za")
+            continue
+        # LOGIKA TYPERA: średnia modelu po złej stronie linii — patrz tam
+        if (not juz_pokazany(b) and not na_ogloszonej_liscie(b, zamkniete)
+                and srednia_po_zlej_stronie(b)):
+            zdjete.setdefault(_klucz_publikacji(b), "srednia_po_zlej_stronie")
             continue
         if not juz_pokazany(b):
             if (z_polki.get(_polka_klucz, 0) >= _polka_limit
@@ -2878,6 +2905,7 @@ OPISY_ZDJECIA_PL = {
     "bez_sygnalu_skladu": "ani składu, ani występu w ostatnim meczu drużyny – nie wiemy, czy zagra",
     "argument_przeciw": "na wyższych kursach stoi przeciw typowi mocny argument (słaba forma, rywal tego nie oddaje, z rywalem nie wchodziło, rzadko w składzie)",
     "wiecej_przeciw_niz_za": "na karcie stałoby więcej powodów przeciw niż za – opis przeczyłby typowi",
+    "srednia_po_zlej_stronie": "model spodziewa się liczby po drugiej stronie linii niż typ (np. średnio 1,6 kartki przy typie poniżej 1,5)",
     "zdjete_recznie": "jednorazowo zdjęty przez właściciela (18.10: opis przeczył typowi)",
     "ujemna_po_korekcie": "po urealnieniu szansy wartość wyszła ujemna",
     "kurs_poza_widelkami": "kurs poza widełkami, w jakich gramy",
