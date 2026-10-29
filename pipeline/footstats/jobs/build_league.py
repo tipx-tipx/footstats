@@ -127,6 +127,7 @@ def upcoming_events(days: int = 6) -> list[MeczLigowy]:
     """
     now = int(time.time())
     out: dict[int, MeczLigowy] = {}
+    bledy: list[str] = []
     for d in range(days):
         start = now + d * 86400
         start -= start % 86400
@@ -139,7 +140,13 @@ def upcoming_events(days: int = 6) -> list[MeczLigowy]:
             # wtedy tak, jakby w ten dzień nikt nie grał (patrz „mecz bez typu
             # znikał ze strony" — ta sama klasa objawu).
             diagnostyka.cichy("cykl", "dzien_terminarza", e)
+            bledy.append(repr(e)[:200])
             continue
+    # ⚑ 29.10 od ~18 UTC statshub oddawał chmurze 0 meczów, a log mówił tylko
+    # „0 meczów statshub" – bez tego wiersza nie widać, czy to blokada, czy pusty dzień
+    if bledy:
+        print(f"Terminarz statshub: {len(bledy)} z {days} dni bez odpowiedzi, "
+              f"pierwszy błąd: {bledy[0]}", flush=True)
         for e in data:
             ev = e.get("events") or {}
             if ev.get("status") != "notstarted":
@@ -687,10 +694,13 @@ def zbuduj_tryb(days: int = 5, publikuj: bool = False) -> TrybLigowy | None:
     )
 
 
-def main(publikuj: bool = False) -> None:
+def main(publikuj: bool = False) -> bool:
     """Pełny cykl ligowy. Domyślnie DRY-RUN: silnik liczy wszystko,
     ale dumpy idą do web/src/data/.../liga_dryrun, a Supabase/rozliczenia
-    są nietknięte (patrz build_wc_fast._dry_run)."""
+    są nietknięte (patrz build_wc_fast._dry_run).
+
+    Zwraca False, gdy silnik NIE ruszył (brak sparowanych meczów) – wtedy
+    w katalogu danych leżą tylko pliki z checkoutu i nie wolno ich wysyłać."""
     from . import build_wc_fast
 
     # STOPER ODKRYWANIA (2026-08-01) — patrz komentarz w cycle.py. Rozdziela
@@ -704,11 +714,12 @@ def main(publikuj: bool = False) -> None:
           f"{(time.monotonic() - t0) / 60:.1f} min", flush=True)
     if tryb is None:
         print("Brak sparowanych meczów — cykl ligowy pominięty.")
-        return
+        return False
     t1 = time.monotonic()
     build_wc_fast.main(tryb)
     print(f"[stoper] silnik (typy, kupony, rozliczenia): "
           f"{(time.monotonic() - t1) / 60:.1f} min", flush=True)
+    return True
 
 
 if __name__ == "__main__":

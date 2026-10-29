@@ -125,7 +125,16 @@ def main():
             build_wc_fast.main()
         elif MODE == "liga":
             from . import build_league
-            build_league.main(publikuj=True)
+            # ⚑⚑ BEZ SILNIKA NIE MA WYSYŁKI (2026-10-29). Statshub oddał chmurze
+            # 0 meczów, cykl ligowy się pominął, manifest nie powstał, a push bez
+            # manifestu wysłał WSZYSTKIE pliki z checkoutu – demo z 27.07. Strona
+            # pokazała „dane sprzed 96 dni" i zero typów. Lepiej czerwony job
+            # i ostatnie dobre dane na stronie niż zielony job i trzymiesięczne.
+            if not build_league.main(publikuj=True):
+                raise RuntimeError(
+                    "Cykl ligowy pominięty (0 sparowanych meczów) – NIE wysyłam "
+                    "do Supabase, strona zostaje na ostatnich dobrych danych"
+                )
         else:
             from . import build_demo
             build_demo.main()
