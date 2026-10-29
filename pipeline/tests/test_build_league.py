@@ -261,3 +261,37 @@ def test_ta_sama_minuta_niejednoznaczna_nie_paruje():
     sb = [_sb(101, "Halmstads·AIK Stockholm", ts), _sb(102, "Halmstads·AIK Solna", ts)]
     n, _ = bl.paruj_superbet([m], sb)
     assert n == 0
+
+
+# --- terminarz: dzień bez odpowiedzi nie gubi pozostałych (29.10) ---
+
+def _event(eid, ts):
+    return {"events": {"id": eid, "status": "notstarted", "uniqueTournamentId": 17,
+                       "timeStartTimestamp": ts},
+            "unique_tournaments": {"id": 17, "name": "Premier League"},
+            "categories": {"name": "England"},
+            "homeTeam": {"id": 1, "name": "Arsenal"},
+            "awayTeam": {"id": 2, "name": "Chelsea"}}
+
+
+def test_upcoming_events_zbiera_mecze_z_dni_z_odpowiedzia(monkeypatch, capsys):
+    """29.10 pętla po meczach dnia trafiła pod `if bledy:` – przy działającym
+    statshub terminarz był pusty, przy 403 cykl padał na UnboundLocalError."""
+    wywolania = []
+
+    def falszywy_sh(url):
+        wywolania.append(url)
+        if len(wywolania) == 2:
+            raise RuntimeError("HTTP Error 403")
+        return {"data": [_event(100 + len(wywolania), 1_800_000_000 + len(wywolania))]}
+
+    monkeypatch.setattr(bl, "_sh", falszywy_sh)
+    mecze = bl.upcoming_events(3)
+    assert [m.event_id for m in mecze] == [101, 103]
+    assert "1 z 3 dni bez odpowiedzi" in capsys.readouterr().out
+
+
+def test_upcoming_events_bez_bledow_nie_pisze_wiersza(monkeypatch, capsys):
+    monkeypatch.setattr(bl, "_sh", lambda url: {"data": [_event(7, 1_800_000_000)]})
+    assert [m.event_id for m in bl.upcoming_events(2)] == [7]
+    assert "Terminarz statshub" not in capsys.readouterr().out

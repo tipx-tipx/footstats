@@ -142,11 +142,6 @@ def upcoming_events(days: int = 6) -> list[MeczLigowy]:
             diagnostyka.cichy("cykl", "dzien_terminarza", e)
             bledy.append(repr(e)[:200])
             continue
-    # ⚑ 29.10 od ~18 UTC statshub oddawał chmurze 0 meczów, a log mówił tylko
-    # „0 meczów statshub" – bez tego wiersza nie widać, czy to blokada, czy pusty dzień
-    if bledy:
-        print(f"Terminarz statshub: {len(bledy)} z {days} dni bez odpowiedzi, "
-              f"pierwszy błąd: {bledy[0]}", flush=True)
         for e in data:
             ev = e.get("events") or {}
             if ev.get("status") != "notstarted":
@@ -175,6 +170,11 @@ def upcoming_events(days: int = 6) -> list[MeczLigowy]:
                 kolejka=_kolejka(ev, e.get("tournaments") or {}),
                 raw=ev,
             )
+    # ⚑ 29.10 od ~18 UTC statshub oddawał chmurze 0 meczów, a log mówił tylko
+    # „0 meczów statshub" – bez tego wiersza nie widać, czy to blokada, czy pusty dzień
+    if bledy:
+        print(f"Terminarz statshub: {len(bledy)} z {days} dni bez odpowiedzi, "
+              f"pierwszy błąd: {bledy[0]}", flush=True)
     return sorted(out.values(), key=lambda m: m.kickoff_ts)
 
 
