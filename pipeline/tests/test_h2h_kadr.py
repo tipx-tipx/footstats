@@ -85,12 +85,12 @@ def test_odswiezanie_raz_na_dobe_i_sprzatanie():
         return _kadra(tid)
 
     pam = {"1:2": {"ts": teraz - 10 * DZIEN, "g": {}}}          # stara para
-    nowe, stare = B.odswiez_h2h_kadr(events, pam, teraz, fetch=fetch)
+    nowe, stare = B.odswiez_h2h_kadr(events, pam, teraz, fetch=fetch, limit=60)
     assert (nowe, stare) == (2, 1) and sorted(wolania) == [10, 20]  # mecz 2 poza oknem
     assert set(pam) == {"10:20", "20:10"}
     assert pam["10:20"]["g"]["5"]["fouls_committed"][0][1] == 3.0
     wolania.clear()
-    assert B.odswiez_h2h_kadr(events, pam, teraz + 3600, fetch=fetch) == (0, 0)
+    assert B.odswiez_h2h_kadr(events, pam, teraz + 3600, fetch=fetch, limit=60) == (0, 0)
     assert wolania == []                                        # świeże — bez zapytań
     # limit drużyn na cykl
     assert B.odswiez_h2h_kadr(events, {}, teraz, fetch=fetch, limit=1)[0] == 1
@@ -101,7 +101,7 @@ def test_awaria_pobrania_nie_zapisuje_pary():
         raise RuntimeError("429")
     pam: dict = {}
     events = [{"id": 1, "timeStartTimestamp": KO, "homeTeamId": 10, "awayTeamId": 20}]
-    assert B.odswiez_h2h_kadr(events, pam, KO - DZIEN, fetch=zly) == (0, 0)
+    assert B.odswiez_h2h_kadr(events, pam, KO - DZIEN, fetch=zly, limit=60) == (0, 0)
     assert pam == {}
 
 

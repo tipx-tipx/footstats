@@ -1559,7 +1559,10 @@ H2H_KADR_KLUCZ = "h2h_kadry"
 H2H_KADR_SWIEZOSC_S = 20 * 3600
 H2H_KADR_OKNO_S = 3 * 86400
 H2H_KADR_TRZYMAJ_S = 4 * 86400
-H2H_KADR_MAX_CYKL = 60             # drużyn (0,3 s i ~1,8 MB na drużynę)
+# ⚑ 0 OD 29.10: statshub od ~18 UTC odrzuca nasz klient (403), a te zapytania
+# (do 60 drużyn × 80 meczów na cykl) to największy przyrost ruchu od 27.10.
+# Pobieranie wstrzymane, pamięć czytana dalej; powrót do 60 po odblokowaniu
+H2H_KADR_MAX_CYKL = 0              # drużyn (0,3 s i ~1,8 MB na drużynę)
 H2H_KADR_BUDZET_S = 60.0
 
 
