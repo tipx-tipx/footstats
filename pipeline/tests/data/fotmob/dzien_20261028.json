@@ -1,0 +1,288 @@
+{
+ "leagues": [
+  {
+   "ccode": "ENG",
+   "id": 938221,
+   "primaryId": 133,
+   "name": "EFL Cup",
+   "parentLeagueId": 133,
+   "internalRank": 19,
+   "simpleLeague": false,
+   "localRank": 26,
+   "matches": [
+    {
+     "id": 6275368,
+     "leagueId": 938221,
+     "time": "28.10.2026 20:30",
+     "home": {
+      "id": 8456,
+      "score": 2,
+      "name": "Manchester City",
+      "penScore": 4,
+      "shortName": "Man City",
+      "longName": "Manchester City"
+     },
+     "away": {
+      "id": 10204,
+      "score": 2,
+      "name": "Brighton & Hove Albion",
+      "penScore": 3,
+      "shortName": "Brighton",
+      "longName": "Brighton & Hove Albion"
+     },
+     "eliminatedTeamId": 10204,
+     "statusId": 13,
+     "tournamentStage": "4",
+     "status": {
+      "utcTime": "2026-10-28T19:30:00.000Z",
+      "halfs": {
+       "firstHalfStarted": "28.10.2026 20:30:19",
+       "secondHalfStarted": "28.10.2026 21:34:06"
+      },
+      "periodLength": 45,
+      "finished": true,
+      "started": true,
+      "cancelled": false,
+      "awarded": false,
+      "scoreStr": "2 - 2",
+      "reason": {
+       "short": "Pen",
+       "shortKey": "penalties_short",
+       "long": "After penalties",
+       "longKey": "afterpenalties"
+      }
+     },
+     "timeTS": 1793215800000
+    },
+    {
+     "id": 6275374,
+     "leagueId": 938221,
+     "time": "28.10.2026 20:45",
+     "home": {
+      "id": 8678,
+      "score": 3,
+      "name": "AFC Bournemouth",
+      "shortName": "Bournemouth",
+      "longName": "AFC Bournemouth"
+     },
+     "away": {
+      "id": 10252,
+      "score": 0,
+      "name": "Aston Villa",
+      "longName": "Aston Villa"
+     },
+     "eliminatedTeamId": null,
+     "statusId": 6,
+     "tournamentStage": "4",
+     "status": {
+      "utcTime": "2026-10-28T19:45:00.000Z",
+      "halfs": {
+       "firstHalfStarted": "28.10.2026 20:45:15",
+       "secondHalfStarted": "28.10.2026 21:47:21"
+      },
+      "periodLength": 45,
+      "finished": true,
+      "started": true,
+      "cancelled": false,
+      "awarded": false,
+      "scoreStr": "3 - 0",
+      "reason": {
+       "short": "FT",
+       "shortKey": "fulltime_short",
+       "long": "Full-Time",
+       "longKey": "finished"
+      }
+     },
+     "timeTS": 1793216700000
+    }
+   ]
+  },
+  {
+   "ccode": "NOR",
+   "id": 206,
+   "primaryId": 206,
+   "name": "Cup",
+   "internalRank": 0,
+   "simpleLeague": false,
+   "matches": [
+    {
+     "id": 6284084,
+     "leagueId": 206,
+     "time": "28.10.2026 18:00",
+     "home": {
+      "id": 8111,
+      "score": 3,
+      "name": "Pors",
+      "longName": "Pors"
+     },
+     "away": {
+      "id": 8179,
+      "score": 1,
+      "name": "Kongsvinger",
+      "longName": "Kongsvinger"
+     },
+     "eliminatedTeamId": null,
+     "statusId": 11,
+     "tournamentStage": "3",
+     "status": {
+      "utcTime": "2026-10-28T17:00:00.000Z",
+      "halfs": {
+       "firstHalfStarted": "28.10.2026 18:00:43",
+       "secondHalfStarted": "28.10.2026 19:03:58",
+       "firstExtraHalfStarted": "28.10.2026 19:57:02",
+       "secondExtraHalfStarted": "28.10.2026 20:16:29"
+      },
+      "periodLength": 45,
+      "finished": true,
+      "started": true,
+      "cancelled": false,
+      "awarded": false,
+      "scoreStr": "3 - 1",
+      "reason": {
+       "short": "AET",
+       "shortKey": "afterextratime_short",
+       "long": "After extra time",
+       "longKey": "afterextra"
+      }
+     },
+     "timeTS": 1793206800000
+    }
+   ]
+  },
+  {
+   "ccode": "GRE",
+   "id": 944879,
+   "primaryId": 145,
+   "name": "Cup Group Stage",
+   "parentLeagueId": 145,
+   "internalRank": 0,
+   "simpleLeague": false,
+   "matches": [
+    {
+     "id": 6106088,
+     "leagueId": 944879,
+     "time": "28.10.2026 17:00",
+     "home": {
+      "id": 4493,
+      "score": 0,
+      "name": "Levadiakos",
+      "longName": "Levadiakos"
+     },
+     "away": {
+      "id": 488099,
+      "score": 0,
+      "name": "Kifisia FC",
+      "longName": "Kifisia FC"
+     },
+     "eliminatedTeamId": null,
+     "statusId": 106,
+     "tournamentStage": "4",
+     "status": {
+      "utcTime": "2026-10-28T16:00:00.000Z",
+      "halfs": {
+       "firstHalfStarted": "28.10.2026 17:00:00"
+      },
+      "periodLength": 45,
+      "cancelled": true,
+      "started": false,
+      "finished": false,
+      "reason": {
+       "short": "Can",
+       "shortKey": "cancelled_short",
+       "long": "Cancelled",
+       "longKey": "cancelled"
+      }
+     },
+     "timeTS": 1793203200000
+    }
+   ]
+  },
+  {
+   "ccode": "TUR",
+   "id": 951326,
+   "primaryId": 151,
+   "name": "Cup Qualification",
+   "parentLeagueId": 151,
+   "internalRank": 0,
+   "simpleLeague": false,
+   "matches": [
+    {
+     "id": 6420075,
+     "leagueId": 951326,
+     "time": "28.10.2026 13:00",
+     "home": {
+      "id": 1559146,
+      "score": 0,
+      "name": "Karabük Idmanyurdu Spor",
+      "longName": "Karabük Idmanyurdu Spor"
+     },
+     "away": {
+      "id": 551689,
+      "score": 0,
+      "name": "Iskenderun FK",
+      "longName": "Iskenderun FK"
+     },
+     "eliminatedTeamId": null,
+     "statusId": 5,
+     "tournamentStage": "3",
+     "status": {
+      "utcTime": "2026-10-28T12:00:00.000Z",
+      "halfs": {
+       "firstHalfStarted": "28.10.2026 13:02:15"
+      },
+      "periodLength": 45,
+      "cancelled": true,
+      "started": false,
+      "finished": false,
+      "reason": {
+       "short": "PP",
+       "shortKey": "postponed_short",
+       "long": "Postponed",
+       "longKey": "postponed"
+      }
+     },
+     "timeTS": 1793188800000
+    },
+    {
+     "id": 6420062,
+     "leagueId": 951326,
+     "time": "28.10.2026 13:30",
+     "home": {
+      "id": 8375,
+      "score": 1,
+      "name": "Fethiyespor",
+      "longName": "Fethiyespor"
+     },
+     "away": {
+      "id": 4681,
+      "score": 2,
+      "name": "Eyüpspor",
+      "longName": "Eyüpspor"
+     },
+     "eliminatedTeamId": null,
+     "statusId": 17,
+     "tournamentStage": "3",
+     "status": {
+      "utcTime": "2026-10-28T12:30:00.000Z",
+      "halfs": {
+       "firstHalfStarted": "28.10.2026 13:31:30",
+       "secondHalfStarted": "28.10.2026 14:24:10"
+      },
+      "periodLength": 45,
+      "cancelled": true,
+      "started": true,
+      "finished": true,
+      "reason": {
+       "short": "Ab",
+       "shortKey": "aborted_short",
+       "long": "Abandoned",
+       "longKey": "aborted"
+      },
+      "scoreStr": "1 - 2"
+     },
+     "timeTS": 1793190600000
+    }
+   ]
+  }
+ ]
+}
