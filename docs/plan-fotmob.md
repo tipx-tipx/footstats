@@ -44,6 +44,26 @@ i obchodzenia zabezpieczeń – odporność bierzemy z małego ruchu, własnych 
 5. **Bezpiecznik strony.** Cykl bez danych nigdy nie nadpisuje strony (f06932a) – zostaje
    ostatni dobry stan.
 
+## Wyniki bramek
+
+**Etap 1 (30.10, 7849ef2):** 320 meczów 28–29.10, 322 zapytania, 0 błędów, 0 odmów.
+Bez nagłówka User-Agent CloudFront odpowiada 403 – klient wysyła własny.
+
+**Etap 2 (30.10):** parser `fotmob.mecz_do_bazy` + `baza_meczow` (klucz na miesiąc, ~0,9 KB/mecz gz).
+- Zawodnicy (237 meczów, zgodność ze statshub): strzały 97,9%, celne 98,9%, faule 99,1%,
+  faulowani 99,3%, głową 98,8% / celne 99,4%, celne zza pola 98,9%, spalone 100%, kartki 99,3%;
+  na granicy: zza pola 96,9%, odbiory 96,0%; mała próba: przechwyty 84% (n=104),
+  zablokowane 94% / niecelne 91% (n=35). Różnice to ±1 – inny dostawca (FotMob = Opta).
+- Drużyny (272 mecze, łączenie co do minuty startu): rożne 99,2%, faule 98,1%, spalone 98,4%,
+  gole 100% poza meczami z karnymi, celne 96,6%, kartki (żółte+czerwone) 94,3%, strzały 89,7%
+  (±1, symetrycznie). **Żadna cecha modelu drużyn bez stałego przesunięcia** (stosunek średnich
+  0,99–1,01 na ~450 meczach). `f3` (wejścia w tercję) → suma „Passes into final third”,
+  korelacja 0,962, skala ×1/0,912 (do warstwy zgodności).
+- **Błąd statshub wykryty przy okazji:** magazyn `hd_*` liczył do goli serię rzutów karnych
+  (Liverpool 7 przy 1:1) – nowa baza ma gole bez karnych + osobno wynik po 90'.
+- Luka: mapa strzałów (głową / zza pola) brak w KNVB Cup, AFC Champions League Elite, lidze
+  chilijskiej – tam statshub ją miał. Zapas do rozważenia w etapie 4: mapa strzałów 365scores.
+
 ## Otwarte sprawy
 - Przewidywane składy (statshub `predicted-teams-lineup`) – właściciel: z innych źródeł.
 - Kursy referencyjne UK (`ref_odds` w trendach) – sprawdzić, czy model z nich korzysta.

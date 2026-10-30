@@ -306,6 +306,11 @@ MAGAZYN: dict[str, str] = {
     # H2H zawodników z 80 meczów kadr (2026-10-27, pomiar) — pamięć między
     # cyklami, odświeżana raz na dobę na parę drużyn; czyta ją tylko pipeline
     "h2h_kadry": "repo",
+    # baza meczów FotMob (2026-10-30, `baza_meczow`) — jeden klucz na miesiąc
+    # startu meczu; zastępuje historie statshub, czyta ją tylko pipeline
+    **{f"fm_baza_{r}{m:02d}": "repo" for r in range(2026, 2031) for m in range(1, 13)},
+    # mapa tożsamości FotMob → numery statshub/Sofascore (etap 3)
+    "fm_tozsamosc": "repo",
 }
 
 # nazwa backendu -> obiekt z `pobierz(key) -> (payload, ok)` i
