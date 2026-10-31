@@ -1,0 +1,62 @@
+name: FootStats — cykl próbny FotMob (ręcznie)
+
+# ETAP 4e PLANU FOTMOB (docs/plan-fotmob.md, 31.10.2026).
+#
+# Pełny cykl ligowy w trybie DRY-RUN (`build_league.main(publikuj=False)`):
+# silnik liczy wszystko, zrzuty idą do web/src/data/liga_dryrun w maszynie
+# joba, Supabase, księga i rozliczenia NIETKNIĘTE (build_wc_fast._dry_run).
+# Źródło statystyk: własny statshub (ZRODLO_STATYSTYK=fotmob) – bank do 29.10
+# + baza FotMob, terminarz i składy z FotMob. Zrzuty jako artefakt joba.
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: footstats-fm
+  cancel-in-progress: false
+
+jobs:
+  proba:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 80
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pipeline/requirements.txt
+
+      - name: Instalacja zależności
+        working-directory: pipeline
+        run: pip install -r requirements.txt
+
+      - name: Cykl ligowy bez publikacji na własnym statshub
+        working-directory: pipeline
+        env:
+          PYTHONIOENCODING: utf-8
+          PYTHONUTF8: "1"
+          ZRODLO_STATYSTYK: fotmob
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          # magazyn stanu pipeline'u (prywatne repo) — bez tego job PADNIE
+          # w produkcji zamiast czytać pusto: patrz magazyn_repo._w_produkcji
+          STAN_REPO: ${{ vars.STAN_REPO }}
+          STAN_TOKEN: ${{ secrets.STAN_TOKEN }}
+        run: python -m footstats.jobs.build_league
+
+      - name: Podsumowanie
+        if: always()
+        working-directory: pipeline
+        run: python scripts/podsumuj_dryrun.py
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: liga_dryrun
+          path: web/src/data/liga_dryrun
+          retention-days: 7

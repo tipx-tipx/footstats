@@ -22,6 +22,8 @@ OGRANICZENIA:
 
 from __future__ import annotations
 
+import functools
+import os
 from collections import Counter
 from dataclasses import dataclass, field
 
@@ -65,6 +67,40 @@ PAUZA_PONOWIENIA_S = 3
 # (`MAX_WYSZUKAN_ODKRYC` 700 → 1400): większy budżet to większa szansa na
 # odcięcie, więc najpierw musi istnieć droga wyjścia.
 PAUZA_ODCIECIA_S = 25
+
+
+# ⚑⚑ PRZEŁĄCZNIK ŹRÓDŁA (2026-10-31, etap 4e planu FotMob, docs/plan-fotmob.md).
+# `ZRODLO_STATYSTYK=fotmob` – cykl buduje `wlasny_statshub.Zrodlo` (bank do 29.10
+# + baza FotMob) i wpina go `ustaw_wlasne_zrodlo`; od tej chwili funkcje tego
+# modułu oddają ten sam kształt z naszych danych, bez zapytań do statshub.
+# Domyślnie (`statshub`) – zachowanie dokładnie jak przed zmianą. Powrót na
+# statshub, gdy odpowie = zmiana zmiennej, nie kodu.
+ZRODLO_STATYSTYK = os.environ.get("ZRODLO_STATYSTYK", "statshub").strip().lower()
+_WLASNE = None
+
+
+def ustaw_wlasne_zrodlo(zrodlo) -> None:
+    """Wpnij własny statshub (None = wróć do statshub)."""
+    global _WLASNE
+    _WLASNE = zrodlo
+
+
+def wlasne_zrodlo():
+    return _WLASNE
+
+
+def _albo_wlasne(nazwa: str, domyslnie=None):
+    """Dekorator: przy wpiętym własnym źródle woła jego metodę `nazwa`
+    (albo zwraca `domyslnie`, gdy źródło jej nie ma – feed propsów porzucony)."""
+    def dek(f):
+        @functools.wraps(f)
+        def w(*a, **k):
+            if _WLASNE is not None:
+                m = getattr(_WLASNE, nazwa, None)
+                return m(*a, **k) if m is not None else (domyslnie() if callable(domyslnie) else domyslnie)
+            return f(*a, **k)
+        return w
+    return dek
 
 
 def _get(url: str, timeout: int = 25, retries: int = 3) -> dict:
@@ -169,6 +205,7 @@ def nazwa_zawodnika(surowa) -> str:
     return f"{imie} {nazwisko}".strip() if imie and nazwisko else s
 
 
+@_albo_wlasne("fetch_event_trends", list)
 def fetch_event_trends(event_ids: list[int]) -> list[StatshubTrend]:
     """Pobierz trendy propsów dla podanych meczów (Z PAGINACJĄ).
 
@@ -350,6 +387,7 @@ PERF_LIMIT = 40
 OKNO_PELNEJ = 10
 
 
+@_albo_wlasne("fetch_player_performance", None)
 def fetch_player_performance(player_id: int, limit: int = PERF_LIMIT) -> list[dict]:
     """Ostatnie mecze gracza ze statystykami — DZIAŁA W KAŻDEJ LIDZE.
 
@@ -542,6 +580,7 @@ def _post(url: str, body: dict, timeout: int = 25, retries: int = 3) -> dict:
     raise last
 
 
+@_albo_wlasne("fetch_team_players_performance", None)
 def fetch_team_players_performance(team_id: int, limit: int = KADRA_LIMIT) -> dict:
     """Cała kadra drużyny: {data: [zawodnik + stats{event_id: staty}],
     events: [{events, homeTeam, awayTeam, ...}], unavailability: [...]}."""
@@ -549,6 +588,7 @@ def fetch_team_players_performance(team_id: int, limit: int = KADRA_LIMIT) -> di
                 f"?limit={int(limit)}&location=both", timeout=30, retries=2)
 
 
+@_albo_wlasne("fetch_extra_stats", None)
 def fetch_extra_stats(event_ids, paczka: int = EXTRA_PACZKA) -> dict[int, list[dict]]:
     """{event_id: [rekord zawodnika]} — zza pola / głową / 1. połowa.
 
@@ -919,6 +959,7 @@ def krycie_wywalczone(kadra_nasza: dict, kadra_rywala: dict, nasza: int, rywal: 
             "f_mir": sr(f_mir) if s_my else None, "f_def": sr(f_def), "f_tot": sr(f_tot)}
 
 
+@_albo_wlasne("fetch_referee", None)
 def fetch_referee(referee_id: int) -> dict | None:
     """Profil sędziego ze statshub (2026-10-18): `matchRecords` to bilans
     kariery liczony na bieżąco (lastGameTimestamp = wczoraj przy sprawdzeniu
@@ -937,6 +978,7 @@ def fetch_referee(referee_id: int) -> dict | None:
             "ost": int(mr.get("lastGameTimestamp") or 0) or None}
 
 
+@_albo_wlasne("fetch_predicted_lineup", None)
 def fetch_predicted_lineup(event_id: int) -> dict:
     """Przewidywane XI OBU drużyn: {'home': [pid...], 'away': [...], 'confirmed': bool}.
 
@@ -958,6 +1000,7 @@ def fetch_predicted_lineup(event_id: int) -> dict:
     return out
 
 
+@_albo_wlasne("fetch_team_lineup", None)
 def fetch_team_lineup(event_id: int, team_id: int) -> list[int]:
     """Oficjalny skład drużyny w meczu (XI bez ławki); [] przed ogłoszeniem.
 
@@ -974,6 +1017,7 @@ def fetch_team_lineup(event_id: int, team_id: int) -> list[int]:
     ]
 
 
+@_albo_wlasne("props_available", False)
 def props_available(event_id: int) -> bool:
     """Czy statshub ma już wystawione propsy dla meczu (feed niepusty)."""
     try:
@@ -1052,6 +1096,7 @@ TEAM_PERF_LIMIT = 40
 OKNO_PELNEJ = 10
 
 
+@_albo_wlasne("fetch_team_performance", None)
 def fetch_team_performance(team_id: int, limit: int = TEAM_PERF_LIMIT) -> list[dict]:
     """Historia meczowa DRUŻYNY — niezależna od tego, czy ktokolwiek ją kwotował.
 
@@ -1225,6 +1270,7 @@ class TeamTrend:
     ref_odds: list[float] = field(default_factory=list)
 
 
+@_albo_wlasne("fetch_team_trends", list)
 def fetch_team_trends(event_ids: list[int]) -> list[TeamTrend]:
     """Trendy drużynowe (`/api/props/team-trends`) dla podanych meczów.
 
@@ -1281,6 +1327,7 @@ def fetch_team_trends(event_ids: list[int]) -> list[TeamTrend]:
     return out
 
 
+@_albo_wlasne("fetch_event_shotmap", None)
 def fetch_event_shotmap(event_id: int) -> list[dict]:
     """Mapa strzałów meczu — lista strzałów z `playerId`, `teamId`, `minute`,
     `situation` (assisted/regular/fast-break/corner/free-kick/set-piece),
@@ -1298,6 +1345,7 @@ def fetch_event_shotmap(event_id: int) -> list[dict]:
 _SHOTMAP_CELNE = {"goal", "save", "saved"}
 
 
+@_albo_wlasne("fetch_event_result", None)
 def fetch_event_result(event_id: int) -> dict | None:
     """Wynik meczu w REGULARNYM czasie dla DOWOLNEJ ligi (otwarte API, z chmury).
 
@@ -1349,6 +1397,7 @@ def fetch_event_result(event_id: int) -> dict | None:
     }
 
 
+@_albo_wlasne("status_meczu", None)
 def status_meczu(event_id: int) -> str | None:
     """Status meczu u źródła: `finished`, `notstarted`, `postponed`, `canceled`.
 
@@ -1378,6 +1427,7 @@ def status_meczu(event_id: int) -> str | None:
     return str(ev.get("status") or "").lower() or None
 
 
+@_albo_wlasne("status_i_start", None)
 def status_i_start(event_id: int) -> tuple[str | None, int | None]:
     """(status, faktyczny start meczu ts) — start po przełożeniu jest NOWYM
     terminem pod tym samym id (Sabadell – Andorra 03.10 → 04.10 19:00 UTC).
@@ -1448,6 +1498,7 @@ def player_shots_from_shotmap(event_id: int) -> dict[str, dict] | None:
 _TOURNAMENT_NAME_CACHE: dict[int, str] = {}
 
 
+@_albo_wlasne("fetch_tournament_name", None)
 def fetch_tournament_name(utid: int) -> str:
     """Nazwa rozgrywek po uniqueTournamentId (`/api/unique-tournament/{id}`).
 
@@ -1471,6 +1522,7 @@ def fetch_tournament_name(utid: int) -> str:
     return nazwa
 
 
+@_albo_wlasne("search_players", None)
 def search_players(nazwa: str) -> list[dict]:
     """Wyszukiwarka zawodników `/api/search?q=` (odkryta 2026-07-22).
 
@@ -1486,6 +1538,7 @@ def search_players(nazwa: str) -> list[dict]:
     return out if isinstance(out, list) else []
 
 
+@_albo_wlasne("fetch_player_profile", None)
 def fetch_player_profile(player_id: int) -> dict:
     """Pełniejszy profil niż fetch_player_meta — pod kartę debiutanta radaru.
 
@@ -1518,6 +1571,7 @@ def fetch_player_profile(player_id: int) -> dict:
     }
 
 
+@_albo_wlasne("fetch_player_meta", None)
 def fetch_player_meta(player_id: int) -> dict:
     """Metadane zawodnika: {"height": int|None, "foot": str|None}.
 

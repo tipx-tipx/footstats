@@ -4283,6 +4283,14 @@ def venue_context(team_name: str, opponent_name: str, is_home_raw: bool) -> tupl
 
 
 def _sh(url: str) -> dict:
+    # własny statshub (ZRODLO_STATYSTYK=fotmob): terminarz z FotMob w tym samym kształcie
+    if statshub.wlasne_zrodlo() is not None and "/event/by-date" in url:
+        from urllib.parse import parse_qs, urlparse
+        return statshub.wlasne_zrodlo().by_date(int(parse_qs(urlparse(url).query)["startOfDay"][0]))
+    return _sh_statshub(url)
+
+
+def _sh_statshub(url: str) -> dict:
     r = requests.get(url, impersonate="chrome124", timeout=30, headers=SH_HEADERS)
     r.raise_for_status()
     return r.json()

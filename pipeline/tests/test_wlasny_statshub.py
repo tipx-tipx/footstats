@@ -328,3 +328,89 @@ def test_sedzia_profil():
 def test_utid_grupy_przed_liga_nadrzedna():
     t = T.Tozsamosc({"rozgrywki": {"147": 999, "9001": 11445}})
     assert t.utid(147, 9001) == 11445 and t.utid(147, 5) == 999 and t.utid(1) is None
+
+
+# ------------------------------------------- terminarz i przełącznik (4e) ----
+DZIEN = 1793318400            # 31.10.2026 00:00 UTC
+
+
+def _terminarz_fm(monkeypatch, mecze):
+    dni = {}
+    for m in mecze:
+        from datetime import datetime, timezone
+        dni.setdefault(datetime.fromtimestamp(m["start_ts"], timezone.utc).strftime("%Y%m%d"), []).append(m)
+    monkeypatch.setattr(fotmob, "mecze_dnia", lambda d: dni.get(d, []))
+
+
+def _m(mid, ts, h=8472, a=8463, status="notstarted", liga=47, grupa=47):
+    return {"id": mid, "start_ts": ts, "home_id": h, "home": "Sunderland", "away_id": a, "away": "Leeds United",
+            "liga_id": liga, "liga_grupa": grupa, "liga": "Premier League", "kraj": "ENG", "status": status}
+
+
+def test_by_date_w_ksztalcie_statshub(monkeypatch):
+    _terminarz_fm(monkeypatch, [_m(1, DZIEN + 15 * 3600), _m(2, DZIEN - 600), _m(3, DZIEN + 3600, h=1, a=2, liga=99,
+                                                                                  grupa=99)])
+    z = _zrodlo()
+    d = z.by_date(DZIEN)["data"]
+    assert [e["events"]["id"] for e in d] == [T.zastepczy(1), T.zastepczy(3)]      # mecz 2 – doba wcześniej
+    e = d[0]
+    assert e["events"]["homeTeamId"] == SH_SUN and e["events"]["uniqueTournamentId"] == 17
+    assert e["events"]["status"] == "notstarted" and e["events"]["timeStartTimestamp"] == DZIEN + 15 * 3600
+    assert e["homeTeam"] == {"id": SH_SUN, "name": "Sunderland AFC"}                # nazwa Sofascore (aliasy parowania)
+    assert e["events"]["slug"] == "sunderland-afc-vs-leeds-united" and e["events"]["lineupConfirmed"] is False
+    # nieznana liga i drużyny – numery zastępcze, ale mecz jest (profil domyślny)
+    assert d[1]["events"]["uniqueTournamentId"] == T.zastepczy(99) and d[1]["events"]["homeTeamId"] == T.zastepczy(1)
+    assert z.status_i_start(T.zastepczy(1)) == ("notstarted", DZIEN + 15 * 3600)
+
+
+def test_by_date_bez_odpowiedzi_fotmob_to_blad(monkeypatch):
+    def pada(d):
+        raise RuntimeError("503")
+    monkeypatch.setattr(fotmob, "mecze_dnia", pada)
+    import pytest
+    with pytest.raises(RuntimeError):
+        _zrodlo().by_date(DZIEN)
+
+
+def test_przelacznik_w_module_statshub(monkeypatch):
+    z = _zrodlo()
+    monkeypatch.setattr(statshub, "_get", lambda *a, **k: (_ for _ in ()).throw(AssertionError("sieć statshub")))
+    statshub.ustaw_wlasne_zrodlo(z)
+    try:
+        assert statshub.fetch_player_performance(SH_XHAKA) == z.fetch_player_performance(SH_XHAKA)
+        assert statshub.fetch_event_trends([1, 2]) == [] and statshub.fetch_team_trends([1]) == []
+        assert statshub.props_available(1) is False
+        assert statshub.fetch_event_result(SH_MECZ)["home_id"] == SH_SUN
+        assert statshub.player_shots_from_shotmap(SH_MECZ)                       # przez fetch_event_shotmap
+        assert statshub.fetch_player_meta(SH_XHAKA) == {"height": None, "foot": None}
+    finally:
+        statshub.ustaw_wlasne_zrodlo(None)
+    assert statshub.wlasne_zrodlo() is None
+
+
+def test_build_league_terminarz_przez_wlasne_zrodlo(monkeypatch):
+    from footstats.jobs import build_league
+    _terminarz_fm(monkeypatch, [_m(1, DZIEN + 15 * 3600)])
+    monkeypatch.setattr(build_league, "_sh_statshub", lambda url: (_ for _ in ()).throw(AssertionError("statshub")))
+    statshub.ustaw_wlasne_zrodlo(_zrodlo())
+    try:
+        d = build_league._sh(f"{build_league.SH_BASE}/event/by-date?startOfDay={DZIEN}&endOfDay={DZIEN + 86399}")
+        assert d["data"][0]["events"]["id"] == T.zastepczy(1)
+    finally:
+        statshub.ustaw_wlasne_zrodlo(None)
+
+
+def test_przed_meczami_sklad_i_sedzia_w_surowym_evencie(monkeypatch):
+    d = _przed("przed_pl_chelsea_mu.json.gz")
+    ts = DZIEN + 12 * 3600
+    _terminarz_fm(monkeypatch, [{**_m(int(d["general"]["matchId"]), ts, h=8455, a=10260)}])
+    monkeypatch.setattr(fotmob, "szczegoly_meczu", lambda mid: d)
+    z = W.Zrodlo(T.Tozsamosc({"druzyny": {"8455": 38, "10260": 35}}), {}, {}, {})
+    ev = z.by_date(DZIEN)["data"][0]["events"]
+    licz = z.przed_meczami([ev], teraz=ts - 3600)
+    assert licz["pobrane"] == 1 and licz["sklad_przewidywany"] == 1 and licz["niedostepni"] > 0
+    assert ev["lineupConfirmed"] is False
+    assert z.fetch_predicted_lineup(ev["id"])["home"]
+    # poza horyzontem – bez zapytania
+    licz = z.przed_meczami([ev], teraz=ts - 3 * 86400)
+    assert licz == {}

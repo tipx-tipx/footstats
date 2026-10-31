@@ -31,7 +31,7 @@ from pathlib import Path
 from curl_cffi import requests
 
 from .. import diagnostyka, rozgrywki
-from ..sources import superbet
+from ..sources import statshub, superbet
 
 # .env jak w cycle.py — DRY-RUN BEZ TEGO KŁAMIE (zmierzone 2026-07-27).
 # Ten moduł uruchamia się też wprost (`python -m footstats.jobs.build_league`)
@@ -75,6 +75,14 @@ PROG_PODOBIENSTWA_TEJ_MINUTY = 0.5    # 0,25 parowało „Nacional Potosí” z 
 
 
 def _sh(url: str) -> dict:
+    # własny statshub (ZRODLO_STATYSTYK=fotmob): terminarz z FotMob w tym samym kształcie
+    if statshub.wlasne_zrodlo() is not None and "/event/by-date" in url:
+        from urllib.parse import parse_qs, urlparse
+        return statshub.wlasne_zrodlo().by_date(int(parse_qs(urlparse(url).query)["startOfDay"][0]))
+    return _sh_statshub(url)
+
+
+def _sh_statshub(url: str) -> dict:
     r = requests.get(url, impersonate="chrome124", timeout=30, headers=SH_HEADERS)
     r.raise_for_status()
     return r.json()
@@ -709,7 +717,17 @@ def main(publikuj: bool = False) -> bool:
     # modelu. Bez tego rozdziału nie wiadomo, czy limit czasu zjada zakres lig,
     # czy sam silnik.
     t0 = time.monotonic()
+    # ⚑ WŁASNY STATSHUB (etap 4e planu FotMob): ZRODLO_STATYSTYK=fotmob – dane
+    # w kształcie statshub z banku (do 29.10) i bazy FotMob, terminarz z FotMob
+    wlasne = None
+    if statshub.ZRODLO_STATYSTYK == "fotmob":
+        from ..sources import fotmob, wlasny_statshub
+        wlasne = wlasny_statshub.zbuduj()
+        statshub.ustaw_wlasne_zrodlo(wlasne)
     tryb = zbuduj_tryb(publikuj=publikuj)
+    if wlasne is not None and tryb is not None:
+        print(f"Własny statshub: przed meczami {wlasne.przed_meczami(tryb.events)}; "
+              f"FotMob {fotmob.statystyki()}", flush=True)
     print(f"[stoper] odkrywanie meczów + parowanie z Superbetem: "
           f"{(time.monotonic() - t0) / 60:.1f} min", flush=True)
     if tryb is None:
@@ -719,6 +737,8 @@ def main(publikuj: bool = False) -> bool:
     build_wc_fast.main(tryb)
     print(f"[stoper] silnik (typy, kupony, rozliczenia): "
           f"{(time.monotonic() - t1) / 60:.1f} min", flush=True)
+    if wlasne is not None:
+        print(f"Własny statshub: liczniki {dict(wlasne.licz)}; FotMob {fotmob.statystyki()}", flush=True)
     return True
 
 

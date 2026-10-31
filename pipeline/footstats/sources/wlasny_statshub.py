@@ -102,6 +102,9 @@ class Zrodlo:
         self._sedziowie: dict[int, dict] = {}            # numer sędziego → profil
         self._hd: dict = {}                              # magazyn drużyn (`ustaw_magazyn`)
         self._niedostepni: dict[int, list[dict]] = {}    # drużyna → z nadchodzącego meczu
+        self._dni_fm: dict[str, list[dict] | None] = {}   # terminarze FotMob (raz na proces)
+        self._fm_mecz_po_ev: dict[int, dict] = {}         # numer meczu → mecz z terminarza FotMob
+        self._przed_meczem: dict[int, dict] = {}          # numer meczu → {sedzia, potwierdzony}
         self._sklady: dict[int, dict] = {}               # mecz → XI
         for zapis in (baza or {}).values():
             self._dodaj_mecz_fm(baza_meczow.rozpakuj(zapis))
@@ -389,6 +392,14 @@ class Zrodlo:
                                  if w]
             self._niedostepni[sh_t] = niedostepni[sh_t]
         h, a = self.t.id_druzyny(fm_h), self.t.id_druzyny(fm_a)
+        sedzia = ((c.get("matchFacts") or {}).get("infoBox") or {}).get("Referee") or {}
+        sid = None
+        if sedzia.get("id"):
+            from .fotmob import _staty_sedziego
+            sid = T.zastepczy(int(sedzia["id"]))
+            self._sedziowie[sid] = {"id": sedzia["id"], "nazwa": sedzia.get("text"), **_staty_sedziego(sedzia),
+                                    "ost": (self._sedziowie.get(sid) or {}).get("ost")}
+        self._przed_meczem[eid] = {"sedzia": sid, "potwierdzony": potwierdzony}
         self._sklady[eid] = {"home": xi.get(h, []), "away": xi.get(a, []), "confirmed": potwierdzony,
                              "przewidywany": przewidywany, "h": h, "a": a}
         return {"event_id": eid, "home_id": h, "away_id": a, "xi": xi, "potwierdzony": potwierdzony,
@@ -605,3 +616,188 @@ def _rozszerz_zrodlo():
 
 
 _rozszerz_zrodlo()
+
+
+# ------------------------------------------------- terminarz i metadane (4e) ----
+STATUS_BY_DATE = {"notstarted": "notstarted", "inprogress": "inprogress", "finished": "finished",
+                  "postponed": "postponed", "canceled": "canceled", "abandoned": "canceled"}
+
+
+def _rozszerz_4e():
+
+    def _fm_dzien(self, data: str) -> list[dict]:
+        """Terminarz FotMob dnia `RRRRMMDD` – raz na proces (pamięć klienta)."""
+        if data not in self._dni_fm:
+            from . import fotmob
+            try:
+                self._dni_fm[data] = fotmob.mecze_dnia(data)
+            except Exception as e:                       # noqa: BLE001
+                self._dni_fm[data] = None
+                self.licz["terminarz_blad"] += 1
+                self._blad_terminarza = repr(e)[:200]
+            if self._dni_fm[data]:
+                self.dodaj_terminarz(self._dni_fm[data])
+        return self._dni_fm[data] or []
+
+    def by_date(self, start: int) -> dict:
+        """Odpowiedź `event/by-date?startOfDay=start&endOfDay=start+86399`
+        w kształcie statshub, z terminarza FotMob (numery z mapy tożsamości,
+        zastępcze dla nowych). Doba UTC może zahaczać o dwa dni FotMob,
+        więc bierzemy oba i filtrujemy po starcie."""
+        from datetime import datetime, timedelta, timezone
+        d = datetime.fromtimestamp(int(start), timezone.utc).date()
+        mecze = {m["id"]: m for dzien in (d - timedelta(days=1), d)
+                 for m in self._fm_dzien(dzien.strftime("%Y%m%d"))}
+        if all(self._dni_fm.get(x.strftime("%Y%m%d")) is None for x in (d - timedelta(days=1), d)):
+            raise RuntimeError(f"terminarz FotMob {d}: {getattr(self, '_blad_terminarza', 'brak odpowiedzi')}")
+        out = []
+        for m in mecze.values():
+            if not (int(start) <= int(m["start_ts"]) <= int(start) + 86399):
+                continue
+            h, a = self.t.id_druzyny(m["home_id"]), self.t.id_druzyny(m["away_id"])
+            utid = (self.t.utid(m.get("liga_id") or 0, m.get("liga_grupa"))
+                    or T.zastepczy(m.get("liga_grupa") or m.get("liga_id") or 0))
+            n_h, n_a = self.nazwy.get(h) or m["home"], self.nazwy.get(a) or m["away"]
+            eid = self.t.id_meczu(m["id"])
+            self._fm_mecz_po_ev[eid] = m
+            prz = self._przed_meczem.get(eid) or {}
+            ev = {"id": eid, "status": STATUS_BY_DATE.get(m.get("status"), "notstarted"),
+                  "uniqueTournamentId": utid, "tournament": {"uniqueTournamentId": utid},
+                  "timeStartTimestamp": int(m["start_ts"]), "homeTeamId": h, "awayTeamId": a,
+                  "roundSlug": "", "roundInfo": None, "refereeId": prz.get("sedzia"),
+                  "lineupConfirmed": bool(prz.get("potwierdzony")),
+                  "slug": f"{statshub._klucz_slug(n_h)}-vs-{statshub._klucz_slug(n_a)}"}
+            out.append({"events": ev, "homeTeam": {"id": h, "name": n_h}, "awayTeam": {"id": a, "name": n_a},
+                        "unique_tournaments": {"id": utid, "name": m.get("liga") or ""},
+                        "categories": {"name": m.get("kraj") or ""},
+                        "tournaments": {"name": m.get("liga") or ""}, "hasOdd": True})
+        return {"data": out}
+
+    def search_players(self, nazwa: str) -> list[dict]:
+        """Jak `statshub.search_players`: [{id, name, slug}] po zgodności nazwiska
+        (bank + baza FotMob), najlepsze pierwsze, do 8."""
+        oc = []
+        for pid, n in self.nazwy_zawodnikow.items():
+            p = T.podobienstwo_nazwisk(nazwa, n)
+            if p >= T.PROG_NAZWISKA:
+                oc.append((p, pid, n))
+        oc.sort(key=lambda x: (-x[0], x[1]))
+        return [{"id": pid, "name": n, "slug": statshub._klucz_slug(n)} for _, pid, n in oc[:8]]
+
+    def fetch_player_profile(self, player_id: int) -> dict:
+        """Jak `statshub.fetch_player_profile`; `team_id` = drużyna z ostatniego meczu."""
+        pid = int(player_id)
+        hist = self._historia(pid)
+        if not hist and pid not in self.nazwy_zawodnikow:
+            return {}
+        team = int(hist[0][1]["player_statistics_event"].get("teamId") or 0) if hist else None
+        poz = str(hist[0][1]["player_statistics_event"].get("position") or "")[:1] if hist else None
+        return {"id": pid, "name": self.nazwy_zawodnikow.get(pid, ""), "position": poz or None,
+                "height": None, "foot": None, "team_id": team or None, "country": None,
+                "market_value": None, "birth_ts": None}
+
+    def fetch_player_meta(self, player_id: int) -> dict:
+        """Wzrost i noga – FotMob podaje je tylko w profilu zawodnika (osobne
+        zapytanie); dla `matchup.is_target_man` brak = 0 (pytaliśmy, nie wiemy)."""
+        return {"height": None, "foot": None}
+
+    def fetch_tournament_name(self, utid: int) -> str:
+        for m in self._mecz.values():
+            if m["ev"]["uniqueTournamentId"] == int(utid):
+                kraj = m.get("kraj") or ""
+                return f"{m.get('liga') or ''} ({kraj})" if kraj and kraj not in (m.get("liga") or "") else (m.get("liga") or "")
+        return ""
+
+    for f in (_fm_dzien, by_date, search_players, fetch_player_profile, fetch_player_meta, fetch_tournament_name):
+        setattr(Zrodlo, f.__name__, f)
+
+
+_rozszerz_4e()
+
+
+HORYZONT_PRZED_MECZEM_S = 48 * 3600
+BUDZET_PRZED_MECZEM = 150      # zapytań o szczegóły nadchodzących meczów na przebieg
+
+
+def _przed_meczami(self, events: list[dict], teraz: int | None = None,
+                   horyzont_s: int = HORYZONT_PRZED_MECZEM_S, budzet: int = BUDZET_PRZED_MECZEM) -> dict:
+    """Szczegóły meczów z najbliższych `horyzont_s` (składy, niedostępni,
+    sędzia) – najbliższe najpierw, do `budzet` zapytań. Surowe eventy
+    terminarza (`raw` silnika) dostają `lineupConfirmed` i `refereeId`, żeby
+    silnik wiedział, po który skład sięgnąć. Odmowa FotMob = koniec pętli,
+    cykl liczy dalej bez składów (jak przy statshub bez `predicted-lineup`)."""
+    import time
+    from . import fotmob
+    teraz = int(teraz or time.time())
+    licz = defaultdict(int)
+    kolejka = sorted((e for e in events if 0 < int(e.get("timeStartTimestamp") or 0) - teraz <= horyzont_s),
+                     key=lambda e: int(e["timeStartTimestamp"]))
+    for ev in kolejka:
+        m = self._fm_mecz_po_ev.get(int(ev["id"]))
+        if m is None:
+            licz["bez_meczu_fotmob"] += 1
+            continue
+        if licz["pobrane"] >= budzet:
+            licz["poza_budzetem"] += 1
+            continue
+        try:
+            wyn = self.mecz_nadchodzacy(fotmob.szczegoly_meczu(m["id"]))
+        except (fotmob.FotmobOdmowa, fotmob.FotmobLimit) as e:
+            licz["odmowa"] += 1
+            self._odmowa_przed_meczem = str(e)
+            break
+        except Exception:                                # noqa: BLE001
+            licz["blad"] += 1
+            continue
+        licz["pobrane"] += 1
+        licz["sklad_potwierdzony" if wyn["potwierdzony"] else
+             "sklad_przewidywany" if wyn["przewidywany"] else "bez_skladu"] += 1
+        licz["niedostepni"] += sum(len(v) for v in wyn["niedostepni"].values())
+        prz = self._przed_meczem.get(int(ev["id"])) or {}
+        ev["lineupConfirmed"] = bool(prz.get("potwierdzony"))
+        ev["refereeId"] = prz.get("sedzia")
+    return dict(licz)
+
+
+Zrodlo.przed_meczami = _przed_meczami
+
+
+def zbuduj(miesiace: int = 4) -> Zrodlo:
+    """Własny statshub ze stanu: mapa tożsamości, baza FotMob z `miesiace`
+    ostatnich miesięcy, bank, magazyn drużyn, nazwy drużyn. Awaria odczytu
+    któregokolwiek klucza = wyjątek (cykl na niepełnych danych liczyłby
+    historie od zera – patrz build_league o dry-runie bez .env)."""
+    import time
+    from datetime import datetime, timezone
+    from .. import supa
+
+    def czytaj(k):
+        d, ok = supa.get_key_ok(k)
+        if not ok:
+            raise RuntimeError(f"własny statshub: odczyt '{k}' padł")
+        return d
+    t, ok = T.wczytaj()
+    if not ok or t is None or not t.druzyny:
+        raise RuntimeError("własny statshub: mapa tożsamości pusta albo nieczytelna")
+    teraz = datetime.now(timezone.utc)
+    klucze = []
+    r, m = teraz.year, teraz.month
+    for _ in range(int(miesiace)):
+        klucze.append(baza_meczow.KLUCZ_WZOR.format(f"{r}{m:02d}"))
+        r, m = (r, m - 1) if m > 1 else (r - 1, 12)
+    baza, braki = baza_meczow.wczytaj(klucze)
+    if braki:
+        raise RuntimeError(f"własny statshub: odczyt {braki} padł")
+    hd = {}
+    for i in range(10):
+        hd.update(czytaj(f"hd_{i}") or {})
+    bank = czytaj("trend_lib") or {}
+    eventy = T.eventy_z_magazynu(hd)
+    nazwy = T.nazwy_druzyn_sh(bank, czytaj("typy_log") or {}, czytaj("zakres_meczow") or [], eventy)
+    t0 = time.time()
+    z = Zrodlo(t, baza, bank, eventy, nazwy)
+    z.ustaw_magazyn(hd)
+    print(f"Własny statshub: baza {len(baza)} meczów, bank {len(bank)} serii, magazyn {len(hd)} drużyn, "
+          f"mapa {len(t.druzyny)} drużyn / {sum(1 for v in t.zawodnicy.values() if v)} zawodników "
+          f"({time.time() - t0:.0f} s)", flush=True)
+    return z
