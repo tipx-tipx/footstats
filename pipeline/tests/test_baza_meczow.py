@@ -105,6 +105,21 @@ def test_indeksy_druzyn_i_zawodnikow():
     assert mecz["id"] == pl["id"] and wiersz["staty"]["fouls_won"] == 3
 
 
+def test_zmiennik_i_starszy_zapis_bez_tego_pola():
+    """Kto za kogo wszedł (superzmiana w rozliczaniu); zapis sprzed 31.10
+    (9 pól zawodnika) odtwarza się z None, nie wywraca odczytu."""
+    r = _rek("mecz_pl_5795494.json.gz")
+    po = {z["pid"]: z for z in r["zawodnicy"]}
+    wszedl = next(z for z in r["zawodnicy"] if z["zmiana_za"])
+    assert po[wszedl["zmiana_za"]]["zmiana_przez"] == wszedl["pid"]
+    assert po[wszedl["zmiana_za"]]["zszedl"] == wszedl["wszedl"]
+    z = B.spakuj(r)
+    for w in z["zawodnicy"]:
+        del w[9:]
+    stary = B.rozpakuj(z)
+    assert all(w["zmiana_za"] is None and w["zmiana_przez"] is None for w in stary["zawodnicy"])
+
+
 @pytest.mark.magazyn_produkcyjny
 def test_klucze_bazy_w_magazynie_repo():
     """Produkcyjny MAGAZYN (nie pusty z conftestu) kieruje miesiące bazy do repo."""

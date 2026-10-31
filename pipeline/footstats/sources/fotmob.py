@@ -333,13 +333,19 @@ def mecz_do_bazy(dane: dict) -> dict:
                                                 "poz": _pozycja(None, p.get("usualPlayingPositionId"))})
     wszedl: dict[int, int] = {}
     zszedl: dict[int, int] = {}
+    # kto za kogo (31.10): rozliczanie potrzebuje numeru zmiennika – reguła
+    # „superzmiany” (statshub `substitutedIn` / `substitutedOut`)
+    zmiana_za: dict[int, int] = {}
+    zmiana_przez: dict[int, int] = {}
     zolte: Counter = Counter()
     czerwone: Counter = Counter()
     for e in ((c.get("matchFacts") or {}).get("events") or {}).get("events") or []:
         if e.get("type") == "Substitution" and len(e.get("swap") or []) == 2:
             # swap[0] wchodzi, swap[1] schodzi (sprawdzone na składach 30.10)
-            wszedl[int(e["swap"][0]["id"])] = int(e.get("time") or 0)
-            zszedl[int(e["swap"][1]["id"])] = int(e.get("time") or 0)
+            na, z = int(e["swap"][0]["id"]), int(e["swap"][1]["id"])
+            wszedl[na] = int(e.get("time") or 0)
+            zszedl[z] = int(e.get("time") or 0)
+            zmiana_za[na], zmiana_przez[z] = z, na
         elif e.get("type") == "Card" and e.get("playerId"):
             if e.get("card") == "Yellow":
                 zolte[int(e["playerId"])] += 1
@@ -429,6 +435,8 @@ def mecz_do_bazy(dane: dict) -> dict:
             "zszedl": zszedl.get(pid),
             "poz": info.get("poz") or _pozycja(None, surowe.get("usualPosition")),
             "staty": staty or None,
+            "zmiana_za": zmiana_za.get(pid),
+            "zmiana_przez": zmiana_przez.get(pid),
         })
 
     # --- drużyny: poprawki z bramki etapu 2 (30.10) -----------------------

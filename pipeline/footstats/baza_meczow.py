@@ -36,8 +36,10 @@ from .sources import fotmob
 
 KLUCZ_WZOR = "fm_baza_{}"
 
-# kolejność pól zawodnika w zapisie zwięzłym
-_POLA_ZAW = ("pid", "name", "team_id", "minuty", "start", "wszedl", "zszedl", "poz", "staty")
+# kolejność pól zawodnika w zapisie zwięzłym; nowe pola TYLKO na końcu –
+# starszy zapis (krótsza lista) odtwarza się z None w brakujących polach
+_POLA_ZAW = ("pid", "name", "team_id", "minuty", "start", "wszedl", "zszedl", "poz", "staty",
+             "zmiana_za", "zmiana_przez")
 _KODY_STATYSTYK = (tuple(fotmob.POLA_ZAWODNIKA.values()) + tuple(fotmob.POLA_STRZALOW.values())
                    + fotmob.RYNKI_Z_MAPY + ("yellow_card", "red_card"))
 
@@ -53,7 +55,8 @@ def spakuj(rek: dict) -> dict:
         s = z.get("staty")
         zaw.append([z["pid"], z["name"], z["team_id"], z["minuty"], 1 if z["start"] else 0,
                     z["wszedl"], z["zszedl"], z["poz"],
-                    None if s is None else {k: v for k, v in s.items() if v}])
+                    None if s is None else {k: v for k, v in s.items() if v},
+                    z.get("zmiana_za"), z.get("zmiana_przez")])
     return {**{k: v for k, v in rek.items() if k != "zawodnicy"}, "zawodnicy": zaw}
 
 
@@ -63,7 +66,7 @@ def rozpakuj(zapis: dict) -> dict:
     mapa = bool(zapis.get("mapa_strzalow"))
     zaw = []
     for w in zapis.get("zawodnicy") or []:
-        z = dict(zip(_POLA_ZAW, w))
+        z = {**dict.fromkeys(_POLA_ZAW), **dict(zip(_POLA_ZAW, w))}
         z["start"] = bool(z["start"])
         if z["staty"] is not None:
             pelne = {}

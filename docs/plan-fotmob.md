@@ -94,6 +94,20 @@ Bez nagłówka User-Agent CloudFront odpowiada 403 – klient wysyła własny.
   Carlos Hernández, Juan Pérez), próg samego podobieństwa napisu < 0,86 („Takeshi Wada” ≠
   „Takashi Sawada”).
 
+## Etap 4 – podkroki (31.10)
+Zasada łączenia historii: **do 29.10 – nasze dane statshub (`trend_lib`, `hd_*`), od 29.10 – baza
+FotMob**, bez dubli (ten sam mecz = ten sam start ±3 h). Nie wolno oddać samego FotMob: bank łączy
+historie regułą „pełna nie ustępuje częściowej”, więc 2–3 świeże mecze z `historia_pelna` wyparłyby
+20 meczów z banku.
+
+| # | Podkrok | Bramka |
+|---|---|---|
+| 4a | Baza meczów od 29.10 + codzienne dopisywanie (`fm_baza`, c9d98e1) | nadrobione 29.10–dziś, 0 odmów |
+| 4b | Zawodnik: `fetch_player_performance` w kształcie statshub (bank + baza), `fetch_extra_stats`, wyszukiwarka/profil z mapy | na meczach 25–29.10 wiersze z bazy = bank ≥ 97% na rynek; `trendy_z_performance` z nowych wierszy = z wierszy statshub (testy kształtu) |
+| 4c | Kadra: `fetch_team_players_performance` (+ niedostępni z `lineup.unavailable`) | kadra = zawodnicy meczów drużyny; testy kształtu `trendy_kadry`, `niedostepni_z_kadry`, `braki_druzyny` |
+| 4d | Drużyna: `fetch_team_performance` (`hd_*` + baza, 15 pól), wynik, status, mapa strzałów, sędzia | magazyn `hd_*` dopisany z bazy = rekordy statshub na meczach wspólnych (bramka etapu 2) |
+| 4e | Terminarz w kształcie `event/by-date` (numery z mapy, zastępcze dla nowych) + przełącznik `ZRODLO_STATYSTYK` (statshub / fotmob) w `sources/statshub.py` i `build_league._sh` | cykl próbny lokalnie bez wysyłki daje typy; porównanie z ostatnim cyklem statshub (typy per rynek, rozkład szans) |
+
 ## ⚑ Wyłączone do etapu 7 (31.10)
 `cycle.yml`, `rozlicz.yml`, `magazyn.yml` – wyłączone ręcznie (`gh workflow disable`): przy 403
 statshub cykl kończył się na czerwono co 30 min (~30 maili/dobę), rozliczanie wisiało do limitu
