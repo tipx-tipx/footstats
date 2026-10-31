@@ -108,6 +108,20 @@ historie regułą „pełna nie ustępuje częściowej”, więc 2–3 świeże 
 | 4d | Drużyna: `fetch_team_performance` (`hd_*` + baza, 15 pól), wynik, status, mapa strzałów, sędzia | magazyn `hd_*` dopisany z bazy = rekordy statshub na meczach wspólnych (bramka etapu 2) |
 | 4e | Terminarz w kształcie `event/by-date` (numery z mapy, zastępcze dla nowych) + przełącznik `ZRODLO_STATYSTYK` (statshub / fotmob) w `sources/statshub.py` i `build_league._sh` | cykl próbny lokalnie bez wysyłki daje typy; porównanie z ostatnim cyklem statshub (typy per rynek, rozkład szans) |
 
+**4b – rdzeń (31.10, `sources/wlasny_statshub.py`):** wiersze `player/performance` z banku + bazy.
+- Bank → wiersze → `trendy_z_performance` = bank: 11 126 / 11 675 serii identycznych, 511 z dodatkowymi
+  meczami (warstwa zna mecz z innych rynków, np. zerowe kartki), 38 różnic (0,3%) – dublety w samym
+  banku (ten sam mecz dwa razy), które warstwa scala.
+- Wiersz FotMob = wiersz statshub na 4776 wspólnych meczach: numer meczu 99,9%, drużyna 100%, faule
+  99,4%, faulowani 99,4%, celne 98,9%, strzały 98,1%, głową 98,9/99,6%, zza pola 97,6/99,2%, spalone
+  i kartki 100%, minuty ±3 96,4%, odbiory 96,3%; mała próba: przechwyty 85% (n=117).
+- Symulacja przełączenia (bank ucięty na 27.10 + FotMob): mecze sprzed granicy 7989 / 8450 serii
+  identycznie, po granicy zgodne tam, gdzie FotMob ma składy. **Luka źródła:** część meczów FotMob
+  nie ma składów (krajowe puchary – np. 14 meczów z pustą listą zawodników) albo statystyk zawodników
+  (Botola Pro, National League) – statshub je miał. ⚑ Reguła do 4c: mecz bez składów NIE wchodzi
+  do listy meczów drużyny w kadrze – inaczej „opuścił mecz drużyny” uznałby, że zawodnik nie zagrał.
+- Do zrobienia w 4b: wyszukiwarka i profil zawodnika z mapy, `fetch_extra_stats` dla kadr.
+
 ## ⚑ Wyłączone do etapu 7 (31.10)
 `cycle.yml`, `rozlicz.yml`, `magazyn.yml` – wyłączone ręcznie (`gh workflow disable`): przy 403
 statshub cykl kończył się na czerwono co 30 min (~30 maili/dobę), rozliczanie wisiało do limitu
