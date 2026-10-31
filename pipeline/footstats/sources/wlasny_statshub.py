@@ -636,6 +636,12 @@ def _rozszerz_4e():
                 self.licz["terminarz_blad"] += 1
                 self._blad_terminarza = repr(e)[:200]
             if self._dni_fm[data]:
+                # mecz znany ze statshub (typ sprzed przełączenia) – ten sam numer,
+                # zanim terminarz nada mu zastępczy (`tozsamosc.dopasuj_mecze_znane`)
+                if getattr(self, "_znane", None):
+                    _n, _l = T.dopasuj_mecze_znane(self.t, self._dni_fm[data], self._znane, self.nazwy)
+                    for k, v in _l.items():
+                        self.licz[f"terminarz_znane_{k}"] += v
                 self.dodaj_terminarz(self._dni_fm[data])
         return self._dni_fm[data] or []
 
@@ -830,11 +836,21 @@ def zbuduj(miesiace: int = 4) -> Zrodlo:
         hd.update(czytaj(f"hd_{i}") or {})
     bank = czytaj("trend_lib") or {}
     eventy = T.eventy_z_magazynu(hd)
-    nazwy = T.nazwy_druzyn_sh(bank, czytaj("typy_log") or {}, czytaj("zakres_meczow") or [], eventy)
+    ksiega, zakres = czytaj("typy_log") or {}, czytaj("zakres_meczow") or []
+    nazwy = T.nazwy_druzyn_sh(bank, ksiega, zakres, eventy)
+    # mecze znane ze statshub (zakres ostatniego cyklu, księga) – typy sprzed
+    # przełączenia zostają przy swoim numerze; najpierw mecze z bazy (rozegrane
+    # po 29.10 – rozliczenia), terminarz dopasowuje się w `_fm_dzien`
+    znane = T.znane_mecze_sofascore(zakres, ksiega, od_ts=int(time.time()) - 21 * 86400)
+    n_baza, _ = T.dopasuj_mecze_znane(t, [
+        {"id": k, "start_ts": v.get("ts"), "home_id": (v.get("home") or {}).get("id"),
+         "away_id": (v.get("away") or {}).get("id")} for k, v in baza.items()], znane, nazwy)
     t0 = time.time()
     z = Zrodlo(t, baza, bank, eventy, nazwy)
+    z._znane = znane
     z.ustaw_magazyn(hd)
     print(f"Własny statshub: baza {len(baza)} meczów, bank {len(bank)} serii, magazyn {len(hd)} drużyn, "
-          f"mapa {len(t.druzyny)} drużyn / {sum(1 for v in t.zawodnicy.values() if v)} zawodników "
+          f"mapa {len(t.druzyny)} drużyn / {sum(1 for v in t.zawodnicy.values() if v)} zawodników, "
+          f"mecze znane ze statshub {len(znane)} (z bazy dopasowane {n_baza}) "
           f"({time.time() - t0:.0f} s)", flush=True)
     return z

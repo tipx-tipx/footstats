@@ -288,6 +288,80 @@ def nazwy_druzyn_sh(trend_lib: dict | None = None, ksiega: dict | None = None,
     return {k: v for k, v in n.items() if v}
 
 
+# ⚑ MECZE ZNANE ZE STATSHUB (cykl próbny 31.10). Typy opublikowane do 29.10 na
+# mecze po tej dacie zostają na stronie pod numerem Sofascore, a mapa meczów zna
+# tylko mecze z `hd_*` (rozegrane). Bez tej pary ten sam mecz z terminarza FotMob
+# dostawał numer zastępczy: 22 mecze dwa razy na stronie, typy pod dwoma numerami
+# (limit „3 na mecz” i „jedna linia na stronę” nie widziały dubla), a typ sprzed
+# przełączenia nie miałby czym się rozliczyć.
+def znane_mecze_sofascore(zakres: list | None, ksiega: dict | None,
+                          od_ts: int = 0) -> list[tuple[int, int, str, str]]:
+    """[(numer meczu Sofascore, start, gospodarz, gość)] z zapisu zakresu meczów
+    cyklu statshub i z księgi typów (mecz „A – B”), start ≥ `od_ts`."""
+    out: dict[int, tuple[int, int, str, str]] = {}
+    for r in zakres or []:
+        try:
+            e, k = int(r.get("id") or 0), int(r.get("kickoff_ts") or 0)
+        except (TypeError, ValueError):
+            continue
+        if e and k >= od_ts and r.get("gospodarz") and r.get("gosc") and not czy_zastepczy(e):
+            out[e] = (e, k, str(r["gospodarz"]), str(r["gosc"]))
+    for r in (ksiega or {}).values():
+        try:
+            e, k = int(r.get("mecz_id") or 0), int(r.get("kickoff_ts") or 0)
+        except (TypeError, ValueError):
+            continue
+        s = str(r.get("mecz") or "")
+        if e and e not in out and k >= od_ts and " – " in s and not czy_zastepczy(e):
+            a, b = s.split(" – ", 1)
+            out[e] = (e, k, a.strip(), b.strip())
+    return list(out.values())
+
+
+def dopasuj_mecze_znane(t: "Tozsamosc", mecze_fm: list[dict], znane, nazwy: dict[int, str],
+                        tol_s: int = TOL_MECZU_PO_PARZE_S) -> tuple[int, Counter]:
+    """Mecz FotMob bez pary w mapie ← znany mecz Sofascore z `znane`, gdy OBIE
+    zmapowane drużyny zgadzają się z nazwami Sofascore (≥ PROG_NAZWISKA – jak
+    nazwiska, każda strona osobno) i start różni się najwyżej o `tol_s`
+    (przełożona godzina; drużyna nie gra dwa razy w dwa dni). Para jednoznaczna:
+    przy dwóch kandydatach równie dobrych mecz zostaje zastępczy. Dopisuje do
+    `t.mecze`; zwraca (ile dopisano, liczniki)."""
+    licz: Counter = Counter()
+    zajete = set(t.mecze.values())
+    n = 0
+    for m in mecze_fm:
+        try:
+            fid, ts = int(m["id"]), int(m.get("start_ts") or 0)
+        except (KeyError, TypeError, ValueError):
+            continue
+        if fid in t.mecze:
+            continue
+        h, a = t.druzyny.get(int(m.get("home_id") or 0)), t.druzyny.get(int(m.get("away_id") or 0))
+        if not h or not a or not nazwy.get(h) or not nazwy.get(a):
+            licz["bez_druzyn"] += 1
+            continue
+        kand = []
+        for e, k, nh, na in znane:
+            if e in zajete or abs(k - ts) > tol_s:
+                continue
+            ph, pa = podobienstwo_nazwisk(nazwy[h], nh), podobienstwo_nazwisk(nazwy[a], na)
+            if ph >= PROG_NAZWISKA and pa >= PROG_NAZWISKA:
+                kand.append((-(ph + pa), abs(k - ts), e))
+        if not kand:
+            licz["bez_znanego"] += 1
+            continue
+        kand.sort()
+        if len(kand) > 1 and kand[1][:2] == kand[0][:2]:
+            licz["niejednoznaczne"] += 1
+            continue
+        t.mecze[fid] = kand[0][2]
+        zajete.add(kand[0][2])
+        n += 1
+        licz["dopasowane"] += 1
+    t.__dict__.pop("_odwr_mecze", None)
+    return n, licz
+
+
 def dopasuj_druzyny_po_nazwie(mecze_fm: list[dict], eventy: dict[int, dict],
                               nazwy_sh: dict[int, str], druzyny: dict[int, int]) -> dict[int, int]:
     """Zapas dla drużyn, których terminarz nie rozstrzygnął (reprezentacje

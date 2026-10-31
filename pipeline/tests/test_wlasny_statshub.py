@@ -363,6 +363,34 @@ def test_by_date_w_ksztalcie_statshub(monkeypatch):
     assert z.status_i_start(T.zastepczy(1)) == ("notstarted", DZIEN + 15 * 3600)
 
 
+def test_by_date_mecz_znany_ze_statshub_pod_swoim_numerem(monkeypatch):
+    # typ sprzed przełączenia stoi pod numerem Sofascore – terminarz FotMob nie dubluje meczu
+    _terminarz_fm(monkeypatch, [_m(77, DZIEN + 15 * 3600)])
+    z = _zrodlo()
+    z._znane = [(16_400_000, DZIEN + 15 * 3600, "Sunderland AFC", "Leeds United")]
+    e = z.by_date(DZIEN)["data"][0]["events"]
+    assert e["id"] == 16_400_000 and z.status_i_start(16_400_000) == ("notstarted", DZIEN + 15 * 3600)
+    assert z.licz["terminarz_znane_dopasowane"] == 1
+
+
+def test_zbuduj_mecz_z_bazy_pod_numerem_ze_statshub(monkeypatch):
+    # mecz rozegrany po 29.10 z typem sprzed przełączenia: wynik pod numerem Sofascore
+    from footstats import supa
+    rek = {**REK, "id": 4_242_424}
+    stan = {"zakres_meczow": [{"id": 16_400_001, "gospodarz": "Sunderland AFC", "gosc": "Leeds United",
+                               "kickoff_ts": rek["ts"]}],
+            "trend_lib": {"x": {"team_id": SH_SUN, "team_name": "Sunderland AFC", "opponent_id": SH_LEE,
+                                "opponent_name": "Leeds United", "player_id": 1}}}
+    monkeypatch.setattr(supa, "get_key_ok", lambda k: (stan.get(k), True))
+    monkeypatch.setattr(T, "wczytaj", lambda: (T.Tozsamosc({"druzyny": {"8472": SH_SUN, "8463": SH_LEE}}), True))
+    monkeypatch.setattr(baza_meczow, "wczytaj", lambda klucze: ({rek["id"]: baza_meczow.spakuj(rek)}, []))
+    import time
+    monkeypatch.setattr(time, "time", lambda: rek["ts"] + 86400)
+    z = W.zbuduj(miesiace=1)
+    assert z.t.id_meczu(rek["id"]) == 16_400_001
+    assert z.fetch_event_result(16_400_001)["home_id"] == SH_SUN
+
+
 def test_by_date_bez_odpowiedzi_fotmob_to_blad(monkeypatch):
     def pada(d):
         raise RuntimeError("503")

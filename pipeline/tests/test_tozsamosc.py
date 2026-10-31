@@ -300,6 +300,37 @@ def test_nazwy_druzyn_sh_z_ksiegi_i_trendow():
     assert n == {303: "Trzecia", 101: "Pierwsza", 202: "Druga"}
 
 
+def test_znane_mecze_z_zakresu_i_ksiegi_bez_zastepczych():
+    zak = [{"id": 16434076, "gospodarz": "FC Bayern München", "gosc": "Borussia Dortmund", "kickoff_ts": T0},
+           {"id": T.zastepczy(7), "gospodarz": "A", "gosc": "B", "kickoff_ts": T0},
+           {"id": 5, "gospodarz": "Stary", "gosc": "Mecz", "kickoff_ts": T0 - 99 * 86400}]
+    ks = {"k1": {"mecz_id": 16363908, "mecz": "Manchester City – Brighton & Hove Albion", "kickoff_ts": T0 + 3600},
+          "k2": {"mecz_id": 16434076, "mecz": "Inna nazwa – Inna", "kickoff_ts": T0}}
+    z = sorted(T.znane_mecze_sofascore(zak, ks, od_ts=T0 - 86400))
+    assert z == [(16363908, T0 + 3600, "Manchester City", "Brighton & Hove Albion"),
+                 (16434076, T0, "FC Bayern München", "Borussia Dortmund")]
+
+
+def test_mecz_fotmob_dostaje_znany_numer_sofascore():
+    t = T.Tozsamosc({"druzyny": {"9823": 2672, "9789": 2673, "8456": 17, "10204": 30}})
+    nazwy = {2672: "FC Bayern München", 2673: "Borussia Dortmund", 17: "Manchester City",
+             30: "Brighton & Hove Albion"}
+    znane = [(16434076, T0, "FC Bayern München", "Borussia Dortmund"),
+             (16363908, T0 + 7200, "Manchester City", "Brighton & Hove Albion")]
+    mecze = [{"id": 1, "start_ts": T0 + 120 * 60, "home_id": 9823, "away_id": 9789},   # godzina przełożona
+             {"id": 2, "start_ts": T0 + 7200, "home_id": 10204, "away_id": 8456},      # strony odwrotnie
+             {"id": 3, "start_ts": T0, "home_id": 9823, "away_id": 555}]               # drużyna spoza mapy
+    n, licz = T.dopasuj_mecze_znane(t, mecze, znane, nazwy)
+    assert n == 1 and t.id_meczu(1) == 16434076 and t.mecz_fm(16434076) == 1
+    assert t.id_meczu(2) == T.zastepczy(2) and licz["bez_znanego"] == 1 and licz["bez_druzyn"] == 1
+    # numer już zajęty i mecz z parą – bez zmian; dwa dni później to inny mecz
+    assert T.dopasuj_mecze_znane(t, [{"id": 4, "start_ts": T0, "home_id": 9823, "away_id": 9789}],
+                                 znane, nazwy)[0] == 0
+    t2 = T.Tozsamosc({"druzyny": {"9823": 2672, "9789": 2673}})
+    assert T.dopasuj_mecze_znane(t2, [{"id": 5, "start_ts": T0 + 3 * 86400, "home_id": 9823, "away_id": 9789}],
+                                 znane, nazwy)[0] == 0
+
+
 def test_kombinacje_nazw_symetryczne():
     for a, b in itertools.combinations(["Jan Kowalski", "J. Kowalski", "Jan Maria Kowalski", "Kowalski"], 2):
         assert T.podobienstwo_nazwisk(a, b) == T.podobienstwo_nazwisk(b, a)
