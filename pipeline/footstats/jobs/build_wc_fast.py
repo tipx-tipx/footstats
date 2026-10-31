@@ -1561,8 +1561,10 @@ H2H_KADR_OKNO_S = 3 * 86400
 H2H_KADR_TRZYMAJ_S = 4 * 86400
 # ⚑ 0 OD 29.10: statshub od ~18 UTC odrzuca nasz klient (403), a te zapytania
 # (do 60 drużyn × 80 meczów na cykl) to największy przyrost ruchu od 27.10.
-# Pobieranie wstrzymane, pamięć czytana dalej; powrót do 60 po odblokowaniu
-H2H_KADR_MAX_CYKL = 0              # drużyn (0,3 s i ~1,8 MB na drużynę)
+# Pobieranie wstrzymane, pamięć czytana dalej; powrót do 60 po odblokowaniu.
+# Na własnym statshub (ZRODLO_STATYSTYK=fotmob, etap 4e planu FotMob) kadry
+# liczą się lokalnie z banku i bazy FotMob, bez sieci – wraca 60.
+H2H_KADR_MAX_CYKL = 60 if statshub.ZRODLO_STATYSTYK == "fotmob" else 0   # drużyn
 H2H_KADR_BUDZET_S = 60.0
 
 

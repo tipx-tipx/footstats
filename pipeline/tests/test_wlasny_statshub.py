@@ -414,3 +414,20 @@ def test_przed_meczami_sklad_i_sedzia_w_surowym_evencie(monkeypatch):
     # poza horyzontem – bez zapytania
     licz = z.przed_meczami([ev], teraz=ts - 3 * 86400)
     assert licz == {}
+
+
+def test_przed_meczami_najpierw_mecze_z_priorytetu(monkeypatch):
+    # bliższy mecz bez oferty zawodniczej ustępuje dalszemu z priorytetu
+    d = _przed("przed_pl_chelsea_mu.json.gz")
+    ts = DZIEN + 12 * 3600
+    _terminarz_fm(monkeypatch, [_m(11, ts - 7200, h=1, a=2, liga=99, grupa=99), _m(12, ts, h=8455, a=10260)])
+    pytane = []
+    monkeypatch.setattr(fotmob, "szczegoly_meczu", lambda mid: pytane.append(mid) or d)
+    z = W.Zrodlo(T.Tozsamosc({"druzyny": {"8455": 38, "10260": 35}}), {}, {}, {})
+    evs = [e["events"] for e in z.by_date(DZIEN)["data"]]
+    assert [e["timeStartTimestamp"] for e in evs] == [ts - 7200, ts]
+    licz = z.przed_meczami(evs, teraz=ts - 3 * 3600, budzet=1, pierwsze={evs[1]["id"]})
+    assert pytane == [12] and licz["pobrane_z_priorytetu"] == 1 and licz["poza_budzetem"] == 1
+    pytane.clear()
+    z.przed_meczami(evs, teraz=ts - 3 * 3600, budzet=1)                   # bez priorytetu – najbliższy
+    assert pytane == [11]

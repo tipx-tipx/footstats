@@ -726,7 +726,14 @@ def main(publikuj: bool = False) -> bool:
         statshub.ustaw_wlasne_zrodlo(wlasne)
     tryb = zbuduj_tryb(publikuj=publikuj)
     if wlasne is not None and tryb is not None:
-        print(f"Własny statshub: przed meczami {wlasne.przed_meczami(tryb.events)}; "
+        from .build_wc_fast import KADRY_MIN_RYNKOW_SB
+        # najpierw mecze z ofertą zawodniczą (tam liczą się kadry z niedostępnymi)
+        # i rozgrywki drużynowe – patrz `wlasny_statshub._przed_meczami`
+        pierwsze = {mid for mid, sb in tryb.sb_ev_by_mid.items()
+                    if int((sb or {}).get("marketCount") or 0) >= KADRY_MIN_RYNKOW_SB}
+        pierwsze |= set(tryb.druzynowe_mids)
+        print(f"Własny statshub: przed meczami (priorytet {len(pierwsze)}) "
+              f"{wlasne.przed_meczami(tryb.events, pierwsze=pierwsze)}; "
               f"FotMob {fotmob.statystyki()}", flush=True)
     print(f"[stoper] odkrywanie meczów + parowanie z Superbetem: "
           f"{(time.monotonic() - t0) / 60:.1f} min", flush=True)

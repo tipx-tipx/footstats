@@ -720,9 +720,18 @@ BUDZET_PRZED_MECZEM = 150      # zapytań o szczegóły nadchodzących meczów n
 
 
 def _przed_meczami(self, events: list[dict], teraz: int | None = None,
-                   horyzont_s: int = HORYZONT_PRZED_MECZEM_S, budzet: int = BUDZET_PRZED_MECZEM) -> dict:
+                   horyzont_s: int = HORYZONT_PRZED_MECZEM_S, budzet: int = BUDZET_PRZED_MECZEM,
+                   pierwsze: set[int] | None = None) -> dict:
     """Szczegóły meczów z najbliższych `horyzont_s` (składy, niedostępni,
-    sędzia) – najbliższe najpierw, do `budzet` zapytań. Surowe eventy
+    sędzia) – najpierw mecze z `pierwsze` (numery meczów: oferta zawodnicza
+    Superbetu, rozgrywki drużynowe), w każdej grupie najbliższe najpierw, do
+    `budzet` zapytań.
+
+    ⚑ KOLEJNOŚĆ (cykl próbny 31.10): same „najbliższe” wydały 150 zapytań
+    głównie na niższe ligi bez oferty zawodników – pewnych niedostępnych 112
+    przy 713 w sobotnim cyklu statshub 24.10. Niedostępni idą do kadr
+    (`fetch_team_players_performance`), a kadry liczą się tylko tam, gdzie
+    jest oferta zawodnicza. Surowe eventy
     terminarza (`raw` silnika) dostają `lineupConfirmed` i `refereeId`, żeby
     silnik wiedział, po który skład sięgnąć. Odmowa FotMob = koniec pętli,
     cykl liczy dalej bez składów (jak przy statshub bez `predicted-lineup`)."""
@@ -730,8 +739,9 @@ def _przed_meczami(self, events: list[dict], teraz: int | None = None,
     from . import fotmob
     teraz = int(teraz or time.time())
     licz = defaultdict(int)
+    pierwsze = pierwsze or set()
     kolejka = sorted((e for e in events if 0 < int(e.get("timeStartTimestamp") or 0) - teraz <= horyzont_s),
-                     key=lambda e: int(e["timeStartTimestamp"]))
+                     key=lambda e: (int(e["id"]) not in pierwsze, int(e["timeStartTimestamp"])))
     for ev in kolejka:
         m = self._fm_mecz_po_ev.get(int(ev["id"]))
         if m is None:
@@ -750,6 +760,8 @@ def _przed_meczami(self, events: list[dict], teraz: int | None = None,
             licz["blad"] += 1
             continue
         licz["pobrane"] += 1
+        if int(ev["id"]) in pierwsze:
+            licz["pobrane_z_priorytetu"] += 1
         licz["sklad_potwierdzony" if wyn["potwierdzony"] else
              "sklad_przewidywany" if wyn["przewidywany"] else "bez_skladu"] += 1
         licz["niedostepni"] += sum(len(v) for v in wyn["niedostepni"].values())
