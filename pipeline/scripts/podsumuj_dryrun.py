@@ -1,7 +1,7 @@
 """Podsumowanie cyklu próbnego (dry-run `build_league`): ile typów, kart
 i zawodników per rynek i ekran – do porównania źródeł (etap 4e planu FotMob).
 
-Czyta zrzuty z `web/src/data/liga_dryrun/` (patrz `build_wc_fast._dump`)."""
+Czyta zrzuty z `web/src/data/demo/liga_dryrun/` (patrz `build_wc_fast._dump`)."""
 from __future__ import annotations
 
 import json
@@ -9,7 +9,7 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-KATALOG = Path(__file__).resolve().parents[2] / "web" / "src" / "data" / "liga_dryrun"
+KATALOG = Path(__file__).resolve().parents[2] / "web" / "src" / "data" / "demo" / "liga_dryrun"
 
 
 def _czytaj(nazwa):

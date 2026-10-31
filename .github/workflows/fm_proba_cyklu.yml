@@ -3,7 +3,7 @@ name: FootStats — cykl próbny FotMob (ręcznie)
 # ETAP 4e PLANU FOTMOB (docs/plan-fotmob.md, 31.10.2026).
 #
 # Pełny cykl ligowy w trybie DRY-RUN (`build_league.main(publikuj=False)`):
-# silnik liczy wszystko, zrzuty idą do web/src/data/liga_dryrun w maszynie
+# silnik liczy wszystko, zrzuty idą do web/src/data/demo/liga_dryrun w maszynie
 # joba, Supabase, księga i rozliczenia NIETKNIĘTE (build_wc_fast._dry_run).
 # Źródło statystyk: własny statshub (ZRODLO_STATYSTYK=fotmob) – bank do 29.10
 # + baza FotMob, terminarz i składy z FotMob. Zrzuty jako artefakt joba.
@@ -58,5 +58,5 @@ jobs:
         if: always()
         with:
           name: liga_dryrun
-          path: web/src/data/liga_dryrun
+          path: web/src/data/demo/liga_dryrun
           retention-days: 7
