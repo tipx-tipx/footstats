@@ -94,7 +94,7 @@ def main(argv: list[str] | None = None) -> int:
         if m["status"] != "finished":
             continue
         w_zakresie = (m["home_id"] in t.druzyny or m["away_id"] in t.druzyny
-                      or m.get("liga_id") in t.rozgrywki)
+                      or m.get("liga_id") in t.rozgrywki or m.get("liga_grupa") in t.rozgrywki)
         zakres["w_zakresie" if w_zakresie else "poza_zakresem"] += 1
         if not w_zakresie:
             continue

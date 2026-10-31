@@ -122,6 +122,25 @@ historie regułą „pełna nie ustępuje częściowej”, więc 2–3 świeże 
   do listy meczów drużyny w kadrze – inaczej „opuścił mecz drużyny” uznałby, że zawodnik nie zagrał.
 - Do zrobienia w 4b: wyszukiwarka i profil zawodnika z mapy, `fetch_extra_stats` dla kadr.
 
+**4a – wynik (31.10):** baza nadrobiona 29–31.10 (202 mecze, 0 odmów), razem 1152 mecze; mapa:
+19 483 zawodników z parą, 3296 zastępczych; drugi przebieg mapy – bramka 99,12%.
+Dopisane do zapisu meczu: numer zmiennika (superzmiana), surowa mapa strzałów (sytuacja – bank
+stylu), bilans sędziego (mecze, żółte/mecz, czerwone, karne), grupa ligi (`liga_grupa`).
+
+**4c (31.10):** kadra (`fetch_team_players_performance`) + `fetch_extra_stats`; niedostępni i składy
+z meczu przed gwizdkiem (`mecz_nadchodzacy`). 120 drużyn: mecze banku w oknie kadr zgodne 96,5%,
+reszta = mecze ze starym klubem o tej samej porze (słusznie poza kadrą). Zawodnik z niepełnym bankiem
+(feed propsów, ~19% aktywnych) nie dostaje `historia_pelna`, dopóki taki wiersz jest w ostatnich 10
+meczach – „opuścił mecz” mówi wtedy „nie wiemy”, nie „nie grał”.
+
+**4d (31.10):** historia drużyny (`fetch_team_performance`), wynik, status (+ terminarz), mapa
+strzałów, sędzia. Rekord magazynu `hd_*` zbudowany funkcją magazynu z wierszy FotMob vs statshub,
+744 mecze: numer meczu, rywal, strona 100%, rozgrywki 100% (po mapowaniu grup), rożne 98,9%,
+faule 97,2%, spalone 98,3%, posiadanie 95%, celne 94,7%, kartki 93,5%, strzały 89% (±1, jak etap 2),
+gole 96,2% (statshub liczył serię karnych). Cechy modelu (xG, tercja, odbiory, przechwyty) różnią się
+definicją dostawcy – bez stałego przesunięcia (etap 2). **Luka źródła:** w części pucharów i niższych
+lig FotMob nie ma statystyk drużyn (np. kartek), a statshub miał.
+
 ## ⚑ Wyłączone do etapu 7 (31.10)
 `cycle.yml`, `rozlicz.yml`, `magazyn.yml` – wyłączone ręcznie (`gh workflow disable`): przy 403
 statshub cykl kończył się na czerwono co 30 min (~30 maili/dobę), rozliczanie wisiało do limitu

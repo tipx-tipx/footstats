@@ -96,6 +96,11 @@ class Zrodlo:
         # mecze drużyny z bazy (tylko ZE SKŁADAMI – patrz `_dodaj_mecz_fm`)
         self._mecze_fm_druzyny: dict[int, list[dict]] = defaultdict(list)
         self._cache_bank: dict[int, list[tuple[int, dict, dict | None]]] = {}
+        self._mecz: dict[int, dict] = {}                 # numer meczu → mecz bazy (bez zawodników)
+        self._mecze_druz_fm: dict[int, list[int]] = defaultdict(list)   # drużyna → numery meczów bazy
+        self._terminarz: dict[int, tuple[str, int]] = {}  # numer meczu → (status, start) z terminarza
+        self._sedziowie: dict[int, dict] = {}            # numer sędziego → profil
+        self._hd: dict = {}                              # magazyn drużyn (`ustaw_magazyn`)
         self._niedostepni: dict[int, list[dict]] = {}    # drużyna → z nadchodzącego meczu
         self._sklady: dict[int, dict] = {}               # mecz → XI
         for zapis in (baza or {}).values():
@@ -108,12 +113,25 @@ class Zrodlo:
         h, a = self.t.id_druzyny(r["home"]["id"]), self.t.id_druzyny(r["away"]["id"])
         eid = self.t.id_meczu(r["id"])
         ev = {"id": eid, "timeStartTimestamp": int(r["ts"]), "homeTeamId": h, "awayTeamId": a,
-              "uniqueTournamentId": self.t.utid(r.get("liga_id") or 0) or 0, "status": "finished"}
+              "uniqueTournamentId": self.t.utid(r.get("liga_id") or 0, r.get("liga_grupa")) or 0,
+              "status": "finished"}
         dom = {"name": self.nazwy.get(h) or r["home"]["name"]}
         gosc = {"name": self.nazwy.get(a) or r["away"]["name"]}
         # ⚑ mecz BEZ SKŁADÓW (część krajowych pucharów w FotMob) nie wchodzi
         # do meczów drużyny: kadra bez wierszy w tym meczu znaczyłaby „nikt
         # nie zagrał”, a logika „opuścił mecz drużyny” – że zawodnik nie grał
+        f3 = defaultdict(float)
+        for w in r.get("zawodnicy") or []:
+            if w.get("staty") and w["staty"].get("passes_final_third"):
+                f3[w["team_id"]] += float(w["staty"]["passes_final_third"])
+        self._mecz[eid] = {**{k: v for k, v in r.items() if k != "zawodnicy"}, "h": h, "a": a, "ev": ev,
+                           "dom": dom, "gosc": gosc, "f3": dict(f3), "ma_sklady": bool(r.get("zawodnicy"))}
+        self._mecze_druz_fm[h].append(eid)
+        self._mecze_druz_fm[a].append(eid)
+        if r.get("sedzia") and r["sedzia"].get("id"):
+            sid = T.zastepczy(int(r["sedzia"]["id"]))
+            if int(r["ts"]) >= int((self._sedziowie.get(sid) or {}).get("ost") or 0):
+                self._sedziowie[sid] = {**r["sedzia"], "ost": int(r["ts"])}
         if r.get("zawodnicy"):
             rec_ev = {"events": ev, "homeTeam": dom, "awayTeam": gosc}
             self._mecze_fm_druzyny[h].append(rec_ev)
@@ -343,7 +361,8 @@ class Zrodlo:
         fm_h, fm_a = int((druz[0] or {}).get("id") or 0), int((druz[1] or {}).get("id") or 0)
         fm_mid = int(general.get("matchId") or 0)
         eid = self.t.id_meczu(fm_mid)
-        utid = self.t.utid(int(general.get("parentLeagueId") or general.get("leagueId") or 0))
+        utid = self.t.utid(int(general.get("parentLeagueId") or general.get("leagueId") or 0),
+                           int(general.get("leagueId") or 0))
         sklad_fm = []
         for strona, tid in (("homeTeam", fm_h), ("awayTeam", fm_a)):
             t = lu.get(strona) or {}
@@ -425,3 +444,164 @@ def niedostepny_statshub(u: dict, tozsamosc: T.Tozsamosc, utid: int | None) -> d
     return {"playerId": tozsamosc.id_zawodnika(int(u["id"])), "kind": kind, "status": status,
             "startDateTimestamp": None, "endDateTimestamp": koniec, "uniqueTournamentId": utid,
             "reason": powrot}
+
+
+# ---------------------------------------------------------- drużyny (4d) ----
+# kod magazynu `hd_*` → pole `statistics` statshub (`magazyn_druzyn.POLA`)
+POLA_MAGAZYNU = {"cor": "cornerKicks", "sh": "totalShotsOnGoal", "sot": "shotsOnGoal", "crd": "cards",
+                 "fol": "fouls", "pos": "ballPossession", "crs": "accurateCross", "f3": "finalThirdEntries",
+                 "box": "touchesInOppBox", "ins": "totalShotsInsideBox", "out": "totalShotsOutsideBox",
+                 "off": "offsides", "tck": "totalTackle", "int": "interceptionWon", "xg": "expectedGoals"}
+# statystyka drużyny w bazie FotMob → pole statshub
+POLA_DRUZYNY_FM = {"corners": "cornerKicks", "shots": "totalShotsOnGoal", "sot": "shotsOnGoal",
+                   "fouls": "fouls", "possession": "ballPossession", "accurate_crosses": "accurateCross",
+                   "touches_opp_box": "touchesInOppBox", "shots_inside_box": "totalShotsInsideBox",
+                   "shots_outside_box": "totalShotsOutsideBox", "offsides": "offsides", "tackles": "totalTackle",
+                   "interceptions": "interceptionWon", "xg": "expectedGoals", "yellow_cards": "yellowCards",
+                   "red_cards": "redCards"}
+# "Passes into final third" (suma zawodników) → `finalThirdEntries` statshub:
+# korelacja 0,962, stosunek średnich 0,912 na 449 meczach (bramka etapu 2)
+SKALA_F3 = 1 / 0.912
+# sytuacja strzału FotMob → statshub/Sofascore (bank stylu czyta fast-break,
+# corner, free-kick, set-piece, penalty)
+SYTUACJE = {"RegularPlay": "regular", "IndividualPlay": "regular", "FastBreak": "fast-break",
+            "FromCorner": "corner", "FreeKick": "free-kick", "SetPiece": "set-piece",
+            "ThrowInSetPiece": "throw-in-set-piece", "Penalty": "penalty"}
+
+
+def _staty_druzyny_fm(m: dict, fm_team: int) -> dict:
+    a = ((m.get("druzyny") or {}).get(str(fm_team)) or {}).get("all") or {}
+    out = {pole: a[kod] for kod, pole in POLA_DRUZYNY_FM.items() if a.get(kod) is not None}
+    if "yellow_cards" in a or "red_cards" in a:
+        out["cards"] = float(a.get("yellow_cards") or 0) + float(a.get("red_cards") or 0)
+    if (m.get("f3") or {}).get(fm_team):
+        out["finalThirdEntries"] = round(m["f3"][fm_team] * SKALA_F3)
+    return out
+
+
+def _wspolrzedne_sofascore(x: float, y: float, w_polu: bool) -> tuple[float, float]:
+    """FotMob (metry, bramka rywala przy x = 105, szerokość 68) → skala
+    Sofascore 0–100 (x = odległość od bramki rywala). Zgodność z flagą FotMob
+    "z pola karnego" 99,6% (4710 strzałów); rozbieżne przyciągamy do flagi,
+    bo `statshub._poza_polem` liczy z geometrii."""
+    from .sofascore import is_outside_box
+    sx, sy = round((105 - float(x)) / 105 * 100, 2), round(float(y) / 68 * 100, 2)
+    if bool(is_outside_box(sx, sy)) == (not w_polu):
+        return sx, sy
+    if w_polu:
+        return min(sx, 15.0), min(max(sy, 21.0), 79.0)
+    return max(sx, 16.5), sy
+
+
+def _rozszerz_zrodlo():
+    """Metody drużyn i meczu (4d) dopinane do `Zrodlo` – część zawodników
+    zostaje czytelna sama."""
+
+    def ustaw_magazyn(self, hd: dict) -> None:
+        """Magazyn drużyn `hd_*` (scalone szardy) – historia drużyn do 29.10."""
+        self._hd = hd or {}
+
+    def fetch_team_performance(self, team_id: int, limit: int = statshub.TEAM_PERF_LIMIT) -> list[dict]:
+        """Jak `statshub.fetch_team_performance`: mecze od najnowszego, magazyn
+        `hd_*` (do 29.10) + baza FotMob, ten sam mecz raz (z magazynu)."""
+        tid = int(team_id)
+        out = []
+        for m in (self._hd.get(str(tid)) or self._hd.get(tid) or {}).get("m") or []:
+            if not m.get("e") or not m.get("t"):
+                continue
+            dom = m.get("h") == 1
+            h, a = (tid, int(m.get("o") or 0)) if dom else (int(m.get("o") or 0), tid)
+            g, gp = m.get("g"), m.get("gp")
+            out.append({
+                "event": {"id": int(m["e"]), "timeStartTimestamp": int(m["t"]),
+                          "score": ({"home": g if dom else gp, "away": gp if dom else g}
+                                    if g is not None and gp is not None else {}),
+                          "homeScoreOvertime": None, "homeScorePenalties": None},
+                "statistics": {POLA_MAGAZYNU[k]: v for k, v in (m.get("s") or {}).items() if k in POLA_MAGAZYNU},
+                "opponentStatistics": {POLA_MAGAZYNU[k]: v for k, v in (m.get("sp") or {}).items()
+                                       if k in POLA_MAGAZYNU},
+                "homeTeam": {"id": h, "name": self.nazwy.get(h, "")},
+                "awayTeam": {"id": a, "name": self.nazwy.get(a, "")},
+                "league": {"id": m.get("l"), "name": ""}})
+        ts_mag = [int(r["event"]["timeStartTimestamp"]) for r in out]
+        for eid in self._mecze_druz_fm.get(tid, ()):
+            m = self._mecz[eid]
+            if any(abs(int(m["ts"]) - t) <= TOL_MECZU_S for t in ts_mag):
+                continue
+            fm_my, fm_oni = ((m["home"]["id"], m["away"]["id"]) if m["h"] == tid
+                             else (m["away"]["id"], m["home"]["id"]))
+            g, g90 = m.get("gole") or [None, None], m.get("gole90") or [None, None]
+            out.append({
+                "event": {"id": eid, "timeStartTimestamp": int(m["ts"]),
+                          "score": {"home": g90[0], "away": g90[1]},
+                          # statshub: niepuste przy dogrywce / karnych (rozliczanie wtedy nie liczy)
+                          "homeScoreOvertime": (g[0] - g90[0]) if m.get("dogrywka") else None,
+                          "homeScorePenalties": 0 if m.get("karne") else None},
+                "statistics": _staty_druzyny_fm(m, fm_my), "opponentStatistics": _staty_druzyny_fm(m, fm_oni),
+                "homeTeam": {"id": m["h"], "name": m["dom"]["name"]},
+                "awayTeam": {"id": m["a"], "name": m["gosc"]["name"]},
+                "league": {"id": m["ev"]["uniqueTournamentId"], "name": m.get("liga") or ""}})
+        out.sort(key=lambda r: -int(r["event"]["timeStartTimestamp"]))
+        return out[: int(limit)]
+
+    def fetch_event_result(self, event_id: int) -> dict | None:
+        """Jak `statshub.fetch_event_result`: wynik po 90 min + flaga dogrywki."""
+        m = self._mecz.get(int(event_id))
+        if not m or m.get("status") != "finished" or not m.get("gole90"):
+            return None
+        return {"home_id": m["h"], "away_id": m["a"], "home_name": m["dom"]["name"],
+                "away_name": m["gosc"]["name"], "home_goals": float(m["gole90"][0]),
+                "away_goals": float(m["gole90"][1]), "extra_time": bool(m.get("dogrywka"))}
+
+    def dodaj_terminarz(self, mecze_fm: list[dict]) -> None:
+        """Statusy i starty z terminarza FotMob (`fotmob.mecze_dnia`) – mecze
+        przełożone / odwołane i jeszcze nierozegrane."""
+        for m in mecze_fm:
+            self._terminarz[self.t.id_meczu(m["id"])] = (m.get("status") or "", int(m.get("start_ts") or 0))
+
+    def status_i_start(self, event_id: int) -> tuple[str | None, int | None]:
+        e = int(event_id)
+        if e in self._terminarz:
+            st, ts = self._terminarz[e]
+            return st or None, ts or None
+        m = self._mecz.get(e)
+        return (m["status"], int(m["ts"])) if m else (None, None)
+
+    def status_meczu(self, event_id: int) -> str | None:
+        return self.status_i_start(event_id)[0]
+
+    def fetch_event_shotmap(self, event_id: int) -> list[dict]:
+        """Jak `statshub.fetch_event_shotmap` (pola czytane przez pipeline).
+        Mecz bez zapisanej mapy (zapis sprzed 31.10, liga bez mapy) → []."""
+        m = self._mecz.get(int(event_id))
+        if not m:
+            return []
+        out = []
+        for s in m.get("strzaly") or []:
+            pid_fm, team_fm, x, y, syt, cialo, celny, zablok, w_polu, _okres, minuta, gol = s
+            pid = self.t.id_zawodnika(pid_fm)
+            sx, sy = _wspolrzedne_sofascore(x, y, bool(w_polu))
+            out.append({"playerId": pid, "playerName": self.nazwy_zawodnikow.get(pid, ""),
+                        "teamId": self.t.id_druzyny(team_fm), "x": sx, "y": sy, "isOnTarget": bool(celny),
+                        "isHeaded": cialo == "Header", "bodyPart": "head" if cialo == "Header" else "foot",
+                        "result": "goal" if gol else "save" if celny else "block" if zablok else "miss",
+                        "situation": SYTUACJE.get(syt, "regular"), "minute": minuta})
+        return out
+
+    def fetch_referee(self, referee_id: int) -> dict | None:
+        """Jak `statshub.fetch_referee`: {m, zk, ck (czerwone/mecz), k (karne/mecz), ost}.
+        Numer sędziego = zastępczy z numeru FotMob (pamięć `sedziowie_sh`
+        trzyma 3 dni, więc zmiana przestrzeni numerów sama się wymienia)."""
+        r = self._sedziowie.get(int(referee_id))
+        if not r or not r.get("m"):
+            return None
+        m = int(r["m"])
+        return {"m": m, "zk": round(float(r.get("zk") or 0), 3), "ck": round(float(r.get("ck") or 0) / m, 3),
+                "k": round(float(r.get("k") or 0) / m, 3), "ost": r.get("ost")}
+
+    for f in (ustaw_magazyn, fetch_team_performance, fetch_event_result, dodaj_terminarz, status_i_start,
+              status_meczu, fetch_event_shotmap, fetch_referee):
+        setattr(Zrodlo, f.__name__, f)
+
+
+_rozszerz_zrodlo()

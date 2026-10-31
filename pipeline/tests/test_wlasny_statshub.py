@@ -252,3 +252,79 @@ def test_sklad_ogloszony():
     wyn = z.mecz_nadchodzacy(d)
     assert wyn["potwierdzony"] and len(z.fetch_team_lineup(wyn["event_id"], 35)) == 11
     assert z.fetch_predicted_lineup(wyn["event_id"])["confirmed"] is True
+
+
+# ------------------------------------------------- drużyny, wynik, mapa (4d) ----
+def test_historia_druzyny_w_ksztalcie_statshub_i_magazyn():
+    from footstats.jobs import magazyn_druzyn as M
+    z = _zrodlo()
+    stary = REK["ts"] - 7 * 86400
+    z.ustaw_magazyn({str(SH_SUN): {"m": [
+        {"e": 700, "t": stary, "h": 0, "o": 99, "l": 17, "g": 1, "gp": 2,
+         "s": {"cor": 4, "sh": 10, "crd": 2}, "sp": {"cor": 7}},
+        {"e": 701, "t": REK["ts"] + 60, "h": 1, "o": SH_LEE, "l": 17, "g": 9, "gp": 9, "s": {"cor": 1}}]}})
+    rows = z.fetch_team_performance(SH_SUN)
+    # mecz w magazynie i w bazie – raz, z magazynu; od najnowszego
+    assert [r["event"]["id"] for r in rows] == [701, 700]
+    r = rows[1]
+    assert r["event"]["score"] == {"home": 2, "away": 1} and r["homeTeam"]["id"] == 99
+    assert r["statistics"] == {"cornerKicks": 4, "totalShotsOnGoal": 10, "cards": 2}
+    # bez magazynu – mecz z bazy FotMob; rekord magazynu buduje się z niego bez strat
+    rows = _zrodlo().fetch_team_performance(SH_SUN)
+    assert len(rows) == 1 and rows[0]["event"]["id"] == SH_MECZ
+    rek = M.rekord_meczu(SH_SUN, rows[0])
+    assert rek["e"] == SH_MECZ and rek["o"] == SH_LEE and rek["h"] == 1 and rek["l"] == 17
+    assert {"cor", "sh", "sot", "fol", "crd", "pos", "f3"} <= set(rek["s"]) and rek["sp"]
+    assert rek["g"] == REK["gole90"][0] and rek["gp"] == REK["gole90"][1]
+    st = rows[0]["statistics"]
+    assert st["cards"] == st.get("yellowCards", 0) + st.get("redCards", 0)
+    assert rows[0]["event"]["homeScoreOvertime"] is None
+
+
+def test_dogrywka_i_karne_niepuste():
+    rek = fotmob.mecz_do_bazy(json.load(gzip.open(DANE / "mecz_pen_6275371.json.gz", "rt", encoding="utf-8")))
+    t = T.Tozsamosc({"druzyny": {str(rek["home"]["id"]): 1, str(rek["away"]["id"]): 2}})
+    z = W.Zrodlo(t, {rek["id"]: baza_meczow.spakuj(rek)}, {}, {})
+    ev = z.fetch_team_performance(1)[0]["event"]
+    assert ev["homeScoreOvertime"] is not None and ev["homeScorePenalties"] is not None
+    w = z.fetch_event_result(T.zastepczy(rek["id"]))
+    assert w["extra_time"] is True and [w["home_goals"], w["away_goals"]] == rek["gole90"]
+
+
+def test_wynik_i_status_z_terminarza():
+    z = _zrodlo()
+    w = z.fetch_event_result(SH_MECZ)
+    assert w == {"home_id": SH_SUN, "away_id": SH_LEE, "home_name": "Sunderland AFC", "away_name": "Leeds United",
+                 "home_goals": float(REK["gole90"][0]), "away_goals": float(REK["gole90"][1]), "extra_time": False}
+    assert z.status_meczu(SH_MECZ) == "finished" and z.fetch_event_result(123) is None
+    z.dodaj_terminarz([{"id": 999, "status": "postponed", "start_ts": 1_800_000_000}])
+    assert z.status_i_start(T.zastepczy(999)) == ("postponed", 1_800_000_000)
+    assert z.status_i_start(5) == (None, None)
+
+
+def test_mapa_strzalow_w_ksztalcie_statshub():
+    z = _zrodlo()
+    sm = z.fetch_event_shotmap(SH_MECZ)
+    assert len(sm) == len(REK["strzaly"])
+    # rozbicie z geometrii (statshub._poza_polem) = flaga FotMob, głowa i celne zgodne
+    for s, surowy in zip(sm, REK["strzaly"]):
+        assert statshub._poza_polem(s) == (not surowy[8])
+        assert s["isHeaded"] == (surowy[5] == "Header") and s["isOnTarget"] == bool(surowy[6])
+    assert {s["situation"] for s in sm} <= set(W.SYTUACJE.values())
+    assert any(s["situation"] == "corner" for s in sm)
+    assert {s["teamId"] for s in sm} == {SH_SUN, SH_LEE}
+    assert z.fetch_event_shotmap(123) == []
+
+
+def test_sedzia_profil():
+    z = _zrodlo()
+    sid = T.zastepczy(REK["sedzia"]["id"])
+    p = z.fetch_referee(sid)
+    assert p["m"] == REK["sedzia"]["m"] and p["zk"] == REK["sedzia"]["zk"]
+    assert p["k"] == round(REK["sedzia"]["k"] / REK["sedzia"]["m"], 3) and p["ost"] == REK["ts"]
+    assert z.fetch_referee(1) is None
+
+
+def test_utid_grupy_przed_liga_nadrzedna():
+    t = T.Tozsamosc({"rozgrywki": {"147": 999, "9001": 11445}})
+    assert t.utid(147, 9001) == 11445 and t.utid(147, 5) == 999 and t.utid(1) is None

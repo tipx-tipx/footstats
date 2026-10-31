@@ -172,6 +172,9 @@ def mecze_dnia(data: str) -> list[dict]:
                 "away_id": int((m.get("away") or {}).get("id") or 0),
                 "away": str((m.get("away") or {}).get("name") or ""),
                 "liga_id": int(liga.get("primaryId") or liga.get("id") or 0),
+                # grupa / etap (Serie C Grp. A–C, National League North/South):
+                # w FotMob wspólny numer ligi nadrzędnej, w Sofascore osobne utid
+                "liga_grupa": int(liga.get("id") or 0),
                 "liga": str(liga.get("name") or ""),
                 "kraj": str(liga.get("ccode") or ""),
                 "status": status_meczu(st),
@@ -282,6 +285,25 @@ def _gole_po_90(content: dict, koncowy: tuple[int, int], dogrywka: bool) -> tupl
         if e.get("type") == "Half" and int(e.get("time") or 0) == 90:
             return int(e.get("homeScore") or 0), int(e.get("awayScore") or 0)
     return koncowy
+
+
+def _staty_sedziego(sedzia: dict) -> dict:
+    """`infoBox.Referee.stats` → {m: mecze, zk: żółte na mecz, ck: czerwone, k: karne}
+    (31.10: FotMob podaje bilans sędziego w rozgrywkach meczu; tylko obecne pola)."""
+    out = {}
+    for st in sedzia.get("stats") or []:
+        typ, v = st.get("type"), _liczba(st.get("value"))
+        if v is None:
+            continue
+        if typ == "matches":
+            out["m"] = int(v)
+        elif typ == "yellowCards":
+            out["zk"] = float(v) if st.get("valueType") == "perMatch" else None
+        elif typ == "redCards":
+            out["ck"] = int(v)
+        elif typ == "penalties":
+            out["k"] = int(v)
+    return {k: v for k, v in out.items() if v is not None}
 
 
 def mecz_do_bazy(dane: dict) -> dict:
@@ -459,6 +481,7 @@ def mecz_do_bazy(dane: dict) -> dict:
         "id": int(general.get("matchId") or 0),
         "ts": ts,
         "liga_id": int(general.get("parentLeagueId") or general.get("leagueId") or 0),
+        "liga_grupa": int(general.get("leagueId") or 0),
         "liga": str(general.get("leagueName") or ""),
         "kraj": str(general.get("countryCode") or ""),
         "status": status_meczu(st),
@@ -470,7 +493,7 @@ def mecz_do_bazy(dane: dict) -> dict:
         "dogrywka": dogrywka,
         "karne": powod == "Pen",
         "sedzia": ({"id": sedzia.get("id"), "nazwa": sedzia.get("text"),
-                    "kraj": sedzia.get("country")} if sedzia.get("text") else None),
+                    "kraj": sedzia.get("country"), **_staty_sedziego(sedzia)} if sedzia.get("text") else None),
         "staty_zawodnikow": jest_staty,
         "mapa_strzalow": jest_mapa,
         "druzyny": druzyny,

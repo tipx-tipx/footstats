@@ -245,8 +245,11 @@ def mapuj_druzyny(mecze_fm: list[dict], eventy: dict[int, dict]) -> dict:
     gl_lig: dict[int, Counter] = defaultdict(Counter)
     for m in fm:
         e = mecze.get(m["id"])
-        if e is not None and eventy[e].get("l") and m.get("liga_id"):
-            gl_lig[int(m["liga_id"])][int(eventy[e]["l"])] += 1
+        if e is not None and eventy[e].get("l"):
+            # oba poziomy: liga nadrzędna (wspólna dla grup – remis odpada)
+            # i grupa (Serie C Grp. A = jedno utid Sofascore)
+            for liga in {m.get("liga_id"), m.get("liga_grupa")} - {None, 0}:
+                gl_lig[int(liga)][int(eventy[e]["l"])] += 1
     rozgrywki = {}
     for liga, c in gl_lig.items():
         (u, n), *reszta = c.most_common(2)
@@ -558,8 +561,9 @@ class Tozsamosc:
     def id_meczu(self, fm_mid: int) -> int:
         return self.mecze.get(int(fm_mid)) or zastepczy(fm_mid)
 
-    def utid(self, liga_fm: int) -> int | None:
-        return self.rozgrywki.get(int(liga_fm))
+    def utid(self, liga_fm: int, grupa_fm: int | None = None) -> int | None:
+        """utid rozgrywek: najpierw grupa (Serie C Grp. A), potem liga nadrzędna."""
+        return self.rozgrywki.get(int(grupa_fm or 0)) or self.rozgrywki.get(int(liga_fm or 0))
 
     def mecz_fm(self, sh_eid: int) -> int | None:
         """Odwrotnie: mecz Sofascore (np. typ sprzed przełączenia) → mecz FotMob."""
