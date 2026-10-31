@@ -141,6 +141,23 @@ gole 96,2% (statshub liczył serię karnych). Cechy modelu (xG, tercja, odbiory,
 definicją dostawcy – bez stałego przesunięcia (etap 2). **Luka źródła:** w części pucharów i niższych
 lig FotMob nie ma statystyk drużyn (np. kartek), a statshub miał.
 
+**4e (31.10):** przełącznik `ZRODLO_STATYSTYK=fotmob` + terminarz FotMob (89684c9). Cykle próbne
+`fm_proba_cyklu` (dry-run w Actions, ~65 min jak statshub): 41201583687, 41206649696, 41211165139 –
+silnik bez błędów, lista 55 / 53 / 44 typy (statshub 29.10: 66), szanse per rynek w przedziałach ery
+statshub, lejek drabinek w tych samych proporcjach (rzadko w XI 6,1% vs 5,4%, krótki występ 29,6% vs
+27,4%). Poprawki po próbach: zrzuty w `web/src/data/demo/liga_dryrun` (6afbb06); szczegóły przed meczem
+najpierw dla meczów z ofertą zawodniczą (ed7e369 – niedostępni 156 → 760, XI 27 → 77 meczów); H2H kadr
+60 drużyn przy fotmob; wyszukiwarka z indeksem (f912d4d – 0,73 → 0,008 s, odkrywanie 2 → 57); mecz
+znany ze statshub zostaje pod numerem Sofascore (306b40f – 22 mecze z typami sprzed 29.10 były na
+stronie dwa razy). ⚑ Do sprawdzenia: przebieg 41215925965 (306b40f) – brak meczów pod dwoma numerami.
+Betclic w dry-runie celowo wyłączony (`BETCLIC_W_DRYRUN`); job Betclica bierze zakres z zapisu cyklu.
+Ruch FotMob: 166 zapytań na cykl (terminarz + 150 szczegółów) – w etapie 7 pamięć szczegółów z TTL.
+
+**Etap 5 – pomiar (31.10, terminarz dziś + 2 dni, ta sama `paruj_superbet`):** sparowane 83,2%
+terminarza (próg ~79%); oferta Superbetu w oknie terminarza: ≥ 60 rynków 99,7% (1 mecz bez pary –
+Cúcuta – Santa Fe, brak w FotMob), ≥ 30 rynków 91,5% (reszta: Malta, Nikaragua, Jamajka, francuskie
+amatorskie – bez ofert zawodników), całość 57,5% (statshub 29.10: 57%). Bramka przechodzi.
+
 ## ⚑ Wyłączone do etapu 7 (31.10)
 `cycle.yml`, `rozlicz.yml`, `magazyn.yml` – wyłączone ręcznie (`gh workflow disable`): przy 403
 statshub cykl kończył się na czerwono co 30 min (~30 maili/dobę), rozliczanie wisiało do limitu
