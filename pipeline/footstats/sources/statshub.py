@@ -341,6 +341,14 @@ def _pierwszy(v):
 # poprosić o więcej, nie ruszając ścieżki typów.
 PERF_LIMIT = 40
 
+# ⚑ WIERSZ NIEPEŁNY (2026-10-31, etap 4 FotMob). Własny statshub
+# (`wlasny_statshub`) odtwarza mecze sprzed 29.10 z banku; dla zawodnika,
+# którego bank zna tylko z feedu propsów (część meczów), taki wiersz niesie
+# `_niepelny`. Historia z takim wierszem wśród ostatnich `OKNO_PELNEJ` meczów
+# NIE jest pełna – inaczej mecz drużyny bez wiersza („opuścił mecz”, radar)
+# znaczyłby „nie grał”, a znaczy „nie wiemy”. Okno = `radar.OKNO_STARTOW`.
+OKNO_PELNEJ = 10
+
 
 def fetch_player_performance(player_id: int, limit: int = PERF_LIMIT) -> list[dict]:
     """Ostatnie mecze gracza ze statystykami — DZIAŁA W KAŻDEJ LIDZE.
@@ -385,6 +393,9 @@ def trendy_z_performance(
     """
     zebrane: dict[str, list[tuple]] = {}
     meta: dict[str, str] = {}
+    ostatnie = sorted(rows, key=lambda r: -int(_pierwszy(r.get("events")).get("timeStartTimestamp") or 0))
+    pelna = not any(_pierwszy(r.get("player_statistics_event")).get("_niepelny")
+                    for r in ostatnie[:OKNO_PELNEJ])
     for rec in rows:
         ps = _pierwszy(rec.get("player_statistics_event"))
         ev = _pierwszy(rec.get("events"))
@@ -477,7 +488,7 @@ def trendy_z_performance(
             game_opponents=[x[3] for x in lista],
             game_opponent_ids=[x[4] for x in lista],
             game_utids=[x[5] for x in lista],
-            historia_pelna=True,
+            historia_pelna=pelna,
         )
     return out
 
@@ -1031,6 +1042,14 @@ TEAM_PERF_MAP = {
 # RYWALA (`opp12`, +1,89%). Jeśli szukać rezerwy w cechach, to po stronie
 # rywala i kontekstu meczu, nie w głębszej historii własnej.
 TEAM_PERF_LIMIT = 40
+
+# ⚑ WIERSZ NIEPEŁNY (2026-10-31, etap 4 FotMob). Własny statshub
+# (`wlasny_statshub`) odtwarza mecze sprzed 29.10 z banku; dla zawodnika,
+# którego bank zna tylko z feedu propsów (część meczów), taki wiersz niesie
+# `_niepelny`. Historia z takim wierszem wśród ostatnich `OKNO_PELNEJ` meczów
+# NIE jest pełna – inaczej mecz drużyny bez wiersza („opuścił mecz”, radar)
+# znaczyłby „nie grał”, a znaczy „nie wiemy”. Okno = `radar.OKNO_STARTOW`.
+OKNO_PELNEJ = 10
 
 
 def fetch_team_performance(team_id: int, limit: int = TEAM_PERF_LIMIT) -> list[dict]:

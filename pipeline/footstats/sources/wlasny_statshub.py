@@ -72,11 +72,20 @@ class Zrodlo:
         # bank: klucze per zawodnik (wiersze budujemy dopiero na żądanie)
         self._bank = trend_lib or {}
         self._klucze_banku: dict[int, list[str]] = defaultdict(list)
+        self._pelny_bank: set[int] = set()        # bank zna KAŻDY mecz zawodnika
+        self.nazwy_zawodnikow: dict[int, str] = {}
+        self._gracze_druzyny: dict[int, set[int]] = defaultdict(set)
         for k, rec in self._bank.items():
             try:
-                self._klucze_banku[int(rec.get("player_id") or 0)].append(k)
+                pid = int(rec.get("player_id") or 0)
             except (TypeError, ValueError):
                 continue
+            self._klucze_banku[pid].append(k)
+            if rec.get("historia_pelna"):
+                self._pelny_bank.add(pid)
+            self.nazwy_zawodnikow.setdefault(pid, rec.get("player_name") or "")
+            if rec.get("team_id"):
+                self._gracze_druzyny[int(rec["team_id"])].add(pid)
         # mecze magazynu po drużynie (szukanie numeru meczu banku)
         self._ev_druzyny: dict[int, list[tuple[int, int]]] = defaultdict(list)
         for e, v in eventy.items():
@@ -84,6 +93,8 @@ class Zrodlo:
             self._ev_druzyny[v["a"]].append((v["t"], e))
         # baza FotMob: wiersze per zawodnik (numer Sofascore)
         self._fm: dict[int, list[tuple[int, dict, dict | None]]] = defaultdict(list)
+        # mecze drużyny z bazy (tylko ZE SKŁADAMI – patrz `_dodaj_mecz_fm`)
+        self._mecze_fm_druzyny: dict[int, list[dict]] = defaultdict(list)
         self._cache_bank: dict[int, list[tuple[int, dict, dict | None]]] = {}
         for zapis in (baza or {}).values():
             self._dodaj_mecz_fm(baza_meczow.rozpakuj(zapis))
@@ -98,11 +109,22 @@ class Zrodlo:
               "uniqueTournamentId": self.t.utid(r.get("liga_id") or 0) or 0, "status": "finished"}
         dom = {"name": self.nazwy.get(h) or r["home"]["name"]}
         gosc = {"name": self.nazwy.get(a) or r["away"]["name"]}
+        # ⚑ mecz BEZ SKŁADÓW (część krajowych pucharów w FotMob) nie wchodzi
+        # do meczów drużyny: kadra bez wierszy w tym meczu znaczyłaby „nikt
+        # nie zagrał”, a logika „opuścił mecz drużyny” – że zawodnik nie grał
+        if r.get("zawodnicy"):
+            rec_ev = {"events": ev, "homeTeam": dom, "awayTeam": gosc}
+            self._mecze_fm_druzyny[h].append(rec_ev)
+            self._mecze_fm_druzyny[a].append(rec_ev)
+        else:
+            self.licz["mecz_bez_skladow"] += 1
         for w in r.get("zawodnicy") or []:
             if not self.t.wiersz_zgodny(w["pid"], w["name"]):
                 self.licz["kolizja_numeru"] += 1     # inna osoba pod tym numerem FotMob
                 continue
             pid = self.t.id_zawodnika(w["pid"])
+            self._gracze_druzyny[self.t.id_druzyny(w["team_id"])].add(pid)
+            self.nazwy_zawodnikow.setdefault(pid, w["name"])
             ps = {"eventId": eid, "teamId": self.t.id_druzyny(w["team_id"]),
                   "minutesPlayed": float(w["minuty"]), "position": w.get("poz") or ""}
             s = w.get("staty")
@@ -178,6 +200,8 @@ class Zrodlo:
             eid, swoja, h, a, utid = self._numer_meczu_banku(druzyna, g["ryw"], ts)
             ps = {"eventId": eid, "teamId": swoja, "minutesPlayed": g["min"], "position": g["poz"],
                   **{p: v for p, v in g["staty"].items() if p != "yellowCard" or v}}
+            if pid not in self._pelny_bank:
+                ps["_niepelny"] = True        # bank zna część meczów (feed propsów)
             ryw = a if h == swoja else h
             n_ryw = g["ryw_n"] or self.nazwy.get(ryw, "")
             n_dr = self.nazwy.get(swoja) or (nazwa_dr if swoja == druzyna else "")
@@ -211,4 +235,89 @@ class Zrodlo:
         for _, w, x in self._historia(player_id)[: int(limit)]:
             if x is not None:
                 out[int(w["events"]["id"])] = x
+        return out
+
+    # --- kadra drużyny (etap 4c) -------------------------------------------------
+    def _mecze_druzyny(self, team_id: int, teraz: int) -> list[dict]:
+        """Rozegrane mecze drużyny w kształcie `events[]` kadry statshub, od
+        najnowszego: magazyn `hd_*` + baza FotMob (tylko mecze ze składami),
+        ten sam mecz raz – z magazynu, bo pod jego numerem stoją wiersze banku."""
+        tid = int(team_id)
+        out = []
+        for t, e in self._ev_druzyny.get(tid, ()):
+            if t > teraz - TOL_MECZU_S:
+                continue                       # mecz przyszły / trwający
+            v = self.eventy[e]
+            out.append({"events": {"id": e, "timeStartTimestamp": t, "homeTeamId": v["h"],
+                                   "awayTeamId": v["a"], "uniqueTournamentId": v.get("l") or 0,
+                                   "status": "finished"},
+                        "homeTeam": {"name": self.nazwy.get(v["h"], "")},
+                        "awayTeam": {"name": self.nazwy.get(v["a"], "")}})
+        ts_mag = [r["events"]["timeStartTimestamp"] for r in out]
+        for r in self._mecze_fm_druzyny.get(tid, ()):
+            ts = r["events"]["timeStartTimestamp"]
+            if not any(abs(ts - t) <= TOL_MECZU_S for t in ts_mag):
+                out.append(r)
+        out.sort(key=lambda r: -r["events"]["timeStartTimestamp"])
+        return out
+
+    def fetch_team_players_performance(self, team_id: int, limit: int = statshub.KADRA_LIMIT,
+                                       teraz: int | None = None) -> dict:
+        """Jak `statshub.fetch_team_players_performance`: {"events", "data",
+        "unavailability"}; `stats` kluczowane numerem meczu jako TEKSTEM.
+        Zawodnik bez żadnego wiersza w tych meczach nie wchodzi."""
+        import time
+        teraz = int(teraz or time.time())
+        tid = int(team_id)
+        mecze = self._mecze_druzyny(tid, teraz)[: int(limit)]
+        # wiersz łączymy z meczem kadry po STARCIE (±3 h), nie po numerze: mecz
+        # spoza magazynu ma w banku numer zastępczy, a w kadrze numer z bazy
+        starty = [(int(r["events"]["timeStartTimestamp"]), int(r["events"]["id"])) for r in mecze]
+        data = []
+        for pid in sorted(self._gracze_druzyny.get(tid, ())):
+            stats, poz = {}, ""
+            for ts, w, _ in self._historia(pid):
+                ps = w["player_statistics_event"]
+                if int(ps.get("teamId") or 0) != tid:
+                    continue
+                eid = next((e for t, e in starty if abs(t - ts) <= TOL_MECZU_S), None)
+                if eid is not None and str(eid) not in stats:
+                    stats[str(eid)] = ps if ps.get("eventId") == eid else {**ps, "eventId": eid}
+                    poz = poz or str(ps.get("position") or "")[:1]
+            if stats:
+                nazwa = self.nazwy_zawodnikow.get(pid, "")
+                data.append({"id": pid, "slug": statshub._klucz_slug(nazwa), "name": nazwa,
+                             "position": poz or None, "stats": stats})
+        return {"events": mecze, "data": data, "unavailability": []}
+
+    def fetch_extra_stats(self, event_ids) -> dict[int, list[dict]]:
+        """Jak `statshub.fetch_extra_stats`: {mecz: [rekord zawodnika]} tylko
+        dla meczów z rozbiciem strzałów (mecz bez danych NIE wchodzi – nie
+        wiemy, nie zero). Rekord łączy się w `trendy_kadry` po slugu nazwiska."""
+        szukane = {int(x) for x in event_ids or ()}
+        meczu: dict[int, tuple[int, set[int]]] = {}       # mecz → (start, drużyny)
+        for e in szukane:
+            v = self.eventy.get(e)
+            if v:
+                meczu[e] = (v["t"], {v["h"], v["a"]})
+        for lst in self._mecze_fm_druzyny.values():
+            for r in lst:
+                e = int(r["events"]["id"])
+                if e in szukane and e not in meczu:
+                    meczu[e] = (r["events"]["timeStartTimestamp"],
+                                {r["events"]["homeTeamId"], r["events"]["awayTeamId"]})
+        out: dict[int, list[dict]] = {}
+        for e, (start, druzyny) in meczu.items():
+            rek = []
+            for d in druzyny:
+                for pid in self._gracze_druzyny.get(d, ()):
+                    for ts, w, x in self._historia(pid):
+                        if (x is not None and abs(ts - start) <= TOL_MECZU_S
+                                and int(w["player_statistics_event"].get("teamId") or 0) == d):
+                            nazwa = self.nazwy_zawodnikow.get(pid, "")
+                            rek.append({"playerId": pid, "playerSlug": statshub._klucz_slug(nazwa),
+                                        "playerName": nazwa, **x})
+                            break
+            if rek:
+                out[e] = rek
         return out

@@ -129,3 +129,70 @@ def test_zawodnik_bez_pary_pod_numerem_zastepczym():
     z = _zrodlo(mapa=T.Tozsamosc({"druzyny": {"8472": SH_SUN}}))
     w = z.fetch_player_performance(T.zastepczy(XHAKA))
     assert w and w[0]["events"]["awayTeamId"] == T.zastepczy(8463)
+
+
+# --------------------------------------------------------------- kadra (4c) ----
+def _eventy_sun(ts_list):
+    return {800 + i: {"t": ts, "h": SH_SUN, "a": SH_LEE, "l": 17} for i, ts in enumerate(ts_list)}
+
+
+def test_kadra_w_ksztalcie_statshub_bank_i_fotmob():
+    stare = [REK["ts"] - k * 7 * 86400 for k in (1, 2)]
+    z = _zrodlo(bank=_bank(stare), eventy=_eventy_sun(stare))
+    k = z.fetch_team_players_performance(SH_SUN, teraz=REK["ts"] + 86400)
+    assert [r["events"]["id"] for r in k["events"]] == [SH_MECZ, 800, 801]   # od najnowszego
+    assert all(isinstance(r["events"], dict) for r in k["events"])
+    x = next(p for p in k["data"] if p["id"] == SH_XHAKA)
+    assert set(x["stats"]) == {str(SH_MECZ), "800", "801"}                    # klucze tekstem
+    assert x["name"] == "Granit Xhaka" and x["position"] == "M"
+    tr = statshub.trendy_kadry(k, z.fetch_extra_stats([SH_MECZ, 800, 801]), SH_SUN)[SH_XHAKA]
+    assert tr["fouls_committed"].counts == [1.0, 2.0, 2.0] and tr["fouls_committed"].z_kadry
+    assert tr["headed_shots"].counts == [0.0, 2.0, 2.0]                        # extra z obu części
+    assert statshub.braki_druzyny(k, {}, REK["ts"] + 86400) is not None
+
+
+def test_kadra_mecz_przyszly_i_bez_skladow_poza_lista():
+    rek = copy.deepcopy(REK)
+    rek["zawodnicy"] = []
+    z = _zrodlo(rek=rek, eventy=_eventy_sun([REK["ts"] + 3 * 86400]))
+    k = z.fetch_team_players_performance(SH_SUN, teraz=REK["ts"] + 86400)
+    assert k["events"] == [] and z.licz["mecz_bez_skladow"] == 1
+
+
+def test_kadra_limit_i_wiersz_z_innym_klubem_poza_kadra():
+    stare = [REK["ts"] - k * 7 * 86400 for k in (1, 2, 3)]
+    ev = _eventy_sun(stare)
+    ev[900] = {"t": stare[0] + 600, "h": 77, "a": 78, "l": 18}          # inny mecz o tej porze
+    bank = _bank(stare)
+    for rec in bank.values():
+        rec["game_opponent_ids"] = [78, SH_LEE, SH_LEE]                  # pierwszy mecz w starym klubie
+    z = _zrodlo(bank=bank, eventy=ev)
+    k = z.fetch_team_players_performance(SH_SUN, limit=3, teraz=REK["ts"] + 86400)
+    assert len(k["events"]) == 3
+    x = next(p for p in k["data"] if p["id"] == SH_XHAKA)
+    assert set(x["stats"]) == {str(SH_MECZ), "801"}                     # 800 = mecz z 77, nie z Sunderlandem
+
+
+def test_niepelny_bank_nie_daje_pelnej_historii():
+    """Bank znający zawodnika z feedu (część meczów) – historia nie jest pełna,
+    dopóki takie wiersze są w ostatnich `OKNO_PELNEJ` meczach."""
+    stare = [REK["ts"] - k * 7 * 86400 for k in (1, 2)]
+    z = _zrodlo(bank=_bank(stare))
+    tr = statshub.trendy_z_performance(SH_XHAKA, "x", SH_SUN, z.fetch_player_performance(SH_XHAKA))
+    assert not tr["fouls_committed"].historia_pelna
+    bank = _bank(stare)
+    for rec in bank.values():
+        rec["historia_pelna"] = True
+    z = _zrodlo(bank=bank)
+    tr = statshub.trendy_z_performance(SH_XHAKA, "x", SH_SUN, z.fetch_player_performance(SH_XHAKA))
+    assert tr["fouls_committed"].historia_pelna
+    # same wiersze FotMob (pełny skład meczu) – pełna
+    tr = statshub.trendy_z_performance(SH_XHAKA, "x", SH_SUN, _zrodlo().fetch_player_performance(SH_XHAKA))
+    assert tr["fouls_committed"].historia_pelna
+
+
+def test_extra_bez_mapy_strzalow_mecz_nie_wchodzi():
+    rek = copy.deepcopy(REK)
+    rek["mapa_strzalow"] = False
+    assert _zrodlo(rek=rek).fetch_extra_stats([SH_MECZ]) == {}
+    assert SH_MECZ in _zrodlo().fetch_extra_stats([SH_MECZ])
