@@ -1,0 +1,63 @@
+name: FootStats — FotMob tożsamość (ręcznie)
+
+# ETAP 3 PLANU FOTMOB (docs/plan-fotmob.md, 31.10.2026).
+#
+# Buduje mapę numerów FotMob → numery statshub/Sofascore (`fm_tozsamosc`)
+# na meczach sprzed 29.10, które mają oba źródła, i dopisuje pobrane mecze
+# do własnej bazy (`fm_baza_*`). Nic w cyklu jeszcze tego nie czyta – job
+# nie dotyka strony ani księgi. Mapa tylko rośnie: kolejny przebieg nie pyta
+# FotMob o mecze już przetworzone. Ruch: ~45 terminarzy + do `mecze`
+# szczegółów, odstęp 2–3 s (sources/fotmob.py).
+
+on:
+  workflow_dispatch:
+    inputs:
+      mecze:
+        description: "Limit szczegółów meczów w przebiegu"
+        required: false
+        default: "480"
+      dni_szczegolow:
+        description: "Szczegóły z ostatnich N dni okna (okno kończy się 29.10)"
+        required: false
+        default: "7"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: footstats-fm-tozsamosc
+  cancel-in-progress: false
+
+jobs:
+  tozsamosc:
+    runs-on: ubuntu-24.04
+    # 480 meczów × ~3 s + 45 terminarzy ≈ 27 min; odczyt trend_lib ~1 min
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pipeline/requirements.txt
+
+      - name: Instalacja zależności
+        working-directory: pipeline
+        run: pip install -r requirements.txt
+
+      - name: Mapa tożsamości FotMob → Sofascore
+        working-directory: pipeline
+        env:
+          PYTHONIOENCODING: utf-8
+          PYTHONUTF8: "1"
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          # magazyn stanu pipeline'u (prywatne repo) — bez tego job PADNIE
+          # w produkcji zamiast czytać pusto: patrz magazyn_repo._w_produkcji
+          STAN_REPO: ${{ vars.STAN_REPO }}
+          STAN_TOKEN: ${{ secrets.STAN_TOKEN }}
+        run: >
+          python -m footstats.jobs.fm_tozsamosc
+          --mecze "${{ github.event.inputs.mecze }}"
+          --dni-szczegolow "${{ github.event.inputs.dni_szczegolow }}"

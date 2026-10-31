@@ -64,6 +64,36 @@ Bez nagłówka User-Agent CloudFront odpowiada 403 – klient wysyła własny.
 - Luka: mapa strzałów (głową / zza pola) brak w KNVB Cup, AFC Champions League Elite, lidze
   chilijskiej – tam statshub ją miał. Zapas do rozważenia w etapie 4: mapa strzałów 365scores.
 
+**Etap 3 (31.10):** `tozsamosc` + job `fm_tozsamosc` (workflow ręczny), mapa w `fm_tozsamosc`.
+- Drużyny po terminarzu, nie po nazwie: 45 dni terminarzy FotMob (45 zapytań) vs 6206 meczów
+  Sofascore z `hd_*`; głosy na poziomie meczu + **weryfikacja przez rywali** (para zostaje,
+  gdy w meczach z ≥ 2 różnymi rywalami rywal też pasuje – sam czas dawał przypadki typu
+  „Hallescher = Silkeborg”) + propagacja na drużyny z 1 meczem + zapas po nazwie (jedyna
+  w obu źródłach, bez sprzeczności godzin; 87 par – reprezentacje, ligi tureckie, U21).
+  Wynik: 2413 drużyn; mecze księgi do 28.10 – 98,5% (100% tych, które są w `hd_*`);
+  drużyny `trend_lib` 1421/1439 = **99,4% wpisów**; rozgrywki 148, wszystkie z `PROFILE`
+  trafione (poza Leagues Cup – poza sezonem). Lista par o odmiennych nazwach przejrzana
+  („Chivas”/„CD Guadalajara”, „OB”/„Odense”, „FC Kharkiv”/„Metalist 1925”) – wszystkie dobre.
+- Zawodnicy po nazwisku w obrębie meczu (kandydaci z OBU kadr – statshub zapisywał zawodników
+  pod drużyną rywala), z grą Sofascore z tego meczu jako dowodem, 634 mecze 25–29.10:
+  **99,57% zawodników, którzy wg Sofascore grali w zmapowanym meczu, ma parę** (4166/4184);
+  zgodność minut ±15 i strzałów/fauli ±1: 4144 + 18 częściowo, 4 „niezgodne” = jeden mecz,
+  w którym statshub zapisał 4 minuty (te same nazwiska – błąd danych, nie osoby).
+  Tryb „tylko nazwisko” (tak będą mapowani nowi po przełączeniu): 99,28%.
+- Przejrzane ręcznie: 10 par po minutach (pseudonimy: Valde, Malick/El Hadji Diouf,
+  Junior Dina/Eric Ebimbe, Zine/Ambrosini Zini…) – dobre; 30 par spoza kadr (transfery,
+  tylko z dowodem gry i tymi samymi minutami) – te same nazwiska; 4 niejednoznaczne
+  (Danilo, Ramon, Marcos Paulo, Maicon – dwie różne osoby w kadrze) zostają bez pary.
+- **Dublety statshub:** nasz numer syntetyczny (≥ 9·10⁸, 3 mecze) przegrywa z prawdziwym
+  numerem tej osoby (15–40 meczów) – historia zostaje przy prawdziwym.
+- **Błąd FotMob wykryty przy okazji:** ten sam numer zawodnika dla dwóch osób (9 na 18 775,
+  numery ~750 000–760 000; 750027 = Brahim Díaz w Realu i Fabricio Perez w Boliwii).
+  Mapa pamięta nazwisko przy numerze; wiersz z innym nazwiskiem = `kolizje` (do etapu 4:
+  takie wiersze nie wchodzą do historii, `Tozsamosc.wiersz_zgodny`).
+- Odrzucone po pomiarze: „nazwa jedyna w bazie” bez dowodu gry (łączyło pospolite nazwiska –
+  Carlos Hernández, Juan Pérez), próg samego podobieństwa napisu < 0,86 („Takeshi Wada” ≠
+  „Takashi Sawada”).
+
 ## Otwarte sprawy
 - Przewidywane składy (statshub `predicted-teams-lineup`) – właściciel: z innych źródeł.
 - Kursy referencyjne UK (`ref_odds` w trendach) – sprawdzić, czy model z nich korzysta.
