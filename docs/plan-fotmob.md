@@ -94,6 +94,13 @@ Bez nagłówka User-Agent CloudFront odpowiada 403 – klient wysyła własny.
   Carlos Hernández, Juan Pérez), próg samego podobieństwa napisu < 0,86 („Takeshi Wada” ≠
   „Takashi Sawada”).
 
+## ⚑ Wyłączone do etapu 7 (31.10)
+`cycle.yml`, `rozlicz.yml`, `magazyn.yml` – wyłączone ręcznie (`gh workflow disable`): przy 403
+statshub cykl kończył się na czerwono co 30 min (~30 maili/dobę), rozliczanie wisiało do limitu
+czasu, magazyn nic nie pobierał, a wszystkie dalej pukały do statshub. Przy wdrożeniu (etap 7):
+`gh workflow enable` dla trzech + włączyć zadanie w cron-job.org (po odrzuconych `/api/tick`
+wyłącza się samo – jak 07.10).
+
 ## Otwarte sprawy
 - Przewidywane składy (statshub `predicted-teams-lineup`) – właściciel: z innych źródeł.
 - Kursy referencyjne UK (`ref_odds` w trendach) – sprawdzić, czy model z nich korzysta.
