@@ -1,0 +1,70 @@
+name: FootStats — FotMob baza meczów
+
+# ETAP 4a PLANU FOTMOB (docs/plan-fotmob.md, 31.10.2026).
+#
+# Raz na dobę dopisuje zakończone mecze z naszego zakresu do własnej bazy
+# (`fm_baza_RRRRMM`) i mapuje nowych zawodników (`fm_tozsamosc`). Każdy mecz
+# pobierany RAZ: ~1 terminarz na dzień okna + po jednym zapytaniu na nowy
+# mecz, odstęp 2–3 s (sources/fotmob.py). Nic w cyklu jeszcze tego nie czyta.
+# Ręcznie z `od` – nadrabianie (np. od 2026-10-29, gdy statshub padł).
+
+on:
+  schedule:
+    - cron: "40 5 * * *"     # 5:40 UTC – po domknięciu meczów z Ameryk
+  workflow_dispatch:
+    inputs:
+      od:
+        description: "Pierwszy dzień (RRRR-MM-DD); puste = ostatnie 3 dni"
+        required: false
+        default: ""
+      mecze:
+        description: "Limit szczegółów meczów w przebiegu"
+        required: false
+        default: "560"
+
+permissions:
+  contents: read
+
+# TA SAMA grupa co fm_tozsamosc.yml: oba joby piszą `fm_tozsamosc`
+# i `fm_baza_*` – równoległy zapis zgubiłby część meczów jednego z nich
+concurrency:
+  group: footstats-fm
+  cancel-in-progress: false
+
+jobs:
+  baza:
+    runs-on: ubuntu-24.04
+    # 560 meczów × ~3 s ≈ 28 min + odczyt trend_lib
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pipeline/requirements.txt
+
+      - name: Instalacja zależności
+        working-directory: pipeline
+        run: pip install -r requirements.txt
+
+      - name: Dopisz zakończone mecze do bazy FotMob
+        working-directory: pipeline
+        env:
+          PYTHONIOENCODING: utf-8
+          PYTHONUTF8: "1"
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          # magazyn stanu pipeline'u (prywatne repo) — bez tego job PADNIE
+          # w produkcji zamiast czytać pusto: patrz magazyn_repo._w_produkcji
+          STAN_REPO: ${{ vars.STAN_REPO }}
+          STAN_TOKEN: ${{ secrets.STAN_TOKEN }}
+          OD: ${{ github.event.inputs.od }}
+          MECZE: ${{ github.event.inputs.mecze || '560' }}
+        run: |
+          if [ -n "$OD" ]; then
+            python -m footstats.jobs.fm_baza --od "$OD" --mecze "$MECZE"
+          else
+            python -m footstats.jobs.fm_baza --mecze "$MECZE"
+          fi
