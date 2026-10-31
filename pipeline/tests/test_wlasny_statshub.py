@@ -196,3 +196,59 @@ def test_extra_bez_mapy_strzalow_mecz_nie_wchodzi():
     rek["mapa_strzalow"] = False
     assert _zrodlo(rek=rek).fetch_extra_stats([SH_MECZ]) == {}
     assert SH_MECZ in _zrodlo().fetch_extra_stats([SH_MECZ])
+
+
+# ------------------------------------------- nadchodzący mecz: braki i XI (4c) ----
+def _przed(nazwa):
+    return json.load(gzip.open(DANE / nazwa, "rt", encoding="utf-8"))
+
+
+def test_niedostepni_z_meczu_w_ksztalcie_statshub():
+    d = _przed("przed_pl_chelsea_mu.json.gz")           # Chelsea 8455 – Man Utd 10260, PL
+    t = T.Tozsamosc({"druzyny": {"8455": 38, "10260": 35}, "rozgrywki": {"47": 17}})
+    z = W.Zrodlo(t, {}, {}, {})
+    wyn = z.mecz_nadchodzacy(d)
+    assert wyn["przewidywany"] and not wyn["potwierdzony"]
+    k = z.fetch_team_players_performance(38)
+    assert k["unavailability"] and all(u["kind"] == "injury" for u in k["unavailability"])
+    nd = statshub.niedostepni_z_kadry(k, 1_800_000_000, 17)
+    # „Back in training” (Chavarría) = wątpliwy, „Mid January 2027” (James) = pewny
+    po = {u["reason"]: nd[u["playerId"]]["pewny"] for u in k["unavailability"] if u["playerId"] in nd}
+    assert po["Back in training"] is False and po["Mid January 2027"] is True
+    # przewidywany XI – 11 numerów, nieogłoszony
+    xi = z.fetch_predicted_lineup(wyn["event_id"])
+    assert len(xi["home"]) == 11 and len(xi["away"]) == 11 and xi["confirmed"] is False
+    assert z.fetch_team_lineup(wyn["event_id"], 38) == []
+
+
+def test_zawieszenie_w_rozgrywkach_meczu_i_ostatni_sklad_to_nie_przewidywanie():
+    d = _przed("przed_slaven_istra.json.gz")             # lineupType lastStarting11
+    t = T.Tozsamosc({"druzyny": {"1581": 501, "6038": 502}, "rozgrywki": {"252": 170}})
+    z = W.Zrodlo(t, {}, {}, {})
+    wyn = z.mecz_nadchodzacy(d)
+    assert not wyn["przewidywany"] and not wyn["potwierdzony"]
+    assert z.fetch_predicted_lineup(wyn["event_id"]) == {"home": [], "away": [], "confirmed": False}
+    zaw = next(u for u in z.fetch_team_players_performance(501)["unavailability"] if u["kind"] == "suspension")
+    assert zaw["status"] is None and zaw["uniqueTournamentId"] == 170 and zaw["endDateTimestamp"]
+
+
+def test_sklad_przed_meczem_mapuje_po_nazwisku_bez_zamykania():
+    d = _przed("przed_pl_chelsea_mu.json.gz")
+    starter = d["content"]["lineup"]["homeTeam"]["starters"][0]
+    bank = {"77:shots": {"player_id": 77, "player_name": starter["name"], "team_id": 38,
+                         "timestamps": [], "minutes": [], "counts": []}}
+    t = T.Tozsamosc({"druzyny": {"8455": 38, "10260": 35}})
+    z = W.Zrodlo(t, {}, bank, {})
+    wyn = z.mecz_nadchodzacy(d)
+    assert wyn["xi"][38][0] == 77
+    # pozostali bez pary – bez stałego zera (dostaną je dopiero, gdy zagrają)
+    assert all(v != 0 for v in t.zawodnicy.values())
+
+
+def test_sklad_ogloszony():
+    d = copy.deepcopy(_przed("przed_pl_chelsea_mu.json.gz"))
+    d["content"]["lineup"]["lineupType"] = "standard"
+    z = W.Zrodlo(T.Tozsamosc({"druzyny": {"8455": 38, "10260": 35}}), {}, {}, {})
+    wyn = z.mecz_nadchodzacy(d)
+    assert wyn["potwierdzony"] and len(z.fetch_team_lineup(wyn["event_id"], 35)) == 11
+    assert z.fetch_predicted_lineup(wyn["event_id"])["confirmed"] is True

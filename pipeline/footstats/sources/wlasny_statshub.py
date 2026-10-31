@@ -96,6 +96,8 @@ class Zrodlo:
         # mecze drużyny z bazy (tylko ZE SKŁADAMI – patrz `_dodaj_mecz_fm`)
         self._mecze_fm_druzyny: dict[int, list[dict]] = defaultdict(list)
         self._cache_bank: dict[int, list[tuple[int, dict, dict | None]]] = {}
+        self._niedostepni: dict[int, list[dict]] = {}    # drużyna → z nadchodzącego meczu
+        self._sklady: dict[int, dict] = {}               # mecz → XI
         for zapis in (baza or {}).values():
             self._dodaj_mecz_fm(baza_meczow.rozpakuj(zapis))
 
@@ -288,7 +290,7 @@ class Zrodlo:
                 nazwa = self.nazwy_zawodnikow.get(pid, "")
                 data.append({"id": pid, "slug": statshub._klucz_slug(nazwa), "name": nazwa,
                              "position": poz or None, "stats": stats})
-        return {"events": mecze, "data": data, "unavailability": []}
+        return {"events": mecze, "data": data, "unavailability": list(self._niedostepni.get(tid, ()))}
 
     def fetch_extra_stats(self, event_ids) -> dict[int, list[dict]]:
         """Jak `statshub.fetch_extra_stats`: {mecz: [rekord zawodnika]} tylko
@@ -321,3 +323,105 @@ class Zrodlo:
             if rek:
                 out[e] = rek
         return out
+
+    # --- nadchodzący mecz: niedostępni i składy (etap 4c) -----------------------
+    def _zawodnicy_banku(self):
+        if not hasattr(self, "_zaw_banku"):
+            zaw = T.zawodnicy_z_trend_lib(self._bank)
+            self._zaw_banku = (zaw, T.kadry(zaw), T.indeks_nazw(zaw))
+        return self._zaw_banku
+
+    def mecz_nadchodzacy(self, dane: dict) -> dict:
+        """Surowe `matchDetails` meczu PRZED gwizdkiem → niedostępni i składy
+        w numerach Sofascore; zapamiętane pod drużyną (kadra) i meczem (XI).
+
+        Nowych zawodników ze składu mapujemy po nazwisku (`Tozsamosc.dodaj_mecz`
+        bez zamykania – stały numer zastępczy dostaje dopiero ten, kto zagra)."""
+        general, c = dane.get("general") or {}, dane.get("content") or {}
+        lu = c.get("lineup") or {}
+        druz = (dane.get("header") or {}).get("teams") or [{}, {}]
+        fm_h, fm_a = int((druz[0] or {}).get("id") or 0), int((druz[1] or {}).get("id") or 0)
+        fm_mid = int(general.get("matchId") or 0)
+        eid = self.t.id_meczu(fm_mid)
+        utid = self.t.utid(int(general.get("parentLeagueId") or general.get("leagueId") or 0))
+        sklad_fm = []
+        for strona, tid in (("homeTeam", fm_h), ("awayTeam", fm_a)):
+            t = lu.get(strona) or {}
+            for grupa in ("starters", "subs", "unavailable"):
+                for p in t.get(grupa) or []:
+                    if int(p.get("id") or 0):
+                        sklad_fm.append({"pid": int(p["id"]), "name": str(p.get("name") or ""), "team_id": tid,
+                                         "minuty": 0.0, "poz": None})
+        if sklad_fm:
+            zaw, kad, idx = self._zawodnicy_banku()
+            for k, v in self.t.dodaj_mecz(
+                    {"id": 0, "ts": 0, "home": {"id": fm_h}, "away": {"id": fm_a}, "zawodnicy": sklad_fm},
+                    zaw, kad, idx).items():
+                self.licz[f"sklad_{k}"] += v
+        typ = str(lu.get("lineupType") or "")
+        potwierdzony = typ in TYPY_SKLADU_POTWIERDZONEGO
+        przewidywany = typ in TYPY_SKLADU_PRZEWIDYWANEGO
+        xi, niedostepni = {}, {}
+        for strona, tid in (("homeTeam", fm_h), ("awayTeam", fm_a)):
+            t = lu.get(strona) or {}
+            sh_t = self.t.id_druzyny(tid)
+            xi[sh_t] = [self.t.id_zawodnika(p["id"]) for p in t.get("starters") or [] if int(p.get("id") or 0)]
+            niedostepni[sh_t] = [w for w in (niedostepny_statshub(u, self.t, utid) for u in t.get("unavailable") or [])
+                                 if w]
+            self._niedostepni[sh_t] = niedostepni[sh_t]
+        h, a = self.t.id_druzyny(fm_h), self.t.id_druzyny(fm_a)
+        self._sklady[eid] = {"home": xi.get(h, []), "away": xi.get(a, []), "confirmed": potwierdzony,
+                             "przewidywany": przewidywany, "h": h, "a": a}
+        return {"event_id": eid, "home_id": h, "away_id": a, "xi": xi, "potwierdzony": potwierdzony,
+                "przewidywany": przewidywany, "niedostepni": niedostepni, "typ_skladu": typ}
+
+    def fetch_predicted_lineup(self, event_id: int) -> dict:
+        """Jak `statshub.fetch_predicted_lineup`: {"home", "away", "confirmed"}.
+        Pusto, gdy FotMob nie ma ani przewidywanego, ani ogłoszonego składu."""
+        s = self._sklady.get(int(event_id))
+        if not s or not (s["confirmed"] or s["przewidywany"]):
+            return {"home": [], "away": [], "confirmed": False}
+        return {"home": list(s["home"]), "away": list(s["away"]), "confirmed": bool(s["confirmed"])}
+
+    def fetch_team_lineup(self, event_id: int, team_id: int) -> list[int]:
+        """Jak `statshub.fetch_team_lineup`: ogłoszony XI drużyny (≥ 10) albo []."""
+        s = self._sklady.get(int(event_id))
+        if not s or not s["confirmed"]:
+            return []
+        xi = s["home"] if int(team_id) == s["h"] else s["away"] if int(team_id) == s["a"] else []
+        return list(xi) if len(xi) >= 10 else []
+
+
+# `lineup.lineupType` FotMob (31.10, 634 mecze + próbki przed meczem): skład
+# ogłoszony = standard / simple; przewidywany = predicted. `lastStarting11` to
+# tylko ostatnia jedenastka – NIE przewidywanie, nie podajemy go jako XI
+TYPY_SKLADU_POTWIERDZONEGO = frozenset({"standard", "simple"})
+TYPY_SKLADU_PRZEWIDYWANEGO = frozenset({"predicted"})
+# `unavailability.expectedReturn`, które znaczą „może zagrać” (statshub `dayToDay`);
+# reszta (data powrotu, „About a week”, „Out for season”, „Unknown”) = pewny brak
+POWROT_WATPLIWY = frozenset({"doubtful", "day to day", "back in training"})
+
+
+def niedostepny_statshub(u: dict, tozsamosc: T.Tozsamosc, utid: int | None) -> dict | None:
+    """Wpis `lineup.unavailable` FotMob → wpis `unavailability` statshub."""
+    if not int(u.get("id") or 0):
+        return None
+    un = u.get("unavailability") or {}
+    typ = str(un.get("type") or "")
+    powrot = str(un.get("expectedReturn") or "")
+    koniec = None
+    if un.get("expectedReturnDate"):
+        from datetime import datetime
+        try:
+            koniec = int(datetime.fromisoformat(str(un["expectedReturnDate"]).replace("Z", "+00:00")).timestamp())
+        except ValueError:
+            koniec = None
+    if typ == "suspension":
+        # FotMob podaje zawieszenie PRZY TYM meczu – obowiązuje w jego rozgrywkach
+        status, kind = None, "suspension"
+    else:
+        status = "dayToDay" if powrot.lower() in POWROT_WATPLIWY else "out"
+        kind = "injury" if typ == "injury" else (typ or "injury")
+    return {"playerId": tozsamosc.id_zawodnika(int(u["id"])), "kind": kind, "status": status,
+            "startDateTimestamp": None, "endDateTimestamp": koniec, "uniqueTournamentId": utid,
+            "reason": powrot}
