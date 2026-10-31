@@ -673,11 +673,35 @@ def _rozszerz_4e():
                         "tournaments": {"name": m.get("liga") or ""}, "hasOdd": True})
         return {"data": out}
 
+    def _kandydaci_nazwy(self, nazwa: str) -> set[int]:
+        """Zawodnicy, których nazwa ma człon o tym samym początku albo końcu
+        (3 litery) co `nazwa`. Każda para z `podobienstwo_nazwisk` ≥ PROG_NAZWISKA ma wspólny
+        człon (równość, zawieranie, to samo nazwisko) albo napis zgodny w ≥ 86%,
+        a taki napis praktycznie zawsze dzieli początek albo koniec członu
+        („Vanderlan” / „Wanderlan” – sam początek by go zgubił).
+
+        ⚑ PO CO (cykl próbny 31.10): przegląd wszystkich ~20 tys. nazwisk przy
+        każdym wyszukaniu to ~1,5 s – odkrywanie z oferty zmieściło 160 wyszukań
+        w budżecie 240 s (statshub przez sieć: 519) i odkryło 2 zawodników
+        zamiast ~26."""
+        if getattr(self, "_idx_nazw_n", -1) != len(self.nazwy_zawodnikow):
+            idx: dict[str, set[int]] = defaultdict(set)
+            for pid, n in self.nazwy_zawodnikow.items():
+                for tok in T.norm_nazwy(n).split():
+                    idx[tok[:3]].add(pid)
+                    idx["~" + tok[-3:]].add(pid)
+            self._idx_nazw, self._idx_nazw_n = idx, len(self.nazwy_zawodnikow)
+        out: set[int] = set()
+        for tok in T.norm_nazwy(nazwa).split():
+            out |= self._idx_nazw.get(tok[:3], set()) | self._idx_nazw.get("~" + tok[-3:], set())
+        return out
+
     def search_players(self, nazwa: str) -> list[dict]:
         """Jak `statshub.search_players`: [{id, name, slug}] po zgodności nazwiska
         (bank + baza FotMob), najlepsze pierwsze, do 8."""
         oc = []
-        for pid, n in self.nazwy_zawodnikow.items():
+        for pid in self._kandydaci_nazwy(nazwa):
+            n = self.nazwy_zawodnikow[pid]
             p = T.podobienstwo_nazwisk(nazwa, n)
             if p >= T.PROG_NAZWISKA:
                 oc.append((p, pid, n))
@@ -708,7 +732,8 @@ def _rozszerz_4e():
                 return f"{m.get('liga') or ''} ({kraj})" if kraj and kraj not in (m.get("liga") or "") else (m.get("liga") or "")
         return ""
 
-    for f in (_fm_dzien, by_date, search_players, fetch_player_profile, fetch_player_meta, fetch_tournament_name):
+    for f in (_fm_dzien, by_date, _kandydaci_nazwy, search_players, fetch_player_profile, fetch_player_meta,
+              fetch_tournament_name):
         setattr(Zrodlo, f.__name__, f)
 
 

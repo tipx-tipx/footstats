@@ -372,6 +372,22 @@ def test_by_date_bez_odpowiedzi_fotmob_to_blad(monkeypatch):
         _zrodlo().by_date(DZIEN)
 
 
+def test_wyszukiwarka_z_indeksem_jak_pelny_przeglad():
+    z = W.Zrodlo(T.Tozsamosc({}), {}, {}, {})
+    z.nazwy_zawodnikow.update({1: "Wanderlan", 2: "Saied Abu Farchi", 3: "Mads Gjerstrøm", 4: "Takashi Sawada",
+                               5: "Youssuf Sylla", 6: "Granit Xhaka", 7: "Jan Kowalski"})
+
+    def pelny(q):
+        oc = sorted(((T.podobienstwo_nazwisk(q, n), pid) for pid, n in z.nazwy_zawodnikow.items()
+                     if T.podobienstwo_nazwisk(q, n) >= T.PROG_NAZWISKA), key=lambda x: (-x[0], x[1]))
+        return [pid for _, pid in oc[:8]]
+    for q in ("Vanderlan", "Sayed Abu Farkhi", "M. Gjerstrom", "Takeshi Wada", "Sylla Youssuf", "Xhaka", "Kowalsky"):
+        assert [r["id"] for r in z.search_players(q)] == pelny(q), q
+    assert [r["id"] for r in z.search_players("Vanderlan")] == [1]
+    z.nazwy_zawodnikow[8] = "Granit Xhakaj"                  # nowy zawodnik – indeks się odświeża
+    assert 8 in [r["id"] for r in z.search_players("Granit Xhaka")]
+
+
 def test_przelacznik_w_module_statshub(monkeypatch):
     z = _zrodlo()
     monkeypatch.setattr(statshub, "_get", lambda *a, **k: (_ for _ in ()).throw(AssertionError("sieć statshub")))
