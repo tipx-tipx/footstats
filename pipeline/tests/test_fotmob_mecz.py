@@ -127,6 +127,25 @@ def test_pozycja(pid, usual, oczekiwana):
     assert fotmob._pozycja(pid, usual) == oczekiwana
 
 
+def test_surowa_mapa_strzalow_zgodna_z_licznikami(pl, pen):
+    """Zwięzła mapa strzałów (bank stylu) sumuje się do liczników zawodników;
+    w meczu z karnymi seria rzutów karnych i dogrywka nie wchodzą."""
+    for r in (pl, pen):
+        po = {}
+        for s in r["strzaly"]:
+            pid, celny, glowa, w_polu = s[0], s[6], s[5] == "Header", s[8]
+            k = po.setdefault(pid, {"shots": 0, "sot": 0, "headed_shots": 0, "shots_outside_box": 0})
+            k["shots"] += 1
+            k["sot"] += celny
+            k["headed_shots"] += glowa
+            k["shots_outside_box"] += not w_polu
+            assert s[9] in (1, 2)
+        for z in r["zawodnicy"]:
+            if z["staty"] and z["staty"].get("shots") is not None:
+                oczek = po.get(z["pid"], {"shots": 0, "sot": 0, "headed_shots": 0, "shots_outside_box": 0})
+                assert {k: z["staty"][k] for k in oczek} == oczek, z["name"]
+
+
 @pytest.mark.parametrize("v,oczekiwana", [
     ("283 (75%)", 283), ("0.83", 0.83), (7, 7), (None, None), (True, None), ("x", None),
 ])

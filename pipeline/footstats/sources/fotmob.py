@@ -475,4 +475,16 @@ def mecz_do_bazy(dane: dict) -> dict:
         "mapa_strzalow": jest_mapa,
         "druzyny": druzyny,
         "zawodnicy": zawodnicy,
+        # surowa mapa strzałów (31.10) – zwięźle, czas regularny, bez samobójów:
+        # [zawodnik, drużyna, x, y, sytuacja, część ciała, celny, zablokowany,
+        #  z pola karnego, połowa, minuta, gol]. Bank stylu potrzebuje sytuacji
+        # (kontra, rożny, rzut wolny, karny) i wykonawców stałych fragmentów –
+        # a mecz pobieramy RAZ, więc czego tu nie zapiszemy, tego nie odzyskamy
+        "strzaly": [[int(x.get("playerId") or 0), int(x.get("teamId") or 0),
+                     round(float(x.get("x") or 0), 1), round(float(x.get("y") or 0), 1),
+                     str(x.get("situation") or ""), str(x.get("shotType") or ""),
+                     int(bool(x.get("isOnTarget")) and not bool(x.get("isBlocked"))),
+                     int(bool(x.get("isBlocked"))), int(bool(x.get("isFromInsideBox"))),
+                     1 if x.get("period") == "FirstHalf" else 2, int(x.get("min") or 0),
+                     int(x.get("eventType") == "Goal")] for x in strzaly],
     }
