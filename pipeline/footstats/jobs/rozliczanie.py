@@ -1986,7 +1986,11 @@ def _superzmiana_statshub(
     W statshub `substitutedIn` w wierszu zawodnika to numer zmiennika, który
     za niego wszedł (sprawdzone 30.09 na składzie Węgry–Ukraina).
     """
-    if not perf_ctx or rec.get("rynek_kod") not in POLA_PERF_ROZLICZENIA:
+    wlasne = statshub.wlasne_zrodlo()
+    # rynki z mapy strzałów (zza pola, głową) – tylko na własnym źródle, które
+    # ma je per zawodnik w meczu (statshub ich w historii nie rozbijał)
+    pochodny = wlasne is not None and rec.get("rynek_kod") in statshub.SHOTMAP_DERIVED
+    if not perf_ctx or (rec.get("rynek_kod") not in pola_perf() and not pochodny):
         return None
     ps, cache_perf, budzet_perf, cache_sh = perf_ctx
     if ps is None:
@@ -2001,7 +2005,12 @@ def _superzmiana_statshub(
         return None                     # grał do końca
     ps_z = _perf_w_meczu({"podmiot_id": zid, "mecz_id": rec["mecz_id"]},
                          cache_perf, budzet_perf)
-    dodatek = _wartosc_z_perf(rec, ps_z, cache_sh)
+    if pochodny:
+        sr = _statshub_wynik(rec["mecz_id"], cache_sh)
+        dodatek = (wlasne.rynek_mapy_w_meczu(zid, int(rec["mecz_id"]), rec["rynek_kod"])
+                   if sr is not None and not sr["extra_time"] else None)
+    else:
+        dodatek = _wartosc_z_perf(rec, ps_z, cache_sh)
     if not dodatek:
         return None
     suma = float(wartosc or 0.0) + dodatek
@@ -6749,6 +6758,16 @@ POLA_PERF_ROZLICZENIA = {
     "fouls_committed": "fouls",
     "fouls_won": "wasFouled",
 }
+# ⚑ SPALONE TYLKO NA WŁASNYM ŹRÓDLE (01.11, etap 6 planu FotMob): w bazie FotMob
+# = statshub w 100% na 4776 meczach (bramka 4b). Historia statshub tego rynku
+# nie przeszła walidacji z 365, więc tam zostaje poza listą; na FotMob bez tego
+# rynek spoza 365 czekałby na bank, którego po 29.10 nikt nie dopisuje.
+POLA_PERF_WLASNE = {**POLA_PERF_ROZLICZENIA, "offsides": "totalOffside"}
+
+
+def pola_perf() -> dict:
+    """Rynki rozliczane z wiersza historii zawodnika przy obecnym źródle."""
+    return POLA_PERF_WLASNE if statshub.wlasne_zrodlo() is not None else POLA_PERF_ROZLICZENIA
 # jedno zapytanie na zawodnika na przebieg; typy czekają na dane do 7 dni
 # i są pytane w każdym przebiegu, więc bez sufitu przebieg mógłby puchnąć
 BUDZET_PERF_NA_PRZEBIEG = 150
@@ -6782,6 +6801,19 @@ def _perf_pobrana(rec: dict, cache: dict) -> bool:
     # zagrał" w pierwszym cyklu na 402b92d (Román 90', Montaño 66', Franco
     # 90', Olivera 90' — wszyscy z numerem z odkrywania oferty).
     pid = rec.get("podmiot_id")
+    wlasne = statshub.wlasne_zrodlo()
+    if wlasne is not None:
+        # ⚑ WŁASNY STATSHUB (etap 6 planu FotMob): dowodem jest MECZ ze
+        # składami (z ławką – rezerwowy ma wiersz z 0 minut), w którym nie ma
+        # zawodnika ani pod numerem, ani pod nazwiskiem (`_perf_w_meczu`) –
+        # i tylko zawodnika, którego tożsamość FotMob znamy (ma wiersze w bazie;
+        # patrz `wlasny_statshub._zna_zawodnika`). Mecz bez składów w FotMob
+        # (część pucharów) niczego nie dowodzi.
+        try:
+            return (bool(rec.get("mecz_id")) and wlasne.mecz_ze_skladami(int(rec["mecz_id"]))
+                    and wlasne.zna_zawodnika(pid))
+        except Exception:                                   # noqa: BLE001
+            return False
     return (isinstance(pid, int) and 0 < pid < PID_SYNTETYCZNY
             and bool(cache.get(pid)))
 
@@ -6789,6 +6821,22 @@ def _perf_pobrana(rec: dict, cache: dict) -> bool:
 def _perf_w_meczu(rec: dict, cache: dict, budzet: list[int]) -> dict | None:
     """Wiersz statystyk zawodnika z TEGO meczu z historii statshub albo None."""
     pid = rec.get("podmiot_id")
+    wlasne = statshub.wlasne_zrodlo()
+    if wlasne is not None:
+        # własne źródło nie kosztuje zapytań i zna też numery zastępcze FotMob
+        # (≥ 4·10⁹) – najpierw wiersz po numerze, potem po nazwisku (zawodnik,
+        # którego typ ma inny numer niż wiersz FotMob)
+        if not rec.get("mecz_id"):
+            return None
+        try:
+            if isinstance(pid, int) and pid > 0:
+                for wiersz in wlasne.fetch_player_performance(pid, limit=20) or []:
+                    if int(wiersz["events"].get("id") or 0) == int(rec["mecz_id"]):
+                        return wiersz["player_statistics_event"]
+            return wlasne.wiersz_meczu_po_nazwie(int(rec["mecz_id"]), str(rec.get("podmiot") or ""))
+        except Exception as e:                              # noqa: BLE001
+            diagnostyka.cichy("wlasny_statshub", "performance_rozliczenie", e)
+            return None
     if (not isinstance(pid, int) or pid <= 0 or pid >= PID_SYNTETYCZNY
             or not rec.get("mecz_id")):
         # numer syntetyczny: statshub go nie zna, zapytanie tylko zjada budżet
@@ -6822,7 +6870,7 @@ def _wartosc_z_perf(rec: dict, ps: dict | None, cache_sh: dict) -> float | None:
     nie da się potwierdzić (brak wyniku), też czeka.
     """
     mk = rec.get("rynek_kod")
-    pole = POLA_PERF_ROZLICZENIA.get(mk)
+    pole = pola_perf().get(mk)
     # rynek pochodny strzałów (zza pola, głową) historia nie rozbija — ale
     # ZERO strzałów ogółem to zero w każdym podzbiorze; więcej niż zero
     # zostawiamy shotmapie (2026-09-16)
@@ -6885,9 +6933,13 @@ def _statshub_druzyna(rec: dict, cache: dict, budzet: list[int]
     if not pid or not mid:
         return None
     if pid not in cache:
-        if budzet[0] <= 0:
-            return None
-        budzet[0] -= 1
+        # własne źródło (etap 6 planu FotMob) nie kosztuje zapytań – sufit
+        # budżetu chronił statshub, tu zostawiłby typy drużynowe na kolejne
+        # przebiegi bez powodu
+        if statshub.wlasne_zrodlo() is None:
+            if budzet[0] <= 0:
+                return None
+            budzet[0] -= 1
         try:
             cache[pid] = statshub.fetch_team_performance(int(pid), limit=10)
         except Exception:                                   # noqa: BLE001
@@ -7312,7 +7364,7 @@ def rozlicz(
                 skey = scores365.resolve_player_key(set(gra), rec["podmiot"])
                 if skey:
                     wartosc = float(gra[skey].get(MARKETY_365[mk], 0))
-            if wartosc is None and mk in POLA_PERF_ROZLICZENIA:
+            if wartosc is None and mk in pola_perf():
                 # ⚑ HISTORIA PO NUMERZE PRZED BANKIEM (2026-09-30): wiersz
                 # meczu z `performance` to komplet po gwizdku, a bank bywał
                 # migawką z trwającego meczu (Słowenia–Szkocja 26.09)
@@ -7369,7 +7421,7 @@ def rozlicz(
                 wartosc = float(w) if w is not None else None
             # ⚑ historia po numerze PRZED bankiem (2026-09-30): Ferguson,
             # Słowenia–Szkocja 26.09 — bank 0 fauli, statshub 4 (patrz wyżej)
-            if wartosc is None and mk in POLA_PERF_ROZLICZENIA:
+            if wartosc is None and mk in pola_perf():
                 wartosc = _wartosc_z_perf(rec, ps_perf, cache_sh)
                 if wartosc is not None:
                     rozliczone_z_perf[mk] += 1

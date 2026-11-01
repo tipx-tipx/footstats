@@ -722,7 +722,10 @@ def main(publikuj: bool = False) -> bool:
     wlasne = None
     if statshub.ZRODLO_STATYSTYK == "fotmob":
         from ..sources import fotmob, wlasny_statshub
-        wlasne = wlasny_statshub.zbuduj()
+        # dociąganie meczów z typami (etap 6) tylko przy publikacji – dry-run
+        # nie pisze stanu
+        wlasne = wlasny_statshub.zbuduj(
+            dociagnij=wlasny_statshub.DOCIAGNIJ_CYKL if publikuj else 0)
         statshub.ustaw_wlasne_zrodlo(wlasne)
     tryb = zbuduj_tryb(publikuj=publikuj)
     if wlasne is not None and tryb is not None:

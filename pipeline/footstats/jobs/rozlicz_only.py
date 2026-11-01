@@ -31,6 +31,7 @@ except Exception:
     pass
 
 from .. import supa
+from ..sources import statshub
 from . import rozliczanie
 
 
@@ -50,7 +51,18 @@ def main() -> None:
     # — patrz `supa.straz_odciecia`
     supa.straz_odciecia("rozliczanie")
     try:
+        # ⚑ WŁASNY STATSHUB (etap 6 planu FotMob): zapas po 365 (wynik, mapa
+        # strzałów, historia zawodnika, statystyki drużyny) czyta naszą bazę
+        # zamiast statshub; mecze z typami dociągamy z FotMob przed rozliczeniem
+        wlasne = None
+        if statshub.ZRODLO_STATYSTYK == "fotmob":
+            from ..sources import fotmob, wlasny_statshub
+            wlasne = wlasny_statshub.zbuduj(dociagnij=wlasny_statshub.DOCIAGNIJ_ROZLICZ)
+            statshub.ustaw_wlasne_zrodlo(wlasne)
         wyniki = rozliczanie.rozlicz([], [])
+        if wlasne is not None:
+            print(f"[{stamp}] Własny statshub: liczniki {dict(wlasne.licz)}; "
+                  f"FotMob {fotmob.statystyki()}", flush=True)
         # TEN SAM KLUCZ PISZE TEŻ DUŻY CYKL — i musi go pisać tak samo.
         # Do 2026-08-01 lekki job wrzucał kupony SUROWO z logu, więc co 20 minut
         # cofał normalizację robioną przez `build_wc_fast`: na produkcji kupon

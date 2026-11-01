@@ -124,6 +124,15 @@ def main(argv: list[str] | None = None) -> int:
         jakosc["staty_zawodnikow" if r.get("staty_zawodnikow") else "bez_staty_zawodnikow"] += 1
         jakosc["mapa_strzalow" if r.get("mapa_strzalow") else "bez_mapy_strzalow"] += 1
         licz.update(t.dodaj_mecz(r, zaw, kad, idx, zamknij_brak=True))
+    # mecze dociągnięte przez rozliczanie (etap 6, `wlasny_statshub.dociagnij_zakonczone`)
+    # są już w bazie, ale ich zawodników nikt nie zmapował – robimy to tutaj
+    od_ts = int(datetime(od.year, od.month, od.day, tzinfo=timezone.utc).timestamp())
+    pobrane = {r["id"] for r in rekordy}
+    for mid, zapis in sorted(baza.items(), key=lambda x: int(x[1].get("ts") or 0)):
+        if mid in t.przetworzone or mid in pobrane or int(zapis.get("ts") or 0) < od_ts:
+            continue
+        licz.update(t.dodaj_mecz(baza_meczow.rozpakuj(zapis), zaw, kad, idx, zamknij_brak=True))
+        jakosc["zmapowane_z_rozliczen"] += 1
     print(f"Baza FotMob: terminarz {len(mecze_fm)} meczów, zakończone {dict(zakres)}; "
           f"pobrane {len(rekordy)} z {len(kand)} (limit {budzet}); jakość {dict(jakosc)}; błędy {dict(bledy)}")
     print(f"Baza FotMob: zawodnicy {dict(licz)}; w mapie z parą "

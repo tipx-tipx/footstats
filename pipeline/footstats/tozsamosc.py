@@ -641,8 +641,11 @@ class Tozsamosc:
 
     def mecz_fm(self, sh_eid: int) -> int | None:
         """Odwrotnie: mecz Sofascore (np. typ sprzed przełączenia) → mecz FotMob."""
-        if not hasattr(self, "_odwr_mecze"):
+        # mapa rośnie w trakcie procesu (`dopasuj_mecze_znane`) – odwrotność
+        # przeliczamy, gdy zmieniła się liczba par
+        if getattr(self, "_odwr_n", -1) != len(self.mecze):
             self._odwr_mecze = {v: k for k, v in self.mecze.items()}
+            self._odwr_n = len(self.mecze)
         return self._odwr_mecze.get(int(sh_eid))
 
     # --- budowa ---------------------------------------------------------------

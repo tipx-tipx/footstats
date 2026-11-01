@@ -84,6 +84,8 @@ def test_wczytaj_odroznia_awarie_od_pustki(monkeypatch):
 def test_zapisz_pomija_miesiac_nieprzeczytany(monkeypatch):
     zapisane = {}
     monkeypatch.setattr(supa, "put_key", lambda k, v: zapisane.setdefault(k, v) is not None)
+    # zapis czyta świeżą wersję miesiąca tuż przed (etap 6) – tu pusty miesiąc
+    monkeypatch.setattr(supa, "get_key_ok", lambda k: (None, True))
     r = _rek("mecz_pl_5795494.json.gz")
     baza = {}
     zm = B.dopisz(baza, [r])

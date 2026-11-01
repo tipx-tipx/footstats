@@ -125,11 +125,29 @@ def dopisz(baza: dict[int, dict], rekordy: list[dict]) -> set[str]:
 def zapisz(baza: dict[int, dict], miesiace: set[str], nieprzeczytane: list[str]) -> dict[str, bool]:
     """Zapisz zmienione miesiące. Miesiąca, którego odczyt padł, NIE zapisujemy –
     nadpisalibyśmy jego historię garścią świeżych meczów."""
+    # ⚑ ODCZYT TUŻ PRZED ZAPISEM (01.11, etap 6). Bazę piszą dwa joby w różnych
+    # grupach współbieżności: `fm_baza` (raz na dobę, ~10 min) i rozliczanie
+    # (dociąganie meczów z typami, co 20 min). Zapis z pamięci sprzed kilku
+    # minut skasowałby mecze dopisane w tym czasie przez drugi job – więc
+    # bierzemy świeżą wersję miesiąca i scalamy (bogatszy zapis meczu wygrywa).
     wynik = {}
     for k in sorted(miesiace):
         if k in nieprzeczytane:
             wynik[k] = False
             continue
+        # magazyn repo trzyma spis wersji raz na proces – bez odświeżenia
+        # „świeży” odczyt oddałby wersję z początku przebiegu
+        b = supa._backend(k)
+        if hasattr(b, "wyczysc_pamiec"):
+            b.wyczysc_pamiec()
+        swieze, ok = supa.get_key_ok(k)
+        if not ok:
+            wynik[k] = False
+            continue
+        for mid, z in (swieze or {}).items():
+            nasz = baza.get(int(mid))
+            if nasz is None or _bogatszy(z, nasz):
+                baza[int(mid)] = z
         czesc = {str(mid): z for mid, z in baza.items() if klucz_miesiaca(z["ts"]) == k}
         wynik[k] = bool(supa.put_key(k, czesc))
     return wynik

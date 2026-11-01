@@ -1451,6 +1451,7 @@ def status_i_start(event_id: int) -> tuple[str | None, int | None]:
     return st, start
 
 
+@_albo_wlasne("player_shots_from_shotmap", None)
 def player_shots_from_shotmap(event_id: int) -> dict[str, dict] | None:
     """{nazwa_zawodnika: {"shots": n, "sot": n}} z shotmapy meczu (otwarte API).
 

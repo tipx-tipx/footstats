@@ -295,7 +295,8 @@ def test_wynik_i_status_z_terminarza():
     z = _zrodlo()
     w = z.fetch_event_result(SH_MECZ)
     assert w == {"home_id": SH_SUN, "away_id": SH_LEE, "home_name": "Sunderland AFC", "away_name": "Leeds United",
-                 "home_goals": float(REK["gole90"][0]), "away_goals": float(REK["gole90"][1]), "extra_time": False}
+                 "home_goals": float(REK["gole90"][0]), "away_goals": float(REK["gole90"][1]), "extra_time": False,
+                 "sklady": True}     # pole spoza statshub (etap 6): mecz ze składami
     assert z.status_meczu(SH_MECZ) == "finished" and z.fetch_event_result(123) is None
     z.dodaj_terminarz([{"id": 999, "status": "postponed", "start_ts": 1_800_000_000}])
     assert z.status_i_start(T.zastepczy(999)) == ("postponed", 1_800_000_000)

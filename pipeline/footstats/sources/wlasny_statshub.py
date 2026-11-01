@@ -25,7 +25,7 @@ od najnowszego, mecze z 0 minut obecne, `yellowCard` tylko gdy kartka padła.
 from __future__ import annotations
 
 import zlib
-from collections import defaultdict
+from collections import Counter, defaultdict
 
 from .. import baza_meczow
 from .. import tozsamosc as T
@@ -106,6 +106,7 @@ class Zrodlo:
         self._fm_mecz_po_ev: dict[int, dict] = {}         # numer meczu → mecz z terminarza FotMob
         self._przed_meczem: dict[int, dict] = {}          # numer meczu → {sedzia, potwierdzony}
         self._sklady: dict[int, dict] = {}               # mecz → XI
+        self._wiersze_meczu: dict[int, list[tuple[str, int]]] = defaultdict(list)  # mecz → (nazwisko, numer)
         for zapis in (baza or {}).values():
             self._dodaj_mecz_fm(baza_meczow.rozpakuj(zapis))
 
@@ -146,6 +147,7 @@ class Zrodlo:
                 self.licz["kolizja_numeru"] += 1     # inna osoba pod tym numerem FotMob
                 continue
             pid = self.t.id_zawodnika(w["pid"])
+            self._wiersze_meczu[eid].append((w["name"], pid))
             self._gracze_druzyny[self.t.id_druzyny(w["team_id"])].add(pid)
             self.nazwy_zawodnikow.setdefault(pid, w["name"])
             ps = {"eventId": eid, "teamId": self.t.id_druzyny(w["team_id"]),
@@ -562,7 +564,10 @@ def _rozszerz_zrodlo():
             return None
         return {"home_id": m["h"], "away_id": m["a"], "home_name": m["dom"]["name"],
                 "away_name": m["gosc"]["name"], "home_goals": float(m["gole90"][0]),
-                "away_goals": float(m["gole90"][1]), "extra_time": bool(m.get("dogrywka"))}
+                "away_goals": float(m["gole90"][1]), "extra_time": bool(m.get("dogrywka")),
+                # pole spoza statshub: mecz bez składów w FotMob (część pucharów) –
+                # brak wiersza zawodnika NIE znaczy tam „nie zagrał” (rozliczanie)
+                "sklady": bool(m.get("ma_sklady"))}
 
     def dodaj_terminarz(self, mecze_fm: list[dict]) -> None:
         """Statusy i starty z terminarza FotMob (`fotmob.mecze_dnia`) – mecze
@@ -805,7 +810,208 @@ def _przed_meczami(self, events: list[dict], teraz: int | None = None,
 Zrodlo.przed_meczami = _przed_meczami
 
 
-def zbuduj(miesiace: int = 4) -> Zrodlo:
+# ------------------------------------------------------ rozliczenia (etap 6) ----
+# ⚑ ŚWIEŻY MECZ Z TYPEM NIE MOŻE CZEKAĆ NA DOBOWE DOPISYWANIE BAZY (01.11).
+# `fm_baza` chodzi raz na dobę (5:40 UTC), a rozliczanie co 20 min – bez tego
+# zapas po 365 (wynik, mapa strzałów, historia zawodnika, statystyki drużyny)
+# widziałby mecz dopiero następnego ranka. Mecz z nierozliczonym typem
+# pobieramy RAZ, gdy minie `DOCIAGNIJ_PO_S` od startu (ścieżka bez 365 rusza
+# po 4 h – `rozliczanie.PERF_WARTOSC_PO_S`, więc rekord jest gotowy na czas).
+DOCIAGNIJ_PO_S = 3 * 3600 + 30 * 60
+DOCIAGNIJ_DO_S = 7 * 86400            # = rozliczanie.TERMIN_BRAK_DANYCH_S
+# mecz zapisany bez statystyk zawodników (FotMob dopisuje je czasem później)
+# pytamy ponownie najwyżej co tyle i tylko przez 2 dni (jak `fm_baza`)
+PONOW_BEZ_STATYSTYK_S = 3 * 3600
+DNI_DOPELNIENIA = 2
+DNI_TERMINARZA_MAX = 4                # terminarze na przebieg (mecze bez pary w mapie)
+# szczegóły meczów na przebieg: lekkie rozliczanie (co 20 min) bierze więcej,
+# cykl (~166 zapytań na nadchodzące mecze) – resztę, która przyszła w międzyczasie
+DOCIAGNIJ_ROZLICZ = 80
+DOCIAGNIJ_CYKL = 40
+
+
+def _numer_fm(t: T.Tozsamosc, eid: int) -> int | None:
+    if T.czy_zastepczy(eid):
+        return int(eid) - T.ZASTEPCZY
+    return t.mecz_fm(eid)
+
+
+def dociagnij_zakonczone(t: T.Tozsamosc, baza: dict[int, dict], ksiega: dict, znane, nazwy: dict[int, str],
+                         budzet: int, teraz: int | None = None) -> tuple[set[str], dict[int, tuple[str, int]], Counter]:
+    """Pobierz z FotMob zakończone mecze, na które czekają nierozliczone typy
+    księgi, i dopisz je do `baza` (w pamięci). Zwraca (zmienione miesiące bazy,
+    {numer meczu: (status, start)} z pobranych szczegółów – przełożony albo
+    odwołany mecz musi to powiedzieć rozliczaniu, liczniki).
+
+    Nowych zawodników mapujemy dopiero w `fm_baza` (mecz nie jest w
+    `t.przetworzone`) – tu numer zastępczy wystarcza, bo rozliczanie szuka
+    wiersza po numerze, a potem po nazwisku (`Zrodlo.wiersz_meczu_po_nazwie`)."""
+    import time
+    from datetime import datetime, timedelta, timezone
+    from . import fotmob
+    teraz = int(teraz or time.time())
+    licz: Counter = Counter()
+    statusy: dict[int, tuple[str, int]] = {}
+    czeka: dict[int, int] = {}
+    for r in (ksiega or {}).values():
+        if r.get("wynik"):
+            continue
+        try:
+            eid, k = int(r.get("mecz_id") or 0), int(r.get("kickoff_ts") or 0)
+        except (TypeError, ValueError):
+            continue
+        if eid and DOCIAGNIJ_PO_S <= teraz - k <= DOCIAGNIJ_DO_S:
+            czeka[eid] = k
+    if not czeka:
+        return set(), statusy, licz
+    # mecz bez pary w mapie (typ sprzed przełączenia, rozegrany po 29.10):
+    # terminarz dnia + to samo dopasowanie co w cyklu (`dopasuj_mecze_znane`)
+    bez_pary = {e: k for e, k in czeka.items() if _numer_fm(t, e) is None}
+    dni = sorted({(datetime.fromtimestamp(k, timezone.utc).date() + timedelta(days=d)).strftime("%Y%m%d")
+                  for k in bez_pary.values() for d in (-1, 0)}, reverse=True)
+    for i, dzien in enumerate(dni):
+        if i >= DNI_TERMINARZA_MAX:
+            licz["terminarz_poza_budzetem"] += len(dni) - i
+            break
+        try:
+            mecze = fotmob.mecze_dnia(dzien)
+        except (fotmob.FotmobOdmowa, fotmob.FotmobLimit) as e:
+            licz["odmowa"] += 1
+            print(f"Własny statshub: dociąganie – FotMob odmówił przy terminarzu ({e})", flush=True)
+            return set(), statusy, licz
+        except Exception:                                # noqa: BLE001
+            licz["terminarz_blad"] += 1
+            continue
+        T.dopasuj_mecze_znane(t, mecze, znane, nazwy)
+    ligi_ze_statami = {z.get("liga_id") for z in baza.values() if z.get("staty_zawodnikow")}
+    kand = []
+    for eid, k in sorted(czeka.items(), key=lambda x: x[1]):
+        fm = _numer_fm(t, eid)
+        if fm is None:
+            licz["bez_numeru_fotmob"] += 1
+            continue
+        stary = baza.get(fm)
+        if stary is not None:
+            if stary.get("staty_zawodnikow") or stary.get("liga_id") not in ligi_ze_statami:
+                licz["juz_w_bazie"] += 1
+                continue
+            if (teraz - int(stary.get("ts") or k) > DNI_DOPELNIENIA * 86400
+                    or teraz - int(stary.get("pobrano_ts") or 0) < PONOW_BEZ_STATYSTYK_S):
+                licz["w_bazie_bez_statystyk"] += 1
+                continue
+        kand.append((eid, fm))
+    zmienione: set[str] = set()
+    for i, (eid, fm) in enumerate(kand):
+        if i >= budzet:
+            licz["poza_budzetem"] += len(kand) - i
+            break
+        try:
+            r = fotmob.mecz_do_bazy(fotmob.szczegoly_meczu(fm))
+        except (fotmob.FotmobOdmowa, fotmob.FotmobLimit) as e:
+            licz["odmowa"] += 1
+            print(f"Własny statshub: dociąganie – FotMob odmówił przy szczegółach ({e})", flush=True)
+            break
+        except Exception:                                # noqa: BLE001
+            licz["blad_szczegolow"] += 1
+            continue
+        statusy[eid] = (r.get("status") or "", int(r.get("ts") or 0))
+        if r.get("status") != "finished":
+            licz[f"status_{r.get('status') or 'brak'}"] += 1
+            continue
+        r["pobrano_ts"] = teraz
+        z = baza_meczow.dopisz(baza, [r])
+        zmienione |= z
+        licz["dopisane" if z else "bez_zmian"] += 1
+        licz["ze_statystykami" if r.get("staty_zawodnikow") else "bez_statystyk"] += 1
+    return zmienione, statusy, licz
+
+
+def _wiersz_meczu_po_nazwie(self, event_id: int, nazwa: str) -> dict | None:
+    """Wiersz `player_statistics_event` zawodnika z meczu po NAZWISKU (najlepsza
+    zgodność ≥ PROG_NAZWISKA, jednoznacznie). Rozliczanie szuka najpierw po
+    numerze; ten zapas łapie zawodnika, którego typ ma inny numer niż wiersz
+    FotMob (para po nazwisku nie powstała – 0,7% w bramce etapu 3), zanim brak
+    wiersza zostanie przeczytany jako „nie zagrał”."""
+    oc = sorted(((T.podobienstwo_nazwisk(nazwa, n), pid) for n, pid in self._wiersze_meczu.get(int(event_id), ())),
+                reverse=True)
+    # jednoznacznie: drugi kandydat powyżej progu (Victor Hugo / Vitor Hugo
+    # we Flamengo, 26.10) = nie zgadujemy
+    drugi = next((p for p in oc[1:] if p[1] != oc[0][1]), None) if oc else None
+    if not oc or oc[0][0] < T.PROG_NAZWISKA or (drugi is not None and drugi[0] >= T.PROG_NAZWISKA):
+        return None
+    for ts, w, _ in self._fm.get(oc[0][1], ()):
+        if int(w["events"]["id"]) == int(event_id):
+            return w["player_statistics_event"]
+    return None
+
+
+def _mecz_ze_skladami(self, event_id: int) -> bool:
+    """Czy baza ma ten mecz zakończony ZE składami – dopiero wtedy brak
+    zawodnika w meczu znaczy, że nie zagrał."""
+    m = self._mecz.get(int(event_id))
+    return bool(m and m.get("ma_sklady"))
+
+
+def _zna_zawodnika(self, player_id: int) -> bool:
+    """Czy zawodnik ma w bazie FotMob jakikolwiek wiersz pod tym numerem.
+
+    ⚑ BRAK W SKŁADZIE DOWODZI „NIE ZAGRAŁ” TYLKO U ZNANEGO ZAWODNIKA (01.11).
+    Bramka etapu 6 (typy 25–29.10, sam FotMob): 14 z 3196 zawodników, którzy
+    wg księgi grali, nie miało w meczu wiersza ani pod numerem, ani pod
+    nazwiskiem (pseudonim „Bomba”, zmiana nazwiska Siebatcheu → Pefok, para
+    FotMob przy naszym numerze syntetycznym) – i żaden z nich nie miał wiersza
+    FotMob w żadnym meczu. Prawdziwe „nie zagrał” (83) – wszystkie u znanych."""
+    try:
+        return bool(self._fm.get(int(player_id)))
+    except (TypeError, ValueError):
+        return False
+
+
+def _player_shots_from_shotmap(self, event_id: int) -> dict[str, dict] | None:
+    """Jak `statshub.player_shots_from_shotmap`: {nazwisko: {shots, sot, zza pola,
+    głową…}} – z liczników zawodników meczu (FotMob liczy je z tej samej mapy
+    strzałów przy pobraniu). Surowej mapy nie potrzebujemy: zapisy sprzed 31.10
+    jej nie mają, a liczniki tak. Rynki z mapy tylko w meczu z mapą (inaczej
+    brak klucza = brak danych, nie zero). None = mecz bez statystyk zawodników."""
+    eid = int(event_id)
+    m = self._mecz.get(eid)
+    if not m or not m.get("staty_zawodnikow"):
+        return None
+    out: dict[str, dict] = {}
+    for nazwa, pid in self._wiersze_meczu.get(eid, ()):
+        for _ts, w, x in self._fm.get(pid, ()):
+            if int(w["events"]["id"]) != eid:
+                continue
+            ps = w["player_statistics_event"]
+            if ps.get("shots") is None:
+                break
+            d = {"shots": ps["shots"], "sot": ps.get("onTargetScoringAttempt", 0.0)}
+            for pole, kod in statshub.EXTRA_STATS_MAP.items():
+                if x and x.get(pole) is not None:
+                    d[kod] = x[pole]
+            out[str(nazwa)] = d
+            break
+    return out or None
+
+
+def _rynek_mapy_w_meczu(self, player_id: int, event_id: int, rynek: str) -> float | None:
+    """Rynek z mapy strzałów (zza pola, głową…) zawodnika w meczu albo None
+    (mecz bez mapy, zawodnik bez wiersza) – superzmiana na tych rynkach."""
+    pole = next((p for p, k in statshub.EXTRA_STATS_MAP.items() if k == rynek), None)
+    for _ts, w, x in self._fm.get(int(player_id), ()):
+        if int(w["events"]["id"]) == int(event_id):
+            return float(x[pole]) if x and pole and x.get(pole) is not None else None
+    return None
+
+
+Zrodlo.player_shots_from_shotmap = _player_shots_from_shotmap
+Zrodlo.rynek_mapy_w_meczu = _rynek_mapy_w_meczu
+Zrodlo.wiersz_meczu_po_nazwie = _wiersz_meczu_po_nazwie
+Zrodlo.mecz_ze_skladami = _mecz_ze_skladami
+Zrodlo.zna_zawodnika = _zna_zawodnika
+
+
+def zbuduj(miesiace: int = 4, dociagnij: int = 0) -> Zrodlo:
     """Własny statshub ze stanu: mapa tożsamości, baza FotMob z `miesiace`
     ostatnich miesięcy, bank, magazyn drużyn, nazwy drużyn. Awaria odczytu
     któregokolwiek klucza = wyjątek (cykl na niepełnych danych liczyłby
@@ -845,10 +1051,20 @@ def zbuduj(miesiace: int = 4) -> Zrodlo:
     n_baza, _ = T.dopasuj_mecze_znane(t, [
         {"id": k, "start_ts": v.get("ts"), "home_id": (v.get("home") or {}).get("id"),
          "away_id": (v.get("away") or {}).get("id")} for k, v in baza.items()], znane, nazwy)
+    statusy: dict[int, tuple[str, int]] = {}
+    if dociagnij > 0:
+        # świeże mecze z nierozliczonymi typami (etap 6) – PRZED indeksem
+        td = time.time()
+        zmienione, statusy, ld = dociagnij_zakonczone(t, baza, ksiega, znane, nazwy, dociagnij)
+        zapis = baza_meczow.zapisz(baza, zmienione, []) if zmienione else {}
+        print(f"Własny statshub: dociąganie do rozliczeń {dict(ld)}; zapis bazy {zapis} "
+              f"({time.time() - td:.0f} s)", flush=True)
     t0 = time.time()
     z = Zrodlo(t, baza, bank, eventy, nazwy)
     z._znane = znane
     z.ustaw_magazyn(hd)
+    for eid, (st, ts) in statusy.items():
+        z._terminarz[eid] = (st, ts)
     print(f"Własny statshub: baza {len(baza)} meczów, bank {len(bank)} serii, magazyn {len(hd)} drużyn, "
           f"mapa {len(t.druzyny)} drużyn / {sum(1 for v in t.zawodnicy.values() if v)} zawodników, "
           f"mecze znane ze statshub {len(znane)} (z bazy dopasowane {n_baza}) "
