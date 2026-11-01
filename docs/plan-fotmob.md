@@ -189,7 +189,15 @@ rynkach; spalone z wiersza (tylko na FotMob – 100% w 4b); bez sufitu zapytań 
 (powrót = zmienna repo), limity 25 / 15 min. Magazyn `hd_*` czyta przez własne źródło (inaczej
 kalendarz drużyn – zmęczenie, „opuścił mecz” – i model uczony stałyby na 29.10).
 
-## ⚑ Wyłączone do etapu 7 (31.10)
+**Etap 7 – wdrożenie (01.11).** Cykl próbny 41299415097 (z pamięcią przed meczem): zielony, 40 typów,
+FotMob 166 zapytań / 0 odmów, pamięć 0 → 150. Drabinki 0 – w normie (statshub 12–29.10: 1–2 dziennie;
+lejek w tych samych proporcjach co próby 31.10). `cycle.yml`, `rozlicz.yml`, `magazyn.yml` włączone 11:40 UTC,
+zadanie cron-job.org włączone (11:50 UTC `/api/tick` odpalił Betclica i `fm_baza` – token ważny).
+**Pierwszy cykl z publikacją 41302972342: zielony, 46,6 min** – rozliczenie na starcie 926 typów (zaległe od 29.10),
+pamięć przed meczem 150 → 285 (100 z pamięci), 41 typów, 315 meczów, 208 paczek w Supabase (`meta` 12:26 UTC).
+Kontrola produktu: 1 ostrzeżenie (1 typ zza pola czeka > 48 h). Dalej etap 8 – 3 dni obserwacji.
+
+## ⚑ Wyłączone do etapu 7 (31.10) – włączone 01.11
 `cycle.yml`, `rozlicz.yml`, `magazyn.yml` – wyłączone ręcznie (`gh workflow disable`): przy 403
 statshub cykl kończył się na czerwono co 30 min (~30 maili/dobę), rozliczanie wisiało do limitu
 czasu, magazyn nic nie pobierał, a wszystkie dalej pukały do statshub. Przy wdrożeniu (etap 7):

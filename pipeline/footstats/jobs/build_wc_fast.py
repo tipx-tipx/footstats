@@ -13009,7 +13009,10 @@ def _main_impl(tryb=None):
         "tryb": "liga" if tryb else "ms2026",
         "liga": tryb.liga_glowna if tryb else "Mistrzostwa Świata",
         "sezon": tryb.sezon if tryb else "2026",
-        "zrodlo": "statshub (statystyki i historia) + Superbet (kursy)",
+        # źródło statystyk wg przełącznika (etap 7 planu FotMob, 01.11)
+        "zrodlo": ("FotMob od 29.10 + nasze dane statshub do 29.10 (statystyki i historia) + Superbet (kursy)"
+                   if statshub.ZRODLO_STATYSTYK == "fotmob"
+                   else "statshub (statystyki i historia) + Superbet (kursy)"),
         "meczow_w_bazie": len(matches_out), "meczow_demo": len(matches_out),
         "meczow_kalibracja": 20, "okazji": len(value_bets),
         # zmierzone kary korelacji — generator kuponów na żądanie (frontend)
