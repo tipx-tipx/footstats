@@ -129,3 +129,13 @@ def test_spalone_z_historii_tylko_na_wlasnym_zrodle(monkeypatch):
     assert "offsides" not in rozliczanie.pola_perf()
     monkeypatch.setattr(statshub, "_WLASNE", _zrodlo())
     assert rozliczanie.pola_perf()["offsides"] == "totalOffside"
+
+
+def test_mapa_meczow_odwrotnosc_po_skasowaniu_przez_dopasowanie():
+    # cykl 41307600253: dopasuj_mecze_znane kasuje _odwr_mecze, licznik zostawał
+    t = _mapa()
+    assert t.mecz_fm(SH_MECZ) == REK["id"]
+    t.mecze[4243] = 16_000_001
+    t.__dict__.pop("_odwr_mecze", None)
+    t._odwr_n = len(t.mecze)
+    assert t.mecz_fm(16_000_001) == 4243

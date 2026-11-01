@@ -642,8 +642,10 @@ class Tozsamosc:
     def mecz_fm(self, sh_eid: int) -> int | None:
         """Odwrotnie: mecz Sofascore (np. typ sprzed przełączenia) → mecz FotMob."""
         # mapa rośnie w trakcie procesu (`dopasuj_mecze_znane`) – odwrotność
-        # przeliczamy, gdy zmieniła się liczba par
-        if getattr(self, "_odwr_n", -1) != len(self.mecze):
+        # przeliczamy, gdy zmieniła się liczba par ALBO ktoś ją skasował
+        # (`dopasuj_mecze_znane` i `dodaj_druzyny` robią `pop("_odwr_mecze")` –
+        # sam licznik 01.11 położył cykl 41307600253: AttributeError)
+        if "_odwr_mecze" not in self.__dict__ or getattr(self, "_odwr_n", -1) != len(self.mecze):
             self._odwr_mecze = {v: k for k, v in self.mecze.items()}
             self._odwr_n = len(self.mecze)
         return self._odwr_mecze.get(int(sh_eid))
