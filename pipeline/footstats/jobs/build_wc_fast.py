@@ -10968,6 +10968,16 @@ def _main_impl(tryb=None):
         # więc zapas jest, ale nie jest nieskończony — stąd budżet, nie „wszystkie".
         DOCIAG_BUDZET_S = 150
         DOCIAG_SUFIT = 120          # bezpiecznik, gdyby źródło odpowiadało od ręki
+        # ⚑ WŁASNY STATSHUB = PUSTY FEED PROPSÓW (01.11, etap 8 planu FotMob).
+        # Kursy meczów Z trendami feedu pobierała pętla scoringu, a tu trafiały
+        # tylko mecze bez trendów (25.10: 59, 29.10: 80 – „komplet okna”). Po
+        # przełączeniu na FotMob trendów feedu nie ma wcale, więc tu stoi CAŁE
+        # okno 36 h: pierwszy cykl 01.11 – 93 mecze pobrane, 131 bez oferty
+        # (budżet czasu). Większy budżet przywraca ruch do Superbetu sprzed
+        # przełączenia (pętla scoringu + dociąg), nie dokłada nowego.
+        if statshub.ZRODLO_STATYSTYK == "fotmob":
+            DOCIAG_BUDZET_S = 390
+            DOCIAG_SUFIT = 300
         dociagniete = 0
         # ⚑⚑ ILE MECZÓW ZOSTAJE BEZ OFERTY (2026-08-20). Ta pętla ma limit,
         # a limit NIGDZIE nie meldował, ilu meczów nie obsłużył — więc dzień
