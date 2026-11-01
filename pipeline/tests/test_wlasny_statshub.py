@@ -83,6 +83,65 @@ def test_bank_i_fotmob_razem_bez_dubla():
     assert len(z.fetch_player_performance(SH_XHAKA, limit=1)) == 1
 
 
+def test_ten_sam_mecz_bank_uzupelniony_z_fotmob():
+    """01.11: wiersz banku zostaje (numer, czas), FotMob dokłada pola, których
+    bank nie ma, i poprawia zero banku przy FotMob > 0; obie > 0 – bank."""
+    bank = _bank([REK["ts"] + 600])
+    bank[f"{SH_XHAKA}:fouls_won"] = {**bank[f"{SH_XHAKA}:fouls_committed"], "market_code": "fouls_won",
+                                     "counts": [0.0]}
+    z = _zrodlo(bank=bank)
+    w = z.fetch_player_performance(SH_XHAKA)
+    assert len(w) == 1 and w[0]["events"]["timeStartTimestamp"] == REK["ts"] + 600
+    ps = w[0]["player_statistics_event"]
+    assert ps["wasFouled"] == 3.0                       # zero banku → FotMob
+    assert ps["fouls"] == 2.0                           # obie > 0 – bank
+    assert ps["totalTackle"] == 0.0 and ps["shots"] == 0.0   # banku brak → FotMob
+    x = z.extra_zawodnika(SH_XHAKA)[w[0]["events"]["id"]]
+    assert x["headedShot"] == 2.0                       # bank 2, FotMob 0 – bank
+    assert x["shotsOutsideBox"] == 0.0                  # banku brak → FotMob
+    assert z.licz["scalenie_zero_banku"] == 1 and z.licz["scalenie_meczow"] == 1
+    # wiersz z pamięci banku nietknięty (scalenie robi kopię)
+    assert "wasFouled" in z._wiersze_banku(SH_XHAKA)[0][1]["player_statistics_event"]
+    assert z._wiersze_banku(SH_XHAKA)[0][1]["player_statistics_event"]["wasFouled"] == 0.0
+
+
+def test_zero_zza_pola_w_banku_poprawione_z_fotmob():
+    """Messeguem, Sporting – Académico Viseu 25.10: bank 2 strzały / 0 zza pola,
+    FotMob 2 zza pola – pokrycie zza pola liczy 2, w kadrze i per zawodnik."""
+    rek = copy.deepcopy(REK)
+    for w in rek["zawodnicy"]:
+        if w["pid"] == XHAKA:
+            w["staty"].update(shots=2.0, shots_outside_box=2.0)
+    bank = _bank([REK["ts"]])
+    for rk, c in (("shots", 2.0), ("shots_outside_box", 0.0)):
+        bank[f"{SH_XHAKA}:{rk}"] = {**bank[f"{SH_XHAKA}:fouls_committed"], "market_code": rk, "counts": [c]}
+    z = _zrodlo(bank=bank, rek=rek, eventy=_eventy_sun([REK["ts"]]))
+    tr = statshub.trendy_z_performance(SH_XHAKA, "x", SH_SUN, z.fetch_player_performance(SH_XHAKA),
+                                       extra_meczu=z.extra_zawodnika(SH_XHAKA))
+    assert tr["shots_outside_box"].counts == [2.0] and tr["shots"].counts == [2.0]
+    k = z.fetch_team_players_performance(SH_SUN, teraz=REK["ts"] + 86400)
+    eid = int(k["events"][0]["events"]["id"])
+    kad = statshub.trendy_kadry(k, z.fetch_extra_stats([eid]), SH_SUN)[SH_XHAKA]
+    assert kad["shots_outside_box"].counts == [2.0]
+
+
+def test_extra_kadry_bez_rozbicia_nie_daje_falszywego_zera():
+    """01.11: mecz z rozbiciem strzałów (Xhaka ma je w banku), zawodnik bez
+    rozbicia – strzelał: mecz poza rynkami zza pola / głową; nie strzelał: 0."""
+    stare = [REK["ts"] - 7 * 86400]
+    bank = _bank(stare)
+    for pid, nazwa, strzaly in ((501, "Strzelec Bez Mapy", 3.0), (502, "Bez Strzalu", 0.0)):
+        bank[f"{pid}:shots"] = {**bank[f"{SH_XHAKA}:fouls_committed"], "player_id": pid,
+                                "player_name": nazwa, "market_code": "shots", "counts": [strzaly]}
+    z = _zrodlo(bank=bank, eventy=_eventy_sun(stare))
+    k = z.fetch_team_players_performance(SH_SUN, teraz=REK["ts"] + 86400)
+    tr = statshub.trendy_kadry(k, z.fetch_extra_stats([800]), SH_SUN)
+    assert tr[SH_XHAKA]["headed_shots"].counts == [2.0]
+    assert tr[501]["shots"].counts == [3.0] and "shots_outside_box" not in tr[501]
+    assert tr[502]["shots_outside_box"].counts == [0.0]
+    assert z.licz["extra_nieznane"] == 1
+
+
 def test_bank_numer_meczu_z_magazynu_takze_przez_rywala():
     ts = REK["ts"] - 7 * 86400
     ev = {900: {"t": ts + 120, "h": 77, "a": SH_LEE, "l": 18}}

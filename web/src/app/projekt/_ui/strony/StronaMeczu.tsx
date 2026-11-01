@@ -8,6 +8,7 @@ import { fmtLinia } from "@/lib/format";
 
 import type { MeczStrony, ZawodnikMeczu } from "../../_dane/mecz";
 import type { DaneStron } from "../../_dane/strony";
+import { opisKratki, useDymekKratek } from "../atomy/DymekKratek";
 import { Ptaszek } from "../atomy/wspolne";
 import { IkonaKoszulka } from "../atomy2/filtry2";
 import { Logo } from "../atomy2/podstawowe";
@@ -200,14 +201,18 @@ const IkonaKursu = () => (
 /* ---- komórki --------------------------------------------------------- */
 
 function MiniKratki({ p, linia }: { p: NonNullable<ReturnType<typeof pokrycie>>; linia: number }) {
+  const { zdarzenia, dymek } = useDymekKratek();
   return (
-    <span className="mz-kratki" aria-label={`ostatnie mecze od najnowszego: ${p.mecze.map((m) => (m.min > 0 ? m.v : "nie zagrał")).join(", ")}`}>
-      {p.mecze.map((m, i) => (
-        <i key={i} data-s={m.min <= 0 ? "nz" : m.v > linia ? "ok" : "nie"} title={`${m.data} ${m.rywal}: ${m.min > 0 ? `${m.v} (${m.min}′)` : "nie zagrał"}`}>
-          {m.min > 0 ? m.v : ""}
-        </i>
-      ))}
-    </span>
+    <>
+      <span className="mz-kratki" {...zdarzenia} aria-label={`ostatnie mecze od najnowszego: ${p.mecze.map((m) => `${m.rywal ? `${m.rywal} ` : ""}${m.min > 0 ? m.v : "nie zagrał"}`).join(", ")}`}>
+        {p.mecze.map((m, i) => (
+          <i key={i} data-s={m.min <= 0 ? "nz" : m.v > linia ? "ok" : "nie"} {...opisKratki(m)}>
+            {m.min > 0 ? m.v : ""}
+          </i>
+        ))}
+      </span>
+      {dymek}
+    </>
   );
 }
 

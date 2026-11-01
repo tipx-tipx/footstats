@@ -636,6 +636,28 @@
 .mz-kratki i[data-s="ok"] { background: var(--ok-tlo); color: var(--ok); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ok) 35%, transparent); }
 .mz-kratki i[data-s="nz"] { background: repeating-linear-gradient(-45deg, transparent 0 4px, var(--kreska-mocna) 4px 5px); }
 
+/* dymek kratki (atomy/DymekKratek.tsx) – portal do body, od razu po najechaniu */
+.kr-dymek {
+  position: fixed;
+  z-index: 60;
+  transform: translate(-50%, -100%);
+  display: grid;
+  gap: 2px;
+  max-width: 220px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: var(--pow3);
+  border: 1px solid var(--kreska-mocna);
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.25);
+  color: var(--t1);
+  font: 400 12px/1.35 var(--f-t, inherit);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.kr-dymek[data-dol] { transform: translate(-50%, 0); }
+.kr-dymek b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+.kr-dymek span { color: var(--t2); font-variant-numeric: tabular-nums; }
+
 .mz-weszlo { display: grid; gap: 1px; }
 .mz-weszlo b { font: 700 18px/1 var(--f-n); font-variant-numeric: tabular-nums; color: var(--t2); }
 .mz-weszlo[data-poziom="mocne"] b { color: var(--ok); }

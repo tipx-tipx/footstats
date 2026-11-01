@@ -15,7 +15,9 @@ kilkanaście konsumentów, oddajemy im ten sam kształt z dwóch własnych źró
 wygrywa całość” (`build_wc_fast._merge`), a odświeżanie trendów podmienia
 `counts` w całości. Gdyby ta warstwa oddała same 2–3 mecze z FotMob, wyparłyby
 one 20 meczów historii zawodnika. Ten sam mecz w obu częściach (start ±3 h)
-bierzemy RAZ – z banku, bo to dokładnie to, co statshub wtedy oddał.
+bierzemy RAZ – wiersz banku (numer meczu, rywal, pozycja), a FotMob go
+UZUPEŁNIA: pole, którego bank nie ma, i ZERO banku tam, gdzie FotMob ma > 0
+(`Zrodlo._scal_z_fotmob`, pomiar 01.11 niżej).
 
 Kształty jak w `sources/statshub.py` (docs/etap0-mapowanie.md, „Pułapki
 kształtu”): wiersze to DICTY (rozliczanie czyta `events` bez `_pierwszy`),
@@ -44,6 +46,8 @@ POLA_SH = {
 POLA_EXTRA = {v: k for k, v in statshub.EXTRA_STATS_MAP.items()}
 # rynek banku → pole wiersza (odwrotność mapy, z której bank powstał)
 RYNEK_NA_POLE = {v: k for k, v in statshub.PERF_STATTYPE_MAP.items()}
+# pola wiersza, które FotMob uzupełnia w meczu znanym też z banku (`_scal_z_fotmob`)
+POLA_SCALANE = ("minutesPlayed", *POLA_SH.values(), "yellowCard")
 
 # numery meczów banku bez odpowiednika w `hd_*` (stary klub zawodnika, rozgrywki
 # spoza magazynu): stały numer z czasu startu – nie zderza się z Sofascore
@@ -96,7 +100,9 @@ class Zrodlo:
         # mecze drużyny z bazy (tylko ZE SKŁADAMI – patrz `_dodaj_mecz_fm`)
         self._mecze_fm_druzyny: dict[int, list[dict]] = defaultdict(list)
         self._cache_bank: dict[int, list[tuple[int, dict, dict | None]]] = {}
-        self._mecz: dict[int, dict] = {}                 # numer meczu → mecz bazy (bez zawodników)
+        # zawodnik → (historia bank + FotMob, ile z banku, ile z samego FotMob)
+        self._cache_hist: dict[int, tuple[list[tuple[int, dict, dict | None]], int, int]] = {}
+        self._mecz: dict[int, dict] = {}               # numer meczu → mecz bazy (bez zawodników)
         self._mecze_druz_fm: dict[int, list[int]] = defaultdict(list)   # drużyna → numery meczów bazy
         self._terminarz: dict[int, tuple[str, int]] = {}  # numer meczu → (status, start) z terminarza
         self._sedziowie: dict[int, dict] = {}            # numer sędziego → profil
@@ -240,13 +246,59 @@ class Zrodlo:
 
     # --- odpowiedzi w kształcie statshub ---------------------------------------
     def _historia(self, pid: int) -> list[tuple[int, dict, dict | None]]:
-        bank = self._wiersze_banku(int(pid))
-        ts_banku = [ts for ts, _, _ in bank]
-        nowe = [w for w in self._fm.get(int(pid), ())
-                if not any(abs(w[0] - t) <= TOL_MECZU_S for t in ts_banku)]
-        self.licz["mecze_z_banku"] += len(bank)
-        self.licz["mecze_z_fotmob"] += len(nowe)
-        return sorted(bank + nowe, key=lambda w: -w[0])
+        pid = int(pid)
+        if pid not in self._cache_hist:
+            bank = self._wiersze_banku(pid)
+            fm = self._fm.get(pid, ())
+            hist = []
+            for ts, w, x in bank:
+                para = next((r for r in fm if abs(r[0] - ts) <= TOL_MECZU_S), None)
+                hist.append((ts, *self._scal_z_fotmob(w, x, para[1], para[2])) if para else (ts, w, x))
+            nowe = [r for r in fm if not any(abs(r[0] - t) <= TOL_MECZU_S for t, _, _ in bank)]
+            self._cache_hist[pid] = (sorted(hist + nowe, key=lambda w: -w[0]), len(bank), len(nowe))
+        hist, n_bank, n_nowe = self._cache_hist[pid]
+        self.licz["mecze_z_banku"] += n_bank
+        self.licz["mecze_z_fotmob"] += n_nowe
+        return hist
+
+    def _scal_z_fotmob(self, w: dict, x: dict | None, w_fm: dict, x_fm: dict | None) -> tuple[dict, dict | None]:
+        """Wiersz banku uzupełniony wierszem FotMob TEGO SAMEGO meczu.
+
+        ⚑ ZERA BANKU Z OSTATNICH DNI STATSHUB (01.11, zgłoszenie właściciela:
+        Messeguem, Sporting – Académico Viseu 25.10, „0 zza pola”, a miał 2).
+        Bank brał wtedy pierwszy odczyt meczu, którego statshub nie zdążył
+        już poprawić (403 od 29.10): na 13,6 tys. wspólnych par zawodnik ×
+        mecz 23–29.10 bank miał 0 przy FotMob > 0 w 343 meczach zza pola,
+        447 kartek, 163 strzałów głową. Sumy drużyn ze statshub (`hd_*`)
+        rozstrzygają za FotMob: zza pola 311 : 15, kartki 388 : 4, celne
+        59 : 2, faule 12 : 1, strzały 22 : 9. Odsetek rośnie ku 29.10
+        (13% → 45%), a mecze sprzed 23.10 zgadzają się z sumami drużyn jak
+        po scaleniu – statshub zdążył je przeliczyć. Do tego bank nie miał
+        części rynków meczu wcale (celne, faule, odbiory Messeguema w tym
+        samym meczu) – mecz znikał z pokrycia tych rynków.
+
+        Reguła: brak w banku → wartość FotMob; zero banku przy FotMob > 0 →
+        FotMob. Obie > 0 i różne – zostaje bank (sumy drużyn mieszane, to
+        różnice definicji: strzały 38 : 24, odbiory 41 : 18)."""
+        def scal(stare: dict, nowe: dict, pola) -> dict:
+            out = dict(stare)
+            for pole in pola:
+                vf = nowe.get(pole)
+                if vf is None:
+                    continue
+                vb = out.get(pole)
+                if vb is None:
+                    out[pole] = vf
+                    self.licz["scalenie_uzupelnione"] += 1
+                elif float(vb) == 0 and float(vf) > 0:
+                    out[pole] = vf
+                    self.licz["scalenie_zero_banku"] += 1
+            return out
+        self.licz["scalenie_meczow"] += 1
+        ps = scal(w["player_statistics_event"], w_fm["player_statistics_event"], POLA_SCALANE)
+        if x_fm is not None:
+            x = scal(x or {}, x_fm, POLA_EXTRA.values())
+        return {**w, "player_statistics_event": ps}, x
 
     def fetch_player_performance(self, player_id: int, limit: int = statshub.PERF_LIMIT) -> list[dict]:
         """Jak `statshub.fetch_player_performance`: wiersze od najnowszego."""
@@ -331,20 +383,38 @@ class Zrodlo:
                 if e in szukane and e not in meczu:
                     meczu[e] = (r["events"]["timeStartTimestamp"],
                                 {r["events"]["homeTeamId"], r["events"]["awayTeamId"]})
+        # ⚑ ZAWODNIK BEZ ROZBICIA W MECZU Z ROZBICIEM (01.11). `trendy_kadry`
+        # czyta brak rekordu jak statshub: „nie ma go w paczce = nie strzelał
+        # zza pola” → 0. U nas brak rekordu znaczył co innego – bank nie miał
+        # tego zawodnika na rynkach z mapy strzałów – i dawał fałszywe zera:
+        # 1570 z 7105 par zawodnik × mecz w próbie 120 drużyn, 411 przy
+        # strzałach > 0. Teraz każdy zawodnik meczu ma rekord: prawdziwy,
+        # zerowy (nie strzelał albo nie grał – zza pola / głową to pewne 0)
+        # albo `_brak` (strzelał, rozbicia nie znamy – mecz pominięty w tych
+        # rynkach). Prawdziwe idą PIERWSZE: ten sam slug pod dwoma numerami
+        # (bank i FotMob) – wygrywa rekord z danymi.
         out: dict[int, list[dict]] = {}
         for e, (start, druzyny) in meczu.items():
-            rek = []
+            rek, bez = [], []
             for d in druzyny:
                 for pid in self._gracze_druzyny.get(d, ()):
                     for ts, w, x in self._historia(pid):
-                        if (x is not None and abs(ts - start) <= TOL_MECZU_S
-                                and int(w["player_statistics_event"].get("teamId") or 0) == d):
-                            nazwa = self.nazwy_zawodnikow.get(pid, "")
-                            rek.append({"playerId": pid, "playerSlug": statshub._klucz_slug(nazwa),
-                                        "playerName": nazwa, **x})
-                            break
+                        ps = w["player_statistics_event"]
+                        if abs(ts - start) > TOL_MECZU_S or int(ps.get("teamId") or 0) != d:
+                            continue
+                        nazwa = self.nazwy_zawodnikow.get(pid, "")
+                        glowa = {"playerId": pid, "playerSlug": statshub._klucz_slug(nazwa), "playerName": nazwa}
+                        if x is not None:
+                            rek.append({**glowa, **x})
+                        elif (float(ps.get("minutesPlayed") or 0) <= 0
+                              or (ps.get("shots") is not None and float(ps["shots"]) == 0)):
+                            bez.append({**glowa, **{pole: 0.0 for pole in POLA_EXTRA.values()}})
+                        else:
+                            bez.append({**glowa, "_brak": True})
+                            self.licz["extra_nieznane"] += 1
+                        break
             if rek:
-                out[e] = rek
+                out[e] = rek + bez
         return out
 
     # --- nadchodzący mecz: niedostępni i składy (etap 4c) -----------------------

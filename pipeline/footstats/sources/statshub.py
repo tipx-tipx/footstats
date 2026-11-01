@@ -659,8 +659,12 @@ def trendy_kadry(
                          "homeTeam": rec.get("homeTeam"), "awayTeam": rec.get("awayTeam")})
             idx = extra_idx.get(eid)
             if idx is not None:
-                extra_gracza[eid] = (idx.get(_klucz_slug(p.get("slug")))
-                                     or idx.get(_klucz_slug(p.get("name"))) or {})
+                rec_x = (idx.get(_klucz_slug(p.get("slug")))
+                         or idx.get(_klucz_slug(p.get("name"))) or {})
+                # `_brak` (własne źródło, 01.11): strzelał, rozbicia nie znamy –
+                # mecz poza rynkami zza pola / głową, nie fałszywe zero
+                if not rec_x.get("_brak"):
+                    extra_gracza[eid] = rec_x
         if not rows:
             continue
         tr = trendy_z_performance(pid, str(p.get("name") or ""), team_id, rows,

@@ -7,6 +7,7 @@ import { useId, useMemo, useState } from "react";
 import { fmtLinia } from "@/lib/format";
 
 import type { RynekZawodnika, ZawodnikStrony } from "../../_dane/zawodnik";
+import { opisKratki, useDymekKratek } from "../atomy/DymekKratek";
 import { Logo } from "../atomy2/podstawowe";
 import { KartaA } from "../elementy/karta";
 import { IkonaRynku } from "../elementy/ikonyRynkow";
@@ -105,17 +106,21 @@ function Glowa({ z }: { z: ZawodnikStrony }) {
 function MiniKratki({ p, linia, okno }: { p: Pokrycie; linia: number; okno: Okno }) {
   // brakujące mecze (rynek liczony od niedawna) jako puste kratki – kolumny trzymają się w pionie
   const puste = Math.max(0, okno - p.mecze.length);
+  const { zdarzenia, dymek } = useDymekKratek();
   return (
-    <span className="mz-kratki" aria-label={`ostatnie mecze od najnowszego: ${p.mecze.map((m) => (m.min > 0 ? m.v : "nie zagrał")).join(", ")}`}>
-      {p.mecze.map((m, i) => (
-        <i key={i} data-s={m.min <= 0 ? "nz" : m.v > linia ? "ok" : "nie"} title={`${m.data} ${m.rywal}: ${m.min > 0 ? `${m.v} (${m.min}′)` : "nie zagrał"}`}>
-          {m.min > 0 ? m.v : ""}
-        </i>
-      ))}
-      {Array.from({ length: puste }, (_, i) => (
-        <i key={`b${i}`} data-s="brak" title="brak danych z tego meczu" />
-      ))}
-    </span>
+    <>
+      <span className="mz-kratki" {...zdarzenia} aria-label={`ostatnie mecze od najnowszego: ${p.mecze.map((m) => `${m.rywal ? `${m.rywal} ` : ""}${m.min > 0 ? m.v : "nie zagrał"}`).join(", ")}`}>
+        {p.mecze.map((m, i) => (
+          <i key={i} data-s={m.min <= 0 ? "nz" : m.v > linia ? "ok" : "nie"} {...opisKratki(m)}>
+            {m.min > 0 ? m.v : ""}
+          </i>
+        ))}
+        {Array.from({ length: puste }, (_, i) => (
+          <i key={`b${i}`} data-s="brak" data-mecz="brak danych z tego meczu" />
+        ))}
+      </span>
+      {dymek}
+    </>
   );
 }
 
