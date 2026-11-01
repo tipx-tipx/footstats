@@ -18,6 +18,8 @@ import legiPoolLocal from "@/data/demo/legi_pool.json";
 import druzynyFormaLocal from "@/data/demo/druzyny_forma.json";
 import radarLocal from "@/data/demo/radar.json";
 
+import { unstable_rethrow } from "next/navigation";
+
 import { scalWGlab } from "./sklejanie";
 
 import type {
@@ -130,7 +132,8 @@ const BUNDLE_KEYS = [
  * Efekt uboczny, który był powodem zapisania tego w ogóle: bazowy bundle
  * schodzi z 6,3 MB do ~1,4 MB, czyli PONIŻEJ limitu 2 MB data cache Next.
  * Dotąd ten odczyt nie był cache'owany w ogóle i każda instancja szła po
- * komplet do Supabase.
+ * komplet do Supabase. ⚑ Limit liczy się od base64 (×4/3), więc ~1,5 MB to
+ * już granica – paczka zawisła na nim 01.11 (patrz `fetchBundle`).
  *
  * Klucze leniwe celowo NIE przechodzą przez `tylkoNadchodzace` — ten filtr
  * dotyczy wyłącznie kluczy bazowych (typy, mecze, pula legów, radar, STS).
@@ -166,6 +169,8 @@ async function sklejCzesci<T>(
   ile: number,
   fallback: T,
   oknoS: number,
+  /** stempel cyklu w kluczu Data Cache – patrz `naglowkiSupabase` */
+  stempel?: number,
 ): Promise<T> {
   // ⚑ KAŻDA CZĘŚĆ OSOBNYM ZAPYTANIEM (2026-08-25). To nie kosmetyka, tylko
   // jedyny sposób, żeby ciężki klucz w ogóle trafił do Data Cache Next.
@@ -189,10 +194,7 @@ async function sklejCzesci<T>(
         const res = await fetch(
           `${SUPABASE_URL}/rest/v1/app_data?select=payload&key=eq.${nazwa}`,
           {
-            headers: {
-              apikey: SUPABASE_ANON!,
-              Authorization: `Bearer ${SUPABASE_ANON}`,
-            },
+            headers: naglowkiSupabase(stempel),
             next: { revalidate: oknoS },
           },
         );
@@ -312,32 +314,74 @@ function tylkoNadchodzace(bundle: Bundle): Bundle {
   };
 }
 
-async function fetchBundle(): Promise<Bundle> {
+/**
+ * ⚑ PACZKA PO KLUCZU, ZE STEMPLEM CYKLU W KLUCZU PAMIĘCI (2026-11-01).
+ *
+ * Objaw: strona przez całe popołudnie 01.11 pokazywała „kursy sprzed 4 h”,
+ * choć cykle szły co godzinę na zielono, a `meta` w Supabase miała 16:34 UTC.
+ *
+ * Przyczyna: cała paczka szła JEDNYM zapytaniem i jednym wpisem w Data Cache
+ * Next. Po przejściu na FotMob paczka zeszła do ~1,5 MB, a Next trzyma treść
+ * w base64 (×4/3), więc wpis ważył raz 1,97 MB (mieści się w limicie 2 MB),
+ * a raz 2,14 MB (log Vercela 15:54: „items over 2MB can not be cached
+ * (2142852 bytes)”). Gdy raz się zapisał, kolejne, cięższe wersje nie mogły
+ * go nadpisać. Strony są dynamiczne (ciasteczko roli), więc przeterminowany
+ * wpis szedł do każdego wejścia (`patch-fetch`: stary wpis + odświeżenie
+ * w tle), a odświeżenie w tle za każdym razem odbijało się od limitu. Strona
+ * stała na danych z jednego cyklu – nie tylko napis, także typy i kursy.
+ *
+ * Teraz:
+ *  1. Każdy klucz osobnym zapytaniem – największy (`legi_pool`) to ~0,7 MB,
+ *     a pipeline tnie na części wszystko powyżej 1,5 MB (`supa.PROG_SZARDU`),
+ *     więc żaden wpis nie dochodzi do limitu i odświeżanie zawsze się zapisuje.
+ *  2. `meta` (~15 KB) bez pamięci Next, a jej `wygenerowano_ts` idzie jako
+ *     nagłówek do pozostałych zapytań. Next liczy klucz pamięci także
+ *     z nagłówków, więc nowy cykl = nowe wpisy = świeże dane od pierwszego
+ *     wejścia; w obrębie cyklu dalej trafienia bez transferu z Supabase.
+ *     Bez stempla pierwsze wejście po przerwie dostawało stary wpis
+ *     (odświeżanie „w tle” z dokumentacji Next).
+ *
+ * Porażka zapytania = dane lokalne jak dotąd, ale NIE zostają w pamięci
+ * instancji (null → `loadBundle` nie zapamiętuje), następne wejście pyta znowu.
+ */
+const KLUCZE_PACZKI = BUNDLE_KEYS.filter((k) => k !== "meta");
+
+function naglowkiSupabase(stempel?: number): Record<string, string> {
+  return {
+    apikey: SUPABASE_ANON!,
+    Authorization: `Bearer ${SUPABASE_ANON}`,
+    ...(stempel ? { "x-footstats-cykl": String(stempel) } : {}),
+  };
+}
+
+async function pobierzWiersz(key: string, init: RequestInit): Promise<unknown> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/app_data?select=payload&key=eq.${key}`,
+    init,
+  );
+  if (!res.ok) throw new Error(`[data] '${key}': Supabase ${res.status}`);
+  const rows: { payload: unknown }[] = await res.json();
+  return rows[0]?.payload;
+}
+
+async function fetchBundle(): Promise<Bundle | null> {
   if (!SUPABASE_URL || !SUPABASE_ANON) return tylkoNadchodzace(LOCAL);
   try {
-    const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/app_data?select=key,payload` +
-        `&key=in.(${BUNDLE_KEYS.join(",")})`,
-      {
-        headers: {
-          apikey: SUPABASE_ANON,
-          Authorization: `Bearer ${SUPABASE_ANON}`,
-        },
-        // UWAGA: to MUSI być revalidate, nie no-store. Strony są ISR
-        // (prerender statyczny + odświeżanie), a no-store podczas
-        // prerenderu rzuca kontrolny DynamicServerError, który łapał
-        // nasz try/catch – na produkcję zapiekał się LOKALNY fallback
-        // demo zamiast danych z Supabase (incydent 2026-07-21). Zapis
-        // do data cache Next i tak się nie udaje (payload ~14 MB > limit
-        // 2 MB, ostrzeżenie w logach jest kosmetyczne) – realny cache
-        // robi loadBundle niżej, w pamięci instancji.
-        next: { revalidate: ODSWIEZANIE_S },
-      },
-    );
-    if (!res.ok) return tylkoNadchodzace(LOCAL);
-    const rows: { key: keyof Bundle; payload: unknown }[] = await res.json();
-    const map: Record<string, unknown> = Object.fromEntries(
-      rows.map((r) => [r.key, r.payload]),
+    // no-store: strony są dynamiczne (ciasteczko roli), więc to nie rusza
+    // ISR; przy budowaniu kontrolny wyjątek Next przepuszcza
+    // `unstable_rethrow` niżej (incydent 2026-07-21: połknięty wyjątek
+    // zapiekał na produkcji dane demo)
+    const meta = await pobierzWiersz("meta", { headers: naglowkiSupabase(), cache: "no-store" });
+    const ts = (meta as Partial<Meta> | undefined)?.wygenerowano_ts;
+    const stempel = typeof ts === "number" && ts > 0 ? ts : undefined;
+    const map: Record<string, unknown> = { meta };
+    await Promise.all(
+      KLUCZE_PACZKI.map(async (k) => {
+        map[k] = await pobierzWiersz(k, {
+          headers: naglowkiSupabase(stempel),
+          next: { revalidate: ODSWIEZANIE_S },
+        });
+      }),
     );
     // podgląd na localhoście: klucze paczki z plików (jak w `fetchKlucz`,
     // 18.10 – `value_bets` z oznaczeniami przed wysłaniem pipeline); nigdy w produkcji
@@ -365,6 +409,7 @@ async function fetchBundle(): Promise<Bundle> {
             undefined,
             // klucz bazowy = ten sam rytm co reszta bundla (typy, mecze)
             ODSWIEZANIE_S,
+            stempel,
           );
         }),
     );
@@ -383,8 +428,10 @@ async function fetchBundle(): Promise<Bundle> {
       druzyny_forma: (map.druzyny_forma ?? LOCAL.druzyny_forma) as DruzynaForma[],
       radar: (map.radar ?? LOCAL.radar) as Radar,
     });
-  } catch {
-    return tylkoNadchodzace(LOCAL);
+  } catch (e) {
+    unstable_rethrow(e);
+    console.error("[data] paczka z Supabase nie doszła – dane lokalne", e);
+    return null;
   }
 }
 
@@ -405,8 +452,18 @@ function loadBundle(): Promise<Bundle> {
   if (bundleCache && Date.now() - bundleCache.ts < BUNDLE_TTL_MS) {
     return bundleCache.bundle;
   }
-  bundleCache = { ts: Date.now(), bundle: fetchBundle() };
-  return bundleCache.bundle;
+  const surowa = fetchBundle();
+  const wpis = { ts: Date.now(), bundle: surowa.then((b) => b ?? tylkoNadchodzace(LOCAL)) };
+  bundleCache = wpis;
+  // porażka (dane lokalne) ani wyjątek Next przy budowaniu nie zostają
+  // w pamięci na minutę – następne wejście pyta Supabase od nowa
+  const zapomnij = () => {
+    if (bundleCache === wpis) bundleCache = null;
+  };
+  void surowa.then((b) => {
+    if (!b) zapomnij();
+  }, zapomnij);
+  return wpis.bundle;
 }
 
 export async function getValueBets(): Promise<ValueBet[]> {
