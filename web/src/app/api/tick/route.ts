@@ -107,6 +107,51 @@ async function odpalBetclica(
   }
 }
 
+/**
+ * BAZA MECZÓW FOTMOB RAZ NA DOBĘ (2026-11-01, etap 7 planu FotMob).
+ *
+ * `fm_baza.yml` ma cron 5:40 UTC, a 01.11 GitHub go po prostu nie utworzył —
+ * ta sama best-effort pułapka co wyżej (wcześniej `opta.yml` 27.10). Bez bazy
+ * historia zawodników i drużyn po 29.10 stoi, więc odpalamy ją stąd: po
+ * `GODZINA_FM_BAZA_UTC` i najwyżej raz na `MIN_ODSTEP_FM_BAZA_S`. Gdyby cron
+ * GitHuba jednak ruszył, drugi przebieg czeka w `concurrency` i nie ma czego
+ * pobrać (każdy mecz pobierany raz) — koszt to kilka zapytań o terminarz.
+ */
+const GH_WORKFLOW_FM_BAZA = "fm_baza.yml";
+const GODZINA_FM_BAZA_UTC = 6;
+const MIN_ODSTEP_FM_BAZA_S = 20 * 3600;
+const KLUCZ_STANU_FM_BAZA = "fm_baza_dispatch";
+
+async function odpalBazeFotmob(
+  naglowkiGh: Record<string, string>,
+  now: number,
+  supaUrl?: string,
+  supaKey?: string,
+): Promise<string> {
+  // bez stanu nie wiemy, czy dziś już było — wtedy nic (raz na dobę to raz)
+  if (!supaUrl || !supaKey) return "brak stanu";
+  if (new Date(now * 1000).getUTCHours() < GODZINA_FM_BAZA_UTC) return "za wcześnie";
+  try {
+    const stan = await readAppData(supaUrl, supaKey, KLUCZ_STANU_FM_BAZA);
+    const ostatni = typeof stan.ts === "number" ? stan.ts : 0;
+    if (now - ostatni < MIN_ODSTEP_FM_BAZA_S) return "dziś już było";
+    const res = await fetch(
+      `https://api.github.com/repos/${GH_REPO}/actions/workflows/${GH_WORKFLOW_FM_BAZA}/dispatches`,
+      {
+        method: "POST",
+        headers: { ...naglowkiGh, "Content-Type": "application/json" },
+        body: JSON.stringify({ ref: GH_REF }),
+      },
+    );
+    if (!res.ok) return `GitHub ${res.status}`;
+    await writeAppData(supaUrl, supaKey, KLUCZ_STANU_FM_BAZA, { ts: now });
+    return "odpalono";
+  } catch {
+    // awaria bazy FotMob nie może zablokować zegara cyklu
+    return "błąd";
+  }
+}
+
 function podanySekret(req: Request): string {
   const auth = req.headers.get("authorization") ?? "";
   if (auth.toLowerCase().startsWith("bearer ")) return auth.slice(7).trim();
@@ -146,6 +191,7 @@ async function tick(req: Request) {
 
   // 0. BETCLIC — niezależnie od tego, co dalej stanie się z cyklem
   const betclic = await odpalBetclica(naglowkiGh, now, supaUrl, supaKey);
+  const fm_baza = await odpalBazeFotmob(naglowkiGh, now, supaUrl, supaKey);
 
   // 1. ODSTĘP. Stan trzymamy w Supabase, bo instancje serverless nie mają
   //    wspólnej pamięci — zmienna w module resetuje się co zimny start.
@@ -160,6 +206,7 @@ async function tick(req: Request) {
         powod: "za wcześnie",
         za_ile_s: MIN_ODSTEP_S - minelo,
         betclic,
+        fm_baza,
       });
     }
   }
@@ -183,6 +230,7 @@ async function tick(req: Request) {
           odpalono: false,
           powod: "cykl już chodzi",
           betclic,
+        fm_baza,
         });
       }
     }
@@ -201,14 +249,14 @@ async function tick(req: Request) {
   );
   if (!res.ok) {
     return NextResponse.json(
-      { ok: false, odpalono: false, powod: `GitHub ${res.status}`, betclic },
+      { ok: false, odpalono: false, powod: `GitHub ${res.status}`, betclic, fm_baza },
       { status: 502 },
     );
   }
   if (supaUrl && supaKey) {
     await writeAppData(supaUrl, supaKey, KLUCZ_STANU, { ts: now });
   }
-  return NextResponse.json({ ok: true, odpalono: true, betclic });
+  return NextResponse.json({ ok: true, odpalono: true, betclic, fm_baza });
 }
 
 // GET, bo tak wołają darmowe pingery (cron-job.org, UptimeRobot). POST dla

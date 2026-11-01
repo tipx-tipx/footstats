@@ -158,6 +158,37 @@ terminarza (próg ~79%); oferta Superbetu w oknie terminarza: ≥ 60 rynków 99,
 Cúcuta – Santa Fe, brak w FotMob), ≥ 30 rynków 91,5% (reszta: Malta, Nikaragua, Jamajka, francuskie
 amatorskie – bez ofert zawodników), całość 57,5% (statshub 29.10: 57%). Bramka przechodzi.
 
+**Etap 6 – rozliczenia (01.11, 20f5c4a).** Rozliczanie już szło przez przełącznik (zapas po 365:
+wynik, mapa strzałów, historia zawodnika, statystyki drużyny = funkcje statshub → nasza baza), więc
+doszło: dociąganie z FotMob meczów z nierozliczonymi typami (raz, po 3,5 h od startu; lekkie
+rozliczanie 80 meczów/przebieg, cykl 40), `rozlicz_only` wpina własne źródło, zapis bazy czyta świeżą
+wersję miesiąca i scala (dwa joby piszą te same klucze), `fm_baza` mapuje zawodników z meczów
+dociągniętych przez rozliczanie. Reguły na własnym źródle: wiersz po numerze, potem po nazwisku
+(jednoznacznie – Victor Hugo / Vitor Hugo we Flamengo); **„nie zagrał” z braku w meczu ze składami
+tylko u zawodnika znanego FotMob** (14 z 3196 graczy bez wiersza – pseudonimy „Bomba”, Siebatcheu →
+„Jordan Pefok”, para FotMob przy naszym numerze syntetycznym – żaden nie miał wiersza FotMob gdziekolwiek;
+83 prawdziwe „nie zagrał” zostają); liczniki zza pola / głową z wierszy meczu; superzmiana na tych
+rynkach; spalone z wiersza (tylko na FotMob – 100% w 4b); bez sufitu zapytań drużynowych.
+- **Bramka** (typy 25–29.10 rozliczone ponownie SAMYM FotMob – 365 wyłączone, bank i magazyn ucięte na
+  25.10; mecze z superzmianą pobrane ponownie, bo zapis sprzed c1cf5e9 nie miał numeru zmiennika):
+  rozstrzygnięte 9979 z 10 225, **zgodne z księgą 9836 = 98,6%** (drużyny 1683/1695 = 99,3%).
+  Różnice: 83 inna liczba zdarzeń u dostawcy (±1), 30 księga „nie zagrał” a FotMob pokazuje grę
+  (Olympiakos – Kalamata, PAOK – AEK – stara reguła „nie ma go w 365 = nie grał”), 27 inne parowanie
+  zmian przy podwójnej zmianie. Czeka 246: 95 karne w EFL Cup (FotMob nie odróżnia karnych zaraz po
+  90 min od karnych po dogrywce, minuty bywają ucięte na 90 – zostawiamy 365), 117 „nie zagrał” bez
+  znanej tożsamości. **100% z księgą nie jest osiągalne, bo księga ma błędy:** Midtjylland – Lyngby
+  25.10 w księdze 1:1, naprawdę 3:2 (FotMob dobrze). W produkcji najpierw 365 – FotMob to zapas.
+- Mapa po `fm_baza` 01.11: 20 290 zawodników z parą, 9210 zastępczych (nowi z 405 meczów 31.10–01.11,
+  głównie niższe ligi bez historii w banku); 5403 par wskazuje nasz numer syntetyczny – w typach
+  25–29.10 żadna para po numerze nie trafiła w syntetyczny, więc bez wpływu na rozliczenia.
+
+**Etap 7 – przygotowanie (01.11, d750369).** Pamięć szczegółów przed meczem `fm_przed_meczem`
+(przycięte składy, niedostępni, sędzia; ważność wg czasu do gwizdka: > 24 h – 12 h, 6–24 h – 4 h,
+1,5–6 h – 1 h, ostatnie 1,5 h – 15 min; ogłoszony skład do gwizdka; odmowa = starsze dane z pamięci).
+`cycle.yml`, `rozlicz.yml`, `magazyn.yml` dostały `ZRODLO_STATYSTYK: ${{ vars.ZRODLO_STATYSTYK || 'fotmob' }}`
+(powrót = zmienna repo), limity 25 / 15 min. Magazyn `hd_*` czyta przez własne źródło (inaczej
+kalendarz drużyn – zmęczenie, „opuścił mecz” – i model uczony stałyby na 29.10).
+
 ## ⚑ Wyłączone do etapu 7 (31.10)
 `cycle.yml`, `rozlicz.yml`, `magazyn.yml` – wyłączone ręcznie (`gh workflow disable`): przy 403
 statshub cykl kończył się na czerwono co 30 min (~30 maili/dobę), rozliczanie wisiało do limitu
