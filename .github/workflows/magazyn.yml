@@ -61,4 +61,7 @@ jobs:
           # w produkcji zamiast czytac pusto: patrz magazyn_repo._w_produkcji
           STAN_REPO: ${{ vars.STAN_REPO }}
           STAN_TOKEN: ${{ secrets.STAN_TOKEN }}
+          # ⚑ źródło statystyk (etap 7 planu FotMob, 01.11): własny statshub z FotMob;
+          # powrót na statshub = zmienna repozytorium ZRODLO_STATYSTYK=statshub
+          ZRODLO_STATYSTYK: ${{ vars.ZRODLO_STATYSTYK || 'fotmob' }}
         run: python scripts/backfill_magazyn_druzyn.py --wszystkie

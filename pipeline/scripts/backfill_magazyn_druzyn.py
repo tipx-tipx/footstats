@@ -44,6 +44,15 @@ def _main() -> None:
 
     supa.straz_odciecia("magazyn")
 
+    # ⚑ WŁASNY STATSHUB (etap 7 planu FotMob): historia drużyn po 29.10 z bazy
+    # FotMob (rekord magazynu = statshub na 744 meczach – bramka 4d), terminarz
+    # 7 dni z FotMob. Bez tego magazyn stałby na 29.10, a kalendarz drużyn
+    # (zmęczenie, „opuścił mecz”) i model uczony widziałyby wypoczęte drużyny.
+    from footstats.sources import statshub
+    if statshub.ZRODLO_STATYSTYK == "fotmob":
+        from footstats.sources import wlasny_statshub
+        statshub.ustaw_wlasne_zrodlo(wlasny_statshub.zbuduj())
+
     wszystkie = "--wszystkie" in sys.argv
     prof = (supa.get_key("druzyny_profil") or {}).get("druzyny") or {}
     ids = [int(t) for t in prof]

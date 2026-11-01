@@ -735,9 +735,22 @@ def main(publikuj: bool = False) -> bool:
         pierwsze = {mid for mid, sb in tryb.sb_ev_by_mid.items()
                     if int((sb or {}).get("marketCount") or 0) >= KADRY_MIN_RYNKOW_SB}
         pierwsze |= set(tryb.druzynowe_mids)
-        print(f"Własny statshub: przed meczami (priorytet {len(pierwsze)}) "
-              f"{wlasne.przed_meczami(tryb.events, pierwsze=pierwsze)}; "
+        # pamięć szczegółów przed meczem (etap 7). Zapisuje też dry-run: to
+        # pamięć danych źródła, nie strona ani księga – a bez niej nie da się
+        # zmierzyć efektu na dwóch cyklach próbnych. Awaria odczytu = pusta
+        # pamięć i BEZ zapisu (nie nadpisujemy tego, czego nie przeczytaliśmy)
+        from .. import supa
+        pamiec, ok_p = supa.get_key_ok(wlasny_statshub.KLUCZ_PAMIECI_PRZED_MECZEM)
+        pamiec = dict(pamiec or {}) if ok_p else {}
+        n_przed = len(pamiec)
+        print(f"Własny statshub: przed meczami (priorytet {len(pierwsze)}, w pamięci {n_przed}"
+              f"{'' if ok_p else ' – odczyt padł'}) "
+              f"{wlasne.przed_meczami(tryb.events, pierwsze=pierwsze, pamiec=pamiec)}; "
               f"FotMob {fotmob.statystyki()}", flush=True)
+        if ok_p:
+            ok_z = supa.put_key(wlasny_statshub.KLUCZ_PAMIECI_PRZED_MECZEM, pamiec)
+            print(f"Własny statshub: pamięć przed meczem {n_przed} → {len(pamiec)}, zapis "
+                  f"{'OK' if ok_z else 'PADŁ'}", flush=True)
     print(f"[stoper] odkrywanie meczów + parowanie z Superbetem: "
           f"{(time.monotonic() - t0) / 60:.1f} min", flush=True)
     if tryb is None:

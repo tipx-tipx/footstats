@@ -754,10 +754,50 @@ _rozszerz_4e()
 HORYZONT_PRZED_MECZEM_S = 48 * 3600
 BUDZET_PRZED_MECZEM = 150      # zapytań o szczegóły nadchodzących meczów na przebieg
 
+# ⚑ PAMIĘĆ SZCZEGÓŁÓW PRZED MECZEM (01.11, etap 7 planu FotMob). Cykl co 30 min
+# pytał o 150 meczów za każdym razem (cykl próbny: 166 zapytań FotMob, ~8 tys.
+# na dobę) – a skład i niedostępni meczu za dwa dni nie zmieniają się co pół
+# godziny. Przycięte szczegóły (`przytnij_przed_meczem`, kilka KB) leżą w stanie
+# pod `KLUCZ_PAMIECI_PRZED_MECZEM`; świeżość zależy od czasu do gwizdka
+# (`WAZNOSC_PRZED_MECZEM`: [do startu ≥ s, ważność s]). Ogłoszony skład (ostatnia
+# godzina) już się nie zmienia – zostaje do gwizdka.
+KLUCZ_PAMIECI_PRZED_MECZEM = "fm_przed_meczem"
+WAZNOSC_PRZED_MECZEM = ((24 * 3600, 12 * 3600), (6 * 3600, 4 * 3600), (90 * 60, 3600), (0, 15 * 60))
+
+
+def przytnij_przed_meczem(dane: dict) -> dict:
+    """Z surowych `matchDetails` tylko to, co czyta `mecz_nadchodzacy`."""
+    g = dane.get("general") or {}
+    c = dane.get("content") or {}
+    lu = c.get("lineup") or {}
+    out_lu = {"lineupType": lu.get("lineupType")}
+    for strona in ("homeTeam", "awayTeam"):
+        t = lu.get(strona) or {}
+        out_lu[strona] = {
+            "starters": [{"id": p.get("id"), "name": p.get("name")} for p in t.get("starters") or []],
+            "subs": [{"id": p.get("id"), "name": p.get("name")} for p in t.get("subs") or []],
+            "unavailable": [{"id": p.get("id"), "name": p.get("name"), "unavailability": p.get("unavailability")}
+                            for p in t.get("unavailable") or []]}
+    sedzia = ((c.get("matchFacts") or {}).get("infoBox") or {}).get("Referee")
+    return {"general": {k: g.get(k) for k in ("matchId", "parentLeagueId", "leagueId")},
+            "header": {"teams": [{"id": (x or {}).get("id")} for x in (dane.get("header") or {}).get("teams") or []]},
+            "content": {"lineup": out_lu, "matchFacts": {"infoBox": {"Referee": sedzia} if sedzia else {}}}}
+
+
+def swieze_przed_meczem(wpis: dict | None, start: int, teraz: int) -> bool:
+    if not wpis or not wpis.get("dane"):
+        return False
+    if (((wpis["dane"].get("content") or {}).get("lineup") or {}).get("lineupType")
+            in TYPY_SKLADU_POTWIERDZONEGO):
+        return True
+    do = int(start) - int(teraz)
+    waznosc = next(w for prog, w in WAZNOSC_PRZED_MECZEM if do >= prog)
+    return int(teraz) - int(wpis.get("pobrano") or 0) < waznosc
+
 
 def _przed_meczami(self, events: list[dict], teraz: int | None = None,
                    horyzont_s: int = HORYZONT_PRZED_MECZEM_S, budzet: int = BUDZET_PRZED_MECZEM,
-                   pierwsze: set[int] | None = None) -> dict:
+                   pierwsze: set[int] | None = None, pamiec: dict | None = None) -> dict:
     """Szczegóły meczów z najbliższych `horyzont_s` (składy, niedostępni,
     sędzia) – najpierw mecze z `pierwsze` (numery meczów: oferta zawodnicza
     Superbetu, rozgrywki drużynowe), w każdej grupie najbliższe najpierw, do
@@ -778,26 +818,52 @@ def _przed_meczami(self, events: list[dict], teraz: int | None = None,
     pierwsze = pierwsze or set()
     kolejka = sorted((e for e in events if 0 < int(e.get("timeStartTimestamp") or 0) - teraz <= horyzont_s),
                      key=lambda e: (int(e["id"]) not in pierwsze, int(e["timeStartTimestamp"])))
+    if pamiec is not None:
+        # mecze sprzed 3 h wypadają (rozegrane – szczegóły po gwizdku zbiera `fm_baza`)
+        for k in [k for k, w in pamiec.items() if int(w.get("start") or 0) < teraz - 3 * 3600]:
+            del pamiec[k]
+    odmowa = False
     for ev in kolejka:
         m = self._fm_mecz_po_ev.get(int(ev["id"]))
         if m is None:
             licz["bez_meczu_fotmob"] += 1
             continue
-        if licz["pobrane"] >= budzet:
-            licz["poza_budzetem"] += 1
-            continue
+        start = int(ev["timeStartTimestamp"])
+        wpis = (pamiec or {}).get(str(m["id"]))
+        if swieze_przed_meczem(wpis, start, teraz):
+            dane = wpis["dane"]
+            licz["z_pamieci"] += 1
+        elif odmowa or licz["pobrane"] >= budzet:
+            if not (wpis and wpis.get("dane")):
+                licz["odmowa_bez_danych" if odmowa else "poza_budzetem"] += 1
+                continue
+            dane = wpis["dane"]                           # starsze dane lepsze niż żadne
+            licz["z_pamieci_przeterminowane"] += 1
+        else:
+            try:
+                dane = przytnij_przed_meczem(fotmob.szczegoly_meczu(m["id"]))
+            except (fotmob.FotmobOdmowa, fotmob.FotmobLimit) as e:
+                licz["odmowa"] += 1
+                self._odmowa_przed_meczem = str(e)
+                odmowa = True
+                if not (wpis and wpis.get("dane")):
+                    continue
+                dane = wpis["dane"]
+                licz["z_pamieci_przeterminowane"] += 1
+            except Exception:                            # noqa: BLE001
+                licz["blad"] += 1
+                continue
+            else:
+                licz["pobrane"] += 1
+                if int(ev["id"]) in pierwsze:
+                    licz["pobrane_z_priorytetu"] += 1
+                if pamiec is not None:
+                    pamiec[str(m["id"])] = {"pobrano": teraz, "start": start, "dane": dane}
         try:
-            wyn = self.mecz_nadchodzacy(fotmob.szczegoly_meczu(m["id"]))
-        except (fotmob.FotmobOdmowa, fotmob.FotmobLimit) as e:
-            licz["odmowa"] += 1
-            self._odmowa_przed_meczem = str(e)
-            break
+            wyn = self.mecz_nadchodzacy(dane)
         except Exception:                                # noqa: BLE001
             licz["blad"] += 1
             continue
-        licz["pobrane"] += 1
-        if int(ev["id"]) in pierwsze:
-            licz["pobrane_z_priorytetu"] += 1
         licz["sklad_potwierdzony" if wyn["potwierdzony"] else
              "sklad_przewidywany" if wyn["przewidywany"] else "bez_skladu"] += 1
         licz["niedostepni"] += sum(len(v) for v in wyn["niedostepni"].values())

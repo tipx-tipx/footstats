@@ -476,3 +476,41 @@ def test_przed_meczami_najpierw_mecze_z_priorytetu(monkeypatch):
     pytane.clear()
     z.przed_meczami(evs, teraz=ts - 3 * 3600, budzet=1)                   # bez priorytetu – najbliższy
     assert pytane == [11]
+
+
+def test_pamiec_przed_meczem_ttl_i_te_same_dane_po_przycieciu(monkeypatch):
+    # przycięte szczegóły dają ten sam wynik `mecz_nadchodzacy` co surowe
+    d = _przed("przed_pl_chelsea_mu.json.gz")
+    t = lambda: T.Tozsamosc({"druzyny": {"8455": 38, "10260": 35}})
+    assert W.Zrodlo(t(), {}, {}, {}).mecz_nadchodzacy(W.przytnij_przed_meczem(d)) == \
+        W.Zrodlo(t(), {}, {}, {}).mecz_nadchodzacy(d)
+    ts = DZIEN + 12 * 3600
+    _terminarz_fm(monkeypatch, [_m(int(d["general"]["matchId"]), ts, h=8455, a=10260)])
+    pytane = []
+    monkeypatch.setattr(fotmob, "szczegoly_meczu", lambda mid: pytane.append(mid) or d)
+    pamiec = {"stary": {"pobrano": 0, "start": ts - 34 * 3600, "dane": {}}}   # 4 h przed „teraz”
+    z = W.Zrodlo(t(), {}, {}, {})
+    ev = z.by_date(DZIEN)["data"][0]["events"]
+    assert z.przed_meczami([ev], teraz=ts - 30 * 3600, pamiec=pamiec)["pobrane"] == 1
+    assert "stary" not in pamiec and len(pamiec) == 1            # rozegrany mecz wypada
+    # 30 h przed meczem dane ważne 12 h; 8 h przed – już 4 h (pobrane 22 h temu → znowu)
+    licz = z.przed_meczami([ev], teraz=ts - 25 * 3600, pamiec=pamiec)
+    assert licz["z_pamieci"] == 1 and len(pytane) == 1
+    assert z.fetch_predicted_lineup(ev["id"])["home"]              # z pamięci tak samo jak z sieci
+    z.przed_meczami([ev], teraz=ts - 8 * 3600, pamiec=pamiec)
+    assert len(pytane) == 2
+    # odmowa FotMob – starsze dane z pamięci zamiast braku
+    def odmowa(mid):
+        raise fotmob.FotmobOdmowa("403")
+    monkeypatch.setattr(fotmob, "szczegoly_meczu", odmowa)
+    licz = z.przed_meczami([ev], teraz=ts - 3600, pamiec=pamiec)
+    assert licz["odmowa"] == 1 and licz["z_pamieci_przeterminowane"] == 1
+
+
+def test_swiezosc_przed_meczem_sklad_ogloszony_do_gwizdka():
+    dane = {"content": {"lineup": {"lineupType": "standard"}}}
+    assert W.swieze_przed_meczem({"pobrano": 0, "dane": dane}, 10_000, 9_000)
+    dane = {"content": {"lineup": {"lineupType": "predicted"}}}
+    assert not W.swieze_przed_meczem({"pobrano": 8_000, "dane": dane}, 10_000, 9_000)   # < 90 min: 15 min
+    assert W.swieze_przed_meczem({"pobrano": 8_500, "dane": dane}, 10_000, 9_000)
+    assert not W.swieze_przed_meczem(None, 10_000, 9_000)

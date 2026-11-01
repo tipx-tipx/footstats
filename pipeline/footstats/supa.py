@@ -311,6 +311,9 @@ MAGAZYN: dict[str, str] = {
     **{f"fm_baza_{r}{m:02d}": "repo" for r in range(2026, 2031) for m in range(1, 13)},
     # mapa tożsamości FotMob → numery statshub/Sofascore (etap 3)
     "fm_tozsamosc": "repo",
+    # pamięć szczegółów przed meczem FotMob (etap 7, `wlasny_statshub`) –
+    # składy, niedostępni, sędzia; pisze tylko cykl przy publikacji
+    "fm_przed_meczem": "repo",
 }
 
 # nazwa backendu -> obiekt z `pobierz(key) -> (payload, ok)` i

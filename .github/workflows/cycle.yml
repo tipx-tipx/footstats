@@ -130,13 +130,17 @@ jobs:
       - name: Rozlicz zakończone typy przed liczeniem (szybki wynik)
         working-directory: pipeline
         continue-on-error: true
-        timeout-minutes: 10
+        # 10 -> 15 (01.11): wczytanie własnego statshub + dociąganie meczów
+        timeout-minutes: 15
         env:
           PYTHONIOENCODING: utf-8
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           STAN_REPO: ${{ vars.STAN_REPO }}
           STAN_TOKEN: ${{ secrets.STAN_TOKEN }}
+          # ⚑ źródło statystyk (etap 7 planu FotMob, 01.11): własny statshub z FotMob;
+          # powrót na statshub = zmienna repozytorium ZRODLO_STATYSTYK=statshub
+          ZRODLO_STATYSTYK: ${{ vars.ZRODLO_STATYSTYK || 'fotmob' }}
         run: python -m footstats.jobs.rozlicz_only
 
       - name: Przelicz okazje i wypchnij do Supabase
@@ -149,4 +153,7 @@ jobs:
           # w produkcji zamiast czytac pusto: patrz magazyn_repo._w_produkcji
           STAN_REPO: ${{ vars.STAN_REPO }}
           STAN_TOKEN: ${{ secrets.STAN_TOKEN }}
+          # ⚑ źródło statystyk (etap 7 planu FotMob, 01.11): własny statshub z FotMob;
+          # powrót na statshub = zmienna repozytorium ZRODLO_STATYSTYK=statshub
+          ZRODLO_STATYSTYK: ${{ vars.ZRODLO_STATYSTYK || 'fotmob' }}
         run: python -m footstats.jobs.cycle
