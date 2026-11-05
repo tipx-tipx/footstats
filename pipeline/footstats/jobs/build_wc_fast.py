@@ -1662,6 +1662,43 @@ def do_pomiaru_szerokiego(mecz_id, zawodnik_id, rynek, linia, kurs,
     return h < POMIAR_SZEROKI_UDZIAL
 
 
+# ⚑ POMIAR POKRYCIA (05.11, właściciel: „ten pomiar też możesz zrobić”).
+# Szeroki zapis wyżej wyczerpuje limit 300 linii W KAŻDYM cyklu (log 05.11:
+# „zebrano 300, limit cyklu 300”), więc linie z wysokim pokryciem trafiały do
+# księgi przypadkiem – od 25.09 zza pola z pokryciem ≥ 70% i formą ≥ 4/5 było
+# 14. Tu OSOBNY budżet i KAŻDA linia (bez próbki), która odpowiada na pytania
+# właściciela: czy pokrycie 5–7/10 (+ forma, skład, rywal, H2H w `argumenty`)
+# bije cenę na kursach 1,45–2,40 – w tym pasmo 1,45–1,80 bez półki u
+# zawodników i pojedyncze linie zza pola odrzucane przez drabinki („jedna
+# linia”). Tylko księga (`odrzucony`, poza Skutecznością, kalibracją
+# i stroną); odbiory pominięte (właściciel 05.11). Pomiar ma koniec, żeby
+# księga nie puchła na stałe: ~800 linii/dobę.
+POMIAR_POKRYCIA_KURS = (1.45, 2.40)
+POMIAR_POKRYCIA_MIN = 0.5            # trafione / rozegrane w ostatnich 10
+POMIAR_POKRYCIA_MIN_ZAGRANYCH = 7    # jak „Najlepsze linie” – 3/3 nie jest dowodem
+POMIAR_POKRYCIA_MAX_CYKL = 600
+POMIAR_POKRYCIA_BEZ_RYNKOW = frozenset({"tackles"})
+POMIAR_POKRYCIA_DO_TS = int(_dt.datetime(2026, 11, 20, tzinfo=_dt.timezone.utc).timestamp())
+
+
+def do_pomiaru_pokrycia(rynek, kurs, oczekiwane_minuty, trafione: int,
+                        rozegrane: int, start_ts) -> bool:
+    """Czy linia zawodnika wchodzi do pomiaru pokrycia (patrz wyżej)."""
+    lo, hi = POMIAR_POKRYCIA_KURS
+    try:
+        if not (lo <= float(kurs) <= hi):
+            return False
+        if float(oczekiwane_minuty or 0.0) < POMIAR_SZEROKI_MIN_MINUT:
+            return False
+        if int(start_ts or 0) >= POMIAR_POKRYCIA_DO_TS:
+            return False
+    except (TypeError, ValueError):
+        return False
+    if rynek in POMIAR_POKRYCIA_BEZ_RYNKOW or rozegrane < POMIAR_POKRYCIA_MIN_ZAGRANYCH:
+        return False
+    return trafione / rozegrane >= POMIAR_POKRYCIA_MIN - 1e-9
+
+
 def pokrycie_historii(counts, minutes, linia: float, n: int,
                       min_minut: float = 15.0) -> tuple[int, int]:
     """Ile z ostatnich `n` występów (≥ `min_minut`, najnowszy pierwszy, jak
@@ -7114,6 +7151,8 @@ def _main_impl(tryb=None):
     ODRZUCONE_POMIAR_DRUZYN_MAX = 60
     # szeroki zapis kandydatów do selektora — patrz POMIAR_SZEROKI_KURS
     pomiar_szeroki: list[dict] = []
+    # ile z nich to pomiar pokrycia (osobny budżet, patrz POMIAR_POKRYCIA_KURS)
+    _n_pomiaru_pokrycia = [0]
 
     # PEŁNE POKRYCIE p_model per (zawodnik, rynek, linia) — dla scannera value
     # betów STS. Model „widzi" KAŻDĄ kwotowaną linię, nie tylko te, które weszły
@@ -7894,10 +7933,17 @@ def _main_impl(tryb=None):
             # SZEROKI ZAPIS KANDYDATÓW (patrz POMIAR_SZEROKI_KURS) — cechy
             # sprzed meczu: szansa obu rachunków, pokrycie 10, forma 5, minuty,
             # skład; kalendarz i argumenty dokłada stempel przed księgą
-            if (len(pomiar_szeroki) < POMIAR_SZEROKI_MAX_CYKL
-                    and do_pomiaru_szerokiego(mid, tr.player_id, mk, l, over_odd,
-                                              _mm_zaw.expected_minutes)):
-                _pt10, _pz10 = pokrycie_historii(tr.counts, tr.minutes, l, 10)
+            _pt10, _pz10 = pokrycie_historii(tr.counts, tr.minutes, l, 10)
+            _do_szerokiego = (len(pomiar_szeroki) - _n_pomiaru_pokrycia[0] < POMIAR_SZEROKI_MAX_CYKL
+                              and do_pomiaru_szerokiego(mid, tr.player_id, mk, l, over_odd,
+                                                        _mm_zaw.expected_minutes))
+            _do_pokrycia = (not _do_szerokiego
+                            and _n_pomiaru_pokrycia[0] < POMIAR_POKRYCIA_MAX_CYKL
+                            and do_pomiaru_pokrycia(mk, over_odd, _mm_zaw.expected_minutes,
+                                                    _pt10, _pz10, ts))
+            if _do_pokrycia:
+                _n_pomiaru_pokrycia[0] += 1
+            if _do_szerokiego or _do_pokrycia:
                 _pt5, _pz5 = pokrycie_historii(tr.counts, tr.minutes, l, 5)
                 _min6 = [float(mi) for mi in tr.minutes if float(mi or 0) > 0][:6]
                 pomiar_szeroki.append({
@@ -7922,6 +7968,7 @@ def _main_impl(tryb=None):
                     **({"forma5_traf": _pt5, "forma5_z": _pz5} if _pz5 else {}),
                     **({"minuty_sr6": round(sum(_min6) / len(_min6), 1)}
                        if _min6 else {}),
+                    **({"pomiar_pokrycia": True} if _do_pokrycia else {}),
                     "odrzucony": True,
                     "odrzucenie_powod": POWOD_POMIARU_SZEROKIEGO,
                 })
@@ -12784,7 +12831,8 @@ def _main_impl(tryb=None):
         odrzucone_pomiar = list(odrzucone_pomiar) + _szerokie
     print(f"Szeroki zapis kandydatów (zawodnicy, kurs {POMIAR_SZEROKI_KURS[0]:.2f}"
           f"–{POMIAR_SZEROKI_KURS[1]:.2f}): {len(_szerokie)} linii do księgi "
-          f"(zebrano {len(pomiar_szeroki)}, limit cyklu {POMIAR_SZEROKI_MAX_CYKL})")
+          f"(zebrano {len(pomiar_szeroki)}, limit cyklu {POMIAR_SZEROKI_MAX_CYKL}; "
+          f"w tym pomiar pokrycia {_n_pomiaru_pokrycia[0]}, limit {POMIAR_POKRYCIA_MAX_CYKL})")
 
     # ⚑ KALENDARZ DRUŻYNY W KSIĘDZE (2026-10-18, plan „90%”, rozbiór przegranych)
     # — patrz `argumenty.kalendarz`. Następny mecz tylko z listy meczów cyklu

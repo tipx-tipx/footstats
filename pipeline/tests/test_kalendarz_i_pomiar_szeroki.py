@@ -69,6 +69,22 @@ def test_pomiar_szeroki_wybor_linii():
     assert not B.do_pomiaru_szerokiego(1, p, "shots", 1.5, None, 80.0)
 
 
+def test_pomiar_pokrycia_kazda_linia_od_5_z_10():
+    """05.11: osobny budżet – każda linia 1,45–2,40 z pokryciem ≥ 5/10 przy
+    ≥ 7 rozegranych, bez odbiorów, do końca pomiaru."""
+    ts = B.POMIAR_POKRYCIA_DO_TS - 86_400
+    assert B.do_pomiaru_pokrycia("shots_outside_box", 1.75, 80.0, 5, 10, ts)
+    assert B.do_pomiaru_pokrycia("shots", 1.45, 80.0, 4, 7, ts)          # 4/7 = 57%
+    assert not B.do_pomiaru_pokrycia("shots", 1.75, 80.0, 4, 10, ts)     # 40%
+    assert not B.do_pomiaru_pokrycia("shots", 1.75, 80.0, 6, 6, ts)      # za mało meczów
+    assert not B.do_pomiaru_pokrycia("shots", 1.44, 80.0, 8, 10, ts)     # za tani
+    assert not B.do_pomiaru_pokrycia("shots", 2.41, 80.0, 8, 10, ts)     # za drogi
+    assert not B.do_pomiaru_pokrycia("shots", 1.75, 30.0, 8, 10, ts)     # rezerwowy
+    assert not B.do_pomiaru_pokrycia("tackles", 1.75, 80.0, 8, 10, ts)   # odbiory – nie
+    assert not B.do_pomiaru_pokrycia("shots", 1.75, 80.0, 8, 10, B.POMIAR_POKRYCIA_DO_TS)
+    assert not B.do_pomiaru_pokrycia("shots", None, 80.0, 8, 10, ts)
+
+
 def test_pokrycie_historii():
     counts = [3, 0, 2, 2, 1, 4, 0, 2, 3, 1, 5]
     minutes = [90, 5, 90, 80, 90, 90, 70, 90, 90, 90, 90]   # 5 min się nie liczy
