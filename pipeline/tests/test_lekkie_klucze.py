@@ -94,8 +94,53 @@ def test_linie_dnia_tylko_przyszle_mecze_cena_i_pokrycie():
     k = L.klucz_linii_dnia(players, kursy, mecze, teraz=1000)
     # mecz 8 już trwa; 0,5 za tanio (1,08 < 1,30); 2,5: 3/10 – odpada; Z2 słaby
     assert k["linie"] == [[7, 1, "shots", 1.5, 1.4, 1.62]]
-    assert k["zaw"] == {"1": ["Z1", "F", "A", False]}
+    # piąte pole: mecze do dymka kratek (tu bez `ts` – pusta lista)
+    assert k["zaw"] == {"1": ["Z1", "F", "A", False, []]}
     assert k["forma"]["1|shots"][0][:3] == [3, 2, 2]
+    assert k["w"] == 2 and k["prog"] == 0.5
+
+
+def test_linie_dnia_prog_50_procent():
+    # 5/10 powyżej 1,5 – wchodzi od 05.11 (było od 70%); 4/10 nie
+    # (w oknie 5 obaj 2/5 – okno 5 ich nie ratuje)
+    players = [_zaw(1, [0, 2, 0, 2, 0, 2, 2, 0, 2, 0]),
+               _zaw(2, [0, 2, 0, 2, 0, 2, 0, 0, 2, 0])]
+    kursy = {7: {1: {"shots": {"1.5": [1.9, None]}}, 2: {"shots": {"1.5": [1.9, None]}}}}
+    k = L.klucz_linii_dnia(players, kursy, [{"id": 7, "kickoff_ts": 2000}], teraz=1000)
+    assert k["linie"] == [[7, 1, "shots", 1.5, 1.9, None]]
+
+
+def test_linie_dnia_rywale_do_dymka():
+    z = _zaw(1, [3, 2, 2, 2])
+    z["forma"]["shots"].update(ts=[400 * 86400, 300 * 86400, 200 * 86400, 100 * 86400],
+                               rywale=["Legia", "Lech", "", "Legia"])
+    # kartki: inna historia (bez meczów z dni 300 i 200) – własne pozycje
+    z["forma"]["yellow_card"] = {"ostatnie": [1, 1, 1, 1, 1], "minuty": [90] * 5,
+                                 "ts": [400 * 86400, 100 * 86400, 90 * 86400, 80 * 86400, 70 * 86400],
+                                 "rywale": ["Legia", "Legia", "Wisła", "Lech", "Lech"]}
+    kursy = {7: {1: {"shots": {"1.5": [1.5, None]}, "yellow_card": {"0.5": [3.0, None]}}}}
+    k = L.klucz_linii_dnia([z], kursy, [{"id": 7, "kickoff_ts": 2000}], teraz=1000)
+    assert k["druzyny"] == ["Legia", "Lech", "", "Wisła"]
+    assert k["zaw"]["1"][4] == [[400, 0], [300, 1], [200, 2], [100, 0], [90, 3], [80, 1], [70, 1]]
+    assert len(k["forma"]["1|shots"]) == 2              # początek listy – bez pozycji
+    assert k["forma"]["1|yellow_card"][2] == [0, 3, 4, 5, 6]
+    # rynek bez `ts` – kratki bez dymka, zamiast zgadywać
+    del z["forma"]["shots"]["ts"]
+    k = L.klucz_linii_dnia([z], kursy, [{"id": 7, "kickoff_ts": 2000}], teraz=1000)
+    assert k["forma"]["1|shots"][2] is None
+
+
+def test_linie_dnia_bezpiecznik_rozmiaru(monkeypatch):
+    # za duży klucz przy 50% → wyższy próg (strona dostaje go w `prog`)
+    players = [_zaw(1, [0, 2, 0, 2, 2, 2, 0, 2, 2, 0]),     # 6/10, w oknie 5: 3/5
+               _zaw(2, [0, 2, 0, 2, 0, 2, 2, 0, 2, 0])]     # 5/10, w oknie 5: 2/5
+    kursy = {7: {1: {"shots": {"1.5": [1.9, None]}}, 2: {"shots": {"1.5": [1.9, None]}}}}
+    k = L.klucz_linii_dnia(players, kursy, [{"id": 7, "kickoff_ts": 2000}], teraz=1000)
+    duzy = len(__import__("json").dumps(k, ensure_ascii=False, separators=(",", ":")))
+    monkeypatch.setattr(L, "MAX_BAJTOW_LINII", duzy - 1)
+    k = L.klucz_linii_dnia(players, kursy, [{"id": 7, "kickoff_ts": 2000}], teraz=1000)
+    # 60% (= 3/5 i 6/10 – zmiennoprzecinkowo równe progowi) musi wejść
+    assert k["prog"] == 0.6 and [l[1] for l in k["linie"]] == [1]
 
 
 def test_linie_dnia_nie_zagral_i_betclic_inaczej():

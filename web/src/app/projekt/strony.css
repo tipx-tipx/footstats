@@ -1079,8 +1079,47 @@
 .nl-progi { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; font-size: 12.5px; color: var(--t3); }
 .nl-progi b { color: var(--t1); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .nl-progi .e-wyczysc { margin-left: auto; }
-.nl .d-panel[data-tryb="dymek"] { top: 44px; right: 0; left: auto; width: 390px; }
-.nl-panel-uwaga { font-size: 12px; color: var(--t3); margin: 0; }
+.nl .d-panel[data-tryb="dymek"] { top: 44px; right: 0; left: auto; width: 390px; max-height: min(620px, calc(100vh - 140px)); }
+.nl-panel-uwaga { font-size: 12px; color: var(--t3); margin: 0; text-wrap: pretty; }
+/* panel progów (05.11): segmenty na całą szerokość – 6 progów pokrycia mieści się i na 360 px */
+.nl-segment-pelny .a-segment { display: flex; width: 100%; }
+.nl-segment-pelny .a-segment button { flex: 1 1 0; min-width: 0; padding: 7px 2px; min-height: 34px; font-variant-numeric: tabular-nums; }
+.nl-h4-wartosc { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.nl-h4-wartosc span { font-weight: 500; color: var(--t4, var(--t3)); font-variant-numeric: tabular-nums; }
+
+/* suwak „kurs od” (atomy2/SuwakKursu.tsx) – rozkład linii, tor, uchwyt.
+   Boczny margines = pół uchwytu: uchwyt na krańcu nie wystaje poza panel
+   (panel ma overflow – wystający uchwyt dałby poziome przewijanie). */
+.sk { position: relative; padding: 0 12px; touch-action: none; user-select: none; -webkit-user-select: none; cursor: pointer; }
+.sk[data-ciagnie] { cursor: grabbing; }
+.sk-wartosc { display: flex; align-items: baseline; justify-content: center; gap: 6px; margin: 0 -12px 10px; font-variant-numeric: tabular-nums; }
+.sk-wartosc b { font: 700 20px/1 var(--f-n); color: var(--t1); }
+.sk-wartosc span { color: var(--t3); font-size: 14px; }
+.sk-rozklad { display: flex; align-items: flex-end; gap: 1px; height: 34px; margin: 0 -2px; }
+.sk-rozklad i { flex: 1 1 0; min-width: 0; border-radius: 2px 2px 0 0; background: var(--kreska-mocna); transition: background-color 0.12s ease; }
+.sk-rozklad i[data-w] { background: color-mix(in srgb, var(--akcja) 55%, transparent); }
+.sk-tor { position: relative; height: 28px; }
+.sk-tor::before { content: ""; position: absolute; left: 0; right: 0; top: 12px; height: 4px; border-radius: 2px; background: var(--kreska-mocna); }
+.sk-zakres { position: absolute; top: 12px; height: 4px; border-radius: 2px; background: var(--akcja); pointer-events: none; }
+.sk-uchwyt {
+  position: absolute;
+  top: 3px;
+  width: 22px;
+  height: 22px;
+  margin-left: -11px;
+  border-radius: 50%;
+  background: var(--pow1);
+  border: 2px solid var(--akcja);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.25);
+  transition: box-shadow 0.12s ease;
+}
+/* palec: większe pole trafienia niż widać */
+.sk-uchwyt::before { content: ""; position: absolute; inset: -11px; border-radius: 50%; }
+.sk-uchwyt:focus-visible, .sk[data-ciagnie] .sk-uchwyt:focus { outline: none; box-shadow: 0 0 0 5px color-mix(in srgb, var(--akcja) 28%, transparent); }
+.sk-skala { position: relative; height: 16px; font-size: 11px; color: var(--t3); font-variant-numeric: tabular-nums; }
+.sk-skala span { position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; }
+.sk-skala span:first-child { transform: translateX(-12px); }
+.sk-skala span:last-child { transform: translateX(calc(-100% + 12px)); }
 /* pasek: szukaj i przełączniki z lewej, sortuj i progi z prawej – jak na stronie meczu */
 .nl-pasek .e-lewa { flex: 1; }
 .nl-pasek .mz-menu .e-menu-guzik { height: 32px; }

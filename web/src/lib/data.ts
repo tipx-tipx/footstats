@@ -569,14 +569,18 @@ export async function getIndeksZawodnikow(): Promise<WpisIndeksuZawodnikow[] | n
 
 /**
  * Linie ze wszystkich meczów naraz (Mecze › „Najlepsze linie”, 15.10): cena
- * ≥ 1,30 i pokrycie ≥ 70% – resztę filtruje strona. Liczone w pipeline
- * (`lekkie_klucze.klucz_linii_dnia`), bo z koszyków byłoby ~29 MB.
+ * ≥ 1,30 i pokrycie od `prog` (od 05.11: 50%, wcześniej 70%) – resztę
+ * filtruje strona. Liczone w pipeline (`lekkie_klucze.klucz_linii_dnia`), bo
+ * z koszyków byłoby ~29 MB. Kształt w2 (05.11) – `_dane/linie.ts`.
  */
 export type LinieDnia = {
-  /** id → [nazwa, pozycja, drużyna, w składzie] */
-  zaw: Record<string, [string, string, string, boolean]>;
-  /** "id|rynek" → [ostatnie 10, minuty 10], od najnowszego */
-  forma: Record<string, [number[], number[]]>;
+  w?: number;
+  prog?: number;
+  /** id → [nazwa, pozycja, drużyna, w składzie, (mecze: [dzień UTC, numer rywala])] */
+  zaw: Record<string, [string, string, string, boolean, [number, number][]?]>;
+  /** "id|rynek" → [ostatnie 10, minuty 10, (pozycje meczów)], od najnowszego */
+  forma: Record<string, [number[], number[], (number[] | null)?]>;
+  druzyny?: string[];
   /** [mecz, zawodnik, rynek, linia, Superbet, Betclic, (1 = Betclic liczy inaczej)] */
   linie: [number, number, string, number, number | null, number | null, 1?][];
 };

@@ -7,12 +7,32 @@ import { fmtLinia } from "@/lib/format";
 
 import type { MeczE } from "../../_dane/elementy";
 import type { DaneLinii } from "../../_dane/linie";
+import { opisKratki, useDymekKratek } from "../atomy/DymekKratek";
 import { Krzyzyk } from "../atomy/wspolne";
 import { IkonaKoszulka, IkonaZegar, Segment } from "../atomy2/filtry2";
 import { PrzewijanyRzad } from "../atomy2/PrzewijanyRzad";
+import { SuwakKursu } from "../atomy2/SuwakKursu";
 import { useTeraz } from "../czas";
 import { FlagaLigi, Herb } from "../Herb";
-import { bezDubli, DOMYSLNE_LINIE, silaPokrycia, taSamaDruzyna, wybierzLinie, type LiniaS, type Okno, type WarunkiLinii, type WybranaLinia } from "../liniePomiar";
+import {
+  bezDubli,
+  DOMYSLNE_LINIE,
+  KURS_KROK,
+  KURS_MAX,
+  KURS_MIN,
+  liniePokrycia,
+  meczeKratek,
+  progDlaOkna,
+  progiPokrycia,
+  progTxt,
+  silaPokrycia,
+  taSamaDruzyna,
+  wybierzLinie,
+  type LiniaS,
+  type Okno,
+  type WarunkiLinii,
+  type WybranaLinia,
+} from "../liniePomiar";
 import { IkonaSortu, Kurs, MenuWyboru, Weszlo } from "./StronaMeczu";
 
 /*
@@ -74,17 +94,57 @@ function IkonaLupa() {
   );
 }
 
-function Kratki({ v, min, linia, okno }: { v: number[]; min: number[]; linia: number; okno: Okno }) {
-  const mecze = v.slice(0, okno).map((x, i) => ({ x, m: min[i] ?? 90 }));
+/*
+ * Kratki z dymkiem (05.11, właściciel: „żeby było pokazane, na kogo grali,
+ * tak jak jest, gdy się wejdzie w dany mecz”) – ten sam dymek co na stronie
+ * meczu. Wiersz tabeli otwiera mecz; dotknięcie kratki na telefonie pokazuje
+ * dymek i NIE otwiera meczu (inaczej dymka nie dałoby się zobaczyć). Myszką
+ * klik w kratkę dalej otwiera mecz – dymek i tak jest już widoczny.
+ */
+function Kratki({
+  v,
+  min,
+  linia,
+  okno,
+  opisy,
+  zdarzenia,
+}: {
+  v: number[];
+  min: number[];
+  linia: number;
+  okno: Okno;
+  opisy: { rywal: string; data: string }[] | null;
+  zdarzenia: ReturnType<typeof useDymekKratek>["zdarzenia"];
+}) {
+  const dotyk = useRef(false);
+  const mecze = v.slice(0, okno).map((x, i) => ({ v: x, min: min[i] ?? 90, rywal: opisy?.[i]?.rywal ?? "", data: opisy?.[i]?.data ?? "" }));
   return (
-    <span className="mz-kratki" aria-label={`ostatnie mecze od najnowszego: ${mecze.map((m) => (m.m > 0 ? m.x : "nie zagrał")).join(", ")}`}>
+    <span
+      className="mz-kratki"
+      {...(opisy ? zdarzenia : {})}
+      onPointerDown={(e) => {
+        dotyk.current = e.pointerType !== "mouse";
+      }}
+      onClick={(e) => {
+        if (opisy && dotyk.current) e.stopPropagation();
+      }}
+      aria-label={`ostatnie mecze od najnowszego: ${mecze.map((m) => `${m.rywal ? `${m.rywal} ` : ""}${m.min > 0 ? m.v : "nie zagrał"}`).join(", ")}`}
+    >
       {mecze.map((m, i) => (
-        <i key={i} data-s={m.m <= 0 ? "nz" : m.x > linia ? "ok" : "nie"}>
-          {m.m > 0 ? m.x : ""}
+        <i key={i} data-s={m.min <= 0 ? "nz" : m.v > linia ? "ok" : "nie"} {...(opisy ? opisKratki(m) : {})}>
+          {m.min > 0 ? m.v : ""}
         </i>
       ))}
     </span>
   );
+}
+
+/** kubełki suwaka „kurs od”: liczba linii w każdym kroku 0,10 (ostatni = 4,00 i więcej) */
+function rozkladKursow(lista: WybranaLinia[]): number[] {
+  const n = Math.round((KURS_MAX - KURS_MIN) / KURS_KROK);
+  const out = new Array<number>(n + 1).fill(0);
+  for (const w of lista) out[Math.min(n, Math.max(0, Math.floor((w.cena.kurs - KURS_MIN) / KURS_KROK + 1e-9)))] += 1;
+  return out;
 }
 
 export function NajlepszeLinie({
@@ -166,17 +226,30 @@ export function NajlepszeLinie({
   }, [dnia, dane, prog, g.wkrotce, g.sklady, g.rynek, g.tekst, TERAZ]);
   const bezRynku = rynki.reduce((s, [, n]) => s + n, 0);
   const wRoboczym = otwarty ? policz(roboczy, g).length : 0;
+  // rozkład cen pod suwakiem: wszystkie linie przy progu pokrycia i filtrach gracza, bez progu ceny
+  const rozklad = useMemo(
+    () => (otwarty && dane ? rozkladKursow(liniePokrycia(dnia, dane.forma, { ...roboczy, kurs: KURS_MIN }, (s) => pasuje(s, g))) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [otwarty, dnia, dane, roboczy.okno, roboczy.pokrycie, g, TERAZ],
+  );
   // liczniki przełączników: ile linii zostanie po włączeniu (przy pozostałych filtrach)
   const ileSkladow = policz(prog, { ...g, sklady: true }).length;
   const ileWkrotce = policz(prog, { ...g, wkrotce: true }).length;
+  const progMin = dane?.prog ?? 0.5;
+  const { zdarzenia: dymekZdarzenia, dymek } = useDymekKratek();
 
   // pusty wynik: który JEDEN warunek zdjąć, żeby coś się pojawiło
   const ratunek = useMemo(() => {
     if (wynik.length || !dane) return null;
+    const progi = progiPokrycia(prog.okno, progMin);
+    const nizszy = [...progi].reverse().find((p) => p < prog.pokrycie - 1e-9);
+    const okno5 = { ...prog, okno: 5 as Okno, pokrycie: progDlaOkna(prog.pokrycie, 5, progMin) };
     const proby: { opis: string; w: WarunkiLinii; x: Gracz; zastosuj: () => void }[] = [
-      { opis: "przy pokryciu od 70%", w: { ...prog, pokrycie: 0.7 }, x: g, zastosuj: () => setProg((p) => ({ ...p, pokrycie: 0.7 })) },
-      { opis: "przy kursie od 1,30", w: { ...prog, kurs: 1.3 }, x: g, zastosuj: () => setProg((p) => ({ ...p, kurs: 1.3 })) },
-      { opis: "w oknie 5 meczów", w: { ...prog, okno: 5 }, x: g, zastosuj: () => setProg((p) => ({ ...p, okno: 5 })) },
+      ...(nizszy !== undefined
+        ? [{ opis: `przy pokryciu od ${progTxt(nizszy, prog.okno)}`, w: { ...prog, pokrycie: nizszy }, x: g, zastosuj: () => setProg((p) => ({ ...p, pokrycie: nizszy })) }]
+        : []),
+      { opis: "przy kursie od 1,30", w: { ...prog, kurs: KURS_MIN }, x: g, zastosuj: () => setProg((p) => ({ ...p, kurs: KURS_MIN })) },
+      { opis: "w oknie 5 meczów", w: okno5, x: g, zastosuj: () => setProg(okno5) },
       { opis: "bez „Wkrótce”", w: prog, x: { ...g, wkrotce: false }, zastosuj: () => setG((x) => ({ ...x, wkrotce: false })) },
       { opis: "bez „Pewne składy”", w: prog, x: { ...g, sklady: false }, zastosuj: () => setG((x) => ({ ...x, sklady: false })) },
       { opis: "we wszystkich rynkach", w: prog, x: { ...g, rynek: "" }, zastosuj: () => setG((x) => ({ ...x, rynek: "" })) },
@@ -215,7 +288,13 @@ export function NajlepszeLinie({
     };
   }, [telefon]);
 
-  const zmienioneProgi = (prog.pokrycie !== DOMYSLNE_LINIE.pokrycie ? 1 : 0) + (prog.kurs !== DOMYSLNE_LINIE.kurs ? 1 : 0) + (prog.okno !== DOMYSLNE_LINIE.okno ? 1 : 0);
+  const zmienioneProgi =
+    (prog.pokrycie !== DOMYSLNE_LINIE.pokrycie ? 1 : 0) +
+    (prog.kurs !== DOMYSLNE_LINIE.kurs ? 1 : 0) +
+    (prog.okno !== DOMYSLNE_LINIE.okno ? 1 : 0);
+  // „8/10 · od 1,40” – próg tak, jak liczy go gracz, i przedział kursu
+  const opisProgow = (w: WarunkiLinii) => `${progTxt(w.pokrycie, w.okno)} · od ${kursTxt(w.kurs)}`;
+  const opisProgowDlugi = (w: WarunkiLinii) => `pokrycie od ${progTxt(w.pokrycie, w.okno)} (${Math.round(w.pokrycie * 100)}%), kurs od ${kursTxt(w.kurs)}, ostatnie ${w.okno} meczów`;
 
   if (!dane) {
     return (
@@ -325,8 +404,8 @@ export function NajlepszeLinie({
                 className="e-menu-guzik d-dotyk"
                 aria-haspopup="dialog"
                 aria-expanded={otwarty}
-                aria-label={`Progi: pokrycie od ${Math.round(prog.pokrycie * 100)}%, kurs od ${kursTxt(prog.kurs)}, ostatnie ${prog.okno} meczów`}
-                title={`Pokrycie od ${Math.round(prog.pokrycie * 100)}%, kurs od ${kursTxt(prog.kurs)}, ostatnie ${prog.okno} meczów – kliknij, żeby zmienić`}
+                aria-label={`Progi: ${opisProgowDlugi(prog)}`}
+                title={`${opisProgowDlugi(prog)[0].toUpperCase()}${opisProgowDlugi(prog).slice(1)} – kliknij, żeby zmienić`}
                 data-aktywny={zmienioneProgi > 0 ? "true" : undefined}
                 onClick={() => {
                   setRoboczy(prog);
@@ -336,10 +415,7 @@ export function NajlepszeLinie({
                 <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden>
                   <path d="M2 3.5h10M4 7h6M6 10.5h2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
                 </svg>
-                <span className="e-etykieta-sortu">
-                  {Math.round(prog.pokrycie * 100)}% · od {kursTxt(prog.kurs)}
-                  {prog.okno === 5 && " · 5 meczów"}
-                </span>
+                <span className="e-etykieta-sortu">{opisProgow(prog)}</span>
                 {zmienioneProgi > 0 && <span className="a-licznik">{zmienioneProgi}</span>}
               </button>
               {!telefon && panel()}
@@ -378,9 +454,7 @@ export function NajlepszeLinie({
         <b>
           {wynik.length} {odmLinia(wynik.length)}
         </b>
-        <span className="nl-progi-tel">
-          pokrycie od {Math.round(prog.pokrycie * 100)}% · kurs od {kursTxt(prog.kurs)} · ostatnie {prog.okno} meczów
-        </span>
+        <span className="nl-progi-tel">{opisProgowDlugi(prog)}</span>
         {zmienioneProgi > 0 && (
           <button type="button" className="e-wyczysc" onClick={() => setProg(DOMYSLNE_LINIE)}>
             Przywróć domyślne progi
@@ -476,7 +550,7 @@ export function NajlepszeLinie({
                       </small>
                     </span>
                     <span role="cell" className="nl-kratki">
-                      <Kratki v={f[0]} min={f[1]} linia={linia} okno={prog.okno} />
+                      <Kratki v={f[0]} min={f[1]} linia={linia} okno={prog.okno} opisy={meczeKratek(f, z.mecze, dane.druzyny, prog.okno)} zdarzenia={dymekZdarzenia} />
                     </span>
                     <span role="cell">
                       <Weszlo p={w.p} />
@@ -504,6 +578,7 @@ export function NajlepszeLinie({
       </p>
 
       {telefon && panel()}
+      {dymek}
     </div>
   );
 
@@ -542,45 +617,48 @@ export function NajlepszeLinie({
                 </button>
               </div>
             </div>
+            {/* okno najpierw – od niego zależy, jakie progi pokrycia w ogóle istnieją (50% z 5 meczów nie ma) */}
             <div className="d-panel-tresc">
               <div>
-                <h4>Pokrycie</h4>
-                <Segment
-                  wartosc={String(roboczy.pokrycie)}
-                  zmien={(v) => setRoboczy((x) => ({ ...x, pokrycie: Number(v) }))}
-                  opcje={[
-                    ["0.7", "od 70%"],
-                    ["0.8", "od 80%"],
-                    ["0.9", "od 90%"],
-                    ["1", "100%"],
-                  ]}
-                />
-              </div>
-              <div>
-                <h4>Kurs</h4>
-                <Segment
-                  wartosc={String(roboczy.kurs)}
-                  zmien={(v) => setRoboczy((x) => ({ ...x, kurs: Number(v) }))}
-                  opcje={[
-                    ["1.3", "od 1,30"],
-                    ["1.4", "od 1,40"],
-                    ["1.6", "od 1,60"],
-                    ["2", "od 2,00"],
-                  ]}
-                />
-              </div>
-              <div>
                 <h4>Ostatnie mecze</h4>
-                <Segment
-                  wartosc={String(roboczy.okno)}
-                  zmien={(v) => setRoboczy((x) => ({ ...x, okno: Number(v) as Okno }))}
-                  opcje={[
-                    ["10", "10 meczów"],
-                    ["5", "5 meczów"],
-                  ]}
-                />
+                <div className="nl-segment-pelny">
+                  <Segment
+                    wartosc={String(roboczy.okno)}
+                    zmien={(v) => {
+                      const okno = Number(v) as Okno;
+                      setRoboczy((x) => ({ ...x, okno, pokrycie: progDlaOkna(x.pokrycie, okno, progMin) }));
+                    }}
+                    opcje={[
+                      ["10", "10 meczów"],
+                      ["5", "5 meczów"],
+                    ]}
+                  />
+                </div>
               </div>
-              <p className="nl-panel-uwaga">Liczą się tylko mecze, w których zawodnik grał: z 10 – co najmniej 7, z 5 – co najmniej 4.</p>
+              <div>
+                <h4 className="nl-h4-wartosc">
+                  Weszło co najmniej
+                  <span>{Math.round(roboczy.pokrycie * 100)}% rozegranych</span>
+                </h4>
+                <div className="nl-segment-pelny">
+                  <Segment
+                    wartosc={String(roboczy.pokrycie)}
+                    zmien={(v) => setRoboczy((x) => ({ ...x, pokrycie: Number(v) }))}
+                    opcje={progiPokrycia(roboczy.okno, progMin).map((p) => [String(p), progTxt(p, roboczy.okno)] as [string, string])}
+                  />
+                </div>
+              </div>
+              <div>
+                <h4 className="nl-h4-wartosc">
+                  Kurs
+                  <span>co 0,10</span>
+                </h4>
+                <SuwakKursu od={roboczy.kurs} rozklad={rozklad} zmien={(od) => setRoboczy((x) => ({ ...x, kurs: od }))} />
+              </div>
+              <p className="nl-panel-uwaga">
+                Liczą się tylko mecze, w których zawodnik grał: z 10 – co najmniej 7, z 5 – co najmniej 4. Próg to odsetek rozegranych, więc 7/10 przy 9 rozegranych
+                znaczy 7/9.
+              </p>
             </div>
             <div className="d-panel-stopka">
               <button type="button" className="a-guzik" data-t="cichy" data-r="m" onClick={() => setOtwarty(false)}>

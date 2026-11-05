@@ -269,13 +269,24 @@ def klucze_zawodnikow(players: list, kursy_dwa: dict, value_bets: list,
 # Strona nie może liczyć tego sama – kursy + forma wszystkich meczów to ~29 MB
 # w 96 koszykach. Tu zostaje tylko to, co da się pokazać: cena ≥ 1,30 (niżej
 # nie ma czego szukać – właściciel: „bez sensu, żebyśmy 1,05 mieli”) i
-# pokrycie ≥ 70% w oknie 10 albo 5 meczów. Pomiar 15.10: ~650 linii, ~100 KB.
+# pokrycie od progu w oknie 10 albo 5 meczów.
+#
+# 05.11 (właściciel: „w przypadku 10 meczów nawet może być 50%”): próg 50%
+# (5/10; w oknie 5 najniższy możliwy to 3/5). Pomiar 05.11: 1150 linii / 172 KB
+# przy 70% → 3996 linii / 526 KB przy 50%, z rywalami do dymka kratek ~850 KB.
+# Strona czyta klucz z Data Cache Next, który NIE zapisuje wpisu > 2 MB po
+# base64 (×4/3) – przy granicy wpis wisi godzinami (01.11, kursy sprzed 4 h).
+# Dlatego bezpiecznik: za duży klucz → wyższy próg (60%, potem 70%); próg,
+# przy którym klucz powstał, idzie w polu `prog` i strona nie proponuje niższego.
 PROG_KURSU_LINII = 1.30
-PROG_POKRYCIA_LINII = 0.7
+PROGI_POKRYCIA_LINII = (0.5, 0.6, 0.7)
+MAX_BAJTOW_LINII = 1_000_000
 # okno 10: co najmniej 7 rozegranych; okno 5: co najmniej 4 – inaczej
 # „5/5 przy pięciu meczach bez gry” udaje pewniaka (właściciel 15.10 przyjął
 # 80% / od 1,40 / min. 7: pomiar 10–58 linii na dzień przy 13–54 meczach)
 MIN_ZAGRANYCH = {10: 7, 5: 4}
+# wersja kształtu klucza – strona po niej poznaje listę meczów przy zawodniku
+WERSJA_LINII = 2
 
 
 def _pokrycie(ostatnie: list, minuty: list, linia: float, okno: int) -> float:
@@ -285,20 +296,8 @@ def _pokrycie(ostatnie: list, minuty: list, linia: float, okno: int) -> float:
     return sum(1 for v in zagrane if (_f(v) or 0) > linia) / len(zagrane)
 
 
-def klucz_linii_dnia(players: list, kursy_dwa: dict, mecze: list,
-                     teraz: float) -> dict:
-    """`linie_dnia` = {"zaw": {id: [nazwa, pozycja, drużyna, xi]},
-    "forma": {"id|rynek": [ostatnie10, minuty10]},
-    "linie": [[mecz, zawodnik, rynek, linia, superbet, betclic(, 1)]]}.
-
-    Tylko mecze, które się jeszcze nie zaczęły. Trzeci element pary
-    `kursy_dwa` (Betclic liczy statystykę inaczej) przechodzi jako siódmy
-    element linii, a cena Betclica nie bierze udziału w progu – ta sama
-    zasada co na stronie meczu. Kolejność, progi okna i wybór jednej linii na
-    zawodnika robi strona (filtry gracza)."""
-    przyszle = {int(m["id"]) for m in mecze or []
-                if m.get("id") is not None and (m.get("kickoff_ts") or 0) > teraz}
-    gracze = {int(z["id"]): z for z in players or [] if z.get("id") is not None}
+def _linie_przy_progu(gracze: dict, kursy_dwa: dict, przyszle: set,
+                      prog: float) -> tuple[dict, dict, list]:
     zaw: dict = {}
     forma: dict = {}
     linie: list = []
@@ -325,8 +324,9 @@ def klucz_linii_dnia(players: list, kursy_dwa: dict, mecze: list,
                     najlepszy = max([c for c in (sb, None if inaczej else bc) if c] or [0])
                     if najlepszy < PROG_KURSU_LINII:
                         continue
+                    # 1e-9: 3/5 = 0,6 liczone na liczbach zmiennoprzecinkowych
                     if max(_pokrycie(ost, mins, linia, 10),
-                           _pokrycie(ost, mins, linia, 5)) < PROG_POKRYCIA_LINII:
+                           _pokrycie(ost, mins, linia, 5)) < prog - 1e-9:
                         continue
                     wpis = [int(mid), int(pid), mk, linia, sb, None if inaczej else bc]
                     if inaczej:
@@ -335,4 +335,88 @@ def klucz_linii_dnia(players: list, kursy_dwa: dict, mecze: list,
                     zaw[str(pid)] = [z.get("nazwa"), z.get("pozycja"),
                                      z.get("druzyna"), bool(z.get("xi"))]
                     forma[f"{pid}|{mk}"] = [ost, mins]
-    return {"zaw": zaw, "forma": forma, "linie": linie}
+    return zaw, forma, linie
+
+
+def _rywale_linii(gracze: dict, zaw: dict, forma: dict) -> list:
+    """Dymek kratki (05.11, właściciel: „żeby było pokazane, na kogo grali”).
+
+    Każdy zawodnik dostaje piąte pole: swoje mecze `[dzień UTC, numer rywala]`
+    od najnowszego (rywale w jednej liście `druzyny` – nazwy nie powtarzają się
+    tysiące razy). Rynek, którego mecze nie są początkiem tej listy (np. kartki
+    mają inną historię), trzecim polem w `forma` wskazuje swoje pozycje; `None`
+    = długości się nie zgadzają, kratki bez dymka – nic nie zgadujemy.
+    Minuty zostają przy rynku: w 20% wpisów różnią się między rynkami
+    (pomiar 05.11), więc wspólnej listy minut nie ma."""
+    druzyny: list = []
+    nr_druzyny: dict = {}
+    rynki_zaw: dict = {}
+    for k in forma:
+        pid, mk = k.split("|", 1)
+        rynki_zaw.setdefault(pid, []).append(mk)
+    for pid, mks in rynki_zaw.items():
+        fz = (gracze.get(int(pid)) or {}).get("forma") or {}
+        rywal_ts: dict = {}
+        for mk in mks:
+            f = fz.get(mk) or {}
+            ryw = list(f.get("rywale") or [])
+            for i, t in enumerate(list(f.get("ts") or [])[:OKNO_ZAWODNIKA]):
+                if t is None:
+                    continue
+                r = str(ryw[i] or "") if i < len(ryw) else ""
+                if r or int(t) not in rywal_ts:
+                    rywal_ts[int(t)] = r
+        kolejne = sorted(rywal_ts, reverse=True)
+        poz = {t: i for i, t in enumerate(kolejne)}
+        mecze = []
+        for t in kolejne:
+            r = rywal_ts[t]
+            if r not in nr_druzyny:
+                nr_druzyny[r] = len(druzyny)
+                druzyny.append(r)
+            mecze.append([t // 86400, nr_druzyny[r]])
+        zaw[pid] = zaw[pid][:4] + [mecze]
+        for mk in mks:
+            ts = list((fz.get(mk) or {}).get("ts") or [])[:OKNO_ZAWODNIKA]
+            wpis = forma[f"{pid}|{mk}"]
+            if len(ts) != len(wpis[0]) or any(t is None for t in ts):
+                wpis.append(None)
+                continue
+            idx = [poz[int(t)] for t in ts]
+            if idx != list(range(len(idx))):
+                wpis.append(idx)
+    return druzyny
+
+
+def klucz_linii_dnia(players: list, kursy_dwa: dict, mecze: list,
+                     teraz: float) -> dict:
+    """`linie_dnia` = {"w": 2, "prog": 0.5,
+    "zaw": {id: [nazwa, pozycja, drużyna, xi, mecze]},
+    "forma": {"id|rynek": [ostatnie10, minuty10(, pozycje meczów)]},
+    "druzyny": [rywale],
+    "linie": [[mecz, zawodnik, rynek, linia, superbet, betclic(, 1)]]};
+    `mecze` zawodnika – patrz `_rywale_linii`.
+
+    Tylko mecze, które się jeszcze nie zaczęły. Trzeci element pary
+    `kursy_dwa` (Betclic liczy statystykę inaczej) przechodzi jako siódmy
+    element linii, a cena Betclica nie bierze udziału w progu – ta sama
+    zasada co na stronie meczu. Kolejność, progi okna i wybór jednej linii na
+    zawodnika robi strona (filtry gracza)."""
+    import json
+
+    przyszle = {int(m["id"]) for m in mecze or []
+                if m.get("id") is not None and (m.get("kickoff_ts") or 0) > teraz}
+    gracze = {int(z["id"]): z for z in players or [] if z.get("id") is not None}
+    out: dict = {}
+    for prog in PROGI_POKRYCIA_LINII:
+        zaw, forma, linie = _linie_przy_progu(gracze, kursy_dwa, przyszle, prog)
+        druzyny = _rywale_linii(gracze, zaw, forma)
+        out = {"w": WERSJA_LINII, "prog": prog, "zaw": zaw, "forma": forma,
+               "druzyny": druzyny, "linie": linie}
+        bajty = len(json.dumps(out, ensure_ascii=False, separators=(",", ":")))
+        if bajty <= MAX_BAJTOW_LINII:
+            break
+        print(f"Linie dnia: {bajty} B przy pokryciu od {prog:.0%} – ponad "
+              f"{MAX_BAJTOW_LINII} B (limit Data Cache strony), biorę wyższy próg",
+              flush=True)
+    return out
