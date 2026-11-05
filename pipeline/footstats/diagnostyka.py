@@ -100,6 +100,15 @@ def etap(nazwa: str) -> None:
     _etap_t[:] = [teraz]
 
 
+def podetap(nazwa: str, sekundy: float) -> None:
+    """Sekundy jednej części etapu – osobno od `czas_etapow` (05.11, analiza
+    czasu cyklu). `etap()` dzieli cykl na kolejne odcinki; tu mierzymy części
+    w środku odcinka bez zmiany jego granic, więc `czas_etapow` porównuje się
+    dalej ze starymi cyklami. Nic nie zmienia w zachowaniu cyklu."""
+    cz = _rentgen.setdefault("czas_podetapow", {})
+    cz[nazwa] = round(cz.get(nazwa, 0.0) + float(sekundy), 1)
+
+
 def rentgen_z_etapem(nazwa: str) -> dict[str, dict]:
     """rentgen() z domknięciem ostatniego etapu (użycie w literale meta)."""
     etap(nazwa)

@@ -134,6 +134,9 @@ jobs:
         timeout-minutes: 15
         env:
           PYTHONIOENCODING: utf-8
+          # log bez bufora (05.11, analiza czasu cyklu): znacznik czasu linii = chwila
+          # wypisania; z buforem przerwy w logu nie mówiły, gdzie idzie czas
+          PYTHONUNBUFFERED: "1"
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           STAN_REPO: ${{ vars.STAN_REPO }}
@@ -147,6 +150,9 @@ jobs:
         working-directory: pipeline
         env:
           PYTHONIOENCODING: utf-8
+          # log bez bufora (05.11, analiza czasu cyklu): znacznik czasu linii = chwila
+          # wypisania; z buforem przerwy w logu nie mówiły, gdzie idzie czas
+          PYTHONUNBUFFERED: "1"
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           # magazyn stanu pipeline'u (prywatne repo) — bez tego job PADNIE

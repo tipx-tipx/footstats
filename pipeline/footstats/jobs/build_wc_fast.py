@@ -1699,6 +1699,44 @@ def do_pomiaru_pokrycia(rynek, kurs, oczekiwane_minuty, trafione: int,
     return trafione / rozegrane >= POMIAR_POKRYCIA_MIN - 1e-9
 
 
+def _podsumuj_pomiar_bez_oferty(pbo, czas, ile, z_oferta: set, bez_oferty: set,
+                                value_bets, poza_publikacja, legi_pool, pomiary,
+                                odds_grid, real_split) -> dict:
+    """CZAS CYKLU, etap 0 (05.11): podsumowanie pętli zawodników w podziale na
+    mecze z ofertą zawodniczą i bez (ani Superbet, ani Betclic nie mają żadnego
+    zawodnika). Pola `wynik_*` mówią, ile rzeczy, które cykl wysyła dalej,
+    powstało w meczach bez oferty – MA BYĆ ZERO, wtedy pominięcie liczenia
+    takich meczów (etap 2) niczego nie zmieni. Tylko pomiar."""
+    if pbo["t"] is not None:
+        czas[pbo["fl"]] += time.monotonic() - pbo["t"]
+        ile[pbo["fl"]] += 1
+        pbo["t"] = None
+    bez = bez_oferty - z_oferta
+
+    def _w_bez(rekordy) -> int:
+        return sum(1 for r in rekordy or [] if r.get("mecz_id") in bez)
+
+    wynik = {
+        "obroty_z_oferta": ile["z_oferta"],
+        "obroty_bez_oferty": ile["bez_oferty"],
+        "obroty_inne": ile["inne"],
+        "s_z_oferta": round(czas["z_oferta"], 1),
+        "s_bez_oferty": round(czas["bez_oferty"], 1),
+        "s_inne": round(czas["inne"], 1),
+        "mecze_z_oferta": len(z_oferta),
+        "mecze_bez_oferty": len(bez),
+        "wynik_value_bets": _w_bez(value_bets),
+        "wynik_poza_publikacja": _w_bez(poza_publikacja),
+        "wynik_legi_pool": _w_bez(legi_pool),
+        "wynik_pomiar": _w_bez(pomiary),
+        "wynik_siatka_kursow": sum(1 for m in odds_grid or {} if m in bez),
+        "wynik_sugestie_365": sum(1 for v in (real_split or {}).values()
+                                  if (v.get("info") or {}).get("mid") in bez),
+    }
+    print(f"Pętla zawodników – mecze z ofertą / bez: {wynik}", flush=True)
+    return wynik
+
+
 def pokrycie_historii(counts, minutes, linia: float, n: int,
                       min_minut: float = 15.0) -> tuple[int, int]:
     """Ile z ostatnich `n` występów (≥ `min_minut`, najnowszy pierwszy, jak
@@ -7222,6 +7260,8 @@ def _main_impl(tryb=None):
         tempo_cache[mid_o] = tempo_m
         return sb_o
 
+    # ⚑ CZAS CYKLU, etap 0 (05.11): tylko pomiar – patrz `diagnostyka.podetap`
+    _t_pod = time.monotonic()
     _kolejnosc_meczow: dict[int, int] = {}
     for _tr in trends:
         _ev = _mecz_trendu(_tr)
@@ -7244,6 +7284,9 @@ def _main_impl(tryb=None):
         if _tr.in_predicted_lineup:
             rec_p["xi"] = True
         rec_p["forma"].setdefault(_tr.market_code, _forma_z_trendu(_tr, _tr.market_code))
+    diagnostyka.podetap("oferta_przeglad_trendow", time.monotonic() - _t_pod)
+    _t_pod = time.monotonic()
+    _sb_przed = len(sb_cache)
     for _mid, _ts in sorted(_kolejnosc_meczow.items(), key=lambda kv: kv[1]):
         _ev = ev_by_id.get(_mid) or {}
         _oferta_meczu(
@@ -7252,6 +7295,18 @@ def _main_impl(tryb=None):
             team_name.get(_ev.get("awayTeamId"), ""),
             _ts,
         )
+    diagnostyka.podetap("oferta_pobranie_meczow", time.monotonic() - _t_pod)
+    try:
+        _oferta_pomiar = {
+            "meczow_z_trendami": len(_kolejnosc_meczow),
+            "pobranych_w_tym_etapie": len(sb_cache) - _sb_przed,
+            "z_propsami_superbet": sum(1 for _m in _kolejnosc_meczow
+                                       if ((sb_cache.get(_m) or {}).get("players"))),
+        }
+        diagnostyka.zapisz_rentgen("oferta_meczow", _oferta_pomiar)
+        print(f"Oferta Superbetu – mecze z trendami: {_oferta_pomiar}", flush=True)
+    except Exception as _e_pom:                              # noqa: BLE001
+        diagnostyka.cichy("czas_cyklu", "pomiar_oferty", _e_pom)
     diagnostyka.etap("oferta_superbet")
     # --- DRUGI BUKMACHER JAKO ŹRÓDŁO OFERT (2026-08-08, decyzja usera) ---
     #
@@ -7450,6 +7505,7 @@ def _main_impl(tryb=None):
     except Exception as e:                                     # noqa: BLE001
         diagnostyka.cichy("cykl", "udzial_startow_performance", e)
     diagnostyka.etap("odkrywanie_i_udzial_startow")
+    _t_pod = time.monotonic()
     # zapis banku po WSZYSTKICH źródłach (statshub, 365Scores, dopełnianie
     # oferty, ODKRYWANIE z oferty) — uzasadnienie przy `_bank_lib` wyżej. Przepięte z banku trendy
     # (ten sam timestamp) nadpisują wpis wariantem z nadchodzącym meczem, tak
@@ -7491,6 +7547,8 @@ def _main_impl(tryb=None):
         except Exception as e:
             print(f"Bank historii — zapis po źródłach padł ({e}); "
                   "bank zostaje w stanie z poprzedniego cyklu")
+    diagnostyka.podetap("bank_scalenie_i_zapis", time.monotonic() - _t_pod)
+    _t_pod = time.monotonic()
 
     # GRUPA PORÓWNAWCZA DLA PRIORA — liczona RAZ, z kompletu trendów cyklu
     # (razem z tymi z oferty, bo inaczej rynki zawodnicze dołożone 07.08
@@ -7538,8 +7596,25 @@ def _main_impl(tryb=None):
         if ((_u is not None and _u < radar.MIN_UDZIAL_STARTOW)
                 or radar.nie_gral_ostatnio(_wystepy(_t), _kalendarz_druzyn, _teraz_kal) is True):
             _wypadli_z_gry.add(_t.player_id)
+    diagnostyka.podetap("petla_przygotowanie", time.monotonic() - _t_pod)
+
+    # ⚑ CZAS CYKLU, etap 0 (05.11): ile trwa pętla dla meczów, w których ani
+    # Superbet, ani Betclic nie mają ŻADNEGO zawodnika, i czy taki mecz w ogóle
+    # daje jakiś wynik (typ, linię, pomiar). Obrót mierzony od startu do startu
+    # następnego obrotu – ciało pętli ma kilkanaście `continue`. Bez wpływu na
+    # wynik cyklu.
+    _pbo = {"t": None, "fl": "inne"}
+    _pbo_czas = {"z_oferta": 0.0, "bez_oferty": 0.0, "inne": 0.0}
+    _pbo_ile = {"z_oferta": 0, "bez_oferty": 0, "inne": 0}
+    _mecze_z_oferta: set = set()
+    _mecze_bez_oferty: set = set()
 
     for tr in trends:
+        _t_obr = time.monotonic()
+        if _pbo["t"] is not None:
+            _pbo_czas[_pbo["fl"]] += _t_obr - _pbo["t"]
+            _pbo_ile[_pbo["fl"]] += 1
+        _pbo["t"], _pbo["fl"] = _t_obr, "inne"
         # ⚑ KLUCZ Z MECZEM (2026-09-16). Dotąd (zawodnik, rynek) — a biblioteka
         # banku przepina trend na KAŻDY nadchodzący mecz drużyny, więc klub
         # z dwoma meczami w oknie (liga + puchar) dostawał typy tylko na ten
@@ -7608,6 +7683,13 @@ def _main_impl(tryb=None):
         # odczyt z cache; `_oferta_meczu` dociąga wyłącznie mecz, który z jakiegoś
         # powodu ominął pre-pass.
         sb_odds = _oferta_meczu(mid, home_name, away_name, ts)
+        if ((sb_odds or {}).get("players")
+                or ((bc_cache or {}).get(mid) or {}).get("players")):
+            _pbo["fl"] = "z_oferta"
+            _mecze_z_oferta.add(mid)
+        else:
+            _pbo["fl"] = "bez_oferty"
+            _mecze_bez_oferty.add(mid)
 
         # ILU ZAWODNIKÓW TEGO MECZU SUPERBET W OGÓLE KWOTUJE.
         # Strona meczu musi odróżnić "bukmacher nie wystawia propsów" (Leagues
@@ -8487,7 +8569,16 @@ def _main_impl(tryb=None):
                 value_bets.append(rec_okazji)
                 matches_out[mid]["okazje"].append(vb_id)
 
+    try:
+        diagnostyka.zapisz_rentgen("pomiar_bez_oferty", _podsumuj_pomiar_bez_oferty(
+            _pbo, _pbo_czas, _pbo_ile, _mecze_z_oferta, _mecze_bez_oferty,
+            value_bets, typy_poza_publikacja, legi_pool,
+            list(odrzucone_pomiar) + list(pomiar_szeroki), odds_grid, real_split))
+    except Exception as _e_pom:                              # noqa: BLE001
+        diagnostyka.cichy("czas_cyklu", "pomiar_bez_oferty", _e_pom)
+
     diagnostyka.etap("zapis_banku_i_bramy")
+
     # --- OFERTA ZAWODNICZA MECZU: wykonana PRZED pętlą scoringu (2026-08-08).
     # Dawniej stała tutaj i przez to jej rynki mogły zasilić tabelę pokryć oraz
     # drabinki, ale nigdy nie stawały się typem — pętla, która robi typy, była
