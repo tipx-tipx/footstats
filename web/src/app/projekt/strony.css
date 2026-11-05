@@ -681,6 +681,8 @@
 .mz-kurs b { font: 700 15px/1 var(--f-n); font-variant-numeric: tabular-nums; color: var(--t1); }
 .mz-kurs[data-lepszy] { border-color: color-mix(in srgb, var(--akcja) 55%, transparent); }
 .mz-kurs[data-brak] { opacity: 0.5; }
+/* rozjazd cen (05.11): cena prawdziwa, bukmacherzy wyceniają rynek bardzo różnie */
+.mz-kurs[data-rozjazd] { border-style: dashed; }
 .mz-kurs[data-brak] b { color: var(--t3); }
 
 .mz-przypis { margin-top: 10px; font-size: 12px; color: var(--t3); }

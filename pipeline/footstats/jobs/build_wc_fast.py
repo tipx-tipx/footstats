@@ -12446,8 +12446,10 @@ def _main_impl(tryb=None):
             {pid: z.get("nazwa") for pid, z in players_out.items()},
             sb_cache, bc_cache,
             superbet.znajdz_zawodnika, betclic.znajdz_zawodnika,
-            # ta sama brama wiarygodności Betclica co w typach (05.10)
-            brama_bc=lambda _sb, _bc: betclic.linie_do_scalenia(_sb, _bc)[0],
+            # ta sama brama wiarygodności Betclica co w typach (05.10); sam
+            # rozjazd cen (ta sama statystyka) strona pokazuje z dopiskiem (05.11)
+            brama_bc=betclic.linie_do_scalenia,
+            rozjazd_cen=betclic.POWODY_ROZJAZDU_CEN,
         )
     except Exception as e:
         diagnostyka.cichy("cykl", "kursy_dwa", e)

@@ -1403,6 +1403,19 @@ def _rosnie_z_linia(linie: dict[float, float]) -> bool:
     return all(b >= a for a, b in zip(kursy, kursy[1:]))
 
 
+# ⚑ ROZJAZD CEN TO NIE INNA STATYSTYKA (05.11, właściciel: „nie może tak
+# być”, Ángelo Martino: zza pola 1,5 u Betclica 12,00, u Superbetu 5,20 –
+# Betclic schowany jako „liczy inaczej”). Na całej ofercie Betclic liczy zza
+# pola jak Superbet (mediana różnicy cen 2–15%); u Martino różnica to opinia
+# o obrońcy, nie definicja rynku. Te dwa powody bramy znaczą „ceny mocno się
+# różnią” – STRONA pokazuje wtedy cenę Betclica z dopiskiem (flaga 2 w
+# `kursy_dwa`). Typy i model dalej biorą tylko ceny zgodne (`merged` w pętli
+# typów woła tę samą bramę i odrzuca). Drabinka przesunięta o szczebel
+# i niemonotoniczna to inna statystyka albo błąd danych – zostają ukryte (1).
+# Pomiar 05.11 (jeden cykl): 264 odrzucone rynki, z tego 213 to rozjazd cen.
+POWODY_ROZJAZDU_CEN = frozenset({"drabinka_niezgodna", "jedna_wspolna_za_daleko"})
+
+
 def linie_do_scalenia(linie_sb: dict, linie_bc: dict,
                       licz: bool = False) -> tuple[dict, str | None]:
     """(linie Betclica, które wolno dołożyć, powód odrzucenia albo None).

@@ -68,7 +68,8 @@ def siatka_dwoch_kursow(
     bc_cache: dict,
     znajdz_sb: Callable[[dict, str], dict],
     znajdz_bc: Callable[[dict, str], dict],
-    brama_bc: Callable[[dict, dict], dict] | None = None,
+    brama_bc: Callable[[dict, dict], object] | None = None,
+    rozjazd_cen: frozenset = frozenset(),
 ) -> dict:
     """{mecz_id: {zawodnik_id: {rynek: {linia: [superbet, betclic]}}}} – kurs
     „powyżej” u każdego bukmachera osobno (None = nie kwotuje tej linii).
@@ -86,6 +87,12 @@ def siatka_dwoch_kursow(
     a linia dostaje trzeci element `1` = „Betclic liczy inaczej” (front pisze
     „–” z podpowiedzią). Ta sama brama co w typach – strona nie może
     pokazywać „lepszego kursu” na inną statystykę.
+
+    05.11: brama może oddać parę `(linie_przyjete, powod)` (`betclic.
+    linie_do_scalenia`). Powód z `rozjazd_cen` (ceny mocno się różnią, ta sama
+    statystyka) NIE chowa ceny – linia dostaje trzeci element `2` = „ceny
+    bukmacherów mocno się różnią” i cena Betclica zostaje (właściciel: kurs
+    12,00 Martino musi być widoczny). Pozostałe powody – jak dotąd `1`.
     """
     wynik: dict = {}
     for mid, gracze in (odds_grid or {}).items():
@@ -99,10 +106,16 @@ def siatka_dwoch_kursow(
             for mk, linie in (rynki or {}).items():
                 sb_l = {_f(l): (v or {}).get("over") for l, v in (sb_z.get(mk) or {}).items()}
                 bc_l = {_f(l): (v or {}).get("over") for l, v in (bc_z.get(mk) or {}).items()}
-                bc_inaczej = False
-                if brama_bc is not None and bc_l and not brama_bc(
-                        sb_z.get(mk) or {}, bc_z.get(mk) or {}):
-                    bc_l, bc_inaczej = {}, True
+                bc_inaczej = bc_rozjazd = False
+                if brama_bc is not None and bc_l:
+                    _wynik = brama_bc(sb_z.get(mk) or {}, bc_z.get(mk) or {})
+                    _przyjete, _powod = (_wynik if isinstance(_wynik, tuple)
+                                         else (_wynik, None))
+                    if not _przyjete:
+                        if _powod in rozjazd_cen:
+                            bc_rozjazd = True
+                        else:
+                            bc_l, bc_inaczej = {}, True
                 kto = obce.get(mk) or {}
                 cele: dict = {}
                 for l, najlepszy in (linie or {}).items():
@@ -119,6 +132,8 @@ def siatka_dwoch_kursow(
                             round(float(bc), 2) if bc else None]
                     if bc_inaczej:
                         para.append(1)
+                    elif bc_rozjazd and para[1] is not None:
+                        para.append(2)
                     cele[str(l)] = para
                 if cele:
                     wynik.setdefault(int(mid), {}).setdefault(int(pid), {})[mk] = cele
@@ -133,8 +148,9 @@ def stempluj_ceny_bukmacherow(typy: list[dict], kursy_dwa: dict) -> int:
     Stempel TYLKO, gdy znamy OBIE ceny tej samej linii – inaczej nie ma czego
     porównać, a karta nie pokazuje nic (właściciel: „jak nie da się sczytać,
     to się nie wyświetla”). Bez stempla zostają też: linia „Betclic liczy
-    inaczej” (inna statystyka), typy „poniżej” (siatka zna tylko „powyżej”)
-    i drużynowe. Zwraca liczbę ostemplowanych typów."""
+    inaczej” (inna statystyka; trzeci element 1 – element 2, „ceny mocno się
+    różnią”, to ta sama statystyka i stempel jest), typy „poniżej” (siatka zna
+    tylko „powyżej”) i drużynowe. Zwraca liczbę ostemplowanych typów."""
     n = 0
     for t in typy or []:
         t.pop("kursy_bukmacherow", None)
@@ -148,7 +164,7 @@ def stempluj_ceny_bukmacherow(typy: list[dict], kursy_dwa: dict) -> int:
             continue
         para = next((linie[k] for k in (str(t.get("linia")), str(_f(t.get("linia"))))
                      if k in linie), None)
-        if not para or len(para) < 2 or (len(para) > 2 and para[2]):
+        if not para or len(para) < 2 or (len(para) > 2 and para[2] == 1):
             continue
         sb, bc = _f(para[0]), _f(para[1])
         if not sb or not bc or sb <= 1.0 or bc <= 1.0:
@@ -181,7 +197,7 @@ def stempluj_ceny_drabinek(wpisy: list[dict], kursy_dwa: dict) -> int:
             out = {}
             for l in (r.get("linie_pelne") or {}):
                 para = linie.get(str(l)) or linie.get(str(_f(l)))
-                if not para or len(para) < 2 or (len(para) > 2 and para[2]):
+                if not para or len(para) < 2 or (len(para) > 2 and para[2] == 1):
                     continue
                 bc = _f(para[1])
                 if bc and bc > 1.0:
@@ -322,7 +338,10 @@ def _linie_przy_progu(gracze: dict, kursy_dwa: dict, przyszle: set,
                         continue
                     sb = _f(para[0])
                     bc = _f(para[1]) if len(para) > 1 else None
-                    inaczej = len(para) > 2 and bool(para[2])
+                    # 1 = Betclic liczy inaczej (cena ukryta), 2 = ceny mocno
+                    # się różnią, ta sama statystyka (cena prawdziwa, 05.11)
+                    flaga = para[2] if len(para) > 2 else None
+                    inaczej = flaga == 1
                     najlepszy = max([c for c in (sb, None if inaczej else bc) if c] or [0])
                     if najlepszy < PROG_KURSU_LINII:
                         continue
@@ -333,6 +352,8 @@ def _linie_przy_progu(gracze: dict, kursy_dwa: dict, przyszle: set,
                     wpis = [int(mid), int(pid), mk, linia, sb, None if inaczej else bc]
                     if inaczej:
                         wpis.append(1)
+                    elif flaga == 2 and bc:
+                        wpis.append(2)
                     linie.append(wpis)
                     zaw[str(pid)] = [z.get("nazwa"), z.get("pozycja"),
                                      z.get("druzyna"), bool(z.get("xi"))]

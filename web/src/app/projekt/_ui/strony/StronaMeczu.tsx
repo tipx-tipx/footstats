@@ -227,9 +227,20 @@ export function Weszlo({ p }: { p: { weszlo: number; zagrane: number; nz: number
   );
 }
 
-export function Kurs({ k, bukmacher, lepszy, uwaga }: { k: number | null; bukmacher: string; lepszy: boolean; uwaga?: string }) {
+/** `rozjazd` (05.11): cena prawdziwa, ale bukmacherzy wyceniają rynek bardzo różnie – przerywana ramka + podpowiedź */
+export const UWAGA_ROZJAZDU = "Ceny bukmacherów mocno się różnią na tym rynku – to prawdziwy kurs Betclica, ale sprawdź linię u bukmachera";
+
+export function Kurs({ k, bukmacher, lepszy, uwaga, rozjazd }: { k: number | null; bukmacher: string; lepszy: boolean; uwaga?: string; rozjazd?: boolean }) {
+  const opis = uwaga ?? (rozjazd ? UWAGA_ROZJAZDU : undefined);
   return (
-    <span className="mz-kurs" data-lepszy={lepszy || undefined} data-brak={k === null || undefined} title={uwaga} aria-label={uwaga ? `${bukmacher}: ${uwaga}` : undefined}>
+    <span
+      className="mz-kurs"
+      data-lepszy={lepszy || undefined}
+      data-brak={k === null || undefined}
+      data-rozjazd={(rozjazd && k !== null) || undefined}
+      title={opis}
+      aria-label={opis ? `${bukmacher} ${kursTxt(k)}: ${opis}` : undefined}
+    >
       <Logo nazwa={bukmacher} wysokosc={10} />
       <b>{kursTxt(k)}</b>
     </span>
@@ -369,7 +380,13 @@ function TabelaA({
                 </span>
                 <span role="cell" className="mz-kursy">
                   <Kurs k={k.sb} bukmacher="Superbet" lepszy={lepszySb} />
-                  <Kurs k={k.bcInaczej ? null : k.bc} bukmacher="Betclic" lepszy={!lepszySb && k.bc !== null && !k.bcInaczej} uwaga={k.bcInaczej ? "Betclic liczy tę statystykę inaczej – ceny nie porównujemy" : undefined} />
+                  <Kurs
+                    k={k.bcInaczej ? null : k.bc}
+                    bukmacher="Betclic"
+                    lepszy={!lepszySb && k.bc !== null && !k.bcInaczej}
+                    uwaga={k.bcInaczej ? "Betclic liczy tę statystykę inaczej – ceny nie porównujemy" : undefined}
+                    rozjazd={k.bcRozjazd}
+                  />
                 </span>
               </motion.div>
             );
@@ -522,7 +539,7 @@ export function StronaMeczu({ wariant, m, telefon, start }: { wariant: string; m
             <TabelaA key={r.kod} m={m} rynek={r.kod} okno={okno} strona={strona} telefon={telefon} l={l} sort={sort} setSort={setSort} kursOd={kursOd} tylkoXi={tylkoXi} />
           ))}
         <p className="mz-przypis">
-          Pokazujemy zawodników, na których bukmacher daje kurs w tym rynku. Kratka z kreską = nie zagrał (nie liczy się do wyniku).
+          Pokazujemy zawodników, na których bukmacher daje kurs w tym rynku. Kratka z kreską = nie zagrał (nie liczy się do wyniku). Kurs w przerywanej ramce: bukmacherzy wyceniają ten rynek bardzo różnie – cena jest prawdziwa, ale warto sprawdzić linię u bukmachera.
         </p>
       </section>
 

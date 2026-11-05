@@ -34,6 +34,44 @@ def test_dwa_kursy_osobno_z_pelnych_ofert():
     assert wynik[7][101]["shots"] == {"0.5": [1.4, 1.45], "1.5": [2.6, None]}
 
 
+def test_rozjazd_cen_betclica_widoczny_inna_statystyka_ukryta():
+    """05.11 (Ángelo Martino, zza pola 1,5: Superbet 5,20, Betclic 12,00):
+    brama mówi „ceny mocno się różnią” → cena Betclica zostaje z flagą 2;
+    drabinka przesunięta (inna statystyka) → ukryta, flaga 1, jak dotąd."""
+    from footstats.sources import betclic as BC
+    siatka = {7: {101: {"shots_outside_box": {"0.5": 1.97, "1.5": 5.2}}}}
+    sb = {7: {"players": {"Angelo Martino": {"shots_outside_box": {
+        0.5: {"over": 1.97}, 1.5: {"over": 5.2}}}}}}
+    bc = {7: {"players": {"Angelo Martino": {"shots_outside_box": {
+        0.5: {"over": 3.0}, 1.5: {"over": 12.0}}}}}}
+    wynik = L.siatka_dwoch_kursow(siatka, {}, {101: "Angelo Martino"}, sb, bc, _znajdz, _znajdz,
+                                  brama_bc=BC.linie_do_scalenia,
+                                  rozjazd_cen=BC.POWODY_ROZJAZDU_CEN)
+    assert wynik[7][101]["shots_outside_box"] == {"0.5": [1.97, 3.0, 2], "1.5": [5.2, 12.0, 2]}
+    # inna statystyka (powód spoza rozjazdu) – cena ukryta jak przed 05.11
+    wynik = L.siatka_dwoch_kursow(siatka, {}, {101: "Angelo Martino"}, sb, bc, _znajdz, _znajdz,
+                                  brama_bc=lambda _s, _b: ({}, "drabinka_przesunieta"),
+                                  rozjazd_cen=BC.POWODY_ROZJAZDU_CEN)
+    assert wynik[7][101]["shots_outside_box"] == {"0.5": [1.97, None, 1], "1.5": [5.2, None, 1]}
+    # stara brama (same linie) dalej działa: pusto = ukryte
+    wynik = L.siatka_dwoch_kursow(siatka, {}, {101: "Angelo Martino"}, sb, bc, _znajdz, _znajdz,
+                                  brama_bc=lambda _s, _b: {})
+    assert wynik[7][101]["shots_outside_box"]["1.5"] == [5.2, None, 1]
+
+
+def test_rozjazd_cen_w_liniach_dnia_i_stemplach():
+    kursy = {7: {1: {"shots": {"1.5": [1.5, 3.4, 2]}}}}
+    players = [_zaw(1, [3, 2, 2, 3, 2, 4, 2, 2, 3, 2])]
+    k = L.klucz_linii_dnia(players, kursy, [{"id": 7, "kickoff_ts": 2000}], teraz=1000)
+    assert k["linie"] == [[7, 1, "shots", 1.5, 1.5, 3.4, 2]]
+    typy = [{"mecz_id": 7, "podmiot_id": 1, "rynek_kod": "shots", "linia": 1.5,
+             "strona": "powyzej"}]
+    assert L.stempluj_ceny_bukmacherow(typy, kursy) == 1
+    assert typy[0]["kursy_bukmacherow"] == {"Superbet": 1.5, "Betclic": 3.4}
+    kursy[7][1]["shots"]["1.5"] = [1.5, None, 1]
+    assert L.stempluj_ceny_bukmacherow(typy, kursy) == 0
+
+
 def test_bez_oferty_cena_zostaje_u_wlasciciela_z_siatki():
     """Odkrywanie bywa pod inną pisownią – wtedy cena z siatki trafia do tego
     bukmachera, którego wskazuje `zrodla_grid`, a drugi kurs zostaje pusty."""

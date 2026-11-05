@@ -581,8 +581,8 @@ export type LinieDnia = {
   /** "id|rynek" → [ostatnie 10, minuty 10, (pozycje meczów)], od najnowszego */
   forma: Record<string, [number[], number[], (number[] | null)?]>;
   druzyny?: string[];
-  /** [mecz, zawodnik, rynek, linia, Superbet, Betclic, (1 = Betclic liczy inaczej)] */
-  linie: [number, number, string, number, number | null, number | null, 1?][];
+  /** [mecz, zawodnik, rynek, linia, Superbet, Betclic, (1 = Betclic liczy inaczej, 2 = ceny mocno się różnią)] */
+  linie: [number, number, string, number, number | null, number | null, (1 | 2)?][];
 };
 
 export async function getLinieDnia(): Promise<LinieDnia | null> {

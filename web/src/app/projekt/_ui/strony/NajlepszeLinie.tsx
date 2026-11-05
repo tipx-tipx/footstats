@@ -498,7 +498,8 @@ export function NajlepszeLinie({
             )}
             <AnimatePresence initial={false}>
               {wynik.slice(0, ile).map((w) => {
-                const [mid, pid, rynek, linia, sb, bc, inaczej] = w.s;
+                const [mid, pid, rynek, linia, sb, bc, flaga] = w.s;
+                const inaczej = flaga === 1;
                 const m = poId.get(mid)!;
                 const z = dane.zaw[String(pid)];
                 const f = dane.forma[`${pid}|${rynek}`];
@@ -557,7 +558,13 @@ export function NajlepszeLinie({
                     </span>
                     <span role="cell" className="mz-kursy">
                       <Kurs k={sb} bukmacher="Superbet" lepszy={lepszySb} />
-                      <Kurs k={inaczej ? null : bc} bukmacher="Betclic" lepszy={!lepszySb} uwaga={inaczej ? "Betclic liczy tę statystykę inaczej – ceny nie porównujemy" : undefined} />
+                      <Kurs
+                        k={inaczej ? null : bc}
+                        bukmacher="Betclic"
+                        lepszy={!lepszySb}
+                        uwaga={inaczej ? "Betclic liczy tę statystykę inaczej – ceny nie porównujemy" : undefined}
+                        rozjazd={flaga === 2}
+                      />
                     </span>
                   </motion.div>
                 );
@@ -574,7 +581,7 @@ export function NajlepszeLinie({
       )}
 
       <p className="mz-przypis">
-        Dla każdego zawodnika najwyższa linia, którą przebijał przy tych progach, i najlepsza cena. To statystyka, nie nasz typ. Kratka z kreską = nie zagrał (nie liczy się do wyniku). Kliknij linię, żeby zobaczyć cały mecz.
+        Dla każdego zawodnika najwyższa linia, którą przebijał przy tych progach, i najlepsza cena. To statystyka, nie nasz typ. Kratka z kreską = nie zagrał (nie liczy się do wyniku). Kurs w przerywanej ramce: bukmacherzy wyceniają ten rynek bardzo różnie – cena jest prawdziwa, ale warto sprawdzić linię u bukmachera. Kliknij linię, żeby zobaczyć cały mecz.
       </p>
 
       {telefon && panel()}

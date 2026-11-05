@@ -12,8 +12,12 @@
 export type Okno = 5 | 10;
 export const MIN_ZAGRANYCH: Record<Okno, number> = { 10: 7, 5: 4 };
 
-/** [mecz, zawodnik, rynek, linia, Superbet, Betclic, (1 = Betclic liczy inaczej)] – jak w kluczu `linie_dnia` */
-export type LiniaS = [number, number, string, number, number | null, number | null, 1?];
+/**
+ * [mecz, zawodnik, rynek, linia, Superbet, Betclic, (flaga)] – jak w kluczu `linie_dnia`.
+ * Flaga 1 = Betclic liczy inaczej (cena ukryta), 2 = ceny mocno się różnią przy tej
+ * samej statystyce – cena Betclica prawdziwa i liczy się jak każda (05.11).
+ */
+export type LiniaS = [number, number, string, number, number | null, number | null, (1 | 2)?];
 /**
  * "zawodnik|rynek" → [ostatnie 10, minuty 10, (pozycje meczów)] od najnowszego.
  * Trzecie pole (klucz w2, 05.11): brak = kratki to początek listy meczów
