@@ -10,7 +10,8 @@
 import { druzyna, GODZ_FMT, POZYCJE, dzienTs, etykietaDnia, type DruzynaV } from "./przygotuj";
 import { dzisZrodla, zrodlo } from "./zrodlo";
 
-const OKNO_MAX = 10;
+/** historia do 20 meczów: okno 10 WYSTĘPÓW sięga po starsze, gdy zawodnik nie grał (05.11) */
+const OKNO_MAX = 20;
 
 export const RYNKI_ZAWODNIKA: [string, string][] = [
   ["shots", "Strzały"],

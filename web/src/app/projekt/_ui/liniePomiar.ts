@@ -46,16 +46,59 @@ export function progDlaOkna(pokrycie: number, okno: Okno, od = 0.5): number {
 /** „7/10” – próg tak, jak go liczy gracz */
 export const progTxt = (pokrycie: number, okno: Okno) => `${Math.round(pokrycie * okno)}/${okno}`;
 
-export type PokrycieLinii = { weszlo: number; zagrane: number; nz: number; udzial: number; srednia: number | null };
+/**
+ * ⚑ OKNO = OSTATNIE N WYSTĘPÓW (05.11, właściciel: „6 na 8, a nie 6 na 10 …
+ * żeby to było przemyślane pod każdy przypadek”). Dotąd okno było N ostatnich
+ * MECZÓW razem z „nie zagrał”, więc mianownik spadał (6/8), a pipeline (model,
+ * sito drabinek – `pokrycie_historii`) liczył już z N ostatnich WYSTĘPÓW.
+ * Teraz tak samo: „nie zagrał” (minuty 0) nie zajmuje miejsca w oknie – okno
+ * sięga dalej wstecz (historia ma do 20 meczów), a ile razy nie zagrał w tym
+ * czasie, mówi osobna liczba. Mecz BEZ DANYCH dla rynku (minuty −1, np. brak
+ * mapy strzałów w FotMob) zajmuje miejsce i jest widoczny jako „?” – świeżość
+ * okna się nie cofa – ale do wyniku się nie liczy. Mianownik < N zostaje więc
+ * tylko przy krótkiej historii albo braku danych, a próg pokrycia działa wtedy
+ * jako odsetek znanych występów (7/10 = 70%: przy 8 znanych trzeba 6).
+ */
+export const MIN_BRAK_DANYCH = -1;
 
-export function pokrycieLinii(v: number[], min: number[], linia: number, okno: Okno): PokrycieLinii {
-  const mecze = v.slice(0, okno).map((x, i) => ({ x, m: min[i] ?? 90 }));
-  const zagrane = mecze.filter((m) => m.m > 0);
+export function oknoWystepow<T extends { min: number }>(mecze: T[], okno: number): { mecze: T[]; nz: number; bd: number } {
+  const out: T[] = [];
+  let nz = 0;
+  for (const m of mecze) {
+    if (out.length >= okno) break;
+    if (m.min === 0) {
+      nz += 1;
+      continue;
+    }
+    out.push(m);
+  }
+  return { mecze: out, nz, bd: out.filter((m) => m.min < 0).length };
+}
+
+/** podpis pod wynikiem: odsetek, a gdy okno sięgnęło dalej albo czegoś brak – dlaczego (05.11) */
+export function podpisWyniku(p: { nz: number; bd?: number; udzial: number }) {
+  const czesci = [p.nz ? `${p.nz}× nie grał` : "", p.bd ? `${p.bd}× brak danych` : ""].filter(Boolean);
+  return czesci.length ? czesci.join(" · ") : `${Math.round(p.udzial * 100)}%`;
+}
+
+/** stan kratki: „?” brak danych, „NZ” nie zagrał, trafione / nie */
+export const stanKratki = (min: number, trafil: boolean) => (min < 0 ? "brak" : min === 0 ? "nz" : trafil ? "ok" : "nie");
+
+export type PokrycieLinii = { weszlo: number; zagrane: number; nz: number; bd: number; udzial: number; srednia: number | null };
+
+/** `nzPoza` – „nie zagrał” wycięte już w pipeline (klucz `linie_dnia` niesie okno bez nich) */
+export function pokrycieLinii(v: number[], min: number[], linia: number, okno: Okno, nzPoza = 0): PokrycieLinii {
+  const w = oknoWystepow(
+    v.map((x, i) => ({ x, min: min[i] ?? 90 })),
+    okno,
+  );
+  const zagrane = w.mecze.filter((m) => m.min > 0);
   const weszlo = zagrane.filter((m) => m.x > linia).length;
   return {
     weszlo,
     zagrane: zagrane.length,
-    nz: mecze.length - zagrane.length,
+    nz: w.nz + nzPoza,
+    bd: w.bd,
     udzial: zagrane.length ? weszlo / zagrane.length : 0,
     srednia: zagrane.length ? zagrane.reduce((a, m) => a + m.x, 0) / zagrane.length : null,
   };
@@ -68,7 +111,7 @@ export type MeczZawodnika = [number, number];
  * Rywal i data każdej kratki (dymek, 05.11). `null` = klucz bez tych danych
  * (stary kształt albo pipeline nie miał dat) – kratki bez dymka.
  */
-export function meczeKratek(f: FormaLinii[string], mecze: MeczZawodnika[] | undefined, druzyny: string[], okno: Okno): { rywal: string; data: string }[] | null {
+export function meczeKratek(f: FormaLinii[string], mecze: MeczZawodnika[] | undefined, druzyny: string[], okno: number): { rywal: string; data: string }[] | null {
   if (!mecze?.length || f[2] === null) return null;
   const n = Math.min(okno, f[0].length);
   const poz = f[2] ?? Array.from({ length: n }, (_, i) => i);

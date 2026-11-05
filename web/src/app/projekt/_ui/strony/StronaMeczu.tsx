@@ -14,7 +14,7 @@ import { IkonaKoszulka } from "../atomy2/filtry2";
 import { Logo } from "../atomy2/podstawowe";
 import { PrzewijanyRzad } from "../atomy2/PrzewijanyRzad";
 import { Herb } from "../Herb";
-import { silaPokrycia } from "../liniePomiar";
+import { oknoWystepow, podpisWyniku, silaPokrycia, stanKratki } from "../liniePomiar";
 
 /*
  * Etap 5.4 – strona meczu jako narzędzie (decyzja właściciela 01.10):
@@ -44,17 +44,20 @@ const KURS_OD: [number, string][] = [
 const najlepsza = (k: { sb: number | null; bc: number | null; bcInaczej?: boolean }) => Math.max(k.sb ?? 0, k.bcInaczej ? 0 : (k.bc ?? 0));
 
 const kursTxt = (k: number | null) => (k === null ? "–" : k.toFixed(2).replace(".", ","));
-const proc = (x: number) => `${Math.round(x * 100)}%`;
 
-/** pokrycie linii w oknie: mecze bez minut liczą się osobno („nie zagrał”) */
+/** pokrycie linii w oknie N WYSTĘPÓW (`liniePomiar.oknoWystepow`): „nie zagrał” poza oknem, „?” w oknie, ale poza wynikiem */
 function pokrycie(z: ZawodnikMeczu, rynek: string, linia: number, okno: Okno) {
   const h = z.rynki[rynek];
   if (!h) return null;
-  const mecze = h.v.slice(0, okno).map((v, i) => ({ v, min: h.min[i] ?? 90, rywal: h.rywale[i] ?? "", data: h.daty[i] ?? "" }));
+  const w = oknoWystepow(
+    h.v.map((v, i) => ({ v, min: h.min[i] ?? 90, rywal: h.rywale[i] ?? "", data: h.daty[i] ?? "" })),
+    okno,
+  );
+  const mecze = w.mecze;
   const zagrane = mecze.filter((m) => m.min > 0);
   const weszlo = zagrane.filter((m) => m.v > linia).length;
   const srednia = zagrane.length ? zagrane.reduce((a, m) => a + m.v, 0) / zagrane.length : null;
-  return { mecze, weszlo, zagrane: zagrane.length, nz: mecze.length - zagrane.length, udzial: zagrane.length ? weszlo / zagrane.length : 0, srednia };
+  return { mecze, weszlo, zagrane: zagrane.length, nz: w.nz, bd: w.bd, udzial: zagrane.length ? weszlo / zagrane.length : 0, srednia };
 }
 
 function poziom(u: number) {
@@ -204,10 +207,10 @@ function MiniKratki({ p, linia }: { p: NonNullable<ReturnType<typeof pokrycie>>;
   const { zdarzenia, dymek } = useDymekKratek();
   return (
     <>
-      <span className="mz-kratki" {...zdarzenia} aria-label={`ostatnie mecze od najnowszego: ${p.mecze.map((m) => `${m.rywal ? `${m.rywal} ` : ""}${m.min > 0 ? m.v : "nie zagrał"}`).join(", ")}`}>
+      <span className="mz-kratki" {...zdarzenia} aria-label={`ostatnie występy od najnowszego: ${p.mecze.map((m) => `${m.rywal ? `${m.rywal} ` : ""}${m.min > 0 ? m.v : "brak danych"}`).join(", ")}`}>
         {p.mecze.map((m, i) => (
-          <i key={i} data-s={m.min <= 0 ? "nz" : m.v > linia ? "ok" : "nie"} {...opisKratki(m)}>
-            {m.min > 0 ? m.v : ""}
+          <i key={i} data-s={stanKratki(m.min, m.v > linia)} {...opisKratki(m)}>
+            {m.min > 0 ? m.v : m.min < 0 ? "?" : ""}
           </i>
         ))}
       </span>
@@ -216,13 +219,13 @@ function MiniKratki({ p, linia }: { p: NonNullable<ReturnType<typeof pokrycie>>;
   );
 }
 
-export function Weszlo({ p }: { p: { weszlo: number; zagrane: number; nz: number; udzial: number } }) {
+export function Weszlo({ p }: { p: { weszlo: number; zagrane: number; nz: number; bd?: number; udzial: number } }) {
   return (
     <span className="mz-weszlo" data-poziom={poziom(p.udzial)}>
       <b>
         {p.weszlo}/{p.zagrane}
       </b>
-      <small>{p.nz ? `${p.nz}× nie zagrał` : proc(p.udzial)}</small>
+      <small>{podpisWyniku(p)}</small>
     </span>
   );
 }
@@ -339,7 +342,7 @@ function TabelaA({
         {!telefon && (
           <div className="mz-tr mz-th" role="row">
             <span role="columnheader">Zawodnik</span>
-            <span role="columnheader">Ostatnie {okno} meczów, od najnowszego</span>
+            <span role="columnheader">Ostatnie {okno} występów, od najnowszego</span>
             <button type="button" role="columnheader" aria-sort={sort === "pokrycie" ? "descending" : "none"} onClick={() => setSort("pokrycie")}>
               Weszło {sort === "pokrycie" && "↓"}
             </button>
@@ -539,7 +542,7 @@ export function StronaMeczu({ wariant, m, telefon, start }: { wariant: string; m
             <TabelaA key={r.kod} m={m} rynek={r.kod} okno={okno} strona={strona} telefon={telefon} l={l} sort={sort} setSort={setSort} kursOd={kursOd} tylkoXi={tylkoXi} />
           ))}
         <p className="mz-przypis">
-          Pokazujemy zawodników, na których bukmacher daje kurs w tym rynku. Kratka z kreską = nie zagrał (nie liczy się do wyniku). Kurs w przerywanej ramce: bukmacherzy wyceniają ten rynek bardzo różnie – cena jest prawdziwa, ale warto sprawdzić linię u bukmachera.
+          Pokazujemy zawodników, na których bukmacher daje kurs w tym rynku. Okno to ostatnie występy zawodnika – mecze, w których nie zagrał, nie zajmują miejsca („2× nie grał” pod wynikiem). Kratka „?” = brak danych z tego meczu (nie liczy się do wyniku). Kurs w przerywanej ramce: bukmacherzy wyceniają ten rynek bardzo różnie – cena jest prawdziwa, ale warto sprawdzić linię u bukmachera.
         </p>
       </section>
 

@@ -28,6 +28,20 @@ KOSZYKI_ZAWODNIKOW = 64
 OKNO_ZAWODNIKA = 10
 
 
+def dlugosc_okna_wystepow(minuty: list, okno: int = OKNO_ZAWODNIKA) -> int:
+    """Ile pierwszych wpisów historii (od najnowszego) obejmuje okno `okno`
+    WYSTĘPÓW (05.11): mecz „nie zagrał” (minuty 0) nie zajmuje miejsca, więc
+    okno sięga dalej wstecz; mecz bez danych rynku (minuty < 0, kratka „?”)
+    zajmuje. Wpisy „nie zagrał” w środku okna zostają (strona je liczy)."""
+    zajete = 0
+    for i, m in enumerate(minuty or []):
+        if zajete >= okno:
+            return i
+        if (m or 0) != 0:
+            zajete += 1
+    return len(minuty or [])
+
+
 def _f(x) -> float | None:
     try:
         return float(x)
@@ -218,10 +232,12 @@ def klucze_kursow_meczow(kursy_dwa: dict) -> dict:
 
 
 def _forma_okna(forma: dict) -> dict:
+    """Forma rynku przycięta do okna 10 WYSTĘPÓW (patrz `dlugosc_okna_wystepow`)."""
     out = {}
     for mk, f in (forma or {}).items():
         f = f or {}
-        out[mk] = {k: (v[:OKNO_ZAWODNIKA] if isinstance(v, list) else v)
+        n = dlugosc_okna_wystepow(f.get("minuty") or [90] * len(f.get("ostatnie") or []))
+        out[mk] = {k: (v[:n] if isinstance(v, list) else v)
                    for k, v in f.items()}
     return out
 
@@ -308,7 +324,9 @@ WERSJA_LINII = 2
 
 
 def _pokrycie(ostatnie: list, minuty: list, linia: float, okno: int) -> float:
-    zagrane = [v for v, m in zip(ostatnie[:okno], minuty[:okno]) if (m or 0) > 0]
+    # okno WYSTĘPÓW (05.11) – jak strona (`liniePomiar.oknoWystepow`)
+    n = dlugosc_okna_wystepow(minuty, okno)
+    zagrane = [v for v, m in zip(ostatnie[:n], minuty[:n]) if (m or 0) > 0]
     if len(zagrane) < MIN_ZAGRANYCH[okno]:
         return 0.0
     return sum(1 for v in zagrane if (_f(v) or 0) > linia) / len(zagrane)
@@ -328,8 +346,10 @@ def _linie_przy_progu(gracze: dict, kursy_dwa: dict, przyszle: set,
                 continue
             for mk, ceny in (rynki or {}).items():
                 f = (z.get("forma") or {}).get(mk) or {}
-                ost = list(f.get("ostatnie") or [])[:OKNO_ZAWODNIKA]
-                mins = list(f.get("minuty") or [90] * len(ost))[:OKNO_ZAWODNIKA]
+                ost = list(f.get("ostatnie") or [])
+                mins = list(f.get("minuty") or [90] * len(ost))
+                _n_okna = dlugosc_okna_wystepow(mins)
+                ost, mins = ost[:_n_okna], mins[:_n_okna]
                 if not ost:
                     continue
                 for l, para in (ceny or {}).items():
@@ -383,7 +403,8 @@ def _rywale_linii(gracze: dict, zaw: dict, forma: dict) -> list:
         for mk in mks:
             f = fz.get(mk) or {}
             ryw = list(f.get("rywale") or [])
-            for i, t in enumerate(list(f.get("ts") or [])[:OKNO_ZAWODNIKA]):
+            _n = len((forma.get(f"{pid}|{mk}") or [[]])[0])
+            for i, t in enumerate(list(f.get("ts") or [])[:_n]):
                 if t is None:
                     continue
                 r = str(ryw[i] or "") if i < len(ryw) else ""
@@ -400,8 +421,8 @@ def _rywale_linii(gracze: dict, zaw: dict, forma: dict) -> list:
             mecze.append([t // 86400, nr_druzyny[r]])
         zaw[pid] = zaw[pid][:4] + [mecze]
         for mk in mks:
-            ts = list((fz.get(mk) or {}).get("ts") or [])[:OKNO_ZAWODNIKA]
             wpis = forma[f"{pid}|{mk}"]
+            ts = list((fz.get(mk) or {}).get("ts") or [])[:len(wpis[0])]
             if len(ts) != len(wpis[0]) or any(t is None for t in ts):
                 wpis.append(None)
                 continue

@@ -1771,6 +1771,72 @@ def _podsumuj_pomiar_bez_oferty(pbo, czas, ile, z_oferta: set, bez_oferty: set,
     return wynik
 
 
+# ⚑ MECZE BEZ MAPY STRZAŁÓW W HISTORII (05.11, właściciel – Richard
+# Sedláček: „liczba jest dobra, ale są starsze mecze, a nowszych nie ma”).
+# FotMob ma dla 841 z 2254 meczów ze statystykami (czeska 1. liga, Serie C,
+# USL, Eerste Divisie…) łączne strzały, ale nie mapę strzałów – a zza pola
+# i głową bierzemy tylko z niej (365Scores też jej tam nie ma, pomiar 05.11).
+# Rynek pomijał takie mecze, więc kratki „cofały się” do meczów sprzed
+# tygodni i nic nie mówiło, że nowszych brakuje. Teraz mecz, który zawodnik
+# rozegrał (strzały go znają, minuty > 0), a rynek z mapy nie – wchodzi do
+# formy rynku z minutami `MINUTY_BRAK_DANYCH` (−1): każdy rachunek pokrycia
+# liczy tylko minuty > 0, więc nie wchodzi ani do wyniku, ani do minimum
+# rozegranych; strona pokazuje kratkę „?” z dymkiem „brak danych”.
+# NIE wpisujemy 0 tam, gdzie zawodnik w ogóle nie strzelał: mecze, w których
+# strzelał, dalej byłyby nieznane, a pokrycie wyszłoby zaniżone.
+RYNKI_Z_MAPY_STRZALOW = ("shots_outside_box", "sot_outside_box", "headed_shots", "headed_sot")
+MINUTY_BRAK_DANYCH = -1
+
+
+def oznacz_brak_mapy_strzalow(players: list[dict], n: int = 20) -> int:
+    """Dopisuje do form rynków z mapy strzałów mecze znane tylko ze strzałów
+    (patrz `MINUTY_BRAK_DANYCH`). Zmienia `players` w miejscu; zwraca liczbę
+    dopisanych meczów. Rynek bez żadnej historii zostaje bez zmian."""
+    dopisane = 0
+    for z in players or []:
+        forma = z.get("forma") or {}
+        st = forma.get("shots") or {}
+        st_ts = list(st.get("ts") or [])
+        if not st_ts:
+            continue
+        st_min = list(st.get("minuty") or [])
+        st_ryw = list(st.get("rywale") or [])
+        st_kad = list(st.get("kadra") or [])
+        for mk in RYNKI_Z_MAPY_STRZALOW:
+            f = forma.get(mk)
+            if not f or not f.get("ts"):
+                continue
+            ts = list(f.get("ts") or [])
+            k = len(ts)
+
+            def _el(lst, i, d):
+                return lst[i] if i < len(lst) else d
+
+            wpisy = [(int(ts[i]), _el(f.get("ostatnie") or [], i, 0),
+                      _el(f.get("minuty") or [], i, 90), _el(f.get("rywale") or [], i, ""),
+                      _el(f.get("kadra") or [], i, False)) for i in range(k)]
+            nowe = 0
+            for i, t in enumerate(st_ts):
+                m = _el(st_min, i, 0)
+                if not m or float(m) <= 0:
+                    continue
+                if any(abs(int(t) - u) <= 4 * 3600 for u in ts):
+                    continue
+                wpisy.append((int(t), 0, MINUTY_BRAK_DANYCH, _el(st_ryw, i, ""), _el(st_kad, i, False)))
+                nowe += 1
+            if not nowe:
+                continue
+            wpisy.sort(key=lambda w: -w[0])
+            wpisy = wpisy[:n]
+            f["ts"] = [w[0] for w in wpisy]
+            f["ostatnie"] = [w[1] for w in wpisy]
+            f["minuty"] = [w[2] for w in wpisy]
+            f["rywale"] = [w[3] for w in wpisy]
+            f["kadra"] = [w[4] for w in wpisy]
+            dopisane += sum(1 for w in wpisy if w[2] == MINUTY_BRAK_DANYCH)
+    return dopisane
+
+
 def pokrycie_historii(counts, minutes, linia: float, n: int,
                       min_minut: float = 15.0) -> tuple[int, int]:
     """Ile z ostatnich `n` występów (≥ `min_minut`, najnowszy pierwszy, jak
@@ -12555,6 +12621,12 @@ def _main_impl(tryb=None):
     except Exception as e:
         diagnostyka.cichy("cykl", "lekkie_mecze", e)
     _dump("matches.json", list(matches_out.values()))
+    try:
+        _n_brak = oznacz_brak_mapy_strzalow(list(players_out.values()))
+        print(f"Formy rynków z mapy strzałów: {_n_brak} meczów bez rozbicia strzałów "
+              "oznaczonych jako brak danych (kratka „?”)", flush=True)
+    except Exception as _e_bm:                               # noqa: BLE001
+        diagnostyka.cichy("cykl", "brak_mapy_strzalow", _e_bm)
     _dump("players.json", list(players_out.values()))
     _dump("druzyny_forma.json", scal_forme_druzyn(druzyny_forma, lista_pub))
     _dump("odds_superbet.json", odds_grid)   # siatka kursów do TOP POKRYCIA

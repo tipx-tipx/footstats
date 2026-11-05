@@ -130,7 +130,7 @@ function Passa({ t }: { t: KartaStrony }) {
     <div className="st-passa">
       <span className="st-passa-kreski" aria-hidden>
         {mecze.map((m, i) => (
-          <i key={i} data-s={m.min <= 0 ? "nz" : trafil(m.v) ? "ok" : "nie"} />
+          <i key={i} data-s={m.min < 0 ? "brak" : m.min === 0 ? "nz" : trafil(m.v) ? "ok" : "nie"} />
         ))}
       </span>
       <span>

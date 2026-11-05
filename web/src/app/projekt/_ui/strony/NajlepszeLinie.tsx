@@ -22,10 +22,12 @@ import {
   KURS_MIN,
   liniePokrycia,
   meczeKratek,
+  oknoWystepow,
   progDlaOkna,
   progiPokrycia,
   progTxt,
   silaPokrycia,
+  stanKratki,
   taSamaDruzyna,
   wybierzLinie,
   type LiniaS,
@@ -117,7 +119,11 @@ function Kratki({
   zdarzenia: ReturnType<typeof useDymekKratek>["zdarzenia"];
 }) {
   const dotyk = useRef(false);
-  const mecze = v.slice(0, okno).map((x, i) => ({ v: x, min: min[i] ?? 90, rywal: opisy?.[i]?.rywal ?? "", data: opisy?.[i]?.data ?? "" }));
+  // okno N występów (05.11): „nie zagrał” poza kratkami, „?” = brak danych o rynku
+  const mecze = oknoWystepow(
+    v.map((x, i) => ({ v: x, min: min[i] ?? 90, rywal: opisy?.[i]?.rywal ?? "", data: opisy?.[i]?.data ?? "" })),
+    okno,
+  ).mecze;
   return (
     <span
       className="mz-kratki"
@@ -128,11 +134,11 @@ function Kratki({
       onClick={(e) => {
         if (opisy && dotyk.current) e.stopPropagation();
       }}
-      aria-label={`ostatnie mecze od najnowszego: ${mecze.map((m) => `${m.rywal ? `${m.rywal} ` : ""}${m.min > 0 ? m.v : "nie zagrał"}`).join(", ")}`}
+      aria-label={`ostatnie występy od najnowszego: ${mecze.map((m) => `${m.rywal ? `${m.rywal} ` : ""}${m.min > 0 ? m.v : "brak danych"}`).join(", ")}`}
     >
       {mecze.map((m, i) => (
-        <i key={i} data-s={m.min <= 0 ? "nz" : m.v > linia ? "ok" : "nie"} {...(opisy ? opisKratki(m) : {})}>
-          {m.min > 0 ? m.v : ""}
+        <i key={i} data-s={stanKratki(m.min, m.v > linia)} {...(opisy ? opisKratki(m) : {})}>
+          {m.min > 0 ? m.v : m.min < 0 ? "?" : ""}
         </i>
       ))}
     </span>
@@ -487,7 +493,7 @@ export function NajlepszeLinie({
               <div className="mz-tr mz-th nl-tr" role="row">
                 <span role="columnheader">Zawodnik</span>
                 <span role="columnheader">Linia</span>
-                <span role="columnheader">Ostatnie {prog.okno} meczów</span>
+                <span role="columnheader">Ostatnie {prog.okno} występów</span>
                 <button type="button" role="columnheader" aria-sort={sort === "pokrycie" ? "descending" : "none"} onClick={() => setSort("pokrycie")}>
                   Weszło {sort === "pokrycie" && "↓"}
                 </button>
@@ -551,7 +557,7 @@ export function NajlepszeLinie({
                       </small>
                     </span>
                     <span role="cell" className="nl-kratki">
-                      <Kratki v={f[0]} min={f[1]} linia={linia} okno={prog.okno} opisy={meczeKratek(f, z.mecze, dane.druzyny, prog.okno)} zdarzenia={dymekZdarzenia} />
+                      <Kratki v={f[0]} min={f[1]} linia={linia} okno={prog.okno} opisy={meczeKratek(f, z.mecze, dane.druzyny, f[0].length)} zdarzenia={dymekZdarzenia} />
                     </span>
                     <span role="cell">
                       <Weszlo p={w.p} />
@@ -581,7 +587,7 @@ export function NajlepszeLinie({
       )}
 
       <p className="mz-przypis">
-        Dla każdego zawodnika najwyższa linia, którą przebijał przy tych progach, i najlepsza cena. To statystyka, nie nasz typ. Kratka z kreską = nie zagrał (nie liczy się do wyniku). Kurs w przerywanej ramce: bukmacherzy wyceniają ten rynek bardzo różnie – cena jest prawdziwa, ale warto sprawdzić linię u bukmachera. Kliknij linię, żeby zobaczyć cały mecz.
+        Dla każdego zawodnika najwyższa linia, którą przebijał przy tych progach, i najlepsza cena. To statystyka, nie nasz typ. Okno to ostatnie występy – mecze, w których zawodnik nie zagrał, nie zajmują miejsca („2× nie grał” pod wynikiem). Kratka „?” = brak danych z tego meczu (nie liczy się do wyniku). Gdy znanych występów jest mniej niż 10, próg liczy się jako odsetek (7/10 przy 8 znanych = 6/8). Kurs w przerywanej ramce: bukmacherzy wyceniają ten rynek bardzo różnie – cena jest prawdziwa, ale warto sprawdzić linię u bukmachera. Kliknij linię, żeby zobaczyć cały mecz.
       </p>
 
       {telefon && panel()}

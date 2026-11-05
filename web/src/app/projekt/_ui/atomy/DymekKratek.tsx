@@ -70,6 +70,6 @@ export function useDymekKratek() {
 export function opisKratki(m: { v: number; min: number; rywal: string; data: string }) {
   return {
     "data-mecz": [m.rywal && `vs ${m.rywal}`, m.data].filter(Boolean).join(" · ") || "mecz",
-    "data-wynik": m.min > 0 ? `${m.v} · ${m.min} min` : "nie zagrał",
+    "data-wynik": m.min > 0 ? `${m.v} · ${m.min} min` : m.min < 0 ? "brak danych" : "nie zagrał",
   };
 }

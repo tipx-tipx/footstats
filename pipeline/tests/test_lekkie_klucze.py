@@ -191,8 +191,27 @@ def test_linie_dnia_nie_zagral_i_betclic_inaczej():
     assert k["linie"] == []
     kursy = {7: {1: {"shots": {"1.5": [1.35, 1.9, 1]}}}}
     k = L.klucz_linii_dnia(players, kursy, [{"id": 7, "kickoff_ts": 2000}], teraz=1000)
-    # tylko 2 rozegrane w oknie 5 – za mało; w oknie 10: 4 rozegrane – też za mało
-    assert k["linie"] == []
+    # 05.11 okno = ostatnie WYSTĘPY: w oknie 5 są 4 występy (minimum 4) i 4/4
+    # – wchodzi; w oknie 10 też 4 występy – za mało (min. 7), ale wystarczy okno 5.
+    # Do 05.11 okno 5 brało 5 meczów z „nie zagrał” (2 rozegrane) i linia odpadała.
+    assert k["linie"] == [[7, 1, "shots", 1.5, 1.35, None, 1]]
+    assert k["forma"]["1|shots"][1] == [90, 80, 0, 0, 0, 0, 0, 90, 90, 0]
     players = [_zaw(1, [2, 3, 2, 3, 0, 2], [90, 80, 70, 90, 0, 90])]
     k = L.klucz_linii_dnia(players, kursy, [{"id": 7, "kickoff_ts": 2000}], teraz=1000)
     assert k["linie"] == [[7, 1, "shots", 1.5, 1.35, None, 1]]
+
+
+def test_okno_wystepow_siega_dalej_i_zostawia_brak_danych():
+    """05.11: „nie zagrał” (0) nie zajmuje miejsca, „?” (−1) zajmuje."""
+    assert L.dlugosc_okna_wystepow([90, 0, 0, 90, 90], 3) == 5
+    assert L.dlugosc_okna_wystepow([90, -1, 0, 90, 90, 90], 3) == 4
+    assert L.dlugosc_okna_wystepow([90] * 4, 10) == 4
+    # 6/8 przy dwóch „nie zagrał” → okno sięga po 2 starsze występy (6+ z 10)
+    ost = [2, 0, 2, 0, 2, 2, 2, 2, 2, 0, 2, 2, 0]
+    mins = [90, 0, 90, 0, 90, 90, 90, 90, 90, 90, 90, 90, 90]
+    z = _zaw(1, ost, mins)
+    kursy = {7: {1: {"shots": {"1.5": [1.9, None]}}}}
+    k = L.klucz_linii_dnia([z], kursy, [{"id": 7, "kickoff_ts": 2000}], teraz=1000)
+    f = k["forma"]["1|shots"]
+    assert len(f[0]) == 12 and sum(1 for m in f[1] if m > 0) == 10
+    assert L._pokrycie(ost, mins, 1.5, 10) == 0.9

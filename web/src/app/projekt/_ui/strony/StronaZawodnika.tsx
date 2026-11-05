@@ -8,6 +8,7 @@ import { fmtLinia } from "@/lib/format";
 
 import type { RynekZawodnika, ZawodnikStrony } from "../../_dane/zawodnik";
 import { opisKratki, useDymekKratek } from "../atomy/DymekKratek";
+import { oknoWystepow, podpisWyniku, stanKratki } from "../liniePomiar";
 import { Logo } from "../atomy2/podstawowe";
 import { KartaA } from "../elementy/karta";
 import { IkonaRynku } from "../elementy/ikonyRynkow";
@@ -25,12 +26,25 @@ type Okno = 5 | 10;
 const kursTxt = (k: number) => k.toFixed(2).replace(".", ",");
 const srTxt = (x: number | null) => (x === null ? "–" : x.toFixed(1).replace(".", ","));
 
+/** okno N WYSTĘPÓW (05.11, `liniePomiar.oknoWystepow`); `wszystkie` – mecz po meczu z „nie zagrał” */
 function pokrycie(h: RynekZawodnika["historia"], linia: number, okno: Okno) {
-  const mecze = h.v.slice(0, okno).map((v, i) => ({ v, min: h.min[i] ?? 90, rywal: h.rywale[i] ?? "", data: h.daty[i] ?? "" }));
+  const wszystkie = h.v.map((v, i) => ({ v, min: h.min[i] ?? 90, rywal: h.rywale[i] ?? "", data: h.daty[i] ?? "" }));
+  const w = oknoWystepow(wszystkie, okno);
+  const mecze = w.mecze;
   const zagrane = mecze.filter((m) => m.min > 0);
   const weszlo = zagrane.filter((m) => m.v > linia).length;
   const srednia = zagrane.length ? zagrane.reduce((a, m) => a + m.v, 0) / zagrane.length : null;
-  return { mecze, weszlo, zagrane: zagrane.length, nz: mecze.length - zagrane.length, udzial: zagrane.length ? weszlo / zagrane.length : 0, srednia };
+  const doKonca = mecze.length ? wszystkie.indexOf(mecze[mecze.length - 1]) + 1 : 0;
+  return {
+    mecze,
+    wszystkie: wszystkie.slice(0, doKonca),
+    weszlo,
+    zagrane: zagrane.length,
+    nz: w.nz,
+    bd: w.bd,
+    udzial: zagrane.length ? weszlo / zagrane.length : 0,
+    srednia,
+  };
 }
 type Pokrycie = ReturnType<typeof pokrycie>;
 const poziom = (u: number) => (u >= 0.8 ? "mocne" : u >= 0.6 ? "srednie" : "slabe");
@@ -109,10 +123,10 @@ function MiniKratki({ p, linia, okno }: { p: Pokrycie; linia: number; okno: Okno
   const { zdarzenia, dymek } = useDymekKratek();
   return (
     <>
-      <span className="mz-kratki" {...zdarzenia} aria-label={`ostatnie mecze od najnowszego: ${p.mecze.map((m) => `${m.rywal ? `${m.rywal} ` : ""}${m.min > 0 ? m.v : "nie zagrał"}`).join(", ")}`}>
+      <span className="mz-kratki" {...zdarzenia} aria-label={`ostatnie występy od najnowszego: ${p.mecze.map((m) => `${m.rywal ? `${m.rywal} ` : ""}${m.min > 0 ? m.v : "brak danych"}`).join(", ")}`}>
         {p.mecze.map((m, i) => (
-          <i key={i} data-s={m.min <= 0 ? "nz" : m.v > linia ? "ok" : "nie"} {...opisKratki(m)}>
-            {m.min > 0 ? m.v : ""}
+          <i key={i} data-s={stanKratki(m.min, m.v > linia)} {...opisKratki(m)}>
+            {m.min > 0 ? m.v : m.min < 0 ? "?" : ""}
           </i>
         ))}
         {Array.from({ length: puste }, (_, i) => (
@@ -168,7 +182,7 @@ function Weszlo({ p, klucz }: { p: Pokrycie; klucz: string }) {
       <motion.b key={klucz} initial={{ opacity: 0.25, y: -4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
         {p.weszlo}/{p.zagrane}
       </motion.b>
-      <small>{p.nz ? `${p.nz}× nie zagrał` : `${Math.round(p.udzial * 100)}%`}</small>
+      <small>{podpisWyniku(p)}</small>
     </span>
   );
 }
@@ -201,12 +215,12 @@ function Szczegoly({ r, linia, ustaw, okno }: { r: RynekZawodnika; linia: number
       <div>
         <h4 className="zw-h4">Mecz po meczu</h4>
         <ol className="zw-dziennik">
-          {p.mecze.map((m, i) => (
-            <li key={i} data-s={m.min <= 0 ? "nz" : m.v > linia ? "ok" : "nie"}>
+          {p.wszystkie.map((m, i) => (
+            <li key={i} data-s={stanKratki(m.min, m.v > linia)}>
               <span className="zw-dz-data">{m.data}</span>
               <span className="zw-dz-rywal">{m.rywal}</span>
-              <span className="zw-dz-min">{m.min > 0 ? `${m.min}′` : "nie zagrał"}</span>
-              <b className="zw-dz-v">{m.min > 0 ? m.v : "–"}</b>
+              <span className="zw-dz-min">{m.min > 0 ? `${m.min}′` : m.min < 0 ? "brak danych" : "nie zagrał"}</span>
+              <b className="zw-dz-v">{m.min > 0 ? m.v : m.min < 0 ? "?" : "–"}</b>
             </li>
           ))}
         </ol>
@@ -273,7 +287,7 @@ function TabelaRynkow({ z, okno, telefon }: { z: ZawodnikStrony; okno: Okno; tel
         <div className="zw-wiersz zw-glowka" role="row">
           <span role="columnheader">rynek</span>
           <span role="columnheader">linia</span>
-          <span role="columnheader">ostatnie mecze, od najnowszego</span>
+          <span role="columnheader">ostatnie występy, od najnowszego</span>
           <span role="columnheader">weszło</span>
           <span role="columnheader">średnio</span>
           <span role="columnheader">kurs</span>
@@ -379,7 +393,7 @@ export function StronaZawodnika({ z, telefon }: { z: ZawodnikStrony; telefon: bo
           />
         </div>
         <p className="zw-objasnienie">
-          Kratka = jeden mecz, od najnowszego. Zielona – przebił linię, szara – nie, przekreślona – nie zagrał. Kliknij rynek, żeby zobaczyć wszystkie linie i mecz po meczu.
+          Kratka = jeden występ, od najnowszego (mecze, w których nie zagrał, nie zajmują miejsca). Zielona – przebił linię, szara – nie, „?” – brak danych z tego meczu. Kliknij rynek, żeby zobaczyć wszystkie linie i mecz po meczu.
         </p>
         <TabelaRynkow z={z} okno={okno} telefon={telefon} />
         <p className="mz-przypis">Kurs: wyższy z Superbetu i Betclica – logo przy kursie pokazuje, u którego.</p>

@@ -133,6 +133,7 @@
 .zw-dz-v { justify-self: end; display: grid; place-items: center; width: 26px; height: 22px; border-radius: 6px; font-variant-numeric: tabular-nums; background: var(--pow3); color: var(--t2); }
 .zw-dziennik li[data-s="ok"] .zw-dz-v { background: var(--ok-tlo); color: var(--ok); }
 .zw-dziennik li[data-s="nz"] .zw-dz-v { background: none; color: var(--t3); }
+.zw-dziennik li[data-s="brak"] .zw-dz-v { background: none; color: var(--t3); box-shadow: inset 0 0 0 1px var(--kreska-mocna); }
 
 @container (max-width: 760px) {
   .zw-szczegoly { grid-template-columns: 1fr; gap: 14px; padding: 0 12px 14px; }

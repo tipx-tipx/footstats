@@ -274,22 +274,25 @@ export function KratkiD({ t }: { t: TypV }) {
         </span>
         <span className="d-hist-l5">
           ostatnie 5: <b>{ile5}/{ost5.length}</b>
-          {mecze.length > zagrane.length && <> · {mecze.length - zagrane.length}× nie zagrał</>}
+          {mecze.some((m) => m.min === 0) && <> · {mecze.filter((m) => m.min === 0).length}× nie zagrał</>}
+          {mecze.some((m) => m.min < 0) && <> · {mecze.filter((m) => m.min < 0).length}× brak danych</>}
         </span>
       </div>
       <div className="d-kratki" onMouseLeave={() => setDymek(null)}>
         {mecze.map((m, i) => {
           const nieGral = m.min === 0;
+          // brak danych o rynku z tego meczu (05.11: FotMob bez mapy strzałów) – „?”, poza wynikiem
+          const brak = m.min < 0;
           return (
             <motion.button
               type="button"
               key={i}
               className="d-kratka"
-              data-trafil={!nieGral && trafil(m.v) ? "true" : undefined}
-              data-malo-minut={!nieGral && m.min < MALO_MINUT ? "true" : undefined}
-              data-nie-gral={nieGral ? "true" : undefined}
+              data-trafil={!nieGral && !brak && trafil(m.v) ? "true" : undefined}
+              data-malo-minut={!nieGral && !brak && m.min < MALO_MINUT ? "true" : undefined}
+              data-nie-gral={nieGral || brak ? "true" : undefined}
               data-najnowsza={i === 0 ? "true" : undefined}
-              aria-label={`${m.rywal} ${m.data}: ${nieGral ? "nie zagrał" : `${m.v}, ${m.min} min`}`}
+              aria-label={`${m.rywal} ${m.data}: ${nieGral ? "nie zagrał" : brak ? "brak danych" : `${m.v}, ${m.min} min`}`}
               onMouseEnter={() => setDymek(i)}
               onFocus={() => setDymek(i)}
               onClick={() => setDymek((x) => (x === i ? null : i))}
@@ -297,7 +300,7 @@ export function KratkiD({ t }: { t: TypV }) {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.04 + i * 0.03, type: "spring", stiffness: 420, damping: 30 }}
             >
-              {nieGral ? <span className="d-ng">NZ</span> : m.v}
+              {nieGral ? <span className="d-ng">NZ</span> : brak ? <span className="d-ng">?</span> : m.v}
             </motion.button>
           );
         })}
@@ -318,7 +321,9 @@ export function KratkiD({ t }: { t: TypV }) {
                 {d.kadra ? " · reprezentacja" : ""}
               </p>
               <p>
-                {d.min === 0
+                {d.min < 0
+                  ? "brak danych – nie liczymy"
+                  : d.min === 0
                   ? "nie zagrał – nie liczymy"
                   : `${d.v} · ${d.min} min${d.min < MALO_MINUT ? " (krótko na boisku)" : ""}`}
               </p>
