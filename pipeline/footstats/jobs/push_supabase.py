@@ -216,6 +216,17 @@ def push() -> bool:
     # a klucze, które wchodzą razem, są ze sobą spójne.
     from .. import supa
 
+    # ⚑ `meta` NA SAMYM KOŃCU (05.11, właściciel: Boscagli bez Betclica na
+    # stronie, choć w bazie już 3,40). `meta.wygenerowano_ts` to STEMPEL CYKLU,
+    # pod którym strona trzyma w Data Cache każdy klucz (`web/src/lib/data.ts`,
+    # `stempelCyklu`). Paczki szły od najlżejszej, więc `meta` (15 kB) była
+    # w bazie kilka minut przed `linie_dnia` i koszykami – wejście na stronę
+    # w tym oknie zapamiętało STARE linie pod NOWYM stemplem do następnego
+    # cyklu (05.11: nagłówek „kursy z 17:26”, linie z cyklu 14:00).
+    # Najpierw wszystkie dane, stempel jako ostatni zapis.
+    meta_wiersz = [w for w in rows if w["key"] == "meta"]
+    rows = [w for w in rows if w["key"] != "meta"]
+
     lekkie = [w for w in rows if len(json.dumps(w)) <= supa.PROG_SZARDU]
     ciezkie = [w for w in rows if len(json.dumps(w)) > supa.PROG_SZARDU]
     laczna = sum(len(json.dumps(w)) for w in rows)
@@ -256,6 +267,10 @@ def push() -> bool:
     for wiersz in ciezkie:
         (udane if supa.put_key(wiersz["key"], wiersz["payload"])
          else nieudane).append(wiersz["key"])
+
+    for wiersz in meta_wiersz:
+        odp = _upsert(url, key, json.dumps([wiersz]), "push 'meta' (stempel cyklu, na końcu)")
+        (udane if odp is not None and odp.status_code < 300 else nieudane).append("meta")
 
     if nieudane:
         # świadomie False: część kluczy jest świeża, część nie, a `cycle.py`

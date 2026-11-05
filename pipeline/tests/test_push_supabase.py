@@ -84,3 +84,22 @@ def test_push_empty_manifest_pushes_nothing(tmp_path, monkeypatch):
 
     assert push_supabase.push() is False
     assert calls == []
+
+
+def test_meta_stempel_cyklu_idzie_na_samym_koncu(tmp_path, monkeypatch):
+    """05.11: `meta.wygenerowano_ts` to stempel Data Cache strony. Zapisany
+    przed danymi zamrażał stare klucze pod nowym stemplem do kolejnego cyklu."""
+    monkeypatch.setattr(push_supabase, "WEB_DATA_DIR", tmp_path)
+    monkeypatch.setenv("SUPABASE_URL", "https://example.test")
+    monkeypatch.setenv("SUPABASE_SERVICE_KEY", "dummy")
+    _write(tmp_path, "meta", {"wygenerowano_ts": 1})
+    _write(tmp_path, "value_bets", [{"x": "y" * 50}])
+    _write(tmp_path, "typy_wyniki", {"ok": True})
+
+    calls: list = []
+    monkeypatch.setattr(curl_requests, "post", _fake_post_ok(calls))
+
+    assert push_supabase.push() is True
+    kolejnosc = [row["key"] for paczka in calls for row in paczka]
+    assert kolejnosc[-1] == "meta" and kolejnosc.count("meta") == 1
+    assert calls[-1] == [{"key": "meta", "payload": {"wygenerowano_ts": 1}}]
