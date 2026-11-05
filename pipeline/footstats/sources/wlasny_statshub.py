@@ -307,11 +307,18 @@ class Zrodlo:
     def extra_zawodnika(self, player_id: int, limit: int = statshub.PERF_LIMIT) -> dict[int, dict]:
         """{event id: rekord extra-stats} meczów z rozbiciem strzałów – do
         `trendy_z_performance(extra_meczu=...)`. Mecz bez mapy strzałów nie
-        wchodzi (brak danych, nie zero)."""
+        wchodzi (brak danych, nie zero) – chyba że zawodnik nie oddał w nim
+        żadnego strzału albo nie grał: wtedy zza pola / głową to pewne 0, ta
+        sama reguła co w `fetch_extra_stats` (05.11, `dociagnij_rynki_z_mapy`)."""
         out = {}
         for _, w, x in self._historia(player_id)[: int(limit)]:
             if x is not None:
                 out[int(w["events"]["id"])] = x
+                continue
+            ps = w["player_statistics_event"]
+            if (float(ps.get("minutesPlayed") or 0) <= 0
+                    or (ps.get("shots") is not None and float(ps["shots"]) == 0)):
+                out[int(w["events"]["id"])] = {pole: 0.0 for pole in POLA_EXTRA.values()}
         return out
 
     # --- kadra drużyny (etap 4c) -------------------------------------------------

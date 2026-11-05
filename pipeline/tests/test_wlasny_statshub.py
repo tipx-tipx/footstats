@@ -59,8 +59,15 @@ def test_trendy_z_performance_na_nowych_wierszach():
     assert tr["yellow_card"].counts == [0.0]
 
 
+def _xhaka_strzaly(rek, n):
+    for w in rek["zawodnicy"]:
+        if w["pid"] == XHAKA:
+            w["staty"]["shots"] = n
+    return rek
+
+
 def test_bez_mapy_strzalow_brak_rynkow_pochodnych():
-    rek = copy.deepcopy(REK)
+    rek = _xhaka_strzaly(copy.deepcopy(REK), 2.0)       # strzelał – rozbicia nie znamy
     rek["mapa_strzalow"] = False
     z = _zrodlo(rek=rek)
     assert z.extra_zawodnika(SH_XHAKA) == {}
@@ -573,3 +580,14 @@ def test_swiezosc_przed_meczem_sklad_ogloszony_do_gwizdka():
     assert not W.swieze_przed_meczem({"pobrano": 8_000, "dane": dane}, 10_000, 9_000)   # < 90 min: 15 min
     assert W.swieze_przed_meczem({"pobrano": 8_500, "dane": dane}, 10_000, 9_000)
     assert not W.swieze_przed_meczem(None, 10_000, 9_000)
+
+
+def test_bez_mapy_strzalow_ale_bez_strzalow_pewne_zero():
+    """05.11: nie oddał strzału → zza pola / głową to pewne 0 także w meczu
+    bez mapy strzałów (ta sama reguła co `fetch_extra_stats`)."""
+    rek = _xhaka_strzaly(copy.deepcopy(REK), 0.0)
+    rek["mapa_strzalow"] = False
+    z = _zrodlo(rek=rek)
+    tr = statshub.trendy_z_performance(SH_XHAKA, "x", SH_SUN, z.fetch_player_performance(SH_XHAKA),
+                                       extra_meczu=z.extra_zawodnika(SH_XHAKA))
+    assert tr["headed_shots"].counts == [0.0]

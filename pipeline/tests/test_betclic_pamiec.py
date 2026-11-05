@@ -103,6 +103,18 @@ def test_mecz_tuz_przed_gwizdkiem_odswiezamy_raz():
     assert B.bc_z_pamieci(kol, stara, TERAZ) == {}
 
 
+def test_oferta_sprzed_chwili_nie_wypada_na_progu_okna():
+    """⚑ 05.11 (Boscagli, Brighton 20:00 UTC): oferta z 13:31, okno od 14:00,
+    cykl czytał ją o 14:38 – cały mecz bez Betclica, choć job odświeża co
+    ~30 min. Oferta młodsza niż tolerancja to już odświeżenie przed gwizdkiem."""
+    kickoff = TERAZ + 6 * GODZINA - 38 * 60   # okno zaczęło się 38 min temu
+    kol = {101: kickoff}
+    sprzed_okna = _pamiec(101, TERAZ - 67 * 60)   # 29 min przed oknem
+    assert B.bc_z_pamieci(kol, sprzed_okna, TERAZ)
+    za_stara = _pamiec(101, TERAZ - B.TOLERANCJA_ODSWIEZENIA_BC_S - 60)
+    assert B.bc_z_pamieci(kol, za_stara, TERAZ) == {}
+
+
 def test_w_oknie_przedmeczowym_odswiezamy_tylko_raz():
     """Oferta pobrana JUŻ w oknie nie jest pobierana w kółko co cykl."""
     kickoff = TERAZ + 2 * GODZINA

@@ -110,6 +110,15 @@ PUSTA_SWIEZOSC_BC_S = 6 * 3600
 # brak typu. Meczów w takim oknie jest w cyklu kilka, więc kosztuje to 2–3
 # zapytania, nie budżet.
 OKNO_ODSWIEZENIA_BC_S = 6 * 3600
+# ⚑ TOLERANCJA ODŚWIEŻENIA (05.11, właściciel: „wcześniej u Boscagliego był
+# kurs Betclica, a teraz zniknął… tak samo u wielu innych”). Reguła wyżej
+# wyrzucała ofertę zapisaną choćby minutę przed wejściem meczu w okno 6 h –
+# a job Betclica odświeża cały zakres co ~30 min, więc mecz na 20:00 UTC
+# z ofertą z 13:31 tracił Betclica od 14:00 do następnego odczytu. Cykl
+# 05.11 14:00: 18 meczów o 20:00 UTC, 935 kwotowanych zawodników bez ceny
+# Betclica (Brighton, Boscagli 3,40 zza pola). Oferta młodsza niż ta
+# tolerancja jest ŚWIEŻA – to już jest „odświeżenie przed gwizdkiem”.
+TOLERANCJA_ODSWIEZENIA_BC_S = 90 * 60
 # Ile meczów maksymalnie trzymamy w pamięci między cyklami (bezpiecznik
 # objętości klucza — jedna paczka to ~30 kB przy 60 kwotowanych zawodnikach).
 # ⚑ 80 → 200 (2026-09-14): pamięć obejmuje teraz także mecze BEZ propsów
@@ -3584,6 +3593,82 @@ def _scal_historie(stary, pelny) -> dict:
     return {p: [w[i] for w in razem] for i, p in enumerate(_POLA_HISTORII)}
 
 
+# ⚑ RYNKI Z MAPY STRZAŁÓW OPÓŹNIONE WZGLĘDEM STRZAŁÓW (05.11, właściciel:
+# „dociągnąć te 10 i 5 meczów… pod każdy przypadek”). Ratunek historii
+# (`odswiez_stare_trendy`) świadomie pomija zza pola / głową – za statshub
+# wymagały osobnej mapy strzałów – a kadry (`dolacz_pelne_kadry`) wzbogacają
+# tylko mecze z ofertą w ciągu 6 dni. Skutek na produkcji 05.11: strzały
+# świeże z FotMob, a zza pola stały na banku statshub (Christ Tapé – Tuluza:
+# strzały do 01.11, zza pola do 12.09; Mauricio Amaro – Atlanta: do 12.09;
+# Abankwah – Udinese bez 28.10 i 31.10), choć baza FotMob ma mapy strzałów
+# tych meczów. W próbce 612 zawodników 143 mecze po 22.10 bez rozbicia, część
+# z Ligue 1, Serie A, MLS, Ligi Mistrzów. Tu: rynek z mapy, którego ostatni
+# mecz jest starszy niż ostatni występ zawodnika w innych rynkach, dostaje
+# unię z historią własnego źródła (bank + FotMob, `extra_zawodnika`). Mecz bez
+# mapy strzałów w bazie dalej nie wchodzi (brak danych, nie zero) – te
+# oznacza później `oznacz_brak_mapy_strzalow` (kratka „?”).
+ZAPAS_OPOZNIENIA_MAPY_S = 4 * 3600
+
+
+def dociagnij_rynki_z_mapy(trends: list, fetch_performance=None, extra_zawodnika=None) -> Counter:
+    """Uzupełnia w miejscu trendy rynków z mapy strzałów, które zostały w tyle
+    (patrz nota wyżej). Bez własnego źródła (statshub na żywo) – nic nie robi.
+    Zwraca liczniki do logu."""
+    licz: Counter = Counter()
+    zrodlo = statshub.wlasne_zrodlo()
+    if extra_zawodnika is None:
+        if zrodlo is None:
+            return licz
+        extra_zawodnika = zrodlo.extra_zawodnika
+    fetch_performance = fetch_performance or statshub.fetch_player_performance
+    per: dict[int, list] = defaultdict(list)
+    for t in trends:
+        if t.player_id:
+            per[int(t.player_id)].append(t)
+    for pid, ich in per.items():
+        mapy = [t for t in ich if t.market_code in RYNKI_Z_MAPY_STRZALOW]
+        if not mapy:
+            continue
+        ostatni = max((int(ts) for t in ich if t.market_code not in RYNKI_Z_MAPY_STRZALOW
+                       for ts, m in zip(t.timestamps or [], t.minutes or [])
+                       if ts and (m or 0) > 0), default=0)
+        opoznione = [t for t in mapy
+                     if ostatni > max((int(x) for x in t.timestamps or [] if x), default=0)
+                     + ZAPAS_OPOZNIENIA_MAPY_S]
+        if not opoznione:
+            continue
+        licz["zawodnikow"] += 1
+        try:
+            rows = fetch_performance(pid)
+            extra = extra_zawodnika(pid)
+        except Exception as e:                                 # noqa: BLE001
+            diagnostyka.cichy("cykl", "dociagnij_rynki_z_mapy", e)
+            licz["bledy"] += 1
+            continue
+        if not rows:
+            licz["bez_historii"] += 1
+            continue
+        w = opoznione[0]
+        swieze = statshub.trendy_z_performance(pid, w.player_name, w.team_id, rows,
+                                               extra_meczu=extra or {})
+        for t in opoznione:
+            s = swieze.get(t.market_code)
+            if s is None or not s.counts:
+                licz["bez_mapy_w_bazie"] += 1
+                continue
+            przed = max((int(x) for x in t.timestamps or [] if x), default=0)
+            n_przed = len(t.counts or [])
+            for pole, wart in _scal_historie(t, s).items():
+                setattr(t, pole, wart)
+            po = max((int(x) for x in t.timestamps or [] if x), default=0)
+            if po > przed:
+                licz["trendow_odswiezonych"] += 1
+                licz["meczow_dolozonych"] += max(0, len(t.counts or []) - n_przed)
+            else:
+                licz["bez_nowszych_meczow"] += 1
+    return licz
+
+
 def dolacz_pelne_kadry(
     trends: list, wszystkie_ev: list[dict], teraz: int,
     oferta=None, fetch_kadra=None, fetch_extra=None,
@@ -3820,7 +3905,8 @@ def bc_z_pamieci(
             continue
         # mecz wszedł w okno przedmeczowe PO tym, jak zapamiętaliśmy ofertę
         do_gwizdka = int(kickoff or 0) - teraz
-        if 0 < do_gwizdka <= okno_odswiezenia_s and zapisano < int(kickoff) - okno_odswiezenia_s:
+        if (0 < do_gwizdka <= okno_odswiezenia_s and zapisano < int(kickoff) - okno_odswiezenia_s
+                and teraz - zapisano > TOLERANCJA_ODSWIEZENIA_BC_S):
             continue
         # `ts` jedzie razem z ofertą, bo typ z tej ceny musi zapisać, KIEDY ją
         # widzieliśmy — przy ofercie pamiętanej do doby „kurs_ts = teraz" byłby
@@ -7095,6 +7181,17 @@ def _main_impl(tryb=None):
     if niedostepni:
         print(f"Poza ogłoszonymi składami: {len(niedostepni)} zawodników")
 
+    # zza pola / głową dogonione do ostatniego występu (patrz
+    # `dociagnij_rynki_z_mapy`) – PRZED oceną, kartami i formą na stronie
+    try:
+        _t_mapy = time.time()
+        _l_mapy = dociagnij_rynki_z_mapy(trends)
+        if _l_mapy:
+            print(f"Rynki z mapy strzałów dogonione do ostatniego występu: "
+                  f"{dict(_l_mapy)} ({time.time() - _t_mapy:.1f} s)", flush=True)
+            diagnostyka.zapisz_rentgen("rynki_z_mapy_dogonione", dict(_l_mapy))
+    except Exception as e:                                     # noqa: BLE001
+        diagnostyka.cichy("cykl", "dociagnij_rynki_z_mapy", e)
     diagnostyka.etap("shotmapy_365")
     # --- POZA SKŁADEM: twarda brama publikacji (zgłoszenie 2026-07-27) ---
     # `niedostepni` wyżej unieważnia ZAMROŻONE kupony, ale nigdy nie blokował
@@ -7430,8 +7527,17 @@ def _main_impl(tryb=None):
             # jak pustą pamięć, ale wtedy NIE zapisujemy z powrotem — inaczej
             # jeden timeout Supabase kasowałby dorobek kilku cykli
             # ([[supabase-read-modify-write]]).
-            _pamiec_raw, _odczyt_ok = (_bc_odczyt_cyklu if _bc_odczyt_cyklu is not None
-                                       else supa.get_key_ok(BETCLIC_KLUCZ))
+            # ⚑ ODCZYT ŚWIEŻY, NIE TEN Z POCZĄTKU CYKLU (05.11). Pamięć czytana
+            # przy kadrach (~3 min po starcie) trafiała tu ~35 min później:
+            # oferty starsze o tyle, ile trwał cykl, a mecze, które w tym
+            # czasie weszły w okno przedmeczowe, wypadały w całości (patrz
+            # TOLERANCJA_ODSWIEZENIA_BC_S). Job Betclica pisze co ~30 min,
+            # więc w środku cyklu zwykle jest już nowsza wersja. Odczyt padł →
+            # zostaje ten z początku cyklu (lepszy niż żaden).
+            _pamiec_raw, _odczyt_ok = supa.get_key_ok(BETCLIC_KLUCZ)
+            if not _odczyt_ok and _bc_odczyt_cyklu is not None:
+                _pamiec_raw, _odczyt_ok = _bc_odczyt_cyklu
+                print("Betclic: świeży odczyt pamięci padł — oferta z początku cyklu", flush=True)
             _pamiec = dict(_pamiec_raw or {}) if _odczyt_ok else {}
             bc_cache = bc_z_pamieci(_kolejnosc_meczow, _pamiec, _teraz_bc)
             _z_pamieci = len(bc_cache)
@@ -7485,7 +7591,11 @@ def _main_impl(tryb=None):
                       f"(z pamięci {_z_pamieci}, pobrane {_n_bc}), "
                       f"{sum(len(p.get('players') or {}) for p in bc_cache.values())} "
                       "kwotowanych zawodników")
-            if _odczyt_ok and _pamiec and not _dry_run():
+            # ⚑ ZAPIS TYLKO, GDY CYKL SAM COŚ POBRAŁ (05.11). Przy budżecie 0
+            # (domyślnie – ofertę pobiera osobny job) cykl odsyłał do bazy
+            # pamięć przeczytaną na starcie i nadpisywał nowszą wersję joba:
+            # 05.11 14:38 wróciła oferta z 13:31, a odświeżenie z ~14:05 zginęło.
+            if _n_bc and _odczyt_ok and _pamiec and not _dry_run():
                 supa.put_key_bezpiecznie(BETCLIC_KLUCZ, _pamiec)
         except Exception as e:
             bc_cache = {}
