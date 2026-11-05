@@ -124,6 +124,26 @@ def test_zbuduj_daje_werdykt_kazdej_parze_z_oferty():
     assert len(radar_imienny.wiersze(im, TERAZ)) == 4
 
 
+def test_swiezosc_z_najswiezszego_rynku_nie_z_najdluzszego():
+    """05.11: rynek bez nowych meczów (bank statshub do 29.10) ma dłuższą
+    historię niż rynki dopisywane z FotMob – świeżość liczona z niego robiła
+    z grającego co mecz zawodnika „nieświeżego”."""
+    swiezy = _trend(player_id=1, counts=SIEDEM_Z_DZIESIECIU)
+    stary = _trend(player_id=1, market_code="interceptions", counts=[1] * 20)
+    stary.timestamps = [t - 90 * DZIEN for t in stary.timestamps]
+    im: dict = {}
+    radar.zbuduj(
+        trends=[swiezy, stary],
+        events_meta={999: {"label": "Klub – Rywal", "ts": TERAZ + DZIEN,
+                           "hid": 100, "aid": 200, "home": "Klub", "away": "Rywal"}},
+        odds_grid={999: {1: {"shots": {"1.5": 1.7, "2.5": 3.2}}}},
+        sb_cache={}, model_pokrycie=[],
+        players_out={1: {"pozycja": "M", "xi": True}},
+        nazwy_pl={"shots": "Strzały"}, teraz=TERAZ, imienny_out=im,
+    )
+    assert im[(999, 1)]["brama"] != "historia_nieswieza"
+
+
 def test_zbuduj_bez_imienny_out_nic_nie_zapisuje():
     """Parametr jest opcjonalny — stare wywołania działają bez zmian."""
     wpisy = radar.zbuduj(trends=[], events_meta={}, odds_grid={1: {2: {}}},

@@ -3203,7 +3203,15 @@ def zbuduj(
                 _ri(mid, pid, "zawodnik_bez_historii",
                     rynki_oferty=sorted(drabinki or {}))
                 continue
-            tr_ref = max(trendy_mk.values(), key=lambda t: len(t.counts))
+            # ⚑ RYNEK ODNIESIENIA = NAJŚWIEŻSZY MECZ, nie najdłuższa historia
+            # (05.11). Po przejściu na FotMob rynki, których nikt już nie
+            # dopisuje (bank statshub do 29.10), mają DŁUGĄ, ale zamrożoną
+            # historię – i wygrywały. McGregor (Celtic, 90 min w 10 ostatnich)
+            # dostawał „opuścił 9 meczów”; w cyklu 05.11 ok. 290 z 1200
+            # „nieświeżych” grało w ostatnich 10 dniach. Od tego rynku liczy
+            # się też drużyna i sygnał transferu – stary rynek psuł i je.
+            tr_ref = max(trendy_mk.values(),
+                         key=lambda t: (max(t.timestamps or [0]), len(t.counts)))
             # ŚWIEŻOŚĆ PRÓBY: dotąd pilnowały jej tylko detektory transferu
             # i formy, czyli plakietki. Zwykła drabinka mogła stać na historii
             # sprzed pół roku — dla zawodnika po kontuzji albo poza rotacją
