@@ -1069,7 +1069,21 @@ def znajdz_zawodnika(gracze_bc: dict, nazwa: str) -> dict:
     # a dwa ostatnie nadal odpadają. Jednoznaczność obowiązuje jak wyżej.
     bliskie = [v for k, v in gracze_bc.items()
                if _tokeny_z_literowka(tokeny, set(k.split()))]
-    return bliskie[0] if len(bliskie) == 1 else {}
+    if bliskie:
+        return bliskie[0] if len(bliskie) == 1 else {}
+    # CZWARTA PRÓBA: SKRÓT IMIENIA ALBO SKLEJONE CZŁONY (05.11, właściciel:
+    # „przy innych w chuj nie ma kursu Betclica”). Oferta 05.11: z 1153
+    # zawodników bez pary ~1130 Betclic po prostu nie wystawia (~57 na mecz),
+    # ~20 ma u Betclica inną pisownię: „aasgaard thelo” (Thelonious Aasgaard),
+    # „christopher richards” (Chris), „weghorst wouter” (Wout), „josh mcpake”
+    # (Joshua), „max rosenfelder” (Maximilian), „alhassan toure” (Al Hassan).
+    # Reguła: nazwisko (człon ≥ 4 litery) DOKŁADNIE, reszta członów parami
+    # „jeden jest początkiem drugiego” (≥ 3 litery) albo sklejona; jeden
+    # kandydat. Różni ludzie o tym samym nazwisku dalej odpadają
+    # (Amir / Michael Murillo, Joaquín / Jorge Pombo, Andrea Natali / Cambiaso).
+    skroty = [v for k, v in gracze_bc.items()
+              if _tokeny_skrot(klucz.split(), k.split())]
+    return skroty[0] if len(skroty) == 1 else {}
 
 
 def _odleglosc_do_jeden(a: str, b: str) -> bool:
@@ -1097,6 +1111,36 @@ def _odleglosc_do_jeden(a: str, b: str) -> bool:
             return False
         pominiete = True               # wstawienie/usunięcie jednego znaku
         i += 1
+    return True
+
+
+def _tokeny_skrot(nasze: list[str], obce: list[str]) -> bool:
+    """Czy dwie pisownie to ten sam człowiek: wspólne człony dokładnie (choć
+    jeden ≥ 4 litery – nazwisko), a pozostałe albo sklejone dają to samo
+    („al hassan” = „alhassan”), albo łączą się parami jak skrót z pełnym
+    imieniem („thelo” – „thelonious”, ≥ 3 litery). Każdy człon musi mieć parę."""
+    a, b = list(nasze), list(obce)
+    wspolne = [t for t in a if t in b]
+    if not any(len(t) >= 4 for t in wspolne):
+        return False
+    for t in wspolne:
+        a.remove(t)
+        b.remove(t)
+    if not a and not b:
+        return False                     # same wspólne – to już łapie próba 2
+    if not a or not b:
+        return False
+    if "".join(sorted(a)) == "".join(sorted(b)) or "".join(a) == "".join(b)             or "".join(reversed(a)) == "".join(b):
+        return True
+    if len(a) != len(b):
+        return False
+    wolne = list(b)
+    for t in a:
+        para = next((u for u in wolne if min(len(t), len(u)) >= 3
+                     and (u.startswith(t) or t.startswith(u))), None)
+        if para is None:
+            return False
+        wolne.remove(para)
     return True
 
 

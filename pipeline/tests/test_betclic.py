@@ -316,6 +316,33 @@ def test_literowka_w_nazwisku_nie_gubi_zawodnika():
                                     "Ousseyynou Niang")
 
 
+def test_skrot_imienia_i_sklejone_czlony_paruja():
+    """05.11: prawdziwe pary z oferty – Betclic skraca imię albo skleja człony."""
+    for bc, nasze in (("aasgaard thelo", "Thelonious Aasgaard"),
+                      ("christopher richards", "Chris Richards"),
+                      ("weghorst wouter", "Wout Weghorst"),
+                      ("josh mcpake", "Joshua McPake"),
+                      ("max rosenfelder", "Maximilian Rosenfelder"),
+                      ("alhassan toure", "Al Hassan Toure"),
+                      ("gaitan nicolas", "Nico Gaitan"),
+                      ("emir han topcu", "Emirhan Topçu")):
+        assert betclic.znajdz_zawodnika(_bc_gracze(bc, "inny zawodnik"), nasze), (bc, nasze)
+    # dwóch kandydatów ze skrótem – nie zgadujemy
+    assert not betclic.znajdz_zawodnika(_bc_gracze("max rosenfelder", "maxim rosenfelder"),
+                                        "Maximilian Rosenfelder")
+
+
+def test_skrot_nie_skleja_roznych_ludzi_o_tym_samym_nazwisku():
+    """Te same pary z oferty 05.11, które były RÓŻNYMI zawodnikami."""
+    for bc, nasze in (("michael murillo", "Amir Murillo"),
+                      ("jorge pombo", "Joaquin Pombo"),
+                      ("andrea cambiaso", "Andrea Natali"),
+                      ("robert rodrigues vinicius", "Robert Silva"),
+                      ("barry houdoussi kais", "Abubakr Barry"),
+                      ("bill taliari", "Gabriel Taliari")):
+        assert not betclic.znajdz_zawodnika(_bc_gracze(bc), nasze), (bc, nasze)
+
+
 def test_dwaj_rozni_ludzie_ze_wspolnym_imieniem_dalej_nie_paruja():
     """Druga połowa tamtych 42 to NIE literówki, tylko różni zawodnicy
     dzielący imię. Rozluźnienie parowania nie ma prawa ich skleić — kurs
