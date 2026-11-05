@@ -167,4 +167,8 @@ jobs:
           # ⚑ źródło statystyk (etap 7 planu FotMob, 01.11): własny statshub z FotMob;
           # powrót na statshub = zmienna repozytorium ZRODLO_STATYSTYK=statshub
           ZRODLO_STATYSTYK: ${{ vars.ZRODLO_STATYSTYK || 'fotmob' }}
+          # ⚑ CZAS CYKLU, etap 2 (05.11): pętla zawodników pomija mecze bez oferty
+          # zawodniczej (próbka kontrolna 5% liczona dalej). Powrót bez wdrożenia:
+          # zmienna repozytorium POMIN_MECZE_BEZ_OFERTY=0
+          POMIN_MECZE_BEZ_OFERTY: ${{ vars.POMIN_MECZE_BEZ_OFERTY || '1' }}
         run: python -m footstats.jobs.cycle

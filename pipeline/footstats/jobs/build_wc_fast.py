@@ -1699,9 +1699,39 @@ def do_pomiaru_pokrycia(rynek, kurs, oczekiwane_minuty, trafione: int,
     return trafione / rozegrane >= POMIAR_POKRYCIA_MIN - 1e-9
 
 
+# ⚑ CZAS CYKLU, ETAP 2 (05.11, zgoda właściciela: „z głową i dobrze
+# przemyślane – co jeśli nagle się pojawi”). Pętla zawodników nie liczy meczu,
+# w którym ANI Superbet, ANI Betclic nie mają żadnego zawodnika – w cyklu
+# 42029131338 to 432 z 547 meczów i 1216 s (20 min) pracy, z której nie
+# wyszło NIC dalej (typy, pula kuponów, pomiar, siatka kursów = 0; jedyne
+# sugestie 365 są wyłączone, `SUGESTIE_STS_WLACZONE`).
+#
+# „Co jeśli oferta pojawi się później?” – decyzja zapada w KAŻDYM cyklu od
+# nowa, na ofercie pobranej w tym cyklu. Mecz, któremu bukmacher dołoży propsy,
+# jest liczony w najbliższym cyklu – dokładnie wtedy, kiedy dziś pierwszy raz
+# dałby typ (bez kursu nie ma typu). Wpis meczu na stronę (`matches_out`)
+# i liczba propsów Superbetu powstają PRZED tym miejscem, forma zawodników –
+# w przeglądzie trendów przy ofercie; pętla drużynowa jest osobna.
+#
+# Bezpieczniki: (1) przełącznik `POMIN_MECZE_BEZ_OFERTY` z ustawień repo –
+# „0” przywraca stare zachowanie bez wdrożenia kodu; (2) PRÓBKA KONTROLNA –
+# stałe ~5% meczów bez oferty (po numerze meczu) liczy się dalej w całości,
+# a `meta.rentgen.pomiar_bez_oferty.wynik_*` mówi, czy coś z nich wyszło
+# (ma być 0; >0 = sygnał, że pomijanie coś ucina – wtedy przełącznik na „0”).
+POMIN_MECZE_BEZ_OFERTY = os.environ.get("POMIN_MECZE_BEZ_OFERTY", "1").strip() != "0"
+PROBKA_KONTROLNA_PCT = 5
+
+
+def pomin_mecz_bez_oferty(mecz_id, ma_oferte: bool, wlaczone: bool | None = None) -> bool:
+    """Czy pętla zawodników pomija ten mecz (patrz POMIN_MECZE_BEZ_OFERTY)."""
+    if ma_oferte or not (POMIN_MECZE_BEZ_OFERTY if wlaczone is None else wlaczone):
+        return False
+    return zlib.crc32(str(mecz_id).encode("utf-8")) % 100 >= PROBKA_KONTROLNA_PCT
+
+
 def _podsumuj_pomiar_bez_oferty(pbo, czas, ile, z_oferta: set, bez_oferty: set,
                                 value_bets, poza_publikacja, legi_pool, pomiary,
-                                odds_grid, real_split) -> dict:
+                                odds_grid, real_split, pominiete: int = 0) -> dict:
     """CZAS CYKLU, etap 0 (05.11): podsumowanie pętli zawodników w podziale na
     mecze z ofertą zawodniczą i bez (ani Superbet, ani Betclic nie mają żadnego
     zawodnika). Pola `wynik_*` mówią, ile rzeczy, które cykl wysyła dalej,
@@ -1725,6 +1755,10 @@ def _podsumuj_pomiar_bez_oferty(pbo, czas, ile, z_oferta: set, bez_oferty: set,
         "s_inne": round(czas["inne"], 1),
         "mecze_z_oferta": len(z_oferta),
         "mecze_bez_oferty": len(bez),
+        # etap 2: obroty pominięte i mecze próbki kontrolnej (liczone w całości)
+        "pominiete_obroty": int(pominiete),
+        "pomijanie_wlaczone": bool(POMIN_MECZE_BEZ_OFERTY),
+        "probka_kontrolna_mecze": sum(1 for m in bez if not pomin_mecz_bez_oferty(m, False, True)),
         "wynik_value_bets": _w_bez(value_bets),
         "wynik_poza_publikacja": _w_bez(poza_publikacja),
         "wynik_legi_pool": _w_bez(legi_pool),
@@ -7608,6 +7642,7 @@ def _main_impl(tryb=None):
     _pbo_ile = {"z_oferta": 0, "bez_oferty": 0, "inne": 0}
     _mecze_z_oferta: set = set()
     _mecze_bez_oferty: set = set()
+    _pominiete_bez_oferty = [0]
 
     for tr in trends:
         _t_obr = time.monotonic()
@@ -7701,6 +7736,11 @@ def _main_impl(tryb=None):
             matches_out[mid]["propsy_superbet"] = len(
                 (sb_odds or {}).get("players") or {}
             )
+
+        # CZAS CYKLU, etap 2 – patrz POMIN_MECZE_BEZ_OFERTY
+        if pomin_mecz_bez_oferty(mid, _pbo["fl"] == "z_oferta"):
+            _pominiete_bez_oferty[0] += 1
+            continue
 
         mf, mo = matchup_lite.matchup_lite_factor(
             tr.market_code,
@@ -8573,7 +8613,8 @@ def _main_impl(tryb=None):
         diagnostyka.zapisz_rentgen("pomiar_bez_oferty", _podsumuj_pomiar_bez_oferty(
             _pbo, _pbo_czas, _pbo_ile, _mecze_z_oferta, _mecze_bez_oferty,
             value_bets, typy_poza_publikacja, legi_pool,
-            list(odrzucone_pomiar) + list(pomiar_szeroki), odds_grid, real_split))
+            list(odrzucone_pomiar) + list(pomiar_szeroki), odds_grid, real_split,
+            _pominiete_bez_oferty[0]))
     except Exception as _e_pom:                              # noqa: BLE001
         diagnostyka.cichy("czas_cyklu", "pomiar_bez_oferty", _e_pom)
 

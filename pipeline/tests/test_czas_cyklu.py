@@ -36,3 +36,28 @@ def test_pomiar_bez_oferty_liczy_wyniki_tylko_w_meczach_bez_oferty():
             w["wynik_siatka_kursow"], w["wynik_sugestie_365"]) == (1, 1, 0, 1, 1)
     assert w["wynik_legi_pool"] == 0
     assert pbo["t"] is None
+
+
+def test_pominiecie_tylko_meczow_bez_oferty_poza_probka():
+    """Etap 2: mecz z ofertą liczony zawsze; bez oferty – pomijany, chyba że
+    wypadł w stałej próbce kontrolnej (~5%, po numerze meczu) albo przełącznik
+    jest wyłączony."""
+    mecze = range(4_000_000_000, 4_000_002_000)
+    assert not any(B.pomin_mecz_bez_oferty(m, True, True) for m in mecze)
+    assert not any(B.pomin_mecz_bez_oferty(m, False, False) for m in mecze)
+    pominiete = [m for m in mecze if B.pomin_mecz_bez_oferty(m, False, True)]
+    udzial_probki = 1 - len(pominiete) / len(mecze)
+    assert 0.02 < udzial_probki < 0.09
+    # ta sama decyzja w każdym cyklu (próbka stała po numerze meczu)
+    assert pominiete == [m for m in mecze if B.pomin_mecz_bez_oferty(m, False, True)]
+
+
+def test_podsumowanie_liczy_pominiete_i_probke():
+    diagnostyka.reset()
+    w = B._podsumuj_pomiar_bez_oferty(
+        {"t": None, "fl": "inne"}, {"z_oferta": 0.0, "bez_oferty": 0.0, "inne": 0.0},
+        {"z_oferta": 0, "bez_oferty": 0, "inne": 0}, set(), set(range(1, 201)),
+        [], [], [], [], {}, {}, pominiete=7)
+    assert w["pominiete_obroty"] == 7
+    assert 0 < w["probka_kontrolna_mecze"] < 40
+    assert w["pomijanie_wlaczone"] is B.POMIN_MECZE_BEZ_OFERTY
