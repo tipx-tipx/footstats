@@ -48,13 +48,34 @@ export function odm(n: number) {
   return n === 1 ? "typ" : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? "typy" : "typów";
 }
 
-export function Segment({ opcje, wartosc, zmien }: { opcje: [string, string][]; wartosc: string; zmien: (v: string) => void }) {
+/** `wylaczone` – opcje widoczne, ale chwilowo niedostępne (z podpowiedzią `powodWylaczenia`) */
+export function Segment({
+  opcje,
+  wartosc,
+  zmien,
+  wylaczone,
+  powodWylaczenia,
+}: {
+  opcje: [string, string][];
+  wartosc: string;
+  zmien: (v: string) => void;
+  wylaczone?: string[];
+  powodWylaczenia?: string;
+}) {
   const id = useId();
   return (
     <LayoutGroup id={id}>
       <div className="a-segment" role="radiogroup">
         {opcje.map(([v, e]) => (
-          <button key={v} type="button" role="radio" aria-checked={v === wartosc} onClick={() => zmien(v)}>
+          <button
+            key={v}
+            type="button"
+            role="radio"
+            aria-checked={v === wartosc}
+            disabled={wylaczone?.includes(v)}
+            title={wylaczone?.includes(v) ? powodWylaczenia : undefined}
+            onClick={() => zmien(v)}
+          >
             {v === wartosc && (
               <motion.span layoutId="tlo" className="a-segment-tlo" transition={{ type: "spring", stiffness: 500, damping: 38 }} />
             )}

@@ -280,7 +280,9 @@ def klucze_zawodnikow(players: list, kursy_dwa: dict, value_bets: list,
 # przy którym klucz powstał, idzie w polu `prog` i strona nie proponuje niższego.
 PROG_KURSU_LINII = 1.30
 PROGI_POKRYCIA_LINII = (0.5, 0.6, 0.7)
-MAX_BAJTOW_LINII = 1_000_000
+# 1,3 MB surowo = ~1,73 MB po base64 – pod limitem 2 MB z zapasem na nagłówki
+# wpisu (05.11: właściciel chce 5/10 i 3/5 zawsze; weekendy mają ~2× ofertę)
+MAX_BAJTOW_LINII = 1_300_000
 # okno 10: co najmniej 7 rozegranych; okno 5: co najmniej 4 – inaczej
 # „5/5 przy pięciu meczach bez gry” udaje pewniaka (właściciel 15.10 przyjął
 # 80% / od 1,40 / min. 7: pomiar 10–58 linii na dzień przy 13–54 meczach)

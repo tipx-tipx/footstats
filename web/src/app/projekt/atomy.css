@@ -387,6 +387,7 @@
 }
 
 .a-segment button:is([aria-pressed="true"], [aria-checked="true"]) { color: var(--t1); }
+.a-segment button:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .a-segment-tlo {
   position: absolute;

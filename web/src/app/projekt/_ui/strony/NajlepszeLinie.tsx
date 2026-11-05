@@ -644,7 +644,11 @@ export function NajlepszeLinie({
                   <Segment
                     wartosc={String(roboczy.pokrycie)}
                     zmien={(v) => setRoboczy((x) => ({ ...x, pokrycie: Number(v) }))}
-                    opcje={progiPokrycia(roboczy.okno, progMin).map((p) => [String(p), progTxt(p, roboczy.okno)] as [string, string])}
+                    opcje={progiPokrycia(roboczy.okno).map((p) => [String(p), progTxt(p, roboczy.okno)] as [string, string])}
+                    wylaczone={progiPokrycia(roboczy.okno)
+                      .filter((p) => p < progMin - 1e-9)
+                      .map(String)}
+                    powodWylaczenia="Ten próg wróci po najbliższym odświeżeniu danych"
                   />
                 </div>
               </div>
