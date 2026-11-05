@@ -228,6 +228,43 @@ async function sklejCzesci<T>(
   return scalony as T;
 }
 
+/**
+ * ⚑ STEMPEL CYKLU TAKŻE DLA KLUCZY POZA PACZKĄ (05.11). Poprawka z 01.11
+ * (stempel w kluczu Data Cache) objęła tylko `fetchBundle`; klucze czytane
+ * tutaj (`linie_dnia`, `kursy_mNN`, `zaw_kNN`, koszyki zawodników…) wisiały do
+ * 30 min po cyklu – strona pisała „kursy z 13:31”, a Najlepsze linie i ceny
+ * Betclica były z poprzedniego cyklu. Stempel = `meta.wygenerowano_ts`,
+ * jedno małe zapytanie o samo pole, pamiętane w instancji przez minutę.
+ * Brak stempla (pad, lokalnie) = zachowanie jak dotąd.
+ */
+let stempelPamiec: { ts: number; stempel: Promise<number | undefined> } | null = null;
+
+async function stempelCyklu(): Promise<number | undefined> {
+  if (!SUPABASE_URL || !SUPABASE_ANON) return undefined;
+  if (stempelPamiec && Date.now() - stempelPamiec.ts < 60_000) return stempelPamiec.stempel;
+  const stempel = (async () => {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?select=ts:payload->wygenerowano_ts&key=eq.meta`, {
+        headers: naglowkiSupabase(),
+        cache: "no-store",
+      });
+      if (!res.ok) return undefined;
+      const rows: { ts: unknown }[] = await res.json();
+      const ts = Number(rows[0]?.ts);
+      return Number.isFinite(ts) && ts > 0 ? ts : undefined;
+    } catch (e) {
+      unstable_rethrow(e);
+      return undefined;
+    }
+  })();
+  stempelPamiec = { ts: Date.now(), stempel };
+  // porażka nie zostaje na minutę – następne wejście pyta od nowa
+  void stempel.then((v) => {
+    if (v === undefined && stempelPamiec?.stempel === stempel) stempelPamiec = null;
+  });
+  return stempel;
+}
+
 async function fetchKlucz<T>(
   key: string,
   fallback: T,
@@ -244,7 +281,9 @@ async function fetchKlucz<T>(
     }
   }
   if (!SUPABASE_URL || !SUPABASE_ANON) return fallback;
-  const cached = lazyCache.get(key);
+  const stempel = await stempelCyklu();
+  const kluczPamieci = stempel ? `${key}|${stempel}` : key;
+  const cached = lazyCache.get(kluczPamieci);
   if (cached && Date.now() - cached.ts < oknoS * 1000) {
     return cached.dane as Promise<T>;
   }
@@ -253,10 +292,7 @@ async function fetchKlucz<T>(
       const res = await fetch(
         `${SUPABASE_URL}/rest/v1/app_data?select=payload&key=eq.${key}`,
         {
-          headers: {
-            apikey: SUPABASE_ANON,
-            Authorization: `Bearer ${SUPABASE_ANON}`,
-          },
+          headers: naglowkiSupabase(stempel),
           // to samo co przy bundlu: revalidate, NIGDY no-store — patrz
           // komentarz w `fetchBundle` (incydent 2026-07-21)
           next: { revalidate: oknoS },
@@ -266,21 +302,23 @@ async function fetchKlucz<T>(
       const rows: { payload: unknown }[] = await res.json();
       const payload = rows[0]?.payload;
       if (czyMarker(payload)) {
-        return await sklejCzesci<T>(key, payload.__czesci, fallback, oknoS);
+        return await sklejCzesci<T>(key, payload.__czesci, fallback, oknoS, stempel);
       }
       return (payload ?? fallback) as T;
     } catch {
       return fallback;
     }
   })();
-  lazyCache.set(key, { ts: Date.now(), dane });
+  // stare stemple tego klucza nie są już potrzebne – pamięć instancji nie rośnie
+  for (const k of lazyCache.keys()) if (k !== kluczPamieci && k.startsWith(`${key}|`)) lazyCache.delete(k);
+  lazyCache.set(kluczPamieci, { ts: Date.now(), dane });
   // ⚑ „KLUCZA BRAK” NIE ZOSTAJE W PAMIĘCI (01.10). Klucz, którego jeszcze nie
   // było (pierwszy cykl po wdrożeniu, chwilowy pad), zapamiętany na całe
   // okno, trzymał stronę bez danych przez godzinę po tym, jak dane już były –
   // a pamięć Next przy wygaśnięciu oddaje jeszcze raz starą wartość, więc
   // razem wychodziło ponad godzinę. Brak = następne wejście pyta od nowa.
   void dane.then((d) => {
-    if (d === fallback && lazyCache.get(key)?.dane === dane) lazyCache.delete(key);
+    if (d === fallback && lazyCache.get(kluczPamieci)?.dane === dane) lazyCache.delete(kluczPamieci);
   });
   return dane;
 }
