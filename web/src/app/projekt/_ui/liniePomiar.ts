@@ -75,10 +75,9 @@ export function oknoWystepow<T extends { min: number }>(mecze: T[], okno: number
   return { mecze: out, nz, bd: out.filter((m) => m.min < 0).length };
 }
 
-/** podpis pod wynikiem: odsetek, a gdy okno sięgnęło dalej albo czegoś brak – dlaczego (05.11) */
-export function podpisWyniku(p: { nz: number; bd?: number; udzial: number }) {
-  const czesci = [p.nz ? `${p.nz}× nie grał` : "", p.bd ? `${p.bd}× brak danych` : ""].filter(Boolean);
-  return czesci.length ? czesci.join(" · ") : `${Math.round(p.udzial * 100)}%`;
+/** podpis pod wynikiem: sam odsetek (05.11, właściciel) – „nie grał” / „brak danych” mówi dymek kratki */
+export function podpisWyniku(p: { udzial: number }) {
+  return `${Math.round(p.udzial * 100)}%`;
 }
 
 /** stan kratki: „?” brak danych, „NZ” nie zagrał, trafione / nie */

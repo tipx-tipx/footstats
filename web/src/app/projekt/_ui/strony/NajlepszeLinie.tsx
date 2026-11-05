@@ -587,7 +587,7 @@ export function NajlepszeLinie({
       )}
 
       <p className="mz-przypis">
-        Dla każdego zawodnika najwyższa linia, którą przebijał przy tych progach, i najlepsza cena. To statystyka, nie nasz typ. Okno to ostatnie występy – mecze, w których zawodnik nie zagrał, nie zajmują miejsca („2× nie grał” pod wynikiem). Kratka „?” = brak danych z tego meczu (nie liczy się do wyniku). Gdy znanych występów jest mniej niż 10, próg liczy się jako odsetek (7/10 przy 8 znanych = 6/8). Kurs w przerywanej ramce: bukmacherzy wyceniają ten rynek bardzo różnie – cena jest prawdziwa, ale warto sprawdzić linię u bukmachera. Kliknij linię, żeby zobaczyć cały mecz.
+        Dla każdego zawodnika najwyższa linia, którą przebijał przy tych progach, i najlepsza cena. To statystyka, nie nasz typ. Okno to ostatnie występy – mecze, w których zawodnik nie zagrał, nie zajmują miejsca. Kratka „?” = brak danych z tego meczu (nie liczy się do wyniku). Gdy znanych występów jest mniej niż 10, próg liczy się jako odsetek (7/10 przy 8 znanych = 6/8). Kurs w przerywanej ramce: bukmacherzy wyceniają ten rynek bardzo różnie – cena jest prawdziwa, ale warto sprawdzić linię u bukmachera. Kliknij linię, żeby zobaczyć cały mecz.
       </p>
 
       {telefon && panel()}

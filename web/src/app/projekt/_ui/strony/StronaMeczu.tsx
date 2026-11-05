@@ -542,7 +542,7 @@ export function StronaMeczu({ wariant, m, telefon, start }: { wariant: string; m
             <TabelaA key={r.kod} m={m} rynek={r.kod} okno={okno} strona={strona} telefon={telefon} l={l} sort={sort} setSort={setSort} kursOd={kursOd} tylkoXi={tylkoXi} />
           ))}
         <p className="mz-przypis">
-          Pokazujemy zawodników, na których bukmacher daje kurs w tym rynku. Okno to ostatnie występy zawodnika – mecze, w których nie zagrał, nie zajmują miejsca („2× nie grał” pod wynikiem). Kratka „?” = brak danych z tego meczu (nie liczy się do wyniku). Kurs w przerywanej ramce: bukmacherzy wyceniają ten rynek bardzo różnie – cena jest prawdziwa, ale warto sprawdzić linię u bukmachera.
+          Pokazujemy zawodników, na których bukmacher daje kurs w tym rynku. Okno to ostatnie występy zawodnika – mecze, w których nie zagrał, nie zajmują miejsca. Kratka „?” = brak danych z tego meczu (nie liczy się do wyniku). Kurs w przerywanej ramce: bukmacherzy wyceniają ten rynek bardzo różnie – cena jest prawdziwa, ale warto sprawdzić linię u bukmachera.
         </p>
       </section>
 

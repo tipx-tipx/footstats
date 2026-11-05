@@ -274,8 +274,6 @@ export function KratkiD({ t }: { t: TypV }) {
         </span>
         <span className="d-hist-l5">
           ostatnie 5: <b>{ile5}/{ost5.length}</b>
-          {mecze.some((m) => m.min === 0) && <> · {mecze.filter((m) => m.min === 0).length}× nie zagrał</>}
-          {mecze.some((m) => m.min < 0) && <> · {mecze.filter((m) => m.min < 0).length}× brak danych</>}
         </span>
       </div>
       <div className="d-kratki" onMouseLeave={() => setDymek(null)}>
